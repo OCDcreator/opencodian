@@ -1,7 +1,6 @@
 import type { ChatMessage, Conversation } from '../../../../src/core/types';
 import { buildLocalStreamOutcome } from '../../../../src/features/chat/runtime/buildLocalStreamOutcome';
 import type {
-  SendPipelineHost,
   SendPipelineStreamController,
   SendPipelineTabRuntime,
   StreamChunkRouterResult,
@@ -67,25 +66,6 @@ function createRoutedStream(
   };
 }
 
-function createHost(overrides: Partial<SendPipelineHost> = {}): SendPipelineHost {
-  return {
-    buildStreamErrorNotice: jest.fn().mockImplementation(
-      (timestamp: number, content: string, modelId?: string, sourceMessageId?: string) => ({
-        id: sourceMessageId ? `assistant-error-${sourceMessageId}` : `assistant-error-${timestamp}`,
-        role: 'assistant',
-        content,
-        timestamp,
-        modelId,
-        sourceMessageId,
-        displayStyle: 'notice',
-        noticeTitle: 'Error',
-        noticeTone: 'error',
-      }),
-    ),
-    ...overrides,
-  } as SendPipelineHost;
-}
-
 describe('buildLocalStreamOutcome', () => {
   it('prefers metadata and rendered blocks when building the local outcome', () => {
     const preparedSend = createPreparedSend();
@@ -109,10 +89,7 @@ describe('buildLocalStreamOutcome', () => {
         modelId: 'openai/gpt-5.5',
       },
     });
-    const host = createHost();
-
     const outcome = buildLocalStreamOutcome({
-      host,
       preparedSend,
       runtime,
       streamController,
@@ -137,26 +114,20 @@ describe('buildLocalStreamOutcome', () => {
       streamInterrupted: true,
       latestErrorMessage: 'Friendly: boom',
     });
-    const host = createHost();
-
     const outcome = buildLocalStreamOutcome({
-      host,
       preparedSend,
       runtime,
       streamController: null,
       routedStream,
     });
 
-    expect(host.buildStreamErrorNotice).toHaveBeenCalledWith(
-      500,
-      'Friendly: boom',
-      'openai/gpt-5.4',
-      undefined,
-    );
     expect(outcome.streamErrorNoticeMessage).toEqual(expect.objectContaining({
+      id: 'assistant-error-notice-500',
       content: 'Friendly: boom',
       timestamp: 500,
+      modelId: 'openai/gpt-5.4',
       displayStyle: 'notice',
+      noticeTone: 'error',
     }));
     expect(outcome.shouldPersistInterruptedState).toBe(false);
     expect(outcome.shouldSyncFromServer).toBe(false);
@@ -177,10 +148,7 @@ describe('buildLocalStreamOutcome', () => {
     const routedStream = createRoutedStream({
       streamInterrupted: true,
     });
-    const host = createHost();
-
     const outcome = buildLocalStreamOutcome({
-      host,
       preparedSend,
       runtime,
       streamController,
@@ -192,6 +160,5 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.shouldPersistInterruptedState).toBe(true);
     expect(outcome.streamErrorNoticeMessage).toBeNull();
     expect(outcome.shouldSyncFromServer).toBe(false);
-    expect(host.buildStreamErrorNotice).not.toHaveBeenCalled();
   });
 });

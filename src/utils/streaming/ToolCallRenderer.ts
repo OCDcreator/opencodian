@@ -2,12 +2,7 @@ import { addIcon, setIcon } from 'obsidian';
 
 import { getToolIdentity, MCP_TOOL_ICON_ID } from '../../shared';
 import {
-  MCP_ARGUMENT_FIELDS,
-  MCP_GENERIC_SUMMARY_FIELDS,
-  MCP_PATH_LIKE_FIELDS,
-  MCP_SUMMARY_CATEGORY_DEFINITIONS,
-  MCP_URL_LIKE_FIELDS,
-  type McpSummaryCategoryDefinition,
+  getMcpToolSummary,
 } from './mcpSummaryConfig';
 import type { ToolCallInfo, ToolCallStatus, ToolRendererOptions } from './types';
 
@@ -36,6 +31,37 @@ addIcon(MCP_TOOL_ICON_ID, MCP_TOOL_ICON_SVG);
 export class ToolCallRenderer {
   private options: ToolRendererOptions;
 
+  private readonly summaryResolvers: Record<string, (input: Record<string, unknown>) => string> = {
+    read: (input) => this.getReadSummary(input),
+    write: (input) => this.fileNameOnly(this.getToolFilePath(input)),
+    edit: (input) => this.fileNameOnly(this.getToolFilePath(input)),
+    multiedit: (input) => this.getMultiEditSummary(input),
+    apply_patch: (input) => this.getApplyPatchSummary(input),
+    patch: (input) => this.getApplyPatchSummary(input),
+    bash: (input) => this.truncateText((input.command as string) || '', 60),
+    list: (input) => this.directoryNameOnly((input.path as string) || ''),
+    glob: (input) => this.getGlobSummary(input),
+    grep: (input) => this.getGrepSummary(input),
+    lsp: (input) => this.getLspSummary(input),
+    web_search: (input) => this.truncateText((input.query as string) || '', 60),
+    codesearch: (input) => this.truncateText((input.query as string) || '', 60),
+    web_fetch: (input) => this.truncateText((input.url as string) || '', 60),
+    task: (input) => this.getTaskSummary(input),
+    question: (input) => this.getQuestionSummary(input),
+    skill: (input) => this.truncateText(
+      (input.name as string)
+      || (input.skill as string)
+      || '',
+      80,
+    ),
+    plan_enter: () => 'Switch to plan mode',
+    enter_plan_mode: () => 'Switch to plan mode',
+    plan_exit: () => 'Switch to build mode',
+    exit_plan_mode: () => 'Switch to build mode',
+    todoread: (input) => this.getTodoSummary(input) || 'Current tasks',
+    todowrite: (input) => this.getTodoSummary(input),
+  };
+
   constructor(options?: Partial<ToolRendererOptions>) {
     this.options = {
       iconMap: {},
@@ -56,171 +82,13 @@ export class ToolCallRenderer {
     toolKind?: ToolCallInfo['kind']
   ): string => {
     if (toolKind === 'mcp') {
-      return this.getMcpSummary(name, input);
+      return getMcpToolSummary(name, input);
     }
 
-    switch (getToolIdentity(name).normalizedName) {
-      case 'read':
-        return this.getReadSummary(input);
-      case 'write':
-      case 'edit':
-        return this.fileNameOnly(this.getToolFilePath(input));
-      case 'multiedit':
-        return this.getMultiEditSummary(input);
-      case 'apply_patch':
-      case 'patch':
-        return this.getApplyPatchSummary(input);
-      case 'bash':
-        return this.truncateText((input.command as string) || '', 60);
-      case 'list':
-        return this.directoryNameOnly((input.path as string) || '');
-      case 'glob':
-        return this.getGlobSummary(input);
-      case 'grep':
-        return this.getGrepSummary(input);
-      case 'lsp':
-        return this.getLspSummary(input);
-      case 'web_search':
-      case 'websearch':
-      case 'codesearch':
-        return this.truncateText((input.query as string) || '', 60);
-      case 'web_fetch':
-      case 'webfetch':
-        return this.truncateText((input.url as string) || '', 60);
-      case 'task':
-        return this.getTaskSummary(input);
-      case 'question':
-        return this.getQuestionSummary(input);
-      case 'skill':
-        return this.truncateText(
-          (input.name as string)
-          || (input.skill as string)
-          || '',
-          80,
-        );
-      case 'plan_enter':
-      case 'enter_plan_mode':
-        return 'Switch to plan mode';
-      case 'plan_exit':
-      case 'exit_plan_mode':
-        return 'Switch to build mode';
-      case 'todoread': {
-        return this.getTodoSummary(input) || 'Current tasks';
-      }
-      case 'todowrite': {
-        return this.getTodoSummary(input);
-      }
-      default:
-        return '';
-    }
+    const normalizedName = getToolIdentity(name).normalizedName;
+    const resolveSummary = this.summaryResolvers[normalizedName];
+    return resolveSummary ? resolveSummary(input) : '';
   };
-
-  private getMcpSummary(name: string, input: Record<string, unknown>): string {
-    const tokens = this.tokenizeMcpToolName(name);
-    const category = this.resolveMcpSummaryCategory(tokens);
-
-    if (category) {
-      const categorySummary = this.getMcpSummaryFromFields(input, category.fields);
-      if (categorySummary) {
-        return categorySummary;
-      }
-    }
-
-    const genericSummary = this.getMcpSummaryFromFields(input, MCP_GENERIC_SUMMARY_FIELDS);
-    if (genericSummary) {
-      return genericSummary;
-    }
-
-    for (const value of Object.values(input)) {
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) {
-          return this.truncateText(trimmed, 60);
-        }
-        continue;
-      }
-
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return String(value);
-      }
-
-      if (typeof value === 'boolean') {
-        return String(value);
-      }
-    }
-
-    return '';
-  }
-
-  private tokenizeMcpToolName(name: string): string[] {
-    return name
-      .toLowerCase()
-      .split(/(?:__|[_:-])+/)
-      .map((token) => token.trim())
-      .filter((token) => token.length > 0);
-  }
-
-  private resolveMcpSummaryCategory(tokens: string[]): McpSummaryCategoryDefinition | null {
-    for (let index = tokens.length - 1; index >= 0; index -= 1) {
-      const token = tokens[index];
-      const matched = MCP_SUMMARY_CATEGORY_DEFINITIONS.find((category) => category.verbs.includes(token));
-      if (matched) {
-        return matched;
-      }
-    }
-
-    for (const category of MCP_SUMMARY_CATEGORY_DEFINITIONS) {
-      if (category.verbs.some((verb) => tokens.includes(verb))) {
-        return category;
-      }
-    }
-
-    return null;
-  }
-
-  private getMcpSummaryFromFields(
-    input: Record<string, unknown>,
-    fields: readonly string[],
-  ): string {
-    for (const field of fields) {
-      const rawValue = input[field];
-      const formatted = this.formatMcpSummaryField(field, rawValue);
-      if (formatted) {
-        return formatted;
-      }
-    }
-
-    return '';
-  }
-
-  private formatMcpSummaryField(field: string, value: unknown): string {
-    if (MCP_ARGUMENT_FIELDS.has(field)) {
-      if (typeof value !== 'string') {
-        return '';
-      }
-      const trimmed = value.trim();
-      return trimmed ? this.truncateText(trimmed, 60) : '';
-    }
-
-    if (typeof value !== 'string') {
-      return '';
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return '';
-    }
-
-    if (MCP_PATH_LIKE_FIELDS.has(field)) {
-      return this.fileNameOnly(trimmed);
-    }
-
-    if (MCP_URL_LIKE_FIELDS.has(field)) {
-      return this.truncateText(trimmed, 60);
-    }
-
-    return this.truncateText(trimmed, 60);
-  }
 
   private defaultRenderExpandedContent = (
     container: HTMLElement,

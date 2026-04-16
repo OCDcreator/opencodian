@@ -1,0 +1,16 @@
+import { shouldFinalizeTrailingAssistantFooterOnly } from './TrailingAssistantPatchFooterFinalizationDecisionHelper';
+import {
+  buildTrailingAssistantPatchFooterFinalizationDecisionSourceContract,
+  type TrailingAssistantPatchFooterFinalizationDecisionSourceContractParts,
+} from './TrailingAssistantPatchFooterFinalizationDecisionSourceContractHelper';
+
+export type TrailingAssistantPatchFooterFinalizationExecutionTailDecisionSource =
+  TrailingAssistantPatchFooterFinalizationDecisionSourceContractParts;
+
+export function shouldFinalizeTrailingAssistantFooterOnlyFromExecutionTailPlanningContext(
+  source: TrailingAssistantPatchFooterFinalizationExecutionTailDecisionSource,
+): boolean {
+  return shouldFinalizeTrailingAssistantFooterOnly(
+    buildTrailingAssistantPatchFooterFinalizationDecisionSourceContract(source),
+  );
+}

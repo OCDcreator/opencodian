@@ -25,9 +25,9 @@ syncUserMessageStreamingActionState(
 ## 模块关系
 
 - 无上游依赖
-- 下游消费者：`OpenCodianView.syncTabUserMessageActionButtons()`
+- 下游消费者：`runtime/TabRuntimeStateBridge.ts`
 
 ## 注意事项
 
 - 这个函数不会处理用户消息里的复制按钮，因为复制按钮使用的是另一套 class：`opencodian-copy-btn-inline--user`。
-- 它也不判断“是否允许 fork / rewind”；业务判断由 `OpenCodianView` 完成，这里只负责同步当前 tab 的 streaming 禁用态。
+- 它也不判断“是否允许 fork / rewind”；业务判断与 tab runtime 状态桥接现在由 `TabRuntimeStateBridge` 负责，这里只负责同步当前 tab 的 streaming 禁用态。

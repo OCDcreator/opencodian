@@ -1,63 +1,35 @@
-import { WorkspaceLeaf } from 'obsidian';
-
-jest.mock('../../../../src/core/opencode', () => ({
-  OpenCodeService: class OpenCodeService {},
-}));
-
-import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { AssistantShellRenderer } from '../../../../src/features/chat/runtime/AssistantShellRenderer';
+import { PermissionInlineCardRenderer } from '../../../../src/features/chat/runtime/PermissionInlineCardRenderer';
+import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
 
 describe('OpenCodianView streaming assistant shell visibility', () => {
-  function createView(): OpenCodianView {
-    return new OpenCodianView(new WorkspaceLeaf(), {
-      settings: {
-        effortLevel: 'medium',
-        thinkingBudget: 0,
-        locale: 'en',
-      },
-      openCodeService: {},
-      storage: {},
-    } as never);
-  }
-
   it('keeps deferred streaming assistant shells hidden until reveal is requested', () => {
-    const view = createView() as unknown as {
-      createAssistantMessageElement: (
-        tabId: string,
-        hiddenUntilVisible?: boolean,
-      ) => { messageEl: HTMLElement; contentEl: HTMLElement };
-      revealStreamingAssistantMessageElement: (tabId: string) => HTMLElement | null;
-      getTabPaneState: (tabId: string) => {
-        runtime: {
-          streamingMessageEl: HTMLElement | null;
-          streamingContentEl: HTMLElement | null;
-        };
-      } | null;
-      ensureTurnBody: (tabId: string) => HTMLElement;
-      getActiveTabId: () => string;
-      shouldAutoScroll: (tabId: string) => boolean;
-      scheduleSettledScrollToBottomIfNeeded: (autoScroll?: boolean, tabId?: string) => void;
-    };
-
     const turnBody = document.createElement('div');
     const runtime = {
       streamingMessageEl: null as HTMLElement | null,
       streamingContentEl: null as HTMLElement | null,
     };
+    const scrollSpy = jest.fn();
+    const renderer = new AssistantShellRenderer({
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => runtime,
+      ensureTurnBody: () => turnBody,
+      shouldAutoScroll: () => true,
+      scheduleSettledScrollToBottomIfNeeded: scrollSpy,
+      setStreamingAssistantMessageVisibility: (messageEl, visible) => {
+        messageEl.hidden = !visible;
+      },
+      initializeAssistantCopyButton: jest.fn(),
+    });
 
-    jest.spyOn(view, 'getTabPaneState').mockReturnValue({ runtime } as never);
-    jest.spyOn(view, 'ensureTurnBody').mockReturnValue(turnBody);
-    jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-1');
-    jest.spyOn(view, 'shouldAutoScroll').mockReturnValue(true);
-    const scrollSpy = jest.spyOn(view, 'scheduleSettledScrollToBottomIfNeeded').mockImplementation(() => {});
-
-    const { messageEl, contentEl } = view.createAssistantMessageElement('tab-1', true);
+    const { messageEl, contentEl } = renderer.createAssistantMessageElement('tab-1', true);
 
     expect(messageEl.hidden).toBe(true);
     expect(turnBody.contains(messageEl)).toBe(true);
     expect(runtime.streamingMessageEl).toBe(messageEl);
     expect(runtime.streamingContentEl).toBe(contentEl);
 
-    const revealed = view.revealStreamingAssistantMessageElement('tab-1');
+    const revealed = renderer.revealStreamingAssistantMessageElement('tab-1');
 
     expect(revealed).toBe(messageEl);
     expect(messageEl.hidden).toBe(false);
@@ -65,27 +37,67 @@ describe('OpenCodianView streaming assistant shell visibility', () => {
   });
 
   it('reveals a hidden streaming shell when adding an inline card', () => {
-    const view = createView() as unknown as {
-      createStreamingInlineCard: (className: string, tabId: string) => HTMLElement | null;
-      getTabRuntimeState: (tabId: string) => { streamingMessageEl: HTMLElement | null } | null;
-      getActiveTabId: () => string;
-      shouldAutoScroll: (tabId: string) => boolean;
-      scheduleSettledScrollToBottomIfNeeded: (autoScroll?: boolean, tabId?: string) => void;
-    };
-
     const messageEl = document.createElement('div');
     messageEl.hidden = true;
-    messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const toolCallEl = messageEl.createDiv({ cls: 'streaming-tool-call' });
+    const revealSpy = jest.fn(() => {
+      messageEl.hidden = false;
+      return messageEl;
+    });
+    const renderer = new StreamingInlineCardRenderer({
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => ({ streamingMessageEl: messageEl }),
+      revealStreamingAssistantMessageElement: revealSpy,
+    });
 
-    jest.spyOn(view, 'getTabRuntimeState').mockReturnValue({ streamingMessageEl: messageEl } as never);
-    jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-1');
-    jest.spyOn(view, 'shouldAutoScroll').mockReturnValue(true);
-    jest.spyOn(view, 'scheduleSettledScrollToBottomIfNeeded').mockImplementation(() => {});
-
-    const cardEl = view.createStreamingInlineCard('opencodian-question-inline', 'tab-1');
+    const cardEl = renderer.createStreamingInlineCard('opencodian-question-inline', 'tab-1');
 
     expect(cardEl).not.toBeNull();
     expect(messageEl.hidden).toBe(false);
-    expect(messageEl.querySelector('.opencodian-question-inline')).toBe(cardEl);
+    expect(toolCallEl.nextSibling).toBe(cardEl);
+    expect(contentEl.contains(cardEl)).toBe(false);
+    expect(revealSpy).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('renders a permission inline card and resolves the clicked action', async () => {
+    const messageEl = document.createElement('div');
+    messageEl.hidden = true;
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const toolCallEl = messageEl.createDiv({ cls: 'streaming-tool-call' });
+    const inlineCardRenderer = new StreamingInlineCardRenderer({
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => ({ streamingMessageEl: messageEl }),
+      revealStreamingAssistantMessageElement: () => {
+        messageEl.hidden = false;
+        return messageEl;
+      },
+    });
+    const permissionRenderer = new PermissionInlineCardRenderer(inlineCardRenderer);
+
+    const responsePromise = permissionRenderer.collectResponse(
+      {
+        type: 'permission_request',
+        id: 'perm-1',
+        permission: 'websearch_web_search',
+        patterns: ['src/**'],
+        metadata: { command: 'npm test' },
+      },
+      'tab-1',
+    );
+
+    const permissionCard = toolCallEl.nextElementSibling as HTMLElement | null;
+    expect(permissionCard).not.toBeNull();
+    expect(messageEl.hidden).toBe(false);
+    expect(contentEl.contains(permissionCard!)).toBe(false);
+    expect(permissionCard?.querySelector('.opencodian-permission-inline-title')).not.toBeNull();
+    expect(permissionCard?.querySelector('.opencodian-permission-inline-tool')?.textContent).toContain('websearch_web_search');
+    expect(permissionCard?.querySelectorAll('.opencodian-permission-inline-pattern-item')).toHaveLength(1);
+    expect(permissionCard?.querySelector('code')?.textContent).toBe('npm test');
+
+    (permissionCard?.querySelector('.opencodian-permission-inline-always') as HTMLButtonElement).click();
+
+    await expect(responsePromise).resolves.toBe('always');
+    expect(permissionCard?.isConnected).toBe(false);
   });
 });

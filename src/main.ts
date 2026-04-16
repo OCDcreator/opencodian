@@ -14,55 +14,28 @@ import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { splitPersistedSettings, StorageService } from './core/storage';
 import {
-  areChatAppearanceSettingsEqual,
   getThemeAppearanceOverridesFromBase,
   getThemePresetDefinition,
-  resolveThemeChatAppearance,
 } from './core/theme';
 import type {
   ChatAppearanceSettings,
   Conversation,
   OpenCodianSettings,
-  PlatformDebugLogPaths,
   ThemePresetDefinition,
   ThemePresetId,
 } from './core/types';
 import {
-  DEFAULT_SETTINGS,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
   getDefaultChatAppearanceSettings,
-  getDefaultInputPanelGlassRefractionSettings,
-  getDefaultInputPanelGlassRefractionSvgFilterSettings,
-  getDefaultInputPanelLiquidGlassSettings,
-  getDefaultPersistedTabState,
-  getDefaultThemeSettings,
   getServerBaseUrl,
   isLocalServerMode,
-  normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
-  normalizeDisabledModelRefs,
-  normalizeEffortLevel,
-  normalizeInputPanelGlassRefractionSettings,
-  normalizeInputPanelGlassRefractionSvgFilterSettings,
-  normalizeInputPanelLiquidGlassSettings,
-  normalizeInputPanelThemeId,
   normalizeLobehubIconVariant,
-  normalizePersistedTabState,
-  normalizePluginIsolationMode,
   normalizeProviderIconColorMode,
-  normalizeProviderIconLibrary,
-  normalizeQuestionCardPosition,
-  normalizeQuestionDisplayMode,
-  normalizeTabBarPosition,
-  normalizeThemeSettings,
-  normalizeThinkingBudget,
-  normalizeTitleMode,
-  OPENCODE_LEGACY_LOCAL_DEFAULT_PORT,
-  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
-  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
+import { prepareLoadedSettingsBootstrapState } from './core/types/settingsLoadNormalization';
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { setLocale, t } from './i18n';
@@ -76,7 +49,6 @@ import {
 import { registerBuiltinGlassAdapters } from './utils/glass';
 
 const logger = createLogger('OpenCodian');
-const INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION = 2;
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
 const OPENCODIAN_APP_ICON_SVG = `
   <g class="opencodian-app-icon-layer opencodian-app-icon-layer--light">
@@ -89,54 +61,7 @@ const OPENCODIAN_APP_ICON_SVG = `
   </g>
 `;
 
-function isLegacyNikdelvinDefaultProfile(value: unknown): boolean {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  const keys = Object.keys(candidate);
-  const legacyKeys = ['depth', 'strength', 'chromaticAberration', 'blur'];
-  const hasOnlyLegacyKeys = keys.every((key) => legacyKeys.includes(key));
-  const transitionalKeys = [
-    'depth',
-    'strength',
-    'chromaticAberration',
-    'blur',
-    'backgroundPreset',
-    'color',
-    'background',
-    'freeze',
-    'noMorph',
-    'button',
-    'inline',
-    'customEffects',
-  ];
-  const hasOnlyTransitionalKeys = keys.every((key) => transitionalKeys.includes(key));
-
-  const matchesLegacyProfile = hasOnlyLegacyKeys
-    && candidate.depth === 10
-    && candidate.strength === 100
-    && candidate.chromaticAberration === 2
-    && candidate.blur === 0;
-
-  const matchesTransitionalProfile = hasOnlyTransitionalKeys
-    && candidate.depth === 10
-    && candidate.strength === 100
-    && candidate.chromaticAberration === 0
-    && candidate.blur === 0
-    && candidate.backgroundPreset === 'none'
-    && candidate.color === 'transparent'
-    && candidate.background === ''
-    && candidate.freeze === false
-    && candidate.noMorph === false
-    && candidate.button === false
-    && candidate.inline === false
-    && candidate.customEffects === false;
-
-  return matchesLegacyProfile || matchesTransitionalProfile;
-}
-
+type LoadedManagedServerState = Awaited<ReturnType<StorageService['loadManagedServerState']>>;
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
 
@@ -165,25 +90,30 @@ export default class OpenCodianPlugin extends Plugin {
     logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
     addIcon(OPENCODIAN_APP_ICON, OPENCODIAN_APP_ICON_SVG);
 
-    // Initialize storage
+    const initialManagedServerState = await this.prepareStartupState();
+    await this.bootstrapOpenCodeRuntime(initialManagedServerState);
+    this.registerWorkspaceIntegration();
+  }
+
+  private async prepareStartupState(): Promise<LoadedManagedServerState> {
     this.storage = new StorageService(this);
     await this.storage.initialize();
-
-    // Load settings
     await this.loadSettings();
+    this.applyLoadedSettingsStartupEffects();
+    return this.storage.loadManagedServerState();
+  }
+
+  private applyLoadedSettingsStartupEffects(): void {
     registerBuiltinGlassAdapters();
     this.applyLoggerSettings();
     this.applyProviderIconColorMode();
-
-    // Initialize locale
     setLocale(this.settings.locale as 'en' | 'zh');
+  }
 
-    const initialManagedServerState = await this.storage.loadManagedServerState();
-
-    // Auto-create OpenCode config file based on permission mode
+  private async bootstrapOpenCodeRuntime(
+    initialManagedServerState: LoadedManagedServerState,
+  ): Promise<void> {
     await this.initializeOpencodeConfig();
-
-    // Initialize OpenCode service
     this.openCodeService = new OpenCodeService(
       this.settings,
       {
@@ -206,9 +136,13 @@ export default class OpenCodianPlugin extends Plugin {
         },
       },
     );
+    this.configureVaultScopedServices();
+    await this.startConfiguredLocalServerIfNeeded();
+    await this.logServerStatusSnapshot('onload');
+    await this.loadConversations();
+  }
 
-    // Set vault path so OpenCode reads project config from .opencode/
-    // This automatically adapts to Windows (C:\path) and macOS (/Users/path)
+  private configureVaultScopedServices(): void {
     const vaultPath = getVaultBasePath(this.app);
     if (vaultPath) {
       this.opencodeConfigManager = new OpencodeConfigManager(vaultPath);
@@ -221,34 +155,38 @@ export default class OpenCodianPlugin extends Plugin {
       this.modelConfigService = null;
       logger.warn('Could not get vault path, OpenCode will use global config');
     }
+  }
 
-    // Start server if auto-start is enabled
-    if (isLocalServerMode(this.settings.server) && this.settings.server.local.autoStart) {
-      try {
-        await this.openCodeService.start();
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Failed to start server';
-        new Notice(`OpenCode: ${msg}`);
-      }
+  private async startConfiguredLocalServerIfNeeded(): Promise<void> {
+    if (!isLocalServerMode(this.settings.server) || !this.settings.server.local.autoStart) {
+      return;
     }
 
-    await this.logServerStatusSnapshot('onload');
+    try {
+      await this.openCodeService.start();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to start server';
+      new Notice(`OpenCode: ${msg}`);
+    }
+  }
 
-    // Load conversations before restoring any existing OpenCodian view.
-    await this.loadConversations();
-
-    // Register view
+  private registerWorkspaceIntegration(): void {
     this.registerView(
       VIEW_TYPE_OPENCODIAN,
       (leaf) => new OpenCodianView(leaf, this)
     );
 
-    // Add ribbon icon
     this.addRibbonIcon(OPENCODIAN_APP_ICON, '打开 OpenCodian', () => {
       this.activateView();
     });
 
-    // Register commands
+    this.registerPluginCommands();
+
+    this.settingsTab = new OpenCodianSettingTab(this.app, this);
+    this.addSettingTab(this.settingsTab);
+  }
+
+  private registerPluginCommands(): void {
     this.addCommand({
       id: 'open-view',
       name: '打开聊天视图',
@@ -323,11 +261,6 @@ export default class OpenCodianPlugin extends Plugin {
         await this.getOpenCodianView()?.addSelectionContextFromActiveEditor(editor, view);
       },
     });
-
-    // Add settings tab
-    this.settingsTab = new OpenCodianSettingTab(this.app, this);
-    this.addSettingTab(this.settingsTab);
-
   }
 
   onunload() {
@@ -388,339 +321,13 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Load settings from storage */
   async loadSettings() {
-    const persistedSettings = await this.storage.loadPersistedSettings();
-    const savedSettings =
-      persistedSettings.core.data || persistedSettings.ui.data
-        ? ({
-            ...(persistedSettings.core.data ?? {}),
-            ...(persistedSettings.ui.data ?? {}),
-          } as Partial<OpenCodianSettings>)
-        : null;
-    this.settingsPersistenceWritable = persistedSettings.writable;
-    const savedDebugLogPaths =
-      savedSettings && typeof savedSettings === 'object' && 'debugLogPaths' in savedSettings
-        ? (savedSettings as { debugLogPaths?: Partial<PlatformDebugLogPaths> }).debugLogPaths
-        : undefined;
-    const legacyDebugLogPath =
-      savedSettings && typeof savedSettings === 'object' && 'debugLogPath' in savedSettings
-        ? (savedSettings as { debugLogPath?: unknown }).debugLogPath
-        : undefined;
-    const normalizedDebugLogPaths: PlatformDebugLogPaths = {
-      ...DEFAULT_SETTINGS.debugLogPaths,
-      ...savedDebugLogPaths,
-    };
+    const loadState = prepareLoadedSettingsBootstrapState(await this.storage.loadPersistedSettings());
+    this.settingsPersistenceWritable = loadState.persistedSettings.writable;
+    this.settings = loadState.settings;
 
-    if (
-      typeof legacyDebugLogPath === 'string' &&
-      legacyDebugLogPath.trim().length > 0 &&
-      !normalizedDebugLogPaths[getCurrentPlatformKey()]
-    ) {
-      normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath.trim();
-    }
+    this.reportSettingsLoadState(loadState.persistedSettings);
 
-    const legacyServer =
-      savedSettings && typeof savedSettings === 'object' && 'server' in savedSettings
-        ? (savedSettings as {
-            server?:
-              | Partial<OpenCodianSettings['server']>
-              | { host?: string; port?: number; autoStart?: boolean };
-          }).server
-        : undefined;
-    const normalizedServer = (() => {
-      const defaultServer = DEFAULT_SETTINGS.server;
-
-      if (!legacyServer || typeof legacyServer !== 'object') {
-        return defaultServer;
-      }
-
-      const hasNestedServer =
-        'mode' in legacyServer || 'local' in legacyServer || 'remote' in legacyServer || 'auth' in legacyServer;
-
-      if (hasNestedServer) {
-        const nestedServer = legacyServer as Partial<OpenCodianSettings['server']>;
-        return {
-          ...defaultServer,
-          ...nestedServer,
-          local: {
-            ...defaultServer.local,
-            ...(nestedServer.local ?? {}),
-          },
-          remote: {
-            ...defaultServer.remote,
-            ...(nestedServer.remote ?? {}),
-          },
-          auth: {
-            ...defaultServer.auth,
-            ...(nestedServer.auth ?? {}),
-          },
-        };
-      }
-
-      const flatServer = legacyServer as { host?: string; port?: number; autoStart?: boolean };
-      const legacyHost = typeof flatServer.host === 'string' && flatServer.host.trim()
-        ? flatServer.host.trim()
-        : defaultServer.local.host;
-      const legacyPort = typeof flatServer.port === 'number' ? flatServer.port : defaultServer.local.port;
-      const legacyAutoStart = typeof flatServer.autoStart === 'boolean'
-        ? flatServer.autoStart
-        : defaultServer.local.autoStart;
-
-      return {
-        ...defaultServer,
-        mode: 'local' as const,
-        local: {
-          host: legacyHost,
-          port: legacyPort,
-          autoStart: legacyAutoStart,
-        },
-        remote: {
-          baseUrl: `http://${legacyHost}:${legacyPort}`,
-        },
-      };
-    })();
-    const shouldMigrateLegacyLocalDefaultPort = Boolean(
-      savedSettings
-      && normalizedServer.mode === 'local'
-      && normalizedServer.local.host === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST
-      && normalizedServer.local.port === OPENCODE_LEGACY_LOCAL_DEFAULT_PORT
-      && normalizedServer.local.autoStart === DEFAULT_SETTINGS.server.local.autoStart
-      && normalizedServer.remote.baseUrl === `http://${OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST}:${OPENCODE_LEGACY_LOCAL_DEFAULT_PORT}`,
-    );
-    if (shouldMigrateLegacyLocalDefaultPort) {
-      normalizedServer.local = {
-        ...normalizedServer.local,
-        port: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
-      };
-    }
-    const hasSavedChatAppearance =
-      Boolean(savedSettings && typeof savedSettings === 'object' && 'chatAppearance' in savedSettings);
-    const savedChatAppearance =
-      hasSavedChatAppearance
-        ? (savedSettings as { chatAppearance?: Partial<OpenCodianSettings['chatAppearance']> }).chatAppearance
-        : undefined;
-    const normalizedSavedChatAppearance = normalizeChatAppearanceSettings(savedChatAppearance);
-    const hasSavedTheme =
-      Boolean(savedSettings && typeof savedSettings === 'object' && 'theme' in savedSettings);
-    const savedTheme =
-      hasSavedTheme
-        ? (savedSettings as { theme?: Partial<OpenCodianSettings['theme']> }).theme
-        : undefined;
-    const normalizedTheme = (() => {
-      if (!savedSettings) {
-        return getDefaultThemeSettings();
-      }
-
-      if (!hasSavedTheme) {
-        if (
-          hasSavedChatAppearance
-          && !areChatAppearanceSettingsEqual(normalizedSavedChatAppearance, getDefaultChatAppearanceSettings())
-        ) {
-          return {
-            activePresetId: null,
-            customAppearanceOverrides: {},
-          } satisfies OpenCodianSettings['theme'];
-        }
-
-        return getDefaultThemeSettings();
-      }
-
-      const baseTheme = normalizeThemeSettings(savedTheme);
-      if (!baseTheme.activePresetId) {
-        return {
-          activePresetId: null,
-          customAppearanceOverrides: {},
-        } satisfies OpenCodianSettings['theme'];
-      }
-
-      const preset = getThemePresetDefinition(baseTheme.activePresetId);
-      if (!preset) {
-        return {
-          activePresetId: null,
-          customAppearanceOverrides: {},
-        } satisfies OpenCodianSettings['theme'];
-      }
-
-      const effectiveAppearance = hasSavedChatAppearance
-        ? normalizedSavedChatAppearance
-        : resolveThemeChatAppearance(baseTheme);
-
-      return {
-        activePresetId: preset.id,
-        customAppearanceOverrides: getThemeAppearanceOverridesFromBase(preset.appearance, effectiveAppearance),
-      } satisfies OpenCodianSettings['theme'];
-    })();
-    const normalizedChatAppearance = (() => {
-      const themeResolvedAppearance = normalizedTheme.activePresetId
-        ? resolveThemeChatAppearance(normalizedTheme)
-        : normalizedSavedChatAppearance;
-
-      if (!hasSavedChatAppearance) {
-        return themeResolvedAppearance;
-      }
-
-      return normalizeChatAppearanceSettings({
-        ...themeResolvedAppearance,
-        background: normalizedSavedChatAppearance.background,
-      });
-    })();
-    const savedTabState =
-      savedSettings && typeof savedSettings === 'object' && 'tabState' in savedSettings
-        ? (savedSettings as { tabState?: Partial<OpenCodianSettings['tabState']> }).tabState
-        : undefined;
-    const normalizedTabState = normalizePersistedTabState(savedTabState);
-    const savedProviderIconLibrary =
-      savedSettings && typeof savedSettings === 'object' && 'providerIconLibrary' in savedSettings
-        ? (savedSettings as { providerIconLibrary?: OpenCodianSettings['providerIconLibrary'] }).providerIconLibrary
-        : undefined;
-    const normalizedProviderIconLibrary = normalizeProviderIconLibrary(savedProviderIconLibrary);
-    const savedGlassDefaultsVersion =
-      savedSettings
-      && typeof savedSettings === 'object'
-      && 'inputPanelGlassRefractionGlassDefaultsVersion' in savedSettings
-      && Number.isFinite(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
-        ? Number(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
-        : 0;
-    const shouldResetGlassTierDefaults = savedGlassDefaultsVersion < 1;
-    const shouldResetCardAndPillTierDefaults =
-      savedGlassDefaultsVersion < INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION;
-    const shouldResetGlassRefractionGlassDefaults =
-      shouldResetGlassTierDefaults || shouldResetCardAndPillTierDefaults;
-    const defaultInputPanelGlassRefraction = getDefaultInputPanelGlassRefractionSettings();
-    const normalizedInputPanelGlassRefractionBase = normalizeInputPanelGlassRefractionSettings(
-      savedSettings?.inputPanelGlassRefraction,
-    );
-    const normalizedInputPanelGlassRefraction = shouldResetGlassRefractionGlassDefaults
-      ? {
-          ...normalizedInputPanelGlassRefractionBase,
-          ...(shouldResetGlassTierDefaults
-            ? {
-                glass: { ...defaultInputPanelGlassRefraction.glass },
-              }
-            : {}),
-          ...(shouldResetCardAndPillTierDefaults
-            ? {
-                card: { ...defaultInputPanelGlassRefraction.card },
-                pill: { ...defaultInputPanelGlassRefraction.pill },
-              }
-            : {}),
-        }
-      : normalizedInputPanelGlassRefractionBase;
-    const normalizedInputPanelGlassRefractionSvgFilter = normalizeInputPanelGlassRefractionSvgFilterSettings(
-      savedSettings?.inputPanelGlassRefractionSvgFilter,
-    );
-    const normalizedInputPanelLiquidGlassBase = normalizeInputPanelLiquidGlassSettings(
-      savedSettings?.inputPanelLiquidGlass,
-    );
-    const defaultInputPanelLiquidGlass = getDefaultInputPanelLiquidGlassSettings();
-    const shouldResetNikdelvinDefaults = isLegacyNikdelvinDefaultProfile(
-      savedSettings?.inputPanelLiquidGlass?.nikdelvin,
-    );
-    const normalizedInputPanelLiquidGlass = shouldResetNikdelvinDefaults
-      ? {
-          ...normalizedInputPanelLiquidGlassBase,
-          nikdelvin: { ...defaultInputPanelLiquidGlass.nikdelvin },
-        }
-      : normalizedInputPanelLiquidGlassBase;
-
-    const normalizedSettings = savedSettings
-      ? (() => {
-          const remainingSavedSettings = {
-            ...(savedSettings as Partial<OpenCodianSettings> & {
-              experimentalComposerGlassRefractionEnabled?: unknown;
-              inputPanelLiquidGlassMode?: unknown;
-            }),
-          };
-          delete remainingSavedSettings.experimentalComposerGlassRefractionEnabled;
-          delete remainingSavedSettings.inputPanelLiquidGlassMode;
-
-          return {
-            ...remainingSavedSettings,
-            server: normalizedServer,
-            chatScrollMode:
-              (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
-                ? 'sticky-mask'
-                : savedSettings.chatScrollMode,
-            effortLevel: normalizeEffortLevel(savedSettings.effortLevel),
-            thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
-            tabBarPosition: normalizeTabBarPosition(savedSettings.tabBarPosition),
-            belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
-            titleMode: normalizeTitleMode(savedSettings.titleMode),
-            questionDisplayMode: normalizeQuestionDisplayMode(savedSettings.questionDisplayMode),
-            questionCardPosition: normalizeQuestionCardPosition(savedSettings.questionCardPosition),
-            showAnsweredQuestionCards:
-              typeof savedSettings.showAnsweredQuestionCards === 'boolean'
-                ? savedSettings.showAnsweredQuestionCards
-                : DEFAULT_SETTINGS.showAnsweredQuestionCards,
-            aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
-            disabledModelRefs: normalizeDisabledModelRefs(savedSettings.disabledModelRefs),
-            renderUserMarkupAsCodeBlocks:
-              typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'
-                ? savedSettings.renderUserMarkupAsCodeBlocks
-                : DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
-            pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
-            inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
-            inputPanelGlassRefraction: normalizedInputPanelGlassRefraction,
-            inputPanelGlassRefractionSvgFilter: normalizedInputPanelGlassRefractionSvgFilter,
-            inputPanelGlassRefractionGlassDefaultsVersion: INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
-            inputPanelLiquidGlass: normalizedInputPanelLiquidGlass,
-            debugLogPaths: normalizedDebugLogPaths,
-            chatAppearance: normalizedChatAppearance,
-            theme: normalizedTheme,
-            tabState: normalizedTabState,
-            modelAvailabilitySectionOpen:
-              typeof savedSettings.modelAvailabilitySectionOpen === 'boolean'
-                ? savedSettings.modelAvailabilitySectionOpen
-                : DEFAULT_SETTINGS.modelAvailabilitySectionOpen,
-            modelToolsSectionOpen:
-              typeof savedSettings.modelToolsSectionOpen === 'boolean'
-                ? savedSettings.modelToolsSectionOpen
-                : DEFAULT_SETTINGS.modelToolsSectionOpen,
-            inlineSerializedDebugLogArgs:
-              typeof savedSettings.inlineSerializedDebugLogArgs === 'boolean'
-                ? savedSettings.inlineSerializedDebugLogArgs
-                : DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
-            providerIconLibrary: normalizedProviderIconLibrary,
-            providerIconColorMode: normalizeProviderIconColorMode(savedSettings.providerIconColorMode),
-            providerIconDefaultVariant: normalizeLobehubIconVariant(savedSettings.providerIconDefaultVariant),
-          };
-        })()
-      : null;
-    this.settings = {
-      ...DEFAULT_SETTINGS,
-      ...normalizedSettings,
-      server: normalizedServer,
-      tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),
-      belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(normalizedSettings?.belowHeaderTabBarLayout),
-      inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),
-      inputPanelGlassRefraction: normalizedSettings?.inputPanelGlassRefraction
-        ?? getDefaultInputPanelGlassRefractionSettings(),
-      inputPanelGlassRefractionSvgFilter: normalizedSettings?.inputPanelGlassRefractionSvgFilter
-        ?? getDefaultInputPanelGlassRefractionSvgFilterSettings(),
-      inputPanelGlassRefractionGlassDefaultsVersion:
-        normalizedSettings?.inputPanelGlassRefractionGlassDefaultsVersion
-        ?? INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
-      inputPanelLiquidGlass: normalizedSettings?.inputPanelLiquidGlass
-        ?? getDefaultInputPanelLiquidGlassSettings(),
-      debugLogPaths: normalizedDebugLogPaths,
-      disabledModelRefs: normalizedSettings?.disabledModelRefs ?? [],
-      chatAppearance: normalizedChatAppearance,
-      theme: normalizedTheme,
-      tabState: normalizedTabState ?? getDefaultPersistedTabState(),
-      providerIconLibrary: normalizedProviderIconLibrary,
-      providerIconColorMode: normalizeProviderIconColorMode(normalizedSettings?.providerIconColorMode),
-      providerIconDefaultVariant: normalizeLobehubIconVariant(normalizedSettings?.providerIconDefaultVariant),
-    };
-
-    this.reportSettingsLoadState(persistedSettings);
-
-    if (
-      persistedSettings.writable
-      && (
-        persistedSettings.shouldPersist
-        || shouldResetGlassRefractionGlassDefaults
-        || shouldMigrateLegacyLocalDefaultPort
-      )
-    ) {
+    if (loadState.shouldPersistNormalizedSettings) {
       await this.persistSettingsDomains({ core: true, ui: true });
     }
   }

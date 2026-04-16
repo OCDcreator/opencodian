@@ -3,6 +3,11 @@
  */
 
 export type {
+  ModelCatalogState,
+  ModelCatalogStateMode,
+} from './ModelCatalogStateService';
+export { ModelCatalogStateService } from './ModelCatalogStateService';
+export type {
   ModelCatalogBundle,
   ProviderAvailabilityProbe,
   ProviderAvailabilityProbeStatus,

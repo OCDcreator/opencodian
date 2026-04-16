@@ -1,168 +1,73 @@
-import type { SessionActivityStatus } from '../../../core/opencode';
-import {
-  type ChatMessage,
-  type Conversation,
-  type PersistedTabState,
-  type QuestionRequest,
-  type SessionTodo,
-} from '../../../core/types';
-import type { RestoredTabState, TabData, TabId } from '../tabs';
-import {
-  captureElementScrollRestoreSnapshot,
-  isElementNearBottom,
-  restoreElementScrollAfterRender,
-  type ScrollRuntimeState,
-} from './ScrollManager';
+import type { ConversationHydrationOutcomePort } from '../runtime/ConversationHydrationOutcomeBridge';
+import type {
+  ConversationLoadRuntimeOptions,
+  ConversationLoadRuntimePort,
+} from '../runtime/ConversationLoadRuntimeBridge';
+import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
+import type { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
+import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
+import type { TabData, TabId } from '../tabs';
 
 export interface LoadConversationOptions {
   forceServerSync?: boolean;
   preserveScrollPosition?: boolean;
 }
 
-interface ConversationSyncResult {
-  messages: ChatMessage[];
-  revertState: { messageID: string; partID?: string } | null;
-}
-
 interface ConversationViewStateTabManager {
-  createTab(conversation?: Pick<Conversation, 'id' | 'title'> | null): TabData | null;
   getTab(tabId: TabId): TabData | null;
-  restoreTabs(
-    items: RestoredTabState[],
-    activeTabIndex: number,
-    conversations: ReadonlyMap<string, Pick<Conversation, 'id' | 'title'>>,
-  ): TabData | null;
-  setActiveTabConversation(conversation: Pick<Conversation, 'id' | 'title'> | null): void;
 }
 
 export interface ConversationViewStateHost {
   getTabManager(): ConversationViewStateTabManager | null;
-  getPersistedTabState(): PersistedTabState;
-  resetPersistedTabState(): void;
-  persistTabState(options?: { flush?: boolean }): void;
+}
 
-  loadConversations(): Promise<void>;
-  getConversations(): Conversation[];
-  createConversation(): Promise<Conversation>;
-  getConversationById(id: string): Promise<Conversation | null>;
+type TabConversationActivationPort = Pick<
+  TabConversationActivationBridge,
+  | 'applyEmptyTabActivation'
+  | 'applyLoadedConversationActivation'
+  | 'applyStreamingConversationActivation'
+>;
 
-  setActiveMessagesPane(tabId: TabId): void;
-  refreshActiveFocusContextPreview(): void;
-  renderQuestionDock(): void;
-  updateSessionTodoDockForTab(tabId: TabId): void;
-  applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> | void;
-  applyEmptyTabActivation(tabId: TabId): void;
+type TabViewActivationPort =
+  Pick<
+    TabViewActivationBridge,
+    'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'
+  >;
 
-  prepareConversationTransition(nextConversationId: string): Promise<void>;
-  setCurrentConversation(conversation: Conversation): void;
-  clearCurrentConversationRevertState(): void;
-  setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
-  setActiveTabConversation(conversation: Conversation | null): void;
-  getMessagesContainer(): HTMLElement | null;
-  getActiveTabId(): TabId | null;
-  getSessionIdForTab(tabId: TabId | null): string | null;
-  getScrollRuntimeForTab(tabId: TabId | null): ScrollRuntimeState | null;
-  clearScheduledScrollToBottom(): void;
-  beginConversationHydration(tabId: TabId | null): void;
-  clearMessagesContainer(): void;
-  resetTurnState(): void;
-  setOpenCodeSessionId(sessionId: string): void;
-  clearPendingQuestionsForTab(tabId: TabId | null): void;
-  setTabSessionTodos(tabId: TabId | null, todos: SessionTodo[], sessionId: string | null): void;
-  setTabSessionStatus(
-    tabId: TabId | null,
-    status: SessionActivityStatus | null,
-    sessionId: string | null,
-  ): void;
-  resetBackgroundTaskSuppressedFingerprint(tabId: TabId | null): void;
-  shouldSyncConversationFromServer(conversation: Conversation, options: LoadConversationOptions): boolean;
-  syncConversationMessagesFromServer(
-    conversation: Conversation,
-    tabId: TabId | null,
-    reason: string,
-  ): Promise<ConversationSyncResult>;
-  syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
-  renderMessages(messages: ChatMessage[]): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
-  renderSessionTodoDock(tabId?: TabId | null): void;
-  refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | null,
-    options: { suppressErrors?: boolean },
-  ): Promise<SessionActivityStatus | null>;
-  refreshPendingQuestionsForTab(tabId: TabId | null, sessionId: string | null): Promise<QuestionRequest[]>;
-  refreshActiveSessionTodos(options: { suppressErrors?: boolean }): Promise<SessionTodo[]>;
-  getConversationSyncFingerprint(messages: ChatMessage[]): string;
-  setLastConversationSyncFingerprint(fingerprint: string): void;
-  startConversationSyncLoop(): void;
-  scrollToBottom(options: { tabId: TabId | null }): void;
-  syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
-  scheduleComposerLayoutSync(): void;
-  updateModelSelectorDisplay(): void;
-  syncActiveTabContextUsageIdentity(): void;
-  refreshActiveTabContextUsageFromServer(): Promise<void>;
-  endConversationHydration(tabId: TabId | null): void;
-  requestAnimationFrame(callback: FrameRequestCallback): number;
+interface ConversationViewStateServiceDependencies {
+  host: ConversationViewStateHost;
+  tabConversationActivationBridge: TabConversationActivationPort;
+  tabViewActivationBridge: TabViewActivationPort;
+  conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
+  conversationTransitionBridge: ConversationTransitionPort;
+  conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
 }
 
 export class ConversationViewStateService {
-  constructor(private readonly host: ConversationViewStateHost) {}
+  private readonly host: ConversationViewStateHost;
+  private readonly tabConversationActivationBridge: TabConversationActivationPort;
+  private readonly tabViewActivationBridge: TabViewActivationPort;
+  private readonly conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
+  private readonly conversationTransitionBridge: ConversationTransitionPort;
+  private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
 
-  async initializeFirstTab(): Promise<void> {
-    const tabManager = this.host.getTabManager();
-    if (!tabManager) {
-      return;
-    }
-
-    await this.host.loadConversations();
-
-    const restoredTabId = this.restorePersistedTabs();
-    if (restoredTabId) {
-      await this.activateTab(restoredTabId);
-      return;
-    }
-
-    let initialConversation = this.host.getConversations()[0];
-    if (!initialConversation) {
-      initialConversation = await this.host.createConversation();
-    }
-
-    const tab = tabManager.createTab(initialConversation);
-    if (tab) {
-      await this.activateTab(tab.id);
-    }
+  constructor({
+    host,
+    tabConversationActivationBridge,
+    tabViewActivationBridge,
+    conversationHydrationOutcomeBridge,
+    conversationTransitionBridge,
+    conversationLoadRuntimeBridge,
+  }: ConversationViewStateServiceDependencies) {
+    this.host = host;
+    this.tabConversationActivationBridge = tabConversationActivationBridge;
+    this.tabViewActivationBridge = tabViewActivationBridge;
+    this.conversationHydrationOutcomeBridge = conversationHydrationOutcomeBridge;
+    this.conversationTransitionBridge = conversationTransitionBridge;
+    this.conversationLoadRuntimeBridge = conversationLoadRuntimeBridge;
   }
 
-  restorePersistedTabs(): string | null {
-    const tabManager = this.host.getTabManager();
-    if (!tabManager) {
-      return null;
-    }
-
-    const savedState = this.host.getPersistedTabState();
-    if (!savedState.tabs.length) {
-      return null;
-    }
-
-    const conversationMap = new Map(
-      this.host.getConversations().map((conversation) => [conversation.id, conversation] as const),
-    );
-    const restoredTab = tabManager.restoreTabs(
-      savedState.tabs as RestoredTabState[],
-      savedState.activeTabIndex,
-      conversationMap,
-    );
-
-    if (!restoredTab) {
-      this.host.resetPersistedTabState();
-      this.host.persistTabState({ flush: true });
-      return null;
-    }
-
-    return restoredTab.id;
-  }
-
-  async activateTab(tabId: string): Promise<void> {
+  async activateTab(tabId: TabId): Promise<void> {
     const tabManager = this.host.getTabManager();
     if (!tabManager) {
       return;
@@ -173,19 +78,21 @@ export class ConversationViewStateService {
       return;
     }
 
-    this.host.setActiveMessagesPane(tabId);
-    this.host.refreshActiveFocusContextPreview();
-    this.host.renderQuestionDock();
-    this.host.updateSessionTodoDockForTab(tabId);
+    this.tabViewActivationBridge.applyActivationPreflight(tabId);
 
     if (tab.conversationId) {
       if (tab.isStreaming) {
-        const conversation = await this.host.getConversationById(tab.conversationId);
+        const conversation = await this.conversationLoadRuntimeBridge.resolveConversation(
+          tab.conversationId,
+        );
         if (!conversation) {
           return;
         }
 
-        await this.host.applyStreamingConversationActivation(tabId, conversation);
+        this.tabConversationActivationBridge.applyStreamingConversationActivation(
+          tabId,
+          conversation,
+        );
         return;
       }
 
@@ -195,114 +102,56 @@ export class ConversationViewStateService {
       return;
     }
 
-    this.host.applyEmptyTabActivation(tabId);
+    this.tabConversationActivationBridge.applyEmptyTabActivation(tabId);
   }
 
   async loadConversation(
     id: string,
     options: LoadConversationOptions = {},
   ): Promise<void> {
-    await this.host.prepareConversationTransition(id);
+    await this.conversationTransitionBridge.prepareLoadedConversationTransition(id);
 
-    const conversation = await this.resolveConversation(id);
+    const conversation = await this.conversationLoadRuntimeBridge.resolveConversation(id, {
+      reloadIfMissing: true,
+    });
     if (!conversation) {
       return;
     }
 
-    const messagesEl = this.host.getMessagesContainer();
-    const preserveScrollPosition = Boolean(options.preserveScrollPosition && messagesEl);
-    const previousScrollTop = preserveScrollPosition && messagesEl
-      ? messagesEl.scrollTop
-      : 0;
-    const activeTabId = this.host.getActiveTabId();
-    const runtime = this.host.getScrollRuntimeForTab(activeTabId);
-    const shouldStickToBottom = preserveScrollPosition && messagesEl
-      ? runtime?.autoScrollEnabled ?? isElementNearBottom(messagesEl)
-      : true;
-    const previousSessionId = this.host.getSessionIdForTab(activeTabId);
+    const transitionContext = this.conversationTransitionBridge.captureLoadedConversationTransition(
+      Boolean(options.preserveScrollPosition),
+    );
+    const { activeTabId } = transitionContext;
 
-    this.host.setCurrentConversation(conversation);
-    this.host.clearCurrentConversationRevertState();
-    this.host.setActiveTabConversation(conversation);
-    this.host.clearScheduledScrollToBottom();
-    this.host.beginConversationHydration(activeTabId);
-    messagesEl?.classList.add('is-rehydrating');
-    this.host.clearMessagesContainer();
-    this.host.resetTurnState();
-
-    this.host.setOpenCodeSessionId(conversation.openCodeSessionId);
-    if (previousSessionId !== conversation.openCodeSessionId) {
-      this.host.clearPendingQuestionsForTab(activeTabId);
-    }
-    this.host.setTabSessionTodos(activeTabId, [], conversation.openCodeSessionId);
-    this.host.setTabSessionStatus(activeTabId, null, conversation.openCodeSessionId);
-    this.host.resetBackgroundTaskSuppressedFingerprint(activeTabId);
-
-    const shouldSyncFromServer = this.host.shouldSyncConversationFromServer(conversation, options);
+    this.tabConversationActivationBridge.applyLoadedConversationActivation(
+      activeTabId,
+      conversation,
+    );
+    this.conversationTransitionBridge.beginLoadedConversationTransition(transitionContext);
 
     try {
-      let messages = conversation.messages;
-      if (shouldSyncFromServer) {
-        const syncResult = await this.host.syncConversationMessagesFromServer(
-          conversation,
-          activeTabId,
-          'load-conversation',
-        );
-        messages = syncResult.messages;
-        this.host.setCurrentConversationRevertState(syncResult.revertState);
-      }
-
-      this.host.syncBackgroundTaskStateFromConversation(conversation);
-      await this.host.renderMessages(messages);
-      await this.host.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
-      this.host.renderSessionTodoDock(activeTabId);
-      this.host.renderQuestionDock();
-      void this.host.refreshTabSessionStatus(activeTabId, conversation.openCodeSessionId, { suppressErrors: true });
-      void this.host.refreshPendingQuestionsForTab(activeTabId, conversation.openCodeSessionId);
-      void this.host.refreshActiveSessionTodos({ suppressErrors: true });
-      this.host.setLastConversationSyncFingerprint(this.host.getConversationSyncFingerprint(messages));
-      this.host.startConversationSyncLoop();
-
-      if (messagesEl) {
-        if (runtime) {
-          runtime.autoScrollEnabled = shouldStickToBottom;
-        }
-        const scrollSnapshot = captureElementScrollRestoreSnapshot(
-          messagesEl,
-          !preserveScrollPosition || shouldStickToBottom,
-          previousScrollTop,
-        );
-        restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
-          runtime,
-          onRestoreBottom: () => {
-            this.host.scrollToBottom({ tabId: activeTabId });
-          },
-          onRestored: () => {
-            this.host.syncPaneScrollMetrics(activeTabId, messagesEl);
-          },
-          requestAnimationFrame: (callback) => this.host.requestAnimationFrame(callback),
-        });
-        this.host.requestAnimationFrame(() => {
-          messagesEl.classList.remove('is-rehydrating');
-        });
-      }
-
-      this.host.scheduleComposerLayoutSync();
-      this.host.updateModelSelectorDisplay();
-      this.host.syncActiveTabContextUsageIdentity();
-      await this.host.refreshActiveTabContextUsageFromServer();
+      const messages = await this.conversationLoadRuntimeBridge.loadConversationMessages(
+        conversation,
+        activeTabId,
+        this.buildConversationLoadRuntimeOptions(options),
+      );
+      await this.conversationHydrationOutcomeBridge.applyLoadedConversationOutcome(
+        activeTabId,
+        conversation,
+        messages,
+      );
+      this.conversationTransitionBridge.restoreLoadedConversationTransition(transitionContext);
+      await this.tabViewActivationBridge.applyLoadedConversationHydrationTail();
     } finally {
-      this.host.endConversationHydration(activeTabId);
+      this.conversationTransitionBridge.endLoadedConversationTransition(transitionContext);
     }
   }
 
-  private async resolveConversation(id: string): Promise<Conversation | null> {
-    let conversation = await this.host.getConversationById(id);
-    if (!conversation) {
-      await this.host.loadConversations();
-      conversation = await this.host.getConversationById(id);
-    }
-
-    return conversation;
+  private buildConversationLoadRuntimeOptions(
+    options: LoadConversationOptions,
+  ): ConversationLoadRuntimeOptions {
+    return {
+      forceServerSync: options.forceServerSync,
+    };
   }
 }

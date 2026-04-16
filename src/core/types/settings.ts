@@ -91,6 +91,15 @@ export type InputPanelThemeId =
 export type InputPanelActionButtonStyleId = 'default' | 'etched';
 
 export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin' | 'shudingDiamond';
+export type InputPanelThemeFamily = 'preset' | 'glass-refraction' | 'liquid-glass';
+export type GlassRefractionInputPanelThemeId = Exclude<
+  InputPanelThemeId,
+  'preset' | 'liquid-glass-shuding' | 'liquid-glass-nikdelvin'
+>;
+export type LiquidGlassInputPanelThemeId = Extract<
+  InputPanelThemeId,
+  'liquid-glass-shuding' | 'liquid-glass-nikdelvin'
+>;
 
 export type ChatAppearanceBackgroundFitMode = 'cover' | 'contain' | 'fit-width' | 'fit-height';
 
@@ -164,6 +173,81 @@ export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
       return 'preset';
     default:
       return 'preset';
+  }
+}
+
+export function getInputPanelThemeFamily(themeId: InputPanelThemeId): InputPanelThemeFamily {
+  if (themeId === 'preset') {
+    return 'preset';
+  }
+
+  if (
+    themeId === 'liquid-glass-shuding'
+    || themeId === 'liquid-glass-nikdelvin'
+  ) {
+    return 'liquid-glass';
+  }
+
+  return 'glass-refraction';
+}
+
+export function normalizeGlassRefractionInputPanelThemeId(
+  themeId: InputPanelThemeId,
+): GlassRefractionInputPanelThemeId {
+  switch (themeId) {
+    case 'glass-refraction-card':
+    case 'glass-refraction-pill':
+    case 'glass-refraction-glass':
+      return themeId;
+    default:
+      return 'glass-refraction-glass';
+  }
+}
+
+export function normalizeLiquidGlassInputPanelThemeId(
+  themeId: InputPanelThemeId,
+): LiquidGlassInputPanelThemeId {
+  switch (themeId) {
+    case 'liquid-glass-shuding':
+    case 'liquid-glass-nikdelvin':
+      return themeId;
+    default:
+      return 'liquid-glass-shuding';
+  }
+}
+
+export function getLiquidGlassAdapterIdForInputPanelTheme(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
+  switch (themeId) {
+    case 'liquid-glass-shuding':
+      return 'shuding';
+    case 'liquid-glass-nikdelvin':
+      return 'nikdelvin';
+    default:
+      return null;
+  }
+}
+
+export function getInputPanelThemeIdForLiquidGlassAdapter(adapterId: LiquidGlassAdapterId): InputPanelThemeId {
+  switch (adapterId) {
+    case 'shuding':
+      return 'liquid-glass-shuding';
+    case 'nikdelvin':
+      return 'liquid-glass-nikdelvin';
+    default:
+      return 'preset';
+  }
+}
+
+export function getInputPanelGlassRefractionVariantId(
+  themeId: InputPanelThemeId,
+): InputPanelGlassRefractionVariantId {
+  switch (normalizeGlassRefractionInputPanelThemeId(themeId)) {
+    case 'glass-refraction-card':
+      return 'card';
+    case 'glass-refraction-pill':
+      return 'pill';
+    default:
+      return 'glass';
   }
 }
 
@@ -374,6 +458,74 @@ export function getCurrentPlatformDebugLogPath(paths: PlatformDebugLogPaths): st
   return paths[getCurrentPlatformKey()];
 }
 
+function normalizeTrimmedString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue.length > 0 ? normalizedValue : undefined;
+}
+
+function normalizeProviderIconEntryType(value: unknown): ProviderIconEntryType | null {
+  switch (value) {
+    case 'mapped':
+    case 'builtin':
+    case 'url':
+    case 'file':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeProviderIconResolvedVariantValue(
+  value: unknown,
+): Exclude<LobehubIconVariant, 'auto'> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalizedVariant = normalizeLobehubIconVariant(value);
+  return normalizedVariant === 'auto' ? undefined : normalizedVariant;
+}
+
+function normalizeProviderIconEntry(value: unknown): ProviderIconEntry | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as Partial<ProviderIconEntry>;
+  const id = normalizeTrimmedString(candidate.id);
+  const type = normalizeProviderIconEntryType(candidate.type);
+  const source = normalizeTrimmedString(candidate.source);
+
+  if (!id || !type || !source) {
+    return null;
+  }
+
+  if (type === 'builtin' && !/^(lobehub|opencode):[^:\s]+$/i.test(source)) {
+    return null;
+  }
+
+  return {
+    id,
+    type,
+    source,
+    variant: normalizeLobehubIconVariant(candidate.variant),
+    resolvedVariant: normalizeProviderIconResolvedVariantValue(candidate.resolvedVariant),
+    resolvedFormat: normalizeProviderIconResolvedFormat(candidate.resolvedFormat),
+    mimeType: normalizeTrimmedString(candidate.mimeType),
+    cacheFileName: normalizeTrimmedString(candidate.cacheFileName),
+    addedAt: typeof candidate.addedAt === 'number' && Number.isFinite(candidate.addedAt)
+      ? candidate.addedAt
+      : Date.now(),
+    updatedAt: typeof candidate.updatedAt === 'number' && Number.isFinite(candidate.updatedAt)
+      ? candidate.updatedAt
+      : undefined,
+  };
+}
+
 export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrary {
   if (!value || typeof value !== 'object') {
     return {};
@@ -382,68 +534,18 @@ export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrar
   const normalizedLibrary: ProviderIconLibrary = {};
 
   for (const [providerId, entries] of Object.entries(value as Record<string, unknown>)) {
-    if (!providerId.trim() || !Array.isArray(entries)) {
+    const normalizedProviderId = normalizeTrimmedString(providerId);
+    if (!normalizedProviderId || !Array.isArray(entries)) {
       continue;
     }
 
     const normalizedEntries = entries.flatMap((entry) => {
-      if (!entry || typeof entry !== 'object') {
-        return [];
-      }
-
-      const candidate = entry as Partial<ProviderIconEntry>;
-      const id = typeof candidate.id === 'string' && candidate.id.trim()
-        ? candidate.id.trim()
-        : '';
-      const source = typeof candidate.source === 'string' && candidate.source.trim()
-        ? candidate.source.trim()
-        : '';
-
-      if (!id || !source) {
-        return [];
-      }
-
-      if (
-        candidate.type !== 'mapped'
-        && candidate.type !== 'builtin'
-        && candidate.type !== 'url'
-        && candidate.type !== 'file'
-      ) {
-        return [];
-      }
-
-      if (candidate.type === 'builtin' && !/^(lobehub|opencode):[^:\s]+$/i.test(source)) {
-        return [];
-      }
-
-      return [{
-        id,
-        type: candidate.type,
-        source,
-        variant: normalizeLobehubIconVariant(candidate.variant),
-        resolvedVariant: candidate.resolvedVariant === undefined
-          ? undefined
-          : normalizeLobehubIconVariant(candidate.resolvedVariant) === 'auto'
-            ? undefined
-            : normalizeLobehubIconVariant(candidate.resolvedVariant) as Exclude<LobehubIconVariant, 'auto'>,
-        resolvedFormat: normalizeProviderIconResolvedFormat(candidate.resolvedFormat),
-        mimeType: typeof candidate.mimeType === 'string' && candidate.mimeType.trim()
-          ? candidate.mimeType.trim()
-          : undefined,
-        cacheFileName: typeof candidate.cacheFileName === 'string' && candidate.cacheFileName.trim()
-          ? candidate.cacheFileName.trim()
-          : undefined,
-        addedAt: typeof candidate.addedAt === 'number' && Number.isFinite(candidate.addedAt)
-          ? candidate.addedAt
-          : Date.now(),
-        updatedAt: typeof candidate.updatedAt === 'number' && Number.isFinite(candidate.updatedAt)
-          ? candidate.updatedAt
-          : undefined,
-      } satisfies ProviderIconEntry];
+      const normalizedEntry = normalizeProviderIconEntry(entry);
+      return normalizedEntry ? [normalizedEntry] : [];
     });
 
     if (normalizedEntries.length > 0) {
-      normalizedLibrary[providerId.trim()] = normalizedEntries;
+      normalizedLibrary[normalizedProviderId] = normalizedEntries;
     }
   }
 
@@ -932,240 +1034,263 @@ export function normalizeInputPanelGlassRefractionSvgFilterSettings(
   };
 }
 
+type LiquidGlassAdapterSettings = InputPanelLiquidGlassSettings['shuding'];
+
+function normalizeShudingLiquidGlassSettings(
+  value: LiquidGlassAdapterSettings | undefined,
+  defaults: LiquidGlassAdapterSettings,
+): LiquidGlassAdapterSettings {
+  const shuding = value ?? {};
+  return {
+    displacementScale: normalizeFiniteNumber(
+      shuding.displacementScale,
+      defaults.displacementScale as number,
+    ),
+    blurAmount: normalizeFiniteNumber(
+      shuding.blurAmount,
+      defaults.blurAmount as number,
+    ),
+    adaptiveSdf: normalizeBoolean(
+      shuding.adaptiveSdf,
+      defaults.adaptiveSdf as boolean,
+    ),
+    adaptiveSdfMix: normalizeFiniteNumberInRange(
+      shuding.adaptiveSdfMix,
+      defaults.adaptiveSdfMix as number,
+      0,
+      1,
+    ),
+    rectEdgeRefraction: normalizeBoolean(
+      shuding.rectEdgeRefraction,
+      defaults.rectEdgeRefraction as boolean,
+    ),
+    rectEdgeRefractionStrength: normalizeFiniteNumberInRange(
+      shuding.rectEdgeRefractionStrength,
+      defaults.rectEdgeRefractionStrength as number,
+      0,
+      2,
+    ),
+    cornerEnhancement: normalizeBoolean(
+      shuding.cornerEnhancement,
+      defaults.cornerEnhancement as boolean,
+    ),
+    cornerEnhancementStrength: normalizeFiniteNumberInRange(
+      shuding.cornerEnhancementStrength,
+      defaults.cornerEnhancementStrength as number,
+      0,
+      2,
+    ),
+    edgeBandWidth: normalizeFiniteNumberInRange(
+      shuding.edgeBandWidth,
+      defaults.edgeBandWidth as number,
+      0,
+      0.2,
+    ),
+    barrelDistortion: normalizeBoolean(
+      shuding.barrelDistortion,
+      defaults.barrelDistortion as boolean,
+    ),
+    barrelStrength: normalizeFiniteNumberInRange(
+      shuding.barrelStrength,
+      defaults.barrelStrength as number,
+      0,
+      0.1,
+    ),
+    topHighlight: normalizeBoolean(
+      shuding.topHighlight,
+      defaults.topHighlight as boolean,
+    ),
+    topHighlightOpacity: normalizeFiniteNumberInRange(
+      shuding.topHighlightOpacity,
+      defaults.topHighlightOpacity as number,
+      0,
+      1,
+    ),
+    innerBorder: normalizeBoolean(
+      shuding.innerBorder,
+      defaults.innerBorder as boolean,
+    ),
+    innerBorderOpacity: normalizeFiniteNumberInRange(
+      shuding.innerBorderOpacity,
+      defaults.innerBorderOpacity as number,
+      0,
+      1,
+    ),
+    bottomShadow: normalizeBoolean(
+      shuding.bottomShadow,
+      defaults.bottomShadow as boolean,
+    ),
+    bottomShadowOpacity: normalizeFiniteNumberInRange(
+      shuding.bottomShadowOpacity,
+      defaults.bottomShadowOpacity as number,
+      0,
+      1,
+    ),
+    insetDepthShadow: normalizeBoolean(
+      shuding.insetDepthShadow,
+      defaults.insetDepthShadow as boolean,
+    ),
+    insetDepthShadowOpacity: normalizeFiniteNumberInRange(
+      shuding.insetDepthShadowOpacity,
+      defaults.insetDepthShadowOpacity as number,
+      0,
+      1,
+    ),
+    insetShadowBlur: normalizeFiniteNumberInRange(
+      shuding.insetShadowBlur,
+      defaults.insetShadowBlur as number,
+      5,
+      30,
+    ),
+    contrastBoost: normalizeFiniteNumberInRange(
+      shuding.contrastBoost,
+      defaults.contrastBoost as number,
+      1,
+      1.5,
+    ),
+    brightnessBoost: normalizeFiniteNumberInRange(
+      shuding.brightnessBoost,
+      defaults.brightnessBoost as number,
+      1,
+      1.2,
+    ),
+    saturateBoost: normalizeFiniteNumberInRange(
+      shuding.saturateBoost,
+      defaults.saturateBoost as number,
+      1,
+      1.3,
+    ),
+  };
+}
+
+function normalizeNikdelvinLiquidGlassSettings(
+  value: LiquidGlassAdapterSettings | undefined,
+  defaults: LiquidGlassAdapterSettings,
+): LiquidGlassAdapterSettings {
+  const nikdelvin = value ?? {};
+  return {
+    depth: normalizeFiniteNumberInRange(
+      nikdelvin.depth,
+      defaults.depth as number,
+      0,
+      40,
+    ),
+    strength: normalizeFiniteNumberInRange(
+      nikdelvin.strength,
+      defaults.strength as number,
+      0,
+      200,
+    ),
+    chromaticAberration: normalizeFiniteNumberInRange(
+      nikdelvin.chromaticAberration,
+      defaults.chromaticAberration as number,
+      0,
+      10,
+    ),
+    blur: normalizeFiniteNumberInRange(
+      nikdelvin.blur,
+      defaults.blur as number,
+      0,
+      10,
+    ),
+    backgroundPreset:
+      nikdelvin.backgroundPreset === 'background'
+      || nikdelvin.backgroundPreset === 'lines'
+      || nikdelvin.backgroundPreset === 'rocks'
+      || nikdelvin.backgroundPreset === 'chrome'
+      || nikdelvin.backgroundPreset === 'silk'
+      || nikdelvin.backgroundPreset === 'none'
+        ? nikdelvin.backgroundPreset
+        : defaults.backgroundPreset,
+    color:
+      nikdelvin.color === 'black'
+      || nikdelvin.color === 'white'
+      || nikdelvin.color === 'transparent'
+        ? nikdelvin.color
+        : defaults.color,
+    background:
+      typeof nikdelvin.background === 'string'
+        ? nikdelvin.background.trim()
+        : defaults.background,
+    freeze: normalizeBoolean(
+      nikdelvin.freeze,
+      defaults.freeze as boolean,
+    ),
+    noMorph: normalizeBoolean(
+      nikdelvin.noMorph,
+      defaults.noMorph as boolean,
+    ),
+    button: normalizeBoolean(
+      nikdelvin.button,
+      defaults.button as boolean,
+    ),
+    inline: normalizeBoolean(
+      nikdelvin.inline,
+      defaults.inline as boolean,
+    ),
+    customEffects: normalizeBoolean(
+      nikdelvin.customEffects,
+      defaults.customEffects as boolean,
+    ),
+  };
+}
+
+function normalizeShudingDiamondLiquidGlassSettings(
+  value: LiquidGlassAdapterSettings | undefined,
+  defaults: LiquidGlassAdapterSettings,
+): LiquidGlassAdapterSettings {
+  const shudingDiamond = value ?? {};
+  return {
+    displacementScale: normalizeFiniteNumber(
+      shudingDiamond.displacementScale,
+      defaults.displacementScale as number,
+    ),
+    bloomOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.bloomOpacity,
+      defaults.bloomOpacity as number,
+      0,
+      1,
+    ),
+    rimOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.rimOpacity,
+      defaults.rimOpacity as number,
+      0,
+      1,
+    ),
+    faceOverlayOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.faceOverlayOpacity,
+      defaults.faceOverlayOpacity as number,
+      0,
+      1,
+    ),
+    supportOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.supportOpacity,
+      defaults.supportOpacity as number,
+      0,
+      1,
+    ),
+    pointerTracking: normalizeBoolean(
+      shudingDiamond.pointerTracking,
+      defaults.pointerTracking as boolean,
+    ),
+    pointerTilt: normalizeFiniteNumberInRange(
+      shudingDiamond.pointerTilt,
+      defaults.pointerTilt as number,
+      0,
+      2,
+    ),
+  };
+}
+
 export function normalizeInputPanelLiquidGlassSettings(
   value?: Partial<InputPanelLiquidGlassSettings> | null,
 ): InputPanelLiquidGlassSettings {
   const defaults = getDefaultInputPanelLiquidGlassSettings();
-  const shuding = value?.shuding ?? {};
-  const nikdelvin = value?.nikdelvin ?? {};
-  const shudingDiamond = value?.shudingDiamond ?? {};
 
   return {
-    shuding: {
-      displacementScale: normalizeFiniteNumber(
-        shuding.displacementScale,
-        defaults.shuding.displacementScale as number,
-      ),
-      blurAmount: normalizeFiniteNumber(
-        shuding.blurAmount,
-        defaults.shuding.blurAmount as number,
-      ),
-      adaptiveSdf: normalizeBoolean(
-        shuding.adaptiveSdf,
-        defaults.shuding.adaptiveSdf as boolean,
-      ),
-      adaptiveSdfMix: normalizeFiniteNumberInRange(
-        shuding.adaptiveSdfMix,
-        defaults.shuding.adaptiveSdfMix as number,
-        0,
-        1,
-      ),
-      rectEdgeRefraction: normalizeBoolean(
-        shuding.rectEdgeRefraction,
-        defaults.shuding.rectEdgeRefraction as boolean,
-      ),
-      rectEdgeRefractionStrength: normalizeFiniteNumberInRange(
-        shuding.rectEdgeRefractionStrength,
-        defaults.shuding.rectEdgeRefractionStrength as number,
-        0,
-        2,
-      ),
-      cornerEnhancement: normalizeBoolean(
-        shuding.cornerEnhancement,
-        defaults.shuding.cornerEnhancement as boolean,
-      ),
-      cornerEnhancementStrength: normalizeFiniteNumberInRange(
-        shuding.cornerEnhancementStrength,
-        defaults.shuding.cornerEnhancementStrength as number,
-        0,
-        2,
-      ),
-      edgeBandWidth: normalizeFiniteNumberInRange(
-        shuding.edgeBandWidth,
-        defaults.shuding.edgeBandWidth as number,
-        0,
-        0.2,
-      ),
-      barrelDistortion: normalizeBoolean(
-        shuding.barrelDistortion,
-        defaults.shuding.barrelDistortion as boolean,
-      ),
-      barrelStrength: normalizeFiniteNumberInRange(
-        shuding.barrelStrength,
-        defaults.shuding.barrelStrength as number,
-        0,
-        0.1,
-      ),
-      topHighlight: normalizeBoolean(
-        shuding.topHighlight,
-        defaults.shuding.topHighlight as boolean,
-      ),
-      topHighlightOpacity: normalizeFiniteNumberInRange(
-        shuding.topHighlightOpacity,
-        defaults.shuding.topHighlightOpacity as number,
-        0,
-        1,
-      ),
-      innerBorder: normalizeBoolean(
-        shuding.innerBorder,
-        defaults.shuding.innerBorder as boolean,
-      ),
-      innerBorderOpacity: normalizeFiniteNumberInRange(
-        shuding.innerBorderOpacity,
-        defaults.shuding.innerBorderOpacity as number,
-        0,
-        1,
-      ),
-      bottomShadow: normalizeBoolean(
-        shuding.bottomShadow,
-        defaults.shuding.bottomShadow as boolean,
-      ),
-      bottomShadowOpacity: normalizeFiniteNumberInRange(
-        shuding.bottomShadowOpacity,
-        defaults.shuding.bottomShadowOpacity as number,
-        0,
-        1,
-      ),
-      insetDepthShadow: normalizeBoolean(
-        shuding.insetDepthShadow,
-        defaults.shuding.insetDepthShadow as boolean,
-      ),
-      insetDepthShadowOpacity: normalizeFiniteNumberInRange(
-        shuding.insetDepthShadowOpacity,
-        defaults.shuding.insetDepthShadowOpacity as number,
-        0,
-        1,
-      ),
-      insetShadowBlur: normalizeFiniteNumberInRange(
-        shuding.insetShadowBlur,
-        defaults.shuding.insetShadowBlur as number,
-        5,
-        30,
-      ),
-      contrastBoost: normalizeFiniteNumberInRange(
-        shuding.contrastBoost,
-        defaults.shuding.contrastBoost as number,
-        1,
-        1.5,
-      ),
-      brightnessBoost: normalizeFiniteNumberInRange(
-        shuding.brightnessBoost,
-        defaults.shuding.brightnessBoost as number,
-        1,
-        1.2,
-      ),
-      saturateBoost: normalizeFiniteNumberInRange(
-        shuding.saturateBoost,
-        defaults.shuding.saturateBoost as number,
-        1,
-        1.3,
-      ),
-    },
-    nikdelvin: {
-      depth: normalizeFiniteNumberInRange(
-        nikdelvin.depth,
-        defaults.nikdelvin.depth as number,
-        0,
-        40,
-      ),
-      strength: normalizeFiniteNumberInRange(
-        nikdelvin.strength,
-        defaults.nikdelvin.strength as number,
-        0,
-        200,
-      ),
-      chromaticAberration: normalizeFiniteNumberInRange(
-        nikdelvin.chromaticAberration,
-        defaults.nikdelvin.chromaticAberration as number,
-        0,
-        10,
-      ),
-      blur: normalizeFiniteNumberInRange(
-        nikdelvin.blur,
-        defaults.nikdelvin.blur as number,
-        0,
-        10,
-      ),
-      backgroundPreset:
-        nikdelvin.backgroundPreset === 'background'
-        || nikdelvin.backgroundPreset === 'lines'
-        || nikdelvin.backgroundPreset === 'rocks'
-        || nikdelvin.backgroundPreset === 'chrome'
-        || nikdelvin.backgroundPreset === 'silk'
-        || nikdelvin.backgroundPreset === 'none'
-          ? nikdelvin.backgroundPreset
-          : defaults.nikdelvin.backgroundPreset,
-      color:
-        nikdelvin.color === 'black'
-        || nikdelvin.color === 'white'
-        || nikdelvin.color === 'transparent'
-          ? nikdelvin.color
-          : defaults.nikdelvin.color,
-      background:
-        typeof nikdelvin.background === 'string'
-          ? nikdelvin.background.trim()
-          : defaults.nikdelvin.background,
-      freeze: normalizeBoolean(
-        nikdelvin.freeze,
-        defaults.nikdelvin.freeze as boolean,
-      ),
-      noMorph: normalizeBoolean(
-        nikdelvin.noMorph,
-        defaults.nikdelvin.noMorph as boolean,
-      ),
-      button: normalizeBoolean(
-        nikdelvin.button,
-        defaults.nikdelvin.button as boolean,
-      ),
-      inline: normalizeBoolean(
-        nikdelvin.inline,
-        defaults.nikdelvin.inline as boolean,
-      ),
-      customEffects: normalizeBoolean(
-        nikdelvin.customEffects,
-        defaults.nikdelvin.customEffects as boolean,
-      ),
-    },
-    shudingDiamond: {
-      displacementScale: normalizeFiniteNumber(
-        shudingDiamond.displacementScale,
-        defaults.shudingDiamond.displacementScale as number,
-      ),
-      bloomOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.bloomOpacity,
-        defaults.shudingDiamond.bloomOpacity as number,
-        0,
-        1,
-      ),
-      rimOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.rimOpacity,
-        defaults.shudingDiamond.rimOpacity as number,
-        0,
-        1,
-      ),
-      faceOverlayOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.faceOverlayOpacity,
-        defaults.shudingDiamond.faceOverlayOpacity as number,
-        0,
-        1,
-      ),
-      supportOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.supportOpacity,
-        defaults.shudingDiamond.supportOpacity as number,
-        0,
-        1,
-      ),
-      pointerTracking: normalizeBoolean(
-        shudingDiamond.pointerTracking,
-        defaults.shudingDiamond.pointerTracking as boolean,
-      ),
-      pointerTilt: normalizeFiniteNumberInRange(
-        shudingDiamond.pointerTilt,
-        defaults.shudingDiamond.pointerTilt as number,
-        0,
-        2,
-      ),
-    },
+    shuding: normalizeShudingLiquidGlassSettings(value?.shuding, defaults.shuding),
+    nikdelvin: normalizeNikdelvinLiquidGlassSettings(value?.nikdelvin, defaults.nikdelvin),
+    shudingDiamond: normalizeShudingDiamondLiquidGlassSettings(value?.shudingDiamond, defaults.shudingDiamond),
   };
 }
 
@@ -1229,12 +1354,86 @@ export function normalizePartialChatAppearanceSettings(
   return normalized;
 }
 
+function normalizeChatAppearanceBackgroundSettings(
+  background: Partial<ChatAppearanceBackgroundSettings> | null | undefined,
+  defaults: ChatAppearanceBackgroundSettings,
+): ChatAppearanceBackgroundSettings {
+  return {
+    ...defaults,
+    ...(background ?? {}),
+    imagePath: typeof background?.imagePath === 'string' ? background.imagePath.trim() : defaults.imagePath,
+    imageMimeType: typeof background?.imageMimeType === 'string'
+      ? background.imageMimeType.trim()
+      : defaults.imageMimeType,
+    imageDisplayName: typeof background?.imageDisplayName === 'string'
+      ? background.imageDisplayName.trim()
+      : defaults.imageDisplayName,
+    fitMode: normalizeChatAppearanceBackgroundFitMode(background?.fitMode),
+    opacity: normalizeFiniteNumberInRange(background?.opacity, defaults.opacity, 0, 100),
+    blur: normalizeFiniteNumberInRange(background?.blur, defaults.blur, 0, 48),
+    depth: normalizeFiniteNumberInRange(background?.depth, defaults.depth, 0, 36),
+    dim: normalizeFiniteNumberInRange(background?.dim, defaults.dim, 0, 88),
+    edgeFade: normalizeFiniteNumberInRange(background?.edgeFade, defaults.edgeFade, 0, 80),
+    saturation: normalizeFiniteNumberInRange(background?.saturation, defaults.saturation, 50, 200),
+    brightness: normalizeFiniteNumberInRange(background?.brightness, defaults.brightness, 40, 140),
+    focusX: normalizeFiniteNumberInRange(background?.focusX, defaults.focusX, 0, 100),
+    focusY: normalizeFiniteNumberInRange(background?.focusY, defaults.focusY, 0, 100),
+  };
+}
+
+function normalizeChatAppearanceUserSettings(
+  user: Partial<ChatAppearanceUserSettings> | null | undefined,
+  defaults: ChatAppearanceUserSettings,
+): ChatAppearanceUserSettings {
+  return {
+    ...defaults,
+    ...(user ?? {}),
+    timeFontSize: normalizeFiniteNumberInRange(user?.timeFontSize, defaults.timeFontSize, 6, 36),
+    timeFontWeight: normalizeFontWeightValue(user?.timeFontWeight, defaults.timeFontWeight),
+    timeColor: normalizeCssColorValue(user?.timeColor, defaults.timeColor),
+  };
+}
+
+function normalizeChatAppearanceAssistantSettings(
+  assistant: Partial<ChatAppearanceAssistantSettings> | null | undefined,
+  defaults: ChatAppearanceAssistantSettings,
+): ChatAppearanceAssistantSettings {
+  const normalizedMetaFontSize = normalizeFiniteNumberInRange(
+    assistant?.metaFontSize,
+    defaults.metaFontSize,
+    6,
+    36,
+  );
+
+  return {
+    ...defaults,
+    ...(assistant ?? {}),
+    metaFontSize: normalizedMetaFontSize,
+    timeFontSize: normalizeFiniteNumberInRange(assistant?.timeFontSize, normalizedMetaFontSize, 6, 36),
+    timeFontWeight: normalizeFontWeightValue(assistant?.timeFontWeight, defaults.timeFontWeight),
+    metaColor: normalizeCssColorValue(assistant?.metaColor, defaults.metaColor),
+    timeColor: normalizeCssColorValue(assistant?.timeColor, defaults.timeColor),
+    modelIdFontSize: normalizeFiniteNumberInRange(assistant?.modelIdFontSize, normalizedMetaFontSize, 6, 36),
+    modelIdFontWeight: normalizeFontWeightValue(assistant?.modelIdFontWeight, defaults.modelIdFontWeight),
+    modelIdColor: normalizeCssColorValue(assistant?.modelIdColor, defaults.modelIdColor),
+  };
+}
+
+function normalizeChatAppearanceInputSettings(
+  input: Partial<ChatAppearanceInputSettings> | null | undefined,
+  defaults: ChatAppearanceInputSettings,
+): ChatAppearanceInputSettings {
+  return {
+    ...defaults,
+    ...(input ?? {}),
+    actionButtonStyle: normalizeInputPanelActionButtonStyleId(input?.actionButtonStyle),
+  };
+}
+
 export function normalizeChatAppearanceSettings(
   appearance?: PartialChatAppearanceSettings | null,
 ): ChatAppearanceSettings {
   const defaults = getDefaultChatAppearanceSettings();
-  const background = appearance?.background;
-  const assistant = appearance?.assistant;
 
   return {
     layout: {
@@ -1245,63 +1444,10 @@ export function normalizeChatAppearanceSettings(
       ...defaults.sticky,
       ...(appearance?.sticky ?? {}),
     },
-    background: {
-      ...defaults.background,
-      ...(background ?? {}),
-      imagePath: typeof background?.imagePath === 'string' ? background.imagePath.trim() : defaults.background.imagePath,
-      imageMimeType:
-        typeof background?.imageMimeType === 'string'
-          ? background.imageMimeType.trim()
-          : defaults.background.imageMimeType,
-      imageDisplayName:
-        typeof background?.imageDisplayName === 'string'
-          ? background.imageDisplayName.trim()
-          : defaults.background.imageDisplayName,
-      fitMode: normalizeChatAppearanceBackgroundFitMode(background?.fitMode),
-      opacity: normalizeFiniteNumberInRange(background?.opacity, defaults.background.opacity, 0, 100),
-      blur: normalizeFiniteNumberInRange(background?.blur, defaults.background.blur, 0, 48),
-      depth: normalizeFiniteNumberInRange(background?.depth, defaults.background.depth, 0, 36),
-      dim: normalizeFiniteNumberInRange(background?.dim, defaults.background.dim, 0, 88),
-      edgeFade: normalizeFiniteNumberInRange(background?.edgeFade, defaults.background.edgeFade, 0, 80),
-      saturation: normalizeFiniteNumberInRange(background?.saturation, defaults.background.saturation, 50, 200),
-      brightness: normalizeFiniteNumberInRange(background?.brightness, defaults.background.brightness, 40, 140),
-      focusX: normalizeFiniteNumberInRange(background?.focusX, defaults.background.focusX, 0, 100),
-      focusY: normalizeFiniteNumberInRange(background?.focusY, defaults.background.focusY, 0, 100),
-    },
-    user: {
-      ...defaults.user,
-      ...(appearance?.user ?? {}),
-      timeFontSize: normalizeFiniteNumberInRange(appearance?.user?.timeFontSize, defaults.user.timeFontSize, 6, 36),
-      timeFontWeight: normalizeFontWeightValue(appearance?.user?.timeFontWeight, defaults.user.timeFontWeight),
-      timeColor: normalizeCssColorValue(appearance?.user?.timeColor, defaults.user.timeColor),
-    },
-    assistant: {
-      ...defaults.assistant,
-      ...(assistant ?? {}),
-      metaFontSize: normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.metaFontSize, 6, 36),
-      timeFontSize: normalizeFiniteNumberInRange(
-        assistant?.timeFontSize,
-        normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.timeFontSize, 6, 36),
-        6,
-        36,
-      ),
-      timeFontWeight: normalizeFontWeightValue(assistant?.timeFontWeight, defaults.assistant.timeFontWeight),
-      metaColor: normalizeCssColorValue(assistant?.metaColor, defaults.assistant.metaColor),
-      timeColor: normalizeCssColorValue(assistant?.timeColor, defaults.assistant.timeColor),
-      modelIdFontSize: normalizeFiniteNumberInRange(
-        assistant?.modelIdFontSize,
-        normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.modelIdFontSize, 6, 36),
-        6,
-        36,
-      ),
-      modelIdFontWeight: normalizeFontWeightValue(assistant?.modelIdFontWeight, defaults.assistant.modelIdFontWeight),
-      modelIdColor: normalizeCssColorValue(assistant?.modelIdColor, defaults.assistant.modelIdColor),
-    },
-    input: {
-      ...defaults.input,
-      ...(appearance?.input ?? {}),
-      actionButtonStyle: normalizeInputPanelActionButtonStyleId(appearance?.input?.actionButtonStyle),
-    },
+    background: normalizeChatAppearanceBackgroundSettings(appearance?.background, defaults.background),
+    user: normalizeChatAppearanceUserSettings(appearance?.user, defaults.user),
+    assistant: normalizeChatAppearanceAssistantSettings(appearance?.assistant, defaults.assistant),
+    input: normalizeChatAppearanceInputSettings(appearance?.input, defaults.input),
     scrollbar: {
       ...defaults.scrollbar,
       ...(appearance?.scrollbar ?? {}),
@@ -1581,6 +1727,99 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   hiddenSlashCommands: [],
 };
+
+export function normalizeQuestionCardSettings(
+  value?: Partial<Pick<
+    OpenCodianSettings,
+    'questionDisplayMode' | 'questionCardPosition' | 'showAnsweredQuestionCards'
+  >> | null,
+): Pick<
+  OpenCodianSettings,
+  'questionDisplayMode' | 'questionCardPosition' | 'showAnsweredQuestionCards'
+> {
+  return {
+    questionDisplayMode: normalizeQuestionDisplayMode(value?.questionDisplayMode),
+    questionCardPosition: normalizeQuestionCardPosition(value?.questionCardPosition),
+    showAnsweredQuestionCards:
+      typeof value?.showAnsweredQuestionCards === 'boolean'
+        ? value.showAnsweredQuestionCards
+        : DEFAULT_SETTINGS.showAnsweredQuestionCards,
+  };
+}
+
+export function normalizeModelProviderPluginDebugSettings(
+  value?: (Partial<Pick<
+    OpenCodianSettings,
+    | 'aiTitleModel'
+    | 'disabledModelRefs'
+    | 'renderUserMarkupAsCodeBlocks'
+    | 'pluginIsolationMode'
+    | 'providerIconLibrary'
+    | 'providerIconColorMode'
+    | 'providerIconDefaultVariant'
+    | 'modelAvailabilitySectionOpen'
+    | 'modelToolsSectionOpen'
+    | 'inlineSerializedDebugLogArgs'
+    | 'debugLogPaths'
+  >> & {
+    debugLogPath?: unknown;
+  }) | null,
+): Pick<
+  OpenCodianSettings,
+  | 'aiTitleModel'
+  | 'disabledModelRefs'
+  | 'renderUserMarkupAsCodeBlocks'
+  | 'pluginIsolationMode'
+  | 'providerIconLibrary'
+  | 'providerIconColorMode'
+  | 'providerIconDefaultVariant'
+  | 'modelAvailabilitySectionOpen'
+  | 'modelToolsSectionOpen'
+  | 'inlineSerializedDebugLogArgs'
+  | 'debugLogPaths'
+> {
+  const normalizedDebugLogPaths: PlatformDebugLogPaths = {
+    ...DEFAULT_SETTINGS.debugLogPaths,
+    ...(
+      value?.debugLogPaths && typeof value.debugLogPaths === 'object'
+        ? value.debugLogPaths
+        : {}
+    ),
+  };
+  const legacyDebugLogPath = typeof value?.debugLogPath === 'string'
+    ? value.debugLogPath.trim()
+    : '';
+
+  if (legacyDebugLogPath.length > 0 && !normalizedDebugLogPaths[getCurrentPlatformKey()]) {
+    normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath;
+  }
+
+  return {
+    aiTitleModel: typeof value?.aiTitleModel === 'string' ? value.aiTitleModel.trim() : '',
+    disabledModelRefs: normalizeDisabledModelRefs(value?.disabledModelRefs),
+    renderUserMarkupAsCodeBlocks: normalizeBoolean(
+      value?.renderUserMarkupAsCodeBlocks,
+      DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
+    ),
+    pluginIsolationMode: normalizePluginIsolationMode(value?.pluginIsolationMode),
+    providerIconLibrary: normalizeProviderIconLibrary(value?.providerIconLibrary),
+    providerIconColorMode: normalizeProviderIconColorMode(value?.providerIconColorMode),
+    providerIconDefaultVariant: normalizeLobehubIconVariant(value?.providerIconDefaultVariant),
+    modelAvailabilitySectionOpen: normalizeBoolean(
+      value?.modelAvailabilitySectionOpen,
+      DEFAULT_SETTINGS.modelAvailabilitySectionOpen,
+    ),
+    modelToolsSectionOpen: normalizeBoolean(
+      value?.modelToolsSectionOpen,
+      DEFAULT_SETTINGS.modelToolsSectionOpen,
+    ),
+    inlineSerializedDebugLogArgs: normalizeBoolean(
+      value?.inlineSerializedDebugLogArgs,
+      DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
+    ),
+    debugLogPaths: normalizedDebugLogPaths,
+  };
+}
 
 export function isLocalServerMode(server: ServerConfig): boolean {
   return server.mode === 'local';

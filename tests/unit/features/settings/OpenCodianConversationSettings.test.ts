@@ -143,11 +143,39 @@ function createExtraButtonRecord(name: string): ExtraButtonRecord {
   return record;
 }
 
+const dropdownRecords: DropdownRecord[] = [];
+const toggleRecords: ToggleRecord[] = [];
+const buttonRecords: ButtonRecord[] = [];
+const extraButtonRecords: ExtraButtonRecord[] = [];
+
+function renderConversationSettings() {
+  const plugin = {
+    settings: {
+      ...DEFAULT_SETTINGS,
+      titleMode: 'default',
+      questionDisplayMode: 'all',
+      questionCardPosition: 'inline',
+      showAnsweredQuestionCards: true,
+      aiTitleModel: '',
+      renderUserMarkupAsCodeBlocks: true,
+    },
+    modelConfigService: null,
+    saveSettings: jest.fn().mockResolvedValue(undefined),
+    refreshConversationRendering: jest.fn(),
+    refreshQuestionUi: jest.fn(),
+  } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+  const tab = new OpenCodianSettingTab({} as App, plugin);
+  const containerEl = document.createElement('div');
+
+  document.body.appendChild(containerEl);
+  (tab as unknown as {
+    addConversationSettings: (containerEl: HTMLElement) => HTMLHeadingElement;
+  }).addConversationSettings(containerEl);
+
+  return { plugin, tab };
+}
+
 describe('OpenCodian conversation settings', () => {
-  const dropdownRecords: DropdownRecord[] = [];
-  const toggleRecords: ToggleRecord[] = [];
-  const buttonRecords: ButtonRecord[] = [];
-  const extraButtonRecords: ExtraButtonRecord[] = [];
 
   beforeEach(() => {
     setLocale('en');
@@ -210,47 +238,44 @@ describe('OpenCodian conversation settings', () => {
     jest.restoreAllMocks();
   });
 
-  function renderConversationSettings() {
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        titleMode: 'default',
-        questionDisplayMode: 'all',
-        questionCardPosition: 'inline',
-        showAnsweredQuestionCards: true,
-        aiTitleModel: '',
-        renderUserMarkupAsCodeBlocks: true,
-      },
-      modelConfigService: null,
-      saveSettings: jest.fn().mockResolvedValue(undefined),
-      refreshConversationRendering: jest.fn(),
-      refreshQuestionUi: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
-    const containerEl = document.createElement('div');
-    document.body.appendChild(containerEl);
-
-    (tab as unknown as {
-      addConversationSettings: (containerEl: HTMLElement) => HTMLHeadingElement;
-    }).addConversationSettings(containerEl);
-
-    return { plugin, tab };
-  }
-
   it('registers the question card position dropdown and answered-card toggle with current values', () => {
     renderConversationSettings();
 
+    const questionDisplayMode = dropdownRecords.find(
+      (record) => record.name === t('settings.conversation.questionDisplayMode.name'),
+    );
     const questionCardPosition = dropdownRecords.find(
       (record) => record.name === t('settings.conversation.questionCardPosition.name'),
     );
     const showAnsweredCards = toggleRecords.find(
       (record) => record.name === t('settings.conversation.showAnsweredQuestionCards.name'),
     );
+    const renderUserMarkup = toggleRecords.find(
+      (record) => record.name === t('settings.conversation.userMarkupAsCodeBlocks.name'),
+    );
 
+    expect(questionDisplayMode).toBeDefined();
+    expect(questionDisplayMode?.control.setValue).toHaveBeenCalledWith('all');
     expect(questionCardPosition).toBeDefined();
     expect(questionCardPosition?.control.setValue).toHaveBeenCalledWith('inline');
     expect(showAnsweredCards).toBeDefined();
     expect(showAnsweredCards?.control.setValue).toHaveBeenCalledWith(true);
+    expect(renderUserMarkup).toBeDefined();
+    expect(renderUserMarkup?.control.setValue).toHaveBeenCalledWith(true);
+  });
+
+  it('saves and refreshes the question UI when question display mode changes', async () => {
+    const { plugin } = renderConversationSettings();
+    const questionDisplayMode = dropdownRecords.find(
+      (record) => record.name === t('settings.conversation.questionDisplayMode.name'),
+    );
+
+    await questionDisplayMode?.onChange?.('single');
+
+    expect(plugin.settings.questionDisplayMode).toBe('single');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(plugin.refreshQuestionUi).toHaveBeenCalledTimes(1);
+    expect(plugin.refreshConversationRendering).not.toHaveBeenCalled();
   });
 
   it('saves and refreshes the UI when question card position changes', async () => {
@@ -279,6 +304,20 @@ describe('OpenCodian conversation settings', () => {
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(1);
     expect(plugin.refreshQuestionUi).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves and refreshes conversation rendering when user markup rendering changes', async () => {
+    const { plugin } = renderConversationSettings();
+    const renderUserMarkup = toggleRecords.find(
+      (record) => record.name === t('settings.conversation.userMarkupAsCodeBlocks.name'),
+    );
+
+    await renderUserMarkup?.onChange?.(false);
+
+    expect(plugin.settings.renderUserMarkupAsCodeBlocks).toBe(false);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(1);
+    expect(plugin.refreshQuestionUi).not.toHaveBeenCalled();
   });
 
   it('keeps an unavailable AI title model selected and shows a warning action', async () => {

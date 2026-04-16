@@ -1,141 +1,25 @@
-import { TextDecoder, TextEncoder } from 'util';
-
-import { OpenCodeService } from '../../../../src/core/opencode/OpenCodeService';
+import { SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from '../../../../src/core/opencode/sdkFeatureFlags';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import {
+  createOpenCodeServiceSdkCompatContext,
+  OpenCodeService,
+} from './OpenCodeService.sdkCompat.testSupport';
 
-global.TextDecoder = TextDecoder as unknown as typeof global.TextDecoder;
-global.TextEncoder = TextEncoder as unknown as typeof global.TextEncoder;
+let service: OpenCodeService;
 
-jest.mock('obsidian', () => ({
-  Notice: jest.fn(),
-  requestUrl: jest.fn(),
-}));
+const createServiceWithSdkFlags = () => new OpenCodeService(
+  DEFAULT_SETTINGS,
+  {},
+  { sdkFeatureFlags: SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS },
+);
 
-jest.mock('../../../../src/core/opencode/createSdkClient', () => ({
-  createSdkClient: jest.fn(),
-}));
+beforeEach(() => {
+  ({ service } = createOpenCodeServiceSdkCompatContext());
+});
 
-jest.mock('child_process', () => ({
-  spawn: jest.fn().mockReturnValue({
-    on: jest.fn(),
-    once: jest.fn(),
-    removeListener: jest.fn(),
-    kill: jest.fn(),
-    stdout: { on: jest.fn(), removeListener: jest.fn() },
-    stderr: { on: jest.fn(), removeListener: jest.fn() },
-    killed: false,
-  }),
-  spawnSync: jest.fn().mockReturnValue({ status: 0, error: null }),
-}));
-
-jest.mock('net', () => ({
-  createServer: jest.fn().mockReturnValue({
-    once: jest.fn().mockReturnThis(),
-    listen: jest.fn().mockReturnThis(),
-    close: jest.fn(),
-  }),
-}));
-
-const { createSdkClient: mockCreateSdkClient } = jest.requireMock('../../../../src/core/opencode/createSdkClient') as {
-  createSdkClient: jest.Mock;
-};
-
-describe('OpenCodeService SDK compatibility', () => {
-  const createStream = <TValue>(...values: TValue[]) => ({
-    stream: (async function* () {
-      for (const value of values) {
-        yield value;
-      }
-    })(),
-  });
-
-  const createMockSdkClient = () => ({
-    global: {
-      event: jest.fn().mockResolvedValue(createStream({
-        payload: {
-          type: 'mcp.tools.changed',
-          properties: { server: 'exa' },
-        },
-      })),
-      syncEvent: { subscribe: jest.fn().mockResolvedValue(createStream()) },
-    },
-    event: {
-      subscribe: jest.fn().mockResolvedValue(createStream({
-        type: 'message.part.updated',
-        properties: {
-          sessionID: 'session-1',
-          time: Date.now(),
-          part: {
-            id: 'part-tool',
-            sessionID: 'session-1',
-            messageID: 'message-1',
-            type: 'tool',
-            callID: 'call-1',
-            tool: 'exa_search',
-            state: {
-              status: 'running',
-              input: { query: 'docs' },
-              time: { start: Date.now() },
-            },
-          },
-        },
-      })),
-    },
-    tool: {
-      ids: jest.fn().mockResolvedValue(['read', 'bash', 'vault_tool']),
-      list: jest.fn().mockResolvedValue([
-        { id: 'read', description: 'Read file', parameters: {} },
-        { id: 'vault_tool', description: 'Vault custom tool', parameters: { type: 'object' } },
-      ]),
-    },
-    mcp: {
-      status: jest.fn().mockResolvedValue({
-        exa: { status: 'connected' },
-      }),
-      add: jest.fn().mockResolvedValue({
-        exa: { status: 'connected' },
-      }),
-      connect: jest.fn().mockResolvedValue(true),
-      disconnect: jest.fn().mockResolvedValue(true),
-      auth: {
-        start: jest.fn().mockResolvedValue({ authorizationUrl: 'https://example.com/auth' }),
-        callback: jest.fn().mockResolvedValue({ status: 'connected' }),
-        authenticate: jest.fn().mockResolvedValue({ status: 'connected' }),
-        remove: jest.fn().mockResolvedValue({ success: true }),
-      },
-    },
-    session: {
-      init: jest.fn().mockResolvedValue(true),
-      share: jest.fn().mockResolvedValue({ id: 'session-1', title: 'Shared', time: { created: 1, updated: 1 } }),
-      unshare: jest.fn().mockResolvedValue({ id: 'session-1', title: 'Shared', time: { created: 1, updated: 1 } }),
-      summarize: jest.fn().mockResolvedValue(true),
-      message: jest.fn().mockResolvedValue({ info: { id: 'message-1', role: 'assistant' }, parts: [] }),
-      deleteMessage: jest.fn().mockResolvedValue(true),
-      children: jest.fn().mockResolvedValue([{ id: 'child-1', title: 'Child', time: { created: 1, updated: 1 } }]),
-      command: jest.fn().mockResolvedValue({ info: { id: 'message-2', role: 'assistant' }, parts: [] }),
-      shell: jest.fn().mockResolvedValue({ info: { id: 'message-3', role: 'assistant' }, parts: [] }),
-    },
-    part: {
-      update: jest.fn().mockResolvedValue({ id: 'part-1', type: 'text', text: 'updated' }),
-      delete: jest.fn().mockResolvedValue(true),
-    },
-    provider: {
-      auth: jest.fn().mockResolvedValue({ openai: ['oauth'] }),
-      oauth: {
-        authorize: jest.fn().mockResolvedValue({ url: 'https://example.com/provider-auth' }),
-        callback: jest.fn().mockResolvedValue({ success: true }),
-      },
-    },
-  });
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
+describe('OpenCodeService SDK compatibility wrappers', () => {
   it('exposes MCP, tool catalog, session, part, and provider oauth wrappers', async () => {
-    const mockSdkClient = createMockSdkClient();
-    mockCreateSdkClient.mockReturnValue(mockSdkClient);
-    const service = new OpenCodeService(DEFAULT_SETTINGS);
+    service = createServiceWithSdkFlags();
 
     await expect(service.refreshToolIds()).resolves.toEqual(['read', 'bash', 'vault_tool']);
     await expect(service.listTools('openai', 'gpt-5')).resolves.toHaveLength(2);
@@ -182,120 +66,38 @@ describe('OpenCodeService SDK compatibility', () => {
       url: 'https://example.com/provider-auth',
     });
     await expect(service.completeProviderOAuth('openai', 'code-2')).resolves.toEqual({ success: true });
-  });
-
-  it('hydrates registry tools as custom and observed external tools as MCP', async () => {
-    const mockSdkClient = createMockSdkClient();
-    mockCreateSdkClient.mockReturnValue(mockSdkClient);
-    const service = new OpenCodeService(DEFAULT_SETTINGS);
-    await service.refreshToolIds();
-    (service as unknown as { observeRuntimeToolNames: (tools: string[]) => void }).observeRuntimeToolNames(['exa_search']);
-
-    const customMessage = service.hydrateOpenCodeMessage(
+    await expect(service.listProjects()).resolves.toEqual([{ id: 'project-1' }]);
+    await expect(service.getCurrentProject()).resolves.toEqual({ id: 'project-1' });
+    await expect(service.initializeProjectGit()).resolves.toEqual({ success: true });
+    await expect(service.updateProject('project-1', { name: 'Vault' })).resolves.toEqual({
+      id: 'project-1',
+      name: 'Vault',
+    });
+    await expect(service.listFiles({ recursive: true })).resolves.toEqual([{ path: 'README.md' }]);
+    await expect(service.readFile({ path: 'README.md' })).resolves.toEqual({
+      path: 'README.md',
+      content: '# docs',
+    });
+    await expect(service.getFileStatus({ path: 'README.md' })).resolves.toEqual({ modified: [] });
+    await expect(service.findText({ query: 'docs' })).resolves.toEqual([{ path: 'README.md' }]);
+    await expect(service.findFiles({ query: 'main' })).resolves.toEqual([{ path: 'src/main.ts' }]);
+    await expect(service.findSymbols({ query: 'OpenCode' })).resolves.toEqual([{ name: 'OpenCodeService' }]);
+    await expect(service.getPaths()).resolves.toEqual({ cwd: '/vault' });
+    await expect(service.getVcsInfo({ cwd: '/vault' })).resolves.toEqual({ branch: 'main' });
+    await expect(service.getVcsDiff({ staged: true })).resolves.toEqual({ patch: 'diff --git' });
+    await expect(service.getFormatterStatus()).resolves.toEqual({ prettier: 'ready' });
+    await expect(service.getLspStatus()).resolves.toEqual({ tsserver: 'ready' });
+    await expect(service.getPendingPermissions()).resolves.toEqual([
       {
-        id: 'message-custom',
-        role: 'assistant',
+        id: 'permission-1',
         sessionID: 'session-1',
-        providerID: 'openai',
-        modelID: 'gpt-5',
-        time: { created: 1 },
-      } as never,
-      [{
-        id: 'part-custom',
-        sessionID: 'session-1',
-        messageID: 'message-custom',
-        type: 'tool',
-        callID: 'call-custom',
-        tool: 'vault_tool',
-        state: {
-          status: 'running',
-          input: {},
-          time: { start: 1 },
-        },
-      }] as never,
-    );
-    const mcpMessage = service.hydrateOpenCodeMessage(
-      {
-        id: 'message-mcp',
-        role: 'assistant',
-        sessionID: 'session-1',
-        providerID: 'openai',
-        modelID: 'gpt-5',
-        time: { created: 1 },
-      } as never,
-      [{
-        id: 'part-mcp',
-        sessionID: 'session-1',
-        messageID: 'message-mcp',
-        type: 'tool',
-        callID: 'call-mcp',
-        tool: 'exa_search',
-        state: {
-          status: 'running',
-          input: {},
-          time: { start: 1 },
-        },
-      }] as never,
-    );
-
-    expect(customMessage.contentBlocks?.[0]).toMatchObject({
-      toolKind: 'custom',
-      toolSourceKey: 'vault_tool',
-    });
-    expect(mcpMessage.contentBlocks?.[0]).toMatchObject({
-      toolKind: 'mcp',
-      toolSourceKey: 'exa_search',
-    });
-  });
-
-  it('separates cached tool catalogs by scoped directory', async () => {
-    const mockSdkClient = createMockSdkClient();
-    mockSdkClient.tool.list
-      .mockResolvedValueOnce([
-        { id: 'vault_tool_a', description: 'Vault A tool', parameters: {} },
-      ])
-      .mockResolvedValueOnce([
-        { id: 'vault_tool_b', description: 'Vault B tool', parameters: {} },
-      ]);
-    mockCreateSdkClient.mockReturnValue(mockSdkClient);
-    const service = new OpenCodeService(DEFAULT_SETTINGS);
-
-    service.setVaultPath('C:\\vault-a');
-    await expect(service.listTools('openai', 'gpt-5')).resolves.toMatchObject([
-      { id: 'vault_tool_a' },
+        permission: 'bash',
+        patterns: ['npm test'],
+        metadata: {},
+        always: [],
+      },
     ]);
-
-    service.setVaultPath('C:\\vault-b');
-    await expect(service.listTools('openai', 'gpt-5')).resolves.toMatchObject([
-      { id: 'vault_tool_b' },
-    ]);
-
-    expect(mockSdkClient.tool.list).toHaveBeenCalledTimes(2);
-  });
-
-  it('forwards SDK events and catalog updates', async () => {
-    const mockSdkClient = createMockSdkClient();
-    mockCreateSdkClient.mockReturnValue(mockSdkClient);
-    const service = new OpenCodeService(DEFAULT_SETTINGS);
-    const receivedEvents: string[] = [];
-    const catalogSnapshots: string[][] = [];
-
-    const disposeEvents = service.subscribeToOpenCodeEvents((event) => {
-      const payload = event.payload as { type?: string; payload?: { type?: string } };
-      const type = payload.type ?? payload.payload?.type ?? 'unknown';
-      receivedEvents.push(type);
-    });
-    const disposeCatalog = service.subscribeToCatalogUpdates((snapshot) => {
-      catalogSnapshots.push(snapshot.toolCatalog.observedExternalTools);
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 25));
-
-    disposeEvents();
-    disposeCatalog();
-
-    expect(receivedEvents).toContain('message.part.updated');
-    expect(receivedEvents).toContain('mcp.tools.changed');
-    expect(catalogSnapshots.some((tools) => tools.includes('exa_search'))).toBe(true);
+    await expect(service.respondToPermission('permission-1', 'once', 'Allow once')).resolves.toBeUndefined();
+    await expect(service.respondToSessionPermission('session-1', 'permission-1', 'always')).resolves.toBeUndefined();
   });
 });

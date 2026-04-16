@@ -59,11 +59,39 @@ interface LocalServerLaunch {
   cleanup: () => void;
 }
 
+interface LocalServerLaunchSnapshot {
+  outputTail: string[];
+  exited: boolean;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  error: Error | null;
+}
+
 interface ExistingServerProcessInfo {
   pid: number | null;
   commandLine: string | null;
   looksLikeOpenCodeServe: boolean;
 }
+
+interface ManagedServerShutdownPlan {
+  process: ChildProcess | null;
+  pid: number | null;
+  clearManagedState: boolean;
+  cleanup: boolean;
+  waitForPortReleaseMessage?: string;
+}
+
+type ManagedServerAdoptionOutcome = 'adopted' | 'restart' | 'skip';
+
+type OccupiedLocalEndpointResolution =
+  | { action: 'adopt-managed' }
+  | { action: 'restart-managed' }
+  | { action: 'recycle-orphan'; existingServer: ExistingServerProcessInfo }
+  | {
+      action: 'conflict';
+      existingServer: ExistingServerProcessInfo;
+      diagnostics: ServerDiagnostics;
+    };
 
 export class ServerManager {
   private config: OpenCodeServerConfig;
@@ -177,55 +205,8 @@ export class ServerManager {
       if (!portAvailable) {
         const healthy = await this.checkHealth(5000);
         if (healthy) {
-          const adoption = await this.tryAdoptManagedServer();
-          if (adoption === 'adopted') {
-            logger.debug('Adopted previously managed OpenCode server on port', this.config.local.port);
-            this.setStatus('running');
-            return;
-          }
-          if (adoption === 'restart') {
-            logger.debug('Restarting stale managed OpenCode server on port', this.config.local.port);
-            await this.restartManagedServer();
-            await this.spawnServer();
-            await this.waitForHealthy(this.config.timeout ?? 30000);
-            this.setStatus('running');
-            new Notice('OpenCode server started');
-            return;
-          }
-
-          const existingServer = await this.inspectExistingHealthyServer();
-          if (await this.shouldRecycleUnknownLocalServer(existingServer)) {
-            logger.warn('Recycling orphaned OpenCode sidecar on default plugin endpoint', {
-              host: this.config.local.host,
-              port: this.config.local.port,
-              pid: existingServer.pid,
-            });
-            await this.recycleUnknownLocalServer(existingServer);
-            await this.spawnServer();
-            await this.waitForHealthy(this.config.timeout ?? 30000);
-            this.setDiagnostics({
-              reason: 'local-orphan-restarted',
-              host: this.config.local.host,
-              port: this.config.local.port,
-              pid: existingServer.pid ?? undefined,
-              commandLine: existingServer.commandLine ?? undefined,
-              message: 'Detected and restarted an orphaned plugin sidecar.',
-            });
-            this.setStatus('running');
-            new Notice('OpenCode server started');
-            return;
-          }
-
-          this.setDiagnostics({
-            reason: 'local-conflict',
-            host: this.config.local.host,
-            port: this.config.local.port,
-            pid: existingServer.pid ?? undefined,
-            commandLine: existingServer.commandLine ?? undefined,
-            message: 'Another healthy OpenCode server already occupies the configured local endpoint.',
-          });
-          this.setStatus('conflict');
-          throw new Error(this.buildConflictMessage(existingServer, true));
+          await this.handleHealthyOccupiedLocalEndpoint();
+          return;
         }
         this.setDiagnostics({
           reason: 'local-conflict',
@@ -237,11 +218,7 @@ export class ServerManager {
         throw new Error(`Port ${this.config.local.port} is already in use by another process`);
       }
 
-      await this.spawnServer();
-      await this.waitForHealthy(this.config.timeout ?? 30000);
-
-      this.setStatus('running');
-      new Notice('OpenCode server started');
+      await this.launchLocalServerRuntime();
     } catch (error) {
       if (this.config.mode === 'local' && (this.process || this.managedServerState)) {
         try {
@@ -262,7 +239,8 @@ export class ServerManager {
 
   /** Stop the OpenCode server */
   async stop(): Promise<void> {
-    if (!this.process && !this.managedServerState) {
+    const shutdownPlan = this.createCurrentManagedShutdownPlan();
+    if (!shutdownPlan.process && !shutdownPlan.pid) {
       this.clearLaunchState();
       this.setDiagnostics({ reason: 'none' });
       this.setStatus('stopped');
@@ -276,30 +254,75 @@ export class ServerManager {
     this.setStatus('stopped');
     this.setDiagnostics({ reason: 'none' });
 
-    const managedProcess = this.process;
-    const managedPid = this.managedServerState?.pid;
+    await this.runManagedShutdownLifecycle(shutdownPlan);
+  }
 
-    if (!managedProcess && managedPid) {
-      await this.terminateManagedPid(managedPid);
-      this.clearManagedServerState();
-      this.cleanup();
-      return;
+  dispose(): void {
+    this.setDiagnostics({ reason: 'none' });
+    this.runManagedShutdownLifecycleSync(this.createCurrentManagedShutdownPlan());
+  }
+
+  /** Restart the server */
+  async restart(): Promise<void> {
+    this.setStatus('restarting');
+    await this.stop();
+    await this.start();
+  }
+
+  private createCurrentManagedShutdownPlan(): ManagedServerShutdownPlan {
+    return {
+      process: this.process,
+      pid: this.managedServerState?.pid ?? this.process?.pid ?? null,
+      clearManagedState: true,
+      cleanup: true,
+    };
+  }
+
+  private async runManagedShutdownLifecycle(plan: ManagedServerShutdownPlan): Promise<void> {
+    if (plan.process) {
+      await this.terminateManagedProcess(plan.process);
+    } else if (plan.pid) {
+      await this.terminateManagedPid(plan.pid);
     }
 
-    if (!managedProcess) {
+    if (plan.clearManagedState) {
       this.clearManagedServerState();
-      this.cleanup();
-      return;
     }
 
-    return new Promise((resolve) => {
+    if (plan.waitForPortReleaseMessage) {
+      const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
+      if (!released) {
+        throw new Error(plan.waitForPortReleaseMessage);
+      }
+    }
+
+    if (plan.cleanup) {
+      this.cleanup();
+    }
+  }
+
+  private runManagedShutdownLifecycleSync(plan: ManagedServerShutdownPlan): void {
+    const pid = plan.process?.pid ?? plan.pid;
+    if (pid) {
+      this.terminateManagedPidSync(pid);
+    }
+
+    if (plan.clearManagedState) {
+      this.clearManagedServerState();
+    }
+
+    if (plan.cleanup) {
+      this.cleanup();
+    }
+  }
+
+  private async terminateManagedProcess(managedProcess: ChildProcess): Promise<void> {
+    await new Promise<void>((resolve) => {
       let resolved = false;
 
       const doResolve = () => {
         if (!resolved) {
           resolved = true;
-          this.clearManagedServerState();
-          this.cleanup();
           resolve();
         }
       };
@@ -348,29 +371,6 @@ export class ServerManager {
         doResolve();
       }
     });
-  }
-
-  dispose(): void {
-    this.setDiagnostics({ reason: 'none' });
-
-    const managedProcess = this.process;
-    const managedPid = this.managedServerState?.pid;
-
-    if (managedProcess?.pid) {
-      this.terminateManagedPidSync(managedProcess.pid);
-    } else if (managedPid) {
-      this.terminateManagedPidSync(managedPid);
-    }
-
-    this.clearManagedServerState();
-    this.cleanup();
-  }
-
-  /** Restart the server */
-  async restart(): Promise<void> {
-    this.setStatus('restarting');
-    await this.stop();
-    await this.start();
   }
 
   /** Check if server is healthy using Obsidian's requestUrl (bypasses CORS) */
@@ -444,26 +444,33 @@ export class ServerManager {
     this.attachLaunchTracking(this.process);
   }
 
+  private async launchLocalServerRuntime(successDiagnostics?: ServerDiagnostics): Promise<void> {
+    await this.spawnServer();
+    await this.waitForHealthy(this.config.timeout ?? 30000);
+
+    if (successDiagnostics) {
+      this.setDiagnostics(successDiagnostics);
+    }
+
+    this.setStatus('running');
+    new Notice('OpenCode server started');
+  }
+
   private attachLaunchTracking(proc: ChildProcess): void {
     this.clearLaunchState();
 
-    const handleStdout = (data: unknown) => {
-      const text = String(data);
-      this.pushLaunchOutput(launch, text);
-      const trimmed = text.trim();
-      if (trimmed) {
-        logger.debug(trimmed);
-      }
+    const launch: LocalServerLaunch = {
+      proc,
+      outputTail: [],
+      exited: false,
+      exitCode: null,
+      signal: null,
+      error: null,
+      cleanup: () => undefined,
     };
 
-    const handleStderr = (data: unknown) => {
-      const text = String(data);
-      this.pushLaunchOutput(launch, text);
-      const trimmed = text.trim();
-      if (trimmed) {
-        logger.error(trimmed);
-      }
-    };
+    const handleStdout = this.createLaunchOutputHandler(launch, (text) => logger.debug(text));
+    const handleStderr = this.createLaunchOutputHandler(launch, (text) => logger.error(text));
 
     const handleError = (error: Error) => {
       launch.error = error;
@@ -483,19 +490,11 @@ export class ServerManager {
       this.cleanup();
     };
 
-    const launch: LocalServerLaunch = {
-      proc,
-      outputTail: [],
-      exited: false,
-      exitCode: null,
-      signal: null,
-      error: null,
-      cleanup: () => {
-        proc.removeListener('error', handleError);
-        proc.removeListener('exit', handleExit);
-        proc.stdout?.removeListener('data', handleStdout);
-        proc.stderr?.removeListener('data', handleStderr);
-      },
+    launch.cleanup = () => {
+      proc.removeListener('error', handleError);
+      proc.removeListener('exit', handleExit);
+      proc.stdout?.removeListener('data', handleStdout);
+      proc.stderr?.removeListener('data', handleStderr);
     };
 
     proc.stdout?.on('data', handleStdout);
@@ -504,6 +503,20 @@ export class ServerManager {
     proc.on('exit', handleExit);
 
     this.activeLaunch = launch;
+  }
+
+  private createLaunchOutputHandler(
+    launch: LocalServerLaunch,
+    logOutput: (message: string) => void,
+  ): (data: unknown) => void {
+    return (data: unknown) => {
+      const text = String(data);
+      this.pushLaunchOutput(launch, text);
+      const trimmed = text.trim();
+      if (trimmed) {
+        logOutput(trimmed);
+      }
+    };
   }
 
   private pushLaunchOutput(launch: LocalServerLaunch, chunk: string): void {
@@ -644,26 +657,51 @@ export class ServerManager {
   }
 
   private throwIfLaunchFailed(prefix: string): void {
-    if (!this.activeLaunch) {
+    const launch = this.getActiveLaunchSnapshot();
+    if (!launch) {
       return;
     }
 
-    if (this.activeLaunch.error) {
-      throw this.buildLaunchFailureError(`${prefix}: ${this.activeLaunch.error.message}`);
+    if (launch.error) {
+      throw this.buildLaunchFailureError(`${prefix}: ${launch.error.message}`, launch);
     }
 
-    if (this.activeLaunch.exited) {
-      const suffix = this.activeLaunch.exitCode !== null
-        ? ` (exit code ${this.activeLaunch.exitCode})`
-        : this.activeLaunch.signal
-          ? ` (signal ${this.activeLaunch.signal})`
-          : '';
-      throw this.buildLaunchFailureError(`${prefix}${suffix}`);
+    if (launch.exited) {
+      throw this.buildLaunchFailureError(`${prefix}${this.getLaunchExitSuffix(launch)}`, launch);
     }
   }
 
-  private buildLaunchFailureError(message: string): Error {
-    const output = this.formatLaunchOutputTail();
+  private getActiveLaunchSnapshot(): LocalServerLaunchSnapshot | null {
+    if (!this.activeLaunch) {
+      return null;
+    }
+
+    return {
+      outputTail: [...this.activeLaunch.outputTail],
+      exited: this.activeLaunch.exited,
+      exitCode: this.activeLaunch.exitCode,
+      signal: this.activeLaunch.signal,
+      error: this.activeLaunch.error,
+    };
+  }
+
+  private getLaunchExitSuffix(launch: LocalServerLaunchSnapshot): string {
+    if (launch.exitCode !== null) {
+      return ` (exit code ${launch.exitCode})`;
+    }
+
+    if (launch.signal) {
+      return ` (signal ${launch.signal})`;
+    }
+
+    return '';
+  }
+
+  private buildLaunchFailureError(
+    message: string,
+    launch: LocalServerLaunchSnapshot | null = this.getActiveLaunchSnapshot(),
+  ): Error {
+    const output = this.formatLaunchOutputTail(launch);
     if (!output) {
       return new Error(message);
     }
@@ -671,8 +709,8 @@ export class ServerManager {
     return new Error(`${message}\nServer output:\n${output}`);
   }
 
-  private formatLaunchOutputTail(): string {
-    const output = this.activeLaunch?.outputTail.join('').trim() ?? '';
+  private formatLaunchOutputTail(launch: LocalServerLaunchSnapshot | null = this.getActiveLaunchSnapshot()): string {
+    const output = launch?.outputTail.join('').trim() ?? '';
     if (!output) {
       return '';
     }
@@ -733,25 +771,85 @@ export class ServerManager {
     this.onManagedServerStateChange?.(null);
   }
 
-  private async tryAdoptManagedServer(): Promise<'adopted' | 'restart' | 'skip'> {
-    const state = this.managedServerState;
+  private async handleHealthyOccupiedLocalEndpoint(): Promise<void> {
+    const resolution = await this.resolveOccupiedHealthyLocalEndpoint();
+
+    switch (resolution.action) {
+      case 'adopt-managed':
+        logger.debug('Adopted previously managed OpenCode server on port', this.config.local.port);
+        this.setStatus('running');
+        return;
+      case 'restart-managed':
+        logger.debug('Restarting stale managed OpenCode server on port', this.config.local.port);
+        await this.restartManagedServer();
+        await this.launchLocalServerRuntime();
+        return;
+      case 'recycle-orphan':
+        logger.warn('Recycling orphaned OpenCode sidecar on default plugin endpoint', {
+          host: this.config.local.host,
+          port: this.config.local.port,
+          pid: resolution.existingServer.pid,
+        });
+        await this.recycleUnknownLocalServer(resolution.existingServer);
+        await this.launchLocalServerRuntime(this.buildOrphanRestartDiagnostics(resolution.existingServer));
+        return;
+      case 'conflict':
+        this.setDiagnostics(resolution.diagnostics);
+        this.setStatus('conflict');
+        throw new Error(this.buildConflictMessage(resolution.existingServer, true));
+    }
+  }
+
+  private async resolveOccupiedHealthyLocalEndpoint(): Promise<OccupiedLocalEndpointResolution> {
+    const adoption = await this.tryAdoptManagedServer();
+    if (adoption === 'adopted') {
+      return { action: 'adopt-managed' };
+    }
+
+    if (adoption === 'restart') {
+      return { action: 'restart-managed' };
+    }
+
+    const existingServer = await this.inspectExistingHealthyServer();
+    if (await this.shouldRecycleUnknownLocalServer(existingServer)) {
+      return {
+        action: 'recycle-orphan',
+        existingServer,
+      };
+    }
+
+    return {
+      action: 'conflict',
+      existingServer,
+      diagnostics: this.buildHealthyLocalConflictDiagnostics(existingServer),
+    };
+  }
+
+  private buildOrphanRestartDiagnostics(existingServer: ExistingServerProcessInfo): ServerDiagnostics {
+    return {
+      reason: 'local-orphan-restarted',
+      host: this.config.local.host,
+      port: this.config.local.port,
+      pid: existingServer.pid ?? undefined,
+      commandLine: existingServer.commandLine ?? undefined,
+      message: 'Detected and restarted an orphaned plugin sidecar.',
+    };
+  }
+
+  private buildHealthyLocalConflictDiagnostics(existingServer: ExistingServerProcessInfo): ServerDiagnostics {
+    return {
+      reason: 'local-conflict',
+      host: this.config.local.host,
+      port: this.config.local.port,
+      pid: existingServer.pid ?? undefined,
+      commandLine: existingServer.commandLine ?? undefined,
+      message: 'Another healthy OpenCode server already occupies the configured local endpoint.',
+    };
+  }
+
+  private async tryAdoptManagedServer(): Promise<ManagedServerAdoptionOutcome> {
+    const state = await this.getAdoptableManagedServerState();
     if (!state) {
-      return 'skip';
-    }
-
-    if (state.port !== this.config.local.port || state.host !== this.config.local.host) {
-      this.clearManagedServerState();
-      return 'skip';
-    }
-
-    const commandLine = await this.getProcessCommandLine(state.pid);
-    if (!commandLine) {
-      this.clearManagedServerState();
-      return 'skip';
-    }
-
-    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
-      this.clearManagedServerState();
       return 'skip';
     }
 
@@ -761,6 +859,31 @@ export class ServerManager {
 
     this.onManagedServerStateChange?.(state);
     return 'adopted';
+  }
+
+  private async getAdoptableManagedServerState(): Promise<ManagedServerState | null> {
+    const state = this.managedServerState;
+    if (!state) {
+      return null;
+    }
+
+    if (state.port !== this.config.local.port || state.host !== this.config.local.host) {
+      this.clearManagedServerState();
+      return null;
+    }
+
+    const commandLine = await this.getProcessCommandLine(state.pid);
+    if (!commandLine) {
+      this.clearManagedServerState();
+      return null;
+    }
+
+    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
+      this.clearManagedServerState();
+      return null;
+    }
+
+    return state;
   }
 
   private async inspectExistingHealthyServer(): Promise<ExistingServerProcessInfo> {
@@ -816,11 +939,13 @@ export class ServerManager {
       );
     }
 
-    await this.terminateManagedPid(existingServer.pid);
-    const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
-    if (!released) {
-      throw new Error(`Port ${this.config.local.port} stayed busy after stopping the orphaned OpenCode sidecar`);
-    }
+    await this.runManagedShutdownLifecycle({
+      process: null,
+      pid: existingServer.pid,
+      clearManagedState: false,
+      cleanup: false,
+      waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the orphaned OpenCode sidecar`,
+    });
   }
 
   private buildConflictMessage(existingServer: ExistingServerProcessInfo, healthy: boolean): string {
@@ -843,13 +968,13 @@ export class ServerManager {
       return;
     }
 
-    await this.terminateManagedPid(state.pid);
-    this.clearManagedServerState();
-
-    const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
-    if (!released) {
-      throw new Error(`Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`);
-    }
+    await this.runManagedShutdownLifecycle({
+      process: null,
+      pid: state.pid,
+      clearManagedState: true,
+      cleanup: false,
+      waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`,
+    });
   }
 
   private async waitForPortAvailability(timeout: number): Promise<boolean> {

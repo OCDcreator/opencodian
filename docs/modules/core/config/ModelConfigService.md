@@ -11,7 +11,9 @@
 - OpenCode 服务端返回的当前项目运行时 provider 列表、当前作用域解析配置，以及继承层配置
 - 插件侧的可用性过滤条件，例如 `disabledModelRefs`
 
-它不直接维护 UI，也不直接写整个配置文件，而是负责给上层返回一个既能表达“基础事实”，又能表达“当前可选状态”的模型 catalog bundle。
+它不直接维护 UI，也不直接写整个配置文件，而是负责给上层返回一个既能表达“基础事实”，又能表达“当前可选状态”的模型 catalog bundle。自 R11 起，settings 侧围绕这些 bundle 再做 `displayCatalogs` / `providerStatusCatalogs` 的组合语义，已经下沉到 `ModelCatalogStateService`，因此 `ModelConfigService` 继续专注“事实目录 + 继承可用性 + probe”。
+
+自 `R58` 起，继承层配置来源选择、local/scoped/default-scope provider layering，以及 `effectiveProviderConfig` / `currentEnabledProviderIds` 所依赖的 enablement 判定，已统一收口到模型配置 helper seam。自 `R121` 起，runtime result 转 catalog、server catalog merge、`baseEffective` / `effective` 组装、provider probe planning 与默认测试模型选择也持续下沉到相邻 owner；`R145` 进一步把原 `modelConfig.ts` 大文件拆成 `modelConfigShared.ts`、`modelConfigCatalog.ts`、`modelConfigAvailability.ts`、`modelConfigAssembly.ts` 与 `modelConfigSelection.ts`，让 `ModelConfigService` 继续只保留 IO 编排、日志与真实 send probe 调用。
 
 ## 核心类型
 
@@ -34,6 +36,7 @@ export interface ModelCatalogBundle {
 - `currentEnabledProviderIds`: 当前作用域下真正视为“provider 已启用”的 provider ID 列表；设置页用它避免把服务端当前不可用的 provider 误显示成绿色启用。
 - `serverConfig`: 插件使用的“继承层 provider 配置”。本地模式优先来自本机磁盘配置，远程模式回退到服务端默认作用域 `config.get()`；它用于标注服务端禁用状态和 provider 开关继承值。
 - `effectiveProviderConfig`: 以 `serverConfig` 为继承基线，再叠加当前项目 `.opencode/opencode.json` 的 provider 可用性覆盖；本地数组按字段替换继承数组。
+- `serverConfig`、`effectiveProviderConfig` 与 `currentEnabledProviderIds` 现在来自同一个 inherited-config resolution seam，避免服务层重复手写 scope merge / enablement 条件。
 
 ## 关键行为
 
@@ -52,7 +55,7 @@ export interface ModelCatalogBundle {
 ### 构建 catalog
 
 - `getLocalCatalog()`：调用 `buildCatalogFromConfig(..., 'local')`
-- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`。其中：
+- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`，再交给 `assembleServerModelCatalog()` 组装 runtime catalog、继承配置解析与 server 目录。其中：
   - 目录作用域下的 runtime provider/model 列表直接来自 `config.providers()`
   - 不再把 `provider.list()` 当成 `opencode models` / 设置页服务器目录的等价数据源
   - 不再把 `config.get().provider` 整包当成“服务器目录”
@@ -62,7 +65,7 @@ export interface ModelCatalogBundle {
 
 ### 解析“基础目录”与“最终目录”
 
-`getCatalogs(mode, disabledModelRefs = [])` 的核心逻辑是：
+`getCatalogs(mode, disabledModelRefs = [])` 的核心逻辑现在由 `assembleModelCatalog()` 负责：
 
 1. 并发读取当前项目模型子集、当前项目作用域下的运行时 provider 列表、当前作用域解析配置，以及继承层配置
 2. 生成 `local` 与 `server`
@@ -100,6 +103,8 @@ provider 开关继承规则依然保留在 `effectiveProviderConfig` 里，按�
 - 合并后的 server catalog
 
 如果当前 provider 在“最终可用 provider 配置”里仍然允许使用，并且还能选出一个测试模型，服务还会额外调用 `OpenCodeService.probeProviderResponse(providerId, modelId)` 发起一次最小真实请求。也就是说，这个探针现在不再只是“看目录里有没有 / runtime 里有没有”，而是尽量回答“这个 provider 现在到底能不能真发出去”。
+
+自 `R59` 起，project-disabled/server-disabled 优先级、runtime/server model 计数、默认测试模型选择与“是否需要真实发送”的决策由 `resolveProviderAvailabilityProbePlan()` 统一产出；服务层只在 plan 要求时调用真实 send probe，并把成功 / 失败结果写回返回结构。
 
 然后把结果归类成：
 
@@ -161,7 +166,9 @@ OpencodeConfigManager.read()
 
 OpenCodeService.getAvailableModels(includeDirectory=true)
   -> current project runtime catalog
-  -> defaults supplement
+  -> catalogFromRuntimeResult()
+  -> buildServerCatalog()
+  -> server
 
 OpenCodeService.getResolvedModelConfig(includeDirectory=true)
   -> scoped current project config
@@ -173,27 +180,24 @@ OpenCodeService.getResolvedModelConfig(includeDirectory=false)
 local disk config (XDG config / ~/.opencode / managed)
   -> local-mode inherited serverConfig
 
-local-mode inherited serverConfig or remote default-scope serverConfig
-  -> serverConfig
+local-mode disk inherited config or remote default-scope config
+  -> resolveInheritedModelConfigResolution()
+  -> serverConfig + effectiveProviderConfig + currentEnabledProviderIds predicates
 
 local + server + modelSourceMode
-  -> resolveCatalog()
-  -> baseEffective
+  -> assembleModelCatalog()
+  -> baseEffective + currentEnabledProviderIds + effective
 
-serverConfig + local provider arrays
-  -> effectiveProviderConfig
-
-scopedConfig + local provider arrays
-  -> currentEnabledProviderIds
-
-baseEffective + disabledModelRefs + currentEnabledProviderIds
-  -> filterCatalog() + provider ID filter
-  -> effective
+providerId + localConfig + runtime/server catalog + inherited resolution
+  -> resolveProviderAvailabilityProbePlan()
+  -> optional OpenCodeService.probeProviderResponse()
+  -> ProviderAvailabilityProbe
 ```
 
 ## 与其他模块的交互
 
 - `OpenCodianSettings.ts`：同时消费 `baseEffective` 和 `effective`，以便区分“存在但被禁用/不可用”和“完全不存在”。
+- `ModelCatalogStateService.ts`：把 `local/server/baseEffective/effective/currentEnabledProviderIds` 组合成 settings 侧稳定可消费的 catalog state API。
 - `OpenCodianView.ts`：使用 `effective` 约束聊天发送，但需要 `baseEffective` 保留展示元数据。
 - `TitleGenerationService.ts`：解析 `aiTitleModel` 时会先在 `baseEffective/effective` 上做 availability-aware 校验；显式配置的标题模型一旦不可用，会直接阻止标题生效。
 - `ModelConfigModal.ts` / `ModelConfigJsonModal.ts`：通过它读写本地模型配置。

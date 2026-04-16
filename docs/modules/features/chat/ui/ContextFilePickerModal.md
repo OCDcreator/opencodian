@@ -5,10 +5,10 @@
 
 ## 概述
 
-Obsidian Modal，用于从 Vault 文件列表中选择文件作为消息的上下文附件。提供异步加载的文件目录（catalog）、搜索框、后缀名过滤器、分页渲染（最多 `MAX_RENDERED_FILES=200`）。对外暴露 `chooseContextFile()` 函数，返回 `Promise<TFile | null>`。
+Obsidian Modal，用于从 Vault 文件列表中选择文件作为消息的上下文附件。提供异步加载的文件目录（catalog）、搜索框、后缀名过滤器、分页渲染（最多 `MAX_RENDERED_FILES=200`）。对外暴露 `chooseContextFile()` 函数，返回 `Promise<TFile | null>`。Catalog 类型由 `ContextFileCatalogService` 导出，Modal 只消费数据，不负责构建或缓存目录。
 
 ## 导入关系
-上游: `obsidian`（App、TFile、Modal）、`i18n`
+上游: `obsidian`（App、TFile、Modal）、`i18n`、`ContextFileCatalogService`（类型）
 下游: 被 `OpenCodianView` 的内联上下文文件选择器调用
 
 ## 核心类型 / 接口
@@ -85,8 +85,8 @@ render() → 文件按钮列表
 
 ## 与其他模块的交互
 
-- **OpenCodianView**: 调用 `chooseContextFile()`，传入 Vault 文件目录加载器
-- **Vault 文件目录**: 由 `OpenCodianView` 构建的缓存目录（排除隐藏路径）
+- **OpenCodianView**: 调用 `chooseContextFile()`，传入 `ContextFileCatalogService.getCatalog()`
+- **ContextFileCatalogService**: 构建和缓存 Vault 文件目录（排除隐藏路径）
 
 ## 配置项
 
@@ -101,5 +101,5 @@ render() → 文件按钮列表
 
 ## 补充说明
 
-- Catalog 构建逻辑：`OpenCodianView` 在 `buildContextFileCatalog()` 中遍历 `app.vault.getFiles()`，排除以 `.` 开头的路径段（隐藏文件/目录），按扩展名统计 `ContextFileExtensionBucket[]`，生成 `ContextFileEntry[]` 并缓存
-- 隐藏路径排除规则：路径中任意段以 `.` 开头（如 `.obsidian/config`）会被过滤；该逻辑位于 `OpenCodianView` 内部，不在 Modal 中
+- Catalog 构建逻辑：`ContextFileCatalogService` 遍历 `app.vault.getFiles()`，排除以 `.` 开头的路径段（隐藏文件/目录），按扩展名统计 `ContextFileExtensionBucket[]`，生成 `ContextFileEntry[]` 并缓存
+- 隐藏路径排除规则：路径中任意段以 `.` 开头（如 `.obsidian/config`）会被过滤；该逻辑位于 `ContextFileCatalogService`，不在 Modal 中

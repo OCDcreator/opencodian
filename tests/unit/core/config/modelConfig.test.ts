@@ -2,36 +2,34 @@ import {
   buildCatalogFromConfig,
   filterCatalog,
   isProviderEnabled,
-  mergeCatalogs,
   mergeProviderAvailabilityConfig,
-  resolveModelSelection,
-  resolvePreferredAvailableModel,
+  resolveInheritedModelConfigResolution,
   setProviderEnabled,
 } from '../../../../src/core/config/modelConfig';
 import type { OpencodeModelConfigSubset } from '../../../../src/core/types';
 
-describe('modelConfig helpers', () => {
-  const localConfig: OpencodeModelConfigSubset = {
-    model: 'openai/gpt-4o',
-    provider: {
-      openai: {
-        name: 'OpenAI',
-        models: {
-          'gpt-4o': { name: 'GPT-4o' },
-          'gpt-4.1': { name: 'GPT-4.1' },
-        },
-      },
-      anthropic: {
-        name: 'Anthropic',
-        models: {
-          'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet' },
-        },
+const localConfig: OpencodeModelConfigSubset = {
+  model: 'openai/gpt-4o',
+  provider: {
+    openai: {
+      name: 'OpenAI',
+      models: {
+        'gpt-4o': { name: 'GPT-4o' },
+        'gpt-4.1': { name: 'GPT-4.1' },
       },
     },
-    enabled_providers: ['openai', 'anthropic'],
-    disabled_providers: ['anthropic'],
-  };
+    anthropic: {
+      name: 'Anthropic',
+      models: {
+        'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet' },
+      },
+    },
+  },
+  enabled_providers: ['openai', 'anthropic'],
+  disabled_providers: ['anthropic'],
+};
 
+describe('modelConfig provider availability helpers', () => {
   it('resolves provider visibility by whitelist first and blacklist second', () => {
     expect(isProviderEnabled(localConfig, 'openai')).toBe(true);
     expect(isProviderEnabled(localConfig, 'anthropic')).toBe(false);
@@ -85,6 +83,76 @@ describe('modelConfig helpers', () => {
       disabled_providers: ['alibaba-cn'],
     });
   });
+});
+
+describe('modelConfig inherited availability helpers', () => {
+  it('resolves local inherited config layering from disk, scoped runtime, and project overrides', () => {
+    const resolution = resolveInheritedModelConfigResolution({
+      localServerMode: true,
+      diskInheritedConfig: {
+        disabled_providers: ['alibaba'],
+      },
+      scopedConfig: {
+        enabled_providers: ['deepseek'],
+        disabled_providers: ['opencode'],
+      },
+      defaultScopeConfig: {
+        disabled_providers: ['should-not-apply'],
+      },
+      localConfig: {},
+    });
+
+    expect(resolution.inheritedConfigSource).toBe('local_disk');
+    expect(resolution.inheritedConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba', 'opencode'],
+    });
+    expect(resolution.mergedScopedConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['opencode'],
+    });
+    expect(resolution.effectiveProviderConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba', 'opencode'],
+    });
+    expect(resolution.getCurrentEnabledProviderIds(['deepseek', 'alibaba', 'deepseek'])).toEqual(['deepseek']);
+    expect(resolution.isProviderEnabledInServerScope('deepseek')).toBe(true);
+    expect(resolution.isProviderEnabledInCurrentScope('alibaba')).toBe(false);
+    expect(resolution.isProviderEffectivelyEnabled('opencode')).toBe(false);
+  });
+
+  it('lets remote inherited availability come from server default scope while project overrides clear it', () => {
+    const resolution = resolveInheritedModelConfigResolution({
+      localServerMode: false,
+      diskInheritedConfig: {
+        disabled_providers: ['should-not-apply'],
+      },
+      scopedConfig: {
+        enabled_providers: ['deepseek'],
+        disabled_providers: [],
+      },
+      defaultScopeConfig: {
+        enabled_providers: ['deepseek'],
+        disabled_providers: ['alibaba'],
+      },
+      localConfig: {
+        disabled_providers: [],
+      },
+    });
+
+    expect(resolution.inheritedConfigSource).toBe('server_default_scope');
+    expect(resolution.inheritedConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba'],
+    });
+    expect(resolution.effectiveProviderConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: [],
+    });
+    expect(resolution.isProviderEnabledInCurrentScope('deepseek')).toBe(true);
+    expect(resolution.isProviderEffectivelyEnabled('deepseek')).toBe(true);
+    expect(resolution.isProviderEffectivelyEnabled('alibaba')).toBe(false);
+  });
 
   it('preserves inherited blacklist diff when locally re-enabling one provider', () => {
     const inherited = {
@@ -137,103 +205,5 @@ describe('modelConfig helpers', () => {
       inherited,
     });
     expect(restored).toEqual({});
-  });
-
-  it('preserves server disabled scopes when local and server catalogs merge', () => {
-    const merged = mergeCatalogs(
-      {
-        providers: [{
-          id: 'alibaba',
-          name: 'Alibaba',
-          source: 'server',
-          existsInLocal: false,
-          existsInServer: true,
-          disabledScopes: ['global'],
-          models: [{
-            id: 'qwen-max',
-            name: 'Qwen Max',
-            source: 'server',
-            existsInLocal: false,
-            existsInServer: true,
-            disabledScopes: ['global'],
-          }],
-        }],
-        defaults: {},
-      },
-      {
-        providers: [{
-          id: 'alibaba',
-          name: 'Alibaba',
-          source: 'local',
-          existsInLocal: true,
-          existsInServer: false,
-          models: [{
-            id: 'qwen-max',
-            name: 'Qwen Max',
-            source: 'local',
-            existsInLocal: true,
-            existsInServer: false,
-          }],
-        }],
-        defaults: {},
-      },
-    );
-
-    expect(merged.providers[0]?.disabledScopes).toEqual(['global']);
-    expect(merged.providers[0]?.models[0]?.disabledScopes).toEqual(['global']);
-  });
-
-  it('resolves model selections as available, unconfigured, or unavailable', () => {
-    const baseCatalog = buildCatalogFromConfig(localConfig, 'local');
-    const effectiveCatalog = filterCatalog(baseCatalog, {
-      providerConfig: localConfig,
-      disabledModelRefs: ['openai/gpt-4.1'],
-    });
-
-    expect(resolveModelSelection(baseCatalog, effectiveCatalog, 'openai', 'gpt-4o')).toMatchObject({
-      status: 'available',
-      ref: 'openai/gpt-4o',
-    });
-    expect(resolveModelSelection(baseCatalog, effectiveCatalog, '', '')).toMatchObject({
-      status: 'unconfigured',
-      ref: '',
-    });
-    expect(resolveModelSelection(baseCatalog, effectiveCatalog, 'anthropic', 'claude-3-5-sonnet')).toMatchObject({
-      status: 'unavailable',
-      ref: 'anthropic/claude-3-5-sonnet',
-    });
-  });
-
-  it('prefers another available model when the requested one is filtered out', () => {
-    const baseCatalog = buildCatalogFromConfig(localConfig, 'local');
-    const effectiveCatalog = filterCatalog(baseCatalog, {
-      providerConfig: localConfig,
-      disabledModelRefs: ['openai/gpt-4.1'],
-    });
-
-    expect(resolvePreferredAvailableModel(effectiveCatalog, 'openai', 'gpt-4.1')).toEqual({
-      provider: 'openai',
-      model: 'gpt-4o',
-      ref: 'openai/gpt-4o',
-    });
-  });
-
-  it('falls back to the first effective default when the requested provider is unavailable', () => {
-    const baseCatalog = buildCatalogFromConfig(localConfig, 'local');
-    const effectiveCatalog = filterCatalog(baseCatalog, {
-      providerConfig: localConfig,
-      disabledModelRefs: [],
-    });
-
-    expect(resolvePreferredAvailableModel(effectiveCatalog, 'anthropic', 'claude-3-5-sonnet')).toEqual({
-      provider: 'openai',
-      model: 'gpt-4o',
-      ref: 'openai/gpt-4o',
-    });
-    expect(resolvePreferredAvailableModel(effectiveCatalog, '', '')).toEqual({
-      provider: 'openai',
-      model: 'gpt-4o',
-      ref: 'openai/gpt-4o',
-    });
   });
 });

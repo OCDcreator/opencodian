@@ -29,12 +29,22 @@ export class SendPipelineRuntime {
 - `SendPipelineFinalizationPort`
 - `SendPipelineHost`
 
-其中前两个分别复用 `MessageSendPreparationService` 与 `MessageFinalizationService`，host 则把 view 内部仍需使用的 DOM、tab runtime、stream/controller 与 notice 渲染能力桥接进来。
+其中前两个分别复用 `MessageSendPreparationService` 与 `MessageFinalizationService`；host 在第八阶段起不再被视为单一“大接口”，而是由这几组窄 port 组合出来：
+
+- `SendPipelineViewPort`
+- `SendPipelineTransportPort`
+- `SendPipelineShellPort`
+- `SendPipelinePersistencePort`
+- `SendPipelineDebugPort`
+
+`SendPipelineRuntime` 本身继续拿组合后的 runtime host，但 `StreamChunkRouter`、`StreamLocalFinalizer`、`SendPipelineTrace` 等子模块只声明各自真正依赖的 port 子集。
 
 第二刀后，runtime 子目录内部又继续细分成几层：
 
 - `SendPipelineTypes`：共享契约层
+- `AssistantShellRenderer`：assistant streaming shell 的创建、reveal 与 timestamp 收尾
 - `PendingIndicatorController`：pending DOM 与计时器
+- `AssistantNoticeRenderer`：stream error / interrupted notice 构造与占位 shell notice 渲染
 - `SendPipelineTrace`：trace / progress debug
 - `sendPipelineContent`：纯 content helper
 - `buildLocalStreamOutcome`：本地收尾纯推导
@@ -86,10 +96,12 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - `buildLocalStreamOutcome` 负责纯推导最终 outcome
 - `StreamShellFinalizer` 负责把 streaming shell 落成 timestamp / notice / removed
 - `LocalStreamMessagePersistence` 负责第一次本地 `saveConversation()`
+- `AssistantNoticeRenderer` 负责 notice message 构造与 assistant placeholder notice 渲染 adapter
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 只保留 `createSendPipelineRuntimeHost()` 与 `sendMessage()` bridge
+- `createSendPipelineRuntimeHost()` 现在把 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
 - `MessageSendPreparationService` 只负责“发之前能不能发、optimistic user message 何时落地、何时进入 streaming state”
 - `SendPipelineRuntime` 负责“真正发流，并装配 chunk router / local finalizer / post-stream finalizer”
 - `StreamChunkRouter` 负责“消费 chunk、pending/timeout、stream trace”

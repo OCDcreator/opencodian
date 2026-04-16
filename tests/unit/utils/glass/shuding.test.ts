@@ -22,16 +22,17 @@ function createCanvasContextMock(): CanvasRenderingContext2D {
 }
 
 function roundedRectSdf(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
+  point: Readonly<{ x: number; y: number }>,
+  geometry: Readonly<{ width: number; height: number; radius: number }>,
 ): number {
-  const qx = Math.abs(x) - width + radius;
-  const qy = Math.abs(y) - height + radius;
+  const qx = Math.abs(point.x) - geometry.width + geometry.radius;
+  const qy = Math.abs(point.y) - geometry.height + geometry.radius;
 
-  return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - radius;
+  return (
+    Math.min(Math.max(qx, qy), 0) +
+    Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) -
+    geometry.radius
+  );
 }
 
 function smoothStep(edge0: number, edge1: number, value: number): number {
@@ -118,11 +119,11 @@ function installStylePropertyRecorder(style: CSSStyleDeclaration): void {
   });
 }
 
-describe('shuding liquid glass adapter', () => {
-  const originalCss = globalThis.CSS;
-  const originalResizeObserver = globalThis.ResizeObserver;
-  const originalDevicePixelRatio = window.devicePixelRatio;
+const originalCss = globalThis.CSS;
+const originalResizeObserver = globalThis.ResizeObserver;
+const originalDevicePixelRatio = window.devicePixelRatio;
 
+function registerAdapterLifecycleHooks(): void {
   beforeEach(() => {
     document.body.innerHTML = '';
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(createCanvasContextMock());
@@ -161,6 +162,10 @@ describe('shuding liquid glass adapter', () => {
     });
     __testing.resetCachedBackdropFilterUrlSupport();
   });
+}
+
+describe('shuding liquid glass adapter defaults and sampling', () => {
+  registerAdapterLifecycleHooks();
 
   it('locks the default settings to the upstream-style path and keeps enhancements off', () => {
     expect(__testing.resolveSettings(createSettings())).toMatchObject({
@@ -194,7 +199,10 @@ describe('shuding liquid glass adapter', () => {
       { ...__testing.upstreamPanelGeometry },
       __testing.resolveSettings(createSettings()),
     );
-    const distanceToEdge = roundedRectSdf(ix, iy, 0.3, 0.2, 0.6);
+    const distanceToEdge = roundedRectSdf(
+      { x: ix, y: iy },
+      { width: 0.3, height: 0.2, radius: 0.6 },
+    );
     const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
     const scaled = smoothStep(0, 1, displacement);
 
@@ -244,6 +252,10 @@ describe('shuding liquid glass adapter', () => {
       dpi: 1,
     });
   });
+});
+
+describe('shuding liquid glass adapter mount lifecycle', () => {
+  registerAdapterLifecycleHooks();
 
   it('mounts feImage and feDisplacementMap with the upstream default backdrop filter and shadow', () => {
     const ctx = createMountContext();

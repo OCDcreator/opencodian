@@ -27,14 +27,14 @@ const mockPlugin = {
   app: mockApp,
 };
 
-describe('StorageService', () => {
-  let storage: StorageService;
+let storage: StorageService;
 
-  beforeEach(() => {
-    storage = new StorageService(mockPlugin as unknown as { app: { vault: { adapter: typeof mockAdapter } } });
-    jest.clearAllMocks();
-  });
+beforeEach(() => {
+  storage = new StorageService(mockPlugin as unknown as { app: { vault: { adapter: typeof mockAdapter } } });
+  jest.clearAllMocks();
+});
 
+describe('StorageService conversation persistence', () => {
   describe('initialize', () => {
     it('should create storage directories', async () => {
       await storage.initialize();
@@ -237,6 +237,9 @@ describe('StorageService', () => {
     });
   });
 
+});
+
+describe('StorageService conversation indexes', () => {
   describe('listConversations', () => {
     it('should return sorted conversations', async () => {
       mockAdapter.list.mockResolvedValue({
@@ -290,6 +293,9 @@ describe('StorageService', () => {
     });
   });
 
+});
+
+describe('StorageService persisted core settings', () => {
   describe('persisted settings', () => {
     it('writes core settings as a versioned envelope', async () => {
       const { core } = splitPersistedSettings({
@@ -444,7 +450,162 @@ describe('StorageService', () => {
         expect.stringContaining('"userName": "Test User"'),
       );
     });
+  });
+});
 
+describe('StorageService persisted ui settings', () => {
+  describe('persisted settings', () => {
+    it('writes ui settings as a versioned envelope', async () => {
+      const { ui } = splitPersistedSettings({
+        userName: 'Test User',
+        server: {
+          mode: 'local',
+          local: { host: '127.0.0.1', port: 4096, autoStart: true },
+          remote: { baseUrl: 'http://127.0.0.1:4096' },
+          auth: { type: 'none', username: 'opencode', password: '', token: '' },
+        },
+        enableBlocklist: true,
+        allowExternalAccess: false,
+        blockedCommands: { unix: [], windows: [] },
+        permissionMode: 'yolo',
+        autoRestartOnPermissionChange: false,
+        modelSourceMode: 'merge',
+        defaultProvider: 'openai',
+        defaultModel: 'gpt-4o',
+        titleMode: 'default',
+        questionDisplayMode: 'all',
+        questionCardPosition: 'inline',
+        showAnsweredQuestionCards: true,
+        aiTitleModel: '',
+        disabledModelRefs: [],
+        renderUserMarkupAsCodeBlocks: true,
+        pluginIsolationMode: 'default',
+        providers: [],
+        providerIconLibrary: {},
+        effortLevel: 'high',
+        thinkingBudget: 4096,
+        excludedTags: [],
+        mediaFolder: '',
+        systemPrompt: '',
+        allowedExportPaths: [],
+        maxTabs: 3,
+        tabBarPosition: 'below-header',
+        belowHeaderTabBarLayout: 'grid',
+        enableAutoScroll: true,
+        chatScrollMode: 'sticky-mask',
+        inputPanelTheme: 'preset',
+        inputPanelGlassRefraction: { glass: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, card: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, pill: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 } },
+        inputPanelGlassRefractionSvgFilter: { preset: 'none', subtleScale: 8, strongScale: 16 },
+        inputPanelGlassRefractionGlassDefaultsVersion: 2,
+        inputPanelLiquidGlass: {
+          shuding: {
+            displacementScale: 10,
+            blurAmount: 0.25,
+            adaptiveSdf: false,
+            adaptiveSdfMix: 0,
+            rectEdgeRefraction: false,
+            rectEdgeRefractionStrength: 0,
+            cornerEnhancement: false,
+            cornerEnhancementStrength: 0,
+            edgeBandWidth: 0,
+            barrelDistortion: false,
+            barrelStrength: 0,
+            topHighlight: false,
+            topHighlightOpacity: 0.6,
+            innerBorder: false,
+            innerBorderOpacity: 0.2,
+            bottomShadow: false,
+            bottomShadowOpacity: 0.08,
+            insetDepthShadow: false,
+            insetDepthShadowOpacity: 0.12,
+            insetShadowBlur: 10,
+            contrastBoost: 1.2,
+            brightnessBoost: 1.05,
+            saturateBoost: 1.1,
+          },
+          nikdelvin: {
+            depth: 10,
+            strength: 100,
+            chromaticAberration: 0,
+            blur: 0,
+            backgroundPreset: 'none',
+            color: 'transparent',
+            background: '',
+            freeze: false,
+            noMorph: false,
+            button: false,
+            inline: false,
+            customEffects: false,
+          },
+          shudingDiamond: {
+            displacementScale: 10,
+            bloomOpacity: 1,
+            rimOpacity: 0.45,
+            faceOverlayOpacity: 1,
+            sparkleOpacity: 0.35,
+            edgeAlpha: 0.9,
+            faceAlpha: 0.82,
+            rotationSpeed: 1,
+            wobbleAmount: 0.4,
+            pointerTilt: 0.8,
+          },
+        },
+        chatAppearance: {
+          layout: { messagesPaddingTop: 12, messagesPaddingX: 12 },
+          sticky: { maskBlur: 24, edgeFade: 24, opacity: 94 },
+          background: { imagePath: '', fitMode: 'cover', opacity: 92, edgeFade: 28 },
+          user: { radius: 16, timeFontSize: 11, timeFontWeight: 400, timeColor: 'var(--text-muted)' },
+          assistant: {
+            backgroundOpacity: 72,
+            metaFontSize: 10,
+            timeFontSize: 10,
+            timeFontWeight: 400,
+            metaColor: 'var(--text-muted)',
+            timeColor: 'var(--text-muted)',
+            modelIdFontSize: 10,
+            modelIdFontWeight: 400,
+            modelIdColor: 'var(--text-faint, var(--text-muted))',
+          },
+          input: { backgroundOpacity: 72, shadowBlur: 28, actionButtonStyle: 'default' },
+          scrollbar: { width: 8, thumbOpacity: 58, thumbHoverOpacity: 82 },
+          customCss: '',
+        },
+        settingsPanelScrollTop: 42,
+        modelAvailabilitySectionOpen: true,
+        modelToolsSectionOpen: false,
+        enableDebugLogging: false,
+        inlineSerializedDebugLogArgs: false,
+        debugLogPaths: { unix: '', windows: '' },
+        openInMainTab: false,
+        tabState: {
+          tabs: [{ conversationId: 'conv-1', title: 'Conversation', modelOverride: null }],
+          activeTabIndex: 0,
+        },
+        theme: { activePresetId: null, customAppearanceOverrides: {} },
+        locale: 'en',
+        hiddenSlashCommands: [],
+      } as never);
+
+      await storage.saveUiSettings(ui);
+
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.ui.json',
+        expect.stringContaining('"schemaVersion": 1'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.ui.json',
+        expect.stringContaining('"source": "settings.ui"'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.ui.json',
+        expect.stringContaining('"settingsPanelScrollTop": 42'),
+      );
+    });
+  });
+});
+
+describe('StorageService persisted settings recovery', () => {
+  describe('persisted settings', () => {
     it('loads split settings from primary files', async () => {
       mockAdapter.exists.mockImplementation(async (filePath: string) => (
         filePath === '.opencodian/settings.core.json' || filePath === '.opencodian/settings.ui.json'
@@ -531,12 +692,17 @@ describe('StorageService', () => {
       expect(result.writable).toBe(true);
       expect(result.core.source).toBe('backup');
       expect(result.core.shouldPersist).toBe(true);
+      expect(result.core.message).toContain('Recovered .opencodian/settings.core.json from backup');
       expect(result.core.data).toEqual(expect.objectContaining({
         defaultModel: 'gpt-4o',
         disabledModelRefs: ['openai/gpt-4o-mini'],
       }));
     });
+  });
+});
 
+describe('StorageService persisted settings migration', () => {
+  describe('persisted settings', () => {
     it('migrates settings from the legacy single-file store', async () => {
       mockAdapter.exists.mockImplementation(async (filePath: string) => filePath === '.opencodian/settings.json');
       mockAdapter.read.mockResolvedValue(JSON.stringify({
@@ -571,6 +737,8 @@ describe('StorageService', () => {
       expect(result.shouldPersist).toBe(true);
       expect(result.core.source).toBe('legacy');
       expect(result.ui.source).toBe('legacy');
+      expect(result.core.message).toBe('Migrated .opencodian/settings.core.json from legacy settings.json.');
+      expect(result.ui.message).toBe('Migrated .opencodian/settings.ui.json from legacy settings.json.');
       expect(result.core.data).toEqual(expect.objectContaining({
         defaultProvider: 'deepseek',
         defaultModel: 'deepseek-chat',
@@ -601,7 +769,9 @@ describe('StorageService', () => {
       expect(result.core.data).toBeNull();
     });
   });
+});
 
+describe('StorageService runtime assets', () => {
   describe('managed server state', () => {
     it('should persist managed server state to runtime file', async () => {
       await storage.saveManagedServerState({

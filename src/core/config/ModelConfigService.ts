@@ -7,20 +7,18 @@ import type { OpenCodeService } from '../opencode';
 import type { ModelSourceMode, OpencodeModelConfigSubset } from '../types';
 import {
   applyModelConfig,
+  assembleModelCatalog,
+  assembleServerModelCatalog,
   buildCatalogFromConfig,
   collectConfiguredProviderIds,
   extractModelConfig,
-  filterCatalog,
   getEnabledProviderIds,
-  isProviderEnabled,
-  mergeCatalogs,
   mergeModelConfigSubsets,
-  mergeProviderAvailabilityConfig,
   type ModelCatalog,
-  type ModelCatalogProvider,
-  parseModelReference,
+  type ModelServerCatalogAssemblyResult,
   parseOpencodeConfigText,
   type ProviderAvailabilityConfig,
+  resolveProviderAvailabilityProbePlan,
 } from './modelConfig';
 import type { OpencodeConfigManager } from './OpencodeConfigManager';
 
@@ -108,12 +106,12 @@ export class ModelConfigService {
         modelCount: provider.models.length,
       })),
       defaults: serverState.server.defaults,
-      scopedDisabledProviders: [...(serverState.scopedConfig.disabled_providers ?? [])],
-      inheritedConfigSource: serverState.inheritedConfigSource,
-      inheritedServerProviderIds: Object.keys(serverState.inheritedConfig.provider ?? {}),
-      inheritedServerDisabledProviders: [...(serverState.inheritedConfig.disabled_providers ?? [])],
-      defaultScopeProviderIds: Object.keys(serverState.defaultScopeConfig.provider ?? {}),
-      defaultScopeDisabledProviders: [...(serverState.defaultScopeConfig.disabled_providers ?? [])],
+      scopedDisabledProviders: [...(serverState.configResolution.scopedConfig.disabled_providers ?? [])],
+      inheritedConfigSource: serverState.configResolution.inheritedConfigSource,
+      inheritedServerProviderIds: Object.keys(serverState.configResolution.inheritedConfig.provider ?? {}),
+      inheritedServerDisabledProviders: [...(serverState.configResolution.inheritedConfig.disabled_providers ?? [])],
+      defaultScopeProviderIds: Object.keys(serverState.configResolution.defaultScopeConfig.provider ?? {}),
+      defaultScopeDisabledProviders: [...(serverState.configResolution.defaultScopeConfig.disabled_providers ?? [])],
       mergedProviderIds: serverState.server.providers.map((provider) => provider.id),
     });
     return serverState.server;
@@ -124,32 +122,22 @@ export class ModelConfigService {
     const serverState = await this.loadServerState(localConfig);
     const local = buildCatalogFromConfig(localConfig, 'local');
     const server = serverState.server;
-    const baseEffective = this.resolveCatalog(local, server, mode);
-    const effectiveProviderConfig = this.buildEffectiveProviderConfig(
-      serverState.inheritedConfig,
-      localConfig,
-    );
-    const currentEnabledProviderIds = baseEffective.providers
-      .map((provider) => provider.id)
-      .filter((providerId, index, providerIds) => (
-        providerIds.indexOf(providerId) === index
-        && this.isProviderEnabledInCurrentScope(providerId, serverState.scopedConfig, localConfig)
-      ));
-    const effective = this.filterCatalogToProviderIds(
-      filterCatalog(baseEffective, {
-        disabledModelRefs,
-      }),
-      new Set(currentEnabledProviderIds),
-    );
+    const assembledCatalog = assembleModelCatalog({
+      local,
+      server,
+      mode,
+      disabledModelRefs,
+      configResolution: serverState.configResolution,
+    });
 
     const bundle = {
       local,
       server,
-      baseEffective,
-      currentEnabledProviderIds,
-      serverConfig: serverState.inheritedConfig,
-      effectiveProviderConfig,
-      effective,
+      baseEffective: assembledCatalog.baseEffective,
+      currentEnabledProviderIds: assembledCatalog.currentEnabledProviderIds,
+      serverConfig: serverState.configResolution.inheritedConfig,
+      effectiveProviderConfig: assembledCatalog.effectiveProviderConfig,
+      effective: assembledCatalog.effective,
     };
     return bundle;
   }
@@ -165,81 +153,44 @@ export class ModelConfigService {
   }
 
   async testProviderAvailability(providerId: string): Promise<ProviderAvailabilityProbe> {
-    const normalizedProviderId = providerId.trim();
-    if (!normalizedProviderId) {
-      return {
-        providerId: '',
-        status: 'missing',
-        effectiveEnabled: false,
-        projectDisabled: false,
-        serverDisabled: false,
-        overridesServerDisabled: false,
-        runtimeModelCount: 0,
-        catalogModelCount: 0,
-        sendTestAttempted: false,
-        sendTestSucceeded: false,
-      };
-    }
-
     const localConfig = await this.readLocalModelConfig();
     const serverState = await this.loadServerState(localConfig);
-    const effectiveProviderConfig = this.buildEffectiveProviderConfig(
-      serverState.inheritedConfig,
+    const probePlan = resolveProviderAvailabilityProbePlan({
+      providerId,
       localConfig,
-    );
-    const runtimeProvider = serverState.runtime.providers.find((provider) => provider.id === normalizedProviderId);
-    const serverProvider = serverState.server.providers.find((provider) => provider.id === normalizedProviderId);
-    const projectDisabled = !isProviderEnabled(localConfig, normalizedProviderId);
-    const serverDisabled = !projectDisabled && !isProviderEnabled(serverState.scopedConfig, normalizedProviderId);
-    const effectiveEnabled = (
-      this.isProviderEnabledInCurrentScope(normalizedProviderId, serverState.scopedConfig, localConfig)
-      && isProviderEnabled(effectiveProviderConfig, normalizedProviderId)
-    );
-    const runtimeModelCount = runtimeProvider?.models.length ?? 0;
-    const catalogModelCount = serverProvider?.models.length ?? 0;
-    const testedModelId = this.selectProviderProbeModelId({
-      providerId: normalizedProviderId,
-      localConfig,
-      runtimeProvider,
-      serverProvider,
+      runtimeCatalog: serverState.runtime,
       serverCatalog: serverState.server,
+      configResolution: serverState.configResolution,
     });
 
-    let status: ProviderAvailabilityProbeStatus = 'missing';
     let sendTestAttempted = false;
     let sendTestSucceeded = false;
     let sendTestError: string | undefined;
     let sendTestResponsePreview: string | undefined;
+    let status: ProviderAvailabilityProbeStatus = probePlan.status;
 
-    if (!effectiveEnabled && projectDisabled) {
-      status = 'project_disabled';
-    } else if (!effectiveEnabled && serverDisabled) {
-      status = 'server_disabled';
-    } else if (!testedModelId && serverProvider) {
-      status = 'catalog_only';
-    } else if (testedModelId) {
-      const sendProbe = await this.openCodeService.probeProviderResponse(normalizedProviderId, testedModelId);
+    if (probePlan.shouldSendProbe && probePlan.testedModelId) {
+      const sendProbe = await this.openCodeService.probeProviderResponse(
+        probePlan.providerId,
+        probePlan.testedModelId,
+      );
       sendTestAttempted = true;
       sendTestSucceeded = sendProbe.success;
       sendTestError = sendProbe.error;
       sendTestResponsePreview = sendProbe.responsePreview;
       status = sendProbe.success ? 'available' : 'send_failed';
-    } else if (runtimeModelCount > 0) {
-      status = 'available';
-    } else if (serverProvider) {
-      status = 'catalog_only';
     }
 
     return {
-      providerId: normalizedProviderId,
+      providerId: probePlan.providerId,
       status,
-      effectiveEnabled,
-      projectDisabled,
-      serverDisabled,
-      overridesServerDisabled: serverDisabled && effectiveEnabled,
-      runtimeModelCount,
-      catalogModelCount,
-      testedModelId,
+      effectiveEnabled: probePlan.effectiveEnabled,
+      projectDisabled: probePlan.projectDisabled,
+      serverDisabled: probePlan.serverDisabled,
+      overridesServerDisabled: probePlan.serverDisabled && probePlan.effectiveEnabled,
+      runtimeModelCount: probePlan.runtimeModelCount,
+      catalogModelCount: probePlan.catalogModelCount,
+      testedModelId: probePlan.testedModelId,
       sendTestAttempted,
       sendTestSucceeded,
       sendTestError,
@@ -252,108 +203,26 @@ export class ModelConfigService {
     return getEnabledProviderIds(config, collectConfiguredProviderIds(config));
   }
 
-  private resolveCatalog(local: ModelCatalog, server: ModelCatalog, mode: ModelSourceMode): ModelCatalog {
-    if (mode === 'local') {
-      return local;
-    }
-
-    if (mode === 'server') {
-      return server;
-    }
-
-    return mergeCatalogs(server, local);
-  }
-
-  private buildServerCatalog(
-    runtimeCatalog: ModelCatalog,
-    metadataConfig: OpencodeModelConfigSubset,
-  ): ModelCatalog {
-    const resolvedCatalog = buildCatalogFromConfig(metadataConfig, 'server');
-    const providers = new Map<string, ModelCatalogProvider>();
-    const resolvedProviders = new Map(
-      resolvedCatalog.providers.map((provider) => [provider.id, provider] as const),
-    );
-
-    for (const provider of runtimeCatalog.providers) {
-      this.mergeServerProvider(providers, provider);
-    }
-
-    for (const [providerId, provider] of resolvedProviders) {
-      if (!providers.has(providerId)) {
-        continue;
-      }
-
-      this.mergeServerProvider(providers, provider);
-    }
-
-    return {
-      providers: [...providers.values()]
-        .filter((provider) => provider.models.length > 0)
-        .sort((left, right) => left.name.localeCompare(right.name)),
-      defaults: {
-        ...resolvedCatalog.defaults,
-        ...runtimeCatalog.defaults,
-      },
-    };
-  }
-
-  private async loadServerState(localConfig: OpencodeModelConfigSubset | null = null): Promise<{
-    runtime: ModelCatalog;
-    scopedConfig: OpencodeModelConfigSubset;
-    inheritedConfig: OpencodeModelConfigSubset;
-    inheritedConfigSource: 'local_disk' | 'server_default_scope';
-    defaultScopeConfig: OpencodeModelConfigSubset;
-    server: ModelCatalog;
-  }> {
+  private async loadServerState(
+    localConfig: OpencodeModelConfigSubset | null = null,
+  ): Promise<ModelServerCatalogAssemblyResult> {
     const resolvedLocalConfig = localConfig ?? await this.readLocalModelConfig();
-    const [runtimeResult, scopedConfig, defaultScopeConfig] = await Promise.all([
+    const localServerMode = this.isLocalServerMode();
+    const [runtimeResult, scopedConfig, defaultScopeConfig, diskInheritedConfig] = await Promise.all([
       this.openCodeService.getAvailableModels({ includeDirectory: true }),
       this.openCodeService.getResolvedModelConfig({ includeDirectory: true }),
       this.openCodeService.getResolvedModelConfig({ includeDirectory: false }),
+      localServerMode ? this.readLocalInheritedModelConfig() : Promise.resolve(undefined),
     ]);
-    const inherited = await this.resolveInheritedServerConfig(
-      resolvedLocalConfig,
+
+    return assembleServerModelCatalog({
+      runtimeResult,
+      localServerMode,
+      localConfig: resolvedLocalConfig,
       scopedConfig,
       defaultScopeConfig,
-    );
-    const runtime = this.catalogFromResult(runtimeResult);
-    return {
-      runtime,
-      scopedConfig,
-      inheritedConfig: inherited.config,
-      inheritedConfigSource: inherited.source,
-      defaultScopeConfig,
-      server: this.buildServerCatalog(
-        runtime,
-        mergeModelConfigSubsets(inherited.config, scopedConfig),
-      ),
-    };
-  }
-
-  private async resolveInheritedServerConfig(
-    localConfig: OpencodeModelConfigSubset,
-    scopedConfig: OpencodeModelConfigSubset,
-    defaultScopeConfig: OpencodeModelConfigSubset,
-  ): Promise<{
-    config: OpencodeModelConfigSubset;
-    source: 'local_disk' | 'server_default_scope';
-  }> {
-    if (!this.isLocalServerMode()) {
-      return {
-        config: defaultScopeConfig,
-        source: 'server_default_scope',
-      };
-    }
-
-    const diskInheritedConfig = await this.readLocalInheritedModelConfig();
-    return {
-      config: this.supplementInheritedConfigFromScopedConfig(
-        diskInheritedConfig,
-        scopedConfig,
-        localConfig,
-      ),
-      source: 'local_disk',
-    };
+      diskInheritedConfig,
+    });
   }
 
   private isLocalServerMode(): boolean {
@@ -373,35 +242,6 @@ export class ModelConfigService {
       await this.readFirstAvailableModelConfig(this.getManagedConfigCandidates()),
     );
     return inherited;
-  }
-
-  private supplementInheritedConfigFromScopedConfig(
-    inheritedConfig: OpencodeModelConfigSubset,
-    scopedConfig: OpencodeModelConfigSubset,
-    localConfig: OpencodeModelConfigSubset,
-  ): OpencodeModelConfigSubset {
-    let next = mergeModelConfigSubsets({}, inheritedConfig);
-
-    if (
-      !Array.isArray(localConfig.enabled_providers)
-      && !Array.isArray(next.enabled_providers)
-      && Array.isArray(scopedConfig.enabled_providers)
-    ) {
-      next = mergeModelConfigSubsets(next, {
-        enabled_providers: scopedConfig.enabled_providers,
-      });
-    }
-
-    if (!Array.isArray(localConfig.disabled_providers) && Array.isArray(scopedConfig.disabled_providers)) {
-      next = mergeModelConfigSubsets(next, {
-        disabled_providers: [
-          ...(next.disabled_providers ?? []),
-          ...scopedConfig.disabled_providers,
-        ],
-      });
-    }
-
-    return next;
   }
 
   private async readFirstAvailableModelConfig(candidates: string[]): Promise<OpencodeModelConfigSubset> {
@@ -463,184 +303,5 @@ export class ModelConfigService {
       default:
         return '/etc/opencode';
     }
-  }
-
-  private catalogFromResult(result: {
-    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
-    defaults: Record<string, string>;
-  }): ModelCatalog {
-    return {
-      providers: result.providers.map((provider) => ({
-        id: provider.id,
-        name: provider.name || provider.id,
-        source: 'server',
-        existsInLocal: false,
-        existsInServer: true,
-        models: provider.models.map((model) => ({
-          id: model.id,
-          name: model.name || model.id,
-          contextWindow: model.contextWindow,
-          source: 'server',
-          existsInLocal: false,
-          existsInServer: true,
-        })),
-      })),
-      defaults: result.defaults,
-    };
-  }
-
-  private mergeServerProvider(
-    providers: Map<string, ModelCatalogProvider>,
-    provider: ModelCatalogProvider,
-  ): void {
-    const existing = providers.get(provider.id);
-    if (!existing) {
-      providers.set(provider.id, {
-        ...provider,
-        source: 'server',
-        existsInLocal: false,
-        existsInServer: true,
-        models: provider.models.map((model) => ({
-          ...model,
-          source: 'server',
-          existsInLocal: false,
-          existsInServer: true,
-        })),
-      });
-      return;
-    }
-
-    const models = new Map(existing.models.map((model) => [model.id, { ...model }]));
-    for (const model of provider.models) {
-      const existingModel = models.get(model.id);
-      if (!existingModel) {
-        models.set(model.id, {
-          ...model,
-          source: 'server',
-          existsInLocal: false,
-          existsInServer: true,
-        });
-        continue;
-      }
-
-      models.set(model.id, {
-        ...existingModel,
-        ...model,
-        name: model.name || existingModel.name,
-        contextWindow: model.contextWindow ?? existingModel.contextWindow,
-        source: 'server',
-        existsInLocal: false,
-        existsInServer: true,
-        disabledScopes: this.mergeDisabledScopes(existingModel.disabledScopes, model.disabledScopes),
-      });
-    }
-
-    providers.set(provider.id, {
-      ...existing,
-      ...provider,
-      name: provider.name || existing.name,
-      source: 'server',
-      existsInLocal: false,
-      existsInServer: true,
-      disabledScopes: this.mergeDisabledScopes(existing.disabledScopes, provider.disabledScopes),
-      models: [...models.values()].sort((left, right) => left.name.localeCompare(right.name)),
-    });
-  }
-
-  private buildEffectiveProviderConfig(
-    inheritedConfig: ProviderAvailabilityConfig | null | undefined,
-    localConfig: ProviderAvailabilityConfig | null | undefined,
-  ): ProviderAvailabilityConfig {
-    return mergeProviderAvailabilityConfig(inheritedConfig, localConfig);
-  }
-
-  private mergeDisabledScopes(
-    left: ModelCatalogProvider['disabledScopes'] | ModelCatalogProvider['models'][number]['disabledScopes'],
-    right: ModelCatalogProvider['disabledScopes'] | ModelCatalogProvider['models'][number]['disabledScopes'],
-  ): Array<'global' | 'project'> | undefined {
-    const merged = Array.from(new Set([...(left ?? []), ...(right ?? [])]));
-    return merged.length > 0 ? merged : undefined;
-  }
-
-  private collectKnownProviderIds(config: OpencodeModelConfigSubset): string[] {
-    const providerIds = new Set<string>();
-
-    if (config.provider) {
-      for (const providerId of Object.keys(config.provider)) {
-        const trimmed = providerId.trim();
-        if (trimmed) {
-          providerIds.add(trimmed);
-        }
-      }
-    }
-
-    for (const parsed of [parseModelReference(config.model), parseModelReference(config.small_model)]) {
-      if (parsed?.provider) {
-        providerIds.add(parsed.provider);
-      }
-    }
-
-    for (const providerId of config.disabled_providers ?? []) {
-      const trimmed = providerId.trim();
-      if (trimmed) {
-        providerIds.add(trimmed);
-      }
-    }
-
-    return [...providerIds];
-  }
-
-  private selectProviderProbeModelId(options: {
-    providerId: string;
-    localConfig: OpencodeModelConfigSubset;
-    runtimeProvider: ModelCatalogProvider | undefined;
-    serverProvider: ModelCatalogProvider | undefined;
-    serverCatalog: ModelCatalog;
-  }): string | undefined {
-    const configuredDefault = parseModelReference(options.localConfig.model);
-    if (configuredDefault?.provider === options.providerId && configuredDefault.model) {
-      return configuredDefault.model;
-    }
-
-    const serverDefault = options.serverCatalog.defaults[options.providerId];
-    if (typeof serverDefault === 'string' && serverDefault.trim()) {
-      return serverDefault.trim();
-    }
-
-    for (const provider of [options.runtimeProvider, options.serverProvider]) {
-      const modelId = provider?.models.find((model) => model.id.trim())?.id;
-      if (modelId) {
-        return modelId;
-      }
-    }
-
-    return undefined;
-  }
-
-  private isProviderEnabledInCurrentScope(
-    providerId: string,
-    scopedConfig: Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'>,
-    localConfig: Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'>,
-  ): boolean {
-    return isProviderEnabled(scopedConfig, providerId) && isProviderEnabled(localConfig, providerId);
-  }
-
-  private filterCatalogToProviderIds(
-    catalog: ModelCatalog,
-    allowedProviderIds: ReadonlySet<string>,
-  ): ModelCatalog {
-    const providers = catalog.providers
-      .filter((provider) => allowedProviderIds.has(provider.id))
-      .map((provider) => ({
-        ...provider,
-        models: provider.models.map((model) => ({ ...model })),
-      }));
-
-    return {
-      providers,
-      defaults: Object.fromEntries(
-        Object.entries(catalog.defaults).filter(([providerId]) => allowedProviderIds.has(providerId)),
-      ),
-    };
   }
 }

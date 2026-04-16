@@ -102,6 +102,27 @@ interface DiamondDisplacementTrace {
   };
 }
 
+interface DiamondRay {
+  origin: Vec3;
+  direction: Vec3;
+}
+
+interface DiamondTriangle {
+  a: Vec3;
+  b: Vec3;
+  c: Vec3;
+  normal: Vec3;
+}
+
+interface DiamondDisplacementTraceRequest {
+  uv: { x: number; y: number };
+  origin: Vec3;
+  direction: Vec3;
+  entryPoint: Vec3;
+  size: DiamondSize;
+  exitPoint?: Vec3;
+}
+
 interface DiamondSettings {
   displacementScale: number;
   bloomOpacity: number;
@@ -801,13 +822,11 @@ function traceToPlane(origin: Vec3, direction: Vec3, planeZ: number): Vec3 | nul
 }
 
 function intersectRayTriangle(
-  origin: Vec3,
-  direction: Vec3,
-  a: Vec3,
-  b: Vec3,
-  c: Vec3,
-  normal: Vec3,
+  ray: DiamondRay,
+  triangle: DiamondTriangle,
 ): { t: number; point: Vec3; normal: Vec3 } | null {
+  const { origin, direction } = ray;
+  const { a, b, c, normal } = triangle;
   const edge1 = sub3(b, a);
   const edge2 = sub3(c, a);
   const pvec = cross3(direction, edge2);
@@ -851,14 +870,15 @@ function intersectCrystalFaces(
   let bestHit: { t: number; point: Vec3; normal: Vec3 } | null = null;
 
   for (const face of PYRAMID_FACES) {
-    const hit = intersectRayTriangle(
-      localOrigin,
-      localDirection,
-      face.vertices[0],
-      face.vertices[1],
-      face.vertices[2],
-      face.normal,
-    );
+    const hit = intersectRayTriangle({
+      origin: localOrigin,
+      direction: localDirection,
+    }, {
+      a: face.vertices[0],
+      b: face.vertices[1],
+      c: face.vertices[2],
+      normal: face.normal,
+    });
     if (!hit) {
       continue;
     }
@@ -998,14 +1018,14 @@ function createDiamondContext(
   };
 }
 
-function buildDisplacementTrace(
-  uv: { x: number; y: number },
-  origin: Vec3,
-  direction: Vec3,
-  entryPoint: Vec3,
-  size: DiamondSize,
-  exitPoint?: Vec3,
-): DiamondDisplacementTrace {
+function buildDisplacementTrace({
+  uv,
+  origin,
+  direction,
+  entryPoint,
+  size,
+  exitPoint,
+}: DiamondDisplacementTraceRequest): DiamondDisplacementTrace {
   const finalExitPoint = exitPoint ?? entryPoint;
   const stableDirection = stabilizeBackgroundDirection(direction, MIN_BACKGROUND_Z_COMPONENT);
   const hit = traceToPlane(origin, stableDirection, BACKGROUND_Z);
@@ -1053,13 +1073,13 @@ function traceDiamondRay(
   const entryPoint = firstHit.point;
   const entryTransmission = resolveTransmissionDirection(rayDirection, firstHit.normal, 1 / IOR);
   if (entryTransmission.kind === 'reflected') {
-    return buildDisplacementTrace(
+    return buildDisplacementTrace({
       uv,
-      add3(entryPoint, mul3(entryTransmission.direction, SURFACE_OFFSET)),
-      entryTransmission.direction,
+      origin: add3(entryPoint, mul3(entryTransmission.direction, SURFACE_OFFSET)),
+      direction: entryTransmission.direction,
       entryPoint,
       size,
-    );
+    });
   }
 
   let insideOrigin = add3(entryPoint, mul3(entryTransmission.direction, SURFACE_OFFSET));
@@ -1070,7 +1090,13 @@ function traceDiamondRay(
   for (let bounce = 0; bounce < MAX_INTERNAL_BOUNCES; bounce += 1) {
     const insideHit = intersectCrystalFaces(insideOrigin, currentDirection, context);
     if (!insideHit) {
-      return buildDisplacementTrace(uv, insideOrigin, currentDirection, entryPoint, size);
+      return buildDisplacementTrace({
+        uv,
+        origin: insideOrigin,
+        direction: currentDirection,
+        entryPoint,
+        size,
+      });
     }
 
     exitPoint = insideHit.point;
@@ -1085,17 +1111,23 @@ function traceDiamondRay(
   }
 
   if (!exitPoint || !outsideDirection) {
-    return buildDisplacementTrace(uv, insideOrigin, currentDirection, entryPoint, size);
+    return buildDisplacementTrace({
+      uv,
+      origin: insideOrigin,
+      direction: currentDirection,
+      entryPoint,
+      size,
+    });
   }
 
-  return buildDisplacementTrace(
+  return buildDisplacementTrace({
     uv,
-    add3(exitPoint, mul3(outsideDirection, SURFACE_OFFSET)),
-    outsideDirection,
+    origin: add3(exitPoint, mul3(outsideDirection, SURFACE_OFFSET)),
+    direction: outsideDirection,
     entryPoint,
     size,
     exitPoint,
-  );
+  });
 }
 
 function applyEdgeBulge(

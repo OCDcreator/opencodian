@@ -58,11 +58,19 @@ export interface SendPipelineFinalizationPort {
   finalizeAfterStream(options: FinalizeMessageOptions): Promise<void>;
 }
 
-export interface SendPipelineHost {
+export interface SendPipelineViewPort {
   getTabRuntimeState(tabId: TabId | null): SendPipelineTabRuntime | null;
   getActiveTabId(): TabId | null;
   shouldAutoScroll(tabId: TabId | null): boolean;
   scheduleSettledScrollToBottomIfNeeded(shouldScroll?: boolean, tabId?: TabId | null): void;
+  getOrCreateTabStreamController(tabId: TabId | null): SendPipelineStreamController | null;
+  finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId: TabId | null): Promise<void>;
+  removeEmptyAssistantShells(): void;
+  syncTabStreamLikeState(tabId: TabId | null): void;
+  refreshServerStatusBadge(): Promise<void>;
+}
+
+export interface SendPipelineTransportPort {
   sendStreamMessage(
     content: string,
     options: SendMessageModelOptions & {
@@ -71,19 +79,6 @@ export interface SendPipelineHost {
     },
   ): AsyncGenerator<CoreStreamChunk>;
   detachStream(sessionId: string | undefined): void;
-  createAssistantMessageElement(
-    tabId: TabId | null,
-    hiddenUntilVisible: boolean,
-  ): SendPipelineStreamElements;
-  getOrCreateTabStreamController(tabId: TabId | null): SendPipelineStreamController | null;
-  summarizeContentBlocksForDebug(
-    blocks: SendPipelineDebugContentBlock[] | undefined,
-  ): Record<string, unknown> | null;
-  logAssistantFinalizationDebug(label: string, payload: unknown): void;
-  getLogPreview(text: string, maxLength?: number): string;
-  summarizeCoreStreamChunkForDebug(chunk: CoreStreamChunk): Record<string, unknown> | null;
-  getFriendlyStreamErrorMessage(rawMessage: string): string;
-  revealStreamingAssistantMessageElement(tabId: TabId | null): HTMLElement | null;
   syncLatestUserMessageFromServer(
     conversation: Conversation,
     optimisticMessageId: string,
@@ -101,13 +96,15 @@ export interface SendPipelineHost {
   ): Promise<void>;
   showQuestionDialog(request: QuestionRequest, tabId: TabId | null): Promise<void>;
   convertToStreamingChunk(chunk: CoreStreamChunk): StreamingChunk | null;
-  buildStreamErrorNotice(
-    timestamp: number,
-    content: string,
-    modelId?: string,
-    sourceMessageId?: string,
-  ): ChatMessage;
-  buildInterruptedAssistantNotice(timestamp: number, modelId?: string): ChatMessage;
+  getFriendlyStreamErrorMessage(rawMessage: string): string;
+}
+
+export interface SendPipelineShellPort {
+  createAssistantMessageElement(
+    tabId: TabId | null,
+    hiddenUntilVisible: boolean,
+  ): SendPipelineStreamElements;
+  revealStreamingAssistantMessageElement(tabId: TabId | null): HTMLElement | null;
   renderAssistantPlaceholderAsNotice(
     messageEl: HTMLElement,
     noticeMessage: ChatMessage,
@@ -120,14 +117,86 @@ export interface SendPipelineHost {
     modelId?: string;
     statusLabel?: string;
   }): void;
-  finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId: TabId | null): Promise<void>;
-  removeEmptyAssistantShells(): void;
-  syncTabStreamLikeState(tabId: TabId | null): void;
-  refreshServerStatusBadge(): Promise<void>;
+}
+
+export interface SendPipelinePersistencePort {
   saveConversation(conversation: Conversation): Promise<void>;
+}
+
+export interface SendPipelineDebugPort {
+  summarizeContentBlocksForDebug(
+    blocks: SendPipelineDebugContentBlock[] | undefined,
+  ): Record<string, unknown> | null;
+  logAssistantFinalizationDebug(label: string, payload: unknown): void;
+  getLogPreview(text: string, maxLength?: number): string;
+  summarizeCoreStreamChunkForDebug(chunk: CoreStreamChunk): Record<string, unknown> | null;
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
   stringifyLogPayload(payload: unknown): string;
 }
+
+export interface SendPipelineHost extends
+  SendPipelineViewPort,
+  SendPipelineTransportPort,
+  SendPipelineShellPort,
+  SendPipelinePersistencePort,
+  SendPipelineDebugPort {}
+
+export type SendPipelineExecutionHost =
+  Pick<SendPipelineViewPort, 'getTabRuntimeState' | 'getOrCreateTabStreamController'>
+  & Pick<SendPipelineTransportPort, 'sendStreamMessage'>
+  & Pick<SendPipelineShellPort, 'createAssistantMessageElement'>;
+
+export type PendingIndicatorHost =
+  Pick<SendPipelineViewPort, 'getActiveTabId' | 'shouldAutoScroll' | 'scheduleSettledScrollToBottomIfNeeded'>
+  & Pick<SendPipelineShellPort, 'revealStreamingAssistantMessageElement'>;
+
+export type SendPipelineTraceHost =
+  Pick<SendPipelineDebugPort, 'summarizeContentBlocksForDebug' | 'logAssistantFinalizationDebug' | 'getLogPreview'>;
+
+export type StreamChunkRouterHost =
+  Pick<SendPipelineViewPort, 'getActiveTabId' | 'shouldAutoScroll' | 'scheduleSettledScrollToBottomIfNeeded' | 'syncTabStreamLikeState'>
+  & Pick<SendPipelineTransportPort,
+    | 'detachStream'
+    | 'syncLatestUserMessageFromServer'
+    | 'beginTabContextUsageStream'
+    | 'completeTabContextUsageStream'
+    | 'applyUsageChunkToTab'
+    | 'showPermissionDialog'
+    | 'showQuestionDialog'
+    | 'convertToStreamingChunk'
+    | 'getFriendlyStreamErrorMessage'
+  >
+  & Pick<SendPipelineShellPort, 'revealStreamingAssistantMessageElement'>
+  & SendPipelineTraceHost
+  & Pick<SendPipelineDebugPort, 'summarizeCoreStreamChunkForDebug'>;
+
+export type StreamShellFinalizerHost = Pick<
+  SendPipelineShellPort,
+  'addTimestampWithCopyButton' | 'renderAssistantPlaceholderAsNotice'
+>;
+
+export type LocalStreamPersistenceHost =
+  SendPipelinePersistencePort
+  & Pick<SendPipelineDebugPort, 'summarizeChatMessageForDebug' | 'stringifyLogPayload' | 'getLogPreview'>;
+
+export type StreamLocalFinalizerHost =
+  Pick<SendPipelineViewPort,
+    | 'getActiveTabId'
+    | 'scheduleSettledScrollToBottomIfNeeded'
+    | 'finalizeBackgroundTaskIndicatorAfterPrimaryStream'
+    | 'removeEmptyAssistantShells'
+    | 'syncTabStreamLikeState'
+    | 'refreshServerStatusBadge'
+  >
+  & Pick<SendPipelineTransportPort, 'completeTabContextUsageStream'>
+  & Pick<SendPipelineDebugPort, 'summarizeContentBlocksForDebug'>
+  & StreamShellFinalizerHost
+  & LocalStreamPersistenceHost;
+
+export type SendPipelineRuntimeHost =
+  SendPipelineExecutionHost
+  & StreamChunkRouterHost
+  & StreamLocalFinalizerHost;
 
 export interface SendPipelineTraceState {
   streamCompleted: boolean;
@@ -138,7 +207,7 @@ export interface SendPipelineTraceState {
 }
 
 export interface StreamChunkRouterOptions {
-  host: SendPipelineHost;
+  host: StreamChunkRouterHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;
   stream: AsyncGenerator<CoreStreamChunk>;
@@ -167,7 +236,7 @@ export interface LocalStreamOutcome {
 }
 
 export interface StreamLocalFinalizerOptions {
-  host: SendPipelineHost;
+  host: StreamLocalFinalizerHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;
   streamController: SendPipelineStreamController | null;

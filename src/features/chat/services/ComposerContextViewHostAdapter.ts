@@ -1,0 +1,77 @@
+import type { MarkdownView } from 'obsidian';
+
+import type { ComposerContextActionServiceHost } from './ComposerContextActionService';
+import type { ComposerContextChipActionServiceHost } from './ComposerContextChipActionService';
+import type { ComposerContextCoordinatorHost } from './ComposerContextCoordinator';
+import type { ComposerContextPickerActionServiceHost } from './ComposerContextPickerActionService';
+import type { ComposerContextRuntimeStore } from './ComposerContextRuntimeStore';
+export type { ComposerContextRuntimeState } from './ComposerContextRuntimeStore';
+
+export interface ComposerContextChipActionHostOptions {
+  refreshActiveFocusContextPreview(): void;
+}
+
+export interface ComposerContextActionHostOptions {
+  getActiveMarkdownView(): MarkdownView | null;
+}
+
+export interface ComposerContextPickerActionHostOptions {
+  beginContextPickerInteraction(): void;
+  completeContextPickerInteraction(): void;
+}
+
+export class ComposerContextViewHostAdapter {
+  constructor(
+    private readonly runtimeStore: ComposerContextRuntimeStore,
+  ) {}
+
+  createCoordinatorHost(): ComposerContextCoordinatorHost {
+    return {
+      getContextChipStates: () => this.runtimeStore.getContextChipStates(),
+    };
+  }
+
+  createChipActionServiceHost(
+    options: ComposerContextChipActionHostOptions,
+  ): ComposerContextChipActionServiceHost {
+    return {
+      getFocusContextPreview: () => this.runtimeStore.getFocusContextPreview(),
+      addDraftContextItem: (item) => {
+        this.runtimeStore.addDraftContextItem(item);
+      },
+      removeDraftContextItemsForTarget: (target) => {
+        this.runtimeStore.removeDraftContextItemsForTarget(target);
+      },
+      refreshActiveFocusContextPreview: () => {
+        options.refreshActiveFocusContextPreview();
+      },
+    };
+  }
+
+  createActionServiceHost(
+    options: ComposerContextActionHostOptions,
+  ): ComposerContextActionServiceHost {
+    return {
+      getActiveMarkdownView: () => options.getActiveMarkdownView(),
+      addDraftContextItem: (item) => {
+        this.runtimeStore.addDraftContextItem(item);
+      },
+    };
+  }
+
+  createPickerActionServiceHost(
+    options: ComposerContextPickerActionHostOptions,
+  ): ComposerContextPickerActionServiceHost {
+    return {
+      addDraftContextItem: (item) => {
+        this.runtimeStore.addDraftContextItem(item);
+      },
+      beginContextPickerInteraction: () => {
+        options.beginContextPickerInteraction();
+      },
+      completeContextPickerInteraction: () => {
+        options.completeContextPickerInteraction();
+      },
+    };
+  }
+}

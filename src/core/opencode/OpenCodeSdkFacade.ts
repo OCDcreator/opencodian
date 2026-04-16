@@ -1,6 +1,8 @@
+import { createLogger } from '../../shared';
 import { createSdkClient, type CreateSdkClientOptions } from './createSdkClient';
 import type { SdkOpencodeClient } from './sdkTypes';
 
+const logger = createLogger('OpenCodeService');
 export const SDK_FACADE_NAMESPACE_NAMES = [
   'app',
   'auth',
@@ -50,6 +52,79 @@ export type OpenCodeSdkFacadeClient = {
 
 export type OpenCodeSdkFacadeClientFactory = (options: CreateSdkClientOptions) => SdkOpencodeClient;
 
+export interface OpenCodeSdkErrorMessageOptions {
+  fallbackMessage?: string | null;
+  includeName?: boolean;
+  includeTopLevelError?: boolean;
+  includeTopLevelStatus?: boolean;
+  trimMessage?: boolean;
+}
+
+type OpenCodeSdkErrorRecord = {
+  message?: unknown;
+  error?: unknown;
+  data?: { message?: unknown; statusCode?: unknown };
+  name?: unknown;
+  status?: unknown;
+};
+
+const TRANSIENT_CONNECTIVITY_ERROR_PATTERNS = [
+  /net::ERR_CONNECTION_REFUSED/i,
+  /net::ERR_CONNECTION_RESET/i,
+  /\bECONNREFUSED\b/i,
+  /\bECONNRESET\b/i,
+];
+
+interface TransientConnectivityLogState {
+  suppressedCount: number;
+}
+
+type ServiceLogLevel = 'warn' | 'error';
+
+function getSdkErrorText(value: unknown, trimMessage = false): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = trimMessage ? value.trim() : value;
+  return normalized ? normalized : null;
+}
+
+function appendSdkErrorStatus(message: string, statusCode: number | null): string {
+  if (statusCode === null || message.toLowerCase().includes(`http ${statusCode}`)) {
+    return message;
+  }
+
+  return `${message} (HTTP ${statusCode})`;
+}
+
+function getSdkErrorRecordBaseMessage(
+  record: OpenCodeSdkErrorRecord,
+  options: OpenCodeSdkErrorMessageOptions,
+): string | null {
+  return getSdkErrorText(record.data?.message, options.trimMessage)
+    ?? getSdkErrorText(record.message, options.trimMessage)
+    ?? (options.includeTopLevelError === false ? null : getSdkErrorText(record.error, options.trimMessage))
+    ?? (options.includeName ? getSdkErrorText(record.name, options.trimMessage) : null)
+    ?? options.fallbackMessage
+    ?? null;
+}
+
+function getSdkErrorRecordStatusCode(
+  record: OpenCodeSdkErrorRecord,
+  includeTopLevelStatus: boolean,
+): number | null {
+  if (typeof record.data?.statusCode === 'number') {
+    return record.data.statusCode;
+  }
+
+  if (!includeTopLevelStatus || typeof record.status !== 'number') {
+    return null;
+  }
+
+  return record.status;
+}
+
 function unwrapSdkResponse<TValue>(value: TValue): SdkDataShape<TValue> {
   if (value && typeof value === 'object' && 'data' in (value as Record<string, unknown>)) {
     return ((value as unknown) as { data: SdkDataShape<TValue> }).data;
@@ -58,42 +133,142 @@ function unwrapSdkResponse<TValue>(value: TValue): SdkDataShape<TValue> {
   return value as SdkDataShape<TValue>;
 }
 
-function normalizeSdkError(error: unknown): Error {
+export function extractSdkErrorMessage(
+  error: unknown,
+  options: OpenCodeSdkErrorMessageOptions = {},
+): string | null {
+  if (error instanceof Error) {
+    return getSdkErrorText(error.message, options.trimMessage)
+      ?? (options.includeName ? getSdkErrorText(error.name, options.trimMessage) : null)
+      ?? options.fallbackMessage
+      ?? null;
+  }
+
+  if (typeof error === 'string') {
+    return getSdkErrorText(error, options.trimMessage);
+  }
+
+  if (!error || typeof error !== 'object') {
+    return options.fallbackMessage ?? null;
+  }
+
+  const record = error as OpenCodeSdkErrorRecord;
+  const baseMessage = getSdkErrorRecordBaseMessage(record, options);
+
+  if (!baseMessage) {
+    return null;
+  }
+
+  const statusCode = getSdkErrorRecordStatusCode(
+    record,
+    options.includeTopLevelStatus !== false,
+  );
+
+  return appendSdkErrorStatus(baseMessage, statusCode);
+}
+
+export function describeSdkError(
+  error: unknown,
+  fallbackMessage = 'OpenCode SDK request failed',
+): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return extractSdkErrorMessage(error, { fallbackMessage }) ?? fallbackMessage;
+}
+
+export function normalizeSdkError(error: unknown): Error {
   if (error instanceof Error) {
     return error;
   }
 
-  if (typeof error === 'string') {
-    return new Error(error);
+  return new Error(describeSdkError(error));
+}
+
+export class OpenCodeServiceDiagnostics {
+  private transientConnectivityLogState: TransientConnectivityLogState | null = null;
+
+  extractAssistantErrorMessage(errorLike: unknown): string | null {
+    return extractSdkErrorMessage(errorLike, {
+      fallbackMessage: null,
+      includeName: true,
+      includeTopLevelError: false,
+      includeTopLevelStatus: false,
+      trimMessage: true,
+    });
   }
 
-  if (error && typeof error === 'object') {
-    const record = error as {
-      message?: unknown;
-      error?: unknown;
-      data?: { message?: unknown; statusCode?: unknown };
-      status?: unknown;
+  describeError(error: unknown): string {
+    return describeSdkError(
+      error,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  isTransientConnectivityError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return TRANSIENT_CONNECTIVITY_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+  }
+
+  logAssistantFinalizationDebug(label: string, payload: unknown): void {
+    logger.debug(`Assistant stream finalization [${label}]: ${this.stringifyDebugPayload(payload)}`);
+  }
+
+  logServiceWarning(_key: string, message: string, error: unknown): void {
+    this.logServiceIssue('warn', message, error);
+  }
+
+  logServiceError(_key: string, message: string, error: unknown): void {
+    this.logServiceIssue('error', message, error);
+  }
+
+  resetTransientConnectivityLogState(): void {
+    this.transientConnectivityLogState = null;
+  }
+
+  private logServiceIssue(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (this.isTransientConnectivityError(error)) {
+      this.logTransientConnectivityIssue(level, message, error);
+      return;
+    }
+
+    this.emit(level, message, error);
+  }
+
+  private logTransientConnectivityIssue(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (this.transientConnectivityLogState) {
+      this.transientConnectivityLogState.suppressedCount += 1;
+      return;
+    }
+
+    this.transientConnectivityLogState = {
+      suppressedCount: 0,
     };
-    const message = typeof record.data?.message === 'string'
-      ? record.data.message
-      : typeof record.message === 'string'
-        ? record.message
-        : typeof record.error === 'string'
-          ? record.error
-          : 'OpenCode SDK request failed';
 
-    const statusCode = typeof record.data?.statusCode === 'number'
-      ? record.data.statusCode
-      : typeof record.status === 'number'
-        ? record.status
-        : null;
-
-    return statusCode === null
-      ? new Error(message)
-      : new Error(`${message} (HTTP ${statusCode})`);
+    this.emit(level, `${message} (subsequent offline logs suppressed until the server recovers)`, error);
   }
 
-  return new Error('OpenCode SDK request failed');
+  private emit(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (level === 'warn') {
+      logger.warn(message, error);
+      return;
+    }
+
+    logger.error(message, error);
+  }
+
+  private stringifyDebugPayload(payload: unknown): string {
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '[unserializable]';
+    }
+  }
 }
 
 export interface OpenCodeSdkFacadeOptionsProvider {

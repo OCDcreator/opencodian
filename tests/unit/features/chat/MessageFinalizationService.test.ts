@@ -54,8 +54,7 @@ function createHost(
     getConversationSyncFingerprint: jest.fn().mockImplementation(
       (messages: ChatMessage[]) => `sync:${messages.map((message) => `${message.id}:${message.timestamp}`).join('|')}`,
     ),
-    patchTrailingAssistantRender: jest.fn().mockResolvedValue(true),
-    rerenderConversationMessages: jest.fn().mockResolvedValue(undefined),
+    applySyncedConversationUpdate: jest.fn().mockResolvedValue(undefined),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
     appendTurnDiffNoticeIfNeeded: jest.fn().mockResolvedValue(undefined),
     refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
@@ -113,8 +112,7 @@ describe('MessageFinalizationService', () => {
     });
 
     expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
-    expect(host.patchTrailingAssistantRender).not.toHaveBeenCalled();
-    expect(host.rerenderConversationMessages).not.toHaveBeenCalled();
+    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
     expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     expect(host.appendTurnDiffNoticeIfNeeded).not.toHaveBeenCalled();
     expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
@@ -145,8 +143,7 @@ describe('MessageFinalizationService', () => {
     });
 
     expect(host.syncConversationMessagesFromServer).toHaveBeenCalledWith(conversation, 'tab-1', 'send-finalization');
-    expect(host.patchTrailingAssistantRender).not.toHaveBeenCalled();
-    expect(host.rerenderConversationMessages).not.toHaveBeenCalled();
+    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
     expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
     expect(host.appendTurnDiffNoticeIfNeeded).toHaveBeenCalledWith(conversation, ['notes.md'], 'tab-1');
     expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
@@ -159,7 +156,7 @@ describe('MessageFinalizationService', () => {
     expect(host.setConversationSyncInFlight).toHaveBeenCalledWith('tab-1', false);
   });
 
-  it('tries tail patching before rerender when synced visuals changed', async () => {
+  it('delegates synced render application when visuals changed', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Before', timestamp: 10 }),
     ];
@@ -176,40 +173,6 @@ describe('MessageFinalizationService', () => {
           fingerprint: 'sync-fingerprint-2',
         };
       }),
-      patchTrailingAssistantRender: jest.fn().mockResolvedValue(true),
-    });
-    const service = new MessageFinalizationService(host);
-
-    await service.finalizeAfterStream({
-      conversation,
-      tabId: 'tab-1',
-      shouldSyncFromServer: true,
-      editedFiles: ['notes.md'],
-      logStage: jest.fn(),
-    });
-
-    expect(host.patchTrailingAssistantRender).toHaveBeenCalledWith(previousMessages, nextMessages, 'tab-1');
-    expect(host.rerenderConversationMessages).not.toHaveBeenCalled();
-  });
-
-  it('falls back to full rerender when tail patching fails', async () => {
-    const previousMessages = [
-      createMessage({ id: 'assistant-1', content: 'Before', timestamp: 10 }),
-    ];
-    const nextMessages = [
-      createMessage({ id: 'assistant-2', content: 'After', timestamp: 11 }),
-    ];
-    const conversation = createConversation(previousMessages);
-    const host = createHost(conversation, {
-      syncConversationMessagesFromServer: jest.fn().mockImplementation(async (targetConversation: Conversation) => {
-        targetConversation.messages = nextMessages;
-        return {
-          messages: nextMessages,
-          changed: true,
-          fingerprint: 'sync-fingerprint-2',
-        };
-      }),
-      patchTrailingAssistantRender: jest.fn().mockResolvedValue(false),
     });
     const service = new MessageFinalizationService(host);
     const logStage = jest.fn();
@@ -222,10 +185,43 @@ describe('MessageFinalizationService', () => {
       logStage,
     });
 
-    expect(host.patchTrailingAssistantRender).toHaveBeenCalledWith(previousMessages, nextMessages, 'tab-1');
-    expect(host.rerenderConversationMessages).toHaveBeenCalledWith(conversation);
-    expect(logStage).toHaveBeenCalledWith('post-sync-tail-render-attempt', { patchedTail: false });
-    expect(logStage).toHaveBeenCalledWith('post-sync-full-rerender-complete');
+    expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(previousMessages, nextMessages);
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
+    expect(logStage).toHaveBeenCalledWith('post-sync-render-apply-complete');
+  });
+
+  it('keeps synced render application centralized for changed foreground syncs', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Before', timestamp: 10 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'After', timestamp: 11 }),
+    ];
+    const conversation = createConversation(previousMessages);
+    const host = createHost(conversation, {
+      syncConversationMessagesFromServer: jest.fn().mockImplementation(async (targetConversation: Conversation) => {
+        targetConversation.messages = nextMessages;
+        return {
+          messages: nextMessages,
+          changed: true,
+          fingerprint: 'sync-fingerprint-2',
+        };
+      }),
+    });
+    const service = new MessageFinalizationService(host);
+    const logStage = jest.fn();
+
+    await service.finalizeAfterStream({
+      conversation,
+      tabId: 'tab-1',
+      shouldSyncFromServer: true,
+      editedFiles: ['notes.md'],
+      logStage,
+    });
+
+    expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(previousMessages, nextMessages);
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
+    expect(logStage).toHaveBeenCalledWith('post-sync-render-apply-complete');
   });
 
   it('marks the tab for attention instead of foreground updates when user switched away', async () => {
@@ -249,8 +245,7 @@ describe('MessageFinalizationService', () => {
       logStage: jest.fn(),
     });
 
-    expect(host.patchTrailingAssistantRender).not.toHaveBeenCalled();
-    expect(host.rerenderConversationMessages).not.toHaveBeenCalled();
+    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
     expect(host.setActiveTabConversation).not.toHaveBeenCalled();
     expect(host.syncActiveTabContextUsageIdentity).not.toHaveBeenCalled();
     expect(host.refreshActiveTabContextUsageFromServer).not.toHaveBeenCalled();

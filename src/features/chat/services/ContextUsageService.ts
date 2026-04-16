@@ -1,12 +1,14 @@
 import {
   type ChatMessage,
-  type ContextBreakdownSegment,
   createEmptyTabContextState,
   getDefaultContextWindow,
   type StreamChunk,
   type TabContextState,
 } from '../../../core/types';
-import { t } from '../../../i18n';
+import {
+  ContextUsageDisplayService,
+  type ContextUsageSummary,
+} from './ContextUsageDisplayService';
 
 interface ContextModelInfo {
   provider?: string | null;
@@ -23,15 +25,27 @@ interface ContextSessionInfo {
   updatedAt?: number | null;
 }
 
-export interface ContextUsageSummary {
-  totalTokens: number;
-  percentage: number;
-  tone: 'success' | 'warning' | 'danger' | 'muted';
-  ringLabel: string;
-  isUnavailable: boolean;
+export interface ContextUsageSnapshot {
+  sessionId: string;
+  sessionTitle: string;
+  createdAt: number;
+  updatedAt: number;
+  providerId: string | null;
+  providerName: string | null;
+  modelId: string | null;
+  modelName: string | null;
   contextWindow: number;
-  tooltip: string;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
 }
+
+export type { ContextUsageSummary } from './ContextUsageDisplayService';
+
+type TimestampRefreshMode = 'preserve' | 'now' | 'if-missing';
 
 export class ContextUsageService {
   static createState(
@@ -46,7 +60,7 @@ export class ContextUsageService {
     modelInfo?: ContextModelInfo,
     sessionInfo?: ContextSessionInfo,
   ): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
+    const next = this.cloneState(state);
     const modelId = modelInfo?.model ?? next.model;
 
     next.provider = modelInfo?.provider ?? next.provider;
@@ -58,16 +72,11 @@ export class ContextUsageService {
     next.sessionTitle = sessionInfo?.sessionTitle ?? next.sessionTitle;
     next.createdAt = sessionInfo?.createdAt ?? next.createdAt;
     next.updatedAt = sessionInfo?.updatedAt ?? next.updatedAt;
-    next.percentage = this.calculatePercentage(
-      this.getTotalTokens(next),
-      next.contextWindow,
-    );
-
-    return next;
+    return this.finalizeState(next);
   }
 
   static beginStream(state: TabContextState | null | undefined): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
+    const next = this.cloneState(state);
     next.streamInputTokens = 0;
     next.streamOutputTokens = 0;
     return next;
@@ -81,7 +90,7 @@ export class ContextUsageService {
     state: TabContextState | null | undefined,
     chunk: Extract<StreamChunk, { type: 'usage' }>,
   ): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
+    const next = this.cloneState(state);
     const inputTokens = Math.max(0, chunk.inputTokens);
     const outputTokens = Math.max(0, chunk.outputTokens);
     const inputDelta = Math.max(0, inputTokens - next.streamInputTokens);
@@ -92,13 +101,7 @@ export class ContextUsageService {
     next.streamInputTokens = Math.max(next.streamInputTokens, inputTokens);
     next.streamOutputTokens = Math.max(next.streamOutputTokens, outputTokens);
     next.sessionId = chunk.sessionId ?? next.sessionId;
-    next.updatedAt = Date.now();
-    next.percentage = this.calculatePercentage(
-      this.getTotalTokens(next),
-      next.contextWindow,
-    );
-
-    return next;
+    return this.finalizeState(next, 'now');
   }
 
   static applyPreciseUsage(
@@ -112,84 +115,56 @@ export class ContextUsageService {
       totalCost?: number | null;
     },
   ): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
-    const computedTotal = Math.max(0, usage.input + usage.output + usage.reasoning + usage.cacheRead + usage.cacheWrite);
-    next.preciseTokens = {
-      total: computedTotal,
-      input: Math.max(0, usage.input),
-      output: Math.max(0, usage.output),
-      reasoning: Math.max(0, usage.reasoning),
-      cacheRead: Math.max(0, usage.cacheRead),
-      cacheWrite: Math.max(0, usage.cacheWrite),
-    };
+    const next = this.cloneState(state);
+    next.preciseTokens = this.buildPreciseTokens(usage);
     next.estimatedInputTokens = next.preciseTokens.input + next.preciseTokens.cacheRead + next.preciseTokens.cacheWrite;
     next.estimatedOutputTokens = next.preciseTokens.output + next.preciseTokens.reasoning;
     next.totalCost = typeof usage.totalCost === 'number' ? usage.totalCost : next.totalCost;
-    next.updatedAt = next.updatedAt ?? Date.now();
-    next.percentage = this.calculatePercentage(this.getTotalTokens(next), next.contextWindow);
-    return next;
+    return this.finalizeState(next, 'if-missing');
+  }
+
+  static applyUsageSnapshot(
+    state: TabContextState | null | undefined,
+    snapshot: ContextUsageSnapshot,
+  ): TabContextState {
+    return this.applyPreciseUsage(
+      this.syncStateIdentity(
+        state,
+        {
+          provider: snapshot.providerId,
+          providerName: snapshot.providerName,
+          model: snapshot.modelId,
+          modelName: snapshot.modelName,
+          contextWindow: snapshot.contextWindow,
+        },
+        {
+          sessionId: snapshot.sessionId,
+          sessionTitle: snapshot.sessionTitle,
+          createdAt: snapshot.createdAt,
+          updatedAt: snapshot.updatedAt,
+        },
+      ),
+      {
+        input: snapshot.inputTokens,
+        output: snapshot.outputTokens,
+        reasoning: snapshot.reasoningTokens,
+        cacheRead: snapshot.cacheReadTokens,
+        cacheWrite: snapshot.cacheWriteTokens,
+        totalCost: snapshot.totalCost,
+      },
+    );
   }
 
   static summarize(state: TabContextState | null | undefined): ContextUsageSummary {
-    if (!state || !state.model || state.contextWindow <= 0) {
-      return {
-        totalTokens: 0,
-        percentage: 0,
-        tone: 'muted',
-        ringLabel: '-',
-        isUnavailable: true,
-        contextWindow: 0,
-        tooltip: t('context.usage.unavailable'),
-      };
-    }
-
-    const totalTokens = this.getTotalTokens(state);
-    const percentage = this.calculatePercentage(totalTokens, state.contextWindow);
-    const tone = percentage >= 85
-      ? 'danger'
-      : percentage >= 60
-        ? 'warning'
-        : 'success';
-
-    return {
-      totalTokens,
-      percentage,
-      tone,
-      ringLabel: String(percentage),
-      isUnavailable: false,
-      contextWindow: state.contextWindow,
-      tooltip: [
-        `${t('context.usage.totalTokens')}: ${this.formatNumber(totalTokens)}`,
-        `${t('context.usage.usage')}: ${percentage}%`,
-        `${t('context.usage.cost')}: ${this.formatCurrency(state.totalCost)}`,
-      ].join('\n'),
-    };
+    return ContextUsageDisplayService.summarize(state);
   }
 
   static formatNumber(value: number): string {
-    return new Intl.NumberFormat().format(Math.max(0, Math.round(value)));
+    return ContextUsageDisplayService.formatNumber(value);
   }
 
   static formatCurrency(value: number | null | undefined): string {
-    if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
-      return '-';
-    }
-
-    const maximumFractionDigits = value === 0
-      ? 2
-      : value < 0.01
-        ? 6
-        : value < 1
-          ? 4
-          : 2;
-    const minimumFractionDigits = value > 0 && value < 0.01 ? 4 : 2;
-
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits,
-      maximumFractionDigits,
-    }).format(value);
+    return ContextUsageDisplayService.formatCurrency(value);
   }
 
   static getDisplayTokenBreakdown(state: TabContextState | null | undefined): {
@@ -200,105 +175,19 @@ export class ContextUsageService {
     cacheWrite: number;
     total: number;
   } {
-    const precise = state?.preciseTokens;
-    if (precise) {
-      return {
-        input: precise.input,
-        output: precise.output,
-        reasoning: precise.reasoning,
-        cacheRead: precise.cacheRead,
-        cacheWrite: precise.cacheWrite,
-        total: precise.total,
-      };
-    }
-
-    const input = state?.estimatedInputTokens ?? 0;
-    const output = state?.estimatedOutputTokens ?? 0;
-    return {
-      input,
-      output,
-      reasoning: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      total: input + output,
-    };
+    return ContextUsageDisplayService.getDisplayTokenBreakdown(state);
   }
 
   static getContextBreakdown(
     state: TabContextState | null | undefined,
     messages: ChatMessage[],
     systemPrompt?: string | null,
-  ): ContextBreakdownSegment[] {
-    const inputTokens = this.getDisplayTokenBreakdown(state).input;
-    if (inputTokens <= 0) {
-      return [];
-    }
-
-    const systemChars = systemPrompt?.trim().length ?? 0;
-    const counts = messages.reduce(
-      (acc, message) => {
-        if (message.role === 'user') {
-          acc.user += this.getUserCharsFromMessage(message);
-          return acc;
-        }
-
-        if (message.role === 'assistant') {
-          const { assistant, tool } = this.getAssistantCharsFromMessage(message);
-          acc.assistant += assistant;
-          acc.tool += tool;
-        }
-
-        return acc;
-      },
-      {
-        system: systemChars,
-        user: 0,
-        assistant: 0,
-        tool: 0,
-      },
-    );
-
-    const estimated = {
-      system: this.estimateTokens(counts.system),
-      user: this.estimateTokens(counts.user),
-      assistant: this.estimateTokens(counts.assistant),
-      tool: this.estimateTokens(counts.tool),
-    };
-    const estimatedTotal = estimated.system + estimated.user + estimated.assistant + estimated.tool;
-
-    if (estimatedTotal <= inputTokens) {
-      return this.buildBreakdownSegments(
-        {
-          ...estimated,
-          other: inputTokens - estimatedTotal,
-        },
-        inputTokens,
-      );
-    }
-
-    const scale = inputTokens / estimatedTotal;
-    const scaled = {
-      system: Math.floor(estimated.system * scale),
-      user: Math.floor(estimated.user * scale),
-      assistant: Math.floor(estimated.assistant * scale),
-      tool: Math.floor(estimated.tool * scale),
-    };
-    const scaledTotal = scaled.system + scaled.user + scaled.assistant + scaled.tool;
-
-    return this.buildBreakdownSegments(
-      {
-        ...scaled,
-        other: Math.max(0, inputTokens - scaledTotal),
-      },
-      inputTokens,
-    );
+  ) {
+    return ContextUsageDisplayService.getContextBreakdown(state, messages, systemPrompt);
   }
 
   static formatPercent(value: number, digits = 0): string {
-    return `${value.toLocaleString(undefined, {
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-    })}%`;
+    return ContextUsageDisplayService.formatPercent(value, digits);
   }
 
   private static resolveContextWindow(
@@ -332,213 +221,44 @@ export class ContextUsageService {
     return Math.max(0, state.estimatedInputTokens + state.estimatedOutputTokens);
   }
 
-  private static estimateTokens(chars: number): number {
-    return chars > 0 ? Math.ceil(chars / 4) : 0;
+  private static cloneState(state: TabContextState | null | undefined): TabContextState {
+    return state ? { ...state } : createEmptyTabContextState();
   }
 
-  private static buildBreakdownSegments(
-    tokens: Record<'system' | 'user' | 'assistant' | 'tool' | 'other', number>,
-    inputTokens: number,
-  ): ContextBreakdownSegment[] {
-    return ([
-      { key: 'system', tokens: tokens.system },
-      { key: 'user', tokens: tokens.user },
-      { key: 'assistant', tokens: tokens.assistant },
-      { key: 'tool', tokens: tokens.tool },
-      { key: 'other', tokens: tokens.other },
-    ] as const)
-      .filter((segment) => segment.tokens > 0)
-      .map((segment) => ({
-        key: segment.key,
-        tokens: segment.tokens,
-        width: (segment.tokens / inputTokens) * 100,
-        percent: Math.round(((segment.tokens / inputTokens) * 100) * 10) / 10,
-      }));
+  private static finalizeState(
+    state: TabContextState,
+    timestampRefreshMode: TimestampRefreshMode = 'preserve',
+  ): TabContextState {
+    if (timestampRefreshMode === 'now') {
+      state.updatedAt = Date.now();
+    } else if (timestampRefreshMode === 'if-missing') {
+      state.updatedAt = state.updatedAt ?? Date.now();
+    }
+
+    state.percentage = this.calculatePercentage(this.getTotalTokens(state), state.contextWindow);
+    return state;
   }
 
-  private static getUserCharsFromMessage(message: ChatMessage): number {
-    const parts = this.getParts(message);
-    if (parts.length > 0) {
-      return parts.reduce<number>((sum, part) => sum + this.getUserCharsFromPart(part), 0);
-    }
-
-    return message.content.length;
-  }
-
-  private static getAssistantCharsFromMessage(message: ChatMessage): { assistant: number; tool: number } {
-    const parts = this.getParts(message);
-    if (parts.length > 0) {
-      return parts.reduce<{ assistant: number; tool: number }>(
-        (sum, part) => {
-          const next = this.getAssistantCharsFromPart(part);
-          return {
-            assistant: sum.assistant + next.assistant,
-            tool: sum.tool + next.tool,
-          };
-        },
-        { assistant: 0, tool: 0 },
-      );
-    }
-
-    if (message.contentBlocks?.length) {
-      return message.contentBlocks.reduce(
-        (sum, block) => {
-          if (block.type === 'text') {
-            return {
-              ...sum,
-              assistant: sum.assistant + (block.text?.length ?? 0),
-            };
-          }
-
-          if (block.type === 'thinking') {
-            return {
-              ...sum,
-              assistant: sum.assistant + (block.thinking?.length ?? 0),
-            };
-          }
-
-          if (block.type === 'tool_use') {
-            return {
-              ...sum,
-              tool: sum.tool + this.getToolChars(
-                block.toolInput,
-                typeof block.toolResult === 'string' ? block.toolResult : '',
-                '',
-              ),
-            };
-          }
-
-          return sum;
-        },
-        { assistant: 0, tool: 0 },
-      );
-    }
+  private static buildPreciseTokens(usage: {
+    input: number;
+    output: number;
+    reasoning: number;
+    cacheRead: number;
+    cacheWrite: number;
+  }): NonNullable<TabContextState['preciseTokens']> {
+    const input = Math.max(0, usage.input);
+    const output = Math.max(0, usage.output);
+    const reasoning = Math.max(0, usage.reasoning);
+    const cacheRead = Math.max(0, usage.cacheRead);
+    const cacheWrite = Math.max(0, usage.cacheWrite);
 
     return {
-      assistant: message.content.length,
-      tool: 0,
+      total: input + output + reasoning + cacheRead + cacheWrite,
+      input,
+      output,
+      reasoning,
+      cacheRead,
+      cacheWrite,
     };
-  }
-
-  private static getParts(message: ChatMessage): unknown[] {
-    return Array.isArray(message.parts) ? message.parts : [];
-  }
-
-  private static getUserCharsFromPart(part: unknown): number {
-    const type = this.getStringField(part, 'type');
-    if (type === 'text') {
-      return this.getStringField(part, 'text').length;
-    }
-
-    if (type === 'file') {
-      return this.getNestedStringField(part, ['source', 'text', 'value']).length;
-    }
-
-    if (type === 'agent') {
-      return this.getNestedStringField(part, ['source', 'value']).length;
-    }
-
-    return 0;
-  }
-
-  private static getAssistantCharsFromPart(part: unknown): { assistant: number; tool: number } {
-    const type = this.getStringField(part, 'type');
-    if (type === 'text' || type === 'reasoning') {
-      return {
-        assistant: this.getStringField(part, 'text').length,
-        tool: 0,
-      };
-    }
-
-    if (type !== 'tool') {
-      return { assistant: 0, tool: 0 };
-    }
-
-    const state = this.getObjectField(part, 'state');
-    const status = this.getStringField(state, 'status');
-    const input = this.getUnknownField(state, 'input');
-    const raw = this.getStringField(state, 'raw');
-    const output = this.getStringField(state, 'output');
-    const error = this.getStringField(state, 'error');
-
-    if (status === 'pending' || status === 'running') {
-      return {
-        assistant: 0,
-        tool: this.getToolChars(input, raw, ''),
-      };
-    }
-
-    if (status === 'completed') {
-      return {
-        assistant: 0,
-        tool: this.getToolChars(input, output, ''),
-      };
-    }
-
-    if (status === 'error') {
-      return {
-        assistant: 0,
-        tool: this.getToolChars(input, '', error),
-      };
-    }
-
-    return {
-      assistant: 0,
-      tool: this.getToolChars(input, '', ''),
-    };
-  }
-
-  private static getToolChars(input: unknown, output: string, error: string): number {
-    return this.stringifyUnknown(input).length + output.length + error.length;
-  }
-
-  private static getUnknownField(value: unknown, key: string): unknown {
-    if (!this.isRecord(value)) {
-      return undefined;
-    }
-
-    return value[key];
-  }
-
-  private static getObjectField(value: unknown, key: string): Record<string, unknown> | null {
-    const field = this.getUnknownField(value, key);
-    return this.isRecord(field) ? field : null;
-  }
-
-  private static getStringField(value: unknown, key: string): string {
-    const field = this.getUnknownField(value, key);
-    return typeof field === 'string' ? field : '';
-  }
-
-  private static getNestedStringField(value: unknown, path: string[]): string {
-    let current: unknown = value;
-    for (const key of path) {
-      if (!this.isRecord(current)) {
-        return '';
-      }
-      current = current[key];
-    }
-
-    return typeof current === 'string' ? current : '';
-  }
-
-  private static stringifyUnknown(value: unknown): string {
-    if (value === null || value === undefined) {
-      return '';
-    }
-
-    if (typeof value === 'string') {
-      return value;
-    }
-
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-
-  private static isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
   }
 }

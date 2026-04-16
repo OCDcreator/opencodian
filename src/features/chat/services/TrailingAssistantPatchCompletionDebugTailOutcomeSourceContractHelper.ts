@@ -1,0 +1,14 @@
+import {
+  buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract,
+  type TrailingAssistantPatchCompletionDebugPlanningContextSource,
+  type TrailingAssistantPatchCompletionDebugPlanningContextSourceContractParts,
+} from './TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper';
+
+export type TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractParts =
+  TrailingAssistantPatchCompletionDebugPlanningContextSourceContractParts;
+
+export function buildTrailingAssistantPatchCompletionDebugSourceContractFromTailOutcomePlanningContext(
+  parts: TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractParts,
+): TrailingAssistantPatchCompletionDebugPlanningContextSource {
+  return buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract(parts);
+}

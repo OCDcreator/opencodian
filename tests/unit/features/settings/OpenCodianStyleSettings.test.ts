@@ -2,10 +2,8 @@ import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
-import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/LiquidGlassSettingHelpModal';
-import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
+import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
 import { setLocale } from '../../../../src/i18n';
-import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 
 interface MockDropdownControl {
   addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>;
@@ -37,9 +35,19 @@ function createDropdownRecord(name: string): DropdownRecord {
   return record;
 }
 
-describe('OpenCodian style settings', () => {
-  const dropdownRecords: DropdownRecord[] = [];
+function createStyleSection(plugin: ConstructorParameters<typeof SettingsStyleSection>[0]['plugin']): SettingsStyleSection {
+  return new SettingsStyleSection({
+    app: {} as App,
+    plugin,
+    createSectionHeading: (containerEl, title) => containerEl.createEl('h3', { text: title }),
+    setSettingDescWithFormatting: jest.fn(),
+    addSettingHelpButton: jest.fn(),
+  });
+}
 
+const dropdownRecords: DropdownRecord[] = [];
+
+function registerDropdownRecordHooks() {
   beforeEach(() => {
     setLocale('zh');
     document.body.innerHTML = '';
@@ -67,6 +75,10 @@ describe('OpenCodian style settings', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+}
+
+describe('OpenCodian style settings attach wiring', () => {
+  registerDropdownRecordHooks();
 
   it('does not add a separate input theme dropdown anymore', () => {
     const plugin = {
@@ -74,36 +86,38 @@ describe('OpenCodian style settings', () => {
         ...DEFAULT_SETTINGS,
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
-      saveSettings: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
-    const privateTab = tab as unknown as {
-      addStyleSettings: (containerEl: HTMLElement) => void;
+    const privateSection = styleSection as unknown as {
+      attach: (containerEl: HTMLElement) => void;
       addThemePresetSection: (containerEl: HTMLElement) => void;
       addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
       addColorStyleControl: (containerEl: HTMLElement, config: unknown) => void;
       createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
-      createSectionHeading: (containerEl: HTMLElement, title: string) => HTMLHeadingElement;
       createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
-      setSettingDescWithFormatting: (setting: Setting, desc: string) => void;
       registerStyleControlBinding: (group: unknown, callback: () => void) => void;
+      createBackgroundStyleSection: () => {
+        attach: (containerEl: HTMLElement) => void;
+        refresh: () => void;
+        dispose: () => void;
+      };
     };
 
-    jest.spyOn(privateTab, 'addThemePresetSection').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'addColorStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'createSectionHeading').mockImplementation((parent, title) =>
-      parent.createEl('h3', { text: title }),
-    );
-    jest.spyOn(privateTab, 'createStyleGroupSection').mockImplementation((parent) =>
-      parent.createDiv(),
-    );
-    jest.spyOn(privateTab, 'setSettingDescWithFormatting').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'registerStyleControlBinding').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addThemePresetSection').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addNumericStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addColorStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createStyleResetSetting').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
+    jest.spyOn(privateSection, 'registerStyleControlBinding').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createBackgroundStyleSection').mockReturnValue({
+      attach: jest.fn(),
+      refresh: jest.fn(),
+      dispose: jest.fn(),
+    });
 
-    privateTab.addStyleSettings(containerEl);
+    privateSection.attach(containerEl);
 
     expect(
       dropdownRecords.some((record) => record.name === 'Panel style theme' || record.name === '面板样式主题'),
@@ -116,80 +130,48 @@ describe('OpenCodian style settings', () => {
         ...DEFAULT_SETTINGS,
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
-      saveSettings: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
-    const privateTab = tab as unknown as {
-      addStyleSettings: (containerEl: HTMLElement) => void;
+    const privateSection = styleSection as unknown as {
+      attach: (containerEl: HTMLElement) => void;
       addThemePresetSection: (containerEl: HTMLElement) => void;
       addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
       addColorStyleControl: (containerEl: HTMLElement, config: unknown) => void;
       createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
-      createSectionHeading: (containerEl: HTMLElement, title: string) => HTMLHeadingElement;
       createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
-      setSettingDescWithFormatting: (setting: Setting, desc: string) => void;
       registerStyleControlBinding: (group: unknown, callback: () => void) => void;
+      createBackgroundStyleSection: () => {
+        attach: (containerEl: HTMLElement) => void;
+        refresh: () => void;
+        dispose: () => void;
+      };
     };
 
-    jest.spyOn(privateTab, 'addThemePresetSection').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'addColorStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'createSectionHeading').mockImplementation((parent, title) =>
-      parent.createEl('h3', { text: title }),
-    );
-    jest.spyOn(privateTab, 'createStyleGroupSection').mockImplementation((parent) =>
-      parent.createDiv(),
-    );
-    jest.spyOn(privateTab, 'setSettingDescWithFormatting').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'registerStyleControlBinding').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addThemePresetSection').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addNumericStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addColorStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createStyleResetSetting').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
+    jest.spyOn(privateSection, 'registerStyleControlBinding').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createBackgroundStyleSection').mockReturnValue({
+      attach: jest.fn(),
+      refresh: jest.fn(),
+      dispose: jest.fn(),
+    });
 
-    privateTab.addStyleSettings(containerEl);
+    privateSection.attach(containerEl);
 
     const actionButtonsDropdown = dropdownRecords.find((record) => record.name === '操作按钮样式');
     expect(actionButtonsDropdown).toBeDefined();
     expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('default', '独立按钮');
     expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('etched', '刻入玻璃');
   });
+});
 
-  it('does not expose the standalone diamond input theme in the liquid glass adapter dropdown', () => {
-    registerBuiltinGlassAdapters();
-
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        inputPanelTheme: 'liquid-glass-shuding',
-        chatAppearance: getDefaultChatAppearanceSettings(),
-      },
-      saveSettings: jest.fn(),
-      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
-    const containerEl = document.createElement('div');
-    const privateTab = tab as unknown as {
-      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
-      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
-      addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
-      addLiquidGlassInputControls: (containerEl: HTMLElement) => void;
-      createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
-      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
-    };
-
-    jest.spyOn(privateTab, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
-    jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'addLiquidGlassInputControls').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'registerStyleControlBinding').mockImplementation(() => {});
-
-    privateTab.renderInputStyleGroup(containerEl);
-
-    const liquidAdapterDropdown = dropdownRecords.find((record) => record.name === 'Liquid Glass 适配器');
-    expect(liquidAdapterDropdown).toBeDefined();
-    expect(liquidAdapterDropdown?.control.addOption).not.toHaveBeenCalledWith('liquid-diamond-shuding', 'Shuding Diamond');
-    expect(liquidAdapterDropdown?.control.addOption).toHaveBeenCalledWith('liquid-glass-shuding', 'Shuding Liquid Glass');
-    expect(liquidAdapterDropdown?.control.addOption).toHaveBeenCalledWith('liquid-glass-nikdelvin', 'Nikdelvin Liquid Glass');
-  });
+describe('OpenCodian style settings helpers', () => {
+  registerDropdownRecordHooks();
 
   it('sizes numeric inputs to fit the configured value range', () => {
     const plugin = {
@@ -197,13 +179,13 @@ describe('OpenCodian style settings', () => {
         ...DEFAULT_SETTINGS,
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
-    const privateTab = tab as unknown as {
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
+    const privateSection = styleSection as unknown as {
       getNumericControlInputChars: (config: { min: number; max: number; step: number }) => number;
     };
 
-    const inputChars = privateTab.getNumericControlInputChars({
+    const inputChars = privateSection.getNumericControlInputChars({
       min: 0.01,
       max: 0.211,
       step: 0.001,
@@ -211,64 +193,9 @@ describe('OpenCodian style settings', () => {
 
     expect(inputChars).toBe(5);
   });
+});
 
-  it('switches input panel theme without rebuilding the whole settings page', async () => {
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        chatAppearance: getDefaultChatAppearanceSettings(),
-      },
-      saveSettings: jest.fn().mockResolvedValue(undefined),
-      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
-    const privateTab = tab as unknown as {
-      display: () => void;
-      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
-      applyInputPanelThemeChange: (themeId: 'preset' | 'glass-refraction-card') => Promise<void>;
-    };
-
-    const displaySpy = jest.spyOn(privateTab, 'display');
-    const renderInputStyleGroupSpy = jest
-      .spyOn(privateTab, 'renderInputStyleGroup')
-      .mockImplementation(() => {});
-
-    await privateTab.applyInputPanelThemeChange('glass-refraction-card');
-
-    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-    expect(displaySpy).not.toHaveBeenCalled();
-    expect(renderInputStyleGroupSpy).toHaveBeenCalledWith();
-    expect(plugin.settings.inputPanelTheme).toBe('glass-refraction-card');
-  });
-
-  it('creates a plain-language help button config for shuding settings only', () => {
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        inputPanelTheme: 'liquid-glass-shuding',
-        chatAppearance: getDefaultChatAppearanceSettings(),
-      },
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
-    const privateTab = tab as unknown as {
-      getLiquidGlassSettingHelpButtonConfig: (
-        adapterId: 'shuding' | 'nikdelvin',
-        paramKey: string,
-        title: string,
-      ) => { tooltip: string; onClick: () => void } | undefined;
-    };
-    const openSpy = jest.spyOn(LiquidGlassSettingHelpModal.prototype, 'open').mockImplementation(() => {});
-
-    const shudingHelp = privateTab.getLiquidGlassSettingHelpButtonConfig('shuding', 'displacementScale', '位移强度');
-    const nikdelvinHelp = privateTab.getLiquidGlassSettingHelpButtonConfig('nikdelvin', 'depth', '景深');
-
-    expect(shudingHelp?.tooltip).toBe('用大白话解释这项');
-    expect(nikdelvinHelp).toBeUndefined();
-
-    shudingHelp?.onClick();
-    expect(openSpy).toHaveBeenCalledTimes(1);
-  });
-
+describe('OpenCodian style settings color and number controls', () => {
   it('commits color picker changes only after the picker confirms a value', () => {
     const chatAppearance = getDefaultChatAppearanceSettings();
     let createdSettingEl: HTMLElement | null = null;
@@ -280,10 +207,10 @@ describe('OpenCodian style settings', () => {
       updateChatAppearance: jest.fn((mutator: (appearance: typeof chatAppearance) => void) => {
         mutator(chatAppearance);
       }),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
-    const privateTab = tab as unknown as {
+    const privateSection = styleSection as unknown as {
       addColorStyleControl: (containerEl: HTMLElement, config: {
         group: 'assistant';
         name: string;
@@ -299,9 +226,9 @@ describe('OpenCodian style settings', () => {
       createdSettingEl = (this as Setting & { settingEl: HTMLElement }).settingEl;
       return this;
     });
-    const applySpy = jest.spyOn(privateTab, 'applyAndScheduleStyleUpdate').mockImplementation(() => {});
+    const applySpy = jest.spyOn(privateSection, 'applyAndScheduleStyleUpdate').mockImplementation(() => {});
 
-    privateTab.addColorStyleControl(containerEl, {
+    privateSection.addColorStyleControl(containerEl, {
       group: 'assistant',
       name: 'Time color',
       desc: 'desc',
@@ -337,10 +264,10 @@ describe('OpenCodian style settings', () => {
         ...DEFAULT_SETTINGS,
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
-    const privateTab = tab as unknown as {
+    const privateSection = styleSection as unknown as {
       addNumericControl: (containerEl: HTMLElement, config: {
         name: string;
         desc: string;
@@ -364,7 +291,7 @@ describe('OpenCodian style settings', () => {
       return this;
     });
 
-    privateTab.addNumericControl(containerEl, {
+    privateSection.addNumericControl(containerEl, {
       name: 'Blur',
       desc: 'desc',
       min: 0,
@@ -399,7 +326,9 @@ describe('OpenCodian style settings', () => {
 
     expect(numberInput!.value).toBe('8.35');
   });
+});
 
+describe('OpenCodian style settings slider and draft controls', () => {
   it('preserves unfinished decimal drafts until the number input is complete', () => {
     let currentValue = 5;
     let createdSettingEl: HTMLElement | null = null;
@@ -408,10 +337,10 @@ describe('OpenCodian style settings', () => {
         ...DEFAULT_SETTINGS,
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
-    const privateTab = tab as unknown as {
+    const privateSection = styleSection as unknown as {
       addNumericControl: (containerEl: HTMLElement, config: {
         name: string;
         desc: string;
@@ -435,7 +364,7 @@ describe('OpenCodian style settings', () => {
       return this;
     });
 
-    privateTab.addNumericControl(containerEl, {
+    privateSection.addNumericControl(containerEl, {
       name: 'Blur',
       desc: 'desc',
       min: 0,
@@ -475,10 +404,10 @@ describe('OpenCodian style settings', () => {
         ...DEFAULT_SETTINGS,
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
-    const privateTab = tab as unknown as {
+    const privateSection = styleSection as unknown as {
       addNumericControl: (containerEl: HTMLElement, config: {
         name: string;
         desc: string;
@@ -502,7 +431,7 @@ describe('OpenCodian style settings', () => {
       return this;
     });
 
-    privateTab.addNumericControl(containerEl, {
+    privateSection.addNumericControl(containerEl, {
       name: 'Blur',
       desc: 'desc',
       min: 0,

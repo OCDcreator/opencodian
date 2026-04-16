@@ -3,9 +3,9 @@ import type { StreamChunk as StreamingChunk } from '../../../utils/streaming';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import type {
   SendPipelineDebugContentBlock,
-  SendPipelineHost,
   SendPipelineStreamController,
   SendPipelineTabRuntime,
+  SendPipelineTraceHost,
   SendPipelineTraceState,
 } from './SendPipelineTypes';
 
@@ -13,7 +13,7 @@ const STREAM_PROGRESS_LOG_MIN_INTERVAL_MS = 1200;
 const STREAM_PROGRESS_LOG_MIN_TEXT_DELTA = 400;
 
 interface SendPipelineTraceOptions {
-  host: SendPipelineHost;
+  host: SendPipelineTraceHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;
   getState: () => SendPipelineTraceState;

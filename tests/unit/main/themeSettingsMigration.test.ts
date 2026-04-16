@@ -5,6 +5,7 @@ jest.mock('../../../src/core/opencode', () => ({
 
 import type { StorageService } from '../../../src/core/storage';
 import {
+  getCurrentPlatformKey,
   getDefaultChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
 } from '../../../src/core/types';
@@ -41,7 +42,6 @@ function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): 
   return plugin;
 }
 
-describe('OpenCodianPlugin.loadSettings theme migration', () => {
   it('binds legacy default chat appearance to the built-in current style preset', async () => {
     const plugin = createPluginWithSavedSettings({
       chatAppearance: getDefaultChatAppearanceSettings(),
@@ -94,6 +94,74 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
       },
     });
     expect(plugin.settings.chatAppearance.assistant.blur).toBe(4);
+  });
+
+  it('normalizes question card display settings together on load', async () => {
+    const plugin = createPluginWithSavedSettings({
+      questionDisplayMode: 'single',
+      questionCardPosition: 'floating',
+      showAnsweredQuestionCards: false,
+    });
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.questionDisplayMode).toBe('single');
+    expect(plugin.settings.questionCardPosition).toBe('inline');
+    expect(plugin.settings.showAnsweredQuestionCards).toBe(false);
+  });
+
+  it('normalizes provider/model/plugin/debug residual settings together on load', async () => {
+    const plugin = createPluginWithSavedSettings({
+      aiTitleModel: '  openai/gpt-4o-mini  ',
+      disabledModelRefs: [
+        ' openai/gpt-4o ',
+        'invalid',
+        ' openai/gpt-4o ',
+      ],
+      renderUserMarkupAsCodeBlocks: false,
+      pluginIsolationMode: 'pure',
+      providerIconLibrary: {
+        openai: [
+          {
+            id: 'builtin:lobehub:openai',
+            type: 'builtin',
+            source: 'lobehub:openai',
+            variant: 'brand-color',
+            resolvedVariant: 'brand-color',
+            resolvedFormat: 'svg',
+            addedAt: 1,
+          },
+        ],
+      },
+      providerIconColorMode: 'rainbow',
+      providerIconDefaultVariant: 'brand-color',
+      modelAvailabilitySectionOpen: false,
+      modelToolsSectionOpen: 'collapsed',
+      inlineSerializedDebugLogArgs: true,
+      debugLogPath: '/tmp/legacy-debug',
+    });
+
+    await plugin.loadSettings();
+
+    const expectedDebugLogPaths = { unix: '', windows: '' };
+    expectedDebugLogPaths[getCurrentPlatformKey()] = '/tmp/legacy-debug';
+
+    expect(plugin.settings.aiTitleModel).toBe('openai/gpt-4o-mini');
+    expect(plugin.settings.disabledModelRefs).toEqual(['openai/gpt-4o']);
+    expect(plugin.settings.renderUserMarkupAsCodeBlocks).toBe(false);
+    expect(plugin.settings.pluginIsolationMode).toBe('pure');
+    expect(plugin.settings.providerIconColorMode).toBe('system');
+    expect(plugin.settings.providerIconDefaultVariant).toBe('brand-color');
+    expect(plugin.settings.providerIconLibrary.openai?.[0]).toMatchObject({
+      variant: 'brand-color',
+      resolvedVariant: 'brand-color',
+      resolvedFormat: 'svg',
+    });
+    expect(plugin.settings.modelAvailabilitySectionOpen).toBe(false);
+    expect(plugin.settings.modelToolsSectionOpen).toBe(true);
+    expect(plugin.settings.inlineSerializedDebugLogArgs).toBe(true);
+    expect(plugin.settings.debugLogPaths).toEqual(expectedDebugLogPaths);
+    expect((plugin.settings as unknown as Record<string, unknown>).debugLogPath).toBeUndefined();
   });
 
   it('preserves the saved background image when a preset-backed theme is restored', async () => {
@@ -349,4 +417,3 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
       (plugin.settings as unknown as Record<string, unknown>).experimentalComposerGlassRefractionEnabled,
     ).toBeUndefined();
   });
-});

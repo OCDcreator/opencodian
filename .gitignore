@@ -32,7 +32,15 @@ data.json
 .claude/settings.local.json
 
 # Reference projects
-reference-projects/
+reference-projects/*
+!reference-projects/three.js/
+reference-projects/three.js/*
+!reference-projects/three.js/build/
+reference-projects/three.js/build/*
+!reference-projects/three.js/build/three.core.js
+!reference-projects/three.js/build/three.module.js
+!reference-projects/three.js/LICENSE
+!reference-projects/three.js/package.json
 settings_scroll_memory_requirement.md
 settings_scroll_performance_optimization.md
 providers_output.json

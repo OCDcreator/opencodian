@@ -5,12 +5,14 @@ You are running one unattended maintainability round inside the `opencodian` rep
 Read these files first, in order:
 - `AGENTS.md`
 - `docs/status/maintainability-master-plan.md`
+- `docs/status/maintainability-round-roadmap.md`
 - `docs/status/maintainability-lane-map.md`
 - `{{last_phase_doc}}`
 
 Mission:
 - Continue the maintainability program toward single-responsibility modules.
-- Choose exactly one high-value, low-risk refactor slice that follows the master plan first, lane map second, previous phase doc third, and focus hint last.
+- Execute exactly one queued refactor slice: the first item marked `[NEXT]` in `docs/status/maintainability-round-roadmap.md`.
+- Do not freestyle. The roadmap queue overrides `focus_hint` whenever they conflict.
 - Do not start another round.
 
 Round metadata:
@@ -28,22 +30,23 @@ Round metadata:
 
 Required workflow:
 1. Use the plan tool before making substantive changes.
-2. Start from the lane map's first-check entrypoints for the chosen lane before doing broad `rg` searches.
-3. Read only the code and docs needed for this one slice. In successful rounds, do one initial exploration pass and avoid repeatedly rescanning the same large `OpenCodianView` context.
-4. `docs/modules/**` should only be read or edited when the module boundary actually changes.
-5. Make the smallest meaningful maintainability refactor that improves single responsibility and preserves behavior.
-6. If the module boundary changes materially, update only the directly related docs.
-7. If this round changes code or tests, run targeted tests first (for example `npm test -- <focused suites>`).
-8. Run full `npm test` only when either:
-   - the changed files hit a high-risk path such as `src/main.ts`, `src/core/`, `automation/`, `package.json`, `package-lock.json`, `manifest.json`, `styles.css`, or `esbuild.config.mjs`, or
-   - this attempt number is divisible by 5.
-9. If this round changes code, style, manifest, or build-pipeline files, also run `{{build_command}}`.
-10. Deploy to `{{test_vault_plugin_dir}}` only when the changed files hit deploy-relevant paths such as `src/main.ts`, `manifest.json`, `styles.css`, `assets/`, `src/style/`, `src/core/theme/`, or `src/features/settings/`, or when the user explicitly asked to deploy. If deployment runs, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css`, copy `dist/assets/` when bundled assets changed, and verify deployed `main.js` contains the newest `BUILD_ID`.
-11. In successful rounds, keep `git status --short` to at most 2 invocations and `git diff --stat` to at most 1 invocation. Only exceed those budgets during a focused repair after a failed validation step.
-12. Write the round summary to `{{next_phase_doc}}`. Include scope, files changed, validation commands, deployment result when applicable, the lane advanced, and the next recommended slice.
-13. On success, commit all repo changes with message `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
-14. If tests, build, or deployment fail, attempt one focused repair. If still failing, revert this round's changes, do not commit, and return `failure`.
-15. If the maintainability objective is already complete, avoid unnecessary edits and return `goal_complete`.
+2. Read the current `[NEXT]` queue item and restate its lane, goal, constraints, and acceptance criteria in your plan.
+3. Start from the roadmap and lane map entrypoints for that queue item before doing broad `rg` searches.
+4. Read only the code and docs needed for this one slice. In successful rounds, do one initial exploration pass and avoid repeatedly rescanning the same large `OpenCodianView` context.
+5. `docs/modules/**` should only be read or edited when the module boundary actually changes.
+6. Make the smallest meaningful maintainability refactor that satisfies the current queue item's acceptance criteria and preserves behavior.
+7. Prefer merging thin provider / factory / adapter files back into an adjacent owner over creating new files. If a new module would stay under roughly 100 lines and under 3 exports, do not keep it separate unless it isolates a high-risk dependency or is reused in 3+ places.
+8. If the module boundary changes materially, update only the directly related docs.
+9. If this round changes code or tests, run targeted tests first (for example `npm test -- <focused suites>`).
+10. Every successful queue round must also run full `npm run lint`, full `npm run typecheck`, and full `npm test`.
+11. If this round changes code, style, manifest, or build-pipeline files, also run `{{build_command}}`.
+12. Do not deploy during this maintainability batch unless the user explicitly asked to deploy. If deployment is explicitly requested later, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css`, copy `dist/assets/` when bundled assets changed, and verify deployed `main.js` contains the newest `BUILD_ID`.
+13. In successful rounds, keep `git status --short` to at most 2 invocations and `git diff --stat` to at most 1 invocation. Only exceed those budgets during a focused repair after a failed validation step.
+14. On success, update `docs/status/maintainability-round-roadmap.md`: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep all later items as `[QUEUED]`.
+15. Write the round summary to `{{next_phase_doc}}`. Include scope, files changed, validation commands, deployment result when applicable, the lane advanced, the completed roadmap queue item, and the next recommended slice.
+16. On success, commit all repo changes with message `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
+17. If tests, build, or deployment fail, attempt one focused repair. If still failing, revert this round's changes, do not commit, and return `failure`.
+18. If the maintainability objective is already complete, avoid unnecessary edits, mark the roadmap accordingly, and return `goal_complete`.
 
 Response contract:
 - Your final response must be valid JSON matching the provided output schema.

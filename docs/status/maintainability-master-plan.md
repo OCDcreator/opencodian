@@ -1,67 +1,53 @@
 # Maintainability Master Plan
 
-> **状态**: [ACTIVE]
-> **作用**: 这是 maintainability 无人值守的战略文档。每一轮开始前，先读本文件，再读 lane map，最后读最近的阶段文档。
+> **状态**: [PAUSED]
+> **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
+> **自动推进状态**: `R162` checkpoint 已完成；当前没有可自动执行的后续任务，maintainability autopilot 暂停等待人工续排。
 
-## 1. 总体目标
+## 1. 当前判断
 
-- 持续降低 `OpenCodianView` 等主集成点的 ownership 集中度
-- 优先迁移稳定、可单测、可复用的职责边界，而不是把窄 helper 继续碎片化
-- 让后续维护更多落在 dedicated service / runtime bridge / host adapter，而不是回流到超大 view
+当前分支已完成 `R153-R162`，并在本地实测维持 `lint/typecheck/test/build` 全绿：`npm run lint -- --format unix` 为 `0 errors / 0 warnings`，`npm run typecheck` 通过，`npm test` 通过（`282` suites / `1187` tests），`npm run build` 通过。`R162` checkpoint 已确认 `OpenCodianView` 与 `OpenCodeService` 两个 residual thick owner 的最后一批 queue closeout 收益成立，当前分支满足“高可维护性”停机条件。
 
-## 2. 当前阶段判断
+当前判断是：queue 已自然耗尽，应暂停 autopilot，而不是再自动制造新 backlog：
 
-**当前判断：中期。**
+- `src/features/chat/OpenCodianView.ts` 维持在约 `4857` 行、`88` 条 import；`R160` 已把 question post-resolution 薄 adapter 并回 `QuestionRuntimeHostAdapter`，相邻 chat owner 维持在 `236-381` 行区间，没有新增 sub-100 行薄碎片。
+- `src/core/opencode/OpenCodeService.ts` 维持在约 `1358` 行、`24` 条 import；`R161` 已把 service-local diagnostics 并回 `OpenCodeSdkFacade`，并改为直接接入 `sdk.session` lifecycle，相邻 opencode owner 维持在 `236-611` 行区间，没有新增薄 facade / gateway / provider。
+- 剩余热点仍是两个厚 owner 本体，但进一步缩减已不再属于 queue 中的“收掉最后薄 seam”工作，而更像需要产品语义重设计或人工续排的新 lane。
+- 结论：当前分支达到**高可维护性 checkpoint**，应停回人工 review / 功能开发；若未来还要继续压缩，必须先人工续排新 queue。
 
-原因：
+## 2. 当前基线
 
-- 发送、finalization、conversation state、render 等链路已经出现了可复用边界
-- 但聊天域的主集成文件仍然很大，`OpenCodianView` 仍持有大量 runtime、UI、question、todo、background task、context 和 appearance ownership
-- 后续无人值守应优先减少主集成点体量，而不是继续在局部 helper 链上做低收益细拆
+- **lint**: `0 errors / 0 warnings`
+- **typecheck**: 通过
+- **test**: `282 passed, 282 total` suites / `1187 passed, 1187 total` tests
+- **build**: 通过
+- **部署策略**: 当前 maintainability 批次不做 Test Vault 部署，除非用户后续明确要求
+- **当前 `[NEXT]`**: 当前没有可自动执行的后续任务
 
-## 3. 高优先级方向
+## 3. 本批执行规则
 
-### P1. `OpenCodianView` 核心 ownership 迁移
+1. 当前 queue 已在 `R162` 关闭；没有人工续排前，不自动开启 `R163+`。
+2. 若未来恢复 maintainability，仍必须运行全量 `npm run lint`、`npm run typecheck`、`npm test` 与 `npm run build`。
+3. 当前批次不做 Test Vault 部署，除非用户后续明确要求。
+4. `0 碎片` 的含义是：不得新增薄 helper / adapter / provider / factory；若遇到薄层，优先并回相邻厚 owner，禁止回灌到 `OpenCodianView.ts` / `OpenCodeService.ts` 主文件本体。
+5. `OpenCodianView` / `OpenCodeService` 的改动必须带来可量化的 line count、import surface 或 direct assembly surface 下降；不能只把体量平移到更多小文件。
+6. 若候选改动会削弱语义、删断言、降覆盖、暴露 experimental demo 或破坏 SDK-first / legacy fallback，则必须停止并写明阻塞。
 
-- tab / pane / conversation activation 与 sync orchestration
-- 会话级 runtime 状态桥接
-- 仍明显耦合在 view 内的渲染编排桥
+## 4. 回归观察点
 
-### P2. question / todo / background task 链路
+1. `OpenCodianView`：并发 tab/session streaming、hydration/auth-sync gate、background-task completion notice、scroll restore、question card resolution 不回归。
+2. chat services：question/todo/background-task runtime、tab activation、authoritative sync、context usage、model/permission/input panel 语义不回归。
+3. `OpenCodeService` / streaming：SDK-first / legacy fallback、session-scoped abort/detach、managed server adoption/restart、sync-event bridge 与 final response completion 语义不回归。
+4. tests / glass / demo：opt-in glass 行为、demo 不进入 stable UI path、heavy suites 覆盖语义不回归。
 
-- session todo 更新、fingerprint、stale notice、dock 协调
-- background task launch / completion / stale follow-up / inline notice 协调
-- question resolution、question dock、follow-up 行为与状态桥接
+## 5. 高可维护性判定
 
-### P3. context / composer / retained-selection 链路
+`R160-R162` 已在 `lint 0/0`、`typecheck` 通过、全量测试通过、build 通过的前提下完成，并且两个 residual thick owner 的 direct assembly surface 均已较 checkpoint 前明显下降、没有新薄碎片；当前分支可判断为“高可维护性，可暂停 autopilot，转回人工 review / 功能开发”。
 
-- context file catalog 构建与缓存
-- composer context chips / focus preview / retained selection 协调
-- context 附件与 editor 交互桥接
+## 6. 阅读顺序
 
-### P4. message shell / notice / timestamp ownership
-
-- assistant shell / notice card / persistent notice 组装
-- timestamp / footer / notice action bridge
-- assistant render bridge 中仍可稳定下沉的通用渲染职责
-
-### P5. header / appearance / model-permission / experimental demo
-
-- header / input area 组装
-- appearance / theme / glass / layout 状态同步
-- model / permission selector ownership
-- demo / experimental visual feature 的装配边界
-
-## 4. 暂停 / 降优先级方向
-
-- `ConversationRenderService` trailing-assistant helper 链
-- `TrailingAssistantPatch*` 周边继续细拆 source/input/shape/parts/helper 的低收益收口
-- 没有迁出新 ownership 边界、只是在既有窄 helper 链里再抽一层的切片
-
-## 5. 换赛道规则
-
-1. 每轮优先从本文件的高优先级方向选题
-2. 同一热点链路连续多轮推进后，必须复审是否仍在降低主 owner 体量
-3. 如果数轮内没有明显降低主集成文件体量，或没有迁出新的 ownership 边界，则切换方向
-4. 如果上一轮 `next_focus` 与本文件冲突，以本文件为准
-
+1. `AGENTS.md`
+2. `docs/status/maintainability-master-plan.md`
+3. `docs/status/maintainability-round-roadmap.md`
+4. 最近的 `docs/status/maintainability-phase-XXX.md`
+5. 如需历史上下文，再读 `docs/status/maintainability-completed-batches.md`

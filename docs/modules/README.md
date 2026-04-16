@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 当前共有 133 个 TypeScript 源码模块
-- `src/style/**/*.css`: 当前共有 16 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `docs/modules/**/*.md`: 当前共有 149 篇模块与基础设施文档
+- `src/**/*.ts`: 当前共有 313 个 TypeScript 源码模块
+- `src/style/**/*.css`: 当前共有 17 个样式模块（不含 `src/style/index.css` 聚合入口）
+- `docs/modules/**/*.md`: 当前共有 329 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -47,7 +47,17 @@ docs/modules/
 │   │   └── modelConfig.md
 │   ├── opencode/
 │   │   ├── index.md
+│   │   ├── OpenCodeCatalogStateStore.md
+│   │   ├── OpenCodeContextPartSerializer.md
+│   │   ├── OpenCodeEventSubscriptionCoordinator.md
+│   │   ├── OpenCodeMessageContextOmoAssembler.md
+│   │   ├── OpenCodeMessageNormalizationMapper.md
+│   │   ├── OpenCodePromptRequestBuilder.md
+│   │   ├── OpenCodeServiceLifecycleCoordinator.md
 │   │   ├── OpenCodeService.md
+│   │   ├── OpenCodeStreamEventTransformer.md
+│   │   ├── OpenCodeStreamingRuntimeCoordinator.md
+│   │   ├── OpenCodeSyncEventRuntimeCoordinator.md
 │   │   ├── ServerManager.md
 │   │   ├── createSdkClient.md
 │   │   ├── sdkFetch.md
@@ -91,6 +101,27 @@ docs/modules/
 │   │   ├── liquidDiamondDemoWebgl.md
 │   │   ├── renderGroups.md
 │   │   ├── runtime/
+│   │   │   ├── AssistantCopyContent.md
+│   │   │   ├── AssistantErrorRenderer.md
+│   │   │   ├── AssistantFooterRenderer.md
+│   │   │   ├── AssistantFooterPayload.md
+│   │   │   ├── AssistantShellRenderer.md
+│   │   │   ├── AssistantShellViewHostAdapter.md
+│   │   │   ├── AssistantNoticeRenderer.md
+│   │   │   ├── AssistantPlainTextFallbackRenderer.md
+│   │   │   ├── AssistantStructuredContentRenderer.md
+│   │   │   ├── BackgroundTaskIndicatorCoordinator.md
+│   │   │   ├── BackgroundTaskInlinePanelRenderer.md
+│   │   │   ├── BackgroundTaskStreamTriggerCoordinator.md
+│   │   │   ├── ConversationHydrationOutcomeBridge.md
+│   │   │   ├── ConversationHydrationRenderBridge.md
+│   │   │   ├── ConversationLoadRuntimeBridge.md
+│   │   │   ├── ConversationTransitionBridge.md
+│   │   │   ├── PermissionInlineCardRenderer.md
+│   │   │   ├── QuestionInlineCardRenderer.md
+│   │   │   ├── QuestionResolutionCoordinator.md
+│   │   │   ├── QuestionResolutionCardRenderer.md
+│   │   │   ├── StreamingInlineCardRenderer.md
 │   │   │   ├── buildLocalStreamOutcome.md
 │   │   │   ├── LocalStreamMessagePersistence.md
 │   │   │   ├── PendingIndicatorController.md
@@ -106,11 +137,31 @@ docs/modules/
 │   │   ├── rendering/
 │   │   │   └── collapsible.md
 │   │   ├── services/
+│   │   │   ├── ChatHeaderPresenter.md
+│   │   │   ├── ChatSelectionControlsCoordinator.md
+│   │   │   ├── ComposerInputShellCoordinator.md
+│   │   │   ├── InputPanelAppearanceCoordinator.md
+│   │   │   ├── InputPanelThemeRuntime.md
+│   │   │   ├── ModelSelectionRuntime.md
+│   │   │   ├── ComposerContextActionService.md
+│   │   │   ├── ComposerContextCoordinator.md
+│   │   │   ├── ContextAttachmentBuilder.md
+│   │   │   ├── ContextFileCatalogService.md
+│   │   │   ├── FocusContextRuntimeService.md
 │   │   │   ├── ContextUsageService.md
+│   │   │   ├── ConversationHistoryDialogService.md
 │   │   │   ├── ConversationRenderService.md
+│   │   │   ├── ConversationRenderRuntime.md
+│   │   │   ├── ConversationTrailingAssistantPatchPlanner.md
+│   │   │   ├── ConversationLoadRecoveryCoordinator.md
+│   │   │   ├── ConversationTabLifecycleRecoveryCoordinator.md
+│   │   │   ├── ConversationTabOpenCoordinator.md
+│   │   │   ├── ConversationTabRuntimeCoordinator.md
 │   │   │   ├── ConversationViewStateService.md
 │   │   │   ├── MessageFinalizationService.md
 │   │   │   ├── MessageSendPreparationService.md
+│   │   │   ├── PermissionModeSelectorCoordinator.md
+│   │   │   ├── PersistentAssistantNoticeService.md
 │   │   │   ├── ScrollManager.md
 │   │   │   └── TitleGenerationService.md
 │   │   ├── tabs/
@@ -138,10 +189,23 @@ docs/modules/
 │       ├── LiquidGlassSettingHelpModal.md
 │       ├── ModelConfigJsonModal.md
 │       ├── ModelConfigModal.md
+│       ├── ModelPickerModal.md
 │       ├── OpencodeConfigModal.md
 │       ├── OpenCodianSettings.md
+│       ├── ProviderBuiltinIconPickerModal.md
 │       ├── ProviderIconCacheModal.md
-│       └── ServerSettingHelpModal.md
+│       ├── ServerSettingHelpModal.md
+│       ├── SettingsModelCatalogCoordinator.md
+│       ├── SettingsModelCatalogPresenter.md
+│       ├── SettingsModelIconCacheManager.md
+│       ├── SettingsModelSection.md
+│       ├── SettingsSectionCoordinator.md
+│       ├── SettingsSecuritySection.md
+│       ├── SettingsServerSection.md
+│       ├── SettingsStyleInputPanelSection.md
+│       ├── SettingsStyleLiquidGlassInputControls.md
+│       ├── SettingsStyleSection.md
+│       └── SettingsStyleBackgroundSection.md
 ├── i18n/
 │   ├── index.md
 │   └── locales/
@@ -149,6 +213,7 @@ docs/modules/
 │       ├── en.md
 │       └── zh.md
 ├── shared/
+│   ├── contextPath.md
 │   ├── index.md
 │   ├── logger.md
 │   ├── obsidianContext.md

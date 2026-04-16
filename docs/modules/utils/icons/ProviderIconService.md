@@ -7,6 +7,8 @@
 
 AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但 LobeHub 图标的可用 variant/静态资源 URL 不再靠文件名猜测，而是读取构建期生成的 `lobehubIconManifest.ts`。服务统一管理 LobeHub CDN、插件内置 OpenCode provider 图标，以及自定义 URL/文件图标，并把解析结果缓存到本地。
 
+`R62-R63` 后，provider library 的 default/editable/effective entry 决策、canonical provider-id 映射，以及 asset/cache runtime 都先经过文件内 seam：先做 entry resolution / preview metadata，再由统一 candidate-based asset runtime 处理缓存读取、资源加载、cache-only 预览回退与 custom cache 写入。
+
 ## 导入关系
 上游: `fs`, `path`, `obsidian` (App, normalizePath, requestUrl), `../../core/types` (ProviderIconEntry, ProviderIconLibrary), `../../shared` (createLogger)
 下游: `OpenCodianView` (图标显示), `OpenCodianSettings` / `ProviderIconCacheModal` (缓存管理)
@@ -40,6 +42,11 @@ AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但
 2. `OpenCode` alias 命中的 `builtin`
 3. 双图库搜索命中的首个 `builtin`（同分优先 `LobeHub`）
 
+`resolveProviderEntryResolution()` 负责把上述 default entry 与已保存 library entries 合并成：
+- `editableEntries`：供设置页排序/替换时直接编辑的显式条目集
+- `effectiveEntries`：运行时实际可消费的条目集，会在需要时追加默认映射兜底
+- `storageProviderId`：沿用 library 中已有的 canonical provider key，避免 `code xzh` / `codexzh` 这类别名写出重复条目
+
 ### Manifest 驱动 variant 决策
 
 - 构建期脚本 `sync:lobehub-icons` 会把 `@lobehub/icons` 的 `toc` 与 CDN 规则固化成 `lobehubIconManifest.ts`
@@ -50,24 +57,40 @@ AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但
 
 ### 图标加载管线
 
-1. **resolveIconUrl()** — 入口，委托给 `resolveEntryUrl()`
-2. **resolveEntryUrl()** — 检查内存缓存 → 检查失败记录 → 去重 in-flight 请求 → 发起加载
-3. **loadEntryUrl()** — 先尝试本地缓存文件 → 不存在则按条目类型加载（manifest 驱动的 LobeHub CDN / OpenCode 内置资源 / 自定义源）→ 写入缓存 → 返回 data URL
+1. **resolveIconUrl()** — 入口，委托给 `resolveEntryAsset()`
+2. **resolveEntryAsset()** — 检查内存缓存 / failed set / in-flight 请求，再交给具体 entry loader
+3. `loadLobehubEntryAsset()` / `loadBundledBuiltinEntryAsset()` / `loadCustomEntryAsset()` — 各自只负责声明 asset candidates（cache path、preview fallback、实际 loader）
+4. **resolveAssetFromCandidates()** — 统一执行缓存读取 → 资源加载 → cache write → cache-only preview fallback → `ResolvedProviderIconAsset` 装配
 
 ### 自定义图标
 
 `addCustomIconSource()` 支持 URL 和本地文件路径，流程：
 1. 归一化输入（`normalizeCustomSource`）
-2. 加载资源（远程通过 `requestUrl`，本地通过 `fs.readFile`）
-3. 检测 MIME 类型（文件头魔数 + Content-Type + 扩展名）
-4. 写入缓存目录（`.opencodian/provider-icons/`）
-5. 添加到 library
+2. `createCachedCustomEntry()` 统一完成资源加载（远程通过 `requestUrl`，本地通过 `fs.readFile`）、MIME 检测、cache file 命名与缓存写入
+3. 把带 `cacheFileName` 的条目写回 library
 
 ### 内置图标选择
 
 - `listBuiltinIconOptions()`：为单个 provider 生成可浏览的内置图标数据，并给出 `requestedVariant / resolvedVariant / resolvedFormat`
 - `selectBuiltinIcon()`：将选中的内置图标置顶并去重；LobeHub 条目会同时持久化显式 `variant`
 - `getSelectedBuiltinSource()`：把当前 effective 条目归一成 `libraryId:iconId`
+
+### Preview 元数据装配
+
+`resolveEntryPreviewMetadata()` 统一处理 cache state 里的：
+- `iconId` 解析（mapped/builtin/custom）
+- `iconUrl` 预览来源（缓存未命中时回退到 builtin/LobeHub preview URL）
+- `requestedVariant / resolvedVariant / resolvedFormat`
+- `fallbackUsed / sourceLabel`
+
+### Asset runtime seam
+
+`resolveAssetFromCandidates()` 现在是 `R63` 的统一 asset-runtime seam，负责：
+- 读取 cache path 对应二进制资源
+- 在 cache miss 时按 candidate 顺序加载 LobeHub / bundled / custom 资源
+- 写回 `.opencodian/provider-icons/`
+- 在 cache-only 检查时回退到 preview URL / preview format，而不触发真实下载
+- 复用同一 `ResolvedProviderIconAsset` 装配逻辑，避免每类 entry 重复拼装缓存状态
 
 ### 缓存管理
 
@@ -104,17 +127,19 @@ AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但
 getProviderCacheState(app, currentProviderIds, library)
   → mergeProviderIds() → 合并当前和历史 provider
   → 对每个 provider:
-    → getEffectiveEntries() → library entries + default entry
-    → readCachedAsset() → 检查本地缓存
+    → resolveProviderEntryResolution() → canonical provider key + editable/effective entries
+    → resolveEntryAsset(cacheOnly) → 通过 resolveAssetFromCandidates() 检查本地缓存 / cache-only preview fallback
+    → resolveEntryPreviewMetadata() → 组装 iconId / preview / variant metadata
     → 构建 ProviderIconCacheEntry[]
 
 resolveIconUrl(app, providerId, library)
-  → getEffectiveEntries() → 取第一个 entry
-  → resolveEntryUrl()
+  → resolveProviderEntryResolution() → 取 selected entry
+  → resolveEntryAsset()
     → 内存缓存命中? → 返回
-    → readCachedAsset() → 本地文件缓存命中? → 返回 data URL
-    → loadMappedAsset() / loadBuiltinAsset() / loadCustomSourceAsset()
-    → writeCachedAsset() → 返回 data URL
+    → resolveAssetFromCandidates()
+      → readCachedAssetByPath() → 本地文件缓存命中? → 返回 data URL
+      → loadRemotePreviewAsset() / loadBundledOpencodeAsset() / loadCustomSourceAsset()
+      → writeCachedAsset() → 返回 data URL
 ```
 
 ## 与其他模块的交互

@@ -33,6 +33,21 @@ export interface FinalizeMessageOptions {
   logStage(stage: string, payload?: Record<string, unknown>): void;
 }
 
+interface MessageFinalizationSyncAfterStreamState {
+  previousMessagesBeforeSync: ChatMessage[];
+  syncResult: MessageFinalizationSyncResult;
+  isForegroundConversation: boolean;
+  needsForegroundRenderSync: boolean;
+}
+
+interface MessageFinalizationSyncAfterStreamFollowUpContext {
+  conversation: Conversation;
+  tabId: TabId | null;
+  editedFiles: string[];
+  syncAfterStreamState: MessageFinalizationSyncAfterStreamState;
+  logStage: FinalizeMessageOptions['logStage'];
+}
+
 export interface MessageFinalizationHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
@@ -43,12 +58,10 @@ export interface MessageFinalizationHost {
   ): Promise<MessageFinalizationSyncResult>;
   getConversationVisualFingerprint(messages: ChatMessage[]): string;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
-  patchTrailingAssistantRender(
+  applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
-    tabId?: TabId | null,
-  ): Promise<boolean>;
-  rerenderConversationMessages(conversation: Conversation): Promise<void>;
+  ): Promise<void>;
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
   appendTurnDiffNoticeIfNeeded(
     conversation: Conversation,
@@ -85,7 +98,18 @@ export class MessageFinalizationService {
 
     try {
       if (shouldSyncFromServer) {
-        await this.syncConversationAfterStream(conversation, tabId, editedFiles, logStage);
+        const syncAfterStreamState = await this.requestConversationSyncAfterStream(
+          conversation,
+          tabId,
+          logStage,
+        );
+        await this.applySyncAfterStreamFollowUp({
+          conversation,
+          tabId,
+          editedFiles,
+          syncAfterStreamState,
+          logStage,
+        });
       }
 
       await this.host.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
@@ -129,12 +153,11 @@ export class MessageFinalizationService {
     }
   }
 
-  private async syncConversationAfterStream(
+  private async requestConversationSyncAfterStream(
     conversation: Conversation,
     tabId: TabId | null,
-    editedFiles: string[],
     logStage: FinalizeMessageOptions['logStage'],
-  ): Promise<void> {
+  ): Promise<MessageFinalizationSyncAfterStreamState> {
     const previousMessagesBeforeSync = [...conversation.messages];
     const previousVisualFingerprint = this.host.getConversationVisualFingerprint(conversation.messages);
     logStage('server-sync-requested', {
@@ -157,25 +180,44 @@ export class MessageFinalizationService {
       ),
     });
 
-    if (this.isForegroundConversation(conversation, tabId)) {
-      this.host.setLastConversationSyncFingerprint(tabId, syncResult.fingerprint);
-      if (previousVisualFingerprint !== this.host.getConversationVisualFingerprint(syncResult.messages)) {
-        const patchedTail = await this.host.patchTrailingAssistantRender(
-          previousMessagesBeforeSync,
-          syncResult.messages,
-          tabId,
-        );
-        logStage('post-sync-tail-render-attempt', {
-          patchedTail,
-        });
-        if (!patchedTail) {
-          await this.host.rerenderConversationMessages(conversation);
-          logStage('post-sync-full-rerender-complete');
-        }
-      }
+    const isForegroundConversation = this.isForegroundConversation(conversation, tabId);
+    return {
+      previousMessagesBeforeSync,
+      syncResult,
+      isForegroundConversation,
+      needsForegroundRenderSync: isForegroundConversation
+        && previousVisualFingerprint !== this.host.getConversationVisualFingerprint(syncResult.messages),
+    };
+  }
+
+  private async applySyncAfterStreamFollowUp(
+    context: MessageFinalizationSyncAfterStreamFollowUpContext,
+  ): Promise<void> {
+    const {
+      conversation,
+      tabId,
+      editedFiles,
+      syncAfterStreamState,
+      logStage,
+    } = context;
+
+    if (syncAfterStreamState.isForegroundConversation) {
+      this.host.setLastConversationSyncFingerprint(
+        tabId,
+        syncAfterStreamState.syncResult.fingerprint,
+      );
     }
 
-    await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
+    if (syncAfterStreamState.needsForegroundRenderSync) {
+      await this.host.applySyncedConversationUpdate(
+        syncAfterStreamState.previousMessagesBeforeSync,
+        syncAfterStreamState.syncResult.messages,
+      );
+      logStage('post-sync-render-apply-complete');
+    } else {
+      await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
+    }
+
     await this.host.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId);
     logStage('turn-diff-processed', {
       pendingEditedFileCount: editedFiles.length,

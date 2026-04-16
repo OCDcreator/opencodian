@@ -1,0 +1,205 @@
+import {
+  OpenCodeEventSubscriptionCoordinator,
+  type OpenCodeEventSubscriptionCoordinatorHost,
+} from '../../../../src/core/opencode/OpenCodeEventSubscriptionCoordinator';
+
+async function flushAsync(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function* createSignalBoundStream(
+  signal: AbortSignal,
+  events: unknown[] = [],
+): AsyncIterable<unknown> {
+  for (const event of events) {
+    yield event;
+  }
+
+  if (!signal.aborted) {
+    await new Promise<void>((resolve) => {
+      signal.addEventListener('abort', () => resolve(), { once: true });
+    });
+  }
+}
+
+function createHost(
+  overrides: Partial<OpenCodeEventSubscriptionCoordinatorHost> = {},
+): jest.Mocked<OpenCodeEventSubscriptionCoordinatorHost> {
+  return {
+    subscribeToEvents: jest.fn((_, signal) => Promise.resolve(createSignalBoundStream(signal))),
+    hasCatalogUpdateListeners: jest.fn(() => false),
+    observeRuntimeToolNames: jest.fn(() => false),
+    emitCatalogUpdate: jest.fn(),
+    refreshMcpServerStatus: jest.fn().mockResolvedValue({}),
+    logEventSubscriptionFailure: jest.fn(),
+    delay: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  } as jest.Mocked<OpenCodeEventSubscriptionCoordinatorHost>;
+}
+
+describe('OpenCodeEventSubscriptionCoordinator', () => {
+  it('routes open-code events and triggers catalog host actions for catalog-relevant payloads', async () => {
+    const observedToolNames = new Set<string>();
+    const host = createHost({
+      subscribeToEvents: jest.fn((source, signal) =>
+        Promise.resolve(createSignalBoundStream(
+          signal,
+          source === 'event'
+            ? [
+              {
+                type: 'message.part.updated',
+                properties: {
+                  part: {
+                    type: 'tool',
+                    tool: 'exa_search',
+                  },
+                },
+              },
+              {
+                type: 'permission.asked',
+                properties: {
+                  permission: 'vault_write',
+                },
+              },
+            ]
+            : [
+              {
+                payload: {
+                  type: 'message.updated',
+                  properties: {
+                    info: {
+                      tools: {
+                        brave_search: true,
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                payload: {
+                  type: 'mcp.tools.changed',
+                  properties: {
+                    server: 'exa',
+                  },
+                },
+              },
+            ],
+        ))),
+      observeRuntimeToolNames: jest.fn((toolNames) => {
+        let changed = false;
+        for (const toolName of toolNames) {
+          if (!observedToolNames.has(toolName)) {
+            observedToolNames.add(toolName);
+            changed = true;
+          }
+        }
+
+        return changed;
+      }),
+    });
+    const coordinator = new OpenCodeEventSubscriptionCoordinator(host);
+    const receivedEvents: string[] = [];
+
+    const dispose = coordinator.subscribeToOpenCodeEvents((event) => {
+      const payload = event.payload as { type?: string; payload?: { type?: string } };
+      const type = payload.type ?? payload.payload?.type ?? 'unknown';
+      receivedEvents.push(type);
+    });
+
+    await flushAsync();
+    await flushAsync();
+
+    dispose();
+
+    expect(receivedEvents).toEqual(expect.arrayContaining([
+      'message.part.updated',
+      'permission.asked',
+      'message.updated',
+      'mcp.tools.changed',
+    ]));
+    expect([...observedToolNames].sort()).toEqual(['brave_search', 'exa_search', 'vault_write']);
+    expect(host.emitCatalogUpdate).toHaveBeenCalledTimes(3);
+    expect(host.refreshMcpServerStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts both SDK streams when the last listener unsubscribes', async () => {
+    const signals: Array<{ source: string; signal: AbortSignal }> = [];
+    const host = createHost({
+      subscribeToEvents: jest.fn((source, signal) => {
+        signals.push({ source, signal });
+        return Promise.resolve(createSignalBoundStream(signal));
+      }),
+    });
+    const coordinator = new OpenCodeEventSubscriptionCoordinator(host);
+
+    const dispose = coordinator.subscribeToOpenCodeEvents(jest.fn());
+    await flushAsync();
+
+    expect(signals).toHaveLength(2);
+    expect(signals.every(({ signal }) => signal.aborted === false)).toBe(true);
+
+    dispose();
+
+    expect(signals.every(({ signal }) => signal.aborted)).toBe(true);
+  });
+
+  it('restarts both SDK streams when active catalog listeners still need subscriptions', async () => {
+    const signalsBySource = {
+      event: [] as AbortSignal[],
+      global: [] as AbortSignal[],
+    };
+    const host = createHost({
+      hasCatalogUpdateListeners: jest.fn(() => true),
+      subscribeToEvents: jest.fn((source, signal) => {
+        signalsBySource[source].push(signal);
+        return Promise.resolve(createSignalBoundStream(signal));
+      }),
+    });
+    const coordinator = new OpenCodeEventSubscriptionCoordinator(host);
+
+    coordinator.ensureSubscriptions();
+    await flushAsync();
+    coordinator.restartSubscriptions();
+    await flushAsync();
+    await flushAsync();
+
+    expect(signalsBySource.event).toHaveLength(2);
+    expect(signalsBySource.global).toHaveLength(2);
+    expect(signalsBySource.event[0].aborted).toBe(true);
+    expect(signalsBySource.global[0].aborted).toBe(true);
+    expect(signalsBySource.event[1].aborted).toBe(false);
+    expect(signalsBySource.global[1].aborted).toBe(false);
+  });
+
+  it('retries failed subscriptions without dropping active listeners', async () => {
+    const subscriptionAttempts = {
+      event: 0,
+      global: 0,
+    };
+    const failure = new Error('subscribe failed');
+    const host = createHost({
+      subscribeToEvents: jest.fn((source, signal) => {
+        subscriptionAttempts[source] += 1;
+        if (source === 'global' && subscriptionAttempts.global === 1) {
+          return Promise.reject(failure);
+        }
+
+        return Promise.resolve(createSignalBoundStream(signal));
+      }),
+    });
+    const coordinator = new OpenCodeEventSubscriptionCoordinator(host);
+    const dispose = coordinator.subscribeToOpenCodeEvents(jest.fn());
+
+    await flushAsync();
+    await flushAsync();
+
+    expect(host.logEventSubscriptionFailure).toHaveBeenCalledWith('global', failure);
+    expect(subscriptionAttempts.event).toBe(1);
+    expect(subscriptionAttempts.global).toBe(2);
+    expect(host.delay).toHaveBeenCalledWith(1000, expect.any(AbortSignal));
+
+    dispose();
+  });
+});

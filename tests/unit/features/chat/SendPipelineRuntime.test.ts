@@ -231,29 +231,6 @@ function createHost(
           return null;
       }
     }),
-    buildStreamErrorNotice: jest.fn().mockImplementation(
-      (timestamp: number, content: string, modelId?: string, sourceMessageId?: string) => ({
-        id: sourceMessageId ? `assistant-error-notice-${sourceMessageId}` : `assistant-error-notice-${timestamp}`,
-        role: 'assistant',
-        content,
-        timestamp,
-        modelId,
-        sourceMessageId,
-        displayStyle: 'notice',
-        noticeTitle: 'Error',
-        noticeTone: 'error',
-      }),
-    ),
-    buildInterruptedAssistantNotice: jest.fn().mockImplementation((timestamp: number, modelId?: string) => ({
-      id: `assistant-interrupted-${timestamp}`,
-      role: 'assistant',
-      content: 'Interrupted',
-      timestamp,
-      modelId,
-      displayStyle: 'notice',
-      noticeTitle: 'Interrupted',
-      noticeTone: 'warning',
-    })),
     renderAssistantPlaceholderAsNotice: jest.fn().mockResolvedValue(undefined),
     addTimestampWithCopyButton: jest.fn(),
     finalizeBackgroundTaskIndicatorAfterPrimaryStream: jest.fn().mockResolvedValue(undefined),
@@ -376,12 +353,6 @@ describe('SendPipelineRuntime', () => {
     await runtime.sendMessage('Hello');
 
     expect(nowSpy).toHaveBeenCalled();
-    expect(host.buildStreamErrorNotice).toHaveBeenCalledWith(
-      500,
-      'Friendly: boom',
-      'openai/gpt-5.4',
-      undefined,
-    );
     expect(host.renderAssistantPlaceholderAsNotice).toHaveBeenCalledTimes(1);
     expect(preparedSend.conversation.messages).toHaveLength(2);
     expect(preparedSend.conversation.messages[1]).toEqual(expect.objectContaining({

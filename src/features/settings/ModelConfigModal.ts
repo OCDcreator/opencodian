@@ -55,10 +55,65 @@ type ProviderCheckState =
   | { status: 'warning'; message: string }
   | { status: 'error'; message: string };
 
+type ProviderInterfaceFormatOption = (typeof PROVIDER_INTERFACE_FORMAT_OPTIONS)[number];
+type ModelKeyValueCollectionKey = 'options' | 'variants' | 'extraFields';
+type ModelConfigModalFlow = 'workspace' | 'add-provider';
+
+interface SelectedProviderEditorState {
+  flow: ModelConfigModalFlow;
+  provider: ProviderFormState;
+  formatMeta: ProviderInterfaceFormatOption;
+  providerCheckState: ProviderCheckState;
+}
+
+interface ModelConfigSavePlan {
+  nextConfig: OpencodeModelConfigSubset;
+  nextDisabledModelRefs: string[];
+  restartServerAfterWrite: boolean;
+}
+
 interface ModelConfigModalOpenOptions {
   initialProviderId?: string;
   initialView?: 'preset-selector' | 'editor';
   onSaved?: () => Promise<void> | void;
+}
+
+interface KeyValueEditorConfig {
+  title: string;
+  description: string;
+  values: KeyValueFieldState[];
+  onAdd: () => void;
+  onRemove: (uid: string) => void;
+  onKeyChange: (uid: string, value: string) => void;
+  onValueChange: (uid: string, value: string) => void;
+  showColumnHeaders?: boolean;
+  stackedLabels?: boolean;
+  iconRemoveButton?: boolean;
+  emptyState?: string;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+}
+
+interface TextFieldConfig {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  description?: string;
+  secret?: boolean;
+}
+
+interface SelectFieldOption {
+  value: string;
+  label: string;
+}
+
+interface SelectFieldConfig {
+  label: string;
+  value: string;
+  options: SelectFieldOption[];
+  onChange: (value: string) => void;
+  description?: string;
 }
 
 export class ModelConfigModal extends Modal {
@@ -280,22 +335,59 @@ export class ModelConfigModal extends Modal {
   }
 
   private renderEditor(containerEl: HTMLElement): void {
+    const editorState = this.getSelectedProviderEditorState();
+    if (!editorState) {
+      this.renderNoProviderSelectedState(containerEl);
+      return;
+    }
+
+    if (editorState.flow === 'add-provider') {
+      this.renderAddProviderEditor(containerEl, editorState);
+      return;
+    }
+
+    this.renderWorkspaceEditor(containerEl, editorState);
+  }
+
+  private renderNoProviderSelectedState(containerEl: HTMLElement): void {
+    this.previewEl = null;
+    this.restartToggleEl = null;
+    containerEl.createDiv({
+      cls: 'opencodian-model-workspace-empty',
+      text: t('settings.model.visualEditor.noProviderSelected'),
+    });
+  }
+
+  private getSelectedProviderEditorState(): SelectedProviderEditorState | null {
     const provider = this.getSelectedProvider();
     if (!provider) {
-      this.previewEl = null;
-      this.restartToggleEl = null;
-      containerEl.createDiv({
-        cls: 'opencodian-model-workspace-empty',
-        text: t('settings.model.visualEditor.noProviderSelected'),
-      });
-      return;
+      return null;
     }
 
-    if (this.isAddProviderFlow()) {
-      this.renderAddProviderEditor(containerEl, provider);
-      return;
-    }
+    return {
+      flow: this.isAddProviderFlow() ? 'add-provider' : 'workspace',
+      provider,
+      formatMeta: this.getProviderInterfaceFormatMeta(provider.interfaceFormat),
+      providerCheckState: this.providerChecks.get(provider.uid) ?? { status: 'idle' },
+    };
+  }
 
+  private renderWorkspaceEditor(
+    containerEl: HTMLElement,
+    editorState: SelectedProviderEditorState,
+  ): void {
+    const { provider } = editorState;
+    this.renderProviderToolbar(containerEl, provider);
+    const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel' });
+    this.renderProviderIdentitySection(sectionsEl, provider);
+    this.renderProviderConnectionSection(sectionsEl, editorState);
+    this.renderProviderExtraOptionsSection(sectionsEl, provider);
+    this.renderProviderModelsSection(sectionsEl, editorState);
+    this.renderProviderDefaultsSection(sectionsEl);
+    this.renderEditorPreviewSection(sectionsEl);
+  }
+
+  private renderProviderToolbar(containerEl: HTMLElement, provider: ProviderFormState): void {
     const toolbarEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-toolbar is-cc-switch' });
     const toolbarCopyEl = toolbarEl.createDiv({ cls: 'opencodian-model-workspace-toolbar-copy' });
     toolbarCopyEl.createDiv({
@@ -331,13 +423,14 @@ export class ModelConfigModal extends Modal {
     });
 
     const utilityActionsEl = actionsEl.createDiv({ cls: 'opencodian-model-workspace-editor-actions-group' });
+    const providerCheckState = this.providerChecks.get(provider.uid);
     const providerTestButton = utilityActionsEl.createEl('button', {
-      text: this.providerChecks.get(provider.uid)?.status === 'loading'
+      text: providerCheckState?.status === 'loading'
         ? t('settings.model.availability.check.loading')
         : t('settings.model.visualEditor.testProvider'),
     });
     providerTestButton.type = 'button';
-    providerTestButton.disabled = this.providerChecks.get(provider.uid)?.status === 'loading' || !provider.id.trim();
+    providerTestButton.disabled = providerCheckState?.status === 'loading' || !provider.id.trim();
     providerTestButton.addEventListener('click', () => {
       void this.runProviderCheck(provider);
     });
@@ -362,59 +455,60 @@ export class ModelConfigModal extends Modal {
     deleteButton.addEventListener('click', () => {
       this.deleteSelectedProvider();
     });
+  }
 
-    const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel' });
-
-    const identitySectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
+  private renderProviderIdentitySection(containerEl: HTMLElement, provider: ProviderFormState): void {
+    const identitySectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     this.createSectionHeader(
       identitySectionEl,
       t('settings.model.visualEditor.identitySectionTitle'),
       t('settings.model.visualEditor.identitySectionDesc'),
     );
     const identityGridEl = identitySectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-identity-grid' });
-    const providerIdField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerId')} *`,
-      provider.id,
-      (value) => {
+    const providerIdField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerId')} *`,
+      value: provider.id,
+      onChange: (value) => {
         provider.id = value;
       },
-      'my-provider',
-      t('settings.model.visualEditor.providerIdDesc'),
-    );
+      placeholder: 'my-provider',
+      description: t('settings.model.visualEditor.providerIdDesc'),
+    });
     providerIdField.addClass('is-full-span');
 
-    const providerNameField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerName')} *`,
-      provider.name,
-      (value) => {
+    const providerNameField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerName')} *`,
+      value: provider.name,
+      onChange: (value) => {
         provider.name = value;
       },
-      'My Provider',
-    );
+      placeholder: 'My Provider',
+    });
     providerNameField.addClass('is-full-span');
+  }
 
-    const connectionSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
+  private renderProviderConnectionSection(
+    containerEl: HTMLElement,
+    editorState: SelectedProviderEditorState,
+  ): void {
+    const { provider, formatMeta, providerCheckState } = editorState;
+    const connectionSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     this.createSectionHeader(
       connectionSectionEl,
       t('settings.model.visualEditor.providerSectionTitle'),
       t('settings.model.visualEditor.providerSectionDesc'),
     );
     const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
-    const interfaceField = this.createSelectField(
-      connectionGridEl,
-      t('settings.model.visualEditor.interfaceFormat'),
-      provider.interfaceFormat,
-      PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
+    const interfaceField = this.createSelectField(connectionGridEl, {
+      label: t('settings.model.visualEditor.interfaceFormat'),
+      value: provider.interfaceFormat,
+      options: PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
         value: entry.id,
         label: t(entry.labelKey as never),
       })),
-      (value) => {
-        const previous = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
-        const next = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
+      onChange: (value) => {
+        const previous = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
+        const next = this.getProviderInterfaceFormatMeta(value as ProviderInterfaceFormatId);
         provider.interfaceFormat = value as ProviderInterfaceFormatId;
         if (!provider.baseURL.trim() || provider.baseURL.trim() === previous.defaultBaseUrl) {
           provider.baseURL = '';
@@ -423,75 +517,67 @@ export class ModelConfigModal extends Modal {
         this.updatePreview();
         this.render();
       },
-      t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
-        ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1].descriptionKey) as never),
-    );
+      description: t(formatMeta.descriptionKey as never),
+    });
     interfaceField.addClass('is-full-span');
 
     if (provider.interfaceFormat === 'custom') {
-      const customNpmField = this.createTextField(
-        connectionGridEl,
-        t('settings.model.visualEditor.customNpm'),
-        provider.customNpm,
-        (value) => {
+      const customNpmField = this.createTextField(connectionGridEl, {
+        label: t('settings.model.visualEditor.customNpm'),
+        value: provider.customNpm,
+        onChange: (value) => {
           provider.customNpm = value;
         },
-        '@scope/custom-adapter',
-      );
+        placeholder: '@scope/custom-adapter',
+      });
       customNpmField.addClass('is-full-span');
     }
 
-    const formatMeta = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-      ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
-    const baseUrlField = this.createTextField(
-      connectionGridEl,
-      `${t('settings.model.visualEditor.baseURL')} *`,
-      provider.baseURL,
-      (value) => {
+    const baseUrlField = this.createTextField(connectionGridEl, {
+      label: `${t('settings.model.visualEditor.baseURL')} *`,
+      value: provider.baseURL,
+      onChange: (value) => {
         provider.baseURL = value;
       },
-      formatMeta.baseUrlPlaceholder,
-    );
+      placeholder: formatMeta.baseUrlPlaceholder,
+    });
     baseUrlField.addClass('is-full-span');
-    const apiKeyField = this.createTextField(
-      connectionGridEl,
-      t('settings.model.visualEditor.apiKey'),
-      provider.apiKey,
-      (value) => {
+    const apiKeyField = this.createTextField(connectionGridEl, {
+      label: t('settings.model.visualEditor.apiKey'),
+      value: provider.apiKey,
+      onChange: (value) => {
         provider.apiKey = value;
       },
-      formatMeta.apiKeyPlaceholder,
-      undefined,
-      false,
-      true,
-    );
+      placeholder: formatMeta.apiKeyPlaceholder,
+      secret: true,
+    });
     apiKeyField.addClass('is-full-span');
 
-    const providerCheckState = this.providerChecks.get(provider.uid);
-    if (providerCheckState && providerCheckState.status !== 'idle' && providerCheckState.status !== 'loading') {
+    if (providerCheckState.status !== 'idle' && providerCheckState.status !== 'loading') {
       connectionSectionEl.createDiv({
         cls: `opencodian-model-workspace-inline-status ${this.getProviderCheckClass(providerCheckState)}`,
         text: providerCheckState.message,
       });
     }
+  }
 
-    const extraOptionsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.renderKeyValueEditor(
-      extraOptionsSectionEl,
-      t('settings.model.visualEditor.extraOptionsTitle'),
-      t('settings.model.visualEditor.extraOptionsDesc'),
-      provider.extraOptions,
-      () => {
+  private renderProviderExtraOptionsSection(containerEl: HTMLElement, provider: ProviderFormState): void {
+    const extraOptionsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
+    this.renderKeyValueEditor(extraOptionsSectionEl, {
+      title: t('settings.model.visualEditor.extraOptionsTitle'),
+      description: t('settings.model.visualEditor.extraOptionsDesc'),
+      values: provider.extraOptions,
+      onAdd: () => {
         provider.extraOptions.push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
+      onRemove: (uid) => {
         provider.extraOptions = provider.extraOptions.filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
+      onKeyChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -499,7 +585,7 @@ export class ModelConfigModal extends Modal {
         field.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
+      onValueChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -507,13 +593,16 @@ export class ModelConfigModal extends Modal {
         field.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        stackedLabels: true,
-      },
-    );
+      stackedLabels: true,
+    });
+  }
 
-    const modelsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
+  private renderProviderModelsSection(
+    containerEl: HTMLElement,
+    editorState: SelectedProviderEditorState,
+  ): void {
+    const { provider, formatMeta } = editorState;
+    const modelsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
       modelsSectionEl,
       t('settings.model.visualEditor.modelsTitle'),
@@ -546,84 +635,89 @@ export class ModelConfigModal extends Modal {
       this.render();
     });
 
-    const fetchedCandidates = this.fetchedModelCandidates.get(provider.uid) ?? [];
-    if (fetchedCandidates.length > 0) {
-      const importPanelEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-import-panel is-inline' });
-      const importHeaderEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-header' });
-      importHeaderEl.createDiv({
-        cls: 'opencodian-model-workspace-import-title',
-        text: t('settings.model.visualEditor.fetchResultTitle', {
-          count: String(fetchedCandidates.length),
-        }),
-      });
-      const importButton = importHeaderEl.createEl('button', {
-        cls: 'mod-cta',
-        text: t('settings.model.visualEditor.importMissingModels'),
-      });
-      importButton.type = 'button';
-      importButton.addEventListener('click', () => {
-        this.importFetchedModels(provider, fetchedCandidates);
-      });
-      const importListEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-list' });
-      for (const candidate of fetchedCandidates.slice(0, 12)) {
-        importListEl.createDiv({
-          cls: 'opencodian-model-workspace-import-item',
-          text: candidate.name && candidate.name !== candidate.id
-            ? `${candidate.name} · ${candidate.id}`
-            : candidate.id,
-        });
-      }
-    }
+    this.renderFetchedModelCandidates(modelsSectionEl, provider);
 
     if (provider.models.length === 0) {
       modelsSectionEl.createDiv({
         cls: 'opencodian-model-workspace-empty',
         text: t('settings.model.visualEditor.noModels'),
       });
-    } else {
-      const modelsListEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-model-list' });
-      for (const model of provider.models) {
-        this.renderModelCard(modelsListEl, provider, model);
-      }
+      return;
     }
 
-    const defaultsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
+    const modelsListEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-model-list' });
+    for (const model of provider.models) {
+      this.renderModelCard(modelsListEl, provider, model);
+    }
+  }
+
+  private renderFetchedModelCandidates(containerEl: HTMLElement, provider: ProviderFormState): void {
+    const fetchedCandidates = this.fetchedModelCandidates.get(provider.uid) ?? [];
+    if (fetchedCandidates.length === 0) {
+      return;
+    }
+
+    const importPanelEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-import-panel is-inline' });
+    const importHeaderEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-header' });
+    importHeaderEl.createDiv({
+      cls: 'opencodian-model-workspace-import-title',
+      text: t('settings.model.visualEditor.fetchResultTitle', {
+        count: String(fetchedCandidates.length),
+      }),
+    });
+    const importButton = importHeaderEl.createEl('button', {
+      cls: 'mod-cta',
+      text: t('settings.model.visualEditor.importMissingModels'),
+    });
+    importButton.type = 'button';
+    importButton.addEventListener('click', () => {
+      this.importFetchedModels(provider, fetchedCandidates);
+    });
+    const importListEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-list' });
+    for (const candidate of fetchedCandidates.slice(0, 12)) {
+      importListEl.createDiv({
+        cls: 'opencodian-model-workspace-import-item',
+        text: candidate.name && candidate.name !== candidate.id
+          ? `${candidate.name} · ${candidate.id}`
+          : candidate.id,
+      });
+    }
+  }
+
+  private renderProviderDefaultsSection(containerEl: HTMLElement): void {
+    const defaultsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
       defaultsSectionEl,
       t('settings.model.visualEditor.defaultsTitle'),
       t('settings.model.visualEditor.defaultsDesc'),
     );
     const defaultsGridEl = defaultsSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid' });
-    this.createTextField(
-      defaultsGridEl,
-      t('settings.model.visualEditor.defaultModel'),
-      this.modelValue,
-      (value) => {
+    this.createTextField(defaultsGridEl, {
+      label: t('settings.model.visualEditor.defaultModel'),
+      value: this.modelValue,
+      onChange: (value) => {
         this.modelValue = value;
       },
-      'provider/model',
-      t('settings.model.visualEditor.defaultModelDesc'),
-    );
-    this.createTextField(
-      defaultsGridEl,
-      t('settings.model.visualEditor.smallModel'),
-      this.smallModelValue,
-      (value) => {
+      placeholder: 'provider/model',
+      description: t('settings.model.visualEditor.defaultModelDesc'),
+    });
+    this.createTextField(defaultsGridEl, {
+      label: t('settings.model.visualEditor.smallModel'),
+      value: this.smallModelValue,
+      onChange: (value) => {
         this.smallModelValue = value;
       },
-      'provider/model',
-      t('settings.model.visualEditor.smallModelDesc'),
-    );
+      placeholder: 'provider/model',
+      description: t('settings.model.visualEditor.smallModelDesc'),
+    });
+  }
 
-    const previewSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
+  private renderEditorPreviewSection(containerEl: HTMLElement): void {
+    const previewSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
       previewSectionEl,
-      this.isAddProviderFlow()
-        ? t('settings.model.visualEditor.addProviderPreviewTitle')
-        : t('settings.model.visualEditor.previewTitle'),
-      this.isAddProviderFlow()
-        ? t('settings.model.visualEditor.addProviderPreviewDesc')
-        : t('settings.model.visualEditor.previewDesc'),
+      t('settings.model.visualEditor.previewTitle'),
+      t('settings.model.visualEditor.previewDesc'),
     );
 
     const previewToolbarEl = previewSectionEl.createDiv({ cls: 'opencodian-model-workspace-preview-toolbar' });
@@ -650,51 +744,55 @@ export class ModelConfigModal extends Modal {
     this.updatePreview();
   }
 
-  private renderAddProviderEditor(containerEl: HTMLElement, provider: ProviderFormState): void {
+  private getProviderInterfaceFormatMeta(value: ProviderInterfaceFormatId): ProviderInterfaceFormatOption {
+    return PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
+      ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
+  }
+
+  private renderAddProviderEditor(
+    containerEl: HTMLElement,
+    editorState: SelectedProviderEditorState,
+  ): void {
+    const { provider, formatMeta } = editorState;
     containerEl.addClass('is-add-provider-flow');
 
     const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel is-add-provider-flow' });
 
     const identitySectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     const identityGridEl = identitySectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-identity-grid' });
-    const providerIdField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerId')} *`,
-      provider.id,
-      (value) => {
+    const providerIdField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerId')} *`,
+      value: provider.id,
+      onChange: (value) => {
         provider.id = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
       },
-      'my-provider',
-      t('settings.model.visualEditor.providerIdDesc'),
-    );
+      placeholder: 'my-provider',
+      description: t('settings.model.visualEditor.providerIdDesc'),
+    });
     providerIdField.addClass('is-full-span');
 
-    const providerNameField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerName')} *`,
-      provider.name,
-      (value) => {
+    const providerNameField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerName')} *`,
+      value: provider.name,
+      onChange: (value) => {
         provider.name = value;
       },
-      t('settings.model.visualEditor.providerNamePlaceholder'),
-    );
+      placeholder: t('settings.model.visualEditor.providerNamePlaceholder'),
+    });
     providerNameField.addClass('is-full-span');
 
     const connectionSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
-    const interfaceField = this.createSelectField(
-      connectionGridEl,
-      t('settings.model.visualEditor.interfaceFormat'),
-      provider.interfaceFormat,
-      PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
+    const interfaceField = this.createSelectField(connectionGridEl, {
+      label: t('settings.model.visualEditor.interfaceFormat'),
+      value: provider.interfaceFormat,
+      options: PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
         value: entry.id,
         label: t(entry.labelKey as never),
       })),
-      (value) => {
-        const previous = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
-        const next = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
+      onChange: (value) => {
+        const previous = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
+        const next = this.getProviderInterfaceFormatMeta(value as ProviderInterfaceFormatId);
         provider.interfaceFormat = value as ProviderInterfaceFormatId;
         if (!provider.baseURL.trim() || provider.baseURL.trim() === previous.defaultBaseUrl) {
           provider.baseURL = '';
@@ -703,69 +801,61 @@ export class ModelConfigModal extends Modal {
         this.updatePreview();
         this.render();
       },
-      t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
-        ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1].descriptionKey) as never),
-    );
+      description: t(formatMeta.descriptionKey as never),
+    });
     interfaceField.addClass('is-full-span');
 
     if (provider.interfaceFormat === 'custom') {
-      const customNpmField = this.createTextField(
-        connectionGridEl,
-        t('settings.model.visualEditor.customNpm'),
-        provider.customNpm,
-        (value) => {
+      const customNpmField = this.createTextField(connectionGridEl, {
+        label: t('settings.model.visualEditor.customNpm'),
+        value: provider.customNpm,
+        onChange: (value) => {
           provider.customNpm = value;
         },
-        '@scope/custom-adapter',
-      );
+        placeholder: '@scope/custom-adapter',
+      });
       customNpmField.addClass('is-full-span');
     }
 
-    const formatMeta = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-      ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
     const baseUrlPlaceholder = this.getProviderBaseUrlPlaceholder(provider, formatMeta.baseUrlPlaceholder);
-    const apiKeyField = this.createTextField(
-      connectionGridEl,
-      t('settings.model.visualEditor.apiKey'),
-      provider.apiKey,
-      (value) => {
+    const apiKeyField = this.createTextField(connectionGridEl, {
+      label: t('settings.model.visualEditor.apiKey'),
+      value: provider.apiKey,
+      onChange: (value) => {
         provider.apiKey = value;
       },
-      formatMeta.apiKeyPlaceholder || t('settings.model.visualEditor.apiKeyPlaceholder'),
-      t('settings.model.visualEditor.apiKeyAutoFill'),
-      false,
-      true,
-    );
+      placeholder: formatMeta.apiKeyPlaceholder || t('settings.model.visualEditor.apiKeyPlaceholder'),
+      description: t('settings.model.visualEditor.apiKeyAutoFill'),
+      secret: true,
+    });
     apiKeyField.addClass('is-full-span');
 
-    const baseUrlField = this.createTextField(
-      connectionGridEl,
-      `${t('settings.model.visualEditor.baseURL')} *`,
-      provider.baseURL,
-      (value) => {
+    const baseUrlField = this.createTextField(connectionGridEl, {
+      label: `${t('settings.model.visualEditor.baseURL')} *`,
+      value: provider.baseURL,
+      onChange: (value) => {
         provider.baseURL = value;
       },
-      baseUrlPlaceholder,
-    );
+      placeholder: baseUrlPlaceholder,
+    });
     baseUrlField.addClass('is-full-span');
 
     const extraOptionsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.renderKeyValueEditor(
-      extraOptionsSectionEl,
-      t('settings.model.visualEditor.extraOptionsTitle'),
-      t('settings.model.visualEditor.addProviderExtraOptionsDesc'),
-      provider.extraOptions,
-      () => {
+    this.renderKeyValueEditor(extraOptionsSectionEl, {
+      title: t('settings.model.visualEditor.extraOptionsTitle'),
+      description: t('settings.model.visualEditor.addProviderExtraOptionsDesc'),
+      values: provider.extraOptions,
+      onAdd: () => {
         provider.extraOptions.push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
+      onRemove: (uid) => {
         provider.extraOptions = provider.extraOptions.filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
+      onKeyChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -773,7 +863,7 @@ export class ModelConfigModal extends Modal {
         field.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
+      onValueChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -781,12 +871,9 @@ export class ModelConfigModal extends Modal {
         field.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        stackedLabels: true,
-        iconRemoveButton: true,
-      },
-    );
+      stackedLabels: true,
+      iconRemoveButton: true,
+    });
 
     const modelsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     const modelHeaderEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-section-header is-with-actions' });
@@ -883,6 +970,20 @@ export class ModelConfigModal extends Modal {
     const expanded = this.expandedModelUids.has(model.uid);
     const modelEl = containerEl.createDiv({ cls: `opencodian-model-workspace-model-card${model.enabled ? '' : ' is-disabled'}` });
     const headerEl = modelEl.createDiv({ cls: 'opencodian-model-workspace-model-header' });
+    this.renderModelCardHeader(headerEl, provider, model, expanded);
+    if (!expanded) {
+      return;
+    }
+
+    this.renderExpandedModelCardDetails(modelEl, model);
+  }
+
+  private renderModelCardHeader(
+    headerEl: HTMLElement,
+    provider: ProviderFormState,
+    model: ModelFormState,
+    expanded: boolean,
+  ): void {
     const expandButton = headerEl.createEl('button', { cls: 'opencodian-model-workspace-model-expand' });
     expandButton.type = 'button';
     setIcon(expandButton, expanded ? 'chevron-down' : 'chevron-right');
@@ -961,11 +1062,9 @@ export class ModelConfigModal extends Modal {
       this.updatePreview();
       this.render();
     });
+  }
 
-    if (!expanded) {
-      return;
-    }
-
+  private renderExpandedModelCardDetails(modelEl: HTMLElement, model: ModelFormState): void {
     const detailsEl = modelEl.createDiv({ cls: 'opencodian-model-workspace-model-details' });
     const limitsSectionEl = detailsEl.createDiv({
       cls: 'opencodian-model-workspace-subsection opencodian-model-workspace-model-limit-section',
@@ -976,164 +1075,116 @@ export class ModelConfigModal extends Modal {
       t('settings.model.visualEditor.modelLimitsDesc'),
     );
     const limitsGridEl = limitsSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-model-limits-grid' });
-    this.createTextField(
-      limitsGridEl,
-      t('settings.model.visualEditor.contextLimit'),
-      model.context,
-      (value) => {
+    this.createTextField(limitsGridEl, {
+      label: t('settings.model.visualEditor.contextLimit'),
+      value: model.context,
+      onChange: (value) => {
         model.context = value;
       },
-      '200000',
-      t('settings.model.visualEditor.contextLimitDesc'),
-    );
-    this.createTextField(
-      limitsGridEl,
-      t('settings.model.visualEditor.outputLimit'),
-      model.output,
-      (value) => {
+      placeholder: '200000',
+      description: t('settings.model.visualEditor.contextLimitDesc'),
+    });
+    this.createTextField(limitsGridEl, {
+      label: t('settings.model.visualEditor.outputLimit'),
+      value: model.output,
+      onChange: (value) => {
         model.output = value;
       },
-      '65536',
-      t('settings.model.visualEditor.outputLimitDesc'),
-    );
+      placeholder: '65536',
+      description: t('settings.model.visualEditor.outputLimitDesc'),
+    });
 
-    this.renderKeyValueEditor(
-      detailsEl,
-      t('settings.model.visualEditor.modelOptionsTitle'),
-      t('settings.model.visualEditor.modelOptionsDesc'),
-      model.options,
-      () => {
-        model.options.push(this.createKeyValueState());
+    this.renderModelCollectionEditor(detailsEl, model, 'options', {
+      title: t('settings.model.visualEditor.modelOptionsTitle'),
+      description: t('settings.model.visualEditor.modelOptionsDesc'),
+      emptyState: t('settings.model.visualEditor.modelOptionsEmpty'),
+      keyPlaceholder: t('settings.model.visualEditor.modelOptionsKeyPlaceholder'),
+      valuePlaceholder: t('settings.model.visualEditor.modelOptionsValuePlaceholder'),
+    });
+
+    this.renderModelCollectionEditor(detailsEl, model, 'variants', {
+      title: t('settings.model.visualEditor.modelVariantsTitle'),
+      description: t('settings.model.visualEditor.modelVariantsDesc'),
+      emptyState: t('settings.model.visualEditor.modelVariantsEmpty'),
+      keyPlaceholder: t('settings.model.visualEditor.modelVariantsKeyPlaceholder'),
+      valuePlaceholder: t('settings.model.visualEditor.modelVariantsValuePlaceholder'),
+    });
+
+    this.renderModelCollectionEditor(detailsEl, model, 'extraFields', {
+      title: t('settings.model.visualEditor.modelExtraFieldsTitle'),
+      description: t('settings.model.visualEditor.modelExtraFieldsDesc'),
+      emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
+      keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
+      valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
+    });
+  }
+
+  private renderModelCollectionEditor(
+    containerEl: HTMLElement,
+    model: ModelFormState,
+    field: ModelKeyValueCollectionKey,
+    {
+      title,
+      description,
+      emptyState,
+      keyPlaceholder,
+      valuePlaceholder,
+    }: Pick<KeyValueEditorConfig, 'title' | 'description' | 'emptyState' | 'keyPlaceholder' | 'valuePlaceholder'>,
+  ): void {
+    this.renderKeyValueEditor(containerEl, {
+      title,
+      description,
+      values: model[field],
+      onAdd: () => {
+        model[field].push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
-        model.options = model.options.filter((entry) => entry.uid !== uid);
+      onRemove: (uid) => {
+        model[field] = model[field].filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
-        const target = model.options.find((entry) => entry.uid === uid);
+      onKeyChange: (uid, value) => {
+        const target = model[field].find((entry) => entry.uid === uid);
         if (!target) {
           return;
         }
         target.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
-        const target = model.options.find((entry) => entry.uid === uid);
+      onValueChange: (uid, value) => {
+        const target = model[field].find((entry) => entry.uid === uid);
         if (!target) {
           return;
         }
         target.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        emptyState: t('settings.model.visualEditor.modelOptionsEmpty'),
-        keyPlaceholder: t('settings.model.visualEditor.modelOptionsKeyPlaceholder'),
-        valuePlaceholder: t('settings.model.visualEditor.modelOptionsValuePlaceholder'),
-      },
-    );
-
-    this.renderKeyValueEditor(
-      detailsEl,
-      t('settings.model.visualEditor.modelVariantsTitle'),
-      t('settings.model.visualEditor.modelVariantsDesc'),
-      model.variants,
-      () => {
-        model.variants.push(this.createKeyValueState());
-        this.updatePreview();
-        this.render();
-      },
-      (uid) => {
-        model.variants = model.variants.filter((entry) => entry.uid !== uid);
-        this.updatePreview();
-        this.render();
-      },
-      (uid, value) => {
-        const target = model.variants.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.key = value;
-        this.updatePreview();
-      },
-      (uid, value) => {
-        const target = model.variants.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.value = value;
-        this.updatePreview();
-      },
-      false,
-      {
-        emptyState: t('settings.model.visualEditor.modelVariantsEmpty'),
-        keyPlaceholder: t('settings.model.visualEditor.modelVariantsKeyPlaceholder'),
-        valuePlaceholder: t('settings.model.visualEditor.modelVariantsValuePlaceholder'),
-      },
-    );
-
-    this.renderKeyValueEditor(
-      detailsEl,
-      t('settings.model.visualEditor.modelExtraFieldsTitle'),
-      t('settings.model.visualEditor.modelExtraFieldsDesc'),
-      model.extraFields,
-      () => {
-        model.extraFields.push(this.createKeyValueState());
-        this.updatePreview();
-        this.render();
-      },
-      (uid) => {
-        model.extraFields = model.extraFields.filter((entry) => entry.uid !== uid);
-        this.updatePreview();
-        this.render();
-      },
-      (uid, value) => {
-        const target = model.extraFields.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.key = value;
-        this.updatePreview();
-      },
-      (uid, value) => {
-        const target = model.extraFields.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.value = value;
-        this.updatePreview();
-      },
-      false,
-      {
-        emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
-        keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
-        valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
-      },
-    );
+      emptyState,
+      keyPlaceholder,
+      valuePlaceholder,
+    });
   }
 
   private renderKeyValueEditor(
     containerEl: HTMLElement,
-    title: string,
-    description: string,
-    values: KeyValueFieldState[],
-    onAdd: () => void,
-    onRemove: (uid: string) => void,
-    onKeyChange: (uid: string, value: string) => void,
-    onValueChange: (uid: string, value: string) => void,
-    showColumnHeaders = false,
-    options: {
-      stackedLabels?: boolean;
-      iconRemoveButton?: boolean;
-      emptyState?: string;
-      keyPlaceholder?: string;
-      valuePlaceholder?: string;
-    } = {},
+    {
+      title,
+      description,
+      values,
+      onAdd,
+      onRemove,
+      onKeyChange,
+      onValueChange,
+      showColumnHeaders = false,
+      stackedLabels = false,
+      iconRemoveButton = true,
+      emptyState,
+      keyPlaceholder,
+      valuePlaceholder,
+    }: KeyValueEditorConfig,
   ): void {
-    const useIconRemoveButton = options.iconRemoveButton ?? true;
     const sectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-subsection' });
     const headerEl = this.createSubsectionHeader(sectionEl, title, description);
     const addButton = headerEl.createEl('button', {
@@ -1145,7 +1196,7 @@ export class ModelConfigModal extends Modal {
     if (values.length === 0) {
       sectionEl.createDiv({
         cls: 'opencodian-model-workspace-empty small',
-        text: options.emptyState ?? t('settings.model.visualEditor.noExtraFields'),
+        text: emptyState ?? t('settings.model.visualEditor.noExtraFields'),
       });
       return;
     }
@@ -1159,12 +1210,12 @@ export class ModelConfigModal extends Modal {
     }
     for (const field of values) {
       const rowEl = listEl.createDiv({
-        cls: `opencodian-model-workspace-keyvalue-row${options.stackedLabels ? ' is-stacked-labels' : ''}`,
+        cls: `opencodian-model-workspace-keyvalue-row${stackedLabels ? ' is-stacked-labels' : ''}`,
       });
-      const keyFieldEl = options.stackedLabels
+      const keyFieldEl = stackedLabels
         ? rowEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-cell' })
         : rowEl;
-      if (options.stackedLabels) {
+      if (stackedLabels) {
         keyFieldEl.createDiv({
           cls: 'opencodian-model-workspace-keyvalue-cell-label',
           text: t('settings.model.visualEditor.fieldKeyLabel'),
@@ -1174,7 +1225,7 @@ export class ModelConfigModal extends Modal {
         cls: 'opencodian-model-workspace-keyvalue-input',
         attr: {
           type: 'text',
-          placeholder: options.keyPlaceholder ?? t('settings.model.visualEditor.fieldKeyPlaceholder'),
+          placeholder: keyPlaceholder ?? t('settings.model.visualEditor.fieldKeyPlaceholder'),
         },
       });
       this.bindEditableControl(keyInput);
@@ -1182,10 +1233,10 @@ export class ModelConfigModal extends Modal {
       keyInput.addEventListener('input', () => {
         onKeyChange(field.uid, keyInput.value);
       });
-      const valueFieldEl = options.stackedLabels
+      const valueFieldEl = stackedLabels
         ? rowEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-cell' })
         : rowEl;
-      if (options.stackedLabels) {
+      if (stackedLabels) {
         valueFieldEl.createDiv({
           cls: 'opencodian-model-workspace-keyvalue-cell-label',
           text: t('settings.model.visualEditor.fieldValueLabel'),
@@ -1195,7 +1246,7 @@ export class ModelConfigModal extends Modal {
         cls: 'opencodian-model-workspace-keyvalue-textarea',
         attr: {
           rows: '2',
-          placeholder: options.valuePlaceholder ?? t('settings.model.visualEditor.fieldValuePlaceholder'),
+          placeholder: valuePlaceholder ?? t('settings.model.visualEditor.fieldValuePlaceholder'),
         },
       });
       this.bindEditableControl(valueInput);
@@ -1204,14 +1255,14 @@ export class ModelConfigModal extends Modal {
         onValueChange(field.uid, valueInput.value);
       });
       const removeButton = rowEl.createEl('button', {
-        cls: `opencodian-model-workspace-danger-button${useIconRemoveButton ? ' is-icon-only' : ''}`,
-        text: useIconRemoveButton ? '' : t('settings.model.visualEditor.removeField'),
-        attr: useIconRemoveButton
+        cls: `opencodian-model-workspace-danger-button${iconRemoveButton ? ' is-icon-only' : ''}`,
+        text: iconRemoveButton ? '' : t('settings.model.visualEditor.removeField'),
+        attr: iconRemoveButton
           ? { 'aria-label': t('settings.model.visualEditor.removeField') }
           : undefined,
       });
       removeButton.type = 'button';
-      if (useIconRemoveButton) {
+      if (iconRemoveButton) {
         setIcon(removeButton, 'trash-2');
       }
       removeButton.addEventListener('click', () => onRemove(field.uid));
@@ -1220,13 +1271,14 @@ export class ModelConfigModal extends Modal {
 
   private createTextField(
     containerEl: HTMLElement,
-    label: string,
-    value: string,
-    onChange: (value: string) => void,
-    placeholder = '',
-    description?: string,
-    _rerenderOnBlur = false,
-    secret = false,
+    {
+      label,
+      value,
+      onChange,
+      placeholder = '',
+      description,
+      secret = false,
+    }: TextFieldConfig,
   ): HTMLElement {
     const fieldEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-field' });
     fieldEl.createEl('label', { text: label });
@@ -1263,11 +1315,13 @@ export class ModelConfigModal extends Modal {
 
   private createSelectField(
     containerEl: HTMLElement,
-    label: string,
-    value: string,
-    options: Array<{ value: string; label: string }>,
-    onChange: (value: string) => void,
-    description?: string,
+    {
+      label,
+      value,
+      options,
+      onChange,
+      description,
+    }: SelectFieldConfig,
   ): HTMLElement {
     const fieldEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-field' });
     fieldEl.createEl('label', { text: label });
@@ -1667,41 +1721,29 @@ export class ModelConfigModal extends Modal {
     }
 
     try {
-      if (this.isAddProviderFlow()) {
-        await this.saveAddProvider();
-        return;
-      }
-
-      const modelConfig = this.toModelConfig();
-      this.plugin.settings.disabledModelRefs = this.buildNextDisabledModelRefs();
-      await this.plugin.modelConfigService.writeLocalModelConfig(modelConfig);
-      await this.maybeRestartServer();
-      await this.plugin.saveSettings({
-        syncConfig: false,
-        reloadModels: true,
-        applyUi: true,
-      });
-      this.initialDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
-      this.localConfigAtOpen = modelConfig;
-      this.initialSnapshot = this.createSnapshot();
-      try {
-        await this.openOptions.onSaved?.();
-      } catch (error) {
-        logger.error('Failed to run model workspace save callback:', error);
-      }
-      new Notice(t('settings.model.visualEditor.saveSuccess'));
-      this.close();
+      const savePlan = this.buildSavePlan();
+      await this.applySavePlan(savePlan);
+      await this.finalizeSavePlan(savePlan);
     } catch (error) {
-      logger.error('Failed to save visual model config:', error);
-      new Notice(`${t('settings.model.visualEditor.saveFailed')}: ${(error as Error).message}`);
+      this.handleSaveFailure(error);
     }
   }
 
-  private async saveAddProvider(): Promise<void> {
-    if (!this.plugin.modelConfigService) {
-      return;
-    }
+  private buildSavePlan(): ModelConfigSavePlan {
+    return this.isAddProviderFlow()
+      ? this.buildAddProviderSavePlan()
+      : this.buildWorkspaceSavePlan();
+  }
 
+  private buildWorkspaceSavePlan(): ModelConfigSavePlan {
+    return {
+      nextConfig: this.toModelConfig(),
+      nextDisabledModelRefs: this.buildNextDisabledModelRefs(),
+      restartServerAfterWrite: true,
+    };
+  }
+
+  private buildAddProviderSavePlan(): ModelConfigSavePlan {
     const provider = this.getSelectedProvider();
     if (!provider) {
       throw new Error(t('settings.model.visualEditor.noProviderSelected'));
@@ -1726,33 +1768,55 @@ export class ModelConfigModal extends Modal {
     parsedConfig.name = providerName;
 
     const availabilitySubset = this.buildAvailabilitySubset();
-    const nextConfig: OpencodeModelConfigSubset = {
-      ...this.localConfigAtOpen,
-      provider: {
-        ...(this.localConfigAtOpen.provider ?? {}),
-        [providerId]: parsedConfig,
+    return {
+      nextConfig: {
+        ...this.localConfigAtOpen,
+        provider: {
+          ...(this.localConfigAtOpen.provider ?? {}),
+          [providerId]: parsedConfig,
+        },
+        enabled_providers: availabilitySubset.enabled_providers,
+        disabled_providers: availabilitySubset.disabled_providers,
       },
-      enabled_providers: availabilitySubset.enabled_providers,
-      disabled_providers: availabilitySubset.disabled_providers,
+      nextDisabledModelRefs: [...this.initialDisabledModelRefs],
+      restartServerAfterWrite: false,
     };
+  }
 
-    this.plugin.settings.disabledModelRefs = [...this.initialDisabledModelRefs];
-    await this.plugin.modelConfigService.writeLocalModelConfig(nextConfig);
+  private async applySavePlan(savePlan: ModelConfigSavePlan): Promise<void> {
+    this.plugin.settings.disabledModelRefs = [...savePlan.nextDisabledModelRefs];
+    await this.plugin.modelConfigService!.writeLocalModelConfig(savePlan.nextConfig);
+    if (savePlan.restartServerAfterWrite) {
+      await this.maybeRestartServer();
+    }
     await this.plugin.saveSettings({
       syncConfig: false,
       reloadModels: true,
       applyUi: true,
     });
-    this.localConfigAtOpen = nextConfig;
+  }
+
+  private async finalizeSavePlan(savePlan: ModelConfigSavePlan): Promise<void> {
+    this.localConfigAtOpen = savePlan.nextConfig;
     this.initialDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
     this.initialSnapshot = this.createSnapshot();
+    await this.runOnSavedCallback();
+    new Notice(t('settings.model.visualEditor.saveSuccess'));
+    this.close();
+  }
+
+  private async runOnSavedCallback(): Promise<void> {
     try {
       await this.openOptions.onSaved?.();
     } catch (error) {
       logger.error('Failed to run model workspace save callback:', error);
     }
-    new Notice(t('settings.model.visualEditor.saveSuccess'));
-    this.close();
+  }
+
+  private handleSaveFailure(error: unknown): void {
+    logger.error('Failed to save visual model config:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    new Notice(`${t('settings.model.visualEditor.saveFailed')}: ${message}`);
   }
 
   private async maybeRestartServer(): Promise<void> {

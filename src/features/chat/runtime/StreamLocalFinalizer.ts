@@ -33,7 +33,12 @@ export class StreamLocalFinalizer {
   }
 
   private buildOutcome(): LocalStreamOutcome {
-    return buildLocalStreamOutcome(this.options);
+    return buildLocalStreamOutcome({
+      preparedSend: this.options.preparedSend,
+      runtime: this.options.runtime,
+      streamController: this.options.streamController,
+      routedStream: this.options.routedStream,
+    });
   }
 
   private logFinalizationEntry(outcome: LocalStreamOutcome): void {

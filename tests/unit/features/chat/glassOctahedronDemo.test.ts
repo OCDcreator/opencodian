@@ -220,49 +220,50 @@ function getLastRenderPose<T>(): T {
   return mockRender.mock.calls[mockRender.mock.calls.length - 1]?.[0] as T;
 }
 
-describe('OpenCodianView glass octahedron demo', () => {
-  let activeView: GlassOctahedronViewHarness | null = null;
+let activeView: GlassOctahedronViewHarness | null = null;
 
-  beforeEach(() => {
-    document.body.innerHTML = '';
-    mockCreateRenderer.mockClear();
-    mockDestroy.mockClear();
-    mockRender.mockReset();
-    mockRender.mockReturnValue(createProjection());
-    mockDetectBackdropSupport.mockReset();
-    mockDetectBackdropSupport.mockReturnValue({
-      basic: true,
-      url: true,
-    });
-    mockBuildBackdropFilterValue.mockClear();
-    mockBuildLightBackdropFilterValue.mockClear();
-    mockRenderDisplacementSnapshot.mockReset();
-    mockRenderDisplacementSnapshot.mockReturnValue({
-      dataUrl: 'data:image/png;base64,glass-octahedron',
-      filterScale: 22,
-    });
-    jest
-      .spyOn(HTMLCanvasElement.prototype, 'getContext')
-      .mockReturnValue(createCanvasContextMock());
-    jest
-      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/png;base64,glass-octahedron');
+beforeEach(() => {
+  document.body.innerHTML = '';
+  mockCreateRenderer.mockClear();
+  mockDestroy.mockClear();
+  mockRender.mockReset();
+  mockRender.mockReturnValue(createProjection());
+  mockDetectBackdropSupport.mockReset();
+  mockDetectBackdropSupport.mockReturnValue({
+    basic: true,
+    url: true,
   });
-
-  afterEach(async () => {
-    if (
-      activeView
-      && document.body.querySelector(
-        '[data-opencodian-glass-octahedron-demo-role="overlay"]',
-      )
-    ) {
-      await activeView.toggleGlassOctahedron();
-    }
-
-    activeView = null;
-    jest.useRealTimers();
-    jest.restoreAllMocks();
+  mockBuildBackdropFilterValue.mockClear();
+  mockBuildLightBackdropFilterValue.mockClear();
+  mockRenderDisplacementSnapshot.mockReset();
+  mockRenderDisplacementSnapshot.mockReturnValue({
+    dataUrl: 'data:image/png;base64,glass-octahedron',
+    filterScale: 22,
   });
+  jest
+    .spyOn(HTMLCanvasElement.prototype, 'getContext')
+    .mockReturnValue(createCanvasContextMock());
+  jest
+    .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+    .mockReturnValue('data:image/png;base64,glass-octahedron');
+});
+
+afterEach(async () => {
+  if (
+    activeView
+    && document.body.querySelector(
+      '[data-opencodian-glass-octahedron-demo-role="overlay"]',
+    )
+  ) {
+    await activeView.toggleGlassOctahedron();
+  }
+
+  activeView = null;
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+});
+
+describe('OpenCodianView glass octahedron mounting and fallback', () => {
 
   it('mounts the floating octahedron in messages shell, keeps composer geometry untouched, and applies polygon refraction', async () => {
     const originalRequestAnimationFrame = window.requestAnimationFrame;
@@ -426,6 +427,9 @@ describe('OpenCodianView glass octahedron demo', () => {
     }
   });
 
+});
+
+describe('OpenCodianView glass octahedron motion', () => {
   it('enters inertial rebound on pointer release and settles back inside the chat bounds', async () => {
     const originalRequestAnimationFrame = window.requestAnimationFrame;
     const originalCancelAnimationFrame = window.cancelAnimationFrame;
@@ -603,6 +607,9 @@ describe('OpenCodianView glass octahedron demo', () => {
     }
   });
 
+});
+
+describe('OpenCodianView glass octahedron idle lifecycle', () => {
   it('renders low-frequency idle breathing and freezes completely after deep idle timeout', async () => {
     jest.useFakeTimers();
     const originalRequestAnimationFrame = window.requestAnimationFrame;

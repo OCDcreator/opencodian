@@ -4,14 +4,14 @@ import type { PreparedMessageSend } from '../services/MessageSendPreparationServ
 import { mapStreamingContentBlocksToMessageContentBlocks } from './sendPipelineContent';
 import type {
   LocalStreamOutcome,
-  SendPipelineHost,
+  LocalStreamPersistenceHost,
   SendPipelineTabRuntime,
 } from './SendPipelineTypes';
 
 const logger = createLogger('LocalStreamMessagePersistence');
 
 export async function persistLocalStreamOutcome(options: {
-  host: SendPipelineHost;
+  host: LocalStreamPersistenceHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;
   outcome: LocalStreamOutcome;
@@ -86,7 +86,7 @@ export async function persistLocalStreamOutcome(options: {
 
 function appendNoticeMessage(options: {
   conversation: PreparedMessageSend['conversation'];
-  host: SendPipelineHost;
+  host: LocalStreamPersistenceHost;
   message: ChatMessage;
   logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
   stage: string;
@@ -112,7 +112,7 @@ function writeShellDataset(messageEl: HTMLElement | null, message: ChatMessage):
 }
 
 function logInterruptedAssistantPersistence(
-  host: SendPipelineHost,
+  host: LocalStreamPersistenceHost,
   preparedSend: PreparedMessageSend,
   message: ChatMessage,
 ): void {
@@ -128,7 +128,7 @@ function logInterruptedAssistantPersistence(
 }
 
 function logInterruptedNoticePersistence(
-  host: SendPipelineHost,
+  host: LocalStreamPersistenceHost,
   preparedSend: PreparedMessageSend,
   message: ChatMessage,
 ): void {

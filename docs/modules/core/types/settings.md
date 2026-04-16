@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_SETTINGS`，以及一组负责清洗历史配置和运行时输入的 `normalize*()` 辅助函数。它既是设置 UI 的数据底座，也是插件启动时的迁移和兜底入口。
+OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_SETTINGS`，以及一组负责清洗历史配置和运行时输入的 `normalize*()` 辅助函数。它是设置 UI 与启动 bootstrap 的数据底座；具体的启动期 snapshot merge / migration orchestration 已收束到 `src/core/types/settingsLoadNormalization.ts`。
 
 源码约 1396 行，是项目最大的类型定义文件。
 

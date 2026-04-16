@@ -1,6 +1,4 @@
-import type { App } from 'obsidian';
-
-import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
+import { SettingsSectionCoordinator } from '../../../../src/features/settings/SettingsSectionCoordinator';
 import { setDebugLoggingEnabled } from '../../../../src/shared';
 
 class MutationObserverMock {
@@ -54,11 +52,34 @@ function installClampedScrollState(element: HTMLElement, options: { clientHeight
   };
 }
 
-describe('OpenCodianSettingTab scroll restore logging', () => {
-  const originalMutationObserver = globalThis.MutationObserver;
-  const originalRequestAnimationFrame = window.requestAnimationFrame;
-  const originalCancelAnimationFrame = window.cancelAnimationFrame;
+const originalMutationObserver = globalThis.MutationObserver;
+const originalRequestAnimationFrame = window.requestAnimationFrame;
+const originalCancelAnimationFrame = window.cancelAnimationFrame;
 
+function createCoordinator(savedScrollTop = 0) {
+  const state = {
+    settingsPanelScrollTop: savedScrollTop,
+  };
+  const containerEl = document.createElement('div');
+  const scheduleScrollStateSave = jest.fn();
+  const coordinator = new SettingsSectionCoordinator({
+    containerEl,
+    getSavedScrollTop: () => state.settingsPanelScrollTop,
+    setSavedScrollTop: (scrollTop) => {
+      state.settingsPanelScrollTop = scrollTop;
+    },
+    scheduleScrollStateSave,
+  });
+
+  return {
+    coordinator,
+    containerEl,
+    scheduleScrollStateSave,
+    state,
+  };
+}
+
+function registerScrollRestoreSuiteHooks() {
   beforeEach(() => {
     jest.useFakeTimers();
     MutationObserverMock.reset();
@@ -101,16 +122,14 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     window.cancelAnimationFrame = originalCancelAnimationFrame;
     document.body.innerHTML = '';
   });
+}
+
+describe('SettingsSectionCoordinator scroll restore logging', () => {
+  registerScrollRestoreSuiteHooks();
 
   it('logs a single restore success and clears pending work after mutation succeeds', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
     const scrollState = installClampedScrollState(scrollContainer, {
       clientHeight: 200,
@@ -118,13 +137,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
       settingsPanelRestoreObserver: MutationObserver | null;
       settingsPanelRestoreTimeoutIds: number[];
-    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+    }).restoreScrollPosition(400, scrollContainer);
 
     jest.advanceTimersByTime(1);
     expect(logSpy).not.toHaveBeenCalled();
@@ -150,13 +169,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreObserver: MutationObserver | null;
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreObserver,
     ).toBeNull();
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreTimeoutIds,
     ).toHaveLength(0);
@@ -168,13 +187,7 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
   it('skips restore observers and timers when the requested scroll position is already at the top', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
 
     installClampedScrollState(scrollContainer, {
@@ -184,13 +197,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     scrollContainer.scrollTop = 160;
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
       settingsPanelRestoreObserver: MutationObserver | null;
       settingsPanelRestoreTimeoutIds: number[];
-    }).restoreSettingsPanelScrollPosition(0, scrollContainer);
+    }).restoreScrollPosition(0, scrollContainer);
 
     expect(scrollContainer.scrollTop).toBe(0);
     expect(logSpy).toHaveBeenCalledTimes(1);
@@ -202,13 +215,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
     expect(MutationObserverMock.instances).toHaveLength(0);
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreObserver: MutationObserver | null;
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreObserver,
     ).toBeNull();
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreTimeoutIds,
     ).toHaveLength(0);
@@ -217,13 +230,7 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
   it('skips deferred DOM tracking when the initial restore reaches the target immediately', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
 
     installClampedScrollState(scrollContainer, {
@@ -232,25 +239,25 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
       settingsPanelRestoreObserver: MutationObserver | null;
       settingsPanelRestoreTimeoutIds: number[];
-    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+    }).restoreScrollPosition(400, scrollContainer);
 
     jest.advanceTimersByTime(1);
     expect(scrollContainer.scrollTop).toBe(400);
     expect(MutationObserverMock.instances).toHaveLength(0);
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreObserver: MutationObserver | null;
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreObserver,
     ).toBeNull();
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreTimeoutIds,
     ).toHaveLength(0);
@@ -268,13 +275,7 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
   it('reapplies the target scroll position when the panel drifts before settling', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
 
     installClampedScrollState(scrollContainer, {
@@ -283,11 +284,11 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
-    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    }).restoreScrollPosition(400, scrollContainer);
 
     jest.advanceTimersByTime(1);
     expect(scrollContainer.scrollTop).toBe(400);
@@ -312,276 +313,40 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
   });
 });
 
-describe('OpenCodianSettingTab model catalog views', () => {
-  function createTab(disabledModelRefs: string[] = []): OpenCodianSettingTab {
-    const plugin = {
-      settings: {
-        modelAvailabilitySectionOpen: true,
-        modelToolsSectionOpen: true,
-        disabledModelRefs,
-      },
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+describe('SettingsSectionCoordinator quick nav', () => {
+  it('builds quick-nav buttons from registered section headings', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    document.body.appendChild(containerEl);
 
-    return new OpenCodianSettingTab({} as App, plugin);
-  }
-
-  it('keeps runtime providers visible in the server catalog even when they are currently disabled', () => {
-    const tab = createTab();
-    const catalogs = {
-      local: { providers: [], defaults: {} },
-      server: {
-        providers: [
-          {
-            id: 'openai',
-            name: 'OpenAI',
-            models: [{
-              id: 'gpt-4.1',
-              name: 'GPT-4.1',
-              source: 'server' as const,
-              existsInLocal: false,
-              existsInServer: true,
-            }],
-            source: 'server' as const,
-            existsInLocal: false,
-            existsInServer: true,
-          },
-          {
-            id: 'alibaba',
-            name: 'Alibaba',
-            models: [{
-              id: 'qwen-max',
-              name: 'Qwen Max',
-              source: 'server' as const,
-              existsInLocal: false,
-              existsInServer: true,
-            }],
-            source: 'server' as const,
-            existsInLocal: false,
-            existsInServer: true,
-          },
-        ],
-        defaults: {},
-      },
-      baseEffective: { providers: [], defaults: {} },
-      effective: { providers: [], defaults: {} },
-      currentEnabledProviderIds: ['openai'],
-      serverConfig: { disabled_providers: ['alibaba'] },
-      effectiveProviderConfig: { disabled_providers: ['deepseek'] },
-    };
-
-    const serverCatalog = (tab as unknown as {
-      getDisplayCatalogForMode: (mode: 'server', catalogs: typeof catalogs, localModelConfig: { disabled_providers: string[] }) => {
-        providers: Array<{ id: string; models: unknown[]; source: string }>;
-      };
-    }).getDisplayCatalogForMode('server', catalogs, { disabled_providers: ['deepseek'] });
-
-    expect(serverCatalog.providers.map((provider) => provider.id)).toEqual(['openai', 'alibaba']);
-  });
-
-  it('shows disabled models from merged local and server catalogs in the disabled view', () => {
-    const tab = createTab(['local-only/alpha', 'openai/gpt-4.1']);
-    const catalogs = {
-      local: {
-        providers: [{
-          id: 'local-only',
-          name: 'Local Only',
-          models: [{
-            id: 'alpha',
-            name: 'Alpha',
-            source: 'local' as const,
-            existsInLocal: true,
-            existsInServer: false,
-          }],
-          source: 'local' as const,
-          existsInLocal: true,
-          existsInServer: false,
-        }],
-        defaults: {},
-      },
-      server: {
-        providers: [{
-          id: 'openai',
-          name: 'OpenAI',
-          models: [{
-            id: 'gpt-4.1',
-            name: 'GPT-4.1',
-            source: 'server' as const,
-            existsInLocal: false,
-            existsInServer: true,
-          }],
-          source: 'server' as const,
-          existsInLocal: false,
-          existsInServer: true,
-        }],
-        defaults: {},
-      },
-      baseEffective: { providers: [], defaults: {} },
-      effective: { providers: [], defaults: {} },
-      currentEnabledProviderIds: [],
-      serverConfig: {},
-      effectiveProviderConfig: { disabled_providers: ['deepseek'] },
-    };
-
-    const disabledCatalog = (tab as unknown as {
-      getDisplayCatalogForMode: (
-        mode: 'disabled',
-        catalogs: typeof catalogs,
-        localModelConfig: { disabled_providers: string[] },
-      ) => {
-        providers: Array<{ id: string; models: Array<{ id: string }> }>;
-      };
-    }).getDisplayCatalogForMode('disabled', catalogs, { disabled_providers: ['deepseek'] });
-
-    expect(disabledCatalog.providers.map((provider) => provider.id)).toEqual(['deepseek', 'local-only', 'openai']);
-    expect(disabledCatalog.providers.find((provider) => provider.id === 'deepseek')?.models).toEqual([]);
-    expect(disabledCatalog.providers.find((provider) => provider.id === 'local-only')?.models.map((model) => model.id)).toEqual(['alpha']);
-    expect(disabledCatalog.providers.find((provider) => provider.id === 'openai')?.models.map((model) => model.id)).toEqual(['gpt-4.1']);
-  });
-
-  it('removes re-enabled providers from the disabled view once they are back in currentEnabledProviderIds', () => {
-    const tab = createTab();
-    const catalogs = {
-      local: { providers: [], defaults: {} },
-      server: {
-        providers: [
-          {
-            id: 'alibaba',
-            name: 'Alibaba',
-            models: [{
-              id: 'qwen-max',
-              name: 'Qwen Max',
-              source: 'server' as const,
-              existsInLocal: false,
-              existsInServer: true,
-            }],
-            source: 'server' as const,
-            existsInLocal: false,
-            existsInServer: true,
-          },
-          {
-            id: 'alibaba-cn',
-            name: 'Alibaba CN',
-            models: [{
-              id: 'qwen-plus',
-              name: 'Qwen Plus',
-              source: 'server' as const,
-              existsInLocal: false,
-              existsInServer: true,
-            }],
-            source: 'server' as const,
-            existsInLocal: false,
-            existsInServer: true,
-          },
-        ],
-        defaults: {},
-      },
-      baseEffective: { providers: [], defaults: {} },
-      effective: { providers: [], defaults: {} },
-      currentEnabledProviderIds: ['alibaba'],
-      serverConfig: { disabled_providers: ['alibaba', 'alibaba-cn'] },
-      effectiveProviderConfig: { disabled_providers: ['alibaba-cn'] },
-    };
-
-    const disabledCatalog = (tab as unknown as {
-      getDisplayCatalogForMode: (
-        mode: 'disabled',
-        catalogs: typeof catalogs,
-        localModelConfig: { disabled_providers: string[] },
-      ) => {
-        providers: Array<{ id: string; disabledScopes?: Array<'global' | 'project'> }>;
-      };
-    }).getDisplayCatalogForMode('disabled', catalogs, { disabled_providers: ['alibaba-cn'] });
-
-    expect(disabledCatalog.providers.map((provider) => provider.id)).toEqual(['alibaba-cn']);
-    expect(disabledCatalog.providers[0].disabledScopes).toEqual(['project']);
-  });
-
-  it('does not keep inherited disabled placeholders after local config clears them', () => {
-    const tab = createTab();
-    const catalogs = {
-      local: { providers: [], defaults: {} },
-      server: { providers: [], defaults: {} },
-      baseEffective: { providers: [], defaults: {} },
-      effective: { providers: [], defaults: {} },
-      currentEnabledProviderIds: [],
-      serverConfig: { disabled_providers: ['alibaba', 'alibaba-cn'] },
-      effectiveProviderConfig: { disabled_providers: [] },
-    };
-
-    const disabledCatalog = (tab as unknown as {
-      getDisplayCatalogForMode: (
-        mode: 'disabled',
-        catalogs: typeof catalogs,
-        localModelConfig: { disabled_providers: string[] },
-      ) => {
-        providers: Array<{ id: string }>;
-      };
-    }).getDisplayCatalogForMode('disabled', catalogs, { disabled_providers: [] });
-
-    expect(disabledCatalog.providers).toEqual([]);
-  });
-
-  it('prefers project-disabled over server-disabled when both apply', () => {
-    const tab = createTab();
-    const reason = (tab as unknown as {
-      getProviderPrimaryDisabledReason: (
-        provider: {
-          id: string;
-          disabledScopes?: Array<'global' | 'project'>;
-        },
-        localModelConfig: { disabled_providers: string[] },
-        providerEnabled: boolean,
-      ) => 'project' | 'server' | null;
-    }).getProviderPrimaryDisabledReason(
-      {
-        id: 'alibaba',
-        disabledScopes: ['global'],
-      },
-      { disabled_providers: ['alibaba'] },
-      false,
-    );
-
-    expect(reason).toBe('project');
-  });
-
-  it('treats server catalog providers as disabled when the global server config disabled them', () => {
-    const tab = createTab();
-    const statusClass = (tab as unknown as {
-      getProviderAvailabilityStatusClass: (
-        provider: {
-          id: string;
-          disabledScopes?: Array<'global' | 'project'>;
-        },
-        providerEnabled: boolean,
-        disabledCount: number,
-        mode: 'local' | 'server' | 'effective' | 'disabled',
-      ) => 'is-disabled' | 'is-partial' | 'is-available';
-    }).getProviderAvailabilityStatusClass(
-      {
-        id: 'alibaba',
-        disabledScopes: ['global'],
-      },
-      true,
-      0,
-      'server',
-    );
-
-    expect(statusClass).toBe('is-disabled');
-  });
-
-  it('treats a provider as disabled when it is absent from currentEnabledProviderIds', () => {
-    const tab = createTab();
-    const enabled = (tab as unknown as {
-      isProviderCurrentlyEnabled: (
-        providerId: string,
-        catalogs: {
-          currentEnabledProviderIds: string[];
-        },
-      ) => boolean;
-    }).isProviderCurrentlyEnabled('alibaba', {
-      currentEnabledProviderIds: ['deepseek'],
+    coordinator.beginDisplay('Settings');
+    const serverHeadingEl = coordinator.createSectionHeading(containerEl, {
+      title: 'Server',
+      tooltip: 'Server settings',
     });
+    const modelHeadingEl = coordinator.createSectionHeading(containerEl, {
+      title: 'Model',
+      tooltip: 'Model settings',
+    });
+    const serverScrollIntoView = jest.fn();
+    const modelScrollIntoView = jest.fn();
+    serverHeadingEl.scrollIntoView = serverScrollIntoView as typeof serverHeadingEl.scrollIntoView;
+    modelHeadingEl.scrollIntoView = modelScrollIntoView as typeof modelHeadingEl.scrollIntoView;
 
-    expect(enabled).toBe(false);
+    coordinator.finishDisplay();
+
+    const buttons = Array.from(
+      containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn'),
+    );
+    expect(buttons.map((button) => button.textContent)).toEqual(['Server', 'Model']);
+    expect(buttons[0]?.dataset.tooltipAlign).toBe('left');
+    expect(buttons[1]?.dataset.tooltipAlign).toBe('left');
+
+    buttons[1]?.click();
+
+    expect(serverScrollIntoView).not.toHaveBeenCalled();
+    expect(modelScrollIntoView).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'start',
+    });
   });
 });

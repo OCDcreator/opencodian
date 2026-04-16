@@ -26,7 +26,7 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 
 - metadata 优先使用服务端 `message_metadata`，没有时才回退到本地时间和 active model
 - 只有“中断、未完成、且没有真实 error”时才保留 interrupted state
-- 只有“没有 block 且有 error”时才构建 error notice
+- 只有“没有 block 且有 error”时才通过 `AssistantNoticeRenderer.buildStreamErrorNotice()` 构建 error notice
 - `shouldSyncFromServer` 继续复用 `MessageFinalizationService.shouldSyncAfterStream()`
 
 ## 下游消费者

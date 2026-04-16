@@ -108,16 +108,65 @@ interface ResolvedProviderIconAsset {
   sourceLabel: string;
 }
 
+interface ProviderIconEntryResolution {
+  defaultEntry: ProviderIconEntry | null;
+  editableEntries: ProviderIconEntry[];
+  effectiveEntries: ProviderIconEntry[];
+  requestedProviderId: string;
+  resolvedProviderId: string | null;
+  selectedEntry: ProviderIconEntry | null;
+  storageProviderId: string;
+}
+
+interface ProviderIconEntryPreviewMetadata {
+  fallbackUsed: boolean;
+  iconId: string | null;
+  iconUrl: string | null;
+  requestedVariant?: LobehubIconVariant;
+  resolvedFormat?: ProviderIconResolvedFormat;
+  resolvedVariant?: ResolvedLobehubVariant;
+  sourceLabel: string;
+}
+
+interface ProviderIconAssetCandidate {
+  cacheMimeType?: string;
+  cachePath: string | null;
+  continueOnLoadError?: boolean;
+  fallbackUsed: boolean;
+  iconId: string | null;
+  loadAsset?: () => Promise<LoadedIconAsset>;
+  previewResolvedFormat?: ProviderIconResolvedFormat;
+  previewUrl: string | null;
+  requestedVariant?: LobehubIconVariant;
+  resolvedFormat?: ProviderIconResolvedFormat;
+  resolvedVariant?: ResolvedLobehubVariant;
+  sourceLabel: string;
+}
+
 interface NormalizedCustomSource {
   type: 'url' | 'file';
   source: string;
   localPath?: string;
 }
 
+interface SelectBuiltinIconRequest {
+  providerId: string;
+  libraryId: BuiltinIconLibraryId;
+  iconId: string;
+  library: ProviderIconLibrary;
+  variant?: LobehubIconVariant;
+}
+
+interface LobehubCachePathOptions {
+  iconId: string;
+  requestedVariant: LobehubIconVariant;
+  resolvedVariant: ResolvedLobehubVariant;
+  format: ProviderIconResolvedFormat;
+  themeKey: 'light' | 'dark';
+}
+
 type ResolvedLobehubVariant = Exclude<LobehubIconVariant, 'auto' | 'combine'>;
 
-// CDN base URL for Lobehub icons
-const LOBEHUB_CDN_BASE = 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons';
 const ICON_CACHE_DIR = '.opencodian/provider-icons';
 const MAX_ICON_BYTES = 1024 * 1024;
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
@@ -167,7 +216,7 @@ export class ProviderIconService {
     library: ProviderIconLibrary = {},
     options: ResolveIconUrlOptions = {},
   ): Promise<string | null> {
-    const entry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    const entry = this.resolveProviderEntryResolution(providerId, library)?.selectedEntry ?? null;
     if (!entry) {
       if (loggedIconUrls.get(providerId) !== null) {
         logger.debug(`No icon found for: ${providerId}`);
@@ -295,25 +344,23 @@ export class ProviderIconService {
       });
   }
 
-  static selectBuiltinIcon(
-    providerId: string,
-    libraryId: BuiltinIconLibraryId,
-    iconId: string,
-    library: ProviderIconLibrary,
-    variant: LobehubIconVariant = 'auto',
-  ): ProviderIconLibrary {
-    const trimmedProviderId = providerId.trim();
-    if (!trimmedProviderId) {
-      return library;
-    }
-
+  static selectBuiltinIcon({
+    providerId,
+    libraryId,
+    iconId,
+    library,
+    variant = 'auto',
+  }: SelectBuiltinIconRequest): ProviderIconLibrary {
     const builtinDefinition = getBuiltinIcon(libraryId, iconId);
     if (!builtinDefinition) {
       return library;
     }
 
-    const resolvedProviderId = this.resolveLibraryProviderId(trimmedProviderId, library) ?? trimmedProviderId;
-    const existingEntries = this.getEditableEntriesForProvider(resolvedProviderId, library);
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
+      return library;
+    }
+
     const selectedEntry = this.createBuiltinEntry(
       libraryId,
       iconId,
@@ -321,16 +368,18 @@ export class ProviderIconService {
       libraryId === 'lobehub' ? variant : 'auto',
     );
 
-    const dedupedEntries = existingEntries.filter((entry) => !this.areEquivalentEntries(entry, selectedEntry));
+    const dedupedEntries = resolution.editableEntries.filter(
+      (entry) => !this.areEquivalentEntries(entry, selectedEntry),
+    );
     return this.updateProviderEntries(
-      resolvedProviderId,
+      resolution.storageProviderId,
       [selectedEntry, ...dedupedEntries],
       library,
     );
   }
 
   static getSelectedBuiltinSource(providerId: string, library: ProviderIconLibrary = {}): string | null {
-    const selectedEntry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    const selectedEntry = this.resolveProviderEntryResolution(providerId, library)?.selectedEntry ?? null;
     if (!selectedEntry) {
       return null;
     }
@@ -347,7 +396,7 @@ export class ProviderIconService {
   }
 
   static getSelectedBuiltinVariant(providerId: string, library: ProviderIconLibrary = {}): LobehubIconVariant {
-    const selectedEntry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    const selectedEntry = this.resolveProviderEntryResolution(providerId, library)?.selectedEntry ?? null;
     if (!selectedEntry) {
       return this.getActiveDefaultVariant();
     }
@@ -411,18 +460,14 @@ export class ProviderIconService {
     let nextLibrary = { ...library };
 
     for (const providerId of this.uniqueProviderIds(providerIds)) {
-      if (this.resolveLibraryProviderId(providerId, nextLibrary)) {
-        continue;
-      }
-
-      const defaultEntry = this.getDefaultEntry(providerId);
-      if (!defaultEntry) {
+      const resolution = this.resolveProviderEntryResolution(providerId, nextLibrary);
+      if (!resolution || resolution.resolvedProviderId || !resolution.defaultEntry) {
         continue;
       }
 
       nextLibrary = {
         ...nextLibrary,
-        [providerId]: [defaultEntry],
+        [resolution.storageProviderId]: [resolution.defaultEntry],
       };
     }
 
@@ -435,36 +480,23 @@ export class ProviderIconService {
     sourceInput: string,
     library: ProviderIconLibrary,
   ): Promise<ProviderIconLibrary> {
-    const normalizedProviderId = providerId.trim();
-    if (!normalizedProviderId) {
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
       throw new Error('Provider ID is required.');
     }
 
-    const storedProviderId = this.resolveLibraryProviderId(normalizedProviderId, library) ?? normalizedProviderId;
     const normalizedSource = this.normalizeCustomSource(sourceInput);
-    const existingEntries = this.getEffectiveEntries(storedProviderId, library);
+    const existingEntries = this.getEffectiveEntries(resolution.storageProviderId, library);
     if (existingEntries.some((entry) => entry.type !== 'mapped' && entry.source === normalizedSource.source)) {
       throw new Error('This icon source has already been added for the provider.');
     }
 
-    const asset = await this.loadCustomSourceAsset(normalizedSource);
-    const cacheFileName = this.buildCustomCacheFileName(normalizedProviderId, asset.mimeType);
-    const entry: ProviderIconEntry = {
-      id: this.createEntryId(),
-      type: normalizedSource.type,
-      source: normalizedSource.source,
-      mimeType: asset.mimeType,
-      cacheFileName,
-      addedAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    await this.writeCachedAsset(app, normalizePath(`${ICON_CACHE_DIR}/${cacheFileName}`), asset.data);
-    failedIconIds.delete(this.getEntryRuntimeKey(normalizedProviderId, entry));
+    const entry = await this.createCachedCustomEntry(app, resolution.requestedProviderId, normalizedSource);
+    failedIconIds.delete(this.getEntryRuntimeKey(resolution.requestedProviderId, entry));
 
     return {
       ...library,
-      [storedProviderId]: [...existingEntries, entry],
+      [resolution.storageProviderId]: [...existingEntries, entry],
     };
   }
 
@@ -487,11 +519,10 @@ export class ProviderIconService {
     entries: ProviderIconEntry[],
     library: ProviderIconLibrary,
   ): ProviderIconLibrary {
-    const requestedProviderId = providerId.trim();
-    if (!requestedProviderId) {
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
       return library;
     }
-    const normalizedProviderId = this.resolveLibraryProviderId(requestedProviderId, library) ?? requestedProviderId;
 
     const sanitizedEntries = entries.filter((entry, index, collection) =>
       Boolean(entry.id)
@@ -501,13 +532,13 @@ export class ProviderIconService {
 
     if (sanitizedEntries.length === 0) {
       const nextLibrary = { ...library };
-      delete nextLibrary[normalizedProviderId];
+      delete nextLibrary[resolution.storageProviderId];
       return nextLibrary;
     }
 
     return {
       ...library,
-      [normalizedProviderId]: sanitizedEntries,
+      [resolution.storageProviderId]: sanitizedEntries,
     };
   }
 
@@ -516,8 +547,12 @@ export class ProviderIconService {
     entryId: string,
     library: ProviderIconLibrary,
   ): ProviderIconLibrary {
-    const resolvedProviderId = this.resolveLibraryProviderId(providerId, library) ?? providerId;
-    const nextEntries = (library[resolvedProviderId] ?? []).filter((entry) => entry.id !== entryId);
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
+      return library;
+    }
+
+    const nextEntries = (library[resolution.storageProviderId] ?? []).filter((entry) => entry.id !== entryId);
     return this.updateProviderEntries(providerId, nextEntries, library);
   }
 
@@ -571,8 +606,8 @@ export class ProviderIconService {
     let failed = 0;
 
     for (const providerId of uniqueProviderIds) {
-      const entries = this.getEffectiveEntries(providerId, library);
-      if (entries.length === 0) {
+      const resolution = this.resolveProviderEntryResolution(providerId, library);
+      if (!resolution?.selectedEntry) {
         continue;
       }
 
@@ -629,29 +664,24 @@ export class ProviderIconService {
     library: ProviderIconLibrary,
     isCurrentProvider: boolean,
   ): Promise<ProviderIconCacheEntry[]> {
-    const entries = this.getEffectiveEntries(providerId, library);
+    const entries = this.resolveProviderEntryResolution(providerId, library)?.effectiveEntries ?? [];
     return Promise.all(entries.map(async (entry, index) => {
       const asset = await this.resolveEntryAsset(app, providerId, entry, { cacheOnly: true });
+      const preview = this.resolveEntryPreviewMetadata(app, entry, asset);
       return {
         providerId,
         entry,
-        iconId: asset?.iconId ?? (
-          entry.type === 'mapped'
-            ? entry.source
-            : entry.type === 'builtin'
-              ? (parseBuiltinSource(entry.source)?.iconId ?? null)
-              : null
-        ),
+        iconId: preview.iconId,
         cached: asset?.cached ?? false,
         cachePath: asset?.cachePath ?? this.getCachePathForEntry(entry),
-        iconUrl: asset?.iconUrl ?? this.getPreviewUrlForEntry(app, entry),
+        iconUrl: preview.iconUrl,
         isCurrentProvider,
         isSelected: index === 0,
-        requestedVariant: asset?.requestedVariant ?? entry.variant,
-        resolvedVariant: asset?.resolvedVariant,
-        resolvedFormat: asset?.resolvedFormat,
-        fallbackUsed: asset?.fallbackUsed ?? false,
-        sourceLabel: asset?.sourceLabel ?? this.getEntrySourceLabel(entry),
+        requestedVariant: preview.requestedVariant,
+        resolvedVariant: preview.resolvedVariant,
+        resolvedFormat: preview.resolvedFormat,
+        fallbackUsed: preview.fallbackUsed,
+        sourceLabel: preview.sourceLabel,
       } satisfies ProviderIconCacheEntry;
     }));
   }
@@ -660,22 +690,7 @@ export class ProviderIconService {
     providerId: string,
     library: ProviderIconLibrary,
   ): ProviderIconEntry[] {
-    const resolvedProviderId = this.resolveLibraryProviderId(providerId, library);
-    const savedEntries = resolvedProviderId ? (library[resolvedProviderId] ?? []) : [];
-    if (savedEntries.length === 0) {
-      const defaultEntry = this.getDefaultEntry(providerId);
-      return defaultEntry ? [defaultEntry] : [];
-    }
-
-    const defaultEntry = this.getDefaultEntry(providerId);
-    const hasEquivalentDefaultEntry = defaultEntry
-      ? savedEntries.some((entry) => this.areEquivalentEntries(entry, defaultEntry))
-      : false;
-    if (!defaultEntry || hasEquivalentDefaultEntry) {
-      return [...savedEntries];
-    }
-
-    return [...savedEntries, defaultEntry];
+    return this.resolveProviderEntryResolution(providerId, library)?.effectiveEntries ?? [];
   }
 
   private static getDefaultEntry(providerId: string): ProviderIconEntry | null {
@@ -753,10 +768,10 @@ export class ProviderIconService {
 
     try {
       const asset = entry.type === 'mapped' || this.isLobehubBuiltinEntry(entry)
-        ? await this.loadLobehubEntryAsset(app, providerId, entry, options.cacheOnly ?? false)
+        ? await this.loadLobehubEntryAsset(app, entry, options.cacheOnly ?? false)
         : entry.type === 'builtin'
           ? await this.loadBundledBuiltinEntryAsset(app, providerId, entry, options.cacheOnly ?? false)
-          : await this.loadCustomEntryAsset(app, providerId, entry, options.cacheOnly ?? false);
+          : await this.loadCustomEntryAsset(app, entry, options.cacheOnly ?? false);
 
       if (!asset?.iconUrl && !options.cacheOnly) {
         failedIconIds.add(runtimeKey);
@@ -775,11 +790,6 @@ export class ProviderIconService {
       }
       return null;
     }
-  }
-
-  private static async loadMappedAsset(iconId: string, providerId: string): Promise<LoadedIconAsset> {
-    const remoteUrl = `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
-    return this.loadRemotePreviewAsset(remoteUrl, `HTTP error while fetching ${providerId}`);
   }
 
   private static async loadRemotePreviewAsset(url: string, errorPrefix?: string): Promise<LoadedIconAsset> {
@@ -802,23 +812,6 @@ export class ProviderIconService {
       data: response.arrayBuffer,
       mimeType,
     };
-  }
-
-  private static async loadBuiltinAsset(
-    app: App,
-    source: string,
-    providerId: string,
-  ): Promise<LoadedIconAsset> {
-    const parsed = parseBuiltinSource(source);
-    if (!parsed) {
-      throw new Error(`Invalid builtin icon source for ${providerId}.`);
-    }
-
-    if (parsed.libraryId === 'lobehub') {
-      return this.loadMappedAsset(parsed.iconId, providerId);
-    }
-
-    return this.loadBundledOpencodeAsset(app, parsed.iconId, providerId);
   }
 
   private static async loadBundledOpencodeAsset(
@@ -888,7 +881,6 @@ export class ProviderIconService {
 
   private static async loadLobehubEntryAsset(
     app: App,
-    providerId: string,
     entry: ProviderIconEntry,
     cacheOnly: boolean,
   ): Promise<ResolvedProviderIconAsset | null> {
@@ -902,64 +894,23 @@ export class ProviderIconService {
       return null;
     }
 
-    for (const candidate of candidateState.candidates) {
-      const cachedAsset = await this.readCachedAssetByPath(
-        app,
-        candidate.cachePath,
-        this.getMimeTypeForResolvedFormat(candidate.format),
-      );
-      if (cachedAsset) {
-        return {
-          cachePath: candidate.cachePath,
-          cached: true,
-          fallbackUsed: candidate.fallbackUsed,
-          iconId,
-          iconUrl: this.assetToDataUrl(cachedAsset),
-          requestedVariant: candidateState.requestedVariant,
-          resolvedFormat: candidate.format,
-          resolvedVariant: candidate.resolvedVariant,
-          sourceLabel: this.getEntrySourceLabel(entry),
-        };
-      }
-
-      if (cacheOnly) {
-        continue;
-      }
-
-      try {
-        const remoteAsset = await this.loadRemotePreviewAsset(candidate.remoteUrl);
-        await this.writeCachedAsset(app, candidate.cachePath, remoteAsset.data);
-        return {
-          cachePath: candidate.cachePath,
-          cached: false,
-          fallbackUsed: candidate.fallbackUsed,
-          iconId,
-          iconUrl: this.assetToDataUrl(remoteAsset),
-          requestedVariant: candidateState.requestedVariant,
-          resolvedFormat: candidate.format,
-          resolvedVariant: candidate.resolvedVariant,
-          sourceLabel: this.getEntrySourceLabel(entry),
-        };
-      } catch {
-        continue;
-      }
-    }
-
-    if (!cacheOnly) {
-      return null;
-    }
-
-    return {
-      cachePath: candidateState.candidates[0]?.cachePath ?? null,
-      cached: false,
-      fallbackUsed: candidateState.candidates[0]?.fallbackUsed ?? false,
-      iconId,
-      iconUrl: candidateState.previewUrl,
-      requestedVariant: candidateState.requestedVariant,
-      resolvedFormat: candidateState.resolvedFormat,
-      resolvedVariant: candidateState.resolvedVariant,
-      sourceLabel: this.getEntrySourceLabel(entry),
-    };
+    return this.resolveAssetFromCandidates(
+      app,
+      candidateState.candidates.map((candidate) => ({
+        cacheMimeType: this.getMimeTypeForResolvedFormat(candidate.format),
+        cachePath: candidate.cachePath,
+        continueOnLoadError: true,
+        fallbackUsed: candidate.fallbackUsed,
+        iconId,
+        loadAsset: () => this.loadRemotePreviewAsset(candidate.remoteUrl),
+        previewUrl: candidate.remoteUrl,
+        requestedVariant: candidateState.requestedVariant,
+        resolvedFormat: candidate.format,
+        resolvedVariant: candidate.resolvedVariant,
+        sourceLabel: this.getEntrySourceLabel(entry),
+      })),
+      cacheOnly,
+    );
   }
 
   private static async loadBundledBuiltinEntryAsset(
@@ -974,96 +925,100 @@ export class ProviderIconService {
     }
 
     const cachePath = this.getCachePathForEntry(entry);
-    const cachedAsset = await this.readCachedAssetByPath(app, cachePath, 'image/svg+xml');
-    if (cachedAsset) {
-      return {
+    return this.resolveAssetFromCandidates(
+      app,
+      [{
+        cacheMimeType: 'image/svg+xml',
         cachePath,
-        cached: true,
         fallbackUsed: false,
         iconId: parsed.iconId,
-        iconUrl: this.assetToDataUrl(cachedAsset),
+        loadAsset: () => this.loadBundledOpencodeAsset(app, parsed.iconId, providerId),
+        previewResolvedFormat: 'svg',
+        previewUrl: this.getPreviewUrlForEntry(app, entry),
         requestedVariant: 'auto',
         resolvedFormat: 'svg',
         resolvedVariant: 'mono',
         sourceLabel: this.getEntrySourceLabel(entry),
-      };
-    }
-
-    const previewUrl = this.getPreviewUrlForEntry(app, entry);
-    if (cacheOnly) {
-      return {
-        cachePath,
-        cached: false,
-        fallbackUsed: false,
-        iconId: parsed.iconId,
-        iconUrl: previewUrl,
-        requestedVariant: 'auto',
-        resolvedFormat: 'svg',
-        resolvedVariant: 'mono',
-        sourceLabel: this.getEntrySourceLabel(entry),
-      };
-    }
-
-    const asset = await this.loadBundledOpencodeAsset(app, parsed.iconId, providerId);
-    await this.writeCachedAsset(app, cachePath, asset.data);
-    return {
-      cachePath,
-      cached: false,
-      fallbackUsed: false,
-      iconId: parsed.iconId,
-      iconUrl: this.assetToDataUrl(asset),
-      requestedVariant: 'auto',
-      resolvedFormat: 'svg',
-      resolvedVariant: 'mono',
-      sourceLabel: this.getEntrySourceLabel(entry),
-    };
+      }],
+      cacheOnly,
+    );
   }
 
   private static async loadCustomEntryAsset(
     app: App,
-    providerId: string,
     entry: ProviderIconEntry,
     cacheOnly: boolean,
   ): Promise<ResolvedProviderIconAsset | null> {
     const cachePath = this.getCachePathForEntry(entry);
-    const cachedAsset = await this.readCachedAsset(app, entry);
-    if (cachedAsset) {
-      return {
+    return this.resolveAssetFromCandidates(
+      app,
+      [{
+        cacheMimeType: entry.mimeType,
         cachePath,
-        cached: true,
         fallbackUsed: false,
         iconId: null,
-        iconUrl: this.assetToDataUrl(cachedAsset),
-        resolvedFormat: this.getResolvedFormatForMimeType(cachedAsset.mimeType),
+        loadAsset: () => this.loadCustomSourceAsset(
+          this.normalizeCustomSource(entry.source, entry.type === 'file' ? 'file' : 'url'),
+        ),
+        previewResolvedFormat: this.getResolvedFormatForMimeType(entry.mimeType),
+        previewUrl: this.getPreviewUrlForEntry(app, entry),
         sourceLabel: this.getEntrySourceLabel(entry),
-      };
-    }
-
-    const previewUrl = this.getPreviewUrlForEntry(app, entry);
-    if (cacheOnly) {
-      return {
-        cachePath,
-        cached: false,
-        fallbackUsed: false,
-        iconId: null,
-        iconUrl: previewUrl,
-        resolvedFormat: this.getResolvedFormatForMimeType(entry.mimeType),
-        sourceLabel: this.getEntrySourceLabel(entry),
-      };
-    }
-
-    const asset = await this.loadCustomSourceAsset(
-      this.normalizeCustomSource(entry.source, entry.type === 'file' ? 'file' : 'url'),
+      }],
+      cacheOnly,
     );
-    await this.writeCachedAsset(app, cachePath, asset.data);
+  }
+
+  private static async resolveAssetFromCandidates(
+    app: App,
+    candidates: ProviderIconAssetCandidate[],
+    cacheOnly: boolean,
+  ): Promise<ResolvedProviderIconAsset | null> {
+    for (const candidate of candidates) {
+      const cachedAsset = await this.readCachedAssetByPath(app, candidate.cachePath, candidate.cacheMimeType);
+      if (cachedAsset) {
+        return this.createResolvedAsset(candidate, cachedAsset, true);
+      }
+
+      if (cacheOnly || !candidate.loadAsset) {
+        continue;
+      }
+
+      try {
+        const loadedAsset = await candidate.loadAsset();
+        await this.writeCachedAsset(app, candidate.cachePath, loadedAsset.data);
+        return this.createResolvedAsset(candidate, loadedAsset, false);
+      } catch (error) {
+        if (candidate.continueOnLoadError) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    if (!cacheOnly) {
+      return null;
+    }
+
+    const previewCandidate = candidates[0];
+    return previewCandidate ? this.createResolvedAsset(previewCandidate, null, false) : null;
+  }
+
+  private static createResolvedAsset(
+    candidate: ProviderIconAssetCandidate,
+    asset: LoadedIconAsset | null,
+    cached: boolean,
+  ): ResolvedProviderIconAsset {
     return {
-      cachePath,
-      cached: false,
-      fallbackUsed: false,
-      iconId: null,
-      iconUrl: this.assetToDataUrl(asset),
-      resolvedFormat: this.getResolvedFormatForMimeType(asset.mimeType),
-      sourceLabel: this.getEntrySourceLabel(entry),
+      cachePath: candidate.cachePath,
+      cached,
+      fallbackUsed: candidate.fallbackUsed,
+      iconId: candidate.iconId,
+      iconUrl: asset ? this.assetToDataUrl(asset) : candidate.previewUrl,
+      requestedVariant: candidate.requestedVariant,
+      resolvedFormat: candidate.resolvedFormat
+        ?? (asset ? this.getResolvedFormatForMimeType(asset.mimeType) : candidate.previewResolvedFormat),
+      resolvedVariant: candidate.resolvedVariant,
+      sourceLabel: candidate.sourceLabel,
     };
   }
 
@@ -1099,35 +1054,6 @@ export class ProviderIconService {
     }
   }
 
-  private static async readCachedAsset(app: App, entry: ProviderIconEntry): Promise<LoadedIconAsset | null> {
-    const cachePath = this.getCachePathForEntry(entry);
-    if (!cachePath) {
-      return null;
-    }
-
-    try {
-      const adapter = app.vault.adapter;
-      const exists = await adapter.exists(cachePath);
-      if (!exists) {
-        return null;
-      }
-
-      const readBinary = adapter.readBinary?.bind(adapter) as undefined | ((path: string) => Promise<ArrayBuffer>);
-      if (!readBinary) {
-        return null;
-      }
-
-      const data = await readBinary(cachePath);
-      return {
-        data,
-        mimeType: entry.mimeType ?? this.getMimeTypeFromPath(cachePath) ?? 'image/svg+xml',
-      };
-    } catch (error) {
-      logger.debug(`Failed to read cached icon: ${cachePath}`, error);
-      return null;
-    }
-  }
-
   private static async writeCachedAsset(app: App, cachePath: string | null, data: ArrayBuffer): Promise<void> {
     if (!cachePath) {
       return;
@@ -1150,6 +1076,28 @@ export class ProviderIconService {
       logger.debug(`Failed to write cached icon: ${cachePath}`, error);
       throw error;
     }
+  }
+
+  private static async createCachedCustomEntry(
+    app: App,
+    providerId: string,
+    source: NormalizedCustomSource,
+  ): Promise<ProviderIconEntry> {
+    const asset = await this.loadCustomSourceAsset(source);
+    const timestamp = Date.now();
+    const cacheFileName = this.buildCustomCacheFileName(providerId, asset.mimeType);
+    const entry: ProviderIconEntry = {
+      id: this.createEntryId(),
+      type: source.type,
+      source: source.source,
+      mimeType: asset.mimeType,
+      cacheFileName,
+      addedAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    await this.writeCachedAsset(app, normalizePath(`${ICON_CACHE_DIR}/${cacheFileName}`), asset.data);
+    return entry;
   }
 
   private static normalizeCustomSource(
@@ -1259,41 +1207,19 @@ export class ProviderIconService {
   }
 
   private static detectMimeType(buffer: ArrayBuffer, headerValue?: string, sourceHint?: string): string {
-    const normalizedHeader = headerValue?.split(';')[0]?.trim().toLowerCase();
-    if (normalizedHeader && ALLOWED_IMAGE_MIME_TYPES.has(normalizedHeader)) {
-      return normalizedHeader;
+    const bytes = new Uint8Array(buffer);
+    const fromHeader = this.getMimeTypeFromHeader(headerValue);
+    if (fromHeader) {
+      return fromHeader;
     }
 
-    const bytes = new Uint8Array(buffer);
-    const prefix = Buffer.from(bytes.slice(0, Math.min(bytes.length, 2048)))
-      .toString('utf-8')
-      .replace(/^\uFEFF/, '')
-      .trimStart();
-    if (/<svg[\s>]/i.test(prefix) || (/^<\?xml/i.test(prefix) && /\.svg$/i.test(sourceHint ?? ''))) {
+    if (this.isSvgAsset(bytes, sourceHint)) {
       return 'image/svg+xml';
     }
 
-    if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-      return 'image/png';
-    }
-
-    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-      return 'image/jpeg';
-    }
-
-    if (bytes.length >= 6) {
-      const signature = Buffer.from(bytes.slice(0, 6)).toString('ascii');
-      if (signature === 'GIF87a' || signature === 'GIF89a') {
-        return 'image/gif';
-      }
-    }
-
-    if (bytes.length >= 12) {
-      const riff = Buffer.from(bytes.slice(0, 4)).toString('ascii');
-      const webp = Buffer.from(bytes.slice(8, 12)).toString('ascii');
-      if (riff === 'RIFF' && webp === 'WEBP') {
-        return 'image/webp';
-      }
+    const fromSignature = this.getMimeTypeFromSignature(bytes);
+    if (fromSignature) {
+      return fromSignature;
     }
 
     const fromPath = this.getMimeTypeFromPath(sourceHint);
@@ -1302,6 +1228,76 @@ export class ProviderIconService {
     }
 
     throw new Error('Only SVG, PNG, JPEG, WEBP, and GIF icon files are supported.');
+  }
+
+  private static getMimeTypeFromHeader(headerValue?: string): string | null {
+    const normalizedHeader = headerValue?.split(';')[0]?.trim().toLowerCase();
+    return normalizedHeader && ALLOWED_IMAGE_MIME_TYPES.has(normalizedHeader)
+      ? normalizedHeader
+      : null;
+  }
+
+  private static isSvgAsset(bytes: Uint8Array, sourceHint?: string): boolean {
+    const prefix = Buffer.from(bytes.slice(0, Math.min(bytes.length, 2048)))
+      .toString('utf-8')
+      .replace(/^\uFEFF/, '')
+      .trimStart();
+
+    return /<svg[\s>]/i.test(prefix) || (/^<\?xml/i.test(prefix) && /\.svg$/i.test(sourceHint ?? ''));
+  }
+
+  private static getMimeTypeFromSignature(bytes: Uint8Array): string | null {
+    if (this.hasPngSignature(bytes)) {
+      return 'image/png';
+    }
+
+    if (this.hasJpegSignature(bytes)) {
+      return 'image/jpeg';
+    }
+
+    if (this.hasGifSignature(bytes)) {
+      return 'image/gif';
+    }
+
+    if (this.hasWebpSignature(bytes)) {
+      return 'image/webp';
+    }
+
+    return null;
+  }
+
+  private static hasPngSignature(bytes: Uint8Array): boolean {
+    return bytes.length >= 4
+      && bytes[0] === 0x89
+      && bytes[1] === 0x50
+      && bytes[2] === 0x4e
+      && bytes[3] === 0x47;
+  }
+
+  private static hasJpegSignature(bytes: Uint8Array): boolean {
+    return bytes.length >= 3
+      && bytes[0] === 0xff
+      && bytes[1] === 0xd8
+      && bytes[2] === 0xff;
+  }
+
+  private static hasGifSignature(bytes: Uint8Array): boolean {
+    if (bytes.length < 6) {
+      return false;
+    }
+
+    const signature = Buffer.from(bytes.slice(0, 6)).toString('ascii');
+    return signature === 'GIF87a' || signature === 'GIF89a';
+  }
+
+  private static hasWebpSignature(bytes: Uint8Array): boolean {
+    if (bytes.length < 12) {
+      return false;
+    }
+
+    const riff = Buffer.from(bytes.slice(0, 4)).toString('ascii');
+    const webp = Buffer.from(bytes.slice(8, 12)).toString('ascii');
+    return riff === 'RIFF' && webp === 'WEBP';
   }
 
   private static getMimeTypeFromPath(sourceHint?: string): string | null {
@@ -1395,6 +1391,34 @@ export class ProviderIconService {
     }
 
     return entry.source;
+  }
+
+  private static resolveEntryPreviewMetadata(
+    app: App,
+    entry: ProviderIconEntry,
+    asset: ResolvedProviderIconAsset | null,
+  ): ProviderIconEntryPreviewMetadata {
+    return {
+      fallbackUsed: asset?.fallbackUsed ?? false,
+      iconId: asset?.iconId ?? this.getEntryIconId(entry),
+      iconUrl: asset?.iconUrl ?? this.getPreviewUrlForEntry(app, entry),
+      requestedVariant: asset?.requestedVariant ?? entry.variant,
+      resolvedFormat: asset?.resolvedFormat,
+      resolvedVariant: asset?.resolvedVariant,
+      sourceLabel: asset?.sourceLabel ?? this.getEntrySourceLabel(entry),
+    };
+  }
+
+  private static getEntryIconId(entry: ProviderIconEntry): string | null {
+    if (entry.type === 'mapped') {
+      return entry.source;
+    }
+
+    if (entry.type === 'builtin') {
+      return parseBuiltinSource(entry.source)?.iconId ?? null;
+    }
+
+    return null;
   }
 
   private static getPreviewUrlForEntry(app: App, entry: ProviderIconEntry): string | null {
@@ -1532,7 +1556,13 @@ export class ProviderIconService {
       }
 
       return [{
-        cachePath: this.getLobehubCachePath(iconId, requestedVariant, variant, format, themeKey),
+        cachePath: this.getLobehubCachePath({
+          iconId,
+          requestedVariant,
+          resolvedVariant: variant,
+          format,
+          themeKey,
+        }),
         fallbackUsed: index > 0,
         format,
         remoteUrl,
@@ -1652,13 +1682,13 @@ export class ProviderIconService {
     }
   }
 
-  private static getLobehubCachePath(
-    iconId: string,
-    requestedVariant: LobehubIconVariant,
-    resolvedVariant: ResolvedLobehubVariant,
-    format: ProviderIconResolvedFormat,
-    themeKey: 'light' | 'dark',
-  ): string {
+  private static getLobehubCachePath({
+    iconId,
+    requestedVariant,
+    resolvedVariant,
+    format,
+    themeKey,
+  }: LobehubCachePathOptions): string {
     const safeIconId = iconId.replace(/[^a-z0-9_-]/gi, '-');
     const extension = format === 'avatar' ? 'webp' : format;
     return normalizePath(
@@ -1791,19 +1821,6 @@ export class ProviderIconService {
     );
   }
 
-  private static getEditableEntriesForProvider(
-    providerId: string,
-    library: ProviderIconLibrary,
-  ): ProviderIconEntry[] {
-    const currentEntries = library[providerId];
-    if (currentEntries?.length) {
-      return [...currentEntries];
-    }
-
-    const defaultEntry = this.getDefaultEntry(providerId);
-    return defaultEntry ? [defaultEntry] : [];
-  }
-
   private static getRecommendedBuiltinIcons(
     providerId: string,
     libraryId?: BuiltinIconLibraryId,
@@ -1877,6 +1894,47 @@ export class ProviderIconService {
     }
 
     return null;
+  }
+
+  private static resolveProviderEntryResolution(
+    providerId: string,
+    library: ProviderIconLibrary,
+  ): ProviderIconEntryResolution | null {
+    const requestedProviderId = providerId.trim();
+    if (!requestedProviderId) {
+      return null;
+    }
+
+    const resolvedProviderId = this.resolveLibraryProviderId(requestedProviderId, library);
+    const storageProviderId = resolvedProviderId ?? requestedProviderId;
+    const savedEntries = resolvedProviderId ? [...(library[resolvedProviderId] ?? [])] : [];
+    const defaultEntry = this.getDefaultEntry(requestedProviderId);
+    const effectiveEntries = this.mergeDefaultEntry(savedEntries, defaultEntry);
+
+    return {
+      defaultEntry,
+      editableEntries: savedEntries.length > 0 ? savedEntries : (defaultEntry ? [defaultEntry] : []),
+      effectiveEntries,
+      requestedProviderId,
+      resolvedProviderId,
+      selectedEntry: effectiveEntries[0] ?? null,
+      storageProviderId,
+    };
+  }
+
+  private static mergeDefaultEntry(
+    entries: ProviderIconEntry[],
+    defaultEntry: ProviderIconEntry | null,
+  ): ProviderIconEntry[] {
+    if (!defaultEntry) {
+      return [...entries];
+    }
+
+    if (entries.some((entry) => this.areEquivalentEntries(entry, defaultEntry))) {
+      return [...entries];
+    }
+
+    return [...entries, defaultEntry];
   }
 
   private static getCanonicalProviderKey(providerId: string): string {

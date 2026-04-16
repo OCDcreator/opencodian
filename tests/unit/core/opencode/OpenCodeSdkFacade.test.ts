@@ -3,6 +3,8 @@ jest.mock('../../../../src/core/opencode/createSdkClient', () => ({
 }));
 
 import {
+  describeSdkError,
+  extractSdkErrorMessage,
   OpenCodeSdkFacade,
   SDK_FACADE_NAMESPACE_NAMES,
 } from '../../../../src/core/opencode/OpenCodeSdkFacade';
@@ -84,5 +86,24 @@ describe('OpenCodeSdkFacade', () => {
     });
 
     await expect(facade.tool.ids()).rejects.toThrow('boom');
+  });
+
+  it('exports shared structured error helpers for service follow-up paths', () => {
+    expect(extractSdkErrorMessage({
+      message: 'fallback',
+      name: 'APIError',
+      data: {
+        message: ' Incorrect API key provided. ',
+        statusCode: 401,
+      },
+      status: 503,
+    }, {
+      fallbackMessage: null,
+      includeName: true,
+      includeTopLevelError: false,
+      includeTopLevelStatus: false,
+      trimMessage: true,
+    })).toBe('Incorrect API key provided. (HTTP 401)');
+    expect(describeSdkError({ message: 'Service unavailable', status: 503 })).toBe('Service unavailable (HTTP 503)');
   });
 });

@@ -1,8 +1,9 @@
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import type {
+  SendPipelineExecutionHost,
   SendPipelineFinalizationPort,
-  SendPipelineHost,
   SendPipelinePreparationPort,
+  SendPipelineRuntimeHost,
   SendPipelineStreamController,
   SendPipelineTabRuntime,
 } from './SendPipelineTypes';
@@ -12,13 +13,20 @@ import { StreamLocalFinalizer } from './StreamLocalFinalizer';
 export type {
   LocalStreamOutcome,
   SendPipelineDebugContentBlock,
+  SendPipelineDebugPort,
+  SendPipelineExecutionHost,
   SendPipelineFinalizationPort,
   SendPipelineHost,
+  SendPipelinePersistencePort,
   SendPipelinePreparationPort,
+  SendPipelineRuntimeHost,
+  SendPipelineShellPort,
   SendPipelineStreamController,
   SendPipelineStreamElements,
   SendPipelineTabRuntime,
   SendPipelineTraceState,
+  SendPipelineTransportPort,
+  SendPipelineViewPort,
   StreamChunkRouterOptions,
   StreamChunkRouterResult,
   StreamLocalFinalizerOptions,
@@ -27,7 +35,7 @@ export type {
 
 export class SendPipelineRuntime {
   constructor(
-    private readonly host: SendPipelineHost,
+    private readonly host: SendPipelineRuntimeHost,
     private readonly messageSendPreparationService: SendPipelinePreparationPort,
     private readonly messageFinalizationService: SendPipelineFinalizationPort,
   ) {}
@@ -73,7 +81,7 @@ export class SendPipelineRuntime {
     content: string,
   ): {
     runtime: SendPipelineTabRuntime;
-    stream: ReturnType<SendPipelineHost['sendStreamMessage']>;
+    stream: ReturnType<SendPipelineExecutionHost['sendStreamMessage']>;
     streamController: SendPipelineStreamController | null;
     contentEl: HTMLElement;
   } | null {

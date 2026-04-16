@@ -1,6 +1,6 @@
 import type { TabId } from '../tabs';
 import type {
-  SendPipelineHost,
+  PendingIndicatorHost,
   SendPipelineTabRuntime,
 } from './SendPipelineTypes';
 
@@ -46,7 +46,7 @@ export class PendingIndicatorController {
   private readonly pendingMessage = getRandomPendingMessage();
 
   constructor(
-    private readonly host: SendPipelineHost,
+    private readonly host: PendingIndicatorHost,
     private readonly tabId: TabId | null,
     private readonly contentEl: HTMLElement,
   ) {}

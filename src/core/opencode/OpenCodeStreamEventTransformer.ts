@@ -1,0 +1,805 @@
+import {
+  isInternalStructuredOutputTool,
+  resolveToolExecutionStatus,
+  resolveToolResultText,
+  type ToolIdentityKind,
+} from '../../shared';
+import type {
+  QuestionRequest as ChatQuestionRequest,
+  StreamChunk,
+} from '../types';
+import { OpenCodeStreamingRuntimeContext } from './OpenCodeStreamingRuntimeCoordinator';
+
+export interface OpenCodeStreamEventTransformerHost {
+  observeRuntimeToolNames(toolNames: Iterable<string>): boolean;
+  getOpenCodeToolKind(toolName: string | undefined | null): ToolIdentityKind;
+  normalizeQuestionRequest(raw: unknown): ChatQuestionRequest | null;
+  logStreamingDebug(label: string, payload: unknown): void;
+}
+
+export interface OpenCodeSSEEvent {
+  event: string;
+  data: string;
+}
+
+interface OpenCodeToolStateData {
+  status: string;
+  input?: Record<string, unknown>;
+  output?: string;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface OpenCodeStreamPart {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: string;
+  text?: string;
+  duration?: number;
+  time?: {
+    start?: number;
+    end?: number;
+  };
+  callID?: string;
+  tool?: string;
+  state?: OpenCodeToolStateData;
+  [key: string]: unknown;
+}
+
+export interface OpenCodeStreamEvent {
+  type: string;
+  properties?: {
+    sessionID?: string;
+    messageID?: string;
+    id?: string;
+    permission?: string;
+    patterns?: string[];
+    metadata?: Record<string, unknown>;
+    part?: OpenCodeStreamPart;
+    parts?: OpenCodeStreamPart[];
+    delta?: string;
+    field?: string;
+    partID?: string;
+    toolID?: string;
+    result?: string;
+    error?: unknown;
+    usage?: {
+      input?: number;
+      output?: number;
+    };
+    file?: string;
+    text?: string;
+    questions?: Array<{
+      question?: string;
+      header?: string;
+      options?: Array<{ label?: string; description?: string }>;
+      multiple?: boolean;
+      custom?: boolean;
+    }>;
+  };
+}
+
+export interface OpenCodeStreamingTextDeltaDebugState {
+  sequence: number;
+  source: 'event' | 'finalize';
+  partId: string | null;
+  partType: string;
+  length: number;
+  totalLength: number;
+  preview: string;
+}
+
+export interface OpenCodeStreamEventState {
+  lastContent: string;
+  lastErrorMessage: string | null;
+  processedToolIds: Set<string>;
+  toolInputSnapshots: Map<string, string>;
+  debugChunkSequence: number;
+  lastTextDelta: OpenCodeStreamingTextDeltaDebugState | null;
+}
+
+export type OpenCodeStreamPartTypeState = OpenCodeStreamingRuntimeContext | {
+  partTypeMap?: Map<string, string>;
+};
+
+interface OpenCodeStreamingEventHandlerContext {
+  eventData: OpenCodeStreamEvent;
+  sessionId: string;
+  state: OpenCodeStreamEventState;
+  streamContext: OpenCodeStreamPartTypeState;
+  chunks: StreamChunk[];
+}
+
+type OpenCodeStreamEventOutcome = { chunks: StreamChunk[]; stop: boolean };
+
+type OpenCodeStreamingEventHandler = (
+  context: OpenCodeStreamingEventHandlerContext,
+) => OpenCodeStreamEventOutcome;
+
+interface OpenCodeStreamingPartUpdatedHandlerContext {
+  part: OpenCodeStreamPart;
+  state: OpenCodeStreamEventState;
+  chunks: StreamChunk[];
+}
+
+type OpenCodeStreamingPartUpdatedHandler = (
+  context: OpenCodeStreamingPartUpdatedHandlerContext,
+) => void;
+
+type OpenCodeStreamPartChunkTransformer = (
+  part: OpenCodeStreamPart,
+  chunks: StreamChunk[],
+) => void;
+
+interface OpenCodeTextDeltaChunkContext {
+  chunks: StreamChunk[];
+  delta: string;
+  partId: string | undefined;
+  partType: string;
+  sessionId: string;
+  state: OpenCodeStreamEventState;
+}
+
+interface OpenCodeClassifiedToolPart {
+  toolId: string | null;
+  toolName: string;
+  toolKind: ToolIdentityKind;
+  toolInput: Record<string, unknown>;
+  toolStatus: ReturnType<typeof resolveToolExecutionStatus>;
+  toolResult: string | undefined;
+}
+
+function parseJsonRecord(payload: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function inferSseEventName(data: string): string {
+  const parsed = parseJsonRecord(data);
+  const eventType = parsed?.type;
+  return typeof eventType === 'string' && eventType.trim() ? eventType : 'unknown';
+}
+
+function resolveReasoningDurationSeconds(
+  part: Pick<OpenCodeStreamPart, 'duration' | 'time'>,
+): number | undefined {
+  const start = part.time?.start;
+  const end = part.time?.end;
+  if (typeof start === 'number' && typeof end === 'number' && end >= start) {
+    return Math.max(0, end - start) / 1000;
+  }
+
+  if (typeof part.duration === 'number' && part.duration > 0) {
+    return part.duration;
+  }
+
+  return undefined;
+}
+
+function getDebugTextPreview(text: string, maxLength = 160): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function extractStructuredErrorName(errorLike: unknown): string | null {
+  if (!errorLike || typeof errorLike !== 'object') {
+    return null;
+  }
+
+  const errorRecord = errorLike as { name?: unknown };
+  return typeof errorRecord.name === 'string' && errorRecord.name.trim()
+    ? errorRecord.name.trim()
+    : null;
+}
+
+function extractStructuredErrorMessage(errorLike: unknown): string | null {
+  if (!errorLike || typeof errorLike !== 'object') {
+    return null;
+  }
+
+  const errorRecord = errorLike as {
+    message?: unknown;
+    data?: {
+      message?: unknown;
+      statusCode?: unknown;
+      responseBody?: unknown;
+    };
+    name?: unknown;
+  };
+
+  const baseMessage = typeof errorRecord.data?.message === 'string' && errorRecord.data.message.trim()
+    ? errorRecord.data.message.trim()
+    : typeof errorRecord.message === 'string' && errorRecord.message.trim()
+      ? errorRecord.message.trim()
+      : typeof errorRecord.name === 'string' && errorRecord.name.trim()
+        ? errorRecord.name.trim()
+        : null;
+
+  if (!baseMessage) {
+    return null;
+  }
+
+  const statusCode = typeof errorRecord.data?.statusCode === 'number'
+    ? errorRecord.data.statusCode
+    : null;
+
+  if (statusCode === null || baseMessage.toLowerCase().includes(`http ${statusCode}`)) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} (HTTP ${statusCode})`;
+}
+
+export class OpenCodeStreamEventTransformer {
+  private readonly streamingEventHandlers: Record<string, OpenCodeStreamingEventHandler>;
+
+  private readonly streamingPartUpdatedHandlers: Record<string, OpenCodeStreamingPartUpdatedHandler>;
+
+  private readonly streamPartChunkTransformers: Record<string, OpenCodeStreamPartChunkTransformer>;
+
+  constructor(private readonly host: OpenCodeStreamEventTransformerHost) {
+    this.streamingEventHandlers = {
+      'message.part.updated': this.handleMessagePartUpdated.bind(this),
+      'message.part.delta': this.handleMessagePartDelta.bind(this),
+      'permission.asked': this.handlePermissionAsked.bind(this),
+      'file.edited': this.handleFileEdited.bind(this),
+      'session.error': this.handleSessionError.bind(this),
+      'session.idle': this.handleSessionIdle.bind(this),
+      'question.asked': this.handleQuestionAsked.bind(this),
+    };
+    this.streamingPartUpdatedHandlers = {
+      tool: this.handleToolPartUpdated.bind(this),
+      reasoning: this.handleReasoningPartUpdated.bind(this),
+      thinking: this.handleReasoningPartUpdated.bind(this),
+    };
+    this.streamPartChunkTransformers = {
+      text: this.appendTextPartChunks.bind(this),
+      reasoning: this.appendReasoningPartChunks.bind(this),
+      tool: this.appendToolPartChunks.bind(this),
+    };
+  }
+
+  handleStreamingEvent(
+    eventData: OpenCodeStreamEvent,
+    sessionId: string,
+    state: OpenCodeStreamEventState,
+    streamContext: OpenCodeStreamPartTypeState,
+  ): { chunks: StreamChunk[]; stop: boolean } {
+    if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
+      return { chunks: [], stop: false };
+    }
+
+    const partSessionId = eventData.properties?.part?.sessionID;
+    if (partSessionId && partSessionId !== sessionId) {
+      return { chunks: [], stop: false };
+    }
+
+    const chunks = this.createUsageChunks(eventData, sessionId);
+    const eventHandler = this.streamingEventHandlers[eventData.type];
+    if (eventHandler) {
+      return eventHandler({
+        eventData,
+        sessionId,
+        state,
+        streamContext,
+        chunks,
+      });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  parseSSEEventPayload(event: OpenCodeSSEEvent): OpenCodeStreamEvent | null {
+    const parsed = parseJsonRecord(event.data);
+    return parsed ? (parsed as unknown as OpenCodeStreamEvent) : null;
+  }
+
+  parseSSEEvents(buffer: string): { events: OpenCodeSSEEvent[]; remaining: string } {
+    const events: OpenCodeSSEEvent[] = [];
+    const lines = buffer.split('\n');
+    let currentEvent: Partial<OpenCodeSSEEvent> = {};
+    let remaining = '';
+
+    const lastDoubleNewline = buffer.lastIndexOf('\n\n');
+    if (lastDoubleNewline === -1 || lastDoubleNewline !== buffer.length - 2) {
+      remaining = lines.pop() || '';
+    }
+
+    for (const line of lines) {
+      if (line.startsWith('event:')) {
+        currentEvent.event = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        currentEvent.data = line.slice(5).trim();
+      } else if (line === '') {
+        if (currentEvent.data !== undefined) {
+          if (!currentEvent.event) {
+            currentEvent.event = inferSseEventName(currentEvent.data);
+          }
+          events.push(currentEvent as OpenCodeSSEEvent);
+        }
+        currentEvent = {};
+      }
+    }
+
+    return { events, remaining };
+  }
+
+  transformEventToChunks(event: unknown): StreamChunk[] {
+    const chunks: StreamChunk[] = [];
+
+    if (typeof event !== 'object' || event === null) {
+      return chunks;
+    }
+
+    const evt = event as { type?: string; properties?: Record<string, unknown> };
+    const props = evt.properties;
+
+    if (!props) {
+      return chunks;
+    }
+
+    if (props.parts && Array.isArray(props.parts)) {
+      for (const part of props.parts) {
+        const partChunks = this.transformPartToChunks(part as OpenCodeStreamPart);
+        chunks.push(...partChunks);
+      }
+    }
+
+    if (props.part) {
+      const partChunks = this.transformPartToChunks(props.part as OpenCodeStreamPart);
+      chunks.push(...partChunks);
+    }
+
+    if (props.text && typeof props.text === 'string') {
+      chunks.push({ type: 'text', content: props.text });
+    }
+
+    if (props.usage && typeof props.usage === 'object') {
+      const usage = props.usage as { input?: number; output?: number };
+      chunks.push({
+        type: 'usage',
+        inputTokens: usage.input ?? 0,
+        outputTokens: usage.output ?? 0,
+      });
+    }
+
+    return chunks;
+  }
+
+  transformPartToChunks(part: OpenCodeStreamPart): StreamChunk[] {
+    const chunks: StreamChunk[] = [];
+    const chunkTransformer = this.streamPartChunkTransformers[part.type];
+    chunkTransformer?.(part, chunks);
+
+    return chunks;
+  }
+
+  private getToolInputSnapshot(input: Record<string, unknown> | undefined): string {
+    if (!input || Object.keys(input).length === 0) {
+      return '';
+    }
+
+    try {
+      return JSON.stringify(input);
+    } catch {
+      return '[unserializable-tool-input]';
+    }
+  }
+
+  private createUsageChunks(
+    eventData: OpenCodeStreamEvent,
+    sessionId: string,
+  ): StreamChunk[] {
+    const usage = eventData.properties?.usage;
+    if (!usage) {
+      return [];
+    }
+
+    return [{
+      type: 'usage',
+      inputTokens: usage.input ?? 0,
+      outputTokens: usage.output ?? 0,
+      sessionId,
+    }];
+  }
+
+  private handleMessagePartUpdated({
+    eventData,
+    state,
+    streamContext,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const part = eventData.properties?.part;
+    if (!part?.id || !part.type) {
+      return { chunks, stop: false };
+    }
+
+    this.setStreamPartType(streamContext, part.id, part.type);
+    const partHandler = this.streamingPartUpdatedHandlers[part.type];
+    partHandler?.({ part, state, chunks });
+    return { chunks, stop: false };
+  }
+
+  private handleToolPartUpdated(
+    {
+      part: toolPart,
+      state,
+      chunks,
+    }: OpenCodeStreamingPartUpdatedHandlerContext,
+  ): void {
+    const classifiedToolPart = this.resolveToolPartClassification(toolPart);
+    if (!classifiedToolPart) {
+      return;
+    }
+
+    this.host.observeRuntimeToolNames([classifiedToolPart.toolName]);
+
+    const { toolId, toolName, toolKind, toolInput, toolStatus, toolResult } = classifiedToolPart;
+    if (!toolId) {
+      return;
+    }
+
+    const nextSnapshot = this.getToolInputSnapshot(toolInput);
+    const previousSnapshot = state.toolInputSnapshots.get(toolId);
+    const shouldEmitToolUse =
+      !state.processedToolIds.has(toolId)
+      || nextSnapshot !== previousSnapshot;
+
+    if (shouldEmitToolUse) {
+      state.processedToolIds.add(toolId);
+      state.toolInputSnapshots.set(toolId, nextSnapshot);
+      chunks.push({
+        type: 'tool_use',
+        id: toolId,
+        name: toolName,
+        kind: toolKind,
+        input: toolInput,
+      });
+    }
+
+    if ((toolStatus === 'completed' || toolStatus === 'error') && toolResult !== undefined) {
+      const resultKey = `${toolId}_result`;
+      if (!state.processedToolIds.has(resultKey)) {
+        state.processedToolIds.add(resultKey);
+        chunks.push({
+          type: 'tool_result',
+          toolUseId: toolId,
+          content: toolResult,
+          isError: toolStatus === 'error',
+        });
+      }
+    }
+  }
+
+  private handleReasoningPartUpdated({
+    part,
+    chunks,
+  }: OpenCodeStreamingPartUpdatedHandlerContext): void {
+    if (!this.isReasoningPartType(part.type)) {
+      return;
+    }
+
+    const durationSeconds = resolveReasoningDurationSeconds(part);
+    if (durationSeconds !== undefined) {
+      chunks.push({
+        type: 'thinking',
+        content: '',
+        partId: part.id,
+        durationSeconds,
+      });
+    }
+  }
+
+  private appendTextPartChunks(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    if (part.text) {
+      chunks.push({ type: 'text', content: part.text });
+    }
+  }
+
+  private appendReasoningPartChunks(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    if (part.text) {
+      chunks.push({
+        type: 'thinking',
+        content: part.text,
+        partId: part.id,
+        durationSeconds: resolveReasoningDurationSeconds(part),
+      });
+    }
+  }
+
+  private appendToolPartChunks(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    const classifiedToolPart = this.resolveToolPartClassification(part, {
+      requireState: true,
+    });
+    if (!classifiedToolPart) {
+      return;
+    }
+
+    const {
+      toolId,
+      toolName,
+      toolKind,
+      toolInput,
+      toolStatus,
+      toolResult,
+    } = classifiedToolPart;
+
+    if (toolStatus === 'pending' || toolStatus === 'running') {
+      chunks.push({
+        type: 'tool_use',
+        id: toolId ?? '',
+        name: toolName,
+        kind: toolKind,
+        input: toolInput,
+      });
+      return;
+    }
+
+    if (toolStatus === 'completed' || toolStatus === 'error') {
+      chunks.push({
+        type: 'tool_result',
+        toolUseId: toolId ?? '',
+        content: toolResult ?? (toolStatus === 'error' ? 'Error: Tool execution failed' : ''),
+        isError: toolStatus === 'error',
+      });
+    }
+  }
+
+  private handleMessagePartDelta({
+    eventData,
+    sessionId,
+    state,
+    streamContext,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const delta = eventData.properties?.delta;
+    const field = eventData.properties?.field;
+    const partID = eventData.properties?.partID;
+
+    if (!delta || !field) {
+      return { chunks, stop: false };
+    }
+
+    const partType = this.resolveDeltaPartType(eventData, streamContext, partID);
+    if (field !== 'text') {
+      return { chunks, stop: false };
+    }
+
+    if (this.isReasoningPartType(partType)) {
+      chunks.push({ type: 'thinking', content: delta, partId: partID });
+      return { chunks, stop: false };
+    }
+
+    this.appendTextDeltaChunk({
+      chunks,
+      delta,
+      partId: partID,
+      partType,
+      sessionId,
+      state,
+    });
+    return { chunks, stop: false };
+  }
+
+  private resolveDeltaPartType(
+    eventData: OpenCodeStreamEvent,
+    streamContext: OpenCodeStreamPartTypeState,
+    partID: string | undefined,
+  ): string {
+    if (!partID) {
+      return 'text';
+    }
+
+    if (!this.hasStreamPartType(streamContext, partID)) {
+      const partType = eventData.properties?.part?.type;
+      this.setStreamPartType(streamContext, partID, partType || 'text');
+    }
+
+    return this.getStreamPartType(streamContext, partID) || 'text';
+  }
+
+  private appendTextDeltaChunk({
+    chunks,
+    delta,
+    partId,
+    partType,
+    sessionId,
+    state,
+  }: OpenCodeTextDeltaChunkContext): void {
+    chunks.push({ type: 'text', content: delta });
+    state.lastContent += delta;
+    state.debugChunkSequence += 1;
+    state.lastTextDelta = {
+      sequence: state.debugChunkSequence,
+      source: 'event',
+      partId: partId ?? null,
+      partType,
+      length: delta.length,
+      totalLength: state.lastContent.length,
+      preview: getDebugTextPreview(delta, 120),
+    };
+    this.host.logStreamingDebug('service-text-delta', {
+      sessionId,
+      chunkSequence: state.debugChunkSequence,
+      partId: partId ?? null,
+      partType,
+      deltaLength: delta.length,
+      totalLength: state.lastContent.length,
+      deltaPreview: getDebugTextPreview(delta, 120),
+    });
+  }
+
+  private handlePermissionAsked({
+    eventData,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const permission = eventData.properties;
+    if (permission?.id) {
+      chunks.push({
+        type: 'permission_request',
+        id: permission.id,
+        permission: permission.permission || 'unknown',
+        patterns: permission.patterns || [],
+        metadata: permission.metadata || {},
+      });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private handleFileEdited({
+    eventData,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const file = eventData.properties?.file;
+    if (typeof file === 'string' && file.trim()) {
+      chunks.push({ type: 'file_edited', file: file.trim() });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private handleSessionError({
+    eventData,
+    sessionId,
+    state,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const errorName = extractStructuredErrorName(eventData.properties?.error);
+    const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
+    state.lastErrorMessage = errorMessage;
+    this.host.logStreamingDebug('service-session-error', {
+      sessionId,
+      errorName,
+      errorMessage,
+    });
+    if (errorName === 'MessageAbortedError') {
+      return { chunks, stop: true };
+    }
+
+    chunks.push({
+      type: 'error',
+      content: errorMessage,
+    });
+    return { chunks, stop: true };
+  }
+
+  private handleSessionIdle({
+    sessionId,
+    state,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    this.host.logStreamingDebug('service-session-idle', {
+      sessionId,
+      accumulatedTextLength: state.lastContent.length,
+      lastTextDelta: state.lastTextDelta,
+    });
+    return { chunks, stop: true };
+  }
+
+  private handleQuestionAsked({
+    eventData,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const request = this.host.normalizeQuestionRequest(eventData.properties);
+    if (request) {
+      chunks.push({
+        type: 'question_request',
+        request,
+      });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private isReasoningPartType(partType: string): boolean {
+    return partType === 'reasoning' || partType === 'thinking';
+  }
+
+  private resolveToolPartClassification(
+    toolPart: OpenCodeStreamPart,
+    options: { requireState?: boolean } = {},
+  ): OpenCodeClassifiedToolPart | null {
+    if (options.requireState && !toolPart.state) {
+      return null;
+    }
+
+    const toolName = toolPart.tool || 'unknown';
+    if (isInternalStructuredOutputTool(toolName)) {
+      return null;
+    }
+
+    return {
+      toolId: toolPart.callID || toolPart.id || null,
+      toolName,
+      toolKind: this.host.getOpenCodeToolKind(toolName),
+      toolInput: toolPart.state?.input || {},
+      toolStatus: resolveToolExecutionStatus({
+        toolName,
+        state: toolPart.state,
+      }),
+      toolResult: resolveToolResultText(toolPart.state),
+    };
+  }
+
+  private setStreamPartType(
+    streamContext: OpenCodeStreamPartTypeState,
+    partId: string,
+    partType: string,
+  ): void {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      streamContext.setPartType(partId, partType);
+      return;
+    }
+
+    if (!partId || !partType) {
+      return;
+    }
+
+    streamContext.partTypeMap?.set(partId, partType);
+  }
+
+  private hasStreamPartType(
+    streamContext: OpenCodeStreamPartTypeState,
+    partId: string,
+  ): boolean {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      return streamContext.hasPartType(partId);
+    }
+
+    return streamContext.partTypeMap?.has(partId) ?? false;
+  }
+
+  private getStreamPartType(
+    streamContext: OpenCodeStreamPartTypeState,
+    partId: string,
+  ): string | undefined {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      return streamContext.getPartType(partId);
+    }
+
+    return streamContext.partTypeMap?.get(partId);
+  }
+}

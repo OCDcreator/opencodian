@@ -4,8 +4,8 @@ import { PendingIndicatorController } from './PendingIndicatorController';
 import { hasVisibleStreamingContent } from './sendPipelineContent';
 import { SendPipelineTrace } from './SendPipelineTrace';
 import type {
-  SendPipelineHost,
   SendPipelineTraceState,
+  StreamChunkRouterHost,
   StreamChunkRouterOptions,
   StreamChunkRouterResult,
 } from './SendPipelineTypes';
@@ -272,7 +272,9 @@ export class StreamChunkRouter {
     this.options.host.revealStreamingAssistantMessageElement(this.options.preparedSend.tabId);
   }
 
-  private revealStreamingMessageIfNeeded(chunk: NonNullable<ReturnType<SendPipelineHost['convertToStreamingChunk']>>): void {
+  private revealStreamingMessageIfNeeded(
+    chunk: NonNullable<ReturnType<StreamChunkRouterHost['convertToStreamingChunk']>>,
+  ): void {
     if (chunk.type !== 'error' && !hasVisibleStreamingContent(chunk)) {
       return;
     }
@@ -281,7 +283,7 @@ export class StreamChunkRouter {
   }
 
   private clearPendingIndicatorOnFirstVisibleContent(
-    chunk: NonNullable<ReturnType<SendPipelineHost['convertToStreamingChunk']>>,
+    chunk: NonNullable<ReturnType<StreamChunkRouterHost['convertToStreamingChunk']>>,
   ): void {
     if (this.receivedFirstVisibleContent || !hasVisibleStreamingContent(chunk)) {
       return;

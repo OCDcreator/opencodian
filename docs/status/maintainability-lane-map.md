@@ -1,35 +1,43 @@
 # Maintainability Lane Map
 
-> **用途**: 这是每轮开始时的快速定位图。先看这里，再决定是否做广域搜索。
+> **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
+> **当前状态**: [PAUSED] `R162` 已完成；当前没有可自动执行的后续任务。
 
 ## 当前优先级
 
-- **P1**: `OpenCodianView` 里剩余的 activation / sync / runtime bridge ownership
-- **P2**: question / todo / background task wiring 与 post-sync/activation 协调
-- **P3**: context / composer / retained-selection 相关 ownership
-- **P4**: message shell / notice / timestamp 组装边界
+- **当前 `[NEXT]`**：当前没有可自动执行的后续任务
+- **本批目标**：`R160-R162` 已完成最后一批受控 closeout，并以高可维护性 checkpoint 停机
+- **当前 lint 基线**：`0 errors / 0 warnings`
+- **当前 typecheck 基线**：通过
+- **热点顺序**：
+  1. 当前没有可自动执行的后续任务；如需继续，先人工续排新的受控 queue
 
-## 当前热点首查入口
+## 本批边界
 
-- P2 首查顺序固定为：
-  1. `src/features/chat/OpenCodianView.ts` 中 question/todo/background-task 的 host factory 与 wiring 片段
-  2. `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
-  3. `src/features/chat/services/PostSyncQuestionTodoRefreshFacade.ts`
-  4. `src/features/chat/services/BackgroundTaskPostSyncCoordinator.ts`
-  5. 参考模式：`src/features/chat/services/SessionTodoHostAdapter.ts`、`src/features/chat/services/ConversationSyncHostAdapter.ts`
-- P1 首查 `OpenCodianView` 里 activation / sync host 与 runtime bridge 创建区段，再看对应 bridge/service
-- P3 首查 composer/context builder、context catalog 与 retained-selection runtime
-- P4 首查 assistant shell / notice / footer / timestamp 组装入口，再看现有 renderer/finalizer/service
+- 当前 queue 已关闭；不得自动扩展 `R163+`
+- 不新增薄 helper / adapter / provider / factory；优先把过薄文件并回相邻厚 owner，禁止并回 `OpenCodianView` / `OpenCodeService` 主文件本体
+- `OpenCodianView` / `OpenCodeService` 的改动必须带来可见的 line count、import surface 或 assembly surface 收缩，不能只做“换文件不减复杂度”
+- tests / glass / demo cleanup 只允许作为阻塞修复；不允许删断言、减覆盖或把实验特性暴露到 stable UI path
+- 当前 maintainability 批次默认不部署；部署只在用户后续明确要求时才允许恢复
+- 每轮必须保持 `npm run lint`、`npm run typecheck`、`npm test`、`npm run build` 全绿
 
-## 可复用模式
+## 远端实测热点提示
 
-- host wiring 先看 `HostAdapter` / `create*Services()` 的现有模式
-- post-sync / activation / runtime 多入口共享逻辑，优先落到 facade / coordinator / runtime bridge
-- `OpenCodianView` 只保留 host assembly、bridge 入口和必要 UI writeback
+- `src/features/chat/OpenCodianView.ts`：`R160` 后约 `4857` 行、`88` 条 import；question post-resolution thin adapter 已并回 `QuestionRuntimeHostAdapter`
+- `src/core/opencode/OpenCodeService.ts`：`R161` 后约 `1358` 行、`24` 条 import；diagnostics 已并回 `OpenCodeSdkFacade`，session lifecycle 不再依赖 service-local CRUD adapter，`R162` 已确认足以停机
+- `src/features/chat/services/`：只作为并回/收束目标周边证据，不为清理碎片新增新的薄层
+- 当前质量门槛已经全绿，任何 round 若不能维持 `0 errors / 0 warnings` 与 typecheck/test/build 通过，必须最小修复或失败回滚
 
-## 低收益规则
+## 回归观察点
 
-- 不要在成功轮次里反复广扫同一大片 `OpenCodianView` 上下文
-- `docs/modules/**` 只在模块边界真实变化时再读、再改
-- 不要继续深挖 trailing-assistant helper 碎片化链路，除非正确性或构建失败直接阻塞
+- `OpenCodianView`：并发 tab/session streaming、hydration/auth-sync gate、background-task completion notice、scroll restore、question card resolution 不回归
+- chat services：background-task timeline、authoritative sync、question/todo runtime、input panel theme、model/permission selector 语义不变
+- `OpenCodeService` / streaming：SDK-first / legacy fallback、session-scoped abort/detach、managed server adoption/restart、sync-event bridge 语义不变
+- tests / glass / demo：heavy suites coverage、opt-in glass 行为与 experimental demo guardrail 不变
+- lint/typecheck/test/build：整批必须全绿
 
+## 历史入口
+
+- 批次归档：`docs/status/maintainability-completed-batches.md`
+- 最近成功 phase：`docs/status/maintainability-phase-497.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-497.md`

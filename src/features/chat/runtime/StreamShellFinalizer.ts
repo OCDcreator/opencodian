@@ -1,12 +1,13 @@
 import { t } from '../../../i18n';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
+import { buildInterruptedAssistantNotice } from './AssistantNoticeRenderer';
 import type {
   LocalStreamOutcome,
-  SendPipelineHost,
+  StreamShellFinalizerHost,
 } from './SendPipelineTypes';
 
 export async function finalizeStreamingShell(options: {
-  host: SendPipelineHost;
+  host: StreamShellFinalizerHost;
   preparedSend: PreparedMessageSend;
   outcome: LocalStreamOutcome;
 }): Promise<string> {
@@ -37,7 +38,7 @@ export async function finalizeStreamingShell(options: {
   }
 
   if (outcome.shouldPersistInterruptedState) {
-    outcome.interruptedNoticeMessage = host.buildInterruptedAssistantNotice(
+    outcome.interruptedNoticeMessage = buildInterruptedAssistantNotice(
       outcome.finalizedTimestamp,
       outcome.finalizedModelId,
     );

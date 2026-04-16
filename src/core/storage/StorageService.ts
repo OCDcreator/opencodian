@@ -6,15 +6,14 @@
  */
 
 import { type App, normalizePath } from 'obsidian';
-import * as path from 'path';
 
 import type { OpenCodianPlugin } from '../../main';
 import type { ManagedServerState } from '../opencode/types';
 import type { ChatMessage, Conversation, ConversationMeta, OpenCodianSettings } from '../types';
+import { type StoredThemeBackgroundAsset, ThemeBackgroundStorage } from './ThemeBackgroundStorage';
 
 const STORAGE_DIR = '.opencodian';
 const SESSIONS_DIR = `${STORAGE_DIR}/sessions`;
-const THEME_BACKGROUNDS_DIR = `${STORAGE_DIR}/theme-backgrounds`;
 const LEGACY_SETTINGS_FILE = `${STORAGE_DIR}/settings.json`;
 const CORE_SETTINGS_FILE = `${STORAGE_DIR}/settings.core.json`;
 const UI_SETTINGS_FILE = `${STORAGE_DIR}/settings.ui.json`;
@@ -22,20 +21,6 @@ const CORE_SETTINGS_BACKUP_FILE = `${CORE_SETTINGS_FILE}.bak`;
 const UI_SETTINGS_BACKUP_FILE = `${UI_SETTINGS_FILE}.bak`;
 const RUNTIME_FILE = `${STORAGE_DIR}/runtime.json`;
 const SETTINGS_SCHEMA_VERSION = 1;
-const MAX_THEME_BACKGROUND_BYTES = 64 * 1024 * 1024;
-const THEME_BACKGROUND_MIME_TO_EXTENSION: Record<string, string> = {
-  'image/svg+xml': 'svg',
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-};
-
-interface StoredThemeBackgroundAsset {
-  path: string;
-  mimeType: string;
-  displayName: string;
-}
 
 interface RuntimeState {
   managedServer: ManagedServerState | null;
@@ -65,6 +50,21 @@ interface SettingsReadResult<T> {
   message?: string;
 }
 
+interface LoadSettingsFileOptions<T extends Record<string, unknown>> {
+  filePath: string;
+  backupPath: string;
+  source: SettingsEnvelopeSource;
+  legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>;
+  extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>;
+}
+
+interface PersistedSettingsFileProfile<T extends Record<string, unknown>> {
+  filePath: string;
+  backupPath: string;
+  source: SettingsEnvelopeSource;
+  extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>;
+}
+
 export interface SettingsFileLoadResult<T> {
   data: T | null;
   filePath: string;
@@ -80,26 +80,55 @@ export interface SettingsLoadResult {
   shouldPersist: boolean;
 }
 
+const PERSISTED_UI_SETTINGS_KEYS = [
+  'tabState',
+  'settingsPanelScrollTop',
+  'modelAvailabilitySectionOpen',
+  'modelToolsSectionOpen',
+] as const satisfies readonly PersistedUiSettingsKey[];
+
+function extractPersistedUiSettings(
+  settings: Partial<OpenCodianSettings>,
+): Partial<PersistedUiSettings> {
+  return {
+    tabState: settings.tabState,
+    settingsPanelScrollTop: settings.settingsPanelScrollTop,
+    modelAvailabilitySectionOpen: settings.modelAvailabilitySectionOpen,
+    modelToolsSectionOpen: settings.modelToolsSectionOpen,
+  };
+}
+
+function extractPersistedCoreSettings(
+  settings: Partial<OpenCodianSettings>,
+): Partial<PersistedCoreSettings> {
+  const persistedCore = { ...settings } as Partial<OpenCodianSettings>;
+  for (const key of PERSISTED_UI_SETTINGS_KEYS) {
+    delete persistedCore[key];
+  }
+  return persistedCore as Partial<PersistedCoreSettings>;
+}
+
+const CORE_SETTINGS_PROFILE: PersistedSettingsFileProfile<PersistedCoreSettings> = {
+  filePath: CORE_SETTINGS_FILE,
+  backupPath: CORE_SETTINGS_BACKUP_FILE,
+  source: 'settings.core',
+  extractLegacyData: extractPersistedCoreSettings,
+};
+
+const UI_SETTINGS_PROFILE: PersistedSettingsFileProfile<PersistedUiSettings> = {
+  filePath: UI_SETTINGS_FILE,
+  backupPath: UI_SETTINGS_BACKUP_FILE,
+  source: 'settings.ui',
+  extractLegacyData: extractPersistedUiSettings,
+};
+
 export function splitPersistedSettings(settings: OpenCodianSettings): {
   core: PersistedCoreSettings;
   ui: PersistedUiSettings;
 } {
-  const {
-    tabState,
-    settingsPanelScrollTop,
-    modelAvailabilitySectionOpen,
-    modelToolsSectionOpen,
-    ...core
-  } = settings;
-
   return {
-    core,
-    ui: {
-      tabState,
-      settingsPanelScrollTop,
-      modelAvailabilitySectionOpen,
-      modelToolsSectionOpen,
-    },
+    core: extractPersistedCoreSettings(settings) as PersistedCoreSettings,
+    ui: extractPersistedUiSettings(settings) as PersistedUiSettings,
   };
 }
 
@@ -107,17 +136,19 @@ export class StorageService {
   private app: App;
   private vaultPath: string;
   private settingsWriteQueue: Promise<void> = Promise.resolve();
+  private themeBackgroundStorage: ThemeBackgroundStorage;
 
   constructor(plugin: OpenCodianPlugin) {
     this.app = plugin.app;
     this.vaultPath = (this.app.vault.adapter as unknown as { basePath: string }).basePath;
+    this.themeBackgroundStorage = new ThemeBackgroundStorage(this.app.vault.adapter);
   }
 
   /** Initialize storage directories */
   async initialize(): Promise<void> {
     await this.ensureDir(STORAGE_DIR);
     await this.ensureDir(SESSIONS_DIR);
-    await this.ensureDir(THEME_BACKGROUNDS_DIR);
+    await this.themeBackgroundStorage.initialize();
   }
 
   /** Save conversation with all messages */
@@ -219,58 +250,19 @@ export class StorageService {
   }
 
   async saveCoreSettings(settings: PersistedCoreSettings): Promise<void> {
-    await this.enqueueSettingsWrite(() => this.writeSettingsFile(
-      CORE_SETTINGS_FILE,
-      CORE_SETTINGS_BACKUP_FILE,
-      'settings.core',
-      settings,
-    ));
+    await this.saveSettingsProfile(CORE_SETTINGS_PROFILE, settings);
   }
 
   async saveUiSettings(settings: PersistedUiSettings): Promise<void> {
-    await this.enqueueSettingsWrite(() => this.writeSettingsFile(
-      UI_SETTINGS_FILE,
-      UI_SETTINGS_BACKUP_FILE,
-      'settings.ui',
-      settings,
-    ));
+    await this.saveSettingsProfile(UI_SETTINGS_PROFILE, settings);
   }
 
   async loadPersistedSettings(): Promise<SettingsLoadResult> {
     const legacySettings = await this.readLegacySettings();
-    const core = await this.loadSettingsFile(
-      CORE_SETTINGS_FILE,
-      CORE_SETTINGS_BACKUP_FILE,
-      'settings.core',
-      legacySettings,
-      (settings) => {
-        const persistedCore = { ...settings };
-        delete persistedCore.tabState;
-        delete persistedCore.settingsPanelScrollTop;
-        delete persistedCore.modelAvailabilitySectionOpen;
-        delete persistedCore.modelToolsSectionOpen;
-        return persistedCore;
-      },
-    );
-    const ui = await this.loadSettingsFile(
-      UI_SETTINGS_FILE,
-      UI_SETTINGS_BACKUP_FILE,
-      'settings.ui',
-      legacySettings,
-      (settings) => ({
-        tabState: settings.tabState,
-        settingsPanelScrollTop: settings.settingsPanelScrollTop,
-        modelAvailabilitySectionOpen: settings.modelAvailabilitySectionOpen,
-        modelToolsSectionOpen: settings.modelToolsSectionOpen,
-      }),
-    );
+    const core = await this.loadSettingsProfile(CORE_SETTINGS_PROFILE, legacySettings);
+    const ui = await this.loadSettingsProfile(UI_SETTINGS_PROFILE, legacySettings);
 
-    return {
-      core,
-      ui,
-      writable: core.source !== 'blocked' && ui.source !== 'blocked',
-      shouldPersist: core.shouldPersist || ui.shouldPersist,
-    };
+    return this.buildSettingsLoadResult(core, ui);
   }
 
   async saveManagedServerState(state: ManagedServerState | null): Promise<void> {
@@ -292,63 +284,15 @@ export class StorageService {
     sourceName: string,
     hintedMimeType?: string,
   ): Promise<StoredThemeBackgroundAsset> {
-    this.assertThemeBackgroundByteLength(data.byteLength);
-    const mimeType = this.detectThemeBackgroundMimeType(data, hintedMimeType, sourceName);
-    const extension = THEME_BACKGROUND_MIME_TO_EXTENSION[mimeType];
-    if (!extension) {
-      throw new Error('Only SVG, PNG, JPEG, WEBP, and GIF background images are supported.');
-    }
-
-    await this.ensureDir(THEME_BACKGROUNDS_DIR);
-
-    const fileName = `theme-bg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
-    const storedPath = normalizePath(`${THEME_BACKGROUNDS_DIR}/${fileName}`);
-    const writeBinary = this.app.vault.adapter.writeBinary?.bind(this.app.vault.adapter) as
-      | undefined
-      | ((filePath: string, fileData: ArrayBuffer) => Promise<void>);
-    if (!writeBinary) {
-      throw new Error('Vault adapter does not support writing theme background images.');
-    }
-
-    await writeBinary(storedPath, data);
-
-    return {
-      path: storedPath,
-      mimeType,
-      displayName: path.basename(sourceName.trim() || fileName),
-    };
+    return this.themeBackgroundStorage.saveAsset(data, sourceName, hintedMimeType);
   }
 
   async removeThemeBackground(storedPath: string | null | undefined): Promise<void> {
-    if (!storedPath?.trim()) {
-      return;
-    }
-
-    try {
-      await this.app.vault.adapter.remove(normalizePath(storedPath));
-    } catch {
-      // Ignore if file doesn't exist
-    }
+    await this.themeBackgroundStorage.remove(storedPath);
   }
 
   async readThemeBackgroundDataUrl(storedPath: string, hintedMimeType?: string): Promise<string | null> {
-    const normalizedStoredPath = normalizePath(storedPath);
-    const exists = await this.app.vault.adapter.exists(normalizedStoredPath);
-    if (!exists) {
-      return null;
-    }
-
-    const readBinary = this.app.vault.adapter.readBinary?.bind(this.app.vault.adapter) as
-      | undefined
-      | ((filePath: string) => Promise<ArrayBuffer>);
-    if (!readBinary) {
-      return null;
-    }
-
-    const data = await readBinary(normalizedStoredPath);
-    const mimeType = this.detectThemeBackgroundMimeType(data, hintedMimeType, normalizedStoredPath);
-    const base64 = Buffer.from(data).toString('base64');
-    return `data:${mimeType};base64,${base64}`;
+    return this.themeBackgroundStorage.readDataUrl(storedPath, hintedMimeType);
   }
 
   /** Ensure directory exists */
@@ -363,6 +307,40 @@ export class StorageService {
     const next = this.settingsWriteQueue.then(task, task);
     this.settingsWriteQueue = next.catch(() => undefined);
     return next;
+  }
+
+  private saveSettingsProfile<T extends Record<string, unknown>>(
+    profile: PersistedSettingsFileProfile<T>,
+    data: T,
+  ): Promise<void> {
+    return this.enqueueSettingsWrite(() => this.writeSettingsFile(
+      profile.filePath,
+      profile.backupPath,
+      profile.source,
+      data,
+    ));
+  }
+
+  private loadSettingsProfile<T extends Record<string, unknown>>(
+    profile: PersistedSettingsFileProfile<T>,
+    legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>,
+  ): Promise<SettingsFileLoadResult<Partial<T>>> {
+    return this.loadSettingsFile({
+      ...profile,
+      legacySettings,
+    });
+  }
+
+  private buildSettingsLoadResult(
+    core: SettingsFileLoadResult<Partial<PersistedCoreSettings>>,
+    ui: SettingsFileLoadResult<Partial<PersistedUiSettings>>,
+  ): SettingsLoadResult {
+    return {
+      core,
+      ui,
+      writable: core.source !== 'blocked' && ui.source !== 'blocked',
+      shouldPersist: core.shouldPersist || ui.shouldPersist,
+    };
   }
 
   private async writeSettingsFile<T extends Record<string, unknown>>(
@@ -408,13 +386,41 @@ export class StorageService {
   }
 
   private async loadSettingsFile<T extends Record<string, unknown>>(
-    filePath: string,
-    backupPath: string,
-    source: SettingsEnvelopeSource,
-    legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>,
-    extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>,
+    options: LoadSettingsFileOptions<T>,
   ): Promise<SettingsFileLoadResult<Partial<T>>> {
+    const {
+      filePath,
+      backupPath,
+      source,
+      legacySettings,
+      extractLegacyData,
+    } = options;
     const primary = await this.readEnvelopeFile<T>(filePath, source);
+    const backup = await this.readEnvelopeFile<T>(backupPath, source);
+    return this.resolveSettingsFileLoad({
+      filePath,
+      primary,
+      backup,
+      legacySettings,
+      extractLegacyData,
+    });
+  }
+
+  private resolveSettingsFileLoad<T extends Record<string, unknown>>(options: {
+    filePath: string;
+    primary: SettingsReadResult<Partial<T>>;
+    backup: SettingsReadResult<Partial<T>>;
+    legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>;
+    extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>;
+  }): SettingsFileLoadResult<Partial<T>> {
+    const {
+      filePath,
+      primary,
+      backup,
+      legacySettings,
+      extractLegacyData,
+    } = options;
+
     if (primary.kind === 'ok') {
       return {
         data: primary.data,
@@ -424,7 +430,6 @@ export class StorageService {
       };
     }
 
-    const backup = await this.readEnvelopeFile<T>(backupPath, source);
     if (backup.kind === 'ok') {
       return {
         data: backup.data,
@@ -545,72 +550,6 @@ export class StorageService {
       return {
         managedServer: null,
       };
-    }
-  }
-
-  private assertThemeBackgroundByteLength(byteLength: number): void {
-    if (byteLength > MAX_THEME_BACKGROUND_BYTES) {
-      throw new Error('The background image is too large. Maximum size is 64 MB.');
-    }
-  }
-
-  private detectThemeBackgroundMimeType(
-    data: ArrayBuffer,
-    hintedMimeType?: string,
-    sourceHint?: string,
-  ): string {
-    const normalizedHint = hintedMimeType?.split(';')[0]?.trim().toLowerCase();
-    if (normalizedHint && Object.prototype.hasOwnProperty.call(THEME_BACKGROUND_MIME_TO_EXTENSION, normalizedHint)) {
-      return normalizedHint;
-    }
-
-    const bytes = new Uint8Array(data);
-    const textPrefix = Buffer.from(bytes.slice(0, Math.min(bytes.length, 2048)))
-      .toString('utf-8')
-      .replace(/^\uFEFF/, '')
-      .trimStart();
-    if (/<svg[\s>]/i.test(textPrefix) || (/^<\?xml/i.test(textPrefix) && /\.svg$/i.test(sourceHint ?? ''))) {
-      return 'image/svg+xml';
-    }
-
-    if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-      return 'image/png';
-    }
-
-    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-      return 'image/jpeg';
-    }
-
-    if (bytes.length >= 6) {
-      const signature = Buffer.from(bytes.slice(0, 6)).toString('ascii');
-      if (signature === 'GIF87a' || signature === 'GIF89a') {
-        return 'image/gif';
-      }
-    }
-
-    if (bytes.length >= 12) {
-      const riff = Buffer.from(bytes.slice(0, 4)).toString('ascii');
-      const webp = Buffer.from(bytes.slice(8, 12)).toString('ascii');
-      if (riff === 'RIFF' && webp === 'WEBP') {
-        return 'image/webp';
-      }
-    }
-
-    const extension = path.extname(sourceHint ?? '').toLowerCase();
-    switch (extension) {
-      case '.svg':
-        return 'image/svg+xml';
-      case '.png':
-        return 'image/png';
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      case '.webp':
-        return 'image/webp';
-      case '.gif':
-        return 'image/gif';
-      default:
-        throw new Error('Only SVG, PNG, JPEG, WEBP, and GIF background images are supported.');
     }
   }
 }
