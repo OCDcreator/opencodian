@@ -9,7 +9,13 @@ import { type App, normalizePath } from 'obsidian';
 
 import type { OpenCodianPlugin } from '../../main';
 import type { ManagedServerState } from '../opencode/types';
-import type { ChatMessage, Conversation, ConversationMeta, OpenCodianSettings } from '../types';
+import {
+  type ChatMessage,
+  type Conversation,
+  type ConversationMeta,
+  normalizeConversationSessionSettings,
+  type OpenCodianSettings,
+} from '../types';
 import { type StoredThemeBackgroundAsset, ThemeBackgroundStorage } from './ThemeBackgroundStorage';
 
 const STORAGE_DIR = '.opencodian';
@@ -167,6 +173,7 @@ export class StorageService {
       openCodeSessionId: conversation.openCodeSessionId,
       currentNote: conversation.currentNote,
       externalContextPaths: conversation.externalContextPaths,
+      sessionSettings: normalizeConversationSessionSettings(conversation.sessionSettings),
       messages: conversation.messages,  // Save full messages with contentBlocks
     };
 
@@ -187,6 +194,7 @@ export class StorageService {
       if (!data.messages) {
         data.messages = [];
       }
+      data.sessionSettings = normalizeConversationSessionSettings(data.sessionSettings);
       return data;
     } catch {
       return null;

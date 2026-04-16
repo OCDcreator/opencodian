@@ -5,7 +5,7 @@
 
 ## 概述
 
-定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组等。供 `ModelConfigService` 和 `OpencodeConfigManager` 读写 OpenCode 原生配置时使用。类型设计允许完整配置与 provider 级配置保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
+定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、结构化 agent / command / compaction 配置等。供 `ModelConfigService` 和 `OpencodeConfigManager` 读写 OpenCode 原生配置时使用。类型设计允许完整配置与 provider 级配置保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
 
 ## 导入关系
 
@@ -25,15 +25,19 @@
 | `OpencodeProviderConfig` | 提供商配置（`npm?`, `name?`, `options?`, `models?`, `[key: string]: unknown`） |
 | `OpencodePluginOptions` | `Record<string, unknown>` — 插件选项 |
 | `OpencodePluginSpec` | `string \| [string, OpencodePluginOptions]` — 插件声明格式 |
+| `OpencodeAgentMode` | agent 模式（`'primary' \| 'subagent' \| 'all'`） |
+| `OpencodeAgentConfig` | 结构化 agent 配置（`description?`, `mode?`, `model?`, `prompt?`, `temperature?`, `top_p?`, `steps?`, `tools?`, `permission?`, `color?`, `hidden?`, `disable?`, `options?`） |
+| `OpencodeCommandConfig` | 结构化命令配置（`template?`, `description?`, `agent?`, `subtask?`, `model?`） |
+| `OpencodeCompactionConfig` | 压缩配置（`auto?`, `prune?`, `reserved?`） |
 | `OpencodeModelConfigSubset` | 模型相关配置子集（`model?`, `small_model?`, `provider?`, `enabled_providers?`, `disabled_providers?`） |
-| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `[key: string]: unknown`） |
+| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `compaction?`, `[key: string]: unknown`） |
 
 ## 核心逻辑
 
 ### 配置层级
 
 - `OpencodeModelConfigSubset` — 仅模型/提供商相关字段，供 `ModelConfigService` 局部读写
-- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`$schema` 等顶层字段
+- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`compaction`、`$schema` 等顶层字段
 
 ### 插件声明格式
 
@@ -74,7 +78,7 @@
 
 ## 关键方法
 
-无运行时方法，仅类型导出。源码约 44 行。
+无运行时方法，仅类型导出。源码约 80 行。
 
 ## 数据流
 
@@ -116,9 +120,26 @@
     }
   },
   "enabled_providers": ["anthropic"],
+  "default_agent": "build",
+  "compaction": {
+    "auto": true,
+    "reserved": 10000
+  },
+  "command": {
+    "test": {
+      "template": "Run the full test suite",
+      "agent": "build"
+    }
+  },
   "permission": { "*": "ask" },
   "plugin": ["oh-my-opencode"],
-  "agent": {}
+  "agent": {
+    "build": {
+      "description": "Primary build agent",
+      "mode": "primary",
+      "steps": 12
+    }
+  }
 }
 ```
 
@@ -142,4 +163,7 @@
 | `disabled_providers` | `string[]?` | 禁用的提供商列表 |
 | `permission` | `PermissionConfig \| PermissionAction?` | 权限配置 |
 | `plugin` | `OpencodePluginSpec[]?` | 插件列表 |
-| `agent` | `Record<string, unknown>?` | 代理配置 |
+| `agent` | `Record<string, OpencodeAgentConfig>?` | 代理配置 |
+| `command` | `Record<string, OpencodeCommandConfig>?` | 命令配置 |
+| `default_agent` | `string?` | 默认 primary agent |
+| `compaction` | `OpencodeCompactionConfig?` | 压缩配置 |

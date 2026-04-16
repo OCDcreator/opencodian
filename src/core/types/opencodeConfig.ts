@@ -27,6 +27,41 @@ export type OpencodePluginOptions = Record<string, unknown>;
 
 export type OpencodePluginSpec = string | [string, OpencodePluginOptions];
 
+export type OpencodeAgentMode = 'primary' | 'subagent' | 'all';
+
+export interface OpencodeAgentConfig {
+  description?: string;
+  mode?: OpencodeAgentMode;
+  model?: string;
+  prompt?: string;
+  temperature?: number;
+  top_p?: number;
+  steps?: number;
+  tools?: Record<string, boolean>;
+  permission?: import('./permission').PermissionConfig | import('./permission').PermissionAction;
+  color?: string;
+  hidden?: boolean;
+  disable?: boolean;
+  options?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface OpencodeCommandConfig {
+  template?: string;
+  description?: string;
+  agent?: string;
+  subtask?: boolean;
+  model?: string;
+  [key: string]: unknown;
+}
+
+export interface OpencodeCompactionConfig {
+  auto?: boolean;
+  prune?: boolean;
+  reserved?: number;
+  [key: string]: unknown;
+}
+
 export interface OpencodeModelConfigSubset {
   model?: string;
   small_model?: string;
@@ -39,6 +74,9 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   $schema?: string;
   permission?: import('./permission').PermissionConfig | import('./permission').PermissionAction;
   plugin?: OpencodePluginSpec[];
-  agent?: Record<string, unknown>;
+  agent?: Record<string, OpencodeAgentConfig>;
+  command?: Record<string, OpencodeCommandConfig>;
+  default_agent?: string;
+  compaction?: OpencodeCompactionConfig;
   [key: string]: unknown;
 }

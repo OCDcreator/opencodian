@@ -244,6 +244,86 @@ describe('OpencodeConfigManager plugin compatibility and paths', () => {
       const config = await manager.read();
       expect(config.provider?.demo?.models?.['demo-model']?.name).toBe('Demo Model');
     });
+
+    it('round-trips agent, command, compaction, and default agent config fields', async () => {
+      await manager.write({
+        default_agent: 'build',
+        compaction: {
+          auto: true,
+          prune: true,
+          reserved: 16000,
+        },
+        command: {
+          test: {
+            template: 'Run the full test suite',
+            description: 'Run tests',
+            agent: 'build',
+            subtask: false,
+            model: 'anthropic/claude-3-5-sonnet-20241022',
+          },
+        },
+        agent: {
+          build: {
+            description: 'Build-focused primary agent',
+            mode: 'primary',
+            model: 'anthropic/claude-3-5-sonnet-20241022',
+            prompt: 'You are the build agent.',
+            temperature: 0.2,
+            top_p: 0.9,
+            steps: 12,
+            color: '#7c3aed',
+            permission: {
+              task: {
+                '*': 'ask',
+              },
+            },
+            tools: {
+              bash: true,
+              write: true,
+            },
+            options: {
+              reasoningSummary: 'auto',
+            },
+          },
+        },
+        formatter: {
+          biome: {
+            disabled: true,
+          },
+        },
+      });
+
+      const config = await manager.read();
+      expect(config).toEqual(expect.objectContaining({
+        default_agent: 'build',
+        compaction: {
+          auto: true,
+          prune: true,
+          reserved: 16000,
+        },
+        command: {
+          test: expect.objectContaining({
+            template: 'Run the full test suite',
+            agent: 'build',
+            subtask: false,
+          }),
+        },
+        agent: {
+          build: expect.objectContaining({
+            mode: 'primary',
+            steps: 12,
+            tools: expect.objectContaining({
+              bash: true,
+            }),
+          }),
+        },
+        formatter: {
+          biome: {
+            disabled: true,
+          },
+        },
+      }));
+    });
   });
 
   describe('paths', () => {

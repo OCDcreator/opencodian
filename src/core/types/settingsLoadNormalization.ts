@@ -15,6 +15,8 @@ import {
   getDefaultThemeSettings,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeChatFontSizePx,
+  normalizeCompactionReservedTokens,
   normalizeEffortLevel,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
@@ -377,12 +379,18 @@ function buildNormalizedLoadedSettings(
       (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
         ? 'sticky-mask'
         : savedSettings.chatScrollMode,
+    autoCompactionEnabled:
+      typeof savedSettings.autoCompactionEnabled === 'boolean'
+        ? savedSettings.autoCompactionEnabled
+        : DEFAULT_SETTINGS.autoCompactionEnabled,
+    compactionReservedTokens: normalizeCompactionReservedTokens(savedSettings.compactionReservedTokens),
     effortLevel: normalizeEffortLevel(savedSettings.effortLevel),
     thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
     tabBarPosition: normalizeTabBarPosition(savedSettings.tabBarPosition),
     belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
     titleMode: normalizeTitleMode(savedSettings.titleMode),
     ...normalizedQuestionCardSettings,
+    chatFontSizePx: normalizeChatFontSizePx(savedSettings.chatFontSizePx),
     inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
     inputPanelGlassRefraction: context.normalizedInputPanelGlassRefraction,
     inputPanelGlassRefractionSvgFilter: context.normalizedInputPanelGlassRefractionSvgFilter,

@@ -39,8 +39,9 @@
 | `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
 | `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`） |
 | `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `status`, `result?`, `isExpanded?`） |
+| `ConversationSessionSettings` | 会话级覆盖设置（`autoCompactionEnabled?`, `compactionReservedTokens?`, `chatFontSizePx?`，支持 `null` 表示显式继承） |
 | `ConversationMeta` | 会话元数据（不含消息体） |
-| `Conversation` | 完整会话（含 `messages` 数组） |
+| `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据） |
 
 ### 流式事件
 
@@ -163,6 +164,7 @@
 - `ChatMessage.parts` 类型为 `unknown[]`，存储 OpenCode 原始 SDK parts 用于高级功能
 - `ChatMessage.streamState` 目前仅支持 `'interrupted'`，标记被取消的流
 - `Conversation.openCodeSessionId` 是 OpenCode 服务端的会话 ID，与本地 `Conversation.id` 不同
+- `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记
 - `ContentBlock.durationSeconds` 仅用于 `thinking` 类型块
 - `SessionDiffEntry` 来自 `session.diff()` API，在文件编辑后自动获取
 - `SessionTodo` 通过 `global.syncEvent.subscribe()` 监听 `todo.updated` 事件更新

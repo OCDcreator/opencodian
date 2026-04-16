@@ -128,6 +128,13 @@ export type QuestionCardPosition = 'inline' | 'above_input';
 /** Plugin isolation mode for local OpenCode */
 export type PluginIsolationMode = 'default' | 'pure';
 
+export const DEFAULT_AUTO_COMPACTION_ENABLED = true;
+export const DEFAULT_COMPACTION_RESERVED_TOKENS = 10000;
+export const DEFAULT_CHAT_FONT_SIZE_PX = 13;
+
+const MIN_CHAT_FONT_SIZE_PX = 10;
+const MAX_CHAT_FONT_SIZE_PX = 24;
+
 export function normalizeTitleMode(value: unknown): TitleMode {
   switch (value) {
     case 'ai':
@@ -891,6 +898,34 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+export function normalizeCompactionReservedTokens(
+  value: unknown,
+  fallback: number = DEFAULT_COMPACTION_RESERVED_TOKENS,
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const rounded = Math.round(value);
+  return rounded > 0 ? rounded : fallback;
+}
+
+export function normalizeChatFontSizePx(
+  value: unknown,
+  fallback: number = DEFAULT_CHAT_FONT_SIZE_PX,
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const rounded = Math.round(value);
+  if (rounded < MIN_CHAT_FONT_SIZE_PX || rounded > MAX_CHAT_FONT_SIZE_PX) {
+    return fallback;
+  }
+
+  return rounded;
+}
+
 export function getDefaultInputPanelGlassRefractionSettings(): InputPanelGlassRefractionSettings {
   return {
     glass: {
@@ -1587,6 +1622,8 @@ export interface OpenCodianSettings {
   // Security
   enableBlocklist: boolean;
   allowExternalAccess: boolean;
+  autoCompactionEnabled: boolean;
+  compactionReservedTokens: number;
   blockedCommands: PlatformBlockedCommands;
   permissionMode: PermissionMode;
   autoRestartOnPermissionChange: boolean;
@@ -1621,6 +1658,7 @@ export interface OpenCodianSettings {
   tabBarPosition: TabBarPosition;
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
   enableAutoScroll: boolean;
+  chatFontSizePx: number;
   chatScrollMode: ChatScrollMode;
   inputPanelTheme: InputPanelThemeId;
   inputPanelGlassRefraction: InputPanelGlassRefractionSettings;
@@ -1669,6 +1707,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   enableBlocklist: true,
   allowExternalAccess: false,
+  autoCompactionEnabled: DEFAULT_AUTO_COMPACTION_ENABLED,
+  compactionReservedTokens: DEFAULT_COMPACTION_RESERVED_TOKENS,
   blockedCommands: getDefaultBlockedCommands(),
   permissionMode: 'yolo',
   autoRestartOnPermissionChange: false,
@@ -1706,6 +1746,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   tabBarPosition: 'below-header',
   belowHeaderTabBarLayout: 'grid',
   enableAutoScroll: true,
+  chatFontSizePx: DEFAULT_CHAT_FONT_SIZE_PX,
   chatScrollMode: 'sticky-mask',
   inputPanelTheme: 'preset',
   inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),

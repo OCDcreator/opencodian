@@ -34,25 +34,25 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-describe('StorageService conversation persistence', () => {
-  describe('initialize', () => {
-    it('should create storage directories', async () => {
-      await storage.initialize();
+describe('StorageService initialization', () => {
+  it('should create storage directories', async () => {
+    await storage.initialize();
 
-      expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian');
-      expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/sessions');
-      expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/theme-backgrounds');
-    });
-
-    it('should handle existing directories', async () => {
-      mockAdapter.exists.mockResolvedValue(true);
-
-      await storage.initialize();
-
-      expect(mockAdapter.mkdir).not.toHaveBeenCalled();
-    });
+    expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian');
+    expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/sessions');
+    expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/theme-backgrounds');
   });
 
+  it('should handle existing directories', async () => {
+    mockAdapter.exists.mockResolvedValue(true);
+
+    await storage.initialize();
+
+    expect(mockAdapter.mkdir).not.toHaveBeenCalled();
+  });
+});
+
+describe('StorageService conversation persistence', () => {
   describe('saveConversation', () => {
     it('should save conversation metadata', async () => {
       const conversation = {
@@ -136,6 +136,7 @@ describe('StorageService conversation persistence', () => {
         },
       ]);
     });
+
   });
 
   describe('loadConversation', () => {
@@ -235,8 +236,68 @@ describe('StorageService conversation persistence', () => {
         },
       ]);
     });
+
   });
 
+});
+
+describe('StorageService conversation session settings', () => {
+  it('persists conversation session settings overrides', async () => {
+    const conversation = {
+      id: 'conv-session-settings',
+      title: 'Session settings conversation',
+      createdAt: 1234567890,
+      updatedAt: 1234567890,
+      openCodeSessionId: 'session-settings',
+      sessionSettings: {
+        autoCompactionEnabled: false,
+        compactionReservedTokens: 16000,
+        chatFontSizePx: null,
+      },
+      messages: [],
+    };
+
+    await storage.saveConversation(conversation as unknown as {
+      id: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+      openCodeSessionId: string;
+      sessionSettings: unknown;
+      messages: unknown[];
+    });
+
+    const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+    expect(savedData.sessionSettings).toEqual({
+      autoCompactionEnabled: false,
+      compactionReservedTokens: 16000,
+      chatFontSizePx: null,
+    });
+  });
+
+  it('restores normalized session settings overrides after reload', async () => {
+    mockAdapter.read.mockResolvedValue(JSON.stringify({
+      id: 'conv-session-settings',
+      title: 'Session settings conversation',
+      createdAt: 1234567890,
+      updatedAt: 1234567999,
+      openCodeSessionId: 'session-settings',
+      sessionSettings: {
+        autoCompactionEnabled: null,
+        compactionReservedTokens: 12000.8,
+        chatFontSizePx: 15.2,
+      },
+      messages: [],
+    }));
+
+    const result = await storage.loadFullConversation('conv-session-settings');
+
+    expect(result?.sessionSettings).toEqual({
+      autoCompactionEnabled: null,
+      compactionReservedTokens: 12001,
+      chatFontSizePx: 15,
+    });
+  });
 });
 
 describe('StorageService conversation indexes', () => {
@@ -308,6 +369,8 @@ describe('StorageService persisted core settings', () => {
         },
         enableBlocklist: true,
         allowExternalAccess: false,
+        autoCompactionEnabled: true,
+        compactionReservedTokens: 10000,
         blockedCommands: { unix: [], windows: [] },
         permissionMode: 'yolo',
         autoRestartOnPermissionChange: false,
@@ -344,6 +407,7 @@ describe('StorageService persisted core settings', () => {
         tabBarPosition: 'below-header',
         belowHeaderTabBarLayout: 'grid',
         enableAutoScroll: true,
+        chatFontSizePx: 13,
         chatScrollMode: 'sticky-mask',
         inputPanelTheme: 'preset',
         inputPanelGlassRefraction: { glass: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, card: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, pill: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 } },
@@ -466,6 +530,8 @@ describe('StorageService persisted ui settings', () => {
         },
         enableBlocklist: true,
         allowExternalAccess: false,
+        autoCompactionEnabled: true,
+        compactionReservedTokens: 10000,
         blockedCommands: { unix: [], windows: [] },
         permissionMode: 'yolo',
         autoRestartOnPermissionChange: false,
@@ -492,6 +558,7 @@ describe('StorageService persisted ui settings', () => {
         tabBarPosition: 'below-header',
         belowHeaderTabBarLayout: 'grid',
         enableAutoScroll: true,
+        chatFontSizePx: 13,
         chatScrollMode: 'sticky-mask',
         inputPanelTheme: 'preset',
         inputPanelGlassRefraction: { glass: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, card: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, pill: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 } },

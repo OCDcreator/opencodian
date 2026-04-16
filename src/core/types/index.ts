@@ -6,10 +6,12 @@ export {
   type ContextBreakdownSegment,
   type Conversation,
   type ConversationMeta,
+  type ConversationSessionSettings,
   createEmptyTabContextState,
   type ImageAttachment,
   type ImageMediaType,
   type MessageContextAttachment,
+  normalizeConversationSessionSettings,
   type OmoBackgroundTaskInfo,
   type OmoMessageMeta,
   type OmoReminderType,
@@ -92,6 +94,8 @@ export {
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceBackgroundFitMode,
   normalizeChatAppearanceSettings,
+  normalizeChatFontSizePx,
+  normalizeCompactionReservedTokens,
   normalizeDisabledModelRefs,
   normalizeEffortLevel,
   normalizeGlassRefractionInputPanelThemeId,
@@ -169,6 +173,10 @@ export {
 
 // OpenCode config types
 export {
+  type OpencodeAgentConfig,
+  type OpencodeAgentMode,
+  type OpencodeCommandConfig,
+  type OpencodeCompactionConfig,
   type OpencodeModelConfigSubset,
   type OpencodePluginOptions,
   type OpencodePluginSpec,
