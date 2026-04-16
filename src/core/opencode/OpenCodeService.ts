@@ -316,39 +316,8 @@ export class OpenCodeService {
       checkHealth: () => this.checkHealth(),
       delay: (ms, signal) => this.delay(ms, signal),
     });
-    const sessionLifecycleSdk: OpenCodeSessionLifecycleSdk = {
-      abort: async (request) => {
-        await this.sdk.session.abort(request);
-      },
-      create: (request) => this.sdk.session.create(request),
-      get: (request) => this.sdk.session.get(request),
-      list: () => this.sdk.session.list(),
-      messages: (request) => this.sdk.session.messages(request),
-      todo: (request) => this.sdk.session.todo(request),
-      status: () => this.sdk.session.status(),
-      delete: async (request) => {
-        await this.sdk.session.delete(request);
-      },
-      update: async (request) => {
-        await this.sdk.session.update(request);
-      },
-    };
-    const sessionControlSdk: OpenCodeSessionControlSdk = {
-      fork: (request) => this.sdk.session.fork(request),
-      revert: (request) => this.sdk.session.revert(request),
-      unrevert: (request) => this.sdk.session.unrevert(request),
-      diff: (request) => this.sdk.session.diff(request),
-      init: (request) => this.sdk.session.init(request),
-      children: (request) => this.sdk.session.children(request),
-      share: (request) => this.sdk.session.share(request),
-      unshare: (request) => this.sdk.session.unshare(request),
-      summarize: (request) => this.sdk.session.summarize(request),
-      message: (request) => this.sdk.session.message(request),
-      deleteMessage: (request) => this.sdk.session.deleteMessage(request),
-      command: (request) =>
-        this.sdk.session.command(request as Parameters<typeof this.sdk.session.command>[0]),
-      shell: (request) => this.sdk.session.shell(request),
-    };
+    const sessionLifecycleSdk = this.createSessionLifecycleSdk();
+    const sessionControlSdk = this.createSessionControlSdk();
     this.sessionLifecycle = new OpenCodeSessionLifecycleCoordinator({
       shouldUseSdkAbort: () => this.shouldUseSdk('sdkAbort'),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
@@ -503,6 +472,45 @@ export class OpenCodeService {
     this.serverManager = lifecycleAssembly.serverManager;
     this.serviceLifecycle = lifecycleAssembly.serviceLifecycle;
     this.settingsReconfiguration = lifecycleAssembly.settingsReconfiguration;
+  }
+
+  private createSessionLifecycleSdk(): OpenCodeSessionLifecycleSdk {
+    return {
+      abort: async (request) => {
+        await this.sdk.session.abort(request);
+      },
+      create: (request) => this.sdk.session.create(request),
+      get: (request) => this.sdk.session.get(request),
+      list: () => this.sdk.session.list(),
+      messages: (request) => this.sdk.session.messages(request),
+      todo: (request) => this.sdk.session.todo(request),
+      status: () => this.sdk.session.status(),
+      delete: async (request) => {
+        await this.sdk.session.delete(request);
+      },
+      update: async (request) => {
+        await this.sdk.session.update(request);
+      },
+    };
+  }
+
+  private createSessionControlSdk(): OpenCodeSessionControlSdk {
+    return {
+      fork: (request) => this.sdk.session.fork(request),
+      revert: (request) => this.sdk.session.revert(request),
+      unrevert: (request) => this.sdk.session.unrevert(request),
+      diff: (request) => this.sdk.session.diff(request),
+      init: (request) => this.sdk.session.init(request),
+      children: (request) => this.sdk.session.children(request),
+      share: (request) => this.sdk.session.share(request),
+      unshare: (request) => this.sdk.session.unshare(request),
+      summarize: (request) => this.sdk.session.summarize(request),
+      message: (request) => this.sdk.session.message(request),
+      deleteMessage: (request) => this.sdk.session.deleteMessage(request),
+      command: (request) =>
+        this.sdk.session.command(request as Parameters<typeof this.sdk.session.command>[0]),
+      shell: (request) => this.sdk.session.shell(request),
+    };
   }
 
   /** Initialize the service */

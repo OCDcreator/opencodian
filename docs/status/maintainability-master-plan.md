@@ -2,32 +2,32 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R155` 已完成；当前 `[NEXT]` 为 `R156 - Zero-warning hotspot closeout after typecheck recovery`。
+> **自动推进状态**: `R156` 已完成；当前 `[NEXT]` 为 `R157 - OpenCodianView residual thick-owner reduction under green gates`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R153-R155` 的 chat / opencode defragmentation 与 typecheck gate recovery。当前最新实测为：`npm run lint -- --format unix` 维持 `0 errors / 38 warnings`、`npm run typecheck` 通过、`npm test` 通过（`286` 个 suites / `1190` 个 tests）、`npm run build` 通过。因此本批已恢复绿色类型门槛，接下来转入 `R156` 把 remaining warnings 清到零，再继续削减 residual thick owner。**
+**当前分支已完成 `R153-R156` 的 chat / opencode defragmentation、typecheck gate recovery 与 zero-warning closeout。当前最新实测为：`npm run lint -- --format unix` 达到 `0 errors / 0 warnings`、`npm run typecheck` 通过、`npm test` 通过（`286` 个 suites / `1190` 个 tests）、`npm run build` 通过。因此本批现已恢复完整绿色质量门槛，接下来转入 `R157-R158` 在绿灯下继续削减 residual thick owner。**
 
 当前继续 maintainability 的理由不是 warning 数本身，而是远端仓库仍存在两类高价值 residual：
 
 - `src/features/chat/OpenCodianView.ts` 仍约 `4866` 行，且直接装配大量 chat runtime owner
 - `src/core/opencode/OpenCodeService.ts` 当前约 `1437` 行；`R154` 已把 `OpenCodeQueryGateway` 并回 `OpenCodeCatalogQueryCoordinator`，但 residual hotspot 仍需在 checkpoint 中复盘
 - `src/features/chat/services/` 里仍可见明显碎片化迹象：按文件名统计约有 `15` 个 `Adapter`、`7` 个 `Provider`、`5` 个 `Factory`、`23` 个 `Host` 命名文件，且存在一批 `40` 行以下的极薄文件
-- live hotspot 仍落在 `tests/**`、`src/features/chat/**`、`src/utils/glass/**` 与 `src/core/opencode/**`
+- lint gate 已清零；当前 residual hotspot 回到 `OpenCodianView` / `OpenCodeService` 主 owner 与其相邻装配面
 
-因此，新一批 queue 的策略调整为：**先把 typecheck 与 lint 清到全绿，再在绿色门槛上继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner；整个过程不部署、不制造薄碎片。**
+因此，新一批 queue 的策略调整为：**保持 `lint/typecheck/test/build` 全绿，再继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner；整个过程不部署、不制造薄碎片。**
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 38 warnings`
+- **lint**: `0 errors / 0 warnings`
 - **typecheck**: 通过
-- **最近验证**: `npm run lint -- --format unix` 通过（`38 problems`，均为 warnings）、`npm run typecheck` 通过、`npm test` 通过（`286 passed, 286 total` suites / `1190 passed, 1190 total` tests）、`npm run build` 通过
+- **最近验证**: `npm run lint -- --format unix` 通过（`0 errors / 0 warnings`）、`npm run typecheck` 通过、`npm test` 通过（`286 passed, 286 total` suites / `1190 passed, 1190 total` tests）、`npm run build` 通过
 - **部署策略**: 当前 maintainability 批次不做 Test Vault 部署，除非用户后续明确要求
-- **当前 `[NEXT]`**: `R156 - Zero-warning hotspot closeout after typecheck recovery`
+- **当前 `[NEXT]`**: `R157 - OpenCodianView residual thick-owner reduction under green gates`
 - **主热点**:
-  - `R154` 已删除 `1` 个 opencode query gateway 薄层，并把 provider/project/file/find/path/VCS/formatter/LSP 与 MCP status/auth surface 并回 `OpenCodeCatalogQueryCoordinator`
-  - `OpenCodeService.ts` 行数从 `1454` 降到 `1437`，direct coordinator/import surface 继续收缩
-  - `tests/**` 约 `8` 条 warnings、`src/features/chat/**` 约 `7` 条、`src/utils/glass/**` 约 `6` 条、`src/features/settings/**` 约 `4` 条、`src/core/opencode/**` 约 `4` 条
+  - `R156` 已把 live lint 从 `0 errors / 38 warnings` 收束到 `0 errors / 0 warnings`
+  - `OpenCodianView.ts` 仍约 `4866` 行，direct host/runtime wiring 仍是下一阶段最高价值入口
+  - `OpenCodeService.ts` 当前约 `1437` 行，constructor/import surface 已继续收束，但 residual coordinator assembly 仍需后续轮次继续压缩
 
 ## 3. 本批执行规则
 

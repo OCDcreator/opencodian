@@ -138,14 +138,18 @@ function smoothStep(edge0: number, edge1: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
-function roundedRectSDF(x: number, y: number, width: number, height: number, radius: number): number {
-  const qx = Math.abs(x) - width + radius;
-  const qy = Math.abs(y) - height + radius;
+function roundedRectSDF(
+  x: number,
+  y: number,
+  geometry: Pick<ShudingPanelGeometry, 'halfWidth' | 'halfHeight' | 'radius'>,
+): number {
+  const qx = Math.abs(x) - geometry.halfWidth + geometry.radius;
+  const qy = Math.abs(y) - geometry.halfHeight + geometry.radius;
 
   return (
     Math.min(Math.max(qx, qy), 0) +
     Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) -
-    radius
+    geometry.radius
   );
 }
 
@@ -446,13 +450,7 @@ function resolveUpstreamTextureSample(
   geometry: ShudingPanelGeometry,
   path: ShudingDisplacementPath,
 ): ShudingTextureSample {
-  const distanceToEdge = roundedRectSDF(
-    ix,
-    iy,
-    geometry.halfWidth,
-    geometry.halfHeight,
-    geometry.radius,
-  );
+  const distanceToEdge = roundedRectSDF(ix, iy, geometry);
   const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
   const scaled = smoothStep(0, 1, displacement);
 
@@ -479,13 +477,7 @@ function resolveDisplacementTextureSample(
     return resolveUpstreamTextureSample(ix, iy, geometry, 'adaptive-upstream');
   }
 
-  const distanceToEdge = roundedRectSDF(
-    ix,
-    iy,
-    geometry.halfWidth,
-    geometry.halfHeight,
-    geometry.radius,
-  );
+  const distanceToEdge = roundedRectSDF(ix, iy, geometry);
 
   let push = 0;
   if (settings.rectEdgeRefraction) {

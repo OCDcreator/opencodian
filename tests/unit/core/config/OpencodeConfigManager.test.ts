@@ -12,27 +12,25 @@ jest.mock('obsidian', () => ({
   Notice: jest.fn(),
 }));
 
-describe('OpencodeConfigManager', () => {
-  const testVaultPath = path.join(__dirname, 'test-vault');
-  let manager: OpencodeConfigManager;
+const testVaultPath = path.join(__dirname, 'test-vault');
+let manager: OpencodeConfigManager;
 
-  beforeEach(() => {
-    // Clean up test directory
-    if (fs.existsSync(testVaultPath)) {
-      fs.rmSync(testVaultPath, { recursive: true });
-    }
-    fs.mkdirSync(testVaultPath, { recursive: true });
-    
-    manager = new OpencodeConfigManager(testVaultPath);
-  });
+beforeEach(() => {
+  if (fs.existsSync(testVaultPath)) {
+    fs.rmSync(testVaultPath, { recursive: true });
+  }
+  fs.mkdirSync(testVaultPath, { recursive: true });
 
-  afterEach(() => {
-    // Clean up test directory
-    if (fs.existsSync(testVaultPath)) {
-      fs.rmSync(testVaultPath, { recursive: true });
-    }
-  });
+  manager = new OpencodeConfigManager(testVaultPath);
+});
 
+afterEach(() => {
+  if (fs.existsSync(testVaultPath)) {
+    fs.rmSync(testVaultPath, { recursive: true });
+  }
+});
+
+describe('OpencodeConfigManager file operations', () => {
   describe('exists', () => {
     it('should return false when config does not exist', async () => {
       const exists = await manager.exists();
@@ -83,7 +81,9 @@ describe('OpencodeConfigManager', () => {
       expect(parsed.permission.bash).toBe('allow');
     });
   });
+});
 
+describe('OpencodeConfigManager permissions', () => {
   describe('updatePermission', () => {
     it('should update permission config', async () => {
       await manager.updatePermission({ bash: 'allow', edit: 'ask' });
@@ -173,7 +173,9 @@ describe('OpencodeConfigManager', () => {
       expect(permission).toEqual({ bash: 'allow' });
     });
   });
+});
 
+describe('OpencodeConfigManager plugin compatibility and paths', () => {
   describe('plugin config', () => {
     it('should update plugin config entries', async () => {
       await manager.updatePluginConfig([

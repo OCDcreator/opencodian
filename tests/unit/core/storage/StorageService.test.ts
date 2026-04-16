@@ -27,14 +27,14 @@ const mockPlugin = {
   app: mockApp,
 };
 
-describe('StorageService', () => {
-  let storage: StorageService;
+let storage: StorageService;
 
-  beforeEach(() => {
-    storage = new StorageService(mockPlugin as unknown as { app: { vault: { adapter: typeof mockAdapter } } });
-    jest.clearAllMocks();
-  });
+beforeEach(() => {
+  storage = new StorageService(mockPlugin as unknown as { app: { vault: { adapter: typeof mockAdapter } } });
+  jest.clearAllMocks();
+});
 
+describe('StorageService conversation persistence', () => {
   describe('initialize', () => {
     it('should create storage directories', async () => {
       await storage.initialize();
@@ -237,6 +237,9 @@ describe('StorageService', () => {
     });
   });
 
+});
+
+describe('StorageService conversation indexes', () => {
   describe('listConversations', () => {
     it('should return sorted conversations', async () => {
       mockAdapter.list.mockResolvedValue({
@@ -290,6 +293,9 @@ describe('StorageService', () => {
     });
   });
 
+});
+
+describe('StorageService persisted core settings', () => {
   describe('persisted settings', () => {
     it('writes core settings as a versioned envelope', async () => {
       const { core } = splitPersistedSettings({
@@ -444,7 +450,11 @@ describe('StorageService', () => {
         expect.stringContaining('"userName": "Test User"'),
       );
     });
+  });
+});
 
+describe('StorageService persisted ui settings', () => {
+  describe('persisted settings', () => {
     it('writes ui settings as a versioned envelope', async () => {
       const { ui } = splitPersistedSettings({
         userName: 'Test User',
@@ -591,7 +601,11 @@ describe('StorageService', () => {
         expect.stringContaining('"settingsPanelScrollTop": 42'),
       );
     });
+  });
+});
 
+describe('StorageService persisted settings recovery', () => {
+  describe('persisted settings', () => {
     it('loads split settings from primary files', async () => {
       mockAdapter.exists.mockImplementation(async (filePath: string) => (
         filePath === '.opencodian/settings.core.json' || filePath === '.opencodian/settings.ui.json'
@@ -684,7 +698,11 @@ describe('StorageService', () => {
         disabledModelRefs: ['openai/gpt-4o-mini'],
       }));
     });
+  });
+});
 
+describe('StorageService persisted settings migration', () => {
+  describe('persisted settings', () => {
     it('migrates settings from the legacy single-file store', async () => {
       mockAdapter.exists.mockImplementation(async (filePath: string) => filePath === '.opencodian/settings.json');
       mockAdapter.read.mockResolvedValue(JSON.stringify({
@@ -751,7 +769,9 @@ describe('StorageService', () => {
       expect(result.core.data).toBeNull();
     });
   });
+});
 
+describe('StorageService runtime assets', () => {
   describe('managed server state', () => {
     it('should persist managed server state to runtime file', async () => {
       await storage.saveManagedServerState({

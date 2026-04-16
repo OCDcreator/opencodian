@@ -53,15 +53,15 @@ function getSelectedProviderState(modal: ModelConfigModal) {
   return state.providers.find((provider) => provider.uid === state.selectedProviderUid) ?? null;
 }
 
-describe('ModelConfigModal', () => {
-  beforeEach(() => {
-    jest.spyOn(ProviderIconService, 'resolveIconUrl').mockResolvedValue(null);
-  });
+beforeEach(() => {
+  jest.spyOn(ProviderIconService, 'resolveIconUrl').mockResolvedValue(null);
+});
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
+describe('ModelConfigModal opening flows', () => {
   it('renders an unavailable message when modelConfigService is missing', async () => {
     const plugin = createPlugin({
       modelConfigService: null,
@@ -151,7 +151,9 @@ describe('ModelConfigModal', () => {
     modal.close();
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
+});
 
+describe('ModelConfigModal save plan', () => {
   it('persists workspace saves through the shared save plan', async () => {
     const writeLocalModelConfig = jest.fn().mockResolvedValue(undefined);
     const plugin = createPlugin({
