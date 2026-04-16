@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R158` 已完成；当前 `[NEXT]` 为 `R159 - Checkpoint after green-gate recovery and thick-owner reduction`。
+> **当前状态**: [PAUSED] `R159` 已完成；当前没有可自动执行的后续任务。
 
 ## 控制规则
 
@@ -18,8 +18,8 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 0 warnings`
 - 当前 typecheck 基线：已恢复通过
-- 最近成功 phase：`docs/status/maintainability-phase-492.md`
-- 当前路线判断：`R153-R158` 已完成 chat / opencode defragmentation、typecheck gate recovery、zero-warning closeout、首个 view residual seam 回并与 `OpenCodeService` lifecycle/settings residual 回并；当前真实基线维持 `lint + typecheck + 全量测试 + build` 全绿，因此当前批次下一步转入 `R159` checkpoint。
+- 最近成功 phase：`docs/status/maintainability-phase-494.md`
+- 当前路线判断：`R153-R159` 已完成 chat / opencode defragmentation、typecheck gate recovery、zero-warning closeout、首个 view residual seam 回并、`OpenCodeService` lifecycle/settings residual 回并与 checkpoint 复盘；当前真实基线维持 `lint + typecheck + 全量测试 + build` 全绿，因此 maintainability autopilot 现应停回“当前没有可自动执行的后续任务”。
 
 ## Queue
 ## Queue
@@ -1674,7 +1674,7 @@
   - `OpenCodeService.ts` 行数与 direct coordinator assembly/import surface 继续下降
   - lint/typecheck/test/build 全绿保持
 
-### [NEXT] R159 - Checkpoint after green-gate recovery and thick-owner reduction
+### [DONE] R159 - Checkpoint after green-gate recovery and thick-owner reduction
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R155-R158` 的 typecheck 恢复、warning 清零、`OpenCodianView` / `OpenCodeService` 体量变化、碎片回并收益与剩余 residual，并据此判断 maintainability autopilot 是否还值得继续。
@@ -1691,6 +1691,6 @@
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R159 - Checkpoint after green-gate recovery and thick-owner reduction`。
-- 当前批次维持 `lint/typecheck/test/build` 全绿；下一步只做 `R155-R158` checkpoint，不自动扩展 `R160+`。
-- `R159` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。
+- 当前没有可自动执行的后续任务。
+- `R155-R159` 已全部完成，且当前批次继续维持 `lint/typecheck/test/build` 全绿。
+- 如需继续 maintainability，必须先由人工续排新的受控 queue；autopilot 不得自行扩展 `R160+`。

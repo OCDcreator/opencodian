@@ -1,20 +1,20 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] `R158` 已完成；当前 `[NEXT]` 为 `R159 - Checkpoint after green-gate recovery and thick-owner reduction`。
+> **当前状态**: [PAUSED] `R159` 已完成；当前没有可自动执行的后续任务。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R159 - Checkpoint after green-gate recovery and thick-owner reduction`
-- **本批目标**：保持 `lint/typecheck/test/build` 全绿，并复盘 `R155-R158` 的 gate recovery 与 thick-owner 回并收益
+- **当前 `[NEXT]`**：当前没有可自动执行的后续任务
+- **本批目标**：`R155-R159` 已完成；当前只保留 checkpoint 结论与残余热点快照，等待人工续排
 - **当前 lint 基线**：`0 errors / 0 warnings`
 - **当前 typecheck 基线**：通过
 - **热点顺序**：
-  1. `R159` checkpoint；当前不得自动扩展 `R160+`
+  1. 当前无自动 lane；如需继续，先人工续排新的 queue
 
 ## 本批边界
 
-- 只允许执行 `R155 -> R156 -> R157 -> R158 -> R159`；当前不得自动扩展 `R160+`
+- `R155 -> R156 -> R157 -> R158 -> R159` 已完成；当前不得自动扩展 `R160+`
 - 不新增薄 helper / adapter / provider / factory；优先把过薄文件并回相邻厚 owner，禁止并回 `OpenCodianView` / `OpenCodeService` 主文件本体
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
 - `OpenCodianView` / `OpenCodeService` 的改动必须带来可见的 import surface / assembly 收缩，不能只做“换文件不减复杂度”，也不能把碎片回灌进主文件
@@ -28,7 +28,7 @@
 - `src/core/opencode/OpenCodeService.ts`：`R158` 已把 settings reconfiguration residual 并回 `OpenCodeServiceLifecycleCoordinator`，当前约 `1475` 行，direct lifecycle fields 收束为单一 `serviceLifecycle`
 - `src/features/chat/services/`：`R157` 已把 hydration / sync-load 的两条 view-adjacent host-provider 链并回既有 factory owner
 - `R156` 已把 live lint 清到 `0 errors / 0 warnings`，并把 justified heavy-suite / demo / registry hotspot 统一收口到现有 owner/config 里
-- 下一步只做 `R159` checkpoint，而不是继续自动压缩新的 production hotspot
+- `R159` checkpoint 结论是暂停 autopilot；如需继续压缩新的 production hotspot，必须先人工续排
 
 ## 回归观察点
 
@@ -41,5 +41,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-492.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-487.md`
+- 最近成功 phase：`docs/status/maintainability-phase-494.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-494.md`
