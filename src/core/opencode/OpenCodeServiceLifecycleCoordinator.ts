@@ -1,6 +1,8 @@
 import { createLogger } from '../../shared';
 import { isLocalServerMode, type OpenCodianSettings } from '../types/settings';
-import type { ServerStatus } from './types';
+import { OpenCodeSettingsReconfigurationCoordinator } from './OpenCodeSettingsReconfigurationCoordinator';
+import { ServerManager } from './ServerManager';
+import type { ManagedServerState, ServerStatus } from './types';
 
 const logger = createLogger('OpenCodeService');
 
@@ -40,6 +42,30 @@ interface OpenCodeServiceLifecycleEventSubscriptionPort {
   restartSubscriptions(): void;
 }
 
+export interface OpenCodeServiceLifecycleAssemblyHost {
+  getSettings(): OpenCodianSettings;
+  setSettings(settings: OpenCodianSettings): void;
+  getBaseUrl(): string;
+  setBaseUrl(baseUrl: string): void;
+  getToolCatalogScopeKey(): string;
+  shouldUseSdkCrud(): boolean;
+  checkSdkHealth(): Promise<unknown>;
+  logHealthProbeFallback(error: unknown): void;
+  resetTransientConnectivityLogState(): void;
+  onServerStatusChange?(status: ServerStatus): void;
+  onError?(error: Error): void;
+  setVaultPath(path: string): void;
+  clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope: string): void;
+  fetchAvailableModels(): Promise<AvailableModelsResult>;
+  refreshToolIds(): Promise<unknown>;
+  refreshMcpServerStatus(): Promise<unknown>;
+  onModelsLoaded?(providers: ProviderSummary[]): void;
+  syncEvents: OpenCodeServiceLifecycleSyncSubscriptionPort;
+  openCodeEvents: OpenCodeServiceLifecycleEventSubscriptionPort;
+  initialManagedServerState?: ManagedServerState | null;
+  onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+}
+
 export interface OpenCodeServiceLifecycleCoordinatorHost {
   getSettings(): OpenCodianSettings;
   getBaseUrl(): string;
@@ -58,6 +84,75 @@ export interface OpenCodeServiceLifecycleCoordinatorHost {
   serverManager: OpenCodeServiceLifecycleServerManagerPort;
   syncEvents: OpenCodeServiceLifecycleSyncSubscriptionPort;
   openCodeEvents: OpenCodeServiceLifecycleEventSubscriptionPort;
+}
+
+export interface OpenCodeServiceLifecycleAssembly {
+  serverManager: ServerManager;
+  serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
+  settingsReconfiguration: OpenCodeSettingsReconfigurationCoordinator;
+}
+
+export function createOpenCodeServiceLifecycleAssembly(
+  host: OpenCodeServiceLifecycleAssemblyHost,
+): OpenCodeServiceLifecycleAssembly {
+  const serviceLifecycleRef: {
+    current: OpenCodeServiceLifecycleCoordinator | null;
+  } = { current: null };
+
+  const serverManager = new ServerManager(
+    OpenCodeSettingsReconfigurationCoordinator.createServerConfig(host.getSettings()),
+    {
+      onStatusChange: (status) => {
+        serviceLifecycleRef.current?.handleServerStatusChange(status);
+      },
+      onError: (error) => {
+        host.onError?.(error);
+      },
+    },
+    {
+      initialManagedServerState: host.initialManagedServerState,
+      onManagedServerStateChange: host.onManagedServerStateChange,
+    },
+  );
+
+  const serviceLifecycle = new OpenCodeServiceLifecycleCoordinator({
+    getSettings: host.getSettings,
+    getBaseUrl: host.getBaseUrl,
+    getToolCatalogScopeKey: host.getToolCatalogScopeKey,
+    shouldUseSdkCrud: host.shouldUseSdkCrud,
+    checkSdkHealth: host.checkSdkHealth,
+    logHealthProbeFallback: host.logHealthProbeFallback,
+    resetTransientConnectivityLogState: host.resetTransientConnectivityLogState,
+    notifyServerStatusChange: (status) => host.onServerStatusChange?.(status),
+    setVaultPath: host.setVaultPath,
+    clearToolSchemaCacheIfScopeChanged: host.clearToolSchemaCacheIfScopeChanged,
+    fetchAvailableModels: host.fetchAvailableModels,
+    refreshToolIds: host.refreshToolIds,
+    refreshMcpServerStatus: host.refreshMcpServerStatus,
+    notifyModelsLoaded: (providers) => host.onModelsLoaded?.(providers),
+    serverManager,
+    syncEvents: host.syncEvents,
+    openCodeEvents: host.openCodeEvents,
+  });
+  serviceLifecycleRef.current = serviceLifecycle;
+
+  const settingsReconfiguration = new OpenCodeSettingsReconfigurationCoordinator({
+    getCurrentSettings: host.getSettings,
+    setCurrentSettings: host.setSettings,
+    getCurrentBaseUrl: host.getBaseUrl,
+    setCurrentBaseUrl: host.setBaseUrl,
+    getToolCatalogScopeKey: host.getToolCatalogScopeKey,
+    clearToolSchemaCacheIfScopeChanged: host.clearToolSchemaCacheIfScopeChanged,
+    serverManager,
+    syncEvents: host.syncEvents,
+    openCodeEvents: host.openCodeEvents,
+  });
+
+  return {
+    serverManager,
+    serviceLifecycle,
+    settingsReconfiguration,
+  };
 }
 
 export class OpenCodeServiceLifecycleCoordinator {

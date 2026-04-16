@@ -1,8 +1,17 @@
 import {
+  createOpenCodeServiceLifecycleAssembly,
+  type OpenCodeServiceLifecycleAssemblyHost,
   OpenCodeServiceLifecycleCoordinator,
   type OpenCodeServiceLifecycleCoordinatorHost,
 } from '../../../../src/core/opencode/OpenCodeServiceLifecycleCoordinator';
+import type { OpenCodeSettingsReconfigurationCoordinatorHost } from '../../../../src/core/opencode/OpenCodeSettingsReconfigurationCoordinator';
+import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+
+jest.mock('obsidian', () => ({
+  Notice: jest.fn(),
+  requestUrl: jest.fn(),
+}));
 
 async function flushAsync(): Promise<void> {
   await Promise.resolve();
@@ -58,7 +67,91 @@ function createHost(
   return host as unknown as jest.Mocked<OpenCodeServiceLifecycleCoordinatorHost>;
 }
 
+function createAssemblyHost(
+  overrides: Partial<OpenCodeServiceLifecycleAssemblyHost> = {},
+): jest.Mocked<OpenCodeServiceLifecycleAssemblyHost> {
+  const host = {
+    getSettings: jest.fn(() => DEFAULT_SETTINGS),
+    setSettings: jest.fn(),
+    getBaseUrl: jest.fn(() => 'http://127.0.0.1:4096'),
+    setBaseUrl: jest.fn(),
+    getToolCatalogScopeKey: jest.fn(() => 'http://127.0.0.1:4096::'),
+    shouldUseSdkCrud: jest.fn(() => true),
+    checkSdkHealth: jest.fn().mockResolvedValue(true),
+    logHealthProbeFallback: jest.fn(),
+    resetTransientConnectivityLogState: jest.fn(),
+    onServerStatusChange: jest.fn(),
+    onError: jest.fn(),
+    setVaultPath: jest.fn(),
+    clearToolSchemaCacheIfScopeChanged: jest.fn(),
+    fetchAvailableModels: jest.fn().mockResolvedValue({
+      providers: [],
+    }),
+    refreshToolIds: jest.fn().mockResolvedValue(undefined),
+    refreshMcpServerStatus: jest.fn().mockResolvedValue(undefined),
+    onModelsLoaded: jest.fn(),
+    syncEvents: {
+      ensureSubscription: jest.fn(),
+      stopSubscription: jest.fn(),
+      restartSubscription: jest.fn(),
+    },
+    openCodeEvents: {
+      ensureSubscriptions: jest.fn(),
+      stopSubscriptions: jest.fn(),
+      restartSubscriptions: jest.fn(),
+    },
+    ...overrides,
+  };
+
+  return host as unknown as jest.Mocked<OpenCodeServiceLifecycleAssemblyHost>;
+}
+
 describe('OpenCodeServiceLifecycleCoordinator', () => {
+  it('assembles shared lifecycle owners around one server manager', () => {
+    const managedServerState = {
+      pid: 1234,
+      host: '127.0.0.1',
+      port: 4096,
+    };
+    const host = createAssemblyHost({
+      initialManagedServerState: managedServerState,
+    });
+
+    const assembly = createOpenCodeServiceLifecycleAssembly(host);
+    const lifecycleHost = (
+      assembly.serviceLifecycle as unknown as {
+        host: OpenCodeServiceLifecycleCoordinatorHost;
+      }
+    ).host;
+    const settingsHost = (
+      assembly.settingsReconfiguration as unknown as {
+        host: OpenCodeSettingsReconfigurationCoordinatorHost;
+      }
+    ).host;
+
+    expect(assembly.serverManager).toBeInstanceOf(ServerManager);
+    expect(assembly.serverManager.getManagedServerStateSnapshot()).toEqual(managedServerState);
+    expect(lifecycleHost.serverManager).toBe(assembly.serverManager);
+    expect(settingsHost.serverManager).toBe(assembly.serverManager);
+
+    const handleServerStatusChange = jest
+      .spyOn(assembly.serviceLifecycle, 'handleServerStatusChange')
+      .mockImplementation(() => undefined);
+    const serverManagerEvents = (assembly.serverManager as unknown as {
+      events: {
+        onStatusChange?: (status: 'running') => void;
+        onError?: (error: Error) => void;
+      };
+    }).events;
+
+    serverManagerEvents.onStatusChange?.('running');
+    expect(handleServerStatusChange).toHaveBeenCalledWith('running');
+
+    const error = new Error('lifecycle boom');
+    serverManagerEvents.onError?.(error);
+    expect(host.onError).toHaveBeenCalledWith(error);
+  });
+
   it('initializes by starting only when local auto-start is enabled', async () => {
     const host = createHost();
     const coordinator = new OpenCodeServiceLifecycleCoordinator(host);

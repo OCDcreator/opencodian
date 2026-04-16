@@ -1,15 +1,15 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R148`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R149`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R148 - OpenCodeService and ServerManager lifecycle residual seam`
+- **当前 `[NEXT]`**：`R149 - Streaming transform/runtime residual seam`
 - **本批目标**：`R138-R152` 分三批继续收束 live residual：chat runtime/service → settings/model/startup → opencode/streaming/persistence/glass-test cleanup
-- **当前 lint 基线**：`0 errors / 41 warnings`
+- **当前 lint 基线**：`0 errors / 40 warnings`
 - **热点顺序**：
-  1. `R148-R150`: `src/core/opencode/**`、streaming utils、storage/provider-icon persistence residual
+  1. `R149-R150`: streaming utils、storage/provider-icon persistence residual
   2. `R151`: 仅在 live hotspot 仍支撑时处理 heavy tests / opt-in glass warning cleanup
   3. `R152`: 批次 continuation checkpoint
 
@@ -33,5 +33,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-482.md`
+- 最近成功 phase：`docs/status/maintainability-phase-483.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-482.md`

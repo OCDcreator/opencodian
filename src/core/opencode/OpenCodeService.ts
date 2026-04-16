@@ -55,6 +55,7 @@ import {
   OpenCodeSdkFacade,
 } from './OpenCodeSdkFacade';
 import {
+  createOpenCodeServiceLifecycleAssembly,
   OpenCodeServiceLifecycleCoordinator,
 } from './OpenCodeServiceLifecycleCoordinator';
 import {
@@ -456,60 +457,34 @@ export class OpenCodeService {
       delay: (ms, signal) => this.delay(ms, signal),
     });
 
-    this.serverManager = new ServerManager(
-      OpenCodeSettingsReconfigurationCoordinator.createServerConfig(settings),
-      {
-        onStatusChange: (status) => {
-          this.serviceLifecycle.handleServerStatusChange(status);
-        },
-        onError: (error) => {
-          events.onError?.(error);
-        },
-      },
-      {
-        initialManagedServerState: runtimeOptions.initialManagedServerState,
-        onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
-      },
-    );
-    this.serviceLifecycle = new OpenCodeServiceLifecycleCoordinator({
+    const lifecycleAssembly = createOpenCodeServiceLifecycleAssembly({
       getSettings: () => this.settings,
+      setSettings: (nextSettings) => { this.settings = nextSettings; },
       getBaseUrl: () => this.baseUrl,
+      setBaseUrl: (nextBaseUrl) => { this.baseUrl = nextBaseUrl; },
       getToolCatalogScopeKey: () => this.catalogQueries.getToolCatalogScopeKey(),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       checkSdkHealth: async () => this.getSdkFacade({ includeDirectory: false }).global.health(),
       logHealthProbeFallback: (error) =>
         logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error),
       resetTransientConnectivityLogState: () => this.diagnostics.resetTransientConnectivityLogState(),
-      notifyServerStatusChange: (status) => events.onServerStatusChange?.(status),
-      setVaultPath: (path) => {
-        this.vaultPath = path;
-      },
+      onServerStatusChange: (status) => events.onServerStatusChange?.(status),
+      onError: (error) => events.onError?.(error),
+      setVaultPath: (path) => { this.vaultPath = path; },
       clearToolSchemaCacheIfScopeChanged: (previousScope) =>
         this.catalogQueries.clearToolSchemaCacheIfScopeChanged(previousScope),
       fetchAvailableModels: () => this.getAvailableModels(),
       refreshToolIds: () => this.refreshToolIds(),
       refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
-      notifyModelsLoaded: (providers) => this.events.onModelsLoaded?.(providers),
-      serverManager: this.serverManager,
+      onModelsLoaded: (providers) => this.events.onModelsLoaded?.(providers),
       syncEvents: this.syncEventRuntime,
       openCodeEvents: this.openCodeEventRuntime,
+      initialManagedServerState: runtimeOptions.initialManagedServerState,
+      onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
     });
-    this.settingsReconfiguration = new OpenCodeSettingsReconfigurationCoordinator({
-      getCurrentSettings: () => this.settings,
-      setCurrentSettings: (nextSettings) => {
-        this.settings = nextSettings;
-      },
-      getCurrentBaseUrl: () => this.baseUrl,
-      setCurrentBaseUrl: (nextBaseUrl) => {
-        this.baseUrl = nextBaseUrl;
-      },
-      getToolCatalogScopeKey: () => this.catalogQueries.getToolCatalogScopeKey(),
-      clearToolSchemaCacheIfScopeChanged: (previousScope) =>
-        this.catalogQueries.clearToolSchemaCacheIfScopeChanged(previousScope),
-      serverManager: this.serverManager,
-      syncEvents: this.syncEventRuntime,
-      openCodeEvents: this.openCodeEventRuntime,
-    });
+    this.serverManager = lifecycleAssembly.serverManager;
+    this.serviceLifecycle = lifecycleAssembly.serviceLifecycle;
+    this.settingsReconfiguration = lifecycleAssembly.settingsReconfiguration;
   }
 
   /** Initialize the service */

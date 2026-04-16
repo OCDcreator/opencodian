@@ -7,6 +7,8 @@
 
 `OpenCodeServiceLifecycleCoordinator` 是 `OpenCodeService` 内部的 service bootstrap / subscription lifecycle owner。它把服务初始化、server start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 vault path scope refresh 与 sync / open-code event subscription 的启动停止顺序收束到一个 coordinator 中。
 
+同一模块现在还暴露 `createOpenCodeServiceLifecycleAssembly()`，把 `ServerManager`、`OpenCodeServiceLifecycleCoordinator` 与 `OpenCodeSettingsReconfigurationCoordinator` 的共享 lifecycle 装配集中到一个现有厚 owner 中，避免 `OpenCodeService` 构造函数继续直接铺开这段 wiring。
+
 它不改变 `OpenCodeService` 的公开 API；上层仍然调用 `initialize()`、`start()`、`stop()`、`dispose()`、`checkHealth()` 和 `setVaultPath()`，只是这些入口的 runtime 编排不再直接铺在主门面里。
 
 ## 导入关系
@@ -24,10 +26,19 @@
 
 ## 核心类型 / 接口
 
+- `OpenCodeServiceLifecycleAssemblyHost`: lifecycle 装配 seam，补充 settings/baseUrl 写回、managed server state 回传与 upward events，供 `createOpenCodeServiceLifecycleAssembly()` 统一创建共享的 `ServerManager`、`serviceLifecycle` 与 `settingsReconfiguration` owner。
 - `OpenCodeServiceLifecycleCoordinatorHost`: host seam，提供 settings/baseUrl、原始 SDK health probe payload、server manager、sync/open-code event subscription ports、model/catalog bootstrap hooks 与对外通知回调。
 - `OpenCodeServiceLifecycleCoordinator`: 持有初始化、start/stop/dispose、vault path scope refresh、health fallback、server-running bootstrap 与 event subscription restart 的编排逻辑。
 
 ## 核心逻辑
+
+### Lifecycle assembly
+
+`createOpenCodeServiceLifecycleAssembly()` 会先用当前 settings 创建共享的 `ServerManager`，再把同一个 manager 注入 `OpenCodeServiceLifecycleCoordinator` 与 `OpenCodeSettingsReconfigurationCoordinator`：
+
+- `ServerManager.onStatusChange` 直接回流到 `serviceLifecycle.handleServerStatusChange()`
+- `ServerManager.onError` 继续透传给 `OpenCodeService` 上游事件回调
+- settings reconfiguration 仍保留既有 rollback / restart 语义，只是不再由 `OpenCodeService` 构造函数亲自组装
 
 ### Initialize / start / stop
 

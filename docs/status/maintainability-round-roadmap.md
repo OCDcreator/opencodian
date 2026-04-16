@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R148`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R149`。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 41 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-482.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R147` 已完成 settings model catalog/provider icon、settings style/input panel、model config layering、startup normalization residual 与 settings/startup checkpoint，当前 queue 进入 `R148-R150` 的 opencode/streaming/persistence residual，再视 live hotspot 决定是否执行 `R151` heavy cleanup。
+- 当前 live lint 基线：`0 errors / 40 warnings`
+- 最近成功 phase：`docs/status/maintainability-phase-483.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R147` 已完成 settings model catalog/provider icon、settings style/input panel、model config layering、startup normalization residual 与 settings/startup checkpoint，`R148` 已完成 opencode lifecycle assembly residual，当前 queue 进入 `R149-R150` 的 streaming/persistence residual，再视 live hotspot 决定是否执行 `R151` heavy cleanup。
 
 ## Queue
 ## Queue
@@ -1462,7 +1462,7 @@
 
 - **批次目标**: 最后处理 opencode/streaming/persistence production residual，再只在 live lint 仍支撑时做 heavy tests / opt-in glass cleanup；`R152` 作为整批 continuation checkpoint。
 
-### [NEXT] R148 - OpenCodeService and ServerManager lifecycle residual seam
+### [DONE] R148 - OpenCodeService and ServerManager lifecycle residual seam
 
 - **Lane**: Maintainability / opencode lifecycle
 - **目标**: 沿 `OpenCodeService`、`ServerManager` 与 lifecycle coordinator 收束 constructor/settings/server adoption residual，优先把 lifecycle decision 与 restart/rollback 责任留在既有厚 owner。
@@ -1475,7 +1475,7 @@
 - **禁止项**: 不改变 SDK-first / legacy fallback、managed server adoption/restart、auth fallback、directory scope、subscription pause/resume、session-scoped abort/detach 或 sync-event bridge 语义。
 - **验收**: opencode lifecycle residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R149 - Streaming transform/runtime residual seam
+### [NEXT] R149 - Streaming transform/runtime residual seam
 
 - **Lane**: Maintainability / streaming runtime
 - **目标**: 沿 `OpenCodeStreamEventTransformer`、`OpenCodeStreamingRuntimeCoordinator`、stream controller 与 tool renderer 收束 stream transform/runtime/render residual，保持 foreground status 与 message-layer sync signals 分离。
