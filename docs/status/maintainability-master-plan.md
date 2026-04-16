@@ -2,19 +2,19 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R147`。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R148`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R146` 并已人工续排 `R147-R152`。`R146` 已把 `main.ts` 的 persisted-settings bootstrap normalization 收束到相邻 owner `settingsLoadNormalization.ts`，并把 startup/settings focused suites 拆开，live lint 从 `0 errors / 44 warnings` 收敛到 `0 errors / 41 warnings`；当前 queue 进入 `R147` checkpoint，随后继续按 opencode/streaming/persistence residual → justified heavy cleanup 推进，并只在 `R152` 保留本批 continuation checkpoint。**
+**当前分支已完成 `R88-R147` 并已人工续排 `R148-R152`。`R147` 已完成 settings/startup checkpoint，复盘 `R143-R146` 的 settings/model/startup 收益、最近 Test Vault 部署与 warning 轨迹，并确认 live lint 维持 `0 errors / 41 warnings`；当前 queue 已进入 `R148-R150` 的 opencode/streaming/persistence residual，随后仅在热点仍支撑时处理 `R151` heavy cleanup，并在 `R152` 做 continuation checkpoint。**
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 41 warnings`
-- **最近验证**: `R146` 运行 focused `npm test -- themeSettingsMigration.test.ts settings.test.ts settingsAppearance.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 41 warnings`，`npm test` 为 `286 passed, 286 total` suites / `1189 passed, 1189 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160757`
+- **最近验证**: `R147` 运行全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 41 warnings`，`npm test` 为 `286 passed, 286 total` suites / `1189 passed, 1189 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160803`
 - **最近 Test Vault 部署**: `R146`，`BUILD_ID` `autopilot-maintainability.202604160757`
-- **当前 `[NEXT]`**: `R147 - Checkpoint after settings/startup seams`
-- **主热点**: live lint 仍为 `41` warnings，其中 `tests/**` 约 `9`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 settings modal/provider-icon/persistence residual；`R147` 先做 settings/startup checkpoint，再继续 `R148-R150` 的 opencode/streaming/persistence residual
+- **当前 `[NEXT]`**: `R148 - OpenCodeService and ServerManager lifecycle residual seam`
+- **主热点**: live lint 仍为 `41` warnings，其中 `tests/**` 约 `9`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 settings modal/provider-icon/persistence residual；当前先按 `R148-R150` 收束 opencode/streaming/persistence production residual，再视 live hotspot 决定是否执行 `R151`
 
 ## 3. 本批执行规则
 
