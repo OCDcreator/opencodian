@@ -1,34 +1,34 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [PAUSED] `R159` 已完成；当前没有可自动执行的后续任务。
+> **当前状态**: [ACTIVE] `R159` 已完成；当前 `[NEXT]` 为 `R160 - OpenCodianView final residual thick seam closeout`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：当前没有可自动执行的后续任务
-- **本批目标**：`R155-R159` 已完成；当前只保留 checkpoint 结论与残余热点快照，等待人工续排
+- **当前 `[NEXT]`**：`R160 - OpenCodianView final residual thick seam closeout`
+- **本批目标**：最后一批受控 closeout，只处理 `OpenCodianView` 与 `OpenCodeService` 两个 residual thick seam，然后 checkpoint 停机
 - **当前 lint 基线**：`0 errors / 0 warnings`
 - **当前 typecheck 基线**：通过
 - **热点顺序**：
-  1. 当前无自动 lane；如需继续，先人工续排新的 queue
+  1. `R160`：`OpenCodianView` final residual thick seam
+  2. `R161`：`OpenCodeService` final residual thick seam
+  3. `R162`：高可维护性 checkpoint；不得自动扩展 `R163+`
 
 ## 本批边界
 
-- `R155 -> R156 -> R157 -> R158 -> R159` 已完成；当前不得自动扩展 `R160+`
+- 只允许执行 `R160 -> R161 -> R162`；当前不得自动扩展 `R163+`
 - 不新增薄 helper / adapter / provider / factory；优先把过薄文件并回相邻厚 owner，禁止并回 `OpenCodianView` / `OpenCodeService` 主文件本体
-- `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
-- `OpenCodianView` / `OpenCodeService` 的改动必须带来可见的 import surface / assembly 收缩，不能只做“换文件不减复杂度”，也不能把碎片回灌进主文件
-- tests / glass / demo cleanup 只允许沿现有 suite / owner 内部整理，不允许删断言、减覆盖或把实验特性暴露到 stable UI path
+- `OpenCodianView` / `OpenCodeService` 的改动必须带来可见的 line count、import surface 或 assembly surface 收缩，不能只做“换文件不减复杂度”
+- tests / glass / demo cleanup 只允许作为阻塞修复；不允许删断言、减覆盖或把实验特性暴露到 stable UI path
 - 当前 maintainability 批次默认不部署；部署只在用户后续明确要求时才允许恢复
-- 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
+- 每轮必须保持 `npm run lint`、`npm run typecheck`、`npm test`、`npm run build` 全绿
 
 ## 远端实测热点提示
 
-- `src/features/chat/OpenCodianView.ts`：`R157` 后约 `4859` 行
-- `src/core/opencode/OpenCodeService.ts`：`R158` 已把 settings reconfiguration residual 并回 `OpenCodeServiceLifecycleCoordinator`，当前约 `1475` 行，direct lifecycle fields 收束为单一 `serviceLifecycle`
-- `src/features/chat/services/`：`R157` 已把 hydration / sync-load 的两条 view-adjacent host-provider 链并回既有 factory owner
-- `R156` 已把 live lint 清到 `0 errors / 0 warnings`，并把 justified heavy-suite / demo / registry hotspot 统一收口到现有 owner/config 里
-- `R159` checkpoint 结论是暂停 autopilot；如需继续压缩新的 production hotspot，必须先人工续排
+- `src/features/chat/OpenCodianView.ts`：`R157` 后约 `4859` 行、`89` 条 import；优先处理仍由 view 直接装配的 conversation/render/composer/question/background runtime residual
+- `src/core/opencode/OpenCodeService.ts`：`R158` 后约 `1475` 行、`24` 条 import；优先处理仍由 service 直接持有的 diagnostics/session/question facade residual
+- `src/features/chat/services/`：只作为并回/收束目标周边证据，不为清理碎片新增新的薄层
+- 当前质量门槛已经全绿，任何 round 若不能维持 `0 errors / 0 warnings` 与 typecheck/test/build 通过，必须最小修复或失败回滚
 
 ## 回归观察点
 
@@ -36,7 +36,7 @@
 - chat services：background-task timeline、authoritative sync、question/todo runtime、input panel theme、model/permission selector 语义不变
 - `OpenCodeService` / streaming：SDK-first / legacy fallback、session-scoped abort/detach、managed server adoption/restart、sync-event bridge 语义不变
 - tests / glass / demo：heavy suites coverage、opt-in glass 行为与 experimental demo guardrail 不变
-- lint：整批都必须维持 `0 errors`
+- lint/typecheck/test/build：整批必须全绿
 
 ## 历史入口
 
