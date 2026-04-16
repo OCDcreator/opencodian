@@ -153,7 +153,7 @@ export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
       host.resetBackgroundTaskIndicator(host.getActiveTabId());
     },
     syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
-      host.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      host.syncBackgroundTaskStateFromConversation(conversation, tabId ?? null);
     },
     renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
       host.renderBackgroundTaskIndicatorIfNeeded(tabId),

@@ -57,11 +57,13 @@ import {
 } from './OpenCodeServiceLifecycleCoordinator';
 import {
   OpenCodeSessionControlOrchestrator,
+  type OpenCodeSessionControlSdk,
   type SessionContextUsageSnapshot,
 } from './OpenCodeSessionControlOrchestrator';
 import {
   type Message,
   OpenCodeSessionLifecycleCoordinator,
+  type OpenCodeSessionLifecycleSdk,
   type Part,
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
@@ -314,10 +316,43 @@ export class OpenCodeService {
       checkHealth: () => this.checkHealth(),
       delay: (ms, signal) => this.delay(ms, signal),
     });
+    const sessionLifecycleSdk: OpenCodeSessionLifecycleSdk = {
+      abort: async (request) => {
+        await this.sdk.session.abort(request);
+      },
+      create: (request) => this.sdk.session.create(request),
+      get: (request) => this.sdk.session.get(request),
+      list: () => this.sdk.session.list(),
+      messages: (request) => this.sdk.session.messages(request),
+      todo: (request) => this.sdk.session.todo(request),
+      status: () => this.sdk.session.status(),
+      delete: async (request) => {
+        await this.sdk.session.delete(request);
+      },
+      update: async (request) => {
+        await this.sdk.session.update(request);
+      },
+    };
+    const sessionControlSdk: OpenCodeSessionControlSdk = {
+      fork: (request) => this.sdk.session.fork(request),
+      revert: (request) => this.sdk.session.revert(request),
+      unrevert: (request) => this.sdk.session.unrevert(request),
+      diff: (request) => this.sdk.session.diff(request),
+      init: (request) => this.sdk.session.init(request),
+      children: (request) => this.sdk.session.children(request),
+      share: (request) => this.sdk.session.share(request),
+      unshare: (request) => this.sdk.session.unshare(request),
+      summarize: (request) => this.sdk.session.summarize(request),
+      message: (request) => this.sdk.session.message(request),
+      deleteMessage: (request) => this.sdk.session.deleteMessage(request),
+      command: (request) =>
+        this.sdk.session.command(request as Parameters<typeof this.sdk.session.command>[0]),
+      shell: (request) => this.sdk.session.shell(request),
+    };
     this.sessionLifecycle = new OpenCodeSessionLifecycleCoordinator({
       shouldUseSdkAbort: () => this.shouldUseSdk('sdkAbort'),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
-      getSdkSession: () => this.sdk.session,
+      getSdkSession: () => sessionLifecycleSdk,
       postLegacy: (path, body) => this.post(path, body),
       getLegacy: (path) => this.get(path),
       patchLegacy: (path, body) => this.patch(path, body),
@@ -333,7 +368,7 @@ export class OpenCodeService {
     }, this.syncEventRuntime);
     this.sessionControl = new OpenCodeSessionControlOrchestrator({
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
-      getSdkSession: () => this.sdk.session,
+      getSdkSession: () => sessionControlSdk,
       getSdkPart: () => this.sdk.part,
       postLegacy: (path, body) => this.post(path, body),
       getLegacy: (path) => this.get(path),

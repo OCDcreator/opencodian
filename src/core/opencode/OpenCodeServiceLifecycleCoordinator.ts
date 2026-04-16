@@ -31,12 +31,14 @@ interface OpenCodeServiceLifecycleServerManagerPort {
 }
 
 interface OpenCodeServiceLifecycleSyncSubscriptionPort {
+  hasListeners(): boolean;
   ensureSubscription(): void;
   stopSubscription(keepWanted?: boolean): void;
   restartSubscription(): void;
 }
 
 interface OpenCodeServiceLifecycleEventSubscriptionPort {
+  hasListeners(): boolean;
   ensureSubscriptions(): void;
   stopSubscriptions(keepWanted?: boolean): void;
   restartSubscriptions(): void;

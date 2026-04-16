@@ -48,6 +48,10 @@ type ModelConfigService = NonNullable<OpenCodianPlugin['modelConfigService']>;
 interface SettingsModelSectionRuntimeState
   extends SettingsModelCatalogRuntimeState, SettingsModelIconCacheRuntimeState {}
 
+type SettingsModelSectionActiveRuntime =
+  SettingsModelCatalogRuntimeState
+  | SettingsModelIconCacheRuntimeState;
+
 interface SettingsModelSectionBodies {
   commonBodyEl: HTMLElement;
   toolsBodyEl: HTMLElement;
@@ -161,7 +165,7 @@ export class SettingsModelSection {
       applyProviderIcon: (targetEl, providerId, label) => this.iconCacheManager.applyProviderIcon(
         targetEl,
         providerId,
-        label,
+        label ?? providerId,
       ),
       onProviderAvailabilityChange: (providerIds, enabled) => this.catalogCoordinator.applyProviderAvailabilityChange(
         providerIds,
@@ -291,7 +295,7 @@ export class SettingsModelSection {
     await this.iconCacheManager.refreshIconCacheOverview();
   }
 
-  private isRuntimeActive(runtime: SettingsModelSectionRuntimeState): boolean {
+  private isRuntimeActive(runtime: SettingsModelSectionActiveRuntime): boolean {
     return this.runtime === runtime;
   }
 }

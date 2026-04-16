@@ -635,10 +635,10 @@ export class OpenCodianView extends ItemView {
       getCurrentConversation: () => this.currentConversation,
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       loadConversation: (conversationId) => this.loadConversation(conversationId),
-      getConversationById: (conversationId) =>
-        this.plugin.getConversationById(conversationId, {
+      getConversationById: async (conversationId) =>
+        (await this.plugin.getConversationById(conversationId, {
           preferCache: true,
-        }),
+        })) ?? null,
       cancelConversationTitleGeneration: (conversationId) => {
         titleGenerationService.cancelConversation(conversationId);
       },
@@ -672,8 +672,9 @@ export class OpenCodianView extends ItemView {
         this.setTooltipLabel(element, label, position);
       },
       getInputPlaceholder: () => this.getInputPlaceholder(),
-      addChosenFileContextToActiveTab: () =>
-        this.composerContextViewFacade.addChosenFileContextToActiveTab(),
+      addChosenFileContextToActiveTab: async () => {
+        await this.composerContextViewFacade.addChosenFileContextToActiveTab();
+      },
       mountSelectionControls: (toolbar) => {
         this.chatSelectionControlsCoordinator.build(toolbar);
       },
@@ -1497,7 +1498,8 @@ export class OpenCodianView extends ItemView {
         this.registerEvent(eventRef);
       },
       registerDomEvent: (target, type, callback, options) => {
-        this.registerDomEvent(target, type, callback, options);
+        const registerDomEvent = this.registerDomEvent.bind(this) as unknown as ComposerContextViewHost['registerDomEvent'];
+        registerDomEvent(target, type, callback, options);
       },
     };
   }
@@ -1513,7 +1515,7 @@ export class OpenCodianView extends ItemView {
     return {
       setCurrentConversationNotePath: (path) => {
         if (this.currentConversation) {
-          this.currentConversation.currentNote = path;
+          this.currentConversation.currentNote = path ?? undefined;
         }
       },
     };
@@ -1524,8 +1526,9 @@ export class OpenCodianView extends ItemView {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
       getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
-      renderAssistantMessage: (message) =>
-        this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({ message }),
+      renderAssistantMessage: async (message) => {
+        await this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({ message });
+      },
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       handleVisibleNoticeMessageAppended: () => {
         if (this.conversationTabRuntimeCoordinator.recordHydrationLayoutMutation()) {

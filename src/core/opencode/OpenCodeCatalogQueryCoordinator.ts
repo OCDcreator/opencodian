@@ -75,6 +75,14 @@ export interface OpenCodeCatalogQueryCoordinatorHost {
   getToolCatalogScopeKey(): string;
 }
 
+type OpenCodeSdkMcpConfig = NonNullable<Parameters<OpenCodeSdkFacade['mcp']['add']>[0]>['config'];
+type OpenCodeSdkFileListInput = Parameters<OpenCodeSdkFacade['file']['list']>[0];
+type OpenCodeSdkFileReadInput = Parameters<OpenCodeSdkFacade['file']['read']>[0];
+type OpenCodeSdkFindTextInput = Parameters<OpenCodeSdkFacade['find']['text']>[0];
+type OpenCodeSdkFindFilesInput = Parameters<OpenCodeSdkFacade['find']['files']>[0];
+type OpenCodeSdkFindSymbolsInput = Parameters<OpenCodeSdkFacade['find']['symbols']>[0];
+type OpenCodeSdkVcsDiffInput = Parameters<OpenCodeSdkFacade['vcs']['diff']>[0];
+
 export class OpenCodeCatalogQueryCoordinator {
   constructor(
     private readonly catalogState: OpenCodeCatalogStateStore,
@@ -277,7 +285,10 @@ export class OpenCodeCatalogQueryCoordinator {
   }
 
   async addMcpServer(name: string, config: Record<string, unknown>): Promise<Record<string, McpServerStatus>> {
-    return this.storeMcpServerStatus(await this.host.getSdkFacade().mcp.add({ name, config }));
+    return this.storeMcpServerStatus(await this.host.getSdkFacade().mcp.add({
+      name,
+      config: config as OpenCodeSdkMcpConfig,
+    }));
   }
 
   async connectMcpServer(name: string): Promise<boolean> {
@@ -309,10 +320,8 @@ export class OpenCodeCatalogQueryCoordinator {
   }
 
   async removeMcpAuth(name: string): Promise<{ success: true }> {
-    const response = await this.host.getSdkFacade().mcp.auth.remove({ name });
-    return response && typeof response === 'object' && 'success' in (response as Record<string, unknown>)
-      ? response as { success: true }
-      : { success: true };
+    await this.host.getSdkFacade().mcp.auth.remove({ name });
+    return { success: true };
   }
 
   async getProviderAuthMethods(): Promise<unknown> {
@@ -344,11 +353,11 @@ export class OpenCodeCatalogQueryCoordinator {
   }
 
   async listFiles(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.host.getSdkFacade().file.list(input);
+    return this.host.getSdkFacade().file.list(input as OpenCodeSdkFileListInput);
   }
 
   async readFile(input: Record<string, unknown>): Promise<unknown> {
-    return this.host.getSdkFacade().file.read(input);
+    return this.host.getSdkFacade().file.read(input as OpenCodeSdkFileReadInput);
   }
 
   async getFileStatus(input: Record<string, unknown> = {}): Promise<unknown> {
@@ -356,15 +365,15 @@ export class OpenCodeCatalogQueryCoordinator {
   }
 
   async findText(input: Record<string, unknown>): Promise<unknown> {
-    return this.host.getSdkFacade().find.text(input);
+    return this.host.getSdkFacade().find.text(input as OpenCodeSdkFindTextInput);
   }
 
   async findFiles(input: Record<string, unknown>): Promise<unknown> {
-    return this.host.getSdkFacade().find.files(input);
+    return this.host.getSdkFacade().find.files(input as OpenCodeSdkFindFilesInput);
   }
 
   async findSymbols(input: Record<string, unknown>): Promise<unknown> {
-    return this.host.getSdkFacade().find.symbols(input);
+    return this.host.getSdkFacade().find.symbols(input as OpenCodeSdkFindSymbolsInput);
   }
 
   async getPaths(): Promise<unknown> {
@@ -376,7 +385,7 @@ export class OpenCodeCatalogQueryCoordinator {
   }
 
   async getVcsDiff(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.host.getSdkFacade().vcs.diff(input);
+    return this.host.getSdkFacade().vcs.diff(input as OpenCodeSdkVcsDiffInput);
   }
 
   async getFormatterStatus(): Promise<unknown> {

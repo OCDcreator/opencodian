@@ -227,7 +227,8 @@ export class BackgroundTaskTimelineAssemblyService {
       return;
     }
 
-    for (const segment of this.resolveReminderSegments(state, message)) {
+    const reminderMeta = message.omo;
+    for (const segment of this.resolveReminderSegments(state, message, reminderMeta.tasks ?? [])) {
       this.applyReminderToSegment(segment, message);
     }
   }
@@ -235,9 +236,14 @@ export class BackgroundTaskTimelineAssemblyService {
   private resolveReminderSegments(
     state: BackgroundTaskSegmentCollectionState,
     message: ChatMessage,
+    tasks: NonNullable<NonNullable<ChatMessage['omo']> extends infer TOmo
+      ? TOmo extends { kind: 'system-reminder'; tasks?: infer TTasks }
+        ? TTasks
+        : never
+      : never>,
   ): BackgroundTaskSegment[] {
     const matched = new Set<BackgroundTaskSegment>();
-    for (const task of message.omo?.tasks ?? []) {
+    for (const task of tasks) {
       if (!task.id) {
         continue;
       }

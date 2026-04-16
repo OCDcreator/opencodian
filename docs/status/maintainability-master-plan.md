@@ -2,11 +2,11 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R154` 已完成；当前 `[NEXT]` 为 `R155 - Typecheck gate recovery before zero-warning closeout`。
+> **自动推进状态**: `R155` 已完成；当前 `[NEXT]` 为 `R156 - Zero-warning hotspot closeout after typecheck recovery`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R153-R154` 的 chat / opencode defragmentation，但远端真实基线仍未达到用户要求的 `0 errors / 0 warnings + typecheck 通过 + 全量测试通过`。当前最新实测为：`npm test` 通过（`286` 个 suites / `1190` 个 tests）、`npm run build` 通过，但 `npm run lint -- --format unix` 仍有 `39` 条 warnings，`npm run typecheck` 当前失败。因此本批接下来先恢复绿色质量门槛，再继续削减 residual thick owner。**
+**当前分支已完成 `R153-R155` 的 chat / opencode defragmentation 与 typecheck gate recovery。当前最新实测为：`npm run lint -- --format unix` 维持 `0 errors / 38 warnings`、`npm run typecheck` 通过、`npm test` 通过（`286` 个 suites / `1190` 个 tests）、`npm run build` 通过。因此本批已恢复绿色类型门槛，接下来转入 `R156` 把 remaining warnings 清到零，再继续削减 residual thick owner。**
 
 当前继续 maintainability 的理由不是 warning 数本身，而是远端仓库仍存在两类高价值 residual：
 
@@ -19,11 +19,11 @@
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 39 warnings`
-- **typecheck**: 当前失败；远端红线集中在 `OpenCodianView`、background-task services、settings 运行时类型对齐与 `src/types/jsx-shim.ts`
-- **最近验证**: 远端最新实测 `npm test` 通过（`286 passed, 286 total` suites / `1190 passed, 1190 total` tests），`npm run build` 通过；但 `npm run lint -- --format unix` 仍有 `39 problems`，`npm run typecheck` 当前失败
+- **lint**: `0 errors / 38 warnings`
+- **typecheck**: 通过
+- **最近验证**: `npm run lint -- --format unix` 通过（`38 problems`，均为 warnings）、`npm run typecheck` 通过、`npm test` 通过（`286 passed, 286 total` suites / `1190 passed, 1190 total` tests）、`npm run build` 通过
 - **部署策略**: 当前 maintainability 批次不做 Test Vault 部署，除非用户后续明确要求
-- **当前 `[NEXT]`**: `R155 - Typecheck gate recovery before zero-warning closeout`
+- **当前 `[NEXT]`**: `R156 - Zero-warning hotspot closeout after typecheck recovery`
 - **主热点**:
   - `R154` 已删除 `1` 个 opencode query gateway 薄层，并把 provider/project/file/find/path/VCS/formatter/LSP 与 MCP status/auth surface 并回 `OpenCodeCatalogQueryCoordinator`
   - `OpenCodeService.ts` 行数从 `1454` 降到 `1437`，direct coordinator/import surface 继续收缩

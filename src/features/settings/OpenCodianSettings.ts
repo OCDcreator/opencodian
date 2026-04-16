@@ -38,7 +38,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private refreshModelCatalogStatusCallback?: () => void;
   private modelRefreshFrameId: number | null = null;
   private lastKnownServerHealthy = false;
-  private lastKnownServerStatus = 'stopped';
+  private lastKnownServerStatus: ReturnType<OpenCodianPlugin['openCodeService']['getServerStatus']> = 'stopped';
   private readonly sectionCoordinator: SettingsSectionCoordinator;
   private conversationSection: SettingsConversationSection | null = null;
   private modelSection: SettingsModelSection | null = null;

@@ -92,7 +92,7 @@ export class OpenCodeMessageContextOmoAssembler {
         continue;
       }
 
-      const normalizedPart = this.normalizeTextPart(role, part, vaultPath);
+      const normalizedPart = this.normalizeTextPart(role, part as OpenCodeTextPart, vaultPath);
       if (normalizedPart.visibleText) {
         visibleTextParts.push(normalizedPart.visibleText);
       }

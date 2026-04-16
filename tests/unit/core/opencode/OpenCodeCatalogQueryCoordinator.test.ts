@@ -1,8 +1,8 @@
-import { OpenCodeCatalogStateStore } from '../../../../src/core/opencode/OpenCodeCatalogStateStore';
 import {
   OpenCodeCatalogQueryCoordinator,
   type OpenCodeCatalogQueryCoordinatorHost,
 } from '../../../../src/core/opencode/OpenCodeCatalogQueryCoordinator';
+import { OpenCodeCatalogStateStore } from '../../../../src/core/opencode/OpenCodeCatalogStateStore';
 
 type MockHost = OpenCodeCatalogQueryCoordinatorHost & {
   shouldUseSdkCrud: jest.Mock<boolean, []>;

@@ -1,19 +1,18 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] `R154` 已完成；当前 `[NEXT]` 为 `R155 - Typecheck gate recovery before zero-warning closeout`。
+> **当前状态**: [ACTIVE] `R155` 已完成；当前 `[NEXT]` 为 `R156 - Zero-warning hotspot closeout after typecheck recovery`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R155 - Typecheck gate recovery before zero-warning closeout`
+- **当前 `[NEXT]`**：`R156 - Zero-warning hotspot closeout after typecheck recovery`
 - **本批目标**：先恢复 `typecheck` 绿灯，再把 lint 清到 `0 errors / 0 warnings`，然后继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner，最后进入 checkpoint
-- **当前 lint 基线**：`0 errors / 39 warnings`
-- **当前 typecheck 基线**：失败
+- **当前 lint 基线**：`0 errors / 38 warnings`
+- **当前 typecheck 基线**：通过
 - **热点顺序**：
-  1. `R155` typecheck blocker recovery
-  2. `R156` zero-warning hotspot closeout
-  3. `R157-R158` 核心厚 owner residual 收缩
-  4. `R159` checkpoint；当前不得自动扩展 `R160+`
+  1. `R156` zero-warning hotspot closeout
+  2. `R157-R158` 核心厚 owner residual 收缩
+  3. `R159` checkpoint；当前不得自动扩展 `R160+`
 
 ## 本批边界
 
@@ -31,7 +30,7 @@
 - `src/core/opencode/OpenCodeService.ts`：`R154` 已把 `OpenCodeQueryGateway` 并回 `OpenCodeCatalogQueryCoordinator`，当前约 `1437` 行
 - `src/features/chat/services/`：`R153` 后命名上约为 `Adapter 15 / Provider 4 / Factory 4 / Host 21 / Runtime 21 / Coordinator 33 / Facade 7`；view-adjacent 纯转发薄层已先收掉 `4` 个
 - `tests/**` 约 `8` 条 warning、`src/features/chat/**` 约 `7` 条、`src/utils/glass/**` 约 `6` 条、`src/features/settings/**` 约 `4` 条、`src/core/opencode/**` 约 `4` 条
-- 当前 typecheck 红线集中在 `OpenCodianView`、background-task services、settings runtime state 与 `src/types/jsx-shim.ts`
+- `R155` 已恢复 typecheck；remaining lint hotspot 继续集中在 `tests/**`、`src/features/chat/**`、`src/utils/glass/**`、`src/features/settings/**` 与 `src/core/opencode/**`
 
 ## 回归观察点
 
@@ -44,5 +43,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-489.md`
+- 最近成功 phase：`docs/status/maintainability-phase-490.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-487.md`

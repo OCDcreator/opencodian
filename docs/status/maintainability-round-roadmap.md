@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R154` 已完成；当前 `[NEXT]` 为 `R155 - Typecheck gate recovery before zero-warning closeout`。
+> **当前状态**: [ACTIVE] `R155` 已完成；当前 `[NEXT]` 为 `R156 - Zero-warning hotspot closeout after typecheck recovery`。
 
 ## 控制规则
 
@@ -16,10 +16,10 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 39 warnings`
-- 当前 typecheck 基线：失败（当前远端存在 `OpenCodianView`、background-task services、settings 与 `src/types/jsx-shim.ts` 的红线）
-- 最近成功 phase：`docs/status/maintainability-phase-489.md`
-- 当前路线判断：`R153-R154` 已完成 chat 与 opencode defragmentation 两个受控切口，但远端真实基线仍未达到用户要求的 `0 errors / 0 warnings + typecheck 通过 + 全量测试通过`。因此当前批次先恢复绿色质量门槛，再继续压缩 heavy hotspots 与核心厚 owner。
+- 当前 live lint 基线：`0 errors / 38 warnings`
+- 当前 typecheck 基线：已恢复通过
+- 最近成功 phase：`docs/status/maintainability-phase-490.md`
+- 当前路线判断：`R153-R155` 已完成 chat / opencode defragmentation 与 typecheck gate recovery 三个受控切口；当前真实基线已恢复到 `typecheck + 全量测试 + build` 全绿，但距离用户要求的 `0 errors / 0 warnings` 仍差 `38` 条 warnings。因此当前批次下一步转入 `R156` 的 warning hotspot closeout，然后才继续压缩核心厚 owner。
 
 ## Queue
 ## Queue
@@ -1592,7 +1592,7 @@
   - 至少一条过薄 opencode wrapper 链被回并进相邻更厚 owner，且 `OpenCodeService` 行数压力下降
   - 全量 `npm test` 与 `npm run build` 通过
 
-### [NEXT] R155 - Typecheck gate recovery before zero-warning closeout
+### [DONE] R155 - Typecheck gate recovery before zero-warning closeout
 
 - **Lane**: Correctness / typecheck recovery
 - **目标**: 先恢复远端真实 `typecheck` 绿灯，只吸收当前红线并保持运行语义不变；不得借机新建薄层。
@@ -1614,10 +1614,10 @@
   - `npm run lint` 保持 `0 errors` 且 warning 不上升
   - 全量 `npm test` 与 `npm run build` 通过
 
-### [QUEUED] R156 - Zero-warning hotspot closeout after typecheck recovery
+### [NEXT] R156 - Zero-warning hotspot closeout after typecheck recovery
 
 - **Lane**: Warning cleanup / justified hotspots
-- **目标**: 在 `typecheck` 恢复后，把 live lint warning 从当前 `39` 条压到 `0`，优先沿现有 suite / owner 内部整理 heavy tests 与 glass/demo / opencode / chat residual，不新增 test helper 碎片。
+- **目标**: 在 `typecheck` 已恢复后，把 live lint warning 从当前 `38` 条压到 `0`，优先沿现有 suite / owner 内部整理 heavy tests 与 glass/demo / opencode / chat residual，不新增 test helper 碎片。
 - **优先入口**:
   - `tests/unit/core/storage/StorageService.test.ts`
   - `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
@@ -1691,6 +1691,6 @@
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R155 - Typecheck gate recovery before zero-warning closeout`。
-- 当前批次必须先做到 `typecheck` 通过、再清到 `0 errors / 0 warnings`，然后才继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner。
+- 当前可自动执行的 `[NEXT]` 是 `R156 - Zero-warning hotspot closeout after typecheck recovery`。
+- 当前批次已恢复 `typecheck` 绿灯；下一步必须先清到 `0 errors / 0 warnings`，然后才继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner。
 - `R159` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。
