@@ -1,16 +1,15 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R151`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R152`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R151 - Heavy tests and glass warning cleanup`
-- **本批目标**：`R138-R152` 分三批继续收束 live residual：chat runtime/service → settings/model/startup → opencode/streaming/persistence/glass-test cleanup
-- **当前 lint 基线**：`0 errors / 38 warnings`
+- **当前 `[NEXT]`**：`R152 - Continuation checkpoint after R138-R151`
+- **本批目标**：`R138-R152` 的三批 residual 收束已完成，当前进入 continuation checkpoint 复盘 warning 轨迹、验证记录与是否继续自动推进
+- **当前 lint 基线**：`0 errors / 36 warnings`
 - **热点顺序**：
-  1. `R151`: 仅在 live hotspot 仍支撑时处理 heavy tests / opt-in glass warning cleanup
-  2. `R152`: 批次 continuation checkpoint
+  1. `R152`: 复盘 `R138-R151` 收益、warning 轨迹、validation/deploy 记录与 remaining hotspots
 
 ## 本批边界
 
@@ -32,5 +31,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-485.md`
+- 最近成功 phase：`docs/status/maintainability-phase-486.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-482.md`

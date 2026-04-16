@@ -2,19 +2,19 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R151`。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R152`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R150` 并已人工续排 `R151-R152`。`R150` 已完成 storage/theme background persistence residual：把 `StorageService` 中的主题背景目录初始化、MIME 检测、二进制写入/回读逻辑收束到新的 `ThemeBackgroundStorage` owner，保持 conversation serialization、theme background persistence 与 provider icon fallback/caching 语义不变，并把 live lint 推进到 `0 errors / 38 warnings`；当前 queue 已进入 `R151` 的 heavy tests / opt-in glass warning cleanup，随后在 `R152` 做 continuation checkpoint。**
+**当前分支已完成 `R88-R151` 并已人工续排 `R151-R152`。`R151` 已完成 heavy tests / opt-in glass residual 的首个受控 closeout：把 `tests/unit/utils/glass/shuding.test.ts` 按 defaults/sampling 与 mount lifecycle 分组，并把 `roundedRectSdf()` test helper 收束为 geometry 参数形态，保持 shuding adapter 的默认采样路径、URL-backed filter、mount/unmount style restore 与 opt-in glass 行为不变，并把 live lint 从 `0 errors / 38 warnings` 推进到 `0 errors / 36 warnings`；当前 queue 已进入 `R152` 的 continuation checkpoint。**
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 38 warnings`
-- **最近验证**: `R150` 运行 targeted `npx eslint --format unix src/core/storage/StorageService.ts src/core/storage/ThemeBackgroundStorage.ts tests/unit/core/storage/StorageService.test.ts`、focused `npm test -- StorageService.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `BUILD_ID=autopilot-maintainability.$(date +%Y%m%d%H%M); echo "$BUILD_ID"; BUILD_ID=$BUILD_ID npm run build`；targeted storage lint 仅余 `3` 个 test warning，整体 lint 从 `0 errors / 39 warnings` 降到 `0 errors / 38 warnings`，`npm test` 为 `286 passed, 286 total` suites / `1190 passed, 1190 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160834`
+- **lint**: `0 errors / 36 warnings`
+- **最近验证**: `R151` 运行 focused `npm test -- shuding.test.ts`、targeted `npx eslint --format unix tests/unit/utils/glass/shuding.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `BUILD_ID=autopilot-maintainability.$(date +%Y%m%d%H%M); echo "$BUILD_ID"; BUILD_ID=$BUILD_ID npm run build`；targeted shuding lint 归零，整体 lint 从 `0 errors / 38 warnings` 降到 `0 errors / 36 warnings`，`npm test` 为 `286 passed, 286 total` suites / `1190 passed, 1190 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160857`
 - **最近 Test Vault 部署**: `R146`，`BUILD_ID` `autopilot-maintainability.202604160757`
-- **当前 `[NEXT]`**: `R151 - Heavy tests and glass warning cleanup`
-- **主热点**: live lint 仍为 `38` warnings，其中 `tests/**` 约 `9`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `4`；storage/theme background persistence residual 已收束，当前转入 `R151`，再由 `R152` 做 continuation checkpoint
+- **当前 `[NEXT]`**: `R152 - Continuation checkpoint after R138-R151`
+- **主热点**: live lint 仍为 `36` warnings，其中 `tests/**` 约 `8`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `4`；`R151` 已完成 shuding heavy test residual cleanup，当前转入 `R152` continuation checkpoint
 
 ## 3. 本批执行规则
 
