@@ -12,7 +12,7 @@
 - 模型 / 样式 / server / security owner 的装配与跨 section 桥接
 - 通过 `SettingsConversationSection` 协调 conversation section 的 title model / global session defaults / question card / user-markup lifecycle
 - 通过 `SettingsAgentsSection` 协调 Agents section 的 runtime+project agent catalog、default_agent、project agent core-field CRUD（含 `disable`）与基础 subagent visibility lifecycle
-- 通过 `SettingsCommandsSection` 协调 Commands section 的 runtime+project slash-command catalog、project command editor shell 与 `hiddenSlashCommands` 用户可见性 lifecycle
+- 通过 `SettingsCommandsSection` 协调 Commands section 的 runtime+project slash-command catalog、project command editor shell / placeholder reference 与 `hiddenSlashCommands` 用户可见性 lifecycle
 - 通过 `SettingsPluginSection` 协调 plugin snapshot / project config editor / OMO lifecycle
 - 通过 `SettingsStyleSection` 协调 style section 的 preset / background / input appearance / custom CSS lifecycle
 - 通过 `SettingsServerSection` 协调 server section 的 mode/auth/status lifecycle
@@ -60,8 +60,8 @@
   - agent 侧 hide 其余规则与更厚运行时语义仍留在后续 Agents/Commands slice
 - **Commands**
   - `SettingsCommandsSection` 现在接管 slash command 目录壳层：合并 `sdk.command.list()` 返回的 runtime slash commands 与 project `.opencode/opencode.json` `command` 条目
-  - 当前已暴露 companion owner `SettingsProjectCommandEditor`：支持创建 / 编辑 / 删除 project `command.<id>` 的 `template`、`description`、`agent`、`model`、`subtask`
-  - slash menu visible/hidden 开关仍写回插件设置 `hiddenSlashCommands`；placeholder preview、command-owned hidden agent 与 slash execution 继续留给后续 commands slice
+  - 当前已暴露 companion owner `SettingsProjectCommandEditor`：支持创建 / 编辑 / 删除 project `command.<id>` 的 `template`、`description`、`agent`、`model`、`subtask`，并展示 OpenCodian placeholder reference
+  - slash menu visible/hidden 开关仍写回插件设置 `hiddenSlashCommands`；runtime placeholder expansion、command-owned hidden agent 与 slash execution 继续留给后续 commands slice
 - **Plugins**
   - `SettingsPluginSection` 现在接管 plugin environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config 管理
   - `OpenCodianSettings` 不再直接铺开 plugin snapshot refresh、config editor 保存、directory/OMO action 或 restart notice 细节，只保留 owner 装配与 inline-code formatting seam
@@ -174,7 +174,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsModelSection`: 管理模型 section 的 block shell、callback bridge 与 `SettingsModelCatalogPresenter` host；source mode、refresh 链路、workspace 卡片和 icon cache 工具区继续委托给相邻 model-section owners
 - `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、global session defaults、question card display/position、answered-card toggle 与 user-markup render toggle；`OpenCodianSettings` 只保留 owner 装配与 title-model refresh callback bridge
 - `SettingsAgentsSection`: 管理 Agents section 的 runtime+project agent catalog、默认主代理选择、project agent 核心字段 CRUD（含 `disable`）与基础 subagent `hidden` 可见性写回；project agent 表单细节继续委托给 companion owner `SettingsProjectAgentEditor`，`OpenCodianSettings` 只保留 owner 装配
-- `SettingsCommandsSection`: 管理 Commands section 的 runtime+project slash-command catalog、project command editor shell 与 `hiddenSlashCommands` 用户可见性写回；project command 表单细节继续委托给 companion owner `SettingsProjectCommandEditor`，更厚的 placeholder / slash execution runtime 仍留给后续 commands slice
+- `SettingsCommandsSection`: 管理 Commands section 的 runtime+project slash-command catalog、project command editor shell / placeholder reference 与 `hiddenSlashCommands` 用户可见性写回；project command 表单细节继续委托给 companion owner `SettingsProjectCommandEditor`，更厚的 runtime placeholder / slash execution runtime 仍留给后续 commands slice
 - `SettingsPluginSection`: 管理 plugin section 的 environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config open/create action；`OpenCodianSettings` 只保留 owner 装配与 formatting bridge
 - `SettingsUiSection`: 管理 UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 保存逻辑；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsDebugSection`: 管理 debug section 的 logging toggle、inline serialized args、log path picker、diagnostic copy/generate action 与 console help；`OpenCodianSettings` 只保留 owner 装配

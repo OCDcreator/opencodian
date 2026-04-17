@@ -10,7 +10,7 @@
 - 通过 companion owner `SettingsProjectCommandEditor` 处理 project command 的 create/edit/delete 壳层
 - 通过插件设置 `hiddenSlashCommands` 管理 slash menu 的用户级 visible/hidden 开关
 
-本轮交付的 item 6 slice 仍然只覆盖 commands settings 范围：project `command.<id>` 核心字段编辑与 catalog 可见性写回；placeholder preview、command-owned hidden agent 与 slash execution runtime 继续留给后续 slice。
+当前 item 6 slice 仍然只覆盖 commands settings 范围：project `command.<id>` 核心字段编辑、OpenCodian placeholder reference 展示与 catalog 可见性写回；runtime placeholder 展开、command-owned hidden agent 与 slash execution runtime 继续留给后续 slice。
 
 ## 核心逻辑
 
@@ -35,6 +35,7 @@ owner 会并行读取：
 - 选中 runtime command 时，editor 会用当前 catalog 中合并后的 `template` / `description` / `agent` / `model` / `subtask` 回填表单，因此 built-in 命令也能直接生成 project override
 - 保存统一走 `OpencodeConfigManager.upsertCommandConfig()`，写回 `command.<id>` 的五个核心字段；空白的 `description` / `agent` / `model` 会被转成 `undefined` patch，让 manager 清理这些字段
 - `template` 在 editor 中是必填字段；删除动作统一走 `OpencodeConfigManager.removeCommandConfig()`，且只对当前已存在 project override 的条目开放
+- editor 在 `template` 字段下方展示 OpenCodian 支持的 placeholder token reference：`{{vault_path}}`、`{{current_note_path}}`、`{{current_selection}}`、`{{external_context_paths}}`、`{{conversation_title}}`
 - 保存或删除成功后，editor 调用上层传入的 `onConfigChanged()`，让 section 重新拉取 runtime/project catalog 并刷新 editor + catalog
 
 ### 用户可见性写回
@@ -71,4 +72,4 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 - 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`。
 - project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀。
 - `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径。
-- 如果后续 slice 需要 placeholder preview、command-owned hidden agent 或 slash execution，应继续沿着本 owner + editor seam 扩展，而不是绕开现有 catalog seam。
+- 如果后续 slice 需要 runtime placeholder 展开、command-owned hidden agent 或 slash execution，应继续沿着本 owner + editor seam 扩展，而不是绕开现有 catalog seam。

@@ -11,10 +11,11 @@
 
 - 选择 runtime command / runtime+project override / project-only command，或创建新的 project command
 - 编辑 `command.<id>` 的 `template`、`description`、`agent`、`model`、`subtask`
+- 在 template 字段旁展示 OpenCodian 支持的 placeholder token reference
 - 保存到当前 vault 的 `.opencode/opencode.json`
 - 删除当前已存在的 project command override
 
-placeholder preview、command-owned hidden agent 与 slash execution runtime 仍留给后续 slice。
+runtime placeholder 展开、command-owned hidden agent 与 slash execution runtime 仍留给后续 slice。
 
 ## 核心逻辑
 
@@ -33,6 +34,12 @@ placeholder preview、command-owned hidden agent 与 slash execution runtime 仍
 - `subtask` 会明确写回布尔值，让 project command 能表达“强制作为子任务运行”或显式关闭该行为
 - 未触碰的未知字段由 `OpencodeConfigManager.upsertCommandConfig()` 的 merge 行为保留
 
+### placeholder reference
+
+- editor 会在 `template` textarea 下方渲染 OpenCodian placeholder reference，而不会在保存时改写 template 文本
+- 当前展示的 token 是 `{{vault_path}}`、`{{current_note_path}}`、`{{current_selection}}`、`{{external_context_paths}}`、`{{conversation_title}}`
+- 这只是 settings/editor 层面的说明壳层，实际运行时展开与 slash command execution 仍由后续 runtime slice 接入
+
 ### 删除路径
 
 - 删除统一走 `OpencodeConfigManager.removeCommandConfig()`
@@ -44,6 +51,7 @@ placeholder preview、command-owned hidden agent 与 slash execution runtime 仍
 | 方法 | 说明 |
 |------|------|
 | `render()` | 渲染 command 选择器、核心字段表单和保存 / 删除动作 |
+| `renderPlaceholderReference()` | 在 template 字段附近渲染支持的 OpenCodian placeholder token 列表 |
 | `createProjectCommandEditorState()` | 根据当前选中的 command 生成 editor state |
 | `buildProjectCommandPatch()` | 把 editor state 归一化成 `OpencodeCommandConfig` patch，并校验必填 `template` |
 | `saveProjectCommandFromEditor()` | 执行保存、notice 提示与刷新回调 |
@@ -59,5 +67,5 @@ placeholder preview、command-owned hidden agent 与 slash execution runtime 仍
 ## 注意事项
 
 - 这是 `SettingsCommandsSection` 的 companion owner，不应接管 slash catalog merge 或 `hiddenSlashCommands` 可见性写回。
-- 当前 editor 只处理 project command 核心字段，不负责 placeholder preview、slash autocomplete 或 `runSessionCommand()`。
+- 当前 editor 只处理 project command 核心字段和 placeholder reference，不负责 placeholder runtime expansion、slash autocomplete 或 `runSessionCommand()`。
 - 如果后续 slice 为 command 增加更多本地表单字段，优先继续沿这个 owner 扩展，而不是把表单逻辑塞回 `SettingsCommandsSection.ts`。

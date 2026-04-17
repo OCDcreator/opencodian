@@ -225,6 +225,7 @@ function renderEditor(options: {
     projectCommands: options.projectCommands ?? {},
   });
   return {
+    containerEl,
     configManager,
     onConfigChanged,
   };
@@ -329,6 +330,17 @@ afterEach(() => {
 });
 
 describe('SettingsProjectCommandEditor', () => {
+  it('renders the supported OpenCodian command placeholder reference', () => {
+    const { containerEl } = renderEditor();
+
+    expect(containerEl.textContent).toContain(t('settings.commands.editor.placeholders.title'));
+    expect(containerEl.textContent).toContain('{{vault_path}}');
+    expect(containerEl.textContent).toContain('{{current_note_path}}');
+    expect(containerEl.textContent).toContain('{{current_selection}}');
+    expect(containerEl.textContent).toContain('{{external_context_paths}}');
+    expect(containerEl.textContent).toContain('{{conversation_title}}');
+  });
+
   it('creates a project command with editable core fields', async () => {
     const { configManager } = renderEditor();
 

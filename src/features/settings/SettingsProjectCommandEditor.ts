@@ -4,11 +4,37 @@ import type {
   OpencodeCommandConfig,
   OpencodeCommandConfigRecord,
 } from '../../core/types';
-import { t } from '../../i18n';
+import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 
 const logger = createLogger('SettingsProjectCommandEditor');
+
+const OPEN_CODIAN_COMMAND_PLACEHOLDERS: ReadonlyArray<{
+  descriptionKey: TranslationKey;
+  token: string;
+}> = [
+  {
+    token: '{{vault_path}}',
+    descriptionKey: 'settings.commands.editor.placeholders.vaultPath',
+  },
+  {
+    token: '{{current_note_path}}',
+    descriptionKey: 'settings.commands.editor.placeholders.currentNotePath',
+  },
+  {
+    token: '{{current_selection}}',
+    descriptionKey: 'settings.commands.editor.placeholders.currentSelection',
+  },
+  {
+    token: '{{external_context_paths}}',
+    descriptionKey: 'settings.commands.editor.placeholders.externalContextPaths',
+  },
+  {
+    token: '{{conversation_title}}',
+    descriptionKey: 'settings.commands.editor.placeholders.conversationTitle',
+  },
+];
 
 export interface ProjectCommandEditorSource {
   id: string;
@@ -148,6 +174,8 @@ export class SettingsProjectCommandEditor {
           });
       });
 
+    this.renderPlaceholderReference(containerEl);
+
     new Setting(containerEl)
       .setName(t('settings.commands.editor.description.name'))
       .setDesc(t('settings.commands.editor.description.desc'))
@@ -224,6 +252,31 @@ export class SettingsProjectCommandEditor {
       });
 
     syncEditorControls();
+  }
+
+  private renderPlaceholderReference(containerEl: HTMLElement): void {
+    const referenceEl = containerEl.createDiv({
+      cls: 'opencodian-command-placeholder-reference',
+    });
+
+    referenceEl.createEl('h5', {
+      text: t('settings.commands.editor.placeholders.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+    referenceEl.createDiv({
+      cls: 'opencodian-plugin-block-desc',
+      text: t('settings.commands.editor.placeholders.desc'),
+    });
+
+    const listEl = referenceEl.createEl('ul', {
+      cls: 'opencodian-command-placeholder-list',
+    });
+
+    for (const placeholder of OPEN_CODIAN_COMMAND_PLACEHOLDERS) {
+      const itemEl = listEl.createEl('li');
+      itemEl.createEl('code', { text: placeholder.token });
+      itemEl.appendText(` — ${t(placeholder.descriptionKey)}`);
+    }
   }
 
   private createProjectCommandEditorState(
