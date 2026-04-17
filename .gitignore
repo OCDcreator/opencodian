@@ -60,3 +60,5 @@ docs/*
 
 # Automation runtime
 automation/runtime/
+.codex/
+.opencode/
