@@ -1,9 +1,12 @@
 import { Notice, Setting } from 'obsidian';
 
+import { isRecord } from '../../core/config/modelConfig';
 import type {
   OpencodeAgentConfig,
   OpencodeAgentConfigRecord,
   OpencodeAgentMode,
+  PermissionAction,
+  PermissionConfig,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -18,8 +21,11 @@ interface ProjectAgentEditorState {
   disabled: boolean;
   mode: OpencodeAgentMode;
   model: string;
+  permission: OpencodeAgentConfig['permission'];
   prompt: string;
   steps: string;
+  taskAllowlist: string;
+  taskAllowlistDirty: boolean;
   temperature: string;
   topP: string;
 }
@@ -65,6 +71,7 @@ export class SettingsProjectAgentEditor {
     let topPControl: TextLikeControl | null = null;
     let stepsControl: TextLikeControl | null = null;
     let colorControl: TextLikeControl | null = null;
+    let taskAllowlistControl: TextLikeControl | null = null;
     let deleteButton: DisableableControl | null = null;
 
     const canDeleteSelectedProjectAgent = (): boolean =>
@@ -86,6 +93,7 @@ export class SettingsProjectAgentEditor {
       topPControl?.setValue(state.topP);
       stepsControl?.setValue(state.steps);
       colorControl?.setValue(state.color);
+      taskAllowlistControl?.setValue(state.taskAllowlist);
       syncDeleteButton();
     };
 
@@ -236,29 +244,21 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(containerEl)
-      .setName(t('settings.agents.editor.actions.name'))
-      .setDesc(t('settings.agents.editor.actions.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.agents.editor.actions.save'))
-          .onClick(async () => {
-            await this.saveProjectAgentFromEditor(state, onConfigChanged);
-          });
-      })
-      .addButton((button) => {
+    this.renderTaskAllowlistSetting(containerEl, state, (control) => {
+      taskAllowlistControl = control;
+    });
+
+    this.renderActionsSetting({
+      containerEl,
+      state,
+      onConfigChanged,
+      projectAgents,
+      getSelectedProjectAgentId: () => selectedProjectAgentId,
+      canDeleteSelectedProjectAgent,
+      setDeleteButton: (button) => {
         deleteButton = button;
-        button
-          .setButtonText(t('settings.agents.editor.actions.delete'))
-          .setDisabled(!canDeleteSelectedProjectAgent())
-          .onClick(async () => {
-            await this.deleteSelectedProjectAgent(
-              selectedProjectAgentId,
-              projectAgents,
-              onConfigChanged,
-            );
-          });
-      });
+      },
+    });
   }
 
   private createProjectAgentEditorState(
@@ -272,8 +272,11 @@ export class SettingsProjectAgentEditor {
       disabled: agent?.disable === true,
       mode: this.normalizeEditorMode(agent?.mode) ?? 'primary',
       model: this.stringifyConfigText(agent?.model),
+      permission: this.clonePermission(agent?.permission),
       prompt: this.stringifyConfigText(agent?.prompt),
       steps: this.stringifyConfigNumber(agent?.steps),
+      taskAllowlist: this.stringifyTaskAllowlist(agent?.permission),
+      taskAllowlistDirty: false,
       temperature: this.stringifyConfigNumber(agent?.temperature),
       topP: this.stringifyConfigNumber(agent?.top_p),
     };
@@ -333,6 +336,123 @@ export class SettingsProjectAgentEditor {
       steps: this.parseOptionalNumber(state.steps, t('settings.agents.editor.steps.name')),
       color: this.optionalTrimmedText(state.color),
       disable: state.disabled ? true : undefined,
+      ...this.buildPermissionPatch(state),
+    };
+  }
+
+  private renderTaskAllowlistSetting(
+    containerEl: HTMLElement,
+    state: ProjectAgentEditorState,
+    setTaskAllowlistControl: (control: TextLikeControl) => void,
+  ): void {
+    new Setting(containerEl)
+      .setName(t('settings.agents.editor.taskAllowlist.name'))
+      .setDesc(t('settings.agents.editor.taskAllowlist.desc'))
+      .addTextArea((text) => {
+        setTaskAllowlistControl(text);
+        text
+          .setPlaceholder(t('settings.agents.editor.taskAllowlist.placeholder'))
+          .setValue(state.taskAllowlist)
+          .onChange((value) => {
+            state.taskAllowlist = value;
+            state.taskAllowlistDirty = true;
+          });
+      });
+  }
+
+  private renderActionsSetting(options: {
+    containerEl: HTMLElement;
+    state: ProjectAgentEditorState;
+    onConfigChanged: () => Promise<void>;
+    projectAgents: OpencodeAgentConfigRecord;
+    getSelectedProjectAgentId: () => string;
+    canDeleteSelectedProjectAgent: () => boolean;
+    setDeleteButton: (button: DisableableControl) => void;
+  }): void {
+    const {
+      containerEl,
+      state,
+      onConfigChanged,
+      projectAgents,
+      getSelectedProjectAgentId,
+      canDeleteSelectedProjectAgent,
+      setDeleteButton,
+    } = options;
+
+    new Setting(containerEl)
+      .setName(t('settings.agents.editor.actions.name'))
+      .setDesc(t('settings.agents.editor.actions.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.agents.editor.actions.save'))
+          .onClick(async () => {
+            await this.saveProjectAgentFromEditor(state, onConfigChanged);
+          });
+      })
+      .addButton((button) => {
+        setDeleteButton(button);
+        button
+          .setButtonText(t('settings.agents.editor.actions.delete'))
+          .setDisabled(!canDeleteSelectedProjectAgent())
+          .onClick(async () => {
+            await this.deleteSelectedProjectAgent(
+              getSelectedProjectAgentId(),
+              projectAgents,
+              onConfigChanged,
+            );
+          });
+      });
+  }
+
+  private buildPermissionPatch(
+    state: ProjectAgentEditorState,
+  ): Pick<OpencodeAgentConfig, 'permission'> | Record<string, never> {
+    if (!state.taskAllowlistDirty) {
+      return {};
+    }
+
+    const taskPermission = this.buildTaskAllowlistPermission(state.taskAllowlist);
+    const basePermission = state.permission;
+
+    if (typeof basePermission === 'string') {
+      if (!taskPermission) {
+        return {};
+      }
+      const permission: PermissionConfig = {
+        '*': basePermission,
+        task: taskPermission,
+      };
+      return {
+        permission,
+      };
+    }
+
+    if (!isRecord(basePermission)) {
+      if (!taskPermission) {
+        return {};
+      }
+      const permission: PermissionConfig = {
+        task: taskPermission,
+      };
+      return {
+        permission,
+      };
+    }
+
+    if (!taskPermission) {
+      const permissionPatch = this.hasPermissionKeysOtherThanTask(basePermission)
+        ? ({ task: undefined } as PermissionConfig)
+        : undefined;
+      return {
+        permission: permissionPatch,
+      };
+    }
+
+    const permission: PermissionConfig = {
+      task: taskPermission,
+    };
+    return {
+      permission,
     };
   }
 
@@ -366,5 +486,70 @@ export class SettingsProjectAgentEditor {
 
   private stringifyConfigNumber(value: unknown): string {
     return typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
+  }
+
+  private stringifyTaskAllowlist(permission: OpencodeAgentConfig['permission']): string {
+    if (!isRecord(permission)) {
+      return '';
+    }
+
+    const taskPermission = permission.task;
+    if (!isRecord(taskPermission)) {
+      return '';
+    }
+
+    return Object.entries(taskPermission)
+      .filter(([pattern, action]) => pattern !== '*' && action === 'allow')
+      .map(([pattern]) => pattern)
+      .join('\n');
+  }
+
+  private buildTaskAllowlistPermission(
+    value: string,
+  ): Record<string, PermissionAction> | undefined {
+    const patterns = this.parseTaskAllowlistPatterns(value);
+    if (patterns.length === 0) {
+      return undefined;
+    }
+
+    const taskPermission: Record<string, PermissionAction> = {
+      '*': 'deny',
+    };
+    for (const pattern of patterns) {
+      taskPermission[pattern] = 'allow';
+    }
+    return taskPermission;
+  }
+
+  private parseTaskAllowlistPatterns(value: string): string[] {
+    const seen = new Set<string>();
+    const patterns: string[] = [];
+    for (const line of value.split(/\r?\n/u)) {
+      const pattern = line.trim();
+      if (!pattern || seen.has(pattern)) {
+        continue;
+      }
+      seen.add(pattern);
+      patterns.push(pattern);
+    }
+    return patterns;
+  }
+
+  private hasPermissionKeysOtherThanTask(permission: Record<string, unknown>): boolean {
+    return Object.keys(permission).some((key) => key !== 'task');
+  }
+
+  private clonePermission(
+    permission: OpencodeAgentConfig['permission'],
+  ): OpencodeAgentConfig['permission'] {
+    if (typeof permission === 'string') {
+      return permission;
+    }
+
+    if (!isRecord(permission)) {
+      return undefined;
+    }
+
+    return JSON.parse(JSON.stringify(permission)) as PermissionConfig;
   }
 }

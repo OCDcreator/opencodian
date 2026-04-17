@@ -24,8 +24,9 @@
   - `top_p`
   - `steps`
   - `color`
+  - `permission.task` allowlist
 
-`permission.task` allowlist、hide 批量规则与 commands/slash runtime 仍留给后续 slice。
+hide 批量规则、`options` 与 commands/slash runtime 仍留给后续 slice。
 
 ## 核心逻辑
 
@@ -49,7 +50,7 @@ owner 会并行读取：
 
 这条路径只对 `mode: 'subagent'` 且未 `disable` 的条目开放，因为 OpenCode 的 `hidden` 语义主要用于子代理 `@` 菜单可见性。
 
-### 项目 agent 核心字段编辑器 / disable 写回
+### 项目 agent 核心字段编辑器 / disable / task allowlist 写回
 
 owner 现在在同一分区内提供一个 project agent editor：
 
@@ -59,6 +60,9 @@ owner 现在在同一分区内提供一个 project agent editor：
 - 删除时统一走 `removeAgentConfig()`，只删除当前 project override，不会影响 runtime built-in catalog
 - 所有写回都局限在当前 vault 的 `.opencode/opencode.json`
 - `disable` 打开后会写入 `agent.<id>.disable = true`；关闭时改写成 `undefined` patch，让 `OpencodeConfigManager` 清理该字段，同时继续保留其他 project override 字段
+- `permission.task` textarea 每行接收一个允许的子代理 ID 或 glob；保存时会写成 `permission.task = { '*': 'deny', ...allowRules }`
+- 如果已有 agent 使用字符串形式的 `permission` 简写，首次编辑 allowlist 时会提升为 object，并保留原本的 `'*'` 行为再追加 `task`
+- 如果只清空 allowlist，则 owner 只清理 `permission.task`，继续保留该 agent 其他 `permission` 键
 
 具体表单实现现已下沉到 companion owner `SettingsProjectAgentEditor`，避免 catalog owner 继续扩张。
 
@@ -93,4 +97,4 @@ owner 现在在同一分区内提供一个 project agent editor：
 
 - 不要在 `OpenCodianView.ts` 或 `OpenCodeService.ts` 中追加 Agents settings ownership；设置页写回应继续留在本 owner 与 `OpencodeConfigManager` seam 内。
 - 当前 owner 只写项目级 `.opencode/opencode.json`，不要读写全局 OpenCode 配置。
-- 表单当前只覆盖 item 5 的核心字段；`permission.task` allowlist、`options` 与 command/slash runtime 仍应继续扩展本 owner 或相邻 agent-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。
+- 表单当前已覆盖 item 5 的核心字段与 `permission.task` allowlist；`options` 与 command/slash runtime 仍应继续扩展本 owner 或相邻 agent-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。

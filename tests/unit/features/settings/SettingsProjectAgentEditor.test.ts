@@ -1,8 +1,7 @@
-import type { Agent as RuntimeAgent } from '@opencode-ai/sdk/v2/client';
 import { Setting } from 'obsidian';
 
 import type { OpencodeAgentConfigRecord } from '../../../../src/core/types';
-import { SettingsAgentsSection } from '../../../../src/features/settings/SettingsAgentsSection';
+import { SettingsProjectAgentEditor } from '../../../../src/features/settings/SettingsProjectAgentEditor';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
@@ -17,7 +16,10 @@ interface TextRecord { control: MockTextControl; name: string; onChange?: (value
 interface TextAreaRecord { control: MockTextAreaControl; name: string; onChange?: (value: string) => void | Promise<void>; }
 interface ButtonRecord { control: MockButtonControl; label?: string; name: string; onClick?: () => void | Promise<void>; }
 
-type AgentsSectionPlugin = Pick<OpenCodianPlugin, 'openCodeService' | 'opencodeConfigManager'>;
+type ProjectAgentConfigManager = Pick<
+  NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  'upsertAgentConfig' | 'removeAgentConfig'
+>;
 
 const dropdownRecords: DropdownRecord[] = [];
 const toggleRecords: ToggleRecord[] = [];
@@ -127,68 +129,29 @@ function createButtonRecord(name: string): ButtonRecord {
   return record;
 }
 
-function createRuntimeAgent(overrides: Partial<RuntimeAgent> & Pick<RuntimeAgent, 'name'>): RuntimeAgent {
+function createConfigManager(): ProjectAgentConfigManager {
   return {
-    name: overrides.name,
-    mode: overrides.mode ?? 'primary',
-    native: overrides.native ?? true,
-    hidden: overrides.hidden,
-    description: overrides.description,
-    permission: overrides.permission ?? [],
-    options: overrides.options ?? {},
-    color: overrides.color,
-    model: overrides.model,
-    prompt: overrides.prompt,
-    variant: overrides.variant,
-    topP: overrides.topP,
-    temperature: overrides.temperature,
-    steps: overrides.steps,
-  };
+    upsertAgentConfig: jest.fn().mockResolvedValue(undefined),
+    removeAgentConfig: jest.fn().mockResolvedValue(undefined),
+  } as unknown as ProjectAgentConfigManager;
 }
 
-function createPlugin(options: {
-  runtimeAgents?: RuntimeAgent[];
-  projectAgents?: OpencodeAgentConfigRecord;
-  defaultAgent?: string | undefined;
-} = {}): AgentsSectionPlugin {
-  return {
-    openCodeService: {
-      sdk: {
-        app: {
-          agents: jest.fn().mockResolvedValue(options.runtimeAgents ?? []),
-        },
-      },
-    },
-    opencodeConfigManager: {
-      getAgentConfig: jest.fn().mockResolvedValue(options.projectAgents ?? {}),
-      getDefaultAgent: jest.fn().mockResolvedValue(options.defaultAgent),
-      updateDefaultAgent: jest.fn().mockResolvedValue(undefined),
-      upsertAgentConfig: jest.fn().mockResolvedValue(undefined),
-      removeAgentConfig: jest.fn().mockResolvedValue(undefined),
-    },
-  } as unknown as AgentsSectionPlugin;
-}
-
-function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
-  const headingEl = document.createElement('h2');
-  headingEl.textContent = title;
-  containerEl.appendChild(headingEl);
-  return headingEl;
-}
-
-function createSection(plugin = createPlugin()) {
-  const section = new SettingsAgentsSection({
-    plugin: plugin as unknown as OpenCodianPlugin,
-    createSectionHeading,
-  });
+function renderEditor(options: { projectAgents?: OpencodeAgentConfigRecord } = {}) {
+  const configManager = createConfigManager();
+  const onConfigChanged = jest.fn().mockResolvedValue(undefined);
+  const editor = new SettingsProjectAgentEditor(
+    configManager as NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  );
   const containerEl = document.createElement('div');
   document.body.appendChild(containerEl);
-  const headingEl = section.attach(containerEl);
-  return {
+  editor.render({
     containerEl,
-    headingEl,
-    plugin,
-    section,
+    onConfigChanged,
+    projectAgents: options.projectAgents ?? {},
+  });
+  return {
+    configManager,
+    onConfigChanged,
   };
 }
 
@@ -196,8 +159,12 @@ function findDropdown(name: string): DropdownRecord | undefined {
   return dropdownRecords.find((record) => record.name === name);
 }
 
-function findToggle(name: string): ToggleRecord | undefined {
-  return toggleRecords.find((record) => record.name === name);
+function findText(name: string): TextRecord | undefined {
+  return textRecords.find((record) => record.name === name);
+}
+
+function findTextArea(name: string): TextAreaRecord | undefined {
+  return textAreaRecords.find((record) => record.name === name);
 }
 
 function findButton(label: string): ButtonRecord | undefined {
@@ -276,173 +243,46 @@ beforeEach(() => {
 
 afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
 
-describe('SettingsAgentsSection catalog shell', () => {
-  it('loads built-in and project agents into the default selection and subagent visibility controls', async () => {
-    const plugin = createPlugin({
-      runtimeAgents: [
-        createRuntimeAgent({
-          name: 'build',
-          mode: 'primary',
-          native: true,
-          description: 'Builds things',
-        }),
-        createRuntimeAgent({
-          name: 'plan',
-          mode: 'subagent',
-          native: true,
-          description: 'Plans work',
-        }),
-        createRuntimeAgent({
-          name: 'review',
-          mode: 'all',
-          native: false,
-          description: 'Reviews changes',
-        }),
-      ],
-      projectAgents: {
-        plan: {
-          hidden: true,
-          description: 'Project planner',
-        },
-        design: {
-          mode: 'primary',
-          description: 'Project-only design agent',
-        },
-      },
-      defaultAgent: 'design',
-    });
+describe('SettingsProjectAgentEditor', () => {
+  it('creates a project agent with editable core fields', async () => {
+    const { configManager } = renderEditor();
 
-    createSection(plugin);
-    await flushAsync();
+    await findText(t('settings.agents.editor.id.name'))?.onChange?.('architect');
+    await findDropdown(t('settings.agents.editor.mode.name'))?.onChange?.('subagent');
+    await findText(t('settings.agents.editor.description.name'))?.onChange?.('Plans implementation slices');
+    await findTextArea(t('settings.agents.editor.prompt.name'))?.onChange?.('You plan focused implementation work.');
+    await findText(t('settings.agents.editor.model.name'))?.onChange?.('anthropic/claude-sonnet-4');
+    await findText(t('settings.agents.editor.temperature.name'))?.onChange?.('0.2');
+    await findText(t('settings.agents.editor.topP.name'))?.onChange?.('0.85');
+    await findText(t('settings.agents.editor.steps.name'))?.onChange?.('6');
+    await findText(t('settings.agents.editor.color.name'))?.onChange?.('#8b5cf6');
 
-    const defaultDropdown = findDropdown(t('settings.agents.default.name'));
-    expect(plugin.openCodeService.sdk.app.agents).toHaveBeenCalledTimes(1);
-    expect(plugin.opencodeConfigManager?.getAgentConfig).toHaveBeenCalledTimes(1);
-    expect(plugin.opencodeConfigManager?.getDefaultAgent).toHaveBeenCalledTimes(1);
-    expect(defaultDropdown?.control.addOption).toHaveBeenCalledWith(
-      '',
-      t('settings.agents.default.followOpenCode'),
-    );
-    expect(defaultDropdown?.control.addOption).toHaveBeenCalledWith('build', 'build');
-    expect(defaultDropdown?.control.addOption).toHaveBeenCalledWith('review', 'review');
-    expect(defaultDropdown?.control.addOption).toHaveBeenCalledWith('design', 'design');
-    expect(defaultDropdown?.control.addOption).not.toHaveBeenCalledWith('plan', 'plan');
-    expect(defaultDropdown?.control.setValue).toHaveBeenLastCalledWith('design');
-    expect(findToggle('plan')?.control.setValue).toHaveBeenCalledWith(true);
-    expect(findToggle('build')).toBeUndefined();
-    expect(findToggle('design')).toBeUndefined();
-  });
-
-  it('persists default-agent changes through the project config manager', async () => {
-    const plugin = createPlugin({
-      runtimeAgents: [
-        createRuntimeAgent({
-          name: 'build',
-          mode: 'primary',
-        }),
-      ],
-    });
-
-    createSection(plugin);
-    await flushAsync();
-
-    const defaultDropdown = findDropdown(t('settings.agents.default.name'));
-
-    await defaultDropdown?.onChange?.('build');
-    await defaultDropdown?.onChange?.('');
-
-    expect(plugin.opencodeConfigManager?.updateDefaultAgent).toHaveBeenNthCalledWith(1, 'build');
-    expect(plugin.opencodeConfigManager?.updateDefaultAgent).toHaveBeenNthCalledWith(2, undefined);
-  });
-
-  it('writes and cleans up project hidden overrides for subagents', async () => {
-    const hiddenPlugin = createPlugin({
-      runtimeAgents: [
-        createRuntimeAgent({
-          name: 'plan',
-          mode: 'subagent',
-        }),
-      ],
-    });
-
-    createSection(hiddenPlugin);
-    await flushAsync();
-
-    await findToggle('plan')?.onChange?.(true);
-    await flushAsync();
-
-    expect(hiddenPlugin.opencodeConfigManager?.upsertAgentConfig).toHaveBeenCalledWith('plan', {
-      hidden: true,
-    });
-    expect(hiddenPlugin.opencodeConfigManager?.removeAgentConfig).not.toHaveBeenCalled();
-
-    dropdownRecords.length = 0;
-    toggleRecords.length = 0;
-
-    const restoredPlugin = createPlugin({
-      runtimeAgents: [
-        createRuntimeAgent({
-          name: 'plan',
-          mode: 'subagent',
-        }),
-      ],
-      projectAgents: {
-        plan: {
-          hidden: true,
-        },
-      },
-    });
-
-    createSection(restoredPlugin);
-    await flushAsync();
-
-    await findToggle('plan')?.onChange?.(false);
-    await flushAsync();
-
-    expect(restoredPlugin.opencodeConfigManager?.removeAgentConfig).toHaveBeenCalledWith('plan');
-  });
-});
-
-describe('SettingsAgentsSection project agent editor', () => {
-  it('edits the project disable flag without making disabled agents default-eligible', async () => {
-    const plugin = createPlugin({
-      runtimeAgents: [
-        createRuntimeAgent({
-          name: 'reviewer',
-          mode: 'primary',
-        }),
-      ],
-      projectAgents: {
-        reviewer: {
-          mode: 'primary',
-          disable: true,
-          hidden: true,
-        },
-      },
-      defaultAgent: 'reviewer',
-    });
-
-    createSection(plugin);
-    await flushAsync();
-
-    const defaultDropdown = findDropdown(t('settings.agents.default.name'));
-    expect(defaultDropdown?.control.addOption).not.toHaveBeenCalledWith('reviewer', 'reviewer');
-    expect(defaultDropdown?.control.addOption).toHaveBeenCalledWith(
-      'reviewer',
-      t('settings.agents.default.unavailable', { id: 'reviewer' }),
-    );
-
-    await findDropdown(t('settings.agents.editor.select.name'))?.onChange?.('reviewer');
-
-    const disableToggle = findToggle(t('settings.agents.editor.disable.name'));
-    expect(disableToggle).toBeDefined();
-    expect(disableToggle?.control.setValue).toHaveBeenLastCalledWith(true);
-
-    await disableToggle?.onChange?.(false);
     await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
     await flushAsync();
 
-    expect(plugin.opencodeConfigManager?.upsertAgentConfig).toHaveBeenCalledWith('reviewer', {
+    expect(configManager.upsertAgentConfig).toHaveBeenCalledWith('architect', {
+      mode: 'subagent',
+      description: 'Plans implementation slices',
+      prompt: 'You plan focused implementation work.',
+      model: 'anthropic/claude-sonnet-4',
+      temperature: 0.2,
+      top_p: 0.85,
+      steps: 6,
+      color: '#8b5cf6',
+      disable: undefined,
+    });
+  });
+
+  it('writes a task allowlist as project-scoped permission.task rules', async () => {
+    const { configManager } = renderEditor();
+
+    await findText(t('settings.agents.editor.id.name'))?.onChange?.('planner');
+    await findTextArea(t('settings.agents.editor.taskAllowlist.name'))?.onChange?.('  explore  \n\nreview-*\nexplore');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertAgentConfig).toHaveBeenCalledWith('planner', {
       mode: 'primary',
       description: undefined,
       prompt: undefined,
@@ -452,6 +292,120 @@ describe('SettingsAgentsSection project agent editor', () => {
       steps: undefined,
       color: undefined,
       disable: undefined,
+      permission: {
+        task: {
+          '*': 'deny',
+          explore: 'allow',
+          'review-*': 'allow',
+        },
+      },
     });
+  });
+
+  it('merges task allowlists onto shorthand permissions when editing a project agent', async () => {
+    const { configManager } = renderEditor({
+      projectAgents: {
+        reviewer: {
+          mode: 'primary',
+          permission: 'ask',
+        },
+      },
+    });
+
+    await findDropdown(t('settings.agents.editor.select.name'))?.onChange?.('reviewer');
+    await findTextArea(t('settings.agents.editor.taskAllowlist.name'))?.onChange?.('plan\nreview-*');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertAgentConfig).toHaveBeenCalledWith('reviewer', {
+      mode: 'primary',
+      description: undefined,
+      prompt: undefined,
+      model: undefined,
+      temperature: undefined,
+      top_p: undefined,
+      steps: undefined,
+      color: undefined,
+      disable: undefined,
+      permission: {
+        '*': 'ask',
+        task: {
+          '*': 'deny',
+          plan: 'allow',
+          'review-*': 'allow',
+        },
+      },
+    });
+  });
+
+  it('edits and deletes a selected project agent without overwriting unrelated fields', async () => {
+    const { configManager } = renderEditor({
+      projectAgents: {
+        reviewer: {
+          mode: 'primary',
+          description: 'Old description',
+          prompt: 'Old prompt',
+          model: 'old/model',
+          temperature: 0.7,
+          top_p: 0.9,
+          steps: 12,
+          color: 'blue',
+          hidden: true,
+          permission: {
+            bash: 'ask',
+            task: {
+              '*': 'deny',
+              planner: 'allow',
+              'review-*': 'allow',
+              audit: 'ask',
+            },
+          },
+          options: {
+            custom: true,
+          },
+        },
+      },
+    });
+
+    await findDropdown(t('settings.agents.editor.select.name'))?.onChange?.('reviewer');
+
+    expect(findText(t('settings.agents.editor.id.name'))?.control.setValue).toHaveBeenLastCalledWith('reviewer');
+    expect(findDropdown(t('settings.agents.editor.mode.name'))?.control.setValue).toHaveBeenLastCalledWith('primary');
+    expect(findText(t('settings.agents.editor.description.name'))?.control.setValue).toHaveBeenLastCalledWith('Old description');
+    expect(findTextArea(t('settings.agents.editor.prompt.name'))?.control.setValue).toHaveBeenLastCalledWith('Old prompt');
+    expect(findTextArea(t('settings.agents.editor.taskAllowlist.name'))?.control.setValue).toHaveBeenLastCalledWith('planner\nreview-*');
+
+    await findDropdown(t('settings.agents.editor.mode.name'))?.onChange?.('all');
+    await findText(t('settings.agents.editor.description.name'))?.onChange?.('New description');
+    await findTextArea(t('settings.agents.editor.prompt.name'))?.onChange?.('New prompt');
+    await findText(t('settings.agents.editor.model.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.temperature.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.topP.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.steps.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.color.name'))?.onChange?.('#22c55e');
+    await findTextArea(t('settings.agents.editor.taskAllowlist.name'))?.onChange?.('');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertAgentConfig).toHaveBeenCalledWith('reviewer', {
+      mode: 'all',
+      description: 'New description',
+      prompt: 'New prompt',
+      model: undefined,
+      temperature: undefined,
+      top_p: undefined,
+      steps: undefined,
+      color: '#22c55e',
+      disable: undefined,
+      permission: {
+        task: undefined,
+      },
+    });
+
+    await findButton(t('settings.agents.editor.actions.delete'))?.onClick?.();
+
+    expect(configManager.removeAgentConfig).toHaveBeenCalledWith('reviewer');
   });
 });

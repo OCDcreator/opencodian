@@ -18,8 +18,9 @@
 - `top_p`
 - `steps`
 - `color`
+- `permission.task` allowlist
 
-`permission.task` allowlist、`options` 与 commands/slash runtime 仍留在后续 slice。
+`options` 与 commands/slash runtime 仍留在后续 slice。
 
 ## 核心逻辑
 
@@ -40,6 +41,9 @@
 - 空字符串会转换成 `undefined`，用于清理已移除的核心字段
 - `disable` 用布尔 toggle 表达；打开时写入 `true`，关闭时写入 `undefined` 以便仅清理该字段而不影响其他 override
 - `temperature`、`top_p`、`steps` 会解析为 number；如果不是合法数字，会中断保存并显示 notice
+- `permission.task` allowlist 用多行 textarea 表达；每行一个子代理 ID 或 glob pattern，保存时会写成 `{'*': 'deny', <pattern>: 'allow'}` 形式的显式 allowlist
+- 读取已有 agent 时，只从 `permission.task` object 中提取值为 `allow` 的条目回填到 textarea；未改动该字段时不会覆盖原有 `permission` 配置
+- 如果原始 `permission` 是字符串简写（如 `ask`），首次编辑 allowlist 时会先提升为 object，再附加 `task` 规则
 - 未触碰的未知字段由 `OpencodeConfigManager.upsertAgentConfig()` 的 merge 行为保留
 
 ## 关键方法
@@ -60,4 +64,4 @@
 
 - 只写当前 vault 的 `.opencode/opencode.json`；不要扩展到全局 OpenCode 配置。
 - 这是 `SettingsAgentsSection` 的 companion owner，不应接管 runtime agent catalog 或 default primary-agent dropdown。
-- 如果后续补充 `permission.task` allowlist 或 command-owned hidden agent 逻辑，优先继续沿这个 owner/section seam 扩展，而不是把表单逻辑塞回 `OpenCodianSettings.ts`。
+- 后续如果继续补 `options` 或 command-owned hidden agent 逻辑，优先继续沿这个 owner/section seam 扩展，而不是把表单逻辑塞回 `OpenCodianSettings.ts`。
