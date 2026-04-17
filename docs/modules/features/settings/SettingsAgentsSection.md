@@ -25,8 +25,9 @@
   - `steps`
   - `color`
   - `permission.task` allowlist
+  - `options`
 
-hide 批量规则、`options` 与 commands/slash runtime 仍留给后续 slice。
+hide 批量规则与 commands/slash runtime 仍留给后续 slice。
 
 ## 核心逻辑
 
@@ -63,6 +64,8 @@ owner 现在在同一分区内提供一个 project agent editor：
 - `permission.task` textarea 每行接收一个允许的子代理 ID 或 glob；保存时会写成 `permission.task = { '*': 'deny', ...allowRules }`
 - 如果已有 agent 使用字符串形式的 `permission` 简写，首次编辑 allowlist 时会提升为 object，并保留原本的 `'*'` 行为再追加 `task`
 - 如果只清空 allowlist，则 owner 只清理 `permission.task`，继续保留该 agent 其他 `permission` 键
+- `options` 通过 raw JSON textarea 编辑；留空会清理 `agent.<id>.options`，非空时必须是 JSON object
+- 保存 `options` 时，editor 会基于当前 project override 构造替换型 object patch，这样删除过的嵌套 key 不会被 `upsertAgentConfig()` 的递归 merge 悄悄保留下来
 
 具体表单实现现已下沉到 companion owner `SettingsProjectAgentEditor`，避免 catalog owner 继续扩张。
 
@@ -90,6 +93,7 @@ owner 现在在同一分区内提供一个 project agent editor：
 - `OpenCodeService`: 通过 SDK facade 的 `app.agents()` 读取 runtime agent 目录
 - `OpencodeConfigManager`: 读取 / 写回 project `agent`、legacy `mode` import、`default_agent`
 - `SettingsProjectAgentEditor.ts`: 负责 project agent 核心字段表单、保存 / 删除 action 与 notice
+- `projectAgentEditorConfig.ts`: 为 project agent editor 提供字段归一化与 delete-aware patch helper
 - `core/types/opencodeConfig.ts`: 提供 `OpencodeAgentConfig` / `OpencodeAgentMode` 类型
 - `i18n/locales/*`: 提供 Agents section 标题、目录来源、mode、状态与错误文案
 
@@ -97,4 +101,4 @@ owner 现在在同一分区内提供一个 project agent editor：
 
 - 不要在 `OpenCodianView.ts` 或 `OpenCodeService.ts` 中追加 Agents settings ownership；设置页写回应继续留在本 owner 与 `OpencodeConfigManager` seam 内。
 - 当前 owner 只写项目级 `.opencode/opencode.json`，不要读写全局 OpenCode 配置。
-- 表单当前已覆盖 item 5 的核心字段与 `permission.task` allowlist；`options` 与 command/slash runtime 仍应继续扩展本 owner 或相邻 agent-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。
+- 表单当前已覆盖 item 5 的核心字段、`permission.task` allowlist 与 `options`；commands/slash runtime 仍应继续扩展本 owner 或相邻 command-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。

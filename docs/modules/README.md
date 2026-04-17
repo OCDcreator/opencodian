@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 当前共有 313 个 TypeScript 源码模块
+- `src/**/*.ts`: 当前共有 347 个 TypeScript 源码模块
 - `src/style/**/*.css`: 当前共有 17 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `docs/modules/**/*.md`: 当前共有 329 篇模块与基础设施文档
+- `docs/modules/**/*.md`: 当前共有 363 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -205,7 +205,8 @@ docs/modules/
 │       ├── SettingsStyleInputPanelSection.md
 │       ├── SettingsStyleLiquidGlassInputControls.md
 │       ├── SettingsStyleSection.md
-│       └── SettingsStyleBackgroundSection.md
+│       ├── SettingsStyleBackgroundSection.md
+│       └── projectAgentEditorConfig.md
 ├── i18n/
 │   ├── index.md
 │   └── locales/

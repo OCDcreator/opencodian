@@ -1,4 +1,5 @@
 import { Setting } from 'obsidian';
+import * as obsidian from 'obsidian';
 
 import type { OpencodeAgentConfigRecord } from '../../../../src/core/types';
 import { SettingsProjectAgentEditor } from '../../../../src/features/settings/SettingsProjectAgentEditor';
@@ -302,6 +303,35 @@ describe('SettingsProjectAgentEditor', () => {
     });
   });
 
+  it('writes project agent options from a JSON object field', async () => {
+    const { configManager } = renderEditor();
+
+    await findText(t('settings.agents.editor.id.name'))?.onChange?.('planner');
+    await findTextArea(t('settings.agents.editor.options.name'))?.onChange?.('{\n  "reasoningSummary": "auto",\n  "nested": {\n    "maxTokens": 300\n  },\n  "tags": ["focus"]\n}');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertAgentConfig).toHaveBeenCalledWith('planner', {
+      mode: 'primary',
+      description: undefined,
+      prompt: undefined,
+      model: undefined,
+      temperature: undefined,
+      top_p: undefined,
+      steps: undefined,
+      color: undefined,
+      disable: undefined,
+      options: {
+        reasoningSummary: 'auto',
+        nested: {
+          maxTokens: 300,
+        },
+        tags: ['focus'],
+      },
+    });
+  });
+
   it('merges task allowlists onto shorthand permissions when editing a project agent', async () => {
     const { configManager } = renderEditor({
       projectAgents: {
@@ -363,6 +393,10 @@ describe('SettingsProjectAgentEditor', () => {
           },
           options: {
             custom: true,
+            nested: {
+              keep: true,
+              remove: 'stale',
+            },
           },
         },
       },
@@ -375,6 +409,7 @@ describe('SettingsProjectAgentEditor', () => {
     expect(findText(t('settings.agents.editor.description.name'))?.control.setValue).toHaveBeenLastCalledWith('Old description');
     expect(findTextArea(t('settings.agents.editor.prompt.name'))?.control.setValue).toHaveBeenLastCalledWith('Old prompt');
     expect(findTextArea(t('settings.agents.editor.taskAllowlist.name'))?.control.setValue).toHaveBeenLastCalledWith('planner\nreview-*');
+    expect(findTextArea(t('settings.agents.editor.options.name'))?.control.setValue).toHaveBeenLastCalledWith('{\n  "custom": true,\n  "nested": {\n    "keep": true,\n    "remove": "stale"\n  }\n}');
 
     await findDropdown(t('settings.agents.editor.mode.name'))?.onChange?.('all');
     await findText(t('settings.agents.editor.description.name'))?.onChange?.('New description');
@@ -385,6 +420,7 @@ describe('SettingsProjectAgentEditor', () => {
     await findText(t('settings.agents.editor.steps.name'))?.onChange?.('');
     await findText(t('settings.agents.editor.color.name'))?.onChange?.('#22c55e');
     await findTextArea(t('settings.agents.editor.taskAllowlist.name'))?.onChange?.('');
+    await findTextArea(t('settings.agents.editor.options.name'))?.onChange?.('{\n  "nested": {\n    "keep": false\n  },\n  "mode": "careful"\n}');
 
     await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
     await flushAsync();
@@ -402,10 +438,36 @@ describe('SettingsProjectAgentEditor', () => {
       permission: {
         task: undefined,
       },
+      options: {
+        custom: undefined,
+        nested: {
+          keep: false,
+          remove: undefined,
+        },
+        mode: 'careful',
+      },
     });
 
     await findButton(t('settings.agents.editor.actions.delete'))?.onClick?.();
 
     expect(configManager.removeAgentConfig).toHaveBeenCalledWith('reviewer');
+  });
+
+  it('rejects invalid project agent options JSON', async () => {
+    const { configManager, onConfigChanged } = renderEditor();
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+
+    await findText(t('settings.agents.editor.id.name'))?.onChange?.('planner');
+    await findTextArea(t('settings.agents.editor.options.name'))?.onChange?.('{"reasoningSummary": }');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertAgentConfig).not.toHaveBeenCalled();
+    expect(onConfigChanged).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(expect.stringContaining(t('settings.agents.editor.notice.invalidJson', {
+      field: t('settings.agents.editor.options.name'),
+      message: '',
+    }).split(':')[0]));
   });
 });

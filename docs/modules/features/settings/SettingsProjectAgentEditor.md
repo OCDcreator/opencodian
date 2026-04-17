@@ -19,8 +19,9 @@
 - `steps`
 - `color`
 - `permission.task` allowlist
+- `options`
 
-`options` 与 commands/slash runtime 仍留在后续 slice。
+commands/slash runtime 仍留在后续 slice。
 
 ## 核心逻辑
 
@@ -44,6 +45,8 @@
 - `permission.task` allowlist 用多行 textarea 表达；每行一个子代理 ID 或 glob pattern，保存时会写成 `{'*': 'deny', <pattern>: 'allow'}` 形式的显式 allowlist
 - 读取已有 agent 时，只从 `permission.task` object 中提取值为 `allow` 的条目回填到 textarea；未改动该字段时不会覆盖原有 `permission` 配置
 - 如果原始 `permission` 是字符串简写（如 `ask`），首次编辑 allowlist 时会先提升为 object，再附加 `task` 规则
+- `options` 用 raw JSON textarea 表达；留空会清理 `agent.<id>.options`，非空时必须是 JSON object
+- 读取已有 `options` 时会格式化成缩进 JSON 回填；保存时会按当前 textarea 内容构造“替换型 patch”，让已删除的嵌套键也能从项目 override 中真正移除
 - 未触碰的未知字段由 `OpencodeConfigManager.upsertAgentConfig()` 的 merge 行为保留
 
 ## 关键方法
@@ -56,6 +59,7 @@
 
 ## 与其他模块的交互
 
+- `projectAgentEditorConfig.ts`: 提供表单归一化、`permission.task` allowlist patch 与 `options` JSON 替换型 patch helper
 - `SettingsAgentsSection`: 提供 editor 挂载点、当前 project agent map 与刷新回调
 - `OpencodeConfigManager`: 执行 project `agent.<id>` 的 upsert/remove
 - `i18n/locales/*`: 提供 editor 字段、按钮与错误提示文案
@@ -64,4 +68,4 @@
 
 - 只写当前 vault 的 `.opencode/opencode.json`；不要扩展到全局 OpenCode 配置。
 - 这是 `SettingsAgentsSection` 的 companion owner，不应接管 runtime agent catalog 或 default primary-agent dropdown。
-- 后续如果继续补 `options` 或 command-owned hidden agent 逻辑，优先继续沿这个 owner/section seam 扩展，而不是把表单逻辑塞回 `OpenCodianSettings.ts`。
+- 后续如果继续补 command-owned hidden agent 或 slash runtime 逻辑，优先继续沿这个 owner/section seam 扩展，而不是把表单逻辑塞回 `OpenCodianSettings.ts`。

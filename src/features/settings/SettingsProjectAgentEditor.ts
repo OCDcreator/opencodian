@@ -1,16 +1,25 @@
 import { Notice, Setting } from 'obsidian';
 
-import { isRecord } from '../../core/config/modelConfig';
 import type {
   OpencodeAgentConfig,
   OpencodeAgentConfigRecord,
-  OpencodeAgentMode,
-  PermissionAction,
-  PermissionConfig,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import {
+  buildProjectAgentOptionsPatch,
+  buildProjectAgentPermissionPatch,
+  cloneOptions,
+  clonePermission,
+  normalizeProjectAgentEditorMode,
+  optionalTrimmedText,
+  parseOptionalNumber,
+  stringifyConfigNumber,
+  stringifyConfigText,
+  stringifyOptions,
+  stringifyTaskAllowlist,
+} from './projectAgentEditorConfig';
 
 const logger = createLogger('SettingsProjectAgentEditor');
 
@@ -19,8 +28,11 @@ interface ProjectAgentEditorState {
   color: string;
   description: string;
   disabled: boolean;
-  mode: OpencodeAgentMode;
+  mode: NonNullable<OpencodeAgentConfig['mode']>;
   model: string;
+  options: OpencodeAgentConfig['options'];
+  optionsDirty: boolean;
+  optionsJson: string;
   permission: OpencodeAgentConfig['permission'];
   prompt: string;
   steps: string;
@@ -72,6 +84,7 @@ export class SettingsProjectAgentEditor {
     let stepsControl: TextLikeControl | null = null;
     let colorControl: TextLikeControl | null = null;
     let taskAllowlistControl: TextLikeControl | null = null;
+    let optionsControl: TextLikeControl | null = null;
     let deleteButton: DisableableControl | null = null;
 
     const canDeleteSelectedProjectAgent = (): boolean =>
@@ -94,6 +107,7 @@ export class SettingsProjectAgentEditor {
       stepsControl?.setValue(state.steps);
       colorControl?.setValue(state.color);
       taskAllowlistControl?.setValue(state.taskAllowlist);
+      optionsControl?.setValue(state.optionsJson);
       syncDeleteButton();
     };
 
@@ -137,7 +151,7 @@ export class SettingsProjectAgentEditor {
           .addOption('subagent', t('settings.agents.catalog.mode.subagent'))
           .setValue(state.mode)
           .onChange((value) => {
-            state.mode = this.normalizeEditorMode(value) ?? 'primary';
+            state.mode = normalizeProjectAgentEditorMode(value) ?? 'primary';
           });
       });
 
@@ -247,6 +261,9 @@ export class SettingsProjectAgentEditor {
     this.renderTaskAllowlistSetting(containerEl, state, (control) => {
       taskAllowlistControl = control;
     });
+    this.renderOptionsSetting(containerEl, state, (control) => {
+      optionsControl = control;
+    });
 
     this.renderActionsSetting({
       containerEl,
@@ -267,18 +284,21 @@ export class SettingsProjectAgentEditor {
   ): ProjectAgentEditorState {
     return {
       agentId,
-      color: this.stringifyConfigText(agent?.color),
-      description: this.stringifyConfigText(agent?.description),
+      color: stringifyConfigText(agent?.color),
+      description: stringifyConfigText(agent?.description),
       disabled: agent?.disable === true,
-      mode: this.normalizeEditorMode(agent?.mode) ?? 'primary',
-      model: this.stringifyConfigText(agent?.model),
-      permission: this.clonePermission(agent?.permission),
-      prompt: this.stringifyConfigText(agent?.prompt),
-      steps: this.stringifyConfigNumber(agent?.steps),
-      taskAllowlist: this.stringifyTaskAllowlist(agent?.permission),
+      mode: normalizeProjectAgentEditorMode(agent?.mode) ?? 'primary',
+      model: stringifyConfigText(agent?.model),
+      options: cloneOptions(agent?.options),
+      optionsDirty: false,
+      optionsJson: stringifyOptions(agent?.options),
+      permission: clonePermission(agent?.permission),
+      prompt: stringifyConfigText(agent?.prompt),
+      steps: stringifyConfigNumber(agent?.steps),
+      taskAllowlist: stringifyTaskAllowlist(agent?.permission),
       taskAllowlistDirty: false,
-      temperature: this.stringifyConfigNumber(agent?.temperature),
-      topP: this.stringifyConfigNumber(agent?.top_p),
+      temperature: stringifyConfigNumber(agent?.temperature),
+      topP: stringifyConfigNumber(agent?.top_p),
     };
   }
 
@@ -328,15 +348,39 @@ export class SettingsProjectAgentEditor {
   private buildProjectAgentPatch(state: ProjectAgentEditorState): OpencodeAgentConfig {
     return {
       mode: state.mode,
-      description: this.optionalTrimmedText(state.description),
-      prompt: this.optionalTrimmedText(state.prompt),
-      model: this.optionalTrimmedText(state.model),
-      temperature: this.parseOptionalNumber(state.temperature, t('settings.agents.editor.temperature.name')),
-      top_p: this.parseOptionalNumber(state.topP, t('settings.agents.editor.topP.name')),
-      steps: this.parseOptionalNumber(state.steps, t('settings.agents.editor.steps.name')),
-      color: this.optionalTrimmedText(state.color),
+      description: optionalTrimmedText(state.description),
+      prompt: optionalTrimmedText(state.prompt),
+      model: optionalTrimmedText(state.model),
+      temperature: parseOptionalNumber(
+        state.temperature,
+        t('settings.agents.editor.notice.invalidNumber', {
+          field: t('settings.agents.editor.temperature.name'),
+        }),
+      ),
+      top_p: parseOptionalNumber(
+        state.topP,
+        t('settings.agents.editor.notice.invalidNumber', {
+          field: t('settings.agents.editor.topP.name'),
+        }),
+      ),
+      steps: parseOptionalNumber(
+        state.steps,
+        t('settings.agents.editor.notice.invalidNumber', {
+          field: t('settings.agents.editor.steps.name'),
+        }),
+      ),
+      color: optionalTrimmedText(state.color),
       disable: state.disabled ? true : undefined,
-      ...this.buildPermissionPatch(state),
+      ...buildProjectAgentPermissionPatch(state),
+      ...buildProjectAgentOptionsPatch(state, {
+        invalidJsonMessage: (message) => t('settings.agents.editor.notice.invalidJson', {
+          field: t('settings.agents.editor.options.name'),
+          message,
+        }),
+        objectRequiredMessage: t('settings.agents.editor.notice.objectRequired', {
+          field: t('settings.agents.editor.options.name'),
+        }),
+      }),
     };
   }
 
@@ -404,152 +448,24 @@ export class SettingsProjectAgentEditor {
       });
   }
 
-  private buildPermissionPatch(
+  private renderOptionsSetting(
+    containerEl: HTMLElement,
     state: ProjectAgentEditorState,
-  ): Pick<OpencodeAgentConfig, 'permission'> | Record<string, never> {
-    if (!state.taskAllowlistDirty) {
-      return {};
-    }
-
-    const taskPermission = this.buildTaskAllowlistPermission(state.taskAllowlist);
-    const basePermission = state.permission;
-
-    if (typeof basePermission === 'string') {
-      if (!taskPermission) {
-        return {};
-      }
-      const permission: PermissionConfig = {
-        '*': basePermission,
-        task: taskPermission,
-      };
-      return {
-        permission,
-      };
-    }
-
-    if (!isRecord(basePermission)) {
-      if (!taskPermission) {
-        return {};
-      }
-      const permission: PermissionConfig = {
-        task: taskPermission,
-      };
-      return {
-        permission,
-      };
-    }
-
-    if (!taskPermission) {
-      const permissionPatch = this.hasPermissionKeysOtherThanTask(basePermission)
-        ? ({ task: undefined } as PermissionConfig)
-        : undefined;
-      return {
-        permission: permissionPatch,
-      };
-    }
-
-    const permission: PermissionConfig = {
-      task: taskPermission,
-    };
-    return {
-      permission,
-    };
+    setOptionsControl: (control: TextLikeControl) => void,
+  ): void {
+    new Setting(containerEl)
+      .setName(t('settings.agents.editor.options.name'))
+      .setDesc(t('settings.agents.editor.options.desc'))
+      .addTextArea((text) => {
+        setOptionsControl(text);
+        text
+          .setPlaceholder(t('settings.agents.editor.options.placeholder'))
+          .setValue(state.optionsJson)
+          .onChange((value) => {
+            state.optionsJson = value;
+            state.optionsDirty = true;
+          });
+      });
   }
 
-  private normalizeEditorMode(value: unknown): OpencodeAgentMode | undefined {
-    return value === 'primary' || value === 'all' || value === 'subagent'
-      ? value
-      : undefined;
-  }
-
-  private optionalTrimmedText(value: string): string | undefined {
-    const trimmed = value.trim();
-    return trimmed || undefined;
-  }
-
-  private parseOptionalNumber(value: string, fieldName: string): number | undefined {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return undefined;
-    }
-
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed)) {
-      throw new Error(t('settings.agents.editor.notice.invalidNumber', { field: fieldName }));
-    }
-    return parsed;
-  }
-
-  private stringifyConfigText(value: unknown): string {
-    return typeof value === 'string' ? value : '';
-  }
-
-  private stringifyConfigNumber(value: unknown): string {
-    return typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
-  }
-
-  private stringifyTaskAllowlist(permission: OpencodeAgentConfig['permission']): string {
-    if (!isRecord(permission)) {
-      return '';
-    }
-
-    const taskPermission = permission.task;
-    if (!isRecord(taskPermission)) {
-      return '';
-    }
-
-    return Object.entries(taskPermission)
-      .filter(([pattern, action]) => pattern !== '*' && action === 'allow')
-      .map(([pattern]) => pattern)
-      .join('\n');
-  }
-
-  private buildTaskAllowlistPermission(
-    value: string,
-  ): Record<string, PermissionAction> | undefined {
-    const patterns = this.parseTaskAllowlistPatterns(value);
-    if (patterns.length === 0) {
-      return undefined;
-    }
-
-    const taskPermission: Record<string, PermissionAction> = {
-      '*': 'deny',
-    };
-    for (const pattern of patterns) {
-      taskPermission[pattern] = 'allow';
-    }
-    return taskPermission;
-  }
-
-  private parseTaskAllowlistPatterns(value: string): string[] {
-    const seen = new Set<string>();
-    const patterns: string[] = [];
-    for (const line of value.split(/\r?\n/u)) {
-      const pattern = line.trim();
-      if (!pattern || seen.has(pattern)) {
-        continue;
-      }
-      seen.add(pattern);
-      patterns.push(pattern);
-    }
-    return patterns;
-  }
-
-  private hasPermissionKeysOtherThanTask(permission: Record<string, unknown>): boolean {
-    return Object.keys(permission).some((key) => key !== 'task');
-  }
-
-  private clonePermission(
-    permission: OpencodeAgentConfig['permission'],
-  ): OpencodeAgentConfig['permission'] {
-    if (typeof permission === 'string') {
-      return permission;
-    }
-
-    if (!isRecord(permission)) {
-      return undefined;
-    }
-
-    return JSON.parse(JSON.stringify(permission)) as PermissionConfig;
-  }
 }

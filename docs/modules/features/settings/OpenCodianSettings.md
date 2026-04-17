@@ -54,8 +54,8 @@
   - `OpenCodianSettings` 不再直接铺开 conversation section 的 DOM/state/model-picker wiring，只保留 owner 装配
 - **Agents**
   - `SettingsAgentsSection` 现在接管 agent 目录壳层：合并 runtime built-in/project agent 与 project `.opencode/opencode.json` override
-  - 当前已暴露默认主代理下拉、project agent 核心字段 create/edit/delete（`mode`、`disable`、`description`、`prompt`、`model`、`temperature`、`top_p`、`steps`、`color`）、project-scoped `permission.task` allowlist，以及 `mode: 'subagent'` 的 `hidden` 可见性开关，写回路径统一走 `OpencodeConfigManager`
-  - hide 其余规则、`options` 与 commands/slash runtime 仍留在后续 Agents/Commands slice
+  - 当前已暴露默认主代理下拉、project agent 核心字段 create/edit/delete（`mode`、`disable`、`description`、`prompt`、`model`、`temperature`、`top_p`、`steps`、`color`）、project-scoped `permission.task` allowlist、raw `options` JSON，以及 `mode: 'subagent'` 的 `hidden` 可见性开关，写回路径统一走 `OpencodeConfigManager`
+  - hide 其余规则与 commands/slash runtime 仍留在后续 Agents/Commands slice
 - **Plugins**
   - `SettingsPluginSection` 现在接管 plugin environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config 管理
   - `OpenCodianSettings` 不再直接铺开 plugin snapshot refresh、config editor 保存、directory/OMO action 或 restart notice 细节，只保留 owner 装配与 inline-code formatting seam
