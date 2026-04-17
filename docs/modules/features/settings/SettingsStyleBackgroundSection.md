@@ -33,7 +33,7 @@
 ### 设置写回
 
 - fit mode dropdown 直接更新 `appearance.background.fitMode`，然后触发 style apply/save，并重渲染 subsection
-- 数值控件仍复用 `SettingsStyleSection` 提供的 `addNumericStyleControl()` 与统一 binding 同步机制
+- 数值控件仍复用经由 `SettingsStyleSection` 注入的 `settingsStyleControls.ts` numeric-style seam 与统一 binding 同步机制
 - reset 动作走 `plugin.resetChatAppearanceGroupAndSave('background')`，随后同步控件值、刷新 subsection 并给出 Notice
 
 ## 关键方法
@@ -47,7 +47,8 @@
 
 ## 与其他模块的交互
 
-- `SettingsStyleSection`: 负责创建该 owner，并提供 style-group scaffolding、数值控件 host seam、binding 清理与统一 apply/save 回调
+- `SettingsStyleSection`: 负责创建该 owner，并提供 style-group scaffolding、shared-control seam、binding 清理与统一 apply/save 回调
+- `settingsStyleControls.ts`: 通过注入的 numeric-style/binding contract 承担 slider/number/reset 的具体控件语义
 - `OpenCodianPlugin`: 提供背景资源导入/清理、baseline reset、主题背景 data URL 解析与 chat appearance 写回
 - `core/types/settings.ts`: 定义 background 设置结构、默认值与归一化边界
 - `src/features/chat/chatAppearance.ts`: 提供 `fitMode -> background-size` 映射

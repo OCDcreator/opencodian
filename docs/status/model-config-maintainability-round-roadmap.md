@@ -75,7 +75,7 @@
   - `ProviderIconService.ts` becomes a thinner orchestrator.
   - Existing provider icon tests and full validation pass.
 
-### [NEXT] M5 - SettingsStyleSection controls and preset coarse extraction
+### [DONE] M5 - SettingsStyleSection controls and preset coarse extraction
 
 - **Lane**: Settings style section maintainability
 - **Goal**: Extract reusable numeric/color/reset control primitives and theme preset rendering/state into coarse modules.
@@ -89,7 +89,7 @@
   - `SettingsStyleSection.ts` loses control/preset bulk while retaining section orchestration.
   - Focused settings style tests and full validation pass.
 
-### [QUEUED] M6 - Completion audit and final verification
+### [NEXT] M6 - Completion audit and final verification
 
 - **Lane**: Queue closeout
 - **Goal**: Audit module boundaries, docs, line counts, and validation after M1-M5.

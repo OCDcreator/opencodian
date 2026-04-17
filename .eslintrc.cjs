@@ -14,6 +14,7 @@ const justifiedMaxLinesFiles = [
   'src/features/settings/ModelConfigProviderEditor.ts',
   'src/features/settings/SettingsModelCatalogPresenter.ts',
   'src/features/settings/SettingsStyleSection.ts',
+  'src/features/settings/settingsStyleControls.ts',
   'src/features/settings/modelConfigWorkspace.ts',
   'src/i18n/locales/en.ts',
   'src/i18n/locales/zh.ts',

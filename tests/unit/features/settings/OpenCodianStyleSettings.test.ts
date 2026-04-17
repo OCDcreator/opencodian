@@ -1,7 +1,9 @@
 import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
+import { getBuiltinThemePresets, getThemePresetDefinition } from '../../../../src/core/theme';
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
+import { SettingsStylePresetSection } from '../../../../src/features/settings/SettingsStylePresetSection';
 import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
 import { setLocale } from '../../../../src/i18n';
 
@@ -42,6 +44,22 @@ function createStyleSection(plugin: ConstructorParameters<typeof SettingsStyleSe
     createSectionHeading: (containerEl, title) => containerEl.createEl('h3', { text: title }),
     setSettingDescWithFormatting: jest.fn(),
     addSettingHelpButton: jest.fn(),
+  });
+}
+
+function createPresetSection(
+  plugin: ConstructorParameters<typeof SettingsStylePresetSection>[0]['plugin'],
+  onThemeAppearanceChanged = jest.fn(),
+): SettingsStylePresetSection {
+  return new SettingsStylePresetSection({
+    plugin,
+    createStyleGroupSection: (containerEl, title, desc) => {
+      const sectionEl = containerEl.createDiv();
+      sectionEl.createEl('h4', { text: title });
+      sectionEl.createEl('p', { text: desc });
+      return sectionEl.createDiv();
+    },
+    onThemeAppearanceChanged,
   });
 }
 
@@ -87,6 +105,7 @@ describe('OpenCodian style settings attach wiring', () => {
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
       getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+      getActiveThemePresetDefinition: jest.fn(() => null),
     } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
     const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
@@ -131,6 +150,7 @@ describe('OpenCodian style settings attach wiring', () => {
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
       getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+      getActiveThemePresetDefinition: jest.fn(() => null),
     } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
     const styleSection = createStyleSection(plugin);
     const containerEl = document.createElement('div');
@@ -192,6 +212,91 @@ describe('OpenCodian style settings helpers', () => {
     });
 
     expect(inputChars).toBe(5);
+  });
+});
+
+describe('OpenCodian style preset section', () => {
+  beforeEach(() => {
+    setLocale('zh');
+    document.body.innerHTML = '';
+  });
+
+  it('renders override state and resets the active preset appearance', async () => {
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        theme: {
+          ...DEFAULT_SETTINGS.theme,
+          activePresetId: 'glass-classic',
+          customAppearanceOverrides: {
+            assistant: {
+              blur: 14,
+            },
+          },
+        },
+      },
+      getActiveThemePresetDefinition: jest.fn(() => getThemePresetDefinition(plugin.settings.theme.activePresetId)),
+      selectThemePresetAndSave: jest.fn(),
+      resetThemePresetAppearanceAndSave: jest.fn(async () => {
+        plugin.settings.theme.customAppearanceOverrides = {};
+      }),
+    } as unknown as ConstructorParameters<typeof SettingsStylePresetSection>[0]['plugin'];
+    const onThemeAppearanceChanged = jest.fn();
+    const presetSection = createPresetSection(plugin, onThemeAppearanceChanged);
+    const containerEl = document.createElement('div');
+
+    presetSection.attach(containerEl);
+
+    const statusRowEl = containerEl.querySelector('.opencodian-theme-status-row');
+    const resetBtn = containerEl.querySelector<HTMLButtonElement>('.opencodian-theme-reset-btn');
+
+    expect(statusRowEl?.classList.contains('is-customized')).toBe(true);
+    expect(resetBtn?.disabled).toBe(false);
+
+    resetBtn?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(plugin.resetThemePresetAppearanceAndSave).toHaveBeenCalledTimes(1);
+    expect(onThemeAppearanceChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('selects the first preset in a style family when its card is clicked', async () => {
+    const flatPresetId = getBuiltinThemePresets().find((preset) => preset.styleId === 'flat')?.id;
+    expect(flatPresetId).toBeDefined();
+
+    let activePresetId: typeof DEFAULT_SETTINGS.theme.activePresetId = 'glass-classic';
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        theme: {
+          ...DEFAULT_SETTINGS.theme,
+          activePresetId,
+          customAppearanceOverrides: {},
+        },
+      },
+      getActiveThemePresetDefinition: jest.fn(() => getThemePresetDefinition(activePresetId)),
+      selectThemePresetAndSave: jest.fn(async (presetId: NonNullable<typeof activePresetId>) => {
+        activePresetId = presetId;
+        plugin.settings.theme.activePresetId = presetId;
+      }),
+      resetThemePresetAppearanceAndSave: jest.fn(),
+    } as unknown as ConstructorParameters<typeof SettingsStylePresetSection>[0]['plugin'];
+    const onThemeAppearanceChanged = jest.fn();
+    const presetSection = createPresetSection(plugin, onThemeAppearanceChanged);
+    const containerEl = document.createElement('div');
+
+    presetSection.attach(containerEl);
+
+    const flatCardEl = containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-theme-style-card').item(1);
+    expect(flatCardEl).not.toBeNull();
+
+    flatCardEl?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(plugin.selectThemePresetAndSave).toHaveBeenCalledWith(flatPresetId);
+    expect(onThemeAppearanceChanged).toHaveBeenCalledTimes(1);
   });
 });
 

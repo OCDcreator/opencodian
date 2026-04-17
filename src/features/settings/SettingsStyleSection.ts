@@ -1,83 +1,23 @@
 import type { App } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
-import { getBuiltinThemePresets, hasThemeAppearanceOverrides } from '../../core/theme';
-import {
-  type ChatAppearanceSettings,
-  isValidChatAppearanceCustomCssDeclarations,
-  type ThemePresetDefinition,
-  type ThemeStyleId,
-} from '../../core/types';
-import { t, type TranslationKey } from '../../i18n';
+import { isValidChatAppearanceCustomCssDeclarations } from '../../core/types';
+import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import { SettingsStyleBackgroundSection } from './SettingsStyleBackgroundSection';
+import {
+  type ChatAppearanceStyleGroup,
+  type ColorStyleControlConfig,
+  type NumericControlConfig,
+  type NumericStyleControlConfig,
+  type SettingHelpButtonConfig,
+  SettingsStyleControls,
+} from './settingsStyleControls';
 import { SettingsStyleInputPanelSection } from './SettingsStyleInputPanelSection';
+import { SettingsStylePresetSection } from './SettingsStylePresetSection';
 
 const logger = createLogger('SettingsStyleSection');
-
-type ChatAppearanceStyleGroup =
-  | 'layout'
-  | 'background'
-  | 'user'
-  | 'assistant'
-  | 'input'
-  | 'scrollbar'
-  | 'advanced';
-
-interface NumericStyleControlConfig {
-  group: ChatAppearanceStyleGroup;
-  name: string;
-  desc: string;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  value: () => number;
-  resetValue: () => number;
-  setValue: (appearance: ChatAppearanceSettings, value: number) => void;
-}
-
-interface ColorStyleControlConfig {
-  group: ChatAppearanceStyleGroup;
-  name: string;
-  desc: string;
-  value: () => string;
-  resetValue: () => string;
-  setValue: (appearance: ChatAppearanceSettings, value: string) => void;
-}
-
-interface NumericControlConfig {
-  name: string;
-  desc: string;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  value: () => number;
-  resetValue: () => number;
-  commitValue: (value: number) => void;
-  helpButton?: SettingHelpButtonConfig;
-  registerSync?: (syncFromSettings: () => void) => void;
-}
-
-interface SettingHelpButtonConfig {
-  tooltip: string;
-  onClick: () => void;
-}
-
-interface StyleControlBinding {
-  group: ChatAppearanceStyleGroup;
-  syncFromSettings: () => void;
-}
-
-interface ColorStyleControlElements {
-  settingEl: HTMLElement;
-  previewBtn: HTMLButtonElement;
-  valueEl: HTMLSpanElement;
-  followThemeBtn: HTMLButtonElement;
-  colorInput: HTMLInputElement;
-}
 
 interface SettingsStyleSectionOptions {
   app: App;
@@ -90,7 +30,7 @@ interface SettingsStyleSectionOptions {
 interface SettingsStyleSectionRuntimeState {
   backgroundStyleSection: SettingsStyleBackgroundSection;
   inputPanelSection: SettingsStyleInputPanelSection;
-  stylePresetUiRefresh?: () => void;
+  presetSection: SettingsStylePresetSection;
 }
 
 export class SettingsStyleSection {
@@ -99,7 +39,7 @@ export class SettingsStyleSection {
   private readonly createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
   private readonly setSettingDescWithFormatting: (setting: Setting, text: string) => void;
   private readonly addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
-  private styleControlBindings: StyleControlBinding[] = [];
+  private readonly styleControls: SettingsStyleControls;
   private runtime: SettingsStyleSectionRuntimeState | null = null;
 
   constructor(options: SettingsStyleSectionOptions) {
@@ -108,6 +48,11 @@ export class SettingsStyleSection {
     this.createSectionHeading = options.createSectionHeading;
     this.setSettingDescWithFormatting = options.setSettingDescWithFormatting;
     this.addSettingHelpButton = options.addSettingHelpButton;
+    this.styleControls = new SettingsStyleControls({
+      plugin: this.plugin,
+      addSettingHelpButton: (setting, helpButton) => this.addSettingHelpButton(setting, helpButton),
+      applyAndScheduleStyleUpdate: () => this.applyAndScheduleStyleUpdate(),
+    });
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
@@ -127,18 +72,19 @@ export class SettingsStyleSection {
   }
 
   dispose(): void {
-    this.styleControlBindings = [];
+    this.styleControls.dispose();
     const runtime = this.runtime;
     this.runtime = null;
     runtime?.backgroundStyleSection.dispose();
     runtime?.inputPanelSection.dispose();
+    runtime?.presetSection.dispose();
   }
 
   private initializeRuntime(): SettingsStyleSectionRuntimeState {
     const runtime: SettingsStyleSectionRuntimeState = {
       backgroundStyleSection: this.createBackgroundStyleSection(),
       inputPanelSection: this.createInputPanelSection(),
-      stylePresetUiRefresh: undefined,
+      presetSection: this.createPresetSection(),
     };
     this.runtime = runtime;
     return runtime;
@@ -720,157 +666,7 @@ export class SettingsStyleSection {
     containerEl: HTMLElement,
     runtime: SettingsStyleSectionRuntimeState,
   ): void {
-    const presetGroupEl = this.createStyleGroupSection(
-      containerEl,
-      t('settings.style.presets.title'),
-      t('settings.style.presets.desc'),
-    );
-    presetGroupEl.addClass('opencodian-theme-presets');
-
-    const presets = getBuiltinThemePresets();
-    const styleOrder: ThemeStyleId[] = ['glass', 'flat', 'soft', 'sharp'];
-    const presetsByStyle = new Map<ThemeStyleId, ThemePresetDefinition[]>(
-      styleOrder.map((styleId) => [styleId, presets.filter((preset) => preset.styleId === styleId)]),
-    );
-    const styleGridEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-style-grid' });
-    const statusRowEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-status-row' });
-    const statusEl = statusRowEl.createDiv({ cls: 'opencodian-theme-status-copy' });
-    const schemeSectionEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-scheme-section' });
-    const schemeLabelEl = schemeSectionEl.createDiv({
-      cls: 'opencodian-theme-scheme-label',
-      text: t('settings.style.presets.schemes.label'),
-    });
-    const schemeChipsEl = schemeSectionEl.createDiv({ cls: 'opencodian-theme-scheme-chips' });
-    const actionsEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-actions' });
-    const styleButtons = new Map<ThemeStyleId, HTMLButtonElement>();
-
-    let selectedStyleId: ThemeStyleId = this.plugin.getActiveThemePresetDefinition()?.styleId ?? 'glass';
-
-    const renderPresetUi = () => {
-      const activePreset = this.plugin.getActiveThemePresetDefinition();
-      if (activePreset) {
-        selectedStyleId = activePreset.styleId;
-      }
-
-      const hasOverrides = activePreset ? hasThemeAppearanceOverrides(this.plugin.settings.theme) : false;
-      statusEl.setText(
-        activePreset
-          ? (
-            hasOverrides
-              ? t('settings.style.presets.statusCustomized', { preset: activePreset.name })
-              : t('settings.style.presets.statusPreset', { preset: activePreset.name })
-          )
-          : t('settings.style.presets.statusCustom'),
-      );
-      statusRowEl.toggleClass('is-customized', hasOverrides);
-
-      for (const [styleId, buttonEl] of styleButtons) {
-        buttonEl.toggleClass('is-active', activePreset?.styleId === styleId);
-      }
-
-      schemeChipsEl.empty();
-      for (const preset of presetsByStyle.get(selectedStyleId) ?? []) {
-        const schemeButtonEl = schemeChipsEl.createEl('button', {
-          cls: 'opencodian-theme-scheme-chip',
-          text: this.getThemeSchemeLabel(preset.id),
-        });
-        schemeButtonEl.type = 'button';
-        schemeButtonEl.toggleClass('is-active', activePreset?.id === preset.id);
-        schemeButtonEl.addEventListener('click', () => {
-          void this.applyThemePresetSelection(preset.id, runtime);
-        });
-      }
-      schemeSectionEl.toggleClass('is-empty', schemeChipsEl.childElementCount === 0);
-      schemeLabelEl.setText(t('settings.style.presets.schemes.label'));
-
-      actionsEl.empty();
-      if (activePreset) {
-        const resetBtn = actionsEl.createEl('button', {
-          cls: 'mod-cta opencodian-theme-reset-btn',
-          text: t('settings.style.presets.reset.button'),
-        });
-        resetBtn.type = 'button';
-        resetBtn.disabled = !hasOverrides;
-        resetBtn.addEventListener('click', () => {
-          void this.resetThemePresetAppearance(runtime);
-        });
-      }
-    };
-
-    for (const styleId of styleOrder) {
-      const buttonEl = styleGridEl.createEl('button', {
-        cls: 'opencodian-theme-style-card',
-      });
-      buttonEl.type = 'button';
-      buttonEl.createDiv({
-        cls: 'opencodian-theme-style-card-title',
-        text: this.getThemeStyleTitle(styleId),
-      });
-      buttonEl.createDiv({
-        cls: 'opencodian-theme-style-card-desc',
-        text: this.getThemeStyleDescription(styleId),
-      });
-      buttonEl.addEventListener('click', () => {
-        void this.applyThemeStyleSelection(styleId, presetsByStyle, runtime, (nextStyleId) => {
-          selectedStyleId = nextStyleId;
-        });
-      });
-      styleButtons.set(styleId, buttonEl);
-    }
-
-    runtime.stylePresetUiRefresh = renderPresetUi;
-    renderPresetUi();
-  }
-
-  private async applyThemePresetSelection(
-    presetId: ThemePresetDefinition['id'],
-    runtime: SettingsStyleSectionRuntimeState,
-  ): Promise<void> {
-    try {
-      await this.plugin.selectThemePresetAndSave(presetId);
-      this.refreshThemePresetUi(runtime);
-    } catch (error) {
-      logger.warn('Failed to apply theme preset selection', error);
-      new Notice(t('settings.style.presets.applyFailed'));
-    }
-  }
-
-  private async resetThemePresetAppearance(runtime: SettingsStyleSectionRuntimeState): Promise<void> {
-    try {
-      await this.plugin.resetThemePresetAppearanceAndSave();
-      this.refreshThemePresetUi(runtime);
-    } catch (error) {
-      logger.warn('Failed to reset preset appearance', error);
-      new Notice(t('settings.style.presets.reset.failed'));
-    }
-  }
-
-  private async applyThemeStyleSelection(
-    styleId: ThemeStyleId,
-    presetsByStyle: Map<ThemeStyleId, ThemePresetDefinition[]>,
-    runtime: SettingsStyleSectionRuntimeState,
-    updateSelectedStyleId: (styleId: ThemeStyleId) => void,
-  ): Promise<void> {
-    updateSelectedStyleId(styleId);
-    const nextPreset = presetsByStyle.get(styleId)?.[0];
-    if (!nextPreset) {
-      this.refreshThemePresetUi(runtime);
-      return;
-    }
-
-    await this.applyThemePresetSelection(nextPreset.id, runtime);
-  }
-
-  private getThemeStyleTitle(styleId: ThemeStyleId): string {
-    return t(`settings.style.presets.styles.${styleId}.title` as TranslationKey);
-  }
-
-  private getThemeStyleDescription(styleId: ThemeStyleId): string {
-    return t(`settings.style.presets.styles.${styleId}.desc` as TranslationKey);
-  }
-
-  private getThemeSchemeLabel(presetId: ThemePresetDefinition['id']): string {
-    return t(`settings.style.presets.scheme.${presetId}` as TranslationKey);
+    runtime.presetSection.attach(containerEl);
   }
 
   private createStyleGroupSection(containerEl: HTMLElement, title: string, desc: string): HTMLElement {
@@ -883,452 +679,45 @@ export class SettingsStyleSection {
   }
 
   private addNumericControl(containerEl: HTMLElement, config: NumericControlConfig): void {
-    const setting = new Setting(containerEl)
-      .setName(config.name)
-      .setDesc(config.desc)
-      .setClass('opencodian-style-setting');
-
-    setting.controlEl.empty();
-    setting.controlEl.addClass('opencodian-style-setting-control');
-
-    const decrementBtn = setting.controlEl.createEl('button', {
-      cls: 'opencodian-style-step-btn',
-      text: '−',
-    });
-    decrementBtn.type = 'button';
-    decrementBtn.setAttribute('aria-label', `${config.name} -`);
-
-    const sliderEl = setting.controlEl.createEl('input', {
-      cls: 'opencodian-style-slider',
-      type: 'range',
-    });
-    sliderEl.min = String(config.min);
-    sliderEl.max = String(config.max);
-    sliderEl.step = String(config.step);
-
-    const numberInputChars = this.getNumericControlInputChars(config);
-    const numberWrapEl = setting.controlEl.createDiv({ cls: 'opencodian-style-number-wrap' });
-    numberWrapEl.style.setProperty(
-      '--opencodian-style-number-width',
-      `calc(${numberInputChars}ch + 1.8em)`,
-    );
-    const numberEl = numberWrapEl.createEl('input', {
-      cls: 'opencodian-style-number',
-      type: 'number',
-    });
-    numberEl.size = numberInputChars;
-    numberEl.min = String(config.min);
-    numberEl.max = String(config.max);
-    numberEl.step = 'any';
-    const unitEl = numberWrapEl.createSpan({ cls: 'opencodian-style-unit', text: config.unit });
-
-    const incrementBtn = setting.controlEl.createEl('button', {
-      cls: 'opencodian-style-step-btn',
-      text: '+',
-    });
-    incrementBtn.type = 'button';
-    incrementBtn.setAttribute('aria-label', `${config.name} +`);
-
-    const resetBtn = setting.controlEl.createEl('button', {
-      cls: 'opencodian-style-reset-btn',
-      text: '⟲',
-    });
-    resetBtn.type = 'button';
-    resetBtn.setAttribute('aria-label', t('settings.style.resetSingle.tooltip'));
-    resetBtn.setAttribute('title', t('settings.style.resetSingle.tooltip'));
-
-    let isEditingNumberInput = false;
-    let isDraggingSlider = false;
-
-    const renderValue = (value: number, options: { preserveNumberDraft?: boolean } = {}) => {
-      sliderEl.value = String(value);
-      if (!(options.preserveNumberDraft && isEditingNumberInput)) {
-        numberEl.value = String(value);
-      }
-      unitEl.setText(config.unit);
-    };
-
-    const commitValue = (
-      value: number,
-      options: { preserveNumberDraft?: boolean; snapToStep?: boolean } = {},
-    ) => {
-      const nextValue = options.snapToStep === false
-        ? this.clampNumericControlValue(value, config.min, config.max)
-        : this.clampStyleNumber(value, config.min, config.max, config.step);
-      config.commitValue(nextValue);
-      renderValue(nextValue, { preserveNumberDraft: options.preserveNumberDraft });
-    };
-
-    const commitNumberInputDraft = () => {
-      isEditingNumberInput = false;
-      const rawValue = numberEl.value.trim();
-      if (!this.isStableNumericControlDraft(rawValue)) {
-        renderValue(config.value());
-        return;
-      }
-
-      const nextValue = Number(rawValue);
-      if (Number.isNaN(nextValue)) {
-        renderValue(config.value());
-        return;
-      }
-
-      commitValue(nextValue, { snapToStep: false });
-    };
-
-    decrementBtn.addEventListener('click', () => {
-      commitValue(config.value() - config.step);
-    });
-    incrementBtn.addEventListener('click', () => {
-      commitValue(config.value() + config.step);
-    });
-    resetBtn.addEventListener('click', () => {
-      isDraggingSlider = false;
-      commitValue(config.resetValue());
-    });
-    sliderEl.addEventListener('pointerdown', () => {
-      isDraggingSlider = true;
-    });
-    sliderEl.addEventListener('input', () => {
-      const nextValue = Number(sliderEl.value);
-      if (Number.isNaN(nextValue)) {
-        return;
-      }
-
-      if (isDraggingSlider) {
-        renderValue(nextValue, { preserveNumberDraft: true });
-        return;
-      }
-
-      commitValue(nextValue);
-    });
-    sliderEl.addEventListener('change', () => {
-      isDraggingSlider = false;
-      const nextValue = Number(sliderEl.value);
-      if (!Number.isNaN(nextValue)) {
-        commitValue(nextValue);
-      }
-    });
-    sliderEl.addEventListener('blur', () => {
-      isDraggingSlider = false;
-    });
-    numberEl.addEventListener('focus', () => {
-      isEditingNumberInput = true;
-    });
-    numberEl.addEventListener('input', () => {
-      const rawValue = numberEl.value.trim();
-      if (!this.isStableNumericControlDraft(rawValue)) {
-        return;
-      }
-
-      const nextValue = Number(rawValue);
-      if (!Number.isNaN(nextValue)) {
-        commitValue(nextValue, {
-          preserveNumberDraft: true,
-          snapToStep: false,
-        });
-      }
-    });
-    numberEl.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        numberEl.blur();
-        return;
-      }
-
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        isEditingNumberInput = false;
-        renderValue(config.value());
-        numberEl.blur();
-      }
-    });
-    numberEl.addEventListener('blur', () => {
-      commitNumberInputDraft();
-    });
-
-    renderValue(config.value());
-    config.registerSync?.(() => {
-      renderValue(config.value());
-    });
-
-    if (config.helpButton) {
-      this.addSettingHelpButton(setting, config.helpButton);
-    }
+    this.styleControls.addNumericControl(containerEl, config);
   }
 
   private getNumericControlInputChars(config: Pick<NumericControlConfig, 'min' | 'max' | 'step'>): number {
-    const precision = this.getNumericControlPrecision(config.step);
-    const minChars = this.formatNumericControlValue(config.min, precision).length;
-    const maxChars = this.formatNumericControlValue(config.max, precision).length;
-
-    return Math.max(4, minChars, maxChars);
-  }
-
-  private getNumericControlPrecision(step: number): number {
-    const stepText = String(step);
-    const decimalIndex = stepText.indexOf('.');
-
-    return decimalIndex >= 0 ? stepText.length - decimalIndex - 1 : 0;
-  }
-
-  private formatNumericControlValue(value: number, precision: number): string {
-    if (precision <= 0) {
-      return String(value);
-    }
-
-    return value.toFixed(precision).replace(/\.?0+$/, '');
-  }
-
-  private isStableNumericControlDraft(rawValue: string): boolean {
-    const normalized = rawValue.trim();
-    if (
-      normalized.length === 0
-      || normalized === '-'
-      || normalized === '+'
-      || normalized === '.'
-      || normalized === '-.'
-      || normalized === '+.'
-      || normalized.endsWith('.')
-      || /[eE][+-]?$/.test(normalized)
-    ) {
-      return false;
-    }
-
-    return Number.isFinite(Number(normalized));
-  }
-
-  private clampNumericControlValue(value: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, value));
+    return this.styleControls.getNumericControlInputChars(config);
   }
 
   private addNumericStyleControl(containerEl: HTMLElement, config: NumericStyleControlConfig): void {
-    this.addNumericControl(containerEl, {
-      name: config.name,
-      desc: config.desc,
-      min: config.min,
-      max: config.max,
-      step: config.step,
-      unit: config.unit,
-      value: config.value,
-      resetValue: config.resetValue,
-      commitValue: (nextValue) => {
-        this.plugin.updateChatAppearance((appearance) => {
-          config.setValue(appearance, nextValue);
-        });
-        this.applyAndScheduleStyleUpdate();
-      },
-      registerSync: (syncFromSettings) => {
-        this.registerStyleControlBinding(config.group, syncFromSettings);
-      },
-    });
+    this.styleControls.addNumericStyleControl(containerEl, config);
   }
 
   private addColorStyleControl(containerEl: HTMLElement, config: ColorStyleControlConfig): void {
-    const setting = new Setting(containerEl)
-      .setName(config.name)
-      .setDesc(config.desc)
-      .setClass('opencodian-style-setting');
-
-    const controlEl = (setting as Setting & { controlEl?: HTMLElement }).controlEl instanceof HTMLElement
-      ? (setting as Setting & { controlEl: HTMLElement }).controlEl
-      : setting.settingEl.createDiv({ cls: 'setting-item-control' });
-    controlEl.empty();
-    controlEl.addClass('opencodian-style-setting-control');
-
-    controlEl.addClass('opencodian-style-color-control');
-
-    const previewBtn = controlEl.createEl('button', {
-      cls: 'opencodian-style-color-preview',
-    });
-    previewBtn.type = 'button';
-    previewBtn.setAttribute('aria-label', t('settings.style.colorPicker.pick'));
-
-    const valueEl = controlEl.createSpan({ cls: 'opencodian-style-color-value' });
-
-    const pickBtn = controlEl.createEl('button', {
-      cls: 'opencodian-style-secondary-btn',
-      text: t('settings.style.colorPicker.pick'),
-    });
-    pickBtn.type = 'button';
-
-    const followThemeBtn = controlEl.createEl('button', {
-      cls: 'opencodian-style-secondary-btn',
-      text: t('settings.style.colorPicker.followTheme'),
-    });
-    followThemeBtn.type = 'button';
-
-    const colorInput = controlEl.createEl('input', {
-      cls: 'opencodian-style-color-input',
-      type: 'color',
-    });
-    colorInput.tabIndex = -1;
-    colorInput.setAttribute('aria-hidden', 'true');
-
-    const elements: ColorStyleControlElements = {
-      settingEl: setting.settingEl,
-      previewBtn,
-      valueEl,
-      followThemeBtn,
-      colorInput,
-    };
-
-    const renderValue = (value: string) => {
-      this.renderColorStyleControlValue(config, elements, value);
-    };
-
-    const commitValue = (value: string) => {
-      this.commitColorStyleControlValue(config, value);
-      renderValue(config.value());
-    };
-
-    previewBtn.addEventListener('click', () => {
-      this.openStyleColorPicker(colorInput);
-    });
-    pickBtn.addEventListener('click', () => {
-      this.openStyleColorPicker(colorInput);
-    });
-    followThemeBtn.addEventListener('click', () => {
-      commitValue(config.resetValue());
-    });
-    colorInput.addEventListener('change', () => {
-      commitValue(colorInput.value);
-    });
-
-    renderValue(config.value());
-    this.registerStyleControlBinding(config.group, () => {
-      renderValue(config.value());
-    });
-  }
-
-  private renderColorStyleControlValue(
-    config: ColorStyleControlConfig,
-    elements: ColorStyleControlElements,
-    value: string,
-  ): void {
-    const { settingEl, previewBtn, valueEl, followThemeBtn, colorInput } = elements;
-    const normalizedValue = value.trim();
-    const resetValue = config.resetValue().trim();
-    const pickerHex = this.resolveStyleColorPickerHex(normalizedValue || resetValue, resetValue, settingEl);
-    const followsTheme = normalizedValue === resetValue;
-
-    colorInput.value = pickerHex;
-    previewBtn.style.background = normalizedValue || resetValue;
-    previewBtn.setAttribute('title', followsTheme ? t('settings.style.colorPicker.followThemeValue') : normalizedValue);
-    valueEl.setText(followsTheme ? t('settings.style.colorPicker.followThemeValue') : pickerHex.toUpperCase());
-    valueEl.setAttribute('title', normalizedValue || resetValue);
-    followThemeBtn.disabled = followsTheme;
-  }
-
-  private commitColorStyleControlValue(config: ColorStyleControlConfig, value: string): void {
-    this.plugin.updateChatAppearance((appearance) => {
-      config.setValue(appearance, value.trim());
-    });
-    this.applyAndScheduleStyleUpdate();
-  }
-
-  private openStyleColorPicker(colorInput: HTMLInputElement): void {
-    const inputWithPicker = colorInput as HTMLInputElement & { showPicker?: () => void };
-    if (typeof inputWithPicker.showPicker === 'function') {
-      inputWithPicker.showPicker();
-      return;
-    }
-
-    colorInput.click();
-  }
-
-  private resolveStyleColorPickerHex(
-    value: string,
-    fallback: string,
-    hostEl?: HTMLElement | null,
-  ): string {
-    return this.resolveCssColorToHex(value, hostEl)
-      ?? this.resolveCssColorToHex(fallback, hostEl)
-      ?? '#808080';
-  }
-
-  private resolveCssColorToHex(value: string, hostEl?: HTMLElement | null): string | null {
-    const normalized = value.trim();
-    if (!normalized) {
-      return null;
-    }
-
-    const probeEl = document.createElement('span');
-    probeEl.style.color = normalized;
-    probeEl.style.position = 'absolute';
-    probeEl.style.opacity = '0';
-    probeEl.style.pointerEvents = 'none';
-
-    const mountTarget = hostEl?.isConnected ? hostEl : document.body;
-    mountTarget.appendChild(probeEl);
-    const computedColor = window.getComputedStyle(probeEl).color;
-    probeEl.remove();
-
-    return this.parseCssColorToHex(computedColor);
-  }
-
-  private parseCssColorToHex(color: string): string | null {
-    const match = color.match(/rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})/iu);
-    if (!match) {
-      return null;
-    }
-
-    const toHex = (value: string) => Number.parseInt(value, 10).toString(16).padStart(2, '0');
-    return `#${toHex(match[1])}${toHex(match[2])}${toHex(match[3])}`;
+    this.styleControls.addColorStyleControl(containerEl, config);
   }
 
   private createStyleResetSetting(
     containerEl: HTMLElement,
     group: ChatAppearanceStyleGroup,
   ): void {
-    new Setting(containerEl)
-      .setName(t('settings.style.groupReset.name'))
-      .setDesc(t('settings.style.groupReset.desc'))
-      .setClass('opencodian-style-reset-setting')
-      .addButton((btn) => {
-        btn
-          .setButtonText(t('settings.style.groupReset.button'))
-          .onClick(() => {
-            this.plugin.resetChatAppearanceGroup(group);
-            this.applyAndScheduleStyleUpdate();
-            this.refreshStyleControlValues(group);
-          });
-      });
+    this.styleControls.createStyleResetSetting(containerEl, group);
   }
 
   private registerStyleControlBinding(
     group: ChatAppearanceStyleGroup,
     syncFromSettings: () => void,
   ): void {
-    this.styleControlBindings.push({
-      group,
-      syncFromSettings,
-    });
+    this.styleControls.registerStyleControlBinding(group, syncFromSettings);
   }
 
   private clearStyleControlBindings(group: ChatAppearanceStyleGroup): void {
-    this.styleControlBindings = this.styleControlBindings.filter((binding) => binding.group !== group);
+    this.styleControls.clearStyleControlBindings(group);
   }
 
   private refreshStyleControlValues(group?: ChatAppearanceStyleGroup): void {
-    for (const binding of this.styleControlBindings) {
-      if (group && binding.group !== group) {
-        continue;
-      }
-      binding.syncFromSettings();
-    }
+    this.styleControls.refreshStyleControlValues(group);
   }
 
   private clampStyleNumber(value: number, min: number, max: number, step: number): number {
-    const clampedValue = this.clampNumericControlValue(value, min, max);
-    const precision = Math.max(
-      this.getNumericControlPrecision(step),
-      this.getNumericControlPrecision(min),
-      this.getNumericControlPrecision(max),
-    );
-    const steppedValue = (Math.round(((clampedValue - min) / step) + Number.EPSILON) * step) + min;
-    const normalizedValue = precision > 0 ? Number(steppedValue.toFixed(precision)) : steppedValue;
-    return this.clampNumericControlValue(normalizedValue, min, max);
+    return this.styleControls.clampStyleNumber(value, min, max, step);
   }
 
   private applyAndScheduleStyleUpdate(): void {
@@ -1363,6 +752,17 @@ export class SettingsStyleSection {
     });
   }
 
+  private createPresetSection(): SettingsStylePresetSection {
+    return new SettingsStylePresetSection({
+      plugin: this.plugin,
+      createStyleGroupSection: (containerEl, title, desc) => this.createStyleGroupSection(containerEl, title, desc),
+      onThemeAppearanceChanged: () => {
+        this.refreshStyleControlValues();
+        this.runtime?.backgroundStyleSection.refresh();
+      },
+    });
+  }
+
   private async resetAllChatStyles(): Promise<void> {
     const runtime = this.runtime;
     try {
@@ -1374,6 +774,7 @@ export class SettingsStyleSection {
       new Notice(t('settings.style.resetAll.failed'));
     }
   }
+
   private refreshThemePresetUi(runtime?: SettingsStyleSectionRuntimeState | null): void {
     if (runtime && !this.isRuntimeActive(runtime)) {
       return;
@@ -1381,7 +782,7 @@ export class SettingsStyleSection {
 
     this.refreshStyleControlValues();
     this.runtime?.backgroundStyleSection.refresh();
-    this.runtime?.stylePresetUiRefresh?.();
+    this.runtime?.presetSection.refresh();
   }
 
   private isRuntimeActive(runtime: SettingsStyleSectionRuntimeState): boolean {

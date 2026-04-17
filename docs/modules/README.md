@@ -210,8 +210,10 @@ docs/modules/
 │       ├── SettingsServerSection.md
 │       ├── SettingsStyleInputPanelSection.md
 │       ├── SettingsStyleLiquidGlassInputControls.md
+│       ├── SettingsStylePresetSection.md
 │       ├── SettingsStyleSection.md
 │       ├── SettingsStyleBackgroundSection.md
+│       ├── settingsStyleControls.md
 │       └── projectAgentEditorConfig.md
 ├── i18n/
 │   ├── index.md

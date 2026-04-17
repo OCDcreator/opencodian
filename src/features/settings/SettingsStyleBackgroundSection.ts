@@ -9,21 +9,14 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import { getChatAppearanceBackgroundSizeValue } from '../chat/chatAppearance';
+import type { NumericStyleControlConfig } from './settingsStyleControls';
 
 const logger = createLogger('SettingsStyleBackgroundSection');
 
-interface BackgroundNumericStyleControlConfig {
+type BackgroundNumericStyleControlConfig = NumericStyleControlConfig & {
   group: 'background';
-  name: string;
-  desc: string;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  value: () => number;
-  resetValue: () => number;
   setValue: (appearance: ChatAppearanceSettings, value: number) => void;
-}
+};
 
 interface SettingsStyleBackgroundSectionOptions {
   plugin: OpenCodianPlugin;
