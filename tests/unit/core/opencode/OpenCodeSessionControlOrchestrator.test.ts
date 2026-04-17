@@ -1,4 +1,5 @@
 import {
+  expandSessionCommandTemplate,
   OpenCodeSessionControlOrchestrator,
   type OpenCodeSessionControlOrchestratorHost,
   type OpenCodeSessionControlPartSdk,
@@ -75,6 +76,31 @@ function createHost(
     ...overrides,
   } as MockHost;
 }
+
+it('expands supported session command placeholders with stable path normalization', () => {
+    expect(expandSessionCommandTemplate([
+      'Vault: {{vault_path}}',
+      'Note: {{current_note_path}}',
+      'Selection: {{current_selection}}',
+      'Context:',
+      '{{external_context_paths}}',
+      'Title: {{conversation_title}}',
+    ].join('\n'), {
+      vaultPath: 'C:\\Vault\\Project',
+      currentNotePath: 'notes\\today.md',
+      currentSelection: 'Keep {{vault_path}} literal',
+      externalContextPaths: ['notes\\alpha.md', 'docs/beta.md', ''],
+      conversationTitle: 'Sprint {{current_note_path}}',
+    })).toBe([
+      'Vault: C:/Vault/Project',
+      'Note: notes/today.md',
+      'Selection: Keep {{vault_path}} literal',
+      'Context:',
+      'notes/alpha.md',
+      'docs/beta.md',
+      'Title: Sprint {{current_note_path}}',
+    ].join('\n'));
+  });
 
 it('builds context usage from session info, messages, and model catalog', async () => {
     const sessionSdk = createSessionSdk();
@@ -315,3 +341,51 @@ it('owns session messaging and part SDK wrappers', async () => {
     await expect(orchestrator.updateMessagePart('session-1', 'message-1', 'part-1', updatedPart)).resolves.toEqual(updatedPart);
     await expect(orchestrator.deleteMessagePart('session-1', 'message-1', 'part-1')).resolves.toBe(true);
 });
+
+it('expands session command arguments before delegating to the SDK', async () => {
+    const sessionMessage: SessionMessage = {
+      info: {
+        id: 'message-2',
+        sessionID: 'session-1',
+        role: 'assistant',
+        time: { created: 2 },
+      },
+      parts: [],
+    };
+    const sessionSdk = createSessionSdk({
+      command: jest.fn().mockResolvedValue(sessionMessage),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(
+      createHost(sessionSdk, createPartSdk()),
+    );
+
+    await expect(orchestrator.runSessionCommand('session-1', {
+      command: 'review',
+      arguments: [
+        'Vault={{vault_path}}',
+        'Note={{current_note_path}}',
+        'Selection={{current_selection}}',
+        'Context={{external_context_paths}}',
+        'Title={{conversation_title}}',
+      ].join('\n'),
+      placeholderContext: {
+        vaultPath: '/vault',
+        currentNotePath: 'notes/plan.md',
+        externalContextPaths: ['notes/alpha.md', 'notes/beta.md'],
+      },
+    })).resolves.toEqual(sessionMessage);
+
+    expect(sessionSdk.command).toHaveBeenCalledWith({
+      sessionID: 'session-1',
+      command: 'review',
+      arguments: [
+        'Vault=/vault',
+        'Note=notes/plan.md',
+        'Selection=',
+        'Context=notes/alpha.md',
+        'notes/beta.md',
+        'Title=',
+      ].join('\n'),
+    });
+    expect(sessionSdk.command.mock.calls[0]?.[0]).not.toHaveProperty('placeholderContext');
+  });

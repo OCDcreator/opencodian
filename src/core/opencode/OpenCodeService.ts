@@ -56,6 +56,7 @@ import {
 import {
   OpenCodeSessionControlOrchestrator,
   type OpenCodeSessionControlSdk,
+  type SessionCommandInput,
   type SessionContextUsageSnapshot,
 } from './OpenCodeSessionControlOrchestrator';
 import {
@@ -1231,7 +1232,7 @@ export class OpenCodeService {
 
   async runSessionCommand(
     sessionId: string,
-    input: { command: string; arguments: string; agent?: string; model?: string; messageID?: string; variant?: string; parts?: unknown[] },
+    input: SessionCommandInput,
   ): Promise<{ info: Message; parts: Part[] }> {
     return this.sessionControl.runSessionCommand(sessionId, input);
   }
