@@ -1,14 +1,8 @@
 import { App, Modal, Notice, setIcon } from 'obsidian';
 
-import {
-  collectConfiguredProviderIds,
-  formatModelReference,
-  setProviderEnabled,
-} from '../../core/config/modelConfig';
 import type {
   OpencodeModelConfigSubset,
   OpencodeProviderConfig,
-  OpencodeProviderModelConfig,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -16,28 +10,34 @@ import { createLogger } from '../../shared';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import {
-  assertModelExtraFieldKeyAllowed,
+  createModelConfigKeyValueState,
+  createModelConfigModalSnapshot,
+  isBlankProviderState,
+  type ModelConfigModalFlow,
+  parseAddProviderJsonDraft,
+  resolveModelConfigJsonDraftValue,
+  syncProviderFormFromJsonDraft,
+  tryParseAddProviderJsonDraft,
+} from './modelConfigModalState';
+import {
+  buildAvailabilitySubset,
+  buildModelConfigSavePlan,
+  type ModelConfigSavePlan,
+  serializeProviderConfig,
+} from './modelConfigSavePlan';
+import {
   buildConfigPreview,
   createEmptyModel,
   createEmptyProvider,
   DEFAULT_PROVIDER_INTERFACE_FORMAT,
-  extractModelExtraFields,
-  extractModelOptions,
-  extractModelVariants,
-  extractProviderExtraOptions,
   type FetchedProviderModelCandidate,
   fetchProviderModels,
   hydrateWorkspaceState,
   type KeyValueFieldState,
   type ModelFormState,
-  parseLooseValue,
-  parseModelVariantValue,
-  PROVIDER_ID_PATTERN,
   PROVIDER_INTERFACE_FORMAT_OPTIONS,
   type ProviderFormState,
   type ProviderInterfaceFormatId,
-  resolveInterfaceFormatState,
-  resolveNpmForInterfaceFormat,
 } from './modelConfigWorkspace';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
 import {
@@ -57,19 +57,12 @@ type ProviderCheckState =
 
 type ProviderInterfaceFormatOption = (typeof PROVIDER_INTERFACE_FORMAT_OPTIONS)[number];
 type ModelKeyValueCollectionKey = 'options' | 'variants' | 'extraFields';
-type ModelConfigModalFlow = 'workspace' | 'add-provider';
 
 interface SelectedProviderEditorState {
   flow: ModelConfigModalFlow;
   provider: ProviderFormState;
   formatMeta: ProviderInterfaceFormatOption;
   providerCheckState: ProviderCheckState;
-}
-
-interface ModelConfigSavePlan {
-  nextConfig: OpencodeModelConfigSubset;
-  nextDisabledModelRefs: string[];
-  restartServerAfterWrite: boolean;
 }
 
 interface ModelConfigModalOpenOptions {
@@ -568,7 +561,7 @@ export class ModelConfigModal extends Modal {
       description: t('settings.model.visualEditor.extraOptionsDesc'),
       values: provider.extraOptions,
       onAdd: () => {
-        provider.extraOptions.push(this.createKeyValueState());
+        provider.extraOptions.push(createModelConfigKeyValueState());
         this.updatePreview();
         this.render();
       },
@@ -846,7 +839,7 @@ export class ModelConfigModal extends Modal {
       description: t('settings.model.visualEditor.addProviderExtraOptionsDesc'),
       values: provider.extraOptions,
       onAdd: () => {
-        provider.extraOptions.push(this.createKeyValueState());
+        provider.extraOptions.push(createModelConfigKeyValueState());
         this.updatePreview();
         this.render();
       },
@@ -1136,7 +1129,7 @@ export class ModelConfigModal extends Modal {
       description,
       values: model[field],
       onAdd: () => {
-        model[field].push(this.createKeyValueState());
+        model[field].push(createModelConfigKeyValueState());
         this.updatePreview();
         this.render();
       },
@@ -1535,30 +1528,12 @@ export class ModelConfigModal extends Modal {
   }
 
   private createSnapshot(): string {
-    return JSON.stringify({
+    return createModelConfigModalSnapshot({
+      flow: this.isAddProviderFlow() ? 'add-provider' : 'workspace',
       modelValue: this.modelValue,
       smallModelValue: this.smallModelValue,
-      jsonDraftValue: this.isAddProviderFlow() ? this.getJsonDraftValue() : undefined,
-      providers: this.providers.map((provider) => ({
-        id: provider.id,
-        name: provider.name,
-        interfaceFormat: provider.interfaceFormat,
-        customNpm: provider.customNpm,
-        baseURL: provider.baseURL,
-        apiKey: provider.apiKey,
-        enabled: provider.enabled,
-        extraOptions: provider.extraOptions.map((entry) => ({ key: entry.key, value: entry.value })),
-        models: provider.models.map((model) => ({
-          id: model.id,
-          name: model.name,
-          context: model.context,
-          output: model.output,
-          enabled: model.enabled,
-          options: model.options.map((entry) => ({ key: entry.key, value: entry.value })),
-          variants: model.variants.map((entry) => ({ key: entry.key, value: entry.value })),
-          extraFields: model.extraFields.map((entry) => ({ key: entry.key, value: entry.value })),
-        })),
-      })),
+      jsonDraftValue: resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue),
+      providers: this.providers,
     });
   }
 
@@ -1586,7 +1561,11 @@ export class ModelConfigModal extends Modal {
     }
 
     try {
-      const subset = this.buildAvailabilitySubset();
+      const subset = buildAvailabilitySubset({
+        providers: this.providers,
+        localConfigAtOpen: this.localConfigAtOpen,
+        serverConfigAtOpen: this.serverConfigAtOpen,
+      });
       const nextValue = buildConfigPreview(
         this.modelValue,
         this.smallModelValue,
@@ -1602,185 +1581,28 @@ export class ModelConfigModal extends Modal {
     }
   }
 
-  private buildAvailabilitySubset(): Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'> {
-    const providerIds = Array.from(new Set([
-      ...this.providers.map((provider) => provider.id.trim()).filter(Boolean),
-      ...collectConfiguredProviderIds(this.localConfigAtOpen),
-      ...collectConfiguredProviderIds(this.serverConfigAtOpen),
-    ]));
-
-    let subset: OpencodeModelConfigSubset = {
-      enabled_providers: Array.isArray(this.localConfigAtOpen.enabled_providers)
-        ? [...this.localConfigAtOpen.enabled_providers]
-        : undefined,
-      disabled_providers: Array.isArray(this.localConfigAtOpen.disabled_providers)
-        ? [...this.localConfigAtOpen.disabled_providers]
-        : undefined,
-    };
-
-    for (const provider of this.providers) {
-      const providerId = provider.id.trim();
-      if (!providerId) {
-        continue;
-      }
-      subset = setProviderEnabled({
-        subset,
-        providerId,
-        enabled: provider.enabled,
-        knownProviderIds: providerIds,
-        inherited: this.serverConfigAtOpen,
-      });
-    }
-
-    return {
-      enabled_providers: subset.enabled_providers,
-      disabled_providers: subset.disabled_providers,
-    };
-  }
-
-  private toModelConfig(): OpencodeModelConfigSubset {
-    const providerEntries = this.providers.reduce<Record<string, OpencodeProviderConfig>>((result, provider) => {
-      const isBlankProvider = !provider.id.trim()
-        && !provider.name.trim()
-        && !provider.baseURL.trim()
-        && !provider.apiKey.trim()
-        && provider.extraOptions.every((entry) => !entry.key.trim() && !entry.value.trim())
-        && provider.models.length === 0;
-      if (isBlankProvider) {
-        return result;
-      }
-
-      const providerId = provider.id.trim();
-      const providerName = provider.name.trim();
-      const baseURL = provider.baseURL.trim();
-
-      if (!providerId) {
-        throw new Error(t('settings.model.visualEditor.errorProviderId'));
-      }
-      if (!PROVIDER_ID_PATTERN.test(providerId)) {
-        throw new Error(t('settings.model.visualEditor.errorProviderIdFormat'));
-      }
-      if (!providerName) {
-        throw new Error(t('settings.model.visualEditor.errorProviderName'));
-      }
-      if (!baseURL) {
-        throw new Error(t('settings.model.visualEditor.errorBaseURL'));
-      }
-      if (Object.prototype.hasOwnProperty.call(result, providerId)) {
-        throw new Error(t('settings.model.visualEditor.errorProviderDuplicate'));
-      }
-
-      const nextProvider = this.serializeProviderConfig(provider, {
-        validate: true,
-        includeName: true,
-      });
-      result[providerId] = nextProvider;
-      return result;
-    }, {});
-
-    const availabilitySubset = this.buildAvailabilitySubset();
-    return {
-      model: this.modelValue.trim() || undefined,
-      small_model: this.smallModelValue.trim() || undefined,
-      provider: providerEntries,
-      enabled_providers: availabilitySubset.enabled_providers,
-      disabled_providers: availabilitySubset.disabled_providers,
-    };
-  }
-
-  private buildNextDisabledModelRefs(): string[] {
-    const managedProviderIds = new Set([
-      ...Object.keys(this.localConfigAtOpen.provider ?? {}),
-      ...this.providers.map((provider) => provider.id.trim()).filter(Boolean),
-    ]);
-    const nextRefs = this.initialDisabledModelRefs.filter((ref) => {
-      const [providerId] = ref.split('/');
-      return !managedProviderIds.has(providerId);
-    });
-
-    for (const provider of this.providers) {
-      const providerId = provider.id.trim();
-      if (!providerId) {
-        continue;
-      }
-      for (const model of provider.models) {
-        const modelId = model.id.trim();
-        if (!modelId || model.enabled) {
-          continue;
-        }
-        nextRefs.push(formatModelReference(providerId, modelId));
-      }
-    }
-
-    return Array.from(new Set(nextRefs)).sort((left, right) => left.localeCompare(right));
-  }
-
   private async save(): Promise<void> {
     if (!this.plugin.modelConfigService) {
       return;
     }
 
     try {
-      const savePlan = this.buildSavePlan();
+      const savePlan = buildModelConfigSavePlan({
+        flow: this.isAddProviderFlow() ? 'add-provider' : 'workspace',
+        modelValue: this.modelValue,
+        smallModelValue: this.smallModelValue,
+        providers: this.providers,
+        selectedProvider: this.getSelectedProvider(),
+        localConfigAtOpen: this.localConfigAtOpen,
+        serverConfigAtOpen: this.serverConfigAtOpen,
+        initialDisabledModelRefs: this.initialDisabledModelRefs,
+        jsonDraftValue: resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue),
+      });
       await this.applySavePlan(savePlan);
       await this.finalizeSavePlan(savePlan);
     } catch (error) {
       this.handleSaveFailure(error);
     }
-  }
-
-  private buildSavePlan(): ModelConfigSavePlan {
-    return this.isAddProviderFlow()
-      ? this.buildAddProviderSavePlan()
-      : this.buildWorkspaceSavePlan();
-  }
-
-  private buildWorkspaceSavePlan(): ModelConfigSavePlan {
-    return {
-      nextConfig: this.toModelConfig(),
-      nextDisabledModelRefs: this.buildNextDisabledModelRefs(),
-      restartServerAfterWrite: true,
-    };
-  }
-
-  private buildAddProviderSavePlan(): ModelConfigSavePlan {
-    const provider = this.getSelectedProvider();
-    if (!provider) {
-      throw new Error(t('settings.model.visualEditor.noProviderSelected'));
-    }
-
-    const providerId = provider.id.trim();
-    const providerName = provider.name.trim();
-    if (!providerId) {
-      throw new Error(t('settings.model.visualEditor.errorProviderId'));
-    }
-    if (!PROVIDER_ID_PATTERN.test(providerId)) {
-      throw new Error(t('settings.model.visualEditor.errorProviderIdFormat'));
-    }
-    if (!providerName) {
-      throw new Error(t('settings.model.visualEditor.errorProviderName'));
-    }
-    if (Object.prototype.hasOwnProperty.call(this.localConfigAtOpen.provider ?? {}, providerId)) {
-      throw new Error(t('settings.model.visualEditor.errorProviderDuplicate'));
-    }
-
-    const parsedConfig = this.parseAddProviderJsonDraft();
-    parsedConfig.name = providerName;
-
-    const availabilitySubset = this.buildAvailabilitySubset();
-    return {
-      nextConfig: {
-        ...this.localConfigAtOpen,
-        provider: {
-          ...(this.localConfigAtOpen.provider ?? {}),
-          [providerId]: parsedConfig,
-        },
-        enabled_providers: availabilitySubset.enabled_providers,
-        disabled_providers: availabilitySubset.disabled_providers,
-      },
-      nextDisabledModelRefs: [...this.initialDisabledModelRefs],
-      restartServerAfterWrite: false,
-    };
   }
 
   private async applySavePlan(savePlan: ModelConfigSavePlan): Promise<void> {
@@ -1848,16 +1670,8 @@ export class ModelConfigModal extends Modal {
       return;
     }
     provider.extraOptions = [
-      this.createKeyValueState('setCacheKey', 'true'),
+      createModelConfigKeyValueState('setCacheKey', 'true'),
     ];
-  }
-
-  private createKeyValueState(key = '', value = ''): KeyValueFieldState {
-    return {
-      uid: `field-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      key,
-      value,
-    };
   }
 
   private upsertSelectedDraftProvider(nextProvider: ProviderFormState): void {
@@ -1866,7 +1680,7 @@ export class ModelConfigModal extends Modal {
       this.providers = this.providers.map((provider) => (
         provider.uid === selectedProvider.uid ? nextProvider : provider
       ));
-    } else if (selectedProvider && this.isBlankProvider(selectedProvider)) {
+    } else if (selectedProvider && isBlankProviderState(selectedProvider)) {
       this.providers = this.providers.map((provider) => (
         provider.uid === selectedProvider.uid ? nextProvider : provider
       ));
@@ -1884,10 +1698,10 @@ export class ModelConfigModal extends Modal {
   }
 
   private getAddProviderPreviewValue(provider: ProviderFormState): string {
-    const rawDraft = this.getJsonDraftValue().trim();
+    const rawDraft = resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue).trim();
     let parsedDraft: OpencodeProviderConfig | null = null;
     try {
-      parsedDraft = this.tryParseAddProviderJsonDraft(rawDraft);
+      parsedDraft = tryParseAddProviderJsonDraft(rawDraft);
       if (parsedDraft) {
         provider.raw = parsedDraft;
       }
@@ -1896,7 +1710,7 @@ export class ModelConfigModal extends Modal {
     }
 
     try {
-      const providerConfig = this.serializeProviderConfig(provider, {
+      const providerConfig = serializeProviderConfig(provider, {
         validate: false,
         includeName: false,
       });
@@ -1911,9 +1725,9 @@ export class ModelConfigModal extends Modal {
 
   private syncProviderRawFromJsonDraft(provider: ProviderFormState): void {
     try {
-      const parsedDraft = this.tryParseAddProviderJsonDraft(this.jsonDraftValue);
+      const parsedDraft = tryParseAddProviderJsonDraft(this.jsonDraftValue);
       if (parsedDraft) {
-        this.syncProviderFormFromJsonDraft(provider, parsedDraft);
+        syncProviderFormFromJsonDraft(provider, parsedDraft);
       }
     } catch {
       return;
@@ -1958,18 +1772,16 @@ export class ModelConfigModal extends Modal {
     });
   }
 
-  private getJsonDraftValue(): string {
-    return this.previewEl?.value ?? this.jsonDraftValue;
-  }
-
   private formatAddProviderJson(): void {
     try {
-      const parsed = this.parseAddProviderJsonDraft();
+      const parsed = parseAddProviderJsonDraft(
+        resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue),
+      );
       const nextValue = JSON.stringify(parsed, null, 2);
       this.jsonDraftValue = nextValue;
       const provider = this.getSelectedProvider();
       if (provider) {
-        this.syncProviderFormFromJsonDraft(provider, parsed);
+        syncProviderFormFromJsonDraft(provider, parsed);
       }
       if (this.previewEl) {
         this.previewEl.value = nextValue;
@@ -1978,217 +1790,6 @@ export class ModelConfigModal extends Modal {
     } catch (error) {
       new Notice(`${t('settings.model.jsonEditor.invalidJson')}: ${(error as Error).message}`);
     }
-  }
-
-  private parseAddProviderJsonDraft(): OpencodeProviderConfig {
-    const rawValue = this.getJsonDraftValue().trim();
-    const parsed = this.tryParseAddProviderJsonDraft(rawValue);
-    if (!rawValue || !parsed) {
-      throw new Error(t('settings.model.jsonEditor.invalidJson'));
-    }
-    return parsed;
-  }
-
-  private tryParseAddProviderJsonDraft(rawValue: string): OpencodeProviderConfig | null {
-    if (!rawValue.trim()) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue) as unknown;
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new Error(t('settings.model.jsonEditor.providerObject'));
-    }
-    return parsed as OpencodeProviderConfig;
-  }
-
-  private serializeProviderConfig(
-    provider: ProviderFormState,
-    options: { validate: boolean; includeName: boolean },
-  ): OpencodeProviderConfig {
-    const providerName = provider.name.trim();
-    const baseURL = provider.baseURL.trim();
-
-    if (options.validate) {
-      if (!providerName && options.includeName) {
-        throw new Error(t('settings.model.visualEditor.errorProviderName'));
-      }
-      if (!baseURL) {
-        throw new Error(t('settings.model.visualEditor.errorBaseURL'));
-      }
-    }
-
-    const nextProvider = this.cloneUnmanagedProviderFields(provider.raw);
-    if (options.includeName) {
-      nextProvider.name = providerName;
-    } else {
-      delete nextProvider.name;
-    }
-    nextProvider.npm = resolveNpmForInterfaceFormat(provider);
-    const nextOptions: Record<string, unknown> = {};
-    if (baseURL) {
-      nextOptions.baseURL = baseURL;
-    } else {
-      delete nextOptions.baseURL;
-    }
-    if (provider.apiKey.trim()) {
-      nextOptions.apiKey = provider.apiKey.trim();
-    } else {
-      delete nextOptions.apiKey;
-    }
-    for (const entry of provider.extraOptions) {
-      const key = entry.key.trim();
-      if (!key || key === 'baseURL' || key === 'apiKey') {
-        continue;
-      }
-      nextOptions[key] = parseLooseValue(entry.value);
-    }
-    nextProvider.options = nextOptions;
-
-    const modelEntries = provider.models.reduce<Record<string, OpencodeProviderModelConfig>>((models, model) => {
-      const modelId = model.id.trim();
-      if (!modelId) {
-        if (options.validate) {
-          throw new Error(t('settings.model.visualEditor.errorModelId'));
-        }
-        return models;
-      }
-      if (Object.prototype.hasOwnProperty.call(models, modelId)) {
-        throw new Error(t('settings.model.visualEditor.errorModelDuplicate'));
-      }
-
-      const nextModel: OpencodeProviderModelConfig = {};
-      if (model.name.trim()) {
-        nextModel.name = model.name.trim();
-      } else {
-        delete nextModel.name;
-      }
-
-      const nextLimit: NonNullable<OpencodeProviderModelConfig['limit']> = {};
-      if (model.context.trim()) {
-        const parsed = Number(model.context.trim());
-        if (!Number.isFinite(parsed) || parsed <= 0) {
-          throw new Error(t('settings.model.visualEditor.errorContextLimit'));
-        }
-        nextLimit.context = parsed;
-      } else {
-        delete nextLimit.context;
-      }
-      if (model.output.trim()) {
-        const parsed = Number(model.output.trim());
-        if (!Number.isFinite(parsed) || parsed <= 0) {
-          throw new Error(t('settings.model.visualEditor.errorOutputLimit'));
-        }
-        nextLimit.output = parsed;
-      } else {
-        delete nextLimit.output;
-      }
-      if (Object.keys(nextLimit).length > 0) {
-        nextModel.limit = nextLimit;
-      } else {
-        delete nextModel.limit;
-      }
-
-      const nextModelOptions: Record<string, unknown> = {};
-      for (const entry of model.options) {
-        const key = entry.key.trim();
-        if (!key) {
-          continue;
-        }
-        nextModelOptions[key] = parseLooseValue(entry.value);
-      }
-      if (Object.keys(nextModelOptions).length > 0) {
-        nextModel.options = nextModelOptions;
-      } else {
-        delete nextModel.options;
-      }
-
-      const nextModelVariants: Record<string, Record<string, unknown>> = {};
-      for (const entry of model.variants) {
-        const key = entry.key.trim();
-        if (!key) {
-          continue;
-        }
-        nextModelVariants[key] = parseModelVariantValue(key, entry.value);
-      }
-      if (Object.keys(nextModelVariants).length > 0) {
-        nextModel.variants = nextModelVariants;
-      } else {
-        delete nextModel.variants;
-      }
-
-      for (const entry of model.extraFields) {
-        const key = assertModelExtraFieldKeyAllowed(entry.key);
-        if (!key) {
-          continue;
-        }
-        nextModel[key] = parseLooseValue(entry.value);
-      }
-
-      models[modelId] = nextModel;
-      return models;
-    }, {});
-
-    nextProvider.models = modelEntries;
-    return nextProvider;
-  }
-
-  private syncProviderFormFromJsonDraft(provider: ProviderFormState, draft: OpencodeProviderConfig): void {
-    const interfaceState = resolveInterfaceFormatState(draft.npm);
-    const existingModelEnabledMap = new Map(provider.models.map((model) => [model.id, model.enabled]));
-
-    provider.interfaceFormat = interfaceState.interfaceFormat;
-    provider.customNpm = interfaceState.customNpm;
-    provider.baseURL = this.readOptionString(draft.options, 'baseURL');
-    provider.apiKey = this.readOptionString(draft.options, 'apiKey');
-    provider.extraOptions = extractProviderExtraOptions(draft.options);
-    provider.models = Object.entries(draft.models ?? {}).map(([modelId, model]) => ({
-      uid: `model-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      id: modelId,
-      name: typeof model.name === 'string' ? model.name : '',
-      context: this.readLimitNumber(model.limit, 'context'),
-      output: this.readLimitNumber(model.limit, 'output'),
-      enabled: existingModelEnabledMap.get(modelId) ?? true,
-      options: extractModelOptions(model),
-      variants: extractModelVariants(model),
-      extraFields: extractModelExtraFields(model),
-      raw: model,
-    }));
-    provider.raw = draft;
-  }
-
-  private cloneUnmanagedProviderFields(raw: OpencodeProviderConfig): OpencodeProviderConfig {
-    return Object.entries(raw).reduce<OpencodeProviderConfig>((result, [key, value]) => {
-      if (key === 'name' || key === 'npm' || key === 'options' || key === 'models') {
-        return result;
-      }
-      result[key] = value;
-      return result;
-    }, {});
-  }
-
-  private readOptionString(options: unknown, key: string): string {
-    if (typeof options !== 'object' || options === null || Array.isArray(options)) {
-      return '';
-    }
-    const value = (options as Record<string, unknown>)[key];
-    return typeof value === 'string' ? value : '';
-  }
-
-  private readLimitNumber(limit: unknown, key: 'context' | 'output'): string {
-    if (typeof limit !== 'object' || limit === null || Array.isArray(limit)) {
-      return '';
-    }
-    const value = (limit as Record<string, unknown>)[key];
-    return typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
-  }
-
-  private isBlankProvider(provider: ProviderFormState): boolean {
-    return !provider.id.trim()
-      && !provider.name.trim()
-      && !provider.baseURL.trim()
-      && !provider.apiKey.trim()
-      && provider.extraOptions.every((entry) => !entry.key.trim() && !entry.value.trim())
-      && provider.models.length === 0;
   }
 
   private getProviderCheckClass(state: ProviderCheckState): string {

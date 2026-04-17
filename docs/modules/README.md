@@ -192,6 +192,8 @@ docs/modules/
 │       ├── ModelPickerModal.md
 │       ├── OpencodeConfigModal.md
 │       ├── OpenCodianSettings.md
+│       ├── modelConfigModalState.md
+│       ├── modelConfigSavePlan.md
 │       ├── ProviderBuiltinIconPickerModal.md
 │       ├── ProviderIconCacheModal.md
 │       ├── ServerSettingHelpModal.md

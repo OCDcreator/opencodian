@@ -5,7 +5,7 @@
 
 ## Queue
 
-### [NEXT] M1 - ModelConfigModal state and save-plan coarse extraction
+### [DONE] M1 - ModelConfigModal state and save-plan coarse extraction
 
 - **Lane**: Settings / model config modal coarse extraction
 - **Goal**: Move durable non-UI state, snapshot, JSON draft, serialization, availability subset, disabled model refs, and save-plan logic out of `ModelConfigModal` while keeping the modal as lifecycle/orchestration shell.
@@ -24,7 +24,7 @@
   - `ModelConfigModal.ts` line count and private method surface drop materially.
   - Behavior is preserved with focused tests plus full lint/typecheck/test/build.
 
-### [QUEUED] M2 - ModelConfigModal provider and model editor coarse extraction
+### [NEXT] M2 - ModelConfigModal provider and model editor coarse extraction
 
 - **Lane**: Settings / model config modal UI ownership
 - **Goal**: Move provider editor sections and model card/list editing into one or two cohesive editor owners while keeping `ModelConfigModal` as shell and save orchestrator.
