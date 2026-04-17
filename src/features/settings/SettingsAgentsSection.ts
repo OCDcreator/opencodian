@@ -9,6 +9,7 @@ import type {
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { SettingsProjectAgentEditor } from './SettingsProjectAgentEditor';
 
 const logger = createLogger('SettingsAgentsSection');
 
@@ -43,6 +44,7 @@ interface AgentCatalogRenderContext {
   configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
   currentRunId: number;
   defaultAgentDropdown: DropdownComponent;
+  editorBodyEl: HTMLElement;
   mergedAgents: AgentCatalogEntry[];
   projectAgents: OpencodeAgentConfigRecord;
 }
@@ -162,6 +164,7 @@ export class SettingsAgentsSection {
     title: string,
     tooltip?: string,
   ) => HTMLHeadingElement;
+  private projectAgentEditor: SettingsProjectAgentEditor | null = null;
   private refreshRunId = 0;
 
   constructor(options: SettingsAgentsSectionOptions) {
@@ -189,6 +192,7 @@ export class SettingsAgentsSection {
         .setDesc(t('settings.agents.unavailable.desc'));
       return headingEl;
     }
+    this.projectAgentEditor ??= new SettingsProjectAgentEditor(configManager);
 
     let defaultAgentDropdown: DropdownComponent | null = null;
     new Setting(containerEl)
@@ -204,6 +208,7 @@ export class SettingsAgentsSection {
           });
       });
 
+    const editorBodyEl = this.createProjectAgentEditorBlock(containerEl);
     const catalogBodyEl = this.createCatalogBlock(containerEl);
 
     if (defaultAgentDropdown) {
@@ -212,6 +217,7 @@ export class SettingsAgentsSection {
         configManager,
         currentRunId,
         defaultAgentDropdown,
+        editorBodyEl,
       });
     }
 
@@ -231,17 +237,32 @@ export class SettingsAgentsSection {
     return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
   }
 
+  private createProjectAgentEditorBlock(containerEl: HTMLElement): HTMLElement {
+    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block' });
+    blockEl.createEl('h4', {
+      text: t('settings.agents.editor.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+    blockEl.createDiv({
+      cls: 'opencodian-plugin-block-desc',
+      text: t('settings.agents.editor.desc'),
+    });
+    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
+  }
+
   private async refreshCatalog(options: {
     catalogBodyEl: HTMLElement;
     configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
     currentRunId: number;
     defaultAgentDropdown: DropdownComponent;
+    editorBodyEl: HTMLElement;
   }): Promise<void> {
     const {
       catalogBodyEl,
       configManager,
       currentRunId,
       defaultAgentDropdown,
+      editorBodyEl,
     } = options;
 
     try {
@@ -257,10 +278,24 @@ export class SettingsAgentsSection {
       const runtimeAgents = Array.isArray(runtimeAgentsResult) ? runtimeAgentsResult : [];
       const mergedAgents = mergeAgentCatalog(runtimeAgents, projectAgents);
       this.renderDefaultAgentDropdown(defaultAgentDropdown, mergedAgents, defaultAgent);
+      this.projectAgentEditor?.render({
+        containerEl: editorBodyEl,
+        onConfigChanged: async () => {
+          await this.refreshCatalog({
+            catalogBodyEl,
+            configManager,
+            currentRunId,
+            defaultAgentDropdown,
+            editorBodyEl,
+          });
+        },
+        projectAgents,
+      });
       this.renderCatalog({
         catalogBodyEl,
         configManager,
         defaultAgentDropdown,
+        editorBodyEl,
         mergedAgents,
         projectAgents,
         currentRunId,
@@ -272,6 +307,7 @@ export class SettingsAgentsSection {
 
       logger.error('Failed to load agent catalog:', error);
       this.renderDefaultAgentDropdown(defaultAgentDropdown, [], undefined);
+      editorBodyEl.replaceChildren();
       this.renderCatalogLoadFailure(catalogBodyEl, error);
     }
   }
@@ -309,6 +345,7 @@ export class SettingsAgentsSection {
       configManager,
       currentRunId,
       defaultAgentDropdown,
+      editorBodyEl,
       mergedAgents,
       projectAgents,
     } = context;
@@ -336,6 +373,7 @@ export class SettingsAgentsSection {
                 configManager,
                 currentRunId,
                 defaultAgentDropdown,
+                editorBodyEl,
               });
             });
         });
@@ -438,5 +476,4 @@ export class SettingsAgentsSection {
 
     await configManager.upsertAgentConfig(agentId, nextProjectAgent);
   }
-
 }

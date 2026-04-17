@@ -18,6 +18,26 @@ interface MockToggleControl {
   onChange: jest.MockedFunction<(callback: (value: boolean) => void | Promise<void>) => MockToggleControl>;
 }
 
+interface MockTextControl {
+  inputEl: HTMLInputElement;
+  setPlaceholder: jest.MockedFunction<(value: string) => MockTextControl>;
+  setValue: jest.MockedFunction<(value: string) => MockTextControl>;
+  onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextControl>;
+}
+
+interface MockTextAreaControl {
+  inputEl: HTMLTextAreaElement;
+  setPlaceholder: jest.MockedFunction<(value: string) => MockTextAreaControl>;
+  setValue: jest.MockedFunction<(value: string) => MockTextAreaControl>;
+  onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextAreaControl>;
+}
+
+interface MockButtonControl {
+  setButtonText: jest.MockedFunction<(value: string) => MockButtonControl>;
+  setDisabled: jest.MockedFunction<(value: boolean) => MockButtonControl>;
+  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
+}
+
 interface DropdownRecord {
   control: MockDropdownControl;
   name: string;
@@ -30,10 +50,32 @@ interface ToggleRecord {
   onChange?: (value: boolean) => void | Promise<void>;
 }
 
+interface TextRecord {
+  control: MockTextControl;
+  name: string;
+  onChange?: (value: string) => void | Promise<void>;
+}
+
+interface TextAreaRecord {
+  control: MockTextAreaControl;
+  name: string;
+  onChange?: (value: string) => void | Promise<void>;
+}
+
+interface ButtonRecord {
+  control: MockButtonControl;
+  label?: string;
+  name: string;
+  onClick?: () => void | Promise<void>;
+}
+
 type AgentsSectionPlugin = Pick<OpenCodianPlugin, 'openCodeService' | 'opencodeConfigManager'>;
 
 const dropdownRecords: DropdownRecord[] = [];
 const toggleRecords: ToggleRecord[] = [];
+const textRecords: TextRecord[] = [];
+const textAreaRecords: TextAreaRecord[] = [];
+const buttonRecords: ButtonRecord[] = [];
 
 function createDropdownRecord(name: string): DropdownRecord {
   const record: DropdownRecord = {
@@ -65,6 +107,73 @@ function createToggleRecord(name: string): ToggleRecord {
   record.control.setValue.mockReturnValue(record.control);
   record.control.onChange.mockImplementation((callback) => {
     record.onChange = callback;
+    return record.control;
+  });
+  return record;
+}
+
+function createTextRecord(name: string): TextRecord {
+  const inputEl = document.createElement('input');
+  const record: TextRecord = {
+    name,
+    control: {
+      inputEl,
+      setPlaceholder: jest.fn(),
+      setValue: jest.fn(),
+      onChange: jest.fn(),
+    },
+  };
+  record.control.setPlaceholder.mockReturnValue(record.control);
+  record.control.setValue.mockImplementation((value) => {
+    inputEl.value = value;
+    return record.control;
+  });
+  record.control.onChange.mockImplementation((callback) => {
+    record.onChange = callback;
+    return record.control;
+  });
+  return record;
+}
+
+function createTextAreaRecord(name: string): TextAreaRecord {
+  const inputEl = document.createElement('textarea');
+  const record: TextAreaRecord = {
+    name,
+    control: {
+      inputEl,
+      setPlaceholder: jest.fn(),
+      setValue: jest.fn(),
+      onChange: jest.fn(),
+    },
+  };
+  record.control.setPlaceholder.mockReturnValue(record.control);
+  record.control.setValue.mockImplementation((value) => {
+    inputEl.value = value;
+    return record.control;
+  });
+  record.control.onChange.mockImplementation((callback) => {
+    record.onChange = callback;
+    return record.control;
+  });
+  return record;
+}
+
+function createButtonRecord(name: string): ButtonRecord {
+  const record: ButtonRecord = {
+    name,
+    control: {
+      setButtonText: jest.fn(),
+      setDisabled: jest.fn(),
+      onClick: jest.fn(),
+    },
+  };
+  record.control.setButtonText.mockImplementation((value) => {
+    record.label = value;
+    return record.control;
+  });
+  record.control.setDisabled.mockReturnValue(record.control);
+  record.control.onClick.mockImplementation((callback) => {
+    record.onClick = callback;
     return record.control;
   });
   return record;
@@ -143,52 +252,97 @@ function findToggle(name: string): ToggleRecord | undefined {
   return toggleRecords.find((record) => record.name === name);
 }
 
+function findText(name: string): TextRecord | undefined {
+  return textRecords.find((record) => record.name === name);
+}
+
+function findTextArea(name: string): TextAreaRecord | undefined {
+  return textAreaRecords.find((record) => record.name === name);
+}
+
+function findButton(label: string): ButtonRecord | undefined {
+  return buttonRecords.find((record) => record.label === label);
+}
+
 async function flushAsync(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
 }
 
-describe('SettingsAgentsSection', () => {
-  beforeEach(() => {
-    setLocale('en');
-    document.body.innerHTML = '';
-    dropdownRecords.length = 0;
-    toggleRecords.length = 0;
+beforeEach(() => {
+  setLocale('en');
+  document.body.innerHTML = '';
+  dropdownRecords.length = 0;
+  toggleRecords.length = 0;
+  textRecords.length = 0;
+  textAreaRecords.length = 0;
+  buttonRecords.length = 0;
 
-    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
-      (this as Setting & { __settingName?: string }).__settingName = name;
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
-      this: Setting,
-      callback: (control: MockDropdownControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createDropdownRecord(name);
-      dropdownRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
-      this: Setting,
-      callback: (control: MockToggleControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createToggleRecord(name);
-      toggleRecords.push(record);
-      callback(record.control);
-      return this;
-    });
+  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
+    (this as Setting & { __settingName?: string }).__settingName = name;
+    return this;
   });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-    document.body.innerHTML = '';
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+    return this;
   });
+  jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
+    this: Setting,
+    callback: (control: MockDropdownControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createDropdownRecord(name);
+    dropdownRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
+    this: Setting,
+    callback: (control: MockToggleControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createToggleRecord(name);
+    toggleRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
+    this: Setting,
+    callback: (control: MockTextControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createTextRecord(name);
+    textRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addTextArea').mockImplementation(function addTextArea(
+    this: Setting,
+    callback: (control: MockTextAreaControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createTextAreaRecord(name);
+    textAreaRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
+    this: Setting,
+    callback: (control: MockButtonControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createButtonRecord(name);
+    buttonRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+});
 
+afterEach(() => {
+  jest.restoreAllMocks();
+  document.body.innerHTML = '';
+});
+
+describe('SettingsAgentsSection catalog shell', () => {
   it('loads built-in and project agents into the default selection and subagent visibility controls', async () => {
     const plugin = createPlugin({
       runtimeAgents: [
@@ -312,5 +466,97 @@ describe('SettingsAgentsSection', () => {
     await flushAsync();
 
     expect(restoredPlugin.opencodeConfigManager?.removeAgentConfig).toHaveBeenCalledWith('plan');
+  });
+});
+
+describe('SettingsAgentsSection project agent editor', () => {
+  it('creates a project agent with editable core fields', async () => {
+    const plugin = createPlugin();
+
+    createSection(plugin);
+    await flushAsync();
+
+    await findText(t('settings.agents.editor.id.name'))?.onChange?.('architect');
+    await findDropdown(t('settings.agents.editor.mode.name'))?.onChange?.('subagent');
+    await findText(t('settings.agents.editor.description.name'))?.onChange?.('Plans implementation slices');
+    await findTextArea(t('settings.agents.editor.prompt.name'))?.onChange?.('You plan focused implementation work.');
+    await findText(t('settings.agents.editor.model.name'))?.onChange?.('anthropic/claude-sonnet-4');
+    await findText(t('settings.agents.editor.temperature.name'))?.onChange?.('0.2');
+    await findText(t('settings.agents.editor.topP.name'))?.onChange?.('0.85');
+    await findText(t('settings.agents.editor.steps.name'))?.onChange?.('6');
+    await findText(t('settings.agents.editor.color.name'))?.onChange?.('#8b5cf6');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(plugin.opencodeConfigManager?.upsertAgentConfig).toHaveBeenCalledWith('architect', {
+      mode: 'subagent',
+      description: 'Plans implementation slices',
+      prompt: 'You plan focused implementation work.',
+      model: 'anthropic/claude-sonnet-4',
+      temperature: 0.2,
+      top_p: 0.85,
+      steps: 6,
+      color: '#8b5cf6',
+    });
+  });
+
+  it('edits and deletes a selected project agent without overwriting unrelated fields', async () => {
+    const plugin = createPlugin({
+      projectAgents: {
+        reviewer: {
+          mode: 'primary',
+          description: 'Old description',
+          prompt: 'Old prompt',
+          model: 'old/model',
+          temperature: 0.7,
+          top_p: 0.9,
+          steps: 12,
+          color: 'blue',
+          hidden: true,
+          options: {
+            custom: true,
+          },
+        },
+      },
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    await findDropdown(t('settings.agents.editor.select.name'))?.onChange?.('reviewer');
+
+    expect(findText(t('settings.agents.editor.id.name'))?.control.setValue).toHaveBeenLastCalledWith('reviewer');
+    expect(findDropdown(t('settings.agents.editor.mode.name'))?.control.setValue).toHaveBeenLastCalledWith('primary');
+    expect(findText(t('settings.agents.editor.description.name'))?.control.setValue)
+      .toHaveBeenLastCalledWith('Old description');
+    expect(findTextArea(t('settings.agents.editor.prompt.name'))?.control.setValue).toHaveBeenLastCalledWith('Old prompt');
+
+    await findDropdown(t('settings.agents.editor.mode.name'))?.onChange?.('all');
+    await findText(t('settings.agents.editor.description.name'))?.onChange?.('New description');
+    await findTextArea(t('settings.agents.editor.prompt.name'))?.onChange?.('New prompt');
+    await findText(t('settings.agents.editor.model.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.temperature.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.topP.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.steps.name'))?.onChange?.('');
+    await findText(t('settings.agents.editor.color.name'))?.onChange?.('#22c55e');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(plugin.opencodeConfigManager?.upsertAgentConfig).toHaveBeenCalledWith('reviewer', {
+      mode: 'all',
+      description: 'New description',
+      prompt: 'New prompt',
+      model: undefined,
+      temperature: undefined,
+      top_p: undefined,
+      steps: undefined,
+      color: '#22c55e',
+    });
+
+    await findButton(t('settings.agents.editor.actions.delete'))?.onClick?.();
+
+    expect(plugin.opencodeConfigManager?.removeAgentConfig).toHaveBeenCalledWith('reviewer');
   });
 });
