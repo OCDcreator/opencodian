@@ -7,7 +7,7 @@
 
 `SettingsAgentsSection` 是 settings/agents 分区的 owner。它负责加载当前 OpenCode 运行时返回的 built-in / project agent 目录，并与当前 vault 的 `.opencode/opencode.json` 中的 project agent 覆盖合并展示，同时承接项目级 agent 的核心字段编辑器。
 
-当前实现覆盖了 Agents 设置的前两层交付：
+当前实现覆盖了 Agents settings 的项目级配置范围：
 
 - 读取 runtime agent 目录与 `OpencodeConfigManager.getAgentConfig()`
 - 用 `OpencodeConfigManager.getDefaultAgent()` 初始化默认主代理下拉框
@@ -27,7 +27,7 @@
   - `permission.task` allowlist
   - `options`
 
-hide 批量规则与 commands/slash runtime 仍留给后续 slice。
+commands/slash runtime 与 command-owned hidden-agent flows 不属于本 owner；它们分别由 command config、Commands settings 和 chat runtime seams 维护。
 
 ## 核心逻辑
 
@@ -101,4 +101,4 @@ owner 现在在同一分区内提供一个 project agent editor：
 
 - 不要在 `OpenCodianView.ts` 或 `OpenCodeService.ts` 中追加 Agents settings ownership；设置页写回应继续留在本 owner 与 `OpencodeConfigManager` seam 内。
 - 当前 owner 只写项目级 `.opencode/opencode.json`，不要读写全局 OpenCode 配置。
-- 表单当前已覆盖 item 5 的核心字段、`permission.task` allowlist 与 `options`；commands/slash runtime 仍应继续扩展本 owner 或相邻 command-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。
+- 表单当前已覆盖 project agent 核心字段、`permission.task` allowlist 与 `options`；commands/slash runtime 应保持在相邻 command-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。

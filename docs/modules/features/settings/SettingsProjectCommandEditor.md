@@ -7,7 +7,7 @@
 
 `SettingsProjectCommandEditor` 是 `SettingsCommandsSection` 下拆出的 companion owner，专门负责项目级 slash command 核心字段表单。它把 project command 的 create/edit/delete、表单回填与 notice/error 处理从 catalog owner 中分离出来，避免 `SettingsCommandsSection.ts` 因命令表单语义继续膨胀。
 
-当前 editor 只覆盖 ordered plan item 6 的这一小段：
+这个 editor 覆盖 Commands settings 中的 project slash command 表单范围：
 
 - 选择 runtime command / runtime+project override / project-only command，或创建新的 project command
 - 编辑 `command.<id>` 的 `template`、`description`、`agent`、`model`、`temperature`、`top_p`、`subtask`
@@ -41,7 +41,7 @@ runtime placeholder 展开与 slash execution runtime 已落地在相邻 runtime
 
 - editor 会在 `template` textarea 下方渲染 OpenCodian placeholder reference，而不会在保存时改写 template 文本
 - 当前展示的 token 是 `{{vault_path}}`、`{{current_note_path}}`、`{{current_selection}}`、`{{external_context_paths}}`、`{{conversation_title}}`
-- 这只是 settings/editor 层面的说明壳层，实际运行时展开与 slash command execution 仍由后续 runtime slice 接入
+- 这只是 settings/editor 层面的说明壳层，实际运行时展开与 slash command execution 分别由 `OpenCodeSessionControlOrchestrator` 与 `SlashCommandExecutionService` 处理
 
 ### 删除路径
 
@@ -71,4 +71,4 @@ runtime placeholder 展开与 slash execution runtime 已落地在相邻 runtime
 
 - 这是 `SettingsCommandsSection` 的 companion owner，不应接管 slash catalog merge 或 `hiddenSlashCommands` 可见性写回。
 - 当前 editor 不负责 placeholder runtime expansion、slash autocomplete 或 `runSessionCommand()`；它只把命令级 sampling patch 交给现有 config seam。
-- 如果后续 slice 为 command 增加更多本地表单字段，优先继续沿这个 owner 扩展，而不是把表单逻辑塞回 `SettingsCommandsSection.ts`。
+- 如果以后为 command 增加更多本地表单字段，优先继续沿这个 owner 扩展，而不是把表单逻辑塞回 `SettingsCommandsSection.ts`。

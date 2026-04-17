@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SlashCommandExecutionService` 是 commands item 6 当前 round 新增的 chat-side runtime owner。它拦截 composer 里以 `/` 开头的输入，只为当前 vault 已知的 project/runtime slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。
+`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，只为当前 vault 已知的 project/runtime slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。
 
 这层 owner 当前只覆盖：
 
@@ -20,7 +20,7 @@
   - `conversationTitle`
 - 在 command 请求发出后启动现有 conversation sync loop，并触发一次 visible conversation background sync
 
-它**仍不负责** slash autocomplete、hidden menu UI、command-owned hidden agent generation，避免把后续 item 6 slice 提前塞进当前 round。
+它**仍不负责** slash autocomplete、hidden menu UI 或 command-owned hidden agent generation；这些分别留在 `ComposerInputShellCoordinator`、`slashCommandCatalog`/`SettingsCommandsSection` 与 `OpencodeConfigManager`。
 
 ## 公开接口
 

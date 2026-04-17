@@ -7,7 +7,7 @@
 
 `SettingsProjectAgentEditor` 是 `SettingsAgentsSection` 下拆出的 companion owner，专门负责项目级 agent 核心字段表单。它把 project agent 的 create/edit/delete 写回、表单回填、数值解析与错误提示从 agent catalog owner 中分离出来，避免 `SettingsAgentsSection.ts` 继续膨胀。
 
-当前覆盖的字段范围限定在 ordered item 5 的核心字段：
+这个 editor 覆盖 project agent 表单字段：
 
 - `mode`
 - `disable`
@@ -21,7 +21,7 @@
 - `permission.task` allowlist
 - `options`
 
-commands/slash runtime 仍留在后续 slice。
+commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 editor，继续留在相邻 command config/runtime owners。
 
 ## 核心逻辑
 
@@ -68,4 +68,4 @@ commands/slash runtime 仍留在后续 slice。
 
 - 只写当前 vault 的 `.opencode/opencode.json`；不要扩展到全局 OpenCode 配置。
 - 这是 `SettingsAgentsSection` 的 companion owner，不应接管 runtime agent catalog 或 default primary-agent dropdown。
-- 后续如果继续补 command-owned hidden agent 或 slash runtime 逻辑，优先继续沿这个 owner/section seam 扩展，而不是把表单逻辑塞回 `OpenCodianSettings.ts`。
+- command-owned hidden agent 或 slash runtime 逻辑不应塞进这个 project-agent editor；对应改动优先落在 command config、command settings 或 chat runtime owners。

@@ -106,7 +106,7 @@ getCommandScopedAgentId(commandId: string): string
 
 ### 会话/Agent/Command 配置 helper
 
-本轮在 manager 内补齐了更细粒度的项目配置 helper，供后续 session settings / agents / slash commands UI 直接复用：
+manager 内提供了更细粒度的项目配置 helper，供当前 session settings、Agents settings 与 Commands/slash-command UI/runtime 共同复用：
 
 - `getCompactionConfig()` / `updateCompactionConfig()`：读写 `compaction`，并在 patch 时保留已有未知字段
 - `getDefaultAgent()` / `updateDefaultAgent()`：读写并 trim `default_agent`，空字符串会删除字段
