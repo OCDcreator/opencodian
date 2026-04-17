@@ -20,7 +20,7 @@ type ConversationHydrationRenderRuntimePort = Pick<
 
 type ConversationHydrationOutcomeRuntimePort = Pick<
   ConversationHydrationOutcomeBridgeHost,
-  'syncBackgroundTaskStateFromConversation' | 'renderMessages'
+  'syncBackgroundTaskStateFromConversation' | 'reapplyConversationSessionVisualState' | 'renderMessages'
 >;
 
 type ConversationTransitionStatePort = Pick<
@@ -69,6 +69,9 @@ export function createConversationHydrationRuntimeViewHosts(
     conversationHydrationOutcomeBridgeHost: {
       syncBackgroundTaskStateFromConversation: (conversation) => {
         host.syncBackgroundTaskStateFromConversation(conversation);
+      },
+      reapplyConversationSessionVisualState: (conversation) => {
+        host.reapplyConversationSessionVisualState(conversation);
       },
       renderMessages: (messages) => host.renderMessages(messages),
     },

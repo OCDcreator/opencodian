@@ -31,6 +31,8 @@ export interface TabActivationRuntimeHostProviderHost {
   setCurrentConversationRevertState:
     TabActivationConversationStatePort['setCurrentConversationRevertState'];
   setOpenCodeSessionId: TabActivationConversationStatePort['setOpenCodeSessionId'];
+  applyConversationSessionSettings:
+    TabActivationConversationStatePort['applyConversationSessionSettings'];
   clearPendingQuestionsForTab:
     TabActivationQuestionTodoPort['clearPendingQuestionsForTab'];
   resetTabSessionState: TabActivationQuestionTodoPort['resetTabSessionState'];
@@ -72,6 +74,9 @@ export function createTabActivationRuntimeViewHostFactoryHost(
       },
       setOpenCodeSessionId: (sessionId) => {
         host.setOpenCodeSessionId(sessionId);
+      },
+      applyConversationSessionSettings: (conversation) => {
+        host.applyConversationSessionSettings(conversation);
       },
     }),
     getQuestionTodoRuntime: () => ({

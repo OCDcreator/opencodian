@@ -27,5 +27,5 @@ export function createConversationHydrationRuntimeViewHosts(
 
 - `OpenCodianView` 只保留扁平 hydration/transition seam 的真实实现，以及 bridge 实例化顺序
 - `ConversationHydrationRuntimeViewHostFactory` 直接负责把扁平 seam 重新分组并组合成三份 hydration/transition bridge host seam
-- `ConversationHydrationRenderBridge`、`ConversationHydrationOutcomeBridge` 与 `ConversationTransitionBridge` 的行为边界保持不变
+- `ConversationHydrationRenderBridge`、`ConversationHydrationOutcomeBridge` 与 `ConversationTransitionBridge` 的行为边界保持不变；hydration outcome seam 现在额外承接 conversation session visual-state reapply
 - 这条边界推进 master plan 的 P1 activation / sync / runtime bridge ownership：让 loaded-conversation hydration/transition 的 host assembly 不再散落在 view 里

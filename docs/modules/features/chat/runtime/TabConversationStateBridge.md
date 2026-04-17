@@ -24,6 +24,7 @@ export interface TabConversationStateBridgeHost {
   setCurrentConversation(conversation: Conversation | null): void;
   setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
   setOpenCodeSessionId(sessionId: string): void;
+  applyConversationSessionSettings(conversation: Conversation | null): void;
   clearPendingQuestionsForTab(tabId: TabId | null): void;
   resetTabSessionState(tabId: TabId | null, sessionId: string | null): void;
   clearTabSessionState(tabId: TabId | null): void;
@@ -44,10 +45,10 @@ export class TabConversationStateBridge {
 
 ## 关键行为
 
-- `applyActiveConversation()` 统一处理 active-tab conversation 引用、`currentConversation`、session id 与会话级 runtime reset，避免这些写回继续散落在 `OpenCodianView` 的多条 activation/fork/load 路径里
+- `applyActiveConversation()` 统一处理 active-tab conversation 引用、`currentConversation`、session id、conversation session settings runtime reapply 与会话级 runtime reset，避免这些写回继续散落在 `OpenCodianView` 的多条 activation/fork/load 路径里
 - session id 变化时才清掉 pending question，保持原来的跨 conversation wait-state 语义
 - `resetSessionState` / `clearActiveConversation()` 现在分别复用 host 上的 `resetTabSessionState()` / `clearTabSessionState()`，把 todo/status 双写回折叠到共享 session todo facade 边界
-- `clearActiveConversation()` 只负责 empty-tab 场景下的 conversation/session 清空，不接管消息区 DOM 清理
+- `clearActiveConversation()` 在 empty-tab 场景下会同时清空 conversation/session，并把 session settings runtime 恢复到 view 当前的 global default effective state
 - `commitConversationSyncBaseline()` 把 fingerprint baseline 与 sync loop 启动收束成一个入口，供 hydration load 和 streaming/current-tab activation 复用
 
 ## 与 `OpenCodianView` 的边界

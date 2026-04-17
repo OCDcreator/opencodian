@@ -26,6 +26,7 @@ export interface TabActivationRuntimeHostAdapterHost extends TabActivationBridge
   setCurrentConversation(conversation: Conversation | null): void;
   setCurrentConversationRevertState(revertState: ConversationRevertState): void;
   setOpenCodeSessionId(sessionId: string): void;
+  applyConversationSessionSettings(conversation: Conversation | null): void;
   clearPendingQuestionsForTab(tabId: TabId | null): void;
   resetTabSessionState(tabId: TabId | null, sessionId: string | null): void;
   clearTabSessionState(tabId: TabId | null): void;
@@ -62,6 +63,9 @@ export function createTabActivationRuntimeBridgeHosts(
       },
       setOpenCodeSessionId: (sessionId: string) => {
         host.setOpenCodeSessionId(sessionId);
+      },
+      applyConversationSessionSettings: (conversation: Conversation | null) => {
+        host.applyConversationSessionSettings(conversation);
       },
       clearPendingQuestionsForTab: (tabId: TabId | null) => {
         host.clearPendingQuestionsForTab(tabId);

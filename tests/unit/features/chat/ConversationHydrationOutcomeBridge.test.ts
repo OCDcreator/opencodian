@@ -48,6 +48,9 @@ function createHost(
     syncBackgroundTaskStateFromConversation: jest.fn(() => {
       callOrder.push('syncBackgroundTaskStateFromConversation');
     }),
+    reapplyConversationSessionVisualState: jest.fn(() => {
+      callOrder.push('reapplyConversationSessionVisualState');
+    }),
     renderMessages: jest.fn(async () => {
       callOrder.push('renderMessages');
     }),
@@ -91,6 +94,7 @@ describe('ConversationHydrationOutcomeBridge', () => {
     await bridge.applyLoadedConversationOutcome('tab-1', conversation, messages);
 
     expect(host.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(conversation);
+    expect(host.reapplyConversationSessionVisualState).toHaveBeenCalledWith(conversation);
     expect(host.renderMessages).toHaveBeenCalledWith(messages);
     expect(tabViewActivationBridge.applyLoadedConversationPostRenderOutcome).toHaveBeenCalledWith(
       'tab-1',
@@ -99,6 +103,7 @@ describe('ConversationHydrationOutcomeBridge', () => {
     expect(tabConversationStateBridge.commitConversationSyncBaseline).toHaveBeenCalledWith(messages);
     expect(callOrder).toEqual([
       'syncBackgroundTaskStateFromConversation',
+      'reapplyConversationSessionVisualState',
       'renderMessages',
       'applyLoadedConversationPostRenderOutcome',
       'commitConversationSyncBaseline',

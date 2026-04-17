@@ -205,6 +205,10 @@ import {
   type ConversationUserMessageRenderFrame,
 } from './services/ConversationRenderService';
 import {
+  ConversationSessionSettingsCoordinator,
+  type ConversationSessionSettingsCoordinatorHost,
+} from './services/ConversationSessionSettingsCoordinator';
+import {
   ConversationSessionSignalRuntime,
   type ConversationSessionSignalRuntimeHost,
 } from './services/ConversationSessionSignalRuntime';
@@ -374,6 +378,7 @@ interface OpenCodianViewSurfaceRuntimeWiring {
   chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   composerInputShellCoordinator: ComposerInputShellCoordinator;
   inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
+  conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   composerContextViewFacade: ComposerContextViewFacade;
   tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
   persistentAssistantNoticeService: PersistentAssistantNoticeService;
@@ -572,6 +577,7 @@ export class OpenCodianView extends ItemView {
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionRuntimeServices: QuestionRuntimeServices;
   private sendPipelineRuntime: SendPipelineRuntime;
+  private conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   private composerContextViewFacade: ComposerContextViewFacade;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
 
@@ -613,8 +619,30 @@ export class OpenCodianView extends ItemView {
       showConversationHistory: (event) => {
         this.conversationHistoryActionsCoordinator.show(event);
       },
+      openConversationSessionSettings: () => {
+        this.conversationSessionSettingsCoordinator.openCurrentConversationSettings();
+      },
       openSettings: () => {
         this.openPluginSettingsPreservingScroll();
+      },
+    };
+  }
+
+  private createConversationSessionSettingsCoordinatorHost():
+  ConversationSessionSettingsCoordinatorHost {
+    return {
+      app: this.app,
+      getCurrentConversation: () => this.currentConversation,
+      getSessionSettingsDefaults: () => ({
+        autoCompactionEnabled: this.plugin.settings.autoCompactionEnabled,
+        compactionReservedTokens: this.plugin.settings.compactionReservedTokens,
+        chatFontSizePx: this.plugin.settings.chatFontSizePx,
+      }),
+      getChatContainerEl: () => this.chatContainerEl,
+      getOpencodeConfigManager: () => this.plugin.opencodeConfigManager,
+      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      showNotice: (message) => {
+        new Notice(message);
       },
     };
   }
@@ -1086,6 +1114,8 @@ export class OpenCodianView extends ItemView {
     this.chatSelectionControlsCoordinator = surfaceRuntime.chatSelectionControlsCoordinator;
     this.composerInputShellCoordinator = surfaceRuntime.composerInputShellCoordinator;
     this.inputPanelAppearanceCoordinator = surfaceRuntime.inputPanelAppearanceCoordinator;
+    this.conversationSessionSettingsCoordinator =
+      surfaceRuntime.conversationSessionSettingsCoordinator;
     this.composerContextViewFacade = surfaceRuntime.composerContextViewFacade;
     this.tabConversationSyncFingerprintRuntimePort =
       surfaceRuntime.tabConversationSyncFingerprintRuntimePort;
@@ -1181,6 +1211,9 @@ export class OpenCodianView extends ItemView {
     const conversationHistoryActionsCoordinator = new ConversationHistoryActionsCoordinator(
       this.createConversationHistoryActionsHost(titleGenerationService),
     );
+    const conversationSessionSettingsCoordinator = new ConversationSessionSettingsCoordinator(
+      this.createConversationSessionSettingsCoordinatorHost(),
+    );
 
     return {
       titleGenerationService,
@@ -1198,6 +1231,7 @@ export class OpenCodianView extends ItemView {
       inputPanelAppearanceCoordinator: new InputPanelAppearanceCoordinator(
         this.createInputPanelAppearanceCoordinatorHost(),
       ),
+      conversationSessionSettingsCoordinator,
       composerContextViewFacade,
       tabConversationSyncFingerprintRuntimePort:
         createTabConversationSyncFingerprintRuntimePort(
@@ -1627,6 +1661,11 @@ export class OpenCodianView extends ItemView {
       setOpenCodeSessionId: (sessionId) => {
         this.plugin.openCodeService.setSessionId(sessionId);
       },
+      applyConversationSessionSettings: (conversation) => {
+        void this.conversationSessionSettingsCoordinator.applyConversationRuntimeState(
+          conversation,
+        );
+      },
       clearPendingQuestionsForTab: (tabId) => {
         this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
       },
@@ -1926,6 +1965,9 @@ export class OpenCodianView extends ItemView {
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
       syncBackgroundTaskStateFromConversation: (conversation) => {
         this.syncBackgroundTaskStateFromConversation(conversation);
+      },
+      reapplyConversationSessionVisualState: (conversation) => {
+        this.conversationSessionSettingsCoordinator.applyConversationVisualState(conversation);
       },
       renderMessages: (messages) => conversationRenderService.renderMessages(messages),
       getCurrentConversation: () => this.currentConversation,
@@ -2674,6 +2716,9 @@ export class OpenCodianView extends ItemView {
     for (const [cssVar, cssValue] of Object.entries(cssVariables)) {
       this.chatContainerEl.style.setProperty(cssVar, cssValue);
     }
+    this.conversationSessionSettingsCoordinator.applyConversationVisualState(
+      this.currentConversation,
+    );
 
     const glassRefractionCssVariables = getInputPanelGlassRefractionCssVariables(
       this.plugin.settings.inputPanelGlassRefraction,

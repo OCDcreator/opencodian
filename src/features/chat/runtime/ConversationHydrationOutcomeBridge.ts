@@ -18,6 +18,7 @@ type TabViewActivationPort = Pick<
 
 export interface ConversationHydrationOutcomeBridgeHost {
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
+  reapplyConversationSessionVisualState(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
 }
 
@@ -42,6 +43,7 @@ export class ConversationHydrationOutcomeBridge implements ConversationHydration
     messages: ChatMessage[],
   ): Promise<void> {
     this.host.syncBackgroundTaskStateFromConversation(conversation);
+    this.host.reapplyConversationSessionVisualState(conversation);
     await this.host.renderMessages(messages);
     await this.tabViewActivationBridge.applyLoadedConversationPostRenderOutcome(
       tabId,

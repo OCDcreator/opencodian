@@ -72,6 +72,7 @@
 }
 
 .opencodian-message-content {
+  font-size: var(--opencodian-chat-font-size);
   line-height: 1.5;
   user-select: text;
   -webkit-user-select: text;
@@ -86,7 +87,7 @@
 .opencodian-message--user .opencodian-message-text {
   color: var(--text-normal);
   font-weight: 500;
-  font-size: 15px;
+  font-size: calc(var(--opencodian-chat-font-size) + 2px);
 }
 
 .opencodian-message--user .opencodian-message-text > p {

@@ -26,7 +26,7 @@
 | `onOpen()` | 组装 UI、注册事件、初始化第一个 tab |
 | `onClose()` | 清理订阅、轮询、观察器、dropdown、demo 和 tab 运行时 |
 | `applyTabBarLayout()` | 根据设置把 tab bar 挂到 header / below-header / input / 外部竖排槽位 |
-| `applyChatAppearanceSettings()` | 应用主题 preset、聊天外观变量、自定义 CSS、输入面板 glass 状态 |
+| `applyChatAppearanceSettings()` | 应用主题 preset、聊天外观变量、自定义 CSS、per-conversation chat font-size CSS variable，以及输入面板 glass 状态 |
 | `refreshCurrentConversationRendering()` | 重新渲染当前对话 |
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
 | `applyLocaleTexts()` | 委托 header presenter、selection controls coordinator 与 composer input coordinator 刷新 header/status、selector、placeholder、dock 和 tab 文案 |
@@ -88,6 +88,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 - `currentConversation` / `currentConversationRevertState`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
+- `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、vault-scoped `OpencodeConfigManager`、chat container CSS variable 写回与 per-conversation session settings notice/save
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动

@@ -54,6 +54,7 @@ export interface ChatHeaderPresenterHost {
   createConversationInNewTab(): Promise<void>;
   createConversationInCurrentTab(): Promise<void>;
   showConversationHistory(event: MouseEvent): void;
+  openConversationSessionSettings(): void;
   openSettings(): void;
 }
 
@@ -66,6 +67,7 @@ export class ChatHeaderPresenter {
   private newConversationBtnEl: HTMLElement | null = null;
   private newConversationCurrentTabBtnEl: HTMLElement | null = null;
   private historyBtnEl: HTMLElement | null = null;
+  private conversationSessionSettingsBtnEl: HTMLElement | null = null;
   private settingsBtnEl: HTMLElement | null = null;
   private serverStatusIntervalId: number | null = null;
   private isRefreshingServerStatus = false;
@@ -126,6 +128,14 @@ export class ChatHeaderPresenter {
         this.host.showConversationHistory(event);
       },
     );
+    this.conversationSessionSettingsBtnEl = this.buildActionButton(
+      actionsEl,
+      'sliders-horizontal',
+      () => t('chat.sessionSettings.open'),
+      () => {
+        this.host.openConversationSessionSettings();
+      },
+    );
     this.settingsBtnEl = this.buildActionButton(
       actionsEl,
       'settings',
@@ -157,6 +167,14 @@ export class ChatHeaderPresenter {
 
     if (this.historyBtnEl) {
       this.host.setTooltipLabel(this.historyBtnEl, t('chat.history.open'), 'bottom');
+    }
+
+    if (this.conversationSessionSettingsBtnEl) {
+      this.host.setTooltipLabel(
+        this.conversationSessionSettingsBtnEl,
+        t('chat.sessionSettings.open'),
+        'bottom',
+      );
     }
 
     if (this.settingsBtnEl) {
@@ -193,6 +211,7 @@ export class ChatHeaderPresenter {
     this.newConversationBtnEl = null;
     this.newConversationCurrentTabBtnEl = null;
     this.historyBtnEl = null;
+    this.conversationSessionSettingsBtnEl = null;
     this.settingsBtnEl = null;
     this.isRefreshingServerStatus = false;
     this.lastServerAvailability = null;

@@ -14,6 +14,7 @@
 ```typescript
 export interface ConversationHydrationOutcomeBridgeHost {
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
+  reapplyConversationSessionVisualState(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
 }
 
@@ -28,7 +29,7 @@ export interface ConversationHydrationOutcomePort {
 
 ## 关键行为
 
-- `applyLoadedConversationOutcome()` 保持原有 loaded-conversation outcome 顺序：先 `syncBackgroundTaskStateFromConversation()`，再 `renderMessages()`，然后委托 `TabViewActivationBridge.applyLoadedConversationPostRenderOutcome()`，最后 `commitConversationSyncBaseline()`
+- `applyLoadedConversationOutcome()` 保持原有 loaded-conversation outcome 顺序：先 `syncBackgroundTaskStateFromConversation()`，再把 per-conversation session visual state 重新应用到当前 conversation root，随后 `renderMessages()`，然后委托 `TabViewActivationBridge.applyLoadedConversationPostRenderOutcome()`，最后 `commitConversationSyncBaseline()`
 - background-task runtime rebuild 继续基于当前 conversation 语义，不把 timeline 推导逻辑重新塞回装载服务
 - post-render indicator / dock / status-question-todo lazy refresh 继续复用 `TabViewActivationBridge` 与 `QuestionTodoStatusRefreshCoordinator`
 - sync baseline 提交继续复用 `TabConversationStateBridge`，bridge 自己不重新实现 fingerprint 规则或 sync loop 生命周期

@@ -12,7 +12,7 @@
 - 创建 title logo、wordmark、header tab bar slot 和 header actions
 - 渲染 server status badge、状态 class 与本地/远端文案
 - 管理 status polling、手动 refresh 和 locale refresh
-- 绑定 new-tab、current-tab、history、settings 与 server-section action callbacks
+- 绑定 new-tab、current-tab、history、conversation session settings、settings 与 server-section action callbacks
 - 在 css-change 时刷新 logo/wordmark，并通知 view 做 color/layout sync
 
 ## 公开接口
@@ -38,6 +38,7 @@ export interface ChatHeaderPresenterHost {
   createConversationInNewTab(): Promise<void>;
   createConversationInCurrentTab(): Promise<void>;
   showConversationHistory(event: MouseEvent): void;
+  openConversationSessionSettings(): void;
   openSettings(): void;
 }
 
@@ -54,7 +55,7 @@ export class ChatHeaderPresenter {
 
 ## 关键行为
 
-- `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑
+- `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在包含 history → session settings → global settings 这条会话/全局配置链路
 - `startServerStatusLoop()` 立即刷新一次 status badge，然后每 5 秒重新查询 host 的 server availability
 - `refreshServerStatusBadge()` 更新 `is-running` / `is-offline` 等状态 class，并根据 local/remote mode 选择 status 文案
 - `applyLocaleTexts()` 刷新所有 header tooltip，并按最后一次 availability 立即重算 status label
