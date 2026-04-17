@@ -304,6 +304,10 @@ export default class OpenCodianPlugin extends Plugin {
       : null;
   }
 
+  async reapplyConversationSessionDefaults(): Promise<void> {
+    await this.getOpenCodianView()?.reapplyCurrentConversationSessionSettings();
+  }
+
   async toggleLiquidDiamondDemoForCurrentView(): Promise<void> {
     await this.activateView();
     this.getOpenCodianView()?.toggleLiquidDiamondDemo();

@@ -180,6 +180,33 @@ describe('OpenCodianPlugin.toggleGlassOctahedronForCurrentView', () => {
   });
 });
 
+describe('OpenCodianPlugin.reapplyConversationSessionDefaults', () => {
+  it('reapplies session defaults through the current OpenCodian view seam', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      getOpenCodianView: () => {
+        reapplyCurrentConversationSessionSettings: jest.Mock<Promise<void>, []>;
+      } | null;
+    };
+    const view: {
+      reapplyCurrentConversationSessionSettings: jest.Mock<Promise<void>, []>;
+    } = {
+      reapplyCurrentConversationSessionSettings: jest.fn().mockResolvedValue(undefined),
+    };
+    jest
+      .spyOn(
+        plugin as unknown as {
+          getOpenCodianView: () => typeof view | null;
+        },
+        'getOpenCodianView',
+      )
+      .mockReturnValue(view);
+
+    await plugin.reapplyConversationSessionDefaults();
+
+    expect(view.reapplyCurrentConversationSessionSettings).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('OpenCodianPlugin.onload', () => {
   it('runs startup preparation before runtime bootstrap and workspace registration', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin;

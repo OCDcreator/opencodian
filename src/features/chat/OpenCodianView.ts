@@ -2778,6 +2778,12 @@ export class OpenCodianView extends ItemView {
     void this.conversationRenderService.rerenderConversationMessages(this.currentConversation);
   }
 
+  public async reapplyCurrentConversationSessionSettings(): Promise<void> {
+    await this.conversationSessionSettingsCoordinator.applyConversationRuntimeState(
+      this.currentConversation,
+    );
+  }
+
   /** Apply configured chat scroll mode to the messages container */
   public applyChatScrollMode(): void {
     this.syncChatSurfaceColor();
