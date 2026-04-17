@@ -41,7 +41,7 @@
   - `ModelConfigModal.ts` becomes a clear orchestration shell.
   - Provider/model editor owners are cohesive and not thin wrappers.
 
-### [NEXT] M3 - TrailingAssistantPatch helper defragmentation
+### [DONE] M3 - TrailingAssistantPatch helper defragmentation
 
 - **Lane**: Chat service defragmentation
 - **Goal**: Consolidate the many tiny `TrailingAssistantPatch*Helper.ts` files into a few semantic packages without moving code back into `OpenCodianView`.
@@ -59,7 +59,7 @@
   - File count in the `TrailingAssistantPatch*` family drops materially.
   - Tests covering assistant tail/finalization continue to pass.
 
-### [QUEUED] M4 - ProviderIconService medium responsibility extraction
+### [NEXT] M4 - ProviderIconService medium responsibility extraction
 
 - **Lane**: Provider icon service maintainability
 - **Goal**: Split `ProviderIconService` into medium modules for entry resolution, asset/cache runtime, custom sources, and builtin selection while preserving runtime behavior and fallback order.

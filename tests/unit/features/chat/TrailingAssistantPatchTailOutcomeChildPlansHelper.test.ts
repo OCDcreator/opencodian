@@ -1,5 +1,5 @@
-import { buildTrailingAssistantPatchTailOutcomePlansFromChildPlans } from '../../../../src/features/chat/services/TrailingAssistantPatchTailOutcomeChildPlansHelper';
-import type { TrailingAssistantPatchTailStatePlan } from '../../../../src/features/chat/services/TrailingAssistantPatchTailStateApplierHelper';
+import type { TrailingAssistantPatchTailStatePlan } from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
+import { buildTrailingAssistantPatchTailOutcomePlansFromChildPlans } from '../../../../src/features/chat/services/trailingAssistantPatchPlanning';
 
 describe('TrailingAssistantPatchTailOutcomeChildPlansHelper', () => {
   it('builds tail-outcome plans from precomputed child plans', () => {

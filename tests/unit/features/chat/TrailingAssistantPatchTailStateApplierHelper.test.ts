@@ -1,7 +1,7 @@
 import {
   applyTrailingAssistantPatchTailState,
   type TrailingAssistantPatchTailStatePlan,
-} from '../../../../src/features/chat/services/TrailingAssistantPatchTailStateApplierHelper';
+} from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
 
 function createTailStatePlan(
   overrides: Partial<TrailingAssistantPatchTailStatePlan> = {},

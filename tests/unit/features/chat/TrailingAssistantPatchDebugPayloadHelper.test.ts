@@ -4,7 +4,7 @@ import {
   buildTrailingAssistantPatchCompletionDebugPayloadPlan,
   buildTrailingAssistantPatchSkippedDebugPayloadInputs,
   buildTrailingAssistantPatchSkippedDebugPayloadPlan,
-} from '../../../../src/features/chat/services/TrailingAssistantPatchDebugPayloadHelper';
+} from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
 
 function createMessage(
   overrides: Partial<ChatMessage> & Pick<ChatMessage, 'id'>,

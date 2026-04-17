@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchTailOutcomePlanParts } from '../../../../src/features/chat/services/TrailingAssistantPatchTailOutcomePlanPartsHelper';
+import { buildTrailingAssistantPatchTailOutcomePlanParts } from '../../../../src/features/chat/services/trailingAssistantPatchPlanning';
 
 describe('TrailingAssistantPatchTailOutcomePlanPartsHelper', () => {
   it('builds tail-outcome plan parts from precomputed child plans', () => {

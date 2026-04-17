@@ -19,6 +19,7 @@
 - Do not move complexity sideways into more files without reducing ownership, import surface, or test responsibility.
 - Prefer existing service / coordinator / runtime owners before creating new files.
 - For model-config modal UI work, prefer the existing `ModelConfigProviderEditor.ts` / `ModelConfigModelListEditor.ts` owners before growing `ModelConfigModal.ts` again.
+- For trailing-assistant patch work, extend the coarse `trailingAssistantPatchPlanning.ts` / `trailingAssistantPatchExecution.ts` / `trailingAssistantPatchDebug.ts` / `trailingAssistantPatchTypes.ts` bundles instead of reintroducing one-off helper files.
 
 ## Feature Work Checklist
 

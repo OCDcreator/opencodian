@@ -1,4 +1,4 @@
-import { shouldFinalizeTrailingAssistantFooterOnly } from '../../../../src/features/chat/services/TrailingAssistantPatchFooterFinalizationDecisionHelper';
+import { shouldFinalizeTrailingAssistantFooterOnly } from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
 
 describe('TrailingAssistantPatchFooterFinalizationDecisionHelper', () => {
   it('returns true when body signatures are unchanged', () => {
