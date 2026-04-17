@@ -5,12 +5,12 @@
 
 ## 概述
 
-Provider 图标服务的目录级入口，当前只导出 `ProviderIconService`。它为设置页和模型配置相关 UI 提供统一的图标加载与缓存服务入口。
+Provider 图标目录的公开 barrel。当前继续对外暴露 `ProviderIconService` 与 builtin registry 工具；`M4` 新增的 `providerIconEntryResolution.ts`、`providerIconBuiltinSelection.ts`、`providerIconCustomSources.ts`、`providerIconAssetCache.ts` 与 type-only `providerIconTypes.ts` 仍保持目录内私有协作，不直接从这里导出。
 
 ## 导入关系
 
 ```text
-上游: ./ProviderIconService
+上游: ./builtinIconRegistry, ./ProviderIconService
 下游: 设置界面、图标缓存管理、模型相关 UI
 ```
 
@@ -18,19 +18,35 @@ Provider 图标服务的目录级入口，当前只导出 `ProviderIconService`�
 
 ```typescript
 export { ProviderIconService } from './ProviderIconService';
+export {
+  type BuiltinIconDefinition,
+  type BuiltinIconLibraryId,
+  findBuiltinIcon,
+  formatBuiltinSource,
+  getBuiltinIcon,
+  listBuiltinIcons,
+  parseBuiltinSource,
+  PROVIDER_ICON_MAP,
+  resolveBuiltinIconMatch,
+  searchBuiltinIcons,
+} from './builtinIconRegistry';
 ```
 
 ## 核心逻辑
 
-### 单服务聚合
+### 公开导出面
 
-当前没有附加逻辑，仅作为 icons 子目录的稳定导出面。
+- `ProviderIconService`：provider icon 的稳定公开 API
+- `builtinIconRegistry` 导出：builtin provider 图标 registry / 搜索 / source 解析工具
+- 新增 coarse modules 暂不通过此 barrel 暴露，避免把内部 maintainability seam 变成公共 API
 
 ## 关键方法
 
 | 方法 / 导出 | 说明 |
 |-------------|------|
 | `ProviderIconService` | provider 图标读取、缓存与自定义资源管理服务 |
+| `BuiltinIconLibraryId` / `BuiltinIconDefinition` | builtin 图标库元数据类型 |
+| `searchBuiltinIcons()` / `resolveBuiltinIconMatch()` | builtin 图标搜索与推荐匹配 |
 
 ## 数据流
 
@@ -38,7 +54,7 @@ export { ProviderIconService } from './ProviderIconService';
 
 ## 与其他模块的交互
 
-- 对应实现见 [ProviderIconService.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/icons/ProviderIconService.md)
+- 对应实现见 `docs/modules/utils/icons/ProviderIconService.md`
 
 ## 配置项
 
@@ -46,6 +62,4 @@ export { ProviderIconService } from './ProviderIconService';
 
 ## 注意事项
 
-- 如果 icons 目录未来新增其他公开工具，应同步扩充此 barrel
-
-
+- 内部 coarse modules 仍应优先保持私有；只有在 3+ 外部 owner 需要时再考虑从此 barrel 暴露

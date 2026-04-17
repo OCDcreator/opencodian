@@ -6,24 +6,7 @@ import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getAllGlassAdapters } from '../../utils/glass';
 import { LiquidGlassSettingHelpModal } from './LiquidGlassSettingHelpModal';
-
-interface NumericControlConfig {
-  name: string;
-  desc: string;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  value: () => number;
-  resetValue: () => number;
-  commitValue: (value: number) => void;
-  helpButton?: SettingHelpButtonConfig;
-}
-
-interface SettingHelpButtonConfig {
-  tooltip: string;
-  onClick: () => void;
-}
+import type { NumericControlConfig, SettingHelpButtonConfig } from './settingsStyleControls';
 
 interface SettingsStyleLiquidGlassInputControlsOptions {
   app: App;

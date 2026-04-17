@@ -1,5 +1,5 @@
 import type { App, Editor, MarkdownView } from 'obsidian';
-import { Notice, TFile } from 'obsidian';
+import { normalizePath, Notice, TFile } from 'obsidian';
 
 import type {
   PromptContextItem,
@@ -124,6 +124,41 @@ export class ContextAttachmentBuilder {
     }
 
     return this.buildFileContextItem(file, kind);
+  }
+
+  async buildPersistentFileContextItems(
+    paths: readonly string[] | undefined,
+  ): Promise<PromptContextItem[]> {
+    if (!paths?.length) {
+      return [];
+    }
+
+    const items: PromptContextItem[] = [];
+    const seenPaths = new Set<string>();
+
+    for (const rawPath of paths) {
+      if (typeof rawPath !== 'string') {
+        continue;
+      }
+
+      const normalizedPath = normalizePath(rawPath.trim());
+      if (!normalizedPath || seenPaths.has(normalizedPath)) {
+        continue;
+      }
+      seenPaths.add(normalizedPath);
+
+      const file = this.resolveFileByPath(normalizedPath);
+      if (!file) {
+        continue;
+      }
+
+      const item = await this.buildFileContextItem(file, 'file');
+      if (item) {
+        items.push(item);
+      }
+    }
+
+    return items;
   }
 
   hasFileAtPath(path: string): boolean {

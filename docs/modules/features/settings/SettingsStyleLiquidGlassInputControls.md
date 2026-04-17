@@ -25,6 +25,7 @@
 ## 与其他模块的交互
 
 - `SettingsStyleInputPanelSection.ts`: 决定当前 liquid glass adapter，并把具体参数表单委托给本 owner
+- `settingsStyleControls.ts`: 提供 shared numeric-control / help-button 合约，供 numeric liquid-glass 参数复用
 - `LiquidGlassSettingHelpModal.ts`: 显示 adapter 参数的 plain-language help 文案
 - `utils/glass/index.ts`: 提供 adapter 元数据和 paramDefs
 

@@ -30,6 +30,7 @@ function createFixture() {
     createConversationInNewTab: jest.fn().mockResolvedValue(undefined),
     createConversationInCurrentTab: jest.fn().mockResolvedValue(undefined),
     showConversationHistory: jest.fn(),
+    openConversationSessionSettings: jest.fn(),
     openSettings: jest.fn(),
   };
 
@@ -70,7 +71,7 @@ describe('ChatHeaderPresenter', () => {
 
     expect(fixture.presenter.getTabBarSlotEl()).toBe(tabBarSlotEl);
     expect(fixture.host.registerCssChangeListener).toHaveBeenCalledTimes(1);
-    expect(actionButtons).toHaveLength(4);
+    expect(actionButtons).toHaveLength(5);
     expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openSettings'));
 
     statusBadgeEl?.click();
@@ -78,11 +79,13 @@ describe('ChatHeaderPresenter', () => {
     actionButtons[1]?.click();
     actionButtons[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     actionButtons[3]?.click();
+    actionButtons[4]?.click();
 
     expect(fixture.host.openServerSettings).toHaveBeenCalledTimes(1);
     expect(fixture.host.createConversationInNewTab).toHaveBeenCalledTimes(1);
     expect(fixture.host.createConversationInCurrentTab).toHaveBeenCalledTimes(1);
     expect(fixture.host.showConversationHistory).toHaveBeenCalledTimes(1);
+    expect(fixture.host.openConversationSessionSettings).toHaveBeenCalledTimes(1);
     expect(fixture.host.openSettings).toHaveBeenCalledTimes(1);
   });
 

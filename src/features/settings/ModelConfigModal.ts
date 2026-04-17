@@ -1,45 +1,45 @@
 import { App, Modal, Notice, setIcon } from 'obsidian';
 
-import {
-  collectConfiguredProviderIds,
-  formatModelReference,
-  setProviderEnabled,
-} from '../../core/config/modelConfig';
 import type {
   OpencodeModelConfigSubset,
   OpencodeProviderConfig,
-  OpencodeProviderModelConfig,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
-import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import {
-  assertModelExtraFieldKeyAllowed,
+  createModelConfigKeyValueState,
+  createModelConfigModalSnapshot,
+  isBlankProviderState,
+  parseAddProviderJsonDraft,
+  resolveModelConfigJsonDraftValue,
+  syncProviderFormFromJsonDraft,
+  tryParseAddProviderJsonDraft,
+} from './modelConfigModalState';
+import {
+  ModelConfigProviderEditor,
+  type ProviderCheckState,
+  type SelectedProviderEditorState,
+} from './ModelConfigProviderEditor';
+import {
+  buildAvailabilitySubset,
+  buildModelConfigSavePlan,
+  type ModelConfigSavePlan,
+  serializeProviderConfig,
+} from './modelConfigSavePlan';
+import {
   buildConfigPreview,
   createEmptyModel,
   createEmptyProvider,
   DEFAULT_PROVIDER_INTERFACE_FORMAT,
-  extractModelExtraFields,
-  extractModelOptions,
-  extractModelVariants,
-  extractProviderExtraOptions,
   type FetchedProviderModelCandidate,
   fetchProviderModels,
   hydrateWorkspaceState,
-  type KeyValueFieldState,
-  type ModelFormState,
-  parseLooseValue,
-  parseModelVariantValue,
-  PROVIDER_ID_PATTERN,
   PROVIDER_INTERFACE_FORMAT_OPTIONS,
   type ProviderFormState,
   type ProviderInterfaceFormatId,
-  resolveInterfaceFormatState,
-  resolveNpmForInterfaceFormat,
 } from './modelConfigWorkspace';
-import { ProviderIconCacheModal } from './ProviderIconCacheModal';
 import {
   presetToFormState,
   PROVIDER_PRESETS,
@@ -48,72 +48,10 @@ import {
 
 const logger = createLogger('ModelConfigModal');
 
-type ProviderCheckState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'success'; message: string }
-  | { status: 'warning'; message: string }
-  | { status: 'error'; message: string };
-
-type ProviderInterfaceFormatOption = (typeof PROVIDER_INTERFACE_FORMAT_OPTIONS)[number];
-type ModelKeyValueCollectionKey = 'options' | 'variants' | 'extraFields';
-type ModelConfigModalFlow = 'workspace' | 'add-provider';
-
-interface SelectedProviderEditorState {
-  flow: ModelConfigModalFlow;
-  provider: ProviderFormState;
-  formatMeta: ProviderInterfaceFormatOption;
-  providerCheckState: ProviderCheckState;
-}
-
-interface ModelConfigSavePlan {
-  nextConfig: OpencodeModelConfigSubset;
-  nextDisabledModelRefs: string[];
-  restartServerAfterWrite: boolean;
-}
-
 interface ModelConfigModalOpenOptions {
   initialProviderId?: string;
   initialView?: 'preset-selector' | 'editor';
   onSaved?: () => Promise<void> | void;
-}
-
-interface KeyValueEditorConfig {
-  title: string;
-  description: string;
-  values: KeyValueFieldState[];
-  onAdd: () => void;
-  onRemove: (uid: string) => void;
-  onKeyChange: (uid: string, value: string) => void;
-  onValueChange: (uid: string, value: string) => void;
-  showColumnHeaders?: boolean;
-  stackedLabels?: boolean;
-  iconRemoveButton?: boolean;
-  emptyState?: string;
-  keyPlaceholder?: string;
-  valuePlaceholder?: string;
-}
-
-interface TextFieldConfig {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  description?: string;
-  secret?: boolean;
-}
-
-interface SelectFieldOption {
-  value: string;
-  label: string;
-}
-
-interface SelectFieldConfig {
-  label: string;
-  value: string;
-  options: SelectFieldOption[];
-  onChange: (value: string) => void;
-  description?: string;
 }
 
 export class ModelConfigModal extends Modal {
@@ -131,6 +69,7 @@ export class ModelConfigModal extends Modal {
   private expandedModelUids = new Set<string>();
   private providerChecks = new Map<string, ProviderCheckState>();
   private fetchedModelCandidates = new Map<string, FetchedProviderModelCandidate[]>();
+  private readonly providerEditor: ModelConfigProviderEditor;
 
   constructor(
     app: App,
@@ -138,6 +77,54 @@ export class ModelConfigModal extends Modal {
     private readonly openOptions: ModelConfigModalOpenOptions = {},
   ) {
     super(app);
+    this.providerEditor = new ModelConfigProviderEditor({
+      plugin: this.plugin,
+      getFlow: () => (this.isAddProviderFlow() ? 'add-provider' : 'workspace'),
+      expandedModelUids: this.expandedModelUids,
+      getModelValue: () => this.modelValue,
+      setModelValue: (value) => {
+        this.modelValue = value;
+      },
+      getSmallModelValue: () => this.smallModelValue,
+      setSmallModelValue: (value) => {
+        this.smallModelValue = value;
+      },
+      getProviderCheckState: (providerUid) => this.providerChecks.get(providerUid),
+      getFetchedModelCandidates: (providerUid) => this.fetchedModelCandidates.get(providerUid) ?? [],
+      setPreviewEl: (element) => {
+        this.previewEl = element;
+      },
+      setRestartToggleEl: (element) => {
+        this.restartToggleEl = element;
+      },
+      setJsonDraftValue: (value) => {
+        this.jsonDraftValue = value;
+      },
+      updatePreview: () => {
+        this.updatePreview();
+      },
+      rerender: () => {
+        this.render();
+      },
+      runProviderCheck: (provider) => {
+        void this.runProviderCheck(provider);
+      },
+      fetchModelsForProvider: (provider) => {
+        void this.fetchModelsForProvider(provider);
+      },
+      importFetchedModels: (provider, candidates) => {
+        this.importFetchedModels(provider, candidates);
+      },
+      deleteSelectedProvider: () => {
+        this.deleteSelectedProvider();
+      },
+      syncProviderRawFromJsonDraft: (provider) => {
+        this.syncProviderRawFromJsonDraft(provider);
+      },
+      formatAddProviderJson: () => {
+        this.formatAddProviderJson();
+      },
+    });
   }
 
   async onOpen(): Promise<void> {
@@ -342,11 +329,11 @@ export class ModelConfigModal extends Modal {
     }
 
     if (editorState.flow === 'add-provider') {
-      this.renderAddProviderEditor(containerEl, editorState);
+      this.providerEditor.renderAddProviderEditor(containerEl, editorState);
       return;
     }
 
-    this.renderWorkspaceEditor(containerEl, editorState);
+    this.providerEditor.renderWorkspaceEditor(containerEl, editorState);
   }
 
   private renderNoProviderSelectedState(containerEl: HTMLElement): void {
@@ -367,589 +354,8 @@ export class ModelConfigModal extends Modal {
     return {
       flow: this.isAddProviderFlow() ? 'add-provider' : 'workspace',
       provider,
-      formatMeta: this.getProviderInterfaceFormatMeta(provider.interfaceFormat),
       providerCheckState: this.providerChecks.get(provider.uid) ?? { status: 'idle' },
     };
-  }
-
-  private renderWorkspaceEditor(
-    containerEl: HTMLElement,
-    editorState: SelectedProviderEditorState,
-  ): void {
-    const { provider } = editorState;
-    this.renderProviderToolbar(containerEl, provider);
-    const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel' });
-    this.renderProviderIdentitySection(sectionsEl, provider);
-    this.renderProviderConnectionSection(sectionsEl, editorState);
-    this.renderProviderExtraOptionsSection(sectionsEl, provider);
-    this.renderProviderModelsSection(sectionsEl, editorState);
-    this.renderProviderDefaultsSection(sectionsEl);
-    this.renderEditorPreviewSection(sectionsEl);
-  }
-
-  private renderProviderToolbar(containerEl: HTMLElement, provider: ProviderFormState): void {
-    const toolbarEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-toolbar is-cc-switch' });
-    const toolbarCopyEl = toolbarEl.createDiv({ cls: 'opencodian-model-workspace-toolbar-copy' });
-    toolbarCopyEl.createDiv({
-      cls: 'opencodian-model-workspace-toolbar-label',
-      text: provider.name.trim() || provider.id.trim() || t('settings.model.visualEditor.providerUntitled'),
-    });
-    toolbarCopyEl.createDiv({
-      cls: 'opencodian-model-workspace-toolbar-hint',
-      text: this.describeProviderListMeta(provider),
-    });
-
-    const badgeRowEl = toolbarCopyEl.createDiv({ cls: 'opencodian-model-workspace-provider-item-badges' });
-    badgeRowEl.createSpan({
-      cls: `opencodian-model-workspace-status-badge ${provider.enabled ? 'is-enabled' : 'is-disabled'}`,
-      text: provider.enabled
-        ? t('settings.model.visualEditor.providerEnabledBadge')
-        : t('settings.model.visualEditor.providerDisabledBadge'),
-    });
-
-    const actionsEl = toolbarEl.createDiv({ cls: 'opencodian-model-workspace-editor-actions' });
-    const availabilityLabel = actionsEl.createEl('label', {
-      cls: 'opencodian-model-workspace-toolbar-toggle',
-    });
-    const availabilityInput = availabilityLabel.createEl('input', { attr: { type: 'checkbox' } });
-    availabilityInput.checked = provider.enabled;
-    availabilityInput.addEventListener('change', () => {
-      provider.enabled = availabilityInput.checked;
-      this.updatePreview();
-      this.render();
-    });
-    availabilityLabel.createSpan({
-      text: t('settings.model.visualEditor.providerAvailability'),
-    });
-
-    const utilityActionsEl = actionsEl.createDiv({ cls: 'opencodian-model-workspace-editor-actions-group' });
-    const providerCheckState = this.providerChecks.get(provider.uid);
-    const providerTestButton = utilityActionsEl.createEl('button', {
-      text: providerCheckState?.status === 'loading'
-        ? t('settings.model.availability.check.loading')
-        : t('settings.model.visualEditor.testProvider'),
-    });
-    providerTestButton.type = 'button';
-    providerTestButton.disabled = providerCheckState?.status === 'loading' || !provider.id.trim();
-    providerTestButton.addEventListener('click', () => {
-      void this.runProviderCheck(provider);
-    });
-
-    const iconButton = utilityActionsEl.createEl('button', {
-      text: t('settings.model.visualEditor.manageIcons'),
-    });
-    iconButton.type = 'button';
-    iconButton.disabled = !provider.id.trim();
-    iconButton.addEventListener('click', () => {
-      new ProviderIconCacheModal(this.app, this.plugin, provider.id.trim() ? [provider.id.trim()] : [], () => {
-        this.render();
-      }).open();
-    });
-
-    const dangerActionsEl = actionsEl.createDiv({ cls: 'opencodian-model-workspace-editor-actions-group is-danger' });
-    const deleteButton = dangerActionsEl.createEl('button', {
-      cls: 'opencodian-model-workspace-danger-button',
-      text: t('settings.model.visualEditor.deleteProvider'),
-    });
-    deleteButton.type = 'button';
-    deleteButton.addEventListener('click', () => {
-      this.deleteSelectedProvider();
-    });
-  }
-
-  private renderProviderIdentitySection(containerEl: HTMLElement, provider: ProviderFormState): void {
-    const identitySectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.createSectionHeader(
-      identitySectionEl,
-      t('settings.model.visualEditor.identitySectionTitle'),
-      t('settings.model.visualEditor.identitySectionDesc'),
-    );
-    const identityGridEl = identitySectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-identity-grid' });
-    const providerIdField = this.createTextField(identityGridEl, {
-      label: `${t('settings.model.visualEditor.providerId')} *`,
-      value: provider.id,
-      onChange: (value) => {
-        provider.id = value;
-      },
-      placeholder: 'my-provider',
-      description: t('settings.model.visualEditor.providerIdDesc'),
-    });
-    providerIdField.addClass('is-full-span');
-
-    const providerNameField = this.createTextField(identityGridEl, {
-      label: `${t('settings.model.visualEditor.providerName')} *`,
-      value: provider.name,
-      onChange: (value) => {
-        provider.name = value;
-      },
-      placeholder: 'My Provider',
-    });
-    providerNameField.addClass('is-full-span');
-  }
-
-  private renderProviderConnectionSection(
-    containerEl: HTMLElement,
-    editorState: SelectedProviderEditorState,
-  ): void {
-    const { provider, formatMeta, providerCheckState } = editorState;
-    const connectionSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.createSectionHeader(
-      connectionSectionEl,
-      t('settings.model.visualEditor.providerSectionTitle'),
-      t('settings.model.visualEditor.providerSectionDesc'),
-    );
-    const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
-    const interfaceField = this.createSelectField(connectionGridEl, {
-      label: t('settings.model.visualEditor.interfaceFormat'),
-      value: provider.interfaceFormat,
-      options: PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
-        value: entry.id,
-        label: t(entry.labelKey as never),
-      })),
-      onChange: (value) => {
-        const previous = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
-        const next = this.getProviderInterfaceFormatMeta(value as ProviderInterfaceFormatId);
-        provider.interfaceFormat = value as ProviderInterfaceFormatId;
-        if (!provider.baseURL.trim() || provider.baseURL.trim() === previous.defaultBaseUrl) {
-          provider.baseURL = '';
-        }
-        this.setProviderBaseUrlSuggestion(provider, next.defaultBaseUrl);
-        this.updatePreview();
-        this.render();
-      },
-      description: t(formatMeta.descriptionKey as never),
-    });
-    interfaceField.addClass('is-full-span');
-
-    if (provider.interfaceFormat === 'custom') {
-      const customNpmField = this.createTextField(connectionGridEl, {
-        label: t('settings.model.visualEditor.customNpm'),
-        value: provider.customNpm,
-        onChange: (value) => {
-          provider.customNpm = value;
-        },
-        placeholder: '@scope/custom-adapter',
-      });
-      customNpmField.addClass('is-full-span');
-    }
-
-    const baseUrlField = this.createTextField(connectionGridEl, {
-      label: `${t('settings.model.visualEditor.baseURL')} *`,
-      value: provider.baseURL,
-      onChange: (value) => {
-        provider.baseURL = value;
-      },
-      placeholder: formatMeta.baseUrlPlaceholder,
-    });
-    baseUrlField.addClass('is-full-span');
-    const apiKeyField = this.createTextField(connectionGridEl, {
-      label: t('settings.model.visualEditor.apiKey'),
-      value: provider.apiKey,
-      onChange: (value) => {
-        provider.apiKey = value;
-      },
-      placeholder: formatMeta.apiKeyPlaceholder,
-      secret: true,
-    });
-    apiKeyField.addClass('is-full-span');
-
-    if (providerCheckState.status !== 'idle' && providerCheckState.status !== 'loading') {
-      connectionSectionEl.createDiv({
-        cls: `opencodian-model-workspace-inline-status ${this.getProviderCheckClass(providerCheckState)}`,
-        text: providerCheckState.message,
-      });
-    }
-  }
-
-  private renderProviderExtraOptionsSection(containerEl: HTMLElement, provider: ProviderFormState): void {
-    const extraOptionsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.renderKeyValueEditor(extraOptionsSectionEl, {
-      title: t('settings.model.visualEditor.extraOptionsTitle'),
-      description: t('settings.model.visualEditor.extraOptionsDesc'),
-      values: provider.extraOptions,
-      onAdd: () => {
-        provider.extraOptions.push(this.createKeyValueState());
-        this.updatePreview();
-        this.render();
-      },
-      onRemove: (uid) => {
-        provider.extraOptions = provider.extraOptions.filter((entry) => entry.uid !== uid);
-        this.updatePreview();
-        this.render();
-      },
-      onKeyChange: (uid, value) => {
-        const field = provider.extraOptions.find((entry) => entry.uid === uid);
-        if (!field) {
-          return;
-        }
-        field.key = value;
-        this.updatePreview();
-      },
-      onValueChange: (uid, value) => {
-        const field = provider.extraOptions.find((entry) => entry.uid === uid);
-        if (!field) {
-          return;
-        }
-        field.value = value;
-        this.updatePreview();
-      },
-      stackedLabels: true,
-    });
-  }
-
-  private renderProviderModelsSection(
-    containerEl: HTMLElement,
-    editorState: SelectedProviderEditorState,
-  ): void {
-    const { provider, formatMeta } = editorState;
-    const modelsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
-    this.createSectionHeader(
-      modelsSectionEl,
-      t('settings.model.visualEditor.modelsTitle'),
-      t('settings.model.visualEditor.modelsDesc'),
-    );
-    const modelControlsEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-model-controls' });
-    const modelControlsCopyEl = modelControlsEl.createDiv({ cls: 'opencodian-model-workspace-model-controls-copy' });
-    modelControlsCopyEl.createDiv({
-      cls: 'opencodian-model-workspace-model-hint',
-      text: t('settings.model.visualEditor.modelToggleHint'),
-    });
-    const modelButtonsEl = modelControlsEl.createDiv({ cls: 'opencodian-model-workspace-model-control-buttons' });
-    const fetchButton = modelButtonsEl.createEl('button', {
-      text: t('settings.model.visualEditor.fetchModels'),
-    });
-    fetchButton.type = 'button';
-    fetchButton.disabled = !formatMeta.canFetchModels;
-    fetchButton.addEventListener('click', () => {
-      void this.fetchModelsForProvider(provider);
-    });
-
-    const addModelButton = modelButtonsEl.createEl('button', {
-      cls: 'mod-cta',
-      text: t('settings.model.visualEditor.addModel'),
-    });
-    addModelButton.type = 'button';
-    addModelButton.addEventListener('click', () => {
-      provider.models.push(createEmptyModel());
-      this.updatePreview();
-      this.render();
-    });
-
-    this.renderFetchedModelCandidates(modelsSectionEl, provider);
-
-    if (provider.models.length === 0) {
-      modelsSectionEl.createDiv({
-        cls: 'opencodian-model-workspace-empty',
-        text: t('settings.model.visualEditor.noModels'),
-      });
-      return;
-    }
-
-    const modelsListEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-model-list' });
-    for (const model of provider.models) {
-      this.renderModelCard(modelsListEl, provider, model);
-    }
-  }
-
-  private renderFetchedModelCandidates(containerEl: HTMLElement, provider: ProviderFormState): void {
-    const fetchedCandidates = this.fetchedModelCandidates.get(provider.uid) ?? [];
-    if (fetchedCandidates.length === 0) {
-      return;
-    }
-
-    const importPanelEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-import-panel is-inline' });
-    const importHeaderEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-header' });
-    importHeaderEl.createDiv({
-      cls: 'opencodian-model-workspace-import-title',
-      text: t('settings.model.visualEditor.fetchResultTitle', {
-        count: String(fetchedCandidates.length),
-      }),
-    });
-    const importButton = importHeaderEl.createEl('button', {
-      cls: 'mod-cta',
-      text: t('settings.model.visualEditor.importMissingModels'),
-    });
-    importButton.type = 'button';
-    importButton.addEventListener('click', () => {
-      this.importFetchedModels(provider, fetchedCandidates);
-    });
-    const importListEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-list' });
-    for (const candidate of fetchedCandidates.slice(0, 12)) {
-      importListEl.createDiv({
-        cls: 'opencodian-model-workspace-import-item',
-        text: candidate.name && candidate.name !== candidate.id
-          ? `${candidate.name} · ${candidate.id}`
-          : candidate.id,
-      });
-    }
-  }
-
-  private renderProviderDefaultsSection(containerEl: HTMLElement): void {
-    const defaultsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
-    this.createSectionHeader(
-      defaultsSectionEl,
-      t('settings.model.visualEditor.defaultsTitle'),
-      t('settings.model.visualEditor.defaultsDesc'),
-    );
-    const defaultsGridEl = defaultsSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid' });
-    this.createTextField(defaultsGridEl, {
-      label: t('settings.model.visualEditor.defaultModel'),
-      value: this.modelValue,
-      onChange: (value) => {
-        this.modelValue = value;
-      },
-      placeholder: 'provider/model',
-      description: t('settings.model.visualEditor.defaultModelDesc'),
-    });
-    this.createTextField(defaultsGridEl, {
-      label: t('settings.model.visualEditor.smallModel'),
-      value: this.smallModelValue,
-      onChange: (value) => {
-        this.smallModelValue = value;
-      },
-      placeholder: 'provider/model',
-      description: t('settings.model.visualEditor.smallModelDesc'),
-    });
-  }
-
-  private renderEditorPreviewSection(containerEl: HTMLElement): void {
-    const previewSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
-    this.createSectionHeader(
-      previewSectionEl,
-      t('settings.model.visualEditor.previewTitle'),
-      t('settings.model.visualEditor.previewDesc'),
-    );
-
-    const previewToolbarEl = previewSectionEl.createDiv({ cls: 'opencodian-model-workspace-preview-toolbar' });
-    const jsonButton = previewToolbarEl.createEl('button', { text: t('settings.model.config.jsonButton') });
-    jsonButton.type = 'button';
-    jsonButton.addEventListener('click', () => {
-      new ModelConfigJsonModal(this.app, this.plugin).open();
-    });
-
-    const restartLabel = previewToolbarEl.createEl('label', {
-      cls: 'opencodian-model-config-checkbox opencodian-model-workspace-restart-toggle',
-    });
-    this.restartToggleEl = restartLabel.createEl('input', { attr: { type: 'checkbox' } });
-    this.restartToggleEl.checked = this.plugin.settings.server.mode === 'local';
-    restartLabel.createSpan({ text: t('settings.model.config.restart') });
-
-    this.previewEl = previewSectionEl.createEl('textarea', {
-      cls: 'opencodian-config-editor opencodian-model-config-json-editor',
-      attr: {
-        readonly: 'true',
-        spellcheck: 'false',
-      },
-    });
-    this.updatePreview();
-  }
-
-  private getProviderInterfaceFormatMeta(value: ProviderInterfaceFormatId): ProviderInterfaceFormatOption {
-    return PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
-      ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
-  }
-
-  private renderAddProviderEditor(
-    containerEl: HTMLElement,
-    editorState: SelectedProviderEditorState,
-  ): void {
-    const { provider, formatMeta } = editorState;
-    containerEl.addClass('is-add-provider-flow');
-
-    const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel is-add-provider-flow' });
-
-    const identitySectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    const identityGridEl = identitySectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-identity-grid' });
-    const providerIdField = this.createTextField(identityGridEl, {
-      label: `${t('settings.model.visualEditor.providerId')} *`,
-      value: provider.id,
-      onChange: (value) => {
-        provider.id = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-      },
-      placeholder: 'my-provider',
-      description: t('settings.model.visualEditor.providerIdDesc'),
-    });
-    providerIdField.addClass('is-full-span');
-
-    const providerNameField = this.createTextField(identityGridEl, {
-      label: `${t('settings.model.visualEditor.providerName')} *`,
-      value: provider.name,
-      onChange: (value) => {
-        provider.name = value;
-      },
-      placeholder: t('settings.model.visualEditor.providerNamePlaceholder'),
-    });
-    providerNameField.addClass('is-full-span');
-
-    const connectionSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
-    const interfaceField = this.createSelectField(connectionGridEl, {
-      label: t('settings.model.visualEditor.interfaceFormat'),
-      value: provider.interfaceFormat,
-      options: PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
-        value: entry.id,
-        label: t(entry.labelKey as never),
-      })),
-      onChange: (value) => {
-        const previous = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
-        const next = this.getProviderInterfaceFormatMeta(value as ProviderInterfaceFormatId);
-        provider.interfaceFormat = value as ProviderInterfaceFormatId;
-        if (!provider.baseURL.trim() || provider.baseURL.trim() === previous.defaultBaseUrl) {
-          provider.baseURL = '';
-        }
-        this.setProviderBaseUrlSuggestion(provider, next.defaultBaseUrl);
-        this.updatePreview();
-        this.render();
-      },
-      description: t(formatMeta.descriptionKey as never),
-    });
-    interfaceField.addClass('is-full-span');
-
-    if (provider.interfaceFormat === 'custom') {
-      const customNpmField = this.createTextField(connectionGridEl, {
-        label: t('settings.model.visualEditor.customNpm'),
-        value: provider.customNpm,
-        onChange: (value) => {
-          provider.customNpm = value;
-        },
-        placeholder: '@scope/custom-adapter',
-      });
-      customNpmField.addClass('is-full-span');
-    }
-
-    const baseUrlPlaceholder = this.getProviderBaseUrlPlaceholder(provider, formatMeta.baseUrlPlaceholder);
-    const apiKeyField = this.createTextField(connectionGridEl, {
-      label: t('settings.model.visualEditor.apiKey'),
-      value: provider.apiKey,
-      onChange: (value) => {
-        provider.apiKey = value;
-      },
-      placeholder: formatMeta.apiKeyPlaceholder || t('settings.model.visualEditor.apiKeyPlaceholder'),
-      description: t('settings.model.visualEditor.apiKeyAutoFill'),
-      secret: true,
-    });
-    apiKeyField.addClass('is-full-span');
-
-    const baseUrlField = this.createTextField(connectionGridEl, {
-      label: `${t('settings.model.visualEditor.baseURL')} *`,
-      value: provider.baseURL,
-      onChange: (value) => {
-        provider.baseURL = value;
-      },
-      placeholder: baseUrlPlaceholder,
-    });
-    baseUrlField.addClass('is-full-span');
-
-    const extraOptionsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.renderKeyValueEditor(extraOptionsSectionEl, {
-      title: t('settings.model.visualEditor.extraOptionsTitle'),
-      description: t('settings.model.visualEditor.addProviderExtraOptionsDesc'),
-      values: provider.extraOptions,
-      onAdd: () => {
-        provider.extraOptions.push(this.createKeyValueState());
-        this.updatePreview();
-        this.render();
-      },
-      onRemove: (uid) => {
-        provider.extraOptions = provider.extraOptions.filter((entry) => entry.uid !== uid);
-        this.updatePreview();
-        this.render();
-      },
-      onKeyChange: (uid, value) => {
-        const field = provider.extraOptions.find((entry) => entry.uid === uid);
-        if (!field) {
-          return;
-        }
-        field.key = value;
-        this.updatePreview();
-      },
-      onValueChange: (uid, value) => {
-        const field = provider.extraOptions.find((entry) => entry.uid === uid);
-        if (!field) {
-          return;
-        }
-        field.value = value;
-        this.updatePreview();
-      },
-      stackedLabels: true,
-      iconRemoveButton: true,
-    });
-
-    const modelsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    const modelHeaderEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-section-header is-with-actions' });
-    const modelHeaderCopyEl = modelHeaderEl.createDiv({ cls: 'opencodian-model-workspace-section-copy' });
-    modelHeaderCopyEl.createDiv({
-      cls: 'opencodian-model-workspace-section-title',
-      text: t('settings.model.visualEditor.modelsTitle'),
-    });
-    modelHeaderCopyEl.createDiv({
-      cls: 'opencodian-model-workspace-section-desc',
-      text: t('settings.model.visualEditor.addProviderModelsDesc'),
-    });
-    const modelControlsEl = modelHeaderEl.createDiv({ cls: 'opencodian-model-workspace-model-controls' });
-    const modelButtonsEl = modelControlsEl.createDiv({ cls: 'opencodian-model-workspace-model-control-buttons' });
-    const fetchButton = modelButtonsEl.createEl('button', {
-      text: t('settings.model.visualEditor.fetchModels'),
-    });
-    fetchButton.type = 'button';
-    fetchButton.disabled = !formatMeta.canFetchModels;
-    fetchButton.addEventListener('click', () => {
-      void this.fetchModelsForProvider(provider);
-    });
-
-    const addModelButton = modelButtonsEl.createEl('button', {
-      text: t('settings.model.visualEditor.addModel'),
-    });
-    addModelButton.type = 'button';
-    addModelButton.addEventListener('click', () => {
-      provider.models.push(createEmptyModel());
-      this.updatePreview();
-      this.render();
-    });
-
-    if (provider.models.length === 0) {
-      modelsSectionEl.createDiv({
-        cls: 'opencodian-model-workspace-empty is-prominent',
-        text: t('settings.model.visualEditor.noModels'),
-      });
-    } else {
-      const headerRowEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-list-header' });
-      headerRowEl.createSpan({ text: '' });
-      headerRowEl.createSpan({ text: t('settings.model.visualEditor.modelId') });
-      headerRowEl.createSpan({ text: t('settings.model.visualEditor.modelName') });
-      headerRowEl.createSpan({ text: '' });
-
-      const modelsListEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-model-list' });
-      for (const model of provider.models) {
-        this.renderModelCard(modelsListEl, provider, model);
-      }
-    }
-
-    const previewSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.createSectionHeader(
-      previewSectionEl,
-      t('settings.model.visualEditor.addProviderPreviewTitle'),
-      t('settings.model.visualEditor.addProviderPreviewDesc'),
-    );
-    this.previewEl = previewSectionEl.createEl('textarea', {
-      cls: 'opencodian-config-editor opencodian-model-config-json-editor is-add-provider-flow',
-      attr: {
-        spellcheck: 'false',
-      },
-    });
-    this.previewEl.addEventListener('input', () => {
-      this.jsonDraftValue = this.previewEl?.value ?? '';
-      this.syncProviderRawFromJsonDraft(provider);
-    });
-
-    const previewActionsEl = previewSectionEl.createDiv({ cls: 'opencodian-model-workspace-json-actions' });
-    const formatButton = previewActionsEl.createEl('button', {
-      text: t('settings.model.jsonEditor.format'),
-    });
-    formatButton.type = 'button';
-    formatButton.addEventListener('click', () => this.formatAddProviderJson());
-
-    this.updatePreview();
   }
 
   private renderPresetChip(
@@ -964,397 +370,6 @@ export class ModelConfigModal extends Modal {
     });
     chipEl.type = 'button';
     chipEl.addEventListener('click', onClick);
-  }
-
-  private renderModelCard(containerEl: HTMLElement, provider: ProviderFormState, model: ModelFormState): void {
-    const expanded = this.expandedModelUids.has(model.uid);
-    const modelEl = containerEl.createDiv({ cls: `opencodian-model-workspace-model-card${model.enabled ? '' : ' is-disabled'}` });
-    const headerEl = modelEl.createDiv({ cls: 'opencodian-model-workspace-model-header' });
-    this.renderModelCardHeader(headerEl, provider, model, expanded);
-    if (!expanded) {
-      return;
-    }
-
-    this.renderExpandedModelCardDetails(modelEl, model);
-  }
-
-  private renderModelCardHeader(
-    headerEl: HTMLElement,
-    provider: ProviderFormState,
-    model: ModelFormState,
-    expanded: boolean,
-  ): void {
-    const expandButton = headerEl.createEl('button', { cls: 'opencodian-model-workspace-model-expand' });
-    expandButton.type = 'button';
-    setIcon(expandButton, expanded ? 'chevron-down' : 'chevron-right');
-    expandButton.addEventListener('click', () => {
-      if (expanded) {
-        this.expandedModelUids.delete(model.uid);
-      } else {
-        this.expandedModelUids.add(model.uid);
-      }
-      this.render();
-    });
-
-    const rowEl = this.isAddProviderFlow()
-      ? headerEl
-      : headerEl.createDiv({ cls: 'opencodian-model-workspace-model-header-fields is-compact' });
-    const modelIdInput = rowEl.createEl('input', {
-      cls: 'opencodian-model-workspace-model-input',
-      attr: {
-        type: 'text',
-        placeholder: t('settings.model.visualEditor.modelId'),
-        'aria-label': t('settings.model.visualEditor.modelId'),
-      },
-    });
-    this.bindEditableControl(modelIdInput);
-    modelIdInput.value = model.id;
-    modelIdInput.addEventListener('input', () => {
-      model.id = modelIdInput.value;
-      this.updatePreview();
-    });
-
-    const modelNameInput = rowEl.createEl('input', {
-      cls: 'opencodian-model-workspace-model-input',
-      attr: {
-        type: 'text',
-        placeholder: t('settings.model.visualEditor.modelName'),
-        'aria-label': t('settings.model.visualEditor.modelName'),
-      },
-    });
-    this.bindEditableControl(modelNameInput);
-    modelNameInput.value = model.name;
-    modelNameInput.addEventListener('input', () => {
-      model.name = modelNameInput.value;
-      this.updatePreview();
-    });
-
-    if (!this.isAddProviderFlow()) {
-      const modelToggleWrap = headerEl.createDiv({ cls: 'opencodian-model-workspace-model-toggle' });
-      const modelToggle = modelToggleWrap.createEl('input', { attr: { type: 'checkbox' } });
-      modelToggle.checked = model.enabled;
-      modelToggle.addEventListener('change', () => {
-        model.enabled = modelToggle.checked;
-        this.updatePreview();
-        this.render();
-      });
-      modelToggleWrap.createSpan({
-        text: model.enabled
-          ? t('settings.model.visualEditor.modelEnabledBadge')
-          : t('settings.model.visualEditor.modelDisabledBadge'),
-      });
-    }
-
-    const deleteButton = headerEl.createEl('button', {
-      cls: `opencodian-model-workspace-danger-button${this.isAddProviderFlow() ? ' is-icon-only' : ''}`,
-      text: this.isAddProviderFlow() ? '' : t('settings.model.visualEditor.deleteModel'),
-      attr: this.isAddProviderFlow()
-        ? { 'aria-label': t('settings.model.visualEditor.deleteModel') }
-        : undefined,
-    });
-    deleteButton.type = 'button';
-    if (this.isAddProviderFlow()) {
-      setIcon(deleteButton, 'trash-2');
-    }
-    deleteButton.addEventListener('click', () => {
-      provider.models = provider.models.filter((entry) => entry.uid !== model.uid);
-      this.expandedModelUids.delete(model.uid);
-      this.updatePreview();
-      this.render();
-    });
-  }
-
-  private renderExpandedModelCardDetails(modelEl: HTMLElement, model: ModelFormState): void {
-    const detailsEl = modelEl.createDiv({ cls: 'opencodian-model-workspace-model-details' });
-    const limitsSectionEl = detailsEl.createDiv({
-      cls: 'opencodian-model-workspace-subsection opencodian-model-workspace-model-limit-section',
-    });
-    this.createSubsectionHeader(
-      limitsSectionEl,
-      t('settings.model.visualEditor.modelLimitsTitle'),
-      t('settings.model.visualEditor.modelLimitsDesc'),
-    );
-    const limitsGridEl = limitsSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-model-limits-grid' });
-    this.createTextField(limitsGridEl, {
-      label: t('settings.model.visualEditor.contextLimit'),
-      value: model.context,
-      onChange: (value) => {
-        model.context = value;
-      },
-      placeholder: '200000',
-      description: t('settings.model.visualEditor.contextLimitDesc'),
-    });
-    this.createTextField(limitsGridEl, {
-      label: t('settings.model.visualEditor.outputLimit'),
-      value: model.output,
-      onChange: (value) => {
-        model.output = value;
-      },
-      placeholder: '65536',
-      description: t('settings.model.visualEditor.outputLimitDesc'),
-    });
-
-    this.renderModelCollectionEditor(detailsEl, model, 'options', {
-      title: t('settings.model.visualEditor.modelOptionsTitle'),
-      description: t('settings.model.visualEditor.modelOptionsDesc'),
-      emptyState: t('settings.model.visualEditor.modelOptionsEmpty'),
-      keyPlaceholder: t('settings.model.visualEditor.modelOptionsKeyPlaceholder'),
-      valuePlaceholder: t('settings.model.visualEditor.modelOptionsValuePlaceholder'),
-    });
-
-    this.renderModelCollectionEditor(detailsEl, model, 'variants', {
-      title: t('settings.model.visualEditor.modelVariantsTitle'),
-      description: t('settings.model.visualEditor.modelVariantsDesc'),
-      emptyState: t('settings.model.visualEditor.modelVariantsEmpty'),
-      keyPlaceholder: t('settings.model.visualEditor.modelVariantsKeyPlaceholder'),
-      valuePlaceholder: t('settings.model.visualEditor.modelVariantsValuePlaceholder'),
-    });
-
-    this.renderModelCollectionEditor(detailsEl, model, 'extraFields', {
-      title: t('settings.model.visualEditor.modelExtraFieldsTitle'),
-      description: t('settings.model.visualEditor.modelExtraFieldsDesc'),
-      emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
-      keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
-      valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
-    });
-  }
-
-  private renderModelCollectionEditor(
-    containerEl: HTMLElement,
-    model: ModelFormState,
-    field: ModelKeyValueCollectionKey,
-    {
-      title,
-      description,
-      emptyState,
-      keyPlaceholder,
-      valuePlaceholder,
-    }: Pick<KeyValueEditorConfig, 'title' | 'description' | 'emptyState' | 'keyPlaceholder' | 'valuePlaceholder'>,
-  ): void {
-    this.renderKeyValueEditor(containerEl, {
-      title,
-      description,
-      values: model[field],
-      onAdd: () => {
-        model[field].push(this.createKeyValueState());
-        this.updatePreview();
-        this.render();
-      },
-      onRemove: (uid) => {
-        model[field] = model[field].filter((entry) => entry.uid !== uid);
-        this.updatePreview();
-        this.render();
-      },
-      onKeyChange: (uid, value) => {
-        const target = model[field].find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.key = value;
-        this.updatePreview();
-      },
-      onValueChange: (uid, value) => {
-        const target = model[field].find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.value = value;
-        this.updatePreview();
-      },
-      emptyState,
-      keyPlaceholder,
-      valuePlaceholder,
-    });
-  }
-
-  private renderKeyValueEditor(
-    containerEl: HTMLElement,
-    {
-      title,
-      description,
-      values,
-      onAdd,
-      onRemove,
-      onKeyChange,
-      onValueChange,
-      showColumnHeaders = false,
-      stackedLabels = false,
-      iconRemoveButton = true,
-      emptyState,
-      keyPlaceholder,
-      valuePlaceholder,
-    }: KeyValueEditorConfig,
-  ): void {
-    const sectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-subsection' });
-    const headerEl = this.createSubsectionHeader(sectionEl, title, description);
-    const addButton = headerEl.createEl('button', {
-      text: t('settings.model.visualEditor.addField'),
-    });
-    addButton.type = 'button';
-    addButton.addEventListener('click', onAdd);
-
-    if (values.length === 0) {
-      sectionEl.createDiv({
-        cls: 'opencodian-model-workspace-empty small',
-        text: emptyState ?? t('settings.model.visualEditor.noExtraFields'),
-      });
-      return;
-    }
-
-    const listEl = sectionEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-list' });
-    if (showColumnHeaders) {
-      const headerRowEl = listEl.createDiv({ cls: 'opencodian-model-workspace-list-header is-keyvalue' });
-      headerRowEl.createSpan({ text: t('settings.model.visualEditor.fieldKeyLabel') });
-      headerRowEl.createSpan({ text: t('settings.model.visualEditor.fieldValueLabel') });
-      headerRowEl.createSpan({ text: '' });
-    }
-    for (const field of values) {
-      const rowEl = listEl.createDiv({
-        cls: `opencodian-model-workspace-keyvalue-row${stackedLabels ? ' is-stacked-labels' : ''}`,
-      });
-      const keyFieldEl = stackedLabels
-        ? rowEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-cell' })
-        : rowEl;
-      if (stackedLabels) {
-        keyFieldEl.createDiv({
-          cls: 'opencodian-model-workspace-keyvalue-cell-label',
-          text: t('settings.model.visualEditor.fieldKeyLabel'),
-        });
-      }
-      const keyInput = keyFieldEl.createEl('input', {
-        cls: 'opencodian-model-workspace-keyvalue-input',
-        attr: {
-          type: 'text',
-          placeholder: keyPlaceholder ?? t('settings.model.visualEditor.fieldKeyPlaceholder'),
-        },
-      });
-      this.bindEditableControl(keyInput);
-      keyInput.value = field.key;
-      keyInput.addEventListener('input', () => {
-        onKeyChange(field.uid, keyInput.value);
-      });
-      const valueFieldEl = stackedLabels
-        ? rowEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-cell' })
-        : rowEl;
-      if (stackedLabels) {
-        valueFieldEl.createDiv({
-          cls: 'opencodian-model-workspace-keyvalue-cell-label',
-          text: t('settings.model.visualEditor.fieldValueLabel'),
-        });
-      }
-      const valueInput = valueFieldEl.createEl('textarea', {
-        cls: 'opencodian-model-workspace-keyvalue-textarea',
-        attr: {
-          rows: '2',
-          placeholder: valuePlaceholder ?? t('settings.model.visualEditor.fieldValuePlaceholder'),
-        },
-      });
-      this.bindEditableControl(valueInput);
-      valueInput.value = field.value;
-      valueInput.addEventListener('input', () => {
-        onValueChange(field.uid, valueInput.value);
-      });
-      const removeButton = rowEl.createEl('button', {
-        cls: `opencodian-model-workspace-danger-button${iconRemoveButton ? ' is-icon-only' : ''}`,
-        text: iconRemoveButton ? '' : t('settings.model.visualEditor.removeField'),
-        attr: iconRemoveButton
-          ? { 'aria-label': t('settings.model.visualEditor.removeField') }
-          : undefined,
-      });
-      removeButton.type = 'button';
-      if (iconRemoveButton) {
-        setIcon(removeButton, 'trash-2');
-      }
-      removeButton.addEventListener('click', () => onRemove(field.uid));
-    }
-  }
-
-  private createTextField(
-    containerEl: HTMLElement,
-    {
-      label,
-      value,
-      onChange,
-      placeholder = '',
-      description,
-      secret = false,
-    }: TextFieldConfig,
-  ): HTMLElement {
-    const fieldEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-field' });
-    fieldEl.createEl('label', { text: label });
-    const inputEl = fieldEl.createEl('input', { attr: { type: secret ? 'password' : 'text' } });
-    this.bindEditableControl(inputEl);
-    inputEl.value = value;
-    inputEl.placeholder = placeholder;
-    inputEl.addEventListener('input', () => {
-      onChange(inputEl.value);
-      this.updatePreview();
-    });
-    if (description) {
-      fieldEl.createDiv({
-        cls: 'opencodian-model-workspace-field-description',
-        text: description,
-      });
-    }
-    return fieldEl;
-  }
-
-  private createSubsectionHeader(containerEl: HTMLElement, title: string, description: string): HTMLDivElement {
-    const headerEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-subsection-header' });
-    const copyEl = headerEl.createDiv({ cls: 'opencodian-model-workspace-subsection-copy' });
-    copyEl.createDiv({
-      cls: 'opencodian-model-workspace-subsection-title',
-      text: title,
-    });
-    copyEl.createDiv({
-      cls: 'opencodian-model-workspace-subsection-desc',
-      text: description,
-    });
-    return headerEl;
-  }
-
-  private createSelectField(
-    containerEl: HTMLElement,
-    {
-      label,
-      value,
-      options,
-      onChange,
-      description,
-    }: SelectFieldConfig,
-  ): HTMLElement {
-    const fieldEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-field' });
-    fieldEl.createEl('label', { text: label });
-    const selectEl = fieldEl.createEl('select');
-    this.bindEditableControl(selectEl);
-    for (const option of options) {
-      const optionEl = selectEl.createEl('option', { text: option.label });
-      optionEl.value = option.value;
-    }
-    selectEl.value = value;
-    selectEl.addEventListener('change', () => {
-      onChange(selectEl.value);
-      this.updatePreview();
-    });
-    if (description) {
-      fieldEl.createDiv({
-        cls: 'opencodian-model-workspace-field-description',
-        text: description,
-      });
-    }
-    return fieldEl;
-  }
-
-  private createSectionHeader(containerEl: HTMLElement, title: string, description: string): void {
-    const headerEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section-header' });
-    headerEl.createDiv({
-      cls: 'opencodian-model-workspace-section-title',
-      text: title,
-    });
-    headerEl.createDiv({
-      cls: 'opencodian-model-workspace-section-desc',
-      text: description,
-    });
   }
 
   private getSelectedProvider(): ProviderFormState | null {
@@ -1535,30 +550,12 @@ export class ModelConfigModal extends Modal {
   }
 
   private createSnapshot(): string {
-    return JSON.stringify({
+    return createModelConfigModalSnapshot({
+      flow: this.isAddProviderFlow() ? 'add-provider' : 'workspace',
       modelValue: this.modelValue,
       smallModelValue: this.smallModelValue,
-      jsonDraftValue: this.isAddProviderFlow() ? this.getJsonDraftValue() : undefined,
-      providers: this.providers.map((provider) => ({
-        id: provider.id,
-        name: provider.name,
-        interfaceFormat: provider.interfaceFormat,
-        customNpm: provider.customNpm,
-        baseURL: provider.baseURL,
-        apiKey: provider.apiKey,
-        enabled: provider.enabled,
-        extraOptions: provider.extraOptions.map((entry) => ({ key: entry.key, value: entry.value })),
-        models: provider.models.map((model) => ({
-          id: model.id,
-          name: model.name,
-          context: model.context,
-          output: model.output,
-          enabled: model.enabled,
-          options: model.options.map((entry) => ({ key: entry.key, value: entry.value })),
-          variants: model.variants.map((entry) => ({ key: entry.key, value: entry.value })),
-          extraFields: model.extraFields.map((entry) => ({ key: entry.key, value: entry.value })),
-        })),
-      })),
+      jsonDraftValue: resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue),
+      providers: this.providers,
     });
   }
 
@@ -1586,7 +583,11 @@ export class ModelConfigModal extends Modal {
     }
 
     try {
-      const subset = this.buildAvailabilitySubset();
+      const subset = buildAvailabilitySubset({
+        providers: this.providers,
+        localConfigAtOpen: this.localConfigAtOpen,
+        serverConfigAtOpen: this.serverConfigAtOpen,
+      });
       const nextValue = buildConfigPreview(
         this.modelValue,
         this.smallModelValue,
@@ -1602,185 +603,28 @@ export class ModelConfigModal extends Modal {
     }
   }
 
-  private buildAvailabilitySubset(): Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'> {
-    const providerIds = Array.from(new Set([
-      ...this.providers.map((provider) => provider.id.trim()).filter(Boolean),
-      ...collectConfiguredProviderIds(this.localConfigAtOpen),
-      ...collectConfiguredProviderIds(this.serverConfigAtOpen),
-    ]));
-
-    let subset: OpencodeModelConfigSubset = {
-      enabled_providers: Array.isArray(this.localConfigAtOpen.enabled_providers)
-        ? [...this.localConfigAtOpen.enabled_providers]
-        : undefined,
-      disabled_providers: Array.isArray(this.localConfigAtOpen.disabled_providers)
-        ? [...this.localConfigAtOpen.disabled_providers]
-        : undefined,
-    };
-
-    for (const provider of this.providers) {
-      const providerId = provider.id.trim();
-      if (!providerId) {
-        continue;
-      }
-      subset = setProviderEnabled({
-        subset,
-        providerId,
-        enabled: provider.enabled,
-        knownProviderIds: providerIds,
-        inherited: this.serverConfigAtOpen,
-      });
-    }
-
-    return {
-      enabled_providers: subset.enabled_providers,
-      disabled_providers: subset.disabled_providers,
-    };
-  }
-
-  private toModelConfig(): OpencodeModelConfigSubset {
-    const providerEntries = this.providers.reduce<Record<string, OpencodeProviderConfig>>((result, provider) => {
-      const isBlankProvider = !provider.id.trim()
-        && !provider.name.trim()
-        && !provider.baseURL.trim()
-        && !provider.apiKey.trim()
-        && provider.extraOptions.every((entry) => !entry.key.trim() && !entry.value.trim())
-        && provider.models.length === 0;
-      if (isBlankProvider) {
-        return result;
-      }
-
-      const providerId = provider.id.trim();
-      const providerName = provider.name.trim();
-      const baseURL = provider.baseURL.trim();
-
-      if (!providerId) {
-        throw new Error(t('settings.model.visualEditor.errorProviderId'));
-      }
-      if (!PROVIDER_ID_PATTERN.test(providerId)) {
-        throw new Error(t('settings.model.visualEditor.errorProviderIdFormat'));
-      }
-      if (!providerName) {
-        throw new Error(t('settings.model.visualEditor.errorProviderName'));
-      }
-      if (!baseURL) {
-        throw new Error(t('settings.model.visualEditor.errorBaseURL'));
-      }
-      if (Object.prototype.hasOwnProperty.call(result, providerId)) {
-        throw new Error(t('settings.model.visualEditor.errorProviderDuplicate'));
-      }
-
-      const nextProvider = this.serializeProviderConfig(provider, {
-        validate: true,
-        includeName: true,
-      });
-      result[providerId] = nextProvider;
-      return result;
-    }, {});
-
-    const availabilitySubset = this.buildAvailabilitySubset();
-    return {
-      model: this.modelValue.trim() || undefined,
-      small_model: this.smallModelValue.trim() || undefined,
-      provider: providerEntries,
-      enabled_providers: availabilitySubset.enabled_providers,
-      disabled_providers: availabilitySubset.disabled_providers,
-    };
-  }
-
-  private buildNextDisabledModelRefs(): string[] {
-    const managedProviderIds = new Set([
-      ...Object.keys(this.localConfigAtOpen.provider ?? {}),
-      ...this.providers.map((provider) => provider.id.trim()).filter(Boolean),
-    ]);
-    const nextRefs = this.initialDisabledModelRefs.filter((ref) => {
-      const [providerId] = ref.split('/');
-      return !managedProviderIds.has(providerId);
-    });
-
-    for (const provider of this.providers) {
-      const providerId = provider.id.trim();
-      if (!providerId) {
-        continue;
-      }
-      for (const model of provider.models) {
-        const modelId = model.id.trim();
-        if (!modelId || model.enabled) {
-          continue;
-        }
-        nextRefs.push(formatModelReference(providerId, modelId));
-      }
-    }
-
-    return Array.from(new Set(nextRefs)).sort((left, right) => left.localeCompare(right));
-  }
-
   private async save(): Promise<void> {
     if (!this.plugin.modelConfigService) {
       return;
     }
 
     try {
-      const savePlan = this.buildSavePlan();
+      const savePlan = buildModelConfigSavePlan({
+        flow: this.isAddProviderFlow() ? 'add-provider' : 'workspace',
+        modelValue: this.modelValue,
+        smallModelValue: this.smallModelValue,
+        providers: this.providers,
+        selectedProvider: this.getSelectedProvider(),
+        localConfigAtOpen: this.localConfigAtOpen,
+        serverConfigAtOpen: this.serverConfigAtOpen,
+        initialDisabledModelRefs: this.initialDisabledModelRefs,
+        jsonDraftValue: resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue),
+      });
       await this.applySavePlan(savePlan);
       await this.finalizeSavePlan(savePlan);
     } catch (error) {
       this.handleSaveFailure(error);
     }
-  }
-
-  private buildSavePlan(): ModelConfigSavePlan {
-    return this.isAddProviderFlow()
-      ? this.buildAddProviderSavePlan()
-      : this.buildWorkspaceSavePlan();
-  }
-
-  private buildWorkspaceSavePlan(): ModelConfigSavePlan {
-    return {
-      nextConfig: this.toModelConfig(),
-      nextDisabledModelRefs: this.buildNextDisabledModelRefs(),
-      restartServerAfterWrite: true,
-    };
-  }
-
-  private buildAddProviderSavePlan(): ModelConfigSavePlan {
-    const provider = this.getSelectedProvider();
-    if (!provider) {
-      throw new Error(t('settings.model.visualEditor.noProviderSelected'));
-    }
-
-    const providerId = provider.id.trim();
-    const providerName = provider.name.trim();
-    if (!providerId) {
-      throw new Error(t('settings.model.visualEditor.errorProviderId'));
-    }
-    if (!PROVIDER_ID_PATTERN.test(providerId)) {
-      throw new Error(t('settings.model.visualEditor.errorProviderIdFormat'));
-    }
-    if (!providerName) {
-      throw new Error(t('settings.model.visualEditor.errorProviderName'));
-    }
-    if (Object.prototype.hasOwnProperty.call(this.localConfigAtOpen.provider ?? {}, providerId)) {
-      throw new Error(t('settings.model.visualEditor.errorProviderDuplicate'));
-    }
-
-    const parsedConfig = this.parseAddProviderJsonDraft();
-    parsedConfig.name = providerName;
-
-    const availabilitySubset = this.buildAvailabilitySubset();
-    return {
-      nextConfig: {
-        ...this.localConfigAtOpen,
-        provider: {
-          ...(this.localConfigAtOpen.provider ?? {}),
-          [providerId]: parsedConfig,
-        },
-        enabled_providers: availabilitySubset.enabled_providers,
-        disabled_providers: availabilitySubset.disabled_providers,
-      },
-      nextDisabledModelRefs: [...this.initialDisabledModelRefs],
-      restartServerAfterWrite: false,
-    };
   }
 
   private async applySavePlan(savePlan: ModelConfigSavePlan): Promise<void> {
@@ -1848,16 +692,8 @@ export class ModelConfigModal extends Modal {
       return;
     }
     provider.extraOptions = [
-      this.createKeyValueState('setCacheKey', 'true'),
+      createModelConfigKeyValueState('setCacheKey', 'true'),
     ];
-  }
-
-  private createKeyValueState(key = '', value = ''): KeyValueFieldState {
-    return {
-      uid: `field-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      key,
-      value,
-    };
   }
 
   private upsertSelectedDraftProvider(nextProvider: ProviderFormState): void {
@@ -1866,7 +702,7 @@ export class ModelConfigModal extends Modal {
       this.providers = this.providers.map((provider) => (
         provider.uid === selectedProvider.uid ? nextProvider : provider
       ));
-    } else if (selectedProvider && this.isBlankProvider(selectedProvider)) {
+    } else if (selectedProvider && isBlankProviderState(selectedProvider)) {
       this.providers = this.providers.map((provider) => (
         provider.uid === selectedProvider.uid ? nextProvider : provider
       ));
@@ -1884,10 +720,10 @@ export class ModelConfigModal extends Modal {
   }
 
   private getAddProviderPreviewValue(provider: ProviderFormState): string {
-    const rawDraft = this.getJsonDraftValue().trim();
+    const rawDraft = resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue).trim();
     let parsedDraft: OpencodeProviderConfig | null = null;
     try {
-      parsedDraft = this.tryParseAddProviderJsonDraft(rawDraft);
+      parsedDraft = tryParseAddProviderJsonDraft(rawDraft);
       if (parsedDraft) {
         provider.raw = parsedDraft;
       }
@@ -1896,7 +732,7 @@ export class ModelConfigModal extends Modal {
     }
 
     try {
-      const providerConfig = this.serializeProviderConfig(provider, {
+      const providerConfig = serializeProviderConfig(provider, {
         validate: false,
         includeName: false,
       });
@@ -1911,65 +747,25 @@ export class ModelConfigModal extends Modal {
 
   private syncProviderRawFromJsonDraft(provider: ProviderFormState): void {
     try {
-      const parsedDraft = this.tryParseAddProviderJsonDraft(this.jsonDraftValue);
+      const parsedDraft = tryParseAddProviderJsonDraft(this.jsonDraftValue);
       if (parsedDraft) {
-        this.syncProviderFormFromJsonDraft(provider, parsedDraft);
+        syncProviderFormFromJsonDraft(provider, parsedDraft);
       }
     } catch {
       return;
     }
   }
 
-  private getProviderBaseUrlPlaceholder(provider: ProviderFormState, fallback: string): string {
-    const rawOptions = provider.raw.options;
-    const rawBaseUrl = rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)
-      ? rawOptions.baseURL
-      : undefined;
-    return typeof rawBaseUrl === 'string' && rawBaseUrl.trim()
-      ? rawBaseUrl
-      : fallback;
-  }
-
-  private setProviderBaseUrlSuggestion(provider: ProviderFormState, baseURL: string): void {
-    const rawOptions = provider.raw.options;
-    const nextOptions = rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)
-      ? { ...rawOptions }
-      : {};
-    if (baseURL.trim()) {
-      nextOptions.baseURL = baseURL;
-    } else {
-      delete nextOptions.baseURL;
-    }
-    provider.raw = {
-      ...provider.raw,
-      options: nextOptions,
-    };
-  }
-
-  private bindEditableControl(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): void {
-    element.addEventListener('keydown', (event) => {
-      event.stopPropagation();
-    });
-    element.addEventListener('mousedown', (event) => {
-      event.stopPropagation();
-    });
-    element.addEventListener('click', (event) => {
-      event.stopPropagation();
-    });
-  }
-
-  private getJsonDraftValue(): string {
-    return this.previewEl?.value ?? this.jsonDraftValue;
-  }
-
   private formatAddProviderJson(): void {
     try {
-      const parsed = this.parseAddProviderJsonDraft();
+      const parsed = parseAddProviderJsonDraft(
+        resolveModelConfigJsonDraftValue(this.previewEl?.value, this.jsonDraftValue),
+      );
       const nextValue = JSON.stringify(parsed, null, 2);
       this.jsonDraftValue = nextValue;
       const provider = this.getSelectedProvider();
       if (provider) {
-        this.syncProviderFormFromJsonDraft(provider, parsed);
+        syncProviderFormFromJsonDraft(provider, parsed);
       }
       if (this.previewEl) {
         this.previewEl.value = nextValue;
@@ -1980,249 +776,8 @@ export class ModelConfigModal extends Modal {
     }
   }
 
-  private parseAddProviderJsonDraft(): OpencodeProviderConfig {
-    const rawValue = this.getJsonDraftValue().trim();
-    const parsed = this.tryParseAddProviderJsonDraft(rawValue);
-    if (!rawValue || !parsed) {
-      throw new Error(t('settings.model.jsonEditor.invalidJson'));
-    }
-    return parsed;
-  }
-
-  private tryParseAddProviderJsonDraft(rawValue: string): OpencodeProviderConfig | null {
-    if (!rawValue.trim()) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue) as unknown;
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new Error(t('settings.model.jsonEditor.providerObject'));
-    }
-    return parsed as OpencodeProviderConfig;
-  }
-
-  private serializeProviderConfig(
-    provider: ProviderFormState,
-    options: { validate: boolean; includeName: boolean },
-  ): OpencodeProviderConfig {
-    const providerName = provider.name.trim();
-    const baseURL = provider.baseURL.trim();
-
-    if (options.validate) {
-      if (!providerName && options.includeName) {
-        throw new Error(t('settings.model.visualEditor.errorProviderName'));
-      }
-      if (!baseURL) {
-        throw new Error(t('settings.model.visualEditor.errorBaseURL'));
-      }
-    }
-
-    const nextProvider = this.cloneUnmanagedProviderFields(provider.raw);
-    if (options.includeName) {
-      nextProvider.name = providerName;
-    } else {
-      delete nextProvider.name;
-    }
-    nextProvider.npm = resolveNpmForInterfaceFormat(provider);
-    const nextOptions: Record<string, unknown> = {};
-    if (baseURL) {
-      nextOptions.baseURL = baseURL;
-    } else {
-      delete nextOptions.baseURL;
-    }
-    if (provider.apiKey.trim()) {
-      nextOptions.apiKey = provider.apiKey.trim();
-    } else {
-      delete nextOptions.apiKey;
-    }
-    for (const entry of provider.extraOptions) {
-      const key = entry.key.trim();
-      if (!key || key === 'baseURL' || key === 'apiKey') {
-        continue;
-      }
-      nextOptions[key] = parseLooseValue(entry.value);
-    }
-    nextProvider.options = nextOptions;
-
-    const modelEntries = provider.models.reduce<Record<string, OpencodeProviderModelConfig>>((models, model) => {
-      const modelId = model.id.trim();
-      if (!modelId) {
-        if (options.validate) {
-          throw new Error(t('settings.model.visualEditor.errorModelId'));
-        }
-        return models;
-      }
-      if (Object.prototype.hasOwnProperty.call(models, modelId)) {
-        throw new Error(t('settings.model.visualEditor.errorModelDuplicate'));
-      }
-
-      const nextModel: OpencodeProviderModelConfig = {};
-      if (model.name.trim()) {
-        nextModel.name = model.name.trim();
-      } else {
-        delete nextModel.name;
-      }
-
-      const nextLimit: NonNullable<OpencodeProviderModelConfig['limit']> = {};
-      if (model.context.trim()) {
-        const parsed = Number(model.context.trim());
-        if (!Number.isFinite(parsed) || parsed <= 0) {
-          throw new Error(t('settings.model.visualEditor.errorContextLimit'));
-        }
-        nextLimit.context = parsed;
-      } else {
-        delete nextLimit.context;
-      }
-      if (model.output.trim()) {
-        const parsed = Number(model.output.trim());
-        if (!Number.isFinite(parsed) || parsed <= 0) {
-          throw new Error(t('settings.model.visualEditor.errorOutputLimit'));
-        }
-        nextLimit.output = parsed;
-      } else {
-        delete nextLimit.output;
-      }
-      if (Object.keys(nextLimit).length > 0) {
-        nextModel.limit = nextLimit;
-      } else {
-        delete nextModel.limit;
-      }
-
-      const nextModelOptions: Record<string, unknown> = {};
-      for (const entry of model.options) {
-        const key = entry.key.trim();
-        if (!key) {
-          continue;
-        }
-        nextModelOptions[key] = parseLooseValue(entry.value);
-      }
-      if (Object.keys(nextModelOptions).length > 0) {
-        nextModel.options = nextModelOptions;
-      } else {
-        delete nextModel.options;
-      }
-
-      const nextModelVariants: Record<string, Record<string, unknown>> = {};
-      for (const entry of model.variants) {
-        const key = entry.key.trim();
-        if (!key) {
-          continue;
-        }
-        nextModelVariants[key] = parseModelVariantValue(key, entry.value);
-      }
-      if (Object.keys(nextModelVariants).length > 0) {
-        nextModel.variants = nextModelVariants;
-      } else {
-        delete nextModel.variants;
-      }
-
-      for (const entry of model.extraFields) {
-        const key = assertModelExtraFieldKeyAllowed(entry.key);
-        if (!key) {
-          continue;
-        }
-        nextModel[key] = parseLooseValue(entry.value);
-      }
-
-      models[modelId] = nextModel;
-      return models;
-    }, {});
-
-    nextProvider.models = modelEntries;
-    return nextProvider;
-  }
-
-  private syncProviderFormFromJsonDraft(provider: ProviderFormState, draft: OpencodeProviderConfig): void {
-    const interfaceState = resolveInterfaceFormatState(draft.npm);
-    const existingModelEnabledMap = new Map(provider.models.map((model) => [model.id, model.enabled]));
-
-    provider.interfaceFormat = interfaceState.interfaceFormat;
-    provider.customNpm = interfaceState.customNpm;
-    provider.baseURL = this.readOptionString(draft.options, 'baseURL');
-    provider.apiKey = this.readOptionString(draft.options, 'apiKey');
-    provider.extraOptions = extractProviderExtraOptions(draft.options);
-    provider.models = Object.entries(draft.models ?? {}).map(([modelId, model]) => ({
-      uid: `model-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      id: modelId,
-      name: typeof model.name === 'string' ? model.name : '',
-      context: this.readLimitNumber(model.limit, 'context'),
-      output: this.readLimitNumber(model.limit, 'output'),
-      enabled: existingModelEnabledMap.get(modelId) ?? true,
-      options: extractModelOptions(model),
-      variants: extractModelVariants(model),
-      extraFields: extractModelExtraFields(model),
-      raw: model,
-    }));
-    provider.raw = draft;
-  }
-
-  private cloneUnmanagedProviderFields(raw: OpencodeProviderConfig): OpencodeProviderConfig {
-    return Object.entries(raw).reduce<OpencodeProviderConfig>((result, [key, value]) => {
-      if (key === 'name' || key === 'npm' || key === 'options' || key === 'models') {
-        return result;
-      }
-      result[key] = value;
-      return result;
-    }, {});
-  }
-
-  private readOptionString(options: unknown, key: string): string {
-    if (typeof options !== 'object' || options === null || Array.isArray(options)) {
-      return '';
-    }
-    const value = (options as Record<string, unknown>)[key];
-    return typeof value === 'string' ? value : '';
-  }
-
-  private readLimitNumber(limit: unknown, key: 'context' | 'output'): string {
-    if (typeof limit !== 'object' || limit === null || Array.isArray(limit)) {
-      return '';
-    }
-    const value = (limit as Record<string, unknown>)[key];
-    return typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
-  }
-
-  private isBlankProvider(provider: ProviderFormState): boolean {
-    return !provider.id.trim()
-      && !provider.name.trim()
-      && !provider.baseURL.trim()
-      && !provider.apiKey.trim()
-      && provider.extraOptions.every((entry) => !entry.key.trim() && !entry.value.trim())
-      && provider.models.length === 0;
-  }
-
-  private getProviderCheckClass(state: ProviderCheckState): string {
-    switch (state.status) {
-      case 'success':
-        return 'is-success';
-      case 'warning':
-        return 'is-warning';
-      case 'error':
-        return 'is-error';
-      case 'loading':
-        return 'is-loading';
-      default:
-        return '';
-    }
-  }
-
   private getPresetDisplayName(preset: ProviderPreset): string {
     return t(`settings.model.presets.provider.${preset.id}` as never) || preset.name;
-  }
-
-  private getProviderCheckLabel(state: ProviderCheckState): string {
-    switch (state.status) {
-      case 'success':
-        return t('settings.model.visualEditor.providerCheckBadge.success');
-      case 'warning':
-        return t('settings.model.visualEditor.providerCheckBadge.warning');
-      case 'error':
-        return t('settings.model.visualEditor.providerCheckBadge.error');
-      case 'loading':
-        return t('settings.model.visualEditor.providerCheckBadge.loading');
-      default:
-        return '';
-    }
   }
 
   private async applyProviderIcon(targetEl: HTMLElement, providerId: string, label: string): Promise<void> {

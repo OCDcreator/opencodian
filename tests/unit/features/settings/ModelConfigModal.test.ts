@@ -53,6 +53,13 @@ function getSelectedProviderState(modal: ModelConfigModal) {
   return state.providers.find((provider) => provider.uid === state.selectedProviderUid) ?? null;
 }
 
+function getButtonByText(containerEl: HTMLElement, text: string): HTMLButtonElement {
+  const button = Array.from(containerEl.querySelectorAll('button'))
+    .find((entry) => entry.textContent?.trim() === text);
+  expect(button).toBeDefined();
+  return button as HTMLButtonElement;
+}
+
 beforeEach(() => {
   jest.spyOn(ProviderIconService, 'resolveIconUrl').mockResolvedValue(null);
 });
@@ -126,6 +133,54 @@ describe('ModelConfigModal opening flows', () => {
     const selectedProvider = state.providers.find((provider) => provider.uid === state.selectedProviderUid);
 
     expect(selectedProvider?.id).toBe('anthropic');
+  });
+
+  it('routes add-provider identity edits through the provider editor owner', async () => {
+    const plugin = createPlugin();
+    const modal = new ModelConfigModal({} as App, plugin as never, {
+      initialView: 'preset-selector',
+    });
+
+    await modal.onOpen();
+
+    const providerIdInput = modal.contentEl.querySelector(
+      '.opencodian-model-workspace-field input[type="text"]',
+    ) as HTMLInputElement | null;
+    expect(providerIdInput).not.toBeNull();
+
+    providerIdInput!.value = 'My Provider_01!';
+    providerIdInput!.dispatchEvent(new window.Event('input'));
+
+    expect(getSelectedProviderState(modal)?.id).toBe('myprovider01');
+  });
+
+  it('routes model additions and removals through the model list editor owner', async () => {
+    const plugin = createPlugin({
+      modelConfigService: {
+        readLocalModelConfig: jest.fn().mockResolvedValue({
+          provider: {
+            openai: {
+              name: 'OpenAI',
+              npm: '@ai-sdk/openai',
+              models: {
+                'gpt-4o': {},
+              },
+            },
+          },
+        }),
+        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
+      },
+    });
+    const modal = new ModelConfigModal({} as App, plugin as never);
+
+    await modal.onOpen();
+
+    getButtonByText(modal.contentEl, t('settings.model.visualEditor.addModel')).click();
+    expect(getSelectedProviderState(modal)?.models).toHaveLength(2);
+
+    getButtonByText(modal.contentEl, t('settings.model.visualEditor.deleteModel')).click();
+    expect(getSelectedProviderState(modal)?.models).toHaveLength(1);
   });
 
   it('asks for confirmation before closing with unsaved changes', async () => {

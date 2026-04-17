@@ -5,12 +5,13 @@
 
 ## 概述
 
-`ComposerInputShellCoordinator` 承接聊天输入区 shell 的 DOM 与 layout lifecycle，避免 `OpenCodianView` 继续直接维护 textarea、自适应高度、send/stop 按钮和 composer stack metrics。
+`ComposerInputShellCoordinator` 承接聊天输入区 shell 的 DOM 与 layout lifecycle，避免 `OpenCodianView` 继续直接维护 textarea、自适应高度、send/stop 按钮、slash autocomplete menu 和 composer stack metrics。
 
 它负责：
 
 - 创建 input tab bar slot、composer shell、context row、textarea、footer 和 toolbar slots
 - 绑定 textarea Enter 提交、Shift+Enter 换行，以及 textarea 高度同步
+- 在输入以 `/` 开头且光标仍停留在第一个 command token 内时，显示 slash autocomplete menu
 - 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort 这些既有子控件挂到稳定的 toolbar slot
@@ -33,6 +34,7 @@ export interface ComposerInputShellCoordinatorHost {
   isTabForegroundBusy(): boolean;
   showProcessingBlockedNotice(): void;
   submitMessage(message: string): void | Promise<void>;
+  loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
 }
@@ -55,13 +57,17 @@ export class ComposerInputShellCoordinator {
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam
 - `applyLocaleTexts()` 刷新 placeholder、add-context tooltip 和 send/stop tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
+- `refreshSlashCommandMenu()` 只在 slash trigger session 首次打开时向 host 拉取 merged visible menu items，后续同一次 `/...` 输入仅本地过滤，避免每次按键都重拉 runtime/project catalog
+- `tryHandleSlashCommandMenuKeydown()` 在 menu 打开时拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`
+- 选中 menu item 后，textarea 会被写成 `/<id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
 - `scheduleLayoutSync()` / `clearScheduledLayoutSync()` 收束 composer stack height 的 RAF 节流
 - `destroy()` 释放 textarea/button refs、layout observer 和 context row ownership
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 只创建 coordinator、提供 host callbacks，并把 shell DOM refs 暴露给相邻的 `InputPanelAppearanceCoordinator`
+- merged runtime+project slash command catalog 由 `OpenCodianView` host seam 复用 `core/config/slashCommandCatalog.ts` 组装后传入，本模块自己不接 project config / SDK merge 细节
 - 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`
 - liquid-glass adapter mount、SVG filter 与 diagnostics 已进一步交给 `InputPanelAppearanceCoordinator`，本模块继续只负责 shell/layout lifecycle
 
-本模块推进 master plan 的 P1 `OpenCodianView composer input shell` lane：把输入区 DOM、textarea 行为、submit gate 与 layout metrics 从主 view 迁出，并把 selector toolbar 区域留给后续 dedicated owner 接管。
+本模块推进 commands item 6 的 chat-side slash autocomplete slice：把 slash menu DOM、键盘选择和 menu-item 应用留在输入区 owner 内，而 slash execution 仍继续委托给相邻 runtime seam。

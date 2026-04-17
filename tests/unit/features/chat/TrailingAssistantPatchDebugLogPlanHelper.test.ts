@@ -3,11 +3,11 @@ import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
-} from '../../../../src/features/chat/services/TrailingAssistantPatchDebugLoggingContextHelper';
+} from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
 import {
   buildTrailingAssistantPatchCompletionDebugLogPlan,
   buildTrailingAssistantPatchSkippedDebugLogPlan,
-} from '../../../../src/features/chat/services/TrailingAssistantPatchDebugLogPlanHelper';
+} from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
 
 function createMessage(
   overrides: Partial<ChatMessage> & Pick<ChatMessage, 'id'>,

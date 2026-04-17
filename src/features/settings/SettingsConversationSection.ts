@@ -10,6 +10,10 @@ import type {
   QuestionDisplayMode,
   TitleMode,
 } from '../../core/types';
+import {
+  normalizeChatFontSizePx,
+  normalizeCompactionReservedTokens,
+} from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -79,6 +83,9 @@ export class SettingsConversationSection {
     });
 
     this.addTitleModeSetting(containerEl);
+    this.addAutoCompactionDefaultSetting(containerEl);
+    this.addCompactionReservedTokensSetting(containerEl);
+    this.addChatFontSizeSetting(containerEl);
     this.addQuestionDisplayModeSetting(containerEl);
     this.addQuestionCardPositionSetting(containerEl);
     this.addAnsweredQuestionCardsSetting(containerEl);
@@ -186,6 +193,69 @@ export class SettingsConversationSection {
       });
   }
 
+  private addAutoCompactionDefaultSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.autoCompactionEnabled.name'))
+      .setDesc(t('settings.conversation.autoCompactionEnabled.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.autoCompactionEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.autoCompactionEnabled = value;
+            await this.saveGlobalSessionDefaults();
+          });
+      });
+  }
+
+  private addCompactionReservedTokensSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.compactionReservedTokens.name'))
+      .setDesc(t('settings.conversation.compactionReservedTokens.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '1';
+        text
+          .setPlaceholder(String(this.plugin.settings.compactionReservedTokens))
+          .setValue(String(this.plugin.settings.compactionReservedTokens))
+          .onChange(async (value) => {
+            const nextValue = this.parseCompactionReservedTokens(value);
+            if (nextValue === null) {
+              text.setValue(String(this.plugin.settings.compactionReservedTokens));
+              return;
+            }
+
+            this.plugin.settings.compactionReservedTokens = nextValue;
+            text.setValue(String(nextValue));
+            await this.saveGlobalSessionDefaults();
+          });
+      });
+  }
+
+  private addChatFontSizeSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.chatFontSizePx.name'))
+      .setDesc(t('settings.conversation.chatFontSizePx.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '10';
+        text.inputEl.max = '24';
+        text
+          .setPlaceholder(String(this.plugin.settings.chatFontSizePx))
+          .setValue(String(this.plugin.settings.chatFontSizePx))
+          .onChange(async (value) => {
+            const nextValue = this.parseChatFontSizePx(value);
+            if (nextValue === null) {
+              text.setValue(String(this.plugin.settings.chatFontSizePx));
+              return;
+            }
+
+            this.plugin.settings.chatFontSizePx = nextValue;
+            text.setValue(String(nextValue));
+            await this.saveGlobalSessionDefaults();
+          });
+      });
+  }
+
   private addQuestionCardPositionSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.conversation.questionCardPosition.name'))
@@ -267,5 +337,30 @@ export class SettingsConversationSection {
             this.plugin.refreshConversationRendering();
           });
       });
+  }
+
+  private parseCompactionReservedTokens(value: string): number | null {
+    const nextValue = Number.parseFloat(value.trim());
+    const roundedValue = Math.round(nextValue);
+    if (!Number.isFinite(nextValue) || roundedValue <= 0) {
+      return null;
+    }
+
+    return normalizeCompactionReservedTokens(nextValue, this.plugin.settings.compactionReservedTokens);
+  }
+
+  private parseChatFontSizePx(value: string): number | null {
+    const nextValue = Number.parseFloat(value.trim());
+    const roundedValue = Math.round(nextValue);
+    if (!Number.isFinite(nextValue) || roundedValue < 10 || roundedValue > 24) {
+      return null;
+    }
+
+    return normalizeChatFontSizePx(nextValue, this.plugin.settings.chatFontSizePx);
+  }
+
+  private async saveGlobalSessionDefaults(): Promise<void> {
+    await this.plugin.saveSettings({ reloadModels: false });
+    await this.plugin.reapplyConversationSessionDefaults();
   }
 }

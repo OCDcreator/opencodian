@@ -1,4 +1,5 @@
 import { createLogger } from '../../shared';
+import { normalizeContextPath } from '../../shared/contextPath';
 import type { SessionDiffEntry } from '../types';
 import type {
   Part,
@@ -39,7 +40,15 @@ type AvailableModelDirectory = {
   defaults: Record<string, string>;
 };
 
-type SessionCommandInput = {
+export interface SessionCommandTemplateContext {
+  vaultPath?: string | null;
+  currentNotePath?: string | null;
+  currentSelection?: string | null;
+  externalContextPaths?: readonly string[] | null;
+  conversationTitle?: string | null;
+}
+
+export interface SessionCommandInput {
   command: string;
   arguments: string;
   agent?: string;
@@ -47,7 +56,8 @@ type SessionCommandInput = {
   messageID?: string;
   variant?: string;
   parts?: unknown[];
-};
+  placeholderContext?: SessionCommandTemplateContext;
+}
 
 type SessionShellInput = {
   agent: string;
@@ -88,6 +98,58 @@ export interface OpenCodeSessionControlOrchestratorHost {
   getAvailableModels(): Promise<AvailableModelDirectory>;
   logServiceWarning(key: string, message: string, error: unknown): void;
   logServiceError(key: string, message: string, error: unknown): void;
+}
+
+const SESSION_COMMAND_PLACEHOLDER_PATTERN =
+  /\{\{(?:vault_path|current_note_path|current_selection|external_context_paths|conversation_title)\}\}/g;
+
+function normalizeSessionCommandPath(pathValue?: string | null): string {
+  return typeof pathValue === 'string' && pathValue.length > 0
+    ? normalizeContextPath(pathValue)
+    : '';
+}
+
+function normalizeSessionCommandText(value?: string | null): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeSessionCommandExternalContextPaths(
+  paths?: readonly string[] | null,
+): string {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    return '';
+  }
+
+  return paths
+    .filter((item): item is string => typeof item === 'string' && item.length > 0)
+    .map((item) => normalizeContextPath(item))
+    .join('\n');
+}
+
+export function expandSessionCommandTemplate(
+  template: string,
+  context?: SessionCommandTemplateContext,
+): string {
+  if (!template) {
+    return template;
+  }
+
+  return template.replace(SESSION_COMMAND_PLACEHOLDER_PATTERN, (token) => {
+    switch (token) {
+      case '{{vault_path}}':
+        return normalizeSessionCommandPath(context?.vaultPath);
+      case '{{current_note_path}}':
+        return normalizeSessionCommandPath(context?.currentNotePath);
+      case '{{current_selection}}':
+        return normalizeSessionCommandText(context?.currentSelection);
+      case '{{external_context_paths}}':
+        return normalizeSessionCommandExternalContextPaths(context?.externalContextPaths);
+      case '{{conversation_title}}':
+        return normalizeSessionCommandText(context?.conversationTitle);
+      default:
+        return token;
+    }
+  });
 }
 
 export class OpenCodeSessionControlOrchestrator {
@@ -261,9 +323,15 @@ export class OpenCodeSessionControlOrchestrator {
   }
 
   async runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<SessionMessage> {
+    const {
+      placeholderContext,
+      ...commandInput
+    } = input;
+
     return this.host.getSdkSession().command({
       sessionID: sessionId,
-      ...input,
+      ...commandInput,
+      arguments: expandSessionCommandTemplate(commandInput.arguments, placeholderContext),
     } as never) as Promise<SessionMessage>;
   }
 

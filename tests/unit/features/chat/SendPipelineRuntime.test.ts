@@ -8,6 +8,7 @@ import {
   type SendPipelineHost,
   type SendPipelinePreparationPort,
   SendPipelineRuntime,
+  type SendPipelineSlashCommandPort,
   type SendPipelineStreamController,
   type SendPipelineTabRuntime,
 } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
@@ -44,6 +45,7 @@ function createPreparedSend(overrides: Partial<PreparedMessageSend> = {}): Prepa
     conversation: overrides.conversation ?? createConversation([userMessage]),
     tabId: overrides.tabId ?? 'tab-1',
     draftContextItems: overrides.draftContextItems ?? [],
+    contextItems: overrides.contextItems ?? [],
     modelOptions: overrides.modelOptions ?? {
       provider: 'openai',
       model: 'gpt-5.4',
@@ -89,6 +91,13 @@ type MockedSendPipelineHost = {
     SendPipelineHost[Key] extends (...args: infer Args) => infer Result
       ? jest.Mock<Result, Args>
       : SendPipelineHost[Key];
+};
+
+type MockedSlashCommandPort = {
+  [Key in keyof SendPipelineSlashCommandPort]:
+    SendPipelineSlashCommandPort[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : SendPipelineSlashCommandPort[Key];
 };
 
 function createStreamController(callOrder: string[] = []): SendPipelineStreamController {
@@ -256,6 +265,29 @@ describe('SendPipelineRuntime', () => {
     jest.restoreAllMocks();
   });
 
+  it('delegates handled slash commands before preparing a normal streamed send', async () => {
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(createPreparedSend());
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController);
+    const slashCommandPort: MockedSlashCommandPort = {
+      tryRunSlashCommand: jest.fn().mockResolvedValue(true),
+    };
+    const runtime = new SendPipelineRuntime(
+      host,
+      preparationPort,
+      finalizationPort,
+      slashCommandPort,
+    );
+
+    await runtime.sendMessage('/review');
+
+    expect(slashCommandPort.tryRunSlashCommand).toHaveBeenCalledWith('/review');
+    expect(preparationPort.prepareMessageSend).not.toHaveBeenCalled();
+    expect(host.sendStreamMessage).not.toHaveBeenCalled();
+  });
+
   it('aborts cleanly when preparation does not yield a sendable conversation', async () => {
     const runtimeState = createTabRuntime();
     const streamController = createStreamController();
@@ -333,6 +365,40 @@ describe('SendPipelineRuntime', () => {
       editedFiles: ['notes.md'],
     }));
     expect(callOrder.indexOf('saveConversation')).toBeLessThan(callOrder.indexOf('finalizeAfterStream'));
+  });
+
+  it('sends the merged prepared context items instead of only draft items', async () => {
+    const contextItem = {
+      id: 'context-1',
+      kind: 'file',
+      path: 'notes/guide.md',
+      label: 'guide.md',
+      mime: 'text/markdown',
+    } as const;
+    const preparedSend = createPreparedSend({
+      draftContextItems: [],
+      contextItems: [contextItem],
+    });
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(preparedSend);
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController, [], {
+      sendStreamMessage: jest.fn().mockImplementation(() => createAsyncStream([
+        { type: 'message_start' },
+        { type: 'message_stop' },
+      ])),
+    });
+    const runtime = new SendPipelineRuntime(host, preparationPort, finalizationPort);
+
+    await runtime.sendMessage('Hello');
+
+    expect(host.sendStreamMessage).toHaveBeenCalledWith('Hello', {
+      sessionId: 'session-1',
+      provider: 'openai',
+      model: 'gpt-5.4',
+      contextItems: [contextItem],
+    });
   });
 
   it('persists a notice when the stream ends with only an error', async () => {

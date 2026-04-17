@@ -2,6 +2,11 @@
  * Chat-related type definitions
  */
 
+import {
+  normalizeChatFontSizePx,
+  normalizeCompactionReservedTokens,
+} from './settings';
+
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
 
@@ -82,6 +87,46 @@ export interface SessionDiffEntry {
   additions: number;
   deletions: number;
   status?: 'added' | 'deleted' | 'modified';
+}
+
+export interface ConversationSessionSettings {
+  autoCompactionEnabled?: boolean | null;
+  compactionReservedTokens?: number | null;
+  chatFontSizePx?: number | null;
+}
+
+export function normalizeConversationSessionSettings(
+  value?: Partial<ConversationSessionSettings> | null,
+): ConversationSessionSettings | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const normalized: ConversationSessionSettings = {};
+
+  if (value.autoCompactionEnabled === null || typeof value.autoCompactionEnabled === 'boolean') {
+    normalized.autoCompactionEnabled = value.autoCompactionEnabled;
+  }
+
+  if (value.compactionReservedTokens === null) {
+    normalized.compactionReservedTokens = null;
+  } else {
+    const reservedTokens = normalizeCompactionReservedTokens(value.compactionReservedTokens, -1);
+    if (reservedTokens > 0) {
+      normalized.compactionReservedTokens = reservedTokens;
+    }
+  }
+
+  if (value.chatFontSizePx === null) {
+    normalized.chatFontSizePx = null;
+  } else {
+    const chatFontSizePx = normalizeChatFontSizePx(value.chatFontSizePx, 0);
+    if (chatFontSizePx > 0) {
+      normalized.chatFontSizePx = chatFontSizePx;
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
 /** Content block in a message */
@@ -298,4 +343,5 @@ export interface Conversation {
   messages: ChatMessage[];
   currentNote?: string;
   externalContextPaths?: string[];
+  sessionSettings?: ConversationSessionSettings;
 }

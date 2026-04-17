@@ -18,39 +18,17 @@ import {
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getAllGlassAdapters } from '../../utils/glass';
+import type {
+  NumericControlConfig,
+  NumericStyleControlConfig,
+  SettingHelpButtonConfig,
+} from './settingsStyleControls';
 import { SettingsStyleLiquidGlassInputControls } from './SettingsStyleLiquidGlassInputControls';
 
-interface InputPanelNumericStyleControlConfig {
+type InputPanelNumericStyleControlConfig = NumericStyleControlConfig & {
   group: 'input';
-  name: string;
-  desc: string;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  value: () => number;
-  resetValue: () => number;
   setValue: (appearance: OpenCodianPlugin['settings']['chatAppearance'], value: number) => void;
-}
-
-interface NumericControlConfig {
-  name: string;
-  desc: string;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  value: () => number;
-  resetValue: () => number;
-  commitValue: (value: number) => void;
-  helpButton?: SettingHelpButtonConfig;
-  registerSync?: (syncFromSettings: () => void) => void;
-}
-
-interface SettingHelpButtonConfig {
-  tooltip: string;
-  onClick: () => void;
-}
+};
 
 interface SettingsStyleInputPanelSectionOptions {
   app: App;

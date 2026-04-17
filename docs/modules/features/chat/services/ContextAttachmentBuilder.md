@@ -33,6 +33,9 @@ class ContextAttachmentBuilder {
     path: string,
     kind: 'current_note' | 'file',
   ): Promise<PromptContextItem | null>
+  buildPersistentFileContextItems(
+    paths: readonly string[] | undefined,
+  ): Promise<PromptContextItem[]>
   hasFileAtPath(path: string): boolean
 }
 ```
@@ -56,10 +59,17 @@ class ContextAttachmentBuilder {
 - `buildFileContextItemFromPath()` 与 `hasFileAtPath()` 统一处理 `vault.getAbstractFileByPath()` + `TFile` 判定
 - `OpenCodianView` 因此不再自己解析当前预览 path 或重复持有 `PromptContextItem` 组装细节
 
+### 持久上下文路径解析
+
+- `buildPersistentFileContextItems()` 把 `Conversation.externalContextPaths` 这类持久文件路径批量解析成 `PromptContextItem[]`
+- 这条路径会先做 `normalizePath()` + 去重，再静默跳过已经失效的 stale path，避免历史路径阻塞发送
+- 真正的文件条目仍复用 `buildFileContextItem()`，因此 remote 文本校验、binary 拦截与 `textSnapshot` 规则保持一致
+
 ## 与其他模块的交互
 
 - **ComposerContextActionService**：把 current-note / selection / file 入口动作统一委托给这里
 - **ComposerContextCoordinator**：复用 preview attach 入口，把 current-note / selection focus preview 转成最终附件
+- **ComposerContextViewFacade**：通过 send-context 端口复用持久路径解析，供发送前把 `Conversation.externalContextPaths` 变成真正的 `PromptContextItem[]`
 - **OpenCodianView**：注入当前 server mode getter，并通过 action / coordinator 两条子链路间接消费附件构建
 - **shared/obsidianContext**：复用 MIME 推导、label 格式化与 text-like 判定
 - **composerContext**：复用 `FocusContextPreview` 类型，承接 retained selection preview → attachment 的桥接

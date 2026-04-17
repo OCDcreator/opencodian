@@ -5,7 +5,7 @@
 
 ## 概述
 
-`TabActivationRuntimeViewHostFactory` 把 tab activation runtime 的 shared host assembly 收束到一个 dedicated factory。现在由 `TabActivationRuntimeHostProvider` 先把 `OpenCodianView` 暴露的扁平 late-bound activation/runtime seam，重新分组为 tab runtime、conversation state、question/todo、background task、conversation sync 与 UI writeback 六组 ports；其中 conversation-sync runtime port 现已并回本模块，直接在 `TabActivationRuntimeViewHostFactory` 内收束 fingerprint writeback 与 loop-control seam。factory 再负责组合成 `TabActivationRuntimeHostAdapterHost`，并交给既有 adapter 派生 activation / conversation-state / runtime-state bridge hosts。
+`TabActivationRuntimeViewHostFactory` 把 tab activation runtime 的 shared host assembly 收束到一个 dedicated factory。现在由 `TabActivationRuntimeHostProvider` 先把 `OpenCodianView` 暴露的扁平 late-bound activation/runtime seam，重新分组为 tab runtime、conversation state、question/todo、background task、conversation sync 与 UI writeback 六组 ports；其中 conversation state port 现在额外承接 conversation session settings runtime reapply，conversation-sync runtime port 仍由本模块内联收束 fingerprint writeback 与 loop-control seam。factory 再负责组合成 `TabActivationRuntimeHostAdapterHost`，并交给既有 adapter 派生 activation / conversation-state / runtime-state bridge hosts。
 
 它不负责实例化 `TabConversationActivationBridge`、`TabViewActivationBridge`、`TabConversationStateBridge` 或 `TabRuntimeStateBridge`，也不接管 activation 流程编排；这些仍由 `OpenCodianView` 的 service construction 与对应 runtime bridge 持有。本模块只负责 view-facing host seam assembly。
 

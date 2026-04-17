@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 当前共有 313 个 TypeScript 源码模块
-- `src/style/**/*.css`: 当前共有 17 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `docs/modules/**/*.md`: 当前共有 329 篇模块与基础设施文档
+- `src/**/*.ts`: 当前共有 324 个 TypeScript 源码模块
+- `src/style/**/*.css`: 当前共有 16 个样式模块（不含 `src/style/index.css` 聚合入口）
+- `docs/modules/**/*.md`: 当前共有 339 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -163,7 +163,11 @@ docs/modules/
 │   │   │   ├── PermissionModeSelectorCoordinator.md
 │   │   │   ├── PersistentAssistantNoticeService.md
 │   │   │   ├── ScrollManager.md
-│   │   │   └── TitleGenerationService.md
+│   │   │   ├── TitleGenerationService.md
+│   │   │   ├── trailingAssistantPatchDebug.md
+│   │   │   ├── trailingAssistantPatchExecution.md
+│   │   │   ├── trailingAssistantPatchPlanning.md
+│   │   │   └── trailingAssistantPatchTypes.md
 │   │   ├── tabs/
 │   │   │   ├── index.md
 │   │   │   ├── Tab.md
@@ -188,24 +192,33 @@ docs/modules/
 │       ├── index.md
 │       ├── LiquidGlassSettingHelpModal.md
 │       ├── ModelConfigJsonModal.md
+│       ├── ModelConfigModelListEditor.md
 │       ├── ModelConfigModal.md
+│       ├── ModelConfigProviderEditor.md
 │       ├── ModelPickerModal.md
 │       ├── OpencodeConfigModal.md
 │       ├── OpenCodianSettings.md
+│       ├── modelConfigModalState.md
+│       ├── modelConfigSavePlan.md
 │       ├── ProviderBuiltinIconPickerModal.md
 │       ├── ProviderIconCacheModal.md
 │       ├── ServerSettingHelpModal.md
+│       ├── SettingsCommandsSection.md
 │       ├── SettingsModelCatalogCoordinator.md
 │       ├── SettingsModelCatalogPresenter.md
 │       ├── SettingsModelIconCacheManager.md
 │       ├── SettingsModelSection.md
+│       ├── SettingsProjectCommandEditor.md
 │       ├── SettingsSectionCoordinator.md
 │       ├── SettingsSecuritySection.md
 │       ├── SettingsServerSection.md
 │       ├── SettingsStyleInputPanelSection.md
 │       ├── SettingsStyleLiquidGlassInputControls.md
+│       ├── SettingsStylePresetSection.md
 │       ├── SettingsStyleSection.md
-│       └── SettingsStyleBackgroundSection.md
+│       ├── SettingsStyleBackgroundSection.md
+│       ├── settingsStyleControls.md
+│       └── projectAgentEditorConfig.md
 ├── i18n/
 │   ├── index.md
 │   └── locales/
@@ -237,7 +250,12 @@ docs/modules/
 │   │       └── shudingDiamond.md
 │   ├── icons/
 │   │   ├── index.md
-│   │   └── ProviderIconService.md
+│   │   ├── ProviderIconService.md
+│   │   ├── providerIconAssetCache.md
+│   │   ├── providerIconBuiltinSelection.md
+│   │   ├── providerIconCustomSources.md
+│   │   ├── providerIconEntryResolution.md
+│   │   └── providerIconTypes.md
 │   ├── markdown/
 │   │   ├── index.md
 │   │   ├── MarkdownRenderer.md

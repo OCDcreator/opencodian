@@ -57,6 +57,7 @@ function createComposerSendContext(
 ): MockedComposerSendContextPort {
   return {
     getDraftContextItems: jest.fn().mockReturnValue([]),
+    resolvePersistentContextItems: jest.fn().mockResolvedValue([]),
     clearDraftContextItems: jest.fn().mockImplementation(() => {
       callOrder.push('clearDraftContextItems');
     }),
@@ -264,6 +265,71 @@ describe('MessageSendPreparationService', () => {
       'scrollToBottom',
       'applyFallbackConversationTitle',
       'startAiConversationTitleGeneration',
+    ]);
+  });
+
+  it('resolves persistent conversation context paths and merges them with draft context', async () => {
+    const conversation = createConversation();
+    conversation.externalContextPaths = ['notes/guide.md', 'notes/example.md'];
+
+    const persistentContextItem = createPromptContextItem({
+      id: 'context-persistent',
+      kind: 'file',
+      path: 'notes/guide.md',
+      label: 'guide.md',
+      lineRange: undefined,
+      textSnapshot: undefined,
+    });
+    const duplicatePersistentItem = createPromptContextItem({
+      id: 'context-persistent-duplicate',
+      kind: 'file',
+      path: 'notes/example.md',
+      label: 'example.md',
+      lineRange: undefined,
+      textSnapshot: undefined,
+    });
+    const draftContextItem = createPromptContextItem({
+      id: 'context-draft',
+      kind: 'current_note',
+      path: 'notes/example.md',
+      label: 'example.md',
+      lineRange: undefined,
+      textSnapshot: undefined,
+    });
+    const host = createHost(conversation);
+    const composerSendContext = createComposerSendContext([], {
+      getDraftContextItems: jest.fn().mockReturnValue([draftContextItem]),
+      resolvePersistentContextItems: jest.fn().mockResolvedValue([
+        persistentContextItem,
+        duplicatePersistentItem,
+      ]),
+    });
+    const service = new MessageSendPreparationService(host, composerSendContext);
+
+    const result = await service.prepareMessageSend({ content: 'Hello' });
+
+    expect(composerSendContext.resolvePersistentContextItems).toHaveBeenCalledWith([
+      'notes/guide.md',
+      'notes/example.md',
+    ]);
+    expect(result?.draftContextItems).toEqual([draftContextItem]);
+    expect(result?.contextItems).toEqual([
+      persistentContextItem,
+      draftContextItem,
+    ]);
+    expect(result?.userMessage.contextAttachments).toEqual([
+      {
+        kind: 'file',
+        path: 'notes/guide.md',
+        label: 'guide.md',
+        mime: 'text/markdown',
+      },
+      {
+        kind: 'current_note',
+        path: 'notes/example.md',
+        label: 'example.md',
+        mime: 'text/markdown',
+      },
     ]);
   });
 

@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchDebugFinalLogPlanFromTabId } from '../../../../src/features/chat/services/TrailingAssistantPatchDebugLogHelper';
+import { buildTrailingAssistantPatchDebugFinalLogPlanFromTabId } from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
 
 describe('TrailingAssistantPatchDebugLogHelper', () => {
   it('builds completion debug final logs from tab id and payload plan', () => {

@@ -3,7 +3,7 @@ import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
-} from '../../../../src/features/chat/services/TrailingAssistantPatchDebugLoggingContextHelper';
+} from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
 
 function createMessage(
   overrides: Partial<ChatMessage> & Pick<ChatMessage, 'id'>,

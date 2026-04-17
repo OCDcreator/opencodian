@@ -28,6 +28,7 @@ export interface TabActivationRuntimeHostProviderHost {
   setCurrentConversation(conversation: Conversation | null): void;
   setCurrentConversationRevertState(revertState: ConversationRevertState): void;
   setOpenCodeSessionId(sessionId: string): void;
+  applyConversationSessionSettings(conversation: Conversation | null): void;
   clearPendingQuestionsForTab(tabId: TabId | null): void;
   resetTabSessionState(tabId: TabId | null, sessionId: string | null): void;
   clearTabSessionState(tabId: TabId | null): void;
@@ -52,6 +53,6 @@ export function createTabActivationRuntimeViewHostFactoryHost(
 
 - `OpenCodianView` 只保留扁平 activation/runtime seam 的 late-bound 实现
 - `TabActivationRuntimeViewHostFactory` 自身负责 conversation-sync fingerprint / loop-control regrouping
-- `TabActivationRuntimeHostProvider` 只负责重新分组，不新增业务逻辑
+- `TabActivationRuntimeHostProvider` 只负责重新分组，不新增业务逻辑；conversation session settings runtime reapply 也只是作为 conversation-state port 的一部分继续透传
 - `TabActivationRuntimeViewHostFactory` 继续负责 shared activation runtime host assembly
 - `TabActivationRuntimeHostAdapter` 继续负责派生 activation / conversation-state / runtime-state bridge hosts

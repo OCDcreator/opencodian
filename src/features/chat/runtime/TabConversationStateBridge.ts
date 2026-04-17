@@ -22,6 +22,7 @@ export interface TabConversationStateBridgeHost {
   setCurrentConversation(conversation: Conversation | null): void;
   setCurrentConversationRevertState(revertState: ConversationRevertState): void;
   setOpenCodeSessionId(sessionId: string): void;
+  applyConversationSessionSettings(conversation: Conversation | null): void;
   clearPendingQuestionsForTab(tabId: TabId | null): void;
   resetTabSessionState(tabId: TabId | null, sessionId: string | null): void;
   clearTabSessionState(tabId: TabId | null): void;
@@ -54,6 +55,7 @@ export class TabConversationStateBridge {
     }
 
     this.host.setOpenCodeSessionId(conversation.openCodeSessionId);
+    this.host.applyConversationSessionSettings(conversation);
 
     if (previousSessionId !== conversation.openCodeSessionId) {
       this.host.clearPendingQuestionsForTab(tabId);
@@ -70,6 +72,7 @@ export class TabConversationStateBridge {
 
   clearActiveConversation(tabId: TabId | null): void {
     this.host.setCurrentConversation(null);
+    this.host.applyConversationSessionSettings(null);
     this.host.stopConversationSyncLoop();
     this.host.clearTabSessionState(tabId);
     this.host.clearPendingQuestionsForTab(tabId);

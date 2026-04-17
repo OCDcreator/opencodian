@@ -5,7 +5,7 @@
 
 ## 概述
 
-定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组等。供 `ModelConfigService` 和 `OpencodeConfigManager` 读写 OpenCode 原生配置时使用。类型设计允许完整配置与 provider 级配置保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
+定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、结构化 agent / command / compaction 配置，以及 OpenCode 仍兼容的 deprecated `mode` / top-level `tools` 字段。供 `ModelConfigService` 和 `OpencodeConfigManager` 读写 OpenCode 原生配置时使用。类型设计允许完整配置与 provider 级配置保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
 
 ## 导入关系
 
@@ -25,15 +25,22 @@
 | `OpencodeProviderConfig` | 提供商配置（`npm?`, `name?`, `options?`, `models?`, `[key: string]: unknown`） |
 | `OpencodePluginOptions` | `Record<string, unknown>` — 插件选项 |
 | `OpencodePluginSpec` | `string \| [string, OpencodePluginOptions]` — 插件声明格式 |
+| `OpencodeAgentMode` | agent 模式（`'primary' \| 'subagent' \| 'all'`） |
+| `OpencodeAgentConfig` | 结构化 agent 配置（`description?`, `mode?`, `model?`, `prompt?`, `temperature?`, `top_p?`, `steps?`, `tools?`, `permission?`, `color?`, `hidden?`, `disable?`, `options?`） |
+| `OpencodeAgentConfigRecord` | `Record<string, OpencodeAgentConfig>` — 原生 / deprecated agent map |
+| `OpencodeCommandConfig` | 结构化命令配置（`template?`, `description?`, `agent?`, `subtask?`, `model?`, `temperature?`, `top_p?`） |
+| `OpencodeCommandConfigRecord` | `Record<string, OpencodeCommandConfig>` — 命令 map |
+| `OpencodeCompactionConfig` | 压缩配置（`auto?`, `prune?`, `reserved?`） |
+| `OpencodeToolConfig` | `Record<string, boolean>` — top-level 工具开关 |
 | `OpencodeModelConfigSubset` | 模型相关配置子集（`model?`, `small_model?`, `provider?`, `enabled_providers?`, `disabled_providers?`） |
-| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `[key: string]: unknown`） |
+| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `compaction?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
 
 ## 核心逻辑
 
 ### 配置层级
 
 - `OpencodeModelConfigSubset` — 仅模型/提供商相关字段，供 `ModelConfigService` 局部读写
-- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`$schema` 等顶层字段
+- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`compaction`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
 
 ### 插件声明格式
 
@@ -74,7 +81,7 @@
 
 ## 关键方法
 
-无运行时方法，仅类型导出。源码约 44 行。
+无运行时方法，仅类型导出。源码约 80 行。
 
 ## 数据流
 
@@ -82,6 +89,7 @@
 2. `ModelConfigService` 读取模型子集 → `OpencodeModelConfigSubset`
 3. `PluginManagementService` 读写 `plugin` 数组 → `OpencodePluginSpec[]`
 4. 写回时保留未知字段（索引签名透传）
+5. `mode` / `tools` 继续保留类型，供 `OpencodeConfigManager` 在 native `agent` 辅助读写之外兼容旧项目配置
 
 ## 与其他模块的交互
 
@@ -116,11 +124,40 @@
     }
   },
   "enabled_providers": ["anthropic"],
+  "default_agent": "build",
+  "compaction": {
+    "auto": true,
+    "reserved": 10000
+  },
+  "command": {
+    "test": {
+      "template": "Run the full test suite",
+      "agent": "build"
+    }
+  },
   "permission": { "*": "ask" },
   "plugin": ["oh-my-opencode"],
-  "agent": {}
+  "agent": {
+    "build": {
+      "description": "Primary build agent",
+      "mode": "primary",
+      "steps": 12
+    }
+  },
+  "mode": {
+    "legacy-plan": {
+      "description": "Deprecated legacy mode entry"
+    }
+  },
+  "tools": {
+    "legacy-tool": false
+  }
 }
 ```
+
+### command-local sampling patch
+
+`OpencodeCommandConfig` 里的 `temperature?` / `top_p?` 在 OpenCodian 内部表示“命令级 sampling patch”。`OpencodeConfigManager.upsertCommandConfig()` 会消费它们，并把真实持久化落到一个 command-owned hidden agent，而不是把这两个字段长期保留在 native OpenCode `command` schema 里。
 
 ## 注意事项
 
@@ -142,4 +179,9 @@
 | `disabled_providers` | `string[]?` | 禁用的提供商列表 |
 | `permission` | `PermissionConfig \| PermissionAction?` | 权限配置 |
 | `plugin` | `OpencodePluginSpec[]?` | 插件列表 |
-| `agent` | `Record<string, unknown>?` | 代理配置 |
+| `agent` | `Record<string, OpencodeAgentConfig>?` | 代理配置 |
+| `command` | `Record<string, OpencodeCommandConfig>?` | 命令配置；OpenCodian 会消费 `temperature` / `top_p` patch 并转换成 command-owned hidden agent |
+| `default_agent` | `string?` | 默认 primary agent |
+| `compaction` | `OpencodeCompactionConfig?` | 压缩配置 |
+| `mode` | `Record<string, OpencodeAgentConfig>?` | deprecated 旧 agent map，读写 helper 仍会导入 |
+| `tools` | `Record<string, boolean>?` | top-level 工具开关，helper 会原样保留 |

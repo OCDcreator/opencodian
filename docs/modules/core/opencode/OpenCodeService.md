@@ -149,6 +149,8 @@
 
 默认会话指针现在由 `sessionLifecycle` 持有；调用方如果不显式传 `options.sessionId`，多数接口仍会落回当前 session，只是状态所有权不再直接留在 `OpenCodeService` 主类里。与 session tree/share/command/part 编辑有关的更厚 control surface 则继续落在 `sessionControl`，避免 `OpenCodeService` 再次直接编排这条链。
 
+`runSessionCommand()` 公开 wrapper 现在还接受一份可选的 placeholder runtime context，但 template expansion 仍委托给 `sessionControl` 内的 `runSessionCommand()` seam；`OpenCodeService` 自己不接管 slash command template 语义。
+
 ### Prompt 组装与 SDK/legacy 分流
 
 #### Request-part serializer

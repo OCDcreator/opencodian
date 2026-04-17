@@ -16,6 +16,8 @@ import {
   getInputPanelThemeIdForLiquidGlassAdapter,
   getLiquidGlassAdapterIdForInputPanelTheme,
   normalizeBelowHeaderTabBarLayout,
+  normalizeChatFontSizePx,
+  normalizeCompactionReservedTokens,
   normalizeDisabledModelRefs,
   normalizeGlassRefractionInputPanelThemeId,
   normalizeInputPanelActionButtonStyleId,
@@ -172,6 +174,8 @@ import {
       expect(DEFAULT_SETTINGS.server.auth.type).toBe('none');
       expect(DEFAULT_SETTINGS.enableBlocklist).toBe(true);
       expect(DEFAULT_SETTINGS.allowExternalAccess).toBe(false);
+      expect(DEFAULT_SETTINGS.autoCompactionEnabled).toBe(true);
+      expect(DEFAULT_SETTINGS.compactionReservedTokens).toBe(10000);
       expect(DEFAULT_SETTINGS.permissionMode).toBe('yolo');
       expect(DEFAULT_SETTINGS.modelSourceMode).toBe('merge');
       expect(DEFAULT_SETTINGS.defaultProvider).toBe('anthropic');
@@ -186,6 +190,7 @@ import {
       expect(DEFAULT_SETTINGS.tabBarPosition).toBe('below-header');
       expect(DEFAULT_SETTINGS.belowHeaderTabBarLayout).toBe('grid');
       expect(DEFAULT_SETTINGS.enableAutoScroll).toBe(true);
+      expect(DEFAULT_SETTINGS.chatFontSizePx).toBe(13);
       expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
       expect(DEFAULT_SETTINGS.inputPanelTheme).toBe('preset');
       expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
@@ -320,6 +325,20 @@ import {
         questionCardPosition: 'inline',
         showAnsweredQuestionCards: true,
       });
+    });
+  });
+
+  describe('session defaults normalization', () => {
+    it('normalizes reserved compaction tokens to a positive integer fallback', () => {
+      expect(normalizeCompactionReservedTokens(12000.7)).toBe(12001);
+      expect(normalizeCompactionReservedTokens(0)).toBe(DEFAULT_SETTINGS.compactionReservedTokens);
+      expect(normalizeCompactionReservedTokens('12000')).toBe(DEFAULT_SETTINGS.compactionReservedTokens);
+    });
+
+    it('normalizes chat font size to the supported integer range', () => {
+      expect(normalizeChatFontSizePx(15.2)).toBe(15);
+      expect(normalizeChatFontSizePx(9)).toBe(DEFAULT_SETTINGS.chatFontSizePx);
+      expect(normalizeChatFontSizePx('15')).toBe(DEFAULT_SETTINGS.chatFontSizePx);
     });
   });
 

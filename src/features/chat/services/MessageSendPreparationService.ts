@@ -5,6 +5,7 @@ import type {
 } from '../../../core/types';
 import type { EffortLevel, ThinkingBudget } from '../../../core/types/settings';
 import { buildContextAttachment } from '../../../shared';
+import { getPromptContextTargetKey } from '../composerContext';
 import type { TabId } from '../tabs';
 import type { ComposerSendContextPort } from './ComposerContextViewFacade';
 
@@ -30,6 +31,7 @@ export interface PreparedMessageSend {
   conversation: Conversation;
   tabId: TabId;
   draftContextItems: PromptContextItem[];
+  contextItems: PromptContextItem[];
   modelOptions: SendMessageModelOptions;
   activeModelId?: string;
   userMessage: ChatMessage;
@@ -37,10 +39,10 @@ export interface PreparedMessageSend {
 
 export function buildOptimisticUserMessage(
   content: string,
-  draftContextItems: PromptContextItem[],
+  contextItems: PromptContextItem[],
   now: number = Date.now(),
 ): ChatMessage {
-  const contextAttachments = draftContextItems.map((item) => buildContextAttachment(item));
+  const contextAttachments = contextItems.map((item) => buildContextAttachment(item));
 
   return {
     id: `user-${now}`,
@@ -137,7 +139,11 @@ export class MessageSendPreparationService {
       return null;
     }
 
-    const userMessage = buildOptimisticUserMessage(options.content, draftContextItems);
+    const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(
+      conversation.externalContextPaths,
+    );
+    const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
+    const userMessage = buildOptimisticUserMessage(options.content, contextItems);
     this.host.resetBackgroundTaskIndicator(tabId);
     this.host.armBackgroundTaskIndicatorForUserMessage(userMessage, tabId);
     conversation.messages.push(userMessage);
@@ -159,6 +165,7 @@ export class MessageSendPreparationService {
       conversation,
       tabId,
       draftContextItems,
+      contextItems,
       modelOptions,
       activeModelId,
       userMessage,
@@ -178,5 +185,22 @@ export class MessageSendPreparationService {
 
   private isFirstUserMessage(conversation: Conversation): boolean {
     return conversation.messages.filter((message) => message.role === 'user').length === 1;
+  }
+
+  private mergeContextItems(
+    persistentContextItems: PromptContextItem[],
+    draftContextItems: PromptContextItem[],
+  ): PromptContextItem[] {
+    const itemsByTarget = new Map<string, PromptContextItem>();
+
+    for (const item of persistentContextItems) {
+      itemsByTarget.set(getPromptContextTargetKey(item), item);
+    }
+
+    for (const item of draftContextItems) {
+      itemsByTarget.set(getPromptContextTargetKey(item), item);
+    }
+
+    return [...itemsByTarget.values()];
   }
 }

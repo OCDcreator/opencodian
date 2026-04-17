@@ -7,6 +7,7 @@
 
 `SendPipelineRuntime` 是第七阶段新增的发送子系统 runtime。它把原先仍挂在 `OpenCodianView.sendMessage()` 里的整条发送 ownership 搬成独立模块。第二刀后，它进一步变成发送子系统的 composition root，负责装配：
 
+- 在真正 prepare/send 之前先给 slash command runtime owner 一个拦截机会
 - 调用 `MessageSendPreparationService` 完成 send preflight / optimistic bootstrap
 - 发起真实 `openCodeService.sendMessage()` stream，并创建 streaming shell 与 `StreamController`
 - 把 stream loop / chunk router 交给 `StreamChunkRouter`
@@ -25,6 +26,7 @@ export class SendPipelineRuntime {
 
 同时它定义了三组协作边界：
 
+- `SendPipelineSlashCommandPort`
 - `SendPipelinePreparationPort`
 - `SendPipelineFinalizationPort`
 - `SendPipelineHost`
@@ -55,9 +57,11 @@ export class SendPipelineRuntime {
 
 ### stream bootstrap
 
+- 先调用可选的 `tryRunSlashCommand()`；如果输入已经被已知 slash command 消费，整个普通 streaming send path 直接短路
 - 先调用 `prepareMessageSend()` 获取 `PreparedMessageSend`
 - 如果 active tab runtime 在 preparation 之后已经失效，直接中止，不继续发流
 - 进入 streaming 状态后，再创建真实 stream、streaming shell 和 `StreamController`
+- transport 层收到的是 `PreparedMessageSend.contextItems`，也就是“持久路径 + 一次性 composer context”的合并结果，而不是单独的 draft context
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
 
 ### chunk router
@@ -101,6 +105,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 只保留 `createSendPipelineRuntimeHost()` 与 `sendMessage()` bridge
+- slash command 识别与 `runSessionCommand()` delegation 继续留在专用 `SlashCommandExecutionService`
 - `createSendPipelineRuntimeHost()` 现在把 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
 - `MessageSendPreparationService` 只负责“发之前能不能发、optimistic user message 何时落地、何时进入 streaming state”
 - `SendPipelineRuntime` 负责“真正发流，并装配 chunk router / local finalizer / post-stream finalizer”

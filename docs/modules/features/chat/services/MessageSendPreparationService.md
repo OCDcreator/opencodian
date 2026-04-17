@@ -9,6 +9,7 @@
 
 - 确认当前 conversation、active tab 与 tab runtime 是否可发送
 - 处理 foreground busy、server readiness、model catalog 与 selected model availability 检查
+- 在发送前解析 `Conversation.externalContextPaths`，并与一次性的 composer draft context 合并
 - 落地 optimistic user message，并保持现有 save / render / scroll 时序
 - 维持首条 user message 的 fallback title 与 AI title kickoff 条件
 - 在 stream 真正开始前，统一进入 streaming 状态并通过 composer send-context 端口清理 pending edited files / draft context items
@@ -42,7 +43,9 @@ export class MessageSendPreparationService {
 ### optimistic bootstrap 时序
 
 - 先完成 server readiness 与 model availability 检查
-- 再通过 `ComposerContextViewFacade.sendContext` 读取 context items，构造 optimistic user message，并把 context items 映射成 `contextAttachments`
+- 再通过 `ComposerContextViewFacade.sendContext` 读取 draft context，并把 `Conversation.externalContextPaths` 解析成持久 `PromptContextItem[]`
+- 两类上下文按 target key 合并：持久路径先铺底，同 target 的一次性 draft context 覆盖旧条目
+- optimistic user message 使用合并后的 context items 构造 `contextAttachments`
 - 保持既有顺序：
   - reset / arm background task indicator
   - append 到 conversation
@@ -65,7 +68,7 @@ export class MessageSendPreparationService {
   - 开始 context usage stream
 - `completePreparedStreamStart()` 只负责：
   - 清空 pending edited files
-  - 通过 composer send-context 端口清空 draft context items
+  - 通过 composer send-context 端口清空一次性的 draft context items（持久路径仍保留在 conversation 上）
 
 这让发送子系统可以把“真正的 stream 调用”下沉到 `SendPipelineRuntime`，同时把 preparation 阶段的状态时序单独测住。
 

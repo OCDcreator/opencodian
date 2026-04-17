@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../../src/core/types';
-import { buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext } from '../../../../src/features/chat/services/TrailingAssistantPatchExecutionTailExecutionPlanHelper';
+import { buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext } from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
 
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {

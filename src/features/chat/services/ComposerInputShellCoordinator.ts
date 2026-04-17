@@ -1,8 +1,12 @@
 import { setIcon } from 'obsidian';
 
+import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
 import { t } from '../../../i18n';
+import { createLogger } from '../../../shared';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
+const MAX_VISIBLE_SLASH_COMMAND_ITEMS = 8;
+const logger = createLogger('ComposerInputShellCoordinator');
 
 export interface ComposerInputShellCoordinatorHost {
   attachSessionTodo(container: HTMLElement): void;
@@ -23,6 +27,7 @@ export interface ComposerInputShellCoordinatorHost {
   isTabForegroundBusy(): boolean;
   showProcessingBlockedNotice(): void;
   submitMessage(message: string): void | Promise<void>;
+  loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
 }
@@ -35,8 +40,13 @@ export class ComposerInputShellCoordinator {
   private addContextBtnEl: HTMLButtonElement | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
+  private slashCommandMenuEl: HTMLElement | null = null;
   private layoutSyncFrameId: number | null = null;
   private inputContainerResizeObserver: ResizeObserver | null = null;
+  private slashCommandMenuCatalogItems: SlashCommandMenuItem[] | null = null;
+  private visibleSlashCommandMenuItems: SlashCommandMenuItem[] = [];
+  private selectedSlashCommandMenuItemIndex = 0;
+  private slashCommandMenuRunId = 0;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {}
 
@@ -63,14 +73,23 @@ export class ComposerInputShellCoordinator {
     });
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
+      void this.refreshSlashCommandMenu();
     });
     this.inputTextareaEl.addEventListener('keydown', (event) => {
+      if (this.tryHandleSlashCommandMenuKeydown(event)) {
+        return;
+      }
+
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         this.trySubmitCurrentInput();
       }
     });
     this.syncTextareaHeight();
+    this.slashCommandMenuEl = composerContentEl.createDiv({
+      cls: 'opencodian-slash-command-menu is-hidden',
+    });
+    this.slashCommandMenuEl.setAttribute('role', 'listbox');
 
     const composerFooterEl = composerContentEl.createDiv({ cls: 'opencodian-composer-footer' });
     this.addContextBtnEl = composerFooterEl.createEl('button', {
@@ -180,6 +199,11 @@ export class ComposerInputShellCoordinator {
     this.addContextBtnEl = null;
     this.sendBtnEl = null;
     this.inputTextareaEl = null;
+    this.slashCommandMenuEl = null;
+    this.slashCommandMenuCatalogItems = null;
+    this.visibleSlashCommandMenuItems = [];
+    this.selectedSlashCommandMenuItemIndex = 0;
+    this.slashCommandMenuRunId += 1;
   }
 
   private initializeLayoutMetrics(): void {
@@ -241,6 +265,214 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl.style.overflowY = this.inputTextareaEl.scrollHeight > COMPOSER_TEXTAREA_MAX_HEIGHT
       ? 'auto'
       : 'hidden';
+    this.scheduleLayoutSync();
+  }
+
+  private tryHandleSlashCommandMenuKeydown(event: KeyboardEvent): boolean {
+    if (this.visibleSlashCommandMenuItems.length === 0) {
+      return false;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.moveSlashCommandMenuSelection(1);
+      return true;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.moveSlashCommandMenuSelection(-1);
+      return true;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.clearSlashCommandMenu();
+      return true;
+    }
+
+    if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+      event.preventDefault();
+      this.applySelectedSlashCommandMenuItem();
+      return true;
+    }
+
+    return false;
+  }
+
+  private moveSlashCommandMenuSelection(delta: number): void {
+    if (this.visibleSlashCommandMenuItems.length === 0) {
+      return;
+    }
+
+    const itemCount = this.visibleSlashCommandMenuItems.length;
+    this.selectedSlashCommandMenuItemIndex =
+      (this.selectedSlashCommandMenuItemIndex + delta + itemCount) % itemCount;
+    this.renderSlashCommandMenu();
+  }
+
+  private applySelectedSlashCommandMenuItem(): void {
+    const item = this.visibleSlashCommandMenuItems[this.selectedSlashCommandMenuItemIndex];
+    if (!item || !this.inputTextareaEl) {
+      return;
+    }
+
+    const nextValue = `/${item.id} `;
+    this.inputTextareaEl.value = nextValue;
+    this.inputTextareaEl.focus();
+    this.inputTextareaEl.setSelectionRange(nextValue.length, nextValue.length);
+    this.clearSlashCommandMenu();
+    this.syncTextareaHeight();
+  }
+
+  private async refreshSlashCommandMenu(): Promise<void> {
+    const textarea = this.inputTextareaEl;
+    if (!textarea) {
+      return;
+    }
+
+    const query = this.getSlashCommandMenuQuery(textarea);
+    if (query === null) {
+      this.clearSlashCommandMenu();
+      return;
+    }
+
+    const currentRunId = ++this.slashCommandMenuRunId;
+
+    try {
+      const items = this.slashCommandMenuCatalogItems ?? await this.host.loadSlashCommandMenuItems();
+      if (currentRunId !== this.slashCommandMenuRunId) {
+        return;
+      }
+
+      this.slashCommandMenuCatalogItems = items;
+      this.visibleSlashCommandMenuItems = this.filterSlashCommandMenuItems(
+        this.slashCommandMenuCatalogItems,
+        query,
+      );
+      this.selectedSlashCommandMenuItemIndex = 0;
+      this.renderSlashCommandMenu();
+    } catch (error) {
+      if (currentRunId !== this.slashCommandMenuRunId) {
+        return;
+      }
+
+      logger.error('Failed to load slash command menu items:', error);
+      this.clearSlashCommandMenu();
+    }
+  }
+
+  private getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string | null {
+    const selectionStart = textarea.selectionStart ?? textarea.value.length;
+    const selectionEnd = textarea.selectionEnd ?? selectionStart;
+    if (selectionStart !== selectionEnd) {
+      return null;
+    }
+
+    const beforeCursor = textarea.value.slice(0, selectionStart);
+    if (!beforeCursor.startsWith('/') || beforeCursor.startsWith('//')) {
+      return null;
+    }
+
+    if (/\s/.test(beforeCursor)) {
+      return null;
+    }
+
+    return beforeCursor.slice(1);
+  }
+
+  private filterSlashCommandMenuItems(
+    items: SlashCommandMenuItem[],
+    query: string,
+  ): SlashCommandMenuItem[] {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return items.slice(0, MAX_VISIBLE_SLASH_COMMAND_ITEMS);
+    }
+
+    const prefixMatches: SlashCommandMenuItem[] = [];
+    const secondaryMatches: SlashCommandMenuItem[] = [];
+
+    for (const item of items) {
+      const normalizedId = item.id.toLowerCase();
+      const normalizedDescription = item.description.toLowerCase();
+      if (normalizedId.startsWith(normalizedQuery)) {
+        prefixMatches.push(item);
+        continue;
+      }
+
+      if (
+        normalizedId.includes(normalizedQuery)
+        || normalizedDescription.includes(normalizedQuery)
+      ) {
+        secondaryMatches.push(item);
+      }
+    }
+
+    return [...prefixMatches, ...secondaryMatches].slice(0, MAX_VISIBLE_SLASH_COMMAND_ITEMS);
+  }
+
+  private clearSlashCommandMenu(): void {
+    this.slashCommandMenuRunId += 1;
+    this.slashCommandMenuCatalogItems = null;
+    this.visibleSlashCommandMenuItems = [];
+    this.selectedSlashCommandMenuItemIndex = 0;
+    this.renderSlashCommandMenu();
+  }
+
+  private renderSlashCommandMenu(): void {
+    if (!this.slashCommandMenuEl) {
+      return;
+    }
+
+    this.slashCommandMenuEl.replaceChildren();
+
+    if (this.visibleSlashCommandMenuItems.length === 0) {
+      this.slashCommandMenuEl.addClass('is-hidden');
+      this.scheduleLayoutSync();
+      return;
+    }
+
+    this.slashCommandMenuEl.removeClass('is-hidden');
+
+    this.visibleSlashCommandMenuItems.forEach((item, index) => {
+      const itemEl = this.slashCommandMenuEl?.createEl('button', {
+        cls: 'opencodian-slash-command-menu-item',
+        attr: {
+          type: 'button',
+          role: 'option',
+          'aria-selected': index === this.selectedSlashCommandMenuItemIndex ? 'true' : 'false',
+        },
+      });
+      if (!itemEl) {
+        return;
+      }
+
+      if (index === this.selectedSlashCommandMenuItemIndex) {
+        itemEl.addClass('is-selected');
+      }
+
+      itemEl.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+      });
+      itemEl.addEventListener('click', () => {
+        this.selectedSlashCommandMenuItemIndex = index;
+        this.applySelectedSlashCommandMenuItem();
+      });
+
+      itemEl.createDiv({
+        cls: 'opencodian-slash-command-menu-title',
+        text: `/${item.id}`,
+      });
+
+      if (item.description) {
+        itemEl.createDiv({
+          cls: 'opencodian-slash-command-menu-description',
+          text: item.description,
+        });
+      }
+    });
+
     this.scheduleLayoutSync();
   }
 }

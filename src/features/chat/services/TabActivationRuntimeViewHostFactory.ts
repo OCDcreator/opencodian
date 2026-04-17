@@ -55,6 +55,7 @@ type TabActivationConversationStatePort = Pick<
   | 'setCurrentConversation'
   | 'setCurrentConversationRevertState'
   | 'setOpenCodeSessionId'
+  | 'applyConversationSessionSettings'
 >;
 
 type TabActivationQuestionTodoPort = Pick<
@@ -107,6 +108,9 @@ export function createTabActivationRuntimeViewHosts(
     },
     setOpenCodeSessionId: (sessionId) => {
       host.getConversationState().setOpenCodeSessionId(sessionId);
+    },
+    applyConversationSessionSettings: (conversation) => {
+      host.getConversationState().applyConversationSessionSettings(conversation);
     },
     clearPendingQuestionsForTab: (tabId) => {
       host.getQuestionTodoRuntime().clearPendingQuestionsForTab(tabId);

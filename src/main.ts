@@ -304,6 +304,10 @@ export default class OpenCodianPlugin extends Plugin {
       : null;
   }
 
+  async reapplyConversationSessionDefaults(): Promise<void> {
+    await this.getOpenCodianView()?.reapplyCurrentConversationSessionSettings();
+  }
+
   async toggleLiquidDiamondDemoForCurrentView(): Promise<void> {
     await this.activateView();
     this.getOpenCodianView()?.toggleLiquidDiamondDemo();
@@ -978,6 +982,7 @@ export default class OpenCodianPlugin extends Plugin {
       messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
       currentNote: initial?.currentNote,
       externalContextPaths: initial?.externalContextPaths ? [...initial.externalContextPaths] : undefined,
+      sessionSettings: initial?.sessionSettings ? JSON.parse(JSON.stringify(initial.sessionSettings)) as Conversation['sessionSettings'] : undefined,
       lastResponseAt: initial?.lastResponseAt,
       titleGenerationStatus: initial?.titleGenerationStatus,
     };

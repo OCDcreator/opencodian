@@ -209,6 +209,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `server` | `ServerConfig` | 本地模式 | 服务器配置 |
 | `enableBlocklist` | `boolean` | `true` | 启用命令黑名单 |
 | `allowExternalAccess` | `boolean` | `false` | 允许外部文件访问 |
+| `autoCompactionEnabled` | `boolean` | `true` | 默认启用会话自动压缩 |
+| `compactionReservedTokens` | `number` | `10000` | 默认保留给后续轮次的 token 数 |
 | `blockedCommands` | `PlatformBlockedCommands` | 预定义 | 平台黑名单 |
 | `permissionMode` | `PermissionMode` | `'yolo'` | 权限模式 |
 | `autoRestartOnPermissionChange` | `boolean` | `false` | 权限变更自动重启 |
@@ -237,6 +239,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `tabBarPosition` | `TabBarPosition` | `'below-header'` | 标签栏位置 |
 | `belowHeaderTabBarLayout` | `BelowHeaderTabBarLayout` | `'grid'` | 下方标签布局 |
 | `enableAutoScroll` | `boolean` | `true` | 启用自动滚动 |
+| `chatFontSizePx` | `number` | `13` | 聊天正文的默认字体大小 |
 | `chatScrollMode` | `ChatScrollMode` | `'sticky-mask'` | 滚动模式 |
 | `inputPanelTheme` | `InputPanelThemeId` | `'preset'` | 输入面板主题 |
 | `inputPanelGlassRefraction` | `InputPanelGlassRefractionSettings` | 默认 | 玻璃折射设置 |
@@ -284,6 +287,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 - 颜色和字重现在也会被单独校验，不再只是“数字能过就行”
 - `inputPanelGlassRefractionGlassDefaultsVersion` 用于版本化默认值迁移
 - Windows 上 `getBashToolBlockedCommands()` 合并 unix + windows 两套黑名单
+- `normalizeCompactionReservedTokens()` 会把值归一化为正整数；无效输入回退到默认 `10000`
+- `normalizeChatFontSizePx()` 会把值归一化到受支持的整数范围；无效输入回退到默认 `13`
 - `hiddenSlashCommands` 存储用户隐藏的斜杠命令 ID
 - `modelAvailabilitySectionOpen` / `modelToolsSectionOpen` 属于设置页 UI 状态，和 `settingsPanelScrollTop` 一样会被持久化
 - 归一化函数设计原则：未知值回退到默认值，而非报错

@@ -11,6 +11,10 @@ import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
 import {
+  buildVisibleSlashCommandMenuItems,
+  mergeSlashCommandCatalog,
+} from '../../core/config/slashCommandCatalog';
+import {
   type SessionActivityStatus,
 } from '../../core/opencode';
 import {
@@ -205,6 +209,10 @@ import {
   type ConversationUserMessageRenderFrame,
 } from './services/ConversationRenderService';
 import {
+  ConversationSessionSettingsCoordinator,
+  type ConversationSessionSettingsCoordinatorHost,
+} from './services/ConversationSessionSettingsCoordinator';
+import {
   ConversationSessionSignalRuntime,
   type ConversationSessionSignalRuntimeHost,
 } from './services/ConversationSessionSignalRuntime';
@@ -282,6 +290,10 @@ import {
   type SessionTodoCoordinator,
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
+import {
+  type SlashCommandExecutionHost,
+  SlashCommandExecutionService,
+} from './services/SlashCommandExecutionService';
 import {
   createTabActivationRuntimeViewHostFactoryHost,
   type TabActivationRuntimeHostProviderHost,
@@ -374,6 +386,7 @@ interface OpenCodianViewSurfaceRuntimeWiring {
   chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   composerInputShellCoordinator: ComposerInputShellCoordinator;
   inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
+  conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   composerContextViewFacade: ComposerContextViewFacade;
   tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
   persistentAssistantNoticeService: PersistentAssistantNoticeService;
@@ -572,6 +585,7 @@ export class OpenCodianView extends ItemView {
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionRuntimeServices: QuestionRuntimeServices;
   private sendPipelineRuntime: SendPipelineRuntime;
+  private conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   private composerContextViewFacade: ComposerContextViewFacade;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
 
@@ -613,8 +627,30 @@ export class OpenCodianView extends ItemView {
       showConversationHistory: (event) => {
         this.conversationHistoryActionsCoordinator.show(event);
       },
+      openConversationSessionSettings: () => {
+        this.conversationSessionSettingsCoordinator.openCurrentConversationSettings();
+      },
       openSettings: () => {
         this.openPluginSettingsPreservingScroll();
+      },
+    };
+  }
+
+  private createConversationSessionSettingsCoordinatorHost():
+  ConversationSessionSettingsCoordinatorHost {
+    return {
+      app: this.app,
+      getCurrentConversation: () => this.currentConversation,
+      getSessionSettingsDefaults: () => ({
+        autoCompactionEnabled: this.plugin.settings.autoCompactionEnabled,
+        compactionReservedTokens: this.plugin.settings.compactionReservedTokens,
+        chatFontSizePx: this.plugin.settings.chatFontSizePx,
+      }),
+      getChatContainerEl: () => this.chatContainerEl,
+      getOpencodeConfigManager: () => this.plugin.opencodeConfigManager,
+      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      showNotice: (message) => {
+        new Notice(message);
       },
     };
   }
@@ -708,6 +744,29 @@ export class OpenCodianView extends ItemView {
         new Notice(t('chat.tab.processingBlocked'));
       },
       submitMessage: (message) => this.sendPipelineRuntime.sendMessage(message),
+      loadSlashCommandMenuItems: async () => {
+        const configManager = this.plugin.opencodeConfigManager;
+        if (!configManager) {
+          return [];
+        }
+
+        const [runtimeCommandsResult, projectCommands, projectAgents] = await Promise.all([
+          this.plugin.openCodeService.sdk.command.list(),
+          configManager.getCommandConfig(),
+          configManager.getAgentConfig(),
+        ]);
+
+        const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
+        const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
+        return buildVisibleSlashCommandMenuItems(
+          mergeSlashCommandCatalog(
+            runtimeCommands,
+            projectCommands,
+            projectAgents,
+            hiddenCommandIds,
+          ),
+        );
+      },
       setComposerStackHeight: (stackHeight) => {
         this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
       },
@@ -1086,6 +1145,8 @@ export class OpenCodianView extends ItemView {
     this.chatSelectionControlsCoordinator = surfaceRuntime.chatSelectionControlsCoordinator;
     this.composerInputShellCoordinator = surfaceRuntime.composerInputShellCoordinator;
     this.inputPanelAppearanceCoordinator = surfaceRuntime.inputPanelAppearanceCoordinator;
+    this.conversationSessionSettingsCoordinator =
+      surfaceRuntime.conversationSessionSettingsCoordinator;
     this.composerContextViewFacade = surfaceRuntime.composerContextViewFacade;
     this.tabConversationSyncFingerprintRuntimePort =
       surfaceRuntime.tabConversationSyncFingerprintRuntimePort;
@@ -1181,6 +1242,9 @@ export class OpenCodianView extends ItemView {
     const conversationHistoryActionsCoordinator = new ConversationHistoryActionsCoordinator(
       this.createConversationHistoryActionsHost(titleGenerationService),
     );
+    const conversationSessionSettingsCoordinator = new ConversationSessionSettingsCoordinator(
+      this.createConversationSessionSettingsCoordinatorHost(),
+    );
 
     return {
       titleGenerationService,
@@ -1198,6 +1262,7 @@ export class OpenCodianView extends ItemView {
       inputPanelAppearanceCoordinator: new InputPanelAppearanceCoordinator(
         this.createInputPanelAppearanceCoordinatorHost(),
       ),
+      conversationSessionSettingsCoordinator,
       composerContextViewFacade,
       tabConversationSyncFingerprintRuntimePort:
         createTabConversationSyncFingerprintRuntimePort(
@@ -1463,10 +1528,14 @@ export class OpenCodianView extends ItemView {
       }),
       streamingInlineCardRenderer,
     );
+    const slashCommandExecutionService = new SlashCommandExecutionService(
+      this.createSlashCommandExecutionHost(conversationSyncBridgePorts),
+    );
     const sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       messageSendPreparationService,
       messageFinalizationService,
+      slashCommandExecutionService,
     );
 
     return {
@@ -1626,6 +1695,11 @@ export class OpenCodianView extends ItemView {
       },
       setOpenCodeSessionId: (sessionId) => {
         this.plugin.openCodeService.setSessionId(sessionId);
+      },
+      applyConversationSessionSettings: (conversation) => {
+        void this.conversationSessionSettingsCoordinator.applyConversationRuntimeState(
+          conversation,
+        );
       },
       clearPendingQuestionsForTab: (tabId) => {
         this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
@@ -1926,6 +2000,9 @@ export class OpenCodianView extends ItemView {
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
       syncBackgroundTaskStateFromConversation: (conversation) => {
         this.syncBackgroundTaskStateFromConversation(conversation);
+      },
+      reapplyConversationSessionVisualState: (conversation) => {
+        this.conversationSessionSettingsCoordinator.applyConversationVisualState(conversation);
       },
       renderMessages: (messages) => conversationRenderService.renderMessages(messages),
       getCurrentConversation: () => this.currentConversation,
@@ -2274,6 +2351,54 @@ export class OpenCodianView extends ItemView {
       },
       clearPendingEditedFiles: (tabId) => {
         this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId);
+      },
+    };
+  }
+
+  private createSlashCommandExecutionHost(
+    conversationSyncBridgePorts: ConversationSyncBridgePorts,
+  ): SlashCommandExecutionHost {
+    return {
+      ensureConversationReady: async () => {
+        if (!this.currentConversation) {
+          await this.createNewConversation();
+        }
+
+        return this.currentConversation;
+      },
+      getActiveTabId: () => this.getActiveTabId(),
+      ensureTabRuntime: (tabId) => Boolean(this.ensureTabRuntimeState(tabId)),
+      isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
+      notifyForegroundBusy: () => {
+        new Notice(t('chat.tab.processingBlocked'));
+      },
+      getServerAvailability: () => this.getServerAvailability(),
+      refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
+      ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
+      getProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
+      getRuntimeCommands: async () => {
+        const runtimeCommands = await this.plugin.openCodeService.sdk.command.list();
+        return Array.isArray(runtimeCommands) ? runtimeCommands : [];
+      },
+      getVaultPath: () => getVaultBasePath(this.app),
+      refreshActiveFocusContextPreview: () => {
+        this.composerContextViewFacade.refreshActiveFocusContextPreview();
+      },
+      getActiveFocusContextPreview: () =>
+        this.getTabRuntimeState(this.getActiveTabId())?.focusContextPreview ?? null,
+      runSessionCommand: (sessionId, input) =>
+        this.plugin.openCodeService.runSessionCommand(sessionId, input),
+      startConversationSyncLoop: () => {
+        conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
+      },
+      syncVisibleConversationInBackground: () =>
+        conversationSyncBridgePorts.getVisibleSyncFollowUp().syncVisibleConversationInBackground(),
+      notifySlashCommandFailed: (commandId, error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        new Notice(t('chat.slashCommand.executionFailed', {
+          command: commandId,
+          message,
+        }));
       },
     };
   }
@@ -2674,6 +2799,9 @@ export class OpenCodianView extends ItemView {
     for (const [cssVar, cssValue] of Object.entries(cssVariables)) {
       this.chatContainerEl.style.setProperty(cssVar, cssValue);
     }
+    this.conversationSessionSettingsCoordinator.applyConversationVisualState(
+      this.currentConversation,
+    );
 
     const glassRefractionCssVariables = getInputPanelGlassRefractionCssVariables(
       this.plugin.settings.inputPanelGlassRefraction,
@@ -2731,6 +2859,12 @@ export class OpenCodianView extends ItemView {
     }
 
     void this.conversationRenderService.rerenderConversationMessages(this.currentConversation);
+  }
+
+  public async reapplyCurrentConversationSessionSettings(): Promise<void> {
+    await this.conversationSessionSettingsCoordinator.applyConversationRuntimeState(
+      this.currentConversation,
+    );
   }
 
   /** Apply configured chat scroll mode to the messages container */

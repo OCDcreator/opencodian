@@ -25,6 +25,7 @@
 ## 核心类型 / 接口
 
 - `SessionContextUsageSnapshot`: active tab context-usage 浮层消费的 session token/cost 快照。
+- `SessionCommandTemplateContext`: `runSessionCommand()` 专用的 OpenCodian placeholder runtime 值，覆盖 vault path、当前笔记、当前选区、持久 external context paths 与会话标题。
 - `OpenCodeSessionControlSdk`: orchestrator 依赖的最小 session SDK 面，覆盖 fork/revert/diff、session tree/share/summarize，以及 message command/shell。
 - `OpenCodeSessionControlPartSdk`: part update/delete 的最小 SDK 面。
 - `OpenCodeSessionControlOrchestratorHost`: host seam，提供 SDK CRUD 开关、legacy HTTP helper、session info/messages/model catalog 读取，以及 warning/error 日志。
@@ -61,6 +62,8 @@ orchestrator 现在承接以下共享控制流：
 
 这些 API 目前仍以 SDK namespace 为主，不在 orchestrator 内重新发明 transport layer；它只负责把 session control / message-operation surface 聚到一起。
 
+其中 `runSessionCommand()` 现在还承担一个很窄的 runtime helper 责任：在真正调用 SDK `session.command()` 前，把 OpenCodian command template 里的 `{{vault_path}}`、`{{current_note_path}}`、`{{current_selection}}`、`{{external_context_paths}}`、`{{conversation_title}}` 展开为当前 runtime 文本，并且不把 helper-only context payload 继续透传给 SDK。
+
 ## 数据流
 
 ```mermaid
@@ -81,5 +84,6 @@ graph TD
 ## 注意事项
 
 - 不要把 fork/revert/diff、session share/summarize、message command/shell、part update/delete 再拆成多个薄 gateway；这些 API 共享同一块 session control / message-operation 语义。
+- command template placeholder expansion 继续留在 `runSessionCommand()` 所在的 session control seam；不要把这层 ownership 重新塞回 `OpenCodeService` 或 settings editor。
 - 不要在这里混入 question/permission negotiation 或 broad query gateway；那是 roadmap 的后续 queue。
 - 只读 diff 仍允许 SDK→legacy fallback；session mutation 与 message/part SDK wrappers 保持既有 transport 语义，不在这里引入额外回退分支。

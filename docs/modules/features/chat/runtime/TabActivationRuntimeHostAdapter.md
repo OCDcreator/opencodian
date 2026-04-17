@@ -18,6 +18,7 @@ export interface TabActivationRuntimeHostAdapterHost extends TabActivationBridge
   setCurrentConversation(conversation: Conversation | null): void;
   setCurrentConversationRevertState(...): void;
   setOpenCodeSessionId(sessionId: string): void;
+  applyConversationSessionSettings(conversation: Conversation | null): void;
   clearPendingQuestionsForTab(tabId: TabId | null): void;
   resetTabSessionState(tabId: TabId | null, sessionId: string | null): void;
   clearTabSessionState(tabId: TabId | null): void;
@@ -45,7 +46,7 @@ export function createTabActivationRuntimeBridgeHosts(
 ## 关键行为
 
 - `createTabActivationRuntimeBridgeHosts()` 复用既有 `createTabActivationBridgeHosts()`，继续让 `TabViewActivationBridge` 与 `TabConversationActivationBridge` 共享同一个 activation seam
-- 同一个 adapter 额外派生 `TabConversationStateBridgeHost` 与 `TabRuntimeStateBridgeHost`，把 conversation/session 写回与 tab stream-like 状态写回集中到单一 host-assembly 入口
+- 同一个 adapter 额外派生 `TabConversationStateBridgeHost` 与 `TabRuntimeStateBridgeHost`，把 conversation/session 写回、conversation session settings runtime reapply 与 tab stream-like 状态写回集中到单一 host-assembly 入口
 - `OpenCodianView` 因此不再维护三段平行的 bridge host 闭包，也不再直接维护完整 adapter host shape；P1 activation/runtime bridge host wiring 进一步下沉到 dedicated modules
 
 ## 与 `OpenCodianView` 的边界

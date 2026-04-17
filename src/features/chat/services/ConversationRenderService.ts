@@ -18,30 +18,20 @@ import {
   restoreElementScrollAfterRender,
 } from './ScrollManager';
 import {
-  emitTrailingAssistantPatchCompletionDebugLog,
-  emitTrailingAssistantPatchSkippedDebugLog,
-} from './TrailingAssistantPatchDebugLogEmitterHelper';
-import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
-} from './TrailingAssistantPatchDebugLoggingContextHelper';
-import {
-  type TrailingAssistantPatchExecutionPlan,
-} from './TrailingAssistantPatchExecutionPlanHelper';
-import { type TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
-import {
-  buildTrailingAssistantPatchSuccessPlanFromPlanningContext,
-} from './TrailingAssistantPatchSuccessPlanningContextPlanHelper';
-import {
-  buildTrailingAssistantPatchSuccessPlanningContextPlanSourceContract,
-} from './TrailingAssistantPatchSuccessPlanningContextPlanSourceContractHelper';
+  emitTrailingAssistantPatchCompletionDebugLog,
+  emitTrailingAssistantPatchSkippedDebugLog,
+} from './trailingAssistantPatchDebug';
 import {
   applyTrailingAssistantPatchTailState,
-} from './TrailingAssistantPatchTailStateApplierHelper';
-import {
+  buildTrailingAssistantPatchSuccessPlanFromPlanningContext,
+  buildTrailingAssistantPatchSuccessPlanningContextPlanSourceContract,
+  type TrailingAssistantPatchExecutionPlan,
+  type TrailingAssistantPatchSuccessPlan,
   withTrailingAssistantTurnBodyScope,
-} from './TrailingAssistantPatchTurnBodyScopeHelper';
+} from './trailingAssistantPatchExecution';
 
 export type {
   ConversationAssistantShellRenderPort,

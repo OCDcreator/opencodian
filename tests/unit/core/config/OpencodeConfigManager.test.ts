@@ -175,7 +175,7 @@ describe('OpencodeConfigManager permissions', () => {
   });
 });
 
-describe('OpencodeConfigManager plugin compatibility and paths', () => {
+describe('OpencodeConfigManager plugin compatibility', () => {
   describe('plugin config', () => {
     it('should update plugin config entries', async () => {
       await manager.updatePluginConfig([
@@ -244,9 +244,271 @@ describe('OpencodeConfigManager plugin compatibility and paths', () => {
       const config = await manager.read();
       expect(config.provider?.demo?.models?.['demo-model']?.name).toBe('Demo Model');
     });
+
+    it('round-trips agent, command, compaction, and default agent config fields', async () => {
+      await manager.write({
+        default_agent: 'build',
+        compaction: {
+          auto: true,
+          prune: true,
+          reserved: 16000,
+        },
+        command: {
+          test: {
+            template: 'Run the full test suite',
+            description: 'Run tests',
+            agent: 'build',
+            subtask: false,
+            model: 'anthropic/claude-3-5-sonnet-20241022',
+          },
+        },
+        agent: {
+          build: {
+            description: 'Build-focused primary agent',
+            mode: 'primary',
+            model: 'anthropic/claude-3-5-sonnet-20241022',
+            prompt: 'You are the build agent.',
+            temperature: 0.2,
+            top_p: 0.9,
+            steps: 12,
+            color: '#7c3aed',
+            permission: {
+              task: {
+                '*': 'ask',
+              },
+            },
+            tools: {
+              bash: true,
+              write: true,
+            },
+            options: {
+              reasoningSummary: 'auto',
+            },
+          },
+        },
+        formatter: {
+          biome: {
+            disabled: true,
+          },
+        },
+      });
+
+      const config = await manager.read();
+      expect(config).toEqual(expect.objectContaining({
+        default_agent: 'build',
+        compaction: {
+          auto: true,
+          prune: true,
+          reserved: 16000,
+        },
+        command: {
+          test: expect.objectContaining({
+            template: 'Run the full test suite',
+            agent: 'build',
+            subtask: false,
+          }),
+        },
+        agent: {
+          build: expect.objectContaining({
+            mode: 'primary',
+            steps: 12,
+            tools: expect.objectContaining({
+              bash: true,
+            }),
+          }),
+        },
+        formatter: {
+          biome: {
+            disabled: true,
+          },
+        },
+      }));
+    });
   });
 
-  describe('paths', () => {
+});
+
+describe('OpencodeConfigManager session agent command helpers', () => {
+  it('updates compaction and default agent config while preserving adjacent fields', async () => {
+    await manager.write({
+      default_agent: 'plan',
+      compaction: {
+        auto: true,
+        prune: true,
+        reserved: 10000,
+        strategy: 'token-budget',
+      },
+      formatter: {
+        biome: {
+          disabled: true,
+        },
+      },
+    });
+
+    await manager.updateCompactionConfig({
+      auto: false,
+      reserved: 18000,
+    });
+    await manager.updateDefaultAgent('  build  ');
+
+    let config = await manager.read();
+    expect(await manager.getCompactionConfig()).toEqual({
+      auto: false,
+      prune: true,
+      reserved: 18000,
+      strategy: 'token-budget',
+    });
+    expect(await manager.getDefaultAgent()).toBe('build');
+    expect(config.formatter).toEqual({
+      biome: {
+        disabled: true,
+      },
+    });
+
+    await manager.updateCompactionConfig(null);
+    await manager.updateDefaultAgent('   ');
+
+    config = await manager.read();
+    expect(config.compaction).toBeUndefined();
+    expect(config.default_agent).toBeUndefined();
+    expect(config.formatter).toEqual({
+      biome: {
+        disabled: true,
+      },
+    });
+  });
+
+  it('imports deprecated mode agents and preserves tool config fields during agent writes', async () => {
+    await manager.write({
+      mode: {
+        legacy: {
+          description: 'Legacy imported agent',
+          mode: 'primary',
+          tools: {
+            bash: false,
+          },
+          legacyNote: 'keep',
+        },
+        build: {
+          description: 'Legacy build agent',
+          mode: 'primary',
+        },
+      },
+      agent: {
+        build: {
+          description: 'Native build agent',
+          mode: 'primary',
+          tools: {
+            bash: true,
+            write: true,
+          },
+          nativeNote: 'keep',
+        },
+      },
+      tools: {
+        'legacy-tool': false,
+      },
+      formatter: {
+        biome: {
+          disabled: true,
+        },
+      },
+    });
+
+    expect(await manager.getAgentConfig()).toEqual({
+      legacy: expect.objectContaining({
+        description: 'Legacy imported agent',
+        legacyNote: 'keep',
+      }),
+      build: expect.objectContaining({
+        description: 'Native build agent',
+        nativeNote: 'keep',
+      }),
+    });
+
+    await manager.upsertAgentConfig(' build ', {
+      tools: {
+        edit: false,
+      },
+      temperature: 0.2,
+    });
+    await manager.removeAgentConfig('legacy');
+
+    const config = await manager.read();
+    expect(config.agent?.build).toEqual(expect.objectContaining({
+      description: 'Native build agent',
+      nativeNote: 'keep',
+      temperature: 0.2,
+      tools: {
+        bash: true,
+        write: true,
+        edit: false,
+      },
+    }));
+    expect(config.mode).toEqual({
+      build: {
+        description: 'Legacy build agent',
+        mode: 'primary',
+      },
+    });
+    expect(config.tools).toEqual({
+      'legacy-tool': false,
+    });
+    expect(config.formatter).toEqual({
+      biome: {
+        disabled: true,
+      },
+    });
+  });
+
+  it('updates command config entries while preserving command and top-level unknown fields', async () => {
+    await manager.write({
+      command: {
+        test: {
+          template: 'Run tests',
+          description: 'Run tests',
+          customPlaceholder: '{{vault_path}}',
+        },
+        fmt: {
+          template: 'Format files',
+        },
+      },
+      watcher: {
+        ignore: ['dist/**'],
+      },
+    });
+
+    await manager.upsertCommandConfig(' test ', {
+      description: 'Run the focused test suite',
+      agent: 'build',
+    });
+    await manager.removeCommandConfig('fmt');
+
+    const config = await manager.read();
+    expect(await manager.getCommandConfig()).toEqual({
+      test: {
+        template: 'Run tests',
+        description: 'Run the focused test suite',
+        customPlaceholder: '{{vault_path}}',
+        agent: 'build',
+      },
+    });
+    expect(config.command).toEqual({
+      test: {
+        template: 'Run tests',
+        description: 'Run the focused test suite',
+        customPlaceholder: '{{vault_path}}',
+        agent: 'build',
+      },
+    });
+    expect(config.watcher).toEqual({
+      ignore: ['dist/**'],
+    });
+  });
+
+});
+
+describe('OpencodeConfigManager paths', () => {
     it('should return correct config directory path', () => {
       const dir = manager.getConfigDir();
       expect(dir).toBe(path.join(testVaultPath, '.opencode'));
@@ -261,4 +523,3 @@ describe('OpencodeConfigManager plugin compatibility and paths', () => {
       expect(manager.getPluginDir()).toBe(path.join(testVaultPath, '.opencode', 'plugins'));
     });
   });
-});

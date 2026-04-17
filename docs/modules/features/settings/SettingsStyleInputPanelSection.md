@@ -25,7 +25,7 @@
 
 ### 参数区拆分
 
-- preset input 参数继续复用 `addNumericStyleControl()`，保持 baseline/reset 语义一致
+- preset input 参数继续复用来自 `settingsStyleControls.ts` 的 `addNumericStyleControl()` seam，保持 baseline/reset 语义一致
 - glass refraction 参数与 SVG filter reset 仍在本 owner 内处理，因为它们与 theme-family 切换耦合
 - liquid glass 参数列表委托给 `SettingsStyleLiquidGlassInputControls`
 
@@ -41,6 +41,7 @@
 ## 与其他模块的交互
 
 - `SettingsStyleSection.ts`: 持有 style section 的整体 lifecycle，并把 input subsection 装配委托给本 owner
+- `settingsStyleControls.ts`: 提供 numeric control / style-control / help-button 合约，供本 owner 复用
 - `SettingsStyleLiquidGlassInputControls.ts`: 负责 liquid glass adapter 参数表单与帮助按钮入口
 - `core/types/settings.ts`: 提供 input theme family/variant 与 glass-refraction 默认值、归一化规则
 - `utils/glass/index.ts`: 提供当前可用的 liquid glass adapters 目录

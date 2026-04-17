@@ -84,6 +84,7 @@ class StorageService {
 - `openCodeSessionId`
 - `currentNote`
 - `externalContextPaths`
+- `sessionSettings`
 - `messages`
 
 也就是说，保存时不是只存摘要，而是把完整消息数组一起落盘。
@@ -93,7 +94,7 @@ class StorageService {
 - `loadFullConversation(id)` 返回完整 `Conversation`
 - `loadConversation(id)` 只返回 `ConversationMeta`
 
-`loadFullConversation()` 在旧文件缺少 `messages` 时会自动补成空数组；`loadConversation()` 的 `messageCount` 则优先取 `messages.length`，没有时才回退到文件里的 `messageCount`。
+`loadFullConversation()` 在旧文件缺少 `messages` 时会自动补成空数组，并会顺手归一化 `sessionSettings`；`loadConversation()` 的 `messageCount` 则优先取 `messages.length`，没有时才回退到文件里的 `messageCount`。
 
 ### 会话列表与删除
 
