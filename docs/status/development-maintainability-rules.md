@@ -18,6 +18,7 @@
 - Do not add thin helper / adapter / provider / factory modules unless the module is reused in 3+ places or isolates a high-risk dependency.
 - Do not move complexity sideways into more files without reducing ownership, import surface, or test responsibility.
 - Prefer existing service / coordinator / runtime owners before creating new files.
+- For model-config modal UI work, prefer the existing `ModelConfigProviderEditor.ts` / `ModelConfigModelListEditor.ts` owners before growing `ModelConfigModal.ts` again.
 
 ## Feature Work Checklist
 

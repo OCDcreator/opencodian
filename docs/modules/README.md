@@ -188,7 +188,9 @@ docs/modules/
 │       ├── index.md
 │       ├── LiquidGlassSettingHelpModal.md
 │       ├── ModelConfigJsonModal.md
+│       ├── ModelConfigModelListEditor.md
 │       ├── ModelConfigModal.md
+│       ├── ModelConfigProviderEditor.md
 │       ├── ModelPickerModal.md
 │       ├── OpencodeConfigModal.md
 │       ├── OpenCodianSettings.md

@@ -24,7 +24,7 @@
   - `ModelConfigModal.ts` line count and private method surface drop materially.
   - Behavior is preserved with focused tests plus full lint/typecheck/test/build.
 
-### [NEXT] M2 - ModelConfigModal provider and model editor coarse extraction
+### [DONE] M2 - ModelConfigModal provider and model editor coarse extraction
 
 - **Lane**: Settings / model config modal UI ownership
 - **Goal**: Move provider editor sections and model card/list editing into one or two cohesive editor owners while keeping `ModelConfigModal` as shell and save orchestrator.
@@ -41,7 +41,7 @@
   - `ModelConfigModal.ts` becomes a clear orchestration shell.
   - Provider/model editor owners are cohesive and not thin wrappers.
 
-### [QUEUED] M3 - TrailingAssistantPatch helper defragmentation
+### [NEXT] M3 - TrailingAssistantPatch helper defragmentation
 
 - **Lane**: Chat service defragmentation
 - **Goal**: Consolidate the many tiny `TrailingAssistantPatch*Helper.ts` files into a few semantic packages without moving code back into `OpenCodianView`.

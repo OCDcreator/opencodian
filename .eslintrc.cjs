@@ -11,6 +11,7 @@ const justifiedMaxLinesFiles = [
   'src/features/chat/liquidDiamondDemo.ts',
   'src/features/chat/liquidDiamondDemoWebgl.ts',
   'src/features/settings/ModelConfigModal.ts',
+  'src/features/settings/ModelConfigProviderEditor.ts',
   'src/features/settings/SettingsModelCatalogPresenter.ts',
   'src/features/settings/SettingsStyleSection.ts',
   'src/features/settings/modelConfigWorkspace.ts',
