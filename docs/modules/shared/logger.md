@@ -5,7 +5,7 @@
 
 ## 概述
 
-结构化日志工具模块。通过 `createLogger(scope)` 创建带前缀的 Logger 实例，支持 info/debug/warn/error 四个级别。维护最近 500 条日志的内存环形缓冲区，用于诊断导出。Debug 级别可通过 `setDebugLoggingEnabled()` 或 localStorage 开关控制；另外还能通过 `setInlineSerializedDebugLogArgsEnabled()` 把 debug 的对象参数改成内联 JSON 文本，方便直接在 Console 行内查看。
+结构化日志工具模块。通过 `createLogger(scope)` 创建带前缀的 Logger 实例，支持 info/debug/warn/error 四个级别。维护最近 500 条日志的内存环形缓冲区，用于诊断导出。Debug 级别可通过 `setDebugLoggingEnabled()` 或 localStorage 开关控制；另外还能通过 `setInlineSerializedDebugLogArgsEnabled()` 把 debug 的对象参数改成内联 JSON 文本，方便直接在 Console 行内查看。模块现在还提供 `getPerformanceTimestampMs()` / `formatDurationMs()`，供启动、server boot 和 conversation hydration 埋点复用统一的耗时取样与展示格式。
 
 ## 导入关系
 上游: 无（纯工具模块）
@@ -74,6 +74,8 @@ interface LogEntry {
 | `setInlineSerializedDebugLogArgsEnabled(enabled)` | 控制 debug 日志是否把对象参数内联序列化到消息文本 |
 | `getRecentLogEntries()` | 获取最近日志条目数组 |
 | `getRecentLogText()` | 获取最近日志的格式化文本（用于诊断导出） |
+| `getPerformanceTimestampMs()` | 统一读取高精度性能时间戳；浏览器 `performance.now()` 不可用时回退到 `Date.now()` |
+| `formatDurationMs(durationMs)` | 把耗时格式化为 `12.3ms` / `245ms` / `1.24s` 这类稳定文本 |
 
 ## 数据流
 
@@ -114,4 +116,3 @@ getRecentLogText()
 - `debug` 日志包含敏感信息时应注意过滤
 - `getRecentLogText()` 返回完整日志文本，可能较大
 - 环形缓冲区在插件重载后清空（模块级状态）
-

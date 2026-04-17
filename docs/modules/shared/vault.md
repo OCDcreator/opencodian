@@ -5,7 +5,7 @@
 
 ## 概述
 
-提供 Vault 相关的工具函数。当前仅包含 `getVaultBasePath()`，通过类型断言访问 Obsidian `VaultAdapter` 的 `basePath` 属性，获取 vault 的文件系统绝对路径。
+提供 Vault 相关的工具函数。当前仅包含 `getVaultBasePath()`，通过类型断言访问 Obsidian `VaultAdapter` 的 `basePath` 属性，获取 vault 的文件系统绝对路径。现在它还会容忍 `app.vault` 或 `adapter` 缺失的测试 / mock 场景，直接回退 `null`，避免启动日志和诊断路径在单元测试里提前抛错。
 
 ## 导入关系
 上游: `obsidian` (App)
@@ -21,7 +21,7 @@
 
 ```typescript
 function getVaultBasePath(app: App): string | null {
-  return (app.vault.adapter as unknown as { basePath?: string }).basePath ?? null;
+  return (app.vault?.adapter as unknown as { basePath?: string } | undefined)?.basePath ?? null;
 }
 ```
 
@@ -54,7 +54,7 @@ function getVaultBasePath(app: App): string | null {
 ## 注意事项
 
 - 使用了类型断言访问未公开的 API，未来 Obsidian 版本可能破坏
+- `app.vault` / `adapter` 缺失时会返回 `null`；调用方不能假定这里一定有值
 - 移动端 Obsidian 不支持文件系统路径，返回 `null`
 - 仅适用于桌面端 Obsidian（与 AGENTS.md 中 "Desktop only" 要求一致）
-
 

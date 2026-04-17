@@ -1,6 +1,5 @@
 /**
  * Storage Service
- * 
  * Manages persistence of conversations and settings.
  * Uses Obsidian's file system adapter for storage.
  */
@@ -8,6 +7,7 @@
 import { type App, normalizePath } from 'obsidian';
 
 import type { OpenCodianPlugin } from '../../main';
+import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../../shared';
 import type { ManagedServerState } from '../opencode/types';
 import {
   type ChatMessage,
@@ -27,6 +27,7 @@ const CORE_SETTINGS_BACKUP_FILE = `${CORE_SETTINGS_FILE}.bak`;
 const UI_SETTINGS_BACKUP_FILE = `${UI_SETTINGS_FILE}.bak`;
 const RUNTIME_FILE = `${STORAGE_DIR}/runtime.json`;
 const SETTINGS_SCHEMA_VERSION = 1;
+const logger = createLogger('StorageService');
 
 interface RuntimeState {
   managedServer: ManagedServerState | null;
@@ -85,7 +86,6 @@ export interface SettingsLoadResult {
   writable: boolean;
   shouldPersist: boolean;
 }
-
 const PERSISTED_UI_SETTINGS_KEYS = [
   'tabState',
   'settingsPanelScrollTop',
@@ -186,7 +186,8 @@ export class StorageService {
   /** Load full conversation with messages */
   async loadFullConversation(id: string): Promise<Conversation | null> {
     const path = `${SESSIONS_DIR}/${id}.json`;
-    
+    const startedAt = getPerformanceTimestampMs();
+
     try {
       const content = await this.app.vault.adapter.read(normalizePath(path));
       const data = JSON.parse(content) as Conversation & { messageCount?: number };
@@ -195,6 +196,14 @@ export class StorageService {
         data.messages = [];
       }
       data.sessionSettings = normalizeConversationSessionSettings(data.sessionSettings);
+      const elapsedMs = getPerformanceTimestampMs() - startedAt;
+      if (elapsedMs >= 120) {
+        logger.debug('Loaded full conversation from storage', {
+          id,
+          messageCount: data.messages.length,
+          elapsedMs: Math.round(elapsedMs),
+        });
+      }
       return data;
     } catch {
       return null;
@@ -225,11 +234,14 @@ export class StorageService {
 
   /** List all conversations */
   async listConversations(): Promise<ConversationMeta[]> {
+    const startedAt = getPerformanceTimestampMs();
     const files = await this.app.vault.adapter.list(normalizePath(SESSIONS_DIR));
     const conversations: ConversationMeta[] = [];
+    let scannedJsonFiles = 0;
 
     for (const file of files.files) {
       if (file.endsWith('.json')) {
+        scannedJsonFiles += 1;
         const id = file.split('/').pop()?.replace('.json', '');
         if (id) {
           const conv = await this.loadConversation(id);
@@ -241,9 +253,14 @@ export class StorageService {
     }
 
     // Sort by last response time (newest first)
-    return conversations.sort((a, b) => 
+    const sortedConversations = conversations.sort((a, b) => 
       (b.lastResponseAt ?? b.updatedAt) - (a.lastResponseAt ?? a.updatedAt)
     );
+    const elapsedMs = getPerformanceTimestampMs() - startedAt;
+    logger.debug(
+      `[startup] listConversations loaded ${sortedConversations.length}/${scannedJsonFiles} conversations from ${files.files.length} files in ${formatDurationMs(elapsedMs)}`,
+    );
+    return sortedConversations;
   }
 
   /** Delete a conversation */

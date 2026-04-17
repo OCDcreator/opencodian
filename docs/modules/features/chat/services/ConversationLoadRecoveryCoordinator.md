@@ -63,6 +63,7 @@ export class ConversationLoadRecoveryCoordinator {
 - 首开 bootstrap 会先 `loadConversations()`，再处理 persisted tab restore；restore 失败时仍会 reset tab state 并立即 `persistTabState({ flush: true })`
 - 没有 persisted tabs 时，仍优先复用第一条已有 conversation；只有完全没有会话时才调用 `createConversation()`
 - 这样 `OpenCodianView` 不再分别直连 create/load/bootstrap/delete 的多组 owner，只保留一条 conversation-lifecycle seam
+- 首开 bootstrap 现在还会输出 `[view-open] initializeFirstTab ...` 性能汇总，把 `loadConversations`、restore、create/activate 等关键步骤拆开记时，方便确认首屏慢在“会话列表恢复”还是“激活已选 tab”
 
 ### rewind / restore-rewind
 

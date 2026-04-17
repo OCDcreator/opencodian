@@ -69,6 +69,36 @@ function getTimestamp(): string {
   return `${hours}:${minutes}:${seconds}`;
 }
 
+export function getPerformanceTimestampMs(): number {
+  const performanceRef = globalThis.performance;
+  if (performanceRef && typeof performanceRef.now === 'function') {
+    try {
+      return performanceRef.now();
+    } catch {
+      return Date.now();
+    }
+  }
+
+  return Date.now();
+}
+
+export function formatDurationMs(durationMs: number): string {
+  if (!Number.isFinite(durationMs)) {
+    return '0ms';
+  }
+
+  if (durationMs >= 1000) {
+    const seconds = durationMs / 1000;
+    return `${seconds.toFixed(seconds >= 10 ? 1 : 2)}s`;
+  }
+
+  if (durationMs >= 100) {
+    return `${Math.round(durationMs)}ms`;
+  }
+
+  return `${durationMs.toFixed(durationMs >= 10 ? 1 : 2)}ms`;
+}
+
 function formatArgs(
   scope: string,
   args: unknown[],

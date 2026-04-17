@@ -13,6 +13,8 @@
 
 首开 tab bootstrap / persisted restore 决策现在已经转交给 `services/ConversationLoadRecoveryCoordinator.ts`；loaded-conversation 切换前的 cleanup 与 hydration preflight shell，则继续通过 `runtime/ConversationTransitionBridge.ts` 单独承接；其中消息容器的 rehydrating class / scroll-restore shell 由 `runtime/ConversationHydrationRenderBridge.ts` 提供底层 scroll/class bridge，conversation resolve / server-sync 判定进一步交给 `runtime/ConversationLoadRuntimeBridge.ts`，而消息装载完成后的 background-task rebuild / rerender / post-render outcome / baseline 则再下沉到 `runtime/ConversationHydrationOutcomeBridge.ts`。
 
+为了定位“恢复某个会话时明显卡顿”的问题，这个 service 现在还会输出 `[conversation-load]` 阶段日志，把 resolve、messages load、hydration outcome、tail refresh 等主要步骤拆开记时。
+
 ## 公开接口
 
 ```typescript
@@ -51,6 +53,7 @@ export class ConversationViewStateService {
 - loaded conversation 的 background-task runtime rebuild、消息重渲与 sync baseline 提交，现在先转交给 `ConversationHydrationOutcomeBridge`
 - loaded conversation 在消息重渲后的 background-task indicator、todo dock、question dock、status / pending question / session todo refresh，则由 `ConversationHydrationOutcomeBridge` 继续复用 `TabViewActivationBridge`
 - hydrate 尾段的 composer layout、model selector 与 context usage snapshot 刷新同样转交给 `TabViewActivationBridge`
+- 每次成功装载还会输出一条汇总日志，带上消息数和各阶段耗时，方便和 `StorageService` / `OpenCodianView.onOpen()` 的启动日志交叉比对
 
 ## 与 `OpenCodianView` 的边界
 

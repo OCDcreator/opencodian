@@ -49,6 +49,7 @@
 - `themeBackgroundDataUrlCache` / `themeBackgroundDataUrlRequests`: 聊天背景图 data URL 缓存与并发去重。
 - `chatAppearanceSaveTimeoutId` / `settingsUiStateSaveTimeoutId` / `modelRefreshFrameId`: 插件级节流与 UI 刷新调度句柄。
 - `settingsPersistenceWritable`: 启动恢复失败时切到只读保护，阻止默认值覆盖已损坏的设置文件。
+- `startupPerfTrace`: 最近一次插件启动埋点快照，记录分阶段耗时、运行状态和最慢嵌套步骤，用于冷启动诊断报告。
 
 ## 核心逻辑
 
@@ -56,19 +57,22 @@
 
 `onload()` 的顺序是有意排好的：
 
-1. 输出 `BUILD_ID` 到日志。
-2. 创建并初始化 `StorageService`。
-3. 调用 `loadSettings()`，完成设置归一化与历史字段迁移。
-4. 注册内置 glass adapter，并按设置启用/关闭调试日志。
-5. 设置 i18n locale。
-6. 从存储中读取上次保存的 `ManagedServerState`。
-7. 若 vault 下还没有 `.opencode` 配置，按当前 `permissionMode` 调用 `initializeOpencodeConfig()` 创建。
-8. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
-9. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
-10. 如果当前是本地模式且 `autoStart` 开启，则直接调用 `openCodeService.start()`。
-11. 记录一次 server snapshot。
-12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据。
-13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
+1. 记录启动首行：版本、`BUILD_ID` 和 vault 路径。
+2. 用 `measureStartupStep()` 给顶层和关键嵌套子步骤打点。
+3. 注册品牌 icon。
+4. 创建并初始化 `StorageService`。
+5. 调用 `loadSettings()`，完成设置归一化与历史字段迁移。
+6. 注册内置 glass adapter，并按设置启用/关闭调试日志。
+7. 设置 i18n locale。
+8. 从存储中读取上次保存的 `ManagedServerState`。
+9. 若 vault 下还没有 `.opencode` 配置，按当前 `permissionMode` 调用 `initializeOpencodeConfig()` 创建。
+10. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
+11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
+12. 如果当前是本地模式且 `autoStart` 开启，则直接调用 `openCodeService.start()`。
+13. 记录一次 server snapshot。
+14. 在注册视图之前执行 `loadConversations()`，只预热会话元数据。
+15. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
+16. 启动结束时输出一行汇总日志，并把最近一次 trace 暴露给诊断报告。
 
 这里没有调用 `OpenCodeService.initialize()`；实际运行时由 `main.ts` 自己决定是否启动服务。
 
@@ -153,7 +157,7 @@
   - 维护 data URL 缓存
   - 在保存失败时回滚外观并删除新导入的资源
 - 诊断导出：
-  - `buildDiagnosticReport()` 汇总 server 状态、关键设置与最近日志
+  - `buildDiagnosticReport()` 汇总 server 状态、关键设置、最近一次 startup perf trace 与最近日志
   - `writeDiagnosticLogFile()` 把报告写到指定目录
 
 ## 关键方法
@@ -171,6 +175,7 @@
 | `deleteConversation()` | 删除本地 conversation，并 best-effort 删除远端 session |
 | `buildDiagnosticReport()` | 生成调试报告文本 |
 | `writeDiagnosticLogFile()` | 将调试报告写成日志文件 |
+| `measureStartupStep()` | 统一记录启动阶段耗时、嵌套深度和失败状态 |
 
 ## 数据流
 
@@ -220,6 +225,7 @@ graph TD
 
 - `loadConversations()` 只加载元数据，不加载消息正文；正文由 `getConversationById()` 按需补读。
 - `onload()` 先预载会话，再注册 `OpenCodianView`，这是热重载/恢复链路的顺序约束。
+- 启动 trace 会同时记录顶层 phase 和嵌套子步骤；诊断报告里的总耗时只汇总顶层 phase，避免双重累计。
 - `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。
 - 当启动阶段判定设置不可恢复时，插件会进入持久化只读保护，并通过 `Notice` 告警，而不是把默认值写回磁盘。
 - `onunload()` 当前没有显式调用 `clearSettingsUiStateSaveTimer()`；卸载时只清除了 chat appearance timer 与 model refresh 帧请求。

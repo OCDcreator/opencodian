@@ -15,6 +15,8 @@
 
 因此，它既是进程管理器，也是“当前运行模式下服务是否可用”的状态机。
 
+最近为了诊断 Obsidian 冷启动和插件首开过慢，这个 owner 还补充了 server boot 耗时日志：`start()` 会汇总整次 manager 启动耗时，而本地 spawn 流程会额外拆出 `spawn` 和 `waitForHealthy` 两段，便于确认瓶颈是在拉起进程本身，还是在等待 sidecar 进入 health ready。
+
 ## 导入关系
 
 ```text
@@ -119,7 +121,13 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 
 如果启动失败，报错会带上最近的进程输出 tail，而不是只有泛化 timeout。
 
-本地成功启动后会弹出 `new Notice('OpenCode server started')`。
+本地成功启动后会先输出一条 startup 性能日志，汇总：
+
+- 从开始 spawn 到 ready 的总耗时
+- `spawn` 耗时
+- `waitForHealthy` 耗时
+
+随后才弹出 `new Notice('OpenCode server started')`。
 
 ### 停止与重启 (`stop` / `restart`)
 
@@ -188,6 +196,7 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 | `stop()` | 停止本地 managed 进程或终止被接管的 pid |
 | `restart()` | 顺序执行 stop + start |
 | `checkHealth(timeout?)` | 请求 `/global/health` |
+| `launchLocalServerRuntime()` | 本地模式下 spawn sidecar、等待健康，并输出本次 ready 耗时拆分 |
 
 ## 数据流
 

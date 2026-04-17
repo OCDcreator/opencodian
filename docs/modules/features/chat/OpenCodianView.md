@@ -23,7 +23,7 @@
 | `getViewType()` | 返回 `VIEW_TYPE_OPENCODIAN` |
 | `getDisplayText()` | 返回视图标题 `OpenCodian` |
 | `getIcon()` | 返回自定义图标 id `opencodian-app-icon`，供工作区标签头按当前主题显示品牌 Logo |
-| `onOpen()` | 组装 UI、注册事件、初始化第一个 tab |
+| `onOpen()` | 组装 UI、注册事件、初始化第一个 tab，并输出首开阶段耗时汇总 |
 | `onClose()` | 清理订阅、轮询、观察器、dropdown、demo 和 tab 运行时 |
 | `applyTabBarLayout()` | 根据设置把 tab bar 挂到 header / below-header / input / 外部竖排槽位 |
 | `applyChatAppearanceSettings()` | 应用主题 preset、聊天外观变量、自定义 CSS、per-conversation chat font-size CSS variable，以及输入面板 glass 状态 |
@@ -103,7 +103,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 ### 打开与关闭
 
-`onOpen()` 的顺序是固定的：
+`onOpen()` 的顺序是固定的，而且现在每一步都会记一条轻量性能埋点，方便区分“首开慢”到底卡在 UI 装配、信号订阅，还是首个 tab 初始化：
 
 1. `buildUI()`
 2. `initializeTabSystem()`，实际 tab manager / tab bar / layout 初始化由 `ConversationTabRuntimeCoordinator` 执行
@@ -112,6 +112,8 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
 6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新
 7. `initializeFirstTab()`
+
+结束时会输出一条 `[view-open]` 汇总日志，包含各阶段耗时拆分。
 
 `onClose()` 则会反向清理：
 

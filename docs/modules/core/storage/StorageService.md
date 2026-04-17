@@ -12,7 +12,7 @@
 - 运行时状态 JSON
 - 主题背景图片资产（通过内部 `ThemeBackgroundStorage` owner）
 
-源码里没有把这些数据写到 `.obsidian/plugins/opencodian/`；实际相对路径都是以 vault 根目录为基准。
+源码里没有把这些数据写到 `.obsidian/plugins/opencodian/`；实际相对路径都是以 vault 根目录为基准。为了排查冷启动和首个 tab 打开过慢的问题，模块现在还会补充少量 debug 性能日志：`listConversations()` 输出本次会话元数据扫描耗时，`loadFullConversation()` 会在单次读取明显偏慢时记录 conversation 级别的读盘耗时。
 
 ## 导入关系
 
@@ -96,6 +96,12 @@ class StorageService {
 
 `loadFullConversation()` 在旧文件缺少 `messages` 时会自动补成空数组，并会顺手归一化 `sessionSettings`；`loadConversation()` 的 `messageCount` 则优先取 `messages.length`，没有时才回退到文件里的 `messageCount`。
 
+为了区分“是 metadata 扫描慢”还是“单个大对话读盘慢”，`loadFullConversation()` 现在会在读取明显偏慢时记录一条 debug 日志，包含：
+
+- `conversationId`
+- `messageCount`
+- 读取与 JSON 解析总耗时
+
 ### 会话列表与删除
 
 `listConversations()` 会遍历 `sessions/` 下的所有 `.json` 文件，逐个调用 `loadConversation()`，最后按以下键排序：
@@ -104,6 +110,13 @@ class StorageService {
 - 否则 `updatedAt`
 
 排序方向是从新到旧。
+
+`listConversations()` 现在还会输出一条 startup debug 汇总日志，带上：
+
+- `sessions/` 目录总文件数
+- 实际扫描的 `.json` 文件数
+- 成功载入的 conversation 数
+- 总耗时
 
 `deleteConversation()` 会尝试删除单个文件；文件不存在时静默忽略。
 

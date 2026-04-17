@@ -41,6 +41,8 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import {
   createLogger,
+  formatDurationMs,
+  getPerformanceTimestampMs,
   getVaultBasePath,
   isInternalStructuredOutputTool,
   resolveToolExecutionStatus,
@@ -2554,25 +2556,48 @@ export class OpenCodianView extends ItemView {
   }
 
   async onOpen() {
-    // Build UI
-    this.buildUI();
-    this.initializeTabSystem();
-    this.chatHeaderPresenter.startServerStatusLoop();
+    const startedAt = getPerformanceTimestampMs();
+    const stepSummaries: string[] = [];
+    const measureStep = async <T>(step: string, operation: () => Promise<T> | T): Promise<T> => {
+      const stepStartedAt = getPerformanceTimestampMs();
+      try {
+        return await Promise.resolve(operation());
+      } finally {
+        const elapsedMs = getPerformanceTimestampMs() - stepStartedAt;
+        stepSummaries.push(`${step}=${formatDurationMs(elapsedMs)}`);
+        logger.debug(`[view-open] ${step} completed in ${formatDurationMs(elapsedMs)}`);
+      }
+    };
 
-    // Initialize markdown service
-    if (this.messagesShellEl) {
-      this.markdownService = new MarkdownRenderService({
-        app: this.app,
-        component: this.messageComponent,
-        container: this.messagesShellEl,
-      });
-    }
+    await measureStep('buildUI', () => {
+      this.buildUI();
+    });
+    await measureStep('initializeTabSystem', () => {
+      this.initializeTabSystem();
+    });
+    await measureStep('startServerStatusLoop', () => {
+      this.chatHeaderPresenter.startServerStatusLoop();
+    });
+    await measureStep('initializeMarkdownService', () => {
+      if (this.messagesShellEl) {
+        this.markdownService = new MarkdownRenderService({
+          app: this.app,
+          component: this.messageComponent,
+          container: this.messagesShellEl,
+        });
+      }
+    });
+    await measureStep('wireEventHandlers', () => {
+      this.wireEventHandlers();
+    });
+    await measureStep('startConversationSessionSignalRuntime', () => {
+      this.conversationSessionSignalRuntime.start();
+    });
+    await measureStep('initializeFirstTab', () => this.initializeFirstTab());
 
-    // Wire events
-    this.wireEventHandlers();
-    this.conversationSessionSignalRuntime.start();
-
-    await this.initializeFirstTab();
+    logger.info(
+      `[view-open] completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} | ${stepSummaries.join(', ')}`,
+    );
   }
 
   async onClose() {

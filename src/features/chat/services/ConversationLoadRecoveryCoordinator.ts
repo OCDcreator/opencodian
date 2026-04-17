@@ -4,7 +4,11 @@ import type {
   PersistedTabState,
 } from '../../../core/types';
 import { t } from '../../../i18n';
-import { createLogger } from '../../../shared';
+import {
+  createLogger,
+  formatDurationMs,
+  getPerformanceTimestampMs,
+} from '../../../shared';
 import type { ForkTarget } from '../../../shared/modals';
 import { cloneMessagesBeforeForkTarget } from '../forkMessages';
 import type {
@@ -110,23 +114,43 @@ export class ConversationLoadRecoveryCoordinator {
       return;
     }
 
-    await this.host.loadConversations();
+    const startedAt = getPerformanceTimestampMs();
+    const stepSummaries: string[] = [];
+    const measureStep = async <T>(step: string, operation: () => Promise<T> | T): Promise<T> => {
+      const stepStartedAt = getPerformanceTimestampMs();
+      try {
+        return await Promise.resolve(operation());
+      } finally {
+        const elapsedMs = getPerformanceTimestampMs() - stepStartedAt;
+        stepSummaries.push(`${step}=${formatDurationMs(elapsedMs)}`);
+        logger.debug(`[view-open] initializeFirstTab:${step} completed in ${formatDurationMs(elapsedMs)}`);
+      }
+    };
 
-    const restoredTabId = this.restorePersistedTabs();
+    await measureStep('loadConversations', () => this.host.loadConversations());
+
+    const restoredTabId = await measureStep('restorePersistedTabs', () => this.restorePersistedTabs());
     if (restoredTabId) {
-      await this.port.activateTab(restoredTabId);
+      await measureStep('activateRestoredTab', () => this.port.activateTab(restoredTabId));
+      logger.info(
+        `[view-open] initializeFirstTab restored tab in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} | ${stepSummaries.join(', ')}`,
+      );
       return;
     }
 
     let initialConversation = this.host.getConversations()[0];
     if (!initialConversation) {
-      initialConversation = await this.host.createConversation();
+      initialConversation = await measureStep('createConversation', () => this.host.createConversation());
     }
 
-    const tab = tabManager.createTab(initialConversation);
+    const tab = await measureStep('createTab', () => tabManager.createTab(initialConversation));
     if (tab) {
-      await this.port.activateTab(tab.id);
+      await measureStep('activateCreatedTab', () => this.port.activateTab(tab.id));
     }
+
+    logger.info(
+      `[view-open] initializeFirstTab completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} | ${stepSummaries.join(', ')}`,
+    );
   }
 
   restorePersistedTabs(): TabId | null {

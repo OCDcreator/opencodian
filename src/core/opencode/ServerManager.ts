@@ -11,7 +11,11 @@ import * as net from 'net';
 import { Notice, requestUrl } from 'obsidian';
 import * as path from 'path';
 
-import { createLogger } from '../../shared';
+import {
+  createLogger,
+  formatDurationMs,
+  getPerformanceTimestampMs,
+} from '../../shared';
 import {
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
@@ -177,10 +181,26 @@ export class ServerManager {
       return;
     }
 
+    const startedAt = getPerformanceTimestampMs();
     this.startPromise = this.doStart();
 
     try {
       await this.startPromise;
+      logger.debug(
+        `ServerManager.start completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+        {
+          mode: this.config.mode,
+          status: this.status,
+          host: this.config.local.host,
+          port: this.config.local.port,
+        },
+      );
+    } catch (error) {
+      logger.error(
+        `ServerManager.start failed after ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+        error,
+      );
+      throw error;
     } finally {
       this.startPromise = null;
     }
@@ -445,13 +465,19 @@ export class ServerManager {
   }
 
   private async launchLocalServerRuntime(successDiagnostics?: ServerDiagnostics): Promise<void> {
+    const launchStartedAt = getPerformanceTimestampMs();
     await this.spawnServer();
+    const spawnedAt = getPerformanceTimestampMs();
     await this.waitForHealthy(this.config.timeout ?? 30000);
+    const healthyAt = getPerformanceTimestampMs();
 
     if (successDiagnostics) {
       this.setDiagnostics(successDiagnostics);
     }
 
+    logger.info(
+      `[startup] local OpenCode server ready in ${formatDurationMs(healthyAt - launchStartedAt)} (spawn ${formatDurationMs(spawnedAt - launchStartedAt)}, health ${formatDurationMs(healthyAt - spawnedAt)})`,
+    );
     this.setStatus('running');
     new Notice('OpenCode server started');
   }

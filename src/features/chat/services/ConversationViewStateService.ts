@@ -1,3 +1,8 @@
+import {
+  createLogger,
+  formatDurationMs,
+  getPerformanceTimestampMs,
+} from '../../../shared';
 import type { ConversationHydrationOutcomePort } from '../runtime/ConversationHydrationOutcomeBridge';
 import type {
   ConversationLoadRuntimeOptions,
@@ -42,6 +47,8 @@ interface ConversationViewStateServiceDependencies {
   conversationTransitionBridge: ConversationTransitionPort;
   conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
 }
+
+const logger = createLogger('ConversationViewStateService');
 
 export class ConversationViewStateService {
   private readonly host: ConversationViewStateHost;
@@ -109,39 +116,78 @@ export class ConversationViewStateService {
     id: string,
     options: LoadConversationOptions = {},
   ): Promise<void> {
-    await this.conversationTransitionBridge.prepareLoadedConversationTransition(id);
+    const startedAt = getPerformanceTimestampMs();
+    const stepSummaries: string[] = [];
+    const measureStep = async <T>(step: string, operation: () => Promise<T> | T): Promise<T> => {
+      const stepStartedAt = getPerformanceTimestampMs();
+      try {
+        return await Promise.resolve(operation());
+      } finally {
+        const elapsedMs = getPerformanceTimestampMs() - stepStartedAt;
+        stepSummaries.push(`${step}=${formatDurationMs(elapsedMs)}`);
+        logger.debug(`[conversation-load] ${step} completed in ${formatDurationMs(elapsedMs)}`, {
+          conversationId: id,
+        });
+      }
+    };
 
-    const conversation = await this.conversationLoadRuntimeBridge.resolveConversation(id, {
+    await measureStep(
+      'prepareLoadedConversationTransition',
+      () => this.conversationTransitionBridge.prepareLoadedConversationTransition(id),
+    );
+
+    const conversation = await measureStep('resolveConversation', () => this.conversationLoadRuntimeBridge.resolveConversation(id, {
       reloadIfMissing: true,
-    });
+    }));
     if (!conversation) {
       return;
     }
 
-    const transitionContext = this.conversationTransitionBridge.captureLoadedConversationTransition(
-      Boolean(options.preserveScrollPosition),
+    const transitionContext = await measureStep(
+      'captureLoadedConversationTransition',
+      () => this.conversationTransitionBridge.captureLoadedConversationTransition(
+        Boolean(options.preserveScrollPosition),
+      ),
     );
     const { activeTabId } = transitionContext;
 
-    this.tabConversationActivationBridge.applyLoadedConversationActivation(
-      activeTabId,
-      conversation,
-    );
-    this.conversationTransitionBridge.beginLoadedConversationTransition(transitionContext);
+    await measureStep('applyLoadedConversationActivation', () => {
+      this.tabConversationActivationBridge.applyLoadedConversationActivation(
+        activeTabId,
+        conversation,
+      );
+    });
+    await measureStep('beginLoadedConversationTransition', () => {
+      this.conversationTransitionBridge.beginLoadedConversationTransition(transitionContext);
+    });
 
     try {
-      const messages = await this.conversationLoadRuntimeBridge.loadConversationMessages(
-        conversation,
-        activeTabId,
-        this.buildConversationLoadRuntimeOptions(options),
+      const messages = await measureStep(
+        'loadConversationMessages',
+        () => this.conversationLoadRuntimeBridge.loadConversationMessages(
+          conversation,
+          activeTabId,
+          this.buildConversationLoadRuntimeOptions(options),
+        ),
       );
-      await this.conversationHydrationOutcomeBridge.applyLoadedConversationOutcome(
-        activeTabId,
-        conversation,
-        messages,
+      await measureStep(
+        'applyLoadedConversationOutcome',
+        () => this.conversationHydrationOutcomeBridge.applyLoadedConversationOutcome(
+          activeTabId,
+          conversation,
+          messages,
+        ),
       );
-      this.conversationTransitionBridge.restoreLoadedConversationTransition(transitionContext);
-      await this.tabViewActivationBridge.applyLoadedConversationHydrationTail();
+      await measureStep('restoreLoadedConversationTransition', () => {
+        this.conversationTransitionBridge.restoreLoadedConversationTransition(transitionContext);
+      });
+      await measureStep(
+        'applyLoadedConversationHydrationTail',
+        () => this.tabViewActivationBridge.applyLoadedConversationHydrationTail(),
+      );
+      logger.info(
+        `[conversation-load] loaded ${id} (${messages.length} messages) in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} | ${stepSummaries.join(', ')}`,
+      );
     } finally {
       this.conversationTransitionBridge.endLoadedConversationTransition(transitionContext);
     }
