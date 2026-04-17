@@ -68,11 +68,10 @@
 9. 若 vault 下还没有 `.opencode` 配置，按当前 `permissionMode` 调用 `initializeOpencodeConfig()` 创建。
 10. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
 11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
-12. 如果当前是本地模式且 `autoStart` 开启，则直接调用 `openCodeService.start()`。
-13. 记录一次 server snapshot。
-14. 在注册视图之前执行 `loadConversations()`，只预热会话元数据。
-15. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
-16. 启动结束时输出一行汇总日志，并把最近一次 trace 暴露给诊断报告。
+12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据。
+13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
+14. 启动结束时输出一行汇总日志，并把最近一次 trace 暴露给诊断报告。
+15. `onload()` 返回后再后台调度 deferred runtime warmup：本地 sidecar 自启动与首个 server snapshot 不再阻塞插件注册和视图恢复；真正需要新 session 的路径（当前主要是 `createConversation()`）才会显式接管并等待这次 warmup，避免首次建会话撞上未就绪 server，同时不拖慢已有会话的视图首开。
 
 这里没有调用 `OpenCodeService.initialize()`；实际运行时由 `main.ts` 自己决定是否启动服务。
 
@@ -143,7 +142,7 @@
 
 后续流程分成两层：
 
-- `createConversation()` 先在 OpenCode 侧创建 session，再建立本地 conversation 记录。
+- `createConversation()` 会先接管尚未完成的 deferred runtime warmup，再在 OpenCode 侧创建 session，最后建立本地 conversation 记录。
 - `createConversationFromSession()` 允许已有 OpenCode session 映射为新的本地 conversation。
 - `getConversationById()` 默认优先从磁盘补全完整消息，再更新内存缓存；`preferCache` 可跳过这一步。
 - `deleteConversation()` 会先把本地缓存删掉，再 best-effort 删除 OpenCode session，最后清理本地存储。
@@ -187,14 +186,11 @@ graph TD
     D --> E[initializeOpencodeConfig]
     E --> F[创建 OpenCodeService]
     F --> G[设置 vaultPath / ConfigManager / ModelConfigService]
-    G --> H{local.autoStart?}
-    H -->|yes| I[openCodeService.start]
-    H -->|no| J[跳过启动]
-    I --> K[logServerStatusSnapshot]
-    J --> K
-    K --> L[loadConversations 预载元数据]
-    L --> M[registerView / ribbon / commands / setting tab]
-    M --> N[OpenCodianView 运行时回调插件实例]
+    G --> H[loadConversations 预载元数据]
+    H --> I[registerView / ribbon / commands / setting tab]
+    I --> J[scheduleDeferredRuntimeWarmup]
+    J --> K[需要新 session 时接管 warmup]
+    K --> L[OpenCodianView 运行时回调插件实例]
 ```
 
 ## 与其他模块的交互
@@ -224,7 +220,8 @@ graph TD
 ## 注意事项
 
 - `loadConversations()` 只加载元数据，不加载消息正文；正文由 `getConversationById()` 按需补读。
-- `onload()` 先预载会话，再注册 `OpenCodianView`，这是热重载/恢复链路的顺序约束。
+- `onload()` 仍然先预载会话，再注册 `OpenCodianView`，这是热重载/恢复链路的顺序约束。
+- 本地 server auto-start 已改成注册完成后的后台 warmup；冷启动 trace 现在更接近“插件何时可见”，而不是“sidecar 何时 ready”。
 - 启动 trace 会同时记录顶层 phase 和嵌套子步骤；诊断报告里的总耗时只汇总顶层 phase，避免双重累计。
 - `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。
 - 当启动阶段判定设置不可恢复时，插件会进入持久化只读保护，并通过 `Notice` 告警，而不是把默认值写回磁盘。

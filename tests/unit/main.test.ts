@@ -257,6 +257,102 @@ describe('OpenCodianPlugin.onload', () => {
   });
 });
 
+describe('OpenCodianPlugin deferred runtime warmup', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('defers runtime warmup until after the current tick', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: {
+        server: {
+          mode: 'local';
+          local: { autoStart: boolean };
+        };
+      };
+      openCodeService: { isReady: jest.Mock<boolean, []> };
+      scheduleDeferredRuntimeWarmup: () => void;
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+
+    plugin.settings = {
+      server: {
+        mode: 'local',
+        local: { autoStart: true },
+      },
+    };
+    plugin.openCodeService = {
+      isReady: jest.fn().mockReturnValue(false),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    plugin.scheduleDeferredRuntimeWarmup();
+
+    expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
+    expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
+
+    jest.runOnlyPendingTimers();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(plugin.startConfiguredLocalServerIfNeeded).toHaveBeenCalledTimes(1);
+    expect(plugin.logServerStatusSnapshot).toHaveBeenCalledWith('deferred-onload');
+  });
+
+  it('forces pending warmup to finish before creating a conversation', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: {
+        server: {
+          mode: 'local';
+          local: { autoStart: boolean };
+        };
+      };
+      openCodeService: {
+        isReady: jest.Mock<boolean, []>;
+        createSession: jest.Mock<Promise<string>, []>;
+      };
+      conversations: unknown[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [unknown]> };
+      scheduleDeferredRuntimeWarmup: () => void;
+      ensureRuntimeWarmupReadyForSessionBootstrap: () => Promise<void>;
+      createConversation: () => Promise<{ openCodeSessionId: string }>;
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+
+    plugin.settings = {
+      server: {
+        mode: 'local',
+        local: { autoStart: true },
+      },
+    };
+    plugin.openCodeService = {
+      isReady: jest.fn().mockReturnValue(false),
+      createSession: jest.fn().mockResolvedValue('session-created'),
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    plugin.scheduleDeferredRuntimeWarmup();
+    const conversation = await plugin.createConversation();
+
+    expect(plugin.startConfiguredLocalServerIfNeeded).toHaveBeenCalledTimes(1);
+    expect(plugin.logServerStatusSnapshot).toHaveBeenCalledWith('session-bootstrap');
+    expect(plugin.openCodeService.createSession).toHaveBeenCalledTimes(1);
+    expect(conversation.openCodeSessionId).toBe('session-created');
+  });
+});
+
 describe('OpenCodianPlugin.loadSettings', () => {
   it('preserves the inline debug argument serialization toggle from saved settings', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {

@@ -98,6 +98,8 @@ export default class OpenCodianPlugin extends Plugin {
   private chatAppearanceSaveTimeoutId: number | null = null;
   private settingsUiStateSaveTimeoutId: number | null = null;
   private modelRefreshFrameId: number | null = null;
+  private deferredRuntimeWarmupTimerId: number | null = null;
+  private deferredRuntimeWarmupPromise: Promise<void> | null = null;
   private themeBackgroundDataUrlCache = new Map<string, string | null>();
   private themeBackgroundDataUrlRequests = new Map<string, Promise<string | null>>();
   private settingsPersistenceWritable = true;
@@ -125,8 +127,10 @@ export default class OpenCodianPlugin extends Plugin {
       await this.measureStartupStep('registerWorkspaceIntegration', () => {
         this.registerWorkspaceIntegration();
       });
+      logger.info('[startup] deferring runtime warmup until after workspace integration');
       this.completeStartupPerfTrace('completed');
       await this.persistStartupPerfTraceSnapshot();
+      this.scheduleDeferredRuntimeWarmup();
     } catch (error) {
       this.completeStartupPerfTrace('failed');
       await this.persistStartupPerfTraceSnapshot().catch((persistError) => {
@@ -184,18 +188,6 @@ export default class OpenCodianPlugin extends Plugin {
     await this.measureStartupStep('configureVaultScopedServices', () => {
       this.configureVaultScopedServices();
     });
-    await this.measureStartupStep(
-      'startConfiguredLocalServerIfNeeded',
-      () => this.startConfiguredLocalServerIfNeeded(),
-      {
-        detail: () => (
-          isLocalServerMode(this.settings.server) && this.settings.server.local.autoStart
-            ? `mode=local host=${this.settings.server.local.host} port=${this.settings.server.local.port}`
-            : `mode=${this.settings.server.mode} autoStart=${String(this.settings.server.local.autoStart)}`
-        ),
-      },
-    );
-    await this.measureStartupStep('logServerStatusSnapshot', () => this.logServerStatusSnapshot('onload'));
     await this.measureStartupStep('loadConversations', () => this.loadConversations());
   }
 
@@ -321,6 +313,7 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   onunload() {
+    this.clearDeferredRuntimeWarmupTimer();
     this.openCodeService?.dispose();
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
@@ -826,6 +819,93 @@ export default class OpenCodianPlugin extends Plugin {
     }
   }
 
+  private scheduleDeferredRuntimeWarmup(): void {
+    if (!this.shouldWarmupRuntimeAfterStartup()) {
+      return;
+    }
+
+    if (this.deferredRuntimeWarmupTimerId !== null || this.deferredRuntimeWarmupPromise) {
+      return;
+    }
+
+    this.deferredRuntimeWarmupTimerId = window.setTimeout(() => {
+      this.deferredRuntimeWarmupTimerId = null;
+      void this.startDeferredRuntimeWarmup('deferred-onload');
+    }, 0);
+  }
+
+  async ensureRuntimeWarmupReadyForSessionBootstrap(): Promise<void> {
+    if (!this.shouldWarmupRuntimeAfterStartup() || this.openCodeService.isReady()) {
+      return;
+    }
+
+    if (this.deferredRuntimeWarmupTimerId !== null) {
+      this.clearDeferredRuntimeWarmupTimer();
+      await this.startDeferredRuntimeWarmup('session-bootstrap');
+      return;
+    }
+
+    if (this.deferredRuntimeWarmupPromise) {
+      await this.deferredRuntimeWarmupPromise;
+      return;
+    }
+
+    await this.startDeferredRuntimeWarmup('session-bootstrap');
+  }
+
+  private clearDeferredRuntimeWarmupTimer(): void {
+    if (this.deferredRuntimeWarmupTimerId !== null) {
+      window.clearTimeout(this.deferredRuntimeWarmupTimerId);
+      this.deferredRuntimeWarmupTimerId = null;
+    }
+  }
+
+  private shouldWarmupRuntimeAfterStartup(): boolean {
+    return Boolean(
+      this.openCodeService
+      && this.settings
+      && isLocalServerMode(this.settings.server)
+      && this.settings.server.local.autoStart,
+    );
+  }
+
+  private async startDeferredRuntimeWarmup(
+    source: 'deferred-onload' | 'session-bootstrap',
+  ): Promise<void> {
+    if (this.deferredRuntimeWarmupPromise) {
+      return this.deferredRuntimeWarmupPromise;
+    }
+
+    this.deferredRuntimeWarmupPromise = this.runDeferredRuntimeWarmup(source)
+      .catch((error) => {
+        logger.warn('Deferred runtime warmup failed', error);
+        throw error;
+      })
+      .finally(() => {
+        this.deferredRuntimeWarmupPromise = null;
+      });
+
+    return this.deferredRuntimeWarmupPromise;
+  }
+
+  private async runDeferredRuntimeWarmup(
+    source: 'deferred-onload' | 'session-bootstrap',
+  ): Promise<void> {
+    if (!this.openCodeService) {
+      return;
+    }
+
+    const startedAt = getPerformanceTimestampMs();
+    logger.debug(`[startup] deferred runtime warmup started (${source})`);
+
+    await this.startConfiguredLocalServerIfNeeded();
+    await this.logServerStatusSnapshot(source);
+
+    logger.info(
+      `[startup] deferred runtime warmup completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} (${source})`,
+    );
+  }
+
   async logServerStatusSnapshot(source = 'manual'): Promise<void> {
     const isHealthy = await this.openCodeService.checkHealth();
     const internalStatus = this.openCodeService.getServerStatus();
@@ -1012,6 +1092,8 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Create a new conversation */
   async createConversation(): Promise<Conversation> {
+    await this.ensureRuntimeWarmupReadyForSessionBootstrap();
+
     // Create session in OpenCode
     const sessionId = await this.openCodeService.createSession();
     

@@ -111,7 +111,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
 6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新
-7. `initializeFirstTab()`
+7. `initializeFirstTab()`：恢复持久化 tabs、加载首个对话；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
 
 结束时会输出一条 `[view-open]` 汇总日志，包含各阶段耗时拆分。
 
