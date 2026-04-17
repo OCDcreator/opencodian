@@ -201,6 +201,8 @@ function createCommandSource(
     description: overrides.description ?? '',
     agent: overrides.agent ?? '',
     model: overrides.model ?? '',
+    temperature: overrides.temperature,
+    topP: overrides.topP,
     subtask: overrides.subtask ?? false,
     hasProjectOverride: overrides.hasProjectOverride ?? false,
     runtimeAvailable: overrides.runtimeAvailable ?? true,
@@ -349,6 +351,8 @@ describe('SettingsProjectCommandEditor', () => {
     await findText(t('settings.commands.editor.description.name'))?.onChange?.('Review focused tests');
     await findText(t('settings.commands.editor.agent.name'))?.onChange?.('reviewer');
     await findText(t('settings.commands.editor.model.name'))?.onChange?.('anthropic/claude-sonnet-4');
+    await findText(t('settings.commands.editor.temperature.name'))?.onChange?.('0.2');
+    await findText(t('settings.commands.editor.topP.name'))?.onChange?.('0.85');
     await findToggle(t('settings.commands.editor.subtask.name'))?.onChange?.(true);
 
     await findButton(t('settings.commands.editor.actions.save'))?.onClick?.();
@@ -359,6 +363,8 @@ describe('SettingsProjectCommandEditor', () => {
       description: 'Review focused tests',
       agent: 'reviewer',
       model: 'anthropic/claude-sonnet-4',
+      temperature: 0.2,
+      top_p: 0.85,
       subtask: true,
     });
   });
@@ -384,6 +390,8 @@ describe('SettingsProjectCommandEditor', () => {
     expect(findText(t('settings.commands.editor.description.name'))?.control.setValue).toHaveBeenLastCalledWith('Review changes');
     expect(findText(t('settings.commands.editor.agent.name'))?.control.setValue).toHaveBeenLastCalledWith('code-review');
     expect(findText(t('settings.commands.editor.model.name'))?.control.setValue).toHaveBeenLastCalledWith('anthropic/claude-sonnet-4');
+    expect(findText(t('settings.commands.editor.temperature.name'))?.control.setValue).toHaveBeenLastCalledWith('');
+    expect(findText(t('settings.commands.editor.topP.name'))?.control.setValue).toHaveBeenLastCalledWith('');
     expect(findToggle(t('settings.commands.editor.subtask.name'))?.control.setValue).toHaveBeenLastCalledWith(true);
 
     await findText(t('settings.commands.editor.description.name'))?.onChange?.('Review the staged changes');
@@ -397,6 +405,8 @@ describe('SettingsProjectCommandEditor', () => {
       description: 'Review the staged changes',
       agent: 'code-review',
       model: 'anthropic/claude-sonnet-4',
+      temperature: undefined,
+      top_p: undefined,
       subtask: false,
     });
   });
@@ -410,6 +420,8 @@ describe('SettingsProjectCommandEditor', () => {
           description: 'Project deploy command',
           agent: 'ops',
           model: 'openai/gpt-4.1',
+          temperature: 0.6,
+          topP: 0.9,
           subtask: false,
           hasProjectOverride: true,
           runtimeAvailable: false,
@@ -433,6 +445,10 @@ describe('SettingsProjectCommandEditor', () => {
     await findText(t('settings.commands.editor.description.name'))?.onChange?.('');
     await findText(t('settings.commands.editor.agent.name'))?.onChange?.('release-manager');
     await findText(t('settings.commands.editor.model.name'))?.onChange?.('');
+    expect(findText(t('settings.commands.editor.temperature.name'))?.control.setValue).toHaveBeenLastCalledWith('0.6');
+    expect(findText(t('settings.commands.editor.topP.name'))?.control.setValue).toHaveBeenLastCalledWith('0.9');
+    await findText(t('settings.commands.editor.temperature.name'))?.onChange?.('');
+    await findText(t('settings.commands.editor.topP.name'))?.onChange?.('');
     await findToggle(t('settings.commands.editor.subtask.name'))?.onChange?.(true);
 
     await findButton(t('settings.commands.editor.actions.save'))?.onClick?.();
@@ -443,6 +459,8 @@ describe('SettingsProjectCommandEditor', () => {
       description: undefined,
       agent: 'release-manager',
       model: undefined,
+      temperature: undefined,
+      top_p: undefined,
       subtask: true,
     });
 
@@ -464,5 +482,23 @@ describe('SettingsProjectCommandEditor', () => {
     expect(configManager.upsertCommandConfig).not.toHaveBeenCalled();
     expect(onConfigChanged).not.toHaveBeenCalled();
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.commands.editor.notice.templateRequired'));
+  });
+
+  it('rejects invalid command-local sampling values', async () => {
+    const { configManager, onConfigChanged } = renderEditor();
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+
+    await findText(t('settings.commands.editor.id.name'))?.onChange?.('creative-review');
+    await findTextArea(t('settings.commands.editor.template.name'))?.onChange?.('Review creatively.');
+    await findText(t('settings.commands.editor.temperature.name'))?.onChange?.('warm');
+
+    await findButton(t('settings.commands.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertCommandConfig).not.toHaveBeenCalled();
+    expect(onConfigChanged).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.commands.editor.notice.invalidNumber', {
+      field: t('settings.commands.editor.temperature.name'),
+    }));
   });
 });

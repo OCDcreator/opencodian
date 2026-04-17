@@ -7,6 +7,12 @@ import type {
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import {
+  optionalTrimmedText,
+  parseOptionalNumber,
+  stringifyConfigNumber,
+  stringifyConfigText,
+} from './projectAgentEditorConfig';
 
 const logger = createLogger('SettingsProjectCommandEditor');
 
@@ -42,6 +48,8 @@ export interface ProjectCommandEditorSource {
   description: string;
   agent: string;
   model: string;
+  temperature?: number;
+  topP?: number;
   hasProjectOverride: boolean;
   runtimeAvailable: boolean;
   subtask: boolean;
@@ -54,6 +62,8 @@ interface ProjectCommandEditorState {
   model: string;
   subtask: boolean;
   template: string;
+  temperature: string;
+  topP: string;
 }
 
 interface TextLikeControl {
@@ -70,15 +80,6 @@ interface SettingsProjectCommandEditorRenderOptions {
   containerEl: HTMLElement;
   onConfigChanged: () => Promise<void>;
   projectCommands: OpencodeCommandConfigRecord;
-}
-
-function stringifyConfigText(value: unknown): string {
-  return typeof value === 'string' ? value : '';
-}
-
-function optionalTrimmedText(value: string): string | undefined {
-  const trimmed = value.trim();
-  return trimmed || undefined;
 }
 
 export class SettingsProjectCommandEditor {
@@ -105,6 +106,8 @@ export class SettingsProjectCommandEditor {
     let descriptionControl: TextLikeControl | null = null;
     let agentControl: TextLikeControl | null = null;
     let modelControl: TextLikeControl | null = null;
+    let temperatureControl: TextLikeControl | null = null;
+    let topPControl: TextLikeControl | null = null;
     let deleteButton: DisableableControl | null = null;
     let selectControl: { setValue(value: string): unknown } | null = null;
     let subtaskControl: { setValue(value: boolean): unknown } | null = null;
@@ -124,6 +127,8 @@ export class SettingsProjectCommandEditor {
       descriptionControl?.setValue(state.description);
       agentControl?.setValue(state.agent);
       modelControl?.setValue(state.model);
+      temperatureControl?.setValue(state.temperature);
+      topPControl?.setValue(state.topP);
       subtaskControl?.setValue(state.subtask);
       syncDeleteButton();
     };
@@ -216,6 +221,32 @@ export class SettingsProjectCommandEditor {
       });
 
     new Setting(containerEl)
+      .setName(t('settings.commands.editor.temperature.name'))
+      .setDesc(t('settings.commands.editor.temperature.desc'))
+      .addText((text) => {
+        temperatureControl = text;
+        text
+          .setPlaceholder('0.2')
+          .setValue(state.temperature)
+          .onChange((value) => {
+            state.temperature = value;
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.commands.editor.topP.name'))
+      .setDesc(t('settings.commands.editor.topP.desc'))
+      .addText((text) => {
+        topPControl = text;
+        text
+          .setPlaceholder('0.85')
+          .setValue(state.topP)
+          .onChange((value) => {
+            state.topP = value;
+          });
+      });
+
+    new Setting(containerEl)
       .setName(t('settings.commands.editor.subtask.name'))
       .setDesc(t('settings.commands.editor.subtask.desc'))
       .addToggle((toggle) => {
@@ -290,6 +321,8 @@ export class SettingsProjectCommandEditor {
       agent: stringifyConfigText(command?.agent),
       model: stringifyConfigText(command?.model),
       subtask: command?.subtask === true,
+      temperature: stringifyConfigNumber(command?.temperature),
+      topP: stringifyConfigNumber(command?.topP),
     };
   }
 
@@ -304,6 +337,18 @@ export class SettingsProjectCommandEditor {
       description: optionalTrimmedText(state.description),
       agent: optionalTrimmedText(state.agent),
       model: optionalTrimmedText(state.model),
+      temperature: parseOptionalNumber(
+        state.temperature,
+        t('settings.commands.editor.notice.invalidNumber', {
+          field: t('settings.commands.editor.temperature.name'),
+        }),
+      ),
+      top_p: parseOptionalNumber(
+        state.topP,
+        t('settings.commands.editor.notice.invalidNumber', {
+          field: t('settings.commands.editor.topP.name'),
+        }),
+      ),
       subtask: state.subtask,
     };
   }

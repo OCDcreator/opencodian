@@ -28,7 +28,7 @@
 | `OpencodeAgentMode` | agent 模式（`'primary' \| 'subagent' \| 'all'`） |
 | `OpencodeAgentConfig` | 结构化 agent 配置（`description?`, `mode?`, `model?`, `prompt?`, `temperature?`, `top_p?`, `steps?`, `tools?`, `permission?`, `color?`, `hidden?`, `disable?`, `options?`） |
 | `OpencodeAgentConfigRecord` | `Record<string, OpencodeAgentConfig>` — 原生 / deprecated agent map |
-| `OpencodeCommandConfig` | 结构化命令配置（`template?`, `description?`, `agent?`, `subtask?`, `model?`） |
+| `OpencodeCommandConfig` | 结构化命令配置（`template?`, `description?`, `agent?`, `subtask?`, `model?`, `temperature?`, `top_p?`） |
 | `OpencodeCommandConfigRecord` | `Record<string, OpencodeCommandConfig>` — 命令 map |
 | `OpencodeCompactionConfig` | 压缩配置（`auto?`, `prune?`, `reserved?`） |
 | `OpencodeToolConfig` | `Record<string, boolean>` — top-level 工具开关 |
@@ -155,6 +155,10 @@
 }
 ```
 
+### command-local sampling patch
+
+`OpencodeCommandConfig` 里的 `temperature?` / `top_p?` 在 OpenCodian 内部表示“命令级 sampling patch”。`OpencodeConfigManager.upsertCommandConfig()` 会消费它们，并把真实持久化落到一个 command-owned hidden agent，而不是把这两个字段长期保留在 native OpenCode `command` schema 里。
+
 ## 注意事项
 
 - `permission` 字段类型为 `PermissionConfig | PermissionAction`（联合类型），支持简写形式（如 `permission: "allow"` 等同于所有工具 allow）
@@ -176,7 +180,7 @@
 | `permission` | `PermissionConfig \| PermissionAction?` | 权限配置 |
 | `plugin` | `OpencodePluginSpec[]?` | 插件列表 |
 | `agent` | `Record<string, OpencodeAgentConfig>?` | 代理配置 |
-| `command` | `Record<string, OpencodeCommandConfig>?` | 命令配置 |
+| `command` | `Record<string, OpencodeCommandConfig>?` | 命令配置；OpenCodian 会消费 `temperature` / `top_p` patch 并转换成 command-owned hidden agent |
 | `default_agent` | `string?` | 默认 primary agent |
 | `compaction` | `OpencodeCompactionConfig?` | 压缩配置 |
 | `mode` | `Record<string, OpencodeAgentConfig>?` | deprecated 旧 agent map，读写 helper 仍会导入 |

@@ -505,6 +505,7 @@ describe('OpencodeConfigManager session agent command helpers', () => {
       ignore: ['dist/**'],
     });
   });
+
 });
 
 describe('OpencodeConfigManager paths', () => {

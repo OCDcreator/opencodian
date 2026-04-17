@@ -1,9 +1,13 @@
 import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 import { Setting } from 'obsidian';
 
-import type { OpencodeCommandConfigRecord } from '../../../../src/core/types';
+import { getCommandScopedAgentId } from '../../../../src/core/config/commandScopedAgent';
+import type {
+  OpencodeAgentConfigRecord,
+  OpencodeCommandConfigRecord,
+} from '../../../../src/core/types';
 import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
-import { setLocale } from '../../../../src/i18n';
+import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
 interface MockToggleControl {
@@ -69,10 +73,17 @@ interface ButtonRecord {
   onClick?: () => void | Promise<void>;
 }
 
+type CommandsSectionConfigManager = Pick<
+  NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  'getAgentConfig' | 'getCommandConfig' | 'upsertCommandConfig' | 'removeCommandConfig'
+>;
+
 type CommandsSectionPlugin = Pick<
   OpenCodianPlugin,
-  'openCodeService' | 'opencodeConfigManager' | 'saveSettings' | 'settings'
->;
+  'openCodeService' | 'saveSettings' | 'settings'
+> & {
+  opencodeConfigManager: CommandsSectionConfigManager;
+};
 
 const dropdownRecords: DropdownRecord[] = [];
 const toggleRecords: ToggleRecord[] = [];
@@ -198,6 +209,7 @@ function createRuntimeCommand(
 }
 
 function createPlugin(options: {
+  projectAgents?: OpencodeAgentConfigRecord;
   runtimeCommands?: RuntimeCommand[];
   projectCommands?: OpencodeCommandConfigRecord;
   hiddenSlashCommands?: string[];
@@ -212,6 +224,7 @@ function createPlugin(options: {
     },
     opencodeConfigManager: {
       getCommandConfig: jest.fn().mockResolvedValue(options.projectCommands ?? {}),
+      getAgentConfig: jest.fn().mockResolvedValue(options.projectAgents ?? {}),
       upsertCommandConfig: jest.fn().mockResolvedValue(undefined),
       removeCommandConfig: jest.fn().mockResolvedValue(undefined),
     },
@@ -362,6 +375,7 @@ describe('SettingsCommandsSection catalog shell', () => {
 
     expect(plugin.openCodeService.sdk.command.list).toHaveBeenCalledTimes(1);
     expect(plugin.opencodeConfigManager?.getCommandConfig).toHaveBeenCalledTimes(1);
+    expect(plugin.opencodeConfigManager?.getAgentConfig).toHaveBeenCalledTimes(1);
     expect(findToggle('/init')?.control.setValue).toHaveBeenCalledWith(true);
     expect(findToggle('/review')?.control.setValue).toHaveBeenCalledWith(false);
     expect(findToggle('/deploy')?.control.setValue).toHaveBeenCalledWith(true);
@@ -394,5 +408,44 @@ describe('SettingsCommandsSection catalog shell', () => {
     await flushAsync();
 
     expect(plugin.settings.hiddenSlashCommands).toEqual(['init']);
+  });
+
+  it('prefills command-local sampling from generated hidden agents without exposing the agent id', async () => {
+    const scopedAgentId = getCommandScopedAgentId('review');
+    const plugin = createPlugin({
+      projectCommands: {
+        review: {
+          template: 'Review changes',
+          agent: scopedAgentId,
+        },
+      },
+      projectAgents: {
+        [scopedAgentId]: {
+          hidden: true,
+          mode: 'primary',
+          temperature: 0.2,
+          top_p: 0.85,
+          options: {
+            opencodianCommand: {
+              kind: 'slash-command-sampling',
+              commandId: 'review',
+              baseAgent: 'reviewer',
+            },
+          },
+        },
+      },
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    await dropdownRecords.find((record) => record.name === t('settings.commands.editor.select.name'))?.onChange?.('review');
+
+    expect(textRecords.find((record) => record.name === t('settings.commands.editor.agent.name'))?.control.setValue)
+      .toHaveBeenLastCalledWith('reviewer');
+    expect(textRecords.find((record) => record.name === t('settings.commands.editor.temperature.name'))?.control.setValue)
+      .toHaveBeenLastCalledWith('0.2');
+    expect(textRecords.find((record) => record.name === t('settings.commands.editor.topP.name'))?.control.setValue)
+      .toHaveBeenLastCalledWith('0.85');
   });
 });

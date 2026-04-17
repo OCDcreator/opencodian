@@ -53,6 +53,8 @@ class OpencodeConfigManager {
   remove(): Promise<void>;
   notifyRestartRequired(): Promise<void>;
 }
+
+getCommandScopedAgentId(commandId: string): string
 ```
 
 ## 核心逻辑
@@ -112,8 +114,21 @@ class OpencodeConfigManager {
 - `upsertAgentConfig()`：写入 native `agent` 条目时，会先吸收同名 deprecated `mode` 条目，再递归 merge，避免丢失未知字段 / `tools` / `options`
 - `removeAgentConfig()`：删除 native `agent` 的同时，也会删除 deprecated `mode` 中的同名 legacy 条目，避免 helper 读取时被“复活”
 - `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()`：对 `command` map 做同样的 clone + merge + 删除封装
+- `getCommandScopedAgentId()`：为命令级 Temperature / Top P 生成稳定的隐藏 agent ID（`opencodian-command:<commandId>`）
 
 这些 helper 都基于 `read()` 后再局部修改再 `write()`，因此 `formatter`、`watcher`、top-level `tools` 等不属于当前切口的字段会保持原样。
+
+### command-owned hidden agent
+
+`upsertCommandConfig()` 现在还承担一个很窄的 commands helper 责任：如果 patch 里显式包含 `temperature` 或 `top_p`，manager 会：
+
+- 从 `command.<id>` patch 中消费这两个字段，而不是把它们原样写进 OpenCode 的 `command` schema
+- 生成 / 更新一个稳定的隐藏 project agent：`agent["opencodian-command:<id>"]`
+- 把当前 command 的 `agent` 指向这个生成 agent，让 OpenCode 仍通过原生 `session.command()` 语义拿到命令级 sampling
+- 在 project command 原本指向某个 project agent 时，先用该 project agent 的配置做 base，再叠加 `hidden: true`、sampling 值与 `options.opencodianCommand` metadata
+- 当 `temperature` / `top_p` 被显式清空或 command 被删除时，顺带清理对应的生成 agent
+
+这让 commands settings 可以支持命令级 sampling，而不必把新的 runtime ownership 塞回 chat/view/service 层。
 
 ### 路径与重启提醒
 
@@ -133,7 +148,8 @@ class OpencodeConfigManager {
 | `getCompactionConfig()` / `updateCompactionConfig()` | 读写 `compaction`，支持 patch merge 与删除 |
 | `getDefaultAgent()` / `updateDefaultAgent()` | 读写 `default_agent`，空值时删除 |
 | `getAgentConfig()` / `upsertAgentConfig()` / `removeAgentConfig()` | 兼容 deprecated `mode` 导入的 agent helper |
-| `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()` | 命令 map 的细粒度 helper |
+| `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()` | 命令 map 的细粒度 helper，必要时维护 command-owned hidden agent |
+| `getCommandScopedAgentId()` | 返回命令级隐藏 agent 的稳定 ID |
 | `setYoloMode()` | 整体改为 `'allow'` |
 | `setNormalMode()` | 写入“全部询问”权限对象 |
 | `setPlanMode()` | 写入“禁止写入”的计划模式权限对象 |
@@ -154,3 +170,4 @@ class OpencodeConfigManager {
 - `write()` 失败时会抛出新的通用错误 `Failed to write OpenCode configuration`，原始错误只写日志。
 - `remove()` 只删除配置文件，不会删除 `.opencode` 目录或其子目录。
 - 新增的 agent helper 会读取 deprecated `mode` 作为 legacy import source，但写回目标始终是 native `agent`；只有显式删除某个 agent 时才会同步清理对应的 `mode` 条目。
+- command-owned hidden agent 采用固定前缀 `opencodian-command:`；这是 OpenCodian 保留的 project agent 命名空间。

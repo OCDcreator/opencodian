@@ -54,6 +54,8 @@ export interface OpencodeCommandConfig {
   agent?: string;
   subtask?: boolean;
   model?: string;
+  temperature?: number;
+  top_p?: number;
   [key: string]: unknown;
 }
 

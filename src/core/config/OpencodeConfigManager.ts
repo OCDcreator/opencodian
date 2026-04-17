@@ -1,11 +1,3 @@
-/**
- * OpenCode Configuration Manager
- * 
- * Manages project-level OpenCode configuration files (.opencode/opencode.json)
- * This allows OpenCodian to control OpenCode's permission settings without
- * modifying global user configuration.
- */
-
 import * as fs from 'fs';
 import { Notice } from 'obsidian';
 import * as path from 'path';
@@ -22,6 +14,10 @@ import type {
   PermissionAction,
   PermissionConfig,
 } from '../types';
+import {
+  prepareCommandPatchWithScopedAgent,
+  removeCommandScopedAgent,
+} from './commandScopedAgent';
 import { isRecord, OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
 const logger = createLogger('OpencodeConfigManager');
@@ -37,7 +33,6 @@ export class OpencodeConfigManager {
     this.configPath = path.join(this.configDir, 'opencode.json');
   }
 
-  /** Check if configuration file exists */
   async exists(): Promise<boolean> {
     try {
       await fs.promises.access(this.configPath);
@@ -47,7 +42,6 @@ export class OpencodeConfigManager {
     }
   }
 
-  /** Read configuration file */
   async read(): Promise<OpencodeConfig> {
     if (!(await this.exists())) {
       return this.getDefaultConfig();
@@ -62,7 +56,6 @@ export class OpencodeConfigManager {
     }
   }
 
-  /** Write configuration file */
   async write(config: OpencodeConfig): Promise<void> {
     let tempPath: string | null = null;
     try {
@@ -95,7 +88,6 @@ export class OpencodeConfigManager {
     }
   }
 
-  /** Update permission configuration */
   async updatePermission(permission: PermissionConfig | PermissionAction): Promise<void> {
     const config = await this.read();
     config.permission = permission;
@@ -244,9 +236,24 @@ export class OpencodeConfigManager {
     const config = await this.read();
     const normalizedCommandId = this.normalizeConfigEntryId('command', commandId);
     const commands = this.cloneConfigRecord<OpencodeCommandConfig>(config.command);
+    const nativeAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.agent);
+    const legacyAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.mode);
 
-    commands[normalizedCommandId] = this.mergeConfigObjects(commands[normalizedCommandId], command);
+    const commandPatch = prepareCommandPatchWithScopedAgent({
+      command,
+      commandId: normalizedCommandId,
+      existingCommand: commands[normalizedCommandId],
+      legacyAgents,
+      nativeAgents,
+    });
+
+    commands[normalizedCommandId] = this.mergeConfigObjects(commands[normalizedCommandId], commandPatch);
     config.command = commands;
+    if (Object.keys(nativeAgents).length > 0) {
+      config.agent = nativeAgents;
+    } else {
+      delete config.agent;
+    }
     await this.write(config);
   }
 
@@ -254,27 +261,31 @@ export class OpencodeConfigManager {
     const config = await this.read();
     const normalizedCommandId = this.normalizeConfigEntryId('command', commandId);
     const commands = this.cloneConfigRecord<OpencodeCommandConfig>(config.command);
+    const nativeAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.agent);
     delete commands[normalizedCommandId];
     if (Object.keys(commands).length > 0) {
       config.command = commands;
     } else {
       delete config.command;
     }
+    removeCommandScopedAgent(nativeAgents, normalizedCommandId);
+    if (Object.keys(nativeAgents).length > 0) {
+      config.agent = nativeAgents;
+    } else {
+      delete config.agent;
+    }
     await this.write(config);
   }
 
-  /** Get current permission configuration */
   async getPermissionConfig(): Promise<PermissionConfig | PermissionAction | undefined> {
     const config = await this.read();
     return config.permission;
   }
 
-  /** Set YOLO mode (allow all) */
   async setYoloMode(): Promise<void> {
     await this.updatePermission('allow');
   }
 
-  /** Set normal mode (ask for everything) */
   async setNormalMode(): Promise<void> {
     await this.updatePermission({
       '*': 'ask',
@@ -292,7 +303,6 @@ export class OpencodeConfigManager {
     });
   }
 
-  /** Set plan mode (deny write operations, ask for others) */
   async setPlanMode(): Promise<void> {
     await this.updatePermission({
       '*': 'ask',
@@ -302,7 +312,6 @@ export class OpencodeConfigManager {
     });
   }
 
-  /** Update permission for a specific tool */
   async setToolPermission(tool: string, action: PermissionAction): Promise<void> {
     const config = await this.read();
     
@@ -322,7 +331,6 @@ export class OpencodeConfigManager {
     await this.write(config);
   }
 
-  /** Get configuration directory path */
   getConfigDir(): string {
     return this.configDir;
   }
@@ -331,12 +339,10 @@ export class OpencodeConfigManager {
     return path.join(this.configDir, 'plugins');
   }
 
-  /** Get configuration file path */
   getConfigPath(): string {
     return this.configPath;
   }
 
-  /** Remove configuration file */
   async remove(): Promise<void> {
     try {
       if (await this.exists()) {
@@ -428,10 +434,6 @@ export class OpencodeConfigManager {
     return serialized === undefined ? value : JSON.parse(serialized) as T;
   }
 
-  /** 
-   * Check if OpenCode service needs restart after config change
-   * Note: This is a limitation - OpenCode reads config at startup
-   */
   async notifyRestartRequired(): Promise<void> {
     new Notice(
       'OpenCode configuration updated. Restart the OpenCode service for changes to take effect.',

@@ -10,7 +10,7 @@
 - 通过 companion owner `SettingsProjectCommandEditor` 处理 project command 的 create/edit/delete 壳层
 - 通过插件设置 `hiddenSlashCommands` 管理 slash menu 的用户级 visible/hidden 开关
 
-当前 item 6 slice 仍然只覆盖 commands settings 范围：project `command.<id>` 核心字段编辑、OpenCodian placeholder reference 展示与 catalog 可见性写回；runtime placeholder 展开、command-owned hidden agent 与 slash execution runtime 继续留给后续 slice。
+当前 owner 仍然聚焦 commands settings 范围：project `command.<id>` 字段编辑、OpenCodian placeholder reference、command-owned hidden agent 的 catalog/editor 回填，以及 catalog 可见性写回；runtime placeholder 展开与 slash execution runtime 继续留在相邻 runtime seam。
 
 ## 核心逻辑
 
@@ -20,10 +20,12 @@ owner 会并行读取：
 
 - `openCodeService.sdk.command.list()`：当前 runtime scope 的 slash command 目录
 - `OpencodeConfigManager.getCommandConfig()`：当前 vault `.opencode/opencode.json` 里的 project `command` map
+- `OpencodeConfigManager.getAgentConfig()`：当前 vault 里的 project/legacy agent map，用来识别 command-owned hidden agent
 
 合并时：
 
 - project `template` / `description` / `agent` / `model` / `subtask` 优先覆盖 runtime metadata
+- 如果 project command 指向 `opencodian-command:<id>` 这类 hidden agent，则 section 会把该 agent 的 `temperature` / `top_p` 回填给 editor，并尽量显示 metadata 里的 base agent，而不是暴露内部 agent ID
 - runtime 中不存在、但 project config 存在的条目会保留成 `projectOnly`
 - `source: 'mcp' | 'skill'` 的 runtime 条目不会进入这个 catalog shell
 
@@ -32,10 +34,11 @@ owner 会并行读取：
 `SettingsCommandsSection` 自己不持有 command 表单细节，而是在 vault config 可用时创建 `SettingsProjectCommandEditor`：
 
 - editor dropdown 可以选择 runtime command、runtime+project override、project-only command，或开始创建新项目命令
-- 选中 runtime command 时，editor 会用当前 catalog 中合并后的 `template` / `description` / `agent` / `model` / `subtask` 回填表单，因此 built-in 命令也能直接生成 project override
-- 保存统一走 `OpencodeConfigManager.upsertCommandConfig()`，写回 `command.<id>` 的五个核心字段；空白的 `description` / `agent` / `model` 会被转成 `undefined` patch，让 manager 清理这些字段
+- 选中 runtime command 时，editor 会用当前 catalog 中合并后的 `template` / `description` / `agent` / `model` / `temperature` / `top_p` / `subtask` 回填表单，因此 built-in 命令也能直接生成 project override
+- 保存统一走 `OpencodeConfigManager.upsertCommandConfig()`，写回 `command.<id>` 核心字段；空白的 `description` / `agent` / `model` 与 sampling 字段会被转成 `undefined` patch，让 manager 清理这些字段
 - `template` 在 editor 中是必填字段；删除动作统一走 `OpencodeConfigManager.removeCommandConfig()`，且只对当前已存在 project override 的条目开放
 - editor 在 `template` 字段下方展示 OpenCodian 支持的 placeholder token reference：`{{vault_path}}`、`{{current_note_path}}`、`{{current_selection}}`、`{{external_context_paths}}`、`{{conversation_title}}`
+- manager 会把命令级 `temperature` / `top_p` patch 转成 command-owned hidden agent；section 只负责 catalog/editor 回填，不接管这条持久化规则
 - 保存或删除成功后，editor 调用上层传入的 `onConfigChanged()`，让 section 重新拉取 runtime/project catalog 并刷新 editor + catalog
 
 ### 用户可见性写回
@@ -62,7 +65,7 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 
 - `OpenCodianSettings.ts`: 创建并挂载本 owner，把 Commands section 从主设置页中独立出来
 - `OpenCodeService`: 通过 SDK façade 的 `command.list()` 读取 runtime slash command 目录
-- `OpencodeConfigManager`: 读取当前 vault 的 project `command` 配置
+- `OpencodeConfigManager`: 读取当前 vault 的 project `command` / `agent` 配置，并负责 command-owned hidden agent lifecycle
 - `SettingsProjectCommandEditor.ts`: 负责 project command 核心字段表单、保存 / 删除 action 与 notice
 - `core/types/settings.ts`: 提供插件设置里的 `hiddenSlashCommands`
 - `i18n/locales/*`: 提供 Commands section 标题、catalog 来源、可见性和错误文案
@@ -72,4 +75,4 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 - 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`。
 - project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀。
 - `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径。
-- 如果后续 slice 需要 runtime placeholder 展开、command-owned hidden agent 或 slash execution，应继续沿着本 owner + editor seam 扩展，而不是绕开现有 catalog seam。
+- runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有 catalog seam。

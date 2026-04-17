@@ -60,8 +60,8 @@
   - agent 侧 hide 其余规则与更厚运行时语义仍留在后续 Agents/Commands slice
 - **Commands**
   - `SettingsCommandsSection` 现在接管 slash command 目录壳层：合并 `sdk.command.list()` 返回的 runtime slash commands 与 project `.opencode/opencode.json` `command` 条目
-  - 当前已暴露 companion owner `SettingsProjectCommandEditor`：支持创建 / 编辑 / 删除 project `command.<id>` 的 `template`、`description`、`agent`、`model`、`subtask`，并展示 OpenCodian placeholder reference
-  - slash menu visible/hidden 开关仍写回插件设置 `hiddenSlashCommands`；runtime placeholder expansion、command-owned hidden agent 与 slash execution 继续留给后续 commands slice
+  - 当前已暴露 companion owner `SettingsProjectCommandEditor`：支持创建 / 编辑 / 删除 project `command.<id>` 的 `template`、`description`、`agent`、`model`、`temperature`、`top_p`、`subtask`，并展示 OpenCodian placeholder reference
+  - slash menu visible/hidden 开关仍写回插件设置 `hiddenSlashCommands`；命令级 `temperature` / `top_p` 通过 `OpencodeConfigManager` 自动落到 command-owned hidden agent；runtime placeholder expansion 与 slash execution 则继续留在相邻 runtime seam
 - **Plugins**
   - `SettingsPluginSection` 现在接管 plugin environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config 管理
   - `OpenCodianSettings` 不再直接铺开 plugin snapshot refresh、config editor 保存、directory/OMO action 或 restart notice 细节，只保留 owner 装配与 inline-code formatting seam

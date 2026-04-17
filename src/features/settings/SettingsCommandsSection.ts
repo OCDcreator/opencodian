@@ -1,7 +1,16 @@
 import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 import { Setting } from 'obsidian';
 
-import type { OpencodeCommandConfig, OpencodeCommandConfigRecord } from '../../core/types';
+import {
+  getCommandScopedAgentId,
+  getCommandScopedAgentMetadata,
+} from '../../core/config/commandScopedAgent';
+import type {
+  OpencodeAgentConfig,
+  OpencodeAgentConfigRecord,
+  OpencodeCommandConfig,
+  OpencodeCommandConfigRecord,
+} from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -75,9 +84,86 @@ function normalizeCommandSubtask(
   return runtimeCommand?.subtask === true;
 }
 
+function normalizeCommandSamplingValue(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function resolveCommandScopedAgent(
+  commandId: string,
+  projectCommand: OpencodeCommandConfig | undefined,
+  projectAgents: OpencodeAgentConfigRecord,
+): {
+  agent: OpencodeAgentConfig | undefined;
+  metadata: Record<string, unknown> | undefined;
+} {
+  const scopedAgentId = getCommandScopedAgentId(commandId);
+  if (projectCommand?.agent !== scopedAgentId) {
+    return {
+      agent: undefined,
+      metadata: undefined,
+    };
+  }
+
+  const agent = projectAgents[scopedAgentId];
+  return {
+    agent,
+    metadata: getCommandScopedAgentMetadata(agent?.options, commandId),
+  };
+}
+
+function normalizeCommandAgent(
+  commandId: string,
+  runtimeCommand: RuntimeCommand | undefined,
+  projectCommand: OpencodeCommandConfig | undefined,
+  projectAgents: OpencodeAgentConfigRecord,
+): string {
+  const scopedAgent = resolveCommandScopedAgent(commandId, projectCommand, projectAgents);
+  const baseAgent = typeof scopedAgent.metadata?.baseAgent === 'string'
+    ? scopedAgent.metadata.baseAgent.trim()
+    : '';
+  if (baseAgent) {
+    return baseAgent;
+  }
+
+  if (projectCommand?.agent === getCommandScopedAgentId(commandId)) {
+    return '';
+  }
+
+  return normalizeCommandTextField(runtimeCommand?.agent, projectCommand?.agent);
+}
+
+function normalizeCommandTemperature(
+  commandId: string,
+  projectCommand: OpencodeCommandConfig | undefined,
+  projectAgents: OpencodeAgentConfigRecord,
+): number | undefined {
+  const commandTemperature = normalizeCommandSamplingValue(projectCommand?.temperature);
+  if (commandTemperature !== undefined) {
+    return commandTemperature;
+  }
+
+  const scopedAgent = resolveCommandScopedAgent(commandId, projectCommand, projectAgents);
+  return normalizeCommandSamplingValue(scopedAgent.agent?.temperature);
+}
+
+function normalizeCommandTopP(
+  commandId: string,
+  projectCommand: OpencodeCommandConfig | undefined,
+  projectAgents: OpencodeAgentConfigRecord,
+): number | undefined {
+  const commandTopP = normalizeCommandSamplingValue(projectCommand?.top_p);
+  if (commandTopP !== undefined) {
+    return commandTopP;
+  }
+
+  const scopedAgent = resolveCommandScopedAgent(commandId, projectCommand, projectAgents);
+  return normalizeCommandSamplingValue(scopedAgent.agent?.top_p);
+}
+
 function mergeCommandCatalog(
   runtimeCommands: RuntimeCommand[],
   projectCommands: OpencodeCommandConfigRecord,
+  projectAgents: OpencodeAgentConfigRecord,
   hiddenCommandIds: Set<string>,
 ): CommandCatalogEntry[] {
   const mergedEntries = new Map<string, CommandCatalogEntry>();
@@ -92,8 +178,15 @@ function mergeCommandCatalog(
       id: runtimeCommand.name,
       template: normalizeCommandTemplate(runtimeCommand, projectCommand),
       description: normalizeCommandDescription(runtimeCommand, projectCommand),
-      agent: normalizeCommandTextField(runtimeCommand.agent, projectCommand?.agent),
+      agent: normalizeCommandAgent(
+        runtimeCommand.name,
+        runtimeCommand,
+        projectCommand,
+        projectAgents,
+      ),
       model: normalizeCommandTextField(runtimeCommand.model, projectCommand?.model),
+      temperature: normalizeCommandTemperature(runtimeCommand.name, projectCommand, projectAgents),
+      topP: normalizeCommandTopP(runtimeCommand.name, projectCommand, projectAgents),
       hasProjectOverride: projectCommand !== undefined,
       hidden: hiddenCommandIds.has(runtimeCommand.name),
       runtimeAvailable: true,
@@ -110,8 +203,10 @@ function mergeCommandCatalog(
       id: commandId,
       template: normalizeCommandTemplate(undefined, projectCommand),
       description: normalizeCommandDescription(undefined, projectCommand),
-      agent: normalizeCommandTextField(undefined, projectCommand.agent),
+      agent: normalizeCommandAgent(commandId, undefined, projectCommand, projectAgents),
       model: normalizeCommandTextField(undefined, projectCommand.model),
+      temperature: normalizeCommandTemperature(commandId, projectCommand, projectAgents),
+      topP: normalizeCommandTopP(commandId, projectCommand, projectAgents),
       hasProjectOverride: true,
       hidden: hiddenCommandIds.has(commandId),
       runtimeAvailable: false,
@@ -242,9 +337,10 @@ export class SettingsCommandsSection {
     } = options;
 
     try {
-      const [runtimeCommandsResult, projectCommands] = await Promise.all([
+      const [runtimeCommandsResult, projectCommands, projectAgents] = await Promise.all([
         this.plugin.openCodeService.sdk.command.list(),
         configManager.getCommandConfig(),
+        configManager.getAgentConfig(),
       ]);
 
       if (currentRunId !== this.refreshRunId) {
@@ -253,7 +349,12 @@ export class SettingsCommandsSection {
 
       const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
       const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
-      const mergedCommands = mergeCommandCatalog(runtimeCommands, projectCommands, hiddenCommandIds);
+      const mergedCommands = mergeCommandCatalog(
+        runtimeCommands,
+        projectCommands,
+        projectAgents,
+        hiddenCommandIds,
+      );
       this.renderCatalog({
         catalogBodyEl,
         configManager,
