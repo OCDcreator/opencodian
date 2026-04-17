@@ -200,6 +200,7 @@ docs/modules/
 │       ├── SettingsModelCatalogPresenter.md
 │       ├── SettingsModelIconCacheManager.md
 │       ├── SettingsModelSection.md
+│       ├── SettingsProjectCommandEditor.md
 │       ├── SettingsSectionCoordinator.md
 │       ├── SettingsSecuritySection.md
 │       ├── SettingsServerSection.md

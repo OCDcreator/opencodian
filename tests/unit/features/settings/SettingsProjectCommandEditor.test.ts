@@ -1,21 +1,24 @@
-import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 import { Setting } from 'obsidian';
+import * as obsidian from 'obsidian';
 
 import type { OpencodeCommandConfigRecord } from '../../../../src/core/types';
-import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
-import { setLocale } from '../../../../src/i18n';
+import {
+  type ProjectCommandEditorSource,
+  SettingsProjectCommandEditor,
+} from '../../../../src/features/settings/SettingsProjectCommandEditor';
+import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
-
-interface MockToggleControl {
-  setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>;
-  onChange: jest.MockedFunction<(callback: (value: boolean) => void | Promise<void>) => MockToggleControl>;
-}
 
 interface MockDropdownControl {
   addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>;
   setValue: jest.MockedFunction<(value: string) => MockDropdownControl>;
   onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockDropdownControl>;
   selectEl: HTMLSelectElement;
+}
+
+interface MockToggleControl {
+  setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>;
+  onChange: jest.MockedFunction<(callback: (value: boolean) => void | Promise<void>) => MockToggleControl>;
 }
 
 interface MockTextControl {
@@ -38,16 +41,16 @@ interface MockButtonControl {
   onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
 }
 
-interface ToggleRecord {
-  control: MockToggleControl;
-  name: string;
-  onChange?: (value: boolean) => void | Promise<void>;
-}
-
 interface DropdownRecord {
   control: MockDropdownControl;
   name: string;
   onChange?: (value: string) => void | Promise<void>;
+}
+
+interface ToggleRecord {
+  control: MockToggleControl;
+  name: string;
+  onChange?: (value: boolean) => void | Promise<void>;
 }
 
 interface TextRecord {
@@ -69,9 +72,9 @@ interface ButtonRecord {
   onClick?: () => void | Promise<void>;
 }
 
-type CommandsSectionPlugin = Pick<
-  OpenCodianPlugin,
-  'openCodeService' | 'opencodeConfigManager' | 'saveSettings' | 'settings'
+type ProjectCommandConfigManager = Pick<
+  NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  'upsertCommandConfig' | 'removeCommandConfig'
 >;
 
 const dropdownRecords: DropdownRecord[] = [];
@@ -182,70 +185,69 @@ function createButtonRecord(name: string): ButtonRecord {
   return record;
 }
 
-function createRuntimeCommand(
-  overrides: Partial<RuntimeCommand> & Pick<RuntimeCommand, 'name'>,
-): RuntimeCommand {
+function createConfigManager(): ProjectCommandConfigManager {
   return {
-    name: overrides.name,
-    description: overrides.description,
-    agent: overrides.agent,
-    model: overrides.model,
-    source: overrides.source ?? 'command',
-    template: overrides.template ?? `/${overrides.name}`,
-    subtask: overrides.subtask,
-    hints: overrides.hints ?? [],
+    upsertCommandConfig: jest.fn().mockResolvedValue(undefined),
+    removeCommandConfig: jest.fn().mockResolvedValue(undefined),
+  } as unknown as ProjectCommandConfigManager;
+}
+
+function createCommandSource(
+  overrides: Partial<ProjectCommandEditorSource> & Pick<ProjectCommandEditorSource, 'id'>,
+): ProjectCommandEditorSource {
+  return {
+    id: overrides.id,
+    template: overrides.template ?? `Run /${overrides.id}`,
+    description: overrides.description ?? '',
+    agent: overrides.agent ?? '',
+    model: overrides.model ?? '',
+    subtask: overrides.subtask ?? false,
+    hasProjectOverride: overrides.hasProjectOverride ?? false,
+    runtimeAvailable: overrides.runtimeAvailable ?? true,
   };
 }
 
-function createPlugin(options: {
-  runtimeCommands?: RuntimeCommand[];
+function renderEditor(options: {
+  commands?: ProjectCommandEditorSource[];
   projectCommands?: OpencodeCommandConfigRecord;
-  hiddenSlashCommands?: string[];
-} = {}): CommandsSectionPlugin {
-  return {
-    openCodeService: {
-      sdk: {
-        command: {
-          list: jest.fn().mockResolvedValue(options.runtimeCommands ?? []),
-        },
-      },
-    },
-    opencodeConfigManager: {
-      getCommandConfig: jest.fn().mockResolvedValue(options.projectCommands ?? {}),
-      upsertCommandConfig: jest.fn().mockResolvedValue(undefined),
-      removeCommandConfig: jest.fn().mockResolvedValue(undefined),
-    },
-    settings: {
-      hiddenSlashCommands: [...(options.hiddenSlashCommands ?? [])],
-    },
-    saveSettings: jest.fn().mockResolvedValue(undefined),
-  } as unknown as CommandsSectionPlugin;
-}
-
-function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
-  const headingEl = document.createElement('h2');
-  headingEl.textContent = title;
-  containerEl.appendChild(headingEl);
-  return headingEl;
-}
-
-function createSection(plugin = createPlugin()) {
-  const section = new SettingsCommandsSection({
-    plugin: plugin as unknown as OpenCodianPlugin,
-    createSectionHeading,
-  });
+} = {}) {
+  const configManager = createConfigManager();
+  const onConfigChanged = jest.fn().mockResolvedValue(undefined);
+  const editor = new SettingsProjectCommandEditor(
+    configManager as NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  );
   const containerEl = document.createElement('div');
   document.body.appendChild(containerEl);
-  section.attach(containerEl);
-  return {
+  editor.render({
     containerEl,
-    plugin,
-    section,
+    commands: options.commands ?? [],
+    onConfigChanged,
+    projectCommands: options.projectCommands ?? {},
+  });
+  return {
+    configManager,
+    onConfigChanged,
   };
+}
+
+function findDropdown(name: string): DropdownRecord | undefined {
+  return dropdownRecords.find((record) => record.name === name);
 }
 
 function findToggle(name: string): ToggleRecord | undefined {
   return toggleRecords.find((record) => record.name === name);
+}
+
+function findText(name: string): TextRecord | undefined {
+  return textRecords.find((record) => record.name === name);
+}
+
+function findTextArea(name: string): TextAreaRecord | undefined {
+  return textAreaRecords.find((record) => record.name === name);
+}
+
+function findButton(label: string): ButtonRecord | undefined {
+  return buttonRecords.find((record) => record.label === label);
 }
 
 async function flushAsync(): Promise<void> {
@@ -326,73 +328,129 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('SettingsCommandsSection catalog shell', () => {
-  it('loads runtime and project commands into slash visibility controls', async () => {
-    const plugin = createPlugin({
-      runtimeCommands: [
-        createRuntimeCommand({
-          name: 'init',
-          description: 'Guided setup',
-        }),
-        createRuntimeCommand({
-          name: 'review',
+describe('SettingsProjectCommandEditor', () => {
+  it('creates a project command with editable core fields', async () => {
+    const { configManager } = renderEditor();
+
+    await findText(t('settings.commands.editor.id.name'))?.onChange?.('review-tests');
+    await findTextArea(t('settings.commands.editor.template.name'))?.onChange?.('Review the focused test files and suggest improvements.');
+    await findText(t('settings.commands.editor.description.name'))?.onChange?.('Review focused tests');
+    await findText(t('settings.commands.editor.agent.name'))?.onChange?.('reviewer');
+    await findText(t('settings.commands.editor.model.name'))?.onChange?.('anthropic/claude-sonnet-4');
+    await findToggle(t('settings.commands.editor.subtask.name'))?.onChange?.(true);
+
+    await findButton(t('settings.commands.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertCommandConfig).toHaveBeenCalledWith('review-tests', {
+      template: 'Review the focused test files and suggest improvements.',
+      description: 'Review focused tests',
+      agent: 'reviewer',
+      model: 'anthropic/claude-sonnet-4',
+      subtask: true,
+    });
+  });
+
+  it('prefills runtime command defaults when saving a built-in override', async () => {
+    const { configManager } = renderEditor({
+      commands: [
+        createCommandSource({
+          id: 'review',
+          template: 'Review the current changeset.',
           description: 'Review changes',
+          agent: 'code-review',
+          model: 'anthropic/claude-sonnet-4',
           subtask: true,
         }),
-        createRuntimeCommand({
-          name: 'mcp-prompt',
-          source: 'mcp',
-          description: 'Should stay out of the command catalog shell',
+      ],
+    });
+
+    await findDropdown(t('settings.commands.editor.select.name'))?.onChange?.('review');
+
+    expect(findText(t('settings.commands.editor.id.name'))?.control.setValue).toHaveBeenLastCalledWith('review');
+    expect(findTextArea(t('settings.commands.editor.template.name'))?.control.setValue).toHaveBeenLastCalledWith('Review the current changeset.');
+    expect(findText(t('settings.commands.editor.description.name'))?.control.setValue).toHaveBeenLastCalledWith('Review changes');
+    expect(findText(t('settings.commands.editor.agent.name'))?.control.setValue).toHaveBeenLastCalledWith('code-review');
+    expect(findText(t('settings.commands.editor.model.name'))?.control.setValue).toHaveBeenLastCalledWith('anthropic/claude-sonnet-4');
+    expect(findToggle(t('settings.commands.editor.subtask.name'))?.control.setValue).toHaveBeenLastCalledWith(true);
+
+    await findText(t('settings.commands.editor.description.name'))?.onChange?.('Review the staged changes');
+    await findToggle(t('settings.commands.editor.subtask.name'))?.onChange?.(false);
+
+    await findButton(t('settings.commands.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertCommandConfig).toHaveBeenCalledWith('review', {
+      template: 'Review the current changeset.',
+      description: 'Review the staged changes',
+      agent: 'code-review',
+      model: 'anthropic/claude-sonnet-4',
+      subtask: false,
+    });
+  });
+
+  it('edits and deletes a selected project command', async () => {
+    const { configManager } = renderEditor({
+      commands: [
+        createCommandSource({
+          id: 'deploy',
+          template: 'Deploy the plugin.',
+          description: 'Project deploy command',
+          agent: 'ops',
+          model: 'openai/gpt-4.1',
+          subtask: false,
+          hasProjectOverride: true,
+          runtimeAvailable: false,
         }),
       ],
       projectCommands: {
-        review: {
-          description: 'Project review override',
-        },
         deploy: {
-          description: 'Project-only deploy command',
+          template: 'Deploy the plugin.',
+          description: 'Project deploy command',
           agent: 'ops',
+          model: 'openai/gpt-4.1',
+          subtask: false,
+          custom: true,
         },
       },
-      hiddenSlashCommands: ['review'],
     });
 
-    createSection(plugin);
+    await findDropdown(t('settings.commands.editor.select.name'))?.onChange?.('deploy');
+
+    await findTextArea(t('settings.commands.editor.template.name'))?.onChange?.('Deploy the plugin after a clean build.');
+    await findText(t('settings.commands.editor.description.name'))?.onChange?.('');
+    await findText(t('settings.commands.editor.agent.name'))?.onChange?.('release-manager');
+    await findText(t('settings.commands.editor.model.name'))?.onChange?.('');
+    await findToggle(t('settings.commands.editor.subtask.name'))?.onChange?.(true);
+
+    await findButton(t('settings.commands.editor.actions.save'))?.onClick?.();
     await flushAsync();
 
-    expect(plugin.openCodeService.sdk.command.list).toHaveBeenCalledTimes(1);
-    expect(plugin.opencodeConfigManager?.getCommandConfig).toHaveBeenCalledTimes(1);
-    expect(findToggle('/init')?.control.setValue).toHaveBeenCalledWith(true);
-    expect(findToggle('/review')?.control.setValue).toHaveBeenCalledWith(false);
-    expect(findToggle('/deploy')?.control.setValue).toHaveBeenCalledWith(true);
-    expect(findToggle('/mcp-prompt')).toBeUndefined();
+    expect(configManager.upsertCommandConfig).toHaveBeenCalledWith('deploy', {
+      template: 'Deploy the plugin after a clean build.',
+      description: undefined,
+      agent: 'release-manager',
+      model: undefined,
+      subtask: true,
+    });
+
+    await findButton(t('settings.commands.editor.actions.delete'))?.onClick?.();
+
+    expect(configManager.removeCommandConfig).toHaveBeenCalledWith('deploy');
   });
 
-  it('persists hidden slash command ids through plugin settings', async () => {
-    const plugin = createPlugin({
-      runtimeCommands: [
-        createRuntimeCommand({ name: 'init' }),
-        createRuntimeCommand({ name: 'review' }),
-      ],
-      hiddenSlashCommands: ['review', 'review'],
-    });
+  it('rejects saves without a command template', async () => {
+    const { configManager, onConfigChanged } = renderEditor();
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
 
-    createSection(plugin);
+    await findText(t('settings.commands.editor.id.name'))?.onChange?.('review-tests');
+    await findTextArea(t('settings.commands.editor.template.name'))?.onChange?.('   ');
+
+    await findButton(t('settings.commands.editor.actions.save'))?.onClick?.();
     await flushAsync();
 
-    await findToggle('/init')?.onChange?.(false);
-    await flushAsync();
-
-    expect(plugin.settings.hiddenSlashCommands).toEqual(['init', 'review']);
-    expect(plugin.saveSettings).toHaveBeenCalledWith({
-      syncConfig: false,
-      reloadModels: false,
-      applyUi: false,
-    });
-
-    await findToggle('/review')?.onChange?.(true);
-    await flushAsync();
-
-    expect(plugin.settings.hiddenSlashCommands).toEqual(['init']);
+    expect(configManager.upsertCommandConfig).not.toHaveBeenCalled();
+    expect(onConfigChanged).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.commands.editor.notice.templateRequired'));
   });
 });

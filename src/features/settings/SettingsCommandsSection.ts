@@ -5,6 +5,10 @@ import type { OpencodeCommandConfig, OpencodeCommandConfigRecord } from '../../c
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import {
+  type ProjectCommandEditorSource,
+  SettingsProjectCommandEditor,
+} from './SettingsProjectCommandEditor';
 
 const logger = createLogger('SettingsCommandsSection');
 
@@ -17,22 +21,17 @@ interface SettingsCommandsSectionOptions {
   ) => HTMLHeadingElement;
 }
 
-interface CommandCatalogEntry {
-  id: string;
-  description: string;
-  agent: string;
-  model: string;
-  hasProjectOverride: boolean;
+interface CommandCatalogEntry extends ProjectCommandEditorSource {
   hidden: boolean;
-  runtimeAvailable: boolean;
-  subtask: boolean;
 }
 
 interface CommandCatalogRenderContext {
   catalogBodyEl: HTMLElement;
   configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
   currentRunId: number;
+  editorBodyEl: HTMLElement;
   mergedCommands: CommandCatalogEntry[];
+  projectCommands: OpencodeCommandConfigRecord;
 }
 
 function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
@@ -56,6 +55,13 @@ function normalizeCommandDescription(
   projectCommand: OpencodeCommandConfig | undefined,
 ): string {
   return normalizeCommandTextField(runtimeCommand?.description, projectCommand?.description);
+}
+
+function normalizeCommandTemplate(
+  runtimeCommand: RuntimeCommand | undefined,
+  projectCommand: OpencodeCommandConfig | undefined,
+): string {
+  return normalizeCommandTextField(runtimeCommand?.template, projectCommand?.template);
 }
 
 function normalizeCommandSubtask(
@@ -84,6 +90,7 @@ function mergeCommandCatalog(
     const projectCommand = projectCommands[runtimeCommand.name];
     mergedEntries.set(runtimeCommand.name, {
       id: runtimeCommand.name,
+      template: normalizeCommandTemplate(runtimeCommand, projectCommand),
       description: normalizeCommandDescription(runtimeCommand, projectCommand),
       agent: normalizeCommandTextField(runtimeCommand.agent, projectCommand?.agent),
       model: normalizeCommandTextField(runtimeCommand.model, projectCommand?.model),
@@ -101,6 +108,7 @@ function mergeCommandCatalog(
 
     mergedEntries.set(commandId, {
       id: commandId,
+      template: normalizeCommandTemplate(undefined, projectCommand),
       description: normalizeCommandDescription(undefined, projectCommand),
       agent: normalizeCommandTextField(undefined, projectCommand.agent),
       model: normalizeCommandTextField(undefined, projectCommand.model),
@@ -151,6 +159,7 @@ export class SettingsCommandsSection {
     title: string,
     tooltip?: string,
   ) => HTMLHeadingElement;
+  private projectCommandEditor: SettingsProjectCommandEditor | null = null;
   private refreshRunId = 0;
 
   constructor(options: SettingsCommandsSectionOptions) {
@@ -179,14 +188,31 @@ export class SettingsCommandsSection {
       return headingEl;
     }
 
+    this.projectCommandEditor ??= new SettingsProjectCommandEditor(configManager);
+
+    const editorBodyEl = this.createProjectCommandEditorBlock(containerEl);
     const catalogBodyEl = this.createCatalogBlock(containerEl);
     void this.refreshCatalog({
       catalogBodyEl,
       configManager,
       currentRunId,
+      editorBodyEl,
     });
 
     return headingEl;
+  }
+
+  private createProjectCommandEditorBlock(containerEl: HTMLElement): HTMLElement {
+    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block' });
+    blockEl.createEl('h4', {
+      text: t('settings.commands.editor.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+    blockEl.createDiv({
+      cls: 'opencodian-plugin-block-desc',
+      text: t('settings.commands.editor.desc'),
+    });
+    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
   }
 
   private createCatalogBlock(containerEl: HTMLElement): HTMLElement {
@@ -206,11 +232,13 @@ export class SettingsCommandsSection {
     catalogBodyEl: HTMLElement;
     configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
     currentRunId: number;
+    editorBodyEl: HTMLElement;
   }): Promise<void> {
     const {
       catalogBodyEl,
       configManager,
       currentRunId,
+      editorBodyEl,
     } = options;
 
     try {
@@ -230,7 +258,9 @@ export class SettingsCommandsSection {
         catalogBodyEl,
         configManager,
         currentRunId,
+        editorBodyEl,
         mergedCommands,
+        projectCommands,
       });
     } catch (error) {
       if (currentRunId !== this.refreshRunId) {
@@ -238,6 +268,7 @@ export class SettingsCommandsSection {
       }
 
       logger.error('Failed to load command catalog:', error);
+      editorBodyEl.replaceChildren();
       this.renderCatalogLoadFailure(catalogBodyEl, error);
     }
   }
@@ -247,8 +278,24 @@ export class SettingsCommandsSection {
       catalogBodyEl,
       configManager,
       currentRunId,
+      editorBodyEl,
       mergedCommands,
+      projectCommands,
     } = context;
+
+    this.projectCommandEditor?.render({
+      commands: mergedCommands,
+      containerEl: editorBodyEl,
+      onConfigChanged: async () => {
+        await this.refreshCatalog({
+          catalogBodyEl,
+          configManager,
+          currentRunId,
+          editorBodyEl,
+        });
+      },
+      projectCommands,
+    });
 
     catalogBodyEl.replaceChildren();
 
@@ -271,6 +318,7 @@ export class SettingsCommandsSection {
               catalogBodyEl,
               configManager,
               currentRunId,
+              editorBodyEl,
             });
           });
       });
