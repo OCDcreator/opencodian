@@ -8,6 +8,7 @@ import {
   type SendPipelineHost,
   type SendPipelinePreparationPort,
   SendPipelineRuntime,
+  type SendPipelineSlashCommandPort,
   type SendPipelineStreamController,
   type SendPipelineTabRuntime,
 } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
@@ -90,6 +91,13 @@ type MockedSendPipelineHost = {
     SendPipelineHost[Key] extends (...args: infer Args) => infer Result
       ? jest.Mock<Result, Args>
       : SendPipelineHost[Key];
+};
+
+type MockedSlashCommandPort = {
+  [Key in keyof SendPipelineSlashCommandPort]:
+    SendPipelineSlashCommandPort[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : SendPipelineSlashCommandPort[Key];
 };
 
 function createStreamController(callOrder: string[] = []): SendPipelineStreamController {
@@ -255,6 +263,29 @@ describe('SendPipelineRuntime', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+  });
+
+  it('delegates handled slash commands before preparing a normal streamed send', async () => {
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(createPreparedSend());
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController);
+    const slashCommandPort: MockedSlashCommandPort = {
+      tryRunSlashCommand: jest.fn().mockResolvedValue(true),
+    };
+    const runtime = new SendPipelineRuntime(
+      host,
+      preparationPort,
+      finalizationPort,
+      slashCommandPort,
+    );
+
+    await runtime.sendMessage('/review');
+
+    expect(slashCommandPort.tryRunSlashCommand).toHaveBeenCalledWith('/review');
+    expect(preparationPort.prepareMessageSend).not.toHaveBeenCalled();
+    expect(host.sendStreamMessage).not.toHaveBeenCalled();
   });
 
   it('aborts cleanly when preparation does not yield a sendable conversation', async () => {

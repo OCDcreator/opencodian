@@ -1310,6 +1310,7 @@ export const enTranslations = {
   'chat.tab.newCurrentCreated': 'New conversation created',
   'chat.tab.maxReached': 'Maximum tabs reached ({count})',
   'chat.tab.newBlockedWhileStreaming': 'A response is still streaming. Please try again in a moment.',
+  'chat.slashCommand.executionFailed': 'Failed to run /{command}: {message}',
   'chat.tab.processingBlocked': 'This tab is still processing a response. Please try again in a moment.',
   'chat.tab.streamingBlocked': 'Finish the current tab response before replacing or closing it',
   'chat.fork.button': 'Fork',

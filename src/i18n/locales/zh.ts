@@ -1310,6 +1310,7 @@ export const zhTranslations = {
   'chat.tab.newCurrentCreated': '已创建新对话',
   'chat.tab.maxReached': '已达到最大标签数（{count}）',
   'chat.tab.newBlockedWhileStreaming': '正在生成回复，请稍后再试',
+  'chat.slashCommand.executionFailed': '运行 /{command} 失败：{message}',
   'chat.tab.processingBlocked': '当前标签仍在处理回复，请稍后再试',
   'chat.tab.streamingBlocked': '请先等待当前标签回复完成，再替换或关闭它',
   'chat.fork.button': '分叉对话',

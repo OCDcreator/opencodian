@@ -287,6 +287,10 @@ import {
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
 import {
+  type SlashCommandExecutionHost,
+  SlashCommandExecutionService,
+} from './services/SlashCommandExecutionService';
+import {
   createTabActivationRuntimeViewHostFactoryHost,
   type TabActivationRuntimeHostProviderHost,
 } from './services/TabActivationRuntimeHostProvider';
@@ -1497,10 +1501,14 @@ export class OpenCodianView extends ItemView {
       }),
       streamingInlineCardRenderer,
     );
+    const slashCommandExecutionService = new SlashCommandExecutionService(
+      this.createSlashCommandExecutionHost(conversationSyncBridgePorts),
+    );
     const sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       messageSendPreparationService,
       messageFinalizationService,
+      slashCommandExecutionService,
     );
 
     return {
@@ -2316,6 +2324,54 @@ export class OpenCodianView extends ItemView {
       },
       clearPendingEditedFiles: (tabId) => {
         this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId);
+      },
+    };
+  }
+
+  private createSlashCommandExecutionHost(
+    conversationSyncBridgePorts: ConversationSyncBridgePorts,
+  ): SlashCommandExecutionHost {
+    return {
+      ensureConversationReady: async () => {
+        if (!this.currentConversation) {
+          await this.createNewConversation();
+        }
+
+        return this.currentConversation;
+      },
+      getActiveTabId: () => this.getActiveTabId(),
+      ensureTabRuntime: (tabId) => Boolean(this.ensureTabRuntimeState(tabId)),
+      isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
+      notifyForegroundBusy: () => {
+        new Notice(t('chat.tab.processingBlocked'));
+      },
+      getServerAvailability: () => this.getServerAvailability(),
+      refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
+      ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
+      getProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
+      getRuntimeCommands: async () => {
+        const runtimeCommands = await this.plugin.openCodeService.sdk.command.list();
+        return Array.isArray(runtimeCommands) ? runtimeCommands : [];
+      },
+      getVaultPath: () => getVaultBasePath(this.app),
+      refreshActiveFocusContextPreview: () => {
+        this.composerContextViewFacade.refreshActiveFocusContextPreview();
+      },
+      getActiveFocusContextPreview: () =>
+        this.getTabRuntimeState(this.getActiveTabId())?.focusContextPreview ?? null,
+      runSessionCommand: (sessionId, input) =>
+        this.plugin.openCodeService.runSessionCommand(sessionId, input),
+      startConversationSyncLoop: () => {
+        conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
+      },
+      syncVisibleConversationInBackground: () =>
+        conversationSyncBridgePorts.getVisibleSyncFollowUp().syncVisibleConversationInBackground(),
+      notifySlashCommandFailed: (commandId, error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        new Notice(t('chat.slashCommand.executionFailed', {
+          command: commandId,
+          message,
+        }));
       },
     };
   }

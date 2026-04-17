@@ -33,14 +33,23 @@ export type {
   StreamLocalFinalizerResult,
 } from './SendPipelineTypes';
 
+export interface SendPipelineSlashCommandPort {
+  tryRunSlashCommand(content: string): Promise<boolean>;
+}
+
 export class SendPipelineRuntime {
   constructor(
     private readonly host: SendPipelineRuntimeHost,
     private readonly messageSendPreparationService: SendPipelinePreparationPort,
     private readonly messageFinalizationService: SendPipelineFinalizationPort,
+    private readonly slashCommandExecutionService?: SendPipelineSlashCommandPort,
   ) {}
 
   async sendMessage(content: string): Promise<void> {
+    if (await this.slashCommandExecutionService?.tryRunSlashCommand(content)) {
+      return;
+    }
+
     const preparedSend = await this.messageSendPreparationService.prepareMessageSend({ content });
     if (!preparedSend) {
       return;
