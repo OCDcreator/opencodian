@@ -1,8 +1,9 @@
 # Model Config Maintainability Master Plan
 
-> **Status**: [ACTIVE]
+> **Status**: [PAUSED]
 > **Purpose**: Controlled unattended maintainability queue for coarse package extraction and defragmentation after the Agents / Commands / Session Settings feature line completed.
 > **Base**: Branch `autopilot/model-config-maintainability`, starting from feature-complete commit `d14186f`.
+> **Auto-advance state**: `M6` closeout is complete; there is currently no `[NEXT]` or `[QUEUED]` item, so this autopilot queue is paused until a new manual backlog is written.
 
 ## Objective
 
@@ -16,10 +17,11 @@ Improve maintainability without creating more thin helper sprawl:
 
 ## Current Baseline
 
-- `src/features/chat/OpenCodianView.ts` remains large, but chat already has many tiny adjacent files; do not start by extracting more chat helpers.
-- `src/features/chat/services/` has high file-count pressure; defragment before any new chat owner extraction.
-- `src/features/settings/ModelConfigModal.ts` and `src/utils/icons/ProviderIconService.ts` are thick, cohesive, and better first targets.
-- `src/core/types/settings.ts`, `src/core/opencode/OpenCodeService.ts`, `src/core/opencode/ServerManager.ts`, and `src/main.ts` are explicitly out of scope for this queue unless a validation blocker demands a minimal touch.
+- `ModelConfigModal` closeout is complete: `src/features/settings/ModelConfigModal.ts` now sits at `800` lines, with `modelConfigModalState.ts` (`133`), `modelConfigSavePlan.ts` (`365`), `ModelConfigProviderEditor.ts` (`726`), and `ModelConfigModelListEditor.ts` (`429`) owning the extracted state/save/editor seams.
+- The trailing-assistant helper defragmentation is complete: `trailingAssistantPatchPlanning.ts` (`265`), `trailingAssistantPatchExecution.ts` (`297`), `trailingAssistantPatchDebug.ts` (`441`), and `trailingAssistantPatchTypes.ts` (`374`) hold the chat patch responsibilities without reintroducing thin helpers.
+- Provider-icon extraction is complete: `src/utils/icons/ProviderIconService.ts` is down to `222` lines, with `providerIconEntryResolution.ts` (`336`), `providerIconAssetCache.ts` (`596`), `providerIconCustomSources.ts` (`387`), and `providerIconBuiltinSelection.ts` (`556`) owning the durable seams.
+- Style-settings extraction is complete: `src/features/settings/SettingsStyleSection.ts` is down to `791` lines, with `settingsStyleControls.ts` (`539`) and `SettingsStylePresetSection.ts` (`210`) holding the extracted control/preset bulk.
+- M6 closeout validation passed on this branch with `npm run lint`, `npm run typecheck`, `npm test` (`294` suites / `1258` tests), and `BUILD_ID=autopilot-model-config-maintainability.202604172223 npm run build`.
 
 ## Guardrails
 

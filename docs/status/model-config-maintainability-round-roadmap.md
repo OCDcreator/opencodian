@@ -1,7 +1,7 @@
 # Model Config Maintainability Round Roadmap
 
-> **Status**: [ACTIVE]
-> **Rule**: Execute only the first `[NEXT]` item. On success, mark it `[DONE]` and promote exactly one following `[QUEUED]` item to `[NEXT]`.
+> **Status**: [PAUSED]
+> **Rule**: Execute only the first `[NEXT]` item. On success, mark it `[DONE]` and promote exactly one following `[QUEUED]` item to `[NEXT]`; when no `[NEXT]` or `[QUEUED]` items remain, stop and wait for a manual requeue.
 
 ## Queue
 
@@ -89,7 +89,7 @@
   - `SettingsStyleSection.ts` loses control/preset bulk while retaining section orchestration.
   - Focused settings style tests and full validation pass.
 
-### [NEXT] M6 - Completion audit and final verification
+### [DONE] M6 - Completion audit and final verification
 
 - **Lane**: Queue closeout
 - **Goal**: Audit module boundaries, docs, line counts, and validation after M1-M5.
@@ -100,3 +100,9 @@
 - **Acceptance**:
   - Full `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` pass.
   - Return `goal_complete` only when no `[NEXT]` or `[QUEUED]` items remain.
+
+## Current State
+
+- `M1-M6` are complete.
+- There is currently no `[NEXT]` or `[QUEUED]` item in this queue.
+- Any future maintainability work on this lane must start with a manually written follow-up backlog before autopilot resumes.

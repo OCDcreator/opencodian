@@ -163,7 +163,11 @@ docs/modules/
 │   │   │   ├── PermissionModeSelectorCoordinator.md
 │   │   │   ├── PersistentAssistantNoticeService.md
 │   │   │   ├── ScrollManager.md
-│   │   │   └── TitleGenerationService.md
+│   │   │   ├── TitleGenerationService.md
+│   │   │   ├── trailingAssistantPatchDebug.md
+│   │   │   ├── trailingAssistantPatchExecution.md
+│   │   │   ├── trailingAssistantPatchPlanning.md
+│   │   │   └── trailingAssistantPatchTypes.md
 │   │   ├── tabs/
 │   │   │   ├── index.md
 │   │   │   ├── Tab.md

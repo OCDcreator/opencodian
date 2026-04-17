@@ -1,34 +1,31 @@
 # Model Config Maintainability Lane Map
 
-> **Status**: [ACTIVE]
-> **Use**: Quick map for the current controlled maintainability queue. Execute the first `[NEXT]` item from `model-config-maintainability-round-roadmap.md`; do not freestyle.
+> **Status**: [PAUSED]
+> **Use**: Quick map for the completed controlled maintainability queue. There is currently no active `[NEXT]`; use this file as the retained boundary map until a new manual queue exists.
 
-## Priority Order
+## Current State
 
-1. `ModelConfigModal` coarse extraction.
-2. Chat `TrailingAssistantPatch*` defragmentation.
-3. `ProviderIconService` responsibility split.
-4. `SettingsStyleSection` control / preset extraction.
-5. Completion audit.
+- **Current `[NEXT]`**: none
+- **Queue outcome**: `M1-M6` complete; the controlled queue is closed.
+- **Validation baseline**: `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` all pass at the `M6` closeout checkpoint.
 
-## Hotspots And Intent
+## Retained Boundary Map
 
-- `src/features/settings/ModelConfigModal.ts`: split along durable modal state/save/provider-editor/model-list boundaries; keep the modal as orchestration shell.
-- `src/style/modals/config-editor-modal.css`: only touch if modal boundary changes make selector grouping stale; do not perform a pure CSS redesign.
-- `src/features/chat/services/TrailingAssistantPatch*`: package many thin helpers into a few semantic files; this is consolidation, not extraction.
-- `src/utils/icons/ProviderIconService.ts`: preserve fallback order while moving entry resolution, asset/cache runtime, custom sources, and builtin selection into medium modules.
-- `src/features/settings/SettingsStyleSection.ts`: only extract reusable style controls and preset rendering into coarse modules.
+- `src/features/settings/ModelConfigModal.ts`: now remains the modal shell; extend `modelConfigModalState.ts`, `modelConfigSavePlan.ts`, `ModelConfigProviderEditor.ts`, or `ModelConfigModelListEditor.ts` before regrowing the shell.
+- `src/style/modals/config-editor-modal.css`: unchanged by the closeout round; only touch it if a future modal boundary change genuinely makes selector grouping stale.
+- `src/features/chat/services/trailingAssistantPatch*.ts`: the defragmented planning/execution/debug/types bundles are now the durable chat patch owners; do not recreate one-off helper files around them.
+- `src/utils/icons/ProviderIconService.ts`: remains the public static orchestrator; extend the entry-resolution, builtin-selection, custom-source, or asset-cache owners before pushing runtime detail back into the shell.
+- `src/features/settings/SettingsStyleSection.ts`: remains the section shell; extend `settingsStyleControls.ts`, `SettingsStylePresetSection.ts`, or the existing background/input subsection owners before regrowing it.
 
-## Do Not Touch Unless Blocked
+## Resume Rules
 
-- `src/features/chat/OpenCodianView.ts` broad refactors.
-- `src/core/types/settings.ts` decomposition.
-- `src/core/opencode/OpenCodeService.ts` or `src/core/opencode/ServerManager.ts` maintainability lanes.
-- `reference-projects/`.
+- Do not auto-start another round from this lane map; write a new manual queue item first.
+- Keep `src/features/chat/OpenCodianView.ts`, `src/core/types/settings.ts`, `src/core/opencode/OpenCodeService.ts`, `src/core/opencode/ServerManager.ts`, and `reference-projects/` out of scope unless a future queue explicitly reopens them.
+- Continue avoiding thin helper / adapter / provider / factory sprawl and continue to preserve fallback order, persistence semantics, and style/chat runtime behavior.
 
 ## Validation
 
-- Focused tests matching changed owners.
+- Focused tests matching changed owners when future rounds touch code or tests.
 - Full `npm run lint` with 0 errors / 0 warnings.
 - Full `npm run typecheck`.
 - Full `npm test`.
