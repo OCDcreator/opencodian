@@ -11,7 +11,7 @@
 
 - 模型 / 样式 / server / security owner 的装配与跨 section 桥接
 - 通过 `SettingsConversationSection` 协调 conversation section 的 title model / global session defaults / question card / user-markup lifecycle
-- 通过 `SettingsAgentsSection` 协调 Agents section 的 runtime+project agent catalog、default_agent、project agent core-field CRUD 与基础 subagent visibility lifecycle
+- 通过 `SettingsAgentsSection` 协调 Agents section 的 runtime+project agent catalog、default_agent、project agent core-field CRUD（含 `disable`）与基础 subagent visibility lifecycle
 - 通过 `SettingsPluginSection` 协调 plugin snapshot / project config editor / OMO lifecycle
 - 通过 `SettingsStyleSection` 协调 style section 的 preset / background / input appearance / custom CSS lifecycle
 - 通过 `SettingsServerSection` 协调 server section 的 mode/auth/status lifecycle
@@ -54,8 +54,8 @@
   - `OpenCodianSettings` 不再直接铺开 conversation section 的 DOM/state/model-picker wiring，只保留 owner 装配
 - **Agents**
   - `SettingsAgentsSection` 现在接管 agent 目录壳层：合并 runtime built-in/project agent 与 project `.opencode/opencode.json` override
-  - 当前已暴露默认主代理下拉、project agent 核心字段 create/edit/delete（`mode`、`description`、`prompt`、`model`、`temperature`、`top_p`、`steps`、`color`）以及 `mode: 'subagent'` 的 `hidden` 可见性开关，写回路径统一走 `OpencodeConfigManager`
-  - `permission.task` allowlist、disable/hide 其余规则与 commands/slash runtime 仍留在后续 Agents/Commands slice
+  - 当前已暴露默认主代理下拉、project agent 核心字段 create/edit/delete（`mode`、`disable`、`description`、`prompt`、`model`、`temperature`、`top_p`、`steps`、`color`）以及 `mode: 'subagent'` 的 `hidden` 可见性开关，写回路径统一走 `OpencodeConfigManager`
+  - `permission.task` allowlist、hide 其余规则与 commands/slash runtime 仍留在后续 Agents/Commands slice
 - **Plugins**
   - `SettingsPluginSection` 现在接管 plugin environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config 管理
   - `OpenCodianSettings` 不再直接铺开 plugin snapshot refresh、config editor 保存、directory/OMO action 或 restart notice 细节，只保留 owner 装配与 inline-code formatting seam
@@ -132,7 +132,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - security section 的 config-status、permission mode、restart flow 与 blocklist/export-path 输入现在由 `SettingsSecuritySection` 持有
 - model section 的 source mode、workspace 卡片、手动 refresh、icon cache 和 callback wiring 现在由 `SettingsModelSection` 持有
 - conversation section 的 title model、global session defaults、question card 与 user-markup toggle 现在由 `SettingsConversationSection` 持有
-- Agents section 的 runtime+project agent catalog、default_agent、project agent 核心字段 CRUD 与基础 subagent visibility 现在由 `SettingsAgentsSection` 持有
+- Agents section 的 runtime+project agent catalog、default_agent、project agent 核心字段 CRUD（含 `disable`）与基础 subagent visibility 现在由 `SettingsAgentsSection` 持有
 - plugin section 的 snapshot refresh、project config editor、isolation mode、project directory 与 OMO config 管理现在由 `SettingsPluginSection` 持有
 - UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 写回现在由 `SettingsUiSection` 持有
 - debug section 的 logging toggle、log path picker、diagnostic export/action 与 console help block 现在由 `SettingsDebugSection` 持有
@@ -165,7 +165,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
 - `SettingsModelSection`: 管理模型 section 的 block shell、callback bridge 与 `SettingsModelCatalogPresenter` host；source mode、refresh 链路、workspace 卡片和 icon cache 工具区继续委托给相邻 model-section owners
 - `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、global session defaults、question card display/position、answered-card toggle 与 user-markup render toggle；`OpenCodianSettings` 只保留 owner 装配与 title-model refresh callback bridge
-- `SettingsAgentsSection`: 管理 Agents section 的 runtime+project agent catalog、默认主代理选择、project agent 核心字段 CRUD 与基础 subagent `hidden` 可见性写回；project agent 表单细节继续委托给 companion owner `SettingsProjectAgentEditor`，`OpenCodianSettings` 只保留 owner 装配
+- `SettingsAgentsSection`: 管理 Agents section 的 runtime+project agent catalog、默认主代理选择、project agent 核心字段 CRUD（含 `disable`）与基础 subagent `hidden` 可见性写回；project agent 表单细节继续委托给 companion owner `SettingsProjectAgentEditor`，`OpenCodianSettings` 只保留 owner 装配
 - `SettingsPluginSection`: 管理 plugin section 的 environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config open/create action；`OpenCodianSettings` 只保留 owner 装配与 formatting bridge
 - `SettingsUiSection`: 管理 UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 保存逻辑；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsDebugSection`: 管理 debug section 的 logging toggle、inline serialized args、log path picker、diagnostic copy/generate action 与 console help；`OpenCodianSettings` 只保留 owner 装配
@@ -194,7 +194,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - 如果只是调整 server mode/host/auth/status/action 组装，优先改 `SettingsServerSection`，不要再把这一整块 lifecycle 塞回主设置类。
 - 如果只是调整模型 section 的 source mode、workspace 卡片、icon cache 或 refresh orchestration，优先改 `SettingsModelSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 conversation section 的 title model、global session defaults、question card 或 user-markup render 组装，优先改 `SettingsConversationSection`，不要再把这条 lifecycle 塞回主设置类。
-- 如果只是调整 Agents section 的目录加载、default_agent 写回、project agent 核心字段 CRUD 或基础 subagent visibility，优先改 `SettingsAgentsSection`，不要再把这条 lifecycle 塞回主设置类。
+- 如果只是调整 Agents section 的目录加载、default_agent 写回、project agent 核心字段 CRUD（含 `disable`）或基础 subagent visibility，优先改 `SettingsAgentsSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 plugin snapshot、project config plugin editor、isolation mode、project directory 或 OMO config 组装，优先改 `SettingsPluginSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 UI section 的 tab layout、auto scroll、scroll mode 或 open-in-main-tab 组装，优先改 `SettingsUiSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 debug logging、log path picker、diagnostic export 或 console help 组装，优先改 `SettingsDebugSection`，不要再把这条 lifecycle 塞回主设置类。

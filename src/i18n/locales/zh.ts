@@ -629,6 +629,8 @@ export const zhTranslations = {
   'settings.agents.editor.id.placeholder': 'planner',
   'settings.agents.editor.mode.name': '模式',
   'settings.agents.editor.mode.desc': '选择该代理是主代理、子代理，还是两种模式都可用。',
+  'settings.agents.editor.disable.name': '禁用代理',
+  'settings.agents.editor.disable.desc': '在当前 vault 中阻止 OpenCode 选择该代理，同时保留它的项目级覆盖配置。',
   'settings.agents.editor.description.name': '描述',
   'settings.agents.editor.description.desc': 'OpenCode 列出代理时显示的简短说明。',
   'settings.agents.editor.description.placeholder': '规划聚焦的实现工作',

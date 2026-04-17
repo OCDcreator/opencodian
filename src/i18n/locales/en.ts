@@ -629,6 +629,8 @@ export const enTranslations = {
   'settings.agents.editor.id.placeholder': 'planner',
   'settings.agents.editor.mode.name': 'Mode',
   'settings.agents.editor.mode.desc': 'Choose whether this agent is a primary agent, a subagent, or both.',
+  'settings.agents.editor.disable.name': 'Disable agent',
+  'settings.agents.editor.disable.desc': 'Prevent this agent from being selected by OpenCode in the current vault while keeping its project override saved.',
   'settings.agents.editor.description.name': 'Description',
   'settings.agents.editor.description.desc': 'Short summary shown by OpenCode when listing agents.',
   'settings.agents.editor.description.placeholder': 'Plans focused implementation work',

@@ -16,6 +16,7 @@
 - 通过 `upsertAgentConfig()` / `removeAgentConfig()` 写回或清理 `agent.<id>.hidden`
 - 提供项目 agent 编辑器，支持 create/edit/delete 以下核心字段：
   - `mode`
+  - `disable`
   - `description`
   - `prompt`
   - `model`
@@ -24,7 +25,7 @@
   - `steps`
   - `color`
 
-`permission.task` allowlist、disable/hide 批量规则与 commands/slash runtime 仍留给后续 slice。
+`permission.task` allowlist、hide 批量规则与 commands/slash runtime 仍留给后续 slice。
 
 ## 核心逻辑
 
@@ -48,15 +49,16 @@ owner 会并行读取：
 
 这条路径只对 `mode: 'subagent'` 且未 `disable` 的条目开放，因为 OpenCode 的 `hidden` 语义主要用于子代理 `@` 菜单可见性。
 
-### 项目 agent 核心字段编辑器
+### 项目 agent 核心字段编辑器 / disable 写回
 
 owner 现在在同一分区内提供一个 project agent editor：
 
 - 上方 dropdown 只列出当前 vault 已存在的 project agent override；选择后会把当前配置加载到表单
 - 未选择已有条目时，表单处于“新建 project agent”状态
-- 保存时统一走 `OpencodeConfigManager.upsertAgentConfig()`，因此会保留该 agent 既有的未知字段，同时允许通过 `undefined` patch 清理已清空的核心字段
+- 保存时统一走 `OpencodeConfigManager.upsertAgentConfig()`，因此会保留该 agent 既有的未知字段，同时允许通过 `undefined` patch 清理已清空的核心字段与 `disable`
 - 删除时统一走 `removeAgentConfig()`，只删除当前 project override，不会影响 runtime built-in catalog
 - 所有写回都局限在当前 vault 的 `.opencode/opencode.json`
+- `disable` 打开后会写入 `agent.<id>.disable = true`；关闭时改写成 `undefined` patch，让 `OpencodeConfigManager` 清理该字段，同时继续保留其他 project override 字段
 
 具体表单实现现已下沉到 companion owner `SettingsProjectAgentEditor`，避免 catalog owner 继续扩张。
 

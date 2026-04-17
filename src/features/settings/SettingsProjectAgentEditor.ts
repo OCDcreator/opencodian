@@ -15,6 +15,7 @@ interface ProjectAgentEditorState {
   agentId: string;
   color: string;
   description: string;
+  disabled: boolean;
   mode: OpencodeAgentMode;
   model: string;
   prompt: string;
@@ -56,6 +57,7 @@ export class SettingsProjectAgentEditor {
     let selectedProjectAgentId = '';
     let idControl: (TextLikeControl & Partial<DisableableControl>) | null = null;
     let modeDropdown: { setValue(value: string): unknown } | null = null;
+    let disableControl: { setValue(value: boolean): unknown } | null = null;
     let descriptionControl: TextLikeControl | null = null;
     let promptControl: TextLikeControl | null = null;
     let modelControl: TextLikeControl | null = null;
@@ -76,6 +78,7 @@ export class SettingsProjectAgentEditor {
       idControl?.setValue(state.agentId);
       idControl?.setDisabled?.(Boolean(selectedProjectAgentId));
       modeDropdown?.setValue(state.mode);
+      disableControl?.setValue(state.disabled);
       descriptionControl?.setValue(state.description);
       promptControl?.setValue(state.prompt);
       modelControl?.setValue(state.model);
@@ -127,6 +130,18 @@ export class SettingsProjectAgentEditor {
           .setValue(state.mode)
           .onChange((value) => {
             state.mode = this.normalizeEditorMode(value) ?? 'primary';
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.agents.editor.disable.name'))
+      .setDesc(t('settings.agents.editor.disable.desc'))
+      .addToggle((toggle) => {
+        disableControl = toggle;
+        toggle
+          .setValue(state.disabled)
+          .onChange((value) => {
+            state.disabled = value;
           });
       });
 
@@ -254,6 +269,7 @@ export class SettingsProjectAgentEditor {
       agentId,
       color: this.stringifyConfigText(agent?.color),
       description: this.stringifyConfigText(agent?.description),
+      disabled: agent?.disable === true,
       mode: this.normalizeEditorMode(agent?.mode) ?? 'primary',
       model: this.stringifyConfigText(agent?.model),
       prompt: this.stringifyConfigText(agent?.prompt),
@@ -316,6 +332,7 @@ export class SettingsProjectAgentEditor {
       top_p: this.parseOptionalNumber(state.topP, t('settings.agents.editor.topP.name')),
       steps: this.parseOptionalNumber(state.steps, t('settings.agents.editor.steps.name')),
       color: this.optionalTrimmedText(state.color),
+      disable: state.disabled ? true : undefined,
     };
   }
 

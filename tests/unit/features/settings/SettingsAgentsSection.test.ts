@@ -6,68 +6,16 @@ import { SettingsAgentsSection } from '../../../../src/features/settings/Setting
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
-interface MockDropdownControl {
-  addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>;
-  setValue: jest.MockedFunction<(value: string) => MockDropdownControl>;
-  onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockDropdownControl>;
-  selectEl: HTMLSelectElement;
-}
-
-interface MockToggleControl {
-  setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>;
-  onChange: jest.MockedFunction<(callback: (value: boolean) => void | Promise<void>) => MockToggleControl>;
-}
-
-interface MockTextControl {
-  inputEl: HTMLInputElement;
-  setPlaceholder: jest.MockedFunction<(value: string) => MockTextControl>;
-  setValue: jest.MockedFunction<(value: string) => MockTextControl>;
-  onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextControl>;
-}
-
-interface MockTextAreaControl {
-  inputEl: HTMLTextAreaElement;
-  setPlaceholder: jest.MockedFunction<(value: string) => MockTextAreaControl>;
-  setValue: jest.MockedFunction<(value: string) => MockTextAreaControl>;
-  onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextAreaControl>;
-}
-
-interface MockButtonControl {
-  setButtonText: jest.MockedFunction<(value: string) => MockButtonControl>;
-  setDisabled: jest.MockedFunction<(value: boolean) => MockButtonControl>;
-  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
-}
-
-interface DropdownRecord {
-  control: MockDropdownControl;
-  name: string;
-  onChange?: (value: string) => void | Promise<void>;
-}
-
-interface ToggleRecord {
-  control: MockToggleControl;
-  name: string;
-  onChange?: (value: boolean) => void | Promise<void>;
-}
-
-interface TextRecord {
-  control: MockTextControl;
-  name: string;
-  onChange?: (value: string) => void | Promise<void>;
-}
-
-interface TextAreaRecord {
-  control: MockTextAreaControl;
-  name: string;
-  onChange?: (value: string) => void | Promise<void>;
-}
-
-interface ButtonRecord {
-  control: MockButtonControl;
-  label?: string;
-  name: string;
-  onClick?: () => void | Promise<void>;
-}
+interface MockDropdownControl { addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>; setValue: jest.MockedFunction<(value: string) => MockDropdownControl>; onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockDropdownControl>; selectEl: HTMLSelectElement; }
+interface MockToggleControl { setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>; onChange: jest.MockedFunction<(callback: (value: boolean) => void | Promise<void>) => MockToggleControl>; }
+interface MockTextControl { inputEl: HTMLInputElement; setPlaceholder: jest.MockedFunction<(value: string) => MockTextControl>; setValue: jest.MockedFunction<(value: string) => MockTextControl>; onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextControl>; }
+interface MockTextAreaControl { inputEl: HTMLTextAreaElement; setPlaceholder: jest.MockedFunction<(value: string) => MockTextAreaControl>; setValue: jest.MockedFunction<(value: string) => MockTextAreaControl>; onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextAreaControl>; }
+interface MockButtonControl { setButtonText: jest.MockedFunction<(value: string) => MockButtonControl>; setDisabled: jest.MockedFunction<(value: boolean) => MockButtonControl>; onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>; }
+interface DropdownRecord { control: MockDropdownControl; name: string; onChange?: (value: string) => void | Promise<void>; }
+interface ToggleRecord { control: MockToggleControl; name: string; onChange?: (value: boolean) => void | Promise<void>; }
+interface TextRecord { control: MockTextControl; name: string; onChange?: (value: string) => void | Promise<void>; }
+interface TextAreaRecord { control: MockTextAreaControl; name: string; onChange?: (value: string) => void | Promise<void>; }
+interface ButtonRecord { control: MockButtonControl; label?: string; name: string; onClick?: () => void | Promise<void>; }
 
 type AgentsSectionPlugin = Pick<OpenCodianPlugin, 'openCodeService' | 'opencodeConfigManager'>;
 
@@ -264,10 +212,7 @@ function findButton(label: string): ButtonRecord | undefined {
   return buttonRecords.find((record) => record.label === label);
 }
 
-async function flushAsync(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}
+async function flushAsync(): Promise<void> { await Promise.resolve(); await Promise.resolve(); }
 
 beforeEach(() => {
   setLocale('en');
@@ -337,10 +282,7 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => {
-  jest.restoreAllMocks();
-  document.body.innerHTML = '';
-});
+afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
 
 describe('SettingsAgentsSection catalog shell', () => {
   it('loads built-in and project agents into the default selection and subagent visibility controls', async () => {
@@ -498,6 +440,58 @@ describe('SettingsAgentsSection project agent editor', () => {
       top_p: 0.85,
       steps: 6,
       color: '#8b5cf6',
+      disable: undefined,
+    });
+  });
+
+  it('edits the project disable flag without making disabled agents default-eligible', async () => {
+    const plugin = createPlugin({
+      runtimeAgents: [
+        createRuntimeAgent({
+          name: 'reviewer',
+          mode: 'primary',
+        }),
+      ],
+      projectAgents: {
+        reviewer: {
+          mode: 'primary',
+          disable: true,
+          hidden: true,
+        },
+      },
+      defaultAgent: 'reviewer',
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    const defaultDropdown = findDropdown(t('settings.agents.default.name'));
+    expect(defaultDropdown?.control.addOption).not.toHaveBeenCalledWith('reviewer', 'reviewer');
+    expect(defaultDropdown?.control.addOption).toHaveBeenCalledWith(
+      'reviewer',
+      t('settings.agents.default.unavailable', { id: 'reviewer' }),
+    );
+
+    await findDropdown(t('settings.agents.editor.select.name'))?.onChange?.('reviewer');
+
+    const disableToggle = findToggle(t('settings.agents.editor.disable.name'));
+    expect(disableToggle).toBeDefined();
+    expect(disableToggle?.control.setValue).toHaveBeenLastCalledWith(true);
+
+    await disableToggle?.onChange?.(false);
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(plugin.opencodeConfigManager?.upsertAgentConfig).toHaveBeenCalledWith('reviewer', {
+      mode: 'primary',
+      description: undefined,
+      prompt: undefined,
+      model: undefined,
+      temperature: undefined,
+      top_p: undefined,
+      steps: undefined,
+      color: undefined,
+      disable: undefined,
     });
   });
 
@@ -553,6 +547,7 @@ describe('SettingsAgentsSection project agent editor', () => {
       top_p: undefined,
       steps: undefined,
       color: '#22c55e',
+      disable: undefined,
     });
 
     await findButton(t('settings.agents.editor.actions.delete'))?.onClick?.();

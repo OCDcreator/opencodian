@@ -10,6 +10,7 @@
 当前覆盖的字段范围限定在 ordered item 5 的核心字段：
 
 - `mode`
+- `disable`
 - `description`
 - `prompt`
 - `model`
@@ -37,6 +38,7 @@
 ### 字段归一化
 
 - 空字符串会转换成 `undefined`，用于清理已移除的核心字段
+- `disable` 用布尔 toggle 表达；打开时写入 `true`，关闭时写入 `undefined` 以便仅清理该字段而不影响其他 override
 - `temperature`、`top_p`、`steps` 会解析为 number；如果不是合法数字，会中断保存并显示 notice
 - 未触碰的未知字段由 `OpencodeConfigManager.upsertAgentConfig()` 的 merge 行为保留
 
