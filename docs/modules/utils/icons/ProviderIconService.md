@@ -5,9 +5,14 @@
 
 ## 概述
 
-AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但 LobeHub 图标的可用 variant/静态资源 URL 不再靠文件名猜测，而是读取构建期生成的 `lobehubIconManifest.ts`。服务统一管理 LobeHub CDN、插件内置 OpenCode provider 图标，以及自定义 URL/文件图标，并把解析结果缓存到本地。
+AI 模型提供商图标服务的公开入口。`M4` 后，`ProviderIconService.ts` 不再自己承载近 2k 行的 entry 解析、builtin 选择、custom source 与 cache runtime 细节，而是退回为薄 orchestration shell，继续对设置页、聊天视图与缓存管理 UI 暴露稳定静态 API。
 
-`R62-R63` 后，provider library 的 default/editable/effective entry 决策、canonical provider-id 映射，以及 asset/cache runtime 都先经过文件内 seam：先做 entry resolution / preview metadata，再由统一 candidate-based asset runtime 处理缓存读取、资源加载、cache-only 预览回退与 custom cache 写入。
+当前 provider icon 责任拆分为四个 coarse owner：
+
+- `providerIconEntryResolution.ts`：provider-id 解析、default entry、library canonical key 与 entry 更新/删除
+- `providerIconBuiltinSelection.ts`：builtin picker、manifest-driven preview/variant、LobeHub candidate 选择
+- `providerIconCustomSources.ts`：自定义 URL/文件归一化、批量输入拆分、MIME 检测与首次缓存写入
+- `providerIconAssetCache.ts`：asset candidate runtime、vault cache、warm/clear、provider cache summary
 
 ## 导入关系
 上游: `fs`, `path`, `obsidian` (App, normalizePath, requestUrl), `../../core/types` (ProviderIconEntry, ProviderIconLibrary), `../../shared` (createLogger)
@@ -26,142 +31,61 @@ AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但
 
 ## 核心逻辑
 
-### 图标 ID 解析
+### 公开入口
 
-`getIconId()` 使用 5 级策略解析 provider ID 到稳定的 LobeHub icon ID：
-1. 直接小写匹配
-2. 移除特殊字符后匹配
-3. 提取英文部分逐个/组合匹配
-4. 部分包含匹配（providerId 包含 key）
-5. 反向部分包含匹配（key 包含 providerId）
+- `getIconUrl()` / `createIconElement()`：继续为简单 UI 预览提供 mapped LobeHub preview URL
+- `resolveIconUrl()` / `getProviderCacheState()` / `warmProviderIcons()` / `clearCache()`：直接转发到 `providerIconAssetCache.ts`
+- `listBuiltinIconOptions()` / `selectBuiltinIcon()` / `getSelectedBuiltinVariant()`：直接转发到 `providerIconBuiltinSelection.ts`
+- `addCustomIconSource()` / `splitCustomIconSourcesInput()`：组合 `providerIconEntryResolution.ts`、`providerIconCustomSources.ts` 与 cache writer 完成写回
 
-### 默认图标决策
+### Orchestration 边界
 
-`getDefaultEntry()` 的优先级为：
-1. 现有 `PROVIDER_ICON_MAP` 命中的 `mapped`
-2. `OpenCode` alias 命中的 `builtin`
-3. 双图库搜索命中的首个 `builtin`（同分优先 `LobeHub`）
-
-`resolveProviderEntryResolution()` 负责把上述 default entry 与已保存 library entries 合并成：
-- `editableEntries`：供设置页排序/替换时直接编辑的显式条目集
-- `effectiveEntries`：运行时实际可消费的条目集，会在需要时追加默认映射兜底
-- `storageProviderId`：沿用 library 中已有的 canonical provider key，避免 `code xzh` / `codexzh` 这类别名写出重复条目
-
-### Manifest 驱动 variant 决策
-
-- 构建期脚本 `sync:lobehub-icons` 会把 `@lobehub/icons` 的 `toc` 与 CDN 规则固化成 `lobehubIconManifest.ts`
-- 运行时先看 provider entry 的显式 `variant`
-- 若条目是 `auto`，再读全局 `providerIconDefaultVariant`
-- 如果全局仍是 `auto`，才按 `providerIconColorMode` 推导候选顺序
-- 所有候选最终都会回到 `mono` 兜底；`combine` 目前只保留能力信息，不假设存在静态资源
-
-### 图标加载管线
-
-1. **resolveIconUrl()** — 入口，委托给 `resolveEntryAsset()`
-2. **resolveEntryAsset()** — 检查内存缓存 / failed set / in-flight 请求，再交给具体 entry loader
-3. `loadLobehubEntryAsset()` / `loadBundledBuiltinEntryAsset()` / `loadCustomEntryAsset()` — 各自只负责声明 asset candidates（cache path、preview fallback、实际 loader）
-4. **resolveAssetFromCandidates()** — 统一执行缓存读取 → 资源加载 → cache write → cache-only preview fallback → `ResolvedProviderIconAsset` 装配
-
-### 自定义图标
-
-`addCustomIconSource()` 支持 URL 和本地文件路径，流程：
-1. 归一化输入（`normalizeCustomSource`）
-2. `createCachedCustomEntry()` 统一完成资源加载（远程通过 `requestUrl`，本地通过 `fs.readFile`）、MIME 检测、cache file 命名与缓存写入
-3. 把带 `cacheFileName` 的条目写回 library
-
-### 内置图标选择
-
-- `listBuiltinIconOptions()`：为单个 provider 生成可浏览的内置图标数据，并给出 `requestedVariant / resolvedVariant / resolvedFormat`
-- `selectBuiltinIcon()`：将选中的内置图标置顶并去重；LobeHub 条目会同时持久化显式 `variant`
-- `getSelectedBuiltinSource()`：把当前 effective 条目归一成 `libraryId:iconId`
-
-### Preview 元数据装配
-
-`resolveEntryPreviewMetadata()` 统一处理 cache state 里的：
-- `iconId` 解析（mapped/builtin/custom）
-- `iconUrl` 预览来源（缓存未命中时回退到 builtin/LobeHub preview URL）
-- `requestedVariant / resolvedVariant / resolvedFormat`
-- `fallbackUsed / sourceLabel`
-
-### Asset runtime seam
-
-`resolveAssetFromCandidates()` 现在是 `R63` 的统一 asset-runtime seam，负责：
-- 读取 cache path 对应二进制资源
-- 在 cache miss 时按 candidate 顺序加载 LobeHub / bundled / custom 资源
-- 写回 `.opencodian/provider-icons/`
-- 在 cache-only 检查时回退到 preview URL / preview format，而不触发真实下载
-- 复用同一 `ResolvedProviderIconAsset` 装配逻辑，避免每类 entry 重复拼装缓存状态
-
-### 缓存管理
-
-- 缓存目录：`.opencodian/provider-icons/`
-- LobeHub 缓存 key 包含 `iconId + requestedVariant + resolvedVariant + theme + format`
-- 自定义文件名仍是 `{provider}-{timestamp}-{random}.{ext}`
-- 最大文件大小：1 MB
-- 支持格式：SVG, PNG, JPEG, WEBP, GIF
-- `clearCache()` 清空缓存目录和内存映射
+- `ProviderIconService` 保留现有静态 API，避免上层调用点大面积改名
+- 需要跨 owner 协调时，只在这里组装最小依赖：例如 `addCustomIconSource()` 会先拿 resolution，再调用 custom cache bootstrap，最后写回 library
+- 其余 preview/runtime/persistence 细节不再回流到 `ProviderIconService.ts`
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `getIconUrl(providerId)` | 获取预览 URL（优先 manifest 首选候选） |
-| `resolveIconUrl(app, providerId, library, options)` | 解析图标 URL（含缓存和远程加载） |
-| `getIconId(providerId)` | 5 级策略匹配 provider ID |
-| `hasIcon(providerId)` | 检查是否有图标映射 |
-| `createIconElement(providerId, size)` | 创建 `<img>` 元素 |
-| `getProviderCacheState(app, providerIds, library)` | 构建完整缓存状态 |
-| `listBuiltinIconOptions(app, providerId, library, options?)` | 生成内置图标选择列表 |
-| `selectBuiltinIcon(providerId, libraryId, iconId, library)` | 选择并置顶某个内置图标 |
-| `addCustomIconSource(app, providerId, source, library)` | 添加自定义图标 |
-| `updateProviderEntries(providerId, entries, library)` | 更新 provider 的图标条目 |
-| `removeProviderEntry(providerId, entryId, library)` | 删除单个图标条目 |
-| `splitCustomIconSourcesInput(sourceInput)` | 解析多行/多来源图标输入为独立来源字符串 |
-| `clearCache(app)` | 清空所有缓存 |
-| `warmProviderIcons(app, providerIds, library)` | 批量预热图标缓存 |
-| `persistDefaultEntries(providerIds, library)` | 将默认映射持久化到 library |
+| `getIconUrl(providerId)` | 获取 mapped LobeHub preview URL |
+| `resolveIconUrl(app, providerId, library, options)` | 委托 asset/cache runtime 解析图标 |
+| `listBuiltinIconOptions(app, providerId, library, options?)` | 委托 builtin bundle 生成选择列表 |
+| `addCustomIconSource(app, providerId, source, library)` | 组合 resolution + custom cache bootstrap + library 写回 |
+| `getProviderCacheState(app, providerIds, library)` | 委托 cache bundle 构建缓存状态 |
+| `clearCache(app)` / `warmProviderIcons(app, providerIds, library)` | 委托 cache bundle 管理缓存生命周期 |
 
 ## 数据流
 
-```
-getProviderCacheState(app, currentProviderIds, library)
-  → mergeProviderIds() → 合并当前和历史 provider
-  → 对每个 provider:
-    → resolveProviderEntryResolution() → canonical provider key + editable/effective entries
-    → resolveEntryAsset(cacheOnly) → 通过 resolveAssetFromCandidates() 检查本地缓存 / cache-only preview fallback
-    → resolveEntryPreviewMetadata() → 组装 iconId / preview / variant metadata
-    → 构建 ProviderIconCacheEntry[]
+```text
+ProviderIconService.resolveIconUrl()
+  → providerIconAssetCache.resolveProviderIconUrl()
+    → providerIconEntryResolution.resolveProviderEntryResolution()
+    → providerIconBuiltinSelection / providerIconCustomSources 提供 asset candidates
+    → cache runtime 读取 / 加载 / 写回
 
-resolveIconUrl(app, providerId, library)
-  → resolveProviderEntryResolution() → 取 selected entry
-  → resolveEntryAsset()
-    → 内存缓存命中? → 返回
-    → resolveAssetFromCandidates()
-      → readCachedAssetByPath() → 本地文件缓存命中? → 返回 data URL
-      → loadRemotePreviewAsset() / loadBundledOpencodeAsset() / loadCustomSourceAsset()
-      → writeCachedAsset() → 返回 data URL
+ProviderIconService.addCustomIconSource()
+  → providerIconEntryResolution.resolveProviderEntryResolution()
+  → providerIconCustomSources.normalizeCustomSource()
+  → providerIconCustomSources.createCachedCustomEntry()
+  → providerIconEntryResolution 风格的 library write-back
 ```
 
 ## 与其他模块的交互
 
-- **OpenCodianView**: 调用 `resolveIconUrl()` 在模型选择器和消息头部显示 provider 图标
-- **OpenCodianSettings**: 负责写回 `providerIconColorMode` 与 `providerIconDefaultVariant`
-- **ProviderIconCacheModal**: 展示命中的 `variant / format / fallback`，并调用 `selectBuiltinIcon()`, `addCustomIconSource()`, `removeProviderEntry()`, `clearCache()`
-- **ProviderBuiltinIconPickerModal**: 调用 `listBuiltinIconOptions()` 浏览内置图标库，并把显式 `variant` 一起传回上层
-- **StorageService**: 持久化 `ProviderIconLibrary` 到 settings
+- **OpenCodianView**：继续只依赖 `resolveIconUrl()` 获取展示 URL
+- **ProviderIconCacheModal**：继续通过服务获取 cache state，并触发 builtin/custom/library 更新
+- **ProviderBuiltinIconPickerModal**：通过服务访问 builtin option/selection API，但实现已落到 `providerIconBuiltinSelection.ts`
+- **StorageService / settings**：仍只感知 `ProviderIconLibrary` 数据，不感知新的内部 coarse modules
 
 ## 配置项
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
-| `ICON_CACHE_DIR` | `.opencodian/provider-icons` | 缓存目录（vault 相对路径） |
-| `MAX_ICON_BYTES` | 1048576 | 最大图标文件大小 |
+| `ICON_CACHE_DIR` | `.opencodian/provider-icons` | cache runtime 与 custom bootstrap 共用目录 |
 
 ## 注意事项
 
-- 所有方法为静态方法，不需要实例化
-- 内存缓存（`resolvedIconUrls`, `inFlightIconLoads`, `failedIconIds`）为模块级状态
-- `requestUrl` 使用 Obsidian API，不走系统代理
-- MIME 检测优先级：Content-Type header → 文件头魔数 → 扩展名
-- `PROVIDER_ICON_MAP` 仍是旧映射稳定层；OpenCode 图标则通过 registry + alias + 搜索接入
-- `providerIconColorMode` 仍会通过 CSS filter 影响最终显示，但资源选择本身已优先使用更合适的静态 variant
+- 所有对外方法仍保持静态 API，不需要上层改为实例化调用
+- 需要改 provider icon 行为时，优先落到四个 coarse module owner，而不是把实现重新塞回 `ProviderIconService.ts`
+- fallback 顺序仍然保持：mapped/LobeHub 或 builtin 预览 → custom / cache runtime → 上层 `<img>` 显示

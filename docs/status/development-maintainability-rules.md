@@ -20,6 +20,7 @@
 - Prefer existing service / coordinator / runtime owners before creating new files.
 - For model-config modal UI work, prefer the existing `ModelConfigProviderEditor.ts` / `ModelConfigModelListEditor.ts` owners before growing `ModelConfigModal.ts` again.
 - For trailing-assistant patch work, extend the coarse `trailingAssistantPatchPlanning.ts` / `trailingAssistantPatchExecution.ts` / `trailingAssistantPatchDebug.ts` / `trailingAssistantPatchTypes.ts` bundles instead of reintroducing one-off helper files.
+- For provider icon work, extend `providerIconEntryResolution.ts` / `providerIconBuiltinSelection.ts` / `providerIconCustomSources.ts` / `providerIconAssetCache.ts` before regrowing `ProviderIconService.ts`.
 
 ## Feature Work Checklist
 

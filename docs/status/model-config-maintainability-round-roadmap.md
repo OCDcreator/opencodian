@@ -59,7 +59,7 @@
   - File count in the `TrailingAssistantPatch*` family drops materially.
   - Tests covering assistant tail/finalization continue to pass.
 
-### [NEXT] M4 - ProviderIconService medium responsibility extraction
+### [DONE] M4 - ProviderIconService medium responsibility extraction
 
 - **Lane**: Provider icon service maintainability
 - **Goal**: Split `ProviderIconService` into medium modules for entry resolution, asset/cache runtime, custom sources, and builtin selection while preserving runtime behavior and fallback order.
@@ -75,7 +75,7 @@
   - `ProviderIconService.ts` becomes a thinner orchestrator.
   - Existing provider icon tests and full validation pass.
 
-### [QUEUED] M5 - SettingsStyleSection controls and preset coarse extraction
+### [NEXT] M5 - SettingsStyleSection controls and preset coarse extraction
 
 - **Lane**: Settings style section maintainability
 - **Goal**: Extract reusable numeric/color/reset control primitives and theme preset rendering/state into coarse modules.
