@@ -10,7 +10,7 @@
 - 通过 companion owner `SettingsProjectCommandEditor` 处理 project command 的 create/edit/delete 壳层
 - 通过插件设置 `hiddenSlashCommands` 管理 slash menu 的用户级 visible/hidden 开关
 
-当前 owner 仍然聚焦 commands settings 范围：project `command.<id>` 字段编辑、OpenCodian placeholder reference、command-owned hidden agent 的 catalog/editor 回填，以及 catalog 可见性写回；runtime placeholder 展开与 slash execution runtime 继续留在相邻 runtime seam。
+当前 owner 仍然聚焦 commands settings 范围：project `command.<id>` 字段编辑、OpenCodian placeholder reference、command-owned hidden agent 的 catalog/editor 回填，以及 catalog 可见性写回；共享的 runtime+project merge 规则现已下沉到 `core/config/slashCommandCatalog.ts`，供 settings catalog 与 chat slash menu 共同复用。
 
 ## 核心逻辑
 
@@ -21,6 +21,7 @@ owner 会并行读取：
 - `openCodeService.sdk.command.list()`：当前 runtime scope 的 slash command 目录
 - `OpencodeConfigManager.getCommandConfig()`：当前 vault `.opencode/opencode.json` 里的 project `command` map
 - `OpencodeConfigManager.getAgentConfig()`：当前 vault 里的 project/legacy agent map，用来识别 command-owned hidden agent
+- 然后把这些输入交给 `mergeSlashCommandCatalog()`，避免 settings/chat 再维护两份不同的 merge 规则
 
 合并时：
 
@@ -66,6 +67,7 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 - `OpenCodianSettings.ts`: 创建并挂载本 owner，把 Commands section 从主设置页中独立出来
 - `OpenCodeService`: 通过 SDK façade 的 `command.list()` 读取 runtime slash command 目录
 - `OpencodeConfigManager`: 读取当前 vault 的 project `command` / `agent` 配置，并负责 command-owned hidden agent lifecycle
+- `core/config/slashCommandCatalog.ts`: 提供共享 catalog merge 与 visible-menu projection 规则
 - `SettingsProjectCommandEditor.ts`: 负责 project command 核心字段表单、保存 / 删除 action 与 notice
 - `core/types/settings.ts`: 提供插件设置里的 `hiddenSlashCommands`
 - `i18n/locales/*`: 提供 Commands section 标题、catalog 来源、可见性和错误文案
@@ -75,4 +77,4 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 - 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`。
 - project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀。
 - `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径。
-- runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有 catalog seam。
+- runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有共享 catalog seam。

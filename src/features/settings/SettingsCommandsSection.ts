@@ -1,21 +1,16 @@
-import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 import { Setting } from 'obsidian';
 
 import {
-  getCommandScopedAgentId,
-  getCommandScopedAgentMetadata,
-} from '../../core/config/commandScopedAgent';
+  mergeSlashCommandCatalog,
+  type SlashCommandCatalogEntry,
+} from '../../core/config/slashCommandCatalog';
 import type {
-  OpencodeAgentConfig,
-  OpencodeAgentConfigRecord,
-  OpencodeCommandConfig,
   OpencodeCommandConfigRecord,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import {
-  type ProjectCommandEditorSource,
   SettingsProjectCommandEditor,
 } from './SettingsProjectCommandEditor';
 
@@ -30,201 +25,13 @@ interface SettingsCommandsSectionOptions {
   ) => HTMLHeadingElement;
 }
 
-interface CommandCatalogEntry extends ProjectCommandEditorSource {
-  hidden: boolean;
-}
-
 interface CommandCatalogRenderContext {
   catalogBodyEl: HTMLElement;
   configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
   currentRunId: number;
   editorBodyEl: HTMLElement;
-  mergedCommands: CommandCatalogEntry[];
+  mergedCommands: SlashCommandCatalogEntry[];
   projectCommands: OpencodeCommandConfigRecord;
-}
-
-function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
-  return command.source !== 'mcp' && command.source !== 'skill';
-}
-
-function normalizeCommandTextField(
-  runtimeValue: string | undefined,
-  projectValue: string | undefined,
-): string {
-  const normalizedProjectValue = typeof projectValue === 'string' ? projectValue.trim() : '';
-  if (normalizedProjectValue) {
-    return normalizedProjectValue;
-  }
-
-  return typeof runtimeValue === 'string' ? runtimeValue.trim() : '';
-}
-
-function normalizeCommandDescription(
-  runtimeCommand: RuntimeCommand | undefined,
-  projectCommand: OpencodeCommandConfig | undefined,
-): string {
-  return normalizeCommandTextField(runtimeCommand?.description, projectCommand?.description);
-}
-
-function normalizeCommandTemplate(
-  runtimeCommand: RuntimeCommand | undefined,
-  projectCommand: OpencodeCommandConfig | undefined,
-): string {
-  return normalizeCommandTextField(runtimeCommand?.template, projectCommand?.template);
-}
-
-function normalizeCommandSubtask(
-  runtimeCommand: RuntimeCommand | undefined,
-  projectCommand: OpencodeCommandConfig | undefined,
-): boolean {
-  if (typeof projectCommand?.subtask === 'boolean') {
-    return projectCommand.subtask;
-  }
-
-  return runtimeCommand?.subtask === true;
-}
-
-function normalizeCommandSamplingValue(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-function resolveCommandScopedAgent(
-  commandId: string,
-  projectCommand: OpencodeCommandConfig | undefined,
-  projectAgents: OpencodeAgentConfigRecord,
-): {
-  agent: OpencodeAgentConfig | undefined;
-  metadata: Record<string, unknown> | undefined;
-} {
-  const scopedAgentId = getCommandScopedAgentId(commandId);
-  if (projectCommand?.agent !== scopedAgentId) {
-    return {
-      agent: undefined,
-      metadata: undefined,
-    };
-  }
-
-  const agent = projectAgents[scopedAgentId];
-  return {
-    agent,
-    metadata: getCommandScopedAgentMetadata(agent?.options, commandId),
-  };
-}
-
-function normalizeCommandAgent(
-  commandId: string,
-  runtimeCommand: RuntimeCommand | undefined,
-  projectCommand: OpencodeCommandConfig | undefined,
-  projectAgents: OpencodeAgentConfigRecord,
-): string {
-  const scopedAgent = resolveCommandScopedAgent(commandId, projectCommand, projectAgents);
-  const baseAgent = typeof scopedAgent.metadata?.baseAgent === 'string'
-    ? scopedAgent.metadata.baseAgent.trim()
-    : '';
-  if (baseAgent) {
-    return baseAgent;
-  }
-
-  if (projectCommand?.agent === getCommandScopedAgentId(commandId)) {
-    return '';
-  }
-
-  return normalizeCommandTextField(runtimeCommand?.agent, projectCommand?.agent);
-}
-
-function normalizeCommandTemperature(
-  commandId: string,
-  projectCommand: OpencodeCommandConfig | undefined,
-  projectAgents: OpencodeAgentConfigRecord,
-): number | undefined {
-  const commandTemperature = normalizeCommandSamplingValue(projectCommand?.temperature);
-  if (commandTemperature !== undefined) {
-    return commandTemperature;
-  }
-
-  const scopedAgent = resolveCommandScopedAgent(commandId, projectCommand, projectAgents);
-  return normalizeCommandSamplingValue(scopedAgent.agent?.temperature);
-}
-
-function normalizeCommandTopP(
-  commandId: string,
-  projectCommand: OpencodeCommandConfig | undefined,
-  projectAgents: OpencodeAgentConfigRecord,
-): number | undefined {
-  const commandTopP = normalizeCommandSamplingValue(projectCommand?.top_p);
-  if (commandTopP !== undefined) {
-    return commandTopP;
-  }
-
-  const scopedAgent = resolveCommandScopedAgent(commandId, projectCommand, projectAgents);
-  return normalizeCommandSamplingValue(scopedAgent.agent?.top_p);
-}
-
-function mergeCommandCatalog(
-  runtimeCommands: RuntimeCommand[],
-  projectCommands: OpencodeCommandConfigRecord,
-  projectAgents: OpencodeAgentConfigRecord,
-  hiddenCommandIds: Set<string>,
-): CommandCatalogEntry[] {
-  const mergedEntries = new Map<string, CommandCatalogEntry>();
-
-  for (const runtimeCommand of runtimeCommands) {
-    if (!isCatalogRuntimeCommand(runtimeCommand)) {
-      continue;
-    }
-
-    const projectCommand = projectCommands[runtimeCommand.name];
-    mergedEntries.set(runtimeCommand.name, {
-      id: runtimeCommand.name,
-      template: normalizeCommandTemplate(runtimeCommand, projectCommand),
-      description: normalizeCommandDescription(runtimeCommand, projectCommand),
-      agent: normalizeCommandAgent(
-        runtimeCommand.name,
-        runtimeCommand,
-        projectCommand,
-        projectAgents,
-      ),
-      model: normalizeCommandTextField(runtimeCommand.model, projectCommand?.model),
-      temperature: normalizeCommandTemperature(runtimeCommand.name, projectCommand, projectAgents),
-      topP: normalizeCommandTopP(runtimeCommand.name, projectCommand, projectAgents),
-      hasProjectOverride: projectCommand !== undefined,
-      hidden: hiddenCommandIds.has(runtimeCommand.name),
-      runtimeAvailable: true,
-      subtask: normalizeCommandSubtask(runtimeCommand, projectCommand),
-    });
-  }
-
-  for (const [commandId, projectCommand] of Object.entries(projectCommands)) {
-    if (mergedEntries.has(commandId)) {
-      continue;
-    }
-
-    mergedEntries.set(commandId, {
-      id: commandId,
-      template: normalizeCommandTemplate(undefined, projectCommand),
-      description: normalizeCommandDescription(undefined, projectCommand),
-      agent: normalizeCommandAgent(commandId, undefined, projectCommand, projectAgents),
-      model: normalizeCommandTextField(undefined, projectCommand.model),
-      temperature: normalizeCommandTemperature(commandId, projectCommand, projectAgents),
-      topP: normalizeCommandTopP(commandId, projectCommand, projectAgents),
-      hasProjectOverride: true,
-      hidden: hiddenCommandIds.has(commandId),
-      runtimeAvailable: false,
-      subtask: normalizeCommandSubtask(undefined, projectCommand),
-    });
-  }
-
-  return Array.from(mergedEntries.values()).sort((left, right) => {
-    if (left.runtimeAvailable !== right.runtimeAvailable) {
-      return left.runtimeAvailable ? -1 : 1;
-    }
-
-    if (left.hasProjectOverride !== right.hasProjectOverride) {
-      return left.hasProjectOverride ? 1 : -1;
-    }
-
-    return left.id.localeCompare(right.id);
-  });
 }
 
 function buildNextHiddenSlashCommands(
@@ -349,7 +156,7 @@ export class SettingsCommandsSection {
 
       const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
       const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
-      const mergedCommands = mergeCommandCatalog(
+      const mergedCommands = mergeSlashCommandCatalog(
         runtimeCommands,
         projectCommands,
         projectAgents,
@@ -434,7 +241,7 @@ export class SettingsCommandsSection {
       .setDesc(t('settings.commands.loadFailed.desc', { message }));
   }
 
-  private buildCommandDescription(command: CommandCatalogEntry): string {
+  private buildCommandDescription(command: SlashCommandCatalogEntry): string {
     const parts = [
       this.getSourceLabel(command),
       command.hidden
@@ -465,7 +272,7 @@ export class SettingsCommandsSection {
     return parts.join(' · ');
   }
 
-  private getSourceLabel(command: CommandCatalogEntry): string {
+  private getSourceLabel(command: SlashCommandCatalogEntry): string {
     if (command.runtimeAvailable && command.hasProjectOverride) {
       return t('settings.commands.catalog.source.runtimeOverride');
     }

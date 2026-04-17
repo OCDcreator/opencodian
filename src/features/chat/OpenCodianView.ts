@@ -11,6 +11,10 @@ import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
 import {
+  buildVisibleSlashCommandMenuItems,
+  mergeSlashCommandCatalog,
+} from '../../core/config/slashCommandCatalog';
+import {
   type SessionActivityStatus,
 } from '../../core/opencode';
 import {
@@ -740,6 +744,29 @@ export class OpenCodianView extends ItemView {
         new Notice(t('chat.tab.processingBlocked'));
       },
       submitMessage: (message) => this.sendPipelineRuntime.sendMessage(message),
+      loadSlashCommandMenuItems: async () => {
+        const configManager = this.plugin.opencodeConfigManager;
+        if (!configManager) {
+          return [];
+        }
+
+        const [runtimeCommandsResult, projectCommands, projectAgents] = await Promise.all([
+          this.plugin.openCodeService.sdk.command.list(),
+          configManager.getCommandConfig(),
+          configManager.getAgentConfig(),
+        ]);
+
+        const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
+        const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
+        return buildVisibleSlashCommandMenuItems(
+          mergeSlashCommandCatalog(
+            runtimeCommands,
+            projectCommands,
+            projectAgents,
+            hiddenCommandIds,
+          ),
+        );
+      },
       setComposerStackHeight: (stackHeight) => {
         this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
       },

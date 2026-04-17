@@ -1,3 +1,4 @@
+import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
 import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
@@ -32,11 +33,17 @@ function flushAnimationFrames(): void {
   }
 }
 
+async function flushAsync(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function createFixture() {
   let isStreaming = false;
   let isForegroundBusy = false;
   let inputContainerHeight = 88;
   let textareaScrollHeight = 0;
+  let slashCommandMenuItems: SlashCommandMenuItem[] = [];
 
   const host: jest.Mocked<ComposerInputShellCoordinatorHost> = {
     attachSessionTodo: jest.fn(),
@@ -58,6 +65,7 @@ function createFixture() {
     isTabForegroundBusy: jest.fn(() => isForegroundBusy),
     showProcessingBlockedNotice: jest.fn(),
     submitMessage: jest.fn().mockResolvedValue(undefined),
+    loadSlashCommandMenuItems: jest.fn().mockImplementation(async () => slashCommandMenuItems),
     setComposerStackHeight: jest.fn(),
     scheduleSettledScrollToBottomIfNeeded: jest.fn(),
   };
@@ -106,6 +114,9 @@ function createFixture() {
     },
     setTextareaScrollHeight(nextValue: number) {
       textareaScrollHeight = nextValue;
+    },
+    setSlashCommandMenuItems(nextValue: SlashCommandMenuItem[]) {
+      slashCommandMenuItems = nextValue;
     },
   };
 }
@@ -176,6 +187,80 @@ describe('ComposerInputShellCoordinator', () => {
 
     expect(fixture.sendBtn.getAttribute('data-tooltip')).toBe(t('chat.input.stopStreaming'));
     expect(fixture.host.cancelStreaming).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens slash autocomplete from the merged menu catalog and applies the selected command', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'review',
+        description: 'Review changes',
+        hasProjectOverride: true,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+      {
+        id: 'refactor',
+        description: 'Refactor touched files',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = '/re';
+    fixture.textarea.setSelectionRange(3, 3);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    expect(fixture.host.loadSlashCommandMenuItems).toHaveBeenCalledTimes(1);
+    expect(menuItems).toHaveLength(2);
+    expect(menuItems[0]?.textContent).toContain('/review');
+    expect(menuItems[1]?.textContent).toContain('/refactor');
+
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushAsync();
+
+    expect(fixture.textarea.value).toBe('/refactor ');
+    expect(fixture.host.submitMessage).not.toHaveBeenCalled();
+    expect(
+      fixture.container.querySelector('.opencodian-slash-command-menu-item'),
+    ).toBeNull();
+  });
+
+  it('closes slash autocomplete after the command token is finished', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'review',
+        description: 'Review changes',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = '/review';
+    fixture.textarea.setSelectionRange(7, 7);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(
+      fixture.container.querySelector('.opencodian-slash-command-menu-item'),
+    ).not.toBeNull();
+
+    fixture.textarea.value = '/review now';
+    fixture.textarea.setSelectionRange(11, 11);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(
+      fixture.container.querySelector('.opencodian-slash-command-menu-item'),
+    ).toBeNull();
   });
 
   it('syncs textarea height and composer layout metrics, then tears them down on destroy', () => {
