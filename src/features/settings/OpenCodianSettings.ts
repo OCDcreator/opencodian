@@ -9,6 +9,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
+import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
 import { SettingsModelSection } from './SettingsModelSection';
@@ -42,6 +43,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private lastKnownServerStatus: ReturnType<OpenCodianPlugin['openCodeService']['getServerStatus']> = 'stopped';
   private readonly sectionCoordinator: SettingsSectionCoordinator;
   private agentsSection: SettingsAgentsSection | null = null;
+  private commandsSection: SettingsCommandsSection | null = null;
   private conversationSection: SettingsConversationSection | null = null;
   private modelSection: SettingsModelSection | null = null;
   private pluginSection: SettingsPluginSection | null = null;
@@ -152,6 +154,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     this.conversationSection?.dispose();
     this.agentsSection?.dispose();
+    this.commandsSection?.dispose();
     this.modelSection?.dispose();
     this.pluginSection?.dispose();
     this.styleSection?.dispose();
@@ -167,6 +170,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.addModelSettings(containerEl);
     this.addConversationSettings(containerEl);
     this.addAgentsSettings(containerEl);
+    this.addCommandsSettings(containerEl);
     this.addPluginSettings(containerEl);
     this.addSecuritySettings(containerEl);
     this.addUISettings(containerEl);
@@ -283,6 +287,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     return this.agentsSection.attach(containerEl);
   }
 
+  private addCommandsSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    this.commandsSection ??= new SettingsCommandsSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return this.commandsSection.attach(containerEl);
+  }
+
   private addPluginSettings(containerEl: HTMLElement): HTMLHeadingElement {
     this.pluginSection ??= new SettingsPluginSection({
       app: this.app,
@@ -310,6 +322,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
     this.conversationSection?.dispose();
     this.agentsSection?.dispose();
+    this.commandsSection?.dispose();
     this.styleSection?.dispose();
     this.modelSection?.dispose();
     this.pluginSection?.dispose();
