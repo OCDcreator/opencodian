@@ -66,3 +66,4 @@ automation/runtime/
 # Local debug artifacts
 .obsidian-debug/
 tmp/
+/{outputDir}/
