@@ -62,3 +62,7 @@ docs/*
 automation/runtime/
 .codex/
 .opencode/
+
+# Local debug artifacts
+.obsidian-debug/
+tmp/
