@@ -198,13 +198,20 @@ describe('TabViewActivationBridge', () => {
     expect(callOrder).toEqual(['indicator', 'activation-refresh']);
   });
 
-  it('applies loaded-conversation hydration tail refreshes in order', async () => {
+  it('applies loaded-conversation hydration tail refreshes in order without awaiting the server refresh', async () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
     const focusContextPreviewCoordinator = createFocusContextPreviewCoordinator(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
+    let resolveRefresh: (() => void) | null = null;
+    contextUsageCoordinator.refreshFromServer.mockImplementation(() => {
+      callOrder.push('fetch-context');
+      return new Promise<void>((resolve) => {
+        resolveRefresh = resolve;
+      });
+    });
     const bridge = new TabViewActivationBridge({
       host,
       focusContextPreviewCoordinator,
@@ -213,10 +220,13 @@ describe('TabViewActivationBridge', () => {
       activeTabContextUsageCoordinator: contextUsageCoordinator,
     });
 
-    await bridge.applyLoadedConversationHydrationTail();
+    const result = bridge.applyLoadedConversationHydrationTail();
 
     expect(refreshCoordinator.applyActivationPreflight).not.toHaveBeenCalled();
     expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
+    expect(result).toBeUndefined();
     expect(callOrder).toEqual(['layout', 'selector', 'context', 'fetch-context']);
+    resolveRefresh?.();
+    await Promise.resolve();
   });
 });

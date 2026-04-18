@@ -3,6 +3,11 @@ import {
   createEmptyTabContextState,
   type TabContextState,
 } from '../../../core/types';
+import {
+  createLogger,
+  formatDurationMs,
+  getPerformanceTimestampMs,
+} from '../../../shared';
 import type {
   ModelSelectorKnownModelInfo,
   ModelSelectorSelection,
@@ -11,6 +16,8 @@ import {
   ContextUsageService,
   type ContextUsageSnapshot,
 } from './ContextUsageService';
+
+const logger = createLogger('ActiveTabContextUsageCoordinator');
 
 interface ActiveTabContextUsageConversation {
   id: string;
@@ -77,11 +84,23 @@ export class ActiveTabContextUsageCoordinator {
     const conversation = this.host.getCurrentConversation();
     const expectedConversationId = conversation?.id ?? null;
     const expectedSessionId = conversation?.openCodeSessionId ?? null;
+    const startedAt = getPerformanceTimestampMs();
+    let requestElapsedMs: number | null = null;
+    let outcome = 'skipped';
     if (!expectedConversationId || !expectedSessionId || !this.host.hasActiveTab()) {
+      logger.debug(
+        `[context-usage] refreshFromServer ${outcome} in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+        {
+          conversationId: expectedConversationId,
+          sessionId: expectedSessionId,
+        },
+      );
       return;
     }
 
+    const requestStartedAt = getPerformanceTimestampMs();
     const snapshot = await this.host.getSessionContextUsageSnapshot(expectedSessionId);
+    requestElapsedMs = getPerformanceTimestampMs() - requestStartedAt;
     const currentConversation = this.host.getCurrentConversation();
     if (
       !snapshot
@@ -89,10 +108,28 @@ export class ActiveTabContextUsageCoordinator {
       || currentConversation?.openCodeSessionId !== expectedSessionId
       || !this.host.hasActiveTab()
     ) {
+      outcome = snapshot ? 'stale' : 'empty';
+      logger.debug(
+        `[context-usage] refreshFromServer ${outcome} in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+        {
+          conversationId: expectedConversationId,
+          sessionId: expectedSessionId,
+          request: formatDurationMs(requestElapsedMs),
+        },
+      );
       return;
     }
 
+    outcome = 'committed';
     this.commitState(ContextUsageService.applyUsageSnapshot(this.getCurrentState(), snapshot));
+    logger.debug(
+      `[context-usage] refreshFromServer ${outcome} in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+      {
+        conversationId: expectedConversationId,
+        sessionId: expectedSessionId,
+        request: formatDurationMs(requestElapsedMs),
+      },
+    );
   }
 
   private getCurrentState(): TabContextState {

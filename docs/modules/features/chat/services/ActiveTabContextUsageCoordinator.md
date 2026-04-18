@@ -41,6 +41,7 @@ export class ActiveTabContextUsageCoordinator {
 - `syncIdentity()` 在没有 active tab 时只清空 indicator，不会错误回写旧 tab state
 - `refreshFromServer()` 保持原有 stale guard：snapshot 返回后必须再次确认 current conversation id、session id 和 active-tab 仍匹配，才会写回精确 tokens/cost
 - `refreshFromServer()` 复用 `ContextUsageService.syncStateIdentity()` + `applyPreciseUsage()`，不重新实现 token/cost 汇总规则
+- `refreshFromServer()` 现在会输出 debug 级别耗时日志，并区分 `skipped` / `empty` / `stale` / `committed`，便于把 view-open 慢点进一步拆到具体 context usage 请求
 - `TabViewActivationBridge` 与 `TabConversationActivationBridge` 现在共享同一条 activation/open-side context usage writeback 边界，而不是分别持有 identity/snapshot host callback
 
 ## 与 `OpenCodianView` 的边界
@@ -48,5 +49,6 @@ export class ActiveTabContextUsageCoordinator {
 - `OpenCodianView` 继续保留 model catalog / current conversation / tab manager / context ring 的真实所有权
 - `ContextUsageService` 继续保留纯 state 变换逻辑；streaming usage chunk 的 begin/apply/complete 仍留在 view 的 per-tab runtime 写回
 - `TabViewActivationBridge` 只保留 pane、layout、selector、send-button 与 loaded post-render 编排，不再直接持有 context usage identity/snapshot host
+- `TabViewActivationBridge` 的 loaded-conversation hydration tail 现在只同步 identity，精确 snapshot 改为后台刷新；coordinator 继续负责 stale guard 和回写安全性
 - `TabConversationActivationBridge` 只保留 current-tab open shell/outcome 编排，不再直接持有 context usage identity/snapshot host
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` 相邻 activation/open ownership 收敛，同时为后续 P3 context/composer 链路留出更清晰的 context usage seam

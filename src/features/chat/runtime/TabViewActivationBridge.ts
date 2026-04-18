@@ -1,8 +1,15 @@
+import {
+  createLogger,
+  formatDurationMs,
+  getPerformanceTimestampMs,
+} from '../../../shared';
 import type { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
 import type { FocusContextPreviewCoordinator } from '../services/FocusContextPreviewCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
+
+const logger = createLogger('TabViewActivationBridge');
 
 type ActiveTabContextUsagePort = Pick<
   ActiveTabContextUsageCoordinator,
@@ -89,10 +96,26 @@ export class TabViewActivationBridge {
     this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
   }
 
-  async applyLoadedConversationHydrationTail(): Promise<void> {
+  applyLoadedConversationHydrationTail(): void {
     this.host.scheduleComposerLayoutSync();
     this.host.updateModelSelectorDisplay();
     this.activeTabContextUsageCoordinator.syncIdentity();
-    await this.activeTabContextUsageCoordinator.refreshFromServer();
+    this.refreshContextUsageFromServerInBackground();
+  }
+
+  private refreshContextUsageFromServerInBackground(): void {
+    const startedAt = getPerformanceTimestampMs();
+    void this.activeTabContextUsageCoordinator.refreshFromServer()
+      .then(() => {
+        logger.debug(
+          `[hydration-tail] context usage background refresh completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+        );
+      })
+      .catch((error) => {
+        logger.warn(
+          `[hydration-tail] context usage background refresh failed after ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+          error,
+        );
+      });
   }
 }

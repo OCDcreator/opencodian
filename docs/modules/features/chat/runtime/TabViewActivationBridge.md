@@ -24,7 +24,7 @@ export class TabViewActivationBridge {
   applyStreamingActivationOutcome(tabId: TabId, sessionId: string | null): void;
   applyEmptyActivationOutcome(tabId: TabId): void;
   applyLoadedConversationPostRenderOutcome(tabId: TabId | null, sessionId: string | null): Promise<void>;
-  applyLoadedConversationHydrationTail(): Promise<void>;
+  applyLoadedConversationHydrationTail(): void;
 }
 ```
 
@@ -34,10 +34,11 @@ export class TabViewActivationBridge {
 - `applyStreamingActivationOutcome()` 保持 streaming fast-path 的后续刷新顺序：model selector → context usage identity → activation-side question/todo refresh → send button，其中 context usage identity 已委托给 `ActiveTabContextUsageCoordinator`
 - `applyEmptyActivationOutcome()` 保持 empty-tab 清空后的后续刷新顺序：activation-side empty question/todo refresh → model selector → context usage identity → send button，其中 context usage identity 已委托给 `ActiveTabContextUsageCoordinator`
 - `applyLoadedConversationPostRenderOutcome()` 接管 loaded conversation 在消息重渲后、scroll restore 之前的 activation/render outcome：先经由 `BackgroundTaskActivationIndicatorCoordinator` awaited 刷新 background-task indicator，再复用同一条 activation-side question/todo refresh
-- `applyLoadedConversationHydrationTail()` 接管 loaded conversation 在 scroll restore 之后的 hydration 尾段 UI 顺序：composer layout sync → model selector → context usage identity → context usage snapshot fetch，其中两段 context usage writeback 都经由 `ActiveTabContextUsageCoordinator`
+- `applyLoadedConversationHydrationTail()` 接管 loaded conversation 在 scroll restore 之后的 hydration 尾段 UI 顺序：composer layout sync → model selector → context usage identity，然后把 context usage snapshot fetch 改成后台刷新；这样首开/首个恢复 tab 不会再被慢服务端 snapshot 串行阻塞
 - `ConversationViewStateService.activateTab()` 现在只决定激活后走 streaming / hydration / empty-tab 哪条分支，不再直接持有这些 pane-level UI writeback
 - `ConversationHydrationOutcomeBridge` 现在负责在消息装载后触发本 bridge 的 loaded-conversation post-render outcome；`ConversationViewStateService.loadConversation()` 继续保留 hydrate 主链路和 scroll restore，但不再直接持有这段 post-render outcome
 - `ConversationViewStateService.loadConversation()` 也不再直接持有 composer/model/context usage 这段 hydration 尾部 writeback；activation/open 侧的 dock + supplemental refresh 现在先交给 `QuestionTodoActivationRefreshCoordinator`
+- bridge 会为 hydration-tail 的后台 context usage refresh 输出调试耗时日志，方便继续排查 view-open 长尾
 - `OpenCodianView` 提供给本 bridge 的 pane/composer/model/send-button host shape 现在先经由 `TabActivationBridgeHostFactory` 统一派生，不再单独维护一份 `createTabViewActivationBridgeHost()` 闭包
 - 这样后续如果继续沿 P1 收紧 tab activation ownership，可以在不改动 hydrate 主链路的情况下扩展同一桥接边界
 
