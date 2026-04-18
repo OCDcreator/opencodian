@@ -8,11 +8,15 @@
 `StorageService` 是 OpenCodian 的本地持久化层。它直接通过 `app.vault.adapter` 在当前 vault 根目录下维护一个 `.opencodian/` 目录，用来保存：
 
 - 会话 JSON
+- 会话元数据 sidecar JSON
 - 分层插件设置 JSON
 - 运行时状态 JSON
 - 主题背景图片资产（通过内部 `ThemeBackgroundStorage` owner）
 
-源码里没有把这些数据写到 `.obsidian/plugins/opencodian/`；实际相对路径都是以 vault 根目录为基准。为了排查冷启动和首个 tab 打开过慢的问题，模块现在还会补充少量 debug 性能日志：`listConversations()` 输出本次会话元数据扫描耗时，`loadFullConversation()` 会在单次读取明显偏慢时记录 conversation 级别的读盘耗时。
+源码里没有把这些数据写到 `.obsidian/plugins/opencodian/`；实际相对路径都是以 vault 根目录为基准。为了排查冷启动和首个 tab 打开过慢的问题，模块现在还会同时承担两件事：
+
+- `listConversations()` 输出本次会话元数据扫描耗时，并维护最近一次会话列表扫描诊断快照
+- 当历史会话还没有轻量 metadata sidecar 时，自动从完整 session JSON 回退读取并回填 sidecar，减少后续冷启动的读盘量
 
 ## 导入关系
 
@@ -30,6 +34,7 @@ class StorageService {
   loadFullConversation(id: string): Promise<Conversation | null>;
   loadConversation(id: string): Promise<ConversationMeta | null>;
   listConversations(): Promise<ConversationMeta[]>;
+  getConversationListDiagnosticsSnapshot(): ConversationListDiagnostics | null;
   deleteConversation(id: string): Promise<void>;
   saveCoreSettings(settings: PersistedCoreSettings): Promise<void>;
   saveUiSettings(settings: PersistedUiSettings): Promise<void>;
@@ -62,14 +67,17 @@ class StorageService {
   runtime.json
   sessions/
     {conversationId}.json
+  session-metas/
+    {conversationId}.json
   theme-backgrounds/
     theme-bg-{timestamp}-{random}.{ext}
 ```
 
-`initialize()` 只会确保 3 个目录存在：
+`initialize()` 只会确保 4 个目录存在：
 
 - `.opencodian`
 - `.opencodian/sessions`
+- `.opencodian/session-metas`
 - `.opencodian/theme-backgrounds`
 
 `settings.core.json` / `settings.ui.json` / `runtime.json` 都是按需首次写入时创建。
@@ -87,7 +95,7 @@ class StorageService {
 - `sessionSettings`
 - `messages`
 
-也就是说，保存时不是只存摘要，而是把完整消息数组一起落盘。
+也就是说，保存时不是只存摘要，而是把完整消息数组一起落盘；同时还会额外写一份轻量 sidecar metadata，里面只保留历史列表需要的字段（`title/updatedAt/messageCount/openCodeSessionId` 等）。
 
 读取分成两条路径：
 
@@ -104,7 +112,14 @@ class StorageService {
 
 ### 会话列表与删除
 
-`listConversations()` 会遍历 `sessions/` 下的所有 `.json` 文件，逐个调用 `loadConversation()`，最后按以下键排序：
+`listConversations()` 仍然以 `sessions/` 下的 `.json` 文件为真值来源，但读取顺序变成了：
+
+1. 先看对应的 `session-metas/{id}.json` 是否存在且可读
+2. sidecar 命中时直接返回 metadata
+3. sidecar 缺失或无效时，才回退读取完整 `sessions/{id}.json`
+4. 回退成功后异步补写新的 sidecar，供后续冷启动复用
+
+最后仍按以下键排序：
 
 - 优先 `lastResponseAt`
 - 否则 `updatedAt`
@@ -114,9 +129,22 @@ class StorageService {
 `listConversations()` 现在还会输出一条 startup debug 汇总日志，带上：
 
 - `sessions/` 目录总文件数
-- 实际扫描的 `.json` 文件数
+- 实际扫描的 session `.json` 文件数
+- 命中的 sidecar metadata 数
+- 回退到完整 session JSON 的次数
 - 成功载入的 conversation 数
 - 总耗时
+
+同时，模块会缓存最近一次扫描的结构化诊断快照，供 `main.ts` 的 startup analysis / diagnostic report 直接读取：
+
+- `sessionFileCount`
+- `metadataFileCount`
+- `metadataHitCount`
+- `fullSessionFallbackCount`
+- `metadataBackfillScheduledCount`
+- `totalFallbackBytes`
+- `slowestFallbacks`
+- `largestFallbackSessions`
 
 `deleteConversation()` 会尝试删除单个文件；文件不存在时静默忽略。
 
@@ -228,6 +256,7 @@ OpenCodianView 会话变更
 
 - `src/main.ts` 是 `StorageService` 的创建者，也是设置恢复、分层保存、运行时状态、背景图资源读写的协调者。
 - `src/features/chat/OpenCodianView.ts` 通过 `plugin.saveConversation()` 持久化会话；UI 状态写盘也要先回到插件层。
+- 会话 metadata sidecar、fallback 统计和 sidecar 回填细节已经从 `StorageService` 主类收束到 `src/core/storage/ConversationMetadataCache.ts`。
 - 主题背景图的写入、移除和读取都由 `src/main.ts` 调用这个服务，再把结果回填到设置项中。
 - 背景图二进制细节已经从 `StorageService` 主类收束到 `src/core/storage/ThemeBackgroundStorage.ts`。
 
@@ -236,5 +265,7 @@ OpenCodianView 会话变更
 - 存储根目录是 vault 根下的 `.opencodian/`，不是插件安装目录。
 - `writeBinary` / `readBinary` 都是可选 adapter API；缺失时分别表现为抛错或返回 `null`。
 - `initialize()` 不会创建 `runtime.json`、`settings.core.json` 与 `settings.ui.json`，因此依赖它们存在的逻辑必须允许首次为空。
+- 会话 metadata sidecar 是性能缓存，不是唯一真值；即使 sidecar 缺失或写入失败，也必须允许回退到完整 session JSON。
+- 第一次升级到这套 sidecar 方案的冷启动，可能仍会看到若干 full-session fallback；完成一次启动后，后续冷启动应该更多命中 `session-metas/`。
 - 设置恢复把“损坏/不可解析”与“文件不存在”区分开处理，避免把损坏文件误当首次安装再写默认值覆盖。
 - 模块里声明了 `vaultPath`，但当前公开 API 并不直接使用这个字段。

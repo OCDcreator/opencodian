@@ -49,7 +49,7 @@
 - `themeBackgroundDataUrlCache` / `themeBackgroundDataUrlRequests`: 聊天背景图 data URL 缓存与并发去重。
 - `chatAppearanceSaveTimeoutId` / `settingsUiStateSaveTimeoutId` / `modelRefreshFrameId`: 插件级节流与 UI 刷新调度句柄。
 - `settingsPersistenceWritable`: 启动恢复失败时切到只读保护，阻止默认值覆盖已损坏的设置文件。
-- `startupPerfTrace`: 最近一次插件启动埋点快照，记录分阶段耗时、运行状态和最慢嵌套步骤，用于冷启动诊断报告。
+- `startupPerfTrace`: 最近一次插件启动埋点快照，记录分阶段耗时、运行状态、最慢嵌套步骤，以及自动诊断输出，用于冷启动诊断报告和慢启动自动快照。
 
 ## 核心逻辑
 
@@ -58,7 +58,7 @@
 `onload()` 的顺序是有意排好的：
 
 1. 记录启动首行：版本、`BUILD_ID` 和 vault 路径。
-2. 用 `measureStartupStep()` 给顶层和关键嵌套子步骤打点。
+2. 用 `measureStartupStep()` 给顶层和关键嵌套子步骤打点；`loadSettings()` 会继续拆出 `storage.loadPersistedSettings` / `normalizeLoadedSettings` / `persistNormalizedSettings`，而 `loadConversations()` 会继续拆出 `storage.listConversations` / `cacheConversationMetas`。
 3. 注册品牌 icon。
 4. 创建并初始化 `StorageService`。
 5. 调用 `loadSettings()`，完成设置归一化与历史字段迁移。
@@ -68,10 +68,11 @@
 9. 若 vault 下还没有 `.opencode` 配置，按当前 `permissionMode` 调用 `initializeOpencodeConfig()` 创建。
 10. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
 11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
-12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据。
+12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
 13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
-14. 启动结束时输出一行汇总日志，并把最近一次 trace 暴露给诊断报告。
-15. `onload()` 返回后再后台调度 deferred runtime warmup：本地 sidecar 自启动与首个 server snapshot 不再阻塞插件注册和视图恢复；真正需要新 session 的路径（当前主要是 `createConversation()`）才会显式接管并等待这次 warmup，避免首次建会话撞上未就绪 server，同时不拖慢已有会话的视图首开。
+14. 启动结束时输出一行汇总日志；若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
+15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。
+16. `onload()` 返回后再后台调度 deferred runtime warmup：本地 sidecar 自启动与首个 server snapshot 不再阻塞插件注册和视图恢复；真正需要新 session 的路径（当前主要是 `createConversation()`）才会显式接管并等待这次 warmup，避免首次建会话撞上未就绪 server，同时不拖慢已有会话的视图首开。
 
 这里没有调用 `OpenCodeService.initialize()`；实际运行时由 `main.ts` 自己决定是否启动服务。
 
@@ -156,7 +157,7 @@
   - 维护 data URL 缓存
   - 在保存失败时回滚外观并删除新导入的资源
 - 诊断导出：
-  - `buildDiagnosticReport()` 汇总 server 状态、关键设置、最近一次 startup perf trace 与最近日志
+  - `buildDiagnosticReport()` 汇总 server 状态、关键设置、最近一次 startup perf trace、自动 startup analysis 与最近日志
   - `writeDiagnosticLogFile()` 把报告写到指定目录
 
 ## 关键方法
@@ -225,4 +226,6 @@ graph TD
 - 启动 trace 会同时记录顶层 phase 和嵌套子步骤；诊断报告里的总耗时只汇总顶层 phase，避免双重累计。
 - `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。
 - 当启动阶段判定设置不可恢复时，插件会进入持久化只读保护，并通过 `Notice` 告警，而不是把默认值写回磁盘。
+- `measureStartupStep()` 现在只在 trace 处于 `running` 时记录条目，避免后续手动刷新历史列表时污染“本次启动”快照。
+- 慢启动自动快照不依赖用户先打开 debug；只要启动失败，或顶层总耗时 / 主导 phase 超过阈值，就会把 trace 写到 `.opencodian/debug/startup-perf-latest.log`。
 - `onunload()` 当前没有显式调用 `clearSettingsUiStateSaveTimer()`；卸载时只清除了 chat appearance timer 与 model refresh 帧请求。

@@ -4,18 +4,26 @@
  * Uses Obsidian's file system adapter for storage.
  */
 
+/* eslint-disable max-lines -- This legacy owner still carries settings persistence plus runtime storage; conversation metadata caching was extracted in this change to stop further growth. */
+
 import { type App, normalizePath } from 'obsidian';
 
 import type { OpenCodianPlugin } from '../../main';
 import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../../shared';
 import type { ManagedServerState } from '../opencode/types';
 import {
-  type ChatMessage,
   type Conversation,
   type ConversationMeta,
   normalizeConversationSessionSettings,
   type OpenCodianSettings,
 } from '../types';
+import {
+  buildConversationMetaFromStoredRecord,
+  cloneConversationListDiagnostics,
+  type ConversationListDiagnostics,
+  ConversationMetadataCache,
+  type MutableConversationListDiagnostics,
+} from './ConversationMetadataCache';
 import { type StoredThemeBackgroundAsset, ThemeBackgroundStorage } from './ThemeBackgroundStorage';
 
 const STORAGE_DIR = '.opencodian';
@@ -86,6 +94,7 @@ export interface SettingsLoadResult {
   writable: boolean;
   shouldPersist: boolean;
 }
+
 const PERSISTED_UI_SETTINGS_KEYS = [
   'tabState',
   'settingsPanelScrollTop',
@@ -142,11 +151,14 @@ export class StorageService {
   private app: App;
   private vaultPath: string;
   private settingsWriteQueue: Promise<void> = Promise.resolve();
+  private conversationMetadataCache: ConversationMetadataCache;
   private themeBackgroundStorage: ThemeBackgroundStorage;
+  private lastConversationListDiagnostics: ConversationListDiagnostics | null = null;
 
   constructor(plugin: OpenCodianPlugin) {
     this.app = plugin.app;
     this.vaultPath = (this.app.vault.adapter as unknown as { basePath: string }).basePath;
+    this.conversationMetadataCache = new ConversationMetadataCache(this.app.vault.adapter);
     this.themeBackgroundStorage = new ThemeBackgroundStorage(this.app.vault.adapter);
   }
 
@@ -154,12 +166,13 @@ export class StorageService {
   async initialize(): Promise<void> {
     await this.ensureDir(STORAGE_DIR);
     await this.ensureDir(SESSIONS_DIR);
+    await this.ensureDir(this.conversationMetadataCache.getMetadataDirectoryPath());
     await this.themeBackgroundStorage.initialize();
   }
 
   /** Save conversation with all messages */
   async saveConversation(conversation: Conversation): Promise<void> {
-    const path = `${SESSIONS_DIR}/${conversation.id}.json`;
+    const conversationPath = this.getConversationPath(conversation.id);
     
     // Save full conversation data including messages
     const data = {
@@ -178,8 +191,21 @@ export class StorageService {
     };
 
     await this.app.vault.adapter.write(
-      normalizePath(path),
+      normalizePath(conversationPath),
       JSON.stringify(data, null, 2)
+    );
+    await this.conversationMetadataCache.writeConversationMeta(
+      buildConversationMetaFromStoredRecord(data) ?? {
+        id: conversation.id,
+        title: conversation.title,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+        lastResponseAt: conversation.lastResponseAt,
+        titleGenerationStatus: conversation.titleGenerationStatus,
+        messageCount: conversation.messages.length,
+        openCodeSessionId: conversation.openCodeSessionId,
+      },
+      'saveConversation',
     );
   }
 
@@ -212,43 +238,44 @@ export class StorageService {
 
   /** Load conversation metadata only */
   async loadConversation(id: string): Promise<ConversationMeta | null> {
-    const path = `${SESSIONS_DIR}/${id}.json`;
-    
-    try {
-      const content = await this.app.vault.adapter.read(normalizePath(path));
-      const data = JSON.parse(content) as ConversationMeta & { messages?: ChatMessage[] };
-      return {
-        id: data.id,
-        title: data.title,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
-        lastResponseAt: data.lastResponseAt,
-        titleGenerationStatus: data.titleGenerationStatus,
-        messageCount: data.messages?.length ?? data.messageCount ?? 0,
-        openCodeSessionId: data.openCodeSessionId,
-      };
-    } catch {
-      return null;
-    }
+    return this.conversationMetadataCache.loadConversationMeta(id, this.getConversationPath(id));
   }
 
   /** List all conversations */
   async listConversations(): Promise<ConversationMeta[]> {
     const startedAt = getPerformanceTimestampMs();
-    const files = await this.app.vault.adapter.list(normalizePath(SESSIONS_DIR));
+    const [sessionListing, metadataFileCount] = await Promise.all([
+      this.app.vault.adapter.list(normalizePath(SESSIONS_DIR)),
+      this.conversationMetadataCache.getMetadataFileCount(),
+    ]);
     const conversations: ConversationMeta[] = [];
-    let scannedJsonFiles = 0;
+    const sessionJsonFiles = sessionListing.files.filter((file) => file.endsWith('.json'));
+    const diagnostics: MutableConversationListDiagnostics = {
+      collectedAt: new Date().toISOString(),
+      sessionFileCount: sessionJsonFiles.length,
+      metadataFileCount: metadataFileCount,
+      metadataHitCount: 0,
+      fullSessionFallbackCount: 0,
+      metadataBackfillScheduledCount: 0,
+      totalFallbackBytes: 0,
+      totalElapsedMs: 0,
+      slowestFallbacks: [],
+      largestFallbackSessions: [],
+    };
 
-    for (const file of files.files) {
-      if (file.endsWith('.json')) {
-        scannedJsonFiles += 1;
-        const id = file.split('/').pop()?.replace('.json', '');
-        if (id) {
-          const conv = await this.loadConversation(id);
-          if (conv) {
-            conversations.push(conv);
-          }
-        }
+    for (const file of sessionJsonFiles) {
+      const id = this.extractConversationIdFromFilePath(file);
+      if (!id) {
+        continue;
+      }
+
+      const conv = await this.conversationMetadataCache.loadConversationMeta(
+        id,
+        this.getConversationPath(id),
+        diagnostics,
+      );
+      if (conv) {
+        conversations.push(conv);
       }
     }
 
@@ -257,21 +284,37 @@ export class StorageService {
       (b.lastResponseAt ?? b.updatedAt) - (a.lastResponseAt ?? a.updatedAt)
     );
     const elapsedMs = getPerformanceTimestampMs() - startedAt;
+    diagnostics.totalElapsedMs = elapsedMs;
+    this.lastConversationListDiagnostics = cloneConversationListDiagnostics(diagnostics);
     logger.debug(
-      `[startup] listConversations loaded ${sortedConversations.length}/${scannedJsonFiles} conversations from ${files.files.length} files in ${formatDurationMs(elapsedMs)}`,
+      `[startup] listConversations loaded ${sortedConversations.length}/${sessionJsonFiles.length} conversations from ${sessionListing.files.length} session files in ${formatDurationMs(elapsedMs)} (meta ${diagnostics.metadataHitCount}, fallback ${diagnostics.fullSessionFallbackCount}, fallback-bytes ${diagnostics.totalFallbackBytes})`,
     );
     return sortedConversations;
   }
 
   /** Delete a conversation */
   async deleteConversation(id: string): Promise<void> {
-    const path = `${SESSIONS_DIR}/${id}.json`;
+    const conversationPath = this.getConversationPath(id);
     
     try {
-      await this.app.vault.adapter.remove(normalizePath(path));
+      await this.app.vault.adapter.remove(normalizePath(conversationPath));
     } catch {
       // Ignore if file doesn't exist
     }
+
+    try {
+      await this.conversationMetadataCache.removeConversationMeta(id);
+    } catch {
+      // Ignore if metadata sidecar doesn't exist
+    }
+  }
+
+  getConversationListDiagnosticsSnapshot(): ConversationListDiagnostics | null {
+    if (!this.lastConversationListDiagnostics) {
+      return null;
+    }
+
+    return cloneConversationListDiagnostics(this.lastConversationListDiagnostics);
   }
 
   async saveCoreSettings(settings: PersistedCoreSettings): Promise<void> {
@@ -576,5 +619,18 @@ export class StorageService {
         managedServer: null,
       };
     }
+  }
+
+  private getConversationPath(id: string): string {
+    return `${SESSIONS_DIR}/${id}.json`;
+  }
+
+  private extractConversationIdFromFilePath(filePath: string): string | null {
+    const fileName = filePath.split('/').pop();
+    if (!fileName?.endsWith('.json')) {
+      return null;
+    }
+
+    return fileName.slice(0, -'.json'.length) || null;
   }
 }

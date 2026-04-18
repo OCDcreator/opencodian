@@ -52,6 +52,9 @@ import { registerBuiltinGlassAdapters } from './utils/glass';
 
 const logger = createLogger('OpenCodian');
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
+const STARTUP_TRACE_AUTO_PERSIST_THRESHOLD_MS = 1200;
+const STARTUP_SLOW_PHASE_THRESHOLD_MS = 400;
+const STARTUP_DOMINANT_PHASE_RATIO = 0.45;
 const OPENCODIAN_APP_ICON_SVG = `
   <g class="opencodian-app-icon-layer opencodian-app-icon-layer--light">
     <rect x="10" y="0" width="80" height="100" fill="#211E1E"/>
@@ -375,14 +378,28 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Load settings from storage */
   async loadSettings() {
-    const loadState = prepareLoadedSettingsBootstrapState(await this.storage.loadPersistedSettings());
+    const persistedSettings = await this.measureStartupStep(
+      'storage.loadPersistedSettings',
+      () => this.storage.loadPersistedSettings(),
+    );
+    const loadState = await this.measureStartupStep(
+      'normalizeLoadedSettings',
+      () => prepareLoadedSettingsBootstrapState(persistedSettings),
+      {
+        detail: () => `core=${persistedSettings.core.source}, ui=${persistedSettings.ui.source}, persist=${persistedSettings.shouldPersist ? 'yes' : 'no'}`,
+      },
+    );
     this.settingsPersistenceWritable = loadState.persistedSettings.writable;
     this.settings = loadState.settings;
 
     this.reportSettingsLoadState(loadState.persistedSettings);
 
     if (loadState.shouldPersistNormalizedSettings) {
-      await this.persistSettingsDomains({ core: true, ui: true });
+      await this.measureStartupStep(
+        'persistNormalizedSettings',
+        () => this.persistSettingsDomains({ core: true, ui: true }),
+        { detail: 'startup normalization backfill' },
+      );
     }
   }
 
@@ -959,6 +976,9 @@ export default class OpenCodianPlugin extends Plugin {
       '## Startup Performance',
       ...this.getStartupPerfSummaryLines(),
       '',
+      '## Startup Analysis',
+      ...this.getStartupPerformanceDiagnosisLines(),
+      '',
       '## Recent Logs',
       getRecentLogText() || '(no logs captured yet)',
       '',
@@ -1068,18 +1088,26 @@ export default class OpenCodianPlugin extends Plugin {
     }
 
     this.conversationsLoadPromise = (async () => {
-      const metas = await this.storage.listConversations();
+      const metas = await this.measureStartupStep(
+        'storage.listConversations',
+        () => this.storage.listConversations(),
+        { detail: () => this.describeConversationListDiagnostics() },
+      );
 
-      this.conversations = metas.map((meta) => ({
-        id: meta.id,
-        title: meta.title,
-        createdAt: meta.createdAt,
-        updatedAt: meta.updatedAt,
-        lastResponseAt: meta.lastResponseAt,
-        titleGenerationStatus: meta.titleGenerationStatus,
-        openCodeSessionId: meta.openCodeSessionId ?? meta.id,
-        messages: [],
-      }));
+      this.conversations = await this.measureStartupStep(
+        'cacheConversationMetas',
+        () => metas.map((meta) => ({
+          id: meta.id,
+          title: meta.title,
+          createdAt: meta.createdAt,
+          updatedAt: meta.updatedAt,
+          lastResponseAt: meta.lastResponseAt,
+          titleGenerationStatus: meta.titleGenerationStatus,
+          openCodeSessionId: meta.openCodeSessionId ?? meta.id,
+          messages: [],
+        })),
+        { detail: () => `${metas.length} conversations` },
+      );
       this.conversationsLoaded = true;
     })();
 
@@ -1241,43 +1269,52 @@ export default class OpenCodianPlugin extends Plugin {
     operation: () => Promise<T> | T,
     options: { detail?: string | (() => string) } = {},
   ): Promise<T> {
+    const shouldTrace = this.startupPerfTrace?.status === 'running';
     const depth = this.startupPerfDepth;
     const startedAt = getPerformanceTimestampMs();
-    this.startupPerfDepth = depth + 1;
-    logger.debug(`[startup] ${step} started`);
+    if (shouldTrace) {
+      this.startupPerfDepth = depth + 1;
+      logger.debug(`[startup] ${step} started`);
+    }
 
     try {
       const result = await Promise.resolve(operation());
-      const elapsedMs = getPerformanceTimestampMs() - startedAt;
-      const detail = typeof options.detail === 'function' ? options.detail() : options.detail;
-      this.recordStartupPerfEntry({
-        step,
-        elapsedMs,
-        status: 'ok',
-        depth,
-        detail,
-      });
-      logger.debug(
-        `[startup] ${step} completed in ${formatDurationMs(elapsedMs)}${detail ? ` (${detail})` : ''}`,
-      );
+      if (shouldTrace) {
+        const elapsedMs = getPerformanceTimestampMs() - startedAt;
+        const detail = typeof options.detail === 'function' ? options.detail() : options.detail;
+        this.recordStartupPerfEntry({
+          step,
+          elapsedMs,
+          status: 'ok',
+          depth,
+          detail,
+        });
+        logger.debug(
+          `[startup] ${step} completed in ${formatDurationMs(elapsedMs)}${detail ? ` (${detail})` : ''}`,
+        );
+      }
       return result;
     } catch (error) {
-      const elapsedMs = getPerformanceTimestampMs() - startedAt;
-      const detail = typeof options.detail === 'function' ? options.detail() : options.detail;
-      this.recordStartupPerfEntry({
-        step,
-        elapsedMs,
-        status: 'error',
-        depth,
-        detail,
-      });
-      logger.error(
-        `[startup] ${step} failed after ${formatDurationMs(elapsedMs)}${detail ? ` (${detail})` : ''}`,
-        error,
-      );
+      if (shouldTrace) {
+        const elapsedMs = getPerformanceTimestampMs() - startedAt;
+        const detail = typeof options.detail === 'function' ? options.detail() : options.detail;
+        this.recordStartupPerfEntry({
+          step,
+          elapsedMs,
+          status: 'error',
+          depth,
+          detail,
+        });
+        logger.error(
+          `[startup] ${step} failed after ${formatDurationMs(elapsedMs)}${detail ? ` (${detail})` : ''}`,
+          error,
+        );
+      }
       throw error;
     } finally {
-      this.startupPerfDepth = depth;
+      if (shouldTrace) {
+        this.startupPerfDepth = depth;
+      }
     }
   }
 
@@ -1301,6 +1338,13 @@ export default class OpenCodianPlugin extends Plugin {
     logger.info(
       `[startup] ${status} in ${formatDurationMs(totalElapsedMs)}${summaryText ? ` | ${summaryText}` : ''}`,
     );
+
+    if (status === 'failed' || this.isSlowStartupTrace()) {
+      const diagnosis = this.getStartupPerformanceDiagnosisLines()[0];
+      if (diagnosis) {
+        logger.warn(`[startup] automatic diagnosis: ${diagnosis}`);
+      }
+    }
   }
 
   private getStartupPerfSummaryLines(): string[] {
@@ -1337,8 +1381,86 @@ export default class OpenCodianPlugin extends Plugin {
     ];
   }
 
+  private getStartupPerformanceDiagnosisLines(): string[] {
+    if (!this.startupPerfTrace) {
+      return ['No startup trace captured yet.'];
+    }
+
+    const topLevelEntries = this.getStartupTopLevelEntries()
+      .sort((left, right) => right.elapsedMs - left.elapsedMs);
+    const totalElapsedMs = this.getStartupPerfTotalElapsedMs();
+    const slowestStep = topLevelEntries[0];
+    const lines: string[] = [];
+
+    if (slowestStep && totalElapsedMs > 0) {
+      const share = Math.round((slowestStep.elapsedMs / totalElapsedMs) * 100);
+      lines.push(
+        `Primary phase: ${slowestStep.step} took ${formatDurationMs(slowestStep.elapsedMs)} (${share}% of ${formatDurationMs(totalElapsedMs)} total).`,
+      );
+    } else {
+      return ['No top-level startup phases were recorded.'];
+    }
+
+    const conversationDiagnostics = this.getConversationListDiagnosticsSnapshot();
+    const loadConversationsEntry = topLevelEntries.find((entry) => entry.step === 'loadConversations')
+      ?? this.startupPerfTrace.entries.find((entry) => entry.step === 'storage.listConversations');
+    if (
+      conversationDiagnostics
+      && loadConversationsEntry
+      && (
+        conversationDiagnostics.fullSessionFallbackCount > 0
+        || loadConversationsEntry.elapsedMs >= STARTUP_SLOW_PHASE_THRESHOLD_MS
+      )
+    ) {
+      lines.push(
+        `Conversation scan: ${conversationDiagnostics.metadataHitCount}/${conversationDiagnostics.sessionFileCount} metadata sidecars hit, ${conversationDiagnostics.fullSessionFallbackCount} full-session fallbacks, fallback read volume ~${this.formatStartupDataSize(conversationDiagnostics.totalFallbackBytes)}.`,
+      );
+
+      const slowestFallback = conversationDiagnostics.slowestFallbacks[0];
+      if (slowestFallback) {
+        lines.push(
+          `Slowest fallback session: ${slowestFallback.id} ${formatDurationMs(slowestFallback.elapsedMs ?? 0)} for ~${this.formatStartupDataSize(slowestFallback.contentBytes ?? 0)} (${slowestFallback.messageCount ?? 0} messages).`,
+        );
+      }
+
+      if (conversationDiagnostics.fullSessionFallbackCount > 0) {
+        lines.push(
+          'Inference: missing or stale session metadata sidecars forced a full session JSON scan; this startup already backfilled sidecars so later cold starts should rely more on the lightweight cache.',
+        );
+      }
+    }
+
+    const persistNormalizedSettingsEntry = this.startupPerfTrace.entries.find(
+      (entry) => entry.step === 'persistNormalizedSettings',
+    );
+    if (persistNormalizedSettingsEntry) {
+      lines.push(
+        `Settings recovery wrote normalized files during startup (${formatDurationMs(persistNormalizedSettingsEntry.elapsedMs)}), which usually only happens after migration or file recovery.`,
+      );
+    }
+
+    const storageSettingsEntry = this.startupPerfTrace.entries.find(
+      (entry) => entry.step === 'storage.loadPersistedSettings',
+    );
+    if (
+      storageSettingsEntry
+      && storageSettingsEntry.elapsedMs >= STARTUP_SLOW_PHASE_THRESHOLD_MS
+      && !persistNormalizedSettingsEntry
+    ) {
+      lines.push(
+        `Settings restore itself was slow (${formatDurationMs(storageSettingsEntry.elapsedMs)}); inspect split settings files and backup recovery state if this repeats.`,
+      );
+    }
+
+    if (!this.isSlowStartupTrace() && lines.length === 1) {
+      lines.push('No obvious startup hotspot crossed the current slow-start threshold.');
+    }
+
+    return lines;
+  }
+
   private async persistStartupPerfTraceSnapshot(): Promise<void> {
-    if (!this.startupPerfTrace || !this.settings?.enableDebugLogging) {
+    if (!this.startupPerfTrace || !this.shouldPersistStartupPerfTraceSnapshot()) {
       return;
     }
 
@@ -1361,6 +1483,9 @@ export default class OpenCodianPlugin extends Plugin {
       '',
       ...this.getStartupPerfSummaryLines(),
       '',
+      'Automatic diagnosis:',
+      ...this.getStartupPerformanceDiagnosisLines().map((line) => `- ${line}`),
+      '',
       'Top-level entries:',
       ...(topLevelEntries.length
         ? topLevelEntries.map((entry) =>
@@ -1380,7 +1505,78 @@ export default class OpenCodianPlugin extends Plugin {
 
     await fs.promises.mkdir(debugDirectoryPath, { recursive: true });
     await fs.promises.writeFile(outputPath, lines.join('\n'), 'utf-8');
-    logger.debug(`[startup] wrote startup trace snapshot to ${outputPath}`);
+    if (this.settings?.enableDebugLogging) {
+      logger.debug(`[startup] wrote startup trace snapshot to ${outputPath}`);
+      return;
+    }
+
+    logger.warn(`[startup] wrote automatic startup trace snapshot to ${outputPath}`);
+  }
+
+  private getStartupTopLevelEntries(): StartupPerfEntry[] {
+    return this.startupPerfTrace?.entries.filter((entry) => entry.depth === 0) ?? [];
+  }
+
+  private getStartupPerfTotalElapsedMs(): number {
+    return this.getStartupTopLevelEntries()
+      .reduce((sum, entry) => sum + entry.elapsedMs, 0);
+  }
+
+  private isSlowStartupTrace(): boolean {
+    const totalElapsedMs = this.getStartupPerfTotalElapsedMs();
+    if (totalElapsedMs >= STARTUP_TRACE_AUTO_PERSIST_THRESHOLD_MS) {
+      return true;
+    }
+
+    const slowestTopLevelStep = this.getStartupTopLevelEntries()
+      .sort((left, right) => right.elapsedMs - left.elapsedMs)[0];
+    if (!slowestTopLevelStep || totalElapsedMs <= 0) {
+      return false;
+    }
+
+    return slowestTopLevelStep.elapsedMs >= STARTUP_SLOW_PHASE_THRESHOLD_MS
+      && (slowestTopLevelStep.elapsedMs / totalElapsedMs) >= STARTUP_DOMINANT_PHASE_RATIO;
+  }
+
+  private shouldPersistStartupPerfTraceSnapshot(): boolean {
+    return Boolean(
+      this.settings?.enableDebugLogging
+      || this.startupPerfTrace?.status === 'failed'
+      || this.isSlowStartupTrace(),
+    );
+  }
+
+  private getConversationListDiagnosticsSnapshot():
+    ReturnType<StorageService['getConversationListDiagnosticsSnapshot']> {
+    const storage = this.storage as StorageService & {
+      getConversationListDiagnosticsSnapshot?: () => ReturnType<StorageService['getConversationListDiagnosticsSnapshot']>;
+    };
+    return storage.getConversationListDiagnosticsSnapshot?.() ?? null;
+  }
+
+  private describeConversationListDiagnostics(): string {
+    const diagnostics = this.getConversationListDiagnosticsSnapshot();
+    if (!diagnostics) {
+      return 'conversation diagnostics unavailable';
+    }
+
+    return `sessions=${diagnostics.sessionFileCount}, metaHits=${diagnostics.metadataHitCount}, fullFallbacks=${diagnostics.fullSessionFallbackCount}`;
+  }
+
+  private formatStartupDataSize(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) {
+      return '0 B';
+    }
+
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 1 : 2)} MB`;
+    }
+
+    if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(bytes >= 10 * 1024 ? 1 : 2)} KB`;
+    }
+
+    return `${Math.round(bytes)} B`;
   }
 }
 

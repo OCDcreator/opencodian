@@ -40,6 +40,7 @@ describe('StorageService initialization', () => {
 
     expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian');
     expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/sessions');
+    expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/session-metas');
     expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/theme-backgrounds');
   });
 
@@ -52,9 +53,8 @@ describe('StorageService initialization', () => {
   });
 });
 
-describe('StorageService conversation persistence', () => {
-  describe('saveConversation', () => {
-    it('should save conversation metadata', async () => {
+describe('StorageService conversation persistence - saveConversation', () => {
+  it('should save conversation metadata', async () => {
       const conversation = {
         id: 'conv-123',
         title: 'Test Conversation',
@@ -70,9 +70,9 @@ describe('StorageService conversation persistence', () => {
         '.opencodian/sessions/conv-123.json',
         expect.stringContaining('Test Conversation')
       );
-    });
+  });
 
-    it('should include message count in saved data', async () => {
+  it('should include message count in saved data', async () => {
       const conversation = {
         id: 'conv-123',
         title: 'Test',
@@ -86,9 +86,38 @@ describe('StorageService conversation persistence', () => {
 
       const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
       expect(savedData.messageCount).toBe(2);
-    });
+  });
 
-    it('persists user context attachments inside full messages', async () => {
+  it('writes a lightweight conversation metadata sidecar', async () => {
+      const conversation = {
+        id: 'conv-meta',
+        title: 'Meta conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        openCodeSessionId: 'session-meta',
+        messages: [{ id: 'msg-1' }],
+      };
+
+      await storage.saveConversation(conversation as unknown as {
+        id: string;
+        title: string;
+        createdAt: number;
+        updatedAt: number;
+        openCodeSessionId: string;
+        messages: unknown[];
+      });
+
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/session-metas/conv-meta.json',
+        expect.stringContaining('"messageCount": 1'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/session-metas/conv-meta.json',
+        expect.stringContaining('"openCodeSessionId": "session-meta"'),
+      );
+  });
+
+  it('persists user context attachments inside full messages', async () => {
       const conversation = {
         id: 'conv-ctx',
         title: 'Context conversation',
@@ -135,9 +164,9 @@ describe('StorageService conversation persistence', () => {
           textSnapshot: 'Selected text',
         },
       ]);
-    });
+  });
 
-    it('persists conversation external context paths', async () => {
+  it('persists conversation external context paths', async () => {
       const conversation = {
         id: 'conv-paths',
         title: 'Context paths conversation',
@@ -160,12 +189,11 @@ describe('StorageService conversation persistence', () => {
 
       const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
       expect(savedData.externalContextPaths).toEqual(['notes/alpha.md', 'notes/beta.md']);
-    });
-
   });
+});
 
-  describe('loadConversation', () => {
-    it('should load conversation metadata', async () => {
+describe('StorageService conversation persistence - loadConversation', () => {
+  it('should load conversation metadata', async () => {
       const mockData = JSON.stringify({
         id: 'conv-123',
         title: 'Test Conversation',
@@ -180,19 +208,19 @@ describe('StorageService conversation persistence', () => {
       expect(result).not.toBeNull();
       expect(result?.id).toBe('conv-123');
       expect(result?.title).toBe('Test Conversation');
-    });
+  });
 
-    it('should return null for non-existent conversation', async () => {
+  it('should return null for non-existent conversation', async () => {
       mockAdapter.read.mockRejectedValue(new Error('File not found'));
 
       const result = await storage.loadConversation('non-existent');
 
       expect(result).toBeNull();
-    });
   });
+});
 
-  describe('loadFullConversation', () => {
-    it('should preserve persisted assistant notice messages', async () => {
+describe('StorageService conversation persistence - loadFullConversation', () => {
+  it('should preserve persisted assistant notice messages', async () => {
       mockAdapter.read.mockResolvedValue(JSON.stringify({
         id: 'conv-123',
         title: 'Test Conversation',
@@ -223,9 +251,9 @@ describe('StorageService conversation persistence', () => {
         noticeTone: 'warning',
         noticeActions: [{ type: 'open_model_settings' }],
       });
-    });
+  });
 
-    it('restores persisted context attachments after reload', async () => {
+  it('restores persisted context attachments after reload', async () => {
       mockAdapter.read.mockResolvedValue(JSON.stringify({
         id: 'conv-ctx',
         title: 'Context Conversation',
@@ -260,9 +288,9 @@ describe('StorageService conversation persistence', () => {
           mime: 'text/markdown',
         },
       ]);
-    });
+  });
 
-    it('restores persisted external context paths after reload', async () => {
+  it('restores persisted external context paths after reload', async () => {
       mockAdapter.read.mockResolvedValue(JSON.stringify({
         id: 'conv-paths',
         title: 'Context paths conversation',
@@ -276,10 +304,7 @@ describe('StorageService conversation persistence', () => {
       const result = await storage.loadFullConversation('conv-paths');
 
       expect(result?.externalContextPaths).toEqual(['notes/alpha.md', 'notes/beta.md']);
-    });
-
   });
-
 });
 
 describe('StorageService conversation session settings', () => {
@@ -344,32 +369,56 @@ describe('StorageService conversation session settings', () => {
 describe('StorageService conversation indexes', () => {
   describe('listConversations', () => {
     it('should return sorted conversations', async () => {
-      mockAdapter.list.mockResolvedValue({
-        files: ['.opencodian/sessions/conv-1.json', '.opencodian/sessions/conv-2.json'],
-        folders: [],
+      mockAdapter.list.mockImplementation(async (dirPath: string) => {
+        if (dirPath === '.opencodian/sessions') {
+          return {
+            files: ['.opencodian/sessions/conv-1.json', '.opencodian/sessions/conv-2.json'],
+            folders: [],
+          };
+        }
+
+        return { files: [], folders: [] };
       });
 
-      mockAdapter.read
-        .mockResolvedValueOnce(JSON.stringify({
-          id: 'conv-1',
-          title: 'First',
-          createdAt: 1000,
-          updatedAt: 3000,
-          messageCount: 1,
-        }))
-        .mockResolvedValueOnce(JSON.stringify({
-          id: 'conv-2',
-          title: 'Second',
-          createdAt: 2000,
-          updatedAt: 4000,
-          messageCount: 2,
-        }));
+      mockAdapter.read.mockImplementation(async (filePath: string) => {
+        if (filePath === '.opencodian/session-metas/conv-1.json') {
+          throw new Error('meta missing');
+        }
+        if (filePath === '.opencodian/session-metas/conv-2.json') {
+          throw new Error('meta missing');
+        }
+        if (filePath === '.opencodian/sessions/conv-1.json') {
+          return JSON.stringify({
+            id: 'conv-1',
+            title: 'First',
+            createdAt: 1000,
+            updatedAt: 3000,
+            messageCount: 1,
+          });
+        }
+        if (filePath === '.opencodian/sessions/conv-2.json') {
+          return JSON.stringify({
+            id: 'conv-2',
+            title: 'Second',
+            createdAt: 2000,
+            updatedAt: 4000,
+            messageCount: 2,
+          });
+        }
+
+        throw new Error(`Unexpected path: ${filePath}`);
+      });
 
       const result = await storage.listConversations();
 
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe('conv-2'); // Sorted by updatedAt desc
       expect(result[1].id).toBe('conv-1');
+      expect(storage.getConversationListDiagnosticsSnapshot()).toEqual(expect.objectContaining({
+        sessionFileCount: 2,
+        metadataHitCount: 0,
+        fullSessionFallbackCount: 2,
+      }));
     });
 
     it('should handle empty directory', async () => {
@@ -378,6 +427,56 @@ describe('StorageService conversation indexes', () => {
       const result = await storage.listConversations();
 
       expect(result).toEqual([]);
+    });
+
+    it('prefers metadata sidecars over full session reads when available', async () => {
+      mockAdapter.list.mockImplementation(async (dirPath: string) => {
+        if (dirPath === '.opencodian/sessions') {
+          return {
+            files: ['.opencodian/sessions/conv-1.json'],
+            folders: [],
+          };
+        }
+
+        return {
+          files: ['.opencodian/session-metas/conv-1.json'],
+          folders: [],
+        };
+      });
+
+      mockAdapter.read.mockImplementation(async (filePath: string) => {
+        if (filePath === '.opencodian/session-metas/conv-1.json') {
+          return JSON.stringify({
+            schemaVersion: 1,
+            updatedAt: 1,
+            data: {
+              id: 'conv-1',
+              title: 'From meta',
+              createdAt: 1000,
+              updatedAt: 3000,
+              messageCount: 4,
+            },
+          });
+        }
+
+        throw new Error(`Unexpected read: ${filePath}`);
+      });
+
+      const result = await storage.listConversations();
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: 'conv-1',
+          title: 'From meta',
+          messageCount: 4,
+        }),
+      ]);
+      expect(storage.getConversationListDiagnosticsSnapshot()).toEqual(expect.objectContaining({
+        sessionFileCount: 1,
+        metadataFileCount: 1,
+        metadataHitCount: 1,
+        fullSessionFallbackCount: 0,
+      }));
     });
   });
 
