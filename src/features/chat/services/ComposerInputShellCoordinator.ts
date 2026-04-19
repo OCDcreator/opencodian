@@ -6,6 +6,57 @@ import { createLogger } from '../../../shared';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 const MAX_VISIBLE_SLASH_COMMAND_ITEMS = 8;
+
+interface FuzzyMatchResult {
+  item: SlashCommandMenuItem;
+  score: number;
+}
+
+function fuzzyScore(text: string, query: string): number {
+  if (!query) return 1;
+  const lower = text.toLowerCase();
+  const ql = query.toLowerCase();
+  if (lower.startsWith(ql)) return 1000 + ql.length;
+  let score = 0;
+  let qi = 0;
+  let lastMatchIndex = -2;
+  for (let ti = 0; ti < lower.length && qi < ql.length; ti++) {
+    if (lower[ti] === ql[qi]) {
+      score += ti === lastMatchIndex + 1 ? 15 : 5;
+      score += ti === 0 ? 10 : 0;
+      lastMatchIndex = ti;
+      qi++;
+    }
+  }
+  return qi === ql.length ? score : 0;
+}
+
+function fuzzyFilterItems(
+  items: SlashCommandMenuItem[],
+  query: string,
+  maxCount: number,
+): SlashCommandMenuItem[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return items.slice(0, maxCount);
+  }
+
+  const scored: FuzzyMatchResult[] = [];
+  for (const item of items) {
+    const idScore = fuzzyScore(item.id, normalizedQuery);
+    const descScore = item.description
+      ? fuzzyScore(item.description, normalizedQuery)
+      : 0;
+    const best = Math.max(idScore, descScore);
+    if (best > 0) {
+      scored.push({ item, score: best });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, maxCount).map((r) => r.item);
+}
+
 const logger = createLogger('ComposerInputShellCoordinator');
 
 export interface ComposerInputShellCoordinatorHost {
@@ -309,6 +360,20 @@ export class ComposerInputShellCoordinator {
     this.selectedSlashCommandMenuItemIndex =
       (this.selectedSlashCommandMenuItemIndex + delta + itemCount) % itemCount;
     this.renderSlashCommandMenu();
+    this.scrollSelectedItemIntoView();
+  }
+
+  private scrollSelectedItemIntoView(): void {
+    if (!this.slashCommandMenuEl) {
+      return;
+    }
+
+    const selectedEl = this.slashCommandMenuEl.querySelector<HTMLElement>(
+      '.opencodian-slash-command-menu-item.is-selected',
+    );
+    if (selectedEl && typeof selectedEl.scrollIntoView === 'function') {
+      selectedEl.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   private applySelectedSlashCommandMenuItem(): void {
@@ -370,46 +435,47 @@ export class ComposerInputShellCoordinator {
     }
 
     const beforeCursor = textarea.value.slice(0, selectionStart);
-    if (!beforeCursor.startsWith('/') || beforeCursor.startsWith('//')) {
+
+    // Scan backward from cursor to find the trigger '/' character.
+    // The '/' is valid only at position 0 or when preceded by whitespace.
+    let slashIndex = -1;
+    for (let i = beforeCursor.length - 1; i >= 0; i--) {
+      const ch = beforeCursor[i];
+      if (ch === '/') {
+        slashIndex = i;
+        break;
+      }
+
+      if (/\s/.test(ch)) {
+        break;
+      }
+    }
+
+    if (slashIndex < 0) {
       return null;
     }
 
-    if (/\s/.test(beforeCursor)) {
+    // Reject '//' (escaped slash or comment syntax).
+    if (slashIndex > 0 && beforeCursor[slashIndex - 1] === '/') {
       return null;
     }
 
-    return beforeCursor.slice(1);
+    const searchText = beforeCursor.slice(slashIndex + 1);
+
+    // If the search text (the portion after '/') contains whitespace,
+    // the user has moved past the command name into argument territory.
+    if (/\s/.test(searchText)) {
+      return null;
+    }
+
+    return searchText;
   }
 
   private filterSlashCommandMenuItems(
     items: SlashCommandMenuItem[],
     query: string,
   ): SlashCommandMenuItem[] {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return items.slice(0, MAX_VISIBLE_SLASH_COMMAND_ITEMS);
-    }
-
-    const prefixMatches: SlashCommandMenuItem[] = [];
-    const secondaryMatches: SlashCommandMenuItem[] = [];
-
-    for (const item of items) {
-      const normalizedId = item.id.toLowerCase();
-      const normalizedDescription = item.description.toLowerCase();
-      if (normalizedId.startsWith(normalizedQuery)) {
-        prefixMatches.push(item);
-        continue;
-      }
-
-      if (
-        normalizedId.includes(normalizedQuery)
-        || normalizedDescription.includes(normalizedQuery)
-      ) {
-        secondaryMatches.push(item);
-      }
-    }
-
-    return [...prefixMatches, ...secondaryMatches].slice(0, MAX_VISIBLE_SLASH_COMMAND_ITEMS);
+    return fuzzyFilterItems(items, query, MAX_VISIBLE_SLASH_COMMAND_ITEMS);
   }
 
   private clearSlashCommandMenu(): void {
@@ -455,15 +521,34 @@ export class ComposerInputShellCoordinator {
       itemEl.addEventListener('mousedown', (event) => {
         event.preventDefault();
       });
+      itemEl.addEventListener('mouseenter', () => {
+        if (this.selectedSlashCommandMenuItemIndex === index) {
+          return;
+        }
+
+        this.selectedSlashCommandMenuItemIndex = index;
+        this.renderSlashCommandMenu();
+      });
       itemEl.addEventListener('click', () => {
         this.selectedSlashCommandMenuItemIndex = index;
         this.applySelectedSlashCommandMenuItem();
       });
 
-      itemEl.createDiv({
+      const titleRowEl = itemEl.createDiv({
+        cls: 'opencodian-slash-command-menu-title-row',
+      });
+      titleRowEl.createDiv({
         cls: 'opencodian-slash-command-menu-title',
         text: `/${item.id}`,
       });
+
+      const sourceBadge = this.buildSourceBadge(item);
+      if (sourceBadge) {
+        titleRowEl.createDiv({
+          cls: `opencodian-slash-command-menu-badge ${sourceBadge.cls}`,
+          text: sourceBadge.text,
+        });
+      }
 
       if (item.description) {
         itemEl.createDiv({
@@ -474,5 +559,28 @@ export class ComposerInputShellCoordinator {
     });
 
     this.scheduleLayoutSync();
+  }
+
+  private buildSourceBadge(
+    item: SlashCommandMenuItem,
+  ): { text: string; cls: string } | null {
+    if (item.runtimeAvailable && item.hasProjectOverride) {
+      return {
+        text: t('slashCommand.sourceBadge.override'),
+        cls: 'opencodian-slash-command-menu-badge--override',
+      };
+    }
+
+    if (item.runtimeAvailable) {
+      return {
+        text: t('slashCommand.sourceBadge.runtime'),
+        cls: 'opencodian-slash-command-menu-badge--runtime',
+      };
+    }
+
+    return {
+      text: t('slashCommand.sourceBadge.project'),
+      cls: 'opencodian-slash-command-menu-badge--project',
+    };
   }
 }

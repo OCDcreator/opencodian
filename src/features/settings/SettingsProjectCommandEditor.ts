@@ -131,6 +131,10 @@ export class SettingsProjectCommandEditor {
       topPControl?.setValue(state.topP);
       subtaskControl?.setValue(state.subtask);
       syncDeleteButton();
+
+      if (state.agent || state.model || state.temperature || state.topP) {
+        advancedSectionEl.open = true;
+      }
     };
 
     new Setting(containerEl)
@@ -140,7 +144,10 @@ export class SettingsProjectCommandEditor {
         selectControl = dropdown;
         dropdown.addOption('', t('settings.commands.editor.select.newCommand'));
         for (const command of sortedCommands) {
-          dropdown.addOption(command.id, `/${command.id}`);
+          const sourceTag = command.runtimeAvailable
+            ? (command.hasProjectOverride ? '⟳' : '●')
+            : '○';
+          dropdown.addOption(command.id, `${sourceTag} /${command.id}`);
         }
         dropdown.setValue('');
         dropdown.onChange((value) => {
@@ -195,6 +202,28 @@ export class SettingsProjectCommandEditor {
       });
 
     new Setting(containerEl)
+      .setName(t('settings.commands.editor.subtask.name'))
+      .setDesc(t('settings.commands.editor.subtask.desc'))
+      .addToggle((toggle) => {
+        subtaskControl = toggle;
+        toggle
+          .setValue(state.subtask)
+          .onChange((value) => {
+            state.subtask = value;
+          });
+      });
+
+    const advancedSectionEl = containerEl.createEl('details', {
+      cls: 'opencodian-command-editor-advanced',
+    });
+    advancedSectionEl.createEl('summary', {
+      text: t('settings.commands.editor.advanced.title'),
+    });
+    const advancedBodyEl = advancedSectionEl.createDiv({
+      cls: 'opencodian-command-editor-advanced-body',
+    });
+
+    new Setting(advancedBodyEl)
       .setName(t('settings.commands.editor.agent.name'))
       .setDesc(t('settings.commands.editor.agent.desc'))
       .addText((text) => {
@@ -207,7 +236,7 @@ export class SettingsProjectCommandEditor {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedBodyEl)
       .setName(t('settings.commands.editor.model.name'))
       .setDesc(t('settings.commands.editor.model.desc'))
       .addText((text) => {
@@ -220,7 +249,7 @@ export class SettingsProjectCommandEditor {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedBodyEl)
       .setName(t('settings.commands.editor.temperature.name'))
       .setDesc(t('settings.commands.editor.temperature.desc'))
       .addText((text) => {
@@ -233,7 +262,7 @@ export class SettingsProjectCommandEditor {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedBodyEl)
       .setName(t('settings.commands.editor.topP.name'))
       .setDesc(t('settings.commands.editor.topP.desc'))
       .addText((text) => {
@@ -243,18 +272,6 @@ export class SettingsProjectCommandEditor {
           .setValue(state.topP)
           .onChange((value) => {
             state.topP = value;
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.commands.editor.subtask.name'))
-      .setDesc(t('settings.commands.editor.subtask.desc'))
-      .addToggle((toggle) => {
-        subtaskControl = toggle;
-        toggle
-          .setValue(state.subtask)
-          .onChange((value) => {
-            state.subtask = value;
           });
       });
 
@@ -363,6 +380,12 @@ export class SettingsProjectCommandEditor {
       return;
     }
 
+    const slugError = this.validateCommandSlug(commandId);
+    if (slugError) {
+      new Notice(slugError);
+      return;
+    }
+
     let commandPatch: OpencodeCommandConfig;
     try {
       commandPatch = this.buildProjectCommandPatch(state);
@@ -403,5 +426,17 @@ export class SettingsProjectCommandEditor {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.commands.editor.notice.deleteFailed', { message }));
     }
+  }
+
+  private validateCommandSlug(commandId: string): string | null {
+    if (commandId.length > 64) {
+      return t('settings.commands.editor.notice.slugTooLong');
+    }
+
+    if (!/^[a-z0-9-]+$/.test(commandId)) {
+      return t('settings.commands.editor.notice.slugInvalid');
+    }
+
+    return null;
   }
 }

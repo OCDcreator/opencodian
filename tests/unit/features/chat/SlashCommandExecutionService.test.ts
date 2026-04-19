@@ -176,20 +176,35 @@ describe('SlashCommandExecutionService', () => {
     }));
   });
 
-  it('consumes known commands without execution when the server readiness check fails', async () => {
+  it('consumes runtime commands without execution when the server readiness check fails', async () => {
+    const host = createHost({
+      getServerAvailability: jest.fn().mockResolvedValue('offline'),
+      ensureServerReadyForChat: jest.fn().mockResolvedValue(false),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'build', source: 'command' },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/build')).resolves.toBe(true);
+
+    expect(host.ensureServerReadyForChat).toHaveBeenCalledWith('offline');
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
+  });
+
+  it('bypasses server readiness for project commands', async () => {
     const host = createHost({
       getProjectCommands: jest.fn().mockResolvedValue({
         review: { template: 'Review' },
       }),
       getServerAvailability: jest.fn().mockResolvedValue('offline'),
-      ensureServerReadyForChat: jest.fn().mockResolvedValue(false),
     });
     const service = new SlashCommandExecutionService(host);
 
     await expect(service.tryRunSlashCommand('/review')).resolves.toBe(true);
 
-    expect(host.ensureServerReadyForChat).toHaveBeenCalledWith('offline');
-    expect(host.runSessionCommand).not.toHaveBeenCalled();
+    expect(host.getServerAvailability).not.toHaveBeenCalled();
+    expect(host.runSessionCommand).toHaveBeenCalledTimes(1);
   });
 
   it('consumes known commands through the foreground busy notice path', async () => {

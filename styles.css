@@ -6622,10 +6622,25 @@ body[data-opencodian-provider-icon-mode="color"] {
   border: 1px solid color-mix(in srgb, var(--opencodian-composer-embedded-border-strong) 68%, transparent);
   background: color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 82%, transparent);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--opencodian-composer-lens-shadow) 24%, transparent);
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .opencodian-slash-command-menu.is-hidden {
   display: none;
+}
+
+.opencodian-slash-command-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.opencodian-slash-command-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.opencodian-slash-command-menu::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--background-modifier-border) 56%, transparent);
+  border-radius: 3px;
 }
 
 .opencodian-slash-command-menu-item {
@@ -6649,10 +6664,43 @@ body[data-opencodian-provider-icon-mode="color"] {
   background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 34%, transparent);
 }
 
+.opencodian-slash-command-menu-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
 .opencodian-slash-command-menu-title {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.3;
+  font-family: var(--font-monospace);
+}
+
+.opencodian-slash-command-menu-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.opencodian-slash-command-menu-badge--runtime {
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  color: var(--interactive-accent);
+}
+
+.opencodian-slash-command-menu-badge--override {
+  background: color-mix(in srgb, var(--text-warning) 12%, transparent);
+  color: var(--text-warning);
+}
+
+.opencodian-slash-command-menu-badge--project {
+  background: color-mix(in srgb, var(--text-success) 12%, transparent);
+  color: var(--text-success);
 }
 
 .opencodian-slash-command-menu-description {

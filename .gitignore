@@ -67,3 +67,5 @@ automation/runtime/
 .obsidian-debug/
 tmp/
 /{outputDir}/
+
+.opencode-loop/

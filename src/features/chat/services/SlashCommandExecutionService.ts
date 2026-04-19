@@ -118,11 +118,6 @@ export class SlashCommandExecutionService {
         }
       }
 
-      const ready = isProjectCommand ? await this.ensureServerReadyForCommand() : true;
-      if (!ready) {
-        return true;
-      }
-
       const conversation = await this.prepareExecutionContext();
       if (!conversation) {
         return true;

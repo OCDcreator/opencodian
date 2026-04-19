@@ -263,6 +263,52 @@ describe('ComposerInputShellCoordinator', () => {
     ).toBeNull();
   });
 
+  it('detects slash trigger mid-sentence after whitespace', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'review',
+        description: 'Review changes',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = 'some text /re';
+    fixture.textarea.setSelectionRange(13, 13);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    expect(menuItems).toHaveLength(1);
+    expect(menuItems[0]?.textContent).toContain('/review');
+  });
+
+  it('does not trigger slash menu for // at start of input', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'review',
+        description: 'Review changes',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = '//re';
+    fixture.textarea.setSelectionRange(4, 4);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(
+      fixture.container.querySelector('.opencodian-slash-command-menu-item'),
+    ).toBeNull();
+  });
+
   it('syncs textarea height and composer layout metrics, then tears them down on destroy', () => {
     const fixture = createFixture();
     const resizeObserver = ResizeObserverMock.instances[0];
@@ -282,5 +328,183 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).toHaveBeenCalled();
     expect(resizeObserver?.disconnect).toHaveBeenCalledTimes(1);
     expect(fixture.host.setContextRowElement).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    ResizeObserverMock.reset();
+    animationFrameQueue = [];
+    (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
+      ResizeObserverMock as unknown as typeof ResizeObserver;
+    jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+      animationFrameQueue.push(callback);
+      return animationFrameQueue.length;
+    });
+    jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    jest.restoreAllMocks();
+    ResizeObserverMock.reset();
+    if (originalResizeObserver) {
+      (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
+        originalResizeObserver;
+    } else {
+      delete (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+    }
+  });
+
+  it('uses fuzzy matching to find commands by non-contiguous characters', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'clear',
+        description: 'Clear conversation',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+      {
+        id: 'commit',
+        description: 'Create commit',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+      {
+        id: 'review',
+        description: 'Review code',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = '/cr';
+    fixture.textarea.setSelectionRange(3, 3);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    const itemTexts = menuItems.map((el) => el.textContent);
+    expect(itemTexts.some((t) => t?.includes('/clear'))).toBe(true);
+    expect(itemTexts.some((t) => t?.includes('/commit'))).toBe(true);
+    expect(itemTexts.some((t) => t?.includes('/review'))).toBe(false);
+  });
+
+  it('renders source badges on menu items', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'review',
+        description: 'Review changes',
+        hasProjectOverride: true,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+      {
+        id: 'deploy',
+        description: 'Deploy project',
+        hasProjectOverride: false,
+        runtimeAvailable: false,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const badges = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-badge'),
+    );
+    expect(badges.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('highlights items on mouseenter and selects on click', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'review',
+        description: 'Review changes',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+      {
+        id: 'refactor',
+        description: 'Refactor touched files',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    expect(menuItems).toHaveLength(2);
+
+    const secondItem = menuItems[1];
+    secondItem?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const selectedItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item.is-selected'),
+    );
+    expect(selectedItems).toHaveLength(1);
+    expect(selectedItems[0]?.textContent).toContain('/refactor');
+
+    secondItem?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    secondItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAsync();
+
+    expect(fixture.textarea.value).toBe('/refactor ');
+  });
+
+  it('wraps selection around when navigating past the last item', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      {
+        id: 'review',
+        description: 'Review changes',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+      {
+        id: 'refactor',
+        description: 'Refactor touched files',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        subtask: false,
+      },
+    ]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await flushAsync();
+
+    const selectedItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item.is-selected'),
+    );
+    expect(selectedItems).toHaveLength(1);
+    expect(selectedItems[0]?.textContent).toContain('/review');
   });
 });
