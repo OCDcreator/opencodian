@@ -250,6 +250,7 @@ describe('SlashCommandMenuCatalogCache', () => {
     await expect(cache.load()).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: 'x-reader/video',
+        description: 'Video summary',
         source: 'skill',
         skillSource: { kind: 'global' },
       }),

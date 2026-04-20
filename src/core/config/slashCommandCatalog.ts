@@ -182,6 +182,19 @@ function normalizeCommandDescription(
   return normalizeCommandTextField(runtimeCommand?.description, projectCommand?.description);
 }
 
+function stripRuntimeSkillDescriptionPrefix(description: string): string {
+  return description.replace(/^\([^()]*\s+-\s*Skill\)\s*/i, '').trim();
+}
+
+function normalizeSlashCommandDescription(
+  runtimeCommand: RuntimeCommand | undefined,
+  projectCommand: OpencodeCommandConfig | undefined,
+  source: SlashCommandCatalogSource,
+): string {
+  const description = normalizeCommandDescription(runtimeCommand, projectCommand);
+  return source === 'skill' ? stripRuntimeSkillDescriptionPrefix(description) : description;
+}
+
 function normalizeCommandTemplate(
   runtimeCommand: RuntimeCommand | undefined,
   projectCommand: OpencodeCommandConfig | undefined,
@@ -295,7 +308,7 @@ export function mergeSlashCommandCatalog(
     mergedEntries.set(runtimeCommand.name, {
       id: runtimeCommand.name,
       template: normalizeCommandTemplate(runtimeCommand, projectCommand),
-      description: normalizeCommandDescription(runtimeCommand, projectCommand),
+      description: normalizeSlashCommandDescription(runtimeCommand, projectCommand, normalizedSource),
       agent: normalizeCommandAgent(
         runtimeCommand.name,
         runtimeCommand,

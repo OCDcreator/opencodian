@@ -196,8 +196,8 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     );
 
     expect(menuItems[0]?.textContent).toContain('/skills claude-md-improver');
-    expect(menuItems[0]?.textContent).toContain('插件：claude-md-management');
-    expect(menuItems[1]?.textContent).toContain('OpenCode 项目');
+    expect(menuItems[0]?.textContent).toContain('插件提供：claude-md-management');
+    expect(menuItems[1]?.textContent).toContain('当前项目（OpenCode）');
   });
 
   it('re-syncs an open menu when the skill mode changes to prefixed', async () => {
