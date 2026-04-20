@@ -21,6 +21,10 @@ export interface SlashCommandRuntimeCatalogEntry {
   source?: string;
 }
 
+export interface SlashCommandRuntimeSkillEntry {
+  name?: string;
+}
+
 export interface SlashCommandExecutionHost {
   ensureConversationReady(): Promise<Conversation | null>;
   getActiveTabId(): TabId | null;
@@ -34,6 +38,7 @@ export interface SlashCommandExecutionHost {
   ): Promise<boolean>;
   getProjectCommands(): Promise<OpencodeCommandConfigRecord>;
   getRuntimeCommands(): Promise<SlashCommandRuntimeCatalogEntry[]>;
+  getRuntimeSkills(): Promise<SlashCommandRuntimeSkillEntry[]>;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   getVaultPath(): string | null;
   refreshActiveFocusContextPreview(): void;
@@ -87,19 +92,31 @@ function isRunnableRuntimeCommand(
   command: SlashCommandRuntimeCatalogEntry,
   commandId: string,
   skillMode: SlashCommandSkillMode,
+  runtimeSkillNames: Set<string>,
 ): boolean {
   if (command.name !== commandId || command.source === 'mcp') {
     return false;
   }
 
-  return command.source !== 'skill' || skillMode === 'direct';
+  const isRuntimeSkill = command.source === 'skill' || runtimeSkillNames.has(commandId);
+  return !isRuntimeSkill || skillMode === 'direct';
 }
 
 function isRuntimeSkillCommand(
   command: SlashCommandRuntimeCatalogEntry,
   commandId: string,
+  runtimeSkillNames: Set<string>,
 ): boolean {
-  return command.name === commandId && command.source === 'skill';
+  return command.name === commandId
+    && (command.source === 'skill' || runtimeSkillNames.has(commandId));
+}
+
+function collectRuntimeSkillNames(runtimeSkills: SlashCommandRuntimeSkillEntry[]): Set<string> {
+  return new Set(
+    runtimeSkills
+      .map((skill) => skill.name?.trim())
+      .filter((name): name is string => Boolean(name)),
+  );
 }
 
 function parsePrefixedSkillCommand(argumentsText: string): ParsedSlashCommandInput | null {
@@ -148,8 +165,9 @@ export class SlashCommandExecutionService {
         }
 
         const runtimeCommands = await this.host.getRuntimeCommands();
+        const runtimeSkillNames = collectRuntimeSkillNames(await this.host.getRuntimeSkills());
         const isRuntimeSkill = runtimeCommands.some((command) =>
-          isRuntimeSkillCommand(command, prefixedSkillCommand.command)
+          isRuntimeSkillCommand(command, prefixedSkillCommand.command, runtimeSkillNames)
         );
         if (!isRuntimeSkill) {
           return false;
@@ -166,8 +184,11 @@ export class SlashCommandExecutionService {
           }
 
           const runtimeCommands = await this.host.getRuntimeCommands();
+          const runtimeSkillNames = skillMode === 'skills-command'
+            ? collectRuntimeSkillNames(await this.host.getRuntimeSkills())
+            : new Set<string>();
           const isRuntimeCommand = runtimeCommands.some((command) =>
-            isRunnableRuntimeCommand(command, parsedCommand.command, skillMode)
+            isRunnableRuntimeCommand(command, parsedCommand.command, skillMode, runtimeSkillNames)
           );
           if (!isRuntimeCommand) {
             return false;

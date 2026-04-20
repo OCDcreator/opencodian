@@ -221,4 +221,42 @@ describe('SlashCommandMenuCatalogCache', () => {
       }),
     ]));
   });
+
+  it('reclassifies runtime commands as skills when the skill list contains the same names', async () => {
+    const host = createHost({
+      loadRuntimeCommands: jest.fn().mockResolvedValue([
+        createRuntimeCommand({
+          name: 'x-reader/video',
+          source: 'command',
+          description: '(project - Skill) Video summary',
+        }),
+        createRuntimeCommand({
+          name: 'review',
+          source: 'command',
+          description: 'Review code',
+        }),
+      ]),
+      loadRuntimeSkills: jest.fn().mockResolvedValue([
+        {
+          name: 'x-reader/video',
+          description: 'Video summary',
+          location: 'C:/Users/lt/.claude/skills/video/SKILL.md',
+          content: '',
+        },
+      ]),
+    });
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    await expect(cache.load()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'x-reader/video',
+        source: 'skill',
+        skillSource: { kind: 'global' },
+      }),
+      expect.objectContaining({
+        id: 'review',
+        source: 'command',
+      }),
+    ]));
+  });
 });

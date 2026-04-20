@@ -63,8 +63,13 @@ export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
   return command.source !== 'mcp';
 }
 
-function normalizeRuntimeCommandSource(command: RuntimeCommand): SlashCommandCatalogSource {
-  return command.source === 'skill' ? 'skill' : 'command';
+function normalizeRuntimeCommandSource(
+  command: RuntimeCommand,
+  runtimeSkillSources: Map<string, SlashCommandSkillSource>,
+): SlashCommandCatalogSource {
+  return command.source === 'skill' || runtimeSkillSources.has(command.name)
+    ? 'skill'
+    : 'command';
 }
 
 function normalizeComparablePath(value: string | null | undefined): string {
@@ -286,6 +291,7 @@ export function mergeSlashCommandCatalog(
     }
 
     const projectCommand = projectCommands[runtimeCommand.name];
+    const normalizedSource = normalizeRuntimeCommandSource(runtimeCommand, runtimeSkillSources);
     mergedEntries.set(runtimeCommand.name, {
       id: runtimeCommand.name,
       template: normalizeCommandTemplate(runtimeCommand, projectCommand),
@@ -302,8 +308,8 @@ export function mergeSlashCommandCatalog(
       hasProjectOverride: projectCommand !== undefined,
       hidden: hiddenCommandIds.has(runtimeCommand.name),
       runtimeAvailable: true,
-      source: normalizeRuntimeCommandSource(runtimeCommand),
-      skillSource: runtimeCommand.source === 'skill'
+      source: normalizedSource,
+      skillSource: normalizedSource === 'skill'
         ? runtimeSkillSources.get(runtimeCommand.name)
         : undefined,
       subtask: normalizeCommandSubtask(runtimeCommand, projectCommand),

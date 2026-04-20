@@ -2404,6 +2404,10 @@ export class OpenCodianView extends ItemView {
         const runtimeCommands = await this.plugin.openCodeService.sdk.command.list();
         return Array.isArray(runtimeCommands) ? runtimeCommands : [];
       },
+      getRuntimeSkills: async () => {
+        const runtimeSkills = await this.plugin.openCodeService.sdk.app.skills();
+        return Array.isArray(runtimeSkills) ? runtimeSkills : [];
+      },
       getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
       getVaultPath: () => getVaultBasePath(this.app),
       refreshActiveFocusContextPreview: () => {

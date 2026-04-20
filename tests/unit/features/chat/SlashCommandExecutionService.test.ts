@@ -42,6 +42,7 @@ function createHost(
     ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
     getProjectCommands: jest.fn().mockResolvedValue({}),
     getRuntimeCommands: jest.fn().mockResolvedValue([]),
+    getRuntimeSkills: jest.fn().mockResolvedValue([]),
     getSlashCommandSkillMode: jest.fn().mockReturnValue('direct'),
     getVaultPath: jest.fn().mockReturnValue('/vault'),
     refreshActiveFocusContextPreview: jest.fn(),
@@ -199,6 +200,28 @@ describe('SlashCommandExecutionService', () => {
     expect(host.runSessionCommand).toHaveBeenCalledWith('session-1', expect.objectContaining({
       command: 'skill-review',
       arguments: 'note.md',
+    }));
+  });
+
+  it('treats runtime commands backed by runtime skills as /skills-only entries in prefixed mode', async () => {
+    const host = createHost({
+      getSlashCommandSkillMode: jest.fn().mockReturnValue('skills-command'),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'x-reader/video', source: 'command' },
+      ]),
+      getRuntimeSkills: jest.fn().mockResolvedValue([
+        { name: 'x-reader/video' },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/x-reader/video https://example.com')).resolves.toBe(false);
+    await expect(service.tryRunSlashCommand('/skills x-reader/video https://example.com')).resolves.toBe(true);
+
+    expect(host.runSessionCommand).toHaveBeenCalledTimes(1);
+    expect(host.runSessionCommand).toHaveBeenCalledWith('session-1', expect.objectContaining({
+      command: 'x-reader/video',
+      arguments: 'https://example.com',
     }));
   });
 
