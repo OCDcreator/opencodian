@@ -3,59 +3,17 @@ import { setIcon } from 'obsidian';
 import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 const MAX_VISIBLE_SLASH_COMMAND_ITEMS = 8;
 
-interface FuzzyMatchResult {
-  item: SlashCommandMenuItem;
-  score: number;
-}
-
-function fuzzyScore(text: string, query: string): number {
-  if (!query) return 1;
-  const lower = text.toLowerCase();
-  const ql = query.toLowerCase();
-  if (lower.startsWith(ql)) return 1000 + ql.length;
-  let score = 0;
-  let qi = 0;
-  let lastMatchIndex = -2;
-  for (let ti = 0; ti < lower.length && qi < ql.length; ti++) {
-    if (lower[ti] === ql[qi]) {
-      score += ti === lastMatchIndex + 1 ? 15 : 5;
-      score += ti === 0 ? 10 : 0;
-      lastMatchIndex = ti;
-      qi++;
-    }
-  }
-  return qi === ql.length ? score : 0;
-}
-
-function fuzzyFilterItems(
-  items: SlashCommandMenuItem[],
-  query: string,
-  maxCount: number,
-): SlashCommandMenuItem[] {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return items.slice(0, maxCount);
-  }
-
-  const scored: FuzzyMatchResult[] = [];
-  for (const item of items) {
-    const idScore = fuzzyScore(item.id, normalizedQuery);
-    const descScore = item.description
-      ? fuzzyScore(item.description, normalizedQuery)
-      : 0;
-    const best = Math.max(idScore, descScore);
-    if (best > 0) {
-      scored.push({ item, score: best });
-    }
-  }
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, maxCount).map((r) => r.item);
-}
+type SlashCommandMenuStatus =
+  | 'idle'
+  | 'loading'
+  | 'emptyCatalog'
+  | 'noMatches'
+  | 'loadFailed';
 
 const logger = createLogger('ComposerInputShellCoordinator');
 
@@ -98,6 +56,7 @@ export class ComposerInputShellCoordinator {
   private visibleSlashCommandMenuItems: SlashCommandMenuItem[] = [];
   private selectedSlashCommandMenuItemIndex = 0;
   private slashCommandMenuRunId = 0;
+  private slashCommandMenuStatus: SlashCommandMenuStatus = 'idle';
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {}
 
@@ -137,7 +96,7 @@ export class ComposerInputShellCoordinator {
       }
     });
     this.syncTextareaHeight();
-    this.slashCommandMenuEl = composerContentEl.createDiv({
+    this.slashCommandMenuEl = this.composerShellEl.createDiv({
       cls: 'opencodian-slash-command-menu is-hidden',
     });
     this.slashCommandMenuEl.setAttribute('role', 'listbox');
@@ -255,6 +214,7 @@ export class ComposerInputShellCoordinator {
     this.visibleSlashCommandMenuItems = [];
     this.selectedSlashCommandMenuItemIndex = 0;
     this.slashCommandMenuRunId += 1;
+    this.slashCommandMenuStatus = 'idle';
   }
 
   private initializeLayoutMetrics(): void {
@@ -321,6 +281,12 @@ export class ComposerInputShellCoordinator {
 
   private tryHandleSlashCommandMenuKeydown(event: KeyboardEvent): boolean {
     if (this.visibleSlashCommandMenuItems.length === 0) {
+      if (event.key === 'Escape' && this.slashCommandMenuStatus !== 'idle') {
+        event.preventDefault();
+        this.clearSlashCommandMenu();
+        return true;
+      }
+
       return false;
     }
 
@@ -403,6 +369,10 @@ export class ComposerInputShellCoordinator {
     }
 
     const currentRunId = ++this.slashCommandMenuRunId;
+    this.visibleSlashCommandMenuItems = [];
+    this.selectedSlashCommandMenuItemIndex = 0;
+    this.slashCommandMenuStatus = 'loading';
+    this.renderSlashCommandMenu();
 
     try {
       const items = this.slashCommandMenuCatalogItems ?? await this.host.loadSlashCommandMenuItems();
@@ -411,19 +381,27 @@ export class ComposerInputShellCoordinator {
       }
 
       this.slashCommandMenuCatalogItems = items;
-      this.visibleSlashCommandMenuItems = this.filterSlashCommandMenuItems(
+      this.visibleSlashCommandMenuItems = filterSlashCommandMenuItems(
         this.slashCommandMenuCatalogItems,
         query,
+        MAX_VISIBLE_SLASH_COMMAND_ITEMS,
       );
       this.selectedSlashCommandMenuItemIndex = 0;
+      this.slashCommandMenuStatus = this.visibleSlashCommandMenuItems.length > 0
+        ? 'idle'
+        : this.getEmptySlashCommandMenuStatus(items);
       this.renderSlashCommandMenu();
     } catch (error) {
       if (currentRunId !== this.slashCommandMenuRunId) {
         return;
       }
 
-      logger.error('Failed to load slash command menu items:', error);
-      this.clearSlashCommandMenu();
+      logger.debug('Failed to load slash command menu items:', error);
+      this.slashCommandMenuCatalogItems = null;
+      this.visibleSlashCommandMenuItems = [];
+      this.selectedSlashCommandMenuItemIndex = 0;
+      this.slashCommandMenuStatus = 'loadFailed';
+      this.renderSlashCommandMenu();
     }
   }
 
@@ -471,18 +449,12 @@ export class ComposerInputShellCoordinator {
     return searchText;
   }
 
-  private filterSlashCommandMenuItems(
-    items: SlashCommandMenuItem[],
-    query: string,
-  ): SlashCommandMenuItem[] {
-    return fuzzyFilterItems(items, query, MAX_VISIBLE_SLASH_COMMAND_ITEMS);
-  }
-
   private clearSlashCommandMenu(): void {
     this.slashCommandMenuRunId += 1;
     this.slashCommandMenuCatalogItems = null;
     this.visibleSlashCommandMenuItems = [];
     this.selectedSlashCommandMenuItemIndex = 0;
+    this.slashCommandMenuStatus = 'idle';
     this.renderSlashCommandMenu();
   }
 
@@ -494,7 +466,19 @@ export class ComposerInputShellCoordinator {
     this.slashCommandMenuEl.replaceChildren();
 
     if (this.visibleSlashCommandMenuItems.length === 0) {
-      this.slashCommandMenuEl.addClass('is-hidden');
+      const stateText = this.getSlashCommandMenuStateText();
+      if (!stateText) {
+        this.slashCommandMenuEl.addClass('is-hidden');
+        this.scheduleLayoutSync();
+        return;
+      }
+
+      this.slashCommandMenuEl.removeClass('is-hidden');
+      this.slashCommandMenuEl.createDiv({
+        cls: `opencodian-slash-command-menu-state opencodian-slash-command-menu-state--${this.slashCommandMenuStatus}`,
+        text: stateText,
+        attr: { role: 'status' },
+      });
       this.scheduleLayoutSync();
       return;
     }
@@ -559,6 +543,26 @@ export class ComposerInputShellCoordinator {
     });
 
     this.scheduleLayoutSync();
+  }
+
+  private getEmptySlashCommandMenuStatus(items: SlashCommandMenuItem[]): SlashCommandMenuStatus {
+    return items.length === 0 ? 'emptyCatalog' : 'noMatches';
+  }
+
+  private getSlashCommandMenuStateText(): string | null {
+    switch (this.slashCommandMenuStatus) {
+      case 'loading':
+        return t('slashCommand.menu.loading');
+      case 'emptyCatalog':
+        return t('slashCommand.menu.empty');
+      case 'noMatches':
+        return t('slashCommand.menu.noMatches');
+      case 'loadFailed':
+        return t('slashCommand.menu.loadFailed');
+      case 'idle':
+      default:
+        return null;
+    }
   }
 
   private buildSourceBadge(

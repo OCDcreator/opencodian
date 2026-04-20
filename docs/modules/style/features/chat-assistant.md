@@ -13,7 +13,7 @@
 - 通知卡：`.opencodian-chat-notice-card*`、`.opencodian-chat-notice-action-btn`。
 - 交互按钮：`.opencodian-copy-btn-inline`、`.opencodian-user-action-btn*`。
 - 问题与 TODO：`.opencodian-question-dock*`、`.opencodian-session-todo-*`。
-- 输入区：`.opencodian-composer-*`、`.opencodian-slash-command-menu*`、`.opencodian-input-toolbar`、`.opencodian-context-ring*`。
+- 输入区：`.opencodian-composer-*`、`.opencodian-slash-command-menu*`、`.opencodian-slash-command-menu-state*`、`.opencodian-input-toolbar`、`.opencodian-context-ring*`。
 - 动画：`opencodian-spin`、`opencodian-todo-pulse`、若干玻璃态 hover 过渡。
 
 ## 关联 TS 组件
@@ -28,5 +28,5 @@
 
 - 该文件覆盖面非常广，建议先锁定子域（消息 / 通知 / 输入区）再改，避免回归。
 - `--opencodian-assistant-*`、`--opencodian-composer-*` 与 `base/core.css` 变量紧耦合，改值要联动检查。
-- slash menu 现在跟输入区 layout metrics 同步；如果调整 `.opencodian-slash-command-menu*`，记得同时检查输入区 stack height 与 hover/focus 对比度。
+- slash menu 现在是 composer shell 上方的 absolute overlay，不参与输入区高度计算；如果调整 `.opencodian-slash-command-menu*` 或 `.opencodian-slash-command-menu-state*`，记得同时检查上方弹出位置、长文本换行、状态行可读性与 hover/focus 对比度。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

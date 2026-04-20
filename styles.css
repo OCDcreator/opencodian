@@ -6613,21 +6613,42 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-slash-command-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 12;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 4px;
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
   padding: 6px;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--opencodian-composer-embedded-border-strong) 68%, transparent);
   background: color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 82%, transparent);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--opencodian-composer-lens-shadow) 24%, transparent);
-  max-height: 280px;
+  max-height: min(320px, 45vh);
+  overflow-x: hidden;
   overflow-y: auto;
+  pointer-events: auto;
 }
 
 .opencodian-slash-command-menu.is-hidden {
   display: none;
+}
+
+.opencodian-slash-command-menu-state {
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-slash-command-menu-state--loadFailed {
+  color: var(--text-warning);
 }
 
 .opencodian-slash-command-menu::-webkit-scrollbar {
@@ -6648,13 +6669,16 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   padding: 8px 10px;
   border: none;
   border-radius: 10px;
   background: transparent;
   color: var(--text-normal);
   cursor: pointer;
+  white-space: normal;
   text-align: left;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -6667,18 +6691,26 @@ body[data-opencodian-provider-icon-mode="color"] {
 .opencodian-slash-command-menu-title-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   width: 100%;
+  min-width: 0;
 }
 
 .opencodian-slash-command-menu-title {
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.3;
   font-family: var(--font-monospace);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .opencodian-slash-command-menu-badge {
+  flex: 0 0 auto;
+  max-width: 100%;
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
@@ -6704,9 +6736,13 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-slash-command-menu-description {
+  width: 100%;
+  max-width: 100%;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .opencodian-composer-add-btn {

@@ -38,12 +38,17 @@ async function flushAsync(): Promise<void> {
   await Promise.resolve();
 }
 
+function slashItem(id: string, description: string, overrides: Partial<SlashCommandMenuItem> = {}): SlashCommandMenuItem {
+  return { id, description, hasProjectOverride: false, runtimeAvailable: true, subtask: false, ...overrides };
+}
+
 function createFixture() {
   let isStreaming = false;
   let isForegroundBusy = false;
   let inputContainerHeight = 88;
   let textareaScrollHeight = 0;
   let slashCommandMenuItems: SlashCommandMenuItem[] = [];
+  let slashCommandMenuError: Error | null = null;
 
   const host: jest.Mocked<ComposerInputShellCoordinatorHost> = {
     attachSessionTodo: jest.fn(),
@@ -65,7 +70,13 @@ function createFixture() {
     isTabForegroundBusy: jest.fn(() => isForegroundBusy),
     showProcessingBlockedNotice: jest.fn(),
     submitMessage: jest.fn().mockResolvedValue(undefined),
-    loadSlashCommandMenuItems: jest.fn().mockImplementation(async () => slashCommandMenuItems),
+    loadSlashCommandMenuItems: jest.fn().mockImplementation(async () => {
+      if (slashCommandMenuError) {
+        throw slashCommandMenuError;
+      }
+
+      return slashCommandMenuItems;
+    }),
     setComposerStackHeight: jest.fn(),
     scheduleSettledScrollToBottomIfNeeded: jest.fn(),
   };
@@ -117,6 +128,9 @@ function createFixture() {
     },
     setSlashCommandMenuItems(nextValue: SlashCommandMenuItem[]) {
       slashCommandMenuItems = nextValue;
+    },
+    failSlashCommandMenuLoad(error: Error) {
+      slashCommandMenuError = error;
     },
   };
 }
@@ -192,20 +206,8 @@ describe('ComposerInputShellCoordinator', () => {
   it('opens slash autocomplete from the merged menu catalog and applies the selected command', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'review',
-        description: 'Review changes',
-        hasProjectOverride: true,
-        runtimeAvailable: true,
-        subtask: false,
-      },
-      {
-        id: 'refactor',
-        description: 'Refactor touched files',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
+      slashItem('review', 'Review changes', { hasProjectOverride: true }),
+      slashItem('refactor', 'Refactor touched files'),
     ]);
 
     fixture.textarea.value = '/re';
@@ -232,16 +234,29 @@ describe('ComposerInputShellCoordinator', () => {
     ).toBeNull();
   });
 
+  it('mounts slash autocomplete as an overlay above the composer shell', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      slashItem('review', 'Review changes'),
+    ]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const shell = fixture.container.querySelector('.opencodian-composer-shell');
+    const content = fixture.container.querySelector('.opencodian-composer-content');
+    const menu = fixture.container.querySelector('.opencodian-slash-command-menu');
+
+    expect(menu?.parentElement).toBe(shell);
+    expect(menu?.parentElement).not.toBe(content);
+  });
+
   it('closes slash autocomplete after the command token is finished', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'review',
-        description: 'Review changes',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
+      slashItem('review', 'Review changes'),
     ]);
 
     fixture.textarea.value = '/review';
@@ -266,13 +281,7 @@ describe('ComposerInputShellCoordinator', () => {
   it('detects slash trigger mid-sentence after whitespace', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'review',
-        description: 'Review changes',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
+      slashItem('review', 'Review changes'),
     ]);
 
     fixture.textarea.value = 'some text /re';
@@ -290,13 +299,7 @@ describe('ComposerInputShellCoordinator', () => {
   it('does not trigger slash menu for // at start of input', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'review',
-        description: 'Review changes',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
+      slashItem('review', 'Review changes'),
     ]);
 
     fixture.textarea.value = '//re';
@@ -361,27 +364,9 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
   it('uses fuzzy matching to find commands by non-contiguous characters', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'clear',
-        description: 'Clear conversation',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
-      {
-        id: 'commit',
-        description: 'Create commit',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
-      {
-        id: 'review',
-        description: 'Review code',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
+      slashItem('clear', 'Clear conversation'),
+      slashItem('commit', 'Create commit'),
+      slashItem('review', 'Review code'),
     ]);
 
     fixture.textarea.value = '/cr';
@@ -401,20 +386,8 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
   it('renders source badges on menu items', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'review',
-        description: 'Review changes',
-        hasProjectOverride: true,
-        runtimeAvailable: true,
-        subtask: false,
-      },
-      {
-        id: 'deploy',
-        description: 'Deploy project',
-        hasProjectOverride: false,
-        runtimeAvailable: false,
-        subtask: false,
-      },
+      slashItem('review', 'Review changes', { hasProjectOverride: true }),
+      slashItem('deploy', 'Deploy project', { runtimeAvailable: false }),
     ]);
 
     fixture.textarea.value = '/';
@@ -431,20 +404,8 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
   it('highlights items on mouseenter and selects on click', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'review',
-        description: 'Review changes',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
-      {
-        id: 'refactor',
-        description: 'Refactor touched files',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
+      slashItem('review', 'Review changes'),
+      slashItem('refactor', 'Refactor touched files'),
     ]);
 
     fixture.textarea.value = '/';
@@ -476,20 +437,8 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
   it('wraps selection around when navigating past the last item', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
-      {
-        id: 'review',
-        description: 'Review changes',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
-      {
-        id: 'refactor',
-        description: 'Refactor touched files',
-        hasProjectOverride: false,
-        runtimeAvailable: true,
-        subtask: false,
-      },
+      slashItem('review', 'Review changes'),
+      slashItem('refactor', 'Refactor touched files'),
     ]);
 
     fixture.textarea.value = '/';
@@ -506,5 +455,43 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     );
     expect(selectedItems).toHaveLength(1);
     expect(selectedItems[0]?.textContent).toContain('/review');
+  });
+
+  it('keeps slash menu visible with an empty-catalog state when no commands are available', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menu = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu');
+    const state = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu-state');
+
+    expect(menu?.classList.contains('is-hidden')).toBe(false);
+    expect(state?.textContent).toContain('No slash commands available');
+    expect(
+      fixture.container.querySelector('.opencodian-slash-command-menu-item'),
+    ).toBeNull();
+  });
+
+  it('keeps slash menu visible with a load-failed state when command catalog loading fails', async () => {
+    const fixture = createFixture();
+    fixture.failSlashCommandMenuLoad(new Error('connection refused'));
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menu = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu');
+    const state = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu-state');
+
+    expect(menu?.classList.contains('is-hidden')).toBe(false);
+    expect(state?.textContent).toContain('Could not load slash commands');
+    expect(
+      fixture.container.querySelector('.opencodian-slash-command-menu-item'),
+    ).toBeNull();
   });
 });

@@ -9,9 +9,9 @@
 
 它负责：
 
-- 创建 input tab bar slot、composer shell、context row、textarea、footer 和 toolbar slots
+- 创建 input tab bar slot、composer shell、context row、textarea、footer、toolbar slots，以及挂在 composer shell 上方的 slash menu overlay
 - 绑定 textarea Enter 提交、Shift+Enter 换行，以及 textarea 高度同步
-- 在输入以 `/` 开头且光标仍停留在第一个 command token 内时，显示 slash autocomplete menu
+- 在输入以 `/` 开头且光标仍停留在第一个 command token 内时，显示 slash autocomplete menu；加载中、无命令、无匹配或加载失败时保持可见状态提示，避免静默消失
 - 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort 这些既有子控件挂到稳定的 toolbar slot
@@ -55,9 +55,11 @@ export class ComposerInputShellCoordinator {
 ## 关键行为
 
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam
+- slash menu 作为 `opencodian-composer-shell` 的 overlay 子节点挂载，用 CSS `bottom: calc(100% + 8px)` 显示在输入框上方，而不是插入 textarea/footer 的内部内容流
 - `applyLocaleTexts()` 刷新 placeholder、add-context tooltip 和 send/stop tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
-- `refreshSlashCommandMenu()` 只在 slash trigger session 首次打开时向 host 拉取 merged visible menu items，后续同一次 `/...` 输入仅本地过滤，避免每次按键都重拉 runtime/project catalog
+- `refreshSlashCommandMenu()` 只在 slash trigger session 首次打开时向 host 拉取 merged visible menu items，后续同一次 `/...` 输入通过 `slashCommandMenuFilter.ts` 本地过滤，避免每次按键都重拉 runtime/project catalog
+- 若 runtime/project catalog 返回空、过滤后无结果或加载失败，`refreshSlashCommandMenu()` 会渲染非交互式状态行；失败细节只进入 debug log，避免普通输入 `/` 时刷警告
 - `tryHandleSlashCommandMenuKeydown()` 在 menu 打开时拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`
 - 选中 menu item 后，textarea 会被写成 `/<id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
 - `scheduleLayoutSync()` / `clearScheduledLayoutSync()` 收束 composer stack height 的 RAF 节流
@@ -67,6 +69,7 @@ export class ComposerInputShellCoordinator {
 
 - `OpenCodianView` 只创建 coordinator、提供 host callbacks，并把 shell DOM refs 暴露给相邻的 `InputPanelAppearanceCoordinator`
 - merged runtime+project slash command catalog 由 `OpenCodianView` host seam 复用 `core/config/slashCommandCatalog.ts` 组装后传入，本模块自己不接 project config / SDK merge 细节
+- slash menu fuzzy scoring 已下沉到 `slashCommandMenuFilter.ts`，本模块只消费过滤结果并负责状态行/menu DOM 渲染
 - 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`
 - liquid-glass adapter mount、SVG filter 与 diagnostics 已进一步交给 `InputPanelAppearanceCoordinator`，本模块继续只负责 shell/layout lifecycle
 
