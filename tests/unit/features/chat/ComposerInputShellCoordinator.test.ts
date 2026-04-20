@@ -401,6 +401,24 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     expect(badges.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('renders menu options without native button chrome so long descriptions can expand', async () => {
+    const fixture = createFixture();
+    fixture.setSlashCommandMenuItems([
+      slashItem('build-mcp-server', 'This skill should be used when the user asks to build an MCP server, create an MCP integration, wrap an API for Claude, or expose tools to Claude.'),
+    ]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menuItem = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu-item');
+
+    expect(menuItem?.tagName).toBe('DIV');
+    expect(menuItem?.getAttribute('role')).toBe('option');
+    expect(menuItem?.textContent).toContain('This skill should be used');
+  });
+
   it('highlights items on mouseenter and selects on click', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([

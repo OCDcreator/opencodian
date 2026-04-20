@@ -6678,18 +6678,25 @@ body[data-opencodian-provider-icon-mode="color"] {
   border: none;
   border-radius: 10px;
   background: transparent;
+  box-shadow: none;
   color: var(--text-normal);
   cursor: pointer;
+  font: inherit;
   line-height: 1.35;
   white-space: normal;
   text-align: left;
   appearance: none;
+  outline: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .opencodian-slash-command-menu-item:hover,
 .opencodian-slash-command-menu-item.is-selected {
   background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 34%, transparent);
+}
+
+.opencodian-slash-command-menu-item:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 34%, transparent);
 }
 
 .opencodian-slash-command-menu-title-row {

@@ -486,10 +486,9 @@ export class ComposerInputShellCoordinator {
     this.slashCommandMenuEl.removeClass('is-hidden');
 
     this.visibleSlashCommandMenuItems.forEach((item, index) => {
-      const itemEl = this.slashCommandMenuEl?.createEl('button', {
+      const itemEl = this.slashCommandMenuEl?.createDiv({
         cls: 'opencodian-slash-command-menu-item',
         attr: {
-          type: 'button',
           role: 'option',
           'aria-selected': index === this.selectedSlashCommandMenuItemIndex ? 'true' : 'false',
         },
