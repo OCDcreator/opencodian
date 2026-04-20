@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import TYPE_CHECKING, Any, cast
+
+sys.dont_write_bytecode = True
 
 from _autopilot.cli_parser import build_parser as build_parser_command
 from _autopilot.controller_builders import (
@@ -93,7 +96,7 @@ if TYPE_CHECKING:
 ensure_console_streams()
 
 AUTOPILOT_SCAFFOLD_NAME = cast(str, "codex-autopilot-scaffold")
-AUTOPILOT_SCAFFOLD_VERSION = cast(str, "1.0.0")
+AUTOPILOT_SCAFFOLD_VERSION = cast(str, "1.0.2")
 
 
 def new_state(config: dict[str, Any]) -> dict[str, Any]:

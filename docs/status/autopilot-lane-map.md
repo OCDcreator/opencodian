@@ -1,42 +1,35 @@
-# Autopilot Lane Map
+# Autopilot Lane Map — OpenCode Session Message Alignment
 
 > **Preset**: `Maintainability / Refactor`
 > **Scheduling**: Sequential lane controller
-> **Note**: The active lane comes from `automation/autopilot-config.json`; this file is a static index.
+> **Live plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
+> **Note**: The active lane comes from `automation/autopilot-config.json`; this file indexes the lane queues.
 
-## Lane directories
+## Lane Directories
 
-- `m1-hotspot-slice`
+- `m1-hotspot-slice` — session graph, send, and sync foundations
   - roadmap: `docs/status/lanes/m1-hotspot-slice/autopilot-round-roadmap.md`
   - baseline: `docs/status/lanes/m1-hotspot-slice/autopilot-phase-0.md`
-- `m2-followup-slice`
+  - queued tasks: Task 1, Task 2, Task 3
+- `m2-followup-slice` — stream, render, and command/plugin structured parts
   - roadmap: `docs/status/lanes/m2-followup-slice/autopilot-round-roadmap.md`
   - baseline: `docs/status/lanes/m2-followup-slice/autopilot-phase-0.md`
-- `m3-checkpoint`
+  - queued tasks: Task 4, Task 5, Task 6
+- `m3-checkpoint` — reload compensation and final verification checkpoint
   - roadmap: `docs/status/lanes/m3-checkpoint/autopilot-round-roadmap.md`
   - baseline: `docs/status/lanes/m3-checkpoint/autopilot-phase-0.md`
+  - queued tasks: Task 7
 
-## Suggested entrypoints
+## Primary Reference Files
 
-- `AGENTS.md`
-- `README.md`
-- `docs/`
-- `src/`
-- `tests/`
-- `main.js`
-- `src/utils/icons/lobehubIconManifest.ts`
-- `reference-projects/opencode/packages/sdk/js/src/v2/gen/types.gen.ts`
-
-## Validation baseline
-
-- Lint: `npm run lint` (source: `package.json:scripts.lint`)
-- Typecheck: `npm run typecheck` (source: `package.json:scripts.typecheck`)
-- Full test: `npm test` (source: `package.json:scripts.test`)
-- Build: `npm run build` (source: `package.json:scripts.build`)
-- Vulture: not inferred
+- `C:\Users\lt\Desktop\Write\open-source-project\AI-tools-agents\opencode\packages\app\src\context\global-sync\event-reducer.ts`
+- `C:\Users\lt\Desktop\Write\open-source-project\AI-tools-agents\opencode\packages\ui\src\components\session-turn.tsx`
+- `C:\Users\lt\Desktop\Write\open-source-project\AI-tools-agents\opencode\packages\ui\src\components\message-part.tsx`
+- `C:\Users\lt\Desktop\Write\open-source-project\AI-tools-agents\opencode\packages\opencode\src\session\prompt.ts`
+- `C:\Users\lt\Desktop\Write\open-source-project\AI-tools-agents\opencode\packages\opencode\src\session\session.ts`
 
 ## Boundaries
 
-- Do not refactor outside the queued slice
-- Do not turn maintainability work into a broad rewrite
-- Keep `automation/runtime/` ignored and machine-local state out of committed files
+- The plan file is the implementation source of truth.
+- Lane roadmaps are the autopilot scheduling source of truth.
+- Historical `docs/status/maintainability-*.md` files must not be used to decide the next task for this run.

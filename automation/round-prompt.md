@@ -1,21 +1,25 @@
-# OpenCodian Maintainability Autopilot Round
+# Repository Autopilot Round — Maintainability / Refactor
 
-You are running one unattended maintainability round inside the `opencodian` repository.
+You are running one unattended repository autopilot round inside the `opencodian` repository.
 
 Read these files first, in order:
-- `AGENTS.md`
-- `docs/status/maintainability-master-plan.md`
-- `docs/status/maintainability-round-roadmap.md`
-- `docs/status/maintainability-lane-map.md`
+- `AGENTS.md` if it exists
+- `docs/status/autopilot-master-plan.md`
+- `docs/status/autopilot-lane-map.md`
+- `{{current_lane_roadmap}}`
 - `{{last_phase_doc}}`
 
 Mission:
-- Continue the maintainability program toward single-responsibility modules.
-- Execute exactly one queued refactor slice: the first item marked `[NEXT]` in `docs/status/maintainability-round-roadmap.md`.
-- Do not freestyle. The roadmap queue overrides `focus_hint` whenever they conflict.
+- Continue the maintainability / refactor program one active lane at a time.
+- Stay inside lane `{{current_lane_id}}` (`{{current_lane_label}}`).
+- Execute exactly one queued refactor slice: the first item marked `[NEXT]` in `{{current_lane_roadmap}}`.
+- Do not freestyle outside the queue.
 - Do not start another round.
 
 Round metadata:
+- Active lane id: `{{current_lane_id}}`
+- Active lane label: `{{current_lane_label}}`
+- Active lane roadmap: `{{current_lane_roadmap}}`
 - Attempt number: `{{round_attempt}}`
 - Next phase number: `{{next_phase_number}}`
 - New phase doc path: `{{next_phase_doc}}`
@@ -26,30 +30,37 @@ Round metadata:
 - Focus hint: `{{focus_hint}}`
 - Objective: `{{objective}}`
 - Platform note: `{{platform_note}}`
-- Test Vault plugin dir: `{{test_vault_plugin_dir}}`
+- Runner kind: `{{runner_kind}}`
+- Runner model: `{{runner_model}}`
+
+Configured validation commands:
+- Lint: `{{lint_command}}`
+- Typecheck: `{{typecheck_command}}`
+- Full test: `{{full_test_command}}`
+- Build: `{{build_command}}`
+- Vulture: `{{vulture_command}}`
 
 Required workflow:
 1. Use the plan tool before making substantive changes.
-2. Read the current `[NEXT]` queue item and restate its lane, goal, constraints, and acceptance criteria in your plan.
-3. Start from the roadmap and lane map entrypoints for that queue item before doing broad `rg` searches.
-4. Read only the code and docs needed for this one slice. In successful rounds, do one initial exploration pass and avoid repeatedly rescanning the same large `OpenCodianView` context.
-5. `docs/modules/**` should only be read or edited when the module boundary actually changes.
-6. Make the smallest meaningful maintainability refactor that satisfies the current queue item's acceptance criteria and preserves behavior.
-7. Prefer merging thin provider / factory / adapter files back into an adjacent owner over creating new files. If a new module would stay under roughly 100 lines and under 3 exports, do not keep it separate unless it isolates a high-risk dependency or is reused in 3+ places.
-8. If the module boundary changes materially, update only the directly related docs.
-9. If this round changes code or tests, run targeted tests first (for example `npm test -- <focused suites>`).
-10. Every successful queue round must also run full `npm run lint`, full `npm run typecheck`, and full `npm test`.
-11. If this round changes code, style, manifest, or build-pipeline files, also run `{{build_command}}`.
-12. Do not deploy during this maintainability batch unless the user explicitly asked to deploy. If deployment is explicitly requested later, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css`, copy `dist/assets/` when bundled assets changed, and verify deployed `main.js` contains the newest `BUILD_ID`.
-13. In successful rounds, keep `git status --short` to at most 2 invocations and `git diff --stat` to at most 1 invocation. Only exceed those budgets during a focused repair after a failed validation step.
-14. On success, update `docs/status/maintainability-round-roadmap.md`: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep all later items as `[QUEUED]`.
-15. Write the round summary to `{{next_phase_doc}}`. Include scope, files changed, validation commands, deployment result when applicable, the lane advanced, the completed roadmap queue item, and the next recommended slice.
-16. On success, commit all repo changes with message `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
-17. If tests, build, or deployment fail, attempt one focused repair. If still failing, revert this round's changes, do not commit, and return `failure`.
-18. If the maintainability objective is already complete, avoid unnecessary edits, mark the roadmap accordingly, and return `goal_complete`.
+2. Read the current `[NEXT]` lane item and restate its lane, goal, constraints, and acceptance criteria in your plan.
+3. Start from the lane roadmap and lane-map entrypoints before broad searching.
+4. Read only the code and docs needed for this one slice.
+5. Make the smallest meaningful maintainability refactor that satisfies the lane item and preserves behavior.
+6. Prefer reducing direct ownership and import/assembly surface over moving code into new thin wrappers.
+7. Update only directly related docs when the module boundary materially changes.
+8. Run targeted tests first when code or tests change and a targeted test command pattern is configured.
+9. `Run every configured validation command below on successful rounds.`
+10. When a validation command is blank, do not invent a substitute; record the gap in the phase doc instead.
+11. When Vulture is configured, use it as the dead-code observability command when ownership cleanup or unused code is relevant; record the finding count or any gap in the phase doc.
+12. Update `{{current_lane_roadmap}}` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
+13. Write the round summary to `{{next_phase_doc}}`. Include scope, files changed, validation commands, Vulture findings when configured, the lane advanced, the completed roadmap queue item, and the next recommended slice.
+14. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
+15. If validation fails, attempt one focused repair. If it still fails, revert the round, do not commit, and return `failure`.
+16. If the queued objective is already complete, avoid unnecessary edits, update the lane roadmap accordingly, and return `goal_complete`.
 
 Response contract:
 - Your final response must be valid JSON matching the provided output schema.
+- Set `lane_id` to `{{current_lane_id}}`.
 - Use actual repo-relative paths in `phase_doc_path` and `changed_files`.
 - Set `status` to one of `success`, `failure`, or `goal_complete`.
 - On `success`, `commit_sha` and `commit_message` must be non-null.

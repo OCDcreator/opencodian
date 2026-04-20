@@ -1,38 +1,32 @@
-# Autopilot Baseline: Phase 0
+# Autopilot Baseline: Phase 0 — `m3-checkpoint`
 
 > **Status**: [BASELINE]
 > **Preset**: `Maintainability / Refactor`
-> **Lane**: `m3-checkpoint`
 > **Repository**: `opencodian`
+> **Live plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
 
 ## Objective
 
-- Reduce ownership concentration and maintainability hotspots one queued slice at a time while keeping configured validation commands green.
+- Implement OpenCode session/message/part alignment while preserving OpenCodian's existing UI shell.
 
-## Lane scope
+## Lane Scope
 
-- Review the first refactor batch, document what ownership moved, and decide whether the preset queue should stop or be manually extended.
+- Reload/finalization compensation, diagnostics, regressions, and final gates for Task 7.
 
-## Seeded entrypoints
+## Required Reading
 
 - `AGENTS.md`
-- `README.md`
-- `docs/`
-- `src/`
-- `tests/`
-- `main.js`
-- `src/utils/icons/lobehubIconManifest.ts`
-- `reference-projects/opencode/packages/sdk/js/src/v2/gen/types.gen.ts`
+- `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
+- `docs/status/autopilot-master-plan.md`
+- `docs/status/autopilot-lane-map.md`
+- `docs/status/lanes/m3-checkpoint/autopilot-round-roadmap.md`
 
-## Inferred validation commands
+## Validation Baseline
 
-- Lint: `npm run lint` (source: `package.json:scripts.lint`)
-- Typecheck: `npm run typecheck` (source: `package.json:scripts.typecheck`)
-- Full test: `npm test` (source: `package.json:scripts.test`)
-- Build: `npm run build` (source: `package.json:scripts.build`)
-- Vulture: not inferred
+- Follow the task-specific targeted test command in the lane roadmap.
+- Run `npm run verify` and `npm run check:module-docs` only at the final checkpoint or before merge, unless a task explicitly requires broader validation.
 
 ## Notes
 
-- This document captures the baseline for lane `m3-checkpoint`.
+- This document captures the starting baseline for lane `m3-checkpoint`.
 - The first unattended round in this lane should write `docs/status/lanes/m3-checkpoint/autopilot-phase-1.md`.

@@ -69,3 +69,5 @@ tmp/
 /{outputDir}/
 
 .opencode-loop/
+automation/**/__pycache__/
+automation/**/*.pyc

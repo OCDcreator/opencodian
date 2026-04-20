@@ -1,38 +1,32 @@
-# Autopilot Baseline: Phase 0
+# Autopilot Baseline: Phase 0 — `m1-hotspot-slice`
 
 > **Status**: [BASELINE]
 > **Preset**: `Maintainability / Refactor`
-> **Lane**: `m1-hotspot-slice`
 > **Repository**: `opencodian`
+> **Live plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
 
 ## Objective
 
-- Reduce ownership concentration and maintainability hotspots one queued slice at a time while keeping configured validation commands green.
+- Implement OpenCode session/message/part alignment while preserving OpenCodian's existing UI shell.
 
-## Lane scope
+## Lane Scope
 
-- Choose one high-value, low-risk maintainability slice and measurably reduce direct ownership, assembly surface, or validation churn.
+- Session graph, structured send payloads, and sync-event mutation foundations for Tasks 1-3.
 
-## Seeded entrypoints
+## Required Reading
 
 - `AGENTS.md`
-- `README.md`
-- `docs/`
-- `src/`
-- `tests/`
-- `main.js`
-- `src/utils/icons/lobehubIconManifest.ts`
-- `reference-projects/opencode/packages/sdk/js/src/v2/gen/types.gen.ts`
+- `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
+- `docs/status/autopilot-master-plan.md`
+- `docs/status/autopilot-lane-map.md`
+- `docs/status/lanes/m1-hotspot-slice/autopilot-round-roadmap.md`
 
-## Inferred validation commands
+## Validation Baseline
 
-- Lint: `npm run lint` (source: `package.json:scripts.lint`)
-- Typecheck: `npm run typecheck` (source: `package.json:scripts.typecheck`)
-- Full test: `npm test` (source: `package.json:scripts.test`)
-- Build: `npm run build` (source: `package.json:scripts.build`)
-- Vulture: not inferred
+- Follow the task-specific targeted test command in the lane roadmap.
+- Run `npm run verify` and `npm run check:module-docs` only at the final checkpoint or before merge, unless a task explicitly requires broader validation.
 
 ## Notes
 
-- This document captures the baseline for lane `m1-hotspot-slice`.
+- This document captures the starting baseline for lane `m1-hotspot-slice`.
 - The first unattended round in this lane should write `docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md`.

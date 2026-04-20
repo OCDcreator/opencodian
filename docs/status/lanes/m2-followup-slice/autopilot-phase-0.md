@@ -1,38 +1,32 @@
-# Autopilot Baseline: Phase 0
+# Autopilot Baseline: Phase 0 — `m2-followup-slice`
 
 > **Status**: [BASELINE]
 > **Preset**: `Maintainability / Refactor`
-> **Lane**: `m2-followup-slice`
 > **Repository**: `opencodian`
+> **Live plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
 
 ## Objective
 
-- Reduce ownership concentration and maintainability hotspots one queued slice at a time while keeping configured validation commands green.
+- Implement OpenCode session/message/part alignment while preserving OpenCodian's existing UI shell.
 
-## Lane scope
+## Lane Scope
 
-- Continue with the next bounded maintainability slice after M1 while keeping the same validation baseline.
+- Stream canonical parts, turn view-model rendering, and command/plugin structured semantics for Tasks 4-6.
 
-## Seeded entrypoints
+## Required Reading
 
 - `AGENTS.md`
-- `README.md`
-- `docs/`
-- `src/`
-- `tests/`
-- `main.js`
-- `src/utils/icons/lobehubIconManifest.ts`
-- `reference-projects/opencode/packages/sdk/js/src/v2/gen/types.gen.ts`
+- `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
+- `docs/status/autopilot-master-plan.md`
+- `docs/status/autopilot-lane-map.md`
+- `docs/status/lanes/m2-followup-slice/autopilot-round-roadmap.md`
 
-## Inferred validation commands
+## Validation Baseline
 
-- Lint: `npm run lint` (source: `package.json:scripts.lint`)
-- Typecheck: `npm run typecheck` (source: `package.json:scripts.typecheck`)
-- Full test: `npm test` (source: `package.json:scripts.test`)
-- Build: `npm run build` (source: `package.json:scripts.build`)
-- Vulture: not inferred
+- Follow the task-specific targeted test command in the lane roadmap.
+- Run `npm run verify` and `npm run check:module-docs` only at the final checkpoint or before merge, unless a task explicitly requires broader validation.
 
 ## Notes
 
-- This document captures the baseline for lane `m2-followup-slice`.
+- This document captures the starting baseline for lane `m2-followup-slice`.
 - The first unattended round in this lane should write `docs/status/lanes/m2-followup-slice/autopilot-phase-1.md`.

@@ -2,17 +2,23 @@
 
 ## Queue
 
-### [NEXT] R3 - Checkpoint after first refactor batch
+### [NEXT] Task 7 - Rework reload/finalization as canonical compensation
 
-- **Lane**: Checkpoint
-- **Goal**: Review R1-R2, document what ownership actually moved, and decide whether the preset queue should stop or be manually extended.
-- **Constraints**:
-  - Do not extend the queue automatically beyond R3
-  - Focus on documentation and metrics, not new refactors
-- **Acceptance**:
-  - The phase doc captures wins, remaining hotspots, and a clear stop/continue recommendation
+- **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 7.
+- **Goal**: Make authoritative reload and finalization replace/compare canonical state, add blank-block diagnostics, and cover the real failure classes with regressions.
+- **Key files**:
+  - `src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts`
+  - `src/features/chat/services/ConversationSyncBridge.ts`
+  - `src/features/chat/services/MessageFinalizationService.ts`
+  - `src/features/chat/services/ConversationRenderService.ts`
+  - `src/core/opencode/OpenCodeService.ts`
+  - matching regression tests and module docs from the plan.
+- **Validation**: `npm test -- --runInBand tests/unit/features/chat/MessageFinalizationService.test.ts tests/unit/features/chat/ConversationSyncBridge.test.ts tests/unit/features/chat/ConversationRenderService.renderFlows.test.ts tests/unit/core/opencode/OpenCodeService.messageCompatibility.test.ts tests/unit/core/opencode/OpenCodeService.omoCompatibility.test.ts`
+- **Final gates after this task**:
+  - `npm run verify`
+  - `npm run check:module-docs`
+- **Acceptance**: reload/finalization is a compensation path over canonical turns; blank-block and plugin synthetic-part regressions are covered.
 
-## Lane state
+## Lane State
 
-- This roadmap is lane-local.
-- When it has no remaining `[NEXT]` or `[QUEUED]` items, the overall preset is complete.
+- When Task 7 is complete and no `[NEXT]` or `[QUEUED]` items remain here, the overall session-message-alignment autopilot queue is complete.
