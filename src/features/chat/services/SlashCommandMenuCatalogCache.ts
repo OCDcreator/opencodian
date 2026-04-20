@@ -1,6 +1,7 @@
 import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 
 import {
+  buildRuntimeSkillSourceMap,
   buildVisibleSlashCommandMenuItems,
   mergeSlashCommandCatalog,
   type SlashCommandMenuItem,
@@ -17,6 +18,8 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadProjectAgents(): Promise<OpencodeAgentConfigRecord>;
   loadProjectCommands(): Promise<OpencodeCommandConfigRecord>;
   loadRuntimeCommands(): Promise<unknown>;
+  loadRuntimeSkills(): Promise<unknown>;
+  getVaultPath(): string | null;
   now?(): number;
   onWarmLoadFailed?(error: unknown): void;
 }
@@ -35,6 +38,27 @@ interface SlashCommandMenuCatalogPendingLoad {
 
 function normalizeRuntimeCommands(value: unknown): RuntimeCommand[] {
   return Array.isArray(value) ? value : [];
+}
+
+function normalizeRuntimeSkills(
+  value: unknown,
+): Array<{ name: string; location: string }> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is { name: string; location: string } =>
+      Boolean(
+        item
+        && typeof item === 'object'
+        && typeof (item as { name?: unknown }).name === 'string'
+        && typeof (item as { location?: unknown }).location === 'string',
+      ))
+    .map((item) => ({
+      name: item.name,
+      location: item.location,
+    }));
 }
 
 function buildHiddenCommandCacheKey(commandIds: string[]): string {
@@ -110,15 +134,21 @@ export class SlashCommandMenuCatalogCache {
     const token = Symbol('slash-command-menu-catalog-load');
 
     const promise = (async () => {
-      const [runtimeCommandsResult, projectCommands, projectAgents] = await Promise.all([
+      const [runtimeCommandsResult, runtimeSkillsResult, projectCommands, projectAgents] = await Promise.all([
         this.host.loadRuntimeCommands(),
+        this.host.loadRuntimeSkills().catch(() => []),
         this.host.loadProjectCommands(),
         this.host.loadProjectAgents(),
       ]);
+      const runtimeSkillSources = buildRuntimeSkillSourceMap(
+        normalizeRuntimeSkills(runtimeSkillsResult),
+        this.host.getVaultPath(),
+      );
 
       const items = buildVisibleSlashCommandMenuItems(
         mergeSlashCommandCatalog(
           normalizeRuntimeCommands(runtimeCommandsResult),
+          runtimeSkillSources,
           projectCommands,
           projectAgents,
           new Set(this.host.getHiddenCommandIds()),

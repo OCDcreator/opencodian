@@ -13,6 +13,23 @@ import {
 
 export type SlashCommandCatalogSource = 'command' | 'skill' | 'project';
 export type SlashCommandMenuItemSource = SlashCommandCatalogSource | 'skills-command';
+export type SlashCommandSkillSourceKind =
+  | 'project'
+  | 'opencodeProject'
+  | 'plugin'
+  | 'global'
+  | 'opencodeGlobal'
+  | 'custom';
+
+export interface SlashCommandSkillSource {
+  kind: SlashCommandSkillSourceKind;
+  pluginName?: string;
+}
+
+interface RuntimeSkillInfo {
+  name: string;
+  location: string;
+}
 
 export interface SlashCommandCatalogEntry {
   id: string;
@@ -26,6 +43,7 @@ export interface SlashCommandCatalogEntry {
   hidden: boolean;
   runtimeAvailable: boolean;
   source: SlashCommandCatalogSource;
+  skillSource?: SlashCommandSkillSource;
   subtask: boolean;
 }
 
@@ -37,6 +55,7 @@ export interface SlashCommandMenuItem {
   insertText?: string;
   runtimeAvailable: boolean;
   source: SlashCommandMenuItemSource;
+  skillSource?: SlashCommandSkillSource;
   subtask: boolean;
 }
 
@@ -46,6 +65,84 @@ export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
 
 function normalizeRuntimeCommandSource(command: RuntimeCommand): SlashCommandCatalogSource {
   return command.source === 'skill' ? 'skill' : 'command';
+}
+
+function normalizeComparablePath(value: string | null | undefined): string {
+  const normalized = (value ?? '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/\/$/, '');
+  return /^[A-Za-z]:/.test(normalized) ? normalized.toLowerCase() : normalized;
+}
+
+function isPathWithinRoot(location: string, root: string | null | undefined): boolean {
+  const normalizedLocation = normalizeComparablePath(location);
+  const normalizedRoot = normalizeComparablePath(root);
+  if (!normalizedLocation || !normalizedRoot) {
+    return false;
+  }
+
+  return normalizedLocation === normalizedRoot || normalizedLocation.startsWith(`${normalizedRoot}/`);
+}
+
+function extractPluginSkillName(location: string): string | undefined {
+  const patterns = [
+    /\/plugins\/cache\/[^/]+\/([^/]+)\/[^/]+\/skills\//i,
+    /\/plugins\/marketplaces\/[^/]+\/plugins\/([^/]+)\/skills\//i,
+    /\/plugins\/marketplaces\/[^/]+\/external_plugins\/([^/]+)\/skills\//i,
+    /\/plugins\/marketplaces\/([^/]+)\/skills\//i,
+  ];
+
+  for (const pattern of patterns) {
+    const pluginName = pattern.exec(location)?.[1]?.trim();
+    if (pluginName) {
+      return pluginName;
+    }
+  }
+
+  return undefined;
+}
+
+function inferSkillSource(
+  location: string,
+  vaultPath: string | null | undefined,
+): SlashCommandSkillSource {
+  const normalizedLocation = normalizeComparablePath(location);
+  const pluginName = extractPluginSkillName(normalizedLocation);
+  if (pluginName) {
+    return { kind: 'plugin', pluginName };
+  }
+
+  const projectScoped = isPathWithinRoot(normalizedLocation, vaultPath);
+  if (/\/\.opencode\/(?:skill|skills)\//i.test(normalizedLocation)) {
+    return { kind: projectScoped ? 'opencodeProject' : 'opencodeGlobal' };
+  }
+
+  if (/\/\.(?:claude|agents)\/skills\//i.test(normalizedLocation)) {
+    return { kind: projectScoped ? 'project' : 'global' };
+  }
+
+  return { kind: projectScoped ? 'project' : 'custom' };
+}
+
+export function buildRuntimeSkillSourceMap(
+  runtimeSkills: RuntimeSkillInfo[],
+  vaultPath: string | null | undefined,
+): Map<string, SlashCommandSkillSource> {
+  const skillSourceByName = new Map<string, SlashCommandSkillSource>();
+
+  for (const skill of runtimeSkills) {
+    const skillName = skill.name.trim();
+    const location = skill.location.trim();
+    if (!skillName || !location) {
+      continue;
+    }
+
+    skillSourceByName.set(skillName, inferSkillSource(location, vaultPath));
+  }
+
+  return skillSourceByName;
 }
 
 function getSourceSortRank(source: SlashCommandCatalogSource): number {
@@ -176,6 +273,7 @@ function normalizeCommandTopP(
 
 export function mergeSlashCommandCatalog(
   runtimeCommands: RuntimeCommand[],
+  runtimeSkillSources: Map<string, SlashCommandSkillSource>,
   projectCommands: OpencodeCommandConfigRecord,
   projectAgents: OpencodeAgentConfigRecord,
   hiddenCommandIds: Set<string>,
@@ -205,6 +303,9 @@ export function mergeSlashCommandCatalog(
       hidden: hiddenCommandIds.has(runtimeCommand.name),
       runtimeAvailable: true,
       source: normalizeRuntimeCommandSource(runtimeCommand),
+      skillSource: runtimeCommand.source === 'skill'
+        ? runtimeSkillSources.get(runtimeCommand.name)
+        : undefined,
       subtask: normalizeCommandSubtask(runtimeCommand, projectCommand),
     });
   }
@@ -226,6 +327,7 @@ export function mergeSlashCommandCatalog(
       hidden: hiddenCommandIds.has(commandId),
       runtimeAvailable: false,
       source: 'project',
+      skillSource: undefined,
       subtask: normalizeCommandSubtask(undefined, projectCommand),
     });
   }
@@ -259,6 +361,7 @@ export function buildVisibleSlashCommandMenuItems(
       hasProjectOverride: entry.hasProjectOverride,
       runtimeAvailable: entry.runtimeAvailable,
       source: entry.source,
+      skillSource: entry.skillSource,
       subtask: entry.subtask,
     }));
 }

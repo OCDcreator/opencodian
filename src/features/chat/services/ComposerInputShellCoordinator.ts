@@ -546,6 +546,15 @@ export class ComposerInputShellCoordinator {
         });
       }
 
+      const skillSourceText = this.buildSkillSourceText(item);
+      if (skillSourceText) {
+        itemEl.createDiv({
+          cls: 'opencodian-slash-command-menu-source',
+          text: skillSourceText,
+          attr: { title: skillSourceText },
+        });
+      }
+
       if (item.description) {
         itemEl.createDiv({
           cls: 'opencodian-slash-command-menu-description',
@@ -587,5 +596,29 @@ export class ComposerInputShellCoordinator {
       text: t(badge.key),
       cls: badge.cls,
     };
+  }
+
+  private buildSkillSourceText(item: SlashCommandMenuItem): string | null {
+    if (item.source !== 'skill' || !item.skillSource) {
+      return null;
+    }
+
+    switch (item.skillSource.kind) {
+      case 'project':
+        return t('slashCommand.skillSource.project');
+      case 'opencodeProject':
+        return t('slashCommand.skillSource.opencodeProject');
+      case 'plugin':
+        return t('slashCommand.skillSource.plugin', {
+          name: item.skillSource.pluginName ?? t('slashCommand.skillSource.pluginFallback'),
+        });
+      case 'global':
+        return t('slashCommand.skillSource.global');
+      case 'opencodeGlobal':
+        return t('slashCommand.skillSource.opencodeGlobal');
+      case 'custom':
+      default:
+        return t('slashCommand.skillSource.custom');
+    }
   }
 }

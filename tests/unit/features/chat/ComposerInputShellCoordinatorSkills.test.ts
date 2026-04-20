@@ -4,15 +4,28 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
-import { t } from '../../../../src/i18n';
+import { setLocale, t } from '../../../../src/i18n';
 
 class ResizeObserverMock {
   readonly observe = jest.fn();
   readonly disconnect = jest.fn();
 }
 
-function slashItem(id: string, description: string, source: SlashCommandMenuItem['source'] = 'command'): SlashCommandMenuItem {
-  return { id, description, hasProjectOverride: false, runtimeAvailable: true, source, subtask: false };
+function slashItem(
+  id: string,
+  description: string,
+  source: SlashCommandMenuItem['source'] = 'command',
+  overrides: Record<string, unknown> = {},
+): SlashCommandMenuItem {
+  return {
+    id,
+    description,
+    hasProjectOverride: false,
+    runtimeAvailable: true,
+    source,
+    subtask: false,
+    ...overrides,
+  } as SlashCommandMenuItem;
 }
 
 async function flushAsync(): Promise<void> {
@@ -72,6 +85,7 @@ function getRenderedMenuText(container: HTMLElement): Array<string | null> {
 
 describe('ComposerInputShellCoordinator skill slash modes', () => {
   beforeEach(() => {
+    setLocale('en');
     (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
       ResizeObserverMock as unknown as typeof ResizeObserver;
     jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
@@ -150,5 +164,39 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     nestedItem?.click();
 
     expect(fixture.textarea.value).toBe('/skills build-mcp-server ');
+  });
+
+  it('renders localized skill provenance details in prefixed skill suggestions', async () => {
+    setLocale('zh');
+
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([
+      slashItem(
+        'claude-md-improver',
+        'Improve CLAUDE.md',
+        'skill',
+        { skillSource: { kind: 'plugin', pluginName: 'claude-md-management' } },
+      ),
+      slashItem(
+        'opencode-skill',
+        'OpenCode helper',
+        'skill',
+        { skillSource: { kind: 'opencodeProject' } },
+      ),
+    ]);
+
+    fixture.textarea.value = '/skills ';
+    fixture.textarea.setSelectionRange('/skills '.length, '/skills '.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+
+    expect(menuItems[0]?.textContent).toContain('/skills claude-md-improver');
+    expect(menuItems[0]?.textContent).toContain('插件：claude-md-management');
+    expect(menuItems[1]?.textContent).toContain('OpenCode 项目');
   });
 });

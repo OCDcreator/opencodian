@@ -1153,6 +1153,8 @@ export class OpenCodianView extends ItemView {
       loadProjectAgents: async () => this.plugin.opencodeConfigManager?.getAgentConfig() ?? {},
       loadProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
       loadRuntimeCommands: async () => this.plugin.openCodeService.sdk.command.list(),
+      loadRuntimeSkills: async () => this.plugin.openCodeService.sdk.app.skills(),
+      getVaultPath: () => getVaultBasePath(this.app),
       onWarmLoadFailed: (error) => {
         logger.debug('Failed to preload slash command menu items:', error);
       },

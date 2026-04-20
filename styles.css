@@ -6756,6 +6756,25 @@ body[data-opencodian-provider-icon-mode="color"] {
   color: var(--text-success);
 }
 
+.opencodian-slash-command-menu-badge--skill {
+  background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  color: color-mix(in srgb, var(--interactive-accent) 78%, var(--text-normal));
+}
+
+.opencodian-slash-command-menu-source {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 .opencodian-slash-command-menu-description {
   display: block;
   width: 100%;

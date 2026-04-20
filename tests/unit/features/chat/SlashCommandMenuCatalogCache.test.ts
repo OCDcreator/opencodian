@@ -48,6 +48,8 @@ function createHost(
         description: 'Review code',
       }),
     ]),
+    loadRuntimeSkills: jest.fn().mockResolvedValue([]),
+    getVaultPath: jest.fn(() => 'C:/vault'),
     onWarmLoadFailed: jest.fn(),
     ...overrides,
   } as jest.Mocked<SlashCommandMenuCatalogCacheHost>;
@@ -168,5 +170,55 @@ describe('SlashCommandMenuCatalogCache', () => {
       expect.objectContaining({ id: 'review', source: 'command' }),
       expect.objectContaining({ id: 'frontend-design', source: 'skill' }),
     ]);
+  });
+
+  it('attaches provenance details to runtime skill entries from skill locations', async () => {
+    const host = createHost({
+      getVaultPath: jest.fn(() => 'C:/vault'),
+      loadRuntimeCommands: jest.fn().mockResolvedValue([
+        createRuntimeCommand({ name: 'project-skill', source: 'skill', description: 'Project helper' }),
+        createRuntimeCommand({ name: 'opencode-skill', source: 'skill', description: 'OpenCode helper' }),
+        createRuntimeCommand({ name: 'claude-md-improver', source: 'skill', description: 'Improve CLAUDE.md' }),
+      ]),
+      loadRuntimeSkills: jest.fn().mockResolvedValue([
+        {
+          name: 'project-skill',
+          description: 'Project helper',
+          location: 'C:/vault/.claude/skills/project-skill/SKILL.md',
+          content: '',
+        },
+        {
+          name: 'opencode-skill',
+          description: 'OpenCode helper',
+          location: 'C:/vault/.opencode/skills/opencode-skill/SKILL.md',
+          content: '',
+        },
+        {
+          name: 'claude-md-improver',
+          description: 'Improve CLAUDE.md',
+          location: 'C:/Users/lt/.claude/plugins/cache/claude-plugins-official/claude-md-management/1.0.0/skills/claude-md-improver/SKILL.md',
+          content: '',
+        },
+      ]),
+    });
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    await expect(cache.load()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'project-skill',
+        source: 'skill',
+        skillSource: { kind: 'project' },
+      }),
+      expect.objectContaining({
+        id: 'opencode-skill',
+        source: 'skill',
+        skillSource: { kind: 'opencodeProject' },
+      }),
+      expect.objectContaining({
+        id: 'claude-md-improver',
+        source: 'skill',
+        skillSource: { kind: 'plugin', pluginName: 'claude-md-management' },
+      }),
+    ]));
   });
 });

@@ -180,6 +180,7 @@ export class SettingsCommandsSection {
       const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
       const mergedCommands = mergeSlashCommandCatalog(
         runtimeCommands,
+        new Map(),
         projectCommands,
         projectAgents,
         hiddenCommandIds,

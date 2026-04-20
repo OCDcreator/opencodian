@@ -55,6 +55,7 @@ describe('slashCommandCatalog', () => {
           description: 'Review with a skill',
         }),
       ],
+      new Map(),
       projectCommands,
       {},
       new Set(['review']),

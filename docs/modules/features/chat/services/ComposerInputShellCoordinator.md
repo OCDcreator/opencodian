@@ -65,6 +65,7 @@ export class ComposerInputShellCoordinator {
 - `tryHandleSlashCommandMenuKeydown()` 在 menu 打开时拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`
 - 选中 menu item 后，textarea 默认写成 `/<id> `；prefixed skill suggestion 会写成 `/skills <id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
 - prefixed mode 下如果先选中顶层 `/skills` 入口，coordinator 会立即保留菜单并切换到 nested skill 列表，而不是先关闭菜单再要求用户手动继续输入
+- skill menu item 除了顶层 `skill` badge，还会在标题下方渲染一行多语言 provenance 文本；它来自 catalog 里的 `skillSource`，用于解释该 skill 是来自 project、OpenCode project、plugin cache、global 还是 custom path
 - `scheduleLayoutSync()` / `clearScheduledLayoutSync()` 收束 composer stack height 的 RAF 节流
 - `destroy()` 释放 textarea/button refs、layout observer 和 context row ownership
 

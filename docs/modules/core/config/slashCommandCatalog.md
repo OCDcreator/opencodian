@@ -13,6 +13,7 @@
 - 合并 runtime slash command 与 project `.opencode/opencode.json` `command` map
 - 从 command-owned hidden agent 中回填 `temperature` / `top_p` 与 base agent
 - 标记 catalog/menu item 的 `source: 'command' | 'skill' | 'project'`
+- 对 runtime skill 额外根据 `app.skills()` 返回的 `location` 推导来源标签（project / OpenCode project / plugin / global / custom）
 - 标记 `hiddenSlashCommands` 驱动的 menu hidden 状态
 - 为 chat-side slash autocomplete 导出只包含可见条目的轻量 menu item 列表
 
@@ -37,11 +38,12 @@ export function buildVisibleSlashCommandMenuItems(
 - `command.agent === opencodian-command:<id>` 时，会尝试从对应 hidden agent `options.opencodianCommand.baseAgent` 回填 editor/menu 看到的 agent，而不是泄露内部 agent id
 - runtime 不存在、但 project config 存在的命令会保留为 `runtimeAvailable: false`
 - runtime skill 会保留为 `source: 'skill'`，后续由 chat/menu 层按用户设置决定显示成 `/skill` 还是 `/skills skill`
+- runtime skill 若能从 `location` 识别出 plugin cache、project `.claude/.agents`、project `.opencode` 等路径，会把结果写入 `skillSource`，供聊天输入区渲染多语言来源说明；识别失败时回落到 `custom`
 
 ### menu 可见性投影
 
 - `mergeSlashCommandCatalog()` 保留 `hidden` 状态，供 settings/catalog shell 继续显示 visible toggle
-- `buildVisibleSlashCommandMenuItems()` 再只投影 chat slash menu 真正需要的 `id` / `description` / `runtimeAvailable` / `hasProjectOverride` / `source` / `subtask`
+- `buildVisibleSlashCommandMenuItems()` 再只投影 chat slash menu 真正需要的 `id` / `description` / `runtimeAvailable` / `hasProjectOverride` / `source` / `skillSource` / `subtask`
 - 因此 `hiddenSlashCommands` 只影响 autocomplete/menu 可见性，不影响 command config 本身
 
 ## 使用方
