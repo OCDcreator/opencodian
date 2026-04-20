@@ -71,6 +71,7 @@ import {
 import { OpenCodeSessionStateStore } from './OpenCodeSessionStateStore';
 import {
   OpenCodeStreamEventTransformer,
+  type OpenCodeStreamMutation,
 } from './OpenCodeStreamEventTransformer';
 import {
   OpenCodeStreamingRuntimeCoordinator,
@@ -104,6 +105,10 @@ export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeSy
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Service events */
@@ -324,6 +329,7 @@ export class OpenCodeService {
       logStreamingDebug: (label, payload) => this.diagnostics.logAssistantFinalizationDebug(label, payload),
     });
     this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
+      applyStreamMutations: (mutations) => this.applyCanonicalStreamMutations(mutations),
       abortSessionOnServer: (sessionId) => this.sessionLifecycle.abortSession(sessionId),
       getLegacyEventStreamRequest: () => {
         this.ensureBaseUrl();
@@ -1057,6 +1063,118 @@ export class OpenCodeService {
       case 'session.diff':
         return;
     }
+  }
+
+  private applyCanonicalStreamMutations(mutations: OpenCodeStreamMutation[]): void {
+    for (const mutation of mutations) {
+      this.applyCanonicalStreamMutation(mutation);
+    }
+  }
+
+  private applyCanonicalStreamMutation(mutation: OpenCodeStreamMutation): void {
+    switch (mutation.type) {
+      case 'message.upserted':
+        this.ensureCanonicalStreamMessage(mutation);
+        return;
+      case 'part.upserted':
+        this.ensureCanonicalStreamMessage(mutation);
+        if (mutation.part) {
+          this.upsertCanonicalStreamPart(mutation.part);
+        }
+        return;
+      case 'part.delta':
+        this.ensureCanonicalStreamMessage(mutation);
+        this.applyCanonicalStreamPartDelta(mutation);
+        return;
+      case 'part.completed':
+        this.ensureCanonicalStreamMessage(mutation);
+        return;
+    }
+  }
+
+  private ensureCanonicalStreamMessage(mutation: Pick<
+    OpenCodeStreamMutation,
+    'sessionID' | 'messageID' | 'role' | 'createdAt'
+  >): void {
+    const existing = this.getCanonicalSessionState(mutation.sessionID)?.messages.find(
+      (message) => message.id === mutation.messageID,
+    );
+    if (existing) {
+      return;
+    }
+
+    this.sessionStateStore.upsertMessage({
+      id: mutation.messageID,
+      sessionID: mutation.sessionID,
+      role: mutation.role ?? 'assistant',
+      time: {
+        created: mutation.createdAt ?? Date.now(),
+      },
+    });
+  }
+
+  private upsertCanonicalStreamPart(part: Part): void {
+    const existing = this.getCanonicalSessionState(part.sessionID)?.partsByMessageID[part.messageID]
+      ?.find((candidate) => candidate.id === part.id);
+    const nextPart = existing ? this.mergeCanonicalStreamPart(existing, part) : part;
+    this.sessionStateStore.upsertPart(nextPart);
+  }
+
+  private mergeCanonicalStreamPart(existing: Part, incoming: Part): Part {
+    const merged = this.mergeDefinedRecords(
+      existing as Record<string, unknown>,
+      incoming as Record<string, unknown>,
+    );
+    return merged as Part;
+  }
+
+  private mergeDefinedRecords(
+    existing: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const merged: Record<string, unknown> = { ...existing };
+    for (const [key, value] of Object.entries(incoming)) {
+      if (value === undefined) {
+        continue;
+      }
+
+      if (isPlainRecord(value) && isPlainRecord(merged[key])) {
+        merged[key] = this.mergeDefinedRecords(
+          merged[key] as Record<string, unknown>,
+          value,
+        );
+        continue;
+      }
+
+      merged[key] = value;
+    }
+
+    return merged;
+  }
+
+  private applyCanonicalStreamPartDelta(mutation: OpenCodeStreamMutation): void {
+    if (!mutation.partID || !mutation.field || typeof mutation.delta !== 'string') {
+      return;
+    }
+
+    const nextState = this.sessionStateStore.appendPartDelta({
+      messageID: mutation.messageID,
+      partID: mutation.partID,
+      field: mutation.field,
+      delta: mutation.delta,
+    });
+    if (nextState) {
+      return;
+    }
+
+    const nextPart: Record<string, unknown> = {
+      id: mutation.partID,
+      sessionID: mutation.sessionID,
+      messageID: mutation.messageID,
+      type: mutation.partType ?? 'text',
+    };
+    nextPart[mutation.field] = mutation.delta;
+    this.sessionStateStore.upsertPart(nextPart as Part);
   }
 
   private resolveStructuredPromptSendPayload(

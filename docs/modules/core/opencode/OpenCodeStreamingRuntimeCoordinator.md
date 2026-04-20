@@ -11,6 +11,7 @@
 - 单一 streaming 入口下的 SDK/legacy transport 选择
 - SDK stream 订阅与“首事件前失败 → legacy SSE”降级策略
 - legacy `/event` SSE reader / parser / abort-detach 生命周期
+- 在交付 legacy `StreamChunk` 前先把 stream mutations 转交给 canonical session graph
 - `session.idle` / `session.error` 停止判定后的 final assistant message completion
 - `cancelStream()` / `detachStream()` 的协议语义
 
@@ -34,8 +35,8 @@
 
 ## 核心类型 / 状态
 
-- `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供服务端 abort、legacy SSE 请求参数、session messages 读取、warning log，以及共享的 `streamEventTransformer`。
-- `OpenCodeStreamingRuntimeContext`: 单条活动流的 session-scoped runtime context，封装 `AbortController.signal` 与 part type map。
+- `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供 stream mutation 应用、服务端 abort、legacy SSE 请求参数、session messages 读取、warning log，以及共享的 `streamEventTransformer`。
+- `OpenCodeStreamingRuntimeContext`: 单条活动流的 session-scoped runtime context，封装 `AbortController.signal`、part type map 与 part message-id map。
 - `OpenCodeStreamingRuntimeRequest`: 单一 transport 入口；调用方传入 `useSdkStream`、SDK callbacks 与 legacy callbacks，coordinator 负责选择实际 transport。
 - `OpenCodeStreamingLegacyStreamRequest`: legacy transport 入口；调用方可传入 `startPrompt()`，coordinator 随后接手 `/event` 读取。
 - `OpenCodeStreamingSdkStreamRequest`: SDK transport 入口；调用方传入 `startPrompt()` 与 `subscribe(signal)`，coordinator 负责 SDK stream 读取与必要时的 legacy fallback。
@@ -56,6 +57,7 @@
 - 如果 SDK iterator 在第一条事件前抛错，coordinator 会通过 host 的 legacy SSE 请求参数立即切到 `/event`，保持既有 SDK-first / legacy fallback 策略。
 - 一旦已经收到首个 SDK event，后续异常不会再切回 legacy，而是直接产出 `error` chunk。
 - `streamLegacyResponse()` 则直接执行 legacy prompt 启动后进入 `/event` 读取。
+- 每个 event outcome 都会先调用 `applyStreamMutations()`，再 yield 对应 `StreamChunk`，避免 canonical graph 落后于本地 loose chunk。
 
 ### SSE reader 与 finalize lifecycle
 
@@ -75,7 +77,7 @@
 
 ### Part type tracking
 
-`OpenCodeStreamingRuntimeContext` 继续保存流内 `partId -> partType` 映射，供 `OpenCodeStreamEventTransformer.handleStreamingEvent()` 在 `message.part.updated` / `message.part.delta` 之间共享类型信息。这样 reasoning/tool/text delta 的分类仍保持 per-session、per-stream 隔离。
+`OpenCodeStreamingRuntimeContext` 继续保存流内 `partId -> partType` 映射，并额外记录 `partId -> messageID`。`OpenCodeStreamEventTransformer.handleStreamingEvent()` 会在 `message.part.updated` / `message.part.delta` 之间共享这些信息，让 reasoning/tool/text delta 的分类与 canonical message 归属都保持 per-session、per-stream 隔离。
 
 ## 数据流
 
@@ -88,7 +90,9 @@ graph LR
     B --> F[legacy /event SSE]
     E --> G[OpenCodeStreamEventTransformer]
     F --> G
-    G --> H[StreamChunk]
+    G --> H[StreamChunk + StreamMutation]
+    H --> M[applyStreamMutations]
+    M --> N[OpenCodeService canonical graph]
     B --> I[finishStreamingResponse]
     I --> J[getSessionMessages host seam]
     A --> K[cancelStream / detachStream]
@@ -99,7 +103,7 @@ graph LR
 ## 与其他模块的交互
 
 - `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 transport callback 注入；SDK/legacy 入口分流、完整 transport/fallback/read/finalize 细节都委托给 coordinator。
-- `OpenCodeStreamEventTransformer` 继续负责 `session.error` / `session.idle` 的 stop 判断、tool/question/file/permission 事件映射，以及 SSE event parsing。
+- `OpenCodeStreamEventTransformer` 继续负责 `session.error` / `session.idle` 的 stop 判断、tool/question/file/permission 事件映射、canonical stream mutation 输出，以及 SSE event parsing。
 - `OpenCodeSessionLifecycleCoordinator` 的 `getSessionMessages()` 通过 host seam 被用于 finalize 阶段补拉 assistant message。
 - `abortSessionOnServer()` 仍留在 `OpenCodeService`，因此 SDK `session.abort()` 失败后回退 legacy HTTP 的语义不变。
 

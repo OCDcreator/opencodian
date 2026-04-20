@@ -5,7 +5,9 @@ import type { Message, Part } from './OpenCodeSessionLifecycleCoordinator';
 import type {
   OpenCodeSSEEvent,
   OpenCodeStreamEvent,
+  OpenCodeStreamEventOutcome,
   OpenCodeStreamEventState,
+  OpenCodeStreamMutation,
 } from './OpenCodeStreamEventTransformer';
 import type { SdkEvent } from './sdkTypes';
 
@@ -67,12 +69,13 @@ export interface OpenCodeStreamingRuntimeEventTransformer {
     sessionId: string,
     state: OpenCodeStreamEventState,
     streamContext: OpenCodeStreamingRuntimeContext,
-  ): { chunks: StreamChunk[]; stop: boolean };
+  ): OpenCodeStreamEventOutcome;
   parseSSEEventPayload(event: OpenCodeSSEEvent): OpenCodeStreamEvent | null;
   parseSSEEvents(buffer: string): { events: OpenCodeSSEEvent[]; remaining: string };
 }
 
 export interface OpenCodeStreamingRuntimeCoordinatorHost {
+  applyStreamMutations(mutations: OpenCodeStreamMutation[]): void;
   abortSessionOnServer(sessionId: string): Promise<void> | void;
   getLegacyEventStreamRequest(): {
     url: string;
@@ -196,6 +199,7 @@ export class OpenCodeStreamingRuntimeContext {
   readonly sessionId: string;
   private readonly abortController = new AbortController();
   private readonly partTypeMap = new Map<string, string>();
+  private readonly partMessageIdMap = new Map<string, string>();
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -221,8 +225,20 @@ export class OpenCodeStreamingRuntimeContext {
     this.partTypeMap.set(partId, partType);
   }
 
+  setPartMessageId(partId: string, messageId: string): void {
+    if (!partId || !messageId) {
+      return;
+    }
+
+    this.partMessageIdMap.set(partId, messageId);
+  }
+
   getPartType(partId: string): string | undefined {
     return this.partTypeMap.get(partId);
+  }
+
+  getPartMessageId(partId: string): string | undefined {
+    return this.partMessageIdMap.get(partId);
   }
 }
 
@@ -357,6 +373,9 @@ export class OpenCodeStreamingRuntimeCoordinator {
           state,
           streamContext,
         );
+        if (outcome.mutations.length > 0) {
+          this.host.applyStreamMutations(outcome.mutations);
+        }
         for (const chunk of outcome.chunks) {
           yield chunk;
         }
@@ -449,6 +468,9 @@ export class OpenCodeStreamingRuntimeCoordinator {
         state,
         streamContext,
       );
+      if (outcome.mutations.length > 0) {
+        this.host.applyStreamMutations(outcome.mutations);
+      }
       for (const chunk of outcome.chunks) {
         yield chunk;
       }

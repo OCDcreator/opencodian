@@ -8,6 +8,10 @@ import type {
   QuestionRequest as ChatQuestionRequest,
   StreamChunk,
 } from '../types';
+import type {
+  Message,
+  Part,
+} from './OpenCodeSessionLifecycleCoordinator';
 import { OpenCodeStreamingRuntimeContext } from './OpenCodeStreamingRuntimeCoordinator';
 
 export interface OpenCodeStreamEventTransformerHost {
@@ -30,11 +34,7 @@ interface OpenCodeToolStateData {
   metadata?: Record<string, unknown>;
 }
 
-interface OpenCodeStreamPart {
-  id: string;
-  sessionID: string;
-  messageID: string;
-  type: string;
+export interface OpenCodeStreamPart extends Part {
   text?: string;
   duration?: number;
   time?: {
@@ -101,7 +101,21 @@ export interface OpenCodeStreamEventState {
 
 export type OpenCodeStreamPartTypeState = OpenCodeStreamingRuntimeContext | {
   partTypeMap?: Map<string, string>;
+  partMessageIdMap?: Map<string, string>;
 };
+
+export interface OpenCodeStreamMutation {
+  type: 'message.upserted' | 'part.upserted' | 'part.delta' | 'part.completed';
+  sessionID: string;
+  messageID: string;
+  partID?: string;
+  role?: Message['role'];
+  createdAt?: number;
+  part?: Part;
+  field?: string;
+  delta?: string;
+  partType?: string;
+}
 
 interface OpenCodeStreamingEventHandlerContext {
   eventData: OpenCodeStreamEvent;
@@ -109,9 +123,14 @@ interface OpenCodeStreamingEventHandlerContext {
   state: OpenCodeStreamEventState;
   streamContext: OpenCodeStreamPartTypeState;
   chunks: StreamChunk[];
+  mutations: OpenCodeStreamMutation[];
 }
 
-type OpenCodeStreamEventOutcome = { chunks: StreamChunk[]; stop: boolean };
+export interface OpenCodeStreamEventOutcome {
+  chunks: StreamChunk[];
+  mutations: OpenCodeStreamMutation[];
+  stop: boolean;
+}
 
 type OpenCodeStreamingEventHandler = (
   context: OpenCodeStreamingEventHandlerContext,
@@ -277,17 +296,18 @@ export class OpenCodeStreamEventTransformer {
     sessionId: string,
     state: OpenCodeStreamEventState,
     streamContext: OpenCodeStreamPartTypeState,
-  ): { chunks: StreamChunk[]; stop: boolean } {
+  ): OpenCodeStreamEventOutcome {
     if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
-      return { chunks: [], stop: false };
+      return { chunks: [], mutations: [], stop: false };
     }
 
     const partSessionId = eventData.properties?.part?.sessionID;
     if (partSessionId && partSessionId !== sessionId) {
-      return { chunks: [], stop: false };
+      return { chunks: [], mutations: [], stop: false };
     }
 
     const chunks = this.createUsageChunks(eventData, sessionId);
+    const mutations: OpenCodeStreamMutation[] = [];
     const eventHandler = this.streamingEventHandlers[eventData.type];
     if (eventHandler) {
       return eventHandler({
@@ -296,10 +316,11 @@ export class OpenCodeStreamEventTransformer {
         state,
         streamContext,
         chunks,
+        mutations,
       });
     }
 
-    return { chunks, stop: false };
+    return { chunks, mutations, stop: false };
   }
 
   parseSSEEventPayload(event: OpenCodeSSEEvent): OpenCodeStreamEvent | null {
@@ -418,19 +439,22 @@ export class OpenCodeStreamEventTransformer {
 
   private handleMessagePartUpdated({
     eventData,
+    sessionId,
     state,
     streamContext,
     chunks,
+    mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const part = eventData.properties?.part;
     if (!part?.id || !part.type) {
-      return { chunks, stop: false };
+      return { chunks, mutations, stop: false };
     }
 
-    this.setStreamPartType(streamContext, part.id, part.type);
+    this.rememberStreamPartMetadata(streamContext, eventData, part);
+    mutations.push(...this.buildPartUpdatedMutations(part, eventData, sessionId));
     const partHandler = this.streamingPartUpdatedHandlers[part.type];
     partHandler?.({ part, state, chunks });
-    return { chunks, stop: false };
+    return { chunks, mutations, stop: false };
   }
 
   private handleToolPartUpdated(
@@ -573,23 +597,40 @@ export class OpenCodeStreamEventTransformer {
     state,
     streamContext,
     chunks,
+    mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const delta = eventData.properties?.delta;
     const field = eventData.properties?.field;
-    const partID = eventData.properties?.partID;
+    const partID = eventData.properties?.partID ?? eventData.properties?.part?.id;
 
     if (!delta || !field) {
-      return { chunks, stop: false };
+      return { chunks, mutations, stop: false };
     }
 
+    this.rememberStreamPartMetadata(streamContext, eventData, eventData.properties?.part);
     const partType = this.resolveDeltaPartType(eventData, streamContext, partID);
+    const sessionID = this.resolveStreamPartSessionId(eventData, sessionId);
+    const messageID = this.resolveStreamPartMessageId(eventData, streamContext, partID);
+    if (messageID && partID) {
+      mutations.push(this.buildStreamMessageMutation(sessionID, messageID, undefined));
+      mutations.push({
+        type: 'part.delta',
+        sessionID,
+        messageID,
+        partID,
+        field,
+        delta,
+        partType,
+      });
+    }
+
     if (field !== 'text') {
-      return { chunks, stop: false };
+      return { chunks, mutations, stop: false };
     }
 
     if (this.isReasoningPartType(partType)) {
       chunks.push({ type: 'thinking', content: delta, partId: partID });
-      return { chunks, stop: false };
+      return { chunks, mutations, stop: false };
     }
 
     this.appendTextDeltaChunk({
@@ -600,7 +641,7 @@ export class OpenCodeStreamEventTransformer {
       sessionId,
       state,
     });
-    return { chunks, stop: false };
+    return { chunks, mutations, stop: false };
   }
 
   private resolveDeltaPartType(
@@ -654,6 +695,7 @@ export class OpenCodeStreamEventTransformer {
   private handlePermissionAsked({
     eventData,
     chunks,
+    mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const permission = eventData.properties;
     if (permission?.id) {
@@ -666,19 +708,20 @@ export class OpenCodeStreamEventTransformer {
       });
     }
 
-    return { chunks, stop: false };
+    return { chunks, mutations, stop: false };
   }
 
   private handleFileEdited({
     eventData,
     chunks,
+    mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const file = eventData.properties?.file;
     if (typeof file === 'string' && file.trim()) {
       chunks.push({ type: 'file_edited', file: file.trim() });
     }
 
-    return { chunks, stop: false };
+    return { chunks, mutations, stop: false };
   }
 
   private handleSessionError({
@@ -686,6 +729,7 @@ export class OpenCodeStreamEventTransformer {
     sessionId,
     state,
     chunks,
+    mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const errorName = extractStructuredErrorName(eventData.properties?.error);
     const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
@@ -696,32 +740,34 @@ export class OpenCodeStreamEventTransformer {
       errorMessage,
     });
     if (errorName === 'MessageAbortedError') {
-      return { chunks, stop: true };
+      return { chunks, mutations, stop: true };
     }
 
     chunks.push({
       type: 'error',
       content: errorMessage,
     });
-    return { chunks, stop: true };
+    return { chunks, mutations, stop: true };
   }
 
   private handleSessionIdle({
     sessionId,
     state,
     chunks,
+    mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     this.host.logStreamingDebug('service-session-idle', {
       sessionId,
       accumulatedTextLength: state.lastContent.length,
       lastTextDelta: state.lastTextDelta,
     });
-    return { chunks, stop: true };
+    return { chunks, mutations, stop: true };
   }
 
   private handleQuestionAsked({
     eventData,
     chunks,
+    mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const request = this.host.normalizeQuestionRequest(eventData.properties);
     if (request) {
@@ -731,7 +777,7 @@ export class OpenCodeStreamEventTransformer {
       });
     }
 
-    return { chunks, stop: false };
+    return { chunks, mutations, stop: false };
   }
 
   private isReasoningPartType(partType: string): boolean {
@@ -781,6 +827,23 @@ export class OpenCodeStreamEventTransformer {
     streamContext.partTypeMap?.set(partId, partType);
   }
 
+  private setStreamPartMessageId(
+    streamContext: OpenCodeStreamPartTypeState,
+    partId: string,
+    messageId: string,
+  ): void {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      streamContext.setPartMessageId(partId, messageId);
+      return;
+    }
+
+    if (!partId || !messageId) {
+      return;
+    }
+
+    streamContext.partMessageIdMap?.set(partId, messageId);
+  }
+
   private hasStreamPartType(
     streamContext: OpenCodeStreamPartTypeState,
     partId: string,
@@ -801,5 +864,129 @@ export class OpenCodeStreamEventTransformer {
     }
 
     return streamContext.partTypeMap?.get(partId);
+  }
+
+  private getStreamPartMessageId(
+    streamContext: OpenCodeStreamPartTypeState,
+    partId: string,
+  ): string | undefined {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      return streamContext.getPartMessageId(partId);
+    }
+
+    return streamContext.partMessageIdMap?.get(partId);
+  }
+
+  private rememberStreamPartMetadata(
+    streamContext: OpenCodeStreamPartTypeState,
+    eventData: OpenCodeStreamEvent,
+    part: OpenCodeStreamPart | undefined,
+  ): void {
+    if (!part?.id) {
+      return;
+    }
+
+    const partType = part.type || 'text';
+    this.setStreamPartType(streamContext, part.id, partType);
+
+    const messageId = this.resolveExplicitMessageId(eventData, part);
+    if (messageId) {
+      this.setStreamPartMessageId(streamContext, part.id, messageId);
+    }
+  }
+
+  private buildPartUpdatedMutations(
+    part: OpenCodeStreamPart,
+    eventData: OpenCodeStreamEvent,
+    fallbackSessionId: string,
+  ): OpenCodeStreamMutation[] {
+    const sessionID = this.resolveStreamPartSessionId(eventData, fallbackSessionId);
+    const messageID = this.resolveExplicitMessageId(eventData, part);
+    if (!sessionID || !messageID) {
+      return [];
+    }
+
+    const normalizedPart = {
+      ...part,
+      sessionID,
+      messageID,
+    } as Part;
+    const mutations: OpenCodeStreamMutation[] = [
+      this.buildStreamMessageMutation(sessionID, messageID, part.time?.start),
+      {
+        type: 'part.upserted',
+        sessionID,
+        messageID,
+        partID: normalizedPart.id,
+        part: normalizedPart,
+      },
+    ];
+
+    if (this.shouldMarkPartCompleted(part)) {
+      mutations.push({
+        type: 'part.completed',
+        sessionID,
+        messageID,
+        partID: normalizedPart.id,
+      });
+    }
+
+    return mutations;
+  }
+
+  private buildStreamMessageMutation(
+    sessionID: string,
+    messageID: string,
+    createdAt: number | undefined,
+  ): OpenCodeStreamMutation {
+    return {
+      type: 'message.upserted',
+      sessionID,
+      messageID,
+      role: 'assistant',
+      createdAt,
+    };
+  }
+
+  private shouldMarkPartCompleted(part: OpenCodeStreamPart): boolean {
+    if (this.isReasoningPartType(part.type)) {
+      return typeof part.time?.end === 'number';
+    }
+
+    if (part.type !== 'tool') {
+      return false;
+    }
+
+    const toolStatus = resolveToolExecutionStatus({
+      toolName: part.tool || 'unknown',
+      state: part.state,
+    });
+    return toolStatus === 'completed' || toolStatus === 'error';
+  }
+
+  private resolveStreamPartSessionId(
+    eventData: OpenCodeStreamEvent,
+    fallbackSessionId: string,
+  ): string {
+    return eventData.properties?.part?.sessionID
+      || eventData.properties?.sessionID
+      || fallbackSessionId;
+  }
+
+  private resolveStreamPartMessageId(
+    eventData: OpenCodeStreamEvent,
+    streamContext: OpenCodeStreamPartTypeState,
+    partId: string | undefined,
+  ): string | undefined {
+    return this.resolveExplicitMessageId(eventData, eventData.properties?.part)
+      || eventData.properties?.messageID
+      || (partId ? this.getStreamPartMessageId(streamContext, partId) : undefined);
+  }
+
+  private resolveExplicitMessageId(
+    eventData: OpenCodeStreamEvent,
+    part: OpenCodeStreamPart | undefined,
+  ): string | undefined {
+    return part?.messageID || eventData.properties?.messageID;
   }
 }

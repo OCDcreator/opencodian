@@ -19,7 +19,7 @@ beforeEach(() => {
   ({ service, mockSdkClient } = createOpenCodeServiceTestContext());
 });
 
-describe('OpenCodeService SDK tool and session stream events', () => {
+describe('OpenCodeService SDK tool stream events', () => {
   it('re-emits tool_use when later stream updates provide richer tool input', async () => {
     service = createServiceWithSdkFlags();
     service.setSessionId('test-session');
@@ -174,6 +174,199 @@ describe('OpenCodeService SDK tool and session stream events', () => {
     ));
     expect(toolChunks).toEqual([]);
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+  });
+});
+
+describe('OpenCodeService SDK canonical stream mutations', () => {
+  it('updates canonical assistant parts during tool-first text-late SDK streams', async () => {
+    service = createServiceWithSdkFlags();
+    service.setSessionId('test-session');
+
+    mockSdkClient.session.promptAsync.mockResolvedValue({});
+    let releaseTail: (() => void) | null = null;
+    const tailGate = new Promise<void>((resolve) => {
+      releaseTail = resolve;
+    });
+    mockSdkClient.event.subscribe.mockResolvedValue({
+      stream: (async function* () {
+        yield {
+          type: 'message.part.updated',
+          properties: {
+            sessionID: 'test-session',
+            part: {
+              id: 'part-tool-1',
+              sessionID: 'test-session',
+              messageID: 'assistant-1',
+              type: 'tool',
+              callID: 'call-tool-1',
+              tool: 'read',
+              state: {
+                status: 'running',
+                input: {
+                  file_path: 'docs/architecture/README.md',
+                },
+              },
+            },
+          },
+        };
+        yield {
+          type: 'message.part.updated',
+          properties: {
+            sessionID: 'test-session',
+            part: {
+              id: 'part-text-1',
+              sessionID: 'test-session',
+              messageID: 'assistant-1',
+              type: 'text',
+              text: '',
+            },
+          },
+        };
+        await tailGate;
+        yield {
+          type: 'message.part.delta',
+          properties: {
+            sessionID: 'test-session',
+            messageID: 'assistant-1',
+            partID: 'part-text-1',
+            field: 'text',
+            delta: 'Hello from canonical stream',
+          },
+        };
+        yield {
+          type: 'session.idle',
+          properties: {
+            sessionID: 'test-session',
+          },
+        };
+      })(),
+    });
+    mockSdkClient.session.messages.mockResolvedValue([
+      {
+        info: {
+          id: 'assistant-1',
+          sessionID: 'test-session',
+          role: 'assistant',
+          providerID: 'openai',
+          modelID: 'gpt-5',
+          time: { created: 1234567890 },
+        },
+        parts: [
+          {
+            id: 'part-tool-1',
+            sessionID: 'test-session',
+            messageID: 'assistant-1',
+            type: 'tool',
+            callID: 'call-tool-1',
+            tool: 'read',
+            state: {
+              status: 'running',
+              input: {
+                file_path: 'docs/architecture/README.md',
+              },
+            },
+          },
+          {
+            id: 'part-text-1',
+            sessionID: 'test-session',
+            messageID: 'assistant-1',
+            type: 'text',
+            text: 'Hello from canonical stream',
+          },
+        ],
+      },
+    ]);
+    mockSdkClient.session.get.mockResolvedValue({
+      id: 'test-session',
+      title: 'SDK',
+      time: { created: 1, updated: 1 },
+    });
+
+    const iterator = service.sendMessage('Hello', { sessionId: 'test-session' })[Symbol.asyncIterator]();
+    expect(await iterator.next()).toEqual({
+      value: { type: 'message_start' },
+      done: false,
+    });
+    expect(await iterator.next()).toEqual({
+      value: {
+        type: 'tool_use',
+        id: 'call-tool-1',
+        name: 'read',
+        kind: 'builtin',
+        input: {
+          file_path: 'docs/architecture/README.md',
+        },
+      },
+      done: false,
+    });
+
+    const pendingDeltaChunk = iterator.next();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(service.getCanonicalSessionMessages('test-session')).toEqual([
+      {
+        info: expect.objectContaining({
+          id: 'assistant-1',
+          sessionID: 'test-session',
+          role: 'assistant',
+        }),
+        parts: [
+          expect.objectContaining({
+            id: 'part-text-1',
+            type: 'text',
+            text: '',
+          }),
+          expect.objectContaining({
+            id: 'part-tool-1',
+            type: 'tool',
+            tool: 'read',
+          }),
+        ],
+      },
+    ]);
+
+    releaseTail?.();
+    expect(await pendingDeltaChunk).toEqual({
+      value: {
+        type: 'text',
+        content: 'Hello from canonical stream',
+      },
+      done: false,
+    });
+    expect(service.getCanonicalSessionMessages('test-session')).toEqual([
+      {
+        info: expect.objectContaining({
+          id: 'assistant-1',
+          sessionID: 'test-session',
+          role: 'assistant',
+        }),
+        parts: [
+          expect.objectContaining({
+            id: 'part-text-1',
+            type: 'text',
+            text: 'Hello from canonical stream',
+          }),
+          expect.objectContaining({
+            id: 'part-tool-1',
+            type: 'tool',
+            tool: 'read',
+          }),
+        ],
+      },
+    ]);
+
+    const remainingChunks: unknown[] = [];
+    let nextChunk = await iterator.next();
+    while (!nextChunk.done) {
+      remainingChunks.push(nextChunk.value);
+      nextChunk = await iterator.next();
+    }
+    expect(remainingChunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'message_metadata',
+        messageId: 'assistant-1',
+      }),
+      { type: 'message_stop' },
+    ]));
   });
 });
 

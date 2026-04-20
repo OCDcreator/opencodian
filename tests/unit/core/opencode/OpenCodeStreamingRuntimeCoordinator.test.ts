@@ -84,6 +84,7 @@ function createHost(
   overrides: Partial<OpenCodeStreamingRuntimeCoordinatorHost> = {},
 ): jest.Mocked<OpenCodeStreamingRuntimeCoordinatorHost> {
   return {
+    applyStreamMutations: jest.fn(),
     abortSessionOnServer: jest.fn().mockResolvedValue(undefined),
     getLegacyEventStreamRequest: jest.fn().mockReturnValue({
       url: 'http://127.0.0.1:4196/event',
@@ -176,7 +177,7 @@ describe('OpenCodeStreamingRuntimeCoordinator active stream contexts', () => {
   });
 });
 
-describe('OpenCodeStreamingRuntimeCoordinator transport selection and legacy fallback', () => {
+describe('OpenCodeStreamingRuntimeCoordinator transport routing', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     global.fetch = originalFetch;
@@ -279,6 +280,13 @@ describe('OpenCodeStreamingRuntimeCoordinator transport selection and legacy fal
       }),
     );
   });
+});
+
+describe('OpenCodeStreamingRuntimeCoordinator legacy SSE handling', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
+  });
 
   it('finalizes a legacy stream with assistant metadata after session.idle', async () => {
     const host = createHost({
@@ -336,20 +344,22 @@ describe('OpenCodeStreamingRuntimeCoordinator transport selection and legacy fal
       eventData: OpenCodeStreamEvent,
       _sessionId: string,
       state: OpenCodeStreamEventState,
-    ) => {
-      if (eventData.type === 'message.part.delta') {
-        state.lastContent = 'Hi';
-        return {
-          chunks: [{ type: 'text', content: 'Hi' }],
-          stop: false,
-        };
-      }
+        ) => {
+          if (eventData.type === 'message.part.delta') {
+            state.lastContent = 'Hi';
+            return {
+              chunks: [{ type: 'text', content: 'Hi' }],
+              mutations: [],
+              stop: false,
+            };
+          }
 
-      return {
-        chunks: [],
-        stop: eventData.type === 'session.idle',
-      };
-    });
+          return {
+            chunks: [],
+            mutations: [],
+            stop: eventData.type === 'session.idle',
+          };
+        });
     const host = createHost({
       streamEventTransformer: transformer,
     });
@@ -375,6 +385,52 @@ describe('OpenCodeStreamingRuntimeCoordinator transport selection and legacy fal
     ]);
     expect(chunks).toContainEqual({ type: 'text', content: 'Hi' });
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+  });
+
+  it('applies canonical stream mutations before yielding transformed chunks', async () => {
+    const callOrder: string[] = [];
+    const host = createHost({
+      applyStreamMutations: jest.fn(() => {
+        callOrder.push('apply');
+      }),
+      streamEventTransformer: {
+        handleStreamingEvent: jest.fn().mockReturnValue({
+          chunks: [{ type: 'text', content: 'Hello' }],
+          mutations: [
+            {
+              type: 'message.upserted',
+              sessionID: 'sdk-order',
+              messageID: 'assistant-order',
+            },
+          ],
+          stop: false,
+        }),
+        parseSSEEventPayload: jest.fn().mockReturnValue(null),
+        parseSSEEvents: jest.fn().mockReturnValue({ events: [], remaining: '' }),
+      },
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-order',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield { type: 'ignored' } as never;
+      })()),
+    })) {
+      if ((chunk as { type?: string }).type === 'text') {
+        callOrder.push('chunk');
+      }
+    }
+
+    expect(host.applyStreamMutations).toHaveBeenCalledWith([
+      {
+        type: 'message.upserted',
+        sessionID: 'sdk-order',
+        messageID: 'assistant-order',
+      },
+    ]);
+    expect(callOrder).toEqual(['apply', 'chunk']);
   });
 });
 
@@ -417,6 +473,7 @@ describe('OpenCodeStreamingRuntimeCoordinator SDK tail recovery', () => {
           state.lastContent = 'Hello';
           return {
             chunks: [{ type: 'text', content: 'Hello' }],
+            mutations: [],
             stop: false,
           };
         }),
@@ -603,6 +660,7 @@ describe('OpenCodeStreamingRuntimeCoordinator SDK error fallback', () => {
           state.lastErrorMessage = 'Rate limit hit (HTTP 429)';
           return {
             chunks: [{ type: 'error', content: 'Rate limit hit (HTTP 429)' }],
+            mutations: [],
             stop: false,
           };
         }),

@@ -9,6 +9,7 @@
 
 - 把 SDK / legacy SSE event 统一转换成 `StreamChunk`
 - 维护单条活动流里的 part-type 感知，确保 `message.part.delta` 能区分 text / thinking
+- 同步产出 canonical stream mutations，让 `message.part.updated` / `message.part.delta` 能写入 `sessionStateStore`
 - 处理 tool chunk 去重、tool result 补发、question / permission / file 事件映射
 - 解析原始 SSE buffer，保留未完成尾段
 
@@ -41,7 +42,9 @@
 ## 核心类型 / 状态
 
 - `OpenCodeStreamEventState`: 单条流里的文本累计、error snapshot、tool dedupe 状态与 text-delta debug 游标。
-- `OpenCodeStreamPartTypeState`: `OpenCodeStreamingRuntimeContext` 或测试用 `partTypeMap`，用来记住 `partId -> partType`。
+- `OpenCodeStreamPartTypeState`: `OpenCodeStreamingRuntimeContext` 或测试用 map，记住 `partId -> partType` 与 `partId -> messageID`。
+- `OpenCodeStreamMutation`: 与 legacy chunks 并行的 canonical mutation 输出，覆盖 message upsert、part upsert、part delta 与 part completion signal。
+- `OpenCodeStreamEventOutcome`: `chunks + mutations + stop` 的统一返回结构；调用方必须先应用 mutations，再继续交付 legacy chunks。
 - `OpenCodeStreamEvent`: SDK / legacy 共享的 event shape。
 - `OpenCodeSSEEvent`: 解析后的单条 SSE event。
 
@@ -53,7 +56,8 @@
 
 - 先按 `sessionID` / `part.sessionID` 做 session guard
 - 对 `message.part.updated` 处理 tool_use / tool_result / thinking-duration
-- 对 `message.part.delta` 复用 part type，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`
+- 对 `message.part.updated` 记录 part type/message id，并产出 assistant message + part upsert mutations
+- 对 `message.part.delta` 复用 part type/message id，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`，同时产出 part delta mutation
 - 对 `permission.asked`、`file.edited`、`question.asked` 做结构化 chunk 映射
 - 对 `session.error` / `session.idle` 返回 stop 信号，同时保留错误与 debug 信息
 
@@ -75,14 +79,14 @@
 ```mermaid
 graph LR
     A[SDK event stream / legacy SSE] --> B[OpenCodeStreamEventTransformer]
-    B --> C[StreamChunk[] + stop flag]
+    B --> C[StreamChunk[] + OpenCodeStreamMutation[] + stop flag]
     D[OpenCodeStreamingRuntimeContext] --> B
     E[OpenCodeService host seam] --> B
 ```
 
 ## 与其他模块的交互
 
-- `OpenCodeStreamingRuntimeCoordinator` 继续拥有 active stream registry 与 per-session abort lifecycle；transformer 只读写当前流的 part-type state。
+- `OpenCodeStreamingRuntimeCoordinator` 继续拥有 active stream registry 与 per-session abort lifecycle；transformer 只读写当前流的 part metadata state，并把 mutations 交给 coordinator 转交服务层应用。
 - `OpenCodeCatalogStateStore` 不直接依赖 transformer，但会通过 host seam 接收 runtime tool-name 观察结果。
 - `OpenCodeService` 继续负责 SDK-first / legacy fallback 的 transport 分流与最终 `finishStreamingResponse()`。
 
@@ -90,4 +94,5 @@ graph LR
 
 - 不要在这里改 SDK 首事件失败才 fallback 到 legacy SSE 的策略；那属于 `OpenCodeService` transport owner。
 - 不要把 question normalization 或 tool identity 规则搬进 transformer；保持 host seam 注入。
+- 不要让 `message.part.delta` 只走 loose text chunk；如果能解析出 `partID + messageID`，必须同时输出 canonical part mutation。
 - `transformPartToChunks()` 目前仍保持原有“只直接处理 `reasoning` part，不单独处理 `thinking` part”的兼容语义。

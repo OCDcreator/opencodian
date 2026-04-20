@@ -1,3 +1,5 @@
+import './OpenCodeStreamEventTransformer.streamPartHandlingSuite';
+
 import {
   type OpenCodeStreamEventState,
   OpenCodeStreamEventTransformer,
@@ -74,6 +76,7 @@ describe('OpenCodeStreamEventTransformer event routing', () => {
     });
     expect(outcome).toEqual({
       chunks: [{ type: 'question_request', request }],
+      mutations: [],
       stop: false,
     });
   });
@@ -96,6 +99,7 @@ describe('OpenCodeStreamEventTransformer event routing', () => {
 
     expect(outcome).toEqual({
       chunks: [{ type: 'file_edited', file: 'notes/today.md' }],
+      mutations: [],
       stop: false,
     });
   });
@@ -146,9 +150,10 @@ describe('OpenCodeStreamEventTransformer event routing', () => {
           metadata: { source: 'tool' },
         },
       ],
+      mutations: [],
       stop: false,
     });
-    expect(abortOutcome).toEqual({ chunks: [], stop: true });
+    expect(abortOutcome).toEqual({ chunks: [], mutations: [], stop: true });
     expect(state.lastErrorMessage).toBe('Aborted');
     expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-error', {
       sessionId: 'test-session',
@@ -158,209 +163,16 @@ describe('OpenCodeStreamEventTransformer event routing', () => {
   });
 });
 
-describe('OpenCodeStreamEventTransformer stream part handling', () => {
-  it('tracks tool updates, tool results, and known MCP tool kinds without duplicate tool_use chunks', () => {
-    const host = createHost();
-    const transformer = new OpenCodeStreamEventTransformer(host);
-    const state = createState();
-    const streamContext = { partTypeMap: new Map<string, string>() };
-
-    const runningOutcome = transformer.handleStreamingEvent(
-      {
-        type: 'message.part.updated',
-        properties: {
-          sessionID: 'test-session',
-          usage: { input: 3, output: 5 },
-          part: {
-            id: 'part-tool-mcp',
-            sessionID: 'test-session',
-            messageID: 'assistant-1',
-            type: 'tool',
-            callID: 'call-tool-mcp',
-            tool: 'exa_search',
-            state: {
-              status: 'running',
-              input: { query: 'latest docs' },
-            },
-          },
-        },
-      },
-      'test-session',
-      state,
-      streamContext,
-    );
-    const duplicateOutcome = transformer.handleStreamingEvent(
-      {
-        type: 'message.part.updated',
-        properties: {
-          sessionID: 'test-session',
-          part: {
-            id: 'part-tool-mcp',
-            sessionID: 'test-session',
-            messageID: 'assistant-1',
-            type: 'tool',
-            callID: 'call-tool-mcp',
-            tool: 'exa_search',
-            state: {
-              status: 'running',
-              input: { query: 'latest docs' },
-            },
-          },
-        },
-      },
-      'test-session',
-      state,
-      streamContext,
-    );
-    const completedOutcome = transformer.handleStreamingEvent(
-      {
-        type: 'message.part.updated',
-        properties: {
-          sessionID: 'test-session',
-          part: {
-            id: 'part-tool-mcp',
-            sessionID: 'test-session',
-            messageID: 'assistant-1',
-            type: 'tool',
-            callID: 'call-tool-mcp',
-            tool: 'exa_search',
-            state: {
-              status: 'completed',
-              output: 'Done',
-            },
-          },
-        },
-      },
-      'test-session',
-      state,
-      streamContext,
-    );
-
-    expect(host.observeRuntimeToolNames).toHaveBeenCalledWith(['exa_search']);
-    expect(host.getOpenCodeToolKind).toHaveBeenCalledWith('exa_search');
-    expect(runningOutcome).toEqual({
-      chunks: [
-        {
-          type: 'usage',
-          inputTokens: 3,
-          outputTokens: 5,
-          sessionId: 'test-session',
-        },
-        {
-          type: 'tool_use',
-          id: 'call-tool-mcp',
-          name: 'exa_search',
-          kind: 'mcp',
-          input: { query: 'latest docs' },
-        },
-      ],
-      stop: false,
-    });
-    expect(duplicateOutcome).toEqual({ chunks: [], stop: false });
-    expect(completedOutcome).toEqual({
-      chunks: [
-        {
-          type: 'tool_use',
-          id: 'call-tool-mcp',
-          name: 'exa_search',
-          kind: 'mcp',
-          input: {},
-        },
-        {
-          type: 'tool_result',
-          toolUseId: 'call-tool-mcp',
-          content: 'Done',
-          isError: false,
-        },
-      ],
-      stop: false,
-    });
-  });
-
-  it('routes remembered reasoning deltas to thinking chunks and ignores mismatched part sessions', () => {
-    const transformer = new OpenCodeStreamEventTransformer(createHost());
-    const state = createState();
-    const streamContext = { partTypeMap: new Map<string, string>() };
-
-    const reasoningOutcome = transformer.handleStreamingEvent(
-      {
-        type: 'message.part.updated',
-        properties: {
-          sessionID: 'test-session',
-          part: {
-            id: 'part-thinking',
-            sessionID: 'test-session',
-            messageID: 'assistant-1',
-            type: 'reasoning',
-            duration: 2,
-          },
-        },
-      },
-      'test-session',
-      state,
-      streamContext,
-    );
-    const deltaOutcome = transformer.handleStreamingEvent(
-      {
-        type: 'message.part.delta',
-        properties: {
-          sessionID: 'test-session',
-          partID: 'part-thinking',
-          field: 'text',
-          delta: 'Analyzing',
-        },
-      },
-      'test-session',
-      state,
-      streamContext,
-    );
-    const mismatchedOutcome = transformer.handleStreamingEvent(
-      {
-        type: 'message.part.updated',
-        properties: {
-          sessionID: 'test-session',
-          part: {
-            id: 'part-other',
-            sessionID: 'other-session',
-            messageID: 'assistant-1',
-            type: 'text',
-          },
-        },
-      },
-      'test-session',
-      state,
-      streamContext,
-    );
-
-    expect(reasoningOutcome).toEqual({
-      chunks: [
-        {
-          type: 'thinking',
-          content: '',
-          partId: 'part-thinking',
-          durationSeconds: 2,
-        },
-      ],
-      stop: false,
-    });
-    expect(deltaOutcome).toEqual({
-      chunks: [{ type: 'thinking', content: 'Analyzing', partId: 'part-thinking' }],
-      stop: false,
-    });
-    expect(mismatchedOutcome).toEqual({ chunks: [], stop: false });
-  });
-});
-
 describe('OpenCodeStreamEventTransformer parsing helpers', () => {
   it('parses SSE buffers, infers event names, and preserves incomplete tails', () => {
     const transformer = new OpenCodeStreamEventTransformer(createHost());
 
     const parsed = transformer.parseSSEEvents(
-      'data: {"type":"message.part.delta","properties":{"delta":"Hi"}}\n\n' +
-      'event: custom\n' +
-      'data: {"type":"session.idle"}\n\n' +
-      'data: not-json\n\n' +
-      'data: {"type":"message.part.updated"}',
+      'data: {"type":"message.part.delta","properties":{"delta":"Hi"}}\n\n'
+        + 'event: custom\n'
+        + 'data: {"type":"session.idle"}\n\n'
+        + 'data: not-json\n\n'
+        + 'data: {"type":"message.part.updated"}',
     );
 
     expect(parsed).toEqual({
