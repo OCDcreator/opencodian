@@ -68,7 +68,7 @@ export class ComposerInputShellCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 只创建 coordinator、提供 host callbacks，并把 shell DOM refs 暴露给相邻的 `InputPanelAppearanceCoordinator`
-- merged runtime+project slash command catalog 由 `OpenCodianView` host seam 复用 `core/config/slashCommandCatalog.ts` 组装后传入，本模块自己不接 project config / SDK merge 细节
+- merged runtime+project slash command catalog 由 `OpenCodianView` host seam 通过 `SlashCommandMenuCatalogCache` 预热/缓存后传入，本模块自己不接 project config / SDK merge 细节
 - slash menu fuzzy scoring 已下沉到 `slashCommandMenuFilter.ts`，本模块只消费过滤结果并负责状态行/menu DOM 渲染
 - 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`
 - liquid-glass adapter mount、SVG filter 与 diagnostics 已进一步交给 `InputPanelAppearanceCoordinator`，本模块继续只负责 shell/layout lifecycle

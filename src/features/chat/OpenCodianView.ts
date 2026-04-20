@@ -10,10 +10,7 @@ import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scop
 import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
-import {
-  buildVisibleSlashCommandMenuItems,
-  mergeSlashCommandCatalog,
-} from '../../core/config/slashCommandCatalog';
+import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
 import {
   type SessionActivityStatus,
 } from '../../core/opencode';
@@ -296,6 +293,7 @@ import {
   type SlashCommandExecutionHost,
   SlashCommandExecutionService,
 } from './services/SlashCommandExecutionService';
+import { SlashCommandMenuCatalogCache } from './services/SlashCommandMenuCatalogCache';
 import {
   createTabActivationRuntimeViewHostFactoryHost,
   type TabActivationRuntimeHostProviderHost,
@@ -530,6 +528,8 @@ export class OpenCodianView extends ItemView {
   private chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   private composerInputShellCoordinator: ComposerInputShellCoordinator;
   private inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
+  private slashCommandMenuCatalogCache: SlashCommandMenuCatalogCache;
+  private slashCommandMenuPreloadTimerId: number | null = null;
 
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
@@ -746,29 +746,7 @@ export class OpenCodianView extends ItemView {
         new Notice(t('chat.tab.processingBlocked'));
       },
       submitMessage: (message) => this.sendPipelineRuntime.sendMessage(message),
-      loadSlashCommandMenuItems: async () => {
-        const configManager = this.plugin.opencodeConfigManager;
-        if (!configManager) {
-          return [];
-        }
-
-        const [runtimeCommandsResult, projectCommands, projectAgents] = await Promise.all([
-          this.plugin.openCodeService.sdk.command.list(),
-          configManager.getCommandConfig(),
-          configManager.getAgentConfig(),
-        ]);
-
-        const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
-        const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
-        return buildVisibleSlashCommandMenuItems(
-          mergeSlashCommandCatalog(
-            runtimeCommands,
-            projectCommands,
-            projectAgents,
-            hiddenCommandIds,
-          ),
-        );
-      },
+      loadSlashCommandMenuItems: () => this.loadSlashCommandMenuItems(),
       setComposerStackHeight: (stackHeight) => {
         this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
       },
@@ -776,6 +754,38 @@ export class OpenCodianView extends ItemView {
         this.scheduleSettledScrollToBottomIfNeeded();
       },
     };
+  }
+
+  private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {
+    if (!this.plugin.opencodeConfigManager) {
+      return Promise.resolve([]);
+    }
+
+    return this.slashCommandMenuCatalogCache.load();
+  }
+
+  private scheduleSlashCommandMenuPreload(): void {
+    if (this.slashCommandMenuPreloadTimerId !== null) {
+      window.clearTimeout(this.slashCommandMenuPreloadTimerId);
+    }
+
+    this.slashCommandMenuPreloadTimerId = window.setTimeout(() => {
+      this.slashCommandMenuPreloadTimerId = null;
+      if (!this.plugin.opencodeConfigManager) {
+        return;
+      }
+
+      this.slashCommandMenuCatalogCache.warm();
+    }, 0);
+  }
+
+  private clearSlashCommandMenuPreload(): void {
+    if (this.slashCommandMenuPreloadTimerId !== null) {
+      window.clearTimeout(this.slashCommandMenuPreloadTimerId);
+      this.slashCommandMenuPreloadTimerId = null;
+    }
+
+    this.slashCommandMenuCatalogCache.invalidate();
   }
 
   private createInputPanelAppearanceCoordinatorHost(): InputPanelAppearanceCoordinatorHost {
@@ -1137,6 +1147,15 @@ export class OpenCodianView extends ItemView {
     this.messageComponent = new Component();
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
+    this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
+      getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
+      loadProjectAgents: async () => this.plugin.opencodeConfigManager?.getAgentConfig() ?? {},
+      loadProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
+      loadRuntimeCommands: async () => this.plugin.openCodeService.sdk.command.list(),
+      onWarmLoadFailed: (error) => {
+        logger.debug('Failed to preload slash command menu items:', error);
+      },
+    });
 
     const surfaceRuntime = this.createSurfaceRuntimeWiring();
     this.titleGenerationService = surfaceRuntime.titleGenerationService;
@@ -2598,10 +2617,12 @@ export class OpenCodianView extends ItemView {
     logger.info(
       `[view-open] completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} | ${stepSummaries.join(', ')}`,
     );
+    this.scheduleSlashCommandMenuPreload();
   }
 
   async onClose() {
     this.persistTabState({ flush: true });
+    this.clearSlashCommandMenuPreload();
     this.chatHeaderPresenter.destroy();
     this.conversationHistoryActionsCoordinator.destroy();
     this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();

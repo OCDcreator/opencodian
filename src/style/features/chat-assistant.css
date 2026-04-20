@@ -1330,14 +1330,18 @@
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
+  height: auto;
+  min-height: 0;
   padding: 8px 10px;
   border: none;
   border-radius: 10px;
   background: transparent;
   color: var(--text-normal);
   cursor: pointer;
+  line-height: 1.35;
   white-space: normal;
   text-align: left;
+  appearance: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
 

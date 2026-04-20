@@ -140,6 +140,7 @@ docs/modules/
 │   │   │   ├── ChatHeaderPresenter.md
 │   │   │   ├── ChatSelectionControlsCoordinator.md
 │   │   │   ├── ComposerInputShellCoordinator.md
+│   │   │   ├── SlashCommandMenuCatalogCache.md
 │   │   │   ├── InputPanelAppearanceCoordinator.md
 │   │   │   ├── InputPanelThemeRuntime.md
 │   │   │   ├── ModelSelectionRuntime.md
