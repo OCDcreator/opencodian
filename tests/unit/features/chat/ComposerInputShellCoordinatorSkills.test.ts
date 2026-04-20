@@ -126,6 +126,18 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
       expect.stringContaining('/skills'),
     ]);
 
+    const prefixedEntry = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    ).find((item) => item.textContent?.includes('/skills'));
+    prefixedEntry?.click();
+    await flushAsync();
+
+    expect(fixture.textarea.value).toBe('/skills ');
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/skills build-mcp-server'),
+      expect.stringContaining('/skills frontend-design'),
+    ]);
+
     fixture.textarea.value = '/skills build';
     fixture.textarea.setSelectionRange('/skills build'.length, '/skills build'.length);
     fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));

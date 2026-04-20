@@ -353,8 +353,13 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl.value = nextValue;
     this.inputTextareaEl.focus();
     this.inputTextareaEl.setSelectionRange(nextValue.length, nextValue.length);
-    this.clearSlashCommandMenu();
     this.syncTextareaHeight();
+    if (item.source === 'skills-command') {
+      void this.refreshSlashCommandMenu();
+      return;
+    }
+
+    this.clearSlashCommandMenu();
   }
 
   private async refreshSlashCommandMenu(): Promise<void> {
