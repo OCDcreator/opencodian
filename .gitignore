@@ -57,6 +57,9 @@ docs/*
 !docs/requirements/**
 !docs/status/
 !docs/status/**
+!docs/superpowers/
+!docs/superpowers/plans/
+!docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md
 
 # Automation runtime
 automation/runtime/
