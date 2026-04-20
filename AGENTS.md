@@ -16,6 +16,7 @@ npm run verify
 npm run build
 npm run test
 npm run lint
+npm run check:module-docs
 npm run check:devlog-order
 ```
 
@@ -25,10 +26,12 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 
 - Treat `npm run verify` as the default pre-merge gate: lint, typecheck, full tests, and production build must stay green.
 - Treat lint warnings as blockers; do not merge with anything above `0 errors / 0 warnings`.
+- Treat `npm run check:module-docs` as a hard gate: added, changed, renamed, and deleted source modules must keep `docs/modules/**` in sync.
 - Do not add thin helper / adapter / provider / factory files unless reused in 3+ places or isolating a high-risk dependency.
 - Prefer extending existing service / coordinator / runtime owners over adding new indirection layers.
 - Do not grow `src/features/chat/OpenCodianView.ts` or `src/core/opencode/OpenCodeService.ts` with new runtime ownership; move stable responsibilities to adjacent owners when touching them.
 - If a module boundary changes, update the matching `docs/modules/**` page and keep `docs/status/development-maintainability-rules.md` aligned.
+- Use `npm run list:module-docs -- --range HEAD` for local uncommitted work and `node scripts/check-module-doc-diff.mjs --range origin/main...HEAD` for branch review / CI.
 
 ## Current Architecture
 
@@ -92,6 +95,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - Question card changes: update `OpenCodeService` question methods, `OpenCodianView`, `QuestionDock`, conversation settings, and locale strings together.
 - Chat appearance changes: keep theme presets, normalized settings, CSS variables, settings UI, and rendering behavior aligned.
 - Streaming or tab changes: preserve per-tab runtime ownership and concurrent-session behavior.
+- Added / deleted / renamed modules: update the mapped `docs/modules/**` page plus any surfaced `index.md` / `docs/modules/README.md` entries from the module-doc guard helper.
 - If behavior changes materially, refresh the corresponding file under `docs/modules/`.
 
 ## Devlog Rule

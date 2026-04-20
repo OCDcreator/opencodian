@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "name": "typescript-src",
+      "sourceRoot": "src",
+      "docsRoot": "docs/modules",
+      "include": [
+        "**/*.ts",
+        "**/*.tsx"
+      ],
+      "exclude": [
+        "**/*.d.ts"
+      ],
+      "docIgnore": [
+        "README.md",
+        "_TEMPLATE.md",
+        "_WORKFLOW.md",
+        "infrastructure/**/*.md",
+        "style/README.md",
+        "utils/streaming/mcp-summary-fields.md"
+      ],
+      "exactMappings": {
+        "src/main.ts": "docs/modules/entry-point/main.md"
+      }
+    },
+    {
+      "name": "style-css",
+      "sourceRoot": "src/style",
+      "docsRoot": "docs/modules/style",
+      "include": [
+        "**/*.css"
+      ],
+      "exclude": [
+        "index.css"
+      ],
+      "docIgnore": [
+        "README.md"
+      ],
+      "exactMappings": {}
+    }
+  ]
+}

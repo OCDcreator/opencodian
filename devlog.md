@@ -12,6 +12,57 @@
 
 ---
 
+## 2026-04-21 模块文档硬约束接入 verify，并补齐缺失模块文档
+
+### 🎯 改动目标
+
+- 把现有 `docs/modules/` 机制从“约定”升级为本地 / 分支都能执行的硬校验
+- 保证源码模块新增、修改、删除、重命名时，对应模块文档必须同步，否则校验不通过
+- 将规则落到 repo 内脚本、配置和文档，而不是依赖后续模型记忆
+
+### ✅ 本轮调整
+
+- `module-docs.config.json`
+  - 新增模块文档映射配置，声明 TypeScript 与样式模块的 source-root → docs-root 规则
+  - 为 `src/main.ts` 配置特殊入口映射，并把 `docs/modules/_WORKFLOW.md`、`docs/modules/infrastructure/**` 等非源码文档显式列为例外
+
+- `scripts/module-doc-guard-lib.mjs`
+- `scripts/check-module-doc-coverage.mjs`
+- `scripts/check-module-doc-diff.mjs`
+- `scripts/list-module-doc-targets-from-diff.mjs`
+  - 新增覆盖检查、diff 责任检查和 diff 文档目标列举三类脚本
+  - 本地 `verify` 走 `--range HEAD`，保证未提交源码改动如果没同步文档会立即失败
+
+- `package.json`
+- `AGENTS.md`
+- `docs/modules/README.md`
+- `docs/modules/_WORKFLOW.md`
+- `docs/modules/infrastructure/scripts.md`
+- `docs/status/development-maintainability-rules.md`
+  - 将 `npm run check:module-docs` 纳入标准验证与协作说明
+  - 明确区分本地 `HEAD` 自检与分支 / CI 的 `origin/main...HEAD` 检查方式
+
+- 新补 9 篇缺失模块文档：
+  - `docs/modules/core/config/commandScopedAgent.md`
+  - `docs/modules/features/settings/modelConfigWorkspace.md`
+  - `docs/modules/features/settings/modelPicker.md`
+  - `docs/modules/features/settings/providerPresets.md`
+  - `docs/modules/features/settings/searchInputEnhancer.md`
+  - `docs/modules/types/jsx-shim.md`
+  - `docs/modules/utils/icons/builtinIconRegistry.md`
+  - `docs/modules/utils/icons/lobehubIconManifest.md`
+  - `docs/modules/utils/streaming/mcpSummaryConfig.md`
+
+### 🧪 验证结果
+
+- `node --check scripts/module-doc-guard-lib.mjs` 通过
+- `node --check scripts/check-module-doc-coverage.mjs` 通过
+- `node --check scripts/check-module-doc-diff.mjs` 通过
+- `node --check scripts/list-module-doc-targets-from-diff.mjs` 通过
+- `npm run check:module-docs` 通过
+- `npm run check:devlog-order` 通过
+- `npm run verify` 通过（含 lint / typecheck / 297 套测试 / build）
+
 ## 2026-04-20 斜杠命令运行时对齐、即时缓存失效与文档同步
 
 ### 🎯 改动目标

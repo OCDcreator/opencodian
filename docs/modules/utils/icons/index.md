@@ -5,7 +5,7 @@
 
 ## 概述
 
-Provider 图标目录的公开 barrel。当前继续对外暴露 `ProviderIconService` 与 builtin registry 工具；`M4` 新增的 `providerIconEntryResolution.ts`、`providerIconBuiltinSelection.ts`、`providerIconCustomSources.ts`、`providerIconAssetCache.ts` 与 type-only `providerIconTypes.ts` 仍保持目录内私有协作，不直接从这里导出。
+Provider 图标目录的公开 barrel。当前继续对外暴露 `ProviderIconService` 与 builtin registry 工具；`M4` 新增的 `providerIconEntryResolution.ts`、`providerIconBuiltinSelection.ts`、`providerIconCustomSources.ts`、`providerIconAssetCache.ts` 与 type-only `providerIconTypes.ts` 仍保持目录内私有协作，不直接从这里导出。对应的叶子文档现在也拆分到 `builtinIconRegistry.md` 与 `lobehubIconManifest.md`。
 
 ## 导入关系
 
@@ -55,6 +55,8 @@ export {
 ## 与其他模块的交互
 
 - 对应实现见 `docs/modules/utils/icons/ProviderIconService.md`
+- builtin registry 常量 / 搜索行为见 `docs/modules/utils/icons/builtinIconRegistry.md`
+- LobeHub manifest 结构与同步来源见 `docs/modules/utils/icons/lobehubIconManifest.md`
 
 ## 配置项
 

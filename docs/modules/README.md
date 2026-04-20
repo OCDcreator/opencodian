@@ -1,6 +1,6 @@
 # OpenCodian 模块功能文档
 
-> 按源码模块组织的项目文档群。`src/**/*.ts` 原则上都应在 `docs/modules/` 下拥有一篇对应文档。
+> 按源码模块组织的项目文档群。`module-docs.config.json` 定义源码到文档的一对一映射，`src/**/*.ts(x)` 与 `src/style/**/*.css` 原则上都应在 `docs/modules/` 下拥有一篇对应文档。
 
 ## 覆盖规则
 
@@ -8,6 +8,7 @@
 
 - `src/main.ts` -> `docs/modules/entry-point/main.md`
 - 其余 `src/**/foo.ts` -> `docs/modules/**/foo.md`
+- `src/style/**/foo.css` -> `docs/modules/style/**/foo.md`，但 `src/style/index.css` 是样式聚合入口，不单独建模块文档
 - `index.ts` barrel 文件也需要单独文档，重点说明导出面和聚合关系
 - `i18n/locales/*.ts` 语言包也需要单独文档，重点说明键空间、用途和维护约束
 - 功能目录下的 demo / experimental 辅助模块也需要纳入文档，不因“不是主流程”而跳过
@@ -23,11 +24,20 @@
 - `docs/modules/infrastructure/test-framework.md`
 - `docs/modules/infrastructure/scripts.md`
 
+### 硬约束检查
+
+- `npm run check:module-docs:coverage` 检查源码存在但文档缺失、以及文档存在但源码已删除的漂移。
+- `npm run check:module-docs:diff` 默认用 `--range HEAD` 检查本地未提交的源码改动是否同步触碰映射文档。
+- `npm run check:module-docs` 同时运行 coverage 与 diff，并已接入 `npm run verify`。
+- `node scripts/check-module-doc-diff.mjs --range origin/main...HEAD` 可用于分支 / CI 以主干为基准的审核。
+- `npm run list:module-docs -- --range origin/main...HEAD` 输出某个 diff 范围内必须更新的模块文档与建议检查的聚合文档。
+
 ### 当前基线
 
-- `src/**/*.ts`: 当前共有 324 个 TypeScript 源码模块
+- `src/**/*.ts(x)`: 当前共有 330 个 TypeScript 源码模块（不含 `*.d.ts`）
 - `src/style/**/*.css`: 当前共有 16 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `docs/modules/**/*.md`: 当前共有 339 篇模块与基础设施文档
+- `module-docs.config.json`: 当前映射 346 个源码模块到 346 篇模块文档
+- `docs/modules/**/*.md`: 当前共有 354 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -41,6 +51,7 @@ docs/modules/
 ├── core/
 │   ├── config/
 │   │   ├── index.md
+│   │   ├── commandScopedAgent.md
 │   │   ├── ModelConfigService.md
 │   │   ├── OpencodeConfigManager.md
 │   │   ├── PluginManagementService.md
@@ -198,12 +209,16 @@ docs/modules/
 │       ├── ModelConfigModal.md
 │       ├── ModelConfigProviderEditor.md
 │       ├── ModelPickerModal.md
+│       ├── modelConfigWorkspace.md
+│       ├── modelPicker.md
 │       ├── OpencodeConfigModal.md
 │       ├── OpenCodianSettings.md
 │       ├── modelConfigModalState.md
 │       ├── modelConfigSavePlan.md
+│       ├── providerPresets.md
 │       ├── ProviderBuiltinIconPickerModal.md
 │       ├── ProviderIconCacheModal.md
+│       ├── searchInputEnhancer.md
 │       ├── ServerSettingHelpModal.md
 │       ├── SettingsCommandsSection.md
 │       ├── SettingsModelCatalogCoordinator.md
@@ -227,6 +242,8 @@ docs/modules/
 │       ├── index.md
 │       ├── en.md
 │       └── zh.md
+├── types/
+│   └── jsx-shim.md
 ├── shared/
 │   ├── contextPath.md
 │   ├── index.md
@@ -252,6 +269,8 @@ docs/modules/
 │   │       └── shudingDiamond.md
 │   ├── icons/
 │   │   ├── index.md
+│   │   ├── builtinIconRegistry.md
+│   │   ├── lobehubIconManifest.md
 │   │   ├── ProviderIconService.md
 │   │   ├── providerIconAssetCache.md
 │   │   ├── providerIconBuiltinSelection.md
@@ -266,6 +285,7 @@ docs/modules/
 │   │   └── types.md
 │   └── streaming/
 │       ├── index.md
+│       ├── mcpSummaryConfig.md
 │       ├── StreamController.md
 │       ├── ThinkingBlockRenderer.md
 │       ├── ToolCallRenderer.md

@@ -5,11 +5,12 @@
 
 ## Baseline
 
+- `npm run check:module-docs` must pass.
 - `npm run lint` must stay at `0 errors / 0 warnings`.
 - `npm run typecheck` must pass.
 - Full `npm test` must pass before merge.
 - `npm run build` must pass before merge.
-- Use `npm run verify` as the default local pre-merge command.
+- Use `npm run verify` as the default local pre-merge command; it now includes the module-doc hard gate.
 
 ## Ownership Rules
 
@@ -29,7 +30,8 @@
 2. Keep new behavior local to that owner; avoid cross-domain callbacks or duplicate state.
 3. Add or update focused tests for behavior changes.
 4. Update matching `docs/modules/**` documentation when a module boundary changes.
-5. Run `npm run verify` before merging.
+5. For added / deleted / renamed modules, confirm `npm run check:module-docs` stays green so mapping coverage and diff accountability both hold.
+6. Run `npm run verify` before merging.
 
 ## When To Pause
 

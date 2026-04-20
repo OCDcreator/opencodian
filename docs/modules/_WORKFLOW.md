@@ -245,44 +245,33 @@
 
 不要每次全量重写。固定按 diff 做增量同步。
 
-### 步骤 1: 取本次变更源码列表
+### 步骤 1: 列出本次必须同步的文档
 
-PowerShell 示例：
+分支 / CI 审核时用主干范围：
 
-```powershell
-git diff --name-only HEAD~1..HEAD -- src
+```bash
+npm run list:module-docs -- --range origin/main...HEAD
 ```
 
-如果是对分支：
+本地未提交改动自检时用 `HEAD`：
 
-```powershell
-git diff --name-only origin/main...HEAD -- src
+```bash
+npm run list:module-docs -- --range HEAD
 ```
 
-### 步骤 2: 映射到目标文档
+输出中的 `Required module docs` 是必须修改的直接映射文档；`Aggregate docs to inspect` 是新增、删除或 `index.ts` 变更时建议检查的父级索引 / 总索引。
 
-映射规则：
+### 步骤 2: 更新目标文档
+
+按 `module-docs.config.json` 映射更新直接文档：
 
 - `src/main.ts` -> `docs/modules/entry-point/main.md`
-- 其他 `src/**/foo.ts` -> `docs/modules/**/foo.md`
-
-PowerShell 示例：
-
-```powershell
-$changed = git diff --name-only origin/main...HEAD -- src
-$docs = foreach ($path in $changed) {
-  if ($path -eq 'src/main.ts') {
-    'docs/modules/entry-point/main.md'
-  } else {
-    'docs/modules/' + [System.IO.Path]::ChangeExtension(($path -replace '^src/', ''), '.md')
-  }
-}
-$docs | Sort-Object -Unique
-```
+- 其他 `src/**/foo.ts(x)` -> `docs/modules/**/foo.md`
+- `src/style/**/foo.css` -> `docs/modules/style/**/foo.md`
 
 ### 步骤 3: 判断是否需要额外更新聚合文档
 
-除了直接映射的文档，再按下面规则补充：
+除了直接映射的文档，再结合 `Aggregate docs to inspect` 按下面规则补充：
 
 - 新增或删除 `src/**/*.ts`
   - 更新对应父目录 `index.md`
@@ -345,16 +334,29 @@ reviewer 只检查：
 - [ ] 涉及 `index.ts` 的变更已检查对应 `index.md`
 - [ ] 涉及新增/删除模块时已检查 `docs/modules/README.md`
 - [ ] 必要时已更新 `devlog.md`
+- [ ] 已运行 `npm run check:module-docs`
 
-## 建议补充的自动化脚本
+## 自动化硬约束
 
-长期建议加两个脚本：
+模块文档同步不再只靠人工记忆，交付前必须通过以下脚本：
 
-1. `scripts/check-doc-coverage.mjs`
-   - 检查 `src/**/*.ts` 是否都有对应 `docs/modules/**/*.md`
+```bash
+npm run check:module-docs
+```
 
-2. `scripts/list-doc-targets-from-diff.mjs`
-   - 输入 git diff 范围
-   - 输出应更新的文档列表和需要额外检查的 `index.md` / `README.md`
+它会顺序运行：
 
-这样后续每次更新文档就不再靠人工记忆。
+1. `scripts/check-module-doc-coverage.mjs`
+   - 检查源码存在但文档缺失
+   - 检查文档存在但源码已删除
+
+2. `scripts/check-module-doc-diff.mjs --range HEAD`
+   - 检查本地未提交源码改动是否同步触碰映射文档
+
+分支审核 / CI 场景可以显式传入基准范围：
+
+```bash
+node scripts/check-module-doc-diff.mjs --range origin/main...HEAD
+```
+
+如果脚本失败，先按错误输出补齐、修改或删除对应文档；只有确认是非源码文档或特殊入口时，才把例外写进 `module-docs.config.json`。
