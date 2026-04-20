@@ -166,6 +166,7 @@ docs/modules/
 │   │   │   ├── ConversationHistoryDialogService.md
 │   │   │   ├── ConversationRenderService.md
 │   │   │   ├── ConversationRenderRuntime.md
+│   │   │   ├── ConversationTurnViewModelBuilder.md
 │   │   │   ├── ConversationTrailingAssistantPatchPlanner.md
 │   │   │   ├── ConversationLoadRecoveryCoordinator.md
 │   │   │   ├── ConversationTabLifecycleRecoveryCoordinator.md

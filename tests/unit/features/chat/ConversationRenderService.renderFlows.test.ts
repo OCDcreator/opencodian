@@ -1,3 +1,8 @@
+import type {
+  OpenCodeCanonicalMessageInfo,
+  OpenCodeCanonicalPart,
+  OpenCodeCanonicalSessionState,
+} from '../../../../src/core/opencode';
 import {
   captureElementScrollRestoreSnapshot,
   ConversationRenderService,
@@ -6,6 +11,49 @@ import {
   createMessage,
   restoreElementScrollAfterRender,
 } from './ConversationRenderService.testSupport';
+
+function createCanonicalMessage(
+  overrides: Partial<OpenCodeCanonicalMessageInfo> & {
+    id: string;
+    role: OpenCodeCanonicalMessageInfo['role'];
+  },
+): OpenCodeCanonicalMessageInfo {
+  return {
+    sessionID: 'session-1',
+    time: { created: 1 },
+    ...overrides,
+  };
+}
+
+function createCanonicalPart(
+  overrides: Partial<OpenCodeCanonicalPart> & {
+    id: string;
+    messageID: string;
+    type: string;
+  },
+): OpenCodeCanonicalPart {
+  return {
+    sessionID: 'session-1',
+    ...overrides,
+  };
+}
+
+function hydrateCanonicalMessage(
+  info: OpenCodeCanonicalMessageInfo,
+  parts: OpenCodeCanonicalPart[],
+) {
+  return createMessage({
+    id: info.id,
+    role: info.role,
+    content: parts
+      .filter((part) => typeof part.text === 'string')
+      .map((part) => part.text as string)
+      .join(''),
+    timestamp: info.time.created,
+    sourceMessageId: info.id,
+    parts,
+  });
+}
 
 describe('ConversationRenderService render flows', () => {
   beforeEach(() => {
@@ -140,5 +188,60 @@ describe('ConversationRenderService render flows', () => {
     expect(host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(1);
     expect(host.endConversationHydration).toHaveBeenCalledWith('tab-1');
     expect(host.messagesEl.classList.contains('is-rehydrating')).toBe(false);
+  });
+
+  it('uses canonical turn view-models as the full-rerender source when available', async () => {
+    const conversation = createConversation([
+      createMessage({ id: 'stale-user', role: 'user', content: 'stale user' }),
+      createMessage({ id: 'stale-assistant', content: 'stale assistant' }),
+    ]);
+    const canonicalState: OpenCodeCanonicalSessionState = {
+      sessionID: 'session-1',
+      messages: [
+        createCanonicalMessage({ id: 'user-1', role: 'user', time: { created: 10 } }),
+        createCanonicalMessage({ id: 'assistant-1', role: 'assistant', time: { created: 20 } }),
+      ],
+      partsByMessageID: {
+        'user-1': [
+          createCanonicalPart({
+            id: 'part-user',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'canonical user',
+          }),
+        ],
+        'assistant-1': [
+          createCanonicalPart({
+            id: 'part-assistant',
+            messageID: 'assistant-1',
+            type: 'text',
+            text: 'canonical assistant',
+          }),
+        ],
+      },
+    };
+    const host = createHost({
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    });
+    const service = new ConversationRenderService(host, {
+      getCanonicalSessionState: jest.fn().mockReturnValue(canonicalState),
+      hydrateOpenCodeMessage: jest.fn(hydrateCanonicalMessage),
+    });
+
+    await service.rerenderConversationMessages(conversation);
+
+    expect(host.createUserMessageFrame).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'user-1',
+      content: 'canonical user',
+    }));
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'assistant-1',
+        content: 'canonical assistant',
+      }),
+    );
+    expect(host.createUserMessageFrame).not.toHaveBeenCalledWith(expect.objectContaining({
+      id: 'stale-user',
+    }));
   });
 });

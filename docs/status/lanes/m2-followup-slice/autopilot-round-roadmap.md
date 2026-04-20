@@ -15,7 +15,7 @@
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts tests/unit/core/opencode/OpenCodeService.sdkStreamEvents.test.ts`
 - **Acceptance**: blank assistant blocks no longer come from loose stream text drifting away from sync/reload facts.
 
-### [NEXT] Task 5 - Introduce a turn view-model builder while keeping the UI shell
+### [DONE] Task 5 - Introduce a turn view-model builder while keeping the UI shell
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 5.
 - **Goal**: Build OpenCode-style turn view-models from canonical state while preserving OpenCodian DOM/CSS rendering helpers.
@@ -27,7 +27,7 @@
 - **Validation**: `npm test -- --runInBand tests/unit/features/chat/ConversationTurnViewModelBuilder.test.ts tests/unit/features/chat/ConversationRenderService.test.ts tests/unit/features/chat/ConversationRenderService.renderFlows.test.ts`
 - **Acceptance**: live and reloaded canonical states produce the same turn structure while existing styling remains intact.
 
-### [QUEUED] Task 6 - Align command, shell, and plugin-injection semantics
+### [NEXT] Task 6 - Align command, shell, and plugin-injection semantics
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 6.
 - **Goal**: Distinguish prompt sends from session command/shell execution and preserve plugin-injected material as structured synthetic parts.

@@ -1,3 +1,8 @@
+import type {
+  OpenCodeCanonicalMessageInfo,
+  OpenCodeCanonicalPart,
+  OpenCodeCanonicalSessionState,
+} from '../../../core/opencode';
 import {
   type ChatMessage,
   type Conversation,
@@ -12,6 +17,7 @@ import {
   type TrailingAssistantPatchPlanningContext,
   TrailingAssistantPatchPlanningDelegate,
 } from './ConversationTrailingAssistantPatchPlanner';
+import { ConversationTurnViewModelBuilder } from './ConversationTurnViewModelBuilder';
 import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
@@ -44,12 +50,24 @@ export type {
 } from './ConversationRenderRuntime';
 export { getIncrementalRenderedMessageUpdate } from './ConversationRenderRuntime';
 
+export interface ConversationCanonicalRenderSource {
+  getCanonicalSessionState(sessionId: string): OpenCodeCanonicalSessionState | null;
+  hydrateOpenCodeMessage(
+    info: OpenCodeCanonicalMessageInfo,
+    parts: OpenCodeCanonicalPart[],
+  ): ChatMessage;
+}
+
 export class ConversationRenderService {
   private readonly messageRenderer: ConversationMessageRenderDelegate;
   private readonly syncedUpdateApplier: ConversationSyncedUpdateApplyDelegate;
   private readonly trailingAssistantPatchPlanner: TrailingAssistantPatchPlanningDelegate;
+  private readonly turnViewModelBuilder = new ConversationTurnViewModelBuilder();
 
-  constructor(private readonly host: ConversationRenderHost) {
+  constructor(
+    private readonly host: ConversationRenderHost,
+    private readonly canonicalRenderSource?: ConversationCanonicalRenderSource,
+  ) {
     this.messageRenderer = new ConversationMessageRenderDelegate(host);
     this.trailingAssistantPatchPlanner = new TrailingAssistantPatchPlanningDelegate(host);
     this.syncedUpdateApplier = new ConversationSyncedUpdateApplyDelegate(
@@ -112,7 +130,7 @@ export class ConversationRenderService {
     this.host.resetTurnState();
 
     try {
-      await this.renderMessages(conversation.messages);
+      await this.renderMessages(this.resolveConversationRenderMessages(conversation));
       await this.host.renderBackgroundTaskIndicatorIfNeeded();
       restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
         runtime: this.host.getScrollRuntimeForTab(activeTabId),
@@ -144,7 +162,11 @@ export class ConversationRenderService {
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
   ): Promise<void> {
-    await this.syncedUpdateApplier.apply(previousMessages, nextMessages);
+    const currentConversation = this.host.getCurrentConversation();
+    const resolvedNextMessages = currentConversation
+      ? this.resolveConversationRenderMessages(currentConversation, nextMessages)
+      : nextMessages;
+    await this.syncedUpdateApplier.apply(previousMessages, resolvedNextMessages);
   }
 
   async patchTrailingAssistantRender(
@@ -224,6 +246,170 @@ export class ConversationRenderService {
     await this.host.assistantTailRender.renderMessageBody(
       executionPlan.contentEl,
       executionPlan.nextTailMessage,
+    );
+  }
+
+  private resolveConversationRenderMessages(
+    conversation: Conversation,
+    fallbackMessages: ChatMessage[] = conversation.messages,
+  ): ChatMessage[] {
+    const canonicalMessages = this.buildCanonicalRenderMessages(conversation.openCodeSessionId);
+    if (canonicalMessages.length === 0) {
+      return fallbackMessages;
+    }
+
+    return this.mergeCanonicalRenderMessagesWithFallback(
+      canonicalMessages,
+      fallbackMessages,
+    );
+  }
+
+  private buildCanonicalRenderMessages(sessionId: string): ChatMessage[] {
+    const canonicalRenderSource = this.canonicalRenderSource;
+    if (!canonicalRenderSource) {
+      return [];
+    }
+
+    const sessionState = canonicalRenderSource.getCanonicalSessionState(sessionId);
+    if (!sessionState) {
+      return [];
+    }
+
+    const turns = this.turnViewModelBuilder.buildTurns(sessionState);
+    return this.turnViewModelBuilder.buildRenderMessages(
+      turns,
+      (info, parts) => canonicalRenderSource.hydrateOpenCodeMessage(info, parts),
+    );
+  }
+
+  private mergeCanonicalRenderMessagesWithFallback(
+    canonicalMessages: ChatMessage[],
+    fallbackMessages: ChatMessage[],
+  ): ChatMessage[] {
+    if (fallbackMessages.length === 0) {
+      return canonicalMessages;
+    }
+
+    const canonicalByMatchKey = this.buildMessageMatchIndex(canonicalMessages);
+    const lastCanonicalTimestamp = this.getLastMessageTimestamp(canonicalMessages);
+    const usedCanonicalMessages = new Set<ChatMessage>();
+    const mergedMessages: ChatMessage[] = [];
+
+    for (const fallbackMessage of fallbackMessages) {
+      const canonicalMessage = this.findMatchingCanonicalMessage(
+        fallbackMessage,
+        canonicalByMatchKey,
+      );
+      if (canonicalMessage) {
+        mergedMessages.push(this.mergeClientOnlyRenderFields(
+          canonicalMessage,
+          fallbackMessage,
+        ));
+        usedCanonicalMessages.add(canonicalMessage);
+        continue;
+      }
+
+      if (this.shouldPreserveUnmatchedFallbackMessage(
+        fallbackMessage,
+        lastCanonicalTimestamp,
+      )) {
+        mergedMessages.push(fallbackMessage);
+      }
+    }
+
+    for (const canonicalMessage of canonicalMessages) {
+      if (!usedCanonicalMessages.has(canonicalMessage)) {
+        mergedMessages.push(canonicalMessage);
+      }
+    }
+
+    return mergedMessages;
+  }
+
+  private buildMessageMatchIndex(messages: ChatMessage[]): Map<string, ChatMessage> {
+    const index = new Map<string, ChatMessage>();
+    for (const message of messages) {
+      for (const key of this.getMessageMatchKeys(message)) {
+        if (!index.has(key)) {
+          index.set(key, message);
+        }
+      }
+    }
+    return index;
+  }
+
+  private getLastMessageTimestamp(messages: ChatMessage[]): number {
+    return messages.reduce(
+      (latestTimestamp, message) => Math.max(latestTimestamp, message.timestamp),
+      0,
+    );
+  }
+
+  private findMatchingCanonicalMessage(
+    fallbackMessage: ChatMessage,
+    canonicalByMatchKey: Map<string, ChatMessage>,
+  ): ChatMessage | null {
+    for (const key of this.getMessageMatchKeys(fallbackMessage)) {
+      const match = canonicalByMatchKey.get(key);
+      if (match) {
+        return match;
+      }
+    }
+    return null;
+  }
+
+  private getMessageMatchKeys(message: ChatMessage): string[] {
+    return [message.sourceMessageId, message.id]
+      .filter((key): key is string => typeof key === 'string' && key.length > 0);
+  }
+
+  private mergeClientOnlyRenderFields(
+    canonicalMessage: ChatMessage,
+    fallbackMessage: ChatMessage,
+  ): ChatMessage {
+    const merged: ChatMessage = {
+      ...canonicalMessage,
+      streamState: fallbackMessage.streamState ?? canonicalMessage.streamState,
+      questionResolution: canonicalMessage.questionResolution ?? fallbackMessage.questionResolution,
+      images: canonicalMessage.images ?? fallbackMessage.images,
+      contextAttachments: canonicalMessage.contextAttachments ?? fallbackMessage.contextAttachments,
+      displayStyle: canonicalMessage.displayStyle ?? fallbackMessage.displayStyle,
+      noticeTitle: canonicalMessage.noticeTitle ?? fallbackMessage.noticeTitle,
+      noticeTone: canonicalMessage.noticeTone ?? fallbackMessage.noticeTone,
+      noticeActions: canonicalMessage.noticeActions ?? fallbackMessage.noticeActions,
+      noticeMeta: canonicalMessage.noticeMeta ?? fallbackMessage.noticeMeta,
+      omo: canonicalMessage.omo ?? fallbackMessage.omo,
+    };
+
+    if (
+      fallbackMessage.streamState === 'interrupted'
+      && !this.hasRenderableContent(canonicalMessage)
+      && this.hasRenderableContent(fallbackMessage)
+    ) {
+      merged.content = fallbackMessage.content;
+      merged.contentBlocks = fallbackMessage.contentBlocks;
+      merged.toolCalls = fallbackMessage.toolCalls;
+    }
+
+    return merged;
+  }
+
+  private hasRenderableContent(message: ChatMessage): boolean {
+    return Boolean(
+      message.content?.trim()
+      || (message.contentBlocks?.length ?? 0) > 0
+      || (message.toolCalls?.length ?? 0) > 0,
+    );
+  }
+
+  private shouldPreserveUnmatchedFallbackMessage(
+    message: ChatMessage,
+    lastCanonicalTimestamp: number,
+  ): boolean {
+    return Boolean(
+      message.displayStyle === 'notice'
+      || message.streamState === 'interrupted'
+      || message.timestamp > lastCanonicalTimestamp,
     );
   }
 

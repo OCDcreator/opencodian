@@ -260,6 +260,7 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 - `patchTrailingAssistantRender()`：只在前缀 rendered message 完全稳定时 patch 最后一条 assistant
 - `getIncrementalRenderedMessageUpdate()`：作为纯 helper 判断当前 sync 是否还能走 append-only 路径
 - `createConversationAssistantTailRenderPort()`：把 assistant tail 的正文签名、正文重渲和 persisted footer finalization 先收束成更小 port，再挂回 `ConversationRenderHost`
+- `ConversationCanonicalRenderSource`：把 `OpenCodeService.getCanonicalSessionState()` 与 `hydrateOpenCodeMessage()` 作为独立 source 注入 render service，让 full rerender / synced update 优先走 canonical turn view-model，同时不扩大 DOM host
 
 收到服务端新消息后，`applySyncedConversationUpdate()` 会优先尝试：
 

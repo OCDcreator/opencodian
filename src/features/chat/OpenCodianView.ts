@@ -1197,6 +1197,12 @@ export class OpenCodianView extends ItemView {
 
     const conversationRenderService = new ConversationRenderService(
       this.createConversationRenderHost(),
+      {
+        getCanonicalSessionState: (sessionId) =>
+          this.plugin.openCodeService.getCanonicalSessionState(sessionId),
+        hydrateOpenCodeMessage: (info, parts) =>
+          this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts),
+      },
     );
     this.conversationRenderService = conversationRenderService;
 
