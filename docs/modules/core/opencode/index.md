@@ -41,7 +41,7 @@
 | `resolveSdkFeatureFlags` | `./sdkFeatureFlags` | 合并 SDK rollout 开关 |
 | `SDK_FEATURE_FLAG_DISABLED_DEFAULTS` | `./sdkFeatureFlags` | 全关闭默认值 |
 | `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` | `./sdkFeatureFlags` | 当前运行时 rollout 默认值 |
-| `OpenCodeClientConfig` 等类型 | `./types` | 调用方使用的服务层配置与状态类型 |
+| `OpenCodeClientConfig` 等类型 | `./types` | 调用方使用的服务层配置、状态与 canonical session graph 类型 |
 
 ## 核心逻辑
 
@@ -51,7 +51,7 @@ barrel 的作用是给上层提供稳定入口，而不是把整个目录平铺�
 
 - 运行时类：`OpenCodeService`、`ServerManager`
 - SDK 原子 façade：`OpenCodeSdkFacade`
-- 调用方会直接引用的类型/常量：`SdkFeatureFlags`、`QueryOptions`、`ServerStatus` 等
+- 调用方会直接引用的类型/常量：`SdkFeatureFlags`、`QueryOptions`、`ServerStatus` 与 canonical session graph 类型等
 
 ### rollout 常量透传
 
@@ -78,6 +78,7 @@ graph LR
 - `main.ts` 通过本 barrel 导入 `OpenCodeService` 和 `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS`。
 - `OpenCodeService` 自身也通过本 barrel 暴露给测试和其他调用方，而 `OpenCodeSdkFacade` 提供完整 SDK namespace 入口。
 - 其他模块如果只需要服务层类型，也可以停留在 barrel 这一层，不必直接依赖实现文件。
+- canonical session graph 类型继续通过 `types.ts` 暴露，但 `OpenCodeSessionStateStore` 本身仍是内部 owner，不通过 barrel 对外公开。
 - `createSdkClient.ts`、`sdkFetch.ts`、`sdkTypes.ts`、`omoCompat.ts` 仍然是内部实现文件，需要时应直接导入源码文件，而不是期待 barrel 暴露它们。
 
 ## 配置项

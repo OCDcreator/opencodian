@@ -35,6 +35,7 @@
 - `./OpenCodeQuestionPermissionHub`
 - `./OpenCodeSessionControlOrchestrator`
 - `./OpenCodeSessionLifecycleCoordinator`
+- `./OpenCodeSessionStateStore`
 - `./OpenCodeServiceLifecycleCoordinator`
 - `./OpenCodeStreamingRuntimeCoordinator`
 - `./OpenCodeStreamEventTransformer`
@@ -67,6 +68,7 @@
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、session info lookup、session abort fallback、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
+- `sessionStateStore`: `OpenCodeSessionStateStore` 实例，负责 canonical `session/message/part` graph 的 snapshot replace、增量 mutation 与只读 state clone。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
 - `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、SDK health response normalization / health probe fallback、vault path scope refresh、server status/diagnostics proxy，以及 settings update / rollback 与 sync/open-code event subscription 的 lifecycle 编排；其与 `ServerManager` 的共享装配集中在 `OpenCodeServiceLifecycleCoordinator.createAssembly()`。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
@@ -146,6 +148,8 @@
 
 - legacy 路径使用的是 `/session/:id/message`，不是 `messages`。
 - 无论 SDK 还是 legacy，读到消息后都会调用 `applySessionRevertState()`，按 session 的 `revert.messageID` / `revert.partID` 过滤被回滚掉的消息或消息尾部 parts。
+- 过滤后的 authoritative snapshot 会立即写入 `sessionStateStore`，让服务层第一次拥有稳定的 canonical `session/message/part` truth layer。
+- `getCanonicalSessionState(sessionId)` 提供只读读取口，供后续 sync-event / render slice 共享同一份图状态。
 
 默认会话指针现在由 `sessionLifecycle` 持有；调用方如果不显式传 `options.sessionId`，多数接口仍会落回当前 session，只是状态所有权不再直接留在 `OpenCodeService` 主类里。与 session tree/share/command/part 编辑有关的更厚 control surface 则继续落在 `sessionControl`，避免 `OpenCodeService` 再次直接编排这条链。
 
@@ -339,7 +343,8 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `checkHealth()` | SDK 优先健康检查，失败时回退到 `ServerManager` |
 | `updateSettings()` | 根据新旧设置差异更新 `baseUrl`、`ServerManager` 和订阅状态 |
 | `createSession()` | 创建 session，并可同时写入 `currentSessionId` |
-| `getSessionMessages()` | 读取消息并应用 revert 过滤 |
+| `getSessionMessages()` | 读取消息、应用 revert 过滤，并刷新 canonical session graph snapshot |
+| `getCanonicalSessionState()` | 读取指定 session 的只读 canonical `message/part` 图状态 |
 | `requestAssistantResponse()` | 非流式请求，返回归一化后的 `ChatMessage` |
 | `probeProviderResponse(providerId, modelId)` | 用临时 session 做一次最小真实发送探测 |
 | `sendMessage()` | 流式请求入口，按 flag 选择 SDK 或 legacy SSE |

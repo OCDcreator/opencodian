@@ -19,6 +19,7 @@
 - Do not add thin helper / adapter / provider / factory modules unless the module is reused in 3+ places or isolates a high-risk dependency.
 - Do not move complexity sideways into more files without reducing ownership, import surface, or test responsibility.
 - Prefer existing service / coordinator / runtime owners before creating new files.
+- Canonical OpenCode `session/message/part` truth belongs in `src/core/opencode/OpenCodeSessionStateStore.ts`; do not reintroduce ad-hoc graph state inside `OpenCodeService.ts` or chat view-model code.
 - For model-config modal UI work, prefer the existing `ModelConfigProviderEditor.ts` / `ModelConfigModelListEditor.ts` owners before growing `ModelConfigModal.ts` again.
 - For trailing-assistant patch work, extend the coarse `trailingAssistantPatchPlanning.ts` / `trailingAssistantPatchExecution.ts` / `trailingAssistantPatchDebug.ts` / `trailingAssistantPatchTypes.ts` bundles instead of reintroducing one-off helper files.
 - For provider icon work, extend `providerIconEntryResolution.ts` / `providerIconBuiltinSelection.ts` / `providerIconCustomSources.ts` / `providerIconAssetCache.ts` before regrowing `ProviderIconService.ts`.

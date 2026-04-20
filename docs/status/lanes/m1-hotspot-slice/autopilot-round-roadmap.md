@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 1 - Introduce the canonical session graph owner
+### [DONE] Task 1 - Introduce the canonical session graph owner
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 1.
 - **Goal**: Add `OpenCodeSessionStateStore` as the canonical `session/message/part` graph owner and wire `OpenCodeService` snapshots into it.
@@ -17,7 +17,7 @@
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodeSessionStateStore.test.ts tests/unit/core/opencode/OpenCodeService.sdkCrudSync.test.ts`
 - **Acceptance**: OpenCodian has a stable canonical `session/message/part` truth layer and reducer-style tests pass.
 
-### [QUEUED] Task 2 - Reshape send preparation around stable `messageID + parts[]`
+### [NEXT] Task 2 - Reshape send preparation around stable `messageID + parts[]`
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 2.
 - **Goal**: Make send preparation return structured payloads with stable message and part IDs for optimistic seed and SDK request.

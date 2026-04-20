@@ -66,6 +66,7 @@ docs/modules/
 │   │   ├── OpenCodePromptRequestBuilder.md
 │   │   ├── OpenCodeServiceLifecycleCoordinator.md
 │   │   ├── OpenCodeService.md
+│   │   ├── OpenCodeSessionStateStore.md
 │   │   ├── OpenCodeStreamEventTransformer.md
 │   │   ├── OpenCodeStreamingRuntimeCoordinator.md
 │   │   ├── OpenCodeSyncEventRuntimeCoordinator.md

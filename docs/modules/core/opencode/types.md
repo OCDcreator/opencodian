@@ -5,11 +5,12 @@
 
 ## 概述
 
-`types.ts` 定义的是 `core/opencode` 这一层的服务契约类型。它不描述 OpenCode 持久化 message 的内部结构，也不承担 SDK v2 类型别名工作；它关注的是：
+`types.ts` 定义的是 `core/opencode` 这一层的服务契约类型，以及 canonical session graph 共享类型。它不承担 SDK v2 类型别名工作；它关注的是：
 
 - `OpenCodeService` 对上暴露的方法参数/返回值
 - server 连接与运行配置
 - 与聊天上下文、权限、流式输出有关的输入类型
+- `OpenCodeSessionStateStore` 与后续 session graph slice 共用的 canonical `session/message/part` 结构
 
 ## 导入关系
 
@@ -111,6 +112,27 @@ interface ManagedServerState {
 
 用于记录并恢复插件曾经启动过的 OpenCode 进程。
 
+### `OpenCodeCanonicalSessionState` / `OpenCodeCanonicalMessageInfo` / `OpenCodeCanonicalPart`
+
+这组类型把 canonical `session/message/part` truth layer 的结构统一收在 `types.ts`：
+
+- `OpenCodeCanonicalMessageInfo` / `OpenCodeCanonicalPart` 目前直接对齐 `OpenCodeSessionLifecycleCoordinator` 的 `Message` / `Part`
+- `OpenCodeSessionMessageWithParts` 对齐 authoritative snapshot 的 `{ info, parts[] }`
+- `OpenCodeCanonicalSessionState` 则定义单个 session 的 message 列表与 `partsByMessageID`
+
+这样 `OpenCodeService`、`OpenCodeSessionStateStore` 与测试不需要再各自复制同一份 session graph 结构。
+
+### `OpenCodeCanonicalMutation`
+
+这是 canonical graph reducer 计划使用的 mutation 联合。当前先覆盖：
+
+- `session.snapshot.replaced`
+- `message.upserted` / `message.removed`
+- `part.upserted` / `part.removed`
+- `part.delta`
+
+Task 1 里主要先用于固定 mutation vocabulary，方便后续 sync-event slice 直接复用。
+
 ### `SdkFeatureFlags`
 
 本文件最后重新导出了 `SdkFeatureFlags`，方便调用方从 `core/opencode/types` 或 barrel 间接拿到 SDK rollout 类型。
@@ -127,8 +149,9 @@ settings/chat types -> core/opencode/types.ts -> OpenCodeService / ServerManager
 
 ## 与其他模块的交互
 
-- `OpenCodeService` 用这里的 `QueryOptions`、`ResponseHandler`、`OpenCodeServerConfig`、`ManagedServerState` 做方法签名和内部协作。
+- `OpenCodeService` 用这里的 `QueryOptions`、`ResponseHandler`、`OpenCodeServerConfig`、`ManagedServerState` 和 canonical session graph 类型做方法签名与内部协作。
 - `ServerManager` 直接消费 `OpenCodeServerConfig` 和 `ManagedServerState`。
+- `OpenCodeSessionStateStore` 复用这里的 canonical state 类型，而不再在 store/test/service 三处重复声明。
 - `index.ts` 通过这里向上层重导出服务层类型。
 
 ## 配置项

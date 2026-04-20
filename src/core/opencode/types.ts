@@ -12,6 +12,7 @@ import type {
   ServerMode,
   ThinkingBudget,
 } from '../types/settings';
+import type { Message, Part, SessionMessage } from './OpenCodeSessionLifecycleCoordinator';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 
 /** Response handler callbacks */
@@ -145,6 +146,32 @@ export interface SdkEventEnvelope<TPayload = unknown> {
 export interface OpenCodeCapabilitySnapshot {
   toolCatalog: ToolCatalogSnapshot;
   mcp: McpServerSnapshot;
+}
+
+export type OpenCodeCanonicalMessageInfo = Message;
+
+export type OpenCodeCanonicalPart = Part;
+
+export type OpenCodeSessionMessageWithParts = SessionMessage;
+
+export interface OpenCodeCanonicalSessionState {
+  sessionID: string;
+  messages: OpenCodeCanonicalMessageInfo[];
+  partsByMessageID: Record<string, OpenCodeCanonicalPart[]>;
+}
+
+export interface OpenCodeCanonicalMutation {
+  type:
+    | 'session.snapshot.replaced'
+    | 'message.upserted'
+    | 'message.removed'
+    | 'part.upserted'
+    | 'part.removed'
+    | 'part.delta';
+  sessionID?: string;
+  messageID?: string;
+  partID?: string;
+  field?: string;
 }
 
 export type { SdkFeatureFlags };

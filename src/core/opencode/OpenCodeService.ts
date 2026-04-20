@@ -65,6 +65,7 @@ import {
   type Part,
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
+import { OpenCodeSessionStateStore } from './OpenCodeSessionStateStore';
 import {
   OpenCodeStreamEventTransformer,
 } from './OpenCodeStreamEventTransformer';
@@ -83,7 +84,9 @@ import type {
   ManagedServerState,
   McpServerSnapshot,
   McpServerStatus,
+  OpenCodeCanonicalSessionState,
   OpenCodeCapabilitySnapshot,
+  OpenCodeSessionMessageWithParts,
   QueryOptions,
   ResponseHandler,
   ServerDiagnostics,
@@ -176,6 +179,7 @@ export class OpenCodeService {
   private catalogQueries: OpenCodeCatalogQueryCoordinator;
   private contextPartSerializer: OpenCodeContextPartSerializer;
   private promptRequestBuilder: OpenCodePromptRequestBuilder;
+  private readonly sessionStateStore = new OpenCodeSessionStateStore();
   private streamEventTransformer: OpenCodeStreamEventTransformer;
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
@@ -239,7 +243,7 @@ export class OpenCodeService {
       postLegacy: (path, body) => this.post(path, body),
       getLegacy: (path) => this.get(path),
       getSessionInfo: (sessionId) => this.sessionLifecycle.getSessionInfo(sessionId),
-      getSessionMessages: (sessionId) => this.sessionLifecycle.getSessionMessages(sessionId),
+      getSessionMessages: (sessionId) => this.getSessionMessages(sessionId),
       getAvailableModels: () => this.getAvailableModels(),
       logServiceWarning,
       logServiceError,
@@ -581,7 +585,13 @@ export class OpenCodeService {
 
   /** Get session messages - OpenCode API returns {info: Message, parts: Part[]}[] */
   async getSessionMessages(sessionId: string): Promise<{ info: Message; parts: Part[] }[]> {
-    return this.sessionLifecycle.getSessionMessages(sessionId);
+    const messages = await this.sessionLifecycle.getSessionMessages(sessionId);
+    this.applyCanonicalSnapshot(sessionId, messages);
+    return messages;
+  }
+
+  getCanonicalSessionState(sessionId: string): OpenCodeCanonicalSessionState | null {
+    return this.sessionStateStore.getSessionState(sessionId);
   }
 
   async getSessionTodos(sessionId: string): Promise<SessionTodo[]> {
@@ -946,6 +956,13 @@ export class OpenCodeService {
       );
       return messages;
     }
+  }
+
+  private applyCanonicalSnapshot(
+    sessionId: string,
+    messages: OpenCodeSessionMessageWithParts[],
+  ): void {
+    this.sessionStateStore.replaceSessionSnapshot(sessionId, messages);
   }
 
   private filterMessagesByRevertState(

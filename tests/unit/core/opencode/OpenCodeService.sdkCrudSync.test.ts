@@ -109,8 +109,11 @@ describe('OpenCodeService SDK session lifecycle', () => {
     });
 
     const messages = await service.getSessionMessages('sdk-session');
+    const canonicalState = service.getCanonicalSessionState('sdk-session');
 
     expect(messages.map((message) => message.info.id)).toEqual(['msg-1', 'msg-2']);
+    expect(canonicalState?.messages.map((message) => message.id)).toEqual(['msg-1', 'msg-2']);
+    expect(canonicalState?.messages[0]?.sessionID).toBe('sdk-session');
     expect(mockSdkClient.session.messages).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
     expect(mockSdkClient.session.get).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
   });
