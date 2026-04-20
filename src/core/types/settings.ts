@@ -125,6 +125,9 @@ export type QuestionDisplayMode = 'all' | 'single';
 /** Where pending OpenCode question cards should be shown */
 export type QuestionCardPosition = 'inline' | 'above_input';
 
+/** How OpenCode skills are exposed through slash commands */
+export type SlashCommandSkillMode = 'direct' | 'skills-command';
+
 /** Plugin isolation mode for local OpenCode */
 export type PluginIsolationMode = 'default' | 'pure';
 
@@ -162,6 +165,16 @@ export function normalizeQuestionCardPosition(value: unknown): QuestionCardPosit
       return value;
     default:
       return 'inline';
+  }
+}
+
+export function normalizeSlashCommandSkillMode(value: unknown): SlashCommandSkillMode {
+  switch (value) {
+    case 'skills-command':
+    case 'direct':
+      return value;
+    default:
+      return 'direct';
   }
 }
 
@@ -1681,6 +1694,9 @@ export interface OpenCodianSettings {
 
   // Hidden slash commands
   hiddenSlashCommands: string[];
+
+  // OpenCode skill slash command invocation mode
+  slashCommandSkillMode: SlashCommandSkillMode;
 }
 
 /** Default settings */
@@ -1767,6 +1783,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   locale: 'en',
 
   hiddenSlashCommands: [],
+  slashCommandSkillMode: 'direct',
 };
 
 export function normalizeQuestionCardSettings(

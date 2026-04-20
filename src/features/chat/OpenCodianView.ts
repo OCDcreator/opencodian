@@ -702,6 +702,7 @@ export class OpenCodianView extends ItemView {
         this.setTooltipLabel(element, label, position);
       },
       getInputPlaceholder: () => this.getInputPlaceholder(),
+      getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
       addChosenFileContextToActiveTab: async () => {
         await this.composerContextViewFacade.addChosenFileContextToActiveTab();
       },
@@ -2401,6 +2402,7 @@ export class OpenCodianView extends ItemView {
         const runtimeCommands = await this.plugin.openCodeService.sdk.command.list();
         return Array.isArray(runtimeCommands) ? runtimeCommands : [];
       },
+      getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
       getVaultPath: () => getVaultBasePath(this.app),
       refreshActiveFocusContextPreview: () => {
         this.composerContextViewFacade.refreshActiveFocusContextPreview();

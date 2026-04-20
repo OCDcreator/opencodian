@@ -31,6 +31,7 @@ import {
   normalizeQuestionCardPosition,
   normalizeQuestionCardSettings,
   normalizeQuestionDisplayMode,
+  normalizeSlashCommandSkillMode,
   normalizeTabBarPosition,
 } from '../../../../src/core/types/settings';
 
@@ -227,6 +228,7 @@ import {
       expect(DEFAULT_SETTINGS.openInMainTab).toBe(false);
       expect(DEFAULT_SETTINGS.theme).toEqual(getDefaultThemeSettings());
       expect(DEFAULT_SETTINGS.locale).toBe('en');
+      expect(DEFAULT_SETTINGS.slashCommandSkillMode).toBe('direct');
     });
 
     it('should have providers array with anthropic', () => {
@@ -243,6 +245,12 @@ import {
     it('should have empty arrays for optional settings', () => {
       expect(DEFAULT_SETTINGS.excludedTags).toEqual([]);
       expect(DEFAULT_SETTINGS.hiddenSlashCommands).toEqual([]);
+    });
+
+    it('normalizes slash command skill invocation mode', () => {
+      expect(normalizeSlashCommandSkillMode('direct')).toBe('direct');
+      expect(normalizeSlashCommandSkillMode('skills-command')).toBe('skills-command');
+      expect(normalizeSlashCommandSkillMode('invalid')).toBe('direct');
     });
 
     it('should have allowed export paths', () => {

@@ -9,8 +9,9 @@
 
 - 通过 companion owner `SettingsProjectCommandEditor` 处理 project command 的 create/edit/delete 壳层
 - 通过插件设置 `hiddenSlashCommands` 管理 slash menu 的用户级 visible/hidden 开关
+- 通过插件设置 `slashCommandSkillMode` 管理 skills 是直接显示为 `/skill`，还是通过 `/skills skill` 前缀调用
 
-当前 owner 仍然聚焦 commands settings 范围：project `command.<id>` 字段编辑、OpenCodian placeholder reference、command-owned hidden agent 的 catalog/editor 回填，以及 catalog 可见性写回；共享的 runtime+project merge 规则现已下沉到 `core/config/slashCommandCatalog.ts`，供 settings catalog 与 chat slash menu 共同复用。
+当前 owner 仍然聚焦 commands settings 范围：project `command.<id>` 字段编辑、OpenCodian placeholder reference、command-owned hidden agent 的 catalog/editor 回填、skill invocation mode，以及 catalog 可见性写回；共享的 runtime+project merge 规则现已下沉到 `core/config/slashCommandCatalog.ts`，供 settings catalog 与 chat slash menu 共同复用。
 
 ## 核心逻辑
 
@@ -28,7 +29,7 @@ owner 会并行读取：
 - project `template` / `description` / `agent` / `model` / `subtask` 优先覆盖 runtime metadata
 - 如果 project command 指向 `opencodian-command:<id>` 这类 hidden agent，则 section 会把该 agent 的 `temperature` / `top_p` 回填给 editor，并尽量显示 metadata 里的 base agent，而不是暴露内部 agent ID
 - runtime 中不存在、但 project config 存在的条目会保留成 `projectOnly`
-- `source: 'mcp' | 'skill'` 的 runtime 条目不会进入这个 catalog shell
+- `source: 'mcp'` 的 runtime 条目不会进入这个 catalog shell；`source: 'skill'` 会保留并显示为 Skill 来源
 
 ### project command editor 壳层
 
@@ -52,11 +53,20 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 
 因此这条路径只表达“当前 Obsidian profile 下的 slash menu 可见性”，不改变 OpenCode runtime 自身的 command config。
 
+### Skill 调用模式
+
+Commands section 还提供 `slashCommandSkillMode` 下拉选项：
+
+- `direct` 是默认值，chat slash menu 直接显示 OpenCode skill，例如 `/build-mcp-server`
+- `skills-command` 会在顶层 slash menu 显示合成的 `/skills` 入口，具体 skill 通过 `/skills build-mcp-server` 调用
+- 写回只更新插件设置，不触发 OpenCode config sync、模型重载或 UI theme 应用
+
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
 | `attach()` | 挂载 Commands section，创建 heading、editor block 与 catalog block，并启动首次异步刷新 |
+| `createSkillModeSetting()` | 渲染 skill invocation mode 下拉框并写回 `slashCommandSkillMode` |
 | `dispose()` | 递增 refresh run id，避免旧异步请求回写已重建的设置页 |
 | `refreshCatalog()` | 并行加载 runtime/project commands，合并后同时刷新 editor 与 catalog |
 | `renderCatalog()` | 先委托 `SettingsProjectCommandEditor` 渲染项目命令表单，再为每个 slash command 渲染 `/<id>` setting 与 visible toggle |
@@ -69,7 +79,7 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 - `OpencodeConfigManager`: 读取当前 vault 的 project `command` / `agent` 配置，并负责 command-owned hidden agent lifecycle
 - `core/config/slashCommandCatalog.ts`: 提供共享 catalog merge 与 visible-menu projection 规则
 - `SettingsProjectCommandEditor.ts`: 负责 project command 核心字段表单、保存 / 删除 action 与 notice
-- `core/types/settings.ts`: 提供插件设置里的 `hiddenSlashCommands`
+- `core/types/settings.ts`: 提供插件设置里的 `hiddenSlashCommands` 与 `slashCommandSkillMode`
 - `i18n/locales/*`: 提供 Commands section 标题、catalog 来源、可见性和错误文案
 
 ## 注意事项
@@ -77,4 +87,5 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 - 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`。
 - project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀。
 - `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径。
+- `slashCommandSkillMode` 只改变 chat menu/执行入口形态，不改变 OpenCode runtime 的 skill catalog。
 - runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有共享 catalog seam。

@@ -42,6 +42,7 @@ function createHost(
     ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
     getProjectCommands: jest.fn().mockResolvedValue({}),
     getRuntimeCommands: jest.fn().mockResolvedValue([]),
+    getSlashCommandSkillMode: jest.fn().mockReturnValue('direct'),
     getVaultPath: jest.fn().mockReturnValue('/vault'),
     refreshActiveFocusContextPreview: jest.fn(),
     getActiveFocusContextPreview: jest.fn().mockReturnValue(null),
@@ -156,7 +157,7 @@ describe('SlashCommandExecutionService', () => {
     ]);
   });
 
-  it('executes runtime commands while ignoring MCP and skill catalog entries', async () => {
+  it('executes runtime commands and direct skill commands while ignoring MCP entries', async () => {
     const host = createHost({
       getRuntimeCommands: jest.fn().mockResolvedValue([
         { name: 'ask-docs', source: 'mcp' },
@@ -167,12 +168,37 @@ describe('SlashCommandExecutionService', () => {
     const service = new SlashCommandExecutionService(host);
 
     await expect(service.tryRunSlashCommand('/ask-docs query')).resolves.toBe(false);
+    await expect(service.tryRunSlashCommand('/skill-review note.md')).resolves.toBe(true);
     await expect(service.tryRunSlashCommand('/build --fast')).resolves.toBe(true);
+
+    expect(host.runSessionCommand).toHaveBeenCalledTimes(2);
+    expect(host.runSessionCommand).toHaveBeenNthCalledWith(1, 'session-1', expect.objectContaining({
+      command: 'skill-review',
+      arguments: 'note.md',
+    }));
+    expect(host.runSessionCommand).toHaveBeenNthCalledWith(2, 'session-1', expect.objectContaining({
+      command: 'build',
+      arguments: '--fast',
+    }));
+  });
+
+  it('runs skill commands through /skills prefix mode and suppresses direct skill execution', async () => {
+    const host = createHost({
+      getSlashCommandSkillMode: jest.fn().mockReturnValue('skills-command'),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'skill-review', source: 'skill' },
+        { name: 'build', source: 'command' },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/skill-review note.md')).resolves.toBe(false);
+    await expect(service.tryRunSlashCommand('/skills skill-review note.md')).resolves.toBe(true);
 
     expect(host.runSessionCommand).toHaveBeenCalledTimes(1);
     expect(host.runSessionCommand).toHaveBeenCalledWith('session-1', expect.objectContaining({
-      command: 'build',
-      arguments: '--fast',
+      command: 'skill-review',
+      arguments: 'note.md',
     }));
   });
 

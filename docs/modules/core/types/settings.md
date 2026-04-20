@@ -258,6 +258,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `theme` | `ThemeSettings` | 默认 | 主题设置 |
 | `locale` | `string` | `'en'` | 界面语言 |
 | `hiddenSlashCommands` | `string[]` | `[]` | 隐藏的斜杠命令 |
+| `slashCommandSkillMode` | `SlashCommandSkillMode` | `'direct'` | OpenCode skills 的斜杠命令调用模式 |
 
 ## 数据流
 
@@ -290,6 +291,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 - `normalizeCompactionReservedTokens()` 会把值归一化为正整数；无效输入回退到默认 `10000`
 - `normalizeChatFontSizePx()` 会把值归一化到受支持的整数范围；无效输入回退到默认 `13`
 - `hiddenSlashCommands` 存储用户隐藏的斜杠命令 ID
+- `normalizeSlashCommandSkillMode()` 只接受 `'direct'` 或 `'skills-command'`，未知值回退到默认直显模式
 - `modelAvailabilitySectionOpen` / `modelToolsSectionOpen` 属于设置页 UI 状态，和 `settingsPanelScrollTop` 一样会被持久化
 - 归一化函数设计原则：未知值回退到默认值，而非报错
 

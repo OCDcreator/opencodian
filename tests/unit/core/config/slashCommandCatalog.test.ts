@@ -49,6 +49,11 @@ describe('slashCommandCatalog', () => {
           source: 'mcp',
           description: 'Should stay hidden from slash autocomplete',
         }),
+        createRuntimeCommand({
+          name: 'skill-review',
+          source: 'skill',
+          description: 'Review with a skill',
+        }),
       ],
       projectCommands,
       {},
@@ -60,24 +65,35 @@ describe('slashCommandCatalog', () => {
       hidden: entry.hidden,
       runtimeAvailable: entry.runtimeAvailable,
       hasProjectOverride: entry.hasProjectOverride,
+      source: entry.source,
     }))).toEqual([
       {
         id: 'init',
         hidden: false,
         runtimeAvailable: true,
         hasProjectOverride: false,
+        source: 'command',
+      },
+      {
+        id: 'skill-review',
+        hidden: false,
+        runtimeAvailable: true,
+        hasProjectOverride: false,
+        source: 'skill',
       },
       {
         id: 'review',
         hidden: true,
         runtimeAvailable: true,
         hasProjectOverride: true,
+        source: 'command',
       },
       {
         id: 'deploy',
         hidden: false,
         runtimeAvailable: false,
         hasProjectOverride: true,
+        source: 'project',
       },
     ]);
 
@@ -87,6 +103,15 @@ describe('slashCommandCatalog', () => {
         description: 'Guided setup',
         hasProjectOverride: false,
         runtimeAvailable: true,
+        source: 'command',
+        subtask: false,
+      },
+      {
+        id: 'skill-review',
+        description: 'Review with a skill',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        source: 'skill',
         subtask: false,
       },
       {
@@ -94,6 +119,7 @@ describe('slashCommandCatalog', () => {
         description: 'Project-only deploy command',
         hasProjectOverride: true,
         runtimeAvailable: false,
+        source: 'project',
         subtask: false,
       },
     ]);

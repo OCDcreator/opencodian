@@ -11,7 +11,7 @@
 
 - 创建 input tab bar slot、composer shell、context row、textarea、footer、toolbar slots，以及挂在 composer shell 上方的 slash menu overlay
 - 绑定 textarea Enter 提交、Shift+Enter 换行，以及 textarea 高度同步
-- 在输入以 `/` 开头且光标仍停留在第一个 command token 内时，显示 slash autocomplete menu；加载中、无命令、无匹配或加载失败时保持可见状态提示，避免静默消失
+- 在输入以 `/` 开头且光标仍停留在第一个 command token 内时，显示 slash autocomplete menu；`/skills <query>` 是允许继续显示 nested skill suggestions 的特殊前缀；加载中、无命令、无匹配或加载失败时保持可见状态提示，避免静默消失
 - 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort 这些既有子控件挂到稳定的 toolbar slot
@@ -25,6 +25,7 @@ export interface ComposerInputShellCoordinatorHost {
   setContextRowElement(element: HTMLElement | null): void;
   setTooltipLabel(...): void;
   getInputPlaceholder(): string;
+  getSlashCommandSkillMode(): SlashCommandSkillMode;
   addChosenFileContextToActiveTab(): Promise<void>;
   mountSelectionControls(toolbar: HTMLElement): void;
   mountContextUsageIndicator(container: HTMLElement): void;
@@ -59,9 +60,10 @@ export class ComposerInputShellCoordinator {
 - `applyLocaleTexts()` 刷新 placeholder、add-context tooltip 和 send/stop tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
 - `refreshSlashCommandMenu()` 只在 slash trigger session 首次打开时向 host 拉取 merged visible menu items，后续同一次 `/...` 输入通过 `slashCommandMenuFilter.ts` 本地过滤，避免每次按键都重拉 runtime/project catalog
+- `refreshSlashCommandMenu()` 会把 `getSlashCommandSkillMode()` 传给过滤 helper；direct mode 直接展示 skill，prefixed mode 则顶层展示 `/skills` 并在 `/skills <query>` 下展示 nested skill suggestions
 - 若 runtime/project catalog 返回空、过滤后无结果或加载失败，`refreshSlashCommandMenu()` 会渲染非交互式状态行；失败细节只进入 debug log，避免普通输入 `/` 时刷警告
 - `tryHandleSlashCommandMenuKeydown()` 在 menu 打开时拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`
-- 选中 menu item 后，textarea 会被写成 `/<id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
+- 选中 menu item 后，textarea 默认写成 `/<id> `；prefixed skill suggestion 会写成 `/skills <id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
 - `scheduleLayoutSync()` / `clearScheduledLayoutSync()` 收束 composer stack height 的 RAF 节流
 - `destroy()` 释放 textarea/button refs、layout observer 和 context row ownership
 

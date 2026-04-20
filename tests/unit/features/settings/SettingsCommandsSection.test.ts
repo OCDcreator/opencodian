@@ -5,6 +5,7 @@ import { getCommandScopedAgentId } from '../../../../src/core/config/commandScop
 import type {
   OpencodeAgentConfigRecord,
   OpencodeCommandConfigRecord,
+  SlashCommandSkillMode,
 } from '../../../../src/core/types';
 import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
 import { setLocale, t } from '../../../../src/i18n';
@@ -213,6 +214,7 @@ function createPlugin(options: {
   runtimeCommands?: RuntimeCommand[];
   projectCommands?: OpencodeCommandConfigRecord;
   hiddenSlashCommands?: string[];
+  slashCommandSkillMode?: SlashCommandSkillMode;
 } = {}): CommandsSectionPlugin {
   return {
     openCodeService: {
@@ -230,6 +232,7 @@ function createPlugin(options: {
     },
     settings: {
       hiddenSlashCommands: [...(options.hiddenSlashCommands ?? [])],
+      slashCommandSkillMode: options.slashCommandSkillMode ?? 'direct',
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
   } as unknown as CommandsSectionPlugin;
@@ -408,6 +411,38 @@ describe('SettingsCommandsSection catalog shell', () => {
     await flushAsync();
 
     expect(plugin.settings.hiddenSlashCommands).toEqual(['init']);
+  });
+
+  it('persists the slash command skill invocation mode from the commands settings', async () => {
+    const plugin = createPlugin({
+      slashCommandSkillMode: 'direct',
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    const dropdown = dropdownRecords.find((record) =>
+      record.name === t('settings.commands.skillMode.name')
+    );
+
+    expect(dropdown?.control.setValue).toHaveBeenCalledWith('direct');
+    expect(dropdown?.control.addOption).toHaveBeenCalledWith(
+      'direct',
+      t('settings.commands.skillMode.option.direct'),
+    );
+    expect(dropdown?.control.addOption).toHaveBeenCalledWith(
+      'skills-command',
+      t('settings.commands.skillMode.option.skillsCommand'),
+    );
+
+    await dropdown?.onChange?.('skills-command');
+
+    expect(plugin.settings.slashCommandSkillMode).toBe('skills-command');
+    expect(plugin.saveSettings).toHaveBeenCalledWith({
+      syncConfig: false,
+      reloadModels: false,
+      applyUi: false,
+    });
   });
 
   it('prefills command-local sampling from generated hidden agents without exposing the agent id', async () => {

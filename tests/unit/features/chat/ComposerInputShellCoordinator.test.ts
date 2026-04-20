@@ -39,7 +39,7 @@ async function flushAsync(): Promise<void> {
 }
 
 function slashItem(id: string, description: string, overrides: Partial<SlashCommandMenuItem> = {}): SlashCommandMenuItem {
-  return { id, description, hasProjectOverride: false, runtimeAvailable: true, subtask: false, ...overrides };
+  return { id, description, hasProjectOverride: false, runtimeAvailable: true, source: 'command', subtask: false, ...overrides };
 }
 
 function createFixture() {
@@ -61,6 +61,7 @@ function createFixture() {
       }
     }),
     getInputPlaceholder: jest.fn(() => t('chat.input.placeholder')),
+    getSlashCommandSkillMode: jest.fn(() => 'direct'),
     addChosenFileContextToActiveTab: jest.fn().mockResolvedValue(undefined),
     mountSelectionControls: jest.fn(),
     mountContextUsageIndicator: jest.fn(),

@@ -66,6 +66,7 @@ describe('SlashCommandMenuCatalogCache', () => {
       description: 'Review code',
       hasProjectOverride: false,
       runtimeAvailable: true,
+      source: 'command',
       subtask: false,
     }]);
     expect(second).toBe(first);
@@ -98,6 +99,7 @@ describe('SlashCommandMenuCatalogCache', () => {
       description: 'Create commit',
       hasProjectOverride: false,
       runtimeAvailable: true,
+      source: 'command',
       subtask: false,
     }]);
     expect(host.onWarmLoadFailed).not.toHaveBeenCalled();
@@ -146,8 +148,25 @@ describe('SlashCommandMenuCatalogCache', () => {
       description: 'Guided setup',
       hasProjectOverride: false,
       runtimeAvailable: true,
+      source: 'command',
       subtask: false,
     }]);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps OpenCode skills in the menu catalog for direct or /skills invocation modes', async () => {
+    const host = createHost({
+      loadRuntimeCommands: jest.fn().mockResolvedValue([
+        createRuntimeCommand({ name: 'review', source: 'command' }),
+        createRuntimeCommand({ name: 'frontend-design', source: 'skill', description: 'Design UI' }),
+        createRuntimeCommand({ name: 'mcp-prompt', source: 'mcp' }),
+      ]),
+    });
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    await expect(cache.load()).resolves.toEqual([
+      expect.objectContaining({ id: 'review', source: 'command' }),
+      expect.objectContaining({ id: 'frontend-design', source: 'skill' }),
+    ]);
   });
 });

@@ -11,6 +11,9 @@ import {
   getCommandScopedAgentMetadata,
 } from './commandScopedAgent';
 
+export type SlashCommandCatalogSource = 'command' | 'skill' | 'project';
+export type SlashCommandMenuItemSource = SlashCommandCatalogSource | 'skills-command';
+
 export interface SlashCommandCatalogEntry {
   id: string;
   template: string;
@@ -22,19 +25,40 @@ export interface SlashCommandCatalogEntry {
   hasProjectOverride: boolean;
   hidden: boolean;
   runtimeAvailable: boolean;
+  source: SlashCommandCatalogSource;
   subtask: boolean;
 }
 
 export interface SlashCommandMenuItem {
   id: string;
   description: string;
+  displayId?: string;
   hasProjectOverride: boolean;
+  insertText?: string;
   runtimeAvailable: boolean;
+  source: SlashCommandMenuItemSource;
   subtask: boolean;
 }
 
 export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
-  return command.source !== 'mcp' && command.source !== 'skill';
+  return command.source !== 'mcp';
+}
+
+function normalizeRuntimeCommandSource(command: RuntimeCommand): SlashCommandCatalogSource {
+  return command.source === 'skill' ? 'skill' : 'command';
+}
+
+function getSourceSortRank(source: SlashCommandCatalogSource): number {
+  switch (source) {
+    case 'command':
+      return 0;
+    case 'skill':
+      return 1;
+    case 'project':
+      return 2;
+    default:
+      return 3;
+  }
 }
 
 function normalizeCommandTextField(
@@ -180,6 +204,7 @@ export function mergeSlashCommandCatalog(
       hasProjectOverride: projectCommand !== undefined,
       hidden: hiddenCommandIds.has(runtimeCommand.name),
       runtimeAvailable: true,
+      source: normalizeRuntimeCommandSource(runtimeCommand),
       subtask: normalizeCommandSubtask(runtimeCommand, projectCommand),
     });
   }
@@ -200,6 +225,7 @@ export function mergeSlashCommandCatalog(
       hasProjectOverride: true,
       hidden: hiddenCommandIds.has(commandId),
       runtimeAvailable: false,
+      source: 'project',
       subtask: normalizeCommandSubtask(undefined, projectCommand),
     });
   }
@@ -211,6 +237,11 @@ export function mergeSlashCommandCatalog(
 
     if (left.hasProjectOverride !== right.hasProjectOverride) {
       return left.hasProjectOverride ? 1 : -1;
+    }
+
+    const sourceRankDelta = getSourceSortRank(left.source) - getSourceSortRank(right.source);
+    if (sourceRankDelta !== 0) {
+      return sourceRankDelta;
     }
 
     return left.id.localeCompare(right.id);
@@ -227,6 +258,7 @@ export function buildVisibleSlashCommandMenuItems(
       description: entry.description,
       hasProjectOverride: entry.hasProjectOverride,
       runtimeAvailable: entry.runtimeAvailable,
+      source: entry.source,
       subtask: entry.subtask,
     }));
 }

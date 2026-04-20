@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 
 import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
+import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
@@ -26,6 +27,7 @@ export interface ComposerInputShellCoordinatorHost {
     position?: 'bottom' | 'top' | 'right',
   ): void;
   getInputPlaceholder(): string;
+  getSlashCommandSkillMode(): SlashCommandSkillMode;
   addChosenFileContextToActiveTab(): Promise<void>;
   mountSelectionControls(toolbar: HTMLElement): void;
   mountContextUsageIndicator(container: HTMLElement): void;
@@ -347,7 +349,7 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    const nextValue = `/${item.id} `;
+    const nextValue = item.insertText ?? `/${item.id} `;
     this.inputTextareaEl.value = nextValue;
     this.inputTextareaEl.focus();
     this.inputTextareaEl.setSelectionRange(nextValue.length, nextValue.length);
@@ -383,6 +385,10 @@ export class ComposerInputShellCoordinator {
       this.visibleSlashCommandMenuItems = filterSlashCommandMenuItems(
         this.slashCommandMenuCatalogItems,
         query,
+        {
+          skillMode: this.host.getSlashCommandSkillMode(),
+          skillsCommandDescription: t('slashCommand.skillsCommand.description'),
+        },
       );
       this.selectedSlashCommandMenuItemIndex = 0;
       this.slashCommandMenuStatus = this.visibleSlashCommandMenuItems.length > 0
@@ -411,6 +417,9 @@ export class ComposerInputShellCoordinator {
     }
 
     const beforeCursor = textarea.value.slice(0, selectionStart);
+    if (/^\/skills(?:\s+\S*)?$/i.test(beforeCursor)) {
+      return beforeCursor.slice(1);
+    }
 
     // Scan backward from cursor to find the trigger '/' character.
     // The '/' is valid only at position 0 or when preceded by whitespace.
@@ -440,7 +449,8 @@ export class ComposerInputShellCoordinator {
 
     // If the search text (the portion after '/') contains whitespace,
     // the user has moved past the command name into argument territory.
-    if (/\s/.test(searchText)) {
+    // `/skills <query>` is the one autocomplete-owned nested command form.
+    if (/\s/.test(searchText) && !/^skills(?:\s+\S*)?$/i.test(searchText)) {
       return null;
     }
 
@@ -520,7 +530,7 @@ export class ComposerInputShellCoordinator {
       });
       titleRowEl.createDiv({
         cls: 'opencodian-slash-command-menu-title',
-        text: `/${item.id}`,
+        text: `/${item.displayId ?? item.id}`,
       });
 
       const sourceBadge = this.buildSourceBadge(item);
@@ -548,41 +558,29 @@ export class ComposerInputShellCoordinator {
   }
 
   private getSlashCommandMenuStateText(): string | null {
-    switch (this.slashCommandMenuStatus) {
-      case 'loading':
-        return t('slashCommand.menu.loading');
-      case 'emptyCatalog':
-        return t('slashCommand.menu.empty');
-      case 'noMatches':
-        return t('slashCommand.menu.noMatches');
-      case 'loadFailed':
-        return t('slashCommand.menu.loadFailed');
-      case 'idle':
-      default:
-        return null;
-    }
+    const stateTextKeys: Partial<Record<SlashCommandMenuStatus, Parameters<typeof t>[0]>> = {
+      loading: 'slashCommand.menu.loading',
+      emptyCatalog: 'slashCommand.menu.empty',
+      noMatches: 'slashCommand.menu.noMatches',
+      loadFailed: 'slashCommand.menu.loadFailed',
+    };
+    const textKey = stateTextKeys[this.slashCommandMenuStatus];
+    return textKey ? t(textKey) : null;
   }
 
   private buildSourceBadge(
     item: SlashCommandMenuItem,
   ): { text: string; cls: string } | null {
-    if (item.runtimeAvailable && item.hasProjectOverride) {
-      return {
-        text: t('slashCommand.sourceBadge.override'),
-        cls: 'opencodian-slash-command-menu-badge--override',
-      };
-    }
-
-    if (item.runtimeAvailable) {
-      return {
-        text: t('slashCommand.sourceBadge.runtime'),
-        cls: 'opencodian-slash-command-menu-badge--runtime',
-      };
-    }
-
+    const badge = item.source === 'skill' || item.source === 'skills-command'
+      ? { key: 'slashCommand.sourceBadge.skill' as const, cls: 'opencodian-slash-command-menu-badge--skill' }
+      : item.runtimeAvailable && item.hasProjectOverride
+        ? { key: 'slashCommand.sourceBadge.override' as const, cls: 'opencodian-slash-command-menu-badge--override' }
+        : item.runtimeAvailable
+          ? { key: 'slashCommand.sourceBadge.runtime' as const, cls: 'opencodian-slash-command-menu-badge--runtime' }
+          : { key: 'slashCommand.sourceBadge.project' as const, cls: 'opencodian-slash-command-menu-badge--project' };
     return {
-      text: t('slashCommand.sourceBadge.project'),
-      cls: 'opencodian-slash-command-menu-badge--project',
+      text: t(badge.key),
+      cls: badge.cls,
     };
   }
 }

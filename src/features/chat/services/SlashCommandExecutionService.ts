@@ -5,6 +5,7 @@ import type {
 import type {
   Conversation,
   OpencodeCommandConfigRecord,
+  SlashCommandSkillMode,
 } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { FocusContextPreview } from '../composerContext';
@@ -33,6 +34,7 @@ export interface SlashCommandExecutionHost {
   ): Promise<boolean>;
   getProjectCommands(): Promise<OpencodeCommandConfigRecord>;
   getRuntimeCommands(): Promise<SlashCommandRuntimeCatalogEntry[]>;
+  getSlashCommandSkillMode(): SlashCommandSkillMode;
   getVaultPath(): string | null;
   refreshActiveFocusContextPreview(): void;
   getActiveFocusContextPreview(): FocusContextPreview | null;
@@ -84,10 +86,37 @@ function hasProjectCommand(
 function isRunnableRuntimeCommand(
   command: SlashCommandRuntimeCatalogEntry,
   commandId: string,
+  skillMode: SlashCommandSkillMode,
 ): boolean {
-  return command.name === commandId
-    && command.source !== 'mcp'
-    && command.source !== 'skill';
+  if (command.name !== commandId || command.source === 'mcp') {
+    return false;
+  }
+
+  return command.source !== 'skill' || skillMode === 'direct';
+}
+
+function isRuntimeSkillCommand(
+  command: SlashCommandRuntimeCatalogEntry,
+  commandId: string,
+): boolean {
+  return command.name === commandId && command.source === 'skill';
+}
+
+function parsePrefixedSkillCommand(argumentsText: string): ParsedSlashCommandInput | null {
+  const normalizedArguments = argumentsText.trim();
+  if (!normalizedArguments) {
+    return null;
+  }
+
+  const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(normalizedArguments);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  return {
+    command: match[1],
+    arguments: match[2] ?? '',
+  };
 }
 
 export class SlashCommandExecutionService {
@@ -99,22 +128,50 @@ export class SlashCommandExecutionService {
       return false;
     }
 
-    try {
-      const projectCommands = await this.host.getProjectCommands();
-      const isProjectCommand = hasProjectCommand(projectCommands, parsedCommand.command);
+    let executableCommand = parsedCommand;
 
-      if (!isProjectCommand) {
+    try {
+      const skillMode = this.host.getSlashCommandSkillMode();
+      const projectCommands = await this.host.getProjectCommands();
+      const isPrefixedSkillCommand =
+        skillMode === 'skills-command' && parsedCommand.command === 'skills';
+
+      if (isPrefixedSkillCommand) {
+        const prefixedSkillCommand = parsePrefixedSkillCommand(parsedCommand.arguments);
+        if (!prefixedSkillCommand) {
+          return false;
+        }
+
         const ready = await this.ensureServerReadyForCommand();
         if (!ready) {
           return true;
         }
 
         const runtimeCommands = await this.host.getRuntimeCommands();
-        const isRuntimeCommand = runtimeCommands.some((command) =>
-          isRunnableRuntimeCommand(command, parsedCommand.command)
+        const isRuntimeSkill = runtimeCommands.some((command) =>
+          isRuntimeSkillCommand(command, prefixedSkillCommand.command)
         );
-        if (!isRuntimeCommand) {
+        if (!isRuntimeSkill) {
           return false;
+        }
+
+        executableCommand = prefixedSkillCommand;
+      } else {
+        const isProjectCommand = hasProjectCommand(projectCommands, parsedCommand.command);
+
+        if (!isProjectCommand) {
+          const ready = await this.ensureServerReadyForCommand();
+          if (!ready) {
+            return true;
+          }
+
+          const runtimeCommands = await this.host.getRuntimeCommands();
+          const isRuntimeCommand = runtimeCommands.some((command) =>
+            isRunnableRuntimeCommand(command, parsedCommand.command, skillMode)
+          );
+          if (!isRuntimeCommand) {
+            return false;
+          }
         }
       }
 
@@ -126,15 +183,15 @@ export class SlashCommandExecutionService {
       this.host.refreshActiveFocusContextPreview();
       this.host.startConversationSyncLoop();
       await this.host.runSessionCommand(conversation.openCodeSessionId, {
-        command: parsedCommand.command,
-        arguments: parsedCommand.arguments,
+        command: executableCommand.command,
+        arguments: executableCommand.arguments,
         placeholderContext: this.buildPlaceholderContext(conversation),
       });
       await this.host.syncVisibleConversationInBackground();
       return true;
     } catch (error) {
-      logger.error(`Failed to run slash command /${parsedCommand.command}:`, error);
-      this.host.notifySlashCommandFailed(parsedCommand.command, error);
+      logger.error(`Failed to run slash command /${executableCommand.command}:`, error);
+      this.host.notifySlashCommandFailed(executableCommand.command, error);
       return true;
     }
   }

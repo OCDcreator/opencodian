@@ -4,8 +4,9 @@ import {
   mergeSlashCommandCatalog,
   type SlashCommandCatalogEntry,
 } from '../../core/config/slashCommandCatalog';
-import type {
-  OpencodeCommandConfigRecord,
+import {
+  normalizeSlashCommandSkillMode,
+  type OpencodeCommandConfigRecord,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -83,6 +84,7 @@ export class SettingsCommandsSection {
     );
 
     const configManager = this.plugin.opencodeConfigManager;
+    this.createSkillModeSetting(containerEl);
     if (!configManager) {
       new Setting(containerEl)
         .setName(t('settings.commands.unavailable.name'))
@@ -102,6 +104,26 @@ export class SettingsCommandsSection {
     });
 
     return headingEl;
+  }
+
+  private createSkillModeSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.commands.skillMode.name'))
+      .setDesc(t('settings.commands.skillMode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('direct', t('settings.commands.skillMode.option.direct'))
+          .addOption('skills-command', t('settings.commands.skillMode.option.skillsCommand'))
+          .setValue(normalizeSlashCommandSkillMode(this.plugin.settings.slashCommandSkillMode))
+          .onChange(async (value) => {
+            this.plugin.settings.slashCommandSkillMode = normalizeSlashCommandSkillMode(value);
+            await this.plugin.saveSettings({
+              syncConfig: false,
+              reloadModels: false,
+              applyUi: false,
+            });
+          });
+      });
   }
 
   private createProjectCommandEditorBlock(containerEl: HTMLElement): HTMLElement {
@@ -273,6 +295,10 @@ export class SettingsCommandsSection {
   }
 
   private getSourceLabel(command: SlashCommandCatalogEntry): string {
+    if (command.source === 'skill') {
+      return t('settings.commands.catalog.source.skill');
+    }
+
     if (command.runtimeAvailable && command.hasProjectOverride) {
       return t('settings.commands.catalog.source.runtimeOverride');
     }
