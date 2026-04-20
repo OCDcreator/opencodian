@@ -65,7 +65,7 @@ export class ComposerInputShellCoordinator {
 - `tryHandleSlashCommandMenuKeydown()` 在 menu 打开时拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`
 - 选中 menu item 后，textarea 默认写成 `/<id> `；prefixed skill suggestion 会写成 `/skills <id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
 - prefixed mode 下如果先选中顶层 `/skills` 入口，coordinator 会立即保留菜单并切换到 nested skill 列表，而不是先关闭菜单再要求用户手动继续输入
-- skill menu item 除了顶层 `skill` badge，还会在标题下方渲染一行多语言 provenance 文本；它来自 catalog 里的 `skillSource`，用于解释该 skill 是来自 project、OpenCode project、plugin cache、global 还是 custom path
+- skill menu 的状态行、badge、来源文案和 item DOM 已下沉到 `slashCommandMenuRenderer.ts`；coordinator 继续只保留当前 query、选中项和事件编排
 - `scheduleLayoutSync()` / `clearScheduledLayoutSync()` 收束 composer stack height 的 RAF 节流
 - `destroy()` 释放 textarea/button refs、layout observer 和 context row ownership
 
@@ -73,7 +73,7 @@ export class ComposerInputShellCoordinator {
 
 - `OpenCodianView` 只创建 coordinator、提供 host callbacks，并把 shell DOM refs 暴露给相邻的 `InputPanelAppearanceCoordinator`
 - merged runtime+project slash command catalog 由 `OpenCodianView` host seam 通过 `SlashCommandMenuCatalogCache` 预热/缓存后传入，本模块自己不接 project config / SDK merge 细节
-- slash menu fuzzy scoring 已下沉到 `slashCommandMenuFilter.ts`，本模块只消费过滤结果并负责状态行/menu DOM 渲染
+- slash menu fuzzy scoring 已下沉到 `slashCommandMenuFilter.ts`，状态行/menu DOM 渲染已下沉到 `slashCommandMenuRenderer.ts`，本模块只消费过滤结果并编排选中/应用行为
 - 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`
 - liquid-glass adapter mount、SVG filter 与 diagnostics 已进一步交给 `InputPanelAppearanceCoordinator`，本模块继续只负责 shell/layout lifecycle
 

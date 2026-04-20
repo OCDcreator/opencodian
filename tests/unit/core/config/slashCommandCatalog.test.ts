@@ -33,8 +33,8 @@ describe('slashCommandCatalog', () => {
       },
     };
 
-    const merged = mergeSlashCommandCatalog(
-      [
+    const merged = mergeSlashCommandCatalog({
+      runtimeCommands: [
         createRuntimeCommand({
           name: 'init',
           description: 'Guided setup',
@@ -55,11 +55,11 @@ describe('slashCommandCatalog', () => {
           description: 'Review with a skill',
         }),
       ],
-      new Map(),
+      runtimeSkillSources: new Map(),
       projectCommands,
-      {},
-      new Set(['review']),
-    );
+      projectAgents: {},
+      hiddenCommandIds: new Set(['review']),
+    });
 
     expect(merged.map((entry) => ({
       id: entry.id,

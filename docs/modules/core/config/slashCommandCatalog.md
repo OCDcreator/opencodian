@@ -22,9 +22,12 @@
 ```ts
 export interface SlashCommandCatalogEntry { ... }
 export interface SlashCommandMenuItem { ... }
+export interface MergeSlashCommandCatalogOptions { ... }
 
 export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean;
-export function mergeSlashCommandCatalog(...): SlashCommandCatalogEntry[];
+export function mergeSlashCommandCatalog(
+  options: MergeSlashCommandCatalogOptions,
+): SlashCommandCatalogEntry[];
 export function buildVisibleSlashCommandMenuItems(
   catalog: SlashCommandCatalogEntry[],
 ): SlashCommandMenuItem[];

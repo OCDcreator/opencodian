@@ -59,6 +59,14 @@ export interface SlashCommandMenuItem {
   subtask: boolean;
 }
 
+export interface MergeSlashCommandCatalogOptions {
+  runtimeCommands: RuntimeCommand[];
+  runtimeSkillSources: Map<string, SlashCommandSkillSource>;
+  projectCommands: OpencodeCommandConfigRecord;
+  projectAgents: OpencodeAgentConfigRecord;
+  hiddenCommandIds: Set<string>;
+}
+
 export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
   return command.source !== 'mcp';
 }
@@ -290,12 +298,15 @@ function normalizeCommandTopP(
 }
 
 export function mergeSlashCommandCatalog(
-  runtimeCommands: RuntimeCommand[],
-  runtimeSkillSources: Map<string, SlashCommandSkillSource>,
-  projectCommands: OpencodeCommandConfigRecord,
-  projectAgents: OpencodeAgentConfigRecord,
-  hiddenCommandIds: Set<string>,
+  options: MergeSlashCommandCatalogOptions,
 ): SlashCommandCatalogEntry[] {
+  const {
+    runtimeCommands,
+    runtimeSkillSources,
+    projectCommands,
+    projectAgents,
+    hiddenCommandIds,
+  } = options;
   const mergedEntries = new Map<string, SlashCommandCatalogEntry>();
 
   for (const runtimeCommand of runtimeCommands) {

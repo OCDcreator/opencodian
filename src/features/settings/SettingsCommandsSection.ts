@@ -178,13 +178,13 @@ export class SettingsCommandsSection {
 
       const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
       const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
-      const mergedCommands = mergeSlashCommandCatalog(
+      const mergedCommands = mergeSlashCommandCatalog({
         runtimeCommands,
-        new Map(),
+        runtimeSkillSources: new Map(),
         projectCommands,
         projectAgents,
         hiddenCommandIds,
-      );
+      });
       this.renderCatalog({
         catalogBodyEl,
         configManager,

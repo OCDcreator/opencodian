@@ -5,15 +5,12 @@ import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
+import {
+  renderSlashCommandMenu,
+  type SlashCommandMenuStatus,
+} from './slashCommandMenuRenderer';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
-
-type SlashCommandMenuStatus =
-  | 'idle'
-  | 'loading'
-  | 'emptyCatalog'
-  | 'noMatches'
-  | 'loadFailed';
 
 const logger = createLogger('ComposerInputShellCoordinator');
 
@@ -487,92 +484,23 @@ export class ComposerInputShellCoordinator {
 
     this.syncSlashCommandMenuStateWithCurrentContext();
 
-    this.slashCommandMenuEl.replaceChildren();
-
-    if (this.visibleSlashCommandMenuItems.length === 0) {
-      const stateText = this.getSlashCommandMenuStateText();
-      if (!stateText) {
-        this.slashCommandMenuEl.addClass('is-hidden');
-        this.scheduleLayoutSync();
-        return;
-      }
-
-      this.slashCommandMenuEl.removeClass('is-hidden');
-      this.slashCommandMenuEl.createDiv({
-        cls: `opencodian-slash-command-menu-state opencodian-slash-command-menu-state--${this.slashCommandMenuStatus}`,
-        text: stateText,
-        attr: { role: 'status' },
-      });
-      this.scheduleLayoutSync();
-      return;
-    }
-
-    this.slashCommandMenuEl.removeClass('is-hidden');
-
-    this.visibleSlashCommandMenuItems.forEach((item, index) => {
-      const itemEl = this.slashCommandMenuEl?.createDiv({
-        cls: 'opencodian-slash-command-menu-item',
-        attr: {
-          role: 'option',
-          'aria-selected': index === this.selectedSlashCommandMenuItemIndex ? 'true' : 'false',
-        },
-      });
-      if (!itemEl) {
-        return;
-      }
-
-      if (index === this.selectedSlashCommandMenuItemIndex) {
-        itemEl.addClass('is-selected');
-      }
-
-      itemEl.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-      });
-      itemEl.addEventListener('mouseenter', () => {
+    renderSlashCommandMenu({
+      menuEl: this.slashCommandMenuEl,
+      items: this.visibleSlashCommandMenuItems,
+      selectedIndex: this.selectedSlashCommandMenuItemIndex,
+      status: this.slashCommandMenuStatus,
+      onHoverItem: (index) => {
         if (this.selectedSlashCommandMenuItemIndex === index) {
           return;
         }
 
         this.selectedSlashCommandMenuItemIndex = index;
         this.renderSlashCommandMenu();
-      });
-      itemEl.addEventListener('click', () => {
+      },
+      onSelectItem: (index) => {
         this.selectedSlashCommandMenuItemIndex = index;
         this.applySelectedSlashCommandMenuItem();
-      });
-
-      const titleRowEl = itemEl.createDiv({
-        cls: 'opencodian-slash-command-menu-title-row',
-      });
-      titleRowEl.createDiv({
-        cls: 'opencodian-slash-command-menu-title',
-        text: `/${item.displayId ?? item.id}`,
-      });
-
-      const sourceBadge = this.buildSourceBadge(item);
-      if (sourceBadge) {
-        titleRowEl.createDiv({
-          cls: `opencodian-slash-command-menu-badge ${sourceBadge.cls}`,
-          text: sourceBadge.text,
-        });
-      }
-
-      const skillSourceText = this.buildSkillSourceText(item);
-      if (skillSourceText) {
-        itemEl.createDiv({
-          cls: 'opencodian-slash-command-menu-source',
-          text: skillSourceText,
-          attr: { title: skillSourceText },
-        });
-      }
-
-      if (item.description) {
-        itemEl.createDiv({
-          cls: 'opencodian-slash-command-menu-description',
-          text: item.description,
-          attr: { title: item.description },
-        });
-      }
+      },
     });
 
     this.scheduleLayoutSync();
@@ -602,56 +530,5 @@ export class ComposerInputShellCoordinator {
 
   private getEmptySlashCommandMenuStatus(items: SlashCommandMenuItem[]): SlashCommandMenuStatus {
     return items.length === 0 ? 'emptyCatalog' : 'noMatches';
-  }
-
-  private getSlashCommandMenuStateText(): string | null {
-    const stateTextKeys: Partial<Record<SlashCommandMenuStatus, Parameters<typeof t>[0]>> = {
-      loading: 'slashCommand.menu.loading',
-      emptyCatalog: 'slashCommand.menu.empty',
-      noMatches: 'slashCommand.menu.noMatches',
-      loadFailed: 'slashCommand.menu.loadFailed',
-    };
-    const textKey = stateTextKeys[this.slashCommandMenuStatus];
-    return textKey ? t(textKey) : null;
-  }
-
-  private buildSourceBadge(
-    item: SlashCommandMenuItem,
-  ): { text: string; cls: string } | null {
-    const badge = item.source === 'skill' || item.source === 'skills-command'
-      ? { key: 'slashCommand.sourceBadge.skill' as const, cls: 'opencodian-slash-command-menu-badge--skill' }
-      : item.runtimeAvailable && item.hasProjectOverride
-        ? { key: 'slashCommand.sourceBadge.override' as const, cls: 'opencodian-slash-command-menu-badge--override' }
-        : item.runtimeAvailable
-          ? { key: 'slashCommand.sourceBadge.runtime' as const, cls: 'opencodian-slash-command-menu-badge--runtime' }
-          : { key: 'slashCommand.sourceBadge.project' as const, cls: 'opencodian-slash-command-menu-badge--project' };
-    return {
-      text: t(badge.key),
-      cls: badge.cls,
-    };
-  }
-
-  private buildSkillSourceText(item: SlashCommandMenuItem): string | null {
-    if (item.source !== 'skill' || !item.skillSource) {
-      return null;
-    }
-
-    switch (item.skillSource.kind) {
-      case 'project':
-        return t('slashCommand.skillSource.project');
-      case 'opencodeProject':
-        return t('slashCommand.skillSource.opencodeProject');
-      case 'plugin':
-        return t('slashCommand.skillSource.plugin', {
-          name: item.skillSource.pluginName ?? t('slashCommand.skillSource.pluginFallback'),
-        });
-      case 'global':
-        return t('slashCommand.skillSource.global');
-      case 'opencodeGlobal':
-        return t('slashCommand.skillSource.opencodeGlobal');
-      case 'custom':
-      default:
-        return t('slashCommand.skillSource.custom');
-    }
   }
 }

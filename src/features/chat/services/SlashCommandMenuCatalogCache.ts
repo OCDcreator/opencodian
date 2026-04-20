@@ -146,13 +146,13 @@ export class SlashCommandMenuCatalogCache {
       );
 
       const items = buildVisibleSlashCommandMenuItems(
-        mergeSlashCommandCatalog(
-          normalizeRuntimeCommands(runtimeCommandsResult),
+        mergeSlashCommandCatalog({
+          runtimeCommands: normalizeRuntimeCommands(runtimeCommandsResult),
           runtimeSkillSources,
           projectCommands,
           projectAgents,
-          new Set(this.host.getHiddenCommandIds()),
-        ),
+          hiddenCommandIds: new Set(this.host.getHiddenCommandIds()),
+        }),
       );
 
       if (generation === this.generation && this.pendingLoad?.token === token) {
