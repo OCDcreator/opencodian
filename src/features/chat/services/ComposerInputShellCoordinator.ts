@@ -6,7 +6,6 @@ import { createLogger } from '../../../shared';
 import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
-const MAX_VISIBLE_SLASH_COMMAND_ITEMS = 8;
 
 type SlashCommandMenuStatus =
   | 'idle'
@@ -384,7 +383,6 @@ export class ComposerInputShellCoordinator {
       this.visibleSlashCommandMenuItems = filterSlashCommandMenuItems(
         this.slashCommandMenuCatalogItems,
         query,
-        MAX_VISIBLE_SLASH_COMMAND_ITEMS,
       );
       this.selectedSlashCommandMenuItemIndex = 0;
       this.slashCommandMenuStatus = this.visibleSlashCommandMenuItems.length > 0

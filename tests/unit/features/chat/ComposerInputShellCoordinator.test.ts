@@ -234,6 +234,26 @@ describe('ComposerInputShellCoordinator', () => {
     ).toBeNull();
   });
 
+  it('renders every visible slash command when the query is empty', async () => {
+    const fixture = createFixture();
+    const commands = Array.from({ length: 12 }, (_, index) => {
+      const commandNumber = String(index + 1).padStart(2, '0');
+      return slashItem(`command-${commandNumber}`, `Command ${commandNumber}`);
+    });
+    fixture.setSlashCommandMenuItems(commands);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    expect(menuItems).toHaveLength(commands.length);
+    expect(menuItems.at(-1)?.textContent).toContain('/command-12');
+  });
+
   it('mounts slash autocomplete as an overlay above the composer shell', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([

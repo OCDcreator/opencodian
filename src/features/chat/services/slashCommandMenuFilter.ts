@@ -34,11 +34,10 @@ function fuzzyScore(text: string, query: string): number {
 export function filterSlashCommandMenuItems(
   items: SlashCommandMenuItem[],
   query: string,
-  maxCount: number,
 ): SlashCommandMenuItem[] {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
-    return items.slice(0, maxCount);
+    return items;
   }
 
   const scoredItems: FuzzyMatchResult[] = [];
@@ -54,5 +53,5 @@ export function filterSlashCommandMenuItems(
   }
 
   scoredItems.sort((left, right) => right.score - left.score);
-  return scoredItems.slice(0, maxCount).map((result) => result.item);
+  return scoredItems.map((result) => result.item);
 }
