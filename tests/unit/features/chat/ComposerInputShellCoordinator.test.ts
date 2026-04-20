@@ -401,7 +401,7 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     expect(badges.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('renders menu options without native button chrome so long descriptions can expand', async () => {
+  it('renders neutral menu options with full descriptions available for clipped UI', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
       slashItem('build-mcp-server', 'This skill should be used when the user asks to build an MCP server, create an MCP integration, wrap an API for Claude, or expose tools to Claude.'),
@@ -413,10 +413,12 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     await flushAsync();
 
     const menuItem = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu-item');
+    const description = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu-description');
 
     expect(menuItem?.tagName).toBe('DIV');
     expect(menuItem?.getAttribute('role')).toBe('option');
     expect(menuItem?.textContent).toContain('This skill should be used');
+    expect(description?.getAttribute('title')).toContain('This skill should be used');
   });
 
   it('highlights items on mouseenter and selects on click', async () => {

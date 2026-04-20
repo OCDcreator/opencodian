@@ -537,6 +537,7 @@ export class ComposerInputShellCoordinator {
         itemEl.createDiv({
           cls: 'opencodian-slash-command-menu-description',
           text: item.description,
+          attr: { title: item.description },
         });
       }
     });
