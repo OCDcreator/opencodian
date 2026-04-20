@@ -50,6 +50,7 @@ function createHost(
     getCurrentConversationRevertState: jest.fn().mockReturnValue(null),
     getActiveTabId: jest.fn().mockReturnValue(null),
     getSessionMessages: jest.fn().mockResolvedValue([]),
+    getCanonicalSessionMessages: jest.fn().mockReturnValue([]),
     getSessionRevertState: jest.fn().mockResolvedValue(null),
     hydrateOpenCodeMessage: jest.fn(),
     shouldRenderConversationMessage: jest.fn().mockReturnValue(true),

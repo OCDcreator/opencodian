@@ -81,6 +81,12 @@ function createFixture() {
       fingerprint: 'sync-fingerprint',
       revertState: { messageID: 'assistant-1' },
     }),
+    syncConversationMessagesFromCanonicalState: jest.fn().mockResolvedValue({
+      changed: true,
+      messages: hiddenConversation.messages,
+      fingerprint: 'canonical-fingerprint',
+      revertState: { messageID: 'assistant-1' },
+    }),
     setCurrentConversationRevertState: jest.fn(),
     applySyncedConversationUpdate: jest.fn().mockResolvedValue(undefined),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
@@ -101,6 +107,13 @@ function createFixture() {
       conversationSyncBridge.getConversationSyncFingerprint(messages)),
     syncConversationMessagesFromServer: jest.fn((conversation, tabId, reason, options) =>
       conversationSyncBridge.syncConversationMessagesFromServer(
+        conversation,
+        tabId,
+        reason,
+        options,
+      )),
+    syncConversationMessagesFromCanonicalState: jest.fn((conversation, tabId, reason, options) =>
+      conversationSyncBridge.syncConversationMessagesFromCanonicalState(
         conversation,
         tabId,
         reason,
@@ -168,6 +181,12 @@ describe('ConversationSyncLoadRuntimeViewHostFactory', () => {
         fingerprint: 'sync-fingerprint-2',
         revertState: { messageID: 'assistant-2' },
       }),
+      syncConversationMessagesFromCanonicalState: jest.fn().mockResolvedValue({
+        changed: true,
+        messages: fixture.hiddenConversation.messages,
+        fingerprint: 'canonical-fingerprint-2',
+        revertState: { messageID: 'assistant-2' },
+      }),
       setCurrentConversationRevertState: jest.fn(),
       applySyncedConversationUpdate: jest.fn().mockResolvedValue(undefined),
       renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
@@ -206,12 +225,34 @@ describe('ConversationSyncLoadRuntimeViewHostFactory', () => {
       'background-sync',
       undefined,
     );
+    await expect(
+      conversationSyncViewHost.syncConversationMessagesFromCanonicalState(
+        fixture.hiddenConversation,
+        'tab-hidden',
+        'sync-event:message.updated',
+      ),
+    ).resolves.toMatchObject({
+      fingerprint: 'canonical-fingerprint-2',
+      revertState: { messageID: 'assistant-2' },
+    });
+    expect(nextBridge.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      fixture.hiddenConversation,
+      'tab-hidden',
+      'sync-event:message.updated',
+      undefined,
+    );
     expect(nextBridge.applySyncedConversationUpdate).toHaveBeenCalledWith([], []);
     expect(nextBridge.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-hidden');
     expect(nextStore.loadConversations).toHaveBeenCalledTimes(1);
     expect(nextBridge.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'assistant-3',
     });
+  });
+});
+
+describe('ConversationSyncLoadRuntimeViewHostFactory load policy', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   it('keeps the load-sync decision inside the factory seam', () => {
@@ -274,6 +315,12 @@ describe('ConversationSyncLoadRuntimeViewHostFactory', () => {
         { forceServerSync: true },
       ),
     ).toBe(true);
+  });
+});
+
+describe('ConversationSyncLoadRuntimeViewHostFactory late binding', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   it('keeps the flattened sync/load seam late-bound to the latest collaborators', async () => {

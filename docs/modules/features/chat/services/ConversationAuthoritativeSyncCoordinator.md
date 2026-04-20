@@ -8,7 +8,7 @@
 `ConversationAuthoritativeSyncCoordinator` 现在作为 authoritative sync facade，保留 latest-user hydration owner，并把 conversation reload / merge 细节继续压回相邻厚 owner。它统一负责：
 
 - latest optimistic user bubble 的 server hydration、visible-text guard 与 hydrated writeback
-- 对外暴露稳定的 `mergeClientOnlyMessageFields()` / `syncConversationMessagesFromServer()` / `syncLatestUserMessageFromServer()` 入口
+- 对外暴露稳定的 `mergeClientOnlyMessageFields()` / `syncConversationMessagesFromServer()` / `syncConversationMessagesFromCanonicalState()` / `syncLatestUserMessageFromServer()` 入口
 - 把 conversation reload / auth-sync lifecycle 委托给 `ConversationAuthoritativeReloadCoordinator`
 - 把 client-only field / modelId / rich block merge 规则委托给 `ConversationAuthoritativeMessageMergeCoordinator`
 
@@ -19,6 +19,7 @@
 ```typescript
 export interface ConversationAuthoritativeSyncHost {
   getSessionMessages(sessionId: string): Promise<...>;
+  getCanonicalSessionMessages(sessionId: string): ...;
   getSessionRevertState(sessionId: string): Promise<...>;
   hydrateOpenCodeMessage(...): ChatMessage;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
@@ -34,12 +35,14 @@ export class ConversationAuthoritativeSyncCoordinator {
   mergeClientOnlyMessageFields(...): ChatMessage;
   syncLatestUserMessageFromServer(...): Promise<void>;
   syncConversationMessagesFromServer(...): Promise<...>;
+  syncConversationMessagesFromCanonicalState(...): Promise<...>;
 }
 ```
 
 ## 关键行为
 
 - `syncConversationMessagesFromServer()` 仍保留原有 public contract，但 conversation-level reload / auth-sync 细节已转交给 `ConversationAuthoritativeReloadCoordinator`。
+- `syncConversationMessagesFromCanonicalState()` 会在已有 canonical session graph 可用时，复用同一套 merge/apply owner 做本地 authoritative-like merge；当 graph 缺口存在时则由上层 bridge 继续回退到 server reload。
 - `mergeClientOnlyMessageFields()` 仍保留原有 public contract，但实际 field/model merge 规则已转交给 `ConversationAuthoritativeMessageMergeCoordinator`。
 - `syncLatestUserMessageFromServer()` 继续保留 optimistic user bubble 的 visible-text mismatch guard；只有 source/message text 真正对齐时才会替换本地 message，并继续触发 hydrated anchor writeback 与单条 user rerender。
 - host 依赖与外部调用方式保持不变，因此 `ConversationSyncBridge`、send pipeline 与 view wrapper 不需要感知这次内部 owner 收口。

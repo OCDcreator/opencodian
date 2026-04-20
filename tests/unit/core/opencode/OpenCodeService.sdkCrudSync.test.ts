@@ -219,17 +219,26 @@ describe('OpenCodeService SDK sync events', () => {
       },
     ]);
   });
+});
 
-  it('emits message.updated payloads from SDK sync events', async () => {
+describe('OpenCodeService SDK sync message mutations', () => {
+  it('applies and emits message.updated payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
-    const updates: Array<{ sessionId: string; type: string; messageId: string | null }> = [];
+    const updates: Array<unknown> = [];
     mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
       stream: (async function* () {
         yield {
           type: 'message.updated',
           properties: {
             sessionID: 'sdk-session',
-            info: { id: 'msg-1' },
+            info: {
+              id: 'msg-1',
+              sessionID: 'sdk-session',
+              role: 'assistant',
+              time: { created: 1 },
+              providerID: 'openai',
+              modelID: 'gpt-test',
+            },
           },
         };
       })(),
@@ -238,7 +247,7 @@ describe('OpenCodeService SDK sync events', () => {
     const dispose = (service as unknown as {
       subscribeToSessionSyncEvents: (listener: (update: unknown) => void) => () => void;
     }).subscribeToSessionSyncEvents((update) => {
-      updates.push(update as { sessionId: string; type: string; messageId: string | null });
+      updates.push(update);
     });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -248,33 +257,64 @@ describe('OpenCodeService SDK sync events', () => {
       {
         sessionId: 'sdk-session',
         type: 'message.updated',
-        messageId: 'msg-1',
+        info: {
+          id: 'msg-1',
+          sessionID: 'sdk-session',
+          role: 'assistant',
+          time: { created: 1 },
+          providerID: 'openai',
+          modelID: 'gpt-test',
+        },
       },
+    ]);
+    expect(service.getCanonicalSessionState('sdk-session')?.messages).toEqual([
+      expect.objectContaining({
+        id: 'msg-1',
+        role: 'assistant',
+        providerID: 'openai',
+      }),
     ]);
   });
 
-  it('emits message.part.updated payloads from SDK sync events', async () => {
+  it('applies and emits message part mutation payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
-    const updates: Array<{
-      sessionId: string;
-      type: string;
-      messageId: string | null;
-      partId: string | null;
-      partType: string | null;
-      time: number | null;
-    }> = [];
+    const updates: Array<unknown> = [];
     mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
       stream: (async function* () {
+        yield {
+          type: 'message.updated',
+          properties: {
+            sessionID: 'sdk-session',
+            info: {
+              id: 'msg-1',
+              sessionID: 'sdk-session',
+              role: 'assistant',
+              time: { created: 1 },
+            },
+          },
+        };
         yield {
           type: 'message.part.updated',
           properties: {
             sessionID: 'sdk-session',
             part: {
               id: 'part-1',
+              sessionID: 'sdk-session',
               type: 'tool',
               messageID: 'msg-1',
+              text: 'Hel',
             },
             time: 42,
+          },
+        };
+        yield {
+          type: 'message.part.delta',
+          properties: {
+            sessionID: 'sdk-session',
+            messageID: 'msg-1',
+            partID: 'part-1',
+            field: 'text',
+            delta: 'lo',
           },
         };
       })(),
@@ -283,14 +323,7 @@ describe('OpenCodeService SDK sync events', () => {
     const dispose = (service as unknown as {
       subscribeToSessionSyncEvents: (listener: (update: unknown) => void) => () => void;
     }).subscribeToSessionSyncEvents((update) => {
-      updates.push(update as {
-        sessionId: string;
-        type: string;
-        messageId: string | null;
-        partId: string | null;
-        partType: string | null;
-        time: number | null;
-      });
+      updates.push(update);
     });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -299,15 +332,113 @@ describe('OpenCodeService SDK sync events', () => {
     expect(updates).toEqual([
       {
         sessionId: 'sdk-session',
+        type: 'message.updated',
+        info: {
+          id: 'msg-1',
+          sessionID: 'sdk-session',
+          role: 'assistant',
+          time: { created: 1 },
+        },
+      },
+      {
+        sessionId: 'sdk-session',
         type: 'message.part.updated',
+        part: {
+          id: 'part-1',
+          sessionID: 'sdk-session',
+          type: 'tool',
+          messageID: 'msg-1',
+          text: 'Hel',
+        },
+        time: 42,
+      },
+      {
+        sessionId: 'sdk-session',
+        type: 'message.part.delta',
         messageId: 'msg-1',
         partId: 'part-1',
-        partType: 'tool',
-        time: 42,
+        field: 'text',
+        delta: 'lo',
+      },
+    ]);
+    expect(service.getCanonicalSessionMessages('sdk-session')).toEqual([
+      {
+        info: expect.objectContaining({
+          id: 'msg-1',
+          role: 'assistant',
+        }),
+        parts: [
+          expect.objectContaining({
+            id: 'part-1',
+            messageID: 'msg-1',
+            text: 'Hello',
+          }),
+        ],
       },
     ]);
   });
+});
 
+describe('OpenCodeService SDK sync removals', () => {
+  it('applies message and part removals from SDK sync events', async () => {
+    service = createServiceWithSdkFlags();
+    mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+      stream: (async function* () {
+        yield {
+          type: 'message.updated',
+          properties: {
+            sessionID: 'sdk-session',
+            info: {
+              id: 'msg-1',
+              sessionID: 'sdk-session',
+              role: 'assistant',
+              time: { created: 1 },
+            },
+          },
+        };
+        yield {
+          type: 'message.part.updated',
+          properties: {
+            sessionID: 'sdk-session',
+            part: {
+              id: 'part-1',
+              sessionID: 'sdk-session',
+              messageID: 'msg-1',
+              type: 'text',
+              text: 'temporary',
+            },
+          },
+        };
+        yield {
+          type: 'message.part.removed',
+          properties: {
+            sessionID: 'sdk-session',
+            messageID: 'msg-1',
+            partID: 'part-1',
+          },
+        };
+        yield {
+          type: 'message.removed',
+          properties: {
+            sessionID: 'sdk-session',
+            messageID: 'msg-1',
+          },
+        };
+      })(),
+    });
+
+    const dispose = (service as unknown as {
+      subscribeToSessionSyncEvents: (listener: (update: unknown) => void) => () => void;
+    }).subscribeToSessionSyncEvents(jest.fn());
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    dispose();
+
+    expect(service.getCanonicalSessionMessages('sdk-session')).toEqual([]);
+  });
+});
+
+describe('OpenCodeService SDK sync reload events', () => {
   it('emits session.diff payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
     const updates: Array<{ sessionId: string; type: string }> = [];

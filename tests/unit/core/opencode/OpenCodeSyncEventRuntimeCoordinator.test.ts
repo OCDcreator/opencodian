@@ -35,6 +35,7 @@ function createHost(
     subscribeToSyncEvents: jest.fn((signal) => Promise.resolve(createSignalBoundStream(signal))),
     normalizeSessionTodos: jest.fn((response) => response as SessionTodo[]),
     normalizeSessionStatus: jest.fn((status) => status as SessionActivityStatus),
+    applySessionSyncEvent: jest.fn(),
     isTransientConnectivityError: jest.fn(() => false),
     logSyncEventStreamFailure: jest.fn(),
     checkHealth: jest.fn().mockResolvedValue(true),
@@ -66,7 +67,19 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
             type: 'message.updated',
             properties: {
               sessionID: 'session-1',
-              info: { id: 'msg-1' },
+              info: {
+                id: 'msg-1',
+                sessionID: 'session-1',
+                role: 'assistant',
+                time: { created: 1 },
+              },
+            },
+          },
+          {
+            type: 'message.removed',
+            properties: {
+              sessionID: 'session-1',
+              messageID: 'msg-old',
             },
           },
           {
@@ -75,10 +88,29 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
               sessionID: 'session-1',
               part: {
                 id: 'part-1',
+                sessionID: 'session-1',
                 type: 'tool',
                 messageID: 'msg-1',
               },
               time: 42,
+            },
+          },
+          {
+            type: 'message.part.delta',
+            properties: {
+              sessionID: 'session-1',
+              messageID: 'msg-1',
+              partID: 'part-1',
+              field: 'text',
+              delta: 'hi',
+            },
+          },
+          {
+            type: 'message.part.removed',
+            properties: {
+              sessionID: 'session-1',
+              messageID: 'msg-1',
+              partID: 'part-1',
             },
           },
           {
@@ -126,23 +158,54 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
       {
         sessionId: 'session-1',
         type: 'message.updated',
-        messageId: 'msg-1',
+        info: {
+          id: 'msg-1',
+          sessionID: 'session-1',
+          role: 'assistant',
+          time: { created: 1 },
+        },
+      },
+      {
+        sessionId: 'session-1',
+        type: 'message.removed',
+        messageId: 'msg-old',
       },
       {
         sessionId: 'session-1',
         type: 'message.part.updated',
+        part: {
+          id: 'part-1',
+          sessionID: 'session-1',
+          type: 'tool',
+          messageID: 'msg-1',
+        },
+        time: 42,
+      },
+      {
+        sessionId: 'session-1',
+        type: 'message.part.delta',
         messageId: 'msg-1',
         partId: 'part-1',
-        partType: 'tool',
-        time: 42,
+        field: 'text',
+        delta: 'hi',
+      },
+      {
+        sessionId: 'session-1',
+        type: 'message.part.removed',
+        messageId: 'msg-1',
+        partId: 'part-1',
       },
       {
         sessionId: 'session-1',
         type: 'session.diff',
       },
     ]);
+    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(6);
+    expect(host.applySessionSyncEvent).toHaveBeenNthCalledWith(1, syncUpdates[0]);
   });
+});
 
+describe('OpenCodeSyncEventRuntimeCoordinator lifecycle', () => {
   it('aborts the SDK stream when the last listener unsubscribes', async () => {
     let activeSignal: AbortSignal | null = null;
     const host = createHost({

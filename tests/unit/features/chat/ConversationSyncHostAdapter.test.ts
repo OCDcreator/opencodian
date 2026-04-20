@@ -117,6 +117,14 @@ function createViewHost(options?: {
         revertState: null,
       },
     ),
+    syncConversationMessagesFromCanonicalState: jest.fn().mockResolvedValue(
+      options?.syncResult ?? {
+        changed: true,
+        messages: currentConversation?.messages ?? [],
+        fingerprint: 'canonical-fingerprint',
+        revertState: null,
+      },
+    ),
     applySyncedConversationUpdate: jest.fn().mockResolvedValue(undefined),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
   };
@@ -187,6 +195,14 @@ describe('ConversationSyncHostAdapter', () => {
         { suppressVerboseLogs: true },
       ),
     ).resolves.toEqual(syncResult);
+    await expect(
+      hosts.bridgeHost.syncConversationMessagesFromCanonicalState(
+        currentConversation,
+        'tab-active',
+        'sync-event:message.updated',
+        { suppressVerboseLogs: true },
+      ),
+    ).resolves.toEqual(syncResult);
 
     await hosts.visiblePostSyncRouterHost.applySyncedConversationUpdate(
       currentConversation.messages,
@@ -198,6 +214,12 @@ describe('ConversationSyncHostAdapter', () => {
       currentConversation,
       'tab-active',
       'visible-background-sync',
+      { suppressVerboseLogs: true },
+    );
+    expect(viewHost.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      currentConversation,
+      'tab-active',
+      'sync-event:message.updated',
       { suppressVerboseLogs: true },
     );
     expect(viewHost.applySyncedConversationUpdate).toHaveBeenCalledWith(

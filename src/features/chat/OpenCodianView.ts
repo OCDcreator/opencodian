@@ -1862,6 +1862,8 @@ export class OpenCodianView extends ItemView {
       getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
       syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+      syncConversationMessagesFromCanonicalState: (conversation, tabId, reason, options) =>
+        this.syncConversationMessagesFromCanonicalState(conversation, tabId, reason, options),
       setCurrentConversationRevertState: (revertState) => {
         this.currentConversationRevertState = revertState;
       },
@@ -1884,6 +1886,8 @@ export class OpenCodianView extends ItemView {
       getCurrentConversationRevertState: () => this.currentConversationRevertState,
       getActiveTabId: () => this.getActiveTabId(),
       getSessionMessages: (sessionId) => this.plugin.openCodeService.getSessionMessages(sessionId),
+      getCanonicalSessionMessages: (sessionId) =>
+        this.plugin.openCodeService.getCanonicalSessionMessages(sessionId),
       getSessionRevertState: (sessionId) => this.plugin.openCodeService.getSessionRevertState(sessionId),
       hydrateOpenCodeMessage: (info, parts, vaultBasePath) =>
         this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts, vaultBasePath),
@@ -2004,6 +2008,9 @@ export class OpenCodianView extends ItemView {
           tabId,
           reason,
         ),
+      applySessionSyncEvent: (tabId, update) => {
+        this.conversationSyncBridge.applySessionSyncEvent(tabId, update);
+      },
     };
   }
 
@@ -4497,6 +4504,25 @@ export class OpenCodianView extends ItemView {
     revertState: ConversationRevertState | null;
   }> {
     return this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromServer(
+      conversation,
+      tabId,
+      reason,
+      options,
+    );
+  }
+
+  private async syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null = this.getActiveTabId(),
+    reason = 'sync-event',
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<{
+    messages: ChatMessage[];
+    changed: boolean;
+    fingerprint: string;
+    revertState: ConversationRevertState | null;
+  } | null> {
+    return this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromCanonicalState(
       conversation,
       tabId,
       reason,

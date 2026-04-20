@@ -238,7 +238,7 @@ loaded-conversation 在消息拿到之后那段 `syncBackgroundTaskStateFromConv
 
 tab stream-like badge、background-task badge、rewind/fork 按钮禁用态，以及 attention 标记写回现在也不再由 view 自己散落地直接操作 `TabManager` 或消息区 DOM：这些 runtime→UI 写回统一交给 `runtime/TabRuntimeStateBridge.ts`，view 只保留 wrapper 方法与 host bridge。
 
-除此之外，`ConversationSessionSignalRuntime` 现在会接入 `message.updated`、`message.part.updated` 和 `session.diff`，先按 session 匹配 tab，再交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
+除此之外，`ConversationSessionSignalRuntime` 现在会接入 `message.updated`、`message.removed`、`message.part.updated`、`message.part.removed`、`message.part.delta` 和 `session.diff`：前五类会先按 session 匹配 tab，再交给 `ConversationSyncBridge` 走 canonical local merge；只有 `session.diff` 继续交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，作为 authoritative reload 与 gap recovery 入口。
 
 ### question dock / pending question 编排
 

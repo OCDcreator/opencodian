@@ -26,6 +26,7 @@ export interface ConversationSyncViewHost {
   getConversationById(id: string): Promise<Conversation | null>;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
   syncConversationMessagesFromServer(...): Promise<ConversationSyncBridgeSyncResult>;
+  syncConversationMessagesFromCanonicalState(...): Promise<ConversationSyncBridgeSyncResult | null>;
   applySyncedConversationUpdate(...): Promise<void>;
   renderBackgroundTaskIndicatorIfNeeded(...): Promise<void>;
 }
@@ -40,7 +41,7 @@ export function createConversationSyncServices(...): ConversationSyncServices;
 
 - `createConversationSyncHosts()` 从同一个 `ConversationSyncViewHost` 派生出 runtime/orchestration/bridge 三组 host
 - 三组 host 都继续读取同一份 tab runtime、active tab、conversation 查询和 render bridge，避免 view 内部维护重复闭包
-- bridge host 仍只暴露 `syncConversationMessagesFromServer()`、`applySyncedConversationUpdate()` 和 `renderBackgroundTaskIndicatorIfNeeded()` 这些真正依赖 view 的入口
+- bridge host 现在同时暴露 `syncConversationMessagesFromServer()` 与 `syncConversationMessagesFromCanonicalState()`，让 `ConversationSyncBridge` 可以在同一套 view seam 上切换 authoritative reload 与 canonical local merge
 
 ### sync service bundle
 

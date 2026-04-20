@@ -30,7 +30,7 @@
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodePromptRequestBuilder.test.ts tests/unit/core/opencode/OpenCodeService.sdkPromptTransport.test.ts tests/unit/features/chat/MessageSendPreparationService.test.ts`
 - **Acceptance**: ordinary text, context/file, system/tools/agent options, and optimistic seed use the same stable structured IDs.
 
-### [NEXT] Task 3 - Convert sync-event handling from reload signal to graph mutation
+### [DONE] Task 3 - Convert sync-event handling from reload signal to graph mutation
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 3.
 - **Goal**: Let `message.updated`, `message.removed`, `message.part.updated`, `message.part.removed`, and `session.diff` mutate canonical state directly.

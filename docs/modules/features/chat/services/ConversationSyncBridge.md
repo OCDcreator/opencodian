@@ -5,11 +5,11 @@
 
 ## 概述
 
-`ConversationSyncBridge` 把 `OpenCodianView` 里 visible conversation sync、signal sync 和 background-tab polling sync 的 **callback 装配与 server-sync reason 绑定** 独立出来，专门负责：
+`ConversationSyncBridge` 把 `OpenCodianView` 里 visible conversation sync、signal sync 和 background-tab polling sync 的 **callback 装配与 sync source 绑定** 独立出来，专门负责：
 
 - 把 `ConversationSyncOrchestrationService` 的 loop/signal dispatch 回调统一接到同一条 bridge
 - 让 visible sync 继续通过 `ConversationSyncRuntimeCoordinator` 获取 active-tab runtime guard
-- 为 signal/background sync 统一绑定 server-sync reason，并把 post-sync 路由委托给 dedicated router
+- 为 signal/background sync 区分 canonical local-merge 与 authoritative reload 两条路径，并把 post-sync 路由委托给 dedicated router
 - 为 visible sync 只负责 transport callback，post-sync request shaping 与 outcome dispatch 改由 dedicated router 承接
 
 它不负责 tab / conversation 选择，也不负责 runtime lock / baseline fingerprint 判定；这些职责仍分别留在 `ConversationSyncOrchestrationService` 与 `ConversationSyncRuntimeCoordinator`。它也不直接操作消息 DOM，只把 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类 render host 保留给 `OpenCodianView`，而这些 host 现在由 `ConversationSyncHostAdapter` 统一装配；view 再通过 `ConversationSyncBridge` 模块内联导出的 port builder 把 loop / signal / visible-follow-up 端口分发给相邻 consumer。
@@ -19,10 +19,8 @@
 ```typescript
 export interface ConversationSyncBridgeHost {
   getCurrentConversation(): Conversation | null;
-  getTabRuntimeState(tabId: TabId | null): ConversationSyncBridgeRuntime | null;
   syncConversationMessagesFromServer(...): Promise<ConversationSyncBridgeSyncResult>;
-  applySyncedConversationUpdate(...): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(...): Promise<void>;
+  syncConversationMessagesFromCanonicalState(...): Promise<ConversationSyncBridgeSyncResult | null>;
 }
 
 export class ConversationSyncBridge {
@@ -30,6 +28,7 @@ export class ConversationSyncBridge {
   stopConversationSyncLoop(): void;
   clearScheduledSignalConversationSync(...): void;
   scheduleConversationSyncFromSignal(...): void;
+  applySessionSyncEvent(...): void;
   syncVisibleConversationInBackground(): Promise<void>;
   syncBackgroundTaskTabsInBackground(): Promise<void>;
 }
@@ -46,7 +45,9 @@ export class ConversationSyncBridge {
 ### signal / background sync bridge
 
 - `scheduleConversationSyncFromSignal()` 不再在 view 里内联拼装 hidden-tab callback，而是统一交给 bridge 组装
-- signal sync 会复用 orchestration 提供的 merged reason，并绑定 `sync-event:${reason}` 的 server-sync 标识
+- `applySessionSyncEvent()` 会把非 `session.diff` 的 message / part sync 直接路由到 canonical graph merge：先尝试从 `OpenCodeService` 的 canonical session graph 生成本地 sync 结果，再复用既有 visible/background post-sync router
+- 当 canonical graph 暂时缺口（例如当前 tab 还没拿到该 session snapshot）时，bridge 会回退到 `syncConversationMessagesFromServer()` 做 gap recovery
+- `scheduleConversationSyncFromSignal()` 继续保留给 `session.diff` 这类 authoritative reload signal，并复用 orchestration 提供的 merged reason 绑定 `sync-event:${reason}` 的 server-sync 标识
 - signal/background-tab sync 完成后，bridge 会把 context 与 `syncResult` 委托给 `ConversationSyncBackgroundPostSyncRouter`
 - hidden-tab `lastConversationSyncFingerprint` writeback 与 post-sync option shaping 不再留在 bridge 内部
 

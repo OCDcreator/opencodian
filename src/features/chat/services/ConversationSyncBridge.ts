@@ -90,6 +90,12 @@ export interface ConversationSyncBridgeHost {
     reason: string,
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationSyncBridgeSyncResult>;
+  syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason: string,
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<ConversationSyncBridgeSyncResult | null>;
 }
 
 export interface ConversationSyncBridgeRuntimeCoordinator {
@@ -114,6 +120,14 @@ export interface ConversationSyncBridgeOrchestration {
       syncTabConversation: (context: SignalConversationSyncContext) => Promise<void>;
     },
   ): void;
+  syncConversationFromSignal(
+    tabId: TabId | null,
+    reason: string,
+    callbacks: {
+      syncVisibleConversation: () => Promise<void>;
+      syncTabConversation: (context: SignalConversationSyncContext) => Promise<void>;
+    },
+  ): Promise<void>;
   syncBackgroundTaskTabs(
     callback: (context: TabConversationSyncContext) => Promise<void>,
   ): Promise<void>;
@@ -186,6 +200,23 @@ export class ConversationSyncBridge {
     );
   }
 
+  applySessionSyncEvent(tabId: TabId | null, update: SessionSyncEventUpdate): void {
+    if (update.type === 'session.diff') {
+      this.scheduleConversationSyncFromSignal(tabId, update.type);
+      return;
+    }
+
+    void this.orchestrationService.syncConversationFromSignal(
+      tabId,
+      update.type,
+      {
+        syncVisibleConversation: () => this.syncVisibleConversationFromCanonicalState(update),
+        syncTabConversation: (context) =>
+          this.syncSignalTabConversationFromCanonicalState(context, update),
+      },
+    );
+  }
+
   async syncVisibleConversationInBackground(): Promise<void> {
     await this.runtimeCoordinator.runVisibleConversationSync(
       this.host.getCurrentConversation(),
@@ -233,6 +264,70 @@ export class ConversationSyncBridge {
       `sync-event:${syncContext.reason}`,
       { suppressVerboseLogs: true },
     );
+
+    await this.backgroundPostSyncRouter.routeSignalSyncComplete({
+      syncContext,
+      syncResult,
+    });
+  }
+
+  private async syncVisibleConversationFromCanonicalState(
+    update: Exclude<SessionSyncEventUpdate, { type: 'session.diff' }>,
+  ): Promise<void> {
+    await this.runtimeCoordinator.runVisibleConversationSync(
+      this.host.getCurrentConversation(),
+      async (syncContext) => {
+        const { conversation } = syncContext;
+        if (conversation.openCodeSessionId !== update.sessionId) {
+          return;
+        }
+
+        const previousMessages = [...conversation.messages];
+        const reason = `sync-event:${update.type}`;
+        const syncResult =
+          await this.host.syncConversationMessagesFromCanonicalState(
+            conversation,
+            syncContext.tabId,
+            reason,
+            { suppressVerboseLogs: true },
+          )
+          ?? await this.host.syncConversationMessagesFromServer(
+            conversation,
+            syncContext.tabId,
+            reason,
+            { suppressVerboseLogs: true },
+          );
+
+        await this.visiblePostSyncRouter.routeVisibleSyncComplete({
+          syncContext,
+          previousMessages,
+          syncResult,
+        });
+      },
+    );
+  }
+
+  private async syncSignalTabConversationFromCanonicalState(
+    syncContext: SignalConversationSyncContext,
+    update: Exclude<SessionSyncEventUpdate, { type: 'session.diff' }>,
+  ): Promise<void> {
+    if (syncContext.conversation.openCodeSessionId !== update.sessionId) {
+      return;
+    }
+
+    const reason = `sync-event:${syncContext.reason}`;
+    const syncResult =
+      await this.host.syncConversationMessagesFromCanonicalState(
+        syncContext.conversation,
+        syncContext.tabId,
+        reason,
+        { suppressVerboseLogs: true },
+      );
+
+    if (!syncResult) {
+      await this.syncSignalTabConversation(syncContext);
+      return;
+    }
 
     await this.backgroundPostSyncRouter.routeSignalSyncComplete({
       syncContext,

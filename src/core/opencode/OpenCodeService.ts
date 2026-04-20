@@ -222,6 +222,7 @@ export class OpenCodeService {
       },
       normalizeSessionTodos: (response) => this.normalizeSessionTodos(response),
       normalizeSessionStatus: (status) => this.normalizeSessionStatus(status),
+      applySessionSyncEvent: (update) => this.applyCanonicalSyncEvent(update),
       isTransientConnectivityError: (error) => this.diagnostics.isTransientConnectivityError(error),
       logSyncEventStreamFailure: (error) =>
         logServiceWarning('global.sync-event', 'SDK sync event stream failed', error),
@@ -602,6 +603,18 @@ export class OpenCodeService {
 
   getCanonicalSessionState(sessionId: string): OpenCodeCanonicalSessionState | null {
     return this.sessionStateStore.getSessionState(sessionId);
+  }
+
+  getCanonicalSessionMessages(sessionId: string): OpenCodeSessionMessageWithParts[] | null {
+    const state = this.sessionStateStore.getSessionState(sessionId);
+    if (!state) {
+      return null;
+    }
+
+    return state.messages.map((info) => ({
+      info,
+      parts: state.partsByMessageID[info.id] ?? [],
+    }));
   }
 
   async getSessionTodos(sessionId: string): Promise<SessionTodo[]> {
@@ -1017,6 +1030,33 @@ export class OpenCodeService {
     messages: OpenCodeSessionMessageWithParts[],
   ): void {
     this.sessionStateStore.replaceSessionSnapshot(sessionId, messages);
+  }
+
+  private applyCanonicalSyncEvent(update: SessionSyncEventUpdate): void {
+    switch (update.type) {
+      case 'message.updated':
+        this.sessionStateStore.upsertMessage(update.info);
+        return;
+      case 'message.removed':
+        this.sessionStateStore.removeMessage(update.sessionId, update.messageId);
+        return;
+      case 'message.part.updated':
+        this.sessionStateStore.upsertPart(update.part);
+        return;
+      case 'message.part.removed':
+        this.sessionStateStore.removePart(update.messageId, update.partId);
+        return;
+      case 'message.part.delta':
+        this.sessionStateStore.appendPartDelta({
+          messageID: update.messageId,
+          partID: update.partId,
+          field: update.field,
+          delta: update.delta,
+        });
+        return;
+      case 'session.diff':
+        return;
+    }
   }
 
   private resolveStructuredPromptSendPayload(

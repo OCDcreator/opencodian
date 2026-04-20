@@ -58,7 +58,7 @@
 - `OpenCodeServiceRuntimeOptions`: 初始 managed pid、state 持久化回调、SDK feature flag 覆盖。
 - `SessionActivityStatus`: session 的 `idle` / `busy` / `retry` 状态。
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
-- `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
+- `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期、reducer-ready payload 归一化，以及把 sync mutation 先写入 `sessionStateStore` 后再广播给外部 listener。
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
 - `catalogQueries`: `OpenCodeCatalogQueryCoordinator` 实例，负责 directory-scoped provider/model/config lookup、tool registry/schema cache、MCP status/auth 写回，以及 provider/project/file/find/path/VCS/formatter/LSP query/admin surface。
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
@@ -150,7 +150,10 @@
 - 无论 SDK 还是 legacy，读到消息后都会调用 `applySessionRevertState()`，按 session 的 `revert.messageID` / `revert.partID` 过滤被回滚掉的消息或消息尾部 parts。
 - 过滤后的 authoritative snapshot 会立即写入 `sessionStateStore`，让服务层第一次拥有稳定的 canonical `session/message/part` truth layer。
 - `getCanonicalSessionState(sessionId)` 提供只读读取口，供后续 sync-event / render slice 共享同一份图状态。
+- `getCanonicalSessionMessages(sessionId)` 会把 canonical graph 重新组装成 `[{ info, parts[] }]` 视图，供 chat sync 层在不重拉 server 的情况下复用既有 hydrate / merge 路径。
 - `seedCanonicalUserMessage()` 提供发送前的 optimistic canonical seed seam，让准备阶段可以先把稳定 `messageID + parts[]` 写进同一个 graph owner，再等待 authoritative reload 覆盖。
+
+除此之外，`OpenCodeService` 现在还会在 sync-event runtime host seam 上直接执行 `applyCanonicalSyncEvent()`：`message.updated` / `message.removed` / `message.part.updated` / `message.part.removed` / `message.part.delta` 会先归并到 `sessionStateStore`，`session.diff` 仍只保留给后续 authoritative reload/gap recovery。
 
 默认会话指针现在由 `sessionLifecycle` 持有；调用方如果不显式传 `options.sessionId`，多数接口仍会落回当前 session，只是状态所有权不再直接留在 `OpenCodeService` 主类里。与 session tree/share/command/part 编辑有关的更厚 control surface 则继续落在 `sessionControl`，避免 `OpenCodeService` 再次直接编排这条链。
 

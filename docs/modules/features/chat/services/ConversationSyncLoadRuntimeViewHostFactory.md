@@ -8,6 +8,7 @@
 `ConversationSyncLoadRuntimeViewHostFactory` 把 conversation sync/load 共享 seam 的 host 装配，收束到一个更窄的 factory 模块，专门负责：
 
 - 直接从 `OpenCodianView` 暴露的扁平 conversation store、tab runtime 与 sync bridge seam 生成 `ConversationSyncLoadRuntimeHostAdapterHost`
+- 把 authoritative server sync 与 canonical local sync 两条 callback 都固定在同一份共享 seam 上
 - 在 factory 内固定 loaded-conversation server-sync 判定规则，避免这段 activation/sync policy 继续散落在 `OpenCodianView` 的 host 闭包里
 - 让 `OpenCodianView` 只保留更扁平的 sync/load seam，而不再通过额外 host-provider facade 维护 grouped factory-host 结构
 

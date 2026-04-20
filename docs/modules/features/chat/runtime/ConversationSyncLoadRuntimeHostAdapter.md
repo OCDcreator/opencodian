@@ -23,6 +23,7 @@ export interface ConversationSyncLoadRuntimeHostAdapterHost {
   shouldSyncConversationFromServer: ConversationLoadRuntimeBridgeHost['shouldSyncConversationFromServer'];
   getConversationSyncFingerprint: ConversationSyncViewHost['getConversationSyncFingerprint'];
   syncConversationMessagesFromServer: ConversationSyncViewHost['syncConversationMessagesFromServer'];
+  syncConversationMessagesFromCanonicalState: ConversationSyncViewHost['syncConversationMessagesFromCanonicalState'];
   setCurrentConversationRevertState: ConversationLoadRuntimeBridgeHost['setCurrentConversationRevertState'];
   applySyncedConversationUpdate: ConversationSyncViewHost['applySyncedConversationUpdate'];
   renderBackgroundTaskIndicatorIfNeeded: ConversationSyncViewHost['renderBackgroundTaskIndicatorIfNeeded'];
@@ -41,6 +42,7 @@ export function createConversationSyncLoadRuntimeHosts(
 ## 关键行为
 
 - `createConversationSyncLoadRuntimeHosts()` 从同一份 view seam 派生 `ConversationSyncViewHost`，让 sync runtime/orchestration/bridge 继续沿用既有 `ConversationSyncHostAdapter` 入口
+- sync host 侧会把 canonical local-sync callback 一并透传给 `ConversationSyncBridge`，避免 message/part sync 又额外绕回主 view
 - 同一个 adapter 额外派生 `ConversationLoadRuntimeBridgeHost`，把 load-conversation 的 reload、server-sync 判定与 revert-state 写回入口也收束到同一装配点
 - load host 会继续复用 sync callback 的返回值，但只向 `ConversationLoadRuntimeBridge` 暴露它真正需要的 `messages` 与 `revertState`
 

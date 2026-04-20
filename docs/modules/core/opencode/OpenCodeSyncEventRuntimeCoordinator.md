@@ -5,7 +5,7 @@
 
 ## 概述
 
-`OpenCodeSyncEventRuntimeCoordinator` 是 `OpenCodeService` 内部的 sync-event runtime owner。它把 `global.syncEvent.subscribe()` 相关的 session todo、session status、message updated、message part updated 与 session diff 监听集合、wanted state、订阅生命周期、重连等待和 emit 路径收束到同一个较厚 coordinator，避免这些状态机继续铺在 `OpenCodeService` 主门面里。
+`OpenCodeSyncEventRuntimeCoordinator` 是 `OpenCodeService` 内部的 sync-event runtime owner。它把 `global.syncEvent.subscribe()` 相关的 session todo、session status、message / part 增删改事件与 session diff 监听集合、wanted state、订阅生命周期、重连等待和 emit 路径收束到同一个较厚 coordinator，避免这些状态机继续铺在 `OpenCodeService` 主门面里。
 
 它不改变 `OpenCodeService` 的对外 API；上层仍然通过 `OpenCodeService.subscribeToSessionTodoUpdates()`、`subscribeToSessionStatusUpdates()` 和 `subscribeToSessionSyncEvents()` 订阅事件。
 
@@ -24,8 +24,8 @@
 ## 核心类型 / 接口
 
 - `SessionActivityStatus`: session 的 `idle` / `busy` / `retry` 状态。
-- `SessionSyncEventUpdate`: message/session 层 sync event 的 UI 消费形状。
-- `OpenCodeSyncEventRuntimeCoordinatorHost`: coordinator 的 host seam，提供 SDK 订阅、todo/status normalization、transient connectivity 判断、日志、健康检查和 delay。
+- `SessionSyncEventUpdate`: reducer-ready 的 session sync payload，直接携带 canonical message / part 数据，供 `OpenCodeService` 先写入 `OpenCodeSessionStateStore`，再交给 chat runtime 消费。
+- `OpenCodeSyncEventRuntimeCoordinatorHost`: coordinator 的 host seam，提供 SDK 订阅、todo/status normalization、canonical sync-event apply、transient connectivity 判断、日志、健康检查和 delay。
 - `OpenCodeSyncEventRuntimeCoordinator`: 持有 listener registry、wanted state、abort controller 与订阅 promise。
 
 ## 核心逻辑
@@ -50,11 +50,11 @@ SDK stream 事件会按现有语义路由：
 
 - `todo.updated` → normalized `SessionTodo[]`
 - `session.status` → normalized `SessionActivityStatus`
-- `message.updated` → `SessionSyncEventUpdate`
-- `message.part.updated` → `SessionSyncEventUpdate`
+- `message.updated` / `message.removed` → reducer-ready message mutation
+- `message.part.updated` / `message.part.removed` / `message.part.delta` → reducer-ready part mutation
 - `session.diff` → `SessionSyncEventUpdate`
 
-session id 仍按 `properties.sessionID`、`properties.info.sessionID`、`properties.part.sessionID` 的顺序解析；缺少 session id 的事件会被忽略。
+session id 仍按 `properties.sessionID`、`properties.info.sessionID`、`properties.part.sessionID` 的顺序解析；缺少 session id 的事件会被忽略。对 message / part 事件，coordinator 现在会先调用 host 的 canonical apply seam，再把同一份 `SessionSyncEventUpdate` 广播给 listener。
 
 ### Transient connectivity recovery
 

@@ -12,6 +12,8 @@ export interface ConversationSyncLoadRuntimeHostAdapterHost {
   shouldSyncConversationFromServer: ConversationLoadRuntimeBridgeHost['shouldSyncConversationFromServer'];
   getConversationSyncFingerprint: ConversationSyncViewHost['getConversationSyncFingerprint'];
   syncConversationMessagesFromServer: ConversationSyncViewHost['syncConversationMessagesFromServer'];
+  syncConversationMessagesFromCanonicalState:
+    ConversationSyncViewHost['syncConversationMessagesFromCanonicalState'];
   setCurrentConversationRevertState: ConversationLoadRuntimeBridgeHost['setCurrentConversationRevertState'];
   applySyncedConversationUpdate: ConversationSyncViewHost['applySyncedConversationUpdate'];
   renderBackgroundTaskIndicatorIfNeeded: ConversationSyncViewHost['renderBackgroundTaskIndicatorIfNeeded'];
@@ -41,6 +43,12 @@ export function createConversationSyncLoadRuntimeHosts(
         reason,
         options,
       ) => host.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+      syncConversationMessagesFromCanonicalState: (
+        conversation,
+        tabId,
+        reason,
+        options,
+      ) => host.syncConversationMessagesFromCanonicalState(conversation, tabId, reason, options),
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         host.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>

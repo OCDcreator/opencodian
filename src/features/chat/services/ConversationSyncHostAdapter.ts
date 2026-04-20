@@ -42,6 +42,12 @@ export interface ConversationSyncViewHost {
     reason: string,
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationSyncBridgeSyncResult>;
+  syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason: string,
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<ConversationSyncBridgeSyncResult | null>;
   applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
@@ -94,6 +100,12 @@ export function createConversationSyncHosts(
         reason: string,
         options?: { suppressVerboseLogs?: boolean },
       ) => viewHost.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+      syncConversationMessagesFromCanonicalState: (
+        conversation: Conversation,
+        tabId: TabId | null,
+        reason: string,
+        options?: { suppressVerboseLogs?: boolean },
+      ) => viewHost.syncConversationMessagesFromCanonicalState(conversation, tabId, reason, options),
     },
     visiblePostSyncRouterHost: {
       applySyncedConversationUpdate: (

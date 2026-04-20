@@ -19,12 +19,14 @@
 ```typescript
 export class ConversationAuthoritativeReloadCoordinator {
   syncConversationMessagesFromServer(...): Promise<ConversationAuthoritativeSyncResult>;
+  syncConversationMessagesFromCanonicalState(...): Promise<ConversationAuthoritativeSyncResult | null>;
 }
 ```
 
 ## 关键行为
 
 - `syncConversationMessagesFromServer()` 会先读取 server messages，再统一执行 hydrate、renderable filter、OMO background-task diagnostics 与 authoritative merge。
+- `syncConversationMessagesFromCanonicalState()` 会把 `OpenCodeService` 的 canonical graph 重新组装成 `[{ info, parts[] }]` snapshot，再复用同一套 hydrate / merge / fingerprint / save 路径；拿不到 graph 时返回 `null`，由上层 bridge 做 gap recovery。
 - merge 之后仍然按 timestamp 排序，并继续复用 per-tab `lastConversationSyncFingerprint` 判断本轮是否真的发生 authoritative 变化。
 - preserved interrupted assistants 的日志 fingerprint 仍写回 tab runtime，避免 background/signal sync 重复刷同一条 preservation 日志。
 - authoritative 变化发生时才会更新 `conversation.updatedAt` 并保存；无变化时仍会保留当前 message 集合与 fingerprint。

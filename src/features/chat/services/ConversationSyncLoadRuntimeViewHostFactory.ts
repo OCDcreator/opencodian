@@ -19,6 +19,7 @@ type ConversationSyncLoadBridgePort = Pick<
   ConversationSyncLoadRuntimeHostAdapterHost,
   | 'getConversationSyncFingerprint'
   | 'syncConversationMessagesFromServer'
+  | 'syncConversationMessagesFromCanonicalState'
   | 'setCurrentConversationRevertState'
   | 'applySyncedConversationUpdate'
   | 'renderBackgroundTaskIndicatorIfNeeded'
@@ -59,6 +60,8 @@ export function createConversationSyncLoadRuntimeViewHosts(
       host.getConversationSyncFingerprint(messages),
     syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
       host.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+    syncConversationMessagesFromCanonicalState: (conversation, tabId, reason, options) =>
+      host.syncConversationMessagesFromCanonicalState(conversation, tabId, reason, options),
     setCurrentConversationRevertState: (revertState) => {
       host.setCurrentConversationRevertState(revertState);
     },

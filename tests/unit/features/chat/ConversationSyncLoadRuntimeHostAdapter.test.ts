@@ -86,6 +86,7 @@ function createHost(): Mocked<ConversationSyncLoadRuntimeHostAdapterHost> {
     shouldSyncConversationFromServer: jest.fn().mockReturnValue(true),
     getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint:0'),
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue(syncResult),
+    syncConversationMessagesFromCanonicalState: jest.fn().mockResolvedValue(syncResult),
     setCurrentConversationRevertState: jest.fn(),
     applySyncedConversationUpdate: jest.fn().mockResolvedValue(undefined),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
@@ -120,6 +121,18 @@ describe('ConversationSyncLoadRuntimeHostAdapter', () => {
         hiddenConversation as Conversation,
         'tab-hidden',
         'background-sync',
+        { suppressVerboseLogs: true },
+      ),
+    ).resolves.toMatchObject({
+      changed: true,
+      fingerprint: 'sync-fingerprint',
+      revertState: { messageID: 'assistant-1' },
+    });
+    await expect(
+      conversationSyncViewHost.syncConversationMessagesFromCanonicalState(
+        hiddenConversation as Conversation,
+        'tab-hidden',
+        'sync-event:message.updated',
         { suppressVerboseLogs: true },
       ),
     ).resolves.toMatchObject({
@@ -170,6 +183,12 @@ describe('ConversationSyncLoadRuntimeHostAdapter', () => {
       hiddenConversation,
       'tab-hidden',
       'load-conversation',
+    );
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      hiddenConversation,
+      'tab-hidden',
+      'sync-event:message.updated',
+      { suppressVerboseLogs: true },
     );
     expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith([], []);
     expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-hidden');

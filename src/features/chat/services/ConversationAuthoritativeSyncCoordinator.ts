@@ -56,6 +56,7 @@ export interface ConversationAuthoritativeSyncHost {
   getCurrentConversationRevertState(): ConversationAuthoritativeSyncRevertState | null;
   getActiveTabId(): TabId | null;
   getSessionMessages(sessionId: string): Promise<OpenCodeSessionMessages>;
+  getCanonicalSessionMessages(sessionId: string): OpenCodeSessionMessages | null;
   getSessionRevertState(
     sessionId: string,
   ): Promise<ConversationAuthoritativeSyncRevertState | null>;
@@ -207,6 +208,20 @@ export class ConversationAuthoritativeSyncCoordinator {
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationAuthoritativeSyncResult> {
     return this.reloadCoordinator.syncConversationMessagesFromServer(
+      conversation,
+      tabId,
+      reason,
+      options,
+    );
+  }
+
+  async syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason = 'sync-event',
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<ConversationAuthoritativeSyncResult | null> {
+    return this.reloadCoordinator.syncConversationMessagesFromCanonicalState(
       conversation,
       tabId,
       reason,

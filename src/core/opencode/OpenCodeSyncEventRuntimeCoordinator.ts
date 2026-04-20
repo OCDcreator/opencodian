@@ -1,5 +1,9 @@
 import { createLogger } from '../../shared';
 import type { SessionTodo } from '../types';
+import type {
+  OpenCodeCanonicalMessageInfo,
+  OpenCodeCanonicalPart,
+} from './types';
 
 const logger = createLogger('OpenCodeSyncEventRuntimeCoordinator');
 const TRANSIENT_CONNECTIVITY_RECOVERY_POLL_MS = 3_000;
@@ -36,15 +40,32 @@ export type SessionSyncEventUpdate =
   | {
       sessionId: string;
       type: 'message.updated';
-      messageId: string | null;
+      info: OpenCodeCanonicalMessageInfo;
+    }
+  | {
+      sessionId: string;
+      type: 'message.removed';
+      messageId: string;
     }
   | {
       sessionId: string;
       type: 'message.part.updated';
-      messageId: string | null;
-      partId: string | null;
-      partType: string | null;
+      part: OpenCodeCanonicalPart;
       time: number | null;
+    }
+  | {
+      sessionId: string;
+      type: 'message.part.removed';
+      messageId: string;
+      partId: string;
+    }
+  | {
+      sessionId: string;
+      type: 'message.part.delta';
+      messageId: string;
+      partId: string;
+      field: string;
+      delta: string;
     }
   | {
       sessionId: string;
@@ -62,22 +83,33 @@ type RawSyncEvent = {
     info?: {
       id?: unknown;
       sessionID?: unknown;
+      role?: unknown;
+      time?: unknown;
+      [key: string]: unknown;
     };
     part?: {
       id?: unknown;
       type?: unknown;
       messageID?: unknown;
       sessionID?: unknown;
+      [key: string]: unknown;
     };
+    messageID?: unknown;
+    partID?: unknown;
+    field?: unknown;
+    delta?: unknown;
     time?: unknown;
   };
 };
+
+type RawSyncEventProperties = NonNullable<RawSyncEvent['properties']>;
 
 export interface OpenCodeSyncEventRuntimeCoordinatorHost {
   shouldUseSdkSync(): boolean;
   subscribeToSyncEvents(signal: AbortSignal): Promise<AsyncIterable<unknown>>;
   normalizeSessionTodos(response: unknown): SessionTodo[];
   normalizeSessionStatus(status: unknown): SessionActivityStatus | null;
+  applySessionSyncEvent(update: SessionSyncEventUpdate): void;
   isTransientConnectivityError(error: unknown): boolean;
   logSyncEventStreamFailure(error: unknown): void;
   checkHealth(): Promise<boolean>;
@@ -92,6 +124,69 @@ function resolveSessionId(event: RawSyncEvent): string {
       : typeof event.properties?.part?.sessionID === 'string'
         ? event.properties.part.sessionID
         : '';
+}
+
+function normalizeMessageInfo(
+  info: RawSyncEventProperties['info'],
+  sessionId: string,
+): OpenCodeCanonicalMessageInfo | null {
+  if (!info || typeof info !== 'object' || typeof info.id !== 'string') {
+    return null;
+  }
+
+  const role = info.role === 'user' || info.role === 'assistant'
+    ? info.role
+    : null;
+  if (!role) {
+    return null;
+  }
+
+  const rawTime = info.time && typeof info.time === 'object'
+    ? info.time as Record<string, unknown>
+    : {};
+  const created = typeof rawTime.created === 'number' ? rawTime.created : 0;
+
+  return {
+    ...info,
+    id: info.id,
+    sessionID: typeof info.sessionID === 'string' ? info.sessionID : sessionId,
+    role,
+    time: {
+      ...rawTime,
+      created,
+    },
+  } as OpenCodeCanonicalMessageInfo;
+}
+
+function normalizePart(
+  part: RawSyncEventProperties['part'],
+  sessionId: string,
+): OpenCodeCanonicalPart | null {
+  if (
+    !part
+    || typeof part !== 'object'
+    || typeof part.id !== 'string'
+    || typeof part.messageID !== 'string'
+    || typeof part.type !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    ...part,
+    id: part.id,
+    sessionID: typeof part.sessionID === 'string' ? part.sessionID : sessionId,
+    messageID: part.messageID,
+    type: part.type,
+  } as OpenCodeCanonicalPart;
+}
+
+function resolveStringProperty(
+  event: RawSyncEvent,
+  key: 'messageID' | 'partID' | 'field' | 'delta',
+): string | null {
+  const value = event.properties?.[key];
+  return typeof value === 'string' ? value : null;
 }
 
 export class OpenCodeSyncEventRuntimeCoordinator {
@@ -248,36 +343,9 @@ export class OpenCodeSyncEventRuntimeCoordinator {
     }
 
     if (value.type !== 'session.status') {
-      if (value.type === 'message.updated') {
-        this.emitSessionSyncEventUpdate({
-          sessionId,
-          type: 'message.updated',
-          messageId: typeof value.properties?.info?.id === 'string'
-            ? value.properties.info.id
-            : null,
-        });
-      } else if (value.type === 'message.part.updated') {
-        this.emitSessionSyncEventUpdate({
-          sessionId,
-          type: 'message.part.updated',
-          messageId: typeof value.properties?.part?.messageID === 'string'
-            ? value.properties.part.messageID
-            : null,
-          partId: typeof value.properties?.part?.id === 'string'
-            ? value.properties.part.id
-            : null,
-          partType: typeof value.properties?.part?.type === 'string'
-            ? value.properties.part.type
-            : null,
-          time: typeof value.properties?.time === 'number'
-            ? value.properties.time
-            : null,
-        });
-      } else if (value.type === 'session.diff') {
-        this.emitSessionSyncEventUpdate({
-          sessionId,
-          type: 'session.diff',
-        });
+      const update = this.createSessionSyncEventUpdate(value, sessionId);
+      if (update) {
+        this.emitSessionSyncEventUpdate(update);
       }
       return;
     }
@@ -288,6 +356,82 @@ export class OpenCodeSyncEventRuntimeCoordinator {
     }
 
     this.emitSessionStatusUpdate({ sessionId, status });
+  }
+
+  private createSessionSyncEventUpdate(
+    value: RawSyncEvent,
+    sessionId: string,
+  ): SessionSyncEventUpdate | null {
+    switch (value.type) {
+      case 'message.updated': {
+        const info = normalizeMessageInfo(value.properties?.info, sessionId);
+        return info
+          ? {
+            sessionId,
+            type: 'message.updated',
+            info,
+          }
+          : null;
+      }
+      case 'message.removed': {
+        const messageId = resolveStringProperty(value, 'messageID');
+        return messageId
+          ? {
+            sessionId,
+            type: 'message.removed',
+            messageId,
+          }
+          : null;
+      }
+      case 'message.part.updated': {
+        const part = normalizePart(value.properties?.part, sessionId);
+        return part
+          ? {
+            sessionId,
+            type: 'message.part.updated',
+            part,
+            time: typeof value.properties?.time === 'number'
+              ? value.properties.time
+              : null,
+          }
+          : null;
+      }
+      case 'message.part.removed': {
+        const messageId = resolveStringProperty(value, 'messageID');
+        const partId = resolveStringProperty(value, 'partID');
+        return messageId && partId
+          ? {
+            sessionId,
+            type: 'message.part.removed',
+            messageId,
+            partId,
+          }
+          : null;
+      }
+      case 'message.part.delta': {
+        const messageId = resolveStringProperty(value, 'messageID');
+        const partId = resolveStringProperty(value, 'partID');
+        const field = resolveStringProperty(value, 'field');
+        const delta = resolveStringProperty(value, 'delta');
+        return messageId && partId && field && delta !== null
+          ? {
+            sessionId,
+            type: 'message.part.delta',
+            messageId,
+            partId,
+            field,
+            delta,
+          }
+          : null;
+      }
+      case 'session.diff':
+        return {
+          sessionId,
+          type: 'session.diff',
+        };
+      default:
+        return null;
+    }
   }
 
   private emitSessionTodoUpdate(update: SessionTodoUpdate): void {
@@ -311,6 +455,12 @@ export class OpenCodeSyncEventRuntimeCoordinator {
   }
 
   private emitSessionSyncEventUpdate(update: SessionSyncEventUpdate): void {
+    try {
+      this.host.applySessionSyncEvent(update);
+    } catch (error) {
+      logger.error('Session sync-event canonical apply failed', error);
+    }
+
     for (const listener of this.sessionSyncEventListeners) {
       try {
         listener(update);

@@ -120,6 +120,7 @@ function createHost(): {
       getCurrentConversation: jest.fn().mockReturnValue(currentConversation),
       getActiveTabId: jest.fn().mockReturnValue('tab-active'),
       scheduleConversationSyncFromSignal: jest.fn(),
+      applySessionSyncEvent: jest.fn(),
       applySessionTodoUpdate: jest.fn(),
       applySessionStatusUpdate: jest.fn(),
     },
@@ -179,6 +180,7 @@ describe('ConversationSessionSignalRuntime', () => {
     expect(host.scheduleConversationSyncFromSignal).toHaveBeenCalledTimes(2);
     expect(host.scheduleConversationSyncFromSignal).toHaveBeenNthCalledWith(1, 'tab-active', 'session.diff');
     expect(host.scheduleConversationSyncFromSignal).toHaveBeenNthCalledWith(2, 'tab-hidden', 'session.diff');
+    expect(host.applySessionSyncEvent).not.toHaveBeenCalled();
     expect(host.applySessionTodoUpdate).toHaveBeenCalledTimes(2);
     expect(host.applySessionTodoUpdate).toHaveBeenNthCalledWith(1, 'tab-active', 'session-shared', todos);
     expect(host.applySessionTodoUpdate).toHaveBeenNthCalledWith(2, 'tab-hidden', 'session-shared', todos);
@@ -222,17 +224,24 @@ describe('ConversationSessionSignalRuntime', () => {
     const runtime = new ConversationSessionSignalRuntime(host, backgroundTaskLiveSignalCoordinator);
 
     runtime.start();
-    emitSessionSyncEvent({
+    const syncEvent: SessionSyncEventUpdate = {
       sessionId: 'session-active-only',
       type: 'message.updated',
-      messageId: null,
-    });
+      info: {
+        id: 'msg-1',
+        sessionID: 'session-active-only',
+        role: 'assistant',
+        time: { created: 1 },
+      },
+    };
+    emitSessionSyncEvent(syncEvent);
     emitSessionStatusUpdate('session-active-only', { type: 'busy' });
 
-    expect(host.scheduleConversationSyncFromSignal).toHaveBeenCalledTimes(1);
-    expect(host.scheduleConversationSyncFromSignal).toHaveBeenCalledWith(
+    expect(host.scheduleConversationSyncFromSignal).not.toHaveBeenCalled();
+    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(1);
+    expect(host.applySessionSyncEvent).toHaveBeenCalledWith(
       'tab-active',
-      'message.updated',
+      syncEvent,
     );
     expect(host.applySessionStatusUpdate).toHaveBeenCalledTimes(1);
     expect(host.applySessionStatusUpdate).toHaveBeenCalledWith(

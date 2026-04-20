@@ -40,6 +40,7 @@ interface ConversationServerSyncContext {
 type ConversationAuthoritativeReloadHost = Pick<
   ConversationAuthoritativeSyncHost,
   | 'getConversationSyncFingerprint'
+  | 'getCanonicalSessionMessages'
   | 'getCurrentConversationId'
   | 'getCurrentConversationRevertState'
   | 'getInterruptedSyncPreservationLogFingerprint'
@@ -138,6 +139,53 @@ export class ConversationAuthoritativeReloadCoordinator {
     }
   }
 
+  async syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason = 'sync-event',
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<ConversationAuthoritativeSyncResult | null> {
+    const canonicalMessages = this.host.getCanonicalSessionMessages(conversation.openCodeSessionId);
+    if (!canonicalMessages) {
+      return null;
+    }
+
+    const verbose = !options?.suppressVerboseLogs;
+    const syncContext = { conversation, tabId, reason, verbose };
+    const snapshot: ConversationServerSyncSnapshot = {
+      serverMessages: canonicalMessages,
+      convertedServerMessages: canonicalMessages
+        .map(({ info, parts }) =>
+          this.host.hydrateOpenCodeMessage(info, parts, this.host.getVaultBasePath()))
+        .filter((message) => this.host.shouldRenderConversationMessage(message)),
+      revertState: this.getConversationCanonicalSyncRevertState(conversation, canonicalMessages),
+    };
+
+    this.host.logOmoBackgroundTaskDiagnostics(
+      conversation,
+      conversation.messages,
+      snapshot.convertedServerMessages,
+    );
+    const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
+    await this.applyConversationServerSyncMessages(
+      conversation,
+      syncMerge.merged,
+      syncMerge.changed,
+    );
+
+    this.host.markBackgroundTaskAuthoritativeSync(tabId, reason);
+    await this.host.refreshContextUsageAfterActiveConversationSync(conversation, tabId);
+    this.logConversationServerSyncComplete(conversation, reason, snapshot, syncMerge);
+    this.logConversationServerSyncFinished(syncContext, snapshot, syncMerge);
+
+    return {
+      messages: syncMerge.merged,
+      changed: syncMerge.changed,
+      fingerprint: syncMerge.fingerprint,
+      revertState: snapshot.revertState,
+    };
+  }
+
   private logConversationServerSyncBegin(context: ConversationServerSyncContext): void {
     if (!context.verbose) {
       return;
@@ -181,6 +229,17 @@ export class ConversationAuthoritativeReloadCoordinator {
     }
 
     return this.host.getSessionRevertState(conversation.openCodeSessionId);
+  }
+
+  private getConversationCanonicalSyncRevertState(
+    conversation: Conversation,
+    canonicalMessages: ConversationServerMessages,
+  ): ConversationAuthoritativeSyncRevertState | null {
+    if (canonicalMessages.length > 0 || this.host.getCurrentConversationId() !== conversation.id) {
+      return null;
+    }
+
+    return this.host.getCurrentConversationRevertState();
   }
 
   private logConversationServerSyncFetched(
