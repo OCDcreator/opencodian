@@ -259,11 +259,12 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
       expect(env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
     });
 
-    it('should strip inherited OpenCode config override env before spawning the local server', () => {
+    it('should strip inherited config override env but preserve plugin and skill runtime flags', () => {
       process.env.OPENCODE_CONFIG = 'C:\\temp\\custom-opencode.json';
       process.env.OPENCODE_TUI_CONFIG = 'C:\\temp\\tui.json';
       process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = 'true';
       process.env.OPENCODE_DISABLE_EXTERNAL_SKILLS = 'true';
+      process.env.OPENCODE_PURE = 'true';
       process.env.OPENCODE_PERMISSION = '{"edit":"deny"}';
 
       context.setManager(new ServerManager({
@@ -275,14 +276,16 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
 
       expect(env.OPENCODE_CONFIG).toBeUndefined();
       expect(env.OPENCODE_TUI_CONFIG).toBeUndefined();
-      expect(env.OPENCODE_DISABLE_DEFAULT_PLUGINS).toBeUndefined();
-      expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBeUndefined();
+      expect(env.OPENCODE_DISABLE_DEFAULT_PLUGINS).toBe('true');
+      expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBe('true');
+      expect(env.OPENCODE_PURE).toBe('true');
       expect(env.OPENCODE_PERMISSION).toBeUndefined();
 
       delete process.env.OPENCODE_CONFIG;
       delete process.env.OPENCODE_TUI_CONFIG;
       delete process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS;
       delete process.env.OPENCODE_DISABLE_EXTERNAL_SKILLS;
+      delete process.env.OPENCODE_PURE;
       delete process.env.OPENCODE_PERMISSION;
     });
   });

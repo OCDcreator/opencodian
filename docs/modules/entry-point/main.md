@@ -107,7 +107,11 @@
 3. 把归一化后的设置拆成 `core/ui` 两个域，再写回 `StorageService` 的串行写队列。
 4. 刷新所有已打开的 `OpenCodianView`，并在需要时调用 `syncOpencodeConfig()` 让 `.opencode` 权限配置与 `permissionMode` 对齐。
 
+此外，保存完成后入口层现在会主动广播一次 slash command catalog 失效，让 `OpenCodianView` 内部的 `SlashCommandMenuCatalogCache` 不必再等 120 秒 TTL 才看到新的项目命令/Skill 可见性变化。
+
 `handleModelsLoaded()` 会在服务层模型默认值变化后把新 provider/model 回写到设置，并用 `requestAnimationFrame` 合并视图刷新。
+
+OpenCode server status 回调也不再只刷新设置页状态：当本地/远端服务重新进入 `running` 时，入口层会通知所有已打开的 `OpenCodianView` 立即清空 slash command catalog，并触发一次后台 warm preload，这样服务重启后的命令列表能尽快和当前 runtime 对齐。
 
 聊天外观的防抖保存只写 `core` 域；tab/设置页 UI 状态的防抖保存只写 `ui` 域。视图层不再直接把整份 `this.settings` 落盘。
 

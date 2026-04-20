@@ -12,6 +12,45 @@
 
 ---
 
+## 2026-04-20 斜杠命令运行时对齐、即时缓存失效与文档同步
+
+### 🎯 改动目标
+
+- 让 OpenCodian 的 slash 一级菜单尽量和当前 OpenCode runtime 保持一致，不再被本地 120 秒目录缓存拖慢刷新
+- 修复本地 sidecar 对插件 / skill 运行时环境开关的继承行为，让默认模式更贴近官方 TUI / Desktop
+- 同步模块文档与 `AGENTS.md`，把 slash catalog 缓存的真实行为记录清楚
+
+### ✅ 本轮调整
+
+- `src/core/opencode/ServerManager.ts`
+  - 默认模式不再主动清掉用户显式设置的 `OPENCODE_DISABLE_*` / `OPENCODE_PURE` 等插件与 skill 运行时开关
+  - 补充启动日志，明确记录这些关键 env flag 的实际生效值
+
+- `src/main.ts`
+  - `saveSettings()` 完成后会广播 slash command catalog 失效
+  - OpenCode server status 重新进入 `running` 时，也会广播失效，并请求 view 侧做一次后台 warm preload
+
+- `src/features/chat/OpenCodianView.ts`
+  - 新增公开入口 `invalidateSlashCommandMenuCatalog()`，统一处理 preload timer 清理、catalog 失效和可选预热
+
+- `tests/unit/core/opencode/ServerManager.lifecycle.test.ts`
+- `tests/unit/main.test.ts`
+  - 补回归测试，覆盖 runtime env 继承、设置保存后的 slash catalog 失效，以及 server 恢复 `running` 后的自动预热
+
+- `docs/modules/core/opencode/ServerManager.md`
+- `docs/modules/entry-point/main.md`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/features/chat/services/SlashCommandMenuCatalogCache.md`
+- `AGENTS.md`
+  - 同步 slash command runtime 对齐、缓存 TTL/失效规则，以及 future work 该优先走 invalidate seam 而不是等 TTL 自然过期
+
+### 🧪 验证结果
+
+- `npm run test -- ServerManager.lifecycle.test.ts` 通过
+- `npm run test -- main.test.ts` 通过
+- `npm run verify` 通过
+- 已部署到 Test Vault，并校验 `BUILD_ID = feature-slash-command-improvements.202604202345`
+
 ## 2026-04-11 可维护性第七阶段发送子系统 ownership 拆分与第八阶段交接
 
 ### 🎯 改动目标

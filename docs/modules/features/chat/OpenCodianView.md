@@ -32,6 +32,7 @@
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
 | `applyLocaleTexts()` | 委托 header presenter、selection controls coordinator 与 composer input coordinator 刷新 header/status、selector、placeholder、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
+| `invalidateSlashCommandMenuCatalog()` | 立刻清空 slash command menu catalog 缓存，并可选触发一次后台 warm preload |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
 | `toggleGlassOctahedron()` | 切换实验性的 glass octahedron overlay |
@@ -95,6 +96,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height 与 toolbar slot mount
+- `SlashCommandMenuCatalogCache`：缓存 runtime commands + skills 与项目级 command/agent 配置合并后的 slash 一级菜单目录；现在支持由插件入口在设置保存、server 恢复到 `running` 时主动失效
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background 与 experimental demo / glass octahedron 相关 DOM 引用

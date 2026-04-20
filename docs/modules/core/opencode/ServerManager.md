@@ -173,7 +173,9 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
   - 同样清掉 `OPENCODE_DISABLE_PROJECT_CONFIG` / `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
   - 让 OpenCode 直接按 `cwd=<vault>` 去解析当前 vault 的 `.opencode` 配置
 
-另外，spawn 前还会清理一批继承来的 `OPENCODE_*` 覆盖变量（例如 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG_CONTENT`、`OPENCODE_DISABLE_DEFAULT_PLUGINS`、`OPENCODE_PURE` 等），避免插件本地 `4196` sidecar 沿用外部终端或旧集成留下的配置注入。
+另外，spawn 前仍会清理一批会污染配置作用域的 `OPENCODE_*` 覆盖变量（例如 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG_CONTENT`、`OPENCODE_PERMISSION`、`OPENCODE_PLUGIN_META_FILE` 等），避免插件本地 `4196` sidecar 沿用外部终端或旧集成留下的配置注入。
+
+但从这次 slash-command 对齐修复开始，`default` 模式不会再主动抹掉用户显式设置的插件 / skill 运行时开关（例如 `OPENCODE_DISABLE_DEFAULT_PLUGINS`、`OPENCODE_DISABLE_CLAUDE_CODE*`、`OPENCODE_DISABLE_EXTERNAL_SKILLS`、`OPENCODE_PURE`）。原因是 OpenCodian 需要尽量和用户在官方 OpenCode Desktop / TUI 中看到的插件加载结果一致；如果这些 flag 是用户有意配置的运行时偏好，插件 sidecar 也应继承它们。`pure` 模式仍会显式写入 `OPENCODE_PURE=true`，作为插件内的强制隔离开关。
 
 ### OpenCode 可执行文件解析
 

@@ -1115,7 +1115,7 @@ export const zhTranslations = {
   'settings.plugins.projectDirectory.filesTitle': '项目本地插件文件',
   'settings.plugins.projectDirectory.empty': '未发现项目本地插件文件。',
   'settings.plugins.isolation.name': '插件隔离模式',
-  'settings.plugins.isolation.desc': '纯净模式只对本插件启动的本地 OpenCode 服务生效，并会禁用所有外部插件。',
+  'settings.plugins.isolation.desc': '默认模式会继承当前环境中的 OpenCode 插件/Skill 开关；纯净模式只对本插件启动的本地 OpenCode 服务生效，并会禁用所有外部插件。',
   'settings.plugins.isolation.default': '默认模式',
   'settings.plugins.isolation.pure': '纯净模式',
   'settings.plugins.isolation.updated': '插件隔离模式已更新。',

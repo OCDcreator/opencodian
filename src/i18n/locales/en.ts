@@ -1115,7 +1115,7 @@ export const enTranslations = {
   'settings.plugins.projectDirectory.filesTitle': 'Project local plugin files',
   'settings.plugins.projectDirectory.empty': 'No project local plugins found.',
   'settings.plugins.isolation.name': 'Plugin isolation mode',
-  'settings.plugins.isolation.desc': 'Pure mode only affects the local OpenCode server started by this plugin, and it disables all external plugins.',
+  'settings.plugins.isolation.desc': 'Default mode inherits the current OpenCode plugin and skill environment flags. Pure mode only affects the local OpenCode server started by this plugin and disables all external plugins.',
   'settings.plugins.isolation.default': 'Default mode',
   'settings.plugins.isolation.pure': 'Pure mode',
   'settings.plugins.isolation.updated': 'Plugin isolation mode updated.',

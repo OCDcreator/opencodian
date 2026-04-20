@@ -165,12 +165,11 @@ export default class OpenCodianPlugin extends Plugin {
   ): Promise<void> {
     await this.measureStartupStep('initializeOpencodeConfig', () => this.initializeOpencodeConfig());
     await this.measureStartupStep('constructOpenCodeService', () => {
-      this.openCodeService = new OpenCodeService(
+        this.openCodeService = new OpenCodeService(
         this.settings,
         {
           onServerStatusChange: (status) => {
-            logger.debug(`Server status changed: ${status}`);
-            this.settingsTab?.refreshServerStatusDisplay();
+            this.handleOpenCodeServerStatusChange(status);
           },
           onError: (error) => {
             new Notice(`OpenCode error: ${error.message}`);
@@ -430,6 +429,7 @@ export default class OpenCodianPlugin extends Plugin {
     await this.persistSettingsDomains({ core: true, ui: true });
 
     this.refreshOpenCodianViews({ reloadModels, applyUi });
+    this.invalidateSlashCommandMenuCatalogs();
     
     // Sync OpenCode config with permission mode
     if (syncConfig) {
@@ -797,6 +797,14 @@ export default class OpenCodianPlugin extends Plugin {
     this.queueModelRefresh();
   }
 
+  private handleOpenCodeServerStatusChange(status: string): void {
+    logger.debug(`Server status changed: ${status}`);
+    this.settingsTab?.refreshServerStatusDisplay();
+    if (status === 'running') {
+      this.invalidateSlashCommandMenuCatalogs({ preload: true });
+    }
+  }
+
   private refreshOpenCodianViews(options: { reloadModels?: boolean; applyUi?: boolean } = {}): void {
     const { reloadModels = true, applyUi = true } = options;
 
@@ -816,6 +824,15 @@ export default class OpenCodianPlugin extends Plugin {
         if (reloadModels) {
           void view.reloadModelCatalog();
         }
+      }
+    }
+  }
+
+  private invalidateSlashCommandMenuCatalogs(options: { preload?: boolean } = {}): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
+      const view = leaf.view;
+      if (view instanceof OpenCodianView) {
+        view.invalidateSlashCommandMenuCatalog(options);
       }
     }
   }

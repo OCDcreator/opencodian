@@ -33,13 +33,7 @@ const LOCAL_SERVER_SANITIZED_ENV_KEYS = [
   'OPENCODE_CONFIG_CONTENT',
   'OPENCODE_PERMISSION',
   'OPENCODE_DISABLE_PROJECT_CONFIG',
-  'OPENCODE_DISABLE_DEFAULT_PLUGINS',
-  'OPENCODE_DISABLE_CLAUDE_CODE',
-  'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
-  'OPENCODE_DISABLE_CLAUDE_CODE_SKILLS',
-  'OPENCODE_DISABLE_EXTERNAL_SKILLS',
   'OPENCODE_PLUGIN_META_FILE',
-  'OPENCODE_PURE',
 ] as const;
 
 /** Server manager events */
@@ -440,6 +434,10 @@ export class ServerManager {
       configDir: spawnEnv.OPENCODE_CONFIG_DIR ?? null,
       hasConfigContent: typeof spawnEnv.OPENCODE_CONFIG_CONTENT === 'string',
       configContentLength: spawnEnv.OPENCODE_CONFIG_CONTENT?.length ?? 0,
+      disableDefaultPlugins: spawnEnv.OPENCODE_DISABLE_DEFAULT_PLUGINS ?? null,
+      disableClaudeCode: spawnEnv.OPENCODE_DISABLE_CLAUDE_CODE ?? null,
+      disableClaudeCodeSkills: spawnEnv.OPENCODE_DISABLE_CLAUDE_CODE_SKILLS ?? null,
+      disableExternalSkills: spawnEnv.OPENCODE_DISABLE_EXTERNAL_SKILLS ?? null,
       serverUsernameConfigured: typeof spawnEnv.OPENCODE_SERVER_USERNAME === 'string' && spawnEnv.OPENCODE_SERVER_USERNAME.length > 0,
       serverPasswordConfigured: typeof spawnEnv.OPENCODE_SERVER_PASSWORD === 'string' && spawnEnv.OPENCODE_SERVER_PASSWORD.length > 0,
       pureMode: spawnEnv.OPENCODE_PURE ?? null,
@@ -1287,8 +1285,6 @@ export class ServerManager {
 
     if (this.config.pluginIsolationMode === 'pure') {
       env.OPENCODE_PURE = 'true';
-    } else {
-      delete env.OPENCODE_PURE;
     }
 
     if (this.config.auth.type === 'basic' && this.config.auth.password.trim()) {

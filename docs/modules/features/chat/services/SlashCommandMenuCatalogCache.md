@@ -10,6 +10,7 @@
 ## 核心行为
 
 - `load()` 返回当前 hidden-command key 下的缓存结果；缓存仍新鲜时不再触发 runtime 请求。
+- 缓存 TTL 目前是 `120s`；如果没有主动失效，超时前重复打开 `/` 会继续复用同一份 merged catalog。
 - 如果后台预热仍在进行，用户触发的 `load()` 会复用同一个 pending promise，不会再发第二次 `sdk.command.list()`。
 - hidden command 列表会进入 cache key；设置里隐藏/显示命令后，下一次加载会重新合并 catalog。
 - runtime `source === 'skill'` 会进入缓存；后续由 `slashCommandMenuFilter.ts` 按 `slashCommandSkillMode` 决定直显或 `/skills` 前缀。
@@ -17,6 +18,7 @@
 - runtime skill 的 `location` 会在 cache 内转换成 `skillSource`，供 UI 按当前语言显示“项目 / OpenCode 项目 / 插件：xxx / 全局 / 自定义路径”等来源说明。
 - `warm()` 只做后台预热；失败时通过 `onWarmLoadFailed()` 交给调用方 debug log，不把错误固化到缓存里。
 - `invalidate()` 清理缓存与 pending 引用，用于 view close 或需要强制刷新时。
+- 从当前实现开始，插件入口会在两类场景主动触发失效：`saveSettings()` 完成后，以及 OpenCode server status 重新进入 `running` 时。后者会额外请求 view 侧重新 `warm()`，尽快把 slash 目录和最新 runtime 对齐。
 
 ## 关联模块
 

@@ -1,5 +1,6 @@
 import type { StorageService } from '../../src/core/storage';
 import type { Conversation } from '../../src/core/types';
+import { OpenCodianView } from '../../src/features/chat/OpenCodianView';
 import OpenCodianPlugin from '../../src/main';
 
 jest.mock('@opencode-ai/sdk/v2/client', () => ({
@@ -436,5 +437,108 @@ describe('OpenCodianPlugin.loadSettings', () => {
     expect(plugin.settings.server.local.port).toBe(4196);
     expect(plugin.settings.server.remote.baseUrl).toBe('http://127.0.0.1:4096');
     expect(plugin.storage.saveCoreSettings).toHaveBeenCalled();
+  });
+});
+
+describe('OpenCodianPlugin slash command catalog invalidation', () => {
+  it('invalidates slash command catalogs after settings are saved', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: Record<string, unknown>;
+      persistSettingsDomains: jest.Mock<Promise<void>, [unknown]>;
+      refreshOpenCodianViews: jest.Mock<void, [unknown]>;
+      invalidateSlashCommandMenuCatalogs: jest.Mock<void, []>;
+    };
+
+    plugin.settings = {};
+    plugin.persistSettingsDomains = jest.fn().mockResolvedValue(undefined);
+    plugin.refreshOpenCodianViews = jest.fn();
+    plugin.invalidateSlashCommandMenuCatalogs = jest.fn();
+
+    jest
+      .spyOn(
+        plugin as unknown as {
+          clearChatAppearanceSaveTimer: () => void;
+        },
+        'clearChatAppearanceSaveTimer',
+      )
+      .mockImplementation(() => {});
+    jest
+      .spyOn(
+        plugin as unknown as {
+          clearSettingsUiStateSaveTimer: () => void;
+        },
+        'clearSettingsUiStateSaveTimer',
+      )
+      .mockImplementation(() => {});
+    jest
+      .spyOn(
+        plugin as unknown as {
+          applyLoggerSettings: () => void;
+        },
+        'applyLoggerSettings',
+      )
+      .mockImplementation(() => {});
+
+    await plugin.saveSettings({
+      syncService: false,
+      syncConfig: false,
+      reloadModels: false,
+      applyUi: false,
+    });
+
+    expect(plugin.persistSettingsDomains).toHaveBeenCalledWith({ core: true, ui: true });
+    expect(plugin.refreshOpenCodianViews).toHaveBeenCalledWith({ reloadModels: false, applyUi: false });
+    expect(plugin.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards slash command cache invalidation to open OpenCodian views', () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      app: {
+        workspace: {
+          getLeavesOfType: jest.Mock<Array<{ view: unknown }>, [string]>;
+        };
+      };
+    };
+    const openCodianView = Object.assign(Object.create(OpenCodianView.prototype), {
+      invalidateSlashCommandMenuCatalog: jest.fn(),
+    });
+
+    plugin.app = {
+      workspace: {
+        getLeavesOfType: jest.fn().mockReturnValue([
+          { view: {} },
+          { view: openCodianView },
+        ]),
+      },
+    };
+
+    (
+      plugin as unknown as {
+        invalidateSlashCommandMenuCatalogs: (options?: { preload?: boolean }) => void;
+      }
+    ).invalidateSlashCommandMenuCatalogs({ preload: true });
+
+    expect(openCodianView.invalidateSlashCommandMenuCatalog).toHaveBeenCalledWith({ preload: true });
+  });
+
+  it('warms slash command catalogs when the server becomes running', () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settingsTab: { refreshServerStatusDisplay: jest.Mock<void, []> } | null;
+      invalidateSlashCommandMenuCatalogs: jest.Mock<void, [options?: { preload?: boolean }]>;
+    };
+
+    plugin.settingsTab = {
+      refreshServerStatusDisplay: jest.fn(),
+    };
+    plugin.invalidateSlashCommandMenuCatalogs = jest.fn();
+
+    (
+      plugin as unknown as {
+        handleOpenCodeServerStatusChange: (status: string) => void;
+      }
+    ).handleOpenCodeServerStatusChange('running');
+
+    expect(plugin.settingsTab.refreshServerStatusDisplay).toHaveBeenCalledTimes(1);
+    expect(plugin.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledWith({ preload: true });
   });
 });

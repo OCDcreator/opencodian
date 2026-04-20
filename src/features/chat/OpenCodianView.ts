@@ -789,6 +789,13 @@ export class OpenCodianView extends ItemView {
     this.slashCommandMenuCatalogCache.invalidate();
   }
 
+  public invalidateSlashCommandMenuCatalog(options: { preload?: boolean } = {}): void {
+    this.clearSlashCommandMenuPreload();
+    if (options.preload) {
+      this.scheduleSlashCommandMenuPreload();
+    }
+  }
+
   private createInputPanelAppearanceCoordinatorHost(): InputPanelAppearanceCoordinatorHost {
     return {
       getComposerShellEl: () => this.composerInputShellCoordinator.getComposerShellEl(),
