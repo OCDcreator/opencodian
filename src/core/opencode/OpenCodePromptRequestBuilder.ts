@@ -42,12 +42,20 @@ export type PromptRequestEntityKind = 'message' | 'part';
 export interface PromptBuildInput {
   messageID?: string;
   parts: PromptRequestPart[];
+  syntheticTextParts?: PromptSyntheticTextPartInput[];
 }
 
 export interface BuiltPromptSendPayload {
   messageID: string;
   requestParts: PromptRequestPart[];
   optimisticUserParts: PromptRequestPart[];
+}
+
+export interface PromptSyntheticTextPartInput {
+  id?: string;
+  text: string;
+  ignored?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 type PromptSharedOptions = {
@@ -95,7 +103,10 @@ export class OpenCodePromptRequestBuilder {
     const messageID = input.messageID?.trim()
       ? input.messageID.trim()
       : this.host.createPromptEntityId('message');
-    const requestParts = input.parts.map((part) => this.withStablePartId(part));
+    const requestParts = [
+      ...input.parts,
+      ...this.buildSyntheticTextParts(input.syntheticTextParts),
+    ].map((part) => this.withStablePartId(part));
 
     return {
       messageID,
@@ -297,6 +308,25 @@ export class OpenCodePromptRequestBuilder {
       next.id = this.host.createPromptEntityId('part');
     }
     return next;
+  }
+
+  private buildSyntheticTextParts(
+    syntheticTextParts?: PromptSyntheticTextPartInput[],
+  ): PromptRequestPart[] {
+    if (!Array.isArray(syntheticTextParts) || syntheticTextParts.length === 0) {
+      return [];
+    }
+
+    return syntheticTextParts
+      .filter((part) => typeof part.text === 'string' && part.text.length > 0)
+      .map((part) => ({
+        id: part.id,
+        type: 'text' as const,
+        text: part.text,
+        synthetic: true,
+        ...(typeof part.ignored === 'boolean' ? { ignored: part.ignored } : {}),
+        ...(part.metadata ? { metadata: { ...part.metadata } } : {}),
+      }));
   }
 
   private clonePromptRequestPart(part: PromptRequestPart): PromptRequestPart {

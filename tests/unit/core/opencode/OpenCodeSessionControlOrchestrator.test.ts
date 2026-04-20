@@ -354,13 +354,26 @@ it('expands session command arguments before delegating to the SDK', async () =>
     };
     const sessionSdk = createSessionSdk({
       command: jest.fn().mockResolvedValue(sessionMessage),
+      shell: jest.fn().mockResolvedValue(sessionMessage),
     });
     const orchestrator = new OpenCodeSessionControlOrchestrator(
       createHost(sessionSdk, createPartSdk()),
     );
+    const syntheticParts = [
+      {
+        id: 'part-plugin-1',
+        type: 'text',
+        text: 'Injected plugin prompt',
+        synthetic: true,
+        metadata: {
+          source: 'plugin',
+          pluginName: 'opencode-plugin-x',
+        },
+      },
+    ];
 
     await expect(orchestrator.runSessionCommand('session-1', {
-      command: 'review',
+      command: ' review ',
       arguments: [
         'Vault={{vault_path}}',
         'Note={{current_note_path}}',
@@ -373,6 +386,18 @@ it('expands session command arguments before delegating to the SDK', async () =>
         currentNotePath: 'notes/plan.md',
         externalContextPaths: ['notes/alpha.md', 'notes/beta.md'],
       },
+      agent: ' build ',
+      model: ' openai/gpt-5 ',
+      messageID: ' message-1 ',
+      variant: ' high ',
+      parts: syntheticParts,
+    })).resolves.toEqual(sessionMessage);
+
+    await expect(orchestrator.runSessionShell('session-1', {
+      agent: ' build ',
+      command: ' npm test ',
+      model: { providerID: 'openai', modelID: 'gpt-5' },
+      messageID: ' shell-message-1 ',
     })).resolves.toEqual(sessionMessage);
 
     expect(sessionSdk.command).toHaveBeenCalledWith({
@@ -386,6 +411,20 @@ it('expands session command arguments before delegating to the SDK', async () =>
         'notes/beta.md',
         'Title=',
       ].join('\n'),
+      agent: 'build',
+      model: 'openai/gpt-5',
+      messageID: 'message-1',
+      variant: 'high',
+      parts: syntheticParts,
     });
     expect(sessionSdk.command.mock.calls[0]?.[0]).not.toHaveProperty('placeholderContext');
+    expect(sessionSdk.command.mock.calls[0]?.[0].parts).not.toBe(syntheticParts);
+    expect(sessionSdk.command.mock.calls[0]?.[0].parts?.[0]).toEqual(syntheticParts[0]);
+    expect(sessionSdk.shell).toHaveBeenCalledWith({
+      sessionID: 'session-1',
+      agent: 'build',
+      command: 'npm test',
+      model: { providerID: 'openai', modelID: 'gpt-5' },
+      messageID: 'shell-message-1',
+    });
   });

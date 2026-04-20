@@ -51,6 +51,7 @@ function createFixture() {
     cancelStreaming: jest.fn(),
     isTabForegroundBusy: jest.fn(() => false),
     showProcessingBlockedNotice: jest.fn(),
+    getComposerInputMode: jest.fn(() => 'prompt'),
     submitMessage: jest.fn(),
     loadSlashCommandMenuItems: jest.fn().mockImplementation(async () => menuItems),
     setComposerStackHeight: jest.fn(),

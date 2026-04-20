@@ -252,6 +252,12 @@ describe('MessageSendPreparationService', () => {
     expect(host.renderMessage).not.toHaveBeenCalled();
     expect(conversation.messages).toHaveLength(0);
   });
+});
+
+describe('MessageSendPreparationService optimistic preparation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('persists and renders the optimistic user message before first-message title kickoff', async () => {
     const callOrder: string[] = [];
@@ -382,6 +388,32 @@ describe('MessageSendPreparationService', () => {
       parts: [{ id: 'part-1', type: 'text', text: 'Hello' }],
       timestamp: result?.userMessage.timestamp,
     });
+  });
+
+  it('passes synthetic prompt parts through the structured send builder without changing user content', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const syntheticTextParts = [
+      {
+        text: 'Injected plugin prompt',
+        metadata: {
+          source: 'plugin',
+          pluginName: 'opencode-plugin-x',
+        },
+      },
+    ];
+
+    const result = await service.prepareMessageSend({
+      content: 'Hello',
+      syntheticTextParts,
+    });
+
+    expect(host.buildStructuredPromptSendPayload).toHaveBeenCalledWith('Hello', {
+      contextItems: [],
+      syntheticTextParts,
+    });
+    expect(result?.userMessage.content).toBe('Hello');
   });
 
   it('blocks preparation when the active tab is already busy', async () => {

@@ -59,12 +59,12 @@ export interface SessionCommandInput {
   placeholderContext?: SessionCommandTemplateContext;
 }
 
-type SessionShellInput = {
+export interface SessionShellInput {
   agent: string;
   command: string;
   model?: { providerID: string; modelID: string };
   messageID?: string;
-};
+}
 
 export interface OpenCodeSessionControlSdk {
   fork(request: { sessionID: string; messageID?: string }): Promise<unknown>;
@@ -323,23 +323,15 @@ export class OpenCodeSessionControlOrchestrator {
   }
 
   async runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<SessionMessage> {
-    const {
-      placeholderContext,
-      ...commandInput
-    } = input;
-
-    return this.host.getSdkSession().command({
-      sessionID: sessionId,
-      ...commandInput,
-      arguments: expandSessionCommandTemplate(commandInput.arguments, placeholderContext),
-    } as never) as Promise<SessionMessage>;
+    return this.host.getSdkSession().command(
+      this.buildSessionCommandRequest(sessionId, input) as never,
+    ) as Promise<SessionMessage>;
   }
 
   async runSessionShell(sessionId: string, input: SessionShellInput): Promise<SessionMessage> {
-    return this.host.getSdkSession().shell({
-      sessionID: sessionId,
-      ...input,
-    }) as Promise<SessionMessage>;
+    return this.host.getSdkSession().shell(
+      this.buildSessionShellRequest(sessionId, input) as never,
+    ) as Promise<SessionMessage>;
   }
 
   async updateMessagePart(sessionId: string, messageId: string, partId: string, part: Part): Promise<Part> {
@@ -357,6 +349,77 @@ export class OpenCodeSessionControlOrchestrator {
       messageID: messageId,
       partID: partId,
     })) === true;
+  }
+
+  private buildSessionCommandRequest(
+    sessionId: string,
+    input: SessionCommandInput,
+  ): { sessionID: string } & SessionCommandInput {
+    const {
+      placeholderContext,
+      ...commandInput
+    } = input;
+
+    const request: { sessionID: string } & SessionCommandInput = {
+      sessionID: sessionId,
+      command: commandInput.command.trim(),
+      arguments: expandSessionCommandTemplate(commandInput.arguments, placeholderContext),
+    };
+
+    if (typeof commandInput.agent === 'string' && commandInput.agent.trim()) {
+      request.agent = commandInput.agent.trim();
+    }
+
+    if (typeof commandInput.model === 'string' && commandInput.model.trim()) {
+      request.model = commandInput.model.trim();
+    }
+
+    if (typeof commandInput.messageID === 'string' && commandInput.messageID.trim()) {
+      request.messageID = commandInput.messageID.trim();
+    }
+
+    if (typeof commandInput.variant === 'string' && commandInput.variant.trim()) {
+      request.variant = commandInput.variant.trim();
+    }
+
+    if (Array.isArray(commandInput.parts) && commandInput.parts.length > 0) {
+      request.parts = commandInput.parts.map((part) => this.cloneSessionCommandPart(part));
+    }
+
+    return request;
+  }
+
+  private buildSessionShellRequest(
+    sessionId: string,
+    input: SessionShellInput,
+  ): { sessionID: string } & SessionShellInput {
+    const request: { sessionID: string } & SessionShellInput = {
+      sessionID: sessionId,
+      agent: input.agent.trim(),
+      command: input.command.trim(),
+    };
+
+    if (input.model) {
+      request.model = { ...input.model };
+    }
+
+    if (typeof input.messageID === 'string' && input.messageID.trim()) {
+      request.messageID = input.messageID.trim();
+    }
+
+    return request;
+  }
+
+  private cloneSessionCommandPart(part: unknown): unknown {
+    if (Array.isArray(part)) {
+      return part.slice();
+    }
+
+    if (part && typeof part === 'object') {
+      return { ...(part as Record<string, unknown>) };
+    }
+
+    return part;
   }
 
   private unwrapSdkData<T>(response: unknown): T | undefined {

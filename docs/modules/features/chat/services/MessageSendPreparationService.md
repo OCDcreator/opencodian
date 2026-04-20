@@ -45,7 +45,7 @@ export class MessageSendPreparationService {
 - 先完成 server readiness 与 model availability 检查
 - 再通过 `ComposerContextViewFacade.sendContext` 读取 draft context，并把 `Conversation.externalContextPaths` 解析成持久 `PromptContextItem[]`
 - 两类上下文按 target key 合并：持久路径先铺底，同 target 的一次性 draft context 覆盖旧条目
-- 基于合并后的 context items 向 `OpenCodeService` 请求稳定 `messageID + parts[]` send payload
+- 基于合并后的 context items 向 `OpenCodeService` 请求稳定 `messageID + parts[]` send payload；如果上游额外提供 `syntheticTextParts`，这些插件注入文本会继续以结构化 synthetic parts 进入 payload，而不是改写 `userMessage.content`
 - 先把同一批稳定 `optimisticUserParts` seed 到 canonical session graph，再构造本地 optimistic user message
 - optimistic user message 继续使用合并后的 context items 构造 `contextAttachments`，但不把本地 UI bubble 直接当成最终真相
 - 保持既有顺序：

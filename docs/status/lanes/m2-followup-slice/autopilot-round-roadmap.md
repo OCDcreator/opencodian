@@ -27,7 +27,7 @@
 - **Validation**: `npm test -- --runInBand tests/unit/features/chat/ConversationTurnViewModelBuilder.test.ts tests/unit/features/chat/ConversationRenderService.test.ts tests/unit/features/chat/ConversationRenderService.renderFlows.test.ts`
 - **Acceptance**: live and reloaded canonical states produce the same turn structure while existing styling remains intact.
 
-### [NEXT] Task 6 - Align command, shell, and plugin-injection semantics
+### [DONE] Task 6 - Align command, shell, and plugin-injection semantics
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 6.
 - **Goal**: Distinguish prompt sends from session command/shell execution and preserve plugin-injected material as structured synthetic parts.

@@ -260,6 +260,7 @@ import {
   MessageFinalizationService,
 } from './services/MessageFinalizationService';
 import {
+  type ComposerInputSubmission,
   type MessageSendPreparationHost,
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
@@ -746,7 +747,8 @@ export class OpenCodianView extends ItemView {
       showProcessingBlockedNotice: () => {
         new Notice(t('chat.tab.processingBlocked'));
       },
-      submitMessage: (message) => this.sendPipelineRuntime.sendMessage(message),
+      getComposerInputMode: () => 'prompt',
+      submitMessage: (submission) => this.handleComposerInputSubmission(submission),
       loadSlashCommandMenuItems: () => this.loadSlashCommandMenuItems(),
       setComposerStackHeight: (stackHeight) => {
         this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
@@ -755,6 +757,22 @@ export class OpenCodianView extends ItemView {
         this.scheduleSettledScrollToBottomIfNeeded();
       },
     };
+  }
+
+  private handleComposerInputSubmission(
+    submission: ComposerInputSubmission,
+  ): Promise<void> | void {
+    if (submission.kind === 'shell') {
+      logger.warn('Ignoring shell composer submission because the stable shell runtime is not enabled in this view', {
+        commandPreview: this.getLogPreview(submission.command, 120),
+      });
+      return;
+    }
+
+    const content = submission.kind === 'prompt'
+      ? submission.content
+      : submission.rawContent;
+    return this.sendPipelineRuntime.sendMessage(content);
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {

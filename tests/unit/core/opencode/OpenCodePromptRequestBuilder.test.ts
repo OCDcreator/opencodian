@@ -22,8 +22,6 @@ function createBuilder() {
 }
 
 describe('OpenCodePromptRequestBuilder', () => {
-  const parts: PromptRequestPart[] = [{ type: 'text', text: 'Hello' }];
-
   it('returns stable message and part ids for the optimistic seed and the request payload', () => {
     const { builder, host } = createBuilder();
 
@@ -66,6 +64,66 @@ describe('OpenCodePromptRequestBuilder', () => {
     expect(host.createPromptEntityId).toHaveBeenNthCalledWith(2, 'part');
     expect(host.createPromptEntityId).toHaveBeenNthCalledWith(3, 'part');
   });
+
+  it('appends plugin-injected synthetic text parts without flattening them into user text', () => {
+    const { builder, host } = createBuilder();
+
+    const payload = builder.buildStructuredPromptSendPayload({
+      parts: [{ type: 'text', text: 'Hello' }],
+      syntheticTextParts: [
+        {
+          text: 'Injected plugin prompt',
+          metadata: {
+            source: 'plugin',
+            pluginName: 'opencode-plugin-x',
+          },
+        },
+      ],
+    });
+
+    expect(payload).toEqual({
+      messageID: 'message-1',
+      requestParts: [
+        { id: 'part-1', type: 'text', text: 'Hello' },
+        {
+          id: 'part-2',
+          type: 'text',
+          text: 'Injected plugin prompt',
+          synthetic: true,
+          metadata: {
+            source: 'plugin',
+            pluginName: 'opencode-plugin-x',
+          },
+        },
+      ],
+      optimisticUserParts: [
+        { id: 'part-1', type: 'text', text: 'Hello' },
+        {
+          id: 'part-2',
+          type: 'text',
+          text: 'Injected plugin prompt',
+          synthetic: true,
+          metadata: {
+            source: 'plugin',
+            pluginName: 'opencode-plugin-x',
+          },
+        },
+      ],
+    });
+    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(1, 'message');
+    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(2, 'part');
+    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(3, 'part');
+    expect(payload.requestParts[1]).not.toBe(payload.optimisticUserParts[1]);
+    expect(
+      (payload.requestParts[1] as Extract<PromptRequestPart, { type: 'text' }>).metadata,
+    ).not.toBe(
+      (payload.optimisticUserParts[1] as Extract<PromptRequestPart, { type: 'text' }>).metadata,
+    );
+  });
+});
+
+describe('OpenCodePromptRequestBuilder transport payloads', () => {
+  const parts: PromptRequestPart[] = [{ type: 'text', text: 'Hello' }];
 
   it('builds SDK prompt parameters with shared prompt options and default model selection', () => {
     const { builder, host } = createBuilder();

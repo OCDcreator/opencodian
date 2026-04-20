@@ -34,7 +34,8 @@ export interface ComposerInputShellCoordinatorHost {
   cancelStreaming(): void;
   isTabForegroundBusy(): boolean;
   showProcessingBlockedNotice(): void;
-  submitMessage(message: string): void | Promise<void>;
+  getComposerInputMode(): 'prompt' | 'shell';
+  submitMessage(submission: ComposerInputSubmission): void | Promise<void>;
   loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
@@ -56,6 +57,7 @@ export class ComposerInputShellCoordinator {
 ## 关键行为
 
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam
+- `buildComposerInputSubmission()` 会把当前 textarea 文本归一化成结构化 submission：普通文本 -> `prompt`、`/command ...` -> `command`、shell mode -> `shell`
 - slash menu 作为 `opencodian-composer-shell` 的 overlay 子节点挂载，用 CSS `bottom: calc(100% + 8px)` 显示在输入框上方，而不是插入 textarea/footer 的内部内容流
 - `applyLocaleTexts()` 刷新 placeholder、add-context tooltip 和 send/stop tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
@@ -66,6 +68,7 @@ export class ComposerInputShellCoordinator {
 - 选中 menu item 后，textarea 默认写成 `/<id> `；prefixed skill suggestion 会写成 `/skills <id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
 - prefixed mode 下如果先选中顶层 `/skills` 入口，coordinator 会立即保留菜单并切换到 nested skill 列表，而不是先关闭菜单再要求用户手动继续输入
 - skill menu 的状态行、badge、来源文案和 item DOM 已下沉到 `slashCommandMenuRenderer.ts`；coordinator 继续只保留当前 query、选中项和事件编排
+- Enter 提交现在先在 coordinator 边界把文本归类成结构化 composer submission，再交给 host 决定 prompt / command / shell 的后续 runtime owner，避免 slash / shell 语义再次退化成“只剩原始字符串”
 - `scheduleLayoutSync()` / `clearScheduledLayoutSync()` 收束 composer stack height 的 RAF 节流
 - `destroy()` 释放 textarea/button refs、layout observer 和 context row ownership
 
@@ -74,6 +77,7 @@ export class ComposerInputShellCoordinator {
 - `OpenCodianView` 只创建 coordinator、提供 host callbacks，并把 shell DOM refs 暴露给相邻的 `InputPanelAppearanceCoordinator`
 - merged runtime+project slash command catalog 由 `OpenCodianView` host seam 通过 `SlashCommandMenuCatalogCache` 预热/缓存后传入，本模块自己不接 project config / SDK merge 细节
 - slash menu fuzzy scoring 已下沉到 `slashCommandMenuFilter.ts`，状态行/menu DOM 渲染已下沉到 `slashCommandMenuRenderer.ts`，本模块只消费过滤结果并编排选中/应用行为
+- shell mode 目前仍是一个 typed seam：coordinator 能产出 `shell` submission，但 stable UI host 还没有把它暴露成默认输入模式
 - 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`
 - liquid-glass adapter mount、SVG filter 与 diagnostics 已进一步交给 `InputPanelAppearanceCoordinator`，本模块继续只负责 shell/layout lifecycle
 

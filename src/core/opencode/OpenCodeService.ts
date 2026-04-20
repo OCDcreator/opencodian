@@ -45,6 +45,7 @@ import {
   OpenCodePromptRequestBuilder,
   type PromptRequestEntityKind,
   type PromptRequestPart,
+  type PromptSyntheticTextPartInput,
 } from './OpenCodePromptRequestBuilder';
 import {
   OpenCodeQuestionPermissionHub,
@@ -61,6 +62,7 @@ import {
   type OpenCodeSessionControlSdk,
   type SessionCommandInput,
   type SessionContextUsageSnapshot,
+  type SessionShellInput,
 } from './OpenCodeSessionControlOrchestrator';
 import {
   type Message,
@@ -163,6 +165,7 @@ interface ProviderSendProbeResult {
 type PromptTransportOptions = QueryOptions & {
   messageID?: string;
   requestParts?: PromptRequestPart[];
+  syntheticTextParts?: PromptSyntheticTextPartInput[];
 };
 
 type SessionTodoUpdate = {
@@ -804,10 +807,15 @@ export class OpenCodeService {
 
   buildStructuredPromptSendPayload(
     message: string,
-    options: QueryOptions = {},
+    options: QueryOptions & {
+      syntheticTextParts?: PromptSyntheticTextPartInput[];
+    } = {},
   ): BuiltPromptSendPayload {
     const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
-    return this.promptRequestBuilder.buildStructuredPromptSendPayload({ parts });
+    return this.promptRequestBuilder.buildStructuredPromptSendPayload({
+      parts,
+      syntheticTextParts: options.syntheticTextParts,
+    });
   }
 
   seedCanonicalUserMessage(input: {
@@ -1185,6 +1193,7 @@ export class OpenCodeService {
       return this.promptRequestBuilder.buildStructuredPromptSendPayload({
         messageID: options.messageID,
         parts: options.requestParts,
+        syntheticTextParts: options.syntheticTextParts,
       });
     }
 
@@ -1519,7 +1528,7 @@ export class OpenCodeService {
 
   async runSessionShell(
     sessionId: string,
-    input: { agent: string; command: string; model?: { providerID: string; modelID: string }; messageID?: string },
+    input: SessionShellInput,
   ): Promise<{ info: Message; parts: Part[] }> {
     return this.sessionControl.runSessionShell(sessionId, input);
   }

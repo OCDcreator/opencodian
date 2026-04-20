@@ -25,6 +25,7 @@ builder 不负责 transport 分流，也不负责 context/image request part 序
 ## 核心类型 / 状态
 
 - `PromptRequestPart`: prompt 请求里的 text/file part 结构，包含可选稳定 `id`，供 `OpenCodeContextPartSerializer` 与 builder 共享。
+- `PromptSyntheticTextPartInput`: 供插件 hook / reminder / 其他注入层传入的“附加 synthetic text part”输入；builder 会统一补上 `synthetic: true` 与稳定 `part.id`。
 - `BuiltPromptSendPayload`: 发送层共享的结构化 payload，集中持有稳定 `messageID`、transport `requestParts` 与 optimistic seed `optimisticUserParts`。
 - `PromptRequestOptions`: `QueryOptions` 加上可选 `system` 的 prompt 组装输入。
 - `host.getDefaultModelSelection()`: 提供当前默认 `providerID` / `modelID`，让 builder 不直接持有 settings 副本。
@@ -62,6 +63,7 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 
 - `buildStructuredPromptSendPayload()` 会先为用户消息生成稳定 `messageID`
 - 每个 text/file request part 也会在这里拿到稳定 `part.id`
+- 若调用方额外提供 `syntheticTextParts`，builder 会把它们追加成结构化 synthetic text parts，而不是要求上游把注入文本直接拼回 user content string
 - builder 会复制出两份 part 数组：一份给 SDK/legacy transport，一份给 optimistic canonical seed
 - 两份 part 共享同一批稳定 id，但不会共享同一对象引用，避免后续 mutation 泄漏
 
@@ -74,6 +76,7 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 | `buildLegacyStreamRequestBody()` | 组装 legacy 流式 `/prompt_async` body |
 | `buildStructuredPromptSendPayload()` | 生成稳定 `messageID + parts[]` 的发送层共享 payload |
 | `PromptRequestPart` | 给服务层 request-part serialization 复用的 prompt part 类型 |
+| `PromptSyntheticTextPartInput` | 给插件注入 synthetic text part 的稳定输入类型 |
 
 ## 数据流
 

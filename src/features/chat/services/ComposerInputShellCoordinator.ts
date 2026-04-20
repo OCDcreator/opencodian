@@ -4,6 +4,11 @@ import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCata
 import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import type {
+  CommandComposerSubmission,
+  ComposerInputMode,
+  ComposerInputSubmission,
+} from './MessageSendPreparationService';
 import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
 import {
   renderSlashCommandMenu,
@@ -33,10 +38,58 @@ export interface ComposerInputShellCoordinatorHost {
   cancelStreaming(): void;
   isTabForegroundBusy(): boolean;
   showProcessingBlockedNotice(): void;
-  submitMessage(message: string): void | Promise<void>;
+  getComposerInputMode(): ComposerInputMode;
+  submitMessage(submission: ComposerInputSubmission): void | Promise<void>;
   loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
+}
+
+function parseCommandSubmission(content: string): CommandComposerSubmission | null {
+  const trimmedContent = content.trim();
+  if (!trimmedContent.startsWith('/') || trimmedContent.startsWith('//')) {
+    return null;
+  }
+
+  const commandBody = trimmedContent.slice(1);
+  if (!commandBody || /^\s/.test(commandBody)) {
+    return null;
+  }
+
+  const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
+  if (!commandMatch?.[1]) {
+    return null;
+  }
+
+  return {
+    kind: 'command',
+    rawContent: trimmedContent,
+    command: commandMatch[1],
+    arguments: commandMatch[2] ?? '',
+  };
+}
+
+export function buildComposerInputSubmission(
+  content: string,
+  mode: ComposerInputMode = 'prompt',
+): ComposerInputSubmission | null {
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    return null;
+  }
+
+  if (mode === 'shell') {
+    return {
+      kind: 'shell',
+      rawContent: trimmedContent,
+      command: trimmedContent,
+    };
+  }
+
+  return parseCommandSubmission(trimmedContent) ?? {
+    kind: 'prompt',
+    content: trimmedContent,
+  };
 }
 
 export class ComposerInputShellCoordinator {
@@ -255,12 +308,15 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    const message = this.inputTextareaEl.value.trim();
-    if (!message) {
+    const submission = buildComposerInputSubmission(
+      this.inputTextareaEl.value,
+      this.host.getComposerInputMode(),
+    );
+    if (!submission) {
       return;
     }
 
-    void this.host.submitMessage(message);
+    void this.host.submitMessage(submission);
     this.inputTextareaEl.value = '';
     this.syncTextareaHeight();
   }

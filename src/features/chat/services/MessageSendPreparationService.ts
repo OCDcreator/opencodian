@@ -1,6 +1,7 @@
 import type {
   BuiltPromptSendPayload,
   PromptRequestPart,
+  PromptSyntheticTextPartInput,
 } from '../../../core/opencode/OpenCodePromptRequestBuilder';
 import type {
   ChatMessage,
@@ -27,8 +28,36 @@ export interface SendMessageModelOptions {
   thinkingBudget?: ThinkingBudget;
 }
 
+export type ComposerInputMode = 'prompt' | 'shell';
+
+export interface PromptComposerSubmission {
+  kind: 'prompt';
+  content: string;
+  syntheticTextParts?: PromptSyntheticTextPartInput[];
+}
+
+export interface CommandComposerSubmission {
+  kind: 'command';
+  rawContent: string;
+  command: string;
+  arguments: string;
+  syntheticTextParts?: PromptSyntheticTextPartInput[];
+}
+
+export interface ShellComposerSubmission {
+  kind: 'shell';
+  rawContent: string;
+  command: string;
+}
+
+export type ComposerInputSubmission =
+  | PromptComposerSubmission
+  | CommandComposerSubmission
+  | ShellComposerSubmission;
+
 export interface PrepareMessageSendOptions {
   content: string;
+  syntheticTextParts?: PromptSyntheticTextPartInput[];
 }
 
 export interface PreparedMessageSend {
@@ -83,7 +112,10 @@ export interface MessageSendPreparationHost {
   appendModelUnavailableNoticeMessage(): Promise<void>;
   buildStructuredPromptSendPayload(
     content: string,
-    options: { contextItems: PromptContextItem[] },
+    options: {
+      contextItems: PromptContextItem[];
+      syntheticTextParts?: PromptSyntheticTextPartInput[];
+    },
   ): BuiltPromptSendPayload;
   seedCanonicalUserMessage(input: {
     sessionID: string;
@@ -166,6 +198,7 @@ export class MessageSendPreparationService {
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
     const structuredSend = this.host.buildStructuredPromptSendPayload(options.content, {
       contextItems,
+      syntheticTextParts: options.syntheticTextParts,
     });
     const userMessage = buildOptimisticUserMessage(
       options.content,

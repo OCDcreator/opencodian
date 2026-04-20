@@ -1,5 +1,6 @@
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
 import {
+  buildComposerInputSubmission,
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
@@ -70,6 +71,7 @@ function createFixture() {
     cancelStreaming: jest.fn(),
     isTabForegroundBusy: jest.fn(() => isForegroundBusy),
     showProcessingBlockedNotice: jest.fn(),
+    getComposerInputMode: jest.fn(() => 'prompt'),
     submitMessage: jest.fn().mockResolvedValue(undefined),
     loadSlashCommandMenuItems: jest.fn().mockImplementation(async () => {
       if (slashCommandMenuError) {
@@ -136,31 +138,39 @@ function createFixture() {
   };
 }
 
+function installCoordinatorDomMocks(): void {
+  ResizeObserverMock.reset();
+  animationFrameQueue = [];
+  (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
+    ResizeObserverMock as unknown as typeof ResizeObserver;
+  jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+    animationFrameQueue.push(callback);
+    return animationFrameQueue.length;
+  });
+  jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+}
+
+function restoreCoordinatorDomMocks(originalResizeObserver: typeof ResizeObserver | undefined): void {
+  document.body.innerHTML = '';
+  jest.restoreAllMocks();
+  ResizeObserverMock.reset();
+  if (originalResizeObserver) {
+    (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
+      originalResizeObserver;
+  } else {
+    delete (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+  }
+}
+
 describe('ComposerInputShellCoordinator', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 
   beforeEach(() => {
-    ResizeObserverMock.reset();
-    animationFrameQueue = [];
-    (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
-      ResizeObserverMock as unknown as typeof ResizeObserver;
-    jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
-      animationFrameQueue.push(callback);
-      return animationFrameQueue.length;
-    });
-    jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    installCoordinatorDomMocks();
   });
 
   afterEach(() => {
-    document.body.innerHTML = '';
-    jest.restoreAllMocks();
-    ResizeObserverMock.reset();
-    if (originalResizeObserver) {
-      (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
-        originalResizeObserver;
-    } else {
-      delete (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
-    }
+    restoreCoordinatorDomMocks(originalResizeObserver);
   });
 
   it('builds the composer shell and routes add-context and submit actions through the host', () => {
@@ -180,7 +190,10 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
-    expect(fixture.host.submitMessage).toHaveBeenCalledWith('Hello coordinator');
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith({
+      kind: 'prompt',
+      content: 'Hello coordinator',
+    });
     expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
     expect(fixture.textarea.value).toBe('');
   });
@@ -202,6 +215,66 @@ describe('ComposerInputShellCoordinator', () => {
 
     expect(fixture.sendBtn.getAttribute('data-tooltip')).toBe(t('chat.input.stopStreaming'));
     expect(fixture.host.cancelStreaming).toHaveBeenCalledTimes(1);
+  });
+
+  it('parses slash and shell submissions into structured composer intents', () => {
+    expect(buildComposerInputSubmission('  explain this  ')).toEqual({
+      kind: 'prompt',
+      content: 'explain this',
+    });
+    expect(buildComposerInputSubmission('/review --focus tests')).toEqual({
+      kind: 'command',
+      rawContent: '/review --focus tests',
+      command: 'review',
+      arguments: '--focus tests',
+    });
+    expect(buildComposerInputSubmission('  npm test  ', 'shell')).toEqual({
+      kind: 'shell',
+      rawContent: 'npm test',
+      command: 'npm test',
+    });
+  });
+
+  it('submits slash commands as structured command intents', () => {
+    const fixture = createFixture();
+
+    fixture.textarea.value = ' /review --focus tests ';
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith({
+      kind: 'command',
+      rawContent: '/review --focus tests',
+      command: 'review',
+      arguments: '--focus tests',
+    });
+  });
+
+  it('submits shell commands when the composer mode is shell', () => {
+    const fixture = createFixture();
+    fixture.host.getComposerInputMode.mockReturnValue('shell');
+
+    fixture.textarea.value = ' npm test ';
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith({
+      kind: 'shell',
+      rawContent: 'npm test',
+      command: 'npm test',
+    });
+  });
+});
+
+describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
   });
 
   it('opens slash autocomplete from the merged menu catalog and applies the selected command', async () => {
@@ -359,27 +432,11 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
   const originalResizeObserver = globalThis.ResizeObserver;
 
   beforeEach(() => {
-    ResizeObserverMock.reset();
-    animationFrameQueue = [];
-    (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
-      ResizeObserverMock as unknown as typeof ResizeObserver;
-    jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
-      animationFrameQueue.push(callback);
-      return animationFrameQueue.length;
-    });
-    jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    installCoordinatorDomMocks();
   });
 
   afterEach(() => {
-    document.body.innerHTML = '';
-    jest.restoreAllMocks();
-    ResizeObserverMock.reset();
-    if (originalResizeObserver) {
-      (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
-        originalResizeObserver;
-    } else {
-      delete (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
-    }
+    restoreCoordinatorDomMocks(originalResizeObserver);
   });
 
   it('uses fuzzy matching to find commands by non-contiguous characters', async () => {

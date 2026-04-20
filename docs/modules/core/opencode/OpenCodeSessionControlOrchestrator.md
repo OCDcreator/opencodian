@@ -26,6 +26,7 @@
 
 - `SessionContextUsageSnapshot`: active tab context-usage 浮层消费的 session token/cost 快照。
 - `SessionCommandTemplateContext`: `runSessionCommand()` 专用的 OpenCodian placeholder runtime 值，覆盖 vault path、当前笔记、当前选区、持久 external context paths 与会话标题。
+- `SessionShellInput`: `runSessionShell()` 的结构化 shell 输入，集中持有 `agent`、shell `command`、可选 `model` 与 `messageID`。
 - `OpenCodeSessionControlSdk`: orchestrator 依赖的最小 session SDK 面，覆盖 fork/revert/diff、session tree/share/summarize，以及 message command/shell。
 - `OpenCodeSessionControlPartSdk`: part update/delete 的最小 SDK 面。
 - `OpenCodeSessionControlOrchestratorHost`: host seam，提供 SDK CRUD 开关、legacy HTTP helper、session info/messages/model catalog 读取，以及 warning/error 日志。
@@ -62,7 +63,12 @@ orchestrator 现在承接以下共享控制流：
 
 这些 API 目前仍以 SDK namespace 为主，不在 orchestrator 内重新发明 transport layer；它只负责把 session control / message-operation surface 聚到一起。
 
-其中 `runSessionCommand()` 现在还承担一个很窄的 runtime helper 责任：在真正调用 SDK `session.command()` 前，把 OpenCodian command template 里的 `{{vault_path}}`、`{{current_note_path}}`、`{{current_selection}}`、`{{external_context_paths}}`、`{{conversation_title}}` 展开为当前 runtime 文本，并且不把 helper-only context payload 继续透传给 SDK。
+其中 `runSessionCommand()` / `runSessionShell()` 现在还承担一个很窄的 request-normalization 责任：
+
+- command template 里的 `{{vault_path}}`、`{{current_note_path}}`、`{{current_selection}}`、`{{external_context_paths}}`、`{{conversation_title}}` 会先在 orchestrator 内展开
+- helper-only `placeholderContext` 不会继续透传给 SDK
+- command 的 `agent` / `model` / `messageID` / `variant` 与 shell 的 `agent` / `command` / `messageID` 会在同一 seam 里做 trim / 克隆，避免外部复用同一个 request object 时产生隐式 mutation
+- command 自带的结构化 `parts` 也会在这里浅克隆后再交给 SDK，保持 slash/plugin 注入语义留在 part 层而不是退回 prompt 字符串猜测
 
 ## 数据流
 
