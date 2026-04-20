@@ -64,7 +64,7 @@
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
 - `diagnostics`: `OpenCodeSdkFacade` 模块提供的 diagnostics owner，负责 transient connectivity suppression、assistant/probe 错误文本整形，以及 assistant finalization debug payload 日志，并继续复用 façade 集中的 SDK error formatter。
 - `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化。
-- `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
+- `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责稳定 `messageID + parts[]` send payload、SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、session info lookup、session abort fallback、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
@@ -150,6 +150,7 @@
 - 无论 SDK 还是 legacy，读到消息后都会调用 `applySessionRevertState()`，按 session 的 `revert.messageID` / `revert.partID` 过滤被回滚掉的消息或消息尾部 parts。
 - 过滤后的 authoritative snapshot 会立即写入 `sessionStateStore`，让服务层第一次拥有稳定的 canonical `session/message/part` truth layer。
 - `getCanonicalSessionState(sessionId)` 提供只读读取口，供后续 sync-event / render slice 共享同一份图状态。
+- `seedCanonicalUserMessage()` 提供发送前的 optimistic canonical seed seam，让准备阶段可以先把稳定 `messageID + parts[]` 写进同一个 graph owner，再等待 authoritative reload 覆盖。
 
 默认会话指针现在由 `sessionLifecycle` 持有；调用方如果不显式传 `options.sessionId`，多数接口仍会落回当前 session，只是状态所有权不再直接留在 `OpenCodeService` 主类里。与 session tree/share/command/part 编辑有关的更厚 control surface 则继续落在 `sessionControl`，避免 `OpenCodeService` 再次直接编排这条链。
 
@@ -177,6 +178,7 @@
 
 `OpenCodePromptRequestBuilder` 现在统一负责：
 
+- 稳定 `messageID + parts[]` send payload 的生成
 - SDK `session.prompt()` / `promptAsync()` 的参数组装
 - legacy `/session/:id/message` 与 `/session/:id/prompt_async` 的 shared prompt options 拼装
 - `allowedTools`、`output-format`、`variant`、默认 `provider/model` 的映射
@@ -187,7 +189,7 @@
 - legacy `/prompt_async` 仍会把 `reasoningEffort` / `thinkingBudget` 写进 `model.options`
 - legacy `/message` 仍保持不写 `model.options`
 
-`OpenCodeService` 现在只保留 transport 分流；request-part serialization 与 prompt option assembly 分别委托给 `OpenCodeContextPartSerializer` 和 `OpenCodePromptRequestBuilder`。
+`OpenCodeService` 现在只保留 transport 分流；request-part serialization、稳定 send payload 组装与 canonical optimistic seed 分别委托给 `OpenCodeContextPartSerializer`、`OpenCodePromptRequestBuilder` 与 `OpenCodeSessionStateStore`。
 
 #### 非流式请求
 
@@ -214,7 +216,8 @@
 
 `sendMessage()`：
 
-- 先通过 `OpenCodeContextPartSerializer` + `OpenCodePromptRequestBuilder` 组装 prompt parts / transport payload
+- 先通过 `OpenCodeContextPartSerializer` + `OpenCodePromptRequestBuilder` 组装稳定 `messageID + requestParts[]`
+- 如果上游已经在 preparation 阶段构造好稳定 request parts，transport 会直接复用，不再重建另一批临时 part id
 - 再统一委托 `streamingRuntime.streamResponse()`：coordinator 依据 `sdkStream` flag 选择 SDK 或 legacy transport，并继续持有首事件前失败时的 legacy SSE fallback 与最终 assistant message completion
 
 对应的 prompt option assembly 仍全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 现在只保留 session 选择、payload 组装与 transport callback 注入，不再直接铺开 SDK/legacy 入口分流、transport/fallback/read/finalize 细节。

@@ -104,6 +104,8 @@ export class SendPipelineRuntime {
       sessionId: preparedSend.conversation.openCodeSessionId,
       ...preparedSend.modelOptions,
       contextItems: preparedSend.contextItems,
+      messageID: preparedSend.messageID,
+      requestParts: preparedSend.requestParts,
     });
     this.messageSendPreparationService.completePreparedStreamStart(preparedSend.tabId);
     const streamElements = this.host.createAssistantMessageElement(preparedSend.tabId, true);

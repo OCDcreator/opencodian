@@ -41,7 +41,10 @@ import {
 } from './OpenCodeEventSubscriptionCoordinator';
 import { OpenCodeMessageNormalizationMapper } from './OpenCodeMessageNormalizationMapper';
 import {
+  type BuiltPromptSendPayload,
   OpenCodePromptRequestBuilder,
+  type PromptRequestEntityKind,
+  type PromptRequestPart,
 } from './OpenCodePromptRequestBuilder';
 import {
   OpenCodeQuestionPermissionHub,
@@ -152,6 +155,11 @@ interface ProviderSendProbeResult {
   error?: string;
 }
 
+type PromptTransportOptions = QueryOptions & {
+  messageID?: string;
+  requestParts?: PromptRequestPart[];
+};
+
 type SessionTodoUpdate = {
   sessionId: string;
   todos: SessionTodo[];
@@ -184,6 +192,7 @@ export class OpenCodeService {
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
+  private promptRequestEntitySequence = 0;
   private vaultPath?: string;
 
   constructor(
@@ -295,6 +304,7 @@ export class OpenCodeService {
       getVaultPath: () => this.vaultPath,
     });
     this.promptRequestBuilder = new OpenCodePromptRequestBuilder({
+      createPromptEntityId: (kind) => this.createPromptEntityId(kind),
       getDefaultModelSelection: () => ({
         providerID: this.settings.defaultProvider,
         modelID: this.settings.defaultModel,
@@ -633,18 +643,18 @@ export class OpenCodeService {
   /** Send a message and wait for the full assistant response */
   async requestAssistantResponse(
     message: string,
-    options: QueryOptions & { sessionId?: string; system?: string },
+    options: PromptTransportOptions & { sessionId?: string; system?: string },
   ): Promise<ChatMessage | null> {
     const sessionId = options.sessionId ?? this.sessionLifecycle.getSessionId();
     if (!sessionId) {
       throw new Error('No active session');
     }
 
-    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
+    const payload = this.resolveStructuredPromptSendPayload(message, options);
 
     if (this.shouldUseSdk('sdkPrompt')) {
       const response = await this.sdk.session.prompt(
-        this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
+        this.promptRequestBuilder.buildSdkPromptParameters(sessionId, payload.requestParts, options),
       );
       if (response && typeof response === 'object' && 'info' in response && 'parts' in response) {
         const typedResponse = response as AssistantMessageResponse;
@@ -663,7 +673,10 @@ export class OpenCodeService {
       throw new Error('Invalid assistant response payload');
     }
 
-    const requestBody = this.promptRequestBuilder.buildLegacyMessageRequestBody(parts, options);
+    const requestBody = this.promptRequestBuilder.buildLegacyMessageRequestBody(
+      payload.requestParts,
+      options,
+    );
 
     const response = await this.post<unknown>(`/session/${sessionId}/message`, requestBody);
     if (
@@ -735,14 +748,14 @@ export class OpenCodeService {
   }
 
   /** Send a message and get streaming response using SSE */
-  async *sendMessage(message: string, options: QueryOptions = {}): AsyncGenerator<StreamChunk> {
+  async *sendMessage(message: string, options: PromptTransportOptions = {}): AsyncGenerator<StreamChunk> {
     const sessionId = options.sessionId ?? this.sessionLifecycle.getSessionId();
     if (!sessionId) {
       yield { type: 'error', content: 'No active session' };
       return;
     }
 
-    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
+    const payload = this.resolveStructuredPromptSendPayload(message, options);
 
     yield* this.streamingRuntime.streamResponse({
       sessionId,
@@ -750,7 +763,7 @@ export class OpenCodeService {
       sdk: {
         startPrompt: async () => {
           await this.sdk.session.promptAsync(
-            this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
+            this.promptRequestBuilder.buildSdkPromptParameters(sessionId, payload.requestParts, options),
           );
         },
         subscribe: async (signal) => {
@@ -760,11 +773,52 @@ export class OpenCodeService {
       },
       legacy: {
         startPrompt: async () => {
-          const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(parts, options);
+          const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(
+            payload.requestParts,
+            options,
+          );
           await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
         },
       },
     });
+  }
+
+  buildStructuredPromptSendPayload(
+    message: string,
+    options: QueryOptions = {},
+  ): BuiltPromptSendPayload {
+    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
+    return this.promptRequestBuilder.buildStructuredPromptSendPayload({ parts });
+  }
+
+  seedCanonicalUserMessage(input: {
+    sessionID: string;
+    messageID: string;
+    parts: PromptRequestPart[];
+    timestamp?: number;
+  }): OpenCodeCanonicalSessionState {
+    const timestamp = typeof input.timestamp === 'number' ? input.timestamp : Date.now();
+
+    this.sessionStateStore.upsertMessage({
+      id: input.messageID,
+      sessionID: input.sessionID,
+      role: 'user',
+      time: {
+        created: timestamp,
+      },
+    });
+
+    for (const part of input.parts) {
+      this.sessionStateStore.upsertPart(
+        this.createCanonicalUserPart(input.sessionID, input.messageID, part),
+      );
+    }
+
+    return this.getCanonicalSessionState(input.sessionID) ?? {
+      sessionID: input.sessionID,
+      messages: [],
+      partsByMessageID: {},
+    };
   }
 
   private shouldUseSdk(flag: keyof SdkFeatureFlags): boolean {
@@ -963,6 +1017,57 @@ export class OpenCodeService {
     messages: OpenCodeSessionMessageWithParts[],
   ): void {
     this.sessionStateStore.replaceSessionSnapshot(sessionId, messages);
+  }
+
+  private resolveStructuredPromptSendPayload(
+    message: string,
+    options: PromptTransportOptions,
+  ): BuiltPromptSendPayload {
+    if (options.requestParts) {
+      return this.promptRequestBuilder.buildStructuredPromptSendPayload({
+        messageID: options.messageID,
+        parts: options.requestParts,
+      });
+    }
+
+    return this.buildStructuredPromptSendPayload(message, options);
+  }
+
+  private createPromptEntityId(kind: PromptRequestEntityKind): string {
+    this.promptRequestEntitySequence += 1;
+    const randomValue = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${this.promptRequestEntitySequence}`;
+    return `${kind}-${randomValue}`;
+  }
+
+  private createCanonicalUserPart(
+    sessionID: string,
+    messageID: string,
+    part: PromptRequestPart,
+  ): Part {
+    if (part.type === 'text') {
+      return {
+        ...part,
+        id: part.id ?? this.createPromptEntityId('part'),
+        sessionID,
+        messageID,
+        ...(part.metadata ? { metadata: { ...part.metadata } } : {}),
+      };
+    }
+
+    return {
+      ...part,
+      id: part.id ?? this.createPromptEntityId('part'),
+      sessionID,
+      messageID,
+      ...(part.source ? {
+        source: {
+          ...part.source,
+          text: { ...part.source.text },
+        },
+      } : {}),
+    } as Part;
   }
 
   private filterMessagesByRevertState(

@@ -76,6 +76,8 @@ export interface SendPipelineTransportPort {
     options: SendMessageModelOptions & {
       sessionId?: string;
       contextItems: PromptContextItem[];
+      messageID: PreparedMessageSend['messageID'];
+      requestParts: PreparedMessageSend['requestParts'];
     },
   ): AsyncGenerator<CoreStreamChunk>;
   detachStream(sessionId: string | undefined): void;

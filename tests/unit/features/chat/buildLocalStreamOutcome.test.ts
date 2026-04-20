@@ -29,7 +29,11 @@ function createPreparedSend(overrides: Partial<PreparedMessageSend> = {}): Prepa
   return {
     conversation: overrides.conversation ?? createConversation([userMessage]),
     tabId: overrides.tabId ?? 'tab-1',
+    messageID: overrides.messageID ?? 'message-1',
+    requestParts: overrides.requestParts ?? [{ id: 'part-1', type: 'text', text: 'Hello' }],
+    optimisticUserParts: overrides.optimisticUserParts ?? [{ id: 'part-1', type: 'text', text: 'Hello' }],
     draftContextItems: overrides.draftContextItems ?? [],
+    contextItems: overrides.contextItems ?? [],
     modelOptions: overrides.modelOptions ?? {
       provider: 'openai',
       model: 'gpt-5.4',

@@ -68,6 +68,13 @@ describe('OpenCodeService SDK prompt requests', () => {
     expect(response?.structured).toEqual({ title: 'Generated title' });
     expect(mockSdkClient.session.prompt).toHaveBeenCalledWith(expect.objectContaining({
       sessionID: 'sdk-session',
+      parts: [
+        expect.objectContaining({
+          id: expect.stringMatching(/^part-/),
+          type: 'text',
+          text: 'Create a title',
+        }),
+      ],
       system: 'Return only the title',
       agent: 'title',
       noReply: false,
@@ -255,8 +262,16 @@ describe('OpenCodeService SDK promptAsync transport', () => {
       chunks.push(chunk);
     }
 
+    const sentParts = mockSdkClient.session.promptAsync.mock.calls[0]?.[0]?.parts;
     expect(mockSdkClient.session.promptAsync).toHaveBeenCalledWith(expect.objectContaining({
       sessionID: 'sdk-session',
+      parts: [
+        expect.objectContaining({
+          id: expect.stringMatching(/^part-/),
+          type: 'text',
+          text: 'Hello',
+        }),
+      ],
       agent: 'title',
       noReply: true,
       format: {
@@ -275,7 +290,58 @@ describe('OpenCodeService SDK promptAsync transport', () => {
       },
       variant: 'medium',
     }));
+    expect(Array.isArray(sentParts)).toBe(true);
     expect(chunks[0]).toEqual({ type: 'message_start' });
+    expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+  });
+
+  it('reuses prebuilt request parts when the send path passes stable prompt ids forward', async () => {
+    service = createServiceWithSdkFlags();
+    service.setSessionId('sdk-session');
+
+    const contextItem = {
+      id: 'ctx-1',
+      kind: 'file',
+      path: 'notes/spec.md',
+      label: 'spec.md',
+      mime: 'text/markdown',
+    } as const;
+    const promptPayload = service.buildStructuredPromptSendPayload('Hello', {
+      contextItems: [contextItem],
+    });
+
+    mockSdkClient.session.promptAsync.mockResolvedValue({});
+    mockSdkClient.event.subscribe.mockResolvedValue({
+      stream: (async function* () {
+        yield {
+          type: 'session.idle',
+          properties: {
+            sessionID: 'sdk-session',
+          },
+        };
+      })(),
+    });
+    mockSdkClient.session.messages.mockResolvedValue([]);
+    mockSdkClient.session.get.mockResolvedValue({
+      id: 'sdk-session',
+      title: 'SDK',
+      time: { created: 1, updated: 1 },
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of service.sendMessage('Hello', {
+      sessionId: 'sdk-session',
+      contextItems: [contextItem],
+      messageID: promptPayload.messageID,
+      requestParts: promptPayload.requestParts,
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(mockSdkClient.session.promptAsync).toHaveBeenCalledWith(expect.objectContaining({
+      sessionID: 'sdk-session',
+      parts: promptPayload.requestParts,
+    }));
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
   });
 

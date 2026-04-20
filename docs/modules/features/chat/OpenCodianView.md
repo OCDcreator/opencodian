@@ -278,12 +278,13 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`
 2. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
 3. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
-4. `MessageSendPreparationService` 先把 optimistic user message 落到本地 conversation，并保持 save / render / scroll 时序
-5. 首条 user message 时，仍先写 fallback title，再按设置异步触发 AI title generation
-6. `SendPipelineRuntime` 调用 `openCodeService.sendMessage()`，创建 streaming shell 与 `StreamController`
-7. `SendPipelineRuntime` 装配 `StreamChunkRouter` 处理 chunk / pending / timeout / interruption
-8. `SendPipelineRuntime` 装配 `StreamLocalFinalizer` 处理本地 shell finalization 与第一次本地保存
-9. `MessageFinalizationService` 再接手最终 sync、post-sync patch/rerender、todo/save/attention 收尾
+4. `createMessageSendPreparationHost()` 会把 `openCodeService.buildStructuredPromptSendPayload()` 与 `seedCanonicalUserMessage()` 接进准备阶段，先把 stable `messageID + parts[]` 写到 canonical session graph
+5. `MessageSendPreparationService` 再把 optimistic user message 落到本地 conversation，并保持 save / render / scroll 时序
+6. 首条 user message 时，仍先写 fallback title，再按设置异步触发 AI title generation
+7. `SendPipelineRuntime` 调用 `openCodeService.sendMessage()`，创建 streaming shell 与 `StreamController`
+8. `SendPipelineRuntime` 装配 `StreamChunkRouter` 处理 chunk / pending / timeout / interruption
+9. `SendPipelineRuntime` 装配 `StreamLocalFinalizer` 处理本地 shell finalization 与第一次本地保存
+10. `MessageFinalizationService` 再接手最终 sync、post-sync patch/rerender、todo/save/attention 收尾
 
 `SendPipelineRuntime` 的 chunk router 仍显式覆盖这些分支：
 

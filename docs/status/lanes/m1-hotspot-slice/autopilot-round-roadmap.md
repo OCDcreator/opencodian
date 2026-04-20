@@ -17,7 +17,7 @@
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodeSessionStateStore.test.ts tests/unit/core/opencode/OpenCodeService.sdkCrudSync.test.ts`
 - **Acceptance**: OpenCodian has a stable canonical `session/message/part` truth layer and reducer-style tests pass.
 
-### [NEXT] Task 2 - Reshape send preparation around stable `messageID + parts[]`
+### [DONE] Task 2 - Reshape send preparation around stable `messageID + parts[]`
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 2.
 - **Goal**: Make send preparation return structured payloads with stable message and part IDs for optimistic seed and SDK request.
@@ -30,7 +30,7 @@
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodePromptRequestBuilder.test.ts tests/unit/core/opencode/OpenCodeService.sdkPromptTransport.test.ts tests/unit/features/chat/MessageSendPreparationService.test.ts`
 - **Acceptance**: ordinary text, context/file, system/tools/agent options, and optimistic seed use the same stable structured IDs.
 
-### [QUEUED] Task 3 - Convert sync-event handling from reload signal to graph mutation
+### [NEXT] Task 3 - Convert sync-event handling from reload signal to graph mutation
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 3.
 - **Goal**: Let `message.updated`, `message.removed`, `message.part.updated`, `message.part.removed`, and `session.diff` mutate canonical state directly.

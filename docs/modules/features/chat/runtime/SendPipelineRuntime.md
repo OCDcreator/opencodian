@@ -62,6 +62,7 @@ export class SendPipelineRuntime {
 - 如果 active tab runtime 在 preparation 之后已经失效，直接中止，不继续发流
 - 进入 streaming 状态后，再创建真实 stream、streaming shell 和 `StreamController`
 - transport 层收到的是 `PreparedMessageSend.contextItems`，也就是“持久路径 + 一次性 composer context”的合并结果，而不是单独的 draft context
+- transport 层现在还会直接复用 `PreparedMessageSend.messageID` 与 `requestParts`，避免 send preparation 和真正 transport 再各自生成一批不同的 part id
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
 
 ### chunk router
@@ -108,6 +109,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - slash command 识别与 `runSessionCommand()` delegation 继续留在专用 `SlashCommandExecutionService`
 - `createSendPipelineRuntimeHost()` 现在把 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
 - `MessageSendPreparationService` 只负责“发之前能不能发、optimistic user message 何时落地、何时进入 streaming state”
+- `PreparedMessageSend` 现在是 send preparation 与 transport 之间的稳定 payload handoff，负责把 canonical seed 使用的 `messageID + parts[]` 原样带进 `openCodeService.sendMessage()`
 - `SendPipelineRuntime` 负责“真正发流，并装配 chunk router / local finalizer / post-stream finalizer”
 - `StreamChunkRouter` 负责“消费 chunk、pending/timeout、stream trace”
 - `StreamLocalFinalizer` 负责“本地 shell finalization、第一次本地保存”

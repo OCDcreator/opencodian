@@ -1,4 +1,8 @@
 import type {
+  BuiltPromptSendPayload,
+  PromptRequestPart,
+} from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
+import type {
   ChatMessage,
   Conversation,
   PromptContextItem,
@@ -34,6 +38,20 @@ function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): Pr
     },
     textSnapshot: 'Selected text',
     ...overrides,
+  };
+}
+
+function createStructuredSendPayload(
+  overrides: Partial<BuiltPromptSendPayload> = {},
+): BuiltPromptSendPayload {
+  const requestParts: PromptRequestPart[] = overrides.requestParts ?? [
+    { id: 'part-1', type: 'text', text: 'Hello' },
+  ];
+
+  return {
+    messageID: overrides.messageID ?? 'message-1',
+    requestParts,
+    optimisticUserParts: overrides.optimisticUserParts ?? requestParts.map((part) => ({ ...part })),
   };
 }
 
@@ -99,6 +117,13 @@ function createHost(
       return true;
     }),
     appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
+    buildStructuredPromptSendPayload: jest.fn().mockImplementation((content: string) =>
+      createStructuredSendPayload({
+        requestParts: [{ id: 'part-1', type: 'text', text: content }],
+      })),
+    seedCanonicalUserMessage: jest.fn().mockImplementation(() => {
+      callOrder.push('seedCanonicalUserMessage');
+    }),
     resetBackgroundTaskIndicator: jest.fn().mockImplementation(() => {
       callOrder.push('resetBackgroundTaskIndicator');
     }),
@@ -146,14 +171,20 @@ function createHost(
 describe('buildOptimisticUserMessage', () => {
   it('builds a user message with context attachments', () => {
     const contextItem = createPromptContextItem();
+    const optimisticUserParts: PromptRequestPart[] = [
+      { id: 'part-1', type: 'text', text: 'Hello' },
+    ];
 
-    const message = buildOptimisticUserMessage('Hello', [contextItem], 123);
+    const message = buildOptimisticUserMessage('Hello', [contextItem], 123, {
+      optimisticUserParts,
+    });
 
     expect(message).toEqual({
       id: 'user-123',
       role: 'user',
       content: 'Hello',
       timestamp: 123,
+      parts: optimisticUserParts,
       contextAttachments: [{
         kind: 'selection',
         path: 'notes/example.md',
@@ -239,6 +270,13 @@ describe('MessageSendPreparationService', () => {
     const result = await service.prepareMessageSend({ content: 'Hello' });
 
     expect(result).not.toBeNull();
+    expect(result?.messageID).toBe('message-1');
+    expect(result?.requestParts).toEqual([
+      { id: 'part-1', type: 'text', text: 'Hello' },
+    ]);
+    expect(result?.optimisticUserParts).toEqual([
+      { id: 'part-1', type: 'text', text: 'Hello' },
+    ]);
     expect(result?.activeModelId).toBe('openai/gpt-5.4');
     expect(result?.userMessage.contextAttachments).toEqual([{
       kind: 'selection',
@@ -256,6 +294,7 @@ describe('MessageSendPreparationService', () => {
     expect(conversation.updatedAt).toBe(result?.userMessage.timestamp);
     expect(callOrder).toEqual([
       'ensureSelectedModelAvailable',
+      'seedCanonicalUserMessage',
       'resetBackgroundTaskIndicator',
       'armBackgroundTaskIndicatorForUserMessage',
       'startConversationSyncLoop',
@@ -317,6 +356,12 @@ describe('MessageSendPreparationService', () => {
       persistentContextItem,
       draftContextItem,
     ]);
+    expect(host.buildStructuredPromptSendPayload).toHaveBeenCalledWith('Hello', {
+      contextItems: [
+        persistentContextItem,
+        draftContextItem,
+      ],
+    });
     expect(result?.userMessage.contextAttachments).toEqual([
       {
         kind: 'file',
@@ -331,6 +376,12 @@ describe('MessageSendPreparationService', () => {
         mime: 'text/markdown',
       },
     ]);
+    expect(host.seedCanonicalUserMessage).toHaveBeenCalledWith({
+      sessionID: 'session-1',
+      messageID: 'message-1',
+      parts: [{ id: 'part-1', type: 'text', text: 'Hello' }],
+      timestamp: result?.userMessage.timestamp,
+    });
   });
 
   it('blocks preparation when the active tab is already busy', async () => {

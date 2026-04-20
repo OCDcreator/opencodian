@@ -6,6 +6,7 @@ const logger = createLogger('OpenCodePromptRequestBuilder');
 
 export type PromptRequestPart =
   | {
+      id?: string;
       type: 'text';
       text: string;
       synthetic?: boolean;
@@ -13,6 +14,7 @@ export type PromptRequestPart =
       metadata?: Record<string, unknown>;
     }
   | {
+      id?: string;
       type: 'file';
       mime: string;
       filename?: string;
@@ -34,6 +36,19 @@ type PromptModelSelection = {
   providerID: string;
   modelID: string;
 };
+
+export type PromptRequestEntityKind = 'message' | 'part';
+
+export interface PromptBuildInput {
+  messageID?: string;
+  parts: PromptRequestPart[];
+}
+
+export interface BuiltPromptSendPayload {
+  messageID: string;
+  requestParts: PromptRequestPart[];
+  optimisticUserParts: PromptRequestPart[];
+}
 
 type PromptSharedOptions = {
   system?: string;
@@ -68,12 +83,26 @@ type LegacyPromptRequestBody = SharedPromptTarget & {
 };
 
 interface OpenCodePromptRequestBuilderHost {
+  createPromptEntityId(kind: PromptRequestEntityKind): string;
   getDefaultModelSelection(): PromptModelSelection;
   observeRuntimeToolNames(toolNames: Iterable<string>): boolean;
 }
 
 export class OpenCodePromptRequestBuilder {
   constructor(private readonly host: OpenCodePromptRequestBuilderHost) {}
+
+  buildStructuredPromptSendPayload(input: PromptBuildInput): BuiltPromptSendPayload {
+    const messageID = input.messageID?.trim()
+      ? input.messageID.trim()
+      : this.host.createPromptEntityId('message');
+    const requestParts = input.parts.map((part) => this.withStablePartId(part));
+
+    return {
+      messageID,
+      requestParts,
+      optimisticUserParts: requestParts.map((part) => this.clonePromptRequestPart(part)),
+    };
+  }
 
   buildSdkPromptParameters(
     sessionId: string,
@@ -260,5 +289,32 @@ export class OpenCodePromptRequestBuilder {
 
   private resolveVariant(options: QueryOptions): string | undefined {
     return options.reasoningEffort;
+  }
+
+  private withStablePartId(part: PromptRequestPart): PromptRequestPart {
+    const next = this.clonePromptRequestPart(part);
+    if (!next.id) {
+      next.id = this.host.createPromptEntityId('part');
+    }
+    return next;
+  }
+
+  private clonePromptRequestPart(part: PromptRequestPart): PromptRequestPart {
+    if (part.type === 'text') {
+      return {
+        ...part,
+        ...(part.metadata ? { metadata: { ...part.metadata } } : {}),
+      };
+    }
+
+    return {
+      ...part,
+      ...(part.source ? {
+        source: {
+          ...part.source,
+          text: { ...part.source.text },
+        },
+      } : {}),
+    };
   }
 }

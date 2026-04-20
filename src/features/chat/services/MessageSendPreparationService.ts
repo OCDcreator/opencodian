@@ -1,4 +1,8 @@
 import type {
+  BuiltPromptSendPayload,
+  PromptRequestPart,
+} from '../../../core/opencode/OpenCodePromptRequestBuilder';
+import type {
   ChatMessage,
   Conversation,
   PromptContextItem,
@@ -30,6 +34,9 @@ export interface PrepareMessageSendOptions {
 export interface PreparedMessageSend {
   conversation: Conversation;
   tabId: TabId;
+  messageID: string;
+  requestParts: PromptRequestPart[];
+  optimisticUserParts: PromptRequestPart[];
   draftContextItems: PromptContextItem[];
   contextItems: PromptContextItem[];
   modelOptions: SendMessageModelOptions;
@@ -41,6 +48,9 @@ export function buildOptimisticUserMessage(
   content: string,
   contextItems: PromptContextItem[],
   now: number = Date.now(),
+  structuredSend?: {
+    optimisticUserParts?: PromptRequestPart[];
+  },
 ): ChatMessage {
   const contextAttachments = contextItems.map((item) => buildContextAttachment(item));
 
@@ -50,6 +60,7 @@ export function buildOptimisticUserMessage(
     content,
     timestamp: now,
     contextAttachments: contextAttachments.length > 0 ? contextAttachments : undefined,
+    ...(structuredSend?.optimisticUserParts ? { parts: structuredSend.optimisticUserParts } : {}),
   };
 }
 
@@ -70,6 +81,16 @@ export interface MessageSendPreparationHost {
   formatModelId(model: Partial<SendMessageModelOptions> | null | undefined): string | undefined;
   ensureSelectedModelAvailable(provider: string | undefined, model: string | undefined): Promise<boolean>;
   appendModelUnavailableNoticeMessage(): Promise<void>;
+  buildStructuredPromptSendPayload(
+    content: string,
+    options: { contextItems: PromptContextItem[] },
+  ): BuiltPromptSendPayload;
+  seedCanonicalUserMessage(input: {
+    sessionID: string;
+    messageID: string;
+    parts: PromptRequestPart[];
+    timestamp?: number;
+  }): void;
   resetBackgroundTaskIndicator(tabId: TabId | null): void;
   armBackgroundTaskIndicatorForUserMessage(message: ChatMessage, tabId: TabId | null): void;
   startConversationSyncLoop(): void;
@@ -143,7 +164,21 @@ export class MessageSendPreparationService {
       conversation.externalContextPaths,
     );
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
-    const userMessage = buildOptimisticUserMessage(options.content, contextItems);
+    const structuredSend = this.host.buildStructuredPromptSendPayload(options.content, {
+      contextItems,
+    });
+    const userMessage = buildOptimisticUserMessage(
+      options.content,
+      contextItems,
+      Date.now(),
+      { optimisticUserParts: structuredSend.optimisticUserParts },
+    );
+    this.host.seedCanonicalUserMessage({
+      sessionID: conversation.openCodeSessionId,
+      messageID: structuredSend.messageID,
+      parts: structuredSend.optimisticUserParts,
+      timestamp: userMessage.timestamp,
+    });
     this.host.resetBackgroundTaskIndicator(tabId);
     this.host.armBackgroundTaskIndicatorForUserMessage(userMessage, tabId);
     conversation.messages.push(userMessage);
@@ -164,6 +199,9 @@ export class MessageSendPreparationService {
     return {
       conversation,
       tabId,
+      messageID: structuredSend.messageID,
+      requestParts: structuredSend.requestParts,
+      optimisticUserParts: structuredSend.optimisticUserParts,
       draftContextItems,
       contextItems,
       modelOptions,

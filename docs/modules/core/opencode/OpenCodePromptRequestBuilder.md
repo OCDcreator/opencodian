@@ -5,7 +5,7 @@
 
 ## 概述
 
-`OpenCodePromptRequestBuilder` 是 `OpenCodeService` 内部的 prompt option assembly owner。它把 SDK prompt parameters、legacy request body、allowed-tools / output-format / variant / reasoning 映射，以及默认 provider/model 选择收束到同一个 builder，避免这些请求拼装细节继续散落在主服务里。
+`OpenCodePromptRequestBuilder` 是 `OpenCodeService` 内部的 prompt option assembly owner。它把稳定 `messageID + parts[]` send payload、SDK prompt parameters、legacy request body、allowed-tools / output-format / variant / reasoning 映射，以及默认 provider/model 选择收束到同一个 builder，避免这些请求拼装细节继续散落在主服务里。
 
 builder 不负责 transport 分流，也不负责 context/image request part 序列化；`OpenCodeService` 仍决定走 SDK 还是 legacy，而 request-part assembly 现在由相邻的 `OpenCodeContextPartSerializer` 负责。
 
@@ -24,9 +24,11 @@ builder 不负责 transport 分流，也不负责 context/image request part 序
 
 ## 核心类型 / 状态
 
-- `PromptRequestPart`: prompt 请求里的 text/file part 结构，供 `OpenCodeContextPartSerializer` 与 builder 共享。
+- `PromptRequestPart`: prompt 请求里的 text/file part 结构，包含可选稳定 `id`，供 `OpenCodeContextPartSerializer` 与 builder 共享。
+- `BuiltPromptSendPayload`: 发送层共享的结构化 payload，集中持有稳定 `messageID`、transport `requestParts` 与 optimistic seed `optimisticUserParts`。
 - `PromptRequestOptions`: `QueryOptions` 加上可选 `system` 的 prompt 组装输入。
 - `host.getDefaultModelSelection()`: 提供当前默认 `providerID` / `modelID`，让 builder 不直接持有 settings 副本。
+- `host.createPromptEntityId()`: 生成稳定 `message` / `part` id，避免 optimistic seed 与 transport 各自临时造号。
 - `host.observeRuntimeToolNames()`: 在 allowed-tools 装配阶段把 runtime 外部工具名交回 `OpenCodeService` / `OpenCodeCatalogStateStore` 观察。
 
 ## 核心逻辑
@@ -56,6 +58,13 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 - `buildLegacyMessageRequestBody()` 负责 `/session/:id/message` 的非流式 legacy body，保持不写 `model.options` 的现有语义。
 - `buildLegacyStreamRequestBody()` 负责 `/session/:id/prompt_async` 的 legacy 流式 body，继续把 `reasoningEffort` 和 `thinkingBudget` 写进 `model.options`。
 
+### 稳定 send payload
+
+- `buildStructuredPromptSendPayload()` 会先为用户消息生成稳定 `messageID`
+- 每个 text/file request part 也会在这里拿到稳定 `part.id`
+- builder 会复制出两份 part 数组：一份给 SDK/legacy transport，一份给 optimistic canonical seed
+- 两份 part 共享同一批稳定 id，但不会共享同一对象引用，避免后续 mutation 泄漏
+
 ## 关键方法
 
 | 方法 / 导出 | 说明 |
@@ -63,6 +72,7 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 | `buildSdkPromptParameters()` | 组装 SDK prompt / promptAsync 参数 |
 | `buildLegacyMessageRequestBody()` | 组装 legacy 非流式 `/message` body |
 | `buildLegacyStreamRequestBody()` | 组装 legacy 流式 `/prompt_async` body |
+| `buildStructuredPromptSendPayload()` | 生成稳定 `messageID + parts[]` 的发送层共享 payload |
 | `PromptRequestPart` | 给服务层 request-part serialization 复用的 prompt part 类型 |
 
 ## 数据流
@@ -71,17 +81,18 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 graph TD
     A[OpenCodeService] --> B[OpenCodePromptRequestBuilder]
     A --> C[OpenCodeContextPartSerializer]
-    B --> D[SDK prompt parameters]
-    B --> E[legacy message body]
-    B --> F[legacy prompt_async body]
-    B --> G[observeRuntimeToolNames host seam]
+    B --> D[stable messageID + parts payload]
+    B --> E[SDK prompt parameters]
+    B --> F[legacy message body]
+    B --> G[legacy prompt_async body]
+    B --> H[observeRuntimeToolNames host seam]
 ```
 
 ## 与其他模块的交互
 
-- `OpenCodeService` 仍持有对外 `requestAssistantResponse()` / `sendMessage()` / `sendMessageWithSdk()` 门面，但 prompt option assembly 已统一委托给 builder。
+- `OpenCodeService` 仍持有对外 `requestAssistantResponse()` / `sendMessage()` / `sendMessageWithSdk()` 门面，但 prompt option assembly 与稳定 send payload 组装已统一委托给 builder。
 - `OpenCodeCatalogStateStore` 继续通过 `observeRuntimeToolNames()` 收集 runtime 外部工具名；builder 只负责在 allowed-tools 组装时触发观察。
-- `OpenCodeContextPartSerializer` 负责 request parts；builder 与它共享 `PromptRequestPart`，但仍保持“options vs parts”两条清晰边界。
+- `OpenCodeContextPartSerializer` 负责 request parts；builder 与它共享 `PromptRequestPart`，并在 serializer 之后补上稳定 `messageID` / `part.id`。
 
 ## 配置项
 

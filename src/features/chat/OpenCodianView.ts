@@ -2348,6 +2348,11 @@ export class OpenCodianView extends ItemView {
       ensureSelectedModelAvailable: (provider, model) =>
         this.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model),
       appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
+      buildStructuredPromptSendPayload: (content, options) =>
+        this.plugin.openCodeService.buildStructuredPromptSendPayload(content, options),
+      seedCanonicalUserMessage: (input) => {
+        this.plugin.openCodeService.seedCanonicalUserMessage(input);
+      },
       resetBackgroundTaskIndicator: (tabId) => {
         this.resetBackgroundTaskIndicator(tabId);
       },
