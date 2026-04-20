@@ -1,6 +1,7 @@
 {
   "profile_name": "windows",
   "platform_note": "Windows / PowerShell environment",
-  "test_vault_plugin_dir": "C:\\Users\\lt\\Desktop\\Write\\testvault\\.obsidian\\plugins\\opencodian",
+  "runner_additional_dirs": [],
+  "deploy_verify_path": "",
   "shell_preference": "pwsh"
 }

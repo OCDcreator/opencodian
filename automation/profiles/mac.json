@@ -1,6 +1,7 @@
 {
   "profile_name": "mac",
   "platform_note": "macOS environment",
-  "test_vault_plugin_dir": "",
+  "runner_additional_dirs": [],
+  "deploy_verify_path": "",
   "shell_preference": "zsh"
 }

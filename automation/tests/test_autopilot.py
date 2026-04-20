@@ -1,33 +1,43 @@
 import unittest
 
+from _autopilot.validation import (
+    path_matches_any,
+    test_command_budget_exceeded,
+    test_deploy_required,
+    test_full_test_required,
+    test_runs_include_full_test,
+    test_runs_include_targeted_tests,
+)
 from automation import autopilot
 
 
 class AutopilotPolicyTests(unittest.TestCase):
     def test_path_matches_any_supports_files_and_directories(self) -> None:
         configured = ["src/main.ts", "src/core/", "assets/"]
-        self.assertTrue(autopilot.path_matches_any("src/main.ts", configured))
-        self.assertTrue(autopilot.path_matches_any("src/core/opencode/OpenCodeService.ts", configured))
-        self.assertTrue(autopilot.path_matches_any("assets/icon.png", configured))
-        self.assertFalse(autopilot.path_matches_any("src/features/chat/OpenCodianView.ts", configured))
+        self.assertTrue(path_matches_any("src/main.ts", configured))
+        self.assertTrue(path_matches_any("src/core/opencode/OpenCodeService.ts", configured))
+        self.assertTrue(path_matches_any("assets/icon.png", configured))
+        self.assertFalse(path_matches_any("src/features/chat/OpenCodianView.ts", configured))
 
     def test_full_test_required_for_cadence_or_risky_paths(self) -> None:
         config = {
             "full_test_cadence_rounds": 5,
             "full_test_required_paths": ["src/main.ts", "src/core/", "automation/"],
         }
-        self.assertTrue(autopilot.test_full_test_required(["src/features/chat/OpenCodianView.ts"], 10, config))
-        self.assertTrue(autopilot.test_full_test_required(["src/core/opencode/OpenCodeService.ts"], 1, config))
-        self.assertFalse(autopilot.test_full_test_required(["src/features/chat/OpenCodianView.ts"], 1, config))
+        self.assertTrue(test_full_test_required(["src/features/chat/OpenCodianView.ts"], 10, config))
+        self.assertTrue(test_full_test_required(["src/core/opencode/OpenCodeService.ts"], 1, config))
+        self.assertFalse(test_full_test_required(["src/features/chat/OpenCodianView.ts"], 1, config))
 
     def test_deploy_required_only_for_targeted_paths(self) -> None:
         config = {
             "deploy_policy": "targeted",
             "deploy_required_paths": ["src/main.ts", "manifest.json", "styles.css", "assets/", "src/style/"],
         }
-        self.assertTrue(autopilot.test_deploy_required(["manifest.json"], config))
-        self.assertTrue(autopilot.test_deploy_required(["src/style/theme.css"], config))
-        self.assertFalse(autopilot.test_deploy_required(["src/features/chat/OpenCodianView.ts"], config))
+        self.assertTrue(test_deploy_required(["manifest.json"], config, clean_string=autopilot.clean_string))
+        self.assertTrue(test_deploy_required(["src/style/theme.css"], config, clean_string=autopilot.clean_string))
+        self.assertFalse(
+            test_deploy_required(["src/features/chat/OpenCodianView.ts"], config, clean_string=autopilot.clean_string)
+        )
 
     def test_command_budget_counts_occurrences(self) -> None:
         config = {
@@ -40,20 +50,21 @@ class AutopilotPolicyTests(unittest.TestCase):
             "git diff --stat",
             "git diff --stat -- docs/a.md && git diff --stat -- docs/b.md",
         ]
-        errors = autopilot.test_command_budget_exceeded(commands_run, config)
+        errors = test_command_budget_exceeded(commands_run, config)
         self.assertEqual(1, len(errors))
 
     def test_test_run_detection_distinguishes_targeted_and_full(self) -> None:
         config = {
             "test_command": "npm test",
             "full_test_command": "npm test",
+            "targeted_test_prefixes": ["npm test --", "npm run test --"],
         }
         tests_run = [
             "npm test -- SessionTodoHostAdapter",
             "npm test",
         ]
-        self.assertTrue(autopilot.test_runs_include_targeted_tests(tests_run, config))
-        self.assertTrue(autopilot.test_runs_include_full_test(tests_run, config))
+        self.assertTrue(test_runs_include_targeted_tests(tests_run, config, clean_string=autopilot.clean_string))
+        self.assertTrue(test_runs_include_full_test(tests_run, config, clean_string=autopilot.clean_string))
 
 
 class RestartParserTests(unittest.TestCase):

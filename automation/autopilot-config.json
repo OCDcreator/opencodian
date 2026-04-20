@@ -1,0 +1,90 @@
+{
+  "objective": "Reduce ownership concentration and maintainability hotspots one queued slice at a time while keeping configured validation commands green.",
+  "focus_hint": "R1 - First maintainability / refactor slice",
+  "next_phase_number": 1,
+  "max_rounds": 200,
+  "max_consecutive_failures": 3,
+  "lint_command": "npm run lint",
+  "typecheck_command": "npm run typecheck",
+  "full_test_command": "npm test",
+  "targeted_test_required": true,
+  "targeted_test_prefixes": [
+  "npm test --",
+  "npm run test --"
+],
+  "targeted_test_required_paths": [
+  "src/",
+  "tests/",
+  "docs/",
+  "package.json",
+  "package-lock.json"
+],
+  "full_test_cadence_rounds": 1,
+  "full_test_required_paths": [
+  "src/",
+  "tests/",
+  "docs/",
+  "package.json",
+  "package-lock.json"
+],
+  "build_command": "npm run build",
+  "build_required_paths": [
+  "src/",
+  "tests/",
+  "docs/",
+  "package.json",
+  "package-lock.json"
+],
+  "vulture_command": "",
+  "deploy_after_build": false,
+  "deploy_policy": "never",
+  "deploy_required_paths": [],
+  "deploy_verify_path": "",
+  "max_git_status_per_round": 6,
+  "max_git_diff_stat_per_round": 3,
+  "allowed_branch_prefixes": [
+  "autopilot/",
+  "automation/",
+  "quality/",
+  "bugfix/"
+],
+  "commit_prefix": "autopilot",
+  "prompt_template": "automation/round-prompt.md",
+  "result_schema": "automation/round-result.schema.json",
+  "runner_kind": "codex",
+  "runner_command": "",
+  "runner_model": "",
+  "runner_extra_args": [],
+  "lanes": [
+  {
+    "id": "m1-hotspot-slice",
+    "label": "R1 - First maintainability / refactor slice",
+    "focus_hint": "R1 - First maintainability / refactor slice",
+    "phase_doc_prefix": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-",
+    "starting_phase_doc": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-0.md",
+    "roadmap_path": "docs/status/lanes/m1-hotspot-slice/autopilot-round-roadmap.md",
+    "prompt_template": "automation/round-prompt.md",
+    "commit_prefix": "autopilot"
+  },
+  {
+    "id": "m2-followup-slice",
+    "label": "R2 - Follow-up maintainability / refactor slice",
+    "focus_hint": "R2 - Follow-up maintainability / refactor slice",
+    "phase_doc_prefix": "docs/status/lanes/m2-followup-slice/autopilot-phase-",
+    "starting_phase_doc": "docs/status/lanes/m2-followup-slice/autopilot-phase-0.md",
+    "roadmap_path": "docs/status/lanes/m2-followup-slice/autopilot-round-roadmap.md",
+    "prompt_template": "automation/round-prompt.md",
+    "commit_prefix": "autopilot"
+  },
+  {
+    "id": "m3-checkpoint",
+    "label": "R3 - Checkpoint after first refactor batch",
+    "focus_hint": "R3 - Checkpoint after first refactor batch",
+    "phase_doc_prefix": "docs/status/lanes/m3-checkpoint/autopilot-phase-",
+    "starting_phase_doc": "docs/status/lanes/m3-checkpoint/autopilot-phase-0.md",
+    "roadmap_path": "docs/status/lanes/m3-checkpoint/autopilot-round-roadmap.md",
+    "prompt_template": "automation/round-prompt.md",
+    "commit_prefix": "autopilot"
+  }
+]
+}
