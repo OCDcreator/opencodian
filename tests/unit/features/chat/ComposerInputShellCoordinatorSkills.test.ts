@@ -199,4 +199,31 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     expect(menuItems[0]?.textContent).toContain('插件：claude-md-management');
     expect(menuItems[1]?.textContent).toContain('OpenCode 项目');
   });
+
+  it('re-syncs an open menu when the skill mode changes to prefixed', async () => {
+    const fixture = createFixture();
+    fixture.setMenuItems([
+      slashItem('review', 'Review changes'),
+      slashItem('x-reader/video', 'Video summary', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/review'),
+      expect.stringContaining('/x-reader/video'),
+    ]);
+
+    fixture.setSkillMode('skills-command');
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/review'),
+      expect.stringContaining('/skills'),
+    ]);
+  });
 });

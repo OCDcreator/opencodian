@@ -58,6 +58,7 @@ export class ComposerInputShellCoordinator {
   private selectedSlashCommandMenuItemIndex = 0;
   private slashCommandMenuRunId = 0;
   private slashCommandMenuStatus: SlashCommandMenuStatus = 'idle';
+  private slashCommandMenuQuery: string | null = null;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {}
 
@@ -216,6 +217,7 @@ export class ComposerInputShellCoordinator {
     this.selectedSlashCommandMenuItemIndex = 0;
     this.slashCommandMenuRunId += 1;
     this.slashCommandMenuStatus = 'idle';
+    this.slashCommandMenuQuery = null;
   }
 
   private initializeLayoutMetrics(): void {
@@ -281,6 +283,8 @@ export class ComposerInputShellCoordinator {
   }
 
   private tryHandleSlashCommandMenuKeydown(event: KeyboardEvent): boolean {
+    this.syncSlashCommandMenuStateWithCurrentContext();
+
     if (this.visibleSlashCommandMenuItems.length === 0) {
       if (event.key === 'Escape' && this.slashCommandMenuStatus !== 'idle') {
         event.preventDefault();
@@ -344,6 +348,8 @@ export class ComposerInputShellCoordinator {
   }
 
   private applySelectedSlashCommandMenuItem(): void {
+    this.syncSlashCommandMenuStateWithCurrentContext();
+
     const item = this.visibleSlashCommandMenuItems[this.selectedSlashCommandMenuItemIndex];
     if (!item || !this.inputTextareaEl) {
       return;
@@ -373,6 +379,8 @@ export class ComposerInputShellCoordinator {
       this.clearSlashCommandMenu();
       return;
     }
+
+    this.slashCommandMenuQuery = query;
 
     const currentRunId = ++this.slashCommandMenuRunId;
     this.visibleSlashCommandMenuItems = [];
@@ -468,6 +476,7 @@ export class ComposerInputShellCoordinator {
     this.visibleSlashCommandMenuItems = [];
     this.selectedSlashCommandMenuItemIndex = 0;
     this.slashCommandMenuStatus = 'idle';
+    this.slashCommandMenuQuery = null;
     this.renderSlashCommandMenu();
   }
 
@@ -475,6 +484,8 @@ export class ComposerInputShellCoordinator {
     if (!this.slashCommandMenuEl) {
       return;
     }
+
+    this.syncSlashCommandMenuStateWithCurrentContext();
 
     this.slashCommandMenuEl.replaceChildren();
 
@@ -565,6 +576,28 @@ export class ComposerInputShellCoordinator {
     });
 
     this.scheduleLayoutSync();
+  }
+
+  private syncSlashCommandMenuStateWithCurrentContext(): void {
+    if (this.slashCommandMenuQuery === null || !this.slashCommandMenuCatalogItems) {
+      return;
+    }
+
+    this.visibleSlashCommandMenuItems = filterSlashCommandMenuItems(
+      this.slashCommandMenuCatalogItems,
+      this.slashCommandMenuQuery,
+      {
+        skillMode: this.host.getSlashCommandSkillMode(),
+        skillsCommandDescription: t('slashCommand.skillsCommand.description'),
+      },
+    );
+    this.selectedSlashCommandMenuItemIndex = Math.min(
+      this.selectedSlashCommandMenuItemIndex,
+      Math.max(0, this.visibleSlashCommandMenuItems.length - 1),
+    );
+    this.slashCommandMenuStatus = this.visibleSlashCommandMenuItems.length > 0
+      ? 'idle'
+      : this.getEmptySlashCommandMenuStatus(this.slashCommandMenuCatalogItems);
   }
 
   private getEmptySlashCommandMenuStatus(items: SlashCommandMenuItem[]): SlashCommandMenuStatus {
