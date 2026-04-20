@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 7 - Rework reload/finalization as canonical compensation
+### [DONE] Task 7 - Rework reload/finalization as canonical compensation
 
 - **Plan source**: `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md` Task 7.
 - **Goal**: Make authoritative reload and finalization replace/compare canonical state, add blank-block diagnostics, and cover the real failure classes with regressions.

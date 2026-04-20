@@ -178,6 +178,62 @@ type SessionStatusUpdate = {
   status: SessionActivityStatus;
 };
 
+type AssistantCanonicalDiagnosticSource = 'stream' | 'sync' | 'reload';
+
+interface AssistantCanonicalStateDiagnosticPayload {
+  sessionID: string;
+  messageID: string;
+  partIDs: string[];
+  hasRenderableText: boolean;
+  hasToolParts: boolean;
+  source: AssistantCanonicalDiagnosticSource;
+}
+
+function normalizeFingerprintValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeFingerprintValue(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nestedValue]) => [key, normalizeFingerprintValue(nestedValue)]),
+  );
+}
+
+function buildCanonicalConversationFingerprintPayload(
+  messages: ChatMessage[],
+): Record<string, unknown>[] {
+  return messages.map((message) =>
+    normalizeFingerprintValue({
+      id: message.id,
+      role: message.role,
+      modelId: message.modelId ?? null,
+      sourceMessageId: message.sourceMessageId ?? null,
+      streamState: message.streamState ?? null,
+      displayStyle: message.displayStyle ?? null,
+      noticeTitle: message.noticeTitle ?? null,
+      noticeTone: message.noticeTone ?? null,
+      noticeActions: message.noticeActions ?? null,
+      noticeMeta: message.noticeMeta ?? null,
+      content: message.content,
+      timestamp: message.timestamp,
+      images: message.images ?? null,
+      toolCalls: message.toolCalls ?? null,
+      contentBlocks: message.contentBlocks ?? null,
+      contextAttachments: message.contextAttachments ?? null,
+      questionResolution: message.questionResolution ?? null,
+      omo: message.omo ?? null,
+      structured: message.structured ?? null,
+      parts: message.parts ?? null,
+    }) as Record<string, unknown>,
+  );
+}
+
 export class OpenCodeService {
   private static readonly messageNormalizationMapper = new OpenCodeMessageNormalizationMapper();
   readonly sdk: OpenCodeSdkFacade;
@@ -201,6 +257,7 @@ export class OpenCodeService {
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
   private promptRequestEntitySequence = 0;
+  private readonly assistantCanonicalDiagnosticFingerprints = new Map<string, string>();
   private vaultPath?: string;
 
   constructor(
@@ -626,6 +683,10 @@ export class OpenCodeService {
     }));
   }
 
+  static getCanonicalConversationFingerprint(messages: ChatMessage[]): string {
+    return JSON.stringify(buildCanonicalConversationFingerprintPayload(messages));
+  }
+
   async getSessionTodos(sessionId: string): Promise<SessionTodo[]> {
     return this.sessionLifecycle.getSessionTodos(sessionId);
   }
@@ -1044,21 +1105,41 @@ export class OpenCodeService {
     messages: OpenCodeSessionMessageWithParts[],
   ): void {
     this.sessionStateStore.replaceSessionSnapshot(sessionId, messages);
+    this.logAssistantCanonicalStateForSnapshot(sessionId, messages, 'reload');
   }
 
   private applyCanonicalSyncEvent(update: SessionSyncEventUpdate): void {
     switch (update.type) {
       case 'message.updated':
         this.sessionStateStore.upsertMessage(update.info);
+        this.logAssistantCanonicalStateForMessage(
+          update.sessionId,
+          update.info.id,
+          'sync',
+        );
         return;
       case 'message.removed':
         this.sessionStateStore.removeMessage(update.sessionId, update.messageId);
+        this.clearAssistantCanonicalStateDiagnosticFingerprints(
+          update.sessionId,
+          update.messageId,
+        );
         return;
       case 'message.part.updated':
         this.sessionStateStore.upsertPart(update.part);
+        this.logAssistantCanonicalStateForMessage(
+          update.sessionId,
+          update.part.messageID,
+          'sync',
+        );
         return;
       case 'message.part.removed':
         this.sessionStateStore.removePart(update.messageId, update.partId);
+        this.logAssistantCanonicalStateForMessage(
+          update.sessionId,
+          update.messageId,
+          'sync',
+        );
         return;
       case 'message.part.delta':
         this.sessionStateStore.appendPartDelta({
@@ -1067,6 +1148,11 @@ export class OpenCodeService {
           field: update.field,
           delta: update.delta,
         });
+        this.logAssistantCanonicalStateForMessage(
+          update.sessionId,
+          update.messageId,
+          'sync',
+        );
         return;
       case 'session.diff':
         return;
@@ -1083,21 +1169,27 @@ export class OpenCodeService {
     switch (mutation.type) {
       case 'message.upserted':
         this.ensureCanonicalStreamMessage(mutation);
-        return;
+        break;
       case 'part.upserted':
         this.ensureCanonicalStreamMessage(mutation);
         if (mutation.part) {
           this.upsertCanonicalStreamPart(mutation.part);
         }
-        return;
+        break;
       case 'part.delta':
         this.ensureCanonicalStreamMessage(mutation);
         this.applyCanonicalStreamPartDelta(mutation);
-        return;
+        break;
       case 'part.completed':
         this.ensureCanonicalStreamMessage(mutation);
-        return;
+        break;
     }
+
+    this.logAssistantCanonicalStateForMessage(
+      mutation.sessionID,
+      mutation.messageID,
+      'stream',
+    );
   }
 
   private ensureCanonicalStreamMessage(mutation: Pick<
@@ -1183,6 +1275,87 @@ export class OpenCodeService {
     };
     nextPart[mutation.field] = mutation.delta;
     this.sessionStateStore.upsertPart(nextPart as Part);
+  }
+
+  private logAssistantCanonicalStateForSnapshot(
+    sessionId: string,
+    messages: OpenCodeSessionMessageWithParts[],
+    source: AssistantCanonicalDiagnosticSource,
+  ): void {
+    for (const message of messages) {
+      if (message.info.role !== 'assistant') {
+        continue;
+      }
+
+      this.logAssistantCanonicalStatePayload({
+        sessionID: sessionId,
+        messageID: message.info.id,
+        partIDs: message.parts.map((part) => part.id),
+        hasRenderableText: this.hasRenderableAssistantText(message.parts),
+        hasToolParts: message.parts.some((part) => part.type === 'tool'),
+        source,
+      });
+    }
+  }
+
+  private logAssistantCanonicalStateForMessage(
+    sessionId: string,
+    messageId: string,
+    source: AssistantCanonicalDiagnosticSource,
+  ): void {
+    const state = this.getCanonicalSessionState(sessionId);
+    if (!state) {
+      return;
+    }
+
+    const message = state.messages.find((candidate) => candidate.id === messageId);
+    if (!message || message.role !== 'assistant') {
+      return;
+    }
+
+    const parts = state.partsByMessageID[messageId] ?? [];
+    this.logAssistantCanonicalStatePayload({
+      sessionID: sessionId,
+      messageID: messageId,
+      partIDs: parts.map((part) => part.id),
+      hasRenderableText: this.hasRenderableAssistantText(parts),
+      hasToolParts: parts.some((part) => part.type === 'tool'),
+      source,
+    });
+  }
+
+  private logAssistantCanonicalStatePayload(
+    payload: AssistantCanonicalStateDiagnosticPayload,
+  ): void {
+    const fingerprint = JSON.stringify(payload);
+    const diagnosticKey = `${payload.source}:${payload.sessionID}:${payload.messageID}`;
+    if (this.assistantCanonicalDiagnosticFingerprints.get(diagnosticKey) === fingerprint) {
+      return;
+    }
+
+    this.assistantCanonicalDiagnosticFingerprints.set(diagnosticKey, fingerprint);
+    this.diagnostics.logAssistantFinalizationDebug(
+      'assistant-turn-canonical-state',
+      payload,
+    );
+  }
+
+  private clearAssistantCanonicalStateDiagnosticFingerprints(
+    sessionId: string,
+    messageId: string,
+  ): void {
+    for (const source of ['stream', 'sync', 'reload'] as const) {
+      this.assistantCanonicalDiagnosticFingerprints.delete(
+        `${source}:${sessionId}:${messageId}`,
+      );
+    }
+  }
+
+  private hasRenderableAssistantText(parts: Part[]): boolean {
+    return parts.some((part) =>
+      (part.type === 'text' || part.type === 'reasoning')
+      && typeof part.text === 'string'
+      && part.text.trim().length > 0);
   }
 
   private resolveStructuredPromptSendPayload(

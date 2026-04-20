@@ -151,11 +151,14 @@
 - 过滤后的 authoritative snapshot 会立即写入 `sessionStateStore`，让服务层第一次拥有稳定的 canonical `session/message/part` truth layer。
 - `getCanonicalSessionState(sessionId)` 提供只读读取口，供后续 sync-event / render slice 共享同一份图状态。
 - `getCanonicalSessionMessages(sessionId)` 会把 canonical graph 重新组装成 `[{ info, parts[] }]` 视图，供 chat sync 层在不重拉 server 的情况下复用既有 hydrate / merge 路径。
+- `getCanonicalConversationFingerprint(messages)` 会把 `ChatMessage` 的可见字段、结构化 blocks、上下文附件、OMO metadata 与原始 `parts` 一起做稳定 fingerprint，供 reload/finalization 把“隐藏 graph 已纠偏但文本未变”的情况也视为 canonical drift。
 - `seedCanonicalUserMessage()` 提供发送前的 optimistic canonical seed seam，让准备阶段可以先把稳定 `messageID + parts[]` 写进同一个 graph owner，再等待 authoritative reload 覆盖。
 
 除此之外，`OpenCodeService` 现在还会在 sync-event runtime host seam 上直接执行 `applyCanonicalSyncEvent()`：`message.updated` / `message.removed` / `message.part.updated` / `message.part.removed` / `message.part.delta` 会先归并到 `sessionStateStore`，`session.diff` 仍只保留给后续 authoritative reload/gap recovery。
 
 流式路径也会写入同一个 canonical graph：`OpenCodeStreamEventTransformer` 从 `message.part.updated` / `message.part.delta` 产出 stream mutations，`OpenCodeStreamingRuntimeCoordinator` 在 yield legacy chunks 前把 mutations 交回服务层。服务层会为缺失的 assistant message 建立最小 canonical info、合并 part upsert（避免空字段覆盖已有 text/tool state），并在 delta 先到时补建对应 part；最终 `finishStreamingResponse()` 的 authoritative snapshot 仍会覆盖这些实时状态。
+
+为了排查“tool 先到、text 后到”导致的空白 assistant block，服务层现在还会在 stream / sync / reload 三条 canonical 写入路径上输出 `assistant-turn-canonical-state` debug payload，统一记录 `sessionID`、`messageID`、`partIDs`、`hasRenderableText`、`hasToolParts` 与来源。
 
 默认会话指针现在由 `sessionLifecycle` 持有；调用方如果不显式传 `options.sessionId`，多数接口仍会落回当前 session，只是状态所有权不再直接留在 `OpenCodeService` 主类里。与 session tree/share/command/part 编辑有关的更厚 control surface 则继续落在 `sessionControl`，避免 `OpenCodeService` 再次直接编排这条链。
 

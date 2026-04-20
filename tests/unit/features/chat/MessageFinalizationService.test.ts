@@ -7,6 +7,7 @@ import {
   MessageFinalizationService,
   shouldSyncAfterStream,
 } from '../../../../src/features/chat/services/MessageFinalizationService';
+import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -52,7 +53,7 @@ function createHost(
       (messages: ChatMessage[]) => messages.map((message) => `${message.id}:${message.content}:${message.timestamp}`).join('|'),
     ),
     getConversationSyncFingerprint: jest.fn().mockImplementation(
-      (messages: ChatMessage[]) => `sync:${messages.map((message) => `${message.id}:${message.timestamp}`).join('|')}`,
+      (messages: ChatMessage[]) => OpenCodeService.getCanonicalConversationFingerprint(messages),
     ),
     applySyncedConversationUpdate: jest.fn().mockResolvedValue(undefined),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
@@ -90,7 +91,7 @@ describe('shouldSyncAfterStream', () => {
   });
 });
 
-describe('MessageFinalizationService', () => {
+describe('MessageFinalizationService foreground finalization', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -223,6 +224,12 @@ describe('MessageFinalizationService', () => {
     expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     expect(logStage).toHaveBeenCalledWith('post-sync-render-apply-complete');
   });
+});
+
+describe('MessageFinalizationService background and recovery paths', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('marks the tab for attention instead of foreground updates when user switched away', async () => {
     const sendingConversation = createConversation([
@@ -250,6 +257,92 @@ describe('MessageFinalizationService', () => {
     expect(host.syncActiveTabContextUsageIdentity).not.toHaveBeenCalled();
     expect(host.refreshActiveTabContextUsageFromServer).not.toHaveBeenCalled();
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-1', true);
+  });
+
+  it('records canonical-only sync drift without forcing a foreground rerender', async () => {
+    const previousMessages = [
+      createMessage({
+        id: 'user-1',
+        role: 'user',
+        content: 'Question',
+        timestamp: 1,
+        parts: [
+          {
+            id: 'part-user-visible',
+            sessionID: 'session-1',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'Question',
+          },
+        ],
+      }),
+      createMessage({
+        id: 'assistant-1',
+        content: 'Stable answer',
+        timestamp: 2,
+      }),
+    ];
+    const nextMessages = [
+      {
+        ...previousMessages[0],
+        parts: [
+          {
+            id: 'part-user-visible',
+            sessionID: 'session-1',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'Question',
+          },
+          {
+            id: 'part-user-plugin',
+            sessionID: 'session-1',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'Injected plugin prompt',
+            synthetic: true,
+            metadata: {
+              source: 'plugin',
+              pluginName: 'opencode-plugin-x',
+            },
+          },
+        ],
+      },
+      previousMessages[1],
+    ];
+    const conversation = createConversation(previousMessages);
+    const nextFingerprint = OpenCodeService.getCanonicalConversationFingerprint(nextMessages);
+    const host = createHost(conversation, {
+      syncConversationMessagesFromServer: jest.fn().mockImplementation(async (targetConversation: Conversation) => {
+        targetConversation.messages = nextMessages;
+        return {
+          messages: nextMessages,
+          changed: true,
+          fingerprint: nextFingerprint,
+        };
+      }),
+    });
+    const service = new MessageFinalizationService(host);
+
+    await service.finalizeAfterStream({
+      conversation,
+      tabId: 'tab-1',
+      shouldSyncFromServer: true,
+      editedFiles: ['notes.md'],
+      logStage: jest.fn(),
+    });
+
+    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
+    expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(
+      1,
+      'tab-1',
+      nextFingerprint,
+    );
+    expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(
+      2,
+      'tab-1',
+      nextFingerprint,
+    );
   });
 
   it('clears the sync lock even when final save fails', async () => {

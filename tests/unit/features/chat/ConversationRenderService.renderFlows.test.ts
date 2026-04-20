@@ -3,6 +3,7 @@ import type {
   OpenCodeCanonicalPart,
   OpenCodeCanonicalSessionState,
 } from '../../../../src/core/opencode';
+import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 import {
   captureElementScrollRestoreSnapshot,
   ConversationRenderService,
@@ -55,7 +56,7 @@ function hydrateCanonicalMessage(
   });
 }
 
-describe('ConversationRenderService render flows', () => {
+describe('ConversationRenderService incremental render flows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -162,6 +163,86 @@ describe('ConversationRenderService render flows', () => {
     expect(host.assistantShellRender.renderPersistedMessage).not.toHaveBeenCalled();
   });
 
+  it('renders tool-first assistant sync updates from canonical state without leaving a blank block', async () => {
+    const previousMessages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Inspect docs', timestamp: 1 }),
+    ];
+    const blankAssistantMessage = createMessage({
+      id: 'assistant-1',
+      content: '',
+      timestamp: 2,
+      sourceMessageId: 'assistant-1',
+    });
+    const nextMessages = [...previousMessages, blankAssistantMessage];
+    const conversation = createConversation(nextMessages);
+    const host = createHost({
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    });
+    const service = new ConversationRenderService(host, {
+      getCanonicalSessionState: jest.fn().mockReturnValue({
+        sessionID: 'session-1',
+        messages: [
+          createCanonicalMessage({ id: 'user-1', role: 'user', time: { created: 1 } }),
+          createCanonicalMessage({ id: 'assistant-1', role: 'assistant', time: { created: 2 } }),
+        ],
+        partsByMessageID: {
+          'user-1': [
+            createCanonicalPart({
+              id: 'part-user-1',
+              messageID: 'user-1',
+              type: 'text',
+              text: 'Inspect docs',
+            }),
+          ],
+          'assistant-1': [
+            createCanonicalPart({
+              id: 'part-tool-1',
+              messageID: 'assistant-1',
+              type: 'tool',
+              tool: 'read',
+              callID: 'call-read-1',
+              state: {
+                status: 'running',
+                input: { filePath: 'docs/architecture/README.md' },
+              },
+            }),
+            createCanonicalPart({
+              id: 'part-text-1',
+              messageID: 'assistant-1',
+              type: 'text',
+              text: '',
+            }),
+          ],
+        },
+      }),
+      hydrateOpenCodeMessage: jest.fn((info, parts) =>
+        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
+    });
+
+    await service.applySyncedConversationUpdate(previousMessages, nextMessages);
+
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'assistant-1',
+        content: '',
+        contentBlocks: [
+          expect.objectContaining({
+            type: 'tool_use',
+            toolId: 'call-read-1',
+            toolName: 'read',
+            toolStatus: 'running',
+          }),
+        ],
+      }),
+    );
+  });
+});
+
+describe('ConversationRenderService full rerender flows', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('preserves hydration, scroll restore, and layout sync during full rerenders', async () => {
     const messages = [
       createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
@@ -243,5 +324,102 @@ describe('ConversationRenderService render flows', () => {
     expect(host.createUserMessageFrame).not.toHaveBeenCalledWith(expect.objectContaining({
       id: 'stale-user',
     }));
+  });
+});
+
+describe('ConversationRenderService canonical reload regressions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('rebuilds the same canonical turn after reload when plugin synthetic parts are present', async () => {
+    const conversation = createConversation([
+      createMessage({ id: 'stale-user', role: 'user', content: 'stale question' }),
+      createMessage({ id: 'stale-assistant', content: 'stale answer' }),
+    ]);
+    const canonicalState: OpenCodeCanonicalSessionState = {
+      sessionID: 'session-1',
+      messages: [
+        createCanonicalMessage({ id: 'user-1', role: 'user', time: { created: 10 } }),
+        createCanonicalMessage({ id: 'assistant-1', role: 'assistant', time: { created: 20 } }),
+      ],
+      partsByMessageID: {
+        'user-1': [
+          createCanonicalPart({
+            id: 'part-user-visible',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'Question only',
+          }),
+          createCanonicalPart({
+            id: 'part-user-plugin',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'Injected plugin prompt',
+            synthetic: true,
+            metadata: {
+              source: 'plugin',
+              pluginName: 'opencode-plugin-x',
+            },
+          }),
+        ],
+        'assistant-1': [
+          createCanonicalPart({
+            id: 'part-tool-reload',
+            messageID: 'assistant-1',
+            type: 'tool',
+            tool: 'read',
+            callID: 'call-read-reload',
+            state: {
+              status: 'completed',
+              input: { filePath: 'docs/architecture/README.md' },
+              output: 'done',
+            },
+          }),
+          createCanonicalPart({
+            id: 'part-text-reload',
+            messageID: 'assistant-1',
+            type: 'text',
+            text: 'Reloaded answer',
+          }),
+        ],
+      },
+    };
+    const host = createHost({
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    });
+    const service = new ConversationRenderService(host, {
+      getCanonicalSessionState: jest.fn().mockReturnValue(canonicalState),
+      hydrateOpenCodeMessage: jest.fn((info, parts) =>
+        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
+    });
+
+    await service.rerenderConversationMessages(conversation);
+
+    expect(host.createUserMessageFrame).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'user-1',
+      content: 'Question only',
+    }));
+    expect(host.createUserMessageFrame).not.toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('Injected plugin prompt'),
+    }));
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'assistant-1',
+        content: 'Reloaded answer',
+        contentBlocks: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'tool_use',
+            toolId: 'call-read-reload',
+            toolName: 'read',
+            toolStatus: 'completed',
+          }),
+          expect.objectContaining({
+            type: 'text',
+            text: 'Reloaded answer',
+          }),
+        ]),
+      }),
+    );
   });
 });

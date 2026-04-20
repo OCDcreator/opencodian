@@ -3549,22 +3549,28 @@ export class OpenCodianView extends ItemView {
   }
 
   private getConversationSyncFingerprint(messages: ChatMessage[]): string {
-    return messages
-      .map((message) => JSON.stringify({
-        id: message.id,
-        role: message.role,
-        sourceMessageId: message.sourceMessageId ?? null,
-        streamState: message.streamState ?? null,
-        displayStyle: message.displayStyle ?? null,
-        content: message.content,
-        timestamp: message.timestamp,
-        omo: message.omo ? {
-          kind: message.omo.kind,
-          headline: message.omo.headline,
-          rawText: message.omo.rawText,
-        } : null,
-      }))
-      .join('|');
+    return JSON.stringify(messages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      modelId: message.modelId ?? null,
+      sourceMessageId: message.sourceMessageId ?? null,
+      streamState: message.streamState ?? null,
+      displayStyle: message.displayStyle ?? null,
+      noticeTitle: message.noticeTitle ?? null,
+      noticeTone: message.noticeTone ?? null,
+      noticeActions: message.noticeActions ?? null,
+      noticeMeta: message.noticeMeta ?? null,
+      content: message.content,
+      timestamp: message.timestamp,
+      images: message.images ?? null,
+      toolCalls: message.toolCalls ?? null,
+      contentBlocks: message.contentBlocks ?? null,
+      contextAttachments: message.contextAttachments ?? null,
+      questionResolution: message.questionResolution ?? null,
+      omo: message.omo ?? null,
+      structured: message.structured ?? null,
+      parts: message.parts ?? null,
+    })));
   }
 
   private getInterruptedSyncPreservationLogFingerprint(

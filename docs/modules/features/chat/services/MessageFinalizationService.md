@@ -48,6 +48,7 @@ export class MessageFinalizationService {
 ### post-sync 编排
 
 - final sync 前先快照 `previousMessagesBeforeSync` 和 visual fingerprint
+- runtime baseline fingerprint 继续以 canonical message snapshot 为准，因此隐藏的 `parts` / synthetic metadata 漂移也会在 final sync 后持久化下来
 - sync 完成后，如果当前仍是同一个 foreground conversation/tab，且 visual fingerprint 发生变化，则优先尝试 `patchTrailingAssistantRender()`
 - tail patch 失败时回退 `rerenderConversationMessages()`
 - 不重新实现 append / patch / full rerender 细节，而是复用已有 `ConversationRenderService` 边界
