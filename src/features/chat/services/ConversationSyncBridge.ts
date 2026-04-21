@@ -248,11 +248,17 @@ export class ConversationSyncBridge {
   async syncBackgroundTaskTabsInBackground(): Promise<void> {
     await this.orchestrationService.syncBackgroundTaskTabs(
       async (syncContext: TabConversationSyncContext) => {
-        const syncResult = await this.host.syncConversationMessagesFromServer(
-          syncContext.conversation,
-          syncContext.tabId,
-          'background-tab-sync',
-        );
+        const syncResult =
+          await this.host.syncConversationMessagesFromCanonicalState(
+            syncContext.conversation,
+            syncContext.tabId,
+            'background-tab-sync',
+          )
+          ?? await this.host.syncConversationMessagesFromServer(
+            syncContext.conversation,
+            syncContext.tabId,
+            'background-tab-sync',
+          );
         await this.backgroundPostSyncRouter.routeBackgroundTabSyncComplete({
           syncContext,
           syncResult,
