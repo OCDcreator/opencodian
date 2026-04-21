@@ -132,12 +132,12 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
   ): ChatMessage['contextAttachments'] {
     const existingAttachments = existingMessage.contextAttachments;
     const syncedAttachments = syncedMessage.contextAttachments;
-    if (!existingAttachments?.length) {
-      return syncedAttachments;
+    if (!syncedAttachments?.length) {
+      return undefined;
     }
 
-    if (!syncedAttachments?.length) {
-      return existingAttachments;
+    if (!existingAttachments?.length) {
+      return syncedAttachments;
     }
 
     return syncedAttachments.map((attachment) =>

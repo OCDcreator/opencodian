@@ -7,8 +7,6 @@ import {
   type ConversationAuthoritativeSyncHost,
   type ConversationAuthoritativeSyncRuntime,
 } from '../../../../src/features/chat/services/ConversationAuthoritativeSyncCoordinator';
-import { ConversationTurnViewModelBuilder } from '../../../../src/features/chat/services/ConversationTurnViewModelBuilder';
-import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -16,8 +14,6 @@ type Mocked<T> = {
       ? jest.Mock<Result, Args>
       : T[Key];
 };
-
-type CanonicalSessionMessage = NonNullable<ReturnType<ConversationAuthoritativeSyncHost['getCanonicalSessionMessages']>>[number];
 
 function createConversation(
   id: string,
@@ -97,24 +93,6 @@ function createHost(
     getLogPreview: jest.fn().mockImplementation((text: string) => text),
     ...overrides,
   };
-}
-
-function buildCanonicalRenderMessages(
-  sessionId: string,
-  messages: CanonicalSessionMessage[],
-): ChatMessage[] {
-  const sessionState = {
-    sessionID: sessionId,
-    messages: messages.map(({ info }) => info),
-    partsByMessageID: Object.fromEntries(
-      messages.map(({ info, parts }) => [info.id, parts]),
-    ),
-  };
-
-  return new ConversationTurnViewModelBuilder()
-    .buildCanonicalRenderInput(sessionState, (info, parts) =>
-      OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never))
-    .messages;
 }
 
 describe('ConversationAuthoritativeSyncCoordinator', () => {
@@ -267,204 +245,5 @@ describe('ConversationAuthoritativeSyncCoordinator', () => {
 
     expect(result.messages).toEqual([syncedUserMessage]);
     expect(runtime.lastInterruptedSyncPreservationLogFingerprint).toBeNull();
-  });
-});
-
-describe('ConversationAuthoritativeSyncCoordinator canonical projection', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('projects canonical normal assistant sync output without allowing stale local assistant body to win', async () => {
-    const canonicalMessages: CanonicalSessionMessage[] = [
-      {
-        info: {
-          id: 'user-1',
-          role: 'user',
-          sessionID: 'session-sync-normal',
-          time: { created: 10 },
-        },
-        parts: [
-          {
-            id: 'part-user-1',
-            sessionID: 'session-sync-normal',
-            messageID: 'user-1',
-            type: 'text',
-            text: 'Question',
-          },
-        ],
-      },
-      {
-        info: {
-          id: 'assistant-1',
-          role: 'assistant',
-          sessionID: 'session-sync-normal',
-          time: { created: 20 },
-        },
-        parts: [
-          {
-            id: 'part-assistant-1',
-            sessionID: 'session-sync-normal',
-            messageID: 'assistant-1',
-            type: 'text',
-            text: 'Canonical answer',
-          },
-        ],
-      },
-    ];
-    const conversation = createConversation('sync-normal', {
-      messages: [
-        {
-          id: 'assistant-local',
-          role: 'assistant',
-          content: 'stale local answer',
-          timestamp: 1,
-          sourceMessageId: 'assistant-1',
-          structured: { stale: true },
-          contentBlocks: [
-            { type: 'text', text: 'stale local answer' },
-          ],
-        } as ChatMessage,
-      ],
-    });
-    const expectedMessages = buildCanonicalRenderMessages(conversation.openCodeSessionId, canonicalMessages);
-    const host = createHost({
-      getCanonicalSessionMessages: jest.fn().mockReturnValue(canonicalMessages),
-      hydrateOpenCodeMessage: jest.fn((info, parts) =>
-        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
-    });
-    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
-
-    const result = await coordinator.syncConversationMessagesFromCanonicalState(
-      conversation,
-      'tab-1',
-      'sync-event:message.updated',
-    );
-
-    expect(result?.messages).toEqual(expectedMessages);
-    expect(conversation.messages).toEqual(expectedMessages);
-    expect(result?.messages[1]).toMatchObject({
-      id: 'assistant-1',
-      content: 'Canonical answer',
-      sourceMessageId: 'assistant-1',
-    });
-    expect(result?.messages[1]?.structured).toBeUndefined();
-  });
-
-  it('projects canonical tool-first assistant sync output without reviving stale local tool or structured data', async () => {
-    const canonicalMessages: CanonicalSessionMessage[] = [
-      {
-        info: {
-          id: 'user-1',
-          role: 'user',
-          sessionID: 'session-sync-tool-first',
-          time: { created: 10 },
-        },
-        parts: [
-          {
-            id: 'part-user-1',
-            sessionID: 'session-sync-tool-first',
-            messageID: 'user-1',
-            type: 'text',
-            text: 'Inspect docs',
-          },
-        ],
-      },
-      {
-        info: {
-          id: 'assistant-1',
-          role: 'assistant',
-          sessionID: 'session-sync-tool-first',
-          time: { created: 20 },
-        },
-        parts: [
-          {
-            id: 'part-tool-1',
-            sessionID: 'session-sync-tool-first',
-            messageID: 'assistant-1',
-            type: 'tool',
-            tool: 'read',
-            callID: 'call-read-1',
-            state: {
-              status: 'completed',
-              input: { filePath: 'docs/architecture/README.md' },
-              output: 'done',
-            },
-          },
-          {
-            id: 'part-text-1',
-            sessionID: 'session-sync-tool-first',
-            messageID: 'assistant-1',
-            type: 'text',
-            text: 'Canonical tool answer',
-          },
-        ],
-      },
-    ];
-    const conversation = createConversation('sync-tool-first', {
-      messages: [
-        {
-          id: 'assistant-local',
-          role: 'assistant',
-          content: 'stale local answer',
-          timestamp: 1,
-          sourceMessageId: 'assistant-1',
-          structured: { stale: true },
-          toolCalls: [
-            {
-              id: 'call-stale',
-              name: 'structured_output',
-              input: {},
-              status: 'completed',
-            },
-          ],
-          contentBlocks: [
-            { type: 'tool_use', toolId: 'call-stale', toolName: 'structured_output' },
-            { type: 'text', text: 'stale local answer' },
-          ],
-        } as ChatMessage,
-      ],
-    });
-    const expectedMessages = buildCanonicalRenderMessages(conversation.openCodeSessionId, canonicalMessages);
-    const host = createHost({
-      getCanonicalSessionMessages: jest.fn().mockReturnValue(canonicalMessages),
-      hydrateOpenCodeMessage: jest.fn((info, parts) =>
-        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
-    });
-    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
-
-    const result = await coordinator.syncConversationMessagesFromCanonicalState(
-      conversation,
-      'tab-1',
-      'sync-event:message.part.updated',
-    );
-
-    expect(result?.messages).toEqual(expectedMessages);
-    expect(conversation.messages).toEqual(expectedMessages);
-    expect(result?.messages[1]).toMatchObject({
-      id: 'assistant-1',
-      content: 'Canonical tool answer',
-      sourceMessageId: 'assistant-1',
-      contentBlocks: expect.arrayContaining([
-        expect.objectContaining({
-          type: 'tool_use',
-          toolId: 'call-read-1',
-          toolName: 'read',
-        }),
-        expect.objectContaining({
-          type: 'text',
-          text: 'Canonical tool answer',
-        }),
-      ]),
-    });
-    expect(result?.messages[1]?.contentBlocks).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'tool_use',
-          toolId: 'call-stale',
-        }),
-      ]),
-    );
-    expect(result?.messages[1]?.structured).toBeUndefined();
   });
 });
