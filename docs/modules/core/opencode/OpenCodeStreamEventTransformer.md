@@ -41,7 +41,7 @@
 
 ## 核心类型 / 状态
 
-- `OpenCodeStreamEventState`: 单条流里的文本累计、error snapshot、tool dedupe 状态与 text-delta debug 游标。
+- `OpenCodeStreamEventState`: 单条流里的文本累计、error snapshot、tool dedupe、reasoning text dedupe 状态与 text-delta debug 游标。
 - `OpenCodeStreamPartTypeState`: `OpenCodeStreamingRuntimeContext` 或测试用 map，记住 `partId -> partType` 与 `partId -> messageID`。
 - `OpenCodeStreamMutation`: 与 legacy chunks 并行的 canonical mutation 输出，覆盖 message upsert、part upsert、part delta 与 part completion signal。
 - `OpenCodeStreamEventOutcome`: `chunks + mutations + stop` 的统一返回结构；调用方必须先应用 mutations，再继续交付 legacy chunks。
@@ -55,9 +55,9 @@
 负责处理真实流里的事件：
 
 - 先按 `sessionID` / `part.sessionID` 做 session guard
-- 对 `message.part.updated` 处理 tool_use / tool_result / thinking-duration
+- 对 `message.part.updated` 处理 tool_use / tool_result / thinking-duration；当 SDK 只补发完整 reasoning part 时，会按 part 已发送长度补齐缺失的 thinking 文本；如果 provider 只返回空白 reasoning，则不生成可见空 thinking 块
 - 对 `message.part.updated` 记录 part type/message id，并产出 assistant message + part upsert mutations
-- 对 `message.part.delta` 复用 part type/message id，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`，同时产出 part delta mutation
+- 对 `message.part.delta` 复用 part type/message id，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`，同时产出 part delta mutation；reasoning delta 会更新 dedupe 游标，避免后续 `part.updated` 重复渲染，空白 delta 只保留 canonical mutation 不触发 UI thinking 块
 - 对 `permission.asked`、`file.edited`、`question.asked` 做结构化 chunk 映射
 - 对 `session.error` / `session.idle` 返回 stop 信号，同时保留错误与 debug 信息
 

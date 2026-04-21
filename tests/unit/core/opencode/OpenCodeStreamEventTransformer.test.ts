@@ -26,6 +26,7 @@ function createState(): OpenCodeStreamEventState {
     lastErrorMessage: null,
     processedToolIds: new Set<string>(),
     toolInputSnapshots: new Map<string, string>(),
+    reasoningTextSnapshots: new Map<string, string>(),
     debugChunkSequence: 0,
     lastTextDelta: null,
   };
@@ -304,6 +305,15 @@ describe('OpenCodeStreamEventTransformer parsing helpers', () => {
         durationSeconds: 3,
       },
     ]);
+
+    expect(transformer.transformPartToChunks({
+      id: 'part-blank-reasoning',
+      sessionID: 'test-session',
+      messageID: 'assistant-1',
+      type: 'reasoning',
+      text: '\n',
+      duration: 3,
+    })).toEqual([]);
 
     expect(transformer.transformPartToChunks({
       id: 'part-tool',

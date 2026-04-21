@@ -432,6 +432,35 @@ describe('OpenCodeStreamingRuntimeCoordinator legacy SSE handling', () => {
     ]);
     expect(callOrder).toEqual(['apply', 'chunk']);
   });
+
+  it('subscribes to the SDK event stream before starting the prompt', async () => {
+    const host = createHost();
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const callOrder: string[] = [];
+
+    const subscribe = jest.fn().mockImplementation(async () => {
+      callOrder.push('subscribe');
+      return (async function* () {
+        yield {
+          type: 'session.idle',
+          properties: { sessionID: 'sdk-subscribe-first' },
+        } as never;
+      })();
+    });
+    const startPrompt = jest.fn().mockImplementation(async () => {
+      callOrder.push('start');
+    });
+
+    for await (const _chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-subscribe-first',
+      startPrompt,
+      subscribe,
+    })) {
+      // drain
+    }
+
+    expect(callOrder.slice(0, 2)).toEqual(['subscribe', 'start']);
+  });
 });
 
 describe('OpenCodeStreamingRuntimeCoordinator SDK tail recovery', () => {

@@ -9,7 +9,7 @@
 
 - active stream registry 与 `AbortController` 生命周期
 - 单一 streaming 入口下的 SDK/legacy transport 选择
-- SDK stream 订阅与“首事件前失败 → legacy SSE”降级策略
+- SDK stream 订阅、prompt 启动顺序与“首事件前失败 → legacy SSE”降级策略
 - legacy `/event` SSE reader / parser / abort-detach 生命周期
 - 在交付 legacy `StreamChunk` 前先把 stream mutations 转交给 canonical session graph
 - `session.idle` / `session.error` 停止判定后的 final assistant message completion
@@ -53,7 +53,7 @@
 ### SDK / legacy transport seam
 
 - `streamResponse()` 先根据 `useSdkStream` 选择 SDK 或 legacy transport，把 `OpenCodeService` 的入口分流收束到同一个 runtime seam。
-- `streamSdkResponse()` 先执行 `startPrompt()`，再用传入的 `subscribe(signal)` 建立 SDK event stream。
+- `streamSdkResponse()` 先用传入的 `subscribe(signal)` 建立 SDK event stream，再执行 `startPrompt()`，避免 prompt 启动后立刻产生的 reasoning delta 在订阅前丢失。
 - 如果 SDK iterator 在第一条事件前抛错，coordinator 会通过 host 的 legacy SSE 请求参数立即切到 `/event`，保持既有 SDK-first / legacy fallback 策略。
 - 一旦已经收到首个 SDK event，后续异常不会再切回 legacy，而是直接产出 `error` chunk。
 - `streamLegacyResponse()` 则直接执行 legacy prompt 启动后进入 `/event` 读取。

@@ -95,6 +95,7 @@ export interface OpenCodeStreamEventState {
   lastErrorMessage: string | null;
   processedToolIds: Set<string>;
   toolInputSnapshots: Map<string, string>;
+  reasoningTextSnapshots: Map<string, string>;
   debugChunkSequence: number;
   lastTextDelta: OpenCodeStreamingTextDeltaDebugState | null;
 }
@@ -510,6 +511,7 @@ export class OpenCodeStreamEventTransformer {
 
   private handleReasoningPartUpdated({
     part,
+    state,
     chunks,
   }: OpenCodeStreamingPartUpdatedHandlerContext): void {
     if (!this.isReasoningPartType(part.type)) {
@@ -517,7 +519,20 @@ export class OpenCodeStreamEventTransformer {
     }
 
     const durationSeconds = resolveReasoningDurationSeconds(part);
-    if (durationSeconds !== undefined) {
+    const delta = this.resolveReasoningUpdatedDelta(part.id, part.text, state);
+    if (this.hasVisibleReasoningText(delta)) {
+      chunks.push({
+        type: 'thinking',
+        content: delta,
+        partId: part.id,
+        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+      });
+      return;
+    }
+
+    if (durationSeconds !== undefined && this.hasVisibleReasoningText(
+      state.reasoningTextSnapshots.get(part.id) ?? '',
+    )) {
       chunks.push({
         type: 'thinking',
         content: '',
@@ -540,7 +555,7 @@ export class OpenCodeStreamEventTransformer {
     part: OpenCodeStreamPart,
     chunks: StreamChunk[],
   ): void {
-    if (part.text) {
+    if (this.hasVisibleReasoningText(part.text)) {
       chunks.push({
         type: 'thinking',
         content: part.text,
@@ -629,7 +644,13 @@ export class OpenCodeStreamEventTransformer {
     }
 
     if (this.isReasoningPartType(partType)) {
-      chunks.push({ type: 'thinking', content: delta, partId: partID });
+      if (partID) {
+        const previousText = state.reasoningTextSnapshots.get(partID) ?? '';
+        state.reasoningTextSnapshots.set(partID, `${previousText}${delta}`);
+      }
+      if (this.hasVisibleReasoningText(delta)) {
+        chunks.push({ type: 'thinking', content: delta, partId: partID });
+      }
       return { chunks, mutations, stop: false };
     }
 
@@ -690,6 +711,32 @@ export class OpenCodeStreamEventTransformer {
       totalLength: state.lastContent.length,
       deltaPreview: getDebugTextPreview(delta, 120),
     });
+  }
+
+  private resolveReasoningUpdatedDelta(
+    partId: string,
+    nextText: unknown,
+    state: OpenCodeStreamEventState,
+  ): string {
+    if (typeof nextText !== 'string') {
+      return '';
+    }
+
+    const previousText = state.reasoningTextSnapshots.get(partId) ?? '';
+    if (nextText === previousText) {
+      return '';
+    }
+
+    const delta = nextText.startsWith(previousText)
+      ? nextText.slice(previousText.length)
+      : nextText;
+
+    state.reasoningTextSnapshots.set(partId, nextText);
+    return delta;
+  }
+
+  private hasVisibleReasoningText(text: unknown): text is string {
+    return typeof text === 'string' && text.trim().length > 0;
   }
 
   private handlePermissionAsked({

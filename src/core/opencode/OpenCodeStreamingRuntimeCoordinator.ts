@@ -336,19 +336,34 @@ export class OpenCodeStreamingRuntimeCoordinator {
   async *streamSdkResponse(
     request: OpenCodeStreamingSdkStreamRequest,
   ): AsyncGenerator<StreamChunk> {
-    try {
-      await request.startPrompt();
-    } catch (error) {
-      yield this.buildErrorChunk(error);
-      return;
-    }
-
     const streamContext = this.createActiveStreamContext(request.sessionId);
     const state = this.createStreamingState();
     let yieldedMessageStart = false;
 
     try {
-      const stream = await request.subscribe(streamContext.signal);
+      let stream: AsyncIterable<SdkEvent>;
+      try {
+        stream = await request.subscribe(streamContext.signal);
+      } catch (error) {
+        this.host.logServiceWarning(
+          'session.event-stream',
+          'SDK event stream failed before prompt start, falling back to legacy SSE',
+          error,
+        );
+        yield { type: 'message_start' };
+        yieldedMessageStart = true;
+        await request.startPrompt();
+        yield* this.consumeLegacyEventStream(request.sessionId, streamContext, request.promptMessageId);
+        return;
+      }
+
+      try {
+        await request.startPrompt();
+      } catch (error) {
+        yield this.buildErrorChunk(error);
+        return;
+      }
+
       const iterator = stream[Symbol.asyncIterator]();
 
       while (true) {
@@ -456,6 +471,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
       lastErrorMessage: null,
       processedToolIds: new Set<string>(),
       toolInputSnapshots: new Map(),
+      reasoningTextSnapshots: new Map(),
       debugChunkSequence: 0,
       lastTextDelta: null,
     };
