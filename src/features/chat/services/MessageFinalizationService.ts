@@ -36,6 +36,7 @@ export interface FinalizeMessageOptions {
 interface MessageFinalizationSyncAfterStreamState {
   previousMessagesBeforeSync: ChatMessage[];
   syncResult: MessageFinalizationSyncResult;
+  syncSource: 'canonical' | 'server';
   isForegroundConversation: boolean;
   needsForegroundRenderSync: boolean;
 }
@@ -51,6 +52,11 @@ interface MessageFinalizationSyncAfterStreamFollowUpContext {
 export interface MessageFinalizationHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
+  syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason: string,
+  ): Promise<MessageFinalizationSyncResult | null>;
   syncConversationMessagesFromServer(
     conversation: Conversation,
     tabId: TabId | null,
@@ -168,6 +174,31 @@ export class MessageFinalizationService {
       ),
     });
 
+    const canonicalSyncResult = await this.host.syncConversationMessagesFromCanonicalState(
+      conversation,
+      tabId,
+      'send-finalization',
+    );
+    if (canonicalSyncResult) {
+      logStage('canonical-sync-complete', {
+        changed: canonicalSyncResult.changed,
+        fingerprint: canonicalSyncResult.fingerprint,
+        syncedTailAssistant: this.host.summarizeChatMessageForDebug(
+          this.findLatestAssistantMessage(canonicalSyncResult.messages),
+        ),
+      });
+
+      const isForegroundConversation = this.isForegroundConversation(conversation, tabId);
+      return {
+        previousMessagesBeforeSync,
+        syncResult: canonicalSyncResult,
+        syncSource: 'canonical',
+        isForegroundConversation,
+        needsForegroundRenderSync: isForegroundConversation
+          && previousCanonicalFingerprint !== canonicalSyncResult.fingerprint,
+      };
+    }
+
     const syncResult = await this.host.syncConversationMessagesFromServer(
       conversation,
       tabId,
@@ -185,6 +216,7 @@ export class MessageFinalizationService {
     return {
       previousMessagesBeforeSync,
       syncResult,
+      syncSource: 'server',
       isForegroundConversation,
       needsForegroundRenderSync: isForegroundConversation
         && previousCanonicalFingerprint !== syncResult.fingerprint,

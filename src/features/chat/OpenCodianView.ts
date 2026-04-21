@@ -2314,6 +2314,8 @@ export class OpenCodianView extends ItemView {
     return {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
+      syncConversationMessagesFromCanonicalState: (conversation, tabId, reason) =>
+        this.syncConversationMessagesFromCanonicalState(conversation, tabId, reason),
       syncConversationMessagesFromServer: (conversation, tabId, reason) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason),
       getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),

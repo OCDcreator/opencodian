@@ -289,7 +289,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 7. `SendPipelineRuntime` 调用 `openCodeService.sendMessage()`，创建 streaming shell 与 `StreamController`
 8. `SendPipelineRuntime` 装配 `StreamChunkRouter` 处理 chunk / pending / timeout / interruption
 9. `SendPipelineRuntime` 装配 `StreamLocalFinalizer` 处理本地 shell finalization 与第一次本地保存
-10. `MessageFinalizationService` 再接手最终 sync、post-sync patch/rerender、todo/save/attention 收尾
+10. `MessageFinalizationService` 再接手最终 canonical convergence：优先走 `syncConversationMessagesFromCanonicalState()`，缺失时再回退服务端 sync，然后统一做 post-sync patch/rerender、todo/save/attention 收尾
 
 `SendPipelineRuntime` 的 chunk router 仍显式覆盖这些分支：
 
@@ -305,7 +305,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 发送子系统的本地收尾阶段会：
 
 - 把 streaming 内容组装成持久化的 assistant `ChatMessage`
-- 在正常完成时通过 `MessageFinalizationService` 再向服务端拉一轮最终消息，并按需 patch / rerender UI
+- 在正常完成时通过 `MessageFinalizationService` 先尝试把 canonical session graph 投影回最终消息；只有 canonical state 缺失时才回退服务端拉取，并按需 patch / rerender UI
 - 追加 turn diff notice
 - 刷新 session todos
 - 更新 context usage

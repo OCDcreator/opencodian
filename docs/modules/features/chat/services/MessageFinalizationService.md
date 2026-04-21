@@ -7,8 +7,8 @@
 
 `MessageFinalizationService` 负责接管 `sendMessage()` 在 stream loop 结束之后的 finalization orchestration：
 
-- 判定是否需要最终服务端 sync
-- 调用会话最终 sync 并复用既有 render orchestration
+- 判定是否需要最终 canonical convergence
+- 优先复用 canonical session graph 做最终 sync，缺失时才回退服务端 sync
 - 在 sync 后按需执行 tail patch 或 full rerender
 - 继续推进 background-task indicator、turn diff、session todos 和最终保存
 
@@ -43,19 +43,21 @@ export class MessageFinalizationService {
 - 且没有 interruption
 - 且没有真实错误消息
 
-同时满足时，才进入最终服务端 sync。
+同时满足时，才进入最终 canonical convergence。
 
 ### post-sync 编排
 
 - final sync 前先快照 `previousMessagesBeforeSync` 和 canonical conversation fingerprint
-- runtime baseline fingerprint 继续以 canonical message snapshot 为准，因此隐藏的 `parts` / synthetic metadata 漂移也会在 final sync 后持久化下来
+- finalization 会先尝试 `syncConversationMessagesFromCanonicalState()`，直接把 canonical `session/message/part` 图投影回 `Conversation.messages`
+- 只有 canonical state 当前不可用时，才回退 `syncConversationMessagesFromServer()`
+- runtime baseline fingerprint 继续以 canonical-derived message snapshot 为准，因此隐藏的 `parts` / synthetic metadata 漂移也会在 final sync 后持久化下来
 - sync 完成后，如果当前仍是同一个 foreground conversation/tab，且 canonical fingerprint 发生变化，就统一走 `ConversationRenderService.applySyncedConversationUpdate()`，让 render 层自己决定是 append、tail patch 还是 full rerender
-- tail patch 失败时回退 `rerenderConversationMessages()`
+- 不再把本地 `Conversation.messages` assistant body repair 当作 truth；本地流式消息只作为 live/cache 输出，最终收敛由 canonical projection 决定
 - 不重新实现 append / patch / full rerender 细节，而是复用已有 `ConversationRenderService` 边界
 
 ### 收尾时序
 
-- 只有 should-sync 分支才执行最终服务端 sync、background indicator 刷新与 turn diff notice
+- 只有 should-sync 分支才执行最终 canonical/server sync、background indicator 刷新与 turn diff notice
 - 不论是否 should-sync，都会继续刷新 session todos、写最终 save、清空 pending edited files
 - 如果用户在 finalization 期间切走 tab，则不做 foreground patch/rerender 与 active-tab context usage 刷新，而是改为给原 tab 打 attention
 - sync lock 会在 service 自己的 `finally` 中释放，避免 send finalization 途中遗漏解锁
@@ -63,5 +65,5 @@ export class MessageFinalizationService {
 ## 与 `OpenCodianView` 的边界
 
 - `SendPipelineRuntime` 仍保留 stream loop、本地 shell finalization、本地 assistant/notice message 构建，以及第一次 `saveConversation()`
-- `MessageFinalizationService` 只负责“stream 结束后是否 sync、sync 后如何 patch/rerender、最后如何做 todo/save/attention 收尾”
+- `MessageFinalizationService` 只负责“stream 结束后是否做 canonical convergence、必要时如何回退服务端 sync、sync 后如何 patch/rerender、最后如何做 todo/save/attention 收尾”
 - `ConversationRenderService` 继续负责消息区 full rerender、append-only sync 和 tail patch，本服务只决定何时调用它

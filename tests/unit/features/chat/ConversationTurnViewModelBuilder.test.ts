@@ -319,4 +319,84 @@ describe('ConversationTurnViewModelBuilder canonical render input', () => {
       ]),
     });
   });
+
+  it('builds identical canonical render input fingerprints for live and reload interrupted assistant responses', () => {
+    const liveState = createState(
+      [
+        createMessage({ id: 'user-1', role: 'user', time: { created: 1 } }),
+        createMessage({
+          id: 'assistant-1',
+          role: 'assistant',
+          time: { created: 2 },
+          error: 'interrupted by user',
+        }),
+      ],
+      [
+        createPart({ id: 'part-user', messageID: 'user-1', type: 'text', text: 'Question' }),
+        createPart({ id: 'part-assistant', messageID: 'assistant-1', type: 'text', text: 'Partial answer' }),
+      ],
+    );
+    const reloadState = createState(
+      liveState.messages.map((message) => ({ ...message, time: { ...message.time } })),
+      Object.values(liveState.partsByMessageID).flat().map((part) => ({ ...part })),
+    );
+    const builder = new ConversationTurnViewModelBuilder();
+
+    const liveRenderInput = builder.buildCanonicalRenderInput(liveState, hydrateCanonicalChatMessage);
+    const reloadRenderInput = builder.buildCanonicalRenderInput(reloadState, hydrateCanonicalChatMessage);
+
+    expect(liveRenderInput).toEqual(reloadRenderInput);
+    expect(OpenCodeService.getCanonicalConversationFingerprint(liveRenderInput.messages)).toBe(
+      OpenCodeService.getCanonicalConversationFingerprint(reloadRenderInput.messages),
+    );
+    expect(liveRenderInput.messages[1]).toMatchObject({
+      id: 'assistant-1',
+      content: 'Partial answer',
+      streamState: 'interrupted',
+    });
+  });
+
+  it('builds identical canonical render input fingerprints for live and reload structured assistant responses', () => {
+    const structured = {
+      title: 'Structured answer',
+      bullets: ['one', 'two'],
+    };
+    const liveState = createState(
+      [
+        createMessage({ id: 'user-1', role: 'user', time: { created: 1 } }),
+        createMessage({
+          id: 'assistant-1',
+          role: 'assistant',
+          time: { created: 2 },
+          structured,
+        }),
+      ],
+      [
+        createPart({ id: 'part-user', messageID: 'user-1', type: 'text', text: 'Summarize this' }),
+        createPart({ id: 'part-assistant', messageID: 'assistant-1', type: 'text', text: 'Structured answer' }),
+      ],
+    );
+    const reloadState = createState(
+      liveState.messages.map((message) => ({
+        ...message,
+        time: { ...message.time },
+        structured: message.structured ? { ...message.structured as Record<string, unknown> } : message.structured,
+      })),
+      Object.values(liveState.partsByMessageID).flat().map((part) => ({ ...part })),
+    );
+    const builder = new ConversationTurnViewModelBuilder();
+
+    const liveRenderInput = builder.buildCanonicalRenderInput(liveState, hydrateCanonicalChatMessage);
+    const reloadRenderInput = builder.buildCanonicalRenderInput(reloadState, hydrateCanonicalChatMessage);
+
+    expect(liveRenderInput).toEqual(reloadRenderInput);
+    expect(OpenCodeService.getCanonicalConversationFingerprint(liveRenderInput.messages)).toBe(
+      OpenCodeService.getCanonicalConversationFingerprint(reloadRenderInput.messages),
+    );
+    expect(liveRenderInput.messages[1]).toMatchObject({
+      id: 'assistant-1',
+      content: 'Structured answer',
+      structured,
+    });
+  });
 });

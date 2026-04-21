@@ -5,6 +5,7 @@ import type {
 import {
   type MessageFinalizationHost,
   MessageFinalizationService,
+  type MessageFinalizationSyncResult,
   shouldSyncAfterStream,
 } from '../../../../src/features/chat/services/MessageFinalizationService';
 import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
@@ -37,6 +38,13 @@ type MockedMessageFinalizationHost = {
       : MessageFinalizationHost[Key];
 };
 
+type CanonicalAwareMessageFinalizationHost = MockedMessageFinalizationHost & {
+  syncConversationMessagesFromCanonicalState: jest.Mock<
+    Promise<MessageFinalizationSyncResult | null>,
+    [Conversation, string | null, string]
+  >;
+};
+
 function createHost(
   conversation: Conversation,
   overrides: Partial<MockedMessageFinalizationHost> = {},
@@ -44,6 +52,7 @@ function createHost(
   return {
     getCurrentConversation: jest.fn().mockReturnValue(conversation),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+    syncConversationMessagesFromCanonicalState: jest.fn().mockResolvedValue(null),
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue({
       messages: conversation.messages,
       changed: false,
@@ -188,8 +197,14 @@ describe('MessageFinalizationService foreground finalization', () => {
     expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     expect(logStage).toHaveBeenCalledWith('post-sync-render-apply-complete');
   });
+});
 
-  it('keeps synced render application centralized for changed foreground syncs', async () => {
+describe('MessageFinalizationService canonical-first foreground finalization', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('prefers canonical convergence before server sync for changed foreground text responses', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Before', timestamp: 10 }),
     ];
@@ -206,8 +221,18 @@ describe('MessageFinalizationService foreground finalization', () => {
           fingerprint: 'sync-fingerprint-2',
         };
       }),
-    });
-    const service = new MessageFinalizationService(host);
+    }) as CanonicalAwareMessageFinalizationHost;
+    host.syncConversationMessagesFromCanonicalState = jest.fn().mockImplementation(
+      async (targetConversation: Conversation) => {
+        targetConversation.messages = nextMessages;
+        return {
+          messages: nextMessages,
+          changed: true,
+          fingerprint: 'canonical-fingerprint-2',
+        };
+      },
+    );
+    const service = new MessageFinalizationService(host as unknown as MessageFinalizationHost);
     const logStage = jest.fn();
 
     await service.finalizeAfterStream({
@@ -218,9 +243,87 @@ describe('MessageFinalizationService foreground finalization', () => {
       logStage,
     });
 
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      conversation,
+      'tab-1',
+      'send-finalization',
+    );
+    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
     expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(previousMessages, nextMessages);
     expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     expect(logStage).toHaveBeenCalledWith('post-sync-render-apply-complete');
+  });
+
+  it('prefers canonical convergence for tool-first assistant responses without reviving stale local body data', async () => {
+    const previousMessages = [
+      createMessage({
+        id: 'assistant-local',
+        content: 'stale local answer',
+        timestamp: 10,
+        sourceMessageId: 'assistant-1',
+        structured: { stale: true },
+        contentBlocks: [
+          { type: 'tool_use', toolId: 'call-stale', toolName: 'structured_output' },
+          { type: 'text', text: 'stale local answer' },
+        ],
+      }),
+    ];
+    const nextMessages = [
+      createMessage({
+        id: 'assistant-1',
+        content: 'Canonical tool answer',
+        timestamp: 11,
+        sourceMessageId: 'assistant-1',
+        contentBlocks: [
+          { type: 'tool_use', toolId: 'call-read-1', toolName: 'read' },
+          { type: 'text', text: 'Canonical tool answer' },
+        ],
+      }),
+    ];
+    const conversation = createConversation(previousMessages);
+    const host = createHost(conversation, {
+      syncConversationMessagesFromServer: jest.fn(),
+    }) as CanonicalAwareMessageFinalizationHost;
+    host.syncConversationMessagesFromCanonicalState = jest.fn().mockImplementation(
+      async (targetConversation: Conversation) => {
+        targetConversation.messages = nextMessages;
+        return {
+          messages: nextMessages,
+          changed: true,
+          fingerprint: OpenCodeService.getCanonicalConversationFingerprint(nextMessages),
+        };
+      },
+    );
+    const service = new MessageFinalizationService(host as unknown as MessageFinalizationHost);
+
+    await service.finalizeAfterStream({
+      conversation,
+      tabId: 'tab-1',
+      shouldSyncFromServer: true,
+      editedFiles: ['notes.md'],
+      logStage: jest.fn(),
+    });
+
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      conversation,
+      'tab-1',
+      'send-finalization',
+    );
+    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
+    expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(previousMessages, nextMessages);
+    expect(conversation.messages[0]).toMatchObject({
+      id: 'assistant-1',
+      content: 'Canonical tool answer',
+      sourceMessageId: 'assistant-1',
+      contentBlocks: expect.arrayContaining([
+        expect.objectContaining({
+          type: 'tool_use',
+          toolId: 'call-read-1',
+          toolName: 'read',
+        }),
+      ]),
+    });
+    expect(conversation.messages[0]?.structured).toBeUndefined();
   });
 });
 
@@ -344,6 +447,48 @@ describe('MessageFinalizationService background and recovery paths', () => {
       'tab-1',
       nextFingerprint,
     );
+  });
+
+  it('falls back to server sync only when canonical convergence is unavailable', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-local', content: 'Local only', timestamp: 10 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-server', content: 'Server fallback', timestamp: 11 }),
+    ];
+    const conversation = createConversation(previousMessages);
+    const host = createHost(conversation, {
+      syncConversationMessagesFromServer: jest.fn().mockImplementation(async (targetConversation: Conversation) => {
+        targetConversation.messages = nextMessages;
+        return {
+          messages: nextMessages,
+          changed: true,
+          fingerprint: 'server-fingerprint-2',
+        };
+      }),
+    }) as CanonicalAwareMessageFinalizationHost;
+    host.syncConversationMessagesFromCanonicalState = jest.fn().mockResolvedValue(null);
+    const service = new MessageFinalizationService(host as unknown as MessageFinalizationHost);
+
+    await service.finalizeAfterStream({
+      conversation,
+      tabId: 'tab-1',
+      shouldSyncFromServer: true,
+      editedFiles: [],
+      logStage: jest.fn(),
+    });
+
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      conversation,
+      'tab-1',
+      'send-finalization',
+    );
+    expect(host.syncConversationMessagesFromServer).toHaveBeenCalledWith(
+      conversation,
+      'tab-1',
+      'send-finalization',
+    );
+    expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(previousMessages, nextMessages);
   });
 
   it('clears the sync lock even when final save fails', async () => {
