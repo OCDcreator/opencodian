@@ -218,14 +218,26 @@ describe('OpenCodeService SDK prompt requests', () => {
 });
 
 describe('OpenCodeService SDK promptAsync transport', () => {
-  it('builds stable prompt ids using OpenCode-compatible msg/prt prefixes', () => {
+  it('builds sortable prompt ids using OpenCode-compatible msg/prt format', () => {
     service = createServiceWithSdkFlags();
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(1776789056615);
 
-    const payload = service.buildStructuredPromptSendPayload('Hello');
+    try {
+      const firstPayload = service.buildStructuredPromptSendPayload('Hello');
+      const secondPayload = service.buildStructuredPromptSendPayload('Again');
+      const firstPartId = firstPayload.requestParts[0]?.id;
+      const secondPartId = secondPayload.requestParts[0]?.id;
 
-    expect(payload.messageID).toMatch(/^msg_/);
-    expect(payload.requestParts[0]?.id).toMatch(/^prt_/);
-    expect(payload.optimisticUserParts[0]?.id).toMatch(/^prt_/);
+      expect(firstPayload.messageID).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+      expect(secondPayload.messageID).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+      expect(firstPartId).toMatch(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+      expect(secondPartId).toMatch(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+      expect(firstPayload.messageID < secondPayload.messageID).toBe(true);
+      expect(firstPartId! < secondPartId!).toBe(true);
+      expect(firstPayload.optimisticUserParts[0]?.id).toBe(firstPartId);
+    } finally {
+      dateNowSpy.mockRestore();
+    }
   });
 
   it('maps sendMessage through SDK promptAsync with shared prompt options', async () => {
