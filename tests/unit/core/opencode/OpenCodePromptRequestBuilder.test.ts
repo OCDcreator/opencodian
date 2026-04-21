@@ -5,7 +5,7 @@ import {
 } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
 
 function createBuilder() {
-  const generatedIds = ['message-1', 'part-1', 'part-2', 'part-3'];
+  const generatedIds = ['msg_1', 'prt_1', 'prt_2', 'prt_3'];
   const host = {
     createPromptEntityId: jest.fn(() => generatedIds.shift() ?? `generated-${Date.now()}`),
     getDefaultModelSelection: jest.fn(() => ({
@@ -38,11 +38,11 @@ describe('OpenCodePromptRequestBuilder', () => {
     });
 
     expect(payload).toEqual({
-      messageID: 'message-1',
+      messageID: 'msg_1',
       requestParts: [
-        { id: 'part-1', type: 'text', text: 'Hello' },
+        { id: 'prt_1', type: 'text', text: 'Hello' },
         {
-          id: 'part-2',
+          id: 'prt_2',
           type: 'file',
           mime: 'text/plain',
           filename: 'notes.md',
@@ -50,9 +50,9 @@ describe('OpenCodePromptRequestBuilder', () => {
         },
       ],
       optimisticUserParts: [
-        { id: 'part-1', type: 'text', text: 'Hello' },
+        { id: 'prt_1', type: 'text', text: 'Hello' },
         {
-          id: 'part-2',
+          id: 'prt_2',
           type: 'file',
           mime: 'text/plain',
           filename: 'notes.md',
@@ -82,11 +82,11 @@ describe('OpenCodePromptRequestBuilder', () => {
     });
 
     expect(payload).toEqual({
-      messageID: 'message-1',
+      messageID: 'msg_1',
       requestParts: [
-        { id: 'part-1', type: 'text', text: 'Hello' },
+        { id: 'prt_1', type: 'text', text: 'Hello' },
         {
-          id: 'part-2',
+          id: 'prt_2',
           type: 'text',
           text: 'Injected plugin prompt',
           synthetic: true,
@@ -97,9 +97,9 @@ describe('OpenCodePromptRequestBuilder', () => {
         },
       ],
       optimisticUserParts: [
-        { id: 'part-1', type: 'text', text: 'Hello' },
+        { id: 'prt_1', type: 'text', text: 'Hello' },
         {
-          id: 'part-2',
+          id: 'prt_2',
           type: 'text',
           text: 'Injected plugin prompt',
           synthetic: true,
@@ -146,10 +146,11 @@ describe('OpenCodePromptRequestBuilder transport payloads', () => {
           additionalProperties: false,
         },
       },
-    });
+    }, 'msg_1');
 
     expect(parameters).toEqual({
       sessionID: 'session-1',
+      messageID: 'msg_1',
       model: {
         providerID: 'openai',
         modelID: 'gpt-5',
@@ -210,12 +211,13 @@ describe('OpenCodePromptRequestBuilder transport payloads', () => {
     const enabledThinking = builder.buildLegacyStreamRequestBody(parts, {
       reasoningEffort: 'low',
       thinkingBudget: 256,
-    });
+    }, 'msg_enabled');
     const disabledThinking = builder.buildLegacyStreamRequestBody(parts, {
       thinkingBudget: 0,
-    });
+    }, 'msg_disabled');
 
     expect(enabledThinking).toEqual({
+      messageID: 'msg_enabled',
       parts,
       model: {
         providerID: 'openai',
@@ -231,6 +233,7 @@ describe('OpenCodePromptRequestBuilder transport payloads', () => {
       variant: 'low',
     });
     expect(disabledThinking).toEqual({
+      messageID: 'msg_disabled',
       parts,
       model: {
         providerID: 'openai',

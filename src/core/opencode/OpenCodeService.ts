@@ -846,7 +846,12 @@ export class OpenCodeService {
       sdk: {
         startPrompt: async () => {
           await this.sdk.session.promptAsync(
-            this.promptRequestBuilder.buildSdkPromptParameters(sessionId, payload.requestParts, options),
+            this.promptRequestBuilder.buildSdkPromptParameters(
+              sessionId,
+              payload.requestParts,
+              options,
+              payload.messageID,
+            ),
           );
         },
         subscribe: async (signal) => {
@@ -859,6 +864,7 @@ export class OpenCodeService {
           const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(
             payload.requestParts,
             options,
+            payload.messageID,
           );
           await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
         },
@@ -1375,10 +1381,11 @@ export class OpenCodeService {
 
   private createPromptEntityId(kind: PromptRequestEntityKind): string {
     this.promptRequestEntitySequence += 1;
+    const prefix = kind === 'message' ? 'msg' : 'prt';
     const randomValue = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `${Date.now()}-${this.promptRequestEntitySequence}`;
-    return `${kind}-${randomValue}`;
+    return `${prefix}_${randomValue}`;
   }
 
   private createCanonicalUserPart(

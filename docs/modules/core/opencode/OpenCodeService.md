@@ -64,7 +64,7 @@
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
 - `diagnostics`: `OpenCodeSdkFacade` 模块提供的 diagnostics owner，负责 transient connectivity suppression、assistant/probe 错误文本整形，以及 assistant finalization debug payload 日志，并继续复用 façade 集中的 SDK error formatter。
 - `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化。
-- `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责稳定 `messageID + parts[]` send payload、SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
+- `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责稳定 `messageID + parts[]` send payload、OpenCode 兼容的 `msg_*` / `prt_*` prompt id、SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk + OpenCodeStreamMutation` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、stream mutation 应用顺序、final response completion，以及 active stream registry、session-scoped abort controller、part metadata tracking、cancel/detach lifecycle。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、session info lookup、session abort fallback、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。

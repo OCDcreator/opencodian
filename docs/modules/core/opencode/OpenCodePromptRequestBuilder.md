@@ -29,7 +29,7 @@ builder 不负责 transport 分流，也不负责 context/image request part 序
 - `BuiltPromptSendPayload`: 发送层共享的结构化 payload，集中持有稳定 `messageID`、transport `requestParts` 与 optimistic seed `optimisticUserParts`。
 - `PromptRequestOptions`: `QueryOptions` 加上可选 `system` 的 prompt 组装输入。
 - `host.getDefaultModelSelection()`: 提供当前默认 `providerID` / `modelID`，让 builder 不直接持有 settings 副本。
-- `host.createPromptEntityId()`: 生成稳定 `message` / `part` id，避免 optimistic seed 与 transport 各自临时造号。
+- `host.createPromptEntityId()`: 生成稳定 `message` / `part` id；当前会使用 OpenCode 兼容的 `msg_*` / `prt_*` 前缀，避免 optimistic seed 与 transport 各自临时造号，并满足服务端对 prompt id 格式的校验。
 - `host.observeRuntimeToolNames()`: 在 allowed-tools 装配阶段把 runtime 外部工具名交回 `OpenCodeService` / `OpenCodeCatalogStateStore` 观察。
 
 ## 核心逻辑
@@ -55,9 +55,9 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 
 ### SDK 与 legacy payload 装配
 
-- `buildSdkPromptParameters()` 负责 SDK `session.prompt()` / `promptAsync()` 参数，并保持 `thinkingBudget` 继续只记 debug log、不写进 SDK payload。
+- `buildSdkPromptParameters()` 负责 SDK `session.prompt()` / `promptAsync()` 参数；发送路径会把稳定 `messageID` 一并写入 SDK payload，并保持 `thinkingBudget` 继续只记 debug log、不写进 SDK payload。
 - `buildLegacyMessageRequestBody()` 负责 `/session/:id/message` 的非流式 legacy body，保持不写 `model.options` 的现有语义。
-- `buildLegacyStreamRequestBody()` 负责 `/session/:id/prompt_async` 的 legacy 流式 body，继续把 `reasoningEffort` 和 `thinkingBudget` 写进 `model.options`。
+- `buildLegacyStreamRequestBody()` 负责 `/session/:id/prompt_async` 的 legacy 流式 body；发送路径同样会透传稳定 `messageID`，并继续把 `reasoningEffort` 和 `thinkingBudget` 写进 `model.options`。
 
 ### 稳定 send payload
 

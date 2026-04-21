@@ -77,12 +77,14 @@ type SharedPromptTarget = {
 
 type SdkPromptParameters = SharedPromptTarget & {
   sessionID: string;
+  messageID?: string;
   model: PromptModelSelection;
   parts: PromptRequestPart[];
   format?: SdkOutputFormat;
 };
 
 type LegacyPromptRequestBody = SharedPromptTarget & {
+  messageID?: string;
   parts: PromptRequestPart[];
   model: PromptModelSelection & {
     options?: Record<string, unknown>;
@@ -119,6 +121,7 @@ export class OpenCodePromptRequestBuilder {
     sessionId: string,
     parts: PromptRequestPart[],
     options: PromptRequestOptions,
+    messageID?: string,
   ): SdkPromptParameters {
     if (options.thinkingBudget !== undefined) {
       logger.debug('thinkingBudget is not currently mapped to the SDK v2 prompt payload and is being omitted', {
@@ -128,6 +131,7 @@ export class OpenCodePromptRequestBuilder {
 
     const parameters: SdkPromptParameters = {
       sessionID: sessionId,
+      ...(messageID ? { messageID } : {}),
       model: this.resolveModelSelection(options),
       parts,
     };
@@ -162,9 +166,11 @@ export class OpenCodePromptRequestBuilder {
   buildLegacyStreamRequestBody(
     parts: PromptRequestPart[],
     options: PromptRequestOptions,
+    messageID?: string,
   ): LegacyPromptRequestBody {
     const modelOptions = this.buildLegacyStreamModelOptions(options);
     const requestBody: LegacyPromptRequestBody = {
+      ...(messageID ? { messageID } : {}),
       parts,
       model: {
         ...this.resolveModelSelection(options),

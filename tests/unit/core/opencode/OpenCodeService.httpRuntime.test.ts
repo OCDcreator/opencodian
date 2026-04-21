@@ -193,7 +193,7 @@ describe('OpenCodeService.sendMessage context attachments', () => {
 
     const requestBody = JSON.parse(mockRequestUrl.mock.calls[0][0].body);
     expect(requestBody.parts[1]).toMatchObject({
-      id: expect.stringMatching(/^part-/),
+      id: expect.stringMatching(/^prt_/),
       type: 'text',
       text: '<obsidian_context kind="current_note" path="notes/today.md">Remote note body</obsidian_context>',
       synthetic: true,

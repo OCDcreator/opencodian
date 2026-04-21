@@ -70,7 +70,7 @@ describe('OpenCodeService SDK prompt requests', () => {
       sessionID: 'sdk-session',
       parts: [
         expect.objectContaining({
-          id: expect.stringMatching(/^part-/),
+          id: expect.stringMatching(/^prt_/),
           type: 'text',
           text: 'Create a title',
         }),
@@ -218,6 +218,16 @@ describe('OpenCodeService SDK prompt requests', () => {
 });
 
 describe('OpenCodeService SDK promptAsync transport', () => {
+  it('builds stable prompt ids using OpenCode-compatible msg/prt prefixes', () => {
+    service = createServiceWithSdkFlags();
+
+    const payload = service.buildStructuredPromptSendPayload('Hello');
+
+    expect(payload.messageID).toMatch(/^msg_/);
+    expect(payload.requestParts[0]?.id).toMatch(/^prt_/);
+    expect(payload.optimisticUserParts[0]?.id).toMatch(/^prt_/);
+  });
+
   it('maps sendMessage through SDK promptAsync with shared prompt options', async () => {
     service = createServiceWithSdkFlags();
     service.setSessionId('sdk-session');
@@ -265,9 +275,10 @@ describe('OpenCodeService SDK promptAsync transport', () => {
     const sentParts = mockSdkClient.session.promptAsync.mock.calls[0]?.[0]?.parts;
     expect(mockSdkClient.session.promptAsync).toHaveBeenCalledWith(expect.objectContaining({
       sessionID: 'sdk-session',
+      messageID: expect.stringMatching(/^msg_/),
       parts: [
         expect.objectContaining({
-          id: expect.stringMatching(/^part-/),
+          id: expect.stringMatching(/^prt_/),
           type: 'text',
           text: 'Hello',
         }),
@@ -340,6 +351,7 @@ describe('OpenCodeService SDK promptAsync transport', () => {
 
     expect(mockSdkClient.session.promptAsync).toHaveBeenCalledWith(expect.objectContaining({
       sessionID: 'sdk-session',
+      messageID: promptPayload.messageID,
       parts: promptPayload.requestParts,
     }));
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
