@@ -39,7 +39,8 @@ export class ConversationSyncBridge {
 ### visible sync bridge
 
 - `syncVisibleConversationInBackground()` 先复用 `ConversationSyncRuntimeCoordinator.runVisibleConversationSync()`
-- server sync 完成后，会把 visible sync context、`previousMessages` 与 `syncResult` 统一委托给 `ConversationSyncVisiblePostSyncRouter`
+- visible background sync 现在和 signal sync 一样先尝试 `syncConversationMessagesFromCanonicalState()`，只有 canonical graph 缺失时才回退 `syncConversationMessagesFromServer()` 做 gap recovery
+- sync 完成后，会把 visible sync context、`previousMessages` 与 `syncResult` 统一委托给 `ConversationSyncVisiblePostSyncRouter`
 - bridge 不再内联 visible post-sync request shaping，也不再直接处理 DOM patch / indicator fallback
 
 ### signal / background sync bridge
@@ -48,7 +49,7 @@ export class ConversationSyncBridge {
 - `applySessionSyncEvent()` 会把非 `session.diff` 的 message / part sync 直接路由到 canonical graph merge：先尝试从 `OpenCodeService` 的 canonical session graph 生成本地 sync 结果，再复用既有 visible/background post-sync router
 - `applySessionSyncEvent()` 现在会直接忽略 `session.diff`，确保 diff 事件不再触发 message reload / authoritative correction
 - canonical sync 结果现在也允许携带“可见文本没变、但隐藏 parts / synthetic metadata 已纠偏”的 fingerprint 漂移；是否真正 patch DOM 仍交给后续 render/visual fingerprint owner 决定
-- 当 canonical graph 暂时缺口（例如当前 tab 还没拿到该 session snapshot）时，bridge 会回退到 `syncConversationMessagesFromServer()` 做 gap recovery
+- 当 canonical graph 暂时缺口（例如当前 tab 还没拿到该 session snapshot，或 slash/command 刚返回但 sync event 尚未投影）时，bridge 会回退到 `syncConversationMessagesFromServer()` 做 gap recovery；该 server read 会先回填 canonical snapshot，再投影到本地 cache/render 输出
 - `scheduleConversationSyncFromSignal()` 仍保留给真正需要 debounce 的 signal reload 场景；`session.diff` 不再经过这条路径
 - signal/background-tab sync 完成后，bridge 会把 context 与 `syncResult` 委托给 `ConversationSyncBackgroundPostSyncRouter`
 - hidden-tab `lastConversationSyncFingerprint` writeback 与 post-sync option shaping 不再留在 bridge 内部

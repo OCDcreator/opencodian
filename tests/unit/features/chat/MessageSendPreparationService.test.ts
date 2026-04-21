@@ -453,3 +453,59 @@ describe('MessageSendPreparationService optimistic preparation', () => {
     ]);
   });
 });
+
+describe('MessageSendPreparationService synthetic part canonical seeding', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('seeds canonical user state with synthetic optimistic parts while keeping the user bubble text-only', async () => {
+    const conversation = createConversation();
+    const requestParts: PromptRequestPart[] = [
+      { id: 'part-visible', type: 'text', text: 'Hello' },
+      {
+        id: 'part-plugin',
+        type: 'text',
+        text: 'Injected plugin prompt',
+        synthetic: true,
+        metadata: {
+          source: 'plugin',
+          pluginName: 'opencode-plugin-x',
+        },
+      },
+    ];
+    const host = createHost(conversation, [], {
+      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(
+        createStructuredSendPayload({
+          requestParts,
+          optimisticUserParts: requestParts,
+        }),
+      ),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const syntheticTextParts = [
+      {
+        text: 'Injected plugin prompt',
+        metadata: {
+          source: 'plugin',
+          pluginName: 'opencode-plugin-x',
+        },
+      },
+    ];
+
+    const result = await service.prepareMessageSend({
+      content: 'Hello',
+      syntheticTextParts,
+    });
+
+    expect(host.seedCanonicalUserMessage).toHaveBeenCalledWith({
+      sessionID: 'session-1',
+      messageID: 'message-1',
+      parts: requestParts,
+      timestamp: result?.userMessage.timestamp,
+    });
+    expect(result?.userMessage.content).toBe('Hello');
+    expect(result?.userMessage.parts).toEqual(requestParts);
+    expect(result?.userMessage.content).not.toContain('Injected plugin prompt');
+  });
+});

@@ -70,4 +70,5 @@ export class SlashCommandExecutionService {
 - `SendPipelineRuntime` 现在多了一条最前面的 slash interception seam：
   - 先问 `SlashCommandExecutionService.tryRunSlashCommand()`
   - 如果返回 `false`，再继续普通 `prepareMessageSend()` + streaming pipeline
+- slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
 - `OpenCodianView` 只负责装配 host，不持有新的 slash runtime 逻辑

@@ -167,6 +167,8 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 - chat container 上 `--opencodian-composer-stack-height` 的写回，以及 settled scroll 调度
 - 供后续 glass/theme 逻辑读取的 composer shell / input wrapper DOM refs
 
+稳定聊天视图当前明确只启用 prompt 输入模式：`getComposerInputMode()` 固定返回 `prompt`，意外进入的 shell submission 会被记录并忽略，不会走本地-only shell 状态。后续如果要开启 shell parity，入口必须通过 `OpenCodeService.runSessionShell()` / `session.shell`，并复用 canonical session/message/part projection，而不是在 view 内新增 shell 消息状态。
+
 这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；toolbar 里的 selector 区域也已经进一步交给专门 owner，input shell 只保留 slot 级挂载职责。
 
 ### Model / permission selector ownership

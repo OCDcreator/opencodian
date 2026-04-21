@@ -222,12 +222,19 @@ export class ConversationSyncBridge {
       async (syncContext) => {
         const { conversation } = syncContext;
         const previousMessages = [...conversation.messages];
-        const syncResult = await this.host.syncConversationMessagesFromServer(
-          conversation,
-          syncContext.tabId,
-          'visible-background-sync',
-          { suppressVerboseLogs: true },
-        );
+        const syncResult =
+          await this.host.syncConversationMessagesFromCanonicalState(
+            conversation,
+            syncContext.tabId,
+            'visible-background-sync',
+            { suppressVerboseLogs: true },
+          )
+          ?? await this.host.syncConversationMessagesFromServer(
+            conversation,
+            syncContext.tabId,
+            'visible-background-sync',
+            { suppressVerboseLogs: true },
+          );
 
         await this.visiblePostSyncRouter.routeVisibleSyncComplete({
           syncContext,

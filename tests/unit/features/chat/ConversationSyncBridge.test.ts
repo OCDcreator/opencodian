@@ -117,7 +117,7 @@ describe('ConversationSyncBridge', () => {
     jest.clearAllMocks();
   });
 
-  it('routes visible sync callbacks through the visible post-sync router', async () => {
+  it('routes visible sync callbacks through the canonical-first visible post-sync router', async () => {
     const conversation = createConversation('visible', {
       messages: [
         {
@@ -154,6 +154,57 @@ describe('ConversationSyncBridge', () => {
       conversation,
       expect.any(Function),
     );
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      conversation,
+      'tab-active',
+      'visible-background-sync',
+      { suppressVerboseLogs: true },
+    );
+    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
+    expect(visiblePostSyncRouter.routeVisibleSyncComplete).toHaveBeenCalledWith({
+      syncContext: {
+        tabId: 'tab-active',
+        conversation,
+      },
+      previousMessages: conversation.messages,
+      syncResult: expect.objectContaining({
+        changed: true,
+        fingerprint: 'visible-new',
+        revertState: { messageID: 'assistant-next' },
+      }),
+    });
+  });
+
+  it('falls back to server sync when visible background sync has no canonical session state yet', async () => {
+    const conversation = createConversation('visible-fallback');
+    const host = createHost({
+      currentConversation: conversation,
+      syncResult: createSyncResult(conversation, {
+        changed: false,
+        fingerprint: 'visible-fallback',
+      }),
+    });
+    host.syncConversationMessagesFromCanonicalState.mockResolvedValue(null);
+    const runtimeCoordinator = createRuntimeCoordinator();
+    const orchestration = createOrchestration();
+    const visiblePostSyncRouter = createVisiblePostSyncRouter();
+    const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
+    const bridge = new ConversationSyncBridge({
+      host,
+      runtimeCoordinator,
+      orchestrationService: orchestration,
+      visiblePostSyncRouter,
+      backgroundPostSyncRouter,
+    });
+
+    await bridge.syncVisibleConversationInBackground();
+
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      conversation,
+      'tab-active',
+      'visible-background-sync',
+      { suppressVerboseLogs: true },
+    );
     expect(host.syncConversationMessagesFromServer).toHaveBeenCalledWith(
       conversation,
       'tab-active',
@@ -167,9 +218,8 @@ describe('ConversationSyncBridge', () => {
       },
       previousMessages: conversation.messages,
       syncResult: expect.objectContaining({
-        changed: true,
-        fingerprint: 'visible-new',
-        revertState: { messageID: 'assistant-next' },
+        changed: false,
+        fingerprint: 'visible-fallback',
       }),
     });
   });
