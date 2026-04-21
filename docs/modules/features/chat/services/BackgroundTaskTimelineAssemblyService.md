@@ -35,9 +35,11 @@ export class BackgroundTaskTimelineAssemblyService {
 ## 关键行为
 
 - `collectSegments()` 先按 conversation order 收集 user anchors、tool launches 与 completion reminders，再合并 active runtime state，最后统一 resolve pending state。
+- 只有 search-mode user anchor 之后的 `task` tool block 才会被视为 OMO background-task launch；普通 OpenCode 原生 task/subagent 卡片不会再被 timeline 误吸进 background-task segment。
+- completion reminder 的 fallback 也只允许落到已有 search-mode segment / search-mode anchor；如果当前对话只有普通 user turn，则 orphan reminder 会被丢弃而不会创建 `modeTag: null` 的 background-task segment。
 - all-complete reminder 会清空 pending 并关闭 waiting-for-follow-up；普通 completion reminder 只按 task id / description matching 清掉对应 launch。
 - runtime merge 不保存或修改 conversation，只把当前 tab 仍活跃但尚未持久化的 launch/completion 并入 segment 视图。
-- `collectDiagnostics()` 只扫描最后一个 user anchor 之后的 task/reminder activity，继续保持原 OMO diagnostics 快照范围。
+- `collectDiagnostics()` 只扫描最后一个 search-mode user anchor 之后的 task/reminder activity，继续保持 OMO diagnostics 的语义边界。
 
 ## 与相邻模块的边界
 

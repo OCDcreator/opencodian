@@ -51,6 +51,32 @@ interface OpenCodeToolContentAssembly {
   contentBlocks: ContentBlock[];
 }
 
+function extractRenderableToolMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+
+  const sessionId = typeof metadata.sessionId === 'string' && metadata.sessionId.trim()
+    ? metadata.sessionId.trim()
+    : null;
+  if (!sessionId) {
+    return undefined;
+  }
+
+  return { sessionId };
+}
+
+function resolveToolResultVisibility(
+  toolName: string | undefined | null,
+  toolKind: ToolIdentityKind,
+): 'hidden' | undefined {
+  return toolKind === 'task' || getToolIdentity(toolName || 'unknown').kind === 'task'
+    ? 'hidden'
+    : undefined;
+}
+
 function resolveReasoningDurationSeconds(
   part: Pick<OpenCodeMessagePart, 'duration' | 'time'>,
 ): number | undefined {
@@ -111,14 +137,19 @@ class OpenCodeToolContentAssembler {
         });
         return toolStatus === 'pending' || toolStatus === 'running';
       })
-      .map((part) => ({
-        id: part.callID ?? '',
-        name: part.tool ?? '',
-        toolSourceKey: part.tool ?? undefined,
-        kind: resolveOpenCodeToolKind(part.tool, toolIdentityContext),
-        input: part.state?.input ?? {},
-        status: 'pending' as const,
-      }));
+      .map((part) => {
+        const kind = resolveOpenCodeToolKind(part.tool, toolIdentityContext);
+        return {
+          id: part.callID ?? '',
+          name: part.tool ?? '',
+          toolSourceKey: part.tool ?? undefined,
+          kind,
+          input: part.state?.input ?? {},
+          toolMetadata: extractRenderableToolMetadata(part.state?.metadata),
+          resultVisibility: resolveToolResultVisibility(part.tool, kind),
+          status: 'pending' as const,
+        };
+      });
   }
 
   private buildContentBlocks(
@@ -166,20 +197,26 @@ class OpenCodeToolContentAssembler {
 
       processedToolIds.add(toolId);
       const resultPart = this.findResolvedToolResultPart(toolParts, toolId);
+      const toolKind = resolveOpenCodeToolKind(part.tool, toolIdentityContext);
       const toolStatus = resolveToolExecutionStatus({
         toolName: part.tool,
         state: resultPart?.state ?? part.state,
       });
+      const toolMetadata = extractRenderableToolMetadata(
+        resultPart?.state?.metadata ?? part.state?.metadata,
+      );
 
       contentBlocks.push({
         type: 'tool_use',
         toolId,
         toolName: part.tool || 'unknown',
         toolSourceKey: part.tool || undefined,
-        toolKind: resolveOpenCodeToolKind(part.tool, toolIdentityContext),
+        toolKind,
         toolInput: part.state?.input || {},
+        ...(toolMetadata ? { toolMetadata } : {}),
         toolStatus,
         toolResult: resolveToolResultText(resultPart?.state),
+        toolResultVisibility: resolveToolResultVisibility(part.tool, toolKind),
       });
     }
 

@@ -222,4 +222,54 @@ describe('OpenCodeStreamEventTransformer tool part mutations', () => {
       stop: false,
     });
   });
+
+});
+
+describe('OpenCodeStreamEventTransformer task metadata', () => {
+  it('projects task session metadata into tool_use chunks', () => {
+    const host = createHost({
+      getOpenCodeToolKind: jest.fn(() => 'task'),
+    });
+    const transformer = new OpenCodeStreamEventTransformer(host);
+
+    const outcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-tool-task',
+            sessionID: 'test-session',
+            messageID: 'assistant-task-1',
+            type: 'tool',
+            callID: 'call-tool-task',
+            tool: 'task',
+            state: {
+              status: 'running',
+              input: {
+                description: 'Audit routes',
+              },
+              metadata: {
+                sessionId: 'child-session-1',
+                ignored: 'value',
+              },
+            },
+          },
+        },
+      },
+      'test-session',
+      createState(),
+      createStreamContext(),
+    );
+
+    expect(outcome.chunks).toContainEqual(expect.objectContaining({
+      type: 'tool_use',
+      id: 'call-tool-task',
+      name: 'task',
+      kind: 'task',
+      toolMetadata: {
+        sessionId: 'child-session-1',
+      },
+    }));
+  });
 });

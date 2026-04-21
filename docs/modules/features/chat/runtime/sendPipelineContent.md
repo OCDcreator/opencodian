@@ -17,7 +17,7 @@ hasVisibleStreamingContent(chunk): boolean
 
 ## 关键行为
 
-- `mapStreamingContentBlocksToMessageContentBlocks()`：把 `StreamController` 的 text / thinking / tool_call block 变成会话持久化使用的 `ContentBlock`
+- `mapStreamingContentBlocksToMessageContentBlocks()`：把 `StreamController` 的 text / thinking / tool_call block 变成会话持久化使用的 `ContentBlock`，并保留工具卡片的白名单 `toolMetadata` 与 `toolResultVisibility`
 - `getStreamedTextContent()`：只拼接 text block，供 assistant message `content` 字段回填
 - `hasVisibleStreamingContent()`：统一定义“首次可见内容”的判定，供 pending indicator 与 reveal 逻辑复用
 

@@ -55,6 +55,7 @@ interface BackgroundTaskSegmentCollectionState {
   segments: BackgroundTaskSegment[];
   segmentByAnchorKey: Map<string, BackgroundTaskSegment>;
   latestUserMessage: ChatMessage | null;
+  latestSearchModeMessage: ChatMessage | null;
 }
 
 interface BackgroundTaskSegmentPendingState {
@@ -105,6 +106,11 @@ export class BackgroundTaskTimelineAssemblyService {
     }
 
     const anchorMessage = messages[anchorIndex];
+    const isSearchModeAnchor =
+      anchorMessage.omo?.kind === 'user-injection' && anchorMessage.omo.modeTag === 'search-mode';
+    if (!isSearchModeAnchor) {
+      return null;
+    }
     const launches = new Map<string, BackgroundTaskLaunchInfo>();
     const completed = new Map<string, BackgroundTaskCompletionInfo>();
     let sawAllTasksComplete = false;
@@ -128,12 +134,6 @@ export class BackgroundTaskTimelineAssemblyService {
           result: block.toolResult,
         }, launches);
       }
-    }
-
-    const isSearchModeAnchor =
-      anchorMessage.omo?.kind === 'user-injection' && anchorMessage.omo.modeTag === 'search-mode';
-    if (!isSearchModeAnchor && launches.size === 0 && completed.size === 0 && !sawAllTasksComplete) {
-      return null;
     }
 
     return {
@@ -160,6 +160,7 @@ export class BackgroundTaskTimelineAssemblyService {
       segments: [],
       segmentByAnchorKey: new Map(),
       latestUserMessage: null,
+      latestSearchModeMessage: null,
     };
   }
 
@@ -185,6 +186,7 @@ export class BackgroundTaskTimelineAssemblyService {
   ): void {
     state.latestUserMessage = message;
     if (this.isSearchModeAnchorMessage(message)) {
+      state.latestSearchModeMessage = message;
       this.getOrCreateSegment(state, message);
     }
   }
@@ -200,6 +202,10 @@ export class BackgroundTaskTimelineAssemblyService {
     block: ChatContentBlock,
   ): void {
     if (block.type !== 'tool_use' || block.toolName !== 'task' || !block.toolId) {
+      return;
+    }
+
+    if (!state.latestUserMessage || !this.isSearchModeAnchorMessage(state.latestUserMessage)) {
       return;
     }
 
@@ -258,7 +264,8 @@ export class BackgroundTaskTimelineAssemblyService {
     }
 
     const fallback = this.getLatestSegmentWithActivity(state.segments)
-      ?? this.getOrCreateSegment(state, state.latestUserMessage);
+      ?? this.getLatestSearchModeSegment(state)
+      ?? this.getOrCreateSegment(state, state.latestSearchModeMessage);
     return fallback ? [fallback] : [];
   }
 
@@ -485,8 +492,20 @@ export class BackgroundTaskTimelineAssemblyService {
     segments: BackgroundTaskSegment[],
   ): BackgroundTaskSegment | null {
     for (let index = segments.length - 1; index >= 0; index -= 1) {
-      if (this.segmentHasTaskActivity(segments[index])) {
+      if (segments[index].modeTag === 'search-mode' && this.segmentHasTaskActivity(segments[index])) {
         return segments[index];
+      }
+    }
+
+    return null;
+  }
+
+  private getLatestSearchModeSegment(
+    state: BackgroundTaskSegmentCollectionState,
+  ): BackgroundTaskSegment | null {
+    for (let index = state.segments.length - 1; index >= 0; index -= 1) {
+      if (state.segments[index].modeTag === 'search-mode') {
+        return state.segments[index];
       }
     }
 

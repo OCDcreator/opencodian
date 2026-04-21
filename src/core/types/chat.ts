@@ -140,8 +140,10 @@ export interface ContentBlock {
   toolSourceKey?: string;
   toolKind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   toolInput?: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
   toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
   toolResult?: string;
+  toolResultVisibility?: 'visible' | 'hidden';
   subagentId?: string;
   subagentMode?: 'sync' | 'async';
 }
@@ -224,8 +226,10 @@ export interface ToolCallInfo {
   toolSourceKey?: string;
   kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
   status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
   result?: string;
+  resultVisibility?: 'visible' | 'hidden';
   isExpanded?: boolean;
 }
 
@@ -306,6 +310,8 @@ export type StreamChunk =
       name: string;
       kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
       input: Record<string, unknown>;
+      toolMetadata?: Record<string, unknown>;
+      toolResultVisibility?: 'visible' | 'hidden';
     }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
   | { type: 'file_edited'; file: string }

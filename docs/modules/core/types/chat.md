@@ -37,8 +37,8 @@
 | 类型 | 说明 |
 |------|------|
 | `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
-| `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`） |
-| `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `status`, `result?`, `isExpanded?`） |
+| `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
+| `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
 | `ConversationSessionSettings` | 会话级覆盖设置（`autoCompactionEnabled?`, `compactionReservedTokens?`, `chatFontSizePx?`，支持 `null` 表示显式继承） |
 | `ConversationMeta` | 会话元数据（不含消息体） |
 | `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据） |
@@ -47,7 +47,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `StreamChunk` | 联合类型，14 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `tool_use` 可带 `kind?`） |
+| `StreamChunk` | 联合类型，14 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`） |
 
 ### OMO 兼容
 
@@ -104,7 +104,7 @@
 `ContentBlock.type` 支持五种：
 - `text` — 文本内容
 - `thinking` — AI 推理过程（`durationSeconds?`）
-- `tool_use` — 工具调用（`toolId`, `toolName`, `toolKind?`, `toolInput`）
+- `tool_use` — 工具调用（`toolId`, `toolName`, `toolKind?`, `toolInput`, `toolMetadata?`, `toolResultVisibility?`；当前用于保留 OpenCode `task` child session id 并标记 raw task result 不可直接渲染）
 - `tool_result` — 工具结果（`toolStatus`, `toolResult`）
 - `subagent` — 子代理调用（`subagentId`, `subagentMode`）
 
@@ -166,6 +166,8 @@
 - `Conversation.openCodeSessionId` 是 OpenCode 服务端的会话 ID，与本地 `Conversation.id` 不同
 - `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记
 - `ContentBlock.durationSeconds` 仅用于 `thinking` 类型块
+- `toolMetadata` 当前是 UI-safe 白名单字段，主要用于 `task` / subagent 卡片的 child session linkage，不等于原始 OpenCode metadata 全量透传
+- `toolResultVisibility: 'hidden'` 表示工具结果可保留给内部匹配/审计，但不应作为普通工具输出展示；当前主要用于 OpenCode 原生 `task`。
 - `SessionDiffEntry` 来自 `session.diff()` API，在文件编辑后自动获取
 - `SessionTodo` 通过 `global.syncEvent.subscribe()` 监听 `todo.updated` 事件更新
 - 源码约 279 行

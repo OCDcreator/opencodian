@@ -77,6 +77,7 @@ tool call 不再只是“收到结果时 append 一次”那么简单。控制�
 
 - 同一个 tool call 不会被重复写入 `contentBlocks`
 - timeout / done 收尾时仍能补齐遗漏的工具块
+- task/subagent 工具的白名单 `toolMetadata`（当前为 `sessionId`）与 `resultVisibility: 'hidden'` 也会跟随 running/result 持久化到 `tool_call` block，供最终消息卡片继续打开 child session，同时避免 raw `<task_result>` 被普通结果渲染器消费
 
 ## 关键方法
 

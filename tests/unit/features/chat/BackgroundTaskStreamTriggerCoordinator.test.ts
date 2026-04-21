@@ -19,9 +19,10 @@ function createToolCall(overrides: Partial<ToolCallInfo> = {}): ToolCallInfo {
 }
 
 describe('BackgroundTaskStreamTriggerCoordinator', () => {
-  function createRuntime(): BackgroundTaskStreamTriggerRuntime {
+  function createRuntime(modeTag: string | null = null): BackgroundTaskStreamTriggerRuntime {
     return {
       backgroundTaskStartedAt: null,
+      backgroundTaskModeTag: modeTag,
       backgroundTaskLaunches: new Map(),
       backgroundTaskWaitingForFollowUp: false,
       backgroundTaskStaleNoticeFingerprint: 'stale',
@@ -32,8 +33,11 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
     runtime?: BackgroundTaskStreamTriggerRuntime | null;
     sessionId?: string | null;
     hasIndicator?: boolean;
+    modeTag?: string | null;
   } = {}) {
-    const runtime = options.runtime === undefined ? createRuntime() : options.runtime;
+    const runtime = options.runtime === undefined
+      ? createRuntime(options.modeTag)
+      : options.runtime;
     const indicatorCoordinator = {
       renderIfNeeded: jest.fn().mockResolvedValue(undefined),
     };
@@ -83,7 +87,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       indicatorCoordinator,
       liveSignalCoordinator,
       timelineService,
-    } = createCoordinator();
+    } = createCoordinator({ modeTag: 'search-mode' });
 
     await coordinator.handleToolCallStart(createToolCall(), 'tab-1');
 
@@ -103,6 +107,26 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
     );
     expect(runtime?.backgroundTaskWaitingForFollowUp).toBe(false);
     expect(indicatorCoordinator.renderIfNeeded).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('does not treat plain OpenCode task tools as background tasks when search mode is inactive', async () => {
+    const {
+      coordinator,
+      runtime,
+      indicatorCoordinator,
+      liveSignalCoordinator,
+      timelineService,
+    } = createCoordinator({ modeTag: null });
+
+    await coordinator.handleToolCallStart(createToolCall(), 'tab-1');
+
+    expect(runtime?.backgroundTaskStartedAt).toBeNull();
+    expect(runtime?.backgroundTaskLaunches.size).toBe(0);
+    expect(runtime?.backgroundTaskWaitingForFollowUp).toBe(false);
+    expect(runtime?.backgroundTaskStaleNoticeFingerprint).toBe('stale');
+    expect(timelineService.upsertLaunch).not.toHaveBeenCalled();
+    expect(liveSignalCoordinator.armAuthoritativeSyncGate).not.toHaveBeenCalled();
+    expect(indicatorCoordinator.renderIfNeeded).not.toHaveBeenCalled();
   });
 
   it('refreshes session todos on todo tool completion without touching background-task state', async () => {
@@ -143,7 +167,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       indicatorCoordinator,
       liveSignalCoordinator,
       timelineService,
-    } = createCoordinator();
+    } = createCoordinator({ modeTag: 'search-mode' });
 
     await coordinator.handleToolCallEnd(createToolCall({
       result: 'completed bg_1',

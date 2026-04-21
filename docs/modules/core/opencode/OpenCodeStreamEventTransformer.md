@@ -11,6 +11,7 @@
 - 维护单条活动流里的 part-type 感知，确保 `message.part.delta` 能区分 text / thinking
 - 同步产出 canonical stream mutations，让 `message.part.updated` / `message.part.delta` 能写入 `sessionStateStore`
 - 处理 tool chunk 去重、tool result 补发、question / permission / file 事件映射
+- 对 `task` tool 透传可渲染白名单 metadata（当前为 `sessionId`）并标记 `toolResultVisibility: 'hidden'`，让流式 task 卡片能保留 child session linkage 且不把 `<task_result>` 当普通输出
 - 解析原始 SSE buffer，保留未完成尾段
 
 它不负责 transport、stream lifecycle 或最终 assistant message 补拉；这些仍留在 `OpenCodeService` 与 `OpenCodeStreamingRuntimeCoordinator`。
@@ -56,6 +57,7 @@
 
 - 先按 `sessionID` / `part.sessionID` 做 session guard
 - 对 `message.part.updated` 处理 tool_use / tool_result / thinking-duration；当 SDK 只补发完整 reasoning part 时，会按 part 已发送长度补齐缺失的 thinking 文本；如果 provider 只返回空白 reasoning，则不生成可见空 thinking 块
+- `tool_use` chunk 只透传可渲染白名单 metadata；当前保留 `toolMetadata.sessionId` 用于 OpenCode 原生 subagent/task 卡片，并对 `task` 补 `toolResultVisibility: 'hidden'`，避免在流式/part-helper 路径丢 child session id 或误渲染 raw result
 - 对 `message.part.updated` 记录 part type/message id，并产出 assistant message + part upsert mutations
 - 对 `message.part.delta` 复用 part type/message id，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`，同时产出 part delta mutation；reasoning delta 会更新 dedupe 游标，避免后续 `part.updated` 重复渲染，空白 delta 只保留 canonical mutation 不触发 UI thinking 块
 - 对 `permission.asked`、`file.edited`、`question.asked` 做结构化 chunk 映射
@@ -96,3 +98,5 @@ graph LR
 - 不要把 question normalization 或 tool identity 规则搬进 transformer；保持 host seam 注入。
 - 不要让 `message.part.delta` 只走 loose text chunk；如果能解析出 `partID + messageID`，必须同时输出 canonical part mutation。
 - `transformPartToChunks()` 目前仍保持原有“只直接处理 `reasoning` part，不单独处理 `thinking` part”的兼容语义。
+- `toolMetadata` 是 UI-safe 白名单字段，不要把 OpenCode `part.state.metadata` 整对象直接塞进 `StreamChunk`。
+- `task` 的 result visibility 同样属于流式 contract；如果以后新增 part-to-chunk helper，必须同时保留 `toolMetadata.sessionId` 与 hidden-result 标记。

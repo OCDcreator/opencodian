@@ -1088,6 +1088,8 @@ export class OpenCodeStreamingRuntimeCoordinator {
     }
 
     const toolInput = this.normalizeToolInput(part.state);
+    const toolMetadata = this.normalizeToolMetadata(part.state);
+    const toolResultVisibility = this.resolveToolResultVisibility(toolName);
     const nextSnapshot = this.getToolInputSnapshot(toolInput);
     const previousSnapshot = cursor.toolInputSnapshots.get(toolId);
     const shouldEmitToolUse = !cursor.processedToolIds.has(toolId) || nextSnapshot !== previousSnapshot;
@@ -1109,6 +1111,8 @@ export class OpenCodeStreamingRuntimeCoordinator {
         id: toolId,
         name: toolName,
         input: toolInput,
+        ...(toolMetadata ? { toolMetadata } : {}),
+        ...(toolResultVisibility ? { toolResultVisibility } : {}),
       });
     }
 
@@ -1155,6 +1159,30 @@ export class OpenCodeStreamingRuntimeCoordinator {
     }
 
     return input as Record<string, unknown>;
+  }
+
+  private normalizeToolMetadata(state: Part['state']): Record<string, unknown> | undefined {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) {
+      return undefined;
+    }
+
+    const metadata = (state as { metadata?: unknown }).metadata;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return undefined;
+    }
+
+    const sessionId = typeof (metadata as { sessionId?: unknown }).sessionId === 'string'
+      ? (metadata as { sessionId: string }).sessionId.trim()
+      : '';
+    if (!sessionId) {
+      return undefined;
+    }
+
+    return { sessionId };
+  }
+
+  private resolveToolResultVisibility(toolName: string): 'hidden' | undefined {
+    return toolName === 'task' ? 'hidden' : undefined;
   }
 
   private getToolInputSnapshot(input: Record<string, unknown>): string {

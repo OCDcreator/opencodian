@@ -44,6 +44,7 @@
 - 为 assistant message 生成 `modelId`
 - 用 `shared/toolExecution` + `shared/toolIdentity` 归一化 `toolCalls` 与历史 `tool_use`
 - 过滤内部 `structured_output` tool，同时保留 assistant `structured` payload
+- 对 OpenCode 原生 `task` tool 额外投影白名单 `toolMetadata.sessionId`，并把 `toolResultVisibility` 标为 `hidden`，保留 child session linkage 同时明确 raw `<task_result>` 不是普通可渲染输出
 
 ### Context attachment 与 OMO 委托
 
@@ -73,4 +74,6 @@ graph LR
 
 - 不要在这里改 `ChatMessage` 形状；调用方和测试都依赖现有 schema。
 - 不要把 tool icon / summary 规则搬回 UI；这里只产出结构化 `toolKind` / `toolSourceKey`。
+- `toolMetadata` 当前刻意只投影可渲染的白名单字段（现阶段是 `sessionId`），不要把整份 OpenCode metadata 原样暴露到 UI schema。
+- `task` 的 `toolResult` 可以保留原始 OpenCode 输出供内部匹配/审计，但必须带 `toolResultVisibility: 'hidden'`，调用方不得把它当普通工具结果直接渲染。
 - inline Read tool 文本剥离和 Windows path 归一化是历史兼容边界，修改前应补 focused tests。

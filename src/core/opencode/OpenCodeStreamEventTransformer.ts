@@ -1,4 +1,5 @@
 import {
+  getToolIdentity,
   isInternalStructuredOutputTool,
   resolveToolExecutionStatus,
   resolveToolResultText,
@@ -166,8 +167,36 @@ interface OpenCodeClassifiedToolPart {
   toolName: string;
   toolKind: ToolIdentityKind;
   toolInput: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
+  toolResultVisibility?: 'hidden';
   toolStatus: ReturnType<typeof resolveToolExecutionStatus>;
   toolResult: string | undefined;
+}
+
+function extractRenderableToolMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+
+  const sessionId = typeof metadata.sessionId === 'string' && metadata.sessionId.trim()
+    ? metadata.sessionId.trim()
+    : null;
+  if (!sessionId) {
+    return undefined;
+  }
+
+  return { sessionId };
+}
+
+function resolveToolResultVisibility(
+  toolName: string,
+  toolKind: ToolIdentityKind,
+): 'hidden' | undefined {
+  return toolKind === 'task' || getToolIdentity(toolName).kind === 'task'
+    ? 'hidden'
+    : undefined;
 }
 
 function parseJsonRecord(payload: string): Record<string, unknown> | null {
@@ -472,7 +501,16 @@ export class OpenCodeStreamEventTransformer {
 
     this.host.observeRuntimeToolNames([classifiedToolPart.toolName]);
 
-    const { toolId, toolName, toolKind, toolInput, toolStatus, toolResult } = classifiedToolPart;
+    const {
+      toolId,
+      toolName,
+      toolKind,
+      toolInput,
+      toolMetadata,
+      toolResultVisibility,
+      toolStatus,
+      toolResult,
+    } = classifiedToolPart;
     if (!toolId) {
       return;
     }
@@ -492,6 +530,8 @@ export class OpenCodeStreamEventTransformer {
         name: toolName,
         kind: toolKind,
         input: toolInput,
+        ...(toolMetadata ? { toolMetadata } : {}),
+        ...(toolResultVisibility ? { toolResultVisibility } : {}),
       });
     }
 
@@ -581,6 +621,8 @@ export class OpenCodeStreamEventTransformer {
       toolName,
       toolKind,
       toolInput,
+      toolMetadata,
+      toolResultVisibility,
       toolStatus,
       toolResult,
     } = classifiedToolPart;
@@ -592,11 +634,25 @@ export class OpenCodeStreamEventTransformer {
         name: toolName,
         kind: toolKind,
         input: toolInput,
+        ...(toolMetadata ? { toolMetadata } : {}),
+        ...(toolResultVisibility ? { toolResultVisibility } : {}),
       });
       return;
     }
 
     if (toolStatus === 'completed' || toolStatus === 'error') {
+      if (toolMetadata || toolResultVisibility) {
+        chunks.push({
+          type: 'tool_use',
+          id: toolId ?? '',
+          name: toolName,
+          kind: toolKind,
+          input: toolInput,
+          ...(toolMetadata ? { toolMetadata } : {}),
+          ...(toolResultVisibility ? { toolResultVisibility } : {}),
+        });
+      }
+
       chunks.push({
         type: 'tool_result',
         toolUseId: toolId ?? '',
@@ -844,11 +900,15 @@ export class OpenCodeStreamEventTransformer {
       return null;
     }
 
+    const toolKind = this.host.getOpenCodeToolKind(toolName);
+
     return {
       toolId: toolPart.callID || toolPart.id || null,
       toolName,
-      toolKind: this.host.getOpenCodeToolKind(toolName),
+      toolKind,
       toolInput: toolPart.state?.input || {},
+      toolMetadata: extractRenderableToolMetadata(toolPart.state?.metadata),
+      toolResultVisibility: resolveToolResultVisibility(toolName, toolKind),
       toolStatus: resolveToolExecutionStatus({
         toolName,
         state: toolPart.state,

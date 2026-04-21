@@ -28,8 +28,8 @@ export class BackgroundTaskStreamTriggerCoordinator {
 
 ## 关键行为
 
-- `handleToolCallStart()` 先复用 todo snapshot host（通常落到 `SessionTodoCoordinator.applyStreamingTodoSnapshotFromTool()`），再针对 `toolName === 'task'` 的流式调用补齐 `backgroundTaskStartedAt`、authoritative-sync gate、stale fingerprint 清理、launch upsert 与 indicator rerender
-- `handleToolCallEnd()` 继续承接 todo tool 的即时 refresh，并在 background-task tool 完成时写回 launch result、重新 arm gate，并触发 indicator rerender
+- `handleToolCallStart()` 先复用 todo snapshot host（通常落到 `SessionTodoCoordinator.applyStreamingTodoSnapshotFromTool()`），只有在当前 runtime 已被 `backgroundTaskModeTag === 'search-mode'` arm 过时，才会把 `toolName === 'task'` 当作 OMO background-task 触发器，补齐 `backgroundTaskStartedAt`、authoritative-sync gate、stale fingerprint 清理、launch upsert 与 indicator rerender
+- `handleToolCallEnd()` 继续承接 todo tool 的即时 refresh；同样只在 search-mode background-task lane 已 arm 的前提下，才把 `task` 完成写回 launch result、重新 arm gate，并触发 indicator rerender
 - `finalizeAfterPrimaryStream()` 只负责 primary stream 收尾后的 background-task indicator runtime：它会先复用 `BackgroundTaskLiveSignalCoordinator.hasIndicator()` 判断该 tab 是否仍算 background-task running；没有剩余 launch 时 reset indicator；仍有 launch 时切换到 waiting-for-follow-up 并交由 indicator coordinator 重新渲染
 
 ## 与 `OpenCodianView` 的边界
@@ -41,3 +41,4 @@ export class BackgroundTaskStreamTriggerCoordinator {
 - `QuestionTodoBackgroundTaskRuntimeServiceBundle` 负责把 active-tab / session lookup、session todo snapshot/refresh、tab runtime lookup 与 reset indicator writeback 装配成 shared `BackgroundTaskStreamTriggerCoordinatorHost`
 - `SessionTodoCoordinator` 继续负责 todowrite snapshot 写回、默认 session 解析与 todo refresh，本 coordinator 只是透过 bundle 提供的 host 复用这些 port
 - 这让 P2 `question / todo / background task` lane 继续削弱 `OpenCodianView` 对 background-task stream runtime 的 ownership，而不是回到 paused trailing-assistant helper chain
+- 该 coordinator 不再把所有 OpenCode 原生 `task` 一概提升为 background-task；普通 task/subagent 只保留工具卡片语义。

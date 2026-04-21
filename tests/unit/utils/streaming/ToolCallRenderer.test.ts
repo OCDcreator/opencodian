@@ -96,7 +96,7 @@ describe('ToolCallRenderer', () => {
     ['lsp', { operation: 'goToDefinition', filePath: 'src/main.ts', line: 12, character: 3 }, 'LSP', 'goToDefinition · main.ts:12:3'],
     ['websearch', { query: 'obsidian plugin api' }, 'WebSearch', 'obsidian plugin api'],
     ['webfetch', { url: 'https://example.com/docs' }, 'WebFetch', 'https://example.com/docs'],
-    ['task', { subagent_type: 'explorer', description: 'audit routes' }, 'Background Task', 'explorer · audit routes'],
+    ['task', { subagent_type: 'explorer', description: 'audit routes' }, 'Subagent Task', 'explorer · audit routes'],
     ['question', { questions: [{ header: 'Build Agent', question: 'Continue?' }] }, 'Questions', 'Build Agent'],
     ['question', { questions: [{ question: 'A?' }, { question: 'B?' }] }, 'Questions', '2 questions'],
     ['todoread', {}, 'Todo Read', 'Current tasks'],
@@ -183,5 +183,45 @@ describe('ToolCallRenderer', () => {
     parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();
 
     expect(onCollapsibleToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders task metadata without exposing raw task_result output by default', () => {
+    const parentEl = document.createElement('div');
+    const onOpenToolSession = jest.fn();
+    const renderer = new ToolCallRenderer({ onOpenToolSession } as never);
+
+    renderer.render(parentEl, {
+      id: 'tool-task-1',
+      name: 'task',
+      kind: 'task',
+      input: {
+        subagent_type: 'explorer',
+        description: 'Audit routes',
+      },
+      toolMetadata: {
+        sessionId: 'child-session-1',
+      },
+      resultVisibility: 'hidden',
+      status: 'completed',
+      result: 'task_id: child-session-1\n\n<task_result>\nSecret subagent answer\n</task_result>',
+    });
+
+    parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();
+
+    const contentEl = parentEl.querySelector('.streaming-tool-content');
+    expect(contentEl?.textContent).toContain('explorer');
+    expect(contentEl?.textContent).toContain('Audit routes');
+    expect(contentEl?.textContent).toContain('child-session-1');
+    expect(contentEl?.textContent).not.toContain('Secret subagent answer');
+    expect(contentEl?.textContent).not.toContain('task_result');
+
+    const openButton = parentEl.querySelector<HTMLButtonElement>('.streaming-task-session-button');
+    expect(openButton).not.toBeNull();
+    openButton?.click();
+
+    expect(onOpenToolSession).toHaveBeenCalledWith(
+      'child-session-1',
+      expect.objectContaining({ id: 'tool-task-1', name: 'task' }),
+    );
   });
 });

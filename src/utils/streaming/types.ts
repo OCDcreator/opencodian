@@ -22,6 +22,8 @@ export interface ToolUseChunk {
   name: string;
   kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
+  resultVisibility?: 'visible' | 'hidden';
 }
 
 export interface ToolResultChunk {
@@ -60,8 +62,10 @@ export interface ToolCallInfo {
   toolSourceKey?: string;
   kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
   status: ToolCallStatus;
   result?: string;
+  resultVisibility?: 'visible' | 'hidden';
 }
 
 // ============================================
@@ -167,6 +171,7 @@ export interface ToolRendererOptions {
   ) => string;
   renderExpandedContent?: (container: HTMLElement, toolName: string, result: string | undefined) => void;
   onCollapsibleToggle?: () => void;
+  onOpenToolSession?: (sessionId: string, toolCall: ToolCallInfo) => void;
 }
 
 // ============================================

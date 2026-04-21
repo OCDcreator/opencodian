@@ -16,6 +16,7 @@ type BackgroundTaskTriggerTimelinePort = Pick<BackgroundTaskTimelineService, 'up
 
 export interface BackgroundTaskStreamTriggerRuntime {
   backgroundTaskStartedAt: number | null;
+  backgroundTaskModeTag: string | null;
   backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
   backgroundTaskWaitingForFollowUp: boolean;
   backgroundTaskStaleNoticeFingerprint: string | null;
@@ -53,7 +54,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
 
     this.host.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
 
-    if (!this.isBackgroundTaskTool(toolCall.name)) {
+    if (!this.isBackgroundTaskTool(toolCall.name, runtime)) {
       return;
     }
 
@@ -92,7 +93,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
       }
     }
 
-    if (!this.isBackgroundTaskTool(toolCall.name)) {
+    if (!this.isBackgroundTaskTool(toolCall.name, runtime)) {
       return;
     }
 
@@ -126,8 +127,11 @@ export class BackgroundTaskStreamTriggerCoordinator {
     await this.indicatorCoordinator.renderIfNeeded(tabId);
   }
 
-  private isBackgroundTaskTool(toolName: string): boolean {
-    return toolName === 'task';
+  private isBackgroundTaskTool(
+    toolName: string,
+    runtime: Pick<BackgroundTaskStreamTriggerRuntime, 'backgroundTaskModeTag'>,
+  ): boolean {
+    return toolName === 'task' && runtime.backgroundTaskModeTag === 'search-mode';
   }
 
   private isTodoTool(toolName: string): boolean {

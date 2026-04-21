@@ -5,7 +5,7 @@
 
 ## 概述
 
-渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。
+渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。对 OpenCode 原生 `task`，它会切换到专用 subagent 卡片：显示 agent / description / status / child session，并避免默认展开原始 `<task_result>`。
 
 ## 导入关系
 上游: `obsidian` (setIcon), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
@@ -21,6 +21,7 @@
   getToolSummary?: (name, input, toolKind?) => string;   // 摘要生成
   renderExpandedContent?: (container, toolName, result) => void;  // 展开内容渲染
   onCollapsibleToggle?: () => void;           // 展开/收起后通知上层
+  onOpenToolSession?: (sessionId, toolCall) => void;  // 打开 task/subagent child session
 }
 ```
 
@@ -128,7 +129,11 @@
 
 ### 展开内容渲染
 
-`defaultRenderExpandedContent` 显示工具结果文本（最多 20 行），超出部分显示 "... N more lines"。
+`defaultRenderExpandedContent` 显示工具结果文本（最多 20 行），超出部分显示 "... N more lines"。但对 `task`：
+
+- 展开区优先显示 subagent agent / description / status / session
+- 如果存在 `toolMetadata.sessionId`，显示 “Open subagent session” 动作
+- 不默认把 `<task_result>` 原文当普通工具输出展开；上游会把 `resultVisibility: 'hidden'` 作为数据契约，renderer 仍按 task identity 做兜底防护，保持与 OpenCode 本体一致的“结果留在 child session”语义
 
 ## 关键方法
 
@@ -169,6 +174,7 @@ StreamController.handleToolResultChunk(chunk)
 - `getToolSummary` — 自定义摘要生成
 - `renderExpandedContent` — 自定义结果渲染
 - `onCollapsibleToggle` — tool 详情切换后通知宿主安排滚动补偿
+- `onOpenToolSession` — task/subagent 卡片请求打开 child session 时的宿主回调
 
 ## 注意事项
 

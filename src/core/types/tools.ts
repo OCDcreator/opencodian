@@ -11,8 +11,10 @@ export interface ToolCallInfo {
   toolSourceKey?: string;
   kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
   status: ToolCallStatus;
   result?: string;
+  resultVisibility?: 'visible' | 'hidden';
   isExpanded?: boolean;
 }
 

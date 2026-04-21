@@ -119,6 +119,66 @@ export class ToolCallRenderer {
     }
   };
 
+  private isTaskTool(toolCall: Pick<ToolCallInfo, 'name' | 'kind'>): boolean {
+    return toolCall.kind === 'task' || getToolIdentity(toolCall.name).normalizedName === 'task';
+  }
+
+  private getTaskSessionId(toolCall: Pick<ToolCallInfo, 'toolMetadata'>): string | null {
+    const sessionId = typeof toolCall.toolMetadata?.sessionId === 'string'
+      ? toolCall.toolMetadata.sessionId.trim()
+      : '';
+    return sessionId || null;
+  }
+
+  private renderTaskExpandedContent(
+    container: HTMLElement,
+    toolCall: ToolCallInfo,
+  ): void {
+    const detailsEl = container.createDiv({ cls: 'streaming-task-details' });
+    const subagentType = typeof toolCall.input.subagent_type === 'string'
+      ? toolCall.input.subagent_type.trim()
+      : '';
+    const description = typeof toolCall.input.description === 'string'
+      ? toolCall.input.description.trim()
+      : typeof toolCall.input.prompt === 'string'
+        ? toolCall.input.prompt.trim()
+        : '';
+    const sessionId = this.getTaskSessionId(toolCall);
+
+    if (subagentType) {
+      detailsEl.createDiv({ cls: 'streaming-task-field', text: `Agent: ${subagentType}` });
+    }
+    if (description) {
+      detailsEl.createDiv({ cls: 'streaming-task-field', text: `Description: ${description}` });
+    }
+    detailsEl.createDiv({ cls: 'streaming-task-field', text: `Status: ${toolCall.status}` });
+
+    if (sessionId) {
+      detailsEl.createDiv({ cls: 'streaming-task-field', text: `Session: ${sessionId}` });
+      const openButton = detailsEl.createEl('button', {
+        cls: 'streaming-task-session-button',
+        text: 'Open subagent session',
+      });
+      openButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.options.onOpenToolSession?.(sessionId, toolCall);
+      });
+    } else {
+      detailsEl.createDiv({
+        cls: 'streaming-task-field streaming-task-field-muted',
+        text: 'Session unavailable',
+      });
+    }
+
+    detailsEl.createDiv({
+      cls: 'streaming-task-field streaming-task-field-muted',
+      text: toolCall.status === 'error'
+        ? 'Task failed. Open the subagent session for details.'
+        : 'Task result is kept in the subagent session.',
+    });
+  }
+
   private fileNameOnly(filePath: string): string {
     if (!filePath) return '';
     const normalized = filePath.replace(/\\/g, '/');
@@ -380,7 +440,9 @@ export class ToolCallRenderer {
     const content = toolEl.createDiv({ cls: 'streaming-tool-content' });
     content.style.display = 'none';
 
-    if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
+    if (this.isTaskTool(toolCall)) {
+      this.renderTaskExpandedContent(content, toolCall);
+    } else if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
       this.options.renderExpandedContent!(content, toolCall.name, toolCall.result);
     } else {
       content.createDiv({
@@ -473,7 +535,11 @@ export class ToolCallRenderer {
     const contentEl = toolEl.querySelector('.streaming-tool-content') as HTMLElement;
     if (contentEl) {
       contentEl.empty();
-      this.options.renderExpandedContent!(contentEl, toolCall.name, toolCall.result);
+      if (this.isTaskTool(toolCall)) {
+        this.renderTaskExpandedContent(contentEl, toolCall);
+      } else {
+        this.options.renderExpandedContent!(contentEl, toolCall.name, toolCall.result);
+      }
     }
     this.updateStatus(toolEl, toolCall.status);
   }

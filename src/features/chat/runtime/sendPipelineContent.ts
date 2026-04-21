@@ -26,8 +26,10 @@ export function mapStreamingContentBlocksToMessageContentBlocks(
       toolName: block.toolCall.name,
       toolKind: block.toolCall.kind,
       toolInput: block.toolCall.input,
+      toolMetadata: block.toolCall.toolMetadata,
       toolStatus: block.toolCall.status,
       toolResult: block.toolCall.result,
+      toolResultVisibility: block.toolCall.resultVisibility,
     };
   });
 }

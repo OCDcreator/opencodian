@@ -334,5 +334,36 @@ describe('OpenCodeStreamEventTransformer parsing helpers', () => {
         isError: false,
       },
     ]);
+
+    expect(transformer.transformPartToChunks({
+      id: 'part-task',
+      sessionID: 'test-session',
+      messageID: 'assistant-1',
+      type: 'tool',
+      callID: 'call-task',
+      tool: 'task',
+      state: {
+        status: 'completed',
+        input: { description: 'Audit routes' },
+        metadata: { sessionId: 'child-session-1' },
+        output: 'task_id: child-session-1\n\n<task_result>\nHidden\n</task_result>',
+      },
+    })).toEqual([
+      {
+        type: 'tool_use',
+        id: 'call-task',
+        name: 'task',
+        kind: 'builtin',
+        input: { description: 'Audit routes' },
+        toolMetadata: { sessionId: 'child-session-1' },
+        toolResultVisibility: 'hidden',
+      },
+      {
+        type: 'tool_result',
+        toolUseId: 'call-task',
+        content: 'task_id: child-session-1\n\n<task_result>\nHidden\n</task_result>',
+        isError: false,
+      },
+    ]);
   });
 });

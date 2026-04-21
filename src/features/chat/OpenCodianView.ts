@@ -1038,6 +1038,10 @@ export class OpenCodianView extends ItemView {
             this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
           }
         },
+      }, {
+        onOpenToolSession: (sessionId, toolCall) => {
+          void this.openTaskToolSession(sessionId, toolCall);
+        },
       });
       paneState.runtime.streamController.setCallbacks({
         onToolCallStart: (toolCall) => {
@@ -3626,8 +3630,10 @@ export class OpenCodianView extends ItemView {
         toolName: block.toolName ?? null,
         toolKind: block.toolKind ?? null,
         toolInput: block.toolInput ?? null,
+        toolMetadata: block.toolMetadata ?? null,
         toolStatus: block.toolStatus ?? null,
         toolResult: block.toolResult ?? null,
+        toolResultVisibility: block.toolResultVisibility ?? null,
         subagentId: block.subagentId ?? null,
         subagentMode: block.subagentMode ?? null,
       })),
@@ -3973,8 +3979,10 @@ export class OpenCodianView extends ItemView {
         toolName: block.toolName ?? null,
         toolKind: block.toolKind ?? null,
         toolInput: block.toolInput ?? null,
+        toolMetadata: block.toolMetadata ?? null,
         toolStatus: block.toolStatus ?? null,
         toolResult: block.toolResult ?? null,
+        toolResultVisibility: block.toolResultVisibility ?? null,
         subagentId: block.subagentId ?? null,
         subagentMode: block.subagentMode ?? null,
       })),
@@ -4230,14 +4238,19 @@ export class OpenCodianView extends ItemView {
         if (block.toolName && block.toolId) {
           const toolRenderer = new ToolCallRenderer({
             onCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
+            onOpenToolSession: (sessionId, toolCall) => {
+              void this.openTaskToolSession(sessionId, toolCall);
+            },
           });
           const toolCall: ToolCallInfo = {
             id: block.toolId,
             name: block.toolName,
             kind: block.toolKind,
             input: block.toolInput || {},
+            toolMetadata: block.toolMetadata,
             status: this.getStoredToolStatus(block),
             result: block.toolResult,
+            resultVisibility: block.toolResultVisibility,
           };
           toolRenderer.render(container, toolCall);
         }
@@ -4954,6 +4967,8 @@ export class OpenCodianView extends ItemView {
           name: chunk.name,
           kind: chunk.kind,
           input: chunk.input,
+          toolMetadata: chunk.toolMetadata,
+          resultVisibility: chunk.toolResultVisibility,
         };
 
       case 'tool_result':
@@ -4979,6 +4994,62 @@ export class OpenCodianView extends ItemView {
 
       default:
         return null;
+    }
+  }
+
+  private buildTaskToolSessionTitle(
+    sessionId: string,
+    toolCall?: Pick<ToolCallInfo, 'input'> | null,
+  ): string {
+    const description = typeof toolCall?.input?.description === 'string'
+      ? toolCall.input.description.trim()
+      : '';
+    const subagentType = typeof toolCall?.input?.subagent_type === 'string'
+      ? toolCall.input.subagent_type.trim()
+      : '';
+    return `Subagent: ${description || subagentType || sessionId}`;
+  }
+
+  private async openTaskToolSession(
+    sessionId: string,
+    toolCall?: Pick<ToolCallInfo, 'input'> | null,
+  ): Promise<void> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) {
+      return;
+    }
+
+    const tabManager = this.tabManager;
+    if (tabManager && !tabManager.canCreateTab()) {
+      new Notice(t('chat.tab.maxReached', {
+        count: String(this.plugin.settings.maxTabs),
+      }));
+      return;
+    }
+
+    try {
+      const conversation = await this.plugin.createConversationFromSession(normalizedSessionId, {
+        title: this.buildTaskToolSessionTitle(normalizedSessionId, toolCall),
+      });
+
+      if (tabManager) {
+        const tab = tabManager.createTab(conversation);
+        if (tab) {
+          await this.activateTab(tab.id);
+          return;
+        }
+        await this.plugin.deleteConversation(conversation.id);
+        new Notice(t('chat.tab.maxReached', {
+          count: String(this.plugin.settings.maxTabs),
+        }));
+        return;
+      }
+
+      this.tabConversationStateBridge.syncActiveTabConversation(conversation);
+      await this.loadConversation(conversation.id, { forceServerSync: true });
+    } catch (error) {
+      logger.error('Failed to open subagent session from task tool:', error);
+      new Notice('Failed to open subagent session');
     }
   }
 

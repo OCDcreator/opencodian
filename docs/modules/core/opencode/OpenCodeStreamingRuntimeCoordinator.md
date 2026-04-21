@@ -66,8 +66,9 @@
 - `finishStreamingResponse()` 会重新拉取最终 assistant message：
   - 只把 `parentID` 匹配当前 `promptMessageId` 的 assistant 当作本轮收尾候选，避免 silent timeout 后误复用上一轮 assistant
   - 如果当前 prompt 的 assistant 还没进入 `session.messages()`，会做一次有界短延迟重试，降低“第二次提问刚结束流就收尾，但持久化 assistant 仍未可见”的竞态
-  - 基于 canonical assistant tail 的完整 parts 状态补发任何未在流中出现的尾部内容，而不只补文本：文本 delta、`reasoning/thinking`、tool use/result 都会按缺失情况恢复
-  - 补发 `message_metadata`
+- 基于 canonical assistant tail 的完整 parts 状态补发任何未在流中出现的尾部内容，而不只补文本：文本 delta、`reasoning/thinking`、tool use/result 都会按缺失情况恢复
+- 这条 trailing tool-use recovery 现在也会补发白名单 `toolMetadata.sessionId` 与 `toolResultVisibility: 'hidden'`，避免 task/subagent child session linkage 只在 hydrated path 存在、在 finalize 补发 path 丢失，或把 raw `<task_result>` 重新标成普通输出
+- 补发 `message_metadata`
   - 如果最终持久化 assistant message 带了结构化错误而流里没显式发出 `session.error`，补发 `error`
   - 始终以 `message_stop` 结束
 

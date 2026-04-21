@@ -318,6 +318,54 @@ describe('OpenCodeMessageNormalizationMapper tool content', () => {
   });
 });
 
+describe('OpenCodeMessageNormalizationMapper task metadata', () => {
+  it('projects task session metadata into persisted tool content blocks', () => {
+    const message = mapper.openCodeMessageToChatMessage(
+      {
+        id: 'msg-task-metadata',
+        sessionID: 'session-1',
+        role: 'assistant',
+        providerID: 'openai',
+        modelID: 'gpt-5',
+        time: { created: 123 },
+      } as never,
+      [
+        {
+          type: 'tool',
+          id: 'part-task-complete',
+          sessionID: 'session-1',
+          messageID: 'msg-task-metadata',
+          callID: 'call-task-1',
+          tool: 'task',
+          state: {
+            status: 'completed',
+            input: {
+              description: 'Audit routes',
+              subagent_type: 'explorer',
+            },
+            metadata: {
+              sessionId: 'child-session-1',
+              ignored: 'value',
+            },
+            output: 'task_id: child-session-1\n\n<task_result>\nHidden\n</task_result>',
+          },
+        },
+      ] as never,
+    );
+
+    expect(message.contentBlocks).toContainEqual(expect.objectContaining({
+      type: 'tool_use',
+      toolId: 'call-task-1',
+      toolName: 'task',
+      toolKind: 'task',
+      toolResultVisibility: 'hidden',
+      toolMetadata: {
+        sessionId: 'child-session-1',
+      },
+    }));
+  });
+});
+
 describe('OpenCodeMessageNormalizationMapper OMO metadata', () => {
   it('extracts OMO user-injection metadata into normalized content', () => {
     const message = mapper.openCodeMessageToChatMessage(

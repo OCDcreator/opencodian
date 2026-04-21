@@ -1,4 +1,4 @@
-import { createLogger, isInternalStructuredOutputTool } from '../../shared';
+import { createLogger, getToolIdentity, isInternalStructuredOutputTool } from '../../shared';
 import type { MarkdownRenderService } from '../markdown';
 import { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 import { ToolCallRenderer } from './ToolCallRenderer';
@@ -208,8 +208,10 @@ export class StreamController {
       name: toolCall.name,
       kind: toolCall.kind,
       input: { ...toolCall.input },
+      ...(toolCall.toolMetadata ? { toolMetadata: { ...toolCall.toolMetadata } } : {}),
       status: toolCall.status,
       result: toolCall.result,
+      resultVisibility: toolCall.resultVisibility,
     };
 
     const existingBlock = this.state.contentBlocks.find((block) =>
@@ -240,6 +242,8 @@ export class StreamController {
       name: string;
       kind?: ToolCallInfo['kind'];
       input: Record<string, unknown>;
+      toolMetadata?: Record<string, unknown>;
+      resultVisibility?: 'visible' | 'hidden';
     },
   ): Promise<void> {
     if (isInternalStructuredOutputTool(chunk.name)) {
@@ -256,14 +260,23 @@ export class StreamController {
       if (chunk.kind) {
         existingToolCall.kind = chunk.kind;
       }
+      existingToolCall.resultVisibility = chunk.resultVisibility
+        ?? this.resolveToolResultVisibility(chunk.name, chunk.kind)
+        ?? existingToolCall.resultVisibility;
       const newInput = chunk.input || {};
       if (Object.keys(newInput).length > 0) {
         existingToolCall.input = { ...existingToolCall.input, ...newInput };
+      }
+      if (chunk.toolMetadata) {
+        existingToolCall.toolMetadata = {
+          ...(existingToolCall.toolMetadata ?? {}),
+          ...chunk.toolMetadata,
+        };
+      }
 
-        const toolEl = this.state.toolCallElements.get(chunk.id);
-        if (toolEl) {
-          this.toolRenderer.updateHeader(toolEl, existingToolCall);
-        }
+      const toolEl = this.state.toolCallElements.get(chunk.id);
+      if (toolEl) {
+        this.toolRenderer.updateHeader(toolEl, existingToolCall);
       }
       return;
     }
@@ -273,6 +286,9 @@ export class StreamController {
       name: chunk.name,
       kind: chunk.kind,
       input: chunk.input || {},
+      toolMetadata: chunk.toolMetadata,
+      resultVisibility: chunk.resultVisibility
+        ?? this.resolveToolResultVisibility(chunk.name, chunk.kind),
       status: 'running',
     };
 
@@ -313,6 +329,15 @@ export class StreamController {
     });
 
     this.callbacks.onToolCallEnd?.(toolCall);
+  }
+
+  private resolveToolResultVisibility(
+    toolName: string,
+    toolKind?: ToolCallInfo['kind'],
+  ): ToolCallInfo['resultVisibility'] {
+    return toolKind === 'task' || getToolIdentity(toolName).kind === 'task'
+      ? 'hidden'
+      : undefined;
   }
 
   private async handleErrorChunk(content: string): Promise<void> {

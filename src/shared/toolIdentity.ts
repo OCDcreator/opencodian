@@ -49,7 +49,7 @@ const BUILTIN_TOOL_DEFINITIONS: Record<string, BuiltinToolDefinition> = {
   websearch: { normalizedName: 'web_search', displayName: 'WebSearch', icon: 'search', kind: 'builtin' },
   webfetch: { normalizedName: 'web_fetch', displayName: 'WebFetch', icon: 'download', kind: 'builtin' },
   codesearch: { normalizedName: 'codesearch', displayName: 'CodeSearch', icon: 'code', kind: 'builtin' },
-  task: { normalizedName: 'task', displayName: 'Background Task', icon: 'git-branch', kind: 'task' },
+  task: { normalizedName: 'task', displayName: 'Subagent Task', icon: 'git-branch', kind: 'task' },
   question: { normalizedName: 'question', displayName: 'Questions', icon: 'message-square', kind: 'question' },
   askuserquestion: { normalizedName: 'question', displayName: 'Questions', icon: 'message-square', kind: 'question' },
   skill: { normalizedName: 'skill', displayName: 'Skill', icon: 'brain', kind: 'skill' },

@@ -20,7 +20,7 @@
 | 类型 | 说明 |
 |------|------|
 | `ToolCallStatus` | `'pending' \| 'running' \| 'completed' \| 'error' \| 'blocked'` — 工具调用生命周期状态 |
-| `ToolCallInfo` | 工具调用信息（`id`, `name`, `input`, `status`, `result?`, `isExpanded?`） |
+| `ToolCallInfo` | 工具调用信息（`id`, `name`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
 | `TOOL_NAMES` | `as const` 常量对象，14 个工具名（与 `toolNames.ts` 重复） |
 | `ToolName` | 工具名联合类型（与 `toolNames.ts` 重复） |
 
@@ -68,8 +68,10 @@ pending → running → completed
 | `id` | `string` | 工具调用唯一 ID |
 | `name` | `string` | 工具名（匹配 `TOOL_NAMES` 中的值） |
 | `input` | `Record<string, unknown>` | 工具输入参数 |
+| `toolMetadata` | `Record<string, unknown>?` | UI-safe 白名单 metadata；当前主要保留 OpenCode `task` 的 `sessionId` |
 | `status` | `ToolCallStatus` | 当前状态 |
 | `result` | `string?` | 执行结果（completed/error 时有值） |
+| `resultVisibility` | `'visible' \| 'hidden'?` | 结果可见性；OpenCode 原生 `task` 使用 `hidden`，避免 `<task_result>` 被普通渲染器直接展示 |
 | `isExpanded` | `boolean?` | UI 展开状态 |
 
 ## 关键方法

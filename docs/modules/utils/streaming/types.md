@@ -19,7 +19,7 @@
 |------|------|------|
 | `thinking` | `ThinkingChunk` | `content`, `partId?`, `durationSeconds?` |
 | `text` | `TextChunk` | `content` |
-| `tool_use` | `ToolUseChunk` | `id`, `name`, `input` |
+| `tool_use` | `ToolUseChunk` | `id`, `name`, `input`, `toolMetadata?`, `resultVisibility?` |
 | `tool_result` | `ToolResultChunk` | `id`, `content`, `isError?` |
 | `error` | `ErrorChunk` | `content` |
 | `done` | `DoneChunk` | （无字段） |
@@ -33,8 +33,10 @@ interface ToolCallInfo {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
   status: ToolCallStatus;
   result?: string;
+  resultVisibility?: 'visible' | 'hidden';
 }
 ```
 
@@ -82,7 +84,7 @@ interface ToolCallInfo {
 
 ### 渲染器选项
 
-**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?(name, input, toolKind?)`, `renderExpandedContent?`, `onCollapsibleToggle?`
+**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?(name, input, toolKind?)`, `renderExpandedContent?`, `onCollapsibleToggle?`, `onOpenToolSession?`
 
 **ThinkingRendererOptions**: `collapsedByDefault?`, `showTimer?`, `collapsedLabel?`, `expandedLabel?`, `onCollapsibleToggle?`
 
@@ -140,5 +142,7 @@ SSE event → StreamChunk (输入类型)
 
 - `StreamChunk` 是区分联合类型（discriminated union），`type` 字段用于 switch 分发
 - `ContentBlock` 是持久化格式，不包含 DOM 引用
+- `toolMetadata` 是白名单 UI metadata；当前主要用于 `task` / subagent child session linkage
+- `resultVisibility` 是白名单结果可见性 contract；`task` 使用 `hidden`，表示结果保留但不应直接渲染
 - `ThinkingBlockState` 包含 DOM 引用和 `setInterval` ID，不能序列化
 - `createStreamState()` 是唯一的状态创建入口
