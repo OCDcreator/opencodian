@@ -260,8 +260,12 @@ describe('BackgroundTaskTimelineService timeline assembly with runtime state', (
     }));
   });
 
-  it('filters suppressed inline segments but keeps preparing search-mode anchors', () => {
-    const host = createHost(createRuntime());
+  it('filters suppressed inline segments but keeps active preparing search-mode anchors', () => {
+    const host = createHost(createRuntime({
+      backgroundTaskStartedAt: 3,
+      backgroundTaskActiveAnchorKey: 'msg-user-2',
+      backgroundTaskModeTag: 'search-mode',
+    }));
     host.isSuppressedBackgroundTaskSegment.mockImplementation((segment) => segment.anchorKey === 'msg-user-1');
     const service = new BackgroundTaskTimelineService(host);
     const conversation = createConversation([
@@ -319,6 +323,32 @@ describe('BackgroundTaskTimelineService timeline assembly with runtime state', (
       launches: [],
       pending: [],
     }));
+  });
+
+  it('drops preparing search-mode anchors after runtime no longer tracks them', () => {
+    const host = createHost(createRuntime());
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'search docs',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+        omo: {
+          kind: 'user-injection',
+          modeTag: 'search-mode',
+          injectedPrompt: 'search docs',
+          originalText: 'search docs',
+          rawText: 'search docs',
+          headline: 'search docs',
+        },
+      },
+    ]);
+
+    const segments = service.collectInlineSegments(conversation, 'tab-1');
+
+    expect(segments).toEqual([]);
   });
 });
 
@@ -417,6 +447,55 @@ describe('BackgroundTaskTimelineService runtime state synchronization', () => {
       description: 'Search docs',
     }));
     expect(runtime.backgroundTaskStaleNoticeFingerprint).toBeNull();
+    expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('does not rehydrate launchless search-mode anchors from persisted history', () => {
+    const runtime = createRuntime({
+      isHydratingConversation: true,
+      backgroundTaskStartedAt: 999,
+      backgroundTaskActiveAnchorKey: 'stale-anchor',
+      backgroundTaskModeTag: 'search-mode',
+      backgroundTaskWaitingForFollowUp: true,
+    });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'search docs',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+        omo: {
+          kind: 'user-injection',
+          modeTag: 'search-mode',
+          injectedPrompt: 'search docs',
+          originalText: 'search docs',
+          rawText: 'search docs',
+          headline: 'search docs',
+        },
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'No background tasks were launched.',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'text',
+          text: 'No background tasks were launched.',
+        }],
+      },
+    ]);
+
+    service.syncStateFromConversation(conversation, 'tab-1');
+
+    expect(runtime.backgroundTaskStartedAt).toBeNull();
+    expect(runtime.backgroundTaskActiveAnchorKey).toBeNull();
+    expect(runtime.backgroundTaskModeTag).toBeNull();
+    expect(runtime.backgroundTaskWaitingForFollowUp).toBe(false);
+    expect(runtime.backgroundTaskLaunches.size).toBe(0);
+    expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
     expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
   });
 });

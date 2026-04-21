@@ -50,6 +50,7 @@ export class BackgroundTaskTimelineService {
 
 - `resetIndicatorState()` 统一清空 inline panel、active anchor、launch/completion map、waiting-for-follow-up 与 stale notice fingerprint，并同步 authoritative-sync gate 与 stream-like state。
 - `syncStateFromConversation()` 复用同一份 runtime reset，只是不提前清空 inline panel；conversation reload / authoritative sync 的 runtime rebuild 因此与主动 reset 保持一致。
+- `syncStateFromConversation()` 只会从存在真实 pending `task` launch 的 segment 重建 live runtime；历史会话里的纯 `search-mode` user injection 不会重新 armed 成“后台任务准备中”。
 - hydration 期间如果 conversation 里仍存在 active segment，会重新 arm authoritative-sync gate，避免过早把仍在运行的 background task 降级为 stale。
 
 ### timeline facade
@@ -60,7 +61,7 @@ export class BackgroundTaskTimelineService {
 
 ### inline copy
 
-- `shouldRenderInlineSegment()` 维持原规则：all-complete 不渲染；有 pending launch 渲染；search-mode anchor 在 launch 出现前渲染 preparing 状态。
+- `shouldRenderInlineSegment()` 继续负责 all-complete / pending launch 的基础判定；零 launch 的 `search-mode` preparing 占位现在还要求 runtime 仍在跟踪该 active anchor，避免旧会话 reload 后把已失活的搜索模式误显示成“后台任务准备中”。
 - `getInlineCopy()` 和 `buildTasksMarkdown()` 仍留在 facade 内，保证 inline panel 与 completion queue 使用同一份可读文案。
 
 ## 与相邻模块的边界

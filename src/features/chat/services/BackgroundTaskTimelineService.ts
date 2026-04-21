@@ -102,6 +102,7 @@ export class BackgroundTaskTimelineService {
   ): BackgroundTaskSegment[] {
     return this.collectSegments(conversation?.messages ?? [], tabId).filter((segment) =>
       this.shouldRenderInlineSegment(segment)
+      && this.shouldRenderPreparingInlineSegment(segment, tabId)
       && !this.host.isSuppressedBackgroundTaskSegment(segment, tabId, conversation),
     );
   }
@@ -125,7 +126,7 @@ export class BackgroundTaskTimelineService {
       .find((segment) =>
         !this.host.isSuppressedBackgroundTaskSegment(segment, tabId, conversation)
         && !segment.sawAllTasksComplete
-        && (segment.pending.length > 0 || (segment.modeTag === 'search-mode' && segment.launches.length === 0))
+        && segment.pending.length > 0
       ) ?? null;
 
     if (!latestActiveSegment) {
@@ -165,6 +166,22 @@ export class BackgroundTaskTimelineService {
     }
 
     return segment.modeTag === 'search-mode' && segment.launches.length === 0;
+  }
+
+  private shouldRenderPreparingInlineSegment(
+    segment: BackgroundTaskSegment,
+    tabId: TabId | null,
+  ): boolean {
+    if (segment.modeTag !== 'search-mode' || segment.launches.length > 0) {
+      return true;
+    }
+
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime?.backgroundTaskStartedAt || !runtime.backgroundTaskActiveAnchorKey) {
+      return false;
+    }
+
+    return runtime.backgroundTaskActiveAnchorKey === segment.anchorKey;
   }
 
   getInlineCopy(segment: BackgroundTaskSegment): BackgroundTaskInlineCopy {
