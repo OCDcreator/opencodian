@@ -268,11 +268,10 @@ export class ConversationRenderService {
       return [];
     }
 
-    const turns = this.turnViewModelBuilder.buildTurns(sessionState);
-    return this.turnViewModelBuilder.buildRenderMessages(
-      turns,
+    return this.turnViewModelBuilder.buildCanonicalRenderInput(
+      sessionState,
       (info, parts) => canonicalRenderSource.hydrateOpenCodeMessage(info, parts),
-    );
+    ).messages;
   }
 
 }

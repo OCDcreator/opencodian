@@ -18,7 +18,7 @@
 
 它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 persisted assistant shell / pseudo-stream footer / streaming-shell state 收尾由嵌套的 `ConversationAssistantShellRenderPort` 提供，assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾则进一步收束在 `ConversationAssistantTailRenderPort`。canonical session graph 的读取与 OpenCode message hydration 则通过可选的 `ConversationCanonicalRenderSource` 注入，避免 render host 继续扩大。
 
-基础 render contract、消息/伪流式 assistant 渲染 delegate 与 synced append apply delegate 已拆到 `ConversationRenderRuntime`；尾部 assistant patch 的 tab/container、rendered sequence、signature 与 DOM target preflight 已拆到 `ConversationTrailingAssistantPatchPlanner`。canonical turn 组装由 `ConversationTurnViewModelBuilder` 承接，`ConversationRenderService` 本身因此只保留 full rerender、synced update 输入选择与 trailing-assistant patch execution/logging 这些高层控制流。
+基础 render contract、消息/伪流式 assistant 渲染 delegate 与 synced append apply delegate 已拆到 `ConversationRenderRuntime`；尾部 assistant patch 的 tab/container、rendered sequence、signature 与 DOM target preflight 已拆到 `ConversationTrailingAssistantPatchPlanner`。canonical turn 组装与 canonical render input 投影都由 `ConversationTurnViewModelBuilder` 承接，`ConversationRenderService` 本身因此只保留 full rerender、synced update 输入选择与 trailing-assistant patch execution/logging 这些高层控制流。
 
 ## 公开接口
 
@@ -95,7 +95,7 @@ export class ConversationRenderService {
 ### 全量重渲
 
 - 只在当前活动 conversation 仍匹配、且消息容器存在时执行
-- 如果当前 session 已有 canonical state，先通过 `ConversationTurnViewModelBuilder` 组装 turn view-model，再用注入的 hydrator 转回现有 `ChatMessage` shell 输入
+- 如果当前 session 已有 canonical state，会直接调用 `ConversationTurnViewModelBuilder.buildCanonicalRenderInput()` 生成稳定的 canonical render `ChatMessage[]`
 - canonical state 一旦可用，就直接成为 full rerender 与 synced update 的唯一 render 输入；`conversation.messages` 只在 canonical 缺失时才作为临时 fallback
 - 进入 hydration 前先抓取 scroll snapshot，并复用 `ScrollManager` 恢复 bottom / distance / anchor 语义
 - 重渲后继续刷新 background-task indicator、pane metrics 和 composer layout
@@ -133,6 +133,7 @@ export class ConversationRenderService {
 - `OpenCodianView` 现在主要保留 `renderAssistantMessageBody()` / `renderUserMessageContent()` / `renderContentBlock()` 这类 leaf renderer，以及 empty-notice 文案、copy/footer、markdown 与 tab runtime host seam
 - `OpenCodianView` 会先组装 `ConversationAssistantShellRenderPort` 与 `ConversationAssistantTailRenderPort`，再把它们作为 `ConversationRenderHost` 的子边界传给 service
 - `OpenCodianView` 另外注入 `ConversationCanonicalRenderSource`，让 service 能读取 `OpenCodeService.getCanonicalSessionState()` 并复用 `hydrateOpenCodeMessage()`，但不把 OpenCode service 直接塞进 DOM host
+- 这条 canonical render input 路径现在也与 authoritative reload coordinator 对齐，避免 reload/sync 再走一套独立 hydrate 顺序
 - `ConversationRenderService` 现在同时负责决定“何时整段重渲、何时 patch 尾部、何时仅追加、何时直接重画单条 user/assistant shell”
 - persisted assistant shell / notice / footer 装配已经下沉到 `AssistantShellViewHostAdapter`，所以这里的 tail port 只关心正文重渲与 footer finalization
 - 这样消息区编排逻辑首次拥有独立单测边界，而不用把 assistant renderer 一起打散

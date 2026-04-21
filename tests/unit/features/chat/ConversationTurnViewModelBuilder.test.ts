@@ -5,6 +5,7 @@ import type {
 } from '../../../../src/core/opencode';
 import type { ChatMessage } from '../../../../src/core/types';
 import { ConversationTurnViewModelBuilder } from '../../../../src/features/chat/services/ConversationTurnViewModelBuilder';
+import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 
 function createMessage(
   overrides: Partial<OpenCodeCanonicalMessageInfo> & {
@@ -66,6 +67,13 @@ function hydrateMessage(
     sourceMessageId: info.id,
     parts,
   };
+}
+
+function hydrateCanonicalChatMessage(
+  info: OpenCodeCanonicalMessageInfo,
+  parts: OpenCodeCanonicalPart[],
+): ChatMessage {
+  return OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never);
 }
 
 describe('ConversationTurnViewModelBuilder', () => {
@@ -212,6 +220,103 @@ describe('ConversationTurnViewModelBuilder', () => {
       content: 'Hello',
       sourceMessageId: 'assistant-1',
       streamState: 'interrupted',
+    });
+  });
+});
+
+describe('ConversationTurnViewModelBuilder canonical render input', () => {
+  it('keeps assistant-only canonical messages in render input when no user turn exists yet', () => {
+    const state = createState(
+      [createMessage({ id: 'assistant-1', role: 'assistant', time: { created: 2 } })],
+      [createPart({ id: 'part-assistant', messageID: 'assistant-1', type: 'text', text: 'Visible reply' })],
+    );
+    const builder = new ConversationTurnViewModelBuilder();
+
+    const renderInput = builder.buildCanonicalRenderInput(state, hydrateCanonicalChatMessage);
+
+    expect(renderInput.turns).toEqual([]);
+    expect(renderInput.messages).toEqual([
+      expect.objectContaining({
+        id: 'assistant-1',
+        content: 'Visible reply',
+        sourceMessageId: 'assistant-1',
+      }),
+    ]);
+  });
+
+  it('builds identical canonical render input for live and reload normal assistant responses', () => {
+    const liveState = createState(
+      [
+        createMessage({ id: 'user-1', role: 'user', time: { created: 1 } }),
+        createMessage({ id: 'assistant-1', role: 'assistant', time: { created: 2 } }),
+      ],
+      [
+        createPart({ id: 'part-user', messageID: 'user-1', type: 'text', text: 'Question' }),
+        createPart({ id: 'part-assistant', messageID: 'assistant-1', type: 'text', text: 'Answer' }),
+      ],
+    );
+    const reloadState = createState(
+      liveState.messages.map((message) => ({ ...message, time: { ...message.time } })),
+      Object.values(liveState.partsByMessageID).flat().map((part) => ({ ...part })),
+    );
+    const builder = new ConversationTurnViewModelBuilder();
+
+    expect(builder.buildCanonicalRenderInput(liveState, hydrateCanonicalChatMessage)).toEqual(
+      builder.buildCanonicalRenderInput(reloadState, hydrateCanonicalChatMessage),
+    );
+  });
+
+  it('builds identical canonical render input for live and reload tool-first assistant responses', () => {
+    const liveState = createState(
+      [
+        createMessage({ id: 'user-1', role: 'user', time: { created: 1 } }),
+        createMessage({ id: 'assistant-1', role: 'assistant', time: { created: 2 } }),
+      ],
+      [
+        createPart({ id: 'part-user', messageID: 'user-1', type: 'text', text: 'Inspect docs' }),
+        createPart({
+          id: 'part-tool',
+          messageID: 'assistant-1',
+          type: 'tool',
+          tool: 'read',
+          callID: 'call-read-1',
+          state: {
+            status: 'completed',
+            input: { filePath: 'docs/architecture/README.md' },
+            output: 'done',
+          },
+        }),
+        createPart({ id: 'part-text', messageID: 'assistant-1', type: 'text', text: 'Done' }),
+      ],
+    );
+    const reloadState = createState(
+      liveState.messages.map((message) => ({ ...message, time: { ...message.time } })),
+      Object.values(liveState.partsByMessageID).flat().map((part) => ({
+        ...part,
+        state: part.state && typeof part.state === 'object' ? { ...part.state as Record<string, unknown> } : part.state,
+      })),
+    );
+    const builder = new ConversationTurnViewModelBuilder();
+
+    const liveRenderInput = builder.buildCanonicalRenderInput(liveState, hydrateCanonicalChatMessage);
+    const reloadRenderInput = builder.buildCanonicalRenderInput(reloadState, hydrateCanonicalChatMessage);
+
+    expect(liveRenderInput).toEqual(reloadRenderInput);
+    expect(liveRenderInput.messages[1]).toMatchObject({
+      id: 'assistant-1',
+      sourceMessageId: 'assistant-1',
+      content: 'Done',
+      contentBlocks: expect.arrayContaining([
+        expect.objectContaining({
+          type: 'tool_use',
+          toolId: 'call-read-1',
+          toolName: 'read',
+        }),
+        expect.objectContaining({
+          type: 'text',
+          text: 'Done',
+        }),
+      ]),
     });
   });
 });

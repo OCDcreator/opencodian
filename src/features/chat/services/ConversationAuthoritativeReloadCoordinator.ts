@@ -1,4 +1,7 @@
 import type {
+  OpenCodeCanonicalSessionState,
+} from '../../../core/opencode';
+import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
@@ -10,6 +13,7 @@ import type {
   ConversationAuthoritativeSyncRevertState,
   ConversationAuthoritativeSyncRuntime,
 } from './ConversationAuthoritativeSyncCoordinator';
+import { ConversationTurnViewModelBuilder } from './ConversationTurnViewModelBuilder';
 
 const logger = createLogger('OpenCodianView');
 
@@ -73,6 +77,7 @@ export class ConversationAuthoritativeReloadCoordinator {
   private readonly host: ConversationAuthoritativeReloadHost;
   private readonly mergeSyncedConversationMessages:
     ConversationAuthoritativeReloadCoordinatorDependencies['mergeSyncedConversationMessages'];
+  private readonly turnViewModelBuilder = new ConversationTurnViewModelBuilder();
 
   constructor({
     host,
@@ -154,10 +159,10 @@ export class ConversationAuthoritativeReloadCoordinator {
     const syncContext = { conversation, tabId, reason, verbose };
     const snapshot: ConversationServerSyncSnapshot = {
       serverMessages: canonicalMessages,
-      convertedServerMessages: canonicalMessages
-        .map(({ info, parts }) =>
-          this.host.hydrateOpenCodeMessage(info, parts, this.host.getVaultBasePath()))
-        .filter((message) => this.host.shouldRenderConversationMessage(message)),
+      convertedServerMessages: this.projectCanonicalRenderMessages(
+        conversation.openCodeSessionId,
+        canonicalMessages,
+      ),
       revertState: this.getConversationCanonicalSyncRevertState(conversation, canonicalMessages),
     };
 
@@ -212,12 +217,44 @@ export class ConversationAuthoritativeReloadCoordinator {
       conversation,
       serverMessages,
     );
-    const convertedServerMessages = serverMessages
-      .map(({ info, parts }) =>
-        this.host.hydrateOpenCodeMessage(info, parts, this.host.getVaultBasePath()))
-      .filter((message) => this.host.shouldRenderConversationMessage(message));
+    const convertedServerMessages = this.projectCanonicalRenderMessages(
+      conversation.openCodeSessionId,
+      serverMessages,
+    );
 
     return { serverMessages, convertedServerMessages, revertState };
+  }
+
+  private projectCanonicalRenderMessages(
+    sessionId: string,
+    messages: ConversationServerMessages,
+  ): ChatMessage[] {
+    const renderInput = this.turnViewModelBuilder.buildCanonicalRenderInput(
+      this.buildCanonicalSessionState(sessionId, messages),
+      (info, parts) => this.host.hydrateOpenCodeMessage(info, parts, this.host.getVaultBasePath()),
+    );
+
+    return renderInput.messages.filter((message) => this.host.shouldRenderConversationMessage(message));
+  }
+
+  private buildCanonicalSessionState(
+    sessionId: string,
+    messages: ConversationServerMessages,
+  ): OpenCodeCanonicalSessionState {
+    return {
+      sessionID: sessionId,
+      messages: messages.map(({ info }) => info),
+      partsByMessageID: this.buildPartsByMessageId(messages),
+    };
+  }
+
+  private buildPartsByMessageId(
+    messages: ConversationServerMessages,
+  ): OpenCodeCanonicalSessionState['partsByMessageID'] {
+    return messages.reduce<OpenCodeCanonicalSessionState['partsByMessageID']>((partsByMessageID, message) => {
+      partsByMessageID[message.info.id] = message.parts;
+      return partsByMessageID;
+    }, {});
   }
 
   private async getConversationServerSyncRevertState(

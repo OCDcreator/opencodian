@@ -20,6 +20,11 @@ export interface ConversationTurnViewModel {
   error: OpenCodeNormalizedError | null;
 }
 
+export interface ConversationCanonicalRenderInput {
+  turns: ConversationTurnViewModel[];
+  messages: ChatMessage[];
+}
+
 export type ConversationTurnMessageHydrator = (
   info: OpenCodeCanonicalMessageInfo,
   parts: OpenCodeCanonicalPart[],
@@ -43,6 +48,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export class ConversationTurnViewModelBuilder {
+  buildCanonicalRenderInput(
+    sessionState: OpenCodeCanonicalSessionState,
+    hydrateMessage: ConversationTurnMessageHydrator,
+  ): ConversationCanonicalRenderInput {
+    const turns = this.buildTurns(sessionState);
+    const messages = sessionState.messages.map((message) => {
+      const parts = this.getPartsForMessage(sessionState, message.id);
+      const renderedMessage = hydrateMessage(message, parts);
+      if (message.role === 'assistant' && this.isInterruptedAssistantMessage(message, parts)) {
+        renderedMessage.streamState = 'interrupted';
+      }
+
+      return renderedMessage;
+    });
+
+    return {
+      turns,
+      messages,
+    };
+  }
+
   buildTurns(sessionState: OpenCodeCanonicalSessionState): ConversationTurnViewModel[] {
     const turns: MutableConversationTurnViewModel[] = [];
     let currentTurn: MutableConversationTurnViewModel | null = null;
