@@ -574,6 +574,69 @@ describe('OpenCodeStreamingRuntimeCoordinator SDK tail recovery', () => {
       { type: 'message_stop' },
     ]);
   });
+
+  it('does not recover an earlier assistant for a later prompt message', async () => {
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'user-first',
+            sessionID: 'sdk-prompt-filter',
+            role: 'user',
+            time: { created: 1234567890 },
+          },
+          parts: [],
+        },
+        {
+          info: {
+            id: 'assistant-first',
+            parentID: 'user-first',
+            sessionID: 'sdk-prompt-filter',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567891 },
+          },
+          parts: [
+            {
+              id: 'part-first',
+              sessionID: 'sdk-prompt-filter',
+              messageID: 'assistant-first',
+              type: 'text',
+              text: 'Previous assistant text',
+            },
+          ],
+        },
+        {
+          info: {
+            id: 'user-second',
+            sessionID: 'sdk-prompt-filter',
+            role: 'user',
+            time: { created: 1234567892 },
+          },
+          parts: [],
+        },
+      ]),
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const chunks: unknown[] = [];
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-prompt-filter',
+      promptMessageId: 'user-second',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield* [];
+      })()),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { type: 'message_start' },
+      { type: 'message_stop' },
+    ]);
+  });
 });
 
 describe('OpenCodeStreamingRuntimeCoordinator SDK error fallback', () => {

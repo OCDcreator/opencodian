@@ -241,41 +241,45 @@ describe('OpenCodeService SDK canonical stream mutations', () => {
         };
       })(),
     });
-    mockSdkClient.session.messages.mockResolvedValue([
-      {
-        info: {
-          id: 'assistant-1',
-          sessionID: 'test-session',
-          role: 'assistant',
-          providerID: 'openai',
-          modelID: 'gpt-5',
-          time: { created: 1234567890 },
-        },
-        parts: [
-          {
-            id: 'part-tool-1',
+    mockSdkClient.session.messages.mockImplementation(async () => {
+      const promptMessageId = mockSdkClient.session.promptAsync.mock.calls[0]?.[0]?.messageID;
+      return [
+        {
+          info: {
+            id: 'assistant-1',
+            parentID: promptMessageId,
             sessionID: 'test-session',
-            messageID: 'assistant-1',
-            type: 'tool',
-            callID: 'call-tool-1',
-            tool: 'read',
-            state: {
-              status: 'running',
-              input: {
-                file_path: 'docs/architecture/README.md',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567890 },
+          },
+          parts: [
+            {
+              id: 'part-tool-1',
+              sessionID: 'test-session',
+              messageID: 'assistant-1',
+              type: 'tool',
+              callID: 'call-tool-1',
+              tool: 'read',
+              state: {
+                status: 'running',
+                input: {
+                  file_path: 'docs/architecture/README.md',
+                },
               },
             },
-          },
-          {
-            id: 'part-text-1',
-            sessionID: 'test-session',
-            messageID: 'assistant-1',
-            type: 'text',
-            text: 'Hello from canonical stream',
-          },
-        ],
-      },
-    ]);
+            {
+              id: 'part-text-1',
+              sessionID: 'test-session',
+              messageID: 'assistant-1',
+              type: 'text',
+              text: 'Hello from canonical stream',
+            },
+          ],
+        },
+      ];
+    });
     mockSdkClient.session.get.mockResolvedValue({
       id: 'test-session',
       title: 'SDK',

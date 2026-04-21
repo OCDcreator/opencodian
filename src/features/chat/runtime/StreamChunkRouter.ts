@@ -12,6 +12,7 @@ import type {
 
 const logger = createLogger('StreamChunkRouter');
 const STREAM_IDLE_TIMEOUT_MS = 300000;
+const STREAM_NO_VISIBLE_CONTENT_TIMEOUT_MS = 60000;
 
 export class StreamChunkRouter {
   private timeoutId: number | null = null;
@@ -298,6 +299,9 @@ export class StreamChunkRouter {
 
   private scheduleStreamTimeout(): void {
     this.clearStreamTimeout();
+    const timeoutMs = this.receivedMeaningfulChunk
+      ? STREAM_IDLE_TIMEOUT_MS
+      : STREAM_NO_VISIBLE_CONTENT_TIMEOUT_MS;
     this.timeoutId = window.setTimeout(() => {
       if (!this.options.runtime.isStreaming) {
         return;
@@ -308,14 +312,15 @@ export class StreamChunkRouter {
       logger.warn('Stream idle timeout reached, detaching local stream and continuing background sync', {
         conversationId: this.options.preparedSend.conversation.id,
         sessionId: this.options.preparedSend.conversation.openCodeSessionId,
-        timeoutMs: STREAM_IDLE_TIMEOUT_MS,
+        timeoutMs,
+        timeoutReason: this.receivedMeaningfulChunk ? 'idle-after-content' : 'no-visible-content',
         hasVisibleAssistantContent: Boolean(this.options.streamController?.getContentBlocks().length),
       });
 
       this.options.streamController?.cancelStream();
       this.options.host.detachStream(this.options.preparedSend.conversation.openCodeSessionId);
       this.resetStreamingState();
-    }, STREAM_IDLE_TIMEOUT_MS);
+    }, timeoutMs);
   }
 
   private clearStreamTimeout(): void {

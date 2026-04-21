@@ -35,27 +35,31 @@ describe('OpenCodeService SDK stream completion metadata', () => {
         };
       })(),
     });
-    mockSdkClient.session.messages.mockResolvedValue([
-      {
-        info: {
-          id: 'assistant-42',
-          sessionID: 'test-session',
-          role: 'assistant',
-          providerID: 'openai',
-          modelID: 'gpt-5',
-          time: { created: 1234567890 },
-        },
-        parts: [
-          {
-            id: 'part-1',
+    mockSdkClient.session.messages.mockImplementation(async () => {
+      const promptMessageId = mockSdkClient.session.promptAsync.mock.calls[0]?.[0]?.messageID;
+      return [
+        {
+          info: {
+            id: 'assistant-42',
+            parentID: promptMessageId,
             sessionID: 'test-session',
-            messageID: 'assistant-42',
-            type: 'text',
-            text: 'Hello',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567890 },
           },
-        ],
-      },
-    ]);
+          parts: [
+            {
+              id: 'part-1',
+              sessionID: 'test-session',
+              messageID: 'assistant-42',
+              type: 'text',
+              text: 'Hello',
+            },
+          ],
+        },
+      ];
+    });
     mockSdkClient.session.get.mockResolvedValue({
       id: 'test-session',
       title: 'SDK',
@@ -133,27 +137,31 @@ describe('OpenCodeService SDK stream completion metadata', () => {
         };
       })(),
     });
-    mockSdkClient.session.messages.mockResolvedValue([
-      {
-        info: {
-          id: 'assistant-err',
-          sessionID: 'test-session',
-          role: 'assistant',
-          providerID: 'alibaba',
-          modelID: 'qwen-plus',
-          error: {
-            name: 'APIError',
-            data: {
-              message: 'Incorrect API key provided.',
-              statusCode: 401,
-              isRetryable: false,
+    mockSdkClient.session.messages.mockImplementation(async () => {
+      const promptMessageId = mockSdkClient.session.promptAsync.mock.calls[0]?.[0]?.messageID;
+      return [
+        {
+          info: {
+            id: 'assistant-err',
+            parentID: promptMessageId,
+            sessionID: 'test-session',
+            role: 'assistant',
+            providerID: 'alibaba',
+            modelID: 'qwen-plus',
+            error: {
+              name: 'APIError',
+              data: {
+                message: 'Incorrect API key provided.',
+                statusCode: 401,
+                isRetryable: false,
+              },
             },
+            time: { created: 1234567890 },
           },
-          time: { created: 1234567890 },
+          parts: [],
         },
-        parts: [],
-      },
-    ]);
+      ];
+    });
     mockSdkClient.session.get.mockResolvedValue({
       id: 'test-session',
       title: 'SDK',

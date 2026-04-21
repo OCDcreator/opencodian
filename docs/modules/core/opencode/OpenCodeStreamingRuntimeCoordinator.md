@@ -37,9 +37,9 @@
 
 - `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供 stream mutation 应用、服务端 abort、legacy SSE 请求参数、session messages 读取、warning log，以及共享的 `streamEventTransformer`。
 - `OpenCodeStreamingRuntimeContext`: 单条活动流的 session-scoped runtime context，封装 `AbortController.signal`、part type map 与 part message-id map。
-- `OpenCodeStreamingRuntimeRequest`: 单一 transport 入口；调用方传入 `useSdkStream`、SDK callbacks 与 legacy callbacks，coordinator 负责选择实际 transport。
-- `OpenCodeStreamingLegacyStreamRequest`: legacy transport 入口；调用方可传入 `startPrompt()`，coordinator 随后接手 `/event` 读取。
-- `OpenCodeStreamingSdkStreamRequest`: SDK transport 入口；调用方传入 `startPrompt()` 与 `subscribe(signal)`，coordinator 负责 SDK stream 读取与必要时的 legacy fallback。
+- `OpenCodeStreamingRuntimeRequest`: 单一 transport 入口；调用方传入 `useSdkStream`、当前 prompt 的 `promptMessageId`、SDK callbacks 与 legacy callbacks，coordinator 负责选择实际 transport。
+- `OpenCodeStreamingLegacyStreamRequest`: legacy transport 入口；调用方可传入 `startPrompt()` 与 `promptMessageId`，coordinator 随后接手 `/event` 读取。
+- `OpenCodeStreamingSdkStreamRequest`: SDK transport 入口；调用方传入 `startPrompt()`、`subscribe(signal)` 与 `promptMessageId`，coordinator 负责 SDK stream 读取与必要时的 legacy fallback。
 - `activeStreams`: `Map<string, OpenCodeStreamingRuntimeContext>`，以 `sessionId` 为键保存当前活动流。
 
 ## 核心逻辑
@@ -64,6 +64,7 @@
 - `connectSSE()` / `openSseReader()` / `readSseStream()` 负责 legacy fetch reader、abort cancel、partial buffer、tail flush 生命周期。
 - `streamEventTransformer.parseSSEEvents()` 继续负责把 buffer 切成完整 SSE events；coordinator 只维护 reader state 与剩余缓冲区。
 - `finishStreamingResponse()` 会重新拉取最终 assistant message：
+  - 只把 `parentID` 匹配当前 `promptMessageId` 的 assistant 当作本轮收尾候选，避免 silent timeout 后误复用上一轮 assistant
   - 补发任何未在流中出现的尾部文本 delta
   - 补发 `message_metadata`
   - 如果最终持久化 assistant message 带了结构化错误而流里没显式发出 `session.error`，补发 `error`

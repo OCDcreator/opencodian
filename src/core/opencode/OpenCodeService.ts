@@ -842,6 +842,7 @@ export class OpenCodeService {
 
     yield* this.streamingRuntime.streamResponse({
       sessionId,
+      promptMessageId: payload.messageID,
       useSdkStream: this.shouldUseSdk('sdkStream'),
       sdk: {
         startPrompt: async () => {

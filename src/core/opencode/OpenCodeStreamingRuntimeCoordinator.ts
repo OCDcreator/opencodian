@@ -48,6 +48,10 @@ interface OpenCodeStreamingAssistantTail {
   parts: Part[];
 }
 
+interface OpenCodeStreamingAssistantTailLookupOptions {
+  promptMessageId?: string;
+}
+
 interface OpenCodeStreamingFinalizationOutcome {
   assistantMessageId: string | null;
   chunks: StreamChunk[];
@@ -88,17 +92,20 @@ export interface OpenCodeStreamingRuntimeCoordinatorHost {
 
 export interface OpenCodeStreamingLegacyStreamRequest {
   sessionId: string;
+  promptMessageId?: string;
   startPrompt?: () => Promise<void>;
 }
 
 export interface OpenCodeStreamingSdkStreamRequest {
   sessionId: string;
+  promptMessageId?: string;
   startPrompt: () => Promise<void>;
   subscribe: (signal: AbortSignal) => Promise<AsyncIterable<SdkEvent>>;
 }
 
 export interface OpenCodeStreamingRuntimeRequest {
   sessionId: string;
+  promptMessageId?: string;
   useSdkStream: boolean;
   sdk: Omit<OpenCodeStreamingSdkStreamRequest, 'sessionId'>;
   legacy: Omit<OpenCodeStreamingLegacyStreamRequest, 'sessionId'>;
@@ -253,6 +260,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
     if (request.useSdkStream) {
       yield* this.streamSdkResponse({
         sessionId: request.sessionId,
+        promptMessageId: request.promptMessageId,
         ...request.sdk,
       });
       return;
@@ -260,6 +268,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
 
     yield* this.streamLegacyResponse({
       sessionId: request.sessionId,
+      promptMessageId: request.promptMessageId,
       ...request.legacy,
     });
   }
@@ -308,7 +317,11 @@ export class OpenCodeStreamingRuntimeCoordinator {
       const streamContext = this.createActiveStreamContext(request.sessionId);
       yield { type: 'message_start' };
       try {
-        yield* this.consumeLegacyEventStream(request.sessionId, streamContext);
+        yield* this.consumeLegacyEventStream(
+          request.sessionId,
+          streamContext,
+          request.promptMessageId,
+        );
       } finally {
         this.finalizeActiveStreamContext(
           streamContext,
@@ -395,7 +408,12 @@ export class OpenCodeStreamingRuntimeCoordinator {
         accumulatedTextLength: state.lastContent.length,
         lastTextDelta: state.lastTextDelta,
       });
-      yield* this.finishStreamingResponse(request.sessionId, state.lastContent, state.lastErrorMessage);
+      yield* this.finishStreamingResponse(
+        request.sessionId,
+        state.lastContent,
+        state.lastErrorMessage,
+        request.promptMessageId,
+      );
     } catch (error) {
       yield this.buildErrorChunk(error);
     } finally {
@@ -446,6 +464,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
   private async *consumeLegacyEventStream(
     sessionId: string,
     streamContext: OpenCodeStreamingRuntimeContext,
+    promptMessageId?: string,
   ): AsyncGenerator<StreamChunk> {
     const signal = streamContext.signal;
     const eventStream = this.connectSSE(signal);
@@ -486,15 +505,26 @@ export class OpenCodeStreamingRuntimeCoordinator {
       accumulatedTextLength: state.lastContent.length,
       lastTextDelta: state.lastTextDelta,
     });
-    yield* this.finishStreamingResponse(sessionId, state.lastContent, state.lastErrorMessage);
+    yield* this.finishStreamingResponse(
+      sessionId,
+      state.lastContent,
+      state.lastErrorMessage,
+      promptMessageId,
+    );
   }
 
   private async *finishStreamingResponse(
     sessionId: string,
     lastContent: string,
     priorErrorMessage: string | null = null,
+    promptMessageId?: string,
   ): AsyncGenerator<StreamChunk> {
-    const outcome = await this.buildFinalizationOutcome(sessionId, lastContent, priorErrorMessage);
+    const outcome = await this.buildFinalizationOutcome(
+      sessionId,
+      lastContent,
+      priorErrorMessage,
+      promptMessageId,
+    );
     yield* outcome.chunks;
     this.logFinalizationStop(sessionId, outcome.assistantMessageId, outcome.finalContent);
     yield { type: 'message_stop' };
@@ -720,6 +750,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
     sessionId: string,
     lastContent: string,
     priorErrorMessage: string | null,
+    promptMessageId?: string,
   ): Promise<OpenCodeStreamingFinalizationOutcome> {
     const cursor: OpenCodeStreamingFinalizationCursor = {
       lastContent,
@@ -728,7 +759,9 @@ export class OpenCodeStreamingRuntimeCoordinator {
 
     this.logFinalizationStart(sessionId, cursor);
 
-    const assistantTail = await this.loadAssistantTail(sessionId);
+    const assistantTail = await this.loadAssistantTail(sessionId, {
+      promptMessageId,
+    });
     if (!assistantTail) {
       return {
         assistantMessageId: null,
@@ -744,16 +777,21 @@ export class OpenCodeStreamingRuntimeCoordinator {
     };
   }
 
-  private async loadAssistantTail(sessionId: string): Promise<OpenCodeStreamingAssistantTail | null> {
+  private async loadAssistantTail(
+    sessionId: string,
+    options: OpenCodeStreamingAssistantTailLookupOptions = {},
+  ): Promise<OpenCodeStreamingAssistantTail | null> {
     try {
       const messages = await this.host.getSessionMessages(sessionId);
-      const assistantMessage = this.findLatestAssistantMessage(messages);
+      const assistantMessage = this.findLatestAssistantMessage(messages, options.promptMessageId);
       if (!assistantMessage) {
-        logger.warn('No assistant message found when finalizing stream response', {
+        logger.warn('No assistant message found for current prompt when finalizing stream response', {
           sessionId,
+          promptMessageId: options.promptMessageId ?? null,
           messageCount: messages.length,
           roles: messages.map((item) => item.info.role),
           lastUserId: messages.filter((item) => item.info.role === 'user').at(-1)?.info.id ?? null,
+          lastAssistantId: messages.filter((item) => item.info.role === 'assistant').at(-1)?.info.id ?? null,
         });
         return null;
       }
@@ -790,12 +828,24 @@ export class OpenCodeStreamingRuntimeCoordinator {
 
   private findLatestAssistantMessage(
     messages: Array<{ info: Message; parts: Part[] }>,
+    promptMessageId?: string,
   ): { info: Message; parts: Part[] } | null {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const candidate = messages[index];
-      if (candidate && candidate.info.role === 'assistant') {
-        return candidate;
+      if (!candidate || candidate.info.role !== 'assistant') {
+        continue;
       }
+
+      if (promptMessageId) {
+        const parentId = typeof (candidate.info as Message & { parentID?: unknown }).parentID === 'string'
+          ? (candidate.info as Message & { parentID?: string }).parentID
+          : null;
+        if (parentId !== promptMessageId) {
+          continue;
+        }
+      }
+
+      return candidate;
     }
 
     return null;
