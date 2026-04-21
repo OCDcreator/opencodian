@@ -186,6 +186,55 @@ describe('ConversationAuthoritativeSyncCoordinator', () => {
     expect(runtime.lastInterruptedSyncPreservationLogFingerprint).not.toBeNull();
   });
 
+  it('preserves a locally failed send turn when authoritative sync is empty', async () => {
+    const host = createHost();
+    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
+    const conversation = createConversation('sync-preserve-local-error', {
+      messages: [
+        {
+          id: 'user-local',
+          role: 'user',
+          content: '你好',
+          timestamp: 1000,
+        } as ChatMessage,
+        {
+          id: 'assistant-error-notice-1001',
+          role: 'assistant',
+          content: '发送消息失败\nRequest failed, status 400',
+          timestamp: 1001,
+          modelId: 'opencode/minimax-m2.5-free',
+          displayStyle: 'notice',
+          noticeTitle: '本次回复没有成功返回',
+          noticeTone: 'error',
+        } as ChatMessage,
+      ],
+    });
+
+    const result = await coordinator.syncConversationMessagesFromServer(
+      conversation,
+      'tab-1',
+      'visible-background-sync',
+    );
+
+    expect(result).toMatchObject({
+      changed: false,
+      messages: [
+        expect.objectContaining({
+          id: 'user-local',
+          role: 'user',
+          content: '你好',
+        }),
+        expect.objectContaining({
+          id: 'assistant-error-notice-1001',
+          displayStyle: 'notice',
+          noticeTone: 'error',
+        }),
+      ],
+    });
+    expect(conversation.messages).toHaveLength(2);
+    expect(result.messages[1]).not.toHaveProperty('sourceMessageId');
+  });
+
   it('does not preserve local interrupted assistant messages when canonical synced messages exist', async () => {
     const runtime = createRuntime();
     const syncedUserMessage: ChatMessage = {

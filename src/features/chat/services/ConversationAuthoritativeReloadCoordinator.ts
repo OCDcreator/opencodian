@@ -341,6 +341,10 @@ export class ConversationAuthoritativeReloadCoordinator {
     existingMessages: ChatMessage[],
     syncedMessages: ChatMessage[],
   ): ChatMessage[] {
+    if (syncedMessages.length === 0 && this.hasUnanchoredLocalStreamErrorNotice(existingMessages)) {
+      return existingMessages;
+    }
+
     return existingMessages.filter((message) => {
       if (message.displayStyle === 'notice' && message.sourceMessageId) {
         const matchedMessage = syncedMessages.find(
@@ -376,6 +380,15 @@ export class ConversationAuthoritativeReloadCoordinator {
 
       return true;
     });
+  }
+
+  private hasUnanchoredLocalStreamErrorNotice(messages: ChatMessage[]): boolean {
+    return messages.some((message) =>
+      message.role === 'assistant'
+      && message.displayStyle === 'notice'
+      && message.noticeTone === 'error'
+      && !message.sourceMessageId
+      && message.id.startsWith('assistant-error-notice-'));
   }
 
   private logPreservedInterruptedMessagesDuringSync(

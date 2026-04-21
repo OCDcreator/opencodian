@@ -29,7 +29,7 @@ export class ConversationAuthoritativeReloadCoordinator {
 - `syncConversationMessagesFromCanonicalState()` 会把 `OpenCodeService` 的 canonical graph 先重组回 `OpenCodeCanonicalSessionState`，再通过 `ConversationTurnViewModelBuilder.buildCanonicalRenderInput()` 生成稳定的 canonical render `ChatMessage[]`，最后复用同一套 renderable filter / merge / fingerprint / save 路径；拿不到 graph 时返回 `null`，由上层 bridge 做 gap recovery。
 - `syncConversationMessagesFromServer()` 现在也会先把 raw `[{ info, parts[] }]` snapshot 投影到同一份 canonical render input，再进入 authoritative merge，避免 render path 与 reload path 各自维护一套 message hydrate 顺序。
 - merge 之后仍然按 timestamp 排序，并继续复用 per-tab `lastConversationSyncFingerprint` 判断本轮是否真的发生 authoritative 变化。
-- 只有在 authoritative snapshot 为空时，才继续保留本地 interrupted assistant 作为恢复兜底；只要 canonical/server 已给出消息集合，就不再把本地 interrupted bubble 当作并行事实源混回去。
+- 只有在 authoritative snapshot 为空时，才继续保留本地 interrupted assistant 作为恢复兜底；如果本轮发送在服务端接受 user message 之前就失败并生成了无 `sourceMessageId` 的本地 error notice，也会保留这一整组本地失败 turn，避免后续 background sync 把用户气泡和错误卡片清空；只要 canonical/server 已给出消息集合，就不再把本地 interrupted bubble 当作并行事实源混回去。
 - preserved interrupted assistants 的日志 fingerprint 仍写回 tab runtime，避免 background/signal sync 重复刷同一条 preservation 日志。
 - authoritative 变化发生时才会更新 `conversation.updatedAt` 并保存；无变化时仍会保留当前 message 集合与 fingerprint。
 - 失败兜底仍返回当前 conversation messages 与 active conversation revert-state，不改变现有 auth-sync 完成门槛。
