@@ -216,6 +216,8 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
+`session.diff` 现在不再触发 message authoritative sync/reload：view 会把 sync-event 自带的 diff entries 记在独立的 `sessionDiffEntriesBySessionId` 缓存里，只把它作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
+
 这里的 conversation sync fingerprint 现在直接复用 `OpenCodeService.getCanonicalConversationFingerprint()`：它会把 `contentBlocks`、tool call、context attachment、OMO/notice 元数据和原始 `parts` 一起写入 fingerprint，从而让 authoritative reload/finalization 以 canonical payload 漂移为准，而不是继续依赖 view 层单独维护一套 visual-only 对比。
 
 与此同时，server message 拉取→hydrate→authoritative merge、latest optimistic user bubble hydration、client-only/interrupted message preservation，以及 sync debug payload / fingerprint 组装现在统一收束到 `services/ConversationAuthoritativeSyncCoordinator.ts`。`OpenCodianView` 只再保留 host seam：OpenCode message/revert 查询、runtime fingerprint/anchor 写回、context usage refresh、background-task authoritative-sync 标记，以及 hydrated single-message rerender。
@@ -240,7 +242,7 @@ loaded-conversation 在消息拿到之后那段 `syncBackgroundTaskStateFromConv
 
 tab stream-like badge、background-task badge、rewind/fork 按钮禁用态，以及 attention 标记写回现在也不再由 view 自己散落地直接操作 `TabManager` 或消息区 DOM：这些 runtime→UI 写回统一交给 `runtime/TabRuntimeStateBridge.ts`，view 只保留 wrapper 方法与 host bridge。
 
-除此之外，`ConversationSessionSignalRuntime` 现在会接入 `message.updated`、`message.removed`、`message.part.updated`、`message.part.removed`、`message.part.delta` 和 `session.diff`：前五类会先按 session 匹配 tab，再交给 `ConversationSyncBridge` 走 canonical local merge；只有 `session.diff` 继续交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，作为 authoritative reload 与 gap recovery 入口。
+除此之外，`ConversationSessionSignalRuntime` 现在会接入 `message.updated`、`message.removed`、`message.part.updated`、`message.part.removed`、`message.part.delta` 和 `session.diff`：前五类会先按 session 匹配 tab，再交给 `ConversationSyncBridge` 走 canonical local merge；`session.diff` 则只写入独立 diff/notice 输入，不再进入 authoritative reload / gap-recovery message sync。
 
 ### question dock / pending question 编排
 

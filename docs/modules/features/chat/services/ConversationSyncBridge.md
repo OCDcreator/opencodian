@@ -46,9 +46,10 @@ export class ConversationSyncBridge {
 
 - `scheduleConversationSyncFromSignal()` 不再在 view 里内联拼装 hidden-tab callback，而是统一交给 bridge 组装
 - `applySessionSyncEvent()` 会把非 `session.diff` 的 message / part sync 直接路由到 canonical graph merge：先尝试从 `OpenCodeService` 的 canonical session graph 生成本地 sync 结果，再复用既有 visible/background post-sync router
+- `applySessionSyncEvent()` 现在会直接忽略 `session.diff`，确保 diff 事件不再触发 message reload / authoritative correction
 - canonical sync 结果现在也允许携带“可见文本没变、但隐藏 parts / synthetic metadata 已纠偏”的 fingerprint 漂移；是否真正 patch DOM 仍交给后续 render/visual fingerprint owner 决定
 - 当 canonical graph 暂时缺口（例如当前 tab 还没拿到该 session snapshot）时，bridge 会回退到 `syncConversationMessagesFromServer()` 做 gap recovery
-- `scheduleConversationSyncFromSignal()` 继续保留给 `session.diff` 这类 authoritative reload signal，并复用 orchestration 提供的 merged reason 绑定 `sync-event:${reason}` 的 server-sync 标识
+- `scheduleConversationSyncFromSignal()` 仍保留给真正需要 debounce 的 signal reload 场景；`session.diff` 不再经过这条路径
 - signal/background-tab sync 完成后，bridge 会把 context 与 `syncResult` 委托给 `ConversationSyncBackgroundPostSyncRouter`
 - hidden-tab `lastConversationSyncFingerprint` writeback 与 post-sync option shaping 不再留在 bridge 内部
 

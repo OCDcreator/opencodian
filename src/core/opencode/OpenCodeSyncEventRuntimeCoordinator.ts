@@ -1,5 +1,5 @@
 import { createLogger } from '../../shared';
-import type { SessionTodo } from '../types';
+import type { SessionDiffEntry, SessionTodo } from '../types';
 import type {
   OpenCodeCanonicalMessageInfo,
   OpenCodeCanonicalPart,
@@ -70,6 +70,7 @@ export type SessionSyncEventUpdate =
   | {
       sessionId: string;
       type: 'session.diff';
+      diff?: SessionDiffEntry[];
     };
 
 type SessionSyncEventListener = (update: SessionSyncEventUpdate) => void;
@@ -98,6 +99,7 @@ type RawSyncEvent = {
     partID?: unknown;
     field?: unknown;
     delta?: unknown;
+    diff?: unknown;
     time?: unknown;
   };
 };
@@ -187,6 +189,50 @@ function resolveStringProperty(
 ): string | null {
   const value = event.properties?.[key];
   return typeof value === 'string' ? value : null;
+}
+
+function normalizeDiffEntry(rawEntry: unknown): SessionDiffEntry | null {
+  if (!rawEntry || typeof rawEntry !== 'object') {
+    return null;
+  }
+
+  const entry = rawEntry as Record<string, unknown>;
+  const file = typeof entry.file === 'string'
+    ? entry.file
+    : typeof entry.path === 'string'
+      ? entry.path
+      : '';
+  if (!file) {
+    return null;
+  }
+
+  const status = entry.status === 'added' || entry.status === 'deleted' || entry.status === 'modified'
+    ? entry.status
+    : undefined;
+
+  return {
+    file,
+    additions: typeof entry.additions === 'number' ? entry.additions : 0,
+    deletions: typeof entry.deletions === 'number' ? entry.deletions : 0,
+    ...(typeof entry.patch === 'string' ? { patch: entry.patch } : {}),
+    ...(typeof entry.before === 'string' ? { before: entry.before } : {}),
+    ...(typeof entry.after === 'string' ? { after: entry.after } : {}),
+    ...(status ? { status } : {}),
+  };
+}
+
+function normalizeDiffEntries(rawDiff: unknown): SessionDiffEntry[] {
+  if (!Array.isArray(rawDiff)) {
+    return [];
+  }
+
+  return rawDiff.reduce<SessionDiffEntry[]>((entries, rawEntry) => {
+    const entry = normalizeDiffEntry(rawEntry);
+    if (entry) {
+      entries.push(entry);
+    }
+    return entries;
+  }, []);
 }
 
 export class OpenCodeSyncEventRuntimeCoordinator {
@@ -428,6 +474,7 @@ export class OpenCodeSyncEventRuntimeCoordinator {
         return {
           sessionId,
           type: 'session.diff',
+          diff: normalizeDiffEntries(value.properties?.diff),
         };
       default:
         return null;

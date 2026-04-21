@@ -24,8 +24,11 @@ export interface ConversationSessionSignalRuntimeHost extends ConversationSessio
   subscribeToSessionStatusUpdates(
     listener: (update: { sessionId: string; status: SessionActivityStatus }) => void,
   ): () => void;
-  scheduleConversationSyncFromSignal(tabId: TabId | null, reason: SessionSyncEventUpdate['type']): void;
   applySessionSyncEvent(tabId: TabId | null, update: SessionSyncEventUpdate): void;
+  applySessionDiffUpdate(
+    tabId: TabId | null,
+    update: Extract<SessionSyncEventUpdate, { type: 'session.diff' }>,
+  ): void;
   applySessionTodoUpdate(tabId: TabId | null, sessionId: string, todos: SessionTodo[]): void;
   applySessionStatusUpdate(
     tabId: TabId | null,
@@ -73,7 +76,7 @@ export class ConversationSessionSignalRuntime {
   private handleSessionSyncEvent(update: SessionSyncEventUpdate): void {
     for (const tabId of this.sessionTabResolver.resolveMatchedTabIds(update.sessionId)) {
       if (update.type === 'session.diff') {
-        this.host.scheduleConversationSyncFromSignal(tabId, update.type);
+        this.host.applySessionDiffUpdate(tabId, update);
         continue;
       }
 

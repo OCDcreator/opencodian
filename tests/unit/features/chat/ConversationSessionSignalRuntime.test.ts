@@ -119,8 +119,8 @@ function createHost(): {
       getConversations: jest.fn().mockReturnValue(conversations),
       getCurrentConversation: jest.fn().mockReturnValue(currentConversation),
       getActiveTabId: jest.fn().mockReturnValue('tab-active'),
-      scheduleConversationSyncFromSignal: jest.fn(),
       applySessionSyncEvent: jest.fn(),
+      applySessionDiffUpdate: jest.fn(),
       applySessionTodoUpdate: jest.fn(),
       applySessionStatusUpdate: jest.fn(),
     },
@@ -169,7 +169,11 @@ describe('ConversationSessionSignalRuntime', () => {
     const runtime = new ConversationSessionSignalRuntime(host, backgroundTaskLiveSignalCoordinator);
 
     runtime.start();
-    emitSessionSyncEvent({ sessionId: 'session-shared', type: 'session.diff' });
+    emitSessionSyncEvent({
+      sessionId: 'session-shared',
+      type: 'session.diff',
+      diff: [{ file: 'notes.md', additions: 2, deletions: 1 }],
+    });
     emitSessionTodoUpdate('session-shared', todos);
     emitSessionStatusUpdate('session-shared', { type: 'busy' });
     runtime.stop();
@@ -177,10 +181,18 @@ describe('ConversationSessionSignalRuntime', () => {
     expect(host.subscribeToSessionSyncEvents).toHaveBeenCalledTimes(1);
     expect(host.subscribeToSessionTodoUpdates).toHaveBeenCalledTimes(1);
     expect(host.subscribeToSessionStatusUpdates).toHaveBeenCalledTimes(1);
-    expect(host.scheduleConversationSyncFromSignal).toHaveBeenCalledTimes(2);
-    expect(host.scheduleConversationSyncFromSignal).toHaveBeenNthCalledWith(1, 'tab-active', 'session.diff');
-    expect(host.scheduleConversationSyncFromSignal).toHaveBeenNthCalledWith(2, 'tab-hidden', 'session.diff');
     expect(host.applySessionSyncEvent).not.toHaveBeenCalled();
+    expect(host.applySessionDiffUpdate).toHaveBeenCalledTimes(2);
+    expect(host.applySessionDiffUpdate).toHaveBeenNthCalledWith(1, 'tab-active', {
+      sessionId: 'session-shared',
+      type: 'session.diff',
+      diff: [{ file: 'notes.md', additions: 2, deletions: 1 }],
+    });
+    expect(host.applySessionDiffUpdate).toHaveBeenNthCalledWith(2, 'tab-hidden', {
+      sessionId: 'session-shared',
+      type: 'session.diff',
+      diff: [{ file: 'notes.md', additions: 2, deletions: 1 }],
+    });
     expect(host.applySessionTodoUpdate).toHaveBeenCalledTimes(2);
     expect(host.applySessionTodoUpdate).toHaveBeenNthCalledWith(1, 'tab-active', 'session-shared', todos);
     expect(host.applySessionTodoUpdate).toHaveBeenNthCalledWith(2, 'tab-hidden', 'session-shared', todos);
@@ -237,7 +249,6 @@ describe('ConversationSessionSignalRuntime', () => {
     emitSessionSyncEvent(syncEvent);
     emitSessionStatusUpdate('session-active-only', { type: 'busy' });
 
-    expect(host.scheduleConversationSyncFromSignal).not.toHaveBeenCalled();
     expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(1);
     expect(host.applySessionSyncEvent).toHaveBeenCalledWith(
       'tab-active',

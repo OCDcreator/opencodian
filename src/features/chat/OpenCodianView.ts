@@ -511,6 +511,7 @@ export class OpenCodianView extends ItemView {
   private liquidDiamondWebGlDemoController: LiquidDiamondDemoController | null = null;
   private currentConversation: Conversation | null = null;
   private currentConversationRevertState: ConversationRevertState | null = null;
+  private readonly sessionDiffEntriesBySessionId = new Map<string, SessionDiffEntry[]>();
   private markdownService: MarkdownRenderService | null = null;
   private messageComponent: Component;
 
@@ -2028,13 +2029,11 @@ export class OpenCodianView extends ItemView {
       getConversations: () => this.plugin.getConversations(),
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
-      scheduleConversationSyncFromSignal: (tabId, reason) =>
-        this.conversationSyncBridgePorts.getSignalScheduler().scheduleConversationSyncFromSignal(
-          tabId,
-          reason,
-        ),
       applySessionSyncEvent: (tabId, update) => {
         this.conversationSyncBridge.applySessionSyncEvent(tabId, update);
+      },
+      applySessionDiffUpdate: (_tabId, update) => {
+        this.sessionDiffEntriesBySessionId.set(update.sessionId, update.diff ?? []);
       },
     };
   }
@@ -4846,12 +4845,17 @@ export class OpenCodianView extends ItemView {
       conversation.openCodeSessionId,
       latestUserMessage.sourceMessageId,
     );
+    const cachedDiffEntries = this.sessionDiffEntriesBySessionId.get(conversation.openCodeSessionId) ?? [];
     const fallbackEntries: SessionDiffEntry[] = [...new Set(editedFiles)].map((file) => ({
       file,
       additions: 0,
       deletions: 0,
     }));
-    const entries = diffEntries.length > 0 ? diffEntries : fallbackEntries;
+    const entries = diffEntries.length > 0
+      ? diffEntries
+      : cachedDiffEntries.length > 0
+        ? cachedDiffEntries
+        : fallbackEntries;
     if (entries.length === 0) {
       return;
     }

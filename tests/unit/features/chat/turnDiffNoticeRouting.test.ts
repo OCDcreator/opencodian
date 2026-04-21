@@ -114,4 +114,68 @@ describe('OpenCodianView turn diff notice routing', () => {
     expect(renderSpy).not.toHaveBeenCalled();
     expect(scrollSpy).not.toHaveBeenCalled();
   });
+
+  it('uses cached session.diff entries when the final diff fetch is empty', async () => {
+    const getSessionDiff = jest.fn().mockResolvedValue([]);
+    const saveConversation = jest.fn().mockResolvedValue(undefined);
+    const view = createView({
+      openCodeService: { getSessionDiff },
+      saveConversation,
+    }) as unknown as {
+      currentConversation: { id: string; messages: unknown[] } | null;
+      tabManager: { setTabNeedsAttention: jest.Mock };
+      sessionDiffEntriesBySessionId: Map<string, Array<Record<string, unknown>>>;
+      appendTurnDiffNoticeIfNeeded: (
+        conversation: {
+          id: string;
+          openCodeSessionId: string;
+          messages: Array<Record<string, unknown>>;
+          updatedAt: number;
+        },
+        editedFiles: string[],
+        tabId: string,
+      ) => Promise<void>;
+      getActiveTabId: () => string;
+    };
+
+    view.currentConversation = {
+      id: 'conversation-active',
+      openCodeSessionId: 'session-active',
+      updatedAt: 0,
+      messages: [],
+    };
+    view.tabManager = { setTabNeedsAttention: jest.fn() };
+    view.sessionDiffEntriesBySessionId.set('session-old', [
+      {
+        file: 'notes.md',
+        additions: 5,
+        deletions: 2,
+        status: 'modified',
+      },
+    ]);
+    jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-new');
+
+    const sendingConversation = {
+      id: 'conversation-old',
+      openCodeSessionId: 'session-old',
+      updatedAt: 0,
+      messages: [
+        {
+          id: 'user-1',
+          role: 'user',
+          content: 'please update the file',
+          timestamp: 1,
+          sourceMessageId: 'msg-user-1',
+        },
+      ],
+    };
+
+    await view.appendTurnDiffNoticeIfNeeded(sendingConversation, ['notes.md'], 'tab-old');
+
+    expect(getSessionDiff).toHaveBeenCalledWith('session-old', 'msg-user-1');
+    expect(sendingConversation.messages[1]).toEqual(expect.objectContaining({
+      role: 'assistant',
+      content: expect.stringContaining('(+5 / -2)'),
+    }));
+  });
 });

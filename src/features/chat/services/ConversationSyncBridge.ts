@@ -202,7 +202,6 @@ export class ConversationSyncBridge {
 
   applySessionSyncEvent(tabId: TabId | null, update: SessionSyncEventUpdate): void {
     if (update.type === 'session.diff') {
-      this.scheduleConversationSyncFromSignal(tabId, update.type);
       return;
     }
 

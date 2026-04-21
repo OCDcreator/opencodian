@@ -117,6 +117,14 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
             type: 'session.diff',
             properties: {
               sessionID: 'session-1',
+              diff: [
+                {
+                  file: 'notes.md',
+                  additions: 2,
+                  deletions: 1,
+                  status: 'modified',
+                },
+              ],
             },
           },
         ]))),
@@ -198,6 +206,14 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
       {
         sessionId: 'session-1',
         type: 'session.diff',
+        diff: [
+          {
+            file: 'notes.md',
+            additions: 2,
+            deletions: 1,
+            status: 'modified',
+          },
+        ],
       },
     ]);
     expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(6);

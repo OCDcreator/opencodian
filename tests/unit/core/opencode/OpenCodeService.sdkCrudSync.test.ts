@@ -448,6 +448,14 @@ describe('OpenCodeService SDK sync reload events', () => {
           type: 'session.diff',
           properties: {
             sessionID: 'sdk-session',
+            diff: [
+              {
+                file: 'notes.md',
+                additions: 1,
+                deletions: 0,
+                status: 'modified',
+              },
+            ],
           },
         };
       })(),
@@ -466,6 +474,14 @@ describe('OpenCodeService SDK sync reload events', () => {
       {
         sessionId: 'sdk-session',
         type: 'session.diff',
+        diff: [
+          {
+            file: 'notes.md',
+            additions: 1,
+            deletions: 0,
+            status: 'modified',
+          },
+        ],
       },
     ]);
   });

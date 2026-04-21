@@ -10,7 +10,6 @@ import {
   type ConversationSyncBridgeRuntimeCoordinator,
   type ConversationSyncBridgeSyncResult,
 } from '../../../../src/features/chat/services/ConversationSyncBridge';
-import type { SignalConversationSyncContext } from '../../../../src/features/chat/services/ConversationSyncOrchestrationService';
 import type { TabConversationSyncContext } from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
 import type { ConversationSyncVisiblePostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';
 
@@ -175,14 +174,10 @@ describe('ConversationSyncBridge', () => {
     });
   });
 
-  it('routes session.diff signal callbacks through the background post-sync router', async () => {
-    const hiddenConversation = createConversation('hidden');
+  it('ignores session.diff as message sync input', async () => {
+    const conversation = createConversation('active');
     const host = createHost({
-      currentConversation: createConversation('active'),
-      syncResult: createSyncResult(hiddenConversation, {
-        changed: true,
-        fingerprint: 'hidden-new',
-      }),
+      currentConversation: conversation,
     });
     const runtimeCoordinator = createRuntimeCoordinator();
     const orchestration = createOrchestration();
@@ -195,48 +190,22 @@ describe('ConversationSyncBridge', () => {
       visiblePostSyncRouter,
       backgroundPostSyncRouter,
     });
-    let capturedCallbacks:
-      | {
-        syncVisibleConversation: () => Promise<void>;
-        syncTabConversation: (context: SignalConversationSyncContext) => Promise<void>;
-      }
-      | null = null;
 
-    orchestration.scheduleConversationSyncFromSignal.mockImplementation((_tabId, _reason, callbacks) => {
-      capturedCallbacks = callbacks;
+    bridge.applySessionSyncEvent('tab-active', {
+      sessionId: conversation.openCodeSessionId,
+      type: 'session.diff',
+      diff: [{ file: 'notes.md', additions: 1, deletions: 0 }],
     });
 
-    bridge.scheduleConversationSyncFromSignal('tab-bg', 'session.diff');
-    expect(capturedCallbacks).not.toBeNull();
+    await Promise.resolve();
+    await Promise.resolve();
 
-    await capturedCallbacks?.syncTabConversation({
-      tabId: 'tab-bg',
-      conversation: hiddenConversation,
-      previousFingerprint: 'hidden-old',
-      reason: 'session.diff',
-      activeTabId: 'tab-active',
-      tabHasBackgroundTask: true,
-    });
-
-    expect(host.syncConversationMessagesFromServer).toHaveBeenCalledWith(
-      hiddenConversation,
-      'tab-bg',
-      'sync-event:session.diff',
-      { suppressVerboseLogs: true },
-    );
-    expect(backgroundPostSyncRouter.routeSignalSyncComplete).toHaveBeenCalledWith({
-      syncContext: {
-        tabId: 'tab-bg',
-        conversation: hiddenConversation,
-        reason: 'session.diff',
-        activeTabId: 'tab-active',
-        tabHasBackgroundTask: true,
-        previousFingerprint: 'hidden-old',
-      },
-      syncResult: expect.objectContaining({
-        fingerprint: 'hidden-new',
-      }),
-    });
+    expect(orchestration.scheduleConversationSyncFromSignal).not.toHaveBeenCalled();
+    expect(orchestration.syncConversationFromSignal).not.toHaveBeenCalled();
+    expect(host.syncConversationMessagesFromCanonicalState).not.toHaveBeenCalled();
+    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
+    expect(visiblePostSyncRouter.routeVisibleSyncComplete).not.toHaveBeenCalled();
+    expect(backgroundPostSyncRouter.routeSignalSyncComplete).not.toHaveBeenCalled();
   });
 });
 
