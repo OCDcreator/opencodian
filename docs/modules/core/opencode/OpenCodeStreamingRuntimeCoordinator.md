@@ -35,7 +35,7 @@
 
 ## 核心类型 / 状态
 
-- `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供 stream mutation 应用、服务端 abort、legacy SSE 请求参数、session messages 读取、warning log，以及共享的 `streamEventTransformer`。
+- `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供 stream mutation 应用、服务端 abort、legacy SSE 请求参数、session messages 读取、warning log、短延迟重试能力，以及共享的 `streamEventTransformer`。
 - `OpenCodeStreamingRuntimeContext`: 单条活动流的 session-scoped runtime context，封装 `AbortController.signal`、part type map 与 part message-id map。
 - `OpenCodeStreamingRuntimeRequest`: 单一 transport 入口；调用方传入 `useSdkStream`、当前 prompt 的 `promptMessageId`、SDK callbacks 与 legacy callbacks，coordinator 负责选择实际 transport。
 - `OpenCodeStreamingLegacyStreamRequest`: legacy transport 入口；调用方可传入 `startPrompt()` 与 `promptMessageId`，coordinator 随后接手 `/event` 读取。
@@ -65,7 +65,8 @@
 - `streamEventTransformer.parseSSEEvents()` 继续负责把 buffer 切成完整 SSE events；coordinator 只维护 reader state 与剩余缓冲区。
 - `finishStreamingResponse()` 会重新拉取最终 assistant message：
   - 只把 `parentID` 匹配当前 `promptMessageId` 的 assistant 当作本轮收尾候选，避免 silent timeout 后误复用上一轮 assistant
-  - 补发任何未在流中出现的尾部文本 delta
+  - 如果当前 prompt 的 assistant 还没进入 `session.messages()`，会做一次有界短延迟重试，降低“第二次提问刚结束流就收尾，但持久化 assistant 仍未可见”的竞态
+  - 基于 canonical assistant tail 的完整 parts 状态补发任何未在流中出现的尾部内容，而不只补文本：文本 delta、`reasoning/thinking`、tool use/result 都会按缺失情况恢复
   - 补发 `message_metadata`
   - 如果最终持久化 assistant message 带了结构化错误而流里没显式发出 `session.error`，补发 `error`
   - 始终以 `message_stop` 结束
@@ -106,6 +107,7 @@ graph LR
 - `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 transport callback 注入；SDK/legacy 入口分流、完整 transport/fallback/read/finalize 细节都委托给 coordinator。
 - `OpenCodeStreamEventTransformer` 继续负责 `session.error` / `session.idle` 的 stop 判断、tool/question/file/permission 事件映射、canonical stream mutation 输出，以及 SSE event parsing。
 - `OpenCodeSessionLifecycleCoordinator` 的 `getSessionMessages()` 通过 host seam 被用于 finalize 阶段补拉 assistant message。
+- finalize 阶段还会复用 runtime 已记录的 `processedToolIds`、reasoning 文本快照与 tool input 快照，避免 canonical tail recovery 把已在流内发出的 tool/reasoning 块重复发一遍。
 - `abortSessionOnServer()` 仍留在 `OpenCodeService`，因此 SDK `session.abort()` 失败后回退 legacy HTTP 的语义不变。
 
 ## 配置项
@@ -118,3 +120,4 @@ graph LR
 - `releaseActiveStreamContext()` 的 identity check 是并发安全边界的一部分，不要简化成“按 sessionId 一律删除”。
 - `cancelStream()` 与 `detachStream()` 的差异是协议语义，不只是日志差异：前者会请求服务端 abort，后者不会。
 - `streamSdkResponse()` 的 fallback 只允许发生在首个 SDK event 之前；不要把“已经开始消费 SDK events 后的错误”也改成回退 legacy。
+- 当前根因边界不是“单纯 SDK 不可用”，而是 SDK/legacy 两条 transport 都可能先结束本地流，再晚一点才让 canonical assistant tail 完整可见；因此收尾逻辑必须以最终 session state 为准，而不是只相信流内 chunk。

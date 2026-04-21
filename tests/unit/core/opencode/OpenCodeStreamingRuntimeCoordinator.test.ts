@@ -86,6 +86,7 @@ function createHost(
   return {
     applyStreamMutations: jest.fn(),
     abortSessionOnServer: jest.fn().mockResolvedValue(undefined),
+    delay: jest.fn().mockResolvedValue(undefined),
     getLegacyEventStreamRequest: jest.fn().mockReturnValue({
       url: 'http://127.0.0.1:4196/event',
       headers: {
@@ -451,12 +452,12 @@ describe('OpenCodeStreamingRuntimeCoordinator legacy SSE handling', () => {
       callOrder.push('start');
     });
 
-    for await (const _chunk of coordinator.streamSdkResponse({
+    for await (const chunk of coordinator.streamSdkResponse({
       sessionId: 'sdk-subscribe-first',
       startPrompt,
       subscribe,
     })) {
-      // drain
+      void chunk;
     }
 
     expect(callOrder.slice(0, 2)).toEqual(['subscribe', 'start']);
@@ -663,6 +664,238 @@ describe('OpenCodeStreamingRuntimeCoordinator SDK tail recovery', () => {
 
     expect(chunks).toEqual([
       { type: 'message_start' },
+      { type: 'message_stop' },
+    ]);
+  });
+
+});
+
+describe('OpenCodeStreamingRuntimeCoordinator SDK prompt-scoped tail retry', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
+  });
+
+  it('retries assistant tail lookup for the current prompt before giving up', async () => {
+    const host = createHost({
+      getSessionMessages: jest.fn()
+        .mockResolvedValueOnce([
+          {
+            info: {
+              id: 'user-first',
+              sessionID: 'sdk-tail-retry',
+              role: 'user',
+              time: { created: 1234567890 },
+            },
+            parts: [],
+          },
+          {
+            info: {
+              id: 'assistant-first',
+              parentID: 'user-first',
+              sessionID: 'sdk-tail-retry',
+              role: 'assistant',
+              providerID: 'openai',
+              modelID: 'gpt-5',
+              time: { created: 1234567891 },
+            },
+            parts: [
+              {
+                id: 'part-first',
+                sessionID: 'sdk-tail-retry',
+                messageID: 'assistant-first',
+                type: 'text',
+                text: 'Previous assistant text',
+              },
+            ],
+          },
+          {
+            info: {
+              id: 'user-second',
+              sessionID: 'sdk-tail-retry',
+              role: 'user',
+              time: { created: 1234567892 },
+            },
+            parts: [],
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            info: {
+              id: 'user-first',
+              sessionID: 'sdk-tail-retry',
+              role: 'user',
+              time: { created: 1234567890 },
+            },
+            parts: [],
+          },
+          {
+            info: {
+              id: 'assistant-first',
+              parentID: 'user-first',
+              sessionID: 'sdk-tail-retry',
+              role: 'assistant',
+              providerID: 'openai',
+              modelID: 'gpt-5',
+              time: { created: 1234567891 },
+            },
+            parts: [
+              {
+                id: 'part-first',
+                sessionID: 'sdk-tail-retry',
+                messageID: 'assistant-first',
+                type: 'text',
+                text: 'Previous assistant text',
+              },
+            ],
+          },
+          {
+            info: {
+              id: 'user-second',
+              sessionID: 'sdk-tail-retry',
+              role: 'user',
+              time: { created: 1234567892 },
+            },
+            parts: [],
+          },
+          {
+            info: {
+              id: 'assistant-second',
+              parentID: 'user-second',
+              sessionID: 'sdk-tail-retry',
+              role: 'assistant',
+              providerID: 'openai',
+              modelID: 'gpt-5',
+              time: { created: 1234567893 },
+            },
+            parts: [
+              {
+                id: 'part-second',
+                sessionID: 'sdk-tail-retry',
+                messageID: 'assistant-second',
+                type: 'text',
+                text: 'Recovered current assistant',
+              },
+            ],
+          },
+        ]),
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const chunks: unknown[] = [];
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-tail-retry',
+      promptMessageId: 'user-second',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield* [];
+      })()),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(host.getSessionMessages).toHaveBeenCalledTimes(2);
+    expect(host.delay).toHaveBeenCalled();
+    expect(chunks).toEqual([
+      { type: 'message_start' },
+      { type: 'text', content: 'Recovered current assistant' },
+      {
+        type: 'message_metadata',
+        messageId: 'assistant-second',
+        timestamp: 1234567893,
+        modelId: 'openai/gpt-5',
+      },
+      { type: 'message_stop' },
+    ]);
+  });
+
+});
+
+describe('OpenCodeStreamingRuntimeCoordinator SDK prompt-scoped tail content recovery', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
+  });
+
+  it('recovers visible thinking and tool chunks from the assistant tail when the SDK stream emitted none', async () => {
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-tool-thinking',
+            parentID: 'user-tool-thinking',
+            sessionID: 'sdk-tail-content-recovery',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567894 },
+          },
+          parts: [
+            {
+              id: 'part-thinking',
+              sessionID: 'sdk-tail-content-recovery',
+              messageID: 'assistant-tool-thinking',
+              type: 'reasoning',
+              text: 'Need to inspect the file first',
+              time: { start: 1_000, end: 2_500 },
+            },
+            {
+              id: 'part-tool',
+              sessionID: 'sdk-tail-content-recovery',
+              messageID: 'assistant-tool-thinking',
+              type: 'tool',
+              callID: 'call-read',
+              tool: 'read',
+              state: {
+                status: 'completed',
+                input: { file_path: 'docs/spec.md' },
+                output: 'Spec loaded',
+              },
+            },
+          ],
+        },
+      ]),
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const chunks: unknown[] = [];
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-tail-content-recovery',
+      promptMessageId: 'user-tool-thinking',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield* [];
+      })()),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { type: 'message_start' },
+      {
+        type: 'thinking',
+        content: 'Need to inspect the file first',
+        partId: 'part-thinking',
+        durationSeconds: 1.5,
+      },
+      {
+        type: 'tool_use',
+        id: 'call-read',
+        name: 'read',
+        input: { file_path: 'docs/spec.md' },
+      },
+      {
+        type: 'tool_result',
+        toolUseId: 'call-read',
+        content: 'Spec loaded',
+        isError: false,
+      },
+      {
+        type: 'message_metadata',
+        messageId: 'assistant-tool-thinking',
+        timestamp: 1234567894,
+        modelId: 'openai/gpt-5',
+      },
       { type: 'message_stop' },
     ]);
   });

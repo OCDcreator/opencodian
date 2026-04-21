@@ -1,4 +1,9 @@
-import { createLogger } from '../../shared';
+import {
+  createLogger,
+  isInternalStructuredOutputTool,
+  resolveToolExecutionStatus,
+  resolveToolResultText,
+} from '../../shared';
 import type { StreamChunk } from '../types';
 import { OpenCodeMessageNormalizationMapper } from './OpenCodeMessageNormalizationMapper';
 import type { Message, Part } from './OpenCodeSessionLifecycleCoordinator';
@@ -38,6 +43,9 @@ interface OpenCodeStreamingAssistantSummary {
 interface OpenCodeStreamingFinalizationCursor {
   lastContent: string;
   priorErrorMessage: string | null;
+  processedToolIds: Set<string>;
+  reasoningTextSnapshots: Map<string, string>;
+  toolInputSnapshots: Map<string, string>;
 }
 
 interface OpenCodeStreamingAssistantTail {
@@ -81,6 +89,7 @@ export interface OpenCodeStreamingRuntimeEventTransformer {
 export interface OpenCodeStreamingRuntimeCoordinatorHost {
   applyStreamMutations(mutations: OpenCodeStreamMutation[]): void;
   abortSessionOnServer(sessionId: string): Promise<void> | void;
+  delay(ms: number, signal?: AbortSignal): Promise<void>;
   getLegacyEventStreamRequest(): {
     url: string;
     headers: Record<string, string>;
@@ -112,6 +121,25 @@ export interface OpenCodeStreamingRuntimeRequest {
 }
 
 type StreamingState = OpenCodeStreamEventState;
+
+const ASSISTANT_TAIL_LOOKUP_MAX_ATTEMPTS = 2;
+const ASSISTANT_TAIL_LOOKUP_RETRY_DELAY_MS = 75;
+
+function resolveReasoningDurationSeconds(
+  part: Pick<Part, 'time'> & { duration?: unknown },
+): number | undefined {
+  const start = part.time?.start;
+  const end = part.time?.end;
+  if (typeof start === 'number' && typeof end === 'number' && end >= start) {
+    return Math.max(0, end - start) / 1000;
+  }
+
+  if (typeof part.duration === 'number' && part.duration > 0) {
+    return part.duration;
+  }
+
+  return undefined;
+}
 
 function getDebugTextPreview(text: string, maxLength = 160): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -425,8 +453,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
       });
       yield* this.finishStreamingResponse(
         request.sessionId,
-        state.lastContent,
-        state.lastErrorMessage,
+        state,
         request.promptMessageId,
       );
     } catch (error) {
@@ -523,22 +550,19 @@ export class OpenCodeStreamingRuntimeCoordinator {
     });
     yield* this.finishStreamingResponse(
       sessionId,
-      state.lastContent,
-      state.lastErrorMessage,
+      state,
       promptMessageId,
     );
   }
 
   private async *finishStreamingResponse(
     sessionId: string,
-    lastContent: string,
-    priorErrorMessage: string | null = null,
+    state: StreamingState,
     promptMessageId?: string,
   ): AsyncGenerator<StreamChunk> {
     const outcome = await this.buildFinalizationOutcome(
       sessionId,
-      lastContent,
-      priorErrorMessage,
+      state,
       promptMessageId,
     );
     yield* outcome.chunks;
@@ -764,14 +788,10 @@ export class OpenCodeStreamingRuntimeCoordinator {
 
   private async buildFinalizationOutcome(
     sessionId: string,
-    lastContent: string,
-    priorErrorMessage: string | null,
+    state: StreamingState,
     promptMessageId?: string,
   ): Promise<OpenCodeStreamingFinalizationOutcome> {
-    const cursor: OpenCodeStreamingFinalizationCursor = {
-      lastContent,
-      priorErrorMessage,
-    };
+    const cursor = this.createFinalizationCursor(state);
 
     this.logFinalizationStart(sessionId, cursor);
 
@@ -796,11 +816,29 @@ export class OpenCodeStreamingRuntimeCoordinator {
   private async loadAssistantTail(
     sessionId: string,
     options: OpenCodeStreamingAssistantTailLookupOptions = {},
+    attempt = 1,
   ): Promise<OpenCodeStreamingAssistantTail | null> {
     try {
       const messages = await this.host.getSessionMessages(sessionId);
       const assistantMessage = this.findLatestAssistantMessage(messages, options.promptMessageId);
       if (!assistantMessage) {
+        if (
+          options.promptMessageId
+          && attempt < ASSISTANT_TAIL_LOOKUP_MAX_ATTEMPTS
+        ) {
+          logAssistantFinalizationDebug('service-finish-retrying-assistant-tail', {
+            sessionId,
+            promptMessageId: options.promptMessageId,
+            attempt,
+            nextAttempt: attempt + 1,
+            delayMs: ASSISTANT_TAIL_LOOKUP_RETRY_DELAY_MS,
+            messageCount: messages.length,
+            roles: messages.map((item) => item.info.role),
+          });
+          await this.host.delay(ASSISTANT_TAIL_LOOKUP_RETRY_DELAY_MS);
+          return this.loadAssistantTail(sessionId, options, attempt + 1);
+        }
+
         logger.warn('No assistant message found for current prompt when finalizing stream response', {
           sessionId,
           promptMessageId: options.promptMessageId ?? null,
@@ -878,9 +916,21 @@ export class OpenCodeStreamingRuntimeCoordinator {
       chunks.push(errorChunk);
     }
 
-    chunks.push(...this.collectAssistantTrailingTextChunks(sessionId, assistantTail, cursor));
+    chunks.push(...this.collectAssistantTrailingContentChunks(sessionId, assistantTail, cursor));
     chunks.push(this.buildAssistantMetadataChunk(sessionId, assistantTail, cursor.lastContent.length));
     return chunks;
+  }
+
+  private createFinalizationCursor(
+    state: StreamingState,
+  ): OpenCodeStreamingFinalizationCursor {
+    return {
+      lastContent: state.lastContent,
+      priorErrorMessage: state.lastErrorMessage,
+      processedToolIds: new Set(state.processedToolIds),
+      reasoningTextSnapshots: new Map(state.reasoningTextSnapshots),
+      toolInputSnapshots: new Map(state.toolInputSnapshots),
+    };
   }
 
   private shouldEmitAssistantError(
@@ -915,37 +965,212 @@ export class OpenCodeStreamingRuntimeCoordinator {
     };
   }
 
-  private collectAssistantTrailingTextChunks(
+  private collectAssistantTrailingContentChunks(
     sessionId: string,
     assistantTail: OpenCodeStreamingAssistantTail,
     cursor: OpenCodeStreamingFinalizationCursor,
   ): StreamChunk[] {
     const chunks: StreamChunk[] = [];
     for (const part of assistantTail.parts) {
-      if (part.type !== 'text' || typeof part.text !== 'string') {
+      if (this.isTextPartWithText(part)) {
+        chunks.push(...this.collectAssistantTrailingTextChunks(sessionId, assistantTail.info.id, part, cursor));
         continue;
       }
 
-      const currentText = part.text;
-      if (currentText.length <= cursor.lastContent.length) {
+      if (part.type === 'reasoning' || part.type === 'thinking') {
+        chunks.push(...this.collectAssistantTrailingReasoningChunks(sessionId, assistantTail.info.id, part, cursor));
         continue;
       }
 
-      const delta = currentText.slice(cursor.lastContent.length);
-      logAssistantFinalizationDebug('service-finish-emitting-trailing-text', {
-        sessionId,
-        assistantMessageId: assistantTail.info.id,
-        partId: part.id,
-        deltaLength: delta.length,
-        previousLength: cursor.lastContent.length,
-        nextLength: currentText.length,
-        deltaPreview: getDebugTextPreview(delta, 120),
-      });
-      chunks.push({ type: 'text', content: delta });
-      cursor.lastContent = currentText;
+      if (part.type === 'tool') {
+        chunks.push(...this.collectAssistantTrailingToolChunks(sessionId, assistantTail.info.id, part, cursor));
+      }
     }
 
     return chunks;
+  }
+
+  private isTextPartWithText(part: Part): part is Part & { text: string } {
+    return part.type === 'text' && typeof part.text === 'string';
+  }
+
+  private collectAssistantTrailingTextChunks(
+    sessionId: string,
+    assistantMessageId: string,
+    part: Part & { text: string },
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): StreamChunk[] {
+    const currentText = part.text;
+    if (currentText.length <= cursor.lastContent.length) {
+      return [];
+    }
+
+    const delta = currentText.slice(cursor.lastContent.length);
+    logAssistantFinalizationDebug('service-finish-emitting-trailing-text', {
+      sessionId,
+      assistantMessageId,
+      partId: part.id,
+      deltaLength: delta.length,
+      previousLength: cursor.lastContent.length,
+      nextLength: currentText.length,
+      deltaPreview: getDebugTextPreview(delta, 120),
+    });
+    cursor.lastContent = currentText;
+    return [{ type: 'text', content: delta }];
+  }
+
+  private collectAssistantTrailingReasoningChunks(
+    sessionId: string,
+    assistantMessageId: string,
+    part: Part,
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): StreamChunk[] {
+    if (typeof part.text !== 'string') {
+      return [];
+    }
+
+    const previousText = cursor.reasoningTextSnapshots.get(part.id) ?? '';
+    const nextText = part.text;
+    const delta = nextText.startsWith(previousText)
+      ? nextText.slice(previousText.length)
+      : nextText;
+    cursor.reasoningTextSnapshots.set(part.id, nextText);
+
+    const durationSeconds = resolveReasoningDurationSeconds(part);
+    if (this.hasVisibleReasoningText(delta)) {
+      logAssistantFinalizationDebug('service-finish-emitting-trailing-reasoning', {
+        sessionId,
+        assistantMessageId,
+        partId: part.id,
+        deltaLength: delta.length,
+        durationSeconds: durationSeconds ?? null,
+        deltaPreview: getDebugTextPreview(delta, 120),
+      });
+      return [{
+        type: 'thinking',
+        content: delta,
+        partId: part.id,
+        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+      }];
+    }
+
+    if (
+      durationSeconds !== undefined
+      && this.hasVisibleReasoningText(nextText)
+    ) {
+      return [{
+        type: 'thinking',
+        content: '',
+        partId: part.id,
+        durationSeconds,
+      }];
+    }
+
+    return [];
+  }
+
+  private collectAssistantTrailingToolChunks(
+    sessionId: string,
+    assistantMessageId: string,
+    part: Part,
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): StreamChunk[] {
+    const toolName = typeof part.tool === 'string' ? part.tool : 'unknown';
+    if (isInternalStructuredOutputTool(toolName)) {
+      return [];
+    }
+
+    const toolId = typeof part.callID === 'string' && part.callID.trim()
+      ? part.callID
+      : part.id;
+    if (!toolId) {
+      return [];
+    }
+
+    const toolInput = this.normalizeToolInput(part.state);
+    const nextSnapshot = this.getToolInputSnapshot(toolInput);
+    const previousSnapshot = cursor.toolInputSnapshots.get(toolId);
+    const shouldEmitToolUse = !cursor.processedToolIds.has(toolId) || nextSnapshot !== previousSnapshot;
+
+    const chunks: StreamChunk[] = [];
+    if (shouldEmitToolUse) {
+      logAssistantFinalizationDebug('service-finish-emitting-trailing-tool-use', {
+        sessionId,
+        assistantMessageId,
+        partId: part.id,
+        toolId,
+        toolName,
+        inputSnapshot: nextSnapshot,
+      });
+      cursor.processedToolIds.add(toolId);
+      cursor.toolInputSnapshots.set(toolId, nextSnapshot);
+      chunks.push({
+        type: 'tool_use',
+        id: toolId,
+        name: toolName,
+        input: toolInput,
+      });
+    }
+
+    const toolStatus = resolveToolExecutionStatus({
+      toolName,
+      state: part.state as never,
+    });
+    const toolResult = resolveToolResultText(part.state as never);
+    const resultKey = `${toolId}_result`;
+    if (
+      (toolStatus === 'completed' || toolStatus === 'error')
+      && toolResult !== undefined
+      && !cursor.processedToolIds.has(resultKey)
+    ) {
+      logAssistantFinalizationDebug('service-finish-emitting-trailing-tool-result', {
+        sessionId,
+        assistantMessageId,
+        partId: part.id,
+        toolId,
+        toolName,
+        toolStatus,
+        resultLength: toolResult.length,
+      });
+      cursor.processedToolIds.add(resultKey);
+      chunks.push({
+        type: 'tool_result',
+        toolUseId: toolId,
+        content: toolResult,
+        isError: toolStatus === 'error',
+      });
+    }
+
+    return chunks;
+  }
+
+  private normalizeToolInput(state: Part['state']): Record<string, unknown> {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) {
+      return {};
+    }
+
+    const input = (state as { input?: unknown }).input;
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return {};
+    }
+
+    return input as Record<string, unknown>;
+  }
+
+  private getToolInputSnapshot(input: Record<string, unknown>): string {
+    if (Object.keys(input).length === 0) {
+      return '';
+    }
+
+    try {
+      return JSON.stringify(input);
+    } catch {
+      return '[unserializable-tool-input]';
+    }
+  }
+
+  private hasVisibleReasoningText(text: unknown): text is string {
+    return typeof text === 'string' && text.trim().length > 0;
   }
 
   private logFinalizationStart(

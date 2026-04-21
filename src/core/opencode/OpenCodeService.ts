@@ -282,7 +282,7 @@ export class OpenCodeService {
     this.syncEventRuntime = new OpenCodeSyncEventRuntimeCoordinator({
       shouldUseSdkSync: () => this.shouldUseSdk('sdkSync'),
       subscribeToSyncEvents: async (signal) => {
-        const response = await this.sdk.global.syncEvent.subscribe({ signal });
+        const response = await this.getSdkFacade({ includeDirectory: false }).global.event({ signal } as never);
         return (response as { stream: AsyncIterable<unknown> }).stream;
       },
       normalizeSessionTodos: (response) => this.normalizeSessionTodos(response),
@@ -391,6 +391,7 @@ export class OpenCodeService {
     this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
       applyStreamMutations: (mutations) => this.applyCanonicalStreamMutations(mutations),
       abortSessionOnServer: (sessionId) => this.sessionLifecycle.abortSession(sessionId),
+      delay: (ms, signal) => this.delay(ms, signal),
       getLegacyEventStreamRequest: () => {
         this.ensureBaseUrl();
         return {

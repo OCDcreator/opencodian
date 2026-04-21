@@ -155,7 +155,7 @@ describe('OpenCodeService SDK sync events', () => {
   it('emits todo.updated payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
     const updates: Array<{ sessionId: string; todos: unknown[] }> = [];
-    mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+    mockSdkClient.global.event.mockResolvedValue({
       stream: (async function* () {
         yield {
           type: 'todo.updated',
@@ -177,7 +177,7 @@ describe('OpenCodeService SDK sync events', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     dispose();
 
-    expect(mockSdkClient.global.syncEvent.subscribe).toHaveBeenCalled();
+    expect(mockSdkClient.global.event).toHaveBeenCalled();
     expect(updates).toEqual([
       {
         sessionId: 'sdk-session',
@@ -192,7 +192,7 @@ describe('OpenCodeService SDK sync events', () => {
   it('emits session.status payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
     const updates: Array<{ sessionId: string; status: unknown }> = [];
-    mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+    mockSdkClient.global.event.mockResolvedValue({
       stream: (async function* () {
         yield {
           type: 'session.status',
@@ -211,7 +211,7 @@ describe('OpenCodeService SDK sync events', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     dispose();
 
-    expect(mockSdkClient.global.syncEvent.subscribe).toHaveBeenCalled();
+    expect(mockSdkClient.global.event).toHaveBeenCalled();
     expect(updates).toEqual([
       {
         sessionId: 'sdk-session',
@@ -225,7 +225,7 @@ describe('OpenCodeService SDK sync message mutations', () => {
   it('applies and emits message.updated payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
     const updates: Array<unknown> = [];
-    mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+    mockSdkClient.global.event.mockResolvedValue({
       stream: (async function* () {
         yield {
           type: 'message.updated',
@@ -279,7 +279,7 @@ describe('OpenCodeService SDK sync message mutations', () => {
   it('applies and emits message part mutation payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
     const updates: Array<unknown> = [];
-    mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+    mockSdkClient.global.event.mockResolvedValue({
       stream: (async function* () {
         yield {
           type: 'message.updated',
@@ -382,7 +382,7 @@ describe('OpenCodeService SDK sync message mutations', () => {
 describe('OpenCodeService SDK sync removals', () => {
   it('applies message and part removals from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
-    mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+    mockSdkClient.global.event.mockResolvedValue({
       stream: (async function* () {
         yield {
           type: 'message.updated',
@@ -442,7 +442,7 @@ describe('OpenCodeService SDK sync reload events', () => {
   it('emits session.diff payloads from SDK sync events', async () => {
     service = createServiceWithSdkFlags();
     const updates: Array<{ sessionId: string; type: string }> = [];
-    mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+    mockSdkClient.global.event.mockResolvedValue({
       stream: (async function* () {
         yield {
           type: 'session.diff',

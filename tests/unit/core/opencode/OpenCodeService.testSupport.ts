@@ -66,7 +66,7 @@ export const REMOTE_CONTEXT_LIMIT_BYTES = 64 * 1024;
 
 function createMockSdkClient() {
   return {
-    global: { health: jest.fn(), syncEvent: { subscribe: jest.fn() } },
+    global: { health: jest.fn(), event: jest.fn() },
     session: {
       create: jest.fn(),
       diff: jest.fn(),

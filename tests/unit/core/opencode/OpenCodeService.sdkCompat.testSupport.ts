@@ -58,7 +58,6 @@ const createMockSdkClient = () => ({
         properties: { server: 'exa' },
       },
     })),
-    syncEvent: { subscribe: jest.fn().mockResolvedValue(createStream()) },
   },
   event: {
     subscribe: jest.fn().mockResolvedValue(createStream({

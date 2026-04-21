@@ -66,7 +66,7 @@
 - `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责稳定 `messageID + parts[]` send payload、OpenCode 兼容的 `msg_*` / `prt_*` prompt id、SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk + OpenCodeStreamMutation` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
-- `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、当前 prompt `messageID` 透传、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、stream mutation 应用顺序、final response completion，以及 active stream registry、session-scoped abort controller、part metadata tracking、cancel/detach lifecycle。
+- `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、当前 prompt `messageID` 透传、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、stream mutation 应用顺序、final response completion，以及 active stream registry、session-scoped abort controller、part metadata tracking、cancel/detach lifecycle。服务层现在也把统一的 `delay(ms, signal)` seam 注入给它，用于 bounded assistant-tail retry 等需要和 sync/open-code event runtime 保持一致的短等待逻辑。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、session info lookup、session abort fallback、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `sessionStateStore`: `OpenCodeSessionStateStore` 实例，负责 canonical `session/message/part` graph 的 snapshot replace、增量 mutation 与只读 state clone。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
@@ -108,7 +108,7 @@
 
 补充一个运行时细节：
 
-- 当本地服务短暂离线、SDK/legacy 都同时打到 `ERR_CONNECTION_REFUSED` / `ERR_CONNECTION_RESET` 时，lifecycle diagnostics owner 会把整段离线期的重复 fallback / failure 日志合并成一次；服务恢复并重新健康后才解除抑制。`global.syncEvent.subscribe()` 在离线期也会改为健康轮询等待恢复，而不是每秒继续重连刷控制台。
+- 当本地服务短暂离线、SDK/legacy 都同时打到 `ERR_CONNECTION_REFUSED` / `ERR_CONNECTION_RESET` 时，lifecycle diagnostics owner 会把整段离线期的重复 fallback / failure 日志合并成一次；服务恢复并重新健康后才解除抑制。新版 SDK 下 sync runtime 复用 `global.event()` 流，在离线期也会改为健康轮询等待恢复，而不是每秒继续重连刷控制台。
 
 特别点：
 
@@ -239,6 +239,7 @@
 - `releaseActiveStreamContext()` 只释放仍然是当前注册实例的 context，避免旧流 finally 清掉新流
 - `streamSdkResponse()` 负责 SDK stream 订阅、首事件前失败时的 legacy SSE fallback，以及最终 assistant message completion
 - `streamLegacyResponse()` 负责 legacy `/event` 连接、reader abort/detach 生命周期、event loop 与最终 assistant message completion
+- runtime host 装配会给 streaming coordinator 注入与 sync/open-code event runtime 相同的 `delay()` helper，这样 assistant-tail 可见性重试和其他 runtime backoff 都共享同一套 abort-aware wait 语义
 
 与之配套的 event→chunk transform 现在由 `OpenCodeStreamEventTransformer` 持有：
 
@@ -286,7 +287,7 @@ stream outcome 的顺序边界是：先应用 canonical mutations，再把旧的
 
 ### Todo / status 的 sync 事件循环
 
-只有在 `sdkSync` 开启且存在本地监听器时，才会启动 `global.syncEvent.subscribe()` 循环。
+只有在 `sdkSync` 开启且存在本地监听器时，才会启动 SDK `global.event()` 循环，并只消费其中的 `todo.updated` / `session.status` / message-sync 相关事件。
 
 链路如下：
 
@@ -397,7 +398,7 @@ graph TD
 ## 与其他模块的交互
 
 - `ServerManager`: 负责本地/远程服务生命周期与健康检查。
-- `OpenCodeSyncEventRuntimeCoordinator`: 负责 `global.syncEvent.subscribe()` 的 session todo/status/message sync event listener registry、订阅重启和 transient connectivity recovery 循环。
+- `OpenCodeSyncEventRuntimeCoordinator`: 负责基于 SDK `global.event()` 的 session todo/status/message sync event listener registry、订阅重启和 transient connectivity recovery 循环。
 - `OpenCodeEventSubscriptionCoordinator`: 负责 `event.subscribe()` / `global.event()` 的 open-code event listener registry、catalog-relevant payload routing、双路订阅重启与 catalog listener emit。
 - `OpenCodeCatalogQueryCoordinator`: 负责 directory-scoped provider/model/config lookup、tool registry/schema cache、MCP status/auth 写回，以及 provider/project/file/find/path/VCS/formatter/LSP query surface。
 - `OpenCodeStreamingRuntimeCoordinator`: 负责 active stream registry、session-scoped abort controllers、part metadata tracking、stream mutation 应用顺序，以及 cancel/detach 的 runtime lifecycle。

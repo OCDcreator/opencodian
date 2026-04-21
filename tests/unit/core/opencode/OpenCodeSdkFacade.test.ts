@@ -23,7 +23,6 @@ describe('OpenCodeSdkFacade', () => {
       formatter: { status: jest.fn().mockResolvedValue([]) },
       global: {
         event: jest.fn().mockResolvedValue({ stream: (async function* () {})() }),
-        syncEvent: { subscribe: jest.fn().mockResolvedValue({ stream: (async function* () {})() }) },
       },
       instance: { dispose: jest.fn().mockResolvedValue(true) },
       lsp: { status: jest.fn().mockResolvedValue([]) },
@@ -73,7 +72,7 @@ describe('OpenCodeSdkFacade', () => {
     await expect(facade.provider.oauth.authorize({ providerID: 'openai' })).resolves.toEqual({
       url: 'https://example.com',
     });
-    await expect(facade.global.syncEvent.subscribe()).resolves.toEqual({
+    await expect(facade.global.event()).resolves.toEqual({
       stream: expect.any(Object),
     });
   });
