@@ -96,14 +96,14 @@ export class ConversationRenderService {
 
 - 只在当前活动 conversation 仍匹配、且消息容器存在时执行
 - 如果当前 session 已有 canonical state，先通过 `ConversationTurnViewModelBuilder` 组装 turn view-model，再用注入的 hydrator 转回现有 `ChatMessage` shell 输入
-- canonical render input 会按 source message id 与当前 conversation message 合并，保留本地 interrupted / notice / question-resolution 等 client-only 字段
+- canonical state 一旦可用，就直接成为 full rerender 与 synced update 的唯一 render 输入；`conversation.messages` 只在 canonical 缺失时才作为临时 fallback
 - 进入 hydration 前先抓取 scroll snapshot，并复用 `ScrollManager` 恢复 bottom / distance / anchor 语义
 - 重渲后继续刷新 background-task indicator、pane metrics 和 composer layout
 
 ### 增量同步
 
 - `getIncrementalRenderedMessageUpdate()` 先判断是否还能沿用现有 rendered message 前缀
-- synced update 有 canonical state 时，会先把 next render input 解析为 canonical turn hydrate 结果，再进入现有 append / tail patch 判定
+- synced update 有 canonical state 时，会先把 next render input 解析为 canonical turn hydrate 结果，再进入现有 append / tail patch 判定；不再把 fallback `ChatMessage[]` 与 canonical 输出 merge 成并行 truth
 - append-only 时只渲染新增消息，不重跑整段历史
 - 纯文本 assistant append 继续直接在 service 内走 pseudo-stream reveal，而不是回到 view 再分支
 - synced update 的“增量判断 → optional tail patch → append render → indicator/scroll follow-up”现在由 `ConversationRenderRuntime` 的 apply delegate 串起来，service 公开入口只保留高层委托与 full-rerender fallback

@@ -1,6 +1,5 @@
 import type {
   ChatMessage,
-  ContentBlock,
 } from '../../../core/types';
 import type { ConversationAuthoritativeSyncHost } from './ConversationAuthoritativeSyncCoordinator';
 
@@ -18,13 +17,10 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
     verbose = true,
   ): ChatMessage {
     const contextAttachments = this.mergeSyncedMessageContextAttachments(existingMessage, syncedMessage);
-    const content = this.mergeSyncedMessageContent(existingMessage, syncedMessage);
-    const contentBlocks = this.mergeSyncedMessageContentBlocks(existingMessage, syncedMessage);
-    const toolCalls = this.mergeSyncedMessageToolCalls(existingMessage, syncedMessage);
     const preservedFlags = this.getClientOnlyMessagePreservationFlags(
       existingMessage,
       syncedMessage,
-      { content, contentBlocks, toolCalls },
+      { contextAttachments },
     );
     this.logClientOnlyMessageFieldPreservation(
       existingMessage,
@@ -35,14 +31,8 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
 
     return {
       ...syncedMessage,
-      content,
-      contentBlocks,
-      toolCalls,
       contextAttachments,
       questionResolution: syncedMessage.questionResolution ?? existingMessage.questionResolution,
-      streamState: syncedMessage.streamState ?? existingMessage.streamState,
-      structured: syncedMessage.structured ?? existingMessage.structured,
-      parts: syncedMessage.parts ?? existingMessage.parts,
     };
   }
 
@@ -166,59 +156,18 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
       && left.lineRange?.endLine === right.lineRange?.endLine;
   }
 
-  private mergeSyncedMessageContent(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): string {
-    if (!syncedMessage.content?.trim() && existingMessage.content?.trim()) {
-      return existingMessage.content;
-    }
-
-    return syncedMessage.content;
-  }
-
-  private mergeSyncedMessageContentBlocks(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): ChatMessage['contentBlocks'] {
-    return this.shouldPreserveExistingAssistantContentBlocks(existingMessage, syncedMessage)
-      ? existingMessage.contentBlocks
-      : syncedMessage.contentBlocks;
-  }
-
-  private mergeSyncedMessageToolCalls(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): ChatMessage['toolCalls'] {
-    if (syncedMessage.toolCalls?.length) {
-      return syncedMessage.toolCalls;
-    }
-
-    if (existingMessage.toolCalls?.length) {
-      return existingMessage.toolCalls;
-    }
-
-    return syncedMessage.toolCalls;
-  }
-
   private getClientOnlyMessagePreservationFlags(
     existingMessage: ChatMessage,
     syncedMessage: ChatMessage,
-    mergedFields: Pick<ChatMessage, 'content' | 'contentBlocks' | 'toolCalls'>,
+    mergedFields: Pick<ChatMessage, 'contextAttachments'>,
   ): Record<string, boolean> {
     return {
-      preservedExistingContent:
-        mergedFields.content === existingMessage.content
-        && mergedFields.content !== syncedMessage.content,
-      preservedExistingContentBlocks:
-        mergedFields.contentBlocks === existingMessage.contentBlocks,
-      preservedExistingToolCalls:
-        mergedFields.toolCalls === existingMessage.toolCalls
-        && mergedFields.toolCalls !== syncedMessage.toolCalls,
-      preservedExistingStructured:
-        syncedMessage.structured === undefined
-        && existingMessage.structured !== undefined,
-      preservedExistingParts: syncedMessage.parts === undefined && existingMessage.parts !== undefined,
+      preservedExistingContextAttachments:
+        mergedFields.contextAttachments === existingMessage.contextAttachments
+        && mergedFields.contextAttachments !== syncedMessage.contextAttachments,
+      preservedExistingQuestionResolution:
+        syncedMessage.questionResolution === undefined
+        && existingMessage.questionResolution !== undefined,
     };
   }
 
@@ -237,56 +186,5 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
       syncedMessage: this.host.summarizeChatMessageForDebug(syncedMessage),
       preservedFlags,
     });
-  }
-
-  private shouldPreserveExistingAssistantContentBlocks(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): boolean {
-    if (existingMessage.role !== 'assistant') {
-      return false;
-    }
-
-    const existingBlocks = existingMessage.contentBlocks;
-    if (!existingBlocks || existingBlocks.length === 0) {
-      return false;
-    }
-
-    const syncedBlocks = syncedMessage.contentBlocks;
-    if (!syncedBlocks || syncedBlocks.length === 0) {
-      return true;
-    }
-
-    const existingHasRichBlocks = this.hasRichAssistantContentBlocks(existingBlocks);
-    const syncedHasRichBlocks = this.hasRichAssistantContentBlocks(syncedBlocks);
-    if (existingHasRichBlocks && !syncedHasRichBlocks) {
-      return this.getAssistantTextBlockSignature(existingBlocks, existingMessage.content)
-        === this.getAssistantTextBlockSignature(syncedBlocks, syncedMessage.content);
-    }
-
-    if (existingBlocks.length <= syncedBlocks.length) {
-      return false;
-    }
-
-    return this.getAssistantTextBlockSignature(existingBlocks, existingMessage.content)
-      === this.getAssistantTextBlockSignature(syncedBlocks, syncedMessage.content);
-  }
-
-  private hasRichAssistantContentBlocks(blocks: ContentBlock[]): boolean {
-    return blocks.some((block) => block.type !== 'text');
-  }
-
-  private getAssistantTextBlockSignature(
-    blocks: ContentBlock[] | undefined,
-    fallbackContent: string,
-  ): string {
-    if (!blocks || blocks.length === 0) {
-      return fallbackContent.trim();
-    }
-
-    return blocks
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text?.trim() ?? '')
-      .join('\n');
   }
 }

@@ -216,7 +216,7 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
-这里的 conversation sync fingerprint 现在不再只看平铺文本：`OpenCodianView` 会把 `contentBlocks`、tool call、context attachment、OMO/notice 元数据和原始 `parts` 一起写入 fingerprint，从而让 authoritative reload/finalization 能识别“文本没变但 canonical graph 已纠偏”的 drift。
+这里的 conversation sync fingerprint 现在直接复用 `OpenCodeService.getCanonicalConversationFingerprint()`：它会把 `contentBlocks`、tool call、context attachment、OMO/notice 元数据和原始 `parts` 一起写入 fingerprint，从而让 authoritative reload/finalization 以 canonical payload 漂移为准，而不是继续依赖 view 层单独维护一套 visual-only 对比。
 
 与此同时，server message 拉取→hydrate→authoritative merge、latest optimistic user bubble hydration、client-only/interrupted message preservation，以及 sync debug payload / fingerprint 组装现在统一收束到 `services/ConversationAuthoritativeSyncCoordinator.ts`。`OpenCodianView` 只再保留 host seam：OpenCode message/revert 查询、runtime fingerprint/anchor 写回、context usage refresh、background-task authoritative-sync 标记，以及 hydrated single-message rerender。
 

@@ -325,6 +325,78 @@ describe('ConversationRenderService full rerender flows', () => {
       id: 'stale-user',
     }));
   });
+
+  it('does not merge fallback conversation messages into canonical full-rerender input', async () => {
+    const conversation = createConversation([
+      createMessage({
+        id: 'fallback-user',
+        role: 'user',
+        content: 'stale user',
+        timestamp: 1,
+        sourceMessageId: 'user-1',
+      }),
+      createMessage({
+        id: 'fallback-assistant',
+        content: 'stale assistant',
+        timestamp: 2,
+        sourceMessageId: 'assistant-1',
+      }),
+      createMessage({
+        id: 'local-notice',
+        content: 'local cache notice',
+        timestamp: 30,
+        displayStyle: 'notice',
+      }),
+    ]);
+    const canonicalState: OpenCodeCanonicalSessionState = {
+      sessionID: 'session-1',
+      messages: [
+        createCanonicalMessage({ id: 'user-1', role: 'user', time: { created: 10 } }),
+        createCanonicalMessage({ id: 'assistant-1', role: 'assistant', time: { created: 20 } }),
+      ],
+      partsByMessageID: {
+        'user-1': [
+          createCanonicalPart({
+            id: 'part-user',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'canonical user',
+          }),
+        ],
+        'assistant-1': [
+          createCanonicalPart({
+            id: 'part-assistant',
+            messageID: 'assistant-1',
+            type: 'text',
+            text: 'canonical assistant',
+          }),
+        ],
+      },
+    };
+    const host = createHost({
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    });
+    const service = new ConversationRenderService(host, {
+      getCanonicalSessionState: jest.fn().mockReturnValue(canonicalState),
+      hydrateOpenCodeMessage: jest.fn(hydrateCanonicalMessage),
+    });
+
+    await service.rerenderConversationMessages(conversation);
+
+    expect(host.createUserMessageFrame).toHaveBeenCalledTimes(1);
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledTimes(1);
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'assistant-1',
+        content: 'canonical assistant',
+      }),
+    );
+    expect(host.assistantShellRender.renderPersistedMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'local-notice',
+      }),
+    );
+  });
 });
 
 describe('ConversationRenderService canonical reload regressions', () => {

@@ -319,6 +319,10 @@ export class ConversationAuthoritativeReloadCoordinator {
         return false;
       }
 
+      if (syncedMessages.length > 0) {
+        return false;
+      }
+
       const hasVisibleContent = Boolean(
         message.content?.trim()
         || (message.contentBlocks?.length ?? 0) > 0,

@@ -23,7 +23,7 @@ describe('OpenCodianView synced assistant merge preservation', () => {
     } as never);
   }
 
-  it('preserves richer local assistant content blocks when synced text matches but omits tool metadata', () => {
+  it('does not preserve richer local assistant content blocks over authoritative synced content', () => {
     const view = createView() as unknown as {
       mergeClientOnlyMessageFields: (
         existingMessage: Record<string, unknown>,
@@ -60,7 +60,6 @@ describe('OpenCodianView synced assistant merge preservation', () => {
       sourceMessageId: 'msg-1',
       content: 'answer',
       contentBlocks: [
-        { type: 'tool_use', toolId: 'tool-1', toolName: 'structured_output' },
         { type: 'text', text: 'answer' },
       ],
     });

@@ -47,11 +47,8 @@ function createHost(
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue({
       messages: conversation.messages,
       changed: false,
-      fingerprint: 'sync-fingerprint',
+      fingerprint: OpenCodeService.getCanonicalConversationFingerprint(conversation.messages),
     }),
-    getConversationVisualFingerprint: jest.fn().mockImplementation(
-      (messages: ChatMessage[]) => messages.map((message) => `${message.id}:${message.content}:${message.timestamp}`).join('|'),
-    ),
     getConversationSyncFingerprint: jest.fn().mockImplementation(
       (messages: ChatMessage[]) => OpenCodeService.getCanonicalConversationFingerprint(messages),
     ),
@@ -148,11 +145,12 @@ describe('MessageFinalizationService foreground finalization', () => {
     expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
     expect(host.appendTurnDiffNoticeIfNeeded).toHaveBeenCalledWith(conversation, ['notes.md'], 'tab-1');
     expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
-    expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(1, 'tab-1', 'sync-fingerprint');
+    const stableFingerprint = host.getConversationSyncFingerprint(conversation.messages);
+    expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(1, 'tab-1', stableFingerprint);
     expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(
       2,
       'tab-1',
-      host.getConversationSyncFingerprint(conversation.messages),
+      stableFingerprint,
     );
     expect(host.setConversationSyncInFlight).toHaveBeenCalledWith('tab-1', false);
   });
@@ -259,7 +257,7 @@ describe('MessageFinalizationService background and recovery paths', () => {
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-1', true);
   });
 
-  it('records canonical-only sync drift without forcing a foreground rerender', async () => {
+  it('routes canonical-only sync drift through the centralized foreground render input', async () => {
     const previousMessages = [
       createMessage({
         id: 'user-1',
@@ -331,8 +329,11 @@ describe('MessageFinalizationService background and recovery paths', () => {
       logStage: jest.fn(),
     });
 
-    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
-    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
+    expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(
+      previousMessages,
+      nextMessages,
+    );
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalledWith('tab-1');
     expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(
       1,
       'tab-1',

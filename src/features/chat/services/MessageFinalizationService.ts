@@ -56,7 +56,6 @@ export interface MessageFinalizationHost {
     tabId: TabId | null,
     reason: string,
   ): Promise<MessageFinalizationSyncResult>;
-  getConversationVisualFingerprint(messages: ChatMessage[]): string;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
   applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
@@ -159,9 +158,11 @@ export class MessageFinalizationService {
     logStage: FinalizeMessageOptions['logStage'],
   ): Promise<MessageFinalizationSyncAfterStreamState> {
     const previousMessagesBeforeSync = [...conversation.messages];
-    const previousVisualFingerprint = this.host.getConversationVisualFingerprint(conversation.messages);
+    const previousCanonicalFingerprint = this.host.getConversationSyncFingerprint(
+      conversation.messages,
+    );
     logStage('server-sync-requested', {
-      previousVisualFingerprint,
+      previousCanonicalFingerprint,
       localTailAssistant: this.host.summarizeChatMessageForDebug(
         this.findLatestAssistantMessage(conversation.messages),
       ),
@@ -186,7 +187,7 @@ export class MessageFinalizationService {
       syncResult,
       isForegroundConversation,
       needsForegroundRenderSync: isForegroundConversation
-        && previousVisualFingerprint !== this.host.getConversationVisualFingerprint(syncResult.messages),
+        && previousCanonicalFingerprint !== syncResult.fingerprint,
     };
   }
 

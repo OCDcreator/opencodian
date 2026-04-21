@@ -100,7 +100,7 @@ describe('ConversationAuthoritativeSyncCoordinator', () => {
     jest.clearAllMocks();
   });
 
-  it('preserves richer local assistant content blocks when synced text matches', () => {
+  it('does not preserve richer local assistant content blocks over canonical synced content', () => {
     const host = createHost();
     const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
 
@@ -133,18 +133,10 @@ describe('ConversationAuthoritativeSyncCoordinator', () => {
       sourceMessageId: 'msg-1',
       content: 'answer',
       contentBlocks: [
-        { type: 'tool_use', toolId: 'tool-1', toolName: 'structured_output' },
         { type: 'text', text: 'answer' },
       ],
     });
-    expect(host.logAssistantFinalizationDebug).toHaveBeenCalledWith(
-      'merge-client-only-message-fields',
-      expect.objectContaining({
-        preservedFlags: expect.objectContaining({
-          preservedExistingContentBlocks: true,
-        }),
-      }),
-    );
+    expect(host.logAssistantFinalizationDebug).not.toHaveBeenCalled();
   });
 
   it('preserves interrupted local assistant messages across authoritative sync merges', async () => {
@@ -192,5 +184,66 @@ describe('ConversationAuthoritativeSyncCoordinator', () => {
       'background-tab-sync',
     );
     expect(runtime.lastInterruptedSyncPreservationLogFingerprint).not.toBeNull();
+  });
+
+  it('does not preserve local interrupted assistant messages when canonical synced messages exist', async () => {
+    const runtime = createRuntime();
+    const syncedUserMessage: ChatMessage = {
+      id: 'user-synced',
+      role: 'user',
+      content: 'Server question',
+      timestamp: 10,
+      sourceMessageId: 'user-synced',
+    };
+    const host = createHost({
+      getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'user-synced',
+            role: 'user',
+            sessionID: 'session-sync-no-preserve',
+            time: { created: 10 },
+          },
+          parts: [
+            {
+              id: 'part-user-synced',
+              sessionID: 'session-sync-no-preserve',
+              messageID: 'user-synced',
+              type: 'text',
+              text: 'Server question',
+            },
+          ],
+        },
+      ]),
+      hydrateOpenCodeMessage: jest.fn().mockReturnValue(syncedUserMessage),
+    });
+    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
+    const conversation = createConversation('sync-no-preserve', {
+      messages: [
+        {
+          id: 'assistant-local',
+          role: 'assistant',
+          content: 'Partial interrupted reply',
+          timestamp: 1000,
+          streamState: 'interrupted',
+          contentBlocks: [
+            {
+              type: 'text',
+              text: 'Partial interrupted reply',
+            },
+          ],
+        } as ChatMessage,
+      ],
+    });
+
+    const result = await coordinator.syncConversationMessagesFromServer(
+      conversation,
+      'tab-1',
+      'background-tab-sync',
+    );
+
+    expect(result.messages).toEqual([syncedUserMessage]);
+    expect(runtime.lastInterruptedSyncPreservationLogFingerprint).toBeNull();
   });
 });

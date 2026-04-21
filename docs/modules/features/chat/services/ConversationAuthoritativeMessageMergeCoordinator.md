@@ -7,9 +7,9 @@
 
 `ConversationAuthoritativeMessageMergeCoordinator` 收束 authoritative sync 里的 message merge 规则，统一负责：
 
-- single-message client-only field preservation
+- single-message client-only metadata preservation
 - synced conversation message 与本地 assistant `modelId` 的补配
-- richer local assistant content blocks / tool calls / structured payload 的保留规则
+- 移除 `conversation.messages` 对 assistant content / contentBlocks / toolCalls / structured / parts 的并行 truth 补偿
 - merge 时的 preservation debug payload 记录
 
 它不负责 server fetch / revert-state / fingerprint / save，也不负责 optimistic user bubble hydration；这些职责仍分别留在 `ConversationAuthoritativeReloadCoordinator` 与 `ConversationAuthoritativeSyncCoordinator`。
@@ -25,10 +25,9 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
 
 ## 关键行为
 
-- `mergeClientOnlyMessageFields()` 继续保留 context attachment、tool call、structured、parts 与 question resolution 等 client-only payload。
-- 当 server assistant 缺少 rich blocks / tool metadata 时，仍优先保留本地更完整的 assistant payload。
+- `mergeClientOnlyMessageFields()` 现在只保留 context attachment 与 question resolution 这类 metadata，不再把本地 assistant 正文、block、tool call、structured 或原始 `parts` 覆盖回 authoritative synced message。
 - `mergeSyncedConversationMessages()` 会把 source-message 对齐的 assistant modelId 回填到 synced messages，并在 sourceMessageId 缺失时回退到内容匹配。
-- preservation debug payload 仍经由原有 host 的 `logAssistantFinalizationDebug()` 输出，不改变现有日志口径。
+- 只有真的保留了 metadata 时，才会继续通过 `logAssistantFinalizationDebug()` 输出 preservation debug payload。
 
 ## 与相邻模块的边界
 

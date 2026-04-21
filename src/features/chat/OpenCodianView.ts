@@ -12,6 +12,7 @@ import {
 } from '../../core/config/modelConfig';
 import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
 import {
+  OpenCodeService,
   type SessionActivityStatus,
 } from '../../core/opencode';
 import {
@@ -2316,7 +2317,6 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       syncConversationMessagesFromServer: (conversation, tabId, reason) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason),
-      getConversationVisualFingerprint: (messages) => this.getConversationVisualFingerprint(messages),
       getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
@@ -3549,6 +3549,13 @@ export class OpenCodianView extends ItemView {
   }
 
   private getConversationSyncFingerprint(messages: ChatMessage[]): string {
+    const fingerprintBuilder = (
+      this.plugin.openCodeService?.constructor as typeof OpenCodeService | undefined
+    )?.getCanonicalConversationFingerprint;
+    if (typeof fingerprintBuilder === 'function') {
+      return fingerprintBuilder(messages);
+    }
+
     return JSON.stringify(messages.map((message) => ({
       id: message.id,
       role: message.role,
@@ -3589,12 +3596,6 @@ export class OpenCodianView extends ItemView {
         contentBlocks: message.contentBlocks ?? [],
       })),
     });
-  }
-
-  private getConversationVisualFingerprint(messages: ChatMessage[]): string {
-    return this.getMessagesForRender(messages)
-      .map((message) => this.getMessageVisualSignature(message))
-      .join('|');
   }
 
   private getMessageVisualSignature(message: ChatMessage): string {
