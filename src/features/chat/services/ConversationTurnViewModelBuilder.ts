@@ -35,6 +35,15 @@ interface MutableConversationTurnViewModel extends ConversationTurnViewModel {
   assistantPartsByMessageID: Record<string, OpenCodeCanonicalPart[]>;
 }
 
+function getMessageParentId(
+  message: OpenCodeCanonicalMessageInfo,
+): string | null {
+  const parentID = (message as OpenCodeCanonicalMessageInfo & { parentID?: unknown }).parentID;
+  return typeof parentID === 'string' && parentID.trim()
+    ? parentID
+    : null;
+}
+
 function getRecordString(
   record: Record<string, unknown>,
   key: string,
@@ -53,15 +62,37 @@ export class ConversationTurnViewModelBuilder {
     hydrateMessage: ConversationTurnMessageHydrator,
   ): ConversationCanonicalRenderInput {
     const turns = this.buildTurns(sessionState);
-    const messages = sessionState.messages.map((message) => {
-      const parts = this.getPartsForMessage(sessionState, message.id);
-      const renderedMessage = hydrateMessage(message, parts);
-      if (message.role === 'assistant' && this.isInterruptedAssistantMessage(message, parts)) {
-        renderedMessage.streamState = 'interrupted';
+    const turnsByUserMessageID = new Map<string, ConversationTurnViewModel>(
+      turns.map((turn) => [turn.userMessageID, turn]),
+    );
+    const renderedMessageIDs = new Set<string>();
+    const messages: ChatMessage[] = [];
+
+    for (const message of sessionState.messages) {
+      if (message.role === 'user') {
+        const turn = turnsByUserMessageID.get(message.id);
+        if (!turn) {
+          continue;
+        }
+        for (const renderedMessage of this.buildRenderMessages([turn], hydrateMessage)) {
+          renderedMessageIDs.add(renderedMessage.sourceMessageId ?? renderedMessage.id);
+          messages.push(renderedMessage);
+        }
+        continue;
       }
 
-      return renderedMessage;
-    });
+      if (renderedMessageIDs.has(message.id)) {
+        continue;
+      }
+
+      const parts = this.getPartsForMessage(sessionState, message.id);
+      const renderedMessage = hydrateMessage(message, parts);
+      if (this.isInterruptedAssistantMessage(message, parts)) {
+        renderedMessage.streamState = 'interrupted';
+      }
+      renderedMessageIDs.add(message.id);
+      messages.push(renderedMessage);
+    }
 
     return {
       turns,
@@ -71,29 +102,41 @@ export class ConversationTurnViewModelBuilder {
 
   buildTurns(sessionState: OpenCodeCanonicalSessionState): ConversationTurnViewModel[] {
     const turns: MutableConversationTurnViewModel[] = [];
-    let currentTurn: MutableConversationTurnViewModel | null = null;
+    const turnsByUserMessageID = new Map<string, MutableConversationTurnViewModel>();
 
     for (const message of sessionState.messages) {
+      if (message.role !== 'user') {
+        continue;
+      }
+
       const parts = this.getPartsForMessage(sessionState, message.id);
+      const turn: MutableConversationTurnViewModel = {
+        userMessageID: message.id,
+        userInfo: message,
+        userParts: parts,
+        assistantMessages: [],
+        assistantPartsByMessageID: {},
+        interrupted: false,
+        error: null,
+      };
+      turns.push(turn);
+      turnsByUserMessageID.set(message.id, turn);
+    }
+
+    let currentTurn: MutableConversationTurnViewModel | null = null;
+    for (const message of sessionState.messages) {
       if (message.role === 'user') {
-        currentTurn = {
-          userMessageID: message.id,
-          userInfo: message,
-          userParts: parts,
-          assistantMessages: [],
-          assistantPartsByMessageID: {},
-          interrupted: false,
-          error: null,
-        };
-        turns.push(currentTurn);
+        currentTurn = turnsByUserMessageID.get(message.id) ?? null;
         continue;
       }
 
-      if (!currentTurn) {
+      const parts = this.getPartsForMessage(sessionState, message.id);
+      const parentTurn = this.resolveAssistantTurn(message, currentTurn, turnsByUserMessageID);
+      if (!parentTurn) {
         continue;
       }
 
-      this.appendAssistantMessage(currentTurn, message, parts);
+      this.appendAssistantMessage(parentTurn, message, parts);
     }
 
     return turns;
@@ -129,6 +172,22 @@ export class ConversationTurnViewModelBuilder {
     turn.assistantPartsByMessageID[message.id] = parts;
     turn.interrupted = turn.interrupted || this.isInterruptedAssistantMessage(message, parts);
     turn.error = turn.error ?? this.normalizeError(message.error);
+  }
+
+  private resolveAssistantTurn(
+    message: OpenCodeCanonicalMessageInfo,
+    currentTurn: MutableConversationTurnViewModel | null,
+    turnsByUserMessageID: Map<string, MutableConversationTurnViewModel>,
+  ): MutableConversationTurnViewModel | null {
+    const parentId = getMessageParentId(message);
+    if (parentId) {
+      const parentTurn = turnsByUserMessageID.get(parentId);
+      if (parentTurn) {
+        return parentTurn;
+      }
+    }
+
+    return currentTurn;
   }
 
   private getPartsForMessage(

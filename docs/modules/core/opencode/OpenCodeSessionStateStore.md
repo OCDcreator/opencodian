@@ -27,7 +27,7 @@
 
 ## 核心类型 / 状态
 
-- `OpenCodeCanonicalSessionState`: 单个 session 的规范状态，包含排序后的 `messages` 与按 message 聚合的 `partsByMessageID`。
+- `OpenCodeCanonicalSessionState`: 单个 session 的规范状态，包含保留 authoritative / mutation 插入顺序的 `messages` 与按 message 聚合的 `partsByMessageID`。
 - `OpenCodeSessionMessageWithParts`: `session.messages()` / legacy `/message` 读回的 `{ info, parts[] }` 结构。
 - `sessions`: 以 `sessionID` 为键的内存状态表。
 
@@ -39,7 +39,7 @@
 
 1. 用当前 session 的 authoritative 消息数组重建 state
 2. 补齐缺失的 `sessionID` / `messageID`
-3. 按 `id` 稳定排序 message 与 part
+3. 保留 authoritative message 顺序，并继续按 `id` 稳定排序 part
 4. 丢弃旧 snapshot 中已经不存在的 message/part
 
 ### Incremental mutation
@@ -88,4 +88,5 @@ graph TD
 ## 注意事项
 
 - 这是 canonical truth layer，不要把 UI 级 `ChatMessage.content` 拼接状态写回这里。
-- 目前排序策略与 OpenCode sync reducer 一样偏向稳定 `id` 顺序；若未来改为显式 time/order 字段，应该在这里统一调整。
+- message 顺序必须保留 authoritative snapshot / 增量 mutation 的原始会话顺序，不能再把 `id` 当成时间代理；本地 user message 已经可能使用随机 UUID 风格 `msg_*`，而 assistant message 仍可能来自单调 id 空间，按 `id` 排序会把旧 assistant 错挂到后续 user turn 后面。
+- part 目前仍按 `id` 稳定排序；若未来 part 也引入独立显式顺序字段，应该在这里统一调整。

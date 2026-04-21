@@ -72,7 +72,6 @@ export class OpenCodeSessionStateStore {
       }
     }
 
-    state.messages.sort(compareById);
     this.sessions.set(sessionID, state);
     return cloneState(state);
   }
@@ -86,7 +85,6 @@ export class OpenCodeSessionStateStore {
     } else {
       state.messages.push(next);
     }
-    state.messages.sort(compareById);
     return cloneState(state);
   }
 

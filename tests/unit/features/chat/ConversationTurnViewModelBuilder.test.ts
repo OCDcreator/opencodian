@@ -195,6 +195,40 @@ describe('ConversationTurnViewModelBuilder', () => {
     expect(builder.buildTurns(liveState)).toEqual(builder.buildTurns(reloadedState));
   });
 
+  it('attaches assistant messages back to their parent user turn even when canonical message order drifts', () => {
+    const userOne = createMessage({ id: 'msg_c460fc93-random-user-1', role: 'user', time: { created: 1 } });
+    const assistantOne = createMessage({
+      id: 'msg_db035fb4-monotonic-assistant',
+      role: 'assistant',
+      time: { created: 2 },
+      parentID: 'msg_c460fc93-random-user-1',
+    } as OpenCodeCanonicalMessageInfo);
+    const userTwo = createMessage({ id: 'msg_d4d34935-random-user-2', role: 'user', time: { created: 3 } });
+    const userThree = createMessage({ id: 'msg_947188ec-random-user-3', role: 'user', time: { created: 4 } });
+    const state = createState(
+      [userThree, userOne, userTwo, assistantOne],
+      [
+        createPart({ id: 'part-user-1', messageID: 'msg_c460fc93-random-user-1', type: 'text', text: 'Hello' }),
+        createPart({ id: 'part-assistant-1', messageID: 'msg_db035fb4-monotonic-assistant', type: 'text', text: 'Hi there' }),
+        createPart({ id: 'part-user-2', messageID: 'msg_d4d34935-random-user-2', type: 'text', text: 'Who are you?' }),
+        createPart({ id: 'part-user-3', messageID: 'msg_947188ec-random-user-3', type: 'text', text: 'Still there?' }),
+      ],
+    );
+
+    const turns = new ConversationTurnViewModelBuilder().buildTurns(state);
+
+    expect(turns.map((turn) => turn.userMessageID)).toEqual([
+      'msg_947188ec-random-user-3',
+      'msg_c460fc93-random-user-1',
+      'msg_d4d34935-random-user-2',
+    ]);
+    expect(turns[1]?.assistantMessages).toEqual([
+      expect.objectContaining({ id: 'msg_db035fb4-monotonic-assistant' }),
+    ]);
+    expect(turns[0]?.assistantMessages).toEqual([]);
+    expect(turns[2]?.assistantMessages).toEqual([]);
+  });
+
   it('hydrates turn view-models back into the existing OpenCodian message shell input', () => {
     const user = createMessage({ id: 'user-1', role: 'user', time: { created: 10 } });
     const assistant = createMessage({
@@ -398,5 +432,37 @@ describe('ConversationTurnViewModelBuilder canonical render input', () => {
       content: 'Structured answer',
       structured,
     });
+  });
+
+  it('renders a parent-linked assistant under its original user turn even when canonical state order is wrong', () => {
+    const state = createState(
+      [
+        createMessage({ id: 'msg_947188ec-random-user-3', role: 'user', time: { created: 4 } }),
+        createMessage({ id: 'msg_c460fc93-random-user-1', role: 'user', time: { created: 1 } }),
+        createMessage({ id: 'msg_d4d34935-random-user-2', role: 'user', time: { created: 3 } }),
+        createMessage({
+          id: 'msg_db035fb4-monotonic-assistant',
+          role: 'assistant',
+          time: { created: 2 },
+          parentID: 'msg_c460fc93-random-user-1',
+        } as OpenCodeCanonicalMessageInfo),
+      ],
+      [
+        createPart({ id: 'part-user-1', messageID: 'msg_c460fc93-random-user-1', type: 'text', text: 'Hello' }),
+        createPart({ id: 'part-assistant-1', messageID: 'msg_db035fb4-monotonic-assistant', type: 'text', text: 'Hi there' }),
+        createPart({ id: 'part-user-2', messageID: 'msg_d4d34935-random-user-2', type: 'text', text: 'Who are you?' }),
+        createPart({ id: 'part-user-3', messageID: 'msg_947188ec-random-user-3', type: 'text', text: 'Still there?' }),
+      ],
+    );
+    const builder = new ConversationTurnViewModelBuilder();
+
+    const renderInput = builder.buildCanonicalRenderInput(state, hydrateCanonicalChatMessage);
+
+    expect(renderInput.messages.map((message) => message.id)).toEqual([
+      'msg_947188ec-random-user-3',
+      'msg_c460fc93-random-user-1',
+      'msg_db035fb4-monotonic-assistant',
+      'msg_d4d34935-random-user-2',
+    ]);
   });
 });

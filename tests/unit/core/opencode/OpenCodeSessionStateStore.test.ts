@@ -33,7 +33,7 @@ function createPart(
 }
 
 describe('OpenCodeSessionStateStore', () => {
-  it('keeps messages and parts sorted while merging part deltas', () => {
+  it('preserves message insertion order while keeping parts sorted and merging part deltas', () => {
     const store = new OpenCodeSessionStateStore();
 
     store.upsertMessage(createMessage('msg-2'));
@@ -49,7 +49,7 @@ describe('OpenCodeSessionStateStore', () => {
 
     const state = store.getSessionState('session-1');
 
-    expect(state?.messages.map((message) => message.id)).toEqual(['msg-1', 'msg-2']);
+    expect(state?.messages.map((message) => message.id)).toEqual(['msg-2', 'msg-1']);
     expect(state?.partsByMessageID['msg-1']?.map((part) => part.id)).toEqual(['part-1', 'part-2']);
     expect(state?.partsByMessageID['msg-1']?.[0]?.text).toBe('Hello');
   });
@@ -79,9 +79,44 @@ describe('OpenCodeSessionStateStore', () => {
 
     const state = store.replaceSessionSnapshot('session-1', nextSnapshot);
 
-    expect(state.messages.map((message) => message.id)).toEqual(['msg-1', 'msg-2']);
+    expect(state.messages.map((message) => message.id)).toEqual(['msg-2', 'msg-1']);
     expect(state.partsByMessageID['msg-old']).toBeUndefined();
     expect(state.partsByMessageID['msg-2']?.map((part) => part.id)).toEqual(['part-a', 'part-b']);
+  });
+
+  it('does not move an existing assistant message behind later user turns when it is updated', () => {
+    const store = new OpenCodeSessionStateStore();
+
+    store.upsertMessage(createMessage('msg-user-1', {
+      role: 'user',
+      time: { created: 1 },
+    }));
+    store.upsertMessage(createMessage('msg_assistant_monotonic', {
+      role: 'assistant',
+      time: { created: 2 },
+      parentID: 'msg-user-1',
+    } as Partial<OpenCodeCanonicalMessageInfo>));
+    store.upsertMessage(createMessage('msg-user-2', {
+      role: 'user',
+      time: { created: 3 },
+    }));
+    store.upsertMessage(createMessage('msg-user-3', {
+      role: 'user',
+      time: { created: 4 },
+    }));
+
+    const state = store.upsertMessage(createMessage('msg_assistant_monotonic', {
+      role: 'assistant',
+      time: { created: 2, updated: 5 },
+      parentID: 'msg-user-1',
+    } as Partial<OpenCodeCanonicalMessageInfo>));
+
+    expect(state.messages.map((message) => message.id)).toEqual([
+      'msg-user-1',
+      'msg_assistant_monotonic',
+      'msg-user-2',
+      'msg-user-3',
+    ]);
   });
 
   it('removes messages and parts from the canonical graph', () => {

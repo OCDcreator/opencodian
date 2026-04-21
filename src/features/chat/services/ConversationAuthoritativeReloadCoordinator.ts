@@ -7,6 +7,10 @@ import type {
 } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
+import {
+  shouldBypassCanonicalSyncForInterruptedNotice,
+  shouldPreserveInterruptedNoticeOnSync,
+} from './conversationAuthoritativeReloadLocalFallback';
 import type {
   ConversationAuthoritativeSyncHost,
   ConversationAuthoritativeSyncResult,
@@ -152,6 +156,10 @@ export class ConversationAuthoritativeReloadCoordinator {
   ): Promise<ConversationAuthoritativeSyncResult | null> {
     const canonicalMessages = this.host.getCanonicalSessionMessages(conversation.openCodeSessionId);
     if (!canonicalMessages) {
+      return null;
+    }
+
+    if (shouldBypassCanonicalSyncForInterruptedNotice(conversation.messages, canonicalMessages)) {
       return null;
     }
 
@@ -346,6 +354,10 @@ export class ConversationAuthoritativeReloadCoordinator {
     }
 
     return existingMessages.filter((message) => {
+      if (shouldPreserveInterruptedNoticeOnSync(existingMessages, syncedMessages, message)) {
+        return true;
+      }
+
       if (message.displayStyle === 'notice' && message.sourceMessageId) {
         const matchedMessage = syncedMessages.find(
           (candidate) => candidate.sourceMessageId === message.sourceMessageId,
