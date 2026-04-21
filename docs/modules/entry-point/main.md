@@ -40,7 +40,7 @@
 ## 核心类型 / 状态
 
 - `OpenCodianPlugin extends Plugin`: 插件主类。
-- `BUILD_ID`: 由构建阶段注入的常量，只用于日志与诊断。
+- `BUILD_ID`: 由构建阶段注入的常量，用于启动首行、诊断导出和版本复制动作。
 - `settings`: 当前归一化后的 `OpenCodianSettings`。
 - `storage`: vault 侧持久化入口。
 - `openCodeService`: OpenCode 运行时门面。
@@ -57,7 +57,7 @@
 
 `onload()` 的顺序是有意排好的：
 
-1. 记录启动首行：版本、`BUILD_ID` 和 vault 路径。
+1. 记录启动首行：版本、`BUILD_ID` 和 vault 路径；这条日志走 `always`，默认也可见。
 2. 用 `measureStartupStep()` 给顶层和关键嵌套子步骤打点；`loadSettings()` 会继续拆出 `storage.loadPersistedSettings` / `normalizeLoadedSettings` / `persistNormalizedSettings`，而 `loadConversations()` 会继续拆出 `storage.listConversations` / `cacheConversationMetas`。
 3. 注册品牌 icon。
 4. 创建并初始化 `StorageService`。
@@ -70,7 +70,7 @@
 11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
 13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
-14. 启动结束时输出一行汇总日志；若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
+14. 启动结束时输出一行汇总日志；这条汇总同样走 `always`。若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
 15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。
 16. `onload()` 返回后再后台调度 deferred runtime warmup：本地 sidecar 自启动与首个 server snapshot 不再阻塞插件注册和视图恢复；真正需要新 session 的路径（当前主要是 `createConversation()`）才会显式接管并等待这次 warmup，避免首次建会话撞上未就绪 server，同时不拖慢已有会话的视图首开。
 
@@ -90,6 +90,7 @@
 - 归一化 `chatAppearance`、`theme`、`tabState`、`providerIconLibrary`。
 - 归一化 `questionDisplayMode`、`questionCardPosition`、`showAnsweredQuestionCards`。
 - 归一化 `inlineSerializedDebugLogArgs`，确保 debug 控制台输出格式开关总是布尔值。
+- 归一化 `debugModuleSettings` 与 `debugRefreshIntervalMs`，保证模块开关和高频日志限频始终完整可用。
 - 归一化 `disabledModelRefs`，避免历史配置中的脏模型引用污染当前运行时。
 - 根据 `inputPanelGlassRefractionGlassDefaultsVersion` 判断是否重置 glass/card/pill 默认层级参数。
 - 检测旧版 `nikdelvin` 液态玻璃默认档案并替换为新默认值。
@@ -161,8 +162,9 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
   - 维护 data URL 缓存
   - 在保存失败时回滚外观并删除新导入的资源
 - 诊断导出：
-  - `buildDiagnosticReport()` 汇总 server 状态、关键设置、最近一次 startup perf trace、自动 startup analysis 与最近日志
+  - `buildDiagnosticReport()` 汇总 server 状态、关键设置、debug module 开关、debug refresh interval、最近一次 startup perf trace、自动 startup analysis 与最近日志
   - `writeDiagnosticLogFile()` 把报告写到指定目录
+  - `getDebugBuildIdentityText()` 提供设置页“复制版本 / BUILD_ID”动作使用的稳定文本
 
 ## 关键方法
 
@@ -219,7 +221,7 @@ graph TD
 - `locale`: 决定 i18n 语言。
 - `openInMainTab`: 决定 `activateView()` 打开主标签页还是右侧边栏。
 - `theme` / `chatAppearance` / `inputPanel*`: 决定外观归一化、预设覆盖与主题背景资源行为。
-- `enableDebugLogging` / `inlineSerializedDebugLogArgs` / `debugLogPaths`: 控制调试日志及其 Console 输出格式。
+- `enableDebugLogging` / `debugModuleSettings` / `debugRefreshIntervalMs` / `inlineSerializedDebugLogArgs` / `debugLogPaths`: 控制调试日志及其 Console 输出格式、模块放行和高频日志节流。
 - `defaultProvider` / `defaultModel`: 会在模型加载后由服务层回写和校正。
 
 ## 注意事项

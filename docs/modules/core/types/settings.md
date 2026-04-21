@@ -154,6 +154,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `getDefaultInputPanelGlassRefractionSvgFilterSettings()` | 默认 SVG 滤镜参数 |
 | `getDefaultInputPanelLiquidGlassSettings()` | 默认液态玻璃参数 |
 | `getDefaultBlockedCommands()` | 默认黑名单命令 |
+| `getDefaultDebugModuleSettings()` | 默认模块级调试开关 |
 | `getDefaultDebugLogPaths()` | 默认调试日志路径 |
 | `getDefaultPersistedTabState()` | 默认标签页状态 |
 
@@ -252,6 +253,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `modelToolsSectionOpen` | `boolean` | `true` | 模型“配置与缓存”分区是否展开 |
 | `enableDebugLogging` | `boolean` | `false` | 启用调试日志 |
 | `inlineSerializedDebugLogArgs` | `boolean` | `false` | 是否把 debug 的非字符串参数内联序列化到日志文本 |
+| `debugModuleSettings` | `DebugModuleSettings` | 默认 | 模块级调试开关 |
+| `debugRefreshIntervalMs` | `number` | `3000` | 相同高频日志 payload 的最小重复输出间隔 |
 | `debugLogPaths` | `PlatformDebugLogPaths` | 默认 | 调试日志路径 |
 | `openInMainTab` | `boolean` | `false` | 在主标签页打开 |
 | `tabState` | `PersistedTabState` | 默认 | 标签页状态 |
@@ -277,6 +280,22 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 ## 配置项
 
 此模块本身是配置模式定义，不引入额外配置。
+
+## 调试日志设置簇
+
+调试相关字段现在成组工作，而不是只有单个 `enableDebugLogging`：
+
+- `enableDebugLogging`
+- `debugModuleSettings`
+- `debugRefreshIntervalMs`
+- `inlineSerializedDebugLogArgs`
+- `debugLogPaths`
+
+`normalizeModelProviderPluginDebugSettings()` 会统一负责这些字段的兼容与归一化，包括：
+
+- 把模块开关补齐为完整布尔表
+- 把高频日志刷新间隔限制到稳定范围
+- 把 legacy `debugLogPath` 吸收到新的 `debugLogPaths`
 
 ## 注意事项
 

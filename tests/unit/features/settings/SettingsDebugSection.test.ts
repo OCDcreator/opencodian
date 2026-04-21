@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/ty
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
+import { DEBUG_MODULE_REGISTRY } from '../../../../src/shared/debugModules';
 
 interface MockToggleControl {
   setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>;
@@ -45,7 +46,12 @@ interface ButtonRecord {
 
 type DebugSectionPlugin = Pick<
   OpenCodianPlugin,
-  'settings' | 'saveSettings' | 'logServerStatusSnapshot' | 'buildDiagnosticReport' | 'writeDiagnosticLogFile'
+  | 'settings'
+  | 'saveSettings'
+  | 'logServerStatusSnapshot'
+  | 'buildDiagnosticReport'
+  | 'writeDiagnosticLogFile'
+  | 'getDebugBuildIdentityText'
 >;
 
 const toggleRecords: ToggleRecord[] = [];
@@ -122,6 +128,7 @@ function createPlugin(overrides: Partial<DebugSectionPlugin['settings']> = {}): 
     logServerStatusSnapshot: jest.fn().mockResolvedValue(undefined),
     buildDiagnosticReport: jest.fn().mockResolvedValue('diagnostic report'),
     writeDiagnosticLogFile: jest.fn().mockResolvedValue('/Users/test/Exports/opencodian-diagnostics.md'),
+    getDebugBuildIdentityText: jest.fn().mockReturnValue('OpenCodian 1.0.0 BUILD_ID=test-build'),
   } as unknown as DebugSectionPlugin;
 }
 
@@ -160,6 +167,55 @@ function findButton(label: string): ButtonRecord | undefined {
   return buttonRecords.find((record) => record.label === label);
 }
 
+function mockClipboard(): void {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: {
+      writeText: jest.fn().mockResolvedValue(undefined),
+    },
+  });
+}
+
+function mockSettingPrototype(): void {
+  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
+    (this as Setting & { __settingName?: string }).__settingName = name;
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
+    this: Setting,
+    callback: (control: MockToggleControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createToggleRecord(name);
+    toggleRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
+    this: Setting,
+    callback: (control: MockTextControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createTextRecord(name);
+    textRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
+    this: Setting,
+    callback: (control: MockButtonControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createButtonRecord(name);
+    buttonRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+}
+
 describe('SettingsDebugSection', () => {
   const originalRequire = (globalThis as typeof globalThis & { require?: (module: string) => unknown }).require;
 
@@ -169,51 +225,8 @@ describe('SettingsDebugSection', () => {
     toggleRecords.length = 0;
     textRecords.length = 0;
     buttonRecords.length = 0;
-
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: {
-        writeText: jest.fn().mockResolvedValue(undefined),
-      },
-    });
-
-    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
-      (this as Setting & { __settingName?: string }).__settingName = name;
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
-      this: Setting,
-      callback: (control: MockToggleControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createToggleRecord(name);
-      toggleRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
-      this: Setting,
-      callback: (control: MockTextControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createTextRecord(name);
-      textRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
-      this: Setting,
-      callback: (control: MockButtonControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createButtonRecord(name);
-      buttonRecords.push(record);
-      callback(record.control);
-      return this;
-    });
+    mockClipboard();
+    mockSettingPrototype();
   });
 
   afterEach(() => {
@@ -249,6 +262,46 @@ describe('SettingsDebugSection', () => {
     expect(plugin.settings.inlineSerializedDebugLogArgs).toBe(true);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
     expect(plugin.logServerStatusSnapshot).toHaveBeenCalledWith('settings-toggle');
+  });
+
+  it('renders module logging controls and persists module toggles independently', async () => {
+    const plugin = createPlugin({
+      enableDebugLogging: true,
+      debugModuleSettings: {
+        ...DEFAULT_SETTINGS.debugModuleSettings,
+        contextUsage: false,
+      },
+    });
+
+    createSection(plugin);
+
+    for (const debugModule of DEBUG_MODULE_REGISTRY) {
+      expect(findToggle(t(debugModule.labelKey as never))).toBeDefined();
+    }
+
+    const contextUsageToggle = findToggle(t('settings.debug.modules.contextUsage.name'));
+    expect(contextUsageToggle?.control.setValue).toHaveBeenCalledWith(false);
+
+    await contextUsageToggle?.onChange?.(true);
+
+    expect(plugin.settings.debugModuleSettings.contextUsage).toBe(true);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists the debug refresh interval from the settings panel', async () => {
+    const plugin = createPlugin({
+      debugRefreshIntervalMs: 4000,
+    });
+
+    createSection(plugin);
+    const refreshIntervalField = findText(t('settings.debug.refreshInterval.name'));
+
+    expect(refreshIntervalField?.control.setValue).toHaveBeenCalledWith('4000');
+
+    await refreshIntervalField?.onChange?.('2500');
+
+    expect(plugin.settings.debugRefreshIntervalMs).toBe(2500);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
   });
 
   it('uses the directory picker button to update the current platform log path', async () => {
@@ -357,5 +410,25 @@ describe('SettingsDebugSection', () => {
         path: `${exportDirectory}/opencodian-diagnostics.md`,
       }),
     );
+  });
+
+  it('can clear recent logs and copy version/build identity from the debug panel', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const clipboardSpy = jest
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue(undefined);
+    const plugin = createPlugin();
+
+    createSection(plugin);
+    const clearButton = findButton(t('settings.debug.actions.clearLogs'));
+    const copyVersionButton = findButton(t('settings.debug.actions.copyVersion'));
+
+    await clearButton?.onClick?.();
+    await copyVersionButton?.onClick?.();
+
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('OpenCodian'));
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('BUILD_ID='));
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.debug.actions.clearLogsSuccess'));
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.debug.actions.copyVersionSuccess'));
   });
 });

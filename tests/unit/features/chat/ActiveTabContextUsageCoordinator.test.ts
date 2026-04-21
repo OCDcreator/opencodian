@@ -11,6 +11,14 @@ import type {
   ModelSelectorKnownModelInfo,
   ModelSelectorSelection,
 } from '../../../../src/features/chat/ui/modelSelector/types';
+import {
+  clearRecentLogs,
+  resetLogEmissionThrottleState,
+  setDebugLoggingEnabled,
+  setDebugModuleEnabled,
+  setDebugRefreshIntervalMs,
+} from '../../../../src/shared';
+import { DEFAULT_DEBUG_REFRESH_INTERVAL_MS } from '../../../../src/shared/debugModules';
 
 type MockedHost = {
   [Key in keyof ActiveTabContextUsageCoordinatorHost]:
@@ -69,6 +77,23 @@ function getCommittedState(host: MockedHost): TabContextState {
 }
 
 describe('ActiveTabContextUsageCoordinator', () => {
+  beforeEach(() => {
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('contextUsage', true);
+    setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
+    resetLogEmissionThrottleState();
+    clearRecentLogs();
+  });
+
+  afterEach(() => {
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('contextUsage', true);
+    setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
+    resetLogEmissionThrottleState();
+    clearRecentLogs();
+    jest.restoreAllMocks();
+  });
+
   it('clears the indicator when no active tab is available', () => {
     const host = createHost({
       hasActiveTab: jest.fn().mockReturnValue(false),
@@ -183,5 +208,41 @@ describe('ActiveTabContextUsageCoordinator', () => {
 
     expect(host.setActiveTabContextUsage).not.toHaveBeenCalled();
     expect(host.renderContextUsageIndicator).not.toHaveBeenCalled();
+  });
+
+  it('does not spam identical context usage refresh logs while polling an idle tab', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    setDebugLoggingEnabled(true);
+    setDebugModuleEnabled('contextUsage', true);
+    setDebugRefreshIntervalMs(5000);
+    const host = createHost({
+      getSessionContextUsageSnapshot: jest.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        sessionTitle: 'Chat 1',
+        createdAt: 100,
+        updatedAt: 250,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5.4',
+        modelName: 'GPT-5.4',
+        contextWindow: 128000,
+        inputTokens: 123,
+        outputTokens: 45,
+        reasoningTokens: 6,
+        cacheReadTokens: 7,
+        cacheWriteTokens: 8,
+        totalCost: 0.12,
+      }),
+    });
+    const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+    await coordinator.refreshFromServer();
+    await coordinator.refreshFromServer();
+
+    const contextUsageLogs = consoleSpy.mock.calls
+      .map((call) => String(call[0] ?? ''))
+      .filter((message) => message.includes('[ActiveTabContextUsageCoordinator] [context-usage] refreshFromServer committed'));
+
+    expect(contextUsageLogs).toHaveLength(1);
   });
 });

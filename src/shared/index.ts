@@ -4,9 +4,21 @@
 
 export type { Logger } from './logger';
 export { createLogger } from './logger';
-export { getRecentLogEntries, getRecentLogText } from './logger';
+export { clearRecentLogs, getRecentLogEntries, getRecentLogText } from './logger';
 export { formatDurationMs, getPerformanceTimestampMs } from './logger';
-export { setDebugLoggingEnabled, setInlineSerializedDebugLogArgsEnabled } from './logger';
+export {
+  getDebugModuleSettings,
+  getDebugRefreshIntervalMs,
+  isDebugModuleEnabled,
+  resetLogEmissionThrottleState,
+  resolveLoggerDebugModuleKey,
+  setDebugLoggingEnabled,
+  setDebugModuleEnabled,
+  setDebugModuleSettings,
+  setDebugRefreshIntervalMs,
+  setInlineSerializedDebugLogArgsEnabled,
+  shouldEmitLogFingerprint,
+} from './logger';
 export {
   buildContextAttachment,
   buildObsidianContextTag,

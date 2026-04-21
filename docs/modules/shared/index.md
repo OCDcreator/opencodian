@@ -10,7 +10,7 @@
 ## 导入关系
 
 ```text
-上游: ./logger, ./obsidianContext, ./toolIdentity, ./toolExecution, ./vault
+上游: ./debugModules, ./logger, ./obsidianContext, ./toolIdentity, ./toolExecution, ./vault
 下游: features/chat/*, features/settings/*, main.ts, 测试代码
 ```
 
@@ -19,11 +19,19 @@
 ```typescript
 export type { Logger } from './logger';
 export {
+  clearRecentLogs,
   createLogger,
+  getDebugModuleSettings,
+  getDebugRefreshIntervalMs,
   getRecentLogEntries,
   getRecentLogText,
+  resetLogEmissionThrottleState,
   setDebugLoggingEnabled,
+  setDebugModuleEnabled,
+  setDebugModuleSettings,
+  setDebugRefreshIntervalMs,
   setInlineSerializedDebugLogArgsEnabled,
+  shouldEmitLogFingerprint,
 } from './logger';
 export {
   buildContextAttachment,
@@ -58,7 +66,12 @@ export { getVaultBasePath } from './vault';
 | 方法 / 导出 | 说明 |
 |-------------|------|
 | `createLogger()` | 生成带前缀日志器 |
+| `clearRecentLogs()` | 清空最近诊断日志缓存 |
+| `getDebugModuleSettings()` / `setDebugModuleSettings()` | 读取/写入模块级调试开关 |
+| `setDebugModuleEnabled()` | 切换单个 debug module 开关 |
+| `getDebugRefreshIntervalMs()` / `setDebugRefreshIntervalMs()` | 读取/写入高频日志刷新间隔 |
 | `getRecentLogEntries()` / `getRecentLogText()` | 获取最近日志条目或格式化文本 |
+| `resetLogEmissionThrottleState()` / `shouldEmitLogFingerprint()` | 共享高频日志指纹去重与节流 |
 | `setDebugLoggingEnabled()` | 启用/禁用 debug 级别日志 |
 | `setInlineSerializedDebugLogArgsEnabled()` | 控制 debug 日志是否把对象参数内联序列化 |
 | `buildObsidianContextTag()` | 构建 `<obsidian_context>` XML 标签 |
@@ -86,7 +99,7 @@ export { getVaultBasePath } from './vault';
 ## 与其他模块的交互
 
 - 被聊天、设置和主入口广泛依赖
-- 各具体实现文档见 [logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
+- 各具体实现文档见 [debugModules.md](debugModules.md)、[logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
 
 ## 配置项
 

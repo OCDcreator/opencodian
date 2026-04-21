@@ -7,6 +7,7 @@ import {
   createLogger,
   formatDurationMs,
   getPerformanceTimestampMs,
+  shouldEmitLogFingerprint,
 } from '../../../shared';
 import type {
   ModelSelectorKnownModelInfo,
@@ -88,11 +89,13 @@ export class ActiveTabContextUsageCoordinator {
     let requestElapsedMs: number | null = null;
     let outcome = 'skipped';
     if (!expectedConversationId || !expectedSessionId || !this.host.hasActiveTab()) {
-      logger.debug(
-        `[context-usage] refreshFromServer ${outcome} in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+      this.logRefreshFromServerOutcome(
         {
+          outcome,
+          startedAt,
           conversationId: expectedConversationId,
           sessionId: expectedSessionId,
+          requestElapsedMs,
         },
       );
       return;
@@ -109,12 +112,14 @@ export class ActiveTabContextUsageCoordinator {
       || !this.host.hasActiveTab()
     ) {
       outcome = snapshot ? 'stale' : 'empty';
-      logger.debug(
-        `[context-usage] refreshFromServer ${outcome} in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+      this.logRefreshFromServerOutcome(
         {
+          outcome,
+          startedAt,
           conversationId: expectedConversationId,
           sessionId: expectedSessionId,
-          request: formatDurationMs(requestElapsedMs),
+          requestElapsedMs,
+          snapshot,
         },
       );
       return;
@@ -122,12 +127,14 @@ export class ActiveTabContextUsageCoordinator {
 
     outcome = 'committed';
     this.commitState(ContextUsageService.applyUsageSnapshot(this.getCurrentState(), snapshot));
-    logger.debug(
-      `[context-usage] refreshFromServer ${outcome} in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+    this.logRefreshFromServerOutcome(
       {
+        outcome,
+        startedAt,
         conversationId: expectedConversationId,
         sessionId: expectedSessionId,
-        request: formatDurationMs(requestElapsedMs),
+        requestElapsedMs,
+        snapshot,
       },
     );
   }
@@ -139,5 +146,47 @@ export class ActiveTabContextUsageCoordinator {
   private commitState(contextUsage: TabContextState): void {
     this.host.setActiveTabContextUsage(contextUsage);
     this.host.renderContextUsageIndicator(contextUsage);
+  }
+
+  private logRefreshFromServerOutcome({
+    outcome,
+    startedAt,
+    conversationId,
+    sessionId,
+    requestElapsedMs,
+    snapshot,
+  }: {
+    outcome: string;
+    startedAt: number;
+    conversationId: string | null;
+    sessionId: string | null;
+    requestElapsedMs: number | null;
+    snapshot?: ContextUsageSnapshot | null;
+  }): void {
+    const fingerprint = {
+      outcome,
+      conversationId,
+      sessionId,
+      updatedAt: snapshot?.updatedAt ?? null,
+      inputTokens: snapshot?.inputTokens ?? null,
+      outputTokens: snapshot?.outputTokens ?? null,
+      reasoningTokens: snapshot?.reasoningTokens ?? null,
+      cacheReadTokens: snapshot?.cacheReadTokens ?? null,
+      cacheWriteTokens: snapshot?.cacheWriteTokens ?? null,
+      totalCost: snapshot?.totalCost ?? null,
+    };
+
+    if (!shouldEmitLogFingerprint('context-usage.refreshFromServer', fingerprint)) {
+      return;
+    }
+
+    logger.debug(
+      `[context-usage] refreshFromServer ${outcome} in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)}`,
+      {
+        conversationId,
+        sessionId,
+        ...(requestElapsedMs === null ? {} : { request: formatDurationMs(requestElapsedMs) }),
+      },
+    );
   }
 }

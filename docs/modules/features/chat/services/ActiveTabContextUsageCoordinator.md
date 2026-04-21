@@ -41,7 +41,8 @@ export class ActiveTabContextUsageCoordinator {
 - `syncIdentity()` 在没有 active tab 时只清空 indicator，不会错误回写旧 tab state
 - `refreshFromServer()` 保持原有 stale guard：snapshot 返回后必须再次确认 current conversation id、session id 和 active-tab 仍匹配，才会写回精确 tokens/cost
 - `refreshFromServer()` 复用 `ContextUsageService.syncStateIdentity()` + `applyPreciseUsage()`，不重新实现 token/cost 汇总规则
-- `refreshFromServer()` 现在会输出 debug 级别耗时日志，并区分 `skipped` / `empty` / `stale` / `committed`，便于把 view-open 慢点进一步拆到具体 context usage 请求
+- `refreshFromServer()` 会输出 debug 级别耗时日志，并区分 `skipped` / `empty` / `stale` / `committed`
+- 这些日志现在通过共享 `shouldEmitLogFingerprint()` 做 payload 指纹限频：同一会话、同一 usage snapshot 的空闲轮询不会继续刷屏，但 usage 变化后会立刻重新输出
 - `TabViewActivationBridge` 与 `TabConversationActivationBridge` 现在共享同一条 activation/open-side context usage writeback 边界，而不是分别持有 identity/snapshot host callback
 
 ## 与 `OpenCodianView` 的边界

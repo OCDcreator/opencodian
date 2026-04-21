@@ -6,7 +6,11 @@ import * as path from 'path';
 import { getCurrentPlatformDebugLogPath, getCurrentPlatformKey } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { createLogger } from '../../shared';
+import { clearRecentLogs, createLogger } from '../../shared';
+import {
+  DEBUG_MODULE_REGISTRY,
+  normalizeDebugRefreshIntervalMs,
+} from '../../shared/debugModules';
 
 const logger = createLogger('SettingsDebugSection');
 
@@ -84,6 +88,8 @@ export class SettingsDebugSection {
     const platformKey = getCurrentPlatformKey();
 
     this.addDebugLoggingSetting(containerEl);
+    this.addDebugModuleSettings(containerEl);
+    this.addDebugRefreshIntervalSetting(containerEl);
     this.addInlineSerializedArgsSetting(containerEl);
     const logPathText = this.addLogPathSetting(containerEl, platformKey);
     this.addDiagnosticActionsSetting(containerEl, logPathText);
@@ -121,6 +127,50 @@ export class SettingsDebugSection {
             await this.plugin.saveSettings();
           })
       );
+  }
+
+  private addDebugModuleSettings(containerEl: HTMLElement): void {
+    const modulesEl = containerEl.createDiv({ cls: 'opencodian-debug-modules' });
+    modulesEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading',
+      text: t('settings.debug.modules.title'),
+    });
+    modulesEl.createDiv({
+      cls: 'opencodian-settings-block-desc',
+      text: t('settings.debug.modules.desc'),
+    });
+
+    for (const debugModule of DEBUG_MODULE_REGISTRY) {
+      new Setting(modulesEl)
+        .setName(t(debugModule.labelKey as never))
+        .setDesc(t(debugModule.descriptionKey as never))
+        .addToggle((toggle) =>
+          toggle
+            .setValue(this.plugin.settings.debugModuleSettings[debugModule.key])
+            .onChange(async (value) => {
+              this.plugin.settings.debugModuleSettings = {
+                ...this.plugin.settings.debugModuleSettings,
+                [debugModule.key]: value,
+              };
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+  }
+
+  private addDebugRefreshIntervalSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.debug.refreshInterval.name'))
+      .setDesc(t('settings.debug.refreshInterval.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(String(normalizeDebugRefreshIntervalMs(undefined)))
+          .setValue(String(this.plugin.settings.debugRefreshIntervalMs))
+          .onChange(async (value) => {
+            this.plugin.settings.debugRefreshIntervalMs = normalizeDebugRefreshIntervalMs(value);
+            await this.plugin.saveSettings();
+          });
+      });
   }
 
   private addLogPathSetting(
@@ -199,6 +249,27 @@ export class SettingsDebugSection {
               logger.error('Failed to generate diagnostics file:', error);
               const message = error instanceof Error ? error.message : t('settings.debug.actions.generateFailed');
               new Notice(message);
+            }
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.debug.actions.clearLogs'))
+          .onClick(() => {
+            clearRecentLogs();
+            new Notice(t('settings.debug.actions.clearLogsSuccess'));
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.debug.actions.copyVersion'))
+          .onClick(async () => {
+            try {
+              await navigator.clipboard.writeText(this.plugin.getDebugBuildIdentityText());
+              new Notice(t('settings.debug.actions.copyVersionSuccess'));
+            } catch (error) {
+              logger.error('Failed to copy version/build identity:', error);
+              new Notice(t('settings.debug.actions.copyVersionFailed'));
             }
           });
       });

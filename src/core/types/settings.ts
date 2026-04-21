@@ -2,6 +2,13 @@
  * Settings type definitions for OpenCodian
  */
 
+import {
+  type DebugModuleSettings,
+  getDefaultDebugModuleSettings,
+  normalizeDebugModuleSettings,
+  normalizeDebugRefreshIntervalMs,
+} from '../../shared/debugModules';
+
 /** Permission mode for tool execution */
 export type PermissionMode = 'yolo' | 'plan' | 'normal';
 
@@ -1684,6 +1691,8 @@ export interface OpenCodianSettings {
   modelToolsSectionOpen: boolean;
   enableDebugLogging: boolean;
   inlineSerializedDebugLogArgs: boolean;
+  debugModuleSettings: DebugModuleSettings;
+  debugRefreshIntervalMs: number;
   debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
   tabState: PersistedTabState;
@@ -1775,6 +1784,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   modelToolsSectionOpen: true,
   enableDebugLogging: false,
   inlineSerializedDebugLogArgs: false,
+  debugModuleSettings: getDefaultDebugModuleSettings(),
+  debugRefreshIntervalMs: normalizeDebugRefreshIntervalMs(undefined),
   debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,
   tabState: getDefaultPersistedTabState(),
@@ -1818,6 +1829,8 @@ export function normalizeModelProviderPluginDebugSettings(
     | 'modelAvailabilitySectionOpen'
     | 'modelToolsSectionOpen'
     | 'inlineSerializedDebugLogArgs'
+    | 'debugModuleSettings'
+    | 'debugRefreshIntervalMs'
     | 'debugLogPaths'
   >> & {
     debugLogPath?: unknown;
@@ -1834,6 +1847,8 @@ export function normalizeModelProviderPluginDebugSettings(
   | 'modelAvailabilitySectionOpen'
   | 'modelToolsSectionOpen'
   | 'inlineSerializedDebugLogArgs'
+  | 'debugModuleSettings'
+  | 'debugRefreshIntervalMs'
   | 'debugLogPaths'
 > {
   const normalizedDebugLogPaths: PlatformDebugLogPaths = {
@@ -1875,6 +1890,8 @@ export function normalizeModelProviderPluginDebugSettings(
       value?.inlineSerializedDebugLogArgs,
       DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
     ),
+    debugModuleSettings: normalizeDebugModuleSettings(value?.debugModuleSettings),
+    debugRefreshIntervalMs: normalizeDebugRefreshIntervalMs(value?.debugRefreshIntervalMs),
     debugLogPaths: normalizedDebugLogPaths,
   };
 }

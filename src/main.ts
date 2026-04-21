@@ -46,6 +46,8 @@ import {
   getRecentLogText,
   getVaultBasePath,
   setDebugLoggingEnabled,
+  setDebugModuleSettings,
+  setDebugRefreshIntervalMs,
   setInlineSerializedDebugLogArgsEnabled,
 } from './shared';
 import { registerBuiltinGlassAdapters } from './utils/glass';
@@ -113,7 +115,7 @@ export default class OpenCodianPlugin extends Plugin {
   async onload() {
     this.beginStartupPerfTrace();
     const startupVaultPath = getVaultBasePath(this.app) ?? 'Unavailable';
-    logger.info(`OpenCodian ${this.manifest.version} BUILD_ID=${BUILD_ID} startup begin (vault=${startupVaultPath})`);
+    logger.always(`OpenCodian ${this.manifest.version} BUILD_ID=${BUILD_ID} startup begin (vault=${startupVaultPath})`);
 
     try {
       await this.measureStartupStep('registerAppIcon', () => {
@@ -439,6 +441,8 @@ export default class OpenCodianPlugin extends Plugin {
 
   private applyLoggerSettings(): void {
     setDebugLoggingEnabled(this.settings.enableDebugLogging);
+    setDebugModuleSettings(this.settings.debugModuleSettings);
+    setDebugRefreshIntervalMs(this.settings.debugRefreshIntervalMs);
     setInlineSerializedDebugLogArgsEnabled(this.settings.inlineSerializedDebugLogArgs);
   }
 
@@ -962,6 +966,8 @@ export default class OpenCodianPlugin extends Plugin {
       '',
       `Generated: ${new Date().toISOString()}`,
       `Source: ${source}`,
+      `Plugin name: ${this.manifest.name}`,
+      `Plugin ID: ${this.manifest.id}`,
       `Plugin version: ${this.manifest.version}`,
       `BUILD_ID: ${BUILD_ID}`,
       `Platform: ${process.platform}`,
@@ -983,6 +989,8 @@ export default class OpenCodianPlugin extends Plugin {
       `Locale: ${this.settings.locale}`,
       `Permission mode: ${this.settings.permissionMode}`,
       `Debug logging: ${this.settings.enableDebugLogging}`,
+      `Debug modules: ${JSON.stringify(this.settings.debugModuleSettings)}`,
+      `Debug refresh interval: ${this.settings.debugRefreshIntervalMs}ms`,
       `Inline serialized debug log args: ${this.settings.inlineSerializedDebugLogArgs}`,
       `Plugin isolation mode: ${this.settings.pluginIsolationMode}`,
       `Default provider: ${this.settings.defaultProvider}`,
@@ -1010,6 +1018,10 @@ export default class OpenCodianPlugin extends Plugin {
     const report = await this.buildDiagnosticReport(source);
     await fs.promises.writeFile(targetPath, report, 'utf-8');
     return targetPath;
+  }
+
+  getDebugBuildIdentityText(): string {
+    return `OpenCodian ${this.manifest.version} BUILD_ID=${BUILD_ID}`;
   }
 
   /** Sync OpenCode config with current permission mode */
@@ -1352,7 +1364,7 @@ export default class OpenCodianPlugin extends Plugin {
       .map((entry) => `${entry.step}=${formatDurationMs(entry.elapsedMs)}`)
       .join(', ');
 
-    logger.info(
+    logger.always(
       `[startup] ${status} in ${formatDurationMs(totalElapsedMs)}${summaryText ? ` | ${summaryText}` : ''}`,
     );
 

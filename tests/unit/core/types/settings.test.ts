@@ -34,6 +34,10 @@ import {
   normalizeSlashCommandSkillMode,
   normalizeTabBarPosition,
 } from '../../../../src/core/types/settings';
+import {
+  DEBUG_MODULE_REGISTRY,
+  DEFAULT_DEBUG_REFRESH_INTERVAL_MS,
+} from '../../../../src/shared/debugModules';
 
   describe('provider icon variants', () => {
     it('defaults provider icon variant to auto', () => {
@@ -224,6 +228,10 @@ import {
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.thumbHoverOpacity).toBe(82);
       expect(DEFAULT_SETTINGS.settingsPanelScrollTop).toBe(0);
       expect(DEFAULT_SETTINGS.inlineSerializedDebugLogArgs).toBe(false);
+      expect(DEFAULT_SETTINGS.debugModuleSettings).toEqual(
+        Object.fromEntries(DEBUG_MODULE_REGISTRY.map((debugModule) => [debugModule.key, debugModule.defaultEnabled])),
+      );
+      expect(DEFAULT_SETTINGS.debugRefreshIntervalMs).toBe(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
       expect(DEFAULT_SETTINGS.debugLogPaths).toEqual({ unix: '', windows: '' });
       expect(DEFAULT_SETTINGS.openInMainTab).toBe(false);
       expect(DEFAULT_SETTINGS.theme).toEqual(getDefaultThemeSettings());
@@ -379,6 +387,11 @@ import {
         modelAvailabilitySectionOpen: false,
         modelToolsSectionOpen: 'collapsed' as never,
         inlineSerializedDebugLogArgs: true,
+        debugModuleSettings: {
+          contextUsage: false,
+          streaming: false,
+        },
+        debugRefreshIntervalMs: 2500,
         debugLogPaths: { unix: '', windows: '' },
         debugLogPath: '/tmp/legacy-debug',
       });
@@ -396,6 +409,12 @@ import {
         modelAvailabilitySectionOpen: false,
         modelToolsSectionOpen: true,
         inlineSerializedDebugLogArgs: true,
+        debugModuleSettings: {
+          ...DEFAULT_SETTINGS.debugModuleSettings,
+          contextUsage: false,
+          streaming: false,
+        },
+        debugRefreshIntervalMs: 2500,
         debugLogPaths: expectedDebugLogPaths,
       });
       expect(normalized.providerIconLibrary.openai?.[0]).toMatchObject({

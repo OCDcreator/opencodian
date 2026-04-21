@@ -1,25 +1,61 @@
+import {
+  type DebugModuleKey,
+  type DebugModuleSettings,
+  DEFAULT_DEBUG_REFRESH_INTERVAL_MS,
+  getDefaultDebugModuleSettings,
+  isDebugModuleKey,
+  normalizeDebugModuleSettings,
+  normalizeDebugRefreshIntervalMs,
+  resolveDebugModuleKey,
+} from './debugModules';
+
+type LogLevel = 'always' | 'info' | 'debug' | 'warn' | 'error';
 type LogMethod = 'log' | 'warn' | 'error';
 
 const DEBUG_STORAGE_KEY = 'opencodian:debug';
 const DEBUG_FLAG_KEY = '__OPENCODIAN_DEBUG__';
 const INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY = '__OPENCODIAN_INLINE_SERIALIZED_DEBUG_ARGS__';
+const DEBUG_MODULE_SETTINGS_FLAG_KEY = '__OPENCODIAN_DEBUG_MODULE_SETTINGS__';
+const DEBUG_REFRESH_INTERVAL_FLAG_KEY = '__OPENCODIAN_DEBUG_REFRESH_INTERVAL_MS__';
 const MAX_LOG_ENTRIES = 500;
 
 type LoggerGlobalState = {
   [DEBUG_FLAG_KEY]?: boolean;
   [INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY]?: boolean;
+  [DEBUG_MODULE_SETTINGS_FLAG_KEY]?: DebugModuleSettings;
+  [DEBUG_REFRESH_INTERVAL_FLAG_KEY]?: number;
 };
 
-interface LogEntry {
+export interface LogEntry {
   timestamp: string;
+  level: LogLevel;
   method: LogMethod;
   scope: string;
+  moduleKey: DebugModuleKey;
   message: string;
 }
 
+interface LoggerOptions {
+  moduleKey?: DebugModuleKey;
+}
+
+interface LogFingerprintState {
+  fingerprint: string;
+  lastEmittedAt: number;
+}
+
+interface EmitContext {
+  level: LogLevel;
+  method: LogMethod;
+  scope: string;
+  moduleKey: DebugModuleKey;
+}
+
 const recentLogEntries: LogEntry[] = [];
+const logFingerprintState = new Map<string, LogFingerprintState>();
 
 export interface Logger {
+  always: (...args: unknown[]) => void;
   info: (...args: unknown[]) => void;
   debug: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
@@ -59,6 +95,36 @@ function isInlineSerializedDebugArgsEnabled(): boolean {
 
 export function setInlineSerializedDebugLogArgsEnabled(enabled: boolean): void {
   getLoggerGlobalState()[INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY] = enabled;
+}
+
+export function setDebugModuleSettings(settings: unknown): void {
+  getLoggerGlobalState()[DEBUG_MODULE_SETTINGS_FLAG_KEY] = normalizeDebugModuleSettings(settings);
+}
+
+export function setDebugModuleEnabled(moduleKey: DebugModuleKey, enabled: boolean): void {
+  const currentSettings = getDebugModuleSettings();
+  getLoggerGlobalState()[DEBUG_MODULE_SETTINGS_FLAG_KEY] = {
+    ...currentSettings,
+    [moduleKey]: enabled,
+  };
+}
+
+export function getDebugModuleSettings(): DebugModuleSettings {
+  return normalizeDebugModuleSettings(
+    getLoggerGlobalState()[DEBUG_MODULE_SETTINGS_FLAG_KEY] ?? getDefaultDebugModuleSettings(),
+  );
+}
+
+export function isDebugModuleEnabled(moduleKey: DebugModuleKey): boolean {
+  return getDebugModuleSettings()[moduleKey] !== false;
+}
+
+export function setDebugRefreshIntervalMs(intervalMs: unknown): void {
+  getLoggerGlobalState()[DEBUG_REFRESH_INTERVAL_FLAG_KEY] = normalizeDebugRefreshIntervalMs(intervalMs);
+}
+
+export function getDebugRefreshIntervalMs(): number {
+  return getLoggerGlobalState()[DEBUG_REFRESH_INTERVAL_FLAG_KEY] ?? DEFAULT_DEBUG_REFRESH_INTERVAL_MS;
 }
 
 function getTimestamp(): string {
@@ -135,12 +201,18 @@ function stringifyArg(arg: unknown): string {
   }
 }
 
-function pushRecentLog(method: LogMethod, scope: string, args: unknown[]): void {
+function isOptionalLogEnabled(moduleKey: DebugModuleKey): boolean {
+  return isDebugEnabled() && isDebugModuleEnabled(moduleKey);
+}
+
+function pushRecentLog(context: EmitContext, args: unknown[]): void {
   const parts = args.map((arg) => stringifyArg(arg)).filter(Boolean);
   recentLogEntries.push({
     timestamp: new Date().toISOString(),
-    method,
-    scope,
+    level: context.level,
+    method: context.method,
+    scope: context.scope,
+    moduleKey: context.moduleKey,
     message: parts.join(' '),
   });
 
@@ -150,20 +222,19 @@ function pushRecentLog(method: LogMethod, scope: string, args: unknown[]): void 
 }
 
 function emit(
-  method: LogMethod,
-  scope: string,
+  context: EmitContext,
   args: unknown[],
   options: { inlineSerializeNonStringArgs?: boolean } = {},
 ): void {
   const consoleRef = globalThis.console;
-  pushRecentLog(method, scope, args);
+  pushRecentLog(context, args);
   if (!consoleRef) {
     return;
   }
 
-  const formattedArgs = formatArgs(scope, args, options);
+  const formattedArgs = formatArgs(context.scope, args, options);
 
-  switch (method) {
+  switch (context.method) {
     case 'warn':
       consoleRef.warn(...formattedArgs);
       break;
@@ -177,26 +248,50 @@ function emit(
   }
 }
 
-export function createLogger(scope: string): Logger {
-  return {
-    info: (...args: unknown[]) => {
-      emit('log', scope, args);
-    },
-    debug: (...args: unknown[]) => {
-      if (!isDebugEnabled()) {
-        return;
-      }
+function createLoggerCall(scope: string, options: LoggerOptions | undefined, level: LogLevel): (...args: unknown[]) => void {
+  const moduleKey = resolveDebugModuleKey(scope, options?.moduleKey);
 
-      emit('log', scope, args, {
-        inlineSerializeNonStringArgs: isInlineSerializedDebugArgsEnabled(),
-      });
-    },
-    warn: (...args: unknown[]) => {
-      emit('warn', scope, args);
-    },
-    error: (...args: unknown[]) => {
-      emit('error', scope, args);
-    },
+  switch (level) {
+    case 'always':
+      return (...args: unknown[]) => {
+        emit({ level: 'always', method: 'log', scope, moduleKey }, args);
+      };
+    case 'info':
+      return (...args: unknown[]) => {
+        if (!isOptionalLogEnabled(moduleKey)) {
+          return;
+        }
+        emit({ level: 'info', method: 'log', scope, moduleKey }, args);
+      };
+    case 'debug':
+      return (...args: unknown[]) => {
+        if (!isOptionalLogEnabled(moduleKey)) {
+          return;
+        }
+
+        emit({ level: 'debug', method: 'log', scope, moduleKey }, args, {
+          inlineSerializeNonStringArgs: isInlineSerializedDebugArgsEnabled(),
+        });
+      };
+    case 'warn':
+      return (...args: unknown[]) => {
+        emit({ level: 'warn', method: 'warn', scope, moduleKey }, args);
+      };
+    case 'error':
+    default:
+      return (...args: unknown[]) => {
+        emit({ level: 'error', method: 'error', scope, moduleKey }, args);
+      };
+  }
+}
+
+export function createLogger(scope: string, options?: LoggerOptions): Logger {
+  return {
+    always: createLoggerCall(scope, options, 'always'),
+    info: createLoggerCall(scope, options, 'info'),
+    debug: createLoggerCall(scope, options, 'debug'),
+    warn: createLoggerCall(scope, options, 'warn'),
+    error: createLoggerCall(scope, options, 'error'),
   };
 }
 
@@ -206,6 +301,50 @@ export function getRecentLogEntries(): LogEntry[] {
 
 export function getRecentLogText(): string {
   return recentLogEntries
-    .map((entry) => `${entry.timestamp} [${entry.method.toUpperCase()}] [${entry.scope}] ${entry.message}`)
+    .map((entry) => `${entry.timestamp} [${entry.level.toUpperCase()}] [${entry.moduleKey}] [${entry.scope}] ${entry.message}`)
     .join('\n');
+}
+
+export function clearRecentLogs(): void {
+  recentLogEntries.length = 0;
+}
+
+export function resetLogEmissionThrottleState(): void {
+  logFingerprintState.clear();
+}
+
+export function shouldEmitLogFingerprint(
+  key: string,
+  fingerprint: unknown,
+  options: { minIntervalMs?: number } = {},
+): boolean {
+  const normalizedKey = key.trim();
+  if (!normalizedKey) {
+    return true;
+  }
+
+  const serializedFingerprint = stringifyArg(fingerprint);
+  const now = Date.now();
+  const minIntervalMs = normalizeDebugRefreshIntervalMs(
+    options.minIntervalMs ?? getDebugRefreshIntervalMs(),
+  );
+  const currentState = logFingerprintState.get(normalizedKey);
+
+  if (
+    !currentState
+    || currentState.fingerprint !== serializedFingerprint
+    || now - currentState.lastEmittedAt >= minIntervalMs
+  ) {
+    logFingerprintState.set(normalizedKey, {
+      fingerprint: serializedFingerprint,
+      lastEmittedAt: now,
+    });
+    return true;
+  }
+
+  return false;
+}
+
+export function resolveLoggerDebugModuleKey(scope: string, moduleKey?: string): DebugModuleKey {
+  return resolveDebugModuleKey(scope, isDebugModuleKey(moduleKey) ? moduleKey : undefined);
 }

@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。
+OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近一轮还扩展了完整日志体系相关键：debug module labels/descriptions、high-frequency log refresh interval、clear logs，以及 copy version / `BUILD_ID` 动作。
 
 源码约 1000 行。
 
@@ -94,7 +94,7 @@ t('settings.server.started')
 | `settings.security.*` | 安全设置 |
 | `settings.ui.*` | UI 设置 |
 | `settings.style.*` | 样式设置（含大量 Liquid Glass 帮助文本） |
-| `settings.debug.*` | 调试设置 |
+| `settings.debug.*` | 调试设置（含 module toggles、refresh interval、诊断动作与 console help） |
 | `settings.user.*` | 用户设置 |
 | `settings.plugins.*` | 插件管理 |
 | `settings.quickNav.*` | 快速导航 |
