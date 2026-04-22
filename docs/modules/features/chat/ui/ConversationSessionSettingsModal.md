@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ConversationSessionSettingsModal` 是 per-conversation session settings 的 dedicated modal。它展示当前会话标题、global defaults hint，并允许用户为三项会话级设置输入覆盖值：
+`ConversationSessionSettingsModal` 是 per-conversation session settings 的 dedicated modal。它展示当前会话标题、继承全局默认值的说明，并用设置页风格的分组卡片允许用户为三项会话级设置输入覆盖值：
 
 - `autoCompactionEnabled`
 - `compactionReservedTokens`
@@ -37,7 +37,9 @@ class ConversationSessionSettingsModal extends Modal {
 
 ## 关键行为
 
-- tri-state `autoCompactionEnabled` 使用 `inherit / enabled / disabled` select，而不是单纯 toggle，确保能显式回到“继承全局默认值”
+- 顶部 hero 区显示当前会话标题、继承说明与“会话覆盖”语义 badge，避免用户把它误认为全局设置
+- modal 主体按 `上下文压缩` 与 `显示` 两个 card 分组：压缩组包含自动压缩与保留 Token，显示组包含聊天字体大小
+- tri-state `autoCompactionEnabled` 使用 `inherit / enabled / disabled` segmented button，而不是单纯 toggle，确保能显式回到“继承全局默认值”
 - number input 留空时会回写 `null` 语义（继承）；只有输入内容时才做正数 / supported-range 校验
 - 如果三个字段都回到 inherit，`buildOverrides()` 会直接返回 `undefined`，上游可以把 `Conversation.sessionSettings` 折叠删除
 - `handleSave()` 支持 async `onSave`，保存期间会 disable save/cancel button，并把错误显示在 modal 内部
@@ -47,8 +49,10 @@ class ConversationSessionSettingsModal extends Modal {
 - 上游由 `ConversationSessionSettingsCoordinator.openCurrentConversationSettings()` 打开
 - 使用 `normalizeCompactionReservedTokens()` 与 `normalizeChatFontSizePx()` 复用现有 settings normalization 规则
 - 所有展示文案都走 `chat.sessionSettings.*` locale key
+- 样式落在 `src/style/modals/config-editor-modal.css` 的 `opencodian-session-settings-*` block，复用主设置页的两栏字段、卡片边框、弱化默认值 hint 与 CTA 语言
 
 ## 注意事项
 
 - 这个 modal 不直接写存储，也不直接写 `.opencode/opencode.json`
-- 本轮没有引入额外 modal CSS；class 主要用于测试与后续样式扩展
+- 视觉重设计不改变保存语义、runtime reapply 或 `Conversation.sessionSettings` 的 normalized shape
+- 三态按钮的选中状态由 modal 内部 `autoCompactionSelection` 与 `aria-pressed` 同步，测试可通过 `data-setting="auto-compaction"` 与 `data-value` 定位

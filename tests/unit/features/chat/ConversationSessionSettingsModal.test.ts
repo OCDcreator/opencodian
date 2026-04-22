@@ -4,7 +4,7 @@ import {
 } from '../../../../src/features/chat/ui/ConversationSessionSettingsModal';
 
 describe('ConversationSessionSettingsModal', () => {
-  it('renders overrides and submits inherit-aware session settings values', async () => {
+  it('renders grouped layout and submits inherit-aware session settings values', async () => {
     const onSave = jest.fn().mockResolvedValue(undefined);
     const modal = new ConversationSessionSettingsModal({} as never, {
       conversationTitle: 'Current chat',
@@ -23,8 +23,21 @@ describe('ConversationSessionSettingsModal', () => {
 
     modal.onOpen();
 
-    const autoSelect = modal.contentEl.querySelector<HTMLSelectElement>(
-      '[data-setting="auto-compaction"]',
+    expect(
+      modal.contentEl.querySelector('.opencodian-session-settings-hero'),
+    ).not.toBeNull();
+    expect(
+      modal.contentEl.querySelector('[data-section="compaction"]'),
+    ).not.toBeNull();
+    expect(
+      modal.contentEl.querySelector('[data-section="display"]'),
+    ).not.toBeNull();
+
+    const autoDisabledButton = modal.contentEl.querySelector<HTMLButtonElement>(
+      '[data-setting="auto-compaction"][data-value="disabled"]',
+    );
+    const autoInheritButton = modal.contentEl.querySelector<HTMLButtonElement>(
+      '[data-setting="auto-compaction"][data-value="inherit"]',
     );
     const reservedInput = modal.contentEl.querySelector<HTMLInputElement>(
       '[data-setting="reserved-tokens"]',
@@ -36,15 +49,15 @@ describe('ConversationSessionSettingsModal', () => {
       '.opencodian-session-settings-save',
     );
 
-    expect(autoSelect?.value).toBe('disabled');
+    expect(autoDisabledButton?.classList.contains('is-selected')).toBe(true);
     expect(reservedInput?.value).toBe('');
     expect(fontInput?.value).toBe('16');
 
-    if (!autoSelect || !reservedInput || !fontInput || !saveButton) {
+    if (!autoInheritButton || !reservedInput || !fontInput || !saveButton) {
       throw new Error('Expected modal controls to render');
     }
 
-    autoSelect.value = 'inherit';
+    autoInheritButton.click();
     reservedInput.value = '14000';
     fontInput.value = '';
 
@@ -91,5 +104,26 @@ describe('ConversationSessionSettingsModal', () => {
     expect(
       modal.contentEl.querySelector('.opencodian-session-settings-error')?.textContent,
     ).toBe('Enter a positive reserved token count');
+  });
+
+  it('shows current conversation title and inherit summary in the hero section', () => {
+    const modal = new ConversationSessionSettingsModal({} as never, {
+      conversationTitle: 'Research thread',
+      defaults: {
+        autoCompactionEnabled: false,
+        compactionReservedTokens: 24_000,
+        chatFontSizePx: 15,
+      },
+      onSave: jest.fn(),
+    });
+
+    modal.onOpen();
+
+    expect(
+      modal.contentEl.querySelector('.opencodian-session-settings-subtitle')?.textContent,
+    ).toBe('Research thread');
+    expect(
+      modal.contentEl.querySelector('.opencodian-session-settings-hero-note')?.textContent,
+    ).toContain('inherit');
   });
 });

@@ -26,7 +26,8 @@ interface ConversationSessionSettingsModalOptions {
 type AutoCompactionSelection = 'inherit' | 'enabled' | 'disabled';
 
 export class ConversationSessionSettingsModal extends Modal {
-  private autoCompactionSelectEl: HTMLSelectElement | null = null;
+  private autoCompactionSelection: AutoCompactionSelection = 'inherit';
+  private autoCompactionButtonEls: HTMLButtonElement[] = [];
   private reservedTokensInputEl: HTMLInputElement | null = null;
   private chatFontSizeInputEl: HTMLInputElement | null = null;
   private errorEl: HTMLElement | null = null;
@@ -45,13 +46,19 @@ export class ConversationSessionSettingsModal extends Modal {
     this.contentEl.empty();
     this.titleEl.setText(t('chat.sessionSettings.modal.title'));
 
-    this.contentEl.createDiv({
-      cls: 'opencodian-session-settings-subtitle',
-      text: this.options.conversationTitle,
+    const bodyEl = this.contentEl.createDiv({
+      cls: 'opencodian-session-settings-body',
     });
 
-    this.autoCompactionSelectEl = this.createAutoCompactionField();
-    this.reservedTokensInputEl = this.createNumberField({
+    this.createHero(bodyEl);
+
+    const compactionSectionEl = this.createSection(bodyEl, {
+      section: 'compaction',
+      title: t('chat.sessionSettings.modal.compactionGroup'),
+      description: t('chat.sessionSettings.modal.compactionGroupDesc'),
+    });
+    this.createAutoCompactionField(compactionSectionEl);
+    this.reservedTokensInputEl = this.createNumberField(compactionSectionEl, {
       setting: 'reserved-tokens',
       name: t('chat.sessionSettings.modal.compactionReservedTokens'),
       description: t('chat.sessionSettings.modal.compactionReservedTokensDesc'),
@@ -59,7 +66,13 @@ export class ConversationSessionSettingsModal extends Modal {
       placeholder: String(this.options.defaults.compactionReservedTokens),
       initialValue: this.options.initialOverrides?.compactionReservedTokens,
     });
-    this.chatFontSizeInputEl = this.createNumberField({
+
+    const displaySectionEl = this.createSection(bodyEl, {
+      section: 'display',
+      title: t('chat.sessionSettings.modal.displayGroup'),
+      description: t('chat.sessionSettings.modal.displayGroupDesc'),
+    });
+    this.chatFontSizeInputEl = this.createNumberField(displaySectionEl, {
       setting: 'chat-font-size',
       name: t('chat.sessionSettings.modal.chatFontSize'),
       description: t('chat.sessionSettings.modal.chatFontSizeDesc'),
@@ -68,11 +81,11 @@ export class ConversationSessionSettingsModal extends Modal {
       initialValue: this.options.initialOverrides?.chatFontSizePx,
     });
 
-    this.errorEl = this.contentEl.createDiv({
+    this.errorEl = bodyEl.createDiv({
       cls: 'opencodian-session-settings-error',
     });
 
-    const actionsEl = this.contentEl.createDiv({
+    const actionsEl = bodyEl.createDiv({
       cls: 'opencodian-session-settings-actions',
     });
     this.cancelButtonEl = actionsEl.createEl('button', {
@@ -97,7 +110,8 @@ export class ConversationSessionSettingsModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-session-settings-modal');
-    this.autoCompactionSelectEl = null;
+    this.autoCompactionSelection = 'inherit';
+    this.autoCompactionButtonEls = [];
     this.reservedTokensInputEl = null;
     this.chatFontSizeInputEl = null;
     this.errorEl = null;
@@ -105,45 +119,84 @@ export class ConversationSessionSettingsModal extends Modal {
     this.cancelButtonEl = null;
   }
 
-  private createAutoCompactionField(): HTMLSelectElement {
-    const fieldEl = this.contentEl.createDiv({
-      cls: 'opencodian-session-settings-field',
+  private createHero(containerEl: HTMLElement): void {
+    const heroEl = containerEl.createDiv({
+      cls: 'opencodian-session-settings-hero',
     });
-    fieldEl.createEl('label', {
-      text: t('chat.sessionSettings.modal.autoCompaction'),
+    const heroTextEl = heroEl.createDiv({
+      cls: 'opencodian-session-settings-hero-text',
     });
-    fieldEl.createDiv({
-      cls: 'opencodian-session-settings-field-description',
-      text: t('chat.sessionSettings.modal.autoCompactionDesc'),
+    heroTextEl.createDiv({
+      cls: 'opencodian-session-settings-subtitle',
+      text: this.options.conversationTitle,
     });
-    fieldEl.createDiv({
-      cls: 'opencodian-session-settings-field-hint',
-      text: t('chat.sessionSettings.modal.defaultHint', {
-        value: this.options.defaults.autoCompactionEnabled
-          ? t('chat.sessionSettings.modal.enabled')
-          : t('chat.sessionSettings.modal.disabled'),
-      }),
+    heroTextEl.createDiv({
+      cls: 'opencodian-session-settings-hero-note',
+      text: t('chat.sessionSettings.modal.inheritSummary'),
     });
 
-    const selectEl = fieldEl.createEl('select', {
+    heroEl.createDiv({
+      cls: 'opencodian-session-settings-hero-badge',
+      text: t('chat.sessionSettings.modal.sessionOverrideBadge'),
+    });
+  }
+
+  private createSection(
+    containerEl: HTMLElement,
+    options: { section: string; title: string; description: string },
+  ): HTMLElement {
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-session-settings-section',
       attr: {
-        'data-setting': 'auto-compaction',
+        'data-section': options.section,
       },
     });
-    this.appendOption(selectEl, 'inherit', t('chat.sessionSettings.modal.inherit'));
-    this.appendOption(selectEl, 'enabled', t('chat.sessionSettings.modal.enabled'));
-    this.appendOption(selectEl, 'disabled', t('chat.sessionSettings.modal.disabled'));
+    const headerEl = sectionEl.createDiv({
+      cls: 'opencodian-session-settings-section-header',
+    });
+    headerEl.createDiv({
+      cls: 'opencodian-session-settings-section-title',
+      text: options.title,
+    });
+    headerEl.createDiv({
+      cls: 'opencodian-session-settings-section-description',
+      text: options.description,
+    });
+    return sectionEl;
+  }
 
+  private createAutoCompactionField(containerEl: HTMLElement): void {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: t('chat.sessionSettings.modal.autoCompaction'),
+      description: t('chat.sessionSettings.modal.autoCompactionDesc'),
+      defaultValue: this.options.defaults.autoCompactionEnabled
+        ? t('chat.sessionSettings.modal.enabled')
+        : t('chat.sessionSettings.modal.disabled'),
+    });
+
+    const groupEl = controlEl.createDiv({
+      cls: 'opencodian-session-settings-choice-group',
+      attr: {
+        role: 'group',
+        'aria-label': t('chat.sessionSettings.modal.autoCompaction'),
+      },
+    });
     const initialValue = this.options.initialOverrides?.autoCompactionEnabled;
-    selectEl.value = initialValue === true
+    this.autoCompactionSelection = initialValue === true
       ? 'enabled'
       : initialValue === false
         ? 'disabled'
         : 'inherit';
-    return selectEl;
+
+    this.autoCompactionButtonEls = [
+      this.createAutoCompactionButton(groupEl, 'inherit', t('chat.sessionSettings.modal.inherit')),
+      this.createAutoCompactionButton(groupEl, 'enabled', t('chat.sessionSettings.modal.enabled')),
+      this.createAutoCompactionButton(groupEl, 'disabled', t('chat.sessionSettings.modal.disabled')),
+    ];
+    this.syncAutoCompactionButtons();
   }
 
-  private createNumberField(options: {
+  private createNumberField(containerEl: HTMLElement, options: {
     setting: string;
     name: string;
     description: string;
@@ -151,24 +204,13 @@ export class ConversationSessionSettingsModal extends Modal {
     placeholder: string;
     initialValue: number | null | undefined;
   }): HTMLInputElement {
-    const fieldEl = this.contentEl.createDiv({
-      cls: 'opencodian-session-settings-field',
-    });
-    fieldEl.createEl('label', {
-      text: options.name,
-    });
-    fieldEl.createDiv({
-      cls: 'opencodian-session-settings-field-description',
-      text: options.description,
-    });
-    fieldEl.createDiv({
-      cls: 'opencodian-session-settings-field-hint',
-      text: t('chat.sessionSettings.modal.defaultHint', {
-        value: String(options.defaultValue),
-      }),
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: String(options.defaultValue),
     });
 
-    const inputEl = fieldEl.createEl('input', {
+    const inputEl = controlEl.createEl('input', {
       cls: 'opencodian-session-settings-number-input',
       attr: {
         type: 'number',
@@ -183,15 +225,62 @@ export class ConversationSessionSettingsModal extends Modal {
     return inputEl;
   }
 
-  private appendOption(
-    selectEl: HTMLSelectElement,
+  private createFieldShell(
+    containerEl: HTMLElement,
+    options: { name: string; description: string; defaultValue: string },
+  ): HTMLElement {
+    const fieldEl = containerEl.createDiv({
+      cls: 'opencodian-session-settings-field',
+    });
+    const infoEl = fieldEl.createDiv({
+      cls: 'opencodian-session-settings-field-info',
+    });
+    infoEl.createEl('label', {
+      cls: 'opencodian-session-settings-field-label',
+      text: options.name,
+    });
+    infoEl.createDiv({
+      cls: 'opencodian-session-settings-field-description',
+      text: options.description,
+    });
+    infoEl.createDiv({
+      cls: 'opencodian-session-settings-field-hint',
+      text: t('chat.sessionSettings.modal.defaultHint', {
+        value: options.defaultValue,
+      }),
+    });
+    return fieldEl.createDiv({
+      cls: 'opencodian-session-settings-field-control',
+    });
+  }
+
+  private createAutoCompactionButton(
+    containerEl: HTMLElement,
     value: AutoCompactionSelection,
-    label: string,
-  ): void {
-    const optionEl = document.createElement('option');
-    optionEl.value = value;
-    optionEl.textContent = label;
-    selectEl.appendChild(optionEl);
+    text: string,
+  ): HTMLButtonElement {
+    const buttonEl = containerEl.createEl('button', {
+      cls: 'opencodian-session-settings-choice-button',
+      text,
+      attr: {
+        type: 'button',
+        'data-setting': 'auto-compaction',
+        'data-value': value,
+      },
+    });
+    buttonEl.addEventListener('click', () => {
+      this.autoCompactionSelection = value;
+      this.syncAutoCompactionButtons();
+    });
+    return buttonEl;
+  }
+
+  private syncAutoCompactionButtons(): void {
+    for (const buttonEl of this.autoCompactionButtonEls) {
+      const isSelected = buttonEl.dataset.value === this.autoCompactionSelection;
+      buttonEl.toggleClass('is-selected', isSelected);
+      buttonEl.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    }
   }
 
   private async handleSave(): Promise<void> {
@@ -212,7 +301,7 @@ export class ConversationSessionSettingsModal extends Modal {
   private buildOverrides(): ConversationSessionSettings | undefined {
     const overrides: ConversationSessionSettings = {};
 
-    const autoCompactionSelection = this.autoCompactionSelectEl?.value ?? 'inherit';
+    const autoCompactionSelection = this.autoCompactionSelection;
     overrides.autoCompactionEnabled = autoCompactionSelection === 'enabled'
       ? true
       : autoCompactionSelection === 'disabled'

@@ -5,11 +5,12 @@
 
 ## 职责
 
-负责设置相关弹窗的大型样式集合，包括配置编辑器、上下文消耗明细、模型可用性管理、模型工作区（workspace）与设置块组件。
+负责设置相关弹窗的大型样式集合，包括配置编辑器、会话设置、上下文消耗明细、模型可用性管理、模型工作区（workspace）与设置块组件。
 
 ## 关键类名 / CSS 变量
 
 - 配置编辑：`.opencodian-config-editor*`、`.opencodian-config-help*`、`.opencodian-config-buttons`。
+- 会话设置：`.opencodian-session-settings-*`（hero、分组 card、两栏字段、三态 segmented button、数字输入与错误提示）。
 - 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`、`.opencodian-context-detail-modal*`。
 - 模型开关管理：`.opencodian-model-toggle-*`。
 - 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）。
@@ -22,6 +23,7 @@
 - `src/features/settings/ModelConfigJsonModal.ts`
 - `src/features/settings/ModelConfigModal.ts`
 - `src/features/settings/OpenCodianSettings.ts`
+- `src/features/chat/ui/ConversationSessionSettingsModal.ts`
 - `src/features/chat/ui/ContextDetailModal.ts`
 
 ## 修改注意点
