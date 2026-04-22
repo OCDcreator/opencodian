@@ -84,7 +84,7 @@ function createMockSdkClient() {
       revert: jest.fn(),
       unrevert: jest.fn(),
     },
-    config: { providers: jest.fn(), get: jest.fn() },
+    config: { providers: jest.fn(), get: jest.fn(), update: jest.fn() },
     provider: { list: jest.fn() },
     permission: { list: jest.fn(), reply: jest.fn() },
     question: { list: jest.fn(), reply: jest.fn(), reject: jest.fn() },

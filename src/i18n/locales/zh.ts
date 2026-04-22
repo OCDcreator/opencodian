@@ -1514,6 +1514,7 @@ export const zhTranslations = {
   'chat.sessionSettings.open': '会话设置',
   'chat.sessionSettings.noConversation': '请先打开一个会话',
   'chat.sessionSettings.saved': '会话设置已保存',
+  'chat.sessionSettings.savedDeferred': '会话设置已保存；上下文压缩将在 OpenCode 后端重新加载后生效',
   'chat.sessionSettings.savedRuntimeWarning': '会话设置已保存，但运行时重应用失败',
   'chat.sessionSettings.modal.title': '会话设置',
   'chat.sessionSettings.modal.inherit': '继承全局默认值',

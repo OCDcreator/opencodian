@@ -202,6 +202,68 @@ it('builds context usage from session info, messages, and model catalog', async 
     expect(snapshot?.totalCost).toBeCloseTo(0.6, 6);
   });
 
+it('carries upstream compaction metadata through local session contracts', async () => {
+    const summaryMessage: SessionMessage = {
+      info: {
+        id: 'assistant-summary',
+        sessionID: 'session-1',
+        role: 'assistant',
+        summary: true,
+        time: { created: 5000 },
+      },
+      parts: [
+        {
+          id: 'part-compaction',
+          sessionID: 'session-1',
+          messageID: 'user-compaction',
+          type: 'compaction',
+          auto: true,
+          overflow: true,
+          tail_start_id: 'message-tail',
+          metadata: {
+            compaction_continue: true,
+          },
+        },
+      ],
+    };
+    const sessionSdk = createSessionSdk();
+    const host = createHost(sessionSdk, createPartSdk(), {
+      getSessionInfo: jest.fn().mockResolvedValue({
+        id: 'session-1',
+        title: 'Compacting session',
+        time: {
+          created: 1000,
+          updated: 9000,
+          compacting: 7000,
+        },
+      }),
+      getSessionMessages: jest.fn().mockResolvedValue([summaryMessage]),
+      getAvailableModels: jest.fn().mockResolvedValue({
+        providers: [],
+        defaults: {},
+      }),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    const snapshot = await orchestrator.getSessionContextUsageSnapshot('session-1');
+
+    expect(summaryMessage.info.summary).toBe(true);
+    expect(summaryMessage.parts[0]).toMatchObject({
+      type: 'compaction',
+      auto: true,
+      overflow: true,
+      tail_start_id: 'message-tail',
+      metadata: {
+        compaction_continue: true,
+      },
+    });
+    expect(snapshot).toMatchObject({
+      sessionId: 'session-1',
+      sessionTitle: 'Compacting session',
+      compactingAt: 7000,
+    });
+  });
+
 it('uses configured SDK and legacy transports for control mutations', async () => {
     const sessionSdk = createSessionSdk({
       fork: jest.fn().mockResolvedValue({ id: 'sdk-fork', title: 'Fork Session' }),

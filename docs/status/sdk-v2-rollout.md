@@ -74,9 +74,9 @@
 | `externalContextPaths` | 已废弃但未替代 | 当前会记录 debug 并忽略，新的上下文路径应走 `contextItems` |
 | 更多 stream event 类型 | 部分完成 | 还没有系统化处理 `message.part.removed`、`message.updated` 等更丰富事件 |
 | `sdkQuestions` rollout | 已默认开启 | 代码支持 SDK `question.*`，runtime 默认 flag 已开，legacy 仅保留回滚用途 |
-| `session.summarize()` | 未实现 | 当前没有 facade |
-| `session.unrevert()` | 未实现 | 当前只有 `revertSession()` |
-| `find.*` / `file.status()` / `vcs.get()` | 未实现 | 还没有接到插件 UI 或 service facade |
+| `session.summarize()` | 已实现 | `OpenCodeService.summarizeSession()` / `OpenCodeSessionControlOrchestrator.summarizeSession()` 已接 SDK；当前仍缺少专门的聊天 UI 入口 |
+| `session.unrevert()` | 已实现 | `OpenCodeService.unrevertSession()` 已接 SDK |
+| `find.*` / `file.status()` / `vcs.get()` | 已实现 | service facade 已接 SDK；是否出现在具体 UI 入口仍取决于调用方 |
 
 ## 4. 关键能力逐项映射
 
@@ -189,7 +189,7 @@
 2. 给 facade 补 `format` / `agent` / `noReply`。
 3. 决定 `thinkingBudget` 在 SDK prompt payload 中的映射方式。
 4. 扩展 stream event 覆盖面，至少补 `message.part.removed` / `message.updated`。
-5. 视产品需要再评估 `session.summarize()`、`find.*`、`file.status()`、`vcs.get()`。
+5. 视产品需要再评估手动 compact UX，以及 `find.*` / `file.status()` / `vcs.get()` 在具体 UI 中的落点。
 
 ## 7. 维护建议
 

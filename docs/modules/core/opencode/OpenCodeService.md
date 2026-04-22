@@ -338,6 +338,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 - `getAvailableModels()`: 读取 SDK `config.providers()` 或 legacy `/config/providers`，并把 string-array/object 两种 provider model 结构统一成同一个返回形状。开启 `includeDirectory` 时，它表示“当前项目目录作用域下的 runtime provider/model 列表”，也是设置页复现 `opencode models` 结果的主入口。
 - `getProviderDirectory()`: 读取 SDK `provider.list()` 或 legacy `/provider`，归一化 `all` / `default` / `connected`；它对应的是 connect-provider 目录总览，不是 `opencode models` 的等价接口。
 - `getResolvedModelConfig()`: 读取 SDK `config.get()` 或 legacy `/config`，只提取模型相关配置字段。开启 `includeDirectory` 时返回当前项目作用域的解析结果；关闭时返回服务端“默认工作目录作用域”的解析结果，不能把它简单等同于纯全局配置文件。
+- `applyCompactionConfig()`: 先读当前 backend 解析后的 config，再只 patch `compaction` 字段到 `config.update()` / legacy `PATCH /config`；backend 失败时只返回 deferred 语义，不伪装成立即生效。
 - `getSessionContextUsageSnapshot()`: 现在委托给 `OpenCodeSessionControlOrchestrator`，并发读取 session、messages、providers，计算 provider/model 名称、上下文窗口、token 统计和总 cost。
 - `getPendingPermissions()` / `respondToPermission()` / `respondToSessionPermission()` / `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 现在统一委托给 `OpenCodeQuestionPermissionHub`，由它处理 SDK flag、legacy fallback、question prompt normalization 与 permission request filtering。
 - `getMcpStatus()` / `addMcpServer()` / provider auth / project / file / find / path / VCS / formatter / LSP 查询：现在统一委托给 `OpenCodeCatalogQueryCoordinator`，由它集中处理 SDK query/admin surface 与 MCP status normalization/writeback。
@@ -370,6 +371,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `getAvailableModels()` | 读取并统一 provider/model 目录 |
 | `getProviderDirectory()` | 读取服务端宽 provider 目录，不等同于运行时可用列表 |
 | `getResolvedModelConfig()` | 读取服务器解析后的模型配置子集 |
+| `applyCompactionConfig()` | backend-first 应用当前目录作用域的 compaction 配置，并在失败时返回 deferred 语义 |
 | `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
 | `respondToSessionPermission()` | 回传 session-scoped permission 决策 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
@@ -430,6 +432,7 @@ graph TD
 - `OpenCodeService.initialize()` 仍然存在，但运行时入口 `main.ts` 并不调用它；主要使用方是测试。
 - `OpenCodeQuestionPermissionHub` 现在拥有 question / permission negotiation owner；`OpenCodeService` 只保留 host seam 与对外 façade。
 - `OpenCodeCatalogQueryCoordinator` 现在拥有 directory-scoped config/tool-catalog/MCP/query owner；不要把 `config.providers()`、`provider.list()`、`config.get()`、`tool.ids()`、`tool.list()`、provider/file/find/MCP auth 再拆成多个薄 wrapper，也不要把 `OpenCodeSdkFacade` 的 request option injection 逻辑复制进来。
+- 会话级 compaction 设置应用现在优先走 backend `config.get/config.update`；只有 backend update 不可用时，调用方才应该退回 deferred 本地文件语义。
 - `getPendingPermissions()` / `respondToPermission()` 当前仍跟随 `sdkCrud`，不是单独的 permission flag；`respondToSessionPermission()` 继续直接走 SDK permission responder。
 - `checkHealth()`、`getAvailableModels()`、`getProviderDirectory()` 和 `getResolvedModelConfig()` 都跟随 `sdkCrud`，而不是独立的 health/models flag。
 - `getAvailableModels()` 是运行时可用列表，也是最接近 OpenCode 主界面当前 provider 列表的数据源。

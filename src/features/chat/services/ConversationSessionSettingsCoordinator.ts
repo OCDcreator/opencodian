@@ -28,11 +28,20 @@ interface ConversationSessionSettingsConfigPort {
   ): Promise<void>;
 }
 
+interface ConversationSessionSettingsCompactionApplyResult {
+  status: 'applied' | 'deferred' | 'skipped';
+  reason?: string;
+}
+
 export interface ConversationSessionSettingsCoordinatorHost {
   app: App;
   getCurrentConversation(): Conversation | null;
   getSessionSettingsDefaults(): ResolvedConversationSessionSettings;
   getChatContainerEl(): HTMLElement | null;
+  applyCompactionConfig(
+    compaction: OpencodeCompactionConfig | null | undefined,
+  ): Promise<ConversationSessionSettingsCompactionApplyResult>;
+  refreshCurrentSessionState(): Promise<void>;
   getOpencodeConfigManager(): ConversationSessionSettingsConfigPort | null;
   saveConversation(conversation: Conversation): Promise<void>;
   showNotice(message: string): void;
@@ -44,7 +53,10 @@ interface ApplyConversationRuntimeStateOptions {
 
 export class ConversationSessionSettingsCoordinator {
   private queuedCompactionConfig: OpencodeCompactionConfig | null = null;
-  private compactionFlushPromise: Promise<void> | null = null;
+  private compactionFlushPromise: Promise<ConversationSessionSettingsCompactionApplyResult> | null = null;
+  private lastCompactionApplyResult: ConversationSessionSettingsCompactionApplyResult = {
+    status: 'skipped',
+  };
 
   constructor(private readonly host: ConversationSessionSettingsCoordinatorHost) {}
 
@@ -96,13 +108,9 @@ export class ConversationSessionSettingsCoordinator {
     options: ApplyConversationRuntimeStateOptions = {},
   ): Promise<ResolvedConversationSessionSettings> {
     const effective = this.applyConversationVisualState(conversation);
-    const configManager = this.host.getOpencodeConfigManager();
-    if (!configManager) {
-      return effective;
-    }
 
     try {
-      await this.queueCompactionConfigWrite(configManager, {
+      this.lastCompactionApplyResult = await this.queueCompactionConfigApply({
         auto: effective.autoCompactionEnabled,
         reserved: effective.compactionReservedTokens,
       });
@@ -130,10 +138,12 @@ export class ConversationSessionSettingsCoordinator {
 
     const isCurrentConversation = this.host.getCurrentConversation()?.id === conversation.id;
     let runtimeApplyFailed = false;
+    let runtimeApplyDeferred = false;
 
     if (isCurrentConversation) {
       try {
         await this.applyConversationRuntimeState(conversation, { silent: false });
+        runtimeApplyDeferred = this.lastCompactionApplyResult.status === 'deferred';
       } catch (error) {
         runtimeApplyFailed = true;
         logger.warn('Failed to reapply runtime after saving conversation session settings', error);
@@ -143,31 +153,53 @@ export class ConversationSessionSettingsCoordinator {
     this.host.showNotice(
       runtimeApplyFailed
         ? t('chat.sessionSettings.savedRuntimeWarning')
+        : runtimeApplyDeferred
+          ? t('chat.sessionSettings.savedDeferred')
         : t('chat.sessionSettings.saved'),
     );
   }
 
-  private async queueCompactionConfigWrite(
-    configManager: ConversationSessionSettingsConfigPort,
+  private async queueCompactionConfigApply(
     compaction: OpencodeCompactionConfig,
-  ): Promise<void> {
+  ): Promise<ConversationSessionSettingsCompactionApplyResult> {
     this.queuedCompactionConfig = compaction;
 
     if (this.compactionFlushPromise) {
-      await this.compactionFlushPromise;
-      return;
+      return this.compactionFlushPromise;
     }
 
     this.compactionFlushPromise = (async () => {
+      let result: ConversationSessionSettingsCompactionApplyResult = {
+        status: 'skipped',
+      };
       while (this.queuedCompactionConfig) {
         const nextCompaction = this.queuedCompactionConfig;
         this.queuedCompactionConfig = null;
-        await configManager.updateCompactionConfig(nextCompaction);
+        result = await this.applyCompactionConfig(nextCompaction);
       }
+      return result;
     })().finally(() => {
       this.compactionFlushPromise = null;
     });
 
-    await this.compactionFlushPromise;
+    return this.compactionFlushPromise;
+  }
+
+  private async applyCompactionConfig(
+    compaction: OpencodeCompactionConfig,
+  ): Promise<ConversationSessionSettingsCompactionApplyResult> {
+    const backendResult = await this.host.applyCompactionConfig(compaction);
+    if (backendResult.status === 'applied') {
+      await this.host.refreshCurrentSessionState();
+      return backendResult;
+    }
+
+    const configManager = this.host.getOpencodeConfigManager();
+    if (!configManager) {
+      return backendResult;
+    }
+
+    await configManager.updateCompactionConfig(compaction);
+    return backendResult;
   }
 }

@@ -24,7 +24,7 @@
 
 ## 核心类型 / 接口
 
-- `SessionContextUsageSnapshot`: active tab context-usage 浮层消费的 session token/cost 快照。
+- `SessionContextUsageSnapshot`: active tab context-usage 浮层消费的 session token/cost 快照；当前还会透传 `compactingAt`，让上层能读取 upstream `Session.time.compacting`。
 - `SessionCommandTemplateContext`: `runSessionCommand()` 专用的 OpenCodian placeholder runtime 值，覆盖 vault path、当前笔记、当前选区、持久 external context paths 与会话标题。
 - `SessionShellInput`: `runSessionShell()` 的结构化 shell 输入，集中持有 `agent`、shell `command`、可选 `model` 与 `messageID`。
 - `OpenCodeSessionControlSdk`: orchestrator 依赖的最小 session SDK 面，覆盖 fork/revert/diff、session tree/share/summarize，以及 message command/shell。
@@ -49,6 +49,7 @@ orchestrator 现在承接以下共享控制流：
 - 并行读取 session info、filtered session messages 与当前 model catalog
 - 选取“最后一个带有效 token 的 assistant message”作为展示模型/上下文窗口/usage 的来源
 - 聚合 assistant cost，总结 input/output/reasoning/cache token 数
+- 透传 session-level `time.compacting` 到 `compactingAt`，为后续 compaction live-state UI 保留事实来源
 
 这样 `OpenCodeService` 不再直接持有 context-usage 计算细节，也避免相关逻辑继续散落在 session lifecycle 与 message API 之间。
 

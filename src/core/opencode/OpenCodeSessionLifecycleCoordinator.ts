@@ -18,7 +18,12 @@ export interface Session {
   time: {
     created: number;
     updated: number;
+    compacting?: number | null;
+    archived?: number | null;
   };
+  archived?: boolean;
+  version?: string;
+  share?: unknown;
 }
 
 export interface Message {
@@ -27,6 +32,7 @@ export interface Message {
   role: 'user' | 'assistant';
   providerID?: string;
   modelID?: string;
+  summary?: boolean;
   structured?: unknown;
   error?: unknown;
   cost?: number;
@@ -52,6 +58,11 @@ export interface Part {
   messageID: string;
   type: string;
   text?: string;
+  auto?: boolean;
+  overflow?: boolean;
+  tail_start_id?: string;
+  synthetic?: boolean;
+  metadata?: Record<string, unknown>;
   duration?: number;
   time?: {
     start?: number;

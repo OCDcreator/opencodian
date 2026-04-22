@@ -1514,6 +1514,7 @@ export const enTranslations = {
   'chat.sessionSettings.open': 'Session settings',
   'chat.sessionSettings.noConversation': 'Open a conversation first',
   'chat.sessionSettings.saved': 'Session settings saved',
+  'chat.sessionSettings.savedDeferred': 'Session settings saved; compaction will apply after the OpenCode backend reloads',
   'chat.sessionSettings.savedRuntimeWarning': 'Session settings saved, but runtime reapply failed',
   'chat.sessionSettings.modal.title': 'Session settings',
   'chat.sessionSettings.modal.inherit': 'Inherit global default',

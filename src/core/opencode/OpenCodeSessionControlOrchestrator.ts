@@ -14,6 +14,7 @@ export interface SessionContextUsageSnapshot {
   sessionTitle: string;
   createdAt: number;
   updatedAt: number;
+  compactingAt: number | null;
   providerId: string | null;
   providerName: string | null;
   modelId: string | null;
@@ -188,6 +189,7 @@ export class OpenCodeSessionControlOrchestrator {
         sessionTitle: session.title,
         createdAt: session.time.created,
         updatedAt: latestAssistantWithTokens?.info.time.created ?? session.time.updated,
+        compactingAt: typeof session.time.compacting === 'number' ? session.time.compacting : null,
         providerId,
         providerName: provider?.name ?? providerId,
         modelId,

@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近一轮还扩展了会话设置弹窗分组布局相关键：继承说明、会话覆盖 badge、上下文压缩分组与显示分组。
+OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近一轮还扩展了会话设置弹窗分组布局相关键：继承说明、会话覆盖 badge、上下文压缩分组与显示分组，并新增了 backend-first compaction apply 的 deferred notice 文案。
 
 源码约 1000 行。
 
@@ -47,6 +47,7 @@ export const enTranslations: Record<string, string> = {
 - 会话与聊天交互（`chat.input.*`, `chat.context.*`, `chat.tab.*`, `chat.sessionSettings.*` 等）
 - 权限 / question / 调试提示
 - 主题与 Liquid Glass 参数说明（大量 `settings.style.input.liquidGlass.*` 键）
+- 会话设置保存结果提示（`chat.sessionSettings.saved*`，区分普通保存、deferred backend apply 和 runtime reapply warning）
 
 ### 帮助文本
 

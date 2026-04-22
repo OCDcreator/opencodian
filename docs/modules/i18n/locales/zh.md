@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近一轮还扩展了会话设置弹窗分组布局相关键：继承说明、会话覆盖 badge、上下文压缩分组与显示分组。
+OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近一轮还扩展了会话设置弹窗分组布局相关键：继承说明、会话覆盖 badge、上下文压缩分组与显示分组，并新增了 backend-first compaction apply 的 deferred notice 文案。
 
 源码约 1000 行。
 
@@ -89,7 +89,7 @@ t('settings.server.started')
 - `settings.server.*` — 服务器设置（含帮助文本）
 - `settings.model.*` — 模型设置
 - `chat.context.*` — 上下文操作
-- `chat.sessionSettings.*` — 会话级覆盖设置弹窗
+- `chat.sessionSettings.*` — 会话级覆盖设置弹窗与保存结果提示（含 deferred backend apply notice）
 - `chat.question.*` — 问题系统
 - `chat.omo.*` — OMO 相关
 

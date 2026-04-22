@@ -652,6 +652,10 @@ export class OpenCodianView extends ItemView {
         chatFontSizePx: this.plugin.settings.chatFontSizePx,
       }),
       getChatContainerEl: () => this.chatContainerEl,
+      applyCompactionConfig: (compaction) =>
+        this.plugin.openCodeService.applyCompactionConfig(compaction),
+      refreshCurrentSessionState: () =>
+        this.activeTabContextUsageCoordinator.refreshFromServer(),
       getOpencodeConfigManager: () => this.plugin.opencodeConfigManager,
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       showNotice: (message) => {

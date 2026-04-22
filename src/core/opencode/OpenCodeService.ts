@@ -16,6 +16,7 @@ import { normalizeContextPath } from '../../shared/contextPath';
 import type {
   ChatMessage,
   ImageAttachment,
+  OpencodeCompactionConfig,
   OpencodeModelConfigSubset,
   PermissionReply,
   PermissionRequest,
@@ -108,6 +109,11 @@ const OPEN_CODE_ID_TIMESTAMP_MULTIPLIER = 0x1000;
 const OPEN_CODE_ID_TIMESTAMP_MODULUS = 0x1000000000000;
 
 export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeSyncEventRuntimeCoordinator';
+
+export interface OpenCodeCompactionConfigApplyResult {
+  status: 'applied' | 'deferred';
+  reason?: string;
+}
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
@@ -935,6 +941,91 @@ export class OpenCodeService {
     }));
   }
 
+  private async getBackendResolvedConfigForUpdate(): Promise<Record<string, unknown>> {
+    if (this.shouldUseSdk('sdkCrud') && typeof this.sdk.config.get === 'function') {
+      try {
+        return this.normalizeBackendConfig(await this.sdk.config.get());
+      } catch (error) {
+        this.diagnostics.logServiceWarning(
+          'config.get',
+          'SDK config.get failed while preparing compaction config update, falling back to legacy HTTP',
+          error,
+        );
+      }
+    }
+
+    return this.normalizeBackendConfig(
+      await this.get<unknown>('/config', { includeDirectory: true }),
+    );
+  }
+
+  private async updateBackendResolvedConfig(config: Record<string, unknown>): Promise<void> {
+    if (this.shouldUseSdk('sdkCrud') && typeof this.sdk.config.update === 'function') {
+      try {
+        await this.sdk.config.update({
+          config,
+        } as Parameters<typeof this.sdk.config.update>[0]);
+        return;
+      } catch (error) {
+        this.diagnostics.logServiceWarning(
+          'config.update',
+          'SDK config.update failed while applying compaction config, falling back to legacy HTTP',
+          error,
+        );
+      }
+    }
+
+    await this.patch<unknown>('/config', config, { includeDirectory: true });
+  }
+
+  private normalizeBackendConfig(value: unknown): Record<string, unknown> {
+    return isPlainRecord(value) ? this.clonePlainRecord(value) : {};
+  }
+
+  private withCompactionConfig(
+    config: Record<string, unknown>,
+    compaction: OpencodeCompactionConfig | null | undefined,
+  ): Record<string, unknown> {
+    if (!compaction) {
+      return {
+        compaction: {},
+      };
+    }
+
+    const currentCompaction = isPlainRecord(config.compaction)
+      ? this.clonePlainRecord(config.compaction)
+      : {};
+    for (const [key, value] of Object.entries(compaction)) {
+      if (value === undefined) {
+        delete currentCompaction[key];
+        continue;
+      }
+      currentCompaction[key] = this.cloneConfigValue(value);
+    }
+
+    return {
+      compaction: currentCompaction,
+    };
+  }
+
+  private clonePlainRecord(value: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, this.cloneConfigValue(nestedValue)]),
+    );
+  }
+
+  private cloneConfigValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.cloneConfigValue(item));
+    }
+
+    if (isPlainRecord(value)) {
+      return this.clonePlainRecord(value);
+    }
+
+    return value;
+  }
+
   private observeToolNamesInMessages(messages: Array<{ info: Message; parts: Part[] }>): void {
     for (const message of messages) {
       for (const part of message.parts) {
@@ -1517,6 +1608,28 @@ export class OpenCodeService {
 
   async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {
     return this.sessionControl.getSessionContextUsageSnapshot(sessionId);
+  }
+
+  async applyCompactionConfig(
+    compaction: OpencodeCompactionConfig | null | undefined,
+  ): Promise<OpenCodeCompactionConfigApplyResult> {
+    try {
+      const currentConfig = await this.getBackendResolvedConfigForUpdate();
+      const nextConfig = this.withCompactionConfig(currentConfig, compaction);
+      await this.updateBackendResolvedConfig(nextConfig);
+      return { status: 'applied' };
+    } catch (error) {
+      const reason = this.diagnostics.describeError(error);
+      this.diagnostics.logServiceWarning(
+        'config.update',
+        'Backend compaction config update unavailable; compaction settings are deferred until backend reload',
+        error,
+      );
+      return {
+        status: 'deferred',
+        reason,
+      };
+    }
   }
 
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
