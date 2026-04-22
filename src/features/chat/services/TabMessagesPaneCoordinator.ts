@@ -20,6 +20,7 @@ export interface TabMessagesPaneRuntimeState {
   programmaticScrollGuardUntil: number;
   isHydratingConversation: boolean;
   pendingLayoutMutations: number;
+  suppressNextLayoutAutoScroll?: boolean;
   isStreaming: boolean;
   streamController?: CancellableStreamController | null;
 }
@@ -234,6 +235,16 @@ export class TabMessagesPaneCoordinator<
     this.syncScrollMetrics(tabId, paneState.messagesEl);
   }
 
+  suppressNextLayoutAutoScroll(tabId: TabId | null): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return false;
+    }
+
+    runtime.suppressNextLayoutAutoScroll = true;
+    return true;
+  }
+
   private observePaneChildren(paneState: TabMessagesPaneState<Runtime>): void {
     paneState.resizeObserver?.observe(paneState.messagesEl);
     for (const child of Array.from(paneState.messagesEl.children)) {
@@ -279,8 +290,16 @@ export class TabMessagesPaneCoordinator<
       paneState.runtime.programmaticScrollGuardUntil = 0;
     }
 
+    const suppressAutoScroll = paneState.runtime.suppressNextLayoutAutoScroll === true;
+    if (suppressAutoScroll) {
+      paneState.runtime.suppressNextLayoutAutoScroll = false;
+    }
+
     if (this.host.getActiveTabId() === tabId) {
       if (paneState.runtime.isStreaming) {
+        return;
+      }
+      if (suppressAutoScroll) {
         return;
       }
       this.host.scheduleSettledScrollToBottomIfNeeded(

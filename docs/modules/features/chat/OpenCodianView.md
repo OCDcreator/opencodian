@@ -137,6 +137,8 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 这次没有改变原有 bottom / preserve-anchor / preserve-distance 三种恢复语义，只是把算法从 view 内联实现挪到了可单测模块。
 
+另外，tool / thinking 详情块的展开/收起不再直接触发 settled scroll-to-bottom；视图现在只会把这类点击标记成“一次用户主导的布局变化”，交给 `TabMessagesPaneCoordinator` 在下一次 layout observer 回调里抑制自动贴底，避免首展开时把工具栏或思考栏甩到视图底部。
+
 ### Header/status shell 抽离
 
 header DOM、server status badge、title logo/wordmark、new/current-tab、history 与 settings 按钮现在由 `services/ChatHeaderPresenter.ts` 承接。`OpenCodianView` 只保留 presenter host seam：

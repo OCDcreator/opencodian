@@ -942,6 +942,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskSuppressedFingerprint: null,
       isHydratingConversation: false,
       pendingLayoutMutations: 0,
+      suppressNextLayoutAutoScroll: false,
       pendingSignalConversationSyncReasons: new Set(),
       signalConversationSyncTimerId: null,
       focusContextPreview: null,
@@ -1035,7 +1036,7 @@ export class OpenCodianView extends ItemView {
         },
         onCollapsibleToggle: () => {
           if (this.getActiveTabId() === tabId) {
-            this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
+            this.conversationTabRuntimeCoordinator.suppressNextLayoutAutoScroll(tabId);
           }
         },
       }, {
@@ -4224,7 +4225,7 @@ export class OpenCodianView extends ItemView {
           const thinkingRenderer = new ThinkingBlockRenderer(this.markdownService, {
             collapsedByDefault: true,
             showTimer: false,
-            onCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
+            onCollapsibleToggle: () => this.suppressActiveLayoutAutoScrollOnce(),
           });
           thinkingRenderer.renderStored(container, block.thinking, block.durationSeconds);
         }
@@ -4237,7 +4238,7 @@ export class OpenCodianView extends ItemView {
 
         if (block.toolName && block.toolId) {
           const toolRenderer = new ToolCallRenderer({
-            onCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
+            onCollapsibleToggle: () => this.suppressActiveLayoutAutoScrollOnce(),
             onOpenToolSession: (sessionId, toolCall) => {
               void this.openTaskToolSession(sessionId, toolCall);
             },
@@ -4719,6 +4720,10 @@ export class OpenCodianView extends ItemView {
   private scheduleActiveSettledScrollToBottomIfNeeded(): void {
     const activeTabId = this.getActiveTabId();
     this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(activeTabId), activeTabId);
+  }
+
+  private suppressActiveLayoutAutoScrollOnce(tabId: TabId | null = this.getActiveTabId()): void {
+    this.conversationTabRuntimeCoordinator.suppressNextLayoutAutoScroll(tabId);
   }
 
   private scheduleSettledScrollToBottomIfNeeded(

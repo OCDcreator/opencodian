@@ -172,6 +172,32 @@ describe('TabMessagesPaneCoordinator', () => {
     expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).not.toHaveBeenCalled();
   });
 
+  it('suppresses the next active layout auto-scroll when a user-controlled toggle marks it', async () => {
+    const fixture = createFixture();
+    const pane = fixture.coordinator.ensurePane('tab-1');
+    if (!pane) {
+      throw new Error('Expected a tab pane');
+    }
+
+    setElementMetrics(pane.messagesEl, {
+      scrollTop: 10,
+      scrollHeight: 200,
+      clientHeight: 100,
+    });
+
+    fixture.coordinator.suppressNextLayoutAutoScroll('tab-1');
+    pane.messagesEl.appendChild(document.createElement('div'));
+    await flushMutations();
+
+    expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).not.toHaveBeenCalled();
+
+    fixture.host.scheduleSettledScrollToBottomIfNeeded.mockClear();
+    pane.messagesEl.appendChild(document.createElement('div'));
+    await flushMutations();
+
+    expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).toHaveBeenCalledWith(true, 'tab-1');
+  });
+
   it('cleans up active pane state on remove and clear', () => {
     const fixture = createFixture();
     const firstPane = fixture.coordinator.ensurePane('tab-1');

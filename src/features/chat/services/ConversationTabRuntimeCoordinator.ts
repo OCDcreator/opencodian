@@ -187,6 +187,10 @@ export class ConversationTabRuntimeCoordinator<
     return this.paneCoordinator.syncScrollMetrics(tabId, messagesEl);
   }
 
+  suppressNextLayoutAutoScroll(tabId: TabId | null = this.getActiveTabId()): boolean {
+    return this.paneCoordinator.suppressNextLayoutAutoScroll(tabId);
+  }
+
   resetTurnState(tabId: TabId | null = this.getActiveTabId()): void {
     const runtime = this.getRuntimeState(tabId);
     if (!runtime) {

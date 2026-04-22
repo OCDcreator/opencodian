@@ -46,6 +46,7 @@ export class TabMessagesPaneCoordinator<Runtime extends TabMessagesPaneRuntimeSt
   clearPanes(): void;
   syncScrollMetrics(tabId: TabId | null, messagesEl?: HTMLElement | null): boolean;
   scrollToBottom(tabId: TabId | null, options?: ScrollToBottomOptions): void;
+  suppressNextLayoutAutoScroll(tabId: TabId | null): boolean;
 }
 ```
 
@@ -55,6 +56,7 @@ export class TabMessagesPaneCoordinator<Runtime extends TabMessagesPaneRuntimeSt
 - `setActivePane()` 会统一切换 `is-active` class、写回 `messagesContainer`、恢复当前 turn body、重建 navigation sidebar，并在需要时安排 settled scroll
 - `syncScrollMetrics()` 只负责 pane 级 near-bottom / passive measurement 和当前活动 pane 的 sidebar 可见性刷新
 - layout 变化若发生在 hydration 期间，只累计 `pendingLayoutMutations` 并刷新 metrics；不会过早触发 settled auto-scroll
+- `suppressNextLayoutAutoScroll()` 会给指定 tab runtime 打一次性标记，让下一次 active-pane layout observer 回调只刷新 metrics、不调度 settled scroll；用于 tool / thinking 等用户主动展开场景
 - `removePane()` / `clearPanes()` 会统一取消 per-tab stream、清掉 signal sync 调度、断开 observers 并删除 DOM pane
 
 ## 与 `OpenCodianView` 的边界

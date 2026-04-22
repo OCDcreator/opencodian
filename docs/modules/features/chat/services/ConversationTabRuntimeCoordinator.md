@@ -67,6 +67,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
   removeTabMessagesPane(tabId: TabId): void;
   clearTabMessagesPanes(): void;
   syncPaneScrollMetrics(tabId: TabId | null, messagesEl?: HTMLElement | null): boolean;
+  suppressNextLayoutAutoScroll(tabId?: TabId | null): boolean;
   isActiveTabStreaming(): boolean;
   isTabForegroundBusy(tabId?: TabId | null): boolean;
   syncTabStreamLikeState(tabId: TabId | null): void;
@@ -86,6 +87,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 - `persistTabState()` 只持久化 conversation id、title、model override 与 active index，并继续区分 scheduled save 与 `flush` immediate save
 - `handleTabSwitch()` 先让 `TabManager` 切换 active tab，再转交 activation port；`handleTabClose()` 只转交 close/recovery port
 - `isTabForegroundBusy()` 保持原有 gating：runtime streaming 优先，其次按 session todo/status 的 `busy` / `retry` 判定 foreground busy
+- `suppressNextLayoutAutoScroll()` 是给 view/render 层的细粒度入口：当 tool / thinking 这类用户主动展开将要引发一次 pane layout 变化时，先把下一次 layout-driven auto-scroll 标记为应跳过
 - pane state、runtime state、active pane、pane cleanup 与 scroll metrics 都继续委托给 `TabMessagesPaneCoordinator`，不在本 coordinator 内复制 pane DOM map
 
 ## 与 `OpenCodianView` 的边界
