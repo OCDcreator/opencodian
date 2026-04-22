@@ -20,5 +20,8 @@
   "compaction": {
     "auto": true,
     "prune": true
-  }
+  },
+  "plugin": [
+    ".opencode/plugins/graphify.js"
+  ]
 }

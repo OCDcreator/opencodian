@@ -1,5 +1,3 @@
-AGENTS.md
-
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
