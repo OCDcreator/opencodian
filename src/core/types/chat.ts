@@ -2,10 +2,7 @@
  * Chat-related type definitions
  */
 
-import {
-  normalizeChatFontSizePx,
-  normalizeCompactionReservedTokens,
-} from './settings';
+import { normalizeChatFontSizePx } from './settings';
 
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
@@ -90,8 +87,6 @@ export interface SessionDiffEntry {
 }
 
 export interface ConversationSessionSettings {
-  autoCompactionEnabled?: boolean | null;
-  compactionReservedTokens?: number | null;
   chatFontSizePx?: number | null;
 }
 
@@ -103,19 +98,6 @@ export function normalizeConversationSessionSettings(
   }
 
   const normalized: ConversationSessionSettings = {};
-
-  if (value.autoCompactionEnabled === null || typeof value.autoCompactionEnabled === 'boolean') {
-    normalized.autoCompactionEnabled = value.autoCompactionEnabled;
-  }
-
-  if (value.compactionReservedTokens === null) {
-    normalized.compactionReservedTokens = null;
-  } else {
-    const reservedTokens = normalizeCompactionReservedTokens(value.compactionReservedTokens, -1);
-    if (reservedTokens > 0) {
-      normalized.compactionReservedTokens = reservedTokens;
-    }
-  }
 
   if (value.chatFontSizePx === null) {
     normalized.chatFontSizePx = null;

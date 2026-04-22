@@ -316,9 +316,7 @@ describe('StorageService conversation session settings', () => {
       updatedAt: 1234567890,
       openCodeSessionId: 'session-settings',
       sessionSettings: {
-        autoCompactionEnabled: false,
-        compactionReservedTokens: 16000,
-        chatFontSizePx: null,
+        chatFontSizePx: 15,
       },
       messages: [],
     };
@@ -335,13 +333,11 @@ describe('StorageService conversation session settings', () => {
 
     const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
     expect(savedData.sessionSettings).toEqual({
-      autoCompactionEnabled: false,
-      compactionReservedTokens: 16000,
-      chatFontSizePx: null,
+      chatFontSizePx: 15,
     });
   });
 
-  it('restores normalized session settings overrides after reload', async () => {
+  it('restores normalized session settings overrides after reload, dropping legacy compaction fields', async () => {
     mockAdapter.read.mockResolvedValue(JSON.stringify({
       id: 'conv-session-settings',
       title: 'Session settings conversation',
@@ -359,8 +355,6 @@ describe('StorageService conversation session settings', () => {
     const result = await storage.loadFullConversation('conv-session-settings');
 
     expect(result?.sessionSettings).toEqual({
-      autoCompactionEnabled: null,
-      compactionReservedTokens: 12001,
       chatFontSizePx: 15,
     });
   });
@@ -509,8 +503,6 @@ describe('StorageService persisted core settings', () => {
         },
         enableBlocklist: true,
         allowExternalAccess: false,
-        autoCompactionEnabled: true,
-        compactionReservedTokens: 10000,
         blockedCommands: { unix: [], windows: [] },
         permissionMode: 'yolo',
         autoRestartOnPermissionChange: false,
@@ -670,8 +662,6 @@ describe('StorageService persisted ui settings', () => {
         },
         enableBlocklist: true,
         allowExternalAccess: false,
-        autoCompactionEnabled: true,
-        compactionReservedTokens: 10000,
         blockedCommands: { unix: [], windows: [] },
         permissionMode: 'yolo',
         autoRestartOnPermissionChange: false,

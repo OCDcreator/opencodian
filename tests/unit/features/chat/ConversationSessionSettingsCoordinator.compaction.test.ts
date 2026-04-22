@@ -23,117 +23,61 @@ function createConversation(
 
 function createCoordinator(options?: {
   currentConversation?: Conversation | null;
-  backendApplyResult?: { status: 'applied' | 'deferred'; reason?: string };
-  projectConfigApplyResult?: { status: 'applied' | 'deferred' | 'skipped'; reason?: string };
 }) {
-  const applyCompactionConfig = jest.fn().mockResolvedValue(
-    options?.backendApplyResult ?? { status: 'applied' },
-  );
-  const reapplyCompactionConfigFromProjectConfig = jest.fn().mockResolvedValue(
-    options?.projectConfigApplyResult ?? { status: 'skipped' },
-  );
-  const refreshCurrentSessionState = jest.fn().mockResolvedValue(undefined);
-  const updateCompactionConfig = jest.fn().mockResolvedValue(undefined);
   const saveConversation = jest.fn().mockResolvedValue(undefined);
   const host = {
     app: {} as never,
     getCurrentConversation: jest.fn().mockReturnValue(options?.currentConversation ?? null),
     getSessionSettingsDefaults: jest.fn().mockReturnValue({
-      autoCompactionEnabled: true,
-      compactionReservedTokens: 10_000,
       chatFontSizePx: 13,
     }),
     getChatContainerEl: jest.fn().mockReturnValue(document.createElement('div')),
-    applyCompactionConfig,
-    reapplyCompactionConfigFromProjectConfig,
-    refreshCurrentSessionState,
-    getOpencodeConfigManager: jest.fn().mockReturnValue({
-      updateCompactionConfig,
-    }),
     saveConversation,
     showNotice: jest.fn(),
-  } as jest.Mocked<ConversationSessionSettingsCoordinatorHost> & {
-    reapplyCompactionConfigFromProjectConfig: jest.Mock;
-  };
+  } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
 
   return {
     coordinator: new ConversationSessionSettingsCoordinator(host),
     host,
-    reapplyCompactionConfigFromProjectConfig,
-    refreshCurrentSessionState,
-    updateCompactionConfig,
   };
 }
 
-describe('ConversationSessionSettingsCoordinator compaction fallback', () => {
-  it('falls back to deferred local compaction config without claiming backend apply', async () => {
+describe('ConversationSessionSettingsCoordinator display-only session settings', () => {
+  it('saves only chatFontSizePx overrides for the current conversation', async () => {
     const conversation = createConversation();
-    const {
-      coordinator,
-      host,
-      refreshCurrentSessionState,
-      reapplyCompactionConfigFromProjectConfig,
-      updateCompactionConfig,
-    } = createCoordinator({
+    const { coordinator, host } = createCoordinator({
       currentConversation: conversation,
-      backendApplyResult: {
-        status: 'deferred',
-        reason: 'config.update unavailable',
-      },
     });
 
-    await coordinator.saveConversationOverrides(conversation, {
-      autoCompactionEnabled: false,
-      compactionReservedTokens: 12_000,
-    });
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 15 });
 
-    expect(updateCompactionConfig).toHaveBeenCalledWith({
-      auto: false,
-      reserved: 12_000,
-    });
-    expect(reapplyCompactionConfigFromProjectConfig).toHaveBeenCalledWith({
-      auto: false,
-      reserved: 12_000,
-    });
-    expect(refreshCurrentSessionState).not.toHaveBeenCalled();
-    expect(host.showNotice).toHaveBeenCalledWith(
-      'Session settings saved; compaction will apply after the OpenCode backend reloads',
-    );
+    expect(host.saveConversation).toHaveBeenCalledWith(expect.objectContaining({
+      sessionSettings: { chatFontSizePx: 15 },
+    }));
+    expect(host.showNotice).toHaveBeenCalledWith('Session settings saved');
   });
 
-  it('activates the project-config fallback immediately when the scoped backend can re-read it', async () => {
+  it('applies visual state when saving overrides for the current conversation', async () => {
     const conversation = createConversation();
-    const {
-      coordinator,
-      host,
-      refreshCurrentSessionState,
-      reapplyCompactionConfigFromProjectConfig,
-      updateCompactionConfig,
-    } = createCoordinator({
+    const { coordinator, host } = createCoordinator({
       currentConversation: conversation,
-      backendApplyResult: {
-        status: 'deferred',
-        reason: 'resolved config mismatch',
-      },
-      projectConfigApplyResult: {
-        status: 'applied',
-      },
     });
 
-    await coordinator.saveConversationOverrides(conversation, {
-      autoCompactionEnabled: false,
-      compactionReservedTokens: 14_000,
-    });
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 16 });
 
-    expect(updateCompactionConfig).toHaveBeenCalledWith({
-      auto: false,
-      reserved: 14_000,
-    });
-    expect(reapplyCompactionConfigFromProjectConfig).toHaveBeenCalledWith({
-      auto: false,
-      reserved: 14_000,
-    });
-    expect(refreshCurrentSessionState).toHaveBeenCalledTimes(1);
+    expect(host.getChatContainerEl).toHaveBeenCalled();
     expect(host.showNotice).toHaveBeenCalledWith('Session settings saved');
+  });
+
+  it('does not call compaction or backend methods', async () => {
+    const conversation = createConversation();
+    const { coordinator, host } = createCoordinator({
+      currentConversation: conversation,
+    });
+
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 14 });
+
+    expect(host.saveConversation).toHaveBeenCalledTimes(1);
+    expect(host.showNotice).toHaveBeenCalledTimes(1);
   });
 });

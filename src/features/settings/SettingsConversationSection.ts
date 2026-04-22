@@ -6,13 +6,13 @@ import {
   resolveModelSelection,
 } from '../../core/config/modelConfig';
 import type {
+  OpencodeCompactionConfig,
   QuestionCardPosition,
   QuestionDisplayMode,
   TitleMode,
 } from '../../core/types';
 import {
   normalizeChatFontSizePx,
-  normalizeCompactionReservedTokens,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -25,6 +25,14 @@ import {
 import { ModelPickerModal } from './ModelPickerModal';
 
 const logger = createLogger('SettingsConversationSection');
+
+function parsePositiveInteger(value: string): number | null {
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 1) {
+    return null;
+  }
+  return num;
+}
 
 interface SettingsConversationSectionOptions {
   app: App;
@@ -50,6 +58,18 @@ export class SettingsConversationSection {
   private titleModelButton: ButtonComponent | null = null;
   private titleModelWarningButton: ExtraButtonComponent | null = null;
   private titleModelGroups: ModelPickerGroup[] = [];
+  private projectCompactionAutoToggle: Setting | null = null;
+  private projectCompactionPruneToggle: Setting | null = null;
+  private projectCompactionTailTurnsInput: Setting | null = null;
+  private projectCompactionPreserveRecentTokensInput: Setting | null = null;
+  private projectCompactionReservedInput: Setting | null = null;
+  private currentCompactionState: {
+    auto: boolean;
+    prune: boolean;
+    tailTurns: number;
+    preserveRecentTokens: number | undefined;
+    reserved: number | undefined;
+  } = { auto: true, prune: true, tailTurns: 2, preserveRecentTokens: undefined, reserved: undefined };
 
   constructor(options: SettingsConversationSectionOptions) {
     this.app = options.app;
@@ -64,6 +84,11 @@ export class SettingsConversationSection {
     this.titleModelButton = null;
     this.titleModelWarningButton = null;
     this.titleModelGroups = [];
+    this.projectCompactionAutoToggle = null;
+    this.projectCompactionPruneToggle = null;
+    this.projectCompactionTailTurnsInput = null;
+    this.projectCompactionPreserveRecentTokensInput = null;
+    this.projectCompactionReservedInput = null;
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
@@ -71,6 +96,11 @@ export class SettingsConversationSection {
     this.titleModelButton = null;
     this.titleModelWarningButton = null;
     this.titleModelGroups = [];
+    this.projectCompactionAutoToggle = null;
+    this.projectCompactionPruneToggle = null;
+    this.projectCompactionTailTurnsInput = null;
+    this.projectCompactionPreserveRecentTokensInput = null;
+    this.projectCompactionReservedInput = null;
 
     const headingEl = this.createSectionHeading(
       containerEl,
@@ -83,8 +113,7 @@ export class SettingsConversationSection {
     });
 
     this.addTitleModeSetting(containerEl);
-    this.addAutoCompactionDefaultSetting(containerEl);
-    this.addCompactionReservedTokensSetting(containerEl);
+    this.addProjectCompactionSettings(containerEl);
     this.addChatFontSizeSetting(containerEl);
     this.addQuestionDisplayModeSetting(containerEl);
     this.addQuestionCardPositionSetting(containerEl);
@@ -93,6 +122,8 @@ export class SettingsConversationSection {
     this.updateTitleModelSettingVisibility();
     void this.loadTitleModels();
     this.addUserMarkupRenderSetting(containerEl);
+
+    void this.loadProjectCompactionConfig();
 
     return headingEl;
   }
@@ -193,42 +224,198 @@ export class SettingsConversationSection {
       });
   }
 
-  private addAutoCompactionDefaultSetting(containerEl: HTMLElement): void {
+  private addProjectCompactionSettings(containerEl: HTMLElement): void {
     new Setting(containerEl)
-      .setName(t('settings.conversation.autoCompactionEnabled.name'))
-      .setDesc(t('settings.conversation.autoCompactionEnabled.desc'))
+      .setName(t('settings.conversation.compaction.projectNote'))
+      .setClass('opencodian-setting-description')
+      .setDesc(t('settings.conversation.compaction.projectNoteDesc'));
+
+    this.projectCompactionAutoToggle = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.auto.name'))
+      .setDesc(t('settings.conversation.compaction.auto.desc'))
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.autoCompactionEnabled)
+          .setValue(true)
           .onChange(async (value) => {
-            this.plugin.settings.autoCompactionEnabled = value;
-            await this.saveGlobalSessionDefaults();
+            this.currentCompactionState.auto = value;
+            await this.saveProjectCompactionConfig();
           });
       });
-  }
 
-  private addCompactionReservedTokensSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.conversation.compactionReservedTokens.name'))
-      .setDesc(t('settings.conversation.compactionReservedTokens.desc'))
+    this.projectCompactionPruneToggle = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.prune.name'))
+      .setDesc(t('settings.conversation.compaction.prune.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(true)
+          .onChange(async (value) => {
+            this.currentCompactionState.prune = value;
+            await this.saveProjectCompactionConfig();
+          });
+      });
+
+    this.projectCompactionTailTurnsInput = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.tailTurns.name'))
+      .setDesc(t('settings.conversation.compaction.tailTurns.desc'))
       .addText((text) => {
         text.inputEl.type = 'number';
         text.inputEl.min = '1';
         text
-          .setPlaceholder(String(this.plugin.settings.compactionReservedTokens))
-          .setValue(String(this.plugin.settings.compactionReservedTokens))
+          .setPlaceholder('2')
+          .setValue('2')
           .onChange(async (value) => {
-            const nextValue = this.parseCompactionReservedTokens(value);
-            if (nextValue === null) {
-              text.setValue(String(this.plugin.settings.compactionReservedTokens));
+            const parsed = parsePositiveInteger(value.trim());
+            if (parsed === null) {
               return;
             }
-
-            this.plugin.settings.compactionReservedTokens = nextValue;
-            text.setValue(String(nextValue));
-            await this.saveGlobalSessionDefaults();
+            this.currentCompactionState.tailTurns = parsed;
+            await this.saveProjectCompactionConfig();
           });
       });
+
+    this.projectCompactionPreserveRecentTokensInput = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.preserveRecentTokens.name'))
+      .setDesc(t('settings.conversation.compaction.preserveRecentTokens.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '1';
+        text
+          .setPlaceholder(t('settings.conversation.compaction.followDefault'))
+          .setValue('')
+          .onChange(async (value) => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              this.currentCompactionState.preserveRecentTokens = undefined;
+              await this.saveProjectCompactionConfig();
+              return;
+            }
+            const parsed = parsePositiveInteger(trimmed);
+            if (parsed === null) {
+              return;
+            }
+            this.currentCompactionState.preserveRecentTokens = parsed;
+            await this.saveProjectCompactionConfig();
+          });
+      });
+
+    this.projectCompactionReservedInput = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.reserved.name'))
+      .setDesc(t('settings.conversation.compaction.reserved.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '1';
+        text
+          .setPlaceholder(t('settings.conversation.compaction.followDefault'))
+          .setValue('')
+          .onChange(async (value) => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              this.currentCompactionState.reserved = undefined;
+              await this.saveProjectCompactionConfig();
+              return;
+            }
+            const parsed = parsePositiveInteger(trimmed);
+            if (parsed === null) {
+              return;
+            }
+            this.currentCompactionState.reserved = parsed;
+            await this.saveProjectCompactionConfig();
+          });
+      });
+  }
+
+  private async loadProjectCompactionConfig(): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      return;
+    }
+
+    try {
+      const config = await configManager.getCompactionConfig() ?? {};
+      const state = {
+        auto: config.auto ?? true,
+        prune: config.prune ?? true,
+        tailTurns: config.tail_turns ?? 2,
+        preserveRecentTokens: config.preserve_recent_tokens ?? undefined,
+        reserved: config.reserved ?? undefined,
+      };
+      this.currentCompactionState = state;
+      this.setProjectCompactionUI({
+        auto: state.auto,
+        prune: state.prune,
+        tailTurns: state.tailTurns,
+        preserveRecentTokens: state.preserveRecentTokens ?? null,
+        reservedTokens: state.reserved ?? null,
+      });
+    } catch (error) {
+      logger.warn('Failed to load project compaction config:', error);
+    }
+  }
+
+  private setProjectCompactionUI(state: {
+    auto: boolean;
+    prune: boolean;
+    tailTurns: number;
+    preserveRecentTokens: number | null;
+    reservedTokens: number | null;
+  }): void {
+    const autoToggle = this.projectCompactionAutoToggle;
+    if (autoToggle?.components?.[0]) {
+      (autoToggle.components[0] as unknown as { setValue: (v: boolean) => void }).setValue(state.auto);
+    }
+
+    const pruneToggle = this.projectCompactionPruneToggle;
+    if (pruneToggle?.components?.[0]) {
+      (pruneToggle.components[0] as unknown as { setValue: (v: boolean) => void }).setValue(state.prune);
+    }
+
+    const tailTurnsInput = this.projectCompactionTailTurnsInput;
+    if (tailTurnsInput?.components?.[0]) {
+      (tailTurnsInput.components[0] as unknown as { setValue: (v: string) => void }).setValue(String(state.tailTurns));
+    }
+
+    const preserveRecentTokensInput = this.projectCompactionPreserveRecentTokensInput;
+    if (preserveRecentTokensInput?.components?.[0]) {
+      (preserveRecentTokensInput.components[0] as unknown as { setValue: (v: string) => void })
+        .setValue(state.preserveRecentTokens != null ? String(state.preserveRecentTokens) : '');
+    }
+
+    const reservedInput = this.projectCompactionReservedInput;
+    if (reservedInput?.components?.[0]) {
+      (reservedInput.components[0] as unknown as { setValue: (v: string) => void })
+        .setValue(state.reservedTokens != null ? String(state.reservedTokens) : '');
+    }
+  }
+
+  private async saveProjectCompactionConfig(): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      new Notice(t('settings.conversation.compaction.configUnavailable'));
+      return;
+    }
+
+    const state = this.currentCompactionState;
+    const full: OpencodeCompactionConfig = {
+      auto: state.auto,
+      prune: state.prune,
+      tail_turns: state.tailTurns,
+      preserve_recent_tokens: state.preserveRecentTokens,
+      reserved: state.reserved,
+    };
+
+    try {
+      await configManager.updateCompactionConfig(full);
+
+      const result = await this.plugin.openCodeService.reapplyCompactionConfigFromProjectConfig(full);
+      new Notice(
+        result.status === 'applied'
+          ? t('settings.conversation.compaction.savedApplied')
+          : t('settings.conversation.compaction.savedDeferred'),
+      );
+    } catch (error) {
+      logger.warn('Failed to save project compaction config:', error);
+      new Notice(t('settings.conversation.compaction.saveFailed'));
+    }
   }
 
   private addChatFontSizeSetting(containerEl: HTMLElement): void {
@@ -337,16 +524,6 @@ export class SettingsConversationSection {
             this.plugin.refreshConversationRendering();
           });
       });
-  }
-
-  private parseCompactionReservedTokens(value: string): number | null {
-    const nextValue = Number.parseFloat(value.trim());
-    const roundedValue = Math.round(nextValue);
-    if (!Number.isFinite(nextValue) || roundedValue <= 0) {
-      return null;
-    }
-
-    return normalizeCompactionReservedTokens(nextValue, this.plugin.settings.compactionReservedTokens);
   }
 
   private parseChatFontSizePx(value: string): number | null {

@@ -1642,8 +1642,6 @@ export interface OpenCodianSettings {
   // Security
   enableBlocklist: boolean;
   allowExternalAccess: boolean;
-  autoCompactionEnabled: boolean;
-  compactionReservedTokens: number;
   blockedCommands: PlatformBlockedCommands;
   permissionMode: PermissionMode;
   autoRestartOnPermissionChange: boolean;
@@ -1732,8 +1730,6 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   enableBlocklist: true,
   allowExternalAccess: false,
-  autoCompactionEnabled: DEFAULT_AUTO_COMPACTION_ENABLED,
-  compactionReservedTokens: DEFAULT_COMPACTION_RESERVED_TOKENS,
   blockedCommands: getDefaultBlockedCommands(),
   permissionMode: 'yolo',
   autoRestartOnPermissionChange: false,

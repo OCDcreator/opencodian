@@ -171,3 +171,10 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 - `remove()` 只删除配置文件，不会删除 `.opencode` 目录或其子目录。
 - 新增的 agent helper 会读取 deprecated `mode` 作为 legacy import source，但写回目标始终是 native `agent`；只有显式删除某个 agent 时才会同步清理对应的 `mode` 条目。
 - command-owned hidden agent 采用固定前缀 `opencodian-command:`；这是 OpenCodian 保留的 project agent 命名空间。
+
+## 2026-04-23 Compaction config alignment
+
+Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership facts:
+1. `OpencodeConfigManager` is the sole writer of compaction config to `.opencode/opencode.json` via `updateCompactionConfig()`.
+2. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings; `getCompactionConfig()` reads from this file.
+3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not managed by this configuration manager.

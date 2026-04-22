@@ -1,3 +1,4 @@
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
@@ -62,6 +63,8 @@ type ConversationSectionPlugin = Pick<
   | 'refreshConversationRendering'
   | 'refreshQuestionUi'
   | 'reapplyConversationSessionDefaults'
+  | 'opencodeConfigManager'
+  | 'openCodeService'
 >;
 
 const dropdownRecords: DropdownRecord[] = [];
@@ -152,6 +155,12 @@ function createExtraButtonControl(): MockExtraButtonControl {
 }
 
 function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>): ConversationSectionPlugin {
+  const updateCompactionConfig = jest.fn().mockResolvedValue(undefined);
+  const getCompactionConfig = jest.fn().mockResolvedValue(undefined);
+  const reapplyCompactionConfigFromProjectConfig = jest.fn().mockResolvedValue({
+    status: 'applied',
+  });
+
   return {
     settings: {
       ...DEFAULT_SETTINGS,
@@ -161,6 +170,13 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
     refreshConversationRendering: jest.fn(),
     refreshQuestionUi: jest.fn(),
     reapplyConversationSessionDefaults: jest.fn().mockResolvedValue(undefined),
+    opencodeConfigManager: {
+      getCompactionConfig,
+      updateCompactionConfig,
+    } as never,
+    openCodeService: {
+      reapplyCompactionConfigFromProjectConfig,
+    } as never,
   } as unknown as ConversationSectionPlugin;
 }
 
@@ -281,52 +297,276 @@ describe('SettingsConversationSection', () => {
     expect(refreshTitleModelsCallback).toBeUndefined();
   });
 
-  it('saves global session defaults and reapplies active conversation runtime state', async () => {
+  it('saves chat font size through plugin settings and reapplies active conversation runtime state', async () => {
     const plugin = createPlugin();
     createSection(plugin);
 
-    const autoCompactionToggle = findToggle(t('settings.conversation.autoCompactionEnabled.name'));
-    const reservedTokensText = findText(t('settings.conversation.compactionReservedTokens.name'));
     const chatFontSizeText = findText(t('settings.conversation.chatFontSizePx.name'));
 
-    expect(autoCompactionToggle?.control.setValue).toHaveBeenCalledWith(DEFAULT_SETTINGS.autoCompactionEnabled);
-    expect(reservedTokensText?.control.setValue).toHaveBeenCalledWith(
-      String(DEFAULT_SETTINGS.compactionReservedTokens),
-    );
     expect(chatFontSizeText?.control.setValue).toHaveBeenCalledWith(
       String(DEFAULT_SETTINGS.chatFontSizePx),
     );
 
-    await autoCompactionToggle?.onChange?.(false);
-    await reservedTokensText?.onChange?.('16000');
     await chatFontSizeText?.onChange?.('15');
 
-    expect(plugin.settings.autoCompactionEnabled).toBe(false);
-    expect(plugin.settings.compactionReservedTokens).toBe(16000);
     expect(plugin.settings.chatFontSizePx).toBe(15);
-    expect(plugin.saveSettings).toHaveBeenCalledTimes(3);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(plugin.saveSettings).toHaveBeenNthCalledWith(1, { reloadModels: false });
-    expect(plugin.reapplyConversationSessionDefaults).toHaveBeenCalledTimes(3);
+    expect(plugin.reapplyConversationSessionDefaults).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects invalid numeric session defaults without saving or runtime reapply', async () => {
+  it('rejects invalid chat font size without saving or runtime reapply', async () => {
     const plugin = createPlugin({
-      compactionReservedTokens: 12_000,
       chatFontSizePx: 14,
     });
     createSection(plugin);
 
-    const reservedTokensText = findText(t('settings.conversation.compactionReservedTokens.name'));
     const chatFontSizeText = findText(t('settings.conversation.chatFontSizePx.name'));
 
-    await reservedTokensText?.onChange?.('0');
     await chatFontSizeText?.onChange?.('99');
 
-    expect(plugin.settings.compactionReservedTokens).toBe(12_000);
     expect(plugin.settings.chatFontSizePx).toBe(14);
-    expect(reservedTokensText?.control.inputEl.value).toBe('12000');
     expect(chatFontSizeText?.control.inputEl.value).toBe('14');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(plugin.reapplyConversationSessionDefaults).not.toHaveBeenCalled();
+  });
+
+  it('saves compaction settings through project config with full-object save', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const autoToggle = findToggle(t('settings.conversation.compaction.auto.name'));
+    expect(autoToggle).toBeDefined();
+
+    await autoToggle?.onChange?.(false);
+
+    const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
+    expect(updateCompactionConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ auto: false, prune: true, tail_turns: 2 }),
+    );
+    const reapply = (plugin.openCodeService as { reapplyCompactionConfigFromProjectConfig: jest.Mock })
+      .reapplyCompactionConfigFromProjectConfig;
+    expect(reapply).toHaveBeenCalledWith(
+      expect.objectContaining({ auto: false }),
+    );
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+});
+
+describe('SettingsConversationSection compaction fields', () => {
+  let noticeSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+    dropdownRecords.length = 0;
+    toggleRecords.length = 0;
+    textRecords.length = 0;
+    noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+
+    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
+      (this as Setting & { __settingName?: string }).__settingName = name;
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
+      this: Setting,
+      callback: (control: MockDropdownControl) => unknown,
+    ) {
+      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+      const record = createDropdownRecord(name);
+      dropdownRecords.push(record);
+      callback(record.control);
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
+      this: Setting,
+      callback: (control: MockToggleControl) => unknown,
+    ) {
+      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+      const record = createToggleRecord(name);
+      toggleRecords.push(record);
+      callback(record.control);
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
+      this: Setting,
+      callback: (control: MockTextControl) => unknown,
+    ) {
+      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+      const record = createTextRecord(name);
+      textRecords.push(record);
+      callback(record.control);
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
+      this: Setting,
+      callback: (control: MockButtonControl) => unknown,
+    ) {
+      callback(createButtonControl());
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
+      this: Setting,
+      callback: (control: MockExtraButtonControl) => unknown,
+    ) {
+      callback(createExtraButtonControl());
+      return this;
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('saves prune toggle through project config with full-object save', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const pruneToggle = findToggle(t('settings.conversation.compaction.prune.name'));
+    expect(pruneToggle).toBeDefined();
+
+    await pruneToggle?.onChange?.(false);
+
+    const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
+    expect(updateCompactionConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ prune: false, auto: true, tail_turns: 2 }),
+    );
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
+  });
+
+  it('saves tail_turns number through project config with full-object save', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+    expect(tailTurnsText).toBeDefined();
+
+    await tailTurnsText?.onChange?.('5');
+
+    const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
+    expect(updateCompactionConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ tail_turns: 5, auto: true, prune: true }),
+    );
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
+  });
+
+  it('rejects non-integer tail_turns values like 1.9', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+
+    await tailTurnsText?.onChange?.('1.9');
+
+    expect(
+      (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('ignores invalid tail_turns values', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+
+    await tailTurnsText?.onChange?.('0');
+    await tailTurnsText?.onChange?.('-1');
+    await tailTurnsText?.onChange?.('abc');
+
+    expect(
+      (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('saves preserve_recent_tokens number through project config', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const preserveText = findText(t('settings.conversation.compaction.preserveRecentTokens.name'));
+    expect(preserveText).toBeDefined();
+
+    await preserveText?.onChange?.('8000');
+
+    const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
+    expect(updateCompactionConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ preserve_recent_tokens: 8000 }),
+    );
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
+  });
+
+  it('saves preserve_recent_tokens as undefined when cleared', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const preserveText = findText(t('settings.conversation.compaction.preserveRecentTokens.name'));
+    await preserveText?.onChange?.('');
+
+    const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
+    expect(updateCompactionConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ preserve_recent_tokens: undefined }),
+    );
+  });
+
+  it('saves reserved tokens number through project config', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const reservedText = findText(t('settings.conversation.compaction.reserved.name'));
+    expect(reservedText).toBeDefined();
+
+    await reservedText?.onChange?.('16000');
+
+    const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
+    expect(updateCompactionConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ reserved: 16000 }),
+    );
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
+  });
+
+  it('shows deferred notice when reapply returns deferred status', async () => {
+    const plugin = createPlugin();
+    (
+      plugin.openCodeService as { reapplyCompactionConfigFromProjectConfig: jest.Mock }
+    ).reapplyCompactionConfigFromProjectConfig.mockResolvedValue({ status: 'deferred' });
+    createSection(plugin);
+
+    const autoToggle = findToggle(t('settings.conversation.compaction.auto.name'));
+    await autoToggle?.onChange?.(false);
+
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedDeferred'));
+  });
+
+  it('shows save-failed notice when compaction save throws', async () => {
+    const plugin = createPlugin();
+    (
+      plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }
+    ).updateCompactionConfig.mockRejectedValue(new Error('write failed'));
+    createSection(plugin);
+
+    const autoToggle = findToggle(t('settings.conversation.compaction.auto.name'));
+    await autoToggle?.onChange?.(false);
+
+    expect(
+      (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig,
+    ).toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.saveFailed'));
+  });
+
+  it('shows config-unavailable notice when configManager is missing', async () => {
+    const plugin = createPlugin();
+    (plugin as Record<string, unknown>).opencodeConfigManager = null;
+    createSection(plugin as unknown as ConversationSectionPlugin);
+
+    const autoToggle = findToggle(t('settings.conversation.compaction.auto.name'));
+    await autoToggle?.onChange?.(false);
+
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.configUnavailable'));
   });
 });

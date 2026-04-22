@@ -90,7 +90,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 - `currentConversation` / `currentConversationRevertState`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
-- `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、`OpenCodeService.applyCompactionConfig()`、`OpenCodeService.reapplyCompactionConfigFromProjectConfig()`、active-tab context usage refresh、vault-scoped deferred fallback config manager，以及 per-conversation session settings notice/save
+- `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、active-tab context usage refresh，以及 per-conversation session settings notice/save
 - 一个面向 settings shell 的公开 bridge：`reapplyCurrentConversationSessionSettings()` 会直接复用上述 coordinator，让 settings/conversation 里的 global session default 修改可以立刻落回当前聊天运行时
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
@@ -591,3 +591,10 @@ background task notice 这条子链路现在的边界是：
 - `session.status` 只能代表主 runner 是否 `busy/retry/idle`；后台任务是否完成要看后续消息/提醒是否真正回写到会话历史。
 - 重新渲染消息列表时，滚动恢复不再只按旧 `scrollTop`，而是按“到底 / 保持距底距离 / 保持可见 anchor”三态恢复，避免 hydration 后补写 inline/notice 时把视图重新顶上去。
 - 当 tab 同时处于前台流式和后台任务存活状态时，tab 样式遵循“streaming 主态、background 次级标记”的优先级；不要把二者重新合并成同一套阻塞语义。
+
+## 2026-04-23 Compaction config alignment
+
+Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership facts:
+1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
+2. `ConversationSessionSettingsCoordinator` host seam no longer includes `applyCompactionConfig()` or `reapplyCompactionConfigFromProjectConfig()`; compaction is edited via `SettingsConversationSection` through `OpencodeConfigManager`.
+3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control.

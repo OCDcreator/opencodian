@@ -117,3 +117,10 @@ t('settings.server.started')
 - [ ] 参数占位符 `{xxx}` 数量和名称一致
 - [ ] 新增键同时在 `en.ts` 添加
 - [ ] 帮助文本风格统一（口语化、第二人称）
+
+## 2026-04-23 压缩配置对齐
+
+压缩配置已改为项目级（`.opencode/opencode.json`）。Ownership facts:
+1. 压缩配置真相源为 `.opencode/opencode.json`，而非插件设置或会话设置。
+2. 会话级 `autoCompactionEnabled` / `compactionReservedTokens` locale 键已移除；新增项目级 `settings.conversation.compaction.*` 键。
+3. 手动 `session.summarize()` 仍为 per-session 操作，不由本 locale 管理。

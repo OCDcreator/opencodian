@@ -64,6 +64,8 @@ export type OpencodeCommandConfigRecord = Record<string, OpencodeCommandConfig>;
 export interface OpencodeCompactionConfig {
   auto?: boolean;
   prune?: boolean;
+  tail_turns?: number;
+  preserve_recent_tokens?: number;
   reserved?: number;
   [key: string]: unknown;
 }

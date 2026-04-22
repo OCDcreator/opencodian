@@ -179,8 +179,6 @@ import {
       expect(DEFAULT_SETTINGS.server.auth.type).toBe('none');
       expect(DEFAULT_SETTINGS.enableBlocklist).toBe(true);
       expect(DEFAULT_SETTINGS.allowExternalAccess).toBe(false);
-      expect(DEFAULT_SETTINGS.autoCompactionEnabled).toBe(true);
-      expect(DEFAULT_SETTINGS.compactionReservedTokens).toBe(10000);
       expect(DEFAULT_SETTINGS.permissionMode).toBe('yolo');
       expect(DEFAULT_SETTINGS.modelSourceMode).toBe('merge');
       expect(DEFAULT_SETTINGS.defaultProvider).toBe('anthropic');
@@ -345,10 +343,16 @@ import {
   });
 
   describe('session defaults normalization', () => {
+    it('does not keep plugin-level compaction defaults anymore', () => {
+      const settingsRecord = DEFAULT_SETTINGS as Record<string, unknown>;
+      expect(settingsRecord.autoCompactionEnabled).toBeUndefined();
+      expect(settingsRecord.compactionReservedTokens).toBeUndefined();
+    });
+
     it('normalizes reserved compaction tokens to a positive integer fallback', () => {
       expect(normalizeCompactionReservedTokens(12000.7)).toBe(12001);
-      expect(normalizeCompactionReservedTokens(0)).toBe(DEFAULT_SETTINGS.compactionReservedTokens);
-      expect(normalizeCompactionReservedTokens('12000')).toBe(DEFAULT_SETTINGS.compactionReservedTokens);
+      expect(normalizeCompactionReservedTokens(0)).toBe(10000);
+      expect(normalizeCompactionReservedTokens('12000')).toBe(10000);
     });
 
     it('normalizes chat font size to the supported integer range', () => {

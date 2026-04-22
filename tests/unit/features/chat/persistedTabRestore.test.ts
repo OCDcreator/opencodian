@@ -40,7 +40,6 @@ function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
     },
     openCodeService: {
       setSessionId: jest.fn(),
-      applyCompactionConfig: jest.fn().mockResolvedValue({ status: 'applied' }),
       getSessionContextUsageSnapshot: jest.fn().mockResolvedValue(null),
       getSessionTodos: jest.fn().mockResolvedValue([]),
       getSessionStatuses: jest.fn().mockResolvedValue({}),

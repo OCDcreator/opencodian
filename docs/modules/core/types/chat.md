@@ -39,7 +39,7 @@
 | `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `summary?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
 | `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
 | `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
-| `ConversationSessionSettings` | 会话级覆盖设置（`autoCompactionEnabled?`, `compactionReservedTokens?`, `chatFontSizePx?`，支持 `null` 表示显式继承） |
+| `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
 | `ConversationMeta` | 会话元数据（不含消息体） |
 | `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据） |
 
@@ -173,3 +173,11 @@
 - `SessionDiffEntry` 来自 `session.diff()` API，在文件编辑后自动获取
 - `SessionTodo` 通过 `global.syncEvent.subscribe()` 监听 `todo.updated` 事件更新
 - 源码约 279 行
+
+## 2026-04-23 Compaction config alignment
+
+Ownership facts:
+
+1. Compaction config is project-scoped and stored in `.opencode/opencode.json`.
+2. Conversation session settings no longer own compaction; `ConversationSessionSettings` now only carries display-only `chatFontSizePx`.
+3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not a conversation settings field.

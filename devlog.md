@@ -1,14 +1,54 @@
 # OpenCodian 开发日志
 
 > **📋 日志记录原则**
-> 
+>
 > 本日志采用**倒序排列**，最新的开发进度写在**最前面**。
-> 
+>
 > 新的日期型日志必须插入到最上方第一个 `## YYYY-MM-DD ...` 条目前，禁止追加到文件末尾。
-> 
+>
 > 每次更新后必须运行：`npm run check:devlog-order`
-> 
+>
 > 如需查看最新进展，请直接阅读最上方的条目。
+
+---
+
+## 2026-04-23 Project-scoped compaction config alignment — Round 3 review fixes
+
+- Fixed all trailing whitespace; `git diff --check` now clean.
+- Added 3 ownership facts + `session.summarize()` note to every touched module doc (8 files).
+- Rewrote `SettingsConversationSection.md` to reflect project-scoped compaction ownership; removed stale global session default writeback for compaction.
+- Removed stale `refreshCurrentSessionState()` from `ConversationSessionSettingsCoordinator.md` host interface.
+- Updated debug handoff doc: archived `applyCompactionConfig()` investigation paths, pointed to new `OpencodeConfigManager.updateCompactionConfig()` + `reapplyCompactionConfigFromProjectConfig()` chain.
+- Added real `Notice` mock/assertions to all compaction test branches (applied, deferred, error, config-unavailable).
+- Fixed `Number.parseInt()` truncation: replaced with `Number()` + `Number.isInteger()` via `parsePositiveInteger()` helper.
+- Refactored compaction save from per-field `saveProjectCompactionField()` to single full-object `saveProjectCompactionConfig()` that writes the entire compaction state at once.
+- Updated `OpencodeConfigManager.md` with ownership facts.
+- Removed stale `.codex-review-round1.txt` artifact.
+
+---
+
+## 2026-04-23 Project-scoped compaction config alignment — Round 2 review fixes
+
+- Fixed stale module docs: removed `applyCompactionConfig()` references from `ConversationSessionSettingsModal.md`, `ConversationSessionSettingsCoordinator.md`, `OpenCodianView.md`, and `OpenCodeService.md`.
+- Fixed stale status doc: updated `opencode-auto-compaction-adaptation-report-2026-04-22.md` to reflect current project-scoped implementation.
+- Fixed BEL control characters (`\u0007`) corrupting `autoCompactionEnabled` and `applyCompactionConfig` in `OpenCodianView.md` and `en.md`.
+- Removed dead locale keys (`settings.conversation.autoCompactionEnabled.*`, `settings.conversation.compactionReservedTokens.*`) from `en.ts` and `zh.ts`.
+- Added `settings.conversation.compaction.configUnavailable` locale key for surfacing config manager unavailability.
+- Fixed silent no-op in `SettingsConversationSection.saveProjectCompactionField()` when config manager is unavailable; now shows a notice.
+- Removed stale `applyCompactionConfig` mock from `persistedTabRestore.test.ts`.
+- Added test coverage for `prune`, `tail_turns`, `preserve_recent_tokens`, `reserved`, deferred status, save failure, and config-unavailable branches in `SettingsConversationSection`.
+- Added `tail_turns` and `preserve_recent_tokens` round-trip test in `OpencodeConfigManager`.
+
+---
+
+## 2026-04-23 Project-scoped compaction config alignment
+
+- Removed invalid per-conversation compaction overrides from `ConversationSessionSettings` and persisted conversation state.
+- Moved compaction editing to project `.opencode/opencode.json` in the settings UI, covering all upstream fields (`auto`, `prune`, `tail_turns`, `preserve_recent_tokens`, `reserved`).
+- Replaced per-session compaction runtime apply with project-scoped instance reload after config save.
+- Deleted `OpenCodeService.applyCompactionConfig()` and its dead private helpers; `reapplyCompactionConfigFromProjectConfig()` is now the sole public API.
+- Simplified `ConversationSessionSettingsCoordinator` to display-only (visual state) and `ConversationSessionSettingsModal` to font-size override only.
+- Removed `autoCompactionEnabled` / `compactionReservedTokens` from `OpenCodianSettings` and its load normalization.
 
 ---
 
@@ -7233,11 +7273,11 @@ export class OpencodeConfigManager {
   async setYoloMode(): Promise<void> {
     await this.updatePermission('allow');
   }
-  
+
   async setNormalMode(): Promise<void> {
     await this.updatePermission({ '*': 'ask' });
   }
-  
+
   async setPlanMode(): Promise<void> {
     await this.updatePermission({
       '*': 'ask',
@@ -7296,13 +7336,13 @@ this.process = spawn(opencodePath, ['serve', ...], {
 ```typescript
 private async showPermissionDialog(request: PermissionRequest): Promise<void> {
   // 在消息流中创建权限卡片
-  const permissionCard = permissionContainer.createDiv({ 
-    cls: 'opencodian-permission-inline' 
+  const permissionCard = permissionContainer.createDiv({
+    cls: 'opencodian-permission-inline'
   });
-  
+
   // 显示工具信息和按钮
   // ...
-  
+
   // 用户选择后移除卡片
   const result = await new Promise<...>((resolve) => { ... });
   permissionCard.remove();  // 完全消失，不占用空间
@@ -7341,10 +7381,10 @@ private async showPermissionDialog(request: PermissionRequest): Promise<void> {
 ```typescript
 private initializePermissionSelector(containerEl: HTMLElement): void {
   const trigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
-  
+
   // 根据当前模式显示不同颜色
   trigger.addClass(`mode-${mode}`);  // yolo=green, ask=blue, plan=red
-  
+
   // 点击切换模式并自动重启服务
   trigger.addEventListener('click', async () => {
     await this.switchPermissionMode(newMode);
@@ -7358,7 +7398,7 @@ private async switchPermissionMode(mode: 'yolo' | 'normal' | 'plan'): Promise<vo
   // 1. 更新配置
   this.plugin.settings.permissionMode = mode;
   await this.plugin.saveSettings();
-  
+
   // 2. 重启 OpenCode 服务
   await this.plugin.openCodeService.stop();
   await new Promise(resolve => setTimeout(resolve, 1000));
@@ -7648,22 +7688,22 @@ if (this.isStreaming) {
        .replace(/[\s\-_.]+/g, '')           // 移除分隔符
        .replace(/[\(\（].*?[\)\）]/g, '');  // 移除括号内容
    }
-   
+
    static getIconUrl(providerId: string): string | undefined {
      const normalized = this.normalizeProviderId(providerId);
-     
+
      // 1. 直接匹配
      if (this.PROVIDER_ICON_MAP[normalized]) {
        return this.buildUrl(this.PROVIDER_ICON_MAP[normalized]);
      }
-     
+
      // 2. 包含匹配 (aihub-mix → aihubmix)
      for (const [key, iconName] of Object.entries(this.PROVIDER_ICON_MAP)) {
        if (normalized.includes(key) || key.includes(normalized)) {
          return this.buildUrl(iconName);
        }
      }
-     
+
      // 3. 尝试直接使用
      return this.buildUrl(normalized);
    }
@@ -7673,8 +7713,8 @@ if (this.isStreaming) {
    ```typescript
    static getProviderIconHTML(providerId: string, size: number = 16): string {
      const iconUrl = this.getIconUrl(providerId);
-     return `<img src="${iconUrl}" 
-                  width="${size}" height="${size}" 
+     return `<img src="${iconUrl}"
+                  width="${size}" height="${size}"
                   class="opencodian-provider-icon"
                   style="display: inline-block; vertical-align: middle;">`;
    }
@@ -8074,7 +8114,7 @@ this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 16px;
   border-end-end-radius: 4px;
-  box-shadow: 
+  box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.15),
     0 1px 2px rgba(255, 255, 255, 0.1) inset;
 }
@@ -8496,7 +8536,7 @@ if (eventData.type === 'message.part.updated') {
   const part = eventData.properties?.part;
   if (part?.id && part?.type) {
     this.partTypeMap.set(part.id, part.type);
-    
+
     // 处理工具调用
     if (part.type === 'tool') {
       const toolId = part.callID || part.id;
@@ -8505,14 +8545,14 @@ if (eventData.type === 'message.part.updated') {
         // 新工具调用
         if (!processedToolIds.has(toolId)) {
           processedToolIds.add(toolId);
-          yield { 
-            type: 'tool_use', 
-            id: toolId, 
-            name: toolName, 
+          yield {
+            type: 'tool_use',
+            id: toolId,
+            name: toolName,
             input: part.state?.input || {}
           };
         }
-        
+
         // 工具结果
         if (part.state?.output || part.state?.error) {
           // yield tool_result...
@@ -8559,7 +8599,7 @@ if (eventData.type === 'message.part.updated') {
 ### 🎯 技术要点
 1. **SSE 事件处理**: OpenCode Server 使用 `message.part.updated` 事件通知工具状态变化
 2. **工具生命周期**: 工具调用经历 `pending` → `running` → `completed/error` 状态
-3. **渲染流程**: 
+3. **渲染流程**:
    - `OpenCodeService` 解析 SSE 事件 → yield `tool_use` chunk
    - `StreamController` 接收 chunk → 调用 `ToolCallRenderer.render()`
    - `ToolCallRenderer` 创建 DOM 元素 → 显示工具卡片
@@ -8569,7 +8609,7 @@ if (eventData.type === 'message.part.updated') {
 **会话日期**: 2026-03-23
 **开发时间**: ~2 小时
 **主要贡献**: 修复工具调用显示问题，清理调试日志
-**涉及文件**: 
+**涉及文件**:
 - `src/core/opencode/OpenCodeService.ts`
 - `src/utils/streaming/StreamController.ts`
 
@@ -8687,7 +8727,7 @@ private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<SSE
     method: 'GET',
     headers: { 'Accept': 'text/event-stream' },
   });
-  
+
   const reader = response.body!.getReader();
   // ... 读取和处理 SSE 数据
 }

@@ -72,7 +72,7 @@
 - `npm run verify`
 - `graphify update .`
 
-构建 BUILD_ID（验证过部署）：
+历史构建 BUILD_ID（当时验证过部署）：
 
 - `main.202604222343`
 
@@ -203,36 +203,16 @@ DOM 证据：
 
 ## 5. 当前最值得追的可疑点
 
-## 5.1 backend-first apply / config read-write 不一致
+## 5.1 backend config apply / config read-write investigation
 
-这是目前最可疑、最值得下一轮重点追的点。
+> **2026-04-23 更新**: `applyCompactionConfig()` 已删除。Compaction 配置现在通过 `SettingsConversationSection` 直接写入 `.opencode/opencode.json`，再由 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读。如果 config scope 问题仍然存在，新的调查路径应聚焦于 `OpencodeConfigManager.updateCompactionConfig()` + `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` 链路。
 
-现象：
-
-- 在 OpenCodian / sidecar 路径里，`applyCompactionConfig()` 返回 `{ status: 'applied' }`
-- 直接 HTTP `PATCH /config` 也返回了写入后的 body
-- 但紧接着：
-  - `sdk.config.get()`
-  - 或 `GET /config`
-  - 读回的 resolved config 里并不稳定显示 `compaction`
-
-而与此同时：
-
-- `opencode debug config` 在同一个 `Test Vault` 目录下，**又能读到正确的 compaction 值**
-
-这说明可能存在以下问题之一：
-
-1. sidecar `config.update` / `config.get` 使用的 scope 与 CLI 的 project scope 不一致
-2. `OpenCodeService.getBackendResolvedConfigForUpdate()` / `updateBackendResolvedConfig()` 用的是“resolved info view”，不是稳定的 project config write/read 口径
-3. local sidecar 启动 / scope 继承 / directory query 在这条路径上有不对称
-4. 插件的 backend-first apply 并未真的落到当前正在使用的 project-scoped resolved config
-
-需要重点检查：
+之前的调查方向（已归档）：
 
 - `src/core/opencode/OpenCodeService.ts`
-  - `getBackendResolvedConfigForUpdate()`
-  - `updateBackendResolvedConfig()`
-  - `applyCompactionConfig()`
+  - `getBackendResolvedConfigForUpdate()` (已删除)
+  - `updateBackendResolvedConfig()` (已删除)
+  - `applyCompactionConfig()` (已删除)
 - sidecar 实际打到的：
   - `/config`
   - query `directory`
@@ -355,8 +335,14 @@ DOM 证据：
 
 ### 第一步：查清 config scope / apply 口径
 
-- 比较：
-  - OpenCodian `applyCompactionConfig()`
+> **2026-04-23 更新**: `applyCompactionConfig()` 已删除。Compaction 现在通过 `OpencodeConfigManager.updateCompactionConfig()` 直接写入 `.opencode/opencode.json`，再由 `reapplyCompactionConfigFromProjectConfig()` 重读。如果 scope 问题仍存在，新的比较基线应为：
+> - `OpencodeConfigManager.updateCompactionConfig()` 写入后的文件内容
+> - `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` 的 read-back 结果
+> - `opencode debug config` 的输出
+> - 三者的 `directory` scope 是否一致
+
+之前的比较方向（已归档）：
+- ~~OpenCodian `applyCompactionConfig()`~~ (已删除)
   - HTTP `PATCH /config?directory=...`
   - `sdk.config.get/update`
   - `opencode debug config`
@@ -426,16 +412,16 @@ DOM 证据：
      - `.obsidian-debug/auto-compaction-badges.summary.json`
      - `.obsidian-debug/auto-compaction-message-content.summary.json`
 
-4. 当前最可疑的未解点：
-   - OpenCodian / sidecar 路径里的 backend-first compaction apply 可能存在 config scope / read-write 不一致
-   - 现象是：
-     - `applyCompactionConfig()` 返回 `applied`
-     - 直接 `PATCH /config` 也返回写入 body
-     - 但紧接着 `sdk.config.get()` / `GET /config` 读回并不稳定显示 `compaction`
-     - 与此同时 `opencode debug config` 在同目录下却能读到正确 compaction 值
-   - 怀疑点集中在：
-     - `src/core/opencode/OpenCodeService.ts`
-     - sidecar 的 `/config` scope / `directory` query
+ 4. 当前最可疑的未解点：
+    - OpenCodian / sidecar 路径里的 config apply 可能存在 config scope / read-write 不一致
+    - **注意**: `applyCompactionConfig()` 已删除；现在的链路是 `OpencodeConfigManager.updateCompactionConfig()` 写入 `.opencode/opencode.json` + `reapplyCompactionConfigFromProjectConfig()` 重读
+    - 如果 scope 问题仍存在，比较：
+      - `OpencodeConfigManager.updateCompactionConfig()` 写入后的文件内容
+      - `reapplyCompactionConfigFromProjectConfig()` 的 read-back 结果
+      - `opencode debug config` 的输出
+    - 怀疑点集中在：
+      - `src/core/opencode/OpenCodeService.ts` 的 `reapplyCompactionConfigFromProjectConfig()`
+      - sidecar 的 `/config` scope / `directory` query
      - `sdk.config.get/update` 与 CLI `debug config` 的口径差异
 
 5. 另一个重要坑：
@@ -447,7 +433,7 @@ DOM 证据：
 这次新会话的目标不是重做 transcript 适配，而是聚焦：
 
 优先级 1：
-- 查清 OpenCodian sidecar 路径下 `applyCompactionConfig` / `config.get` / `config.update` / `GET /config` / CLI `opencode debug config` 的 scope 和行为差异
+- 查清 OpenCodian sidecar 路径下 `OpencodeConfigManager.updateCompactionConfig` / `reapplyCompactionConfigFromProjectConfig` / `GET /config` / CLI `opencode debug config` 的 scope 和行为差异
 
 优先级 2：
 - 让 OpenCodian 自己（不是只靠 CLI）在 sidecar 模式下稳定复现真实 auto compaction
@@ -476,3 +462,15 @@ DOM 证据：
 5. 你用了哪些本地证据文件和代码位点
 ```
 
+## 2026-04-23 补充：项目级压缩配置对齐已完成
+
+以下语义纠偏已经落地到本 worktree：
+
+- `ConversationSessionSettings` 已移除 compaction 字段，只保留 `chatFontSizePx`
+- `OpenCodianSettings` 已移除 `autoCompactionEnabled` / `compactionReservedTokens`
+- 会话设置弹窗不再出现 compaction 分组
+- 设置页 compaction 控件现在直接编辑项目 `.opencode/opencode.json`，覆盖全部 upstream 字段（`auto`, `prune`, `tail_turns`, `preserve_recent_tokens`, `reserved`）
+- 保存 compaction 后走项目级 instance reload（`reapplyCompactionConfigFromProjectConfig`），不再走 per-session runtime apply
+- `OpenCodeService.applyCompactionConfig()` 已删除
+
+未来调试压缩行为时，请以项目 `.opencode/opencode.json` 为压缩配置真相源，不再从会话设置或插件 settings 里找 compaction 参数。

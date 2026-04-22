@@ -2,23 +2,19 @@
 
 > 基线：`C:\Users\lt\Desktop\Write\open-source-project\AI-tools-agents\opencode` 已 fast-forward 到 `origin/dev` `266e96557`（`packages/opencode/package.json` 版本 `1.14.20`）。
 >
-> 目标：让 OpenCodian 使用 OpenCode 后端的原生自动压缩链路，并在 UI 中正确展示“正在压缩”“压缩分隔/标记”“压缩报告”，同时让当前会话的压缩设置在可行时立即对当前后端实例生效。
+> 目标（2026-04-22 审计时）：让 OpenCodian 使用 OpenCode 后端的原生自动压缩链路，并在 UI 中正确展示“正在压缩”“压缩分隔/标记”“压缩报告”，同时让当前项目的压缩设置在可行时立即对当前后端实例生效。
 
 ## 一、结论摘要
 
-- OpenCode 后端已经具备完整的自动压缩能力；OpenCodian 当前只接入了 **压缩配置字段的一部分写入**，还没有真正完成 **后端即时生效、压缩状态可见、压缩结果可见** 这三条链路。
-- OpenCode 的“正在压缩”不是通过 `session.status` 暴露，而是通过 `Session.time.compacting` 暴露；当前 OpenCodian 的本地类型和状态流都没有保留这个字段。
+- **2026-04-23 当前状态**：OpenCodian 已完成项目级 compaction 对齐；compaction 配置现在写入项目 `.opencode/opencode.json`，会话设置不再承载 compaction 字段，`OpenCodeService.applyCompactionConfig()` 已删除。
+- OpenCode 的“正在压缩”不是通过 `session.status` 暴露，而是通过 `Session.time.compacting` 暴露；下文中“当前 OpenCodian 未接入”的描述应视为 2026-04-22 审计时的历史基线。
 - OpenCode 的压缩完成后会留下两类会话工件：
   - 一条 **user compaction part**（`type: "compaction"`，带 `auto` / `overflow` / `tail_start_id`）
   - 一条 **assistant summary message**（`summary: true`，正文就是压缩报告）
-- 当前 OpenCodian：
-  - 会把压缩设置写到 `.opencode/opencode.json`
-  - 但没有走后端 `config.update` / `invalidate`，所以 **当前活动实例不保证立刻吃到新配置**
-  - 没有识别 `compaction` part
-  - 没有保留 assistant `summary` 标记
-  - 没有识别 `time.compacting`
-  - 没有识别 `session.compacted`
-- 推荐采用 **“后端优先（backend-first）”方案**：把 compaction 设置应用改成 **通过 OpenCode 后端配置接口即时落地并触发实例刷新**，同时补齐 UI 的 compaction 生命周期展示。
+- 2026-04-22 审计时的 OpenCodian：
+  - 只把压缩设置写到 `.opencode/opencode.json`
+  - 还没有把项目级 compaction reload、compaction transcript 工件和相关状态展示完全接上
+- 当前实现已经收敛为 **项目级文件真相源 + scoped instance reload**，而不是继续维持 per-session/backend-first apply 语义。
 
 ---
 
@@ -39,12 +35,12 @@ OpenCode 当前公开的 compaction 配置字段包括：
 - `packages/sdk/js/src/v2/gen/types.gen.ts`
 - `packages/opencode/src/config/config.ts`
 
-其中 OpenCodian 当前 UI 只暴露了两项：
+其中 2026-04-22 审计时的 OpenCodian UI 只暴露了两项：
 
 - `autoCompactionEnabled` → `compaction.auto`
 - `compactionReservedTokens` → `compaction.reserved`
 
-这意味着当前插件还没有覆盖 `prune` / `tail_turns` / `preserve_recent_tokens`，但这并不阻塞“自动压缩可用”，只是功能面不完整。
+这意味着当时的插件还没有覆盖 `prune` / `tail_turns` / `preserve_recent_tokens`；当前实现已把这些字段纳入项目级设置编辑器。
 
 ### 2.2 自动触发链路
 
@@ -101,7 +97,7 @@ OpenCode 会发出：
 
 - `session.compacted`
 
-公开 SDK/OpenAPI 暴露的事件负载很轻，只保证有 `sessionID`。  
+公开 SDK/OpenAPI 暴露的事件负载很轻，只保证有 `sessionID`。
 内部 v2 session event 还保留了 `auto` / `overflow`，但这些细节并没有完整透传到当前公开 SDK 事件模型。
 
 这意味着插件如果想区分“自动压缩 / 手动压缩 / overflow 触发”，**不能只依赖公开事件**，还需要结合消息工件本身。
@@ -173,7 +169,7 @@ OpenCodian 已经有：
 - `packages/opencode/src/config/config.ts`
 - `packages/opencode/src/effect/instance-state.ts`
 
-如果走后端 `config.update()`，OpenCode 会在写完配置后 dispose 当前 instance；  
+如果走后端 `config.update()`，OpenCode 会在写完配置后 dispose 当前 instance；
 如果只在插件侧直接改文件，则当前活跃 instance 很可能继续吃旧配置。
 
 **结论：当前“保存 compaction 设置”只能算文件层生效，不算活动后端实例即时生效。**
@@ -207,7 +203,7 @@ OpenCodian 当前的 `SessionActivityStatus` 与归一化逻辑只接受：
 - `src/core/opencode/OpenCodeSyncEventRuntimeCoordinator.ts`
 - `src/core/opencode/OpenCodeService.ts`
 
-而 OpenCode 上游本来就没有把 compaction 放进 `session.status`；  
+而 OpenCode 上游本来就没有把 compaction 放进 `session.status`；
 所以当前状态链路天然无法表达 “compacting”。
 
 ### 4. sync runtime 没有接 `session.compacted`
@@ -254,7 +250,7 @@ OpenCodian 的 user/assistant 文本归一化目前只显式处理：
 
 ### 6. assistant `summary` 标记当前也没有保留
 
-OpenCodian 本地 `Message` 类型没有 `summary?: boolean`。  
+OpenCodian 本地 `Message` 类型没有 `summary?: boolean`。
 所以即便压缩报告正文文本最终能显示，插件也无法知道：
 
 - 这是不是 compaction report
@@ -280,7 +276,7 @@ OpenCodian 目前没有识别这个 metadata。
 
 ### 8. `sdk-v2-rollout.md` 已过时
 
-当前仓库文档仍把 `session.summarize()` 写成“未实现”，但 facade 实际已存在。  
+当前仓库文档仍把 `session.summarize()` 写成“未实现”，但 facade 实际已存在。
 这属于文档漂移，应该在实施时顺手修正。
 
 ---
@@ -371,14 +367,14 @@ OpenCodian 目前没有识别这个 metadata。
 
 新增一条 backend-scoped compaction 应用通路，推荐放在 OpenCode service/config owner 内，而不是继续把 compaction 写入留在纯文件工具层。
 
-建议职责分工：
 
-- `OpenCodeService`
-  - 暴露 `applyCompactionConfig(...)` / `getCurrentCompactionConfig(...)`
-- `OpenCodeSessionLifecycleCoordinator` 或新增轻量 config runtime owner
-  - 调 SDK `config.get()` / `config.update()`，必要时走 legacy `/config`
-- `ConversationSessionSettingsCoordinator`
-  - 从“直接写本地文件”改为“请求 OpenCode backend 应用 compaction config”
+> **2026-04-23 update**: This design has been implemented and evolved. Compaction config is now project-scoped (`.opencode/opencode.json`), no longer per-session/per-conversation. `SettingsConversationSection` writes via `OpencodeConfigManager.updateCompactionConfig()`, then calls `reapplyCompactionConfigFromProjectConfig()`. `applyCompactionConfig()` was removed.
+
+Current ownership:
+
+- `SettingsConversationSection` writes compaction config to `.opencode/opencode.json` via `OpencodeConfigManager`
+- `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` disposes scoped instance and verifies reload
+- `applyCompactionConfig()` has been removed from `OpenCodeService`
 
 ### 为什么推荐后端写入
 
@@ -473,7 +469,7 @@ OpenCode 上游 `config.update()` 路径会：
 
 ### 原因
 
-仅靠轮询或被动刷新，UI 收尾会慢半拍；  
+仅靠轮询或被动刷新，UI 收尾会慢半拍；
 `session.compacted` 可以作为：
 
 - 停止“正在压缩”提示
@@ -515,7 +511,7 @@ assistant summary 的正文本来就是压缩报告，应继续正常显示正�
 - badge：`Compaction report`
 - 可用 `summary: true` 作为标记
 
-推荐不要把报告折叠到 tooltip 或只做隐藏 metadata。  
+推荐不要把报告折叠到 tooltip 或只做隐藏 metadata。
 它本来就是继续会话的重要上下文摘要，应该直接可读。
 
 ### C. `compaction_continue` synthetic user message

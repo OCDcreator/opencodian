@@ -4,13 +4,10 @@ import { Modal } from 'obsidian';
 import type { ConversationSessionSettings } from '../../../core/types';
 import {
   normalizeChatFontSizePx,
-  normalizeCompactionReservedTokens,
 } from '../../../core/types';
 import { t } from '../../../i18n';
 
 export interface ConversationSessionSettingsModalDefaults {
-  autoCompactionEnabled: boolean;
-  compactionReservedTokens: number;
   chatFontSizePx: number;
 }
 
@@ -23,12 +20,7 @@ interface ConversationSessionSettingsModalOptions {
   ): Promise<void> | void;
 }
 
-type AutoCompactionSelection = 'inherit' | 'enabled' | 'disabled';
-
 export class ConversationSessionSettingsModal extends Modal {
-  private autoCompactionSelection: AutoCompactionSelection = 'inherit';
-  private autoCompactionButtonEls: HTMLButtonElement[] = [];
-  private reservedTokensInputEl: HTMLInputElement | null = null;
   private chatFontSizeInputEl: HTMLInputElement | null = null;
   private errorEl: HTMLElement | null = null;
   private saveButtonEl: HTMLButtonElement | null = null;
@@ -51,21 +43,6 @@ export class ConversationSessionSettingsModal extends Modal {
     });
 
     this.createHero(bodyEl);
-
-    const compactionSectionEl = this.createSection(bodyEl, {
-      section: 'compaction',
-      title: t('chat.sessionSettings.modal.compactionGroup'),
-      description: t('chat.sessionSettings.modal.compactionGroupDesc'),
-    });
-    this.createAutoCompactionField(compactionSectionEl);
-    this.reservedTokensInputEl = this.createNumberField(compactionSectionEl, {
-      setting: 'reserved-tokens',
-      name: t('chat.sessionSettings.modal.compactionReservedTokens'),
-      description: t('chat.sessionSettings.modal.compactionReservedTokensDesc'),
-      defaultValue: this.options.defaults.compactionReservedTokens,
-      placeholder: String(this.options.defaults.compactionReservedTokens),
-      initialValue: this.options.initialOverrides?.compactionReservedTokens,
-    });
 
     const displaySectionEl = this.createSection(bodyEl, {
       section: 'display',
@@ -110,9 +87,6 @@ export class ConversationSessionSettingsModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-session-settings-modal');
-    this.autoCompactionSelection = 'inherit';
-    this.autoCompactionButtonEls = [];
-    this.reservedTokensInputEl = null;
     this.chatFontSizeInputEl = null;
     this.errorEl = null;
     this.saveButtonEl = null;
@@ -163,37 +137,6 @@ export class ConversationSessionSettingsModal extends Modal {
       text: options.description,
     });
     return sectionEl;
-  }
-
-  private createAutoCompactionField(containerEl: HTMLElement): void {
-    const controlEl = this.createFieldShell(containerEl, {
-      name: t('chat.sessionSettings.modal.autoCompaction'),
-      description: t('chat.sessionSettings.modal.autoCompactionDesc'),
-      defaultValue: this.options.defaults.autoCompactionEnabled
-        ? t('chat.sessionSettings.modal.enabled')
-        : t('chat.sessionSettings.modal.disabled'),
-    });
-
-    const groupEl = controlEl.createDiv({
-      cls: 'opencodian-session-settings-choice-group',
-      attr: {
-        role: 'group',
-        'aria-label': t('chat.sessionSettings.modal.autoCompaction'),
-      },
-    });
-    const initialValue = this.options.initialOverrides?.autoCompactionEnabled;
-    this.autoCompactionSelection = initialValue === true
-      ? 'enabled'
-      : initialValue === false
-        ? 'disabled'
-        : 'inherit';
-
-    this.autoCompactionButtonEls = [
-      this.createAutoCompactionButton(groupEl, 'inherit', t('chat.sessionSettings.modal.inherit')),
-      this.createAutoCompactionButton(groupEl, 'enabled', t('chat.sessionSettings.modal.enabled')),
-      this.createAutoCompactionButton(groupEl, 'disabled', t('chat.sessionSettings.modal.disabled')),
-    ];
-    this.syncAutoCompactionButtons();
   }
 
   private createNumberField(containerEl: HTMLElement, options: {
@@ -254,35 +197,6 @@ export class ConversationSessionSettingsModal extends Modal {
     });
   }
 
-  private createAutoCompactionButton(
-    containerEl: HTMLElement,
-    value: AutoCompactionSelection,
-    text: string,
-  ): HTMLButtonElement {
-    const buttonEl = containerEl.createEl('button', {
-      cls: 'opencodian-session-settings-choice-button',
-      text,
-      attr: {
-        type: 'button',
-        'data-setting': 'auto-compaction',
-        'data-value': value,
-      },
-    });
-    buttonEl.addEventListener('click', () => {
-      this.autoCompactionSelection = value;
-      this.syncAutoCompactionButtons();
-    });
-    return buttonEl;
-  }
-
-  private syncAutoCompactionButtons(): void {
-    for (const buttonEl of this.autoCompactionButtonEls) {
-      const isSelected = buttonEl.dataset.value === this.autoCompactionSelection;
-      buttonEl.toggleClass('is-selected', isSelected);
-      buttonEl.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
-    }
-  }
-
   private async handleSave(): Promise<void> {
     this.setBusy(true);
     this.setError('');
@@ -291,7 +205,7 @@ export class ConversationSessionSettingsModal extends Modal {
       await this.options.onSave(this.buildOverrides());
       this.close();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('chat.sessionSettings.savedRuntimeWarning');
+      const message = error instanceof Error ? error.message : String(error);
       this.setError(message);
     } finally {
       this.setBusy(false);
@@ -300,27 +214,6 @@ export class ConversationSessionSettingsModal extends Modal {
 
   private buildOverrides(): ConversationSessionSettings | undefined {
     const overrides: ConversationSessionSettings = {};
-
-    const autoCompactionSelection = this.autoCompactionSelection;
-    overrides.autoCompactionEnabled = autoCompactionSelection === 'enabled'
-      ? true
-      : autoCompactionSelection === 'disabled'
-        ? false
-        : null;
-
-    const reservedTokensValue = this.reservedTokensInputEl?.value.trim() ?? '';
-    if (reservedTokensValue.length > 0) {
-      const normalizedReservedTokens = normalizeCompactionReservedTokens(
-        Number(reservedTokensValue),
-        -1,
-      );
-      if (normalizedReservedTokens <= 0) {
-        throw new Error(t('chat.sessionSettings.validation.compactionReservedTokens'));
-      }
-      overrides.compactionReservedTokens = normalizedReservedTokens;
-    } else {
-      overrides.compactionReservedTokens = null;
-    }
 
     const chatFontSizeValue = this.chatFontSizeInputEl?.value.trim() ?? '';
     if (chatFontSizeValue.length > 0) {

@@ -647,18 +647,9 @@ export class OpenCodianView extends ItemView {
       app: this.app,
       getCurrentConversation: () => this.currentConversation,
       getSessionSettingsDefaults: () => ({
-        autoCompactionEnabled: this.plugin.settings.autoCompactionEnabled,
-        compactionReservedTokens: this.plugin.settings.compactionReservedTokens,
         chatFontSizePx: this.plugin.settings.chatFontSizePx,
       }),
       getChatContainerEl: () => this.chatContainerEl,
-      applyCompactionConfig: (compaction) =>
-        this.plugin.openCodeService.applyCompactionConfig(compaction),
-      reapplyCompactionConfigFromProjectConfig: (compaction) =>
-        this.plugin.openCodeService.reapplyCompactionConfigFromProjectConfig(compaction),
-      refreshCurrentSessionState: () =>
-        this.activeTabContextUsageCoordinator.refreshFromServer(),
-      getOpencodeConfigManager: () => this.plugin.opencodeConfigManager,
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       showNotice: (message) => {
         new Notice(message);

@@ -55,3 +55,11 @@
 
 - 这里只处理启动期 bootstrap normalization；保存路径、UI refresh、locale/theme side effects 仍在 `main.ts`。
 - 不能改变 conversation preload、plugin load order、provider/model disable layering 或 locale keys。
+
+## 2026-04-23 Compaction config alignment
+
+Ownership facts:
+
+1. Compaction config is project-scoped and stored in `.opencode/opencode.json`.
+2. Conversation session settings no longer own compaction, and `OpenCodianSettings` no longer normalizes `autoCompactionEnabled` / `compactionReservedTokens` during bootstrap.
+3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not a settings bootstrap concern.

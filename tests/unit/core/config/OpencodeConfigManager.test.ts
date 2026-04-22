@@ -378,6 +378,42 @@ describe('OpencodeConfigManager session agent command helpers', () => {
     });
   });
 
+  it('round-trips tail_turns and preserve_recent_tokens in compaction config', async () => {
+    await manager.write({
+      compaction: {
+        auto: true,
+        prune: false,
+        tail_turns: 4,
+        preserve_recent_tokens: 8000,
+        reserved: 12000,
+      },
+    });
+
+    expect(await manager.getCompactionConfig()).toEqual({
+      auto: true,
+      prune: false,
+      tail_turns: 4,
+      preserve_recent_tokens: 8000,
+      reserved: 12000,
+    });
+
+    await manager.updateCompactionConfig({
+      tail_turns: 6,
+      preserve_recent_tokens: 16000,
+    });
+
+    const updated = await manager.getCompactionConfig();
+    expect(updated).toEqual(
+      expect.objectContaining({
+        tail_turns: 6,
+        preserve_recent_tokens: 16000,
+        auto: true,
+        prune: false,
+        reserved: 12000,
+      }),
+    );
+  });
+
   it('imports deprecated mode agents and preserves tool config fields during agent writes', async () => {
     await manager.write({
       mode: {

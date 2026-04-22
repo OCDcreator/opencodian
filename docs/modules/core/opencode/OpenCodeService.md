@@ -338,8 +338,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 - `getAvailableModels()`: 读取 SDK `config.providers()` 或 legacy `/config/providers`，并把 string-array/object 两种 provider model 结构统一成同一个返回形状。开启 `includeDirectory` 时，它表示“当前项目目录作用域下的 runtime provider/model 列表”，也是设置页复现 `opencode models` 结果的主入口。
 - `getProviderDirectory()`: 读取 SDK `provider.list()` 或 legacy `/provider`，归一化 `all` / `default` / `connected`；它对应的是 connect-provider 目录总览，不是 `opencode models` 的等价接口。
 - `getResolvedModelConfig()`: 读取 SDK `config.get()` 或 legacy `/config`，只提取模型相关配置字段。开启 `includeDirectory` 时返回当前项目作用域的解析结果；关闭时返回服务端“默认工作目录作用域”的解析结果，不能把它简单等同于纯全局配置文件。
-- `applyCompactionConfig()`: 先读当前 backend 解析后的 config，再只 patch `compaction` 字段到 `config.update()` / legacy `PATCH /config`；更新后会再读一次 resolved config，只有 read-back 真正包含请求的 compaction keys 才返回 applied，否则返回 deferred。
-- `reapplyCompactionConfigFromProjectConfig()`: 当 backend-first route 不能证明生效时，供上层在 `.opencode/opencode.json` fallback 写入后 dispose 当前 scoped instance，再验证项目配置是否被 sidecar 重新读入；`modelSourceMode: 'server'` 会直接 deferred，因为该模式会禁用项目配置。
+- `reapplyCompactionConfigFromProjectConfig()`: 供 `SettingsConversationSection` 在 `.opencode/opencode.json` 写入后 dispose 当前 scoped instance，再验证项目配置是否被 sidecar 重新读入；`modelSourceMode: 'server'` 会直接 deferred，因为该模式会禁用项目配置。
 - `getSessionContextUsageSnapshot()`: 现在委托给 `OpenCodeSessionControlOrchestrator`，并发读取 session、messages、providers，计算 provider/model 名称、上下文窗口、token 统计和总 cost。
 - `getPendingPermissions()` / `respondToPermission()` / `respondToSessionPermission()` / `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 现在统一委托给 `OpenCodeQuestionPermissionHub`，由它处理 SDK flag、legacy fallback、question prompt normalization 与 permission request filtering。
 - `getMcpStatus()` / `addMcpServer()` / provider auth / project / file / find / path / VCS / formatter / LSP 查询：现在统一委托给 `OpenCodeCatalogQueryCoordinator`，由它集中处理 SDK query/admin surface 与 MCP status normalization/writeback。
@@ -372,8 +371,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `getAvailableModels()` | 读取并统一 provider/model 目录 |
 | `getProviderDirectory()` | 读取服务端宽 provider 目录，不等同于运行时可用列表 |
 | `getResolvedModelConfig()` | 读取服务器解析后的模型配置子集 |
-| `applyCompactionConfig()` | backend-first 应用当前目录作用域的 compaction 配置，并用 resolved read-back 防止 false applied |
-| `reapplyCompactionConfigFromProjectConfig()` | fallback 文件写入后 dispose 当前 scoped instance，并验证 sidecar 是否重新读到项目 compaction |
+| `reapplyCompactionConfigFromProjectConfig()` | dispose 当前 scoped instance，并验证 sidecar 是否重新读到项目 compaction |
 | `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
 | `respondToSessionPermission()` | 回传 session-scoped permission 决策 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
@@ -434,7 +432,7 @@ graph TD
 - `OpenCodeService.initialize()` 仍然存在，但运行时入口 `main.ts` 并不调用它；主要使用方是测试。
 - `OpenCodeQuestionPermissionHub` 现在拥有 question / permission negotiation owner；`OpenCodeService` 只保留 host seam 与对外 façade。
 - `OpenCodeCatalogQueryCoordinator` 现在拥有 directory-scoped config/tool-catalog/MCP/query owner；不要把 `config.providers()`、`provider.list()`、`config.get()`、`tool.ids()`、`tool.list()`、provider/file/find/MCP auth 再拆成多个薄 wrapper，也不要把 `OpenCodeSdkFacade` 的 request option injection 逻辑复制进来。
-- 会话级 compaction 设置应用现在优先走 backend `config.get/config.update`，但必须以 resolved read-back 为准；如果 OpenCode route 回显成功但读回未变，调用方会退回 `.opencode` 文件写入，再通过 `reapplyCompactionConfigFromProjectConfig()` 尝试 dispose 当前 instance 让 sidecar 重读。
+- compaction 配置现在由 `SettingsConversationSection` 直接通过 `OpencodeConfigManager.updateCompactionConfig()` 写入 `.opencode/opencode.json`，然后通过 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读；`applyCompactionConfig()` 已移除。
 - `getPendingPermissions()` / `respondToPermission()` 当前仍跟随 `sdkCrud`，不是单独的 permission flag；`respondToSessionPermission()` 继续直接走 SDK permission responder。
 - `checkHealth()`、`getAvailableModels()`、`getProviderDirectory()` 和 `getResolvedModelConfig()` 都跟随 `sdkCrud`，而不是独立的 health/models flag。
 - `getAvailableModels()` 是运行时可用列表，也是最接近 OpenCode 主界面当前 provider 列表的数据源。
@@ -444,3 +442,10 @@ graph TD
 - 本地模式下如果 `4096` 是旧的 managed server，`getAvailableModels()` / `getResolvedModelConfig()` 即使代码本身没错，也会返回“上一份 vault / 上一份配置”对应的结果；先重启 stale server，再判断是不是 SDK/归一化问题。
 - legacy `connectSSE()` / `parseSSEEvents()` 仍然是有效回滚路径，不能在 SDK rollout 未完全收口前删除。
 - 文件里的 `transformEventToChunks()` / `transformPartToChunks()` 仍保留，但当前主流式路径实际走的是 `handleStreamingEvent()`。
+
+## 2026-04-23 Compaction config alignment
+
+Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership facts:
+1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
+2. `applyCompactionConfig()` was removed from `OpenCodeService`; compaction is now written by `SettingsConversationSection` via `OpencodeConfigManager.updateCompactionConfig()`, then applied via `reapplyCompactionConfigFromProjectConfig()`.
+3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not managed by the compaction configuration surface.

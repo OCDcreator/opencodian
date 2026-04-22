@@ -117,3 +117,10 @@ t('settings.server.started')
 - `settings.style.input.liquidGlass.nikdelvin.*.desc`
 - `settings.style.input.liquidGlass.shudingDiamond.*.desc`
 - `settings.style.input.help.*` — 通用帮助
+
+## 2026-04-23 Compaction config alignment
+
+Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership facts:
+1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
+2. Locale keys for `autoCompactionEnabled` and `compactionReservedTokens` per-session overrides have been removed; new project-scoped compaction keys were added under `settings.conversation.compaction.*`.
+3. Manual `session.summarize()` remains a per-session action, not managed by compaction locale keys.

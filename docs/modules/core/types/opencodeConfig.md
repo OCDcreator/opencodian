@@ -30,7 +30,7 @@
 | `OpencodeAgentConfigRecord` | `Record<string, OpencodeAgentConfig>` — 原生 / deprecated agent map |
 | `OpencodeCommandConfig` | 结构化命令配置（`template?`, `description?`, `agent?`, `subtask?`, `model?`, `temperature?`, `top_p?`） |
 | `OpencodeCommandConfigRecord` | `Record<string, OpencodeCommandConfig>` — 命令 map |
-| `OpencodeCompactionConfig` | 压缩配置（`auto?`, `prune?`, `reserved?`） |
+| `OpencodeCompactionConfig` | 压缩配置（`auto?`, `prune?`, `tail_turns?`, `preserve_recent_tokens?`, `reserved?`） |
 | `OpencodeToolConfig` | `Record<string, boolean>` — top-level 工具开关 |
 | `OpencodeModelConfigSubset` | 模型相关配置子集（`model?`, `small_model?`, `provider?`, `enabled_providers?`, `disabled_providers?`） |
 | `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `compaction?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
@@ -82,6 +82,14 @@
 ## 关键方法
 
 无运行时方法，仅类型导出。源码约 80 行。
+
+## 2026-04-23 Compaction config alignment
+
+Ownership facts:
+
+1. Compaction config is project-scoped and stored in `.opencode/opencode.json`.
+2. Conversation session settings and plugin settings are no longer the source of truth for compaction; this schema models the project-level config object instead.
+3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not part of this configuration contract.
 
 ## 数据流
 

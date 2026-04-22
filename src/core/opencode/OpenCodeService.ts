@@ -960,53 +960,8 @@ export class OpenCodeService {
     );
   }
 
-  private async updateBackendResolvedConfig(config: Record<string, unknown>): Promise<void> {
-    if (this.shouldUseSdk('sdkCrud') && typeof this.sdk.config.update === 'function') {
-      try {
-        await this.sdk.config.update({
-          config,
-        } as Parameters<typeof this.sdk.config.update>[0]);
-        return;
-      } catch (error) {
-        this.diagnostics.logServiceWarning(
-          'config.update',
-          'SDK config.update failed while applying compaction config, falling back to legacy HTTP',
-          error,
-        );
-      }
-    }
-
-    await this.patch<unknown>('/config', config, { includeDirectory: true });
-  }
-
   private normalizeBackendConfig(value: unknown): Record<string, unknown> {
     return isPlainRecord(value) ? this.clonePlainRecord(value) : {};
-  }
-
-  private withCompactionConfig(
-    config: Record<string, unknown>,
-    compaction: OpencodeCompactionConfig | null | undefined,
-  ): Record<string, unknown> {
-    if (!compaction) {
-      return {
-        compaction: {},
-      };
-    }
-
-    const currentCompaction = isPlainRecord(config.compaction)
-      ? this.clonePlainRecord(config.compaction)
-      : {};
-    for (const [key, value] of Object.entries(compaction)) {
-      if (value === undefined) {
-        delete currentCompaction[key];
-        continue;
-      }
-      currentCompaction[key] = this.cloneConfigValue(value);
-    }
-
-    return {
-      compaction: currentCompaction,
-    };
   }
 
   private resolvedCompactionMatches(
@@ -1647,46 +1602,6 @@ export class OpenCodeService {
 
   async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {
     return this.sessionControl.getSessionContextUsageSnapshot(sessionId);
-  }
-
-  async applyCompactionConfig(
-    compaction: OpencodeCompactionConfig | null | undefined,
-  ): Promise<OpenCodeCompactionConfigApplyResult> {
-    try {
-      const currentConfig = await this.getBackendResolvedConfigForUpdate();
-      const nextConfig = this.withCompactionConfig(currentConfig, compaction);
-      await this.updateBackendResolvedConfig(nextConfig);
-      const resolvedConfig = await this.getBackendResolvedConfigForUpdate();
-      if (!this.resolvedCompactionMatches(resolvedConfig, compaction)) {
-        const reason = 'Backend config.update did not affect the resolved config';
-        this.diagnostics.logServiceWarning(
-          'config.update.verify',
-          reason,
-          {
-            requestedCompaction: compaction ?? null,
-            resolvedCompaction: isPlainRecord(resolvedConfig.compaction)
-              ? this.clonePlainRecord(resolvedConfig.compaction)
-              : null,
-          },
-        );
-        return {
-          status: 'deferred',
-          reason,
-        };
-      }
-      return { status: 'applied' };
-    } catch (error) {
-      const reason = this.diagnostics.describeError(error);
-      this.diagnostics.logServiceWarning(
-        'config.update',
-        'Backend compaction config update unavailable; compaction settings are deferred until backend reload',
-        error,
-      );
-      return {
-        status: 'deferred',
-        reason,
-      };
-    }
   }
 
   async reapplyCompactionConfigFromProjectConfig(
