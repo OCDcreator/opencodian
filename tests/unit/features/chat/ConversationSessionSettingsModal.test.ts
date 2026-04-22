@@ -146,4 +146,18 @@ describe('ConversationSessionSettingsModal', () => {
       /\.opencodian-session-settings-choice-button\[data-value="inherit"\]\s*\{[^}]*min-width:\s*max-content;/s,
     );
   });
+
+  it('uses a neutral hero surface without the right-side accent glow', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    const heroRuleMatch = css.match(
+      /\.opencodian-session-settings-hero\s*\{([\s\S]*?)\n\}/,
+    );
+
+    expect(heroRuleMatch?.[1]).toBeDefined();
+    expect(heroRuleMatch?.[1]).not.toContain('radial-gradient');
+  });
 });
