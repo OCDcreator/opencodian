@@ -90,7 +90,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 - `currentConversation` / `currentConversationRevertState`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
-- `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、`OpenCodeService.applyCompactionConfig()`、active-tab context usage refresh、vault-scoped deferred fallback config manager，以及 per-conversation session settings notice/save
+- `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、`OpenCodeService.applyCompactionConfig()`、`OpenCodeService.reapplyCompactionConfigFromProjectConfig()`、active-tab context usage refresh、vault-scoped deferred fallback config manager，以及 per-conversation session settings notice/save
 - 一个面向 settings shell 的公开 bridge：`reapplyCurrentConversationSessionSettings()` 会直接复用上述 coordinator，让 settings/conversation 里的 global session default 修改可以立刻落回当前聊天运行时
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
@@ -222,9 +222,13 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 `session.diff` 现在不再触发 message authoritative sync/reload：view 会把 sync-event 自带的 diff entries 记在独立的 `sessionDiffEntriesBySessionId` 缓存里，只把它作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
 
+`session.compacted` 现在会沿着同一条 session signal runtime 进入 `ConversationSyncBridge`，但 visible current conversation 会强制走 authoritative server sync，而不是先信任可能已过期的 canonical graph；sync 收尾继续复用 active-tab context usage refresh，以便清掉/更新 `Session.time.compacting` 驱动的 live 状态。
+
 这里的 conversation sync fingerprint 现在直接复用 `OpenCodeService.getCanonicalConversationFingerprint()`：它会把 `contentBlocks`、tool call、context attachment、OMO/notice 元数据和原始 `parts` 一起写入 fingerprint，从而让 authoritative reload/finalization 以 canonical payload 漂移为准，而不是继续依赖 view 层单独维护一套 visual-only 对比。
 
 与此同时，view 自己的 assistant body / visual signature 也需要把 `contentBlocks[].toolMetadata` 与 `contentBlocks[].toolResultVisibility` 纳入比较；否则 task 卡片在 authoritative hydration 后即使拿到了 child session id，也可能因为 signature 误判“未变化”而错过重渲。
+
+assistant `summary === true` 的消息会在正文上方渲染一个 compaction report badge，并纳入 assistant body signature；user 消息渲染现在也会跳过没有 visible content / attachments / images / OMO 的空壳消息，用于隐藏 OpenCode `metadata.compaction_continue` 这类内部续跑提示。
 
 与此同时，server message 拉取→hydrate→authoritative merge、latest optimistic user bubble hydration、client-only/interrupted message preservation，以及 sync debug payload / fingerprint 组装现在统一收束到 `services/ConversationAuthoritativeSyncCoordinator.ts`。`OpenCodianView` 只再保留 host seam：OpenCode message/revert 查询、runtime fingerprint/anchor 写回、context usage refresh、background-task authoritative-sync 标记，以及 hydrated single-message rerender。
 
@@ -250,7 +254,7 @@ loaded-conversation 在消息拿到之后那段 `syncBackgroundTaskStateFromConv
 
 tab stream-like badge、background-task badge、rewind/fork 按钮禁用态，以及 attention 标记写回现在也不再由 view 自己散落地直接操作 `TabManager` 或消息区 DOM：这些 runtime→UI 写回统一交给 `runtime/TabRuntimeStateBridge.ts`，view 只保留 wrapper 方法与 host bridge。
 
-除此之外，`ConversationSessionSignalRuntime` 现在会接入 `message.updated`、`message.removed`、`message.part.updated`、`message.part.removed`、`message.part.delta` 和 `session.diff`：前五类会先按 session 匹配 tab，再交给 `ConversationSyncBridge` 走 canonical local merge；`session.diff` 则只写入独立 diff/notice 输入，不再进入 authoritative reload / gap-recovery message sync。
+除此之外，`ConversationSessionSignalRuntime` 现在会接入 `message.updated`、`message.removed`、`message.part.updated`、`message.part.removed`、`message.part.delta`、`session.diff` 和 `session.compacted`：message/part 类会先按 session 匹配 tab，再交给 `ConversationSyncBridge` 走 canonical local merge；`session.diff` 只写入独立 diff/notice 输入；`session.compacted` 则作为 compaction 收尾 signal 触发 current-session authoritative refresh。
 
 ### question dock / pending question 编排
 

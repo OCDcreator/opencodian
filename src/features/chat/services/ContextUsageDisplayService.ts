@@ -11,6 +11,7 @@ export interface ContextUsageSummary {
   percentage: number;
   tone: 'success' | 'warning' | 'danger' | 'muted';
   ringLabel: string;
+  isCompacting: boolean;
   isUnavailable: boolean;
   contextWindow: number;
   tooltip: string;
@@ -36,6 +37,7 @@ export class ContextUsageDisplayService {
         percentage: 0,
         tone: 'muted',
         ringLabel: '-',
+        isCompacting: false,
         isUnavailable: true,
         contextWindow: 0,
         tooltip: t('context.usage.unavailable'),
@@ -45,20 +47,25 @@ export class ContextUsageDisplayService {
     const display = this.getDisplaySnapshot(state);
     const totalTokens = display.totalTokens;
     const percentage = display.percentage;
-    const tone = percentage >= 85
-      ? 'danger'
-      : percentage >= 60
-        ? 'warning'
-        : 'success';
+    const isCompacting = typeof state.compactingAt === 'number';
+    const tone = isCompacting
+      ? 'warning'
+      : percentage >= 85
+        ? 'danger'
+        : percentage >= 60
+          ? 'warning'
+          : 'success';
 
     return {
       totalTokens,
       percentage,
       tone,
-      ringLabel: String(percentage),
+      ringLabel: isCompacting ? '…' : String(percentage),
+      isCompacting,
       isUnavailable: false,
       contextWindow: state.contextWindow,
       tooltip: [
+        ...(isCompacting ? [t('context.usage.compacting')] : []),
         `${t('context.usage.totalTokens')}: ${this.formatNumber(totalTokens)}`,
         `${t('context.usage.usage')}: ${percentage}%`,
         `${t('context.usage.cost')}: ${this.formatCurrency(state.totalCost)}`,

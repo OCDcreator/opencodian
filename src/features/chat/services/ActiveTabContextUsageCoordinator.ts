@@ -168,6 +168,7 @@ export class ActiveTabContextUsageCoordinator {
       conversationId,
       sessionId,
       updatedAt: snapshot?.updatedAt ?? null,
+      compactingAt: snapshot?.compactingAt ?? null,
       inputTokens: snapshot?.inputTokens ?? null,
       outputTokens: snapshot?.outputTokens ?? null,
       reasoningTokens: snapshot?.reasoningTokens ?? null,

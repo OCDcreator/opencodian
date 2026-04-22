@@ -230,6 +230,7 @@ function buildCanonicalConversationFingerprintPayload(
       noticeTone: message.noticeTone ?? null,
       noticeActions: message.noticeActions ?? null,
       noticeMeta: message.noticeMeta ?? null,
+      summary: message.summary ?? null,
       content: message.content,
       timestamp: message.timestamp,
       images: message.images ?? null,
@@ -1008,6 +1009,43 @@ export class OpenCodeService {
     };
   }
 
+  private resolvedCompactionMatches(
+    config: Record<string, unknown>,
+    compaction: OpencodeCompactionConfig | null | undefined,
+  ): boolean {
+    const resolvedCompaction = isPlainRecord(config.compaction)
+      ? config.compaction
+      : {};
+
+    if (!compaction) {
+      return Object.keys(resolvedCompaction).length === 0;
+    }
+
+    return Object.entries(compaction).every(([key, value]) => {
+      if (value === undefined) {
+        return !(key in resolvedCompaction);
+      }
+      return Object.is(resolvedCompaction[key], value);
+    });
+  }
+
+  private async disposeScopedInstance(): Promise<void> {
+    if (this.shouldUseSdk('sdkCrud') && typeof this.sdk.instance.dispose === 'function') {
+      try {
+        await this.sdk.instance.dispose();
+        return;
+      } catch (error) {
+        this.diagnostics.logServiceWarning(
+          'instance.dispose',
+          'SDK instance.dispose failed while reloading project config, falling back to legacy HTTP',
+          error,
+        );
+      }
+    }
+
+    await this.post<boolean>('/instance/dispose', undefined, { includeDirectory: true });
+  }
+
   private clonePlainRecord(value: Record<string, unknown>): Record<string, unknown> {
     return Object.fromEntries(
       Object.entries(value).map(([key, nestedValue]) => [key, this.cloneConfigValue(nestedValue)]),
@@ -1259,6 +1297,7 @@ export class OpenCodeService {
         );
         return;
       case 'session.diff':
+      case 'session.compacted':
         return;
     }
   }
@@ -1617,12 +1656,72 @@ export class OpenCodeService {
       const currentConfig = await this.getBackendResolvedConfigForUpdate();
       const nextConfig = this.withCompactionConfig(currentConfig, compaction);
       await this.updateBackendResolvedConfig(nextConfig);
+      const resolvedConfig = await this.getBackendResolvedConfigForUpdate();
+      if (!this.resolvedCompactionMatches(resolvedConfig, compaction)) {
+        const reason = 'Backend config.update did not affect the resolved config';
+        this.diagnostics.logServiceWarning(
+          'config.update.verify',
+          reason,
+          {
+            requestedCompaction: compaction ?? null,
+            resolvedCompaction: isPlainRecord(resolvedConfig.compaction)
+              ? this.clonePlainRecord(resolvedConfig.compaction)
+              : null,
+          },
+        );
+        return {
+          status: 'deferred',
+          reason,
+        };
+      }
       return { status: 'applied' };
     } catch (error) {
       const reason = this.diagnostics.describeError(error);
       this.diagnostics.logServiceWarning(
         'config.update',
         'Backend compaction config update unavailable; compaction settings are deferred until backend reload',
+        error,
+      );
+      return {
+        status: 'deferred',
+        reason,
+      };
+    }
+  }
+
+  async reapplyCompactionConfigFromProjectConfig(
+    compaction: OpencodeCompactionConfig | null | undefined,
+  ): Promise<OpenCodeCompactionConfigApplyResult> {
+    if (this.settings.modelSourceMode === 'server') {
+      return {
+        status: 'deferred',
+        reason: 'Project config is disabled while modelSourceMode is server',
+      };
+    }
+
+    if (!this.getScopedDirectoryPath()) {
+      return {
+        status: 'deferred',
+        reason: 'Vault directory scope is unavailable',
+      };
+    }
+
+    try {
+      await this.disposeScopedInstance();
+      const resolvedConfig = await this.getBackendResolvedConfigForUpdate();
+      if (this.resolvedCompactionMatches(resolvedConfig, compaction)) {
+        return { status: 'applied' };
+      }
+
+      return {
+        status: 'deferred',
+        reason: 'Project compaction config reload did not affect the resolved config',
+      };
+    } catch (error) {
+      const reason = this.diagnostics.describeError(error);
+      this.diagnostics.logServiceWarning(
+        'config.reload',
+        'Project compaction config reload failed; compaction settings are deferred until backend reload',
         error,
       );
       return {

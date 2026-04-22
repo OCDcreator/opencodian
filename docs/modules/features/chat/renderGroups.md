@@ -23,6 +23,7 @@ interface MessageRenderGroup {
 `buildMessageRenderGroups()` 顺序遍历消息：
 
 - `role === 'assistant'` 且 `displayStyle !== 'notice'` 的消息可合并
+- assistant `summary === true`（当前用于 compaction report）不会参与 merge，保证报告保持独立 render group
 - 如果当前组已经是 `mergedAssistant`，新的可合并助手消息会继续塞进该组
 - 其他任何消息都会开启新组
 

@@ -68,7 +68,9 @@ export class ContextRing {
     this.buttonEl.removeAttribute('title');
     this.srLabelEl.setText(summary.isUnavailable
       ? t('context.usage.title')
-      : `${t('context.usage.title')}: ${summary.percentage}%`);
+      : summary.isCompacting
+        ? `${t('context.usage.title')}: ${t('context.usage.compacting')}`
+        : `${t('context.usage.title')}: ${summary.percentage}%`);
     this.buttonEl.removeAttribute('aria-label');
   }
 

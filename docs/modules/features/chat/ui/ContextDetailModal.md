@@ -40,7 +40,7 @@ constructor(
 
 ### 元信息网格
 
-使用 `renderRow()` 渲染两列 grid：标签 + 值。字段包括 session title、provider、model、message counts、token breakdown、cost、timestamps。
+使用 `renderRow()` 渲染两列 grid：标签 + 值。字段包括 session title、provider、model、message counts、token breakdown、cost、timestamps；当 context summary 标记 `isCompacting` 时，还会额外显示当前 compaction status。
 
 ### 上下文分段条形图（Breakdown）
 
@@ -109,4 +109,4 @@ Modal grid + breakdown bar + raw messages + notes
 ## 补充说明
 
 - `ContextBreakdownSegment` 的 `key` 值由 `ContextUsageService.getContextBreakdown()` 返回，包含 system / history / context 等 key，每个 key 对应 i18n 翻译 `context.breakdown.{key}`
-- 与 `ContextUsageService` 各方法返回类型的精确映射：`summarize()` → `{ percentage, tone, ringLabel, tooltip, isUnavailable, contextWindow }`，`getDisplayTokenBreakdown()` → `{ total, input, output, reasoning, cacheRead, cacheWrite }`，`getContextBreakdown()` → `ContextBreakdownSegment[]`（每个含 `key`, `tokens`, `percent`, `width`）
+- 与 `ContextUsageService` 各方法返回类型的精确映射：`summarize()` → `{ percentage, tone, ringLabel, tooltip, isUnavailable, isCompacting, contextWindow }`，`getDisplayTokenBreakdown()` → `{ total, input, output, reasoning, cacheRead, cacheWrite }`，`getContextBreakdown()` → `ContextBreakdownSegment[]`（每个含 `key`, `tokens`, `percent`, `width`）

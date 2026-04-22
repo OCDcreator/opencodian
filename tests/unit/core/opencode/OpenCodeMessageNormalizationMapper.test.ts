@@ -118,6 +118,53 @@ describe('OpenCodeMessageNormalizationMapper context hydration', () => {
       }),
     ]);
   });
+
+  it('renders compaction parts as readable user markers and hides compaction-continue follow-ups', () => {
+    const compactionMessage = mapper.openCodeMessageToChatMessage(
+      {
+        id: 'msg-user-compaction',
+        sessionID: 'session-1',
+        role: 'user',
+        time: { created: 123 },
+      } as never,
+      [
+        {
+          type: 'compaction',
+          id: 'part-user-compaction',
+          sessionID: 'session-1',
+          messageID: 'msg-user-compaction',
+          auto: true,
+          overflow: true,
+          tail_start_id: 'msg-tail-start',
+        },
+      ] as never,
+    );
+    const continueMessage = mapper.openCodeMessageToChatMessage(
+      {
+        id: 'msg-user-compaction-continue',
+        sessionID: 'session-1',
+        role: 'user',
+        time: { created: 124 },
+      } as never,
+      [
+        {
+          type: 'text',
+          id: 'part-user-compaction-continue',
+          sessionID: 'session-1',
+          messageID: 'msg-user-compaction-continue',
+          text: 'Continue if you have next steps...',
+          metadata: {
+            compaction_continue: true,
+          },
+        },
+      ] as never,
+    );
+
+    expect(compactionMessage.content).toContain('Context compaction');
+    expect(compactionMessage.content).toContain('Automatic compaction');
+    expect(compactionMessage.content).toContain('Triggered after context overflow');
+    expect(continueMessage.content).toBe('');
+  });
 });
 
 describe('OpenCodeMessageNormalizationMapper tool content', () => {
@@ -435,5 +482,31 @@ describe('OpenCodeMessageNormalizationMapper OMO metadata', () => {
         },
       ],
     });
+  });
+
+  it('preserves assistant summary markers for compaction reports', () => {
+    const message = mapper.openCodeMessageToChatMessage(
+      {
+        id: 'msg-summary',
+        sessionID: 'session-1',
+        role: 'assistant',
+        summary: true,
+        providerID: 'anthropic',
+        modelID: 'claude-3-5-sonnet',
+        time: { created: 123 },
+      } as never,
+      [
+        {
+          type: 'text',
+          id: 'part-summary',
+          sessionID: 'session-1',
+          messageID: 'msg-summary',
+          text: 'Compressed 12 earlier turns.',
+        },
+      ] as never,
+    );
+
+    expect(message.summary).toBe(true);
+    expect(message.content).toBe('Compressed 12 earlier turns.');
   });
 });

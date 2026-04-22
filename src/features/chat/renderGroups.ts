@@ -6,7 +6,9 @@ export interface MessageRenderGroup {
 }
 
 function isMergeableAssistantMessage(message: ChatMessage): boolean {
-  return message.role === 'assistant' && message.displayStyle !== 'notice';
+  return message.role === 'assistant'
+    && message.displayStyle !== 'notice'
+    && message.summary !== true;
 }
 
 function extractTextContent(message: ChatMessage): string {

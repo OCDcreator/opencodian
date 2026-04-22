@@ -201,6 +201,7 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   modelId?: string;
+  summary?: boolean;
   sourceMessageId?: string;
   streamState?: 'interrupted';
   displayStyle?: 'default' | 'notice';
@@ -273,6 +274,7 @@ export interface TabContextState {
   providerName: string | null;
   model: string | null;
   modelName: string | null;
+  compactingAt?: number | null;
   sessionId: string | null;
   sessionTitle: string | null;
   createdAt: number | null;
@@ -293,6 +295,7 @@ export function createEmptyTabContextState(): TabContextState {
     providerName: null,
     model: null,
     modelName: null,
+    compactingAt: null,
     sessionId: null,
     sessionTitle: null,
     createdAt: null,

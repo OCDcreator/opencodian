@@ -9,6 +9,7 @@
 
 - 在活动 tab 存在时，根据当前会话模型、模型目录解析结果和当前 conversation 元数据同步 context usage identity
 - 在 loaded/open-side refresh 里拉取 session context usage snapshot，并只在 conversation/session 仍匹配时回写精确 token/cost
+- 在同一条 snapshot refresh 里把 `Session.time.compacting` 投影到 active-tab context state，复用已有 context usage refresh seam 暴露 compaction live state
 - 在无活动 tab 时统一清空 context ring，而不是让 bridge 或 view 分散判断
 - 为 `TabViewActivationBridge` 与 `TabConversationActivationBridge` 提供共享的 activation/open-side context usage 边界
 
@@ -40,6 +41,7 @@ export class ActiveTabContextUsageCoordinator {
 - `syncIdentity()` 保持原有 selector/context usage identity 的回写语义：先读取当前模型解析结果，再把 provider/model/session 元数据同步到 active tab context state
 - `syncIdentity()` 在没有 active tab 时只清空 indicator，不会错误回写旧 tab state
 - `refreshFromServer()` 保持原有 stale guard：snapshot 返回后必须再次确认 current conversation id、session id 和 active-tab 仍匹配，才会写回精确 tokens/cost
+- `refreshFromServer()` 现在也会把 snapshot 里的 `compactingAt` 一起写回，并把该字段纳入 debug 指纹，避免 idle polling 时重复刷相同 compaction log
 - `refreshFromServer()` 复用 `ContextUsageService.syncStateIdentity()` + `applyPreciseUsage()`，不重新实现 token/cost 汇总规则
 - `refreshFromServer()` 会输出 debug 级别耗时日志，并区分 `skipped` / `empty` / `stale` / `committed`
 - 这些日志现在通过共享 `shouldEmitLogFingerprint()` 做 payload 指纹限频：同一会话、同一 usage snapshot 的空闲轮询不会继续刷屏，但 usage 变化后会立刻重新输出

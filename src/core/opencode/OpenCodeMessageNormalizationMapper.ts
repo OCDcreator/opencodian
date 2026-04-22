@@ -26,6 +26,7 @@ interface OpenCodeMessageRecord {
   role: 'user' | 'assistant';
   providerID?: string;
   modelID?: string;
+  summary?: boolean;
   structured?: unknown;
   time?: {
     created?: number;
@@ -311,6 +312,7 @@ export class OpenCodeMessageNormalizationMapper {
       role,
       content: normalizedMessageContent.content,
       timestamp,
+      summary: role === 'assistant' && info.summary === true ? true : undefined,
       modelId: role === 'assistant'
         ? OpenCodeMessageNormalizationMapper.formatModelIdentifier(info.providerID, info.modelID)
         : undefined,

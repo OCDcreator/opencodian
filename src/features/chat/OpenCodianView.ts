@@ -654,6 +654,8 @@ export class OpenCodianView extends ItemView {
       getChatContainerEl: () => this.chatContainerEl,
       applyCompactionConfig: (compaction) =>
         this.plugin.openCodeService.applyCompactionConfig(compaction),
+      reapplyCompactionConfigFromProjectConfig: (compaction) =>
+        this.plugin.openCodeService.reapplyCompactionConfigFromProjectConfig(compaction),
       refreshCurrentSessionState: () =>
         this.activeTabContextUsageCoordinator.refreshFromServer(),
       getOpencodeConfigManager: () => this.plugin.opencodeConfigManager,
@@ -3941,6 +3943,14 @@ export class OpenCodianView extends ItemView {
     content: HTMLElement,
     message: ChatMessage,
   ): Promise<void> {
+    if (message.summary) {
+      const summaryMetaEl = content.createDiv({ cls: 'opencodian-omo-injection-header' });
+      summaryMetaEl.createSpan({
+        cls: 'opencodian-omo-injection-badge',
+        text: t('chat.compaction.reportBadge'),
+      });
+    }
+
     const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan({
       contentBlocks: message.contentBlocks,
       questionResolution: message.questionResolution,
@@ -3968,6 +3978,7 @@ export class OpenCodianView extends ItemView {
   private getAssistantBodySignature(message: ChatMessage): string {
     return JSON.stringify({
       displayStyle: message.displayStyle ?? null,
+      summary: message.summary ?? null,
       content: message.content,
       omo: message.omo ?? null,
       questionResolution: message.questionResolution ? {
@@ -4302,8 +4313,19 @@ export class OpenCodianView extends ItemView {
       return false;
     }
 
-    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
+    if (message.displayStyle === 'notice') {
       return true;
+    }
+
+    if (message.role !== 'assistant') {
+      return Boolean(
+        message.content?.trim()
+        || (message.contentBlocks?.length ?? 0) > 0
+        || (message.contextAttachments?.length ?? 0) > 0
+        || (message.images?.length ?? 0) > 0
+        || message.questionResolution
+        || message.omo,
+      );
     }
 
     return Boolean(

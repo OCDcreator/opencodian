@@ -42,7 +42,7 @@ export class ConversationSyncedUpdateApplyDelegate {
 
 - incremental helper 继续只比较 `getMessagesForRender()` 后的 rendered sequence，非尾部 signature 变化或消息数量回退时返回 `null`
 - synced append path 会先尝试 patch trailing assistant，再渲染新增消息并刷新 background-task indicator
-- plain text assistant append 继续走 pseudo-stream reveal；notice、question resolution 与 structured blocks 仍直接使用 persisted assistant shell
+- plain text assistant append 继续走 pseudo-stream reveal；notice、assistant `summary`、question resolution 与 structured blocks 仍直接使用 persisted assistant shell，避免 compaction report 被伪流式展开
 - user message rerender 继续复用 host 提供的 frame/body/footer callbacks，不在 runtime 内创建新的 view dependency
 
 ## 与 `ConversationRenderService` 的边界

@@ -47,6 +47,7 @@ export class ConversationSyncBridge {
 
 - `scheduleConversationSyncFromSignal()` 不再在 view 里内联拼装 hidden-tab callback，而是统一交给 bridge 组装
 - `applySessionSyncEvent()` 会把非 `session.diff` 的 message / part sync 直接路由到 canonical graph merge：先尝试从 `OpenCodeService` 的 canonical session graph 生成本地 sync 结果，再复用既有 visible/background post-sync router
+- `session.compacted` 是例外：visible current-conversation 会直接走 server reload，而不是先信任旧 canonical graph；hidden/background signal 仍沿用既有 authoritative server sync
 - `applySessionSyncEvent()` 现在会直接忽略 `session.diff`，确保 diff 事件不再触发 message reload / authoritative correction
 - `syncBackgroundTaskTabsInBackground()` 的 hidden/background-tab polling 也走 canonical-first：先从本地 canonical graph 投影 cache/render output，只有 canonical 缺失时才 server gap recovery
 - canonical sync 结果现在也允许携带“可见文本没变、但隐藏 parts / synthetic metadata 已纠偏”的 fingerprint 漂移；是否真正 patch DOM 仍交给后续 render/visual fingerprint owner 决定

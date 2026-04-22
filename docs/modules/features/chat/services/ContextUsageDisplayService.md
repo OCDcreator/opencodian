@@ -23,6 +23,7 @@ export interface ContextUsageSummary {
   percentage: number;
   tone: 'success' | 'warning' | 'danger' | 'muted';
   ringLabel: string;
+  isCompacting: boolean;
   isUnavailable: boolean;
   contextWindow: number;
   tooltip: string;
@@ -41,6 +42,7 @@ export class ContextUsageDisplayService {
 ## 关键行为
 
 - summary tone 阈值保持不变：`>= 85` 为 `danger`，`>= 60` 为 `warning`，其余为 `success`；无模型或 context window 时返回 muted/unavailable。
+- 当 `TabContextState.compactingAt` 存在时，summary 会切到 `isCompacting = true`、warning tone、`ringLabel = '…'`，并在 tooltip 首行加入 compaction 提示。
 - display token breakdown 有 `preciseTokens` 时直接使用 precise split；否则只展示 estimated input/output，reasoning/cache 记为 `0`。
 - context breakdown 的 token 估算仍是“字符数除以 4 向上取整”，仅用于 UI 级近似展示。
 - message 字符统计继续兼容 `parts`、`contentBlocks` 与 fallback `content` 三种存储形态。

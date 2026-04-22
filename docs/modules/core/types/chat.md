@@ -36,7 +36,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
+| `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `summary?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
 | `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
 | `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
 | `ConversationSessionSettings` | 会话级覆盖设置（`autoCompactionEnabled?`, `compactionReservedTokens?`, `chatFontSizePx?`，支持 `null` 表示显式继承） |
@@ -64,7 +64,7 @@
 | 类型 | 说明 |
 |------|------|
 | `UsageInfo` | Token 使用信息（`inputTokens`, `outputTokens`, `model`, `contextWindow`, `percentage`, `sessionId?`） |
-| `TabContextState` | 标签页级上下文状态（估算/精确 token、费用、模型信息、会话元数据） |
+| `TabContextState` | 标签页级上下文状态（估算/精确 token、费用、模型信息、会话元数据，以及 `compactingAt?` live compaction 时间戳） |
 | `ContextBreakdownKey` | `'system' \| 'user' \| 'assistant' \| 'tool' \| 'other'` |
 | `ContextBreakdownSegment` | 上下文分段统计（`key`, `tokens`, `width`, `percent`） |
 
@@ -97,6 +97,7 @@
 - `ChatMessage.role`: `'user' \| 'assistant'`
 - 用户消息可携带 `contextAttachments`（上下文文件/笔记/选区）和 `images`（图片附件）
 - 助手消息可携带 `contentBlocks`（结构化内容）、`toolCalls`、`omo`（OMO 元数据）、`questionResolution`
+- 助手消息可携带 `summary?: true`，当前用于把 OpenCode 原生 compaction report 保持成独立 assistant transcript 节点
 - `displayStyle: 'notice'` 表示系统通知消息，使用不同的渲染模板
 - `streamState: 'interrupted'` 标记被取消的流
 
@@ -162,6 +163,7 @@
 ## 注意事项
 
 - `ChatMessage.parts` 类型为 `unknown[]`，存储 OpenCode 原始 SDK parts 用于高级功能
+- `ChatMessage.summary` 当前由 OpenCode 原生 assistant `summary` 字段透传，主要用于 compaction report 的 merge/render 语义
 - `ChatMessage.streamState` 目前仅支持 `'interrupted'`，标记被取消的流
 - `Conversation.openCodeSessionId` 是 OpenCode 服务端的会话 ID，与本地 `Conversation.id` 不同
 - `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记

@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import {
   formatContextLabel,
   parseLineRangeFromFileUrl,
@@ -23,6 +24,9 @@ export interface OpenCodeMessagePart {
   messageID: string;
   type: string;
   text?: string;
+  auto?: boolean;
+  overflow?: boolean;
+  metadata?: Record<string, unknown>;
   duration?: number;
   time?: {
     start?: number;
@@ -88,6 +92,14 @@ export class OpenCodeMessageContextOmoAssembler {
     const contextAttachments: MessageContextAttachment[] = [];
 
     for (const part of parts) {
+      if (part.type === 'compaction' && role === 'user') {
+        const compactionNotice = this.buildCompactionNotice(part);
+        if (compactionNotice) {
+          visibleTextParts.push(compactionNotice);
+        }
+        continue;
+      }
+
       if (part.type !== 'text' || typeof part.text !== 'string') {
         continue;
       }
@@ -123,6 +135,12 @@ export class OpenCodeMessageContextOmoAssembler {
     if (role !== 'user') {
       return {
         visibleText: part.text,
+        attachments: [],
+      };
+    }
+
+    if (this.isCompactionContinuePart(part)) {
+      return {
         attachments: [],
       };
     }
@@ -252,6 +270,26 @@ export class OpenCodeMessageContextOmoAssembler {
       content: visibleSegments.join('').trim(),
       attachments,
     };
+  }
+
+  private isCompactionContinuePart(part: OpenCodeMessagePart): boolean {
+    return part.metadata?.compaction_continue === true;
+  }
+
+  private buildCompactionNotice(part: OpenCodeMessagePart): string {
+    const lines = [
+      t('chat.compaction.title'),
+      '',
+      part.auto === true
+        ? t('chat.compaction.automatic')
+        : t('chat.compaction.manual'),
+    ];
+
+    if (part.overflow === true) {
+      lines.push(t('chat.compaction.overflow'));
+    }
+
+    return lines.join('\n');
   }
 
   private parseInlineReadToolInvocation(

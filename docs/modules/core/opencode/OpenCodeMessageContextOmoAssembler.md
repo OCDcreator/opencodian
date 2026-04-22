@@ -9,6 +9,7 @@
 
 - 从 hydrated OpenCode message parts 收束 renderable text 与 `contextAttachments`
 - 统一解析 Obsidian context tag、`file` part 与 inline Read tool 文本里的上下文引用
+- 把 OpenCode 原生 `compaction` part 归一化为可读 marker，并隐藏 `metadata.compaction_continue` synthetic follow-up
 - 对 attachment 路径、行号和 MIME 做跨平台归一化与去重
 - 识别 OMO user injection / system reminder metadata，并产出 mapper 继续组装 `ChatMessage` 所需的显示字段
 
@@ -40,8 +41,10 @@
 ### Context attachment 收集
 
 - `normalizeTextPart()` 处理普通文本、Obsidian context tag 与 synthetic inline Read 恢复
+- `normalizeTextPart()` 现在也会过滤 `metadata.compaction_continue === true` 的内部续跑 user text，避免 transcript 泄露“Continue...”提示
 - `parseFileContextAttachment()` 统一处理 `file` part 的 path/url/line-range/mime/textSnapshot
 - `extractInlineReadToolContext()` 从历史 Read tool 文本中恢复 file/selection attachment，并剥离用户可见文本
+- `buildCompactionNotice()` 会把 user `compaction` part 投影成可读文本（自动/手动、overflow 触发）
 
 ### OMO 归一化
 
@@ -67,6 +70,6 @@ graph LR
 
 ## 注意事项
 
-- 不要在这里修改 `ChatMessage` schema；本模块只返回 mapper 已经依赖的局部字段。
+- 本模块仍不直接返回完整 `ChatMessage`；它只扩展 mapper 继续消费的局部显示语义。
 - inline Read tool 文本剥离与 Windows path 归一化属于历史兼容边界，变更前应补 focused tests。
 - tool/content seam 仍留在 `OpenCodeMessageNormalizationMapper.ts`；不要把两条责任线重新混在一起。

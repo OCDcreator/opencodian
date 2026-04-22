@@ -5,7 +5,7 @@
 
 ## 概述
 
-SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以环形进度条 + 百分比标签 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现。
+SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以环形进度条 + 百分比标签 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现；当 session 正在做原生 compaction 时，ring 会切到 compacting 提示。
 
 ## 导入关系
 上游: `TabContextState`（来自 `core/types`）、`i18n`、`ContextUsageService`（来自 `features/chat/services/ContextUsageService`）
@@ -30,6 +30,7 @@ SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的�
 - 生成唯一 `srLabelEl.id`，通过 `aria-labelledby` 关联
 - `data-tooltip` 提供 hover 提示
 - `aria-hidden="true"` 用于 SVG
+- `summary.isCompacting` 时，屏幕阅读器标签会优先读出“Compacting context…”而不是百分比
 
 ## 关键方法
 
@@ -51,7 +52,7 @@ TabContextState → ContextUsageService.summarize() → ContextRing.update()
 
 ## 与其他模块的交互
 
-- **ContextUsageService**: 提供 `summarize()` 返回 `{ percentage, tone, ringLabel, tooltip, isUnavailable, contextWindow }`
+- **ContextUsageService**: 提供 `summarize()` 返回 `{ percentage, tone, ringLabel, tooltip, isUnavailable, isCompacting, contextWindow }`
 - **OpenCodianView**: 持有 `ContextRing` 实例，在上下文状态变化时调用 `update()`，点击时打开 `ContextDetailModal`
 
 ## 配置项

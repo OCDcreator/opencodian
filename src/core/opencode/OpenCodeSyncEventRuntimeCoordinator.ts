@@ -71,6 +71,10 @@ export type SessionSyncEventUpdate =
       sessionId: string;
       type: 'session.diff';
       diff?: SessionDiffEntry[];
+    }
+  | {
+      sessionId: string;
+      type: 'session.compacted';
     };
 
 type SessionSyncEventListener = (update: SessionSyncEventUpdate) => void;
@@ -475,6 +479,11 @@ export class OpenCodeSyncEventRuntimeCoordinator {
           sessionId,
           type: 'session.diff',
           diff: normalizeDiffEntries(value.properties?.diff),
+        };
+      case 'session.compacted':
+        return {
+          sessionId,
+          type: 'session.compacted',
         };
       default:
         return null;

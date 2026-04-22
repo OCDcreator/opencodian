@@ -20,6 +20,7 @@
 export interface ContextUsageSnapshot {
   sessionId: string;
   sessionTitle: string;
+  compactingAt?: number | null;
   providerId: string | null;
   modelId: string | null;
   contextWindow: number;
@@ -46,6 +47,7 @@ export interface ContextUsageSnapshot {
 - `contextWindow`
 - `sessionId` / `sessionTitle`
 - `createdAt` / `updatedAt`
+- `compactingAt`
 - `percentage`
 
 `contextWindow` 优先级是：
@@ -67,7 +69,13 @@ export interface ContextUsageSnapshot {
 - `estimatedInputTokens = input + cacheRead + cacheWrite`
 - `estimatedOutputTokens = output + reasoning`
 
-如果有 `totalCost`，也会同步到 state。`applyUsageSnapshot()` 先同步 identity，再复用这条 precise usage 路径。
+如果有 `totalCost`，也会同步到 state。`applyUsageSnapshot()` 先同步 identity（含 `compactingAt`），再复用这条 precise usage 路径。
+
+### compaction live state
+
+- `TabContextState` 现在可携带 `compactingAt`
+- `syncStateIdentity()` 在同 session refresh 时会保留/更新 compaction 时间戳；session 切换时若没有新值则清空，避免旧 tab 泄露 stale compacting 状态
+- `summarize()` 继续走 display facade，但 display owner 会把 `compactingAt` 映射成 ring/modal 可见的 live compaction 提示
 
 ### display facade
 

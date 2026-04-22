@@ -58,6 +58,25 @@ describe('renderGroups', () => {
     ]);
   });
 
+  it('does not merge assistant compaction summaries with adjacent assistant turns', () => {
+    const groups = buildMessageRenderGroups([
+      createMessage({ id: 'assistant-1', content: 'first' }),
+      createMessage({
+        id: 'assistant-summary',
+        content: 'Compaction report',
+        summary: true,
+      }),
+      createMessage({ id: 'assistant-2', content: 'second' }),
+    ]);
+
+    expect(groups).toHaveLength(3);
+    expect(groups.map((group) => group.messages[0].id)).toEqual([
+      'assistant-1',
+      'assistant-summary',
+      'assistant-2',
+    ]);
+  });
+
   it('merges assistant content blocks in order and keeps the latest metadata', () => {
     const merged = mergeAssistantMessagesForRender([
       createMessage({

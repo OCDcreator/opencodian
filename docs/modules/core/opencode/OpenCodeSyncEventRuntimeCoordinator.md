@@ -24,7 +24,7 @@
 ## 核心类型 / 接口
 
 - `SessionActivityStatus`: session 的 `idle` / `busy` / `retry` 状态。
-- `SessionSyncEventUpdate`: reducer-ready 的 session sync payload，直接携带 canonical message / part 数据；`session.diff` 变体也会尽量附带已归一化的 diff entries，供 chat runtime 走独立 diff/notice 输入。
+- `SessionSyncEventUpdate`: reducer-ready 的 session sync payload，直接携带 canonical message / part 数据；`session.diff` 变体也会尽量附带已归一化的 diff entries，`session.compacted` 变体则作为“需要立即 refresh 当前 session”的轻量信号。
 - `OpenCodeSyncEventRuntimeCoordinatorHost`: coordinator 的 host seam，提供 SDK 订阅、todo/status normalization、canonical sync-event apply、transient connectivity 判断、日志、健康检查和 delay。
 - `OpenCodeSyncEventRuntimeCoordinator`: 持有 listener registry、wanted state、abort controller 与订阅 promise。
 
@@ -53,6 +53,7 @@ SDK stream 事件会按现有语义路由：
 - `message.updated` / `message.removed` → reducer-ready message mutation
 - `message.part.updated` / `message.part.removed` / `message.part.delta` → reducer-ready part mutation
 - `session.diff` → 带可选 `diff` entries 的 `SessionSyncEventUpdate`
+- `session.compacted` → 只携带 `sessionId` 的 compaction-complete signal，供上层走即时收尾 refresh
 
 session id 仍按 `properties.sessionID`、`properties.info.sessionID`、`properties.part.sessionID` 的顺序解析；缺少 session id 的事件会被忽略。`session.diff` 的 `properties.diff` 会在这里先归一化成 `SessionDiffEntry[]`（缺失或形状异常时退为空数组）。对 message / part 事件，coordinator 现在会先调用 host 的 canonical apply seam，再把同一份 `SessionSyncEventUpdate` 广播给 listener。
 

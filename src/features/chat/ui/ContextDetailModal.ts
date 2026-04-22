@@ -87,6 +87,9 @@ export class ContextDetailModal extends Modal {
     this.renderRow(gridEl, t('context.usage.assistantMessages'), ContextUsageService.formatNumber(assistantMessageCount));
     this.renderRow(gridEl, t('context.usage.totalTokens'), ContextUsageService.formatNumber(tokens.total));
     this.renderRow(gridEl, t('context.usage.usage'), `${summary.percentage}%`);
+    if (summary.isCompacting) {
+      this.renderRow(gridEl, t('context.usage.status'), t('context.usage.compacting'));
+    }
     this.renderRow(gridEl, t('context.usage.contextLimit'), ContextUsageService.formatNumber(summary.contextWindow));
     this.renderRow(
       gridEl,

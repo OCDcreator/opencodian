@@ -19,6 +19,7 @@ interface ContextModelInfo {
 }
 
 interface ContextSessionInfo {
+  compactingAt?: number | null;
   sessionId?: string | null;
   sessionTitle?: string | null;
   createdAt?: number | null;
@@ -30,6 +31,7 @@ export interface ContextUsageSnapshot {
   sessionTitle: string;
   createdAt: number;
   updatedAt: number;
+  compactingAt?: number | null;
   providerId: string | null;
   providerName: string | null;
   modelId: string | null;
@@ -61,6 +63,7 @@ export class ContextUsageService {
     sessionInfo?: ContextSessionInfo,
   ): TabContextState {
     const next = this.cloneState(state);
+    const previousSessionId = next.sessionId;
     const modelId = modelInfo?.model ?? next.model;
 
     next.provider = modelInfo?.provider ?? next.provider;
@@ -72,6 +75,15 @@ export class ContextUsageService {
     next.sessionTitle = sessionInfo?.sessionTitle ?? next.sessionTitle;
     next.createdAt = sessionInfo?.createdAt ?? next.createdAt;
     next.updatedAt = sessionInfo?.updatedAt ?? next.updatedAt;
+    if (sessionInfo && Object.prototype.hasOwnProperty.call(sessionInfo, 'compactingAt')) {
+      next.compactingAt = sessionInfo.compactingAt ?? null;
+    } else if (
+      sessionInfo
+      && typeof sessionInfo.sessionId === 'string'
+      && sessionInfo.sessionId !== previousSessionId
+    ) {
+      next.compactingAt = null;
+    }
     return this.finalizeState(next);
   }
 
@@ -138,6 +150,7 @@ export class ContextUsageService {
           contextWindow: snapshot.contextWindow,
         },
         {
+          compactingAt: snapshot.compactingAt ?? null,
           sessionId: snapshot.sessionId,
           sessionTitle: snapshot.sessionTitle,
           createdAt: snapshot.createdAt,

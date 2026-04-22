@@ -76,6 +76,7 @@ describe('ContextUsageService identity and totals', () => {
         sessionTitle: 'Planning',
         createdAt: 1000,
         updatedAt: 2000,
+        compactingAt: null,
         providerId: 'openai',
         providerName: 'OpenAI',
         modelId: 'gpt-5',
@@ -111,6 +112,37 @@ describe('ContextUsageService identity and totals', () => {
       totalCost: 1.25,
       percentage: 40,
     });
+  });
+
+  it('surfaces live compaction state from refreshed snapshots', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'session-1',
+        sessionTitle: 'Planning',
+        createdAt: 1000,
+        updatedAt: 2000,
+        compactingAt: 2500,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        inputTokens: 200,
+        outputTokens: 100,
+        reasoningTokens: 50,
+        cacheReadTokens: 25,
+        cacheWriteTokens: 25,
+        totalCost: 1.25,
+      },
+    );
+
+    const summary = ContextUsageService.summarize(state);
+
+    expect(state.compactingAt).toBe(2500);
+    expect(summary.isCompacting).toBe(true);
+    expect(summary.ringLabel).toBe('…');
+    expect(summary.tooltip).toContain('Compacting context');
   });
 });
 

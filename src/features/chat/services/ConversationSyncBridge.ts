@@ -209,7 +209,9 @@ export class ConversationSyncBridge {
       tabId,
       update.type,
       {
-        syncVisibleConversation: () => this.syncVisibleConversationFromCanonicalState(update),
+        syncVisibleConversation: () => update.type === 'session.compacted'
+          ? this.syncVisibleConversationFromServer(update)
+          : this.syncVisibleConversationFromCanonicalState(update),
         syncTabConversation: (context) =>
           this.syncSignalTabConversationFromCanonicalState(context, update),
       },
@@ -309,6 +311,35 @@ export class ConversationSyncBridge {
             reason,
             { suppressVerboseLogs: true },
           );
+
+        await this.visiblePostSyncRouter.routeVisibleSyncComplete({
+          syncContext,
+          previousMessages,
+          syncResult,
+        });
+      },
+    );
+  }
+
+  private async syncVisibleConversationFromServer(
+    update: Exclude<SessionSyncEventUpdate, { type: 'session.diff' }>,
+  ): Promise<void> {
+    await this.runtimeCoordinator.runVisibleConversationSync(
+      this.host.getCurrentConversation(),
+      async (syncContext) => {
+        const { conversation } = syncContext;
+        if (conversation.openCodeSessionId !== update.sessionId) {
+          return;
+        }
+
+        const previousMessages = [...conversation.messages];
+        const reason = `sync-event:${update.type}`;
+        const syncResult = await this.host.syncConversationMessagesFromServer(
+          conversation,
+          syncContext.tabId,
+          reason,
+          { suppressVerboseLogs: true },
+        );
 
         await this.visiblePostSyncRouter.routeVisibleSyncComplete({
           syncContext,

@@ -41,6 +41,9 @@ export interface ConversationSessionSettingsCoordinatorHost {
   applyCompactionConfig(
     compaction: OpencodeCompactionConfig | null | undefined,
   ): Promise<ConversationSessionSettingsCompactionApplyResult>;
+  reapplyCompactionConfigFromProjectConfig?(
+    compaction: OpencodeCompactionConfig | null | undefined,
+  ): Promise<ConversationSessionSettingsCompactionApplyResult>;
   refreshCurrentSessionState(): Promise<void>;
   getOpencodeConfigManager(): ConversationSessionSettingsConfigPort | null;
   saveConversation(conversation: Conversation): Promise<void>;
@@ -200,6 +203,16 @@ export class ConversationSessionSettingsCoordinator {
     }
 
     await configManager.updateCompactionConfig(compaction);
-    return backendResult;
+    const projectConfigResult = await this.host.reapplyCompactionConfigFromProjectConfig?.(compaction) ?? {
+      status: 'skipped' as const,
+    };
+    if (projectConfigResult.status === 'applied') {
+      await this.host.refreshCurrentSessionState();
+      return projectConfigResult;
+    }
+
+    return projectConfigResult.status === 'skipped'
+      ? backendResult
+      : projectConfigResult;
   }
 }

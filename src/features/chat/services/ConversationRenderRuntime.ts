@@ -155,7 +155,7 @@ class ConversationAssistantMessageRenderDelegate {
   }
 
   private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
-    if (message.displayStyle === 'notice' || message.questionResolution) {
+    if (message.displayStyle === 'notice' || message.questionResolution || message.summary) {
       return false;
     }
 

@@ -29,6 +29,7 @@ export interface ConversationSessionSettingsCoordinatorHost {
   getSessionSettingsDefaults(): ResolvedConversationSessionSettings;
   getChatContainerEl(): HTMLElement | null;
   applyCompactionConfig(...): Promise<{ status: 'applied' | 'deferred' | 'skipped'; reason?: string }>;
+  reapplyCompactionConfigFromProjectConfig?(...): Promise<{ status: 'applied' | 'deferred' | 'skipped'; reason?: string }>;
   refreshCurrentSessionState(): Promise<void>;
   getOpencodeConfigManager(): { updateCompactionConfig(...) } | null;
   saveConversation(conversation: Conversation): Promise<void>;
@@ -56,7 +57,8 @@ export class ConversationSessionSettingsCoordinator {
 - `resolveEffectiveSettings()` 使用 plugin-level defaults 作为 base，再让 `Conversation.sessionSettings` 中的 `boolean / number / null` 覆盖或显式继承
 - `applyConversationVisualState()` 只负责把 effective `chatFontSizePx` 写到 `--opencodian-chat-font-size`
 - `applyConversationRuntimeState()` 在 visual state 之外，会先请求 backend 应用 effective `auto` / `reserved`；成功后立刻触发当前 view 的最小 refresh
-- backend apply 返回 deferred 时，coordinator 才会把 compaction 写回 vault-scoped `OpencodeConfigManager`，并显式保留“等 backend reload 后生效”的 notice 语义
+- backend apply 返回 deferred 时，coordinator 会先把 compaction 写回 vault-scoped `OpencodeConfigManager`，再可选调用 host 的 project-config reapply seam；如果 scoped sidecar dispose + read-back 验证成功，会立刻刷新当前 context state 并按即时生效处理
+- project-config reapply 仍然 deferred 时，coordinator 才会显式保留“等 backend reload 后生效”的 notice 语义
 - compaction apply 内部带有 queue；快速切 tab / hydration 时只会顺序落最新的 pending effective config，避免 view 层自己管理 async race
 - `saveConversationOverrides()` 会先归一化并持久化 `Conversation.sessionSettings`，全为 `null` 时会折叠回 `undefined`，避免存储纯“继承”空壳
 
@@ -64,10 +66,10 @@ export class ConversationSessionSettingsCoordinator {
 
 - `OpenCodianView` 只负责装配 host seam，并在 header action、tab activation state bridge、hydration outcome 与 appearance refresh 处调用 coordinator
 - modal 具体 DOM 与校验留在 `ui/ConversationSessionSettingsModal.ts`
-- backend `config.get/config.update` 的 directory-scoped 应用留在 `OpenCodeService`；`.opencode/opencode.json` 的 merge / preserve-unknown-fields 只在 deferred fallback 时继续交给 `OpencodeConfigManager`
+- backend `config.get/config.update` 的 directory-scoped 应用和 read-back 验证留在 `OpenCodeService`；`.opencode/opencode.json` 的 merge / preserve-unknown-fields 只在 deferred fallback 时继续交给 `OpencodeConfigManager`，随后再由 `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` 尝试让当前 sidecar instance 重读项目配置
 
 ## 注意事项
 
 - runtime reapply 是会话级的 view-side effective state；它不会修改 plugin settings 自身的 global defaults
-- 本模块不再把“已保存到本地文件”误报成“当前 backend 已即时生效”；只有 backend apply 成功时才会走即时生效语义
+- 本模块不再把“已保存到本地文件”误报成“当前 backend 已即时生效”；只有 backend read-back 成功，或本地 fallback 写入后 scoped instance reload + read-back 成功，才会走即时生效语义
 - 当前 round 只覆盖 session settings owner/modal 与 activation/hydration runtime reapply，不包含 Agents / Commands UI

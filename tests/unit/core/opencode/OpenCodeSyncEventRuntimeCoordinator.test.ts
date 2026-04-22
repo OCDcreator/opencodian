@@ -127,6 +127,12 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
               ],
             },
           },
+          {
+            type: 'session.compacted',
+            properties: {
+              sessionID: 'session-1',
+            },
+          },
         ]))),
     });
     const coordinator = new OpenCodeSyncEventRuntimeCoordinator(host);
@@ -215,8 +221,12 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
           },
         ],
       },
+      {
+        sessionId: 'session-1',
+        type: 'session.compacted',
+      },
     ]);
-    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(6);
+    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(7);
     expect(host.applySessionSyncEvent).toHaveBeenNthCalledWith(1, syncUpdates[0]);
   });
 });
