@@ -81,6 +81,7 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
         'opencode serve --port 4196 --hostname 127.0.0.1',
       );
+      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(1234);
 
       await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('restart');
     });
@@ -119,8 +120,94 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
         'opencode serve --port 4196 --hostname 127.0.0.1',
       );
+      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(1234);
 
       await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('adopted');
+    });
+
+    it('restarts when the current listener no longer matches the persisted listener pid', async () => {
+      fs.mkdirSync(path.join(context.testVaultPath, '.opencode'), { recursive: true });
+      fs.writeFileSync(
+        path.join(context.testVaultPath, '.opencode', 'opencode.json'),
+        JSON.stringify({ $schema: 'https://opencode.ai/config.json', disabled_providers: [] }),
+        'utf-8',
+      );
+
+      const signatureManager = new ServerManager(context.defaultConfig);
+      signatureManager.setWorkingDirectory(context.testVaultPath);
+      const workingDirectory = path.resolve(context.testVaultPath);
+      const configFingerprint = (signatureManager as never).getConfigFingerprint() as string;
+
+      const manager = context.setManager(new ServerManager(
+        context.defaultConfig,
+        {},
+        {
+          initialManagedServerState: ({
+            pid: 4321,
+            launcherPid: 1234,
+            listenerPid: 4321,
+            host: '127.0.0.1',
+            port: 4196,
+            signatureVersion: 1,
+            workingDirectory,
+            modelSourceMode: 'merge',
+            pluginIsolationMode: 'default',
+            configFingerprint,
+          } as unknown) as ConstructorParameters<typeof ServerManager>[2]['initialManagedServerState'],
+        },
+      ));
+      manager.setWorkingDirectory(context.testVaultPath);
+
+      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+        'opencode serve --port 4196 --hostname 127.0.0.1 --cors app://obsidian.md --cors app://obsidian',
+      );
+      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(9999);
+
+      await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('restart');
+    });
+
+    it('adopts and upgrades a legacy single-pid snapshot to the live listener pid', async () => {
+      fs.mkdirSync(path.join(context.testVaultPath, '.opencode'), { recursive: true });
+      fs.writeFileSync(
+        path.join(context.testVaultPath, '.opencode', 'opencode.json'),
+        JSON.stringify({ $schema: 'https://opencode.ai/config.json', disabled_providers: [] }),
+        'utf-8',
+      );
+
+      const signatureManager = new ServerManager(context.defaultConfig);
+      signatureManager.setWorkingDirectory(context.testVaultPath);
+      const workingDirectory = path.resolve(context.testVaultPath);
+      const configFingerprint = (signatureManager as never).getConfigFingerprint() as string;
+
+      const manager = context.setManager(new ServerManager(
+        context.defaultConfig,
+        {},
+        {
+          initialManagedServerState: {
+            pid: 20976,
+            host: '127.0.0.1',
+            port: 4196,
+            signatureVersion: 1,
+            workingDirectory,
+            modelSourceMode: 'merge',
+            pluginIsolationMode: 'default',
+            configFingerprint,
+          },
+        },
+      ));
+      manager.setWorkingDirectory(context.testVaultPath);
+
+      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(23332);
+      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+        'opencode serve --port 4196 --hostname 127.0.0.1 --cors app://obsidian.md --cors app://obsidian',
+      );
+
+      await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('adopted');
+      expect(manager.getManagedServerStateSnapshot()).toMatchObject({
+        pid: 23332,
+        launcherPid: 20976,
+        listenerPid: 23332,
+      });
     });
 
     it('restarts a stale managed OpenCode server instead of silently reusing it', async () => {
@@ -142,6 +229,7 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       const restartManagedServer = jest.spyOn(manager as never, 'restartManagedServer').mockResolvedValue(undefined);
       const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
       const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(1234);
 
       await expect(manager.start()).resolves.toBeUndefined();
 
@@ -151,103 +239,6 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       expect(manager.getStatus()).toBe('running');
     });
 
-    it('centralizes healthy occupied local endpoint resolution for stale managed servers', async () => {
-      const manager = context.getManager();
-      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('restart');
-
-      await expect((manager as never).resolveOccupiedHealthyLocalEndpoint()).resolves.toEqual({
-        action: 'restart-managed',
-      });
-    });
-
-    it('marks a custom-port healthy server as conflict instead of silently reusing it', async () => {
-      const manager = context.setManager(new ServerManager({
-        ...context.defaultConfig,
-        baseUrl: 'http://127.0.0.1:5000',
-        local: {
-          host: '127.0.0.1',
-          port: 5000,
-          autoStart: true,
-        },
-      }));
-
-      jest.spyOn(manager as never, 'isPortAvailable').mockResolvedValue(false);
-      jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
-      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
-      jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
-        pid: 4321,
-        commandLine: 'opencode serve --port 5000 --hostname 127.0.0.1',
-        looksLikeOpenCodeServe: true,
-      });
-
-      await expect(manager.start()).rejects.toThrow(/occupies local endpoint 127.0.0.1:5000/i);
-      expect(manager.getStatus()).toBe('conflict');
-      expect(manager.getServerDiagnosticsSnapshot()).toMatchObject({
-        reason: 'local-conflict',
-        host: '127.0.0.1',
-        port: 5000,
-        pid: 4321,
-      });
-    });
-
-    it('builds conflict diagnostics from the occupied local endpoint resolution seam', async () => {
-      const manager = context.setManager(new ServerManager({
-        ...context.defaultConfig,
-        baseUrl: 'http://127.0.0.1:5000',
-        local: {
-          host: '127.0.0.1',
-          port: 5000,
-          autoStart: true,
-        },
-      }));
-
-      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
-      jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
-        pid: 4321,
-        commandLine: 'opencode serve --port 5000 --hostname 127.0.0.1',
-        looksLikeOpenCodeServe: true,
-      });
-      jest.spyOn(manager as never, 'shouldRecycleUnknownLocalServer').mockResolvedValue(false);
-
-      await expect((manager as never).resolveOccupiedHealthyLocalEndpoint()).resolves.toMatchObject({
-        action: 'conflict',
-        diagnostics: {
-          reason: 'local-conflict',
-          host: '127.0.0.1',
-          port: 5000,
-          pid: 4321,
-          commandLine: 'opencode serve --port 5000 --hostname 127.0.0.1',
-        },
-      });
-    });
-
-    it('recycles an orphaned default-port OpenCode sidecar and restarts the current vault service', async () => {
-      const manager = context.getManager();
-      jest.spyOn(manager as never, 'isPortAvailable').mockResolvedValue(false);
-      jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
-      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
-      jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
-        pid: 5678,
-        commandLine: 'opencode serve --port 4196 --hostname 127.0.0.1',
-        looksLikeOpenCodeServe: true,
-      });
-      const recycleUnknownLocalServer = jest.spyOn(manager as never, 'recycleUnknownLocalServer').mockResolvedValue(undefined);
-      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
-      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
-
-      await expect(manager.start()).resolves.toBeUndefined();
-
-      expect(recycleUnknownLocalServer).toHaveBeenCalled();
-      expect(spawnServer).toHaveBeenCalled();
-      expect(waitForHealthy).toHaveBeenCalledWith(30000);
-      expect(manager.getStatus()).toBe('running');
-      expect(manager.getServerDiagnosticsSnapshot()).toMatchObject({
-        reason: 'local-orphan-restarted',
-        host: '127.0.0.1',
-        port: 4196,
-        pid: 5678,
-      });
-    });
   });
 
   describe('dispose', () => {
@@ -301,12 +292,42 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
       ));
       const terminateManagedPid = jest.spyOn(manager as never, 'terminateManagedPid').mockResolvedValue(undefined);
       const waitForPortAvailability = jest.spyOn(manager as never, 'waitForPortAvailability').mockResolvedValue(true);
+      jest.spyOn(manager as never, 'getCurrentPluginManagedListenerPid').mockResolvedValue(null);
 
       await expect((manager as never).restartManagedServer()).resolves.toBeUndefined();
 
       expect(terminateManagedPid).toHaveBeenCalledWith(1234);
       expect(waitForPortAvailability).toHaveBeenCalledWith(5000);
       expect(manager.getManagedServerStateSnapshot()).toBeNull();
+    });
+
+    it('preserves managed state when stop cannot confirm the local port was released', async () => {
+      const manager = context.setManager(new ServerManager(
+        context.defaultConfig,
+        {},
+        {
+          initialManagedServerState: ({
+            pid: 2468,
+            listenerPid: 2468,
+            host: '127.0.0.1',
+            port: 4196,
+            signatureVersion: 1,
+            workingDirectory: path.resolve(context.testVaultPath),
+            modelSourceMode: 'merge',
+            pluginIsolationMode: 'default',
+            configFingerprint: 'fp',
+          } as unknown) as ConstructorParameters<typeof ServerManager>[2]['initialManagedServerState'],
+        },
+      ));
+      (manager as unknown as { status: string }).status = 'running';
+      const terminateManagedPid = jest.spyOn(manager as never, 'terminateManagedPid').mockResolvedValue(undefined);
+      const waitForPortAvailability = jest.spyOn(manager as never, 'waitForPortAvailability').mockResolvedValue(false);
+
+      await expect(manager.stop()).rejects.toThrow(/port 4196/i);
+
+      expect(terminateManagedPid).toHaveBeenCalled();
+      expect(waitForPortAvailability).toHaveBeenCalledWith(5000);
+      expect(manager.getManagedServerStateSnapshot()).not.toBeNull();
     });
   });
 
@@ -330,6 +351,33 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
       expect(manager.getServerDiagnosticsSnapshot()).toMatchObject(successDiagnostics);
       expect(manager.getStatus()).toBe('running');
       expect(mockNotice).toHaveBeenCalledWith('OpenCode server started');
+    });
+
+    it('refreshes the managed state with the live listener pid after startup succeeds', async () => {
+      const manager = context.getManager();
+      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockImplementation(async () => {
+        (manager as unknown as { managedServerState: Record<string, unknown> }).managedServerState = {
+          pid: 1111,
+          host: '127.0.0.1',
+          port: 4196,
+          signatureVersion: 1,
+          workingDirectory: path.resolve(context.testVaultPath),
+          modelSourceMode: 'merge',
+          pluginIsolationMode: 'default',
+          configFingerprint: 'fp',
+        };
+      });
+      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(2468);
+
+      await expect((manager as never).launchLocalServerRuntime()).resolves.toBeUndefined();
+
+      expect(spawnServer).toHaveBeenCalled();
+      expect(waitForHealthy).toHaveBeenCalledWith(30000);
+      expect(manager.getManagedServerStateSnapshot()).toMatchObject({
+        listenerPid: 2468,
+        pid: 2468,
+      });
     });
 
     it('formats launch failures from an immutable launch snapshot', () => {

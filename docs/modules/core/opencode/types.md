@@ -43,7 +43,7 @@ interface ResponseHandler {
 ### `ServerStatus`
 
 ```ts
-'stopped' | 'starting' | 'running' | 'error' | 'restarting'
+'stopped' | 'starting' | 'running' | 'error' | 'restarting' | 'conflict'
 ```
 
 这是服务层对外可见的 server 状态联合类型。`ServerManager.ts` 里还有一个同形的本地 `ServerStatus`，两者语义一致，但定义位置不同。
@@ -105,12 +105,24 @@ interface OpenCodeClientConfig {
 ```ts
 interface ManagedServerState {
   pid: number;
+  launcherPid?: number;
+  listenerPid?: number;
   host: string;
   port: number;
+  signatureVersion?: number;
+  workingDirectory?: string;
+  modelSourceMode?: ModelSourceMode;
+  pluginIsolationMode?: PluginIsolationMode;
+  configFingerprint?: string;
 }
 ```
 
 用于记录并恢复插件曾经启动过的 OpenCode 进程。
+
+- `pid` 现在表示“当前主判定 pid”，优先写入真实监听端口的 `listenerPid`，只有在 listener 还未解析出来时才会临时回退到 launcher pid。
+- `launcherPid` 记录插件最初 `spawn()` 到的 wrapper / shell / direct child pid；Windows 上它常常不是最终监听端口的进程。
+- `listenerPid` 记录当前本地端口真正的 owner pid，后续 adopt / stop / orphan recycle 都优先以它作为生命周期真值。
+- 其余签名字段继续用于判断“这个健康 sidecar 是否仍然属于当前 vault / 当前模式 / 当前配置指纹”。
 
 ### `OpenCodeCanonicalSessionState` / `OpenCodeCanonicalMessageInfo` / `OpenCodeCanonicalPart`
 

@@ -101,6 +101,8 @@ export interface OpenCodeClientConfig {
 
 export interface ManagedServerState {
   pid: number;
+  launcherPid?: number;
+  listenerPid?: number;
   host: string;
   port: number;
   signatureVersion?: number;

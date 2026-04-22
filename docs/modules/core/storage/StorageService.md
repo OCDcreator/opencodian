@@ -184,14 +184,22 @@ class StorageService {
 ```json
 {
   "managedServer": {
-    "pid": 1234,
+    "pid": 2345,
+    "launcherPid": 1234,
+    "listenerPid": 2345,
     "host": "127.0.0.1",
-    "port": 4096
+    "port": 4196
   }
 }
 ```
 
-运行时文件内部通过 `loadRuntimeState()` 做兜底，缺失或解析失败时会回到 `{ managedServer: null }`。
+其中：
+
+- `pid` 现在优先表示真实 listener pid，供旧调用点继续把它当成“主 pid”读取
+- `launcherPid` 记录最初 `spawn()` 到的 wrapper / shell / direct child pid
+- `listenerPid` 记录当前监听本地端口的真实进程 pid
+
+运行时文件内部通过 `loadRuntimeState()` 做兜底，缺失或解析失败时会回到 `{ managedServer: null }`。旧格式只有单个 `pid` 的快照仍然允许读取，但新的生命周期逻辑会在下次成功 adopt / start 后把它升级成带 listener / launcher 的新结构。
 
 ### 主题背景资产
 

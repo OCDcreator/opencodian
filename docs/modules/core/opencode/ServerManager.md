@@ -39,7 +39,7 @@
   - `initialManagedServerState`
   - `onManagedServerStateChange`
 - `process`: 当前 spawn 出来的 `ChildProcess`，只有本地 managed 进程才会有
-- `managedServerState`: 插件持久化的 managed server 快照，除 `{ pid, host, port }` 外还会记录启动签名（工作目录、模型来源模式、隔离模式、配置指纹）
+- `managedServerState`: 插件持久化的 managed server 快照；`pid` 现在优先表示真实 listener pid，并可额外保存 `launcherPid` / `listenerPid` 双 pid 信息，以及启动签名（工作目录、模型来源模式、隔离模式、配置指纹）
 - `diagnostics`: 结构化诊断快照，供设置页区分 `managed` / `external` / `conflict` / `orphan restarted`
 - `startPromise`: 避免并发重复启动
 - `workingDirectory`: 通常是 vault 根目录，用来让 OpenCode 读取 `.opencode/`
@@ -61,13 +61,21 @@
 - 把它作为后续 spawn 的 `cwd`
 - 额外尝试读取 `${path}/.opencode/opencode.json` 里的权限配置并写 debug log
 
-managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerStateChange` 完成。现在除了 `pid` / `host` / `port`，还会一起保存：
+managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerStateChange` 完成。现在这份快照会把“谁启动了 sidecar”和“谁真正监听端口”分开记录：
+
+- `pid`: 当前主判定 pid；优先等于 `listenerPid`
+- `launcherPid`: 插件 `spawn()` 到的 wrapper / shell / direct child pid
+- `listenerPid`: 当前本地端口真正的 owner pid
+
+另外还会一起保存：
 
 - `signatureVersion`
 - `workingDirectory`
 - `modelSourceMode`
 - `pluginIsolationMode`
 - `configFingerprint`
+
+Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；真正监听 `127.0.0.1:4196` 的常常是后代 `opencode.exe`。因此 adopt / recycle / stop 不能再把单一 `pid` 当成永久真值。
 
 ### 启动流程 (`start` / `doStart`)
 
@@ -96,8 +104,9 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 - 端口占用但健康检查通过：
   - 先尝试 `tryAdoptManagedServer()`
   - 如果能确认这个 pid 就是之前插件管理的 `opencode serve --port ... --hostname ...`，且启动签名仍与当前 vault / 模式 / 配置指纹一致，则恢复接管
+  - adopt 前还会再次核对：当前端口 owner 是否仍等于持久化的 `listenerPid`；不一致说明之前记录的 sidecar 已经漂移或被替换，需要转入 restart
   - 如果确认是插件之前的 managed server，但签名已经过期（例如工作目录、模型来源模式、隔离模式或相关 OpenCode 配置文件已经变化），会先停掉旧进程再重新 spawn
-  - 如果当前端点正好是插件默认 `127.0.0.1:4196`，但 runtime state 丢了，而该进程看起来又是 `opencode serve --port 4196 --hostname 127.0.0.1`，则把它视为“插件孤儿 sidecar”，先同步回收，再重启当前 vault 对应服务
+  - 如果当前端点正好是插件默认 `127.0.0.1:4196`，但 runtime state 丢了，而该进程看起来像插件自己拉起的 sidecar（命令行同时带有 Obsidian CORS 标记），则把它视为“插件孤儿 sidecar”，先同步回收，再重启当前 vault 对应服务
   - 其他未知健康服务不再无条件标成 `running`：现在会进入 `conflict`，把 pid / command line / 端口写入 diagnostics，让 UI 明确显示冲突
 - 端口占用但健康检查失败：抛出“端口被其他进程占用”的错误
 
@@ -116,6 +125,7 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 - 把 `cwd` 设为 `workingDirectory`
 - 注入由 `getSpawnEnv()` 生成的环境变量
 - 记录 managed pid
+- 启动成功后再用“当前端口 owner 反查”刷新 `listenerPid`，把 launcher / listener 双 pid 一起写回 runtime state
 - 挂上 stdout/stderr tail、`error` / `exit` 追踪
 - 直接进入“健康轮询 + 进程提前退出”竞态等待；不再依赖固定延迟 1 秒
 
@@ -134,7 +144,7 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 `stop()` 分三种情况：
 
 - 没有 `process`、也没有 `managedServerState`：直接进入 `stopped`
-- 没有 `process` 但有 `managedServerState`：说明是“接管到的 pid”，调用 `terminateManagedPid(pid)`
+- 没有 `process` 但有 `managedServerState`：说明是“接管到的 pid”，会按保存下来的 listener / launcher pid 候选顺序终止
 - 有 `process`：走正常终止流程
 
 正常终止流程的策略是：
@@ -142,7 +152,9 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 - 非 Windows：先发 `SIGTERM`，5 秒后仍未退出再发 `SIGKILL`
 - Windows：通过 `taskkill /PID ... /T /F` 终止整棵进程树
 
-`dispose()` 额外提供了同步 best-effort 清理路径，给 `main.ts` 的 `onunload()` 优先回收已拥有的本地 sidecar，减少 Obsidian 退出时留下孤儿进程。
+`stop()` / `dispose()` 现在还有一个关键约束：**只有确认本地端口已经释放**，才会清掉 `managedServerState`。如果 kill 发出后端口仍然忙，manager 会保留 runtime state，让下次启动优先 adopt / restart，而不是把仍然活着的 sidecar误判成孤儿。
+
+`dispose()` 额外提供了同步 best-effort 清理路径，给 `main.ts` 的 `onunload()` 优先回收已拥有的本地 sidecar，减少 Obsidian 退出时留下孤儿进程；同步 unload 里如果端口仍忙，也会保留 managed state 而不是盲目清空。
 
 `restart()` 只是按顺序执行：
 
@@ -240,6 +252,7 @@ graph TD
 - 远程模式下 `start()` 不是空操作；它会做健康检查并把状态置为 `running`。
 - `findOpenCodeBinary()` 会显式探测候选路径和 `PATH`，不再只是“构造候选字符串后交给 shell”。
 - `setWorkingDirectory()` 只会额外检查 `.opencode/opencode.json` 的存在并写日志，不会在这里解析 `.jsonc`。
-- 对未知健康服务，只有“确认是插件默认 `4196` 端点上的孤儿 sidecar”才允许自动回收；自定义端口上的未知健康服务一律进入 `conflict`。
+- 对未知健康服务，只有“确认是插件默认 `4196` 端点上的插件 sidecar”才允许自动回收；自定义端口上的未知健康服务一律进入 `conflict`。
 - 对“之前插件自己拉起、但当前签名已过期”的本地服务，不会再无条件接管；它现在会先重启，以便让 provider/runtime 目录重新和当前 vault 配置、全局配置保持一致。
+- `pid` 不再等同于“最初 spawn 出来的 child pid”；Windows 上应优先把 `listenerPid` 视为真实 sidecar 生命周期真值。
 - 如果未来又出现“服务器目录突然只剩 deepseek / 1 个 provider / 3 个 provider”这类问题，第一排查项不是 SDK 返回解包，而是：插件默认 `4196` 端点是否被孤儿 sidecar / 冲突进程占用、`runtime.json` 的 managed server 签名是否过期、当前 `cwd` 是否真的指向目标 vault。

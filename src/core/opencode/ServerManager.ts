@@ -69,11 +69,12 @@ interface ExistingServerProcessInfo {
   pid: number | null;
   commandLine: string | null;
   looksLikeOpenCodeServe: boolean;
+  looksLikePluginManagedSidecar: boolean;
 }
 
 interface ManagedServerShutdownPlan {
   process: ChildProcess | null;
-  pid: number | null;
+  pids: number[];
   clearManagedState: boolean;
   cleanup: boolean;
   waitForPortReleaseMessage?: string;
@@ -254,14 +255,10 @@ export class ServerManager {
   /** Stop the OpenCode server */
   async stop(): Promise<void> {
     const shutdownPlan = this.createCurrentManagedShutdownPlan();
-    if (!shutdownPlan.process && !shutdownPlan.pid) {
+    if (!shutdownPlan.process && shutdownPlan.pids.length === 0) {
       this.clearLaunchState();
       this.setDiagnostics({ reason: 'none' });
       this.setStatus('stopped');
-      return;
-    }
-
-    if (this.status === 'stopped') {
       return;
     }
 
@@ -284,23 +281,36 @@ export class ServerManager {
   }
 
   private createCurrentManagedShutdownPlan(): ManagedServerShutdownPlan {
+    const managedState = this.managedServerState;
+    const currentListenerPid = this.getCurrentPluginManagedListenerPidSync();
     return {
       process: this.process,
-      pid: this.managedServerState?.pid ?? this.process?.pid ?? null,
+      pids: this.collectManagedPidCandidates(
+        managedState,
+        this.process?.pid ?? undefined,
+        currentListenerPid,
+      ),
       clearManagedState: true,
       cleanup: true,
+      waitForPortReleaseMessage: this.config.mode === 'local'
+        ? `Port ${this.config.local.port} stayed busy after stopping the managed OpenCode server`
+        : undefined,
     };
   }
 
   private async runManagedShutdownLifecycle(plan: ManagedServerShutdownPlan): Promise<void> {
     if (plan.process) {
       await this.terminateManagedProcess(plan.process);
-    } else if (plan.pid) {
-      await this.terminateManagedPid(plan.pid);
     }
 
-    if (plan.clearManagedState) {
-      this.clearManagedServerState();
+    const shouldSkipAdditionalPids = process.platform === 'win32' && Boolean(plan.process?.pid);
+    if (!shouldSkipAdditionalPids) {
+      for (const pid of plan.pids) {
+        if (pid === plan.process?.pid) {
+          continue;
+        }
+        await this.terminateManagedPid(pid);
+      }
     }
 
     if (plan.waitForPortReleaseMessage) {
@@ -310,15 +320,33 @@ export class ServerManager {
       }
     }
 
+    if (plan.clearManagedState) {
+      this.clearManagedServerState();
+    }
+
     if (plan.cleanup) {
       this.cleanup();
     }
   }
 
   private runManagedShutdownLifecycleSync(plan: ManagedServerShutdownPlan): void {
-    const pid = plan.process?.pid ?? plan.pid;
-    if (pid) {
-      this.terminateManagedPidSync(pid);
+    if (plan.process?.pid) {
+      this.terminateManagedPidSync(plan.process.pid);
+    }
+
+    const shouldSkipAdditionalPids = process.platform === 'win32' && Boolean(plan.process?.pid);
+    if (!shouldSkipAdditionalPids) {
+      for (const pid of plan.pids) {
+        if (pid === plan.process?.pid) {
+          continue;
+        }
+        this.terminateManagedPidSync(pid);
+      }
+    }
+
+    if (plan.waitForPortReleaseMessage && !this.isLocalPortAvailableSync(this.config.local.port)) {
+      logger.warn(plan.waitForPortReleaseMessage);
+      return;
     }
 
     if (plan.clearManagedState) {
@@ -467,6 +495,7 @@ export class ServerManager {
     await this.spawnServer();
     const spawnedAt = getPerformanceTimestampMs();
     await this.waitForHealthy(this.config.timeout ?? 30000);
+    await this.refreshManagedListenerPid();
     const healthyAt = getPerformanceTimestampMs();
 
     if (successDiagnostics) {
@@ -767,14 +796,18 @@ export class ServerManager {
     this.activeLaunch = null;
   }
 
-  private setManagedServerState(pid: number | undefined): void {
-    if (!pid) {
+  private setManagedServerState(launcherPid: number | undefined, listenerPid?: number | null): void {
+    const nextListenerPid = listenerPid ?? undefined;
+    const primaryPid = nextListenerPid ?? launcherPid;
+    if (!primaryPid) {
       this.clearManagedServerState();
       return;
     }
 
     this.managedServerState = {
-      pid,
+      pid: primaryPid,
+      launcherPid,
+      listenerPid: nextListenerPid,
       host: this.config.local.host,
       port: this.config.local.port,
       signatureVersion: MANAGED_SERVER_SIGNATURE_VERSION,
@@ -793,6 +826,75 @@ export class ServerManager {
 
     this.managedServerState = null;
     this.onManagedServerStateChange?.(null);
+  }
+
+  private isLegacyManagedServerState(state: ManagedServerState | null | undefined = this.managedServerState): boolean {
+    return Boolean(
+      state
+      && (typeof state.launcherPid !== 'number' || state.launcherPid <= 0)
+      && (typeof state.listenerPid !== 'number' || state.listenerPid <= 0),
+    );
+  }
+
+  private getManagedLauncherPid(state: ManagedServerState | null | undefined = this.managedServerState): number | null {
+    if (!state) {
+      return null;
+    }
+
+    if (typeof state.launcherPid === 'number' && state.launcherPid > 0) {
+      return state.launcherPid;
+    }
+
+    if (typeof state.listenerPid === 'number' && state.listenerPid > 0 && state.pid !== state.listenerPid) {
+      return state.pid;
+    }
+
+    return typeof state.pid === 'number' && state.pid > 0 ? state.pid : null;
+  }
+
+  private getManagedListenerPid(state: ManagedServerState | null | undefined = this.managedServerState): number | null {
+    if (!state) {
+      return null;
+    }
+
+    if (typeof state.listenerPid === 'number' && state.listenerPid > 0) {
+      return state.listenerPid;
+    }
+
+    if (!this.isLegacyManagedServerState(state) && typeof state.pid === 'number' && state.pid > 0) {
+      return state.pid;
+    }
+
+    return null;
+  }
+
+  private collectManagedPidCandidates(
+    state: ManagedServerState | null | undefined,
+    ...fallbackPids: Array<number | null | undefined>
+  ): number[] {
+    const candidates = [
+      this.getManagedListenerPid(state),
+      this.getManagedLauncherPid(state),
+      ...fallbackPids,
+    ]
+      .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0);
+
+    return [...new Set(candidates)];
+  }
+
+  private async refreshManagedListenerPid(): Promise<void> {
+    const state = this.managedServerState;
+    if (!state) {
+      return;
+    }
+
+    const listenerPid = await this.getListeningProcessId(this.config.local.port);
+    if (!listenerPid) {
+      logger.warn('Unable to resolve live OpenCode listener pid after startup; preserving launcher pid only');
+      return;
+    }
+
+    this.setManagedServerState(this.getManagedLauncherPid(state) ?? undefined, listenerPid);
   }
 
   private async handleHealthyOccupiedLocalEndpoint(): Promise<void> {
@@ -872,6 +974,12 @@ export class ServerManager {
   }
 
   private async tryAdoptManagedServer(): Promise<ManagedServerAdoptionOutcome> {
+    const liveListenerPid = await this.getListeningProcessId(this.config.local.port);
+    const persistedListenerPid = this.getManagedListenerPid(this.managedServerState);
+    if (persistedListenerPid && liveListenerPid && persistedListenerPid !== liveListenerPid) {
+      return 'restart';
+    }
+
     const state = await this.getAdoptableManagedServerState();
     if (!state) {
       return 'skip';
@@ -881,6 +989,7 @@ export class ServerManager {
       return 'restart';
     }
 
+    this.managedServerState = state;
     this.onManagedServerStateChange?.(state);
     return 'adopted';
   }
@@ -896,7 +1005,8 @@ export class ServerManager {
       return null;
     }
 
-    const commandLine = await this.getProcessCommandLine(state.pid);
+    const liveListenerPid = await this.getListeningProcessId(this.config.local.port);
+    const commandLine = await this.getProcessCommandLine(liveListenerPid ?? state.pid);
     if (!commandLine) {
       this.clearManagedServerState();
       return null;
@@ -907,7 +1017,12 @@ export class ServerManager {
       return null;
     }
 
-    return state;
+    return {
+      ...state,
+      pid: liveListenerPid ?? this.getManagedListenerPid(state) ?? state.pid,
+      launcherPid: this.getManagedLauncherPid(state) ?? state.pid,
+      listenerPid: liveListenerPid ?? this.getManagedListenerPid(state) ?? undefined,
+    };
   }
 
   private async inspectExistingHealthyServer(): Promise<ExistingServerProcessInfo> {
@@ -917,6 +1032,7 @@ export class ServerManager {
       pid,
       commandLine,
       looksLikeOpenCodeServe: this.looksLikeOpenCodeServeCommand(commandLine),
+      looksLikePluginManagedSidecar: this.looksLikePluginManagedSidecarCommand(commandLine),
     };
   }
 
@@ -939,6 +1055,18 @@ export class ServerManager {
       );
   }
 
+  private looksLikePluginManagedSidecarCommand(commandLine: string | null): boolean {
+    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
+      return false;
+    }
+
+    const normalizedCommand = commandLine?.toLowerCase() ?? '';
+    return (
+      normalizedCommand.includes('--cors app://obsidian.md')
+      && normalizedCommand.includes('--cors app://obsidian')
+    );
+  }
+
   private async shouldRecycleUnknownLocalServer(existingServer: ExistingServerProcessInfo): Promise<boolean> {
     if (this.managedServerState) {
       return false;
@@ -948,7 +1076,11 @@ export class ServerManager {
       return false;
     }
 
-    return existingServer.pid !== null && existingServer.looksLikeOpenCodeServe;
+    return existingServer.pid !== null
+      && (
+        existingServer.looksLikePluginManagedSidecar
+        || this.looksLikePluginManagedSidecarCommand(existingServer.commandLine)
+      );
   }
 
   private isDefaultManagedLocalEndpoint(): boolean {
@@ -965,7 +1097,7 @@ export class ServerManager {
 
     await this.runManagedShutdownLifecycle({
       process: null,
-      pid: existingServer.pid,
+      pids: [existingServer.pid],
       clearManagedState: false,
       cleanup: false,
       waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the orphaned OpenCode sidecar`,
@@ -992,9 +1124,11 @@ export class ServerManager {
       return;
     }
 
+    const currentListenerPid = await this.getCurrentPluginManagedListenerPid();
+
     await this.runManagedShutdownLifecycle({
       process: null,
-      pid: state.pid,
+      pids: this.collectManagedPidCandidates(state, currentListenerPid),
       clearManagedState: true,
       cleanup: false,
       waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`,
@@ -1117,8 +1251,14 @@ export class ServerManager {
 
       killer.once('exit', (code) => {
         if (code !== 0) {
-          logger.warn(`taskkill exited with code ${code} while stopping OpenCode`);
-          resolve(false);
+          void this.isPidRunning(pid).then((stillRunning) => {
+            if (!stillRunning) {
+              resolve(true);
+              return;
+            }
+            logger.warn(`taskkill exited with code ${code} while stopping OpenCode`);
+            resolve(false);
+          });
           return;
         }
 
@@ -1138,6 +1278,9 @@ export class ServerManager {
     });
 
     if (result.error || result.status !== 0) {
+      if (!this.isPidRunningSync(pid)) {
+        return true;
+      }
       logger.warn('Failed to synchronously terminate OpenCode process tree during dispose', {
         pid,
         error: result.error ?? null,
@@ -1191,6 +1334,48 @@ export class ServerManager {
     }
   }
 
+  private isLocalPortAvailableSync(port: number): boolean {
+    const result = process.platform === 'win32'
+      ? spawnSync(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { exit 1 } else { exit 0 }`,
+        ],
+        {
+          stdio: 'ignore',
+          windowsHide: true,
+        },
+      )
+      : spawnSync(
+        'sh',
+        [
+          '-lc',
+          `if lsof -nP -iTCP:${port} -sTCP:LISTEN -t >/dev/null 2>&1; then exit 1; else exit 0; fi`,
+        ],
+        {
+          stdio: 'ignore',
+          windowsHide: true,
+        },
+      );
+
+    if (result.error) {
+      return false;
+    }
+
+    return result.status === 0;
+  }
+
+  private async isPidRunning(pid: number): Promise<boolean> {
+    const commandLine = await this.getProcessCommandLine(pid);
+    return Boolean(commandLine);
+  }
+
+  private isPidRunningSync(pid: number): boolean {
+    return Boolean(this.getProcessCommandLineSync(pid));
+  }
+
   private async getListeningProcessId(port: number): Promise<number | null> {
     const output = process.platform === 'win32'
       ? await this.captureCommandOutput(
@@ -1217,6 +1402,41 @@ export class ServerManager {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
 
+  private getListeningProcessIdSync(port: number): number | null {
+    const result = process.platform === 'win32'
+      ? spawnSync(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $conn.OwningProcess }`,
+        ],
+        {
+          encoding: 'utf-8',
+          windowsHide: true,
+        },
+      )
+      : spawnSync(
+        'sh',
+        [
+          '-lc',
+          `lsof -nP -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null | head -n 1`,
+        ],
+        {
+          encoding: 'utf-8',
+          windowsHide: true,
+        },
+      );
+
+    if (result.error || result.status !== 0) {
+      return null;
+    }
+
+    const output = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+    const parsed = Number.parseInt(output, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
   private getProcessCommandLine(pid: number): Promise<string | null> {
     if (process.platform === 'win32') {
       return this.captureCommandOutput(
@@ -1231,6 +1451,58 @@ export class ServerManager {
 
     return this.captureCommandOutput('ps', ['-p', String(pid), '-o', 'command=']);
   }
+
+  private getProcessCommandLineSync(pid: number): string | null {
+    const result = process.platform === 'win32'
+      ? spawnSync(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          `$p = Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction SilentlyContinue; if ($p) { $p.CommandLine }`,
+        ],
+        {
+          encoding: 'utf-8',
+          windowsHide: true,
+        },
+      )
+      : spawnSync(
+        'ps',
+        ['-p', String(pid), '-o', 'command='],
+        {
+          encoding: 'utf-8',
+          windowsHide: true,
+        },
+      );
+
+    if (result.error || result.status !== 0) {
+      return null;
+    }
+
+    const output = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+    return output || null;
+  }
+
+  private async getCurrentPluginManagedListenerPid(): Promise<number | null> {
+    const pid = await this.getListeningProcessId(this.config.local.port);
+    if (!pid) {
+      return null;
+    }
+
+    const commandLine = await this.getProcessCommandLine(pid);
+    return this.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
+  }
+
+  private getCurrentPluginManagedListenerPidSync(): number | null {
+    const pid = this.getListeningProcessIdSync(this.config.local.port);
+    if (!pid) {
+      return null;
+    }
+
+    const commandLine = this.getProcessCommandLineSync(pid);
+    return this.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
+  }
+
 
   private captureCommandOutput(command: string, args: string[]): Promise<string | null> {
     return new Promise((resolve) => {
