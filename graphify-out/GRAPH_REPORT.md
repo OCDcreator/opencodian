@@ -1,7 +1,7 @@
 # Graph Report - opencodian  (2026-04-22)
 
 ## Corpus Check
-- 694 files · ~882,187 words
+- 694 files · ~882,231 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

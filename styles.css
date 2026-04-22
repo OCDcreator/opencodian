@@ -8012,7 +8012,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-session-settings-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: 18px;
   align-items: center;
   padding: 14px 18px;
@@ -8053,11 +8053,14 @@ body[data-opencodian-provider-icon-mode="color"] {
   align-items: center;
   justify-content: flex-end;
   min-width: 0;
+  max-width: 100%;
 }
 
 .opencodian-session-settings-choice-group {
   display: inline-flex;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  gap: 2px;
   padding: 3px;
   border: 1px solid color-mix(in srgb, var(--background-modifier-border) 84%, transparent);
   border-radius: 13px;
@@ -8066,11 +8069,11 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-session-settings-choice-button {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 1 auto;
+  min-width: 56px;
   min-height: 30px;
   margin: 0;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
@@ -8086,6 +8089,10 @@ body[data-opencodian-provider-icon-mode="color"] {
     border-color 0.16s ease,
     color 0.16s ease,
     box-shadow 0.16s ease;
+}
+
+.opencodian-session-settings-choice-button[data-value="inherit"] {
+  min-width: max-content;
 }
 
 .opencodian-session-settings-choice-button:hover,
@@ -8191,6 +8198,20 @@ body[data-opencodian-provider-icon-mode="color"] {
   .opencodian-session-settings-number-input {
     width: 100%;
     text-align: left;
+  }
+
+  .opencodian-session-settings-choice-group {
+    width: 100%;
+  }
+
+  .opencodian-session-settings-choice-button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  .opencodian-session-settings-choice-button[data-value="inherit"] {
+    min-width: 0;
   }
 }
 

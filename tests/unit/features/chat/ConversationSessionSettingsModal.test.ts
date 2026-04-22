@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { ConversationSessionSettings } from '../../../../src/core/types';
 import {
   ConversationSessionSettingsModal,
@@ -125,5 +128,22 @@ describe('ConversationSessionSettingsModal', () => {
     expect(
       modal.contentEl.querySelector('.opencodian-session-settings-hero-note')?.textContent,
     ).toContain('inherit');
+  });
+
+  it('keeps segmented choice buttons content-sized instead of equally splitting the row', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.opencodian-session-settings-field\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+max-content;/s,
+    );
+    expect(css).toMatch(
+      /\.opencodian-session-settings-choice-button\s*\{[^}]*flex:\s*0\s+1\s+auto;/s,
+    );
+    expect(css).toMatch(
+      /\.opencodian-session-settings-choice-button\[data-value="inherit"\]\s*\{[^}]*min-width:\s*max-content;/s,
+    );
   });
 });
