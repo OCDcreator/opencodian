@@ -1,0 +1,33 @@
+# Third-party and generated artifacts
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+reference-projects/
+coverage/
+dist/
+node_modules/
+graphify-out/GRAPH_REPORT.md
+graphify-out/graph.html
+graphify-out/graph.json
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/.graphify-venv/
+graphify-out/.graphify_python
+
+# Runtime and local tool state
+.codex/
+.opencode/
+.opencode-loop/
+.obsidian-debug/
+automation/runtime/
+tmp/
+
+# Bundled build outputs
+main.js
+styles.css
+*.js.map
+
+# Keep the default source graph AST-only; include docs in a semantic run when needed.
+src/utils/markdown/README.md
+src/utils/streaming/README.md

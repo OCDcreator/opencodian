@@ -74,3 +74,10 @@ tmp/
 .opencode-loop/
 automation/**/__pycache__/
 automation/**/*.pyc
+
+# Graphify local state
+graphify-out/.graphify-venv/
+graphify-out/.graphify_python
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/cost.json
