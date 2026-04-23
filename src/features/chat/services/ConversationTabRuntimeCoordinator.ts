@@ -3,6 +3,7 @@ import type {
   BelowHeaderTabBarLayout,
   PersistedTabState,
   TabBarPosition,
+  TabContextState,
 } from '../../../core/types';
 import { t } from '../../../i18n';
 import {
@@ -49,6 +50,7 @@ export interface ConversationTabRuntimeCoordinatorHost {
     tabId: TabId | null,
     sessionId: string | null,
   ): SessionActivityStatus | null;
+  getTabContextUsage(tabId: TabId | null): TabContextState | null;
 }
 
 export interface ConversationTabRuntimeCoordinatorPorts {
@@ -356,6 +358,11 @@ export class ConversationTabRuntimeCoordinator<
     }
 
     if (runtime.isStreaming) {
+      return true;
+    }
+
+    const contextUsage = this.host.getTabContextUsage(tabId);
+    if (typeof contextUsage?.compactingAt === 'number') {
       return true;
     }
 

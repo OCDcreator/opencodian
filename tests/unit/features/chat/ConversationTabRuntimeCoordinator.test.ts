@@ -1,5 +1,5 @@
 import type { SessionActivityStatus } from '../../../../src/core/opencode';
-import type { PersistedTabState } from '../../../../src/core/types';
+import type { PersistedTabState, TabContextState } from '../../../../src/core/types';
 import {
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeCoordinatorHost,
@@ -82,6 +82,7 @@ function createFixture(options: {
   tabBarPosition?: 'input' | 'header' | 'below-header';
   belowHeaderTabBarLayout?: 'grid' | 'vertical';
   sessionStatus?: SessionActivityStatus | null;
+  tabContextUsage?: TabContextState | null;
 } = {}) {
   let tabManager: TabManager | null = null;
   let tabBar: TabBar | null = null;
@@ -123,6 +124,7 @@ function createFixture(options: {
     savePersistedTabState: jest.fn(),
     getSessionIdForTab: jest.fn((tabId) => (tabId ? `${tabId}-session` : null)),
     getTabSessionStatus: jest.fn(() => options.sessionStatus ?? null),
+    getTabContextUsage: jest.fn(() => options.tabContextUsage ?? null),
   };
   const ports: jest.Mocked<ConversationTabRuntimeCoordinatorPorts> = {
     activateTab: jest.fn().mockResolvedValue(undefined),
@@ -245,6 +247,35 @@ describe('ConversationTabRuntimeCoordinator', () => {
 
     expect(fixture.coordinator.isTabForegroundBusy('tab-retry-nostream')).toBe(true);
     expect(fixture.host.getTabSessionStatus).toHaveBeenCalledWith('tab-retry-nostream', 'tab-retry-nostream-session');
+  });
+
+  it('considers a tab busy when context usage has compactingAt even if not streaming and session is idle', () => {
+    const fixture = createFixture({
+      sessionStatus: null,
+      tabContextUsage: {
+        estimatedInputTokens: 0,
+        estimatedOutputTokens: 0,
+        streamInputTokens: 0,
+        streamOutputTokens: 0,
+        preciseTokens: null,
+        totalCost: null,
+        contextWindow: 128000,
+        percentage: 95,
+        provider: null,
+        providerName: null,
+        model: null,
+        modelName: null,
+        compactingAt: Date.now(),
+        sessionId: 'session-1',
+        sessionTitle: null,
+        createdAt: null,
+        updatedAt: null,
+      },
+    });
+    fixture.pane.runtimeByTab.set('tab-compacting', createRuntimeState({ isStreaming: false }));
+
+    expect(fixture.coordinator.isTabForegroundBusy('tab-compacting')).toBe(true);
+    expect(fixture.host.getTabContextUsage).toHaveBeenCalledWith('tab-compacting');
   });
 
   it('owns turn-body reset, creation, and reuse for tab panes', () => {

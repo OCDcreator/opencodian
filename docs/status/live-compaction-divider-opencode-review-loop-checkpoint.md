@@ -78,3 +78,26 @@ Track each bounded `opencode run` round here so a truncated session can resume s
   - no blocking issues in targeted tests, lint, or typecheck.
 - Exact next corrective prompt: bounded `compactingAt` bridge slice. Keep the persisted divider render path intact, and now bridge active-tab `compactingAt` into conversation rendering so a synthetic live divider appears only in the owning tab while compaction is active. Preserve close-tab busy protection and do not start summary-streaming changes yet except for the minimum metadata/runtime plumbing required by the approved plan.
 - Verification: passed (`node scripts/run-jest.js tests/unit/features/chat/ConversationRenderService.compactionDivider.test.ts tests/unit/features/chat/compactionDividerI18n.test.ts`, `npm run lint -- --quiet`, `npm run typecheck`).
+
+## 2026-04-24 01:22:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: bounded `compactingAt` bridge slice only.
+- Changed: updated `src/features/chat/OpenCodianView.ts` and `src/features/chat/services/ConversationTabRuntimeCoordinator.ts`; updated `tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts`; added `tests/unit/features/chat/liveCompactionDividerInjection.test.ts`.
+- Reviewed: compacting busy gate is correct; live-divider injection logic is bounded and did not touch summary-streaming code.
+- Problems found:
+  - the synthetic live divider still reuses persisted divider metadata, so the UI would render the completed-state label instead of the live “Compacting…” label.
+  - `tests/unit/features/chat/liveCompactionDividerInjection.test.ts` duplicates the injection algorithm instead of testing the actual production owner, so it is not a trustworthy regression test.
+  - module docs are still intentionally deferred.
+- Exact next corrective prompt: keep this slice bounded. Refactor the live-divider injection logic into an existing owner that can be tested directly without duplicating the algorithm in a test (prefer `src/features/chat/renderGroups.ts`, not a new thin file). Add explicit live/completed state metadata or equivalent so synthetic dividers render with the live label while persisted transcript dividers keep the completed label. Update the focused tests to exercise the real owner, delete the duplicate-logic test, keep the compacting busy gate, and stop once the targeted tests/lint/typecheck are clean. Do not implement summary streaming yet.
+- Verification: passed for current targeted tests/lint/typecheck, but failed review due incorrect live-label semantics and weak duplicate-logic testing.
+
+## 2026-04-24 01:31:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: corrective bridge round for real-owner testability and true live divider state.
+- Changed: updated `src/core/types/chat.ts`, `src/features/chat/renderGroups.ts`, `src/features/chat/OpenCodianView.ts`, `src/features/chat/services/ConversationTabRuntimeCoordinator.ts`, `tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts`, `tests/unit/features/chat/renderGroups.test.ts`; added `tests/unit/features/chat/liveCompactionDividerInjection.test.ts`.
+- Reviewed: live divider injection now lives in an existing owner (`renderGroups.ts`); synthetic dividers carry `live: true`; `OpenCodianView.renderCompactionDivider()` switches to the live label for those dividers; busy-gate still treats `compactingAt` tabs as foreground-busy.
+- Problems found:
+  - module docs are now further stale for `src/core/types/chat.ts`, `src/features/chat/renderGroups.ts`, `src/features/chat/OpenCodianView.ts`, and `src/features/chat/services/ConversationTabRuntimeCoordinator.ts`, which is expected to be reconciled in the later docs slice.
+  - no blocking issues in targeted tests, lint, or typecheck.
+- Exact next corrective prompt: bounded streaming-summary slice. Build the narrow live-summary path so only compaction summaries can patch/grow visibly under the divider; do not broaden that behavior to generic summaries, notices, or question cards. Keep the live divider/tab bridge behavior intact.
+- Verification: passed (`node scripts/run-jest.js tests/unit/features/chat/liveCompactionDividerInjection.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts tests/unit/features/chat/ConversationRenderService.compactionDivider.test.ts tests/unit/features/chat/compactionDividerI18n.test.ts`, `npm run lint -- --quiet`, `npm run typecheck`).

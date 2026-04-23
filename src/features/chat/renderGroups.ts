@@ -1,4 +1,4 @@
-import type { ChatMessage, ContentBlock } from '../../core/types';
+import type { ChatMessage, CompactionDividerMeta, ContentBlock } from '../../core/types';
 
 export interface MessageRenderGroup {
   mergedAssistant: boolean;
@@ -55,6 +55,52 @@ function flattenContentBlocks(messages: ChatMessage[]): ContentBlock[] {
   }
 
   return blocks;
+}
+
+export interface LiveCompactionDividerInjectionOptions {
+  messages: ChatMessage[];
+  compactingAt: number | null;
+  tabId: string;
+}
+
+export function injectLiveCompactionDivider(
+  options: LiveCompactionDividerInjectionOptions,
+): ChatMessage[] {
+  const { messages, compactingAt, tabId } = options;
+  if (typeof compactingAt !== 'number') {
+    return messages;
+  }
+
+  const hasPersistedDividerForPhase = messages.some(
+    (message) => message.compactionDivider && !message.compactionDivider.live && message.timestamp >= compactingAt,
+  );
+  if (hasPersistedDividerForPhase) {
+    return messages;
+  }
+
+  const liveDivider: ChatMessage = {
+    id: `__live-compaction-${tabId}`,
+    role: 'user',
+    content: '',
+    timestamp: compactingAt,
+    compactionDivider: {
+      auto: true,
+      overflow: false,
+      tailStartId: '',
+      live: true,
+    } satisfies CompactionDividerMeta,
+  };
+
+  const firstSummaryAfterCompacting = messages.findIndex(
+    (message) => message.summary && message.timestamp >= compactingAt,
+  );
+  if (firstSummaryAfterCompacting >= 0) {
+    const result = [...messages];
+    result.splice(firstSummaryAfterCompacting, 0, liveDivider);
+    return result;
+  }
+
+  return [...messages, liveDivider];
 }
 
 export function buildMessageRenderGroups(messages: ChatMessage[]): MessageRenderGroup[] {

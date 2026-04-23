@@ -181,6 +181,7 @@ export interface CompactionDividerMeta {
   auto: boolean;
   overflow: boolean;
   tailStartId: string;
+  live?: boolean;
 }
 
 export interface ChatMessage {

@@ -64,7 +64,11 @@ import {
 } from './composerContext';
 import { GlassOctahedronDemoController } from './glassOctahedronDemo';
 import { LiquidDiamondDemoController } from './liquidDiamondDemo';
-import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
+import {
+  buildMessageRenderGroups,
+  injectLiveCompactionDivider,
+  mergeAssistantMessagesForRender,
+} from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
   AssistantNoticeCardRenderer,
@@ -2215,6 +2219,8 @@ export class OpenCodianView extends ItemView {
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
       getTabSessionStatus: (tabId, sessionId) =>
         this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
+      getTabContextUsage: (tabId) =>
+        this.tabManager?.getTabContextUsage(tabId) ?? null,
     };
   }
 
@@ -4002,6 +4008,12 @@ export class OpenCodianView extends ItemView {
   private renderCompactionDivider(messageEl: HTMLElement, divider: CompactionDividerMeta): void {
     const lineEl = messageEl.createDiv({ cls: 'opencodian-compaction-divider-line' });
 
+    if (divider.live) {
+      messageEl.addClass('opencodian-compaction-divider--live');
+      lineEl.textContent = t('chat.compaction.divider.live');
+      return;
+    }
+
     const badgeEl = lineEl.createSpan({ cls: 'opencodian-compaction-divider-badge' });
     badgeEl.textContent = divider.auto
       ? t('chat.compaction.divider.autoLabel')
@@ -4334,7 +4346,8 @@ export class OpenCodianView extends ItemView {
         || (message.contextAttachments?.length ?? 0) > 0
         || (message.images?.length ?? 0) > 0
         || message.questionResolution
-        || message.omo,
+        || message.omo
+        || message.compactionDivider,
       );
     }
 
@@ -4624,11 +4637,21 @@ export class OpenCodianView extends ItemView {
   }
 
   private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {
-    return buildMessageRenderGroups(messages.filter((message) => this.shouldRenderConversationMessage(message))).map((group) =>
+    const filtered = messages.filter((message) => this.shouldRenderConversationMessage(message));
+    const rendered = buildMessageRenderGroups(filtered).map((group) =>
       group.mergedAssistant && group.messages.length > 1
         ? mergeAssistantMessagesForRender(group.messages)
         : group.messages[0],
     );
+    const activeTabId = this.getActiveTabId();
+    const contextUsage = activeTabId
+      ? this.tabManager?.getTabContextUsage(activeTabId) ?? null
+      : null;
+    return injectLiveCompactionDivider({
+      messages: rendered,
+      compactingAt: contextUsage?.compactingAt ?? null,
+      tabId: activeTabId ?? '',
+    });
   }
 
   private isNearBottom(threshold?: number): boolean {

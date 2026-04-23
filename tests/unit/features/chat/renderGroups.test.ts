@@ -1,6 +1,7 @@
 import type { ChatMessage } from '../../../../src/core/types';
 import {
   buildMessageRenderGroups,
+  injectLiveCompactionDivider,
   mergeAssistantMessagesForRender,
 } from '../../../../src/features/chat/renderGroups';
 
@@ -196,5 +197,21 @@ describe('renderGroups', () => {
     const dividerMsg = groups[0].messages[0];
     expect('compactionDivider' in dividerMsg).toBe(true);
     expect(dividerMsg.displayStyle).not.toBe('notice');
+  });
+
+  it('places a live compaction divider injected by injectLiveCompactionDivider into its own render group', () => {
+    const base = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi', timestamp: 100 }),
+      createMessage({ id: 'asst-1', role: 'assistant', content: 'Answer', timestamp: 200 }),
+    ];
+    const injected = injectLiveCompactionDivider({ messages: base, compactingAt: 250, tabId: 'tab-1' });
+    const groups = buildMessageRenderGroups(injected);
+
+    const liveDividerGroup = groups.find(
+      (g) => g.messages.some((m) => m.compactionDivider?.live),
+    );
+    expect(liveDividerGroup).toBeDefined();
+    expect(liveDividerGroup!.messages).toHaveLength(1);
+    expect(liveDividerGroup!.mergedAssistant).toBe(false);
   });
 });
