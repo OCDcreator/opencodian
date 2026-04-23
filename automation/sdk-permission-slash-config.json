@@ -1,0 +1,88 @@
+{
+  "objective": "Implement a review-gated, SDK-first alignment of OpenCodian permission handling and slash command handling one queued slice at a time, including settings rationality and UI consistency.",
+  "focus_hint": "S1 - Permission runtime SDK audit and completion",
+  "next_phase_number": 1,
+  "max_rounds": 30,
+  "max_consecutive_failures": 3,
+  "lint_command": "",
+  "typecheck_command": "",
+  "full_test_command": "npm run verify",
+  "targeted_test_required": true,
+  "targeted_test_prefixes": [
+    "npm test --",
+    "npm run test --"
+  ],
+  "targeted_test_required_paths": [
+    "src/",
+    "tests/",
+    "docs/",
+    "package.json",
+    "package-lock.json",
+    "styles.css",
+    "manifest.json"
+  ],
+  "full_test_cadence_rounds": 1,
+  "full_test_required_paths": [
+    "src/",
+    "tests/",
+    "docs/",
+    "package.json",
+    "package-lock.json",
+    "styles.css",
+    "manifest.json"
+  ],
+  "build_command": "",
+  "build_required_paths": [],
+  "vulture_command": "",
+  "deploy_after_build": false,
+  "deploy_policy": "never",
+  "deploy_required_paths": [],
+  "deploy_verify_path": "",
+  "max_git_status_per_round": 6,
+  "max_git_diff_stat_per_round": 3,
+  "allowed_branch_prefixes": [
+    "autopilot/",
+    "automation/",
+    "quality/",
+    "bugfix/"
+  ],
+  "commit_prefix": "autopilot",
+  "prompt_template": "automation/sdk-permission-slash-round-prompt.md",
+  "result_schema": "automation/round-result.schema.json",
+  "runner_kind": "codex",
+  "runner_command": "",
+  "runner_model": "",
+  "runner_extra_args": [],
+  "lanes": [
+    {
+      "id": "s1-permission-sdk",
+      "label": "Permission runtime and settings alignment",
+      "focus_hint": "P1 - Complete SDK-backed permission runtime wiring, then align security settings wording to the upstream permission model",
+      "phase_doc_prefix": "docs/status/lanes/s1-permission-sdk/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/s1-permission-sdk/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/s1-permission-sdk/autopilot-round-roadmap.md",
+      "prompt_template": "automation/sdk-permission-slash-round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "s2-slash-sdk",
+      "label": "Slash command runtime and settings alignment",
+      "focus_hint": "C1 - Complete slash catalog/runtime SDK alignment, then close command settings and UI wording mismatches",
+      "phase_doc_prefix": "docs/status/lanes/s2-slash-sdk/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/s2-slash-sdk/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/s2-slash-sdk/autopilot-round-roadmap.md",
+      "prompt_template": "automation/sdk-permission-slash-round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "s3-checkpoint",
+      "label": "Final review and verification checkpoint",
+      "focus_hint": "F1 - Close the queue with docs sync, full verification, and a final review-driven checkpoint",
+      "phase_doc_prefix": "docs/status/lanes/s3-checkpoint/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/s3-checkpoint/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/s3-checkpoint/autopilot-round-roadmap.md",
+      "prompt_template": "automation/sdk-permission-slash-round-prompt.md",
+      "commit_prefix": "autopilot"
+    }
+  ]
+}
