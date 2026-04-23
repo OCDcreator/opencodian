@@ -218,6 +218,7 @@ docs/modules/
 │       ├── modelConfigModalState.md
 │       ├── modelConfigSavePlan.md
 │       ├── providerPresets.md
+│       ├── ProjectConfigFileWatcher.md
 │       ├── ProviderBuiltinIconPickerModal.md
 │       ├── ProviderIconCacheModal.md
 │       ├── searchInputEnhancer.md

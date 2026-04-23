@@ -1,3 +1,4 @@
+import type { App } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
@@ -172,12 +173,17 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
     reapplyConversationSessionDefaults: jest.fn().mockResolvedValue(undefined),
     opencodeConfigManager: {
       getCompactionConfig,
+      getConfigPath: jest.fn().mockReturnValue('/test/.opencode/opencode.json'),
       updateCompactionConfig,
     } as never,
     openCodeService: {
       reapplyCompactionConfigFromProjectConfig,
     } as never,
   } as unknown as ConversationSectionPlugin;
+}
+
+function createApp(): App {
+  return { vault: { adapter: { basePath: '/test' }, on: jest.fn(() => ({}) as never), offref: jest.fn() } } as unknown as App;
 }
 
 function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
@@ -187,9 +193,9 @@ function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHead
   return headingEl;
 }
 
-function createSection(plugin = createPlugin()) {
+function createSection(plugin = createPlugin(), app = createApp()) {
   const section = new SettingsConversationSection({
-    app: {} as never,
+    app,
     plugin: plugin as unknown as OpenCodianPlugin,
     createSectionHeading,
     setRefreshTitleModelsCallback: jest.fn(),
@@ -569,4 +575,5 @@ describe('SettingsConversationSection compaction fields', () => {
 
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.configUnavailable'));
   });
+
 });

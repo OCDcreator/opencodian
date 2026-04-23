@@ -48,6 +48,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 - Read via `OpencodeConfigManager.getCompactionConfig()`
 - Save via `OpencodeConfigManager.updateCompactionConfig(patch)`
 - After write, call `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` to reload sidecar
+- While the settings tab is open, delegate `.opencode/opencode.json` `create` / `modify` / `delete` / `rename` watching to `ProjectConfigFileWatcher` and reload the compaction controls when that file changes externally
 - Show `configUnavailable` notice when config manager is missing
 
 ### chat font size (global session default)
@@ -61,7 +62,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 | 方法 | 说明 |
 |------|------|
 | `attach()` | 构建并挂载 conversation section，注册 title-model refresh callback，并启动首次标题模型加载 |
-| `dispose()` | 清理 settings tab 上注册的 title-model refresh callback 与 owner 持有的按钮/setting 引用 |
+| `dispose()` | 清理 settings tab 上注册的 title-model refresh callback、项目 `opencode.json` 监听，以及 owner 持有的按钮/setting 引用 |
 
 ## 与其他模块的交互
 
@@ -69,6 +70,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 - `main.ts`: 提供 `reapplyConversationSessionDefaults()`，把 settings 保存后的默认值变化桥接到当前聊天视图运行时
 - `OpencodeConfigManager.ts`: 提供 `getCompactionConfig()` / `updateCompactionConfig()` 读写项目 `.opencode/opencode.json` 中的 compaction 配置
 - `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置
+- `ProjectConfigFileWatcher.ts`: 监听当前 vault 的 `.opencode/opencode.json` 外部文件变更并触发 compaction 控件回读
 - `ModelConfigService.ts`: 提供 AI 标题模型使用的有效模型目录
 - `modelPicker.ts`: 构建并解析 AI 标题模型 picker group / 选项
 - `ModelPickerModal.ts`: 提供 AI 标题模型的搜索式 picker
@@ -77,6 +79,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 
 - 不要改变 title model fallback、follow-current 语义、chat font-size 的即时重应用语义，或 question card refresh / conversation rendering 触发条件。
 - compaction 配置已改为项目级，不再从 plugin settings 或 conversation session settings 读取或写入。
+- settings 页面打开期间，如果外部工具直接改动或删除 `.opencode/opencode.json`，compaction controls 会自动回读项目配置并刷新到最新状态；不需要手动重开设置页。
 - 手动触发的 `session.summarize()` 是 per-session 操作，不受本项目配置 UI 管理。
 - 如果后续继续推进 conversation lane，优先在这个 owner 内扩展完整 section lifecycle，而不是回到 `OpenCodianSettings` 主类里追加闭包。
 

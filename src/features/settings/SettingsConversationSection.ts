@@ -23,6 +23,7 @@ import {
   type ModelPickerGroup,
 } from './modelPicker';
 import { ModelPickerModal } from './ModelPickerModal';
+import { ProjectConfigFileWatcher } from './ProjectConfigFileWatcher';
 
 const logger = createLogger('SettingsConversationSection');
 
@@ -45,6 +46,14 @@ interface SettingsConversationSectionOptions {
   setRefreshTitleModelsCallback: (callback?: () => void) => void;
 }
 
+interface ToggleValueControl {
+  setValue(value: boolean): unknown;
+}
+
+interface TextValueControl {
+  setValue(value: string): unknown;
+}
+
 export class SettingsConversationSection {
   private readonly app: App;
   private readonly plugin: OpenCodianPlugin;
@@ -58,11 +67,12 @@ export class SettingsConversationSection {
   private titleModelButton: ButtonComponent | null = null;
   private titleModelWarningButton: ExtraButtonComponent | null = null;
   private titleModelGroups: ModelPickerGroup[] = [];
-  private projectCompactionAutoToggle: Setting | null = null;
-  private projectCompactionPruneToggle: Setting | null = null;
-  private projectCompactionTailTurnsInput: Setting | null = null;
-  private projectCompactionPreserveRecentTokensInput: Setting | null = null;
-  private projectCompactionReservedInput: Setting | null = null;
+  private projectCompactionAutoControl: ToggleValueControl | null = null;
+  private projectCompactionPruneControl: ToggleValueControl | null = null;
+  private projectCompactionTailTurnsControl: TextValueControl | null = null;
+  private projectCompactionPreserveRecentTokensControl: TextValueControl | null = null;
+  private projectCompactionReservedControl: TextValueControl | null = null;
+  private projectCompactionConfigWatcher: ProjectConfigFileWatcher | null = null;
   private currentCompactionState: {
     auto: boolean;
     prune: boolean;
@@ -79,28 +89,30 @@ export class SettingsConversationSection {
   }
 
   dispose(): void {
+    this.disposeProjectCompactionConfigListeners();
     this.setRefreshTitleModelsCallback(undefined);
     this.titleModelSetting = null;
     this.titleModelButton = null;
     this.titleModelWarningButton = null;
     this.titleModelGroups = [];
-    this.projectCompactionAutoToggle = null;
-    this.projectCompactionPruneToggle = null;
-    this.projectCompactionTailTurnsInput = null;
-    this.projectCompactionPreserveRecentTokensInput = null;
-    this.projectCompactionReservedInput = null;
+    this.projectCompactionAutoControl = null;
+    this.projectCompactionPruneControl = null;
+    this.projectCompactionTailTurnsControl = null;
+    this.projectCompactionPreserveRecentTokensControl = null;
+    this.projectCompactionReservedControl = null;
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
+    this.disposeProjectCompactionConfigListeners();
     this.titleModelSetting = null;
     this.titleModelButton = null;
     this.titleModelWarningButton = null;
     this.titleModelGroups = [];
-    this.projectCompactionAutoToggle = null;
-    this.projectCompactionPruneToggle = null;
-    this.projectCompactionTailTurnsInput = null;
-    this.projectCompactionPreserveRecentTokensInput = null;
-    this.projectCompactionReservedInput = null;
+    this.projectCompactionAutoControl = null;
+    this.projectCompactionPruneControl = null;
+    this.projectCompactionTailTurnsControl = null;
+    this.projectCompactionPreserveRecentTokensControl = null;
+    this.projectCompactionReservedControl = null;
 
     const headingEl = this.createSectionHeading(
       containerEl,
@@ -123,9 +135,31 @@ export class SettingsConversationSection {
     void this.loadTitleModels();
     this.addUserMarkupRenderSetting(containerEl);
 
+    this.registerProjectCompactionConfigListeners();
     void this.loadProjectCompactionConfig();
 
     return headingEl;
+  }
+
+  private registerProjectCompactionConfigListeners(): void {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      return;
+    }
+
+    this.projectCompactionConfigWatcher = new ProjectConfigFileWatcher({
+      app: this.app,
+      configPath: configManager.getConfigPath(),
+      onChange: () => {
+        void this.loadProjectCompactionConfig();
+      },
+    });
+    this.projectCompactionConfigWatcher.start();
+  }
+
+  private disposeProjectCompactionConfigListeners(): void {
+    this.projectCompactionConfigWatcher?.dispose();
+    this.projectCompactionConfigWatcher = null;
   }
 
   private updateTitleModelSettingVisibility(): void {
@@ -230,10 +264,11 @@ export class SettingsConversationSection {
       .setClass('opencodian-setting-description')
       .setDesc(t('settings.conversation.compaction.projectNoteDesc'));
 
-    this.projectCompactionAutoToggle = new Setting(containerEl)
+    new Setting(containerEl)
       .setName(t('settings.conversation.compaction.auto.name'))
       .setDesc(t('settings.conversation.compaction.auto.desc'))
       .addToggle((toggle) => {
+        this.projectCompactionAutoControl = toggle;
         toggle
           .setValue(true)
           .onChange(async (value) => {
@@ -242,10 +277,11 @@ export class SettingsConversationSection {
           });
       });
 
-    this.projectCompactionPruneToggle = new Setting(containerEl)
+    new Setting(containerEl)
       .setName(t('settings.conversation.compaction.prune.name'))
       .setDesc(t('settings.conversation.compaction.prune.desc'))
       .addToggle((toggle) => {
+        this.projectCompactionPruneControl = toggle;
         toggle
           .setValue(true)
           .onChange(async (value) => {
@@ -254,10 +290,11 @@ export class SettingsConversationSection {
           });
       });
 
-    this.projectCompactionTailTurnsInput = new Setting(containerEl)
+    new Setting(containerEl)
       .setName(t('settings.conversation.compaction.tailTurns.name'))
       .setDesc(t('settings.conversation.compaction.tailTurns.desc'))
       .addText((text) => {
+        this.projectCompactionTailTurnsControl = text;
         text.inputEl.type = 'number';
         text.inputEl.min = '1';
         text
@@ -273,10 +310,11 @@ export class SettingsConversationSection {
           });
       });
 
-    this.projectCompactionPreserveRecentTokensInput = new Setting(containerEl)
+    new Setting(containerEl)
       .setName(t('settings.conversation.compaction.preserveRecentTokens.name'))
       .setDesc(t('settings.conversation.compaction.preserveRecentTokens.desc'))
       .addText((text) => {
+        this.projectCompactionPreserveRecentTokensControl = text;
         text.inputEl.type = 'number';
         text.inputEl.min = '1';
         text
@@ -298,10 +336,11 @@ export class SettingsConversationSection {
           });
       });
 
-    this.projectCompactionReservedInput = new Setting(containerEl)
+    new Setting(containerEl)
       .setName(t('settings.conversation.compaction.reserved.name'))
       .setDesc(t('settings.conversation.compaction.reserved.desc'))
       .addText((text) => {
+        this.projectCompactionReservedControl = text;
         text.inputEl.type = 'number';
         text.inputEl.min = '1';
         text
@@ -359,30 +398,25 @@ export class SettingsConversationSection {
     preserveRecentTokens: number | null;
     reservedTokens: number | null;
   }): void {
-    const autoToggle = this.projectCompactionAutoToggle;
-    if (autoToggle?.components?.[0]) {
-      (autoToggle.components[0] as unknown as { setValue: (v: boolean) => void }).setValue(state.auto);
+    if (this.projectCompactionAutoControl) {
+      this.projectCompactionAutoControl.setValue(state.auto);
     }
 
-    const pruneToggle = this.projectCompactionPruneToggle;
-    if (pruneToggle?.components?.[0]) {
-      (pruneToggle.components[0] as unknown as { setValue: (v: boolean) => void }).setValue(state.prune);
+    if (this.projectCompactionPruneControl) {
+      this.projectCompactionPruneControl.setValue(state.prune);
     }
 
-    const tailTurnsInput = this.projectCompactionTailTurnsInput;
-    if (tailTurnsInput?.components?.[0]) {
-      (tailTurnsInput.components[0] as unknown as { setValue: (v: string) => void }).setValue(String(state.tailTurns));
+    if (this.projectCompactionTailTurnsControl) {
+      this.projectCompactionTailTurnsControl.setValue(String(state.tailTurns));
     }
 
-    const preserveRecentTokensInput = this.projectCompactionPreserveRecentTokensInput;
-    if (preserveRecentTokensInput?.components?.[0]) {
-      (preserveRecentTokensInput.components[0] as unknown as { setValue: (v: string) => void })
+    if (this.projectCompactionPreserveRecentTokensControl) {
+      this.projectCompactionPreserveRecentTokensControl
         .setValue(state.preserveRecentTokens != null ? String(state.preserveRecentTokens) : '');
     }
 
-    const reservedInput = this.projectCompactionReservedInput;
-    if (reservedInput?.components?.[0]) {
-      (reservedInput.components[0] as unknown as { setValue: (v: string) => void })
+    if (this.projectCompactionReservedControl) {
+      this.projectCompactionReservedControl
         .setValue(state.reservedTokens != null ? String(state.reservedTokens) : '');
     }
   }
