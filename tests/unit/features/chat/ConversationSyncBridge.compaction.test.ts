@@ -161,4 +161,120 @@ describe('ConversationSyncBridge compaction signals', () => {
       }),
     });
   });
+
+  it('includes previous-messages snapshot with live compaction divider for diff-aware rendering on session.compacted', async () => {
+    const liveMessages: ChatMessage[] = [
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Question',
+        timestamp: 1,
+      },
+      {
+        id: 'compaction-divider-live',
+        role: 'user',
+        content: '',
+        timestamp: 2,
+        compactionDivider: { auto: true, overflow: true, tailStartId: 'user-1' },
+      } as ChatMessage & { compactionDivider: unknown },
+    ];
+    const serverMessages: ChatMessage[] = [
+      {
+        id: 'user-compaction-persisted',
+        role: 'user',
+        content: '',
+        timestamp: 2,
+        compactionDivider: { auto: true, overflow: true, tailStartId: 'user-1' },
+      } as ChatMessage & { compactionDivider: unknown },
+      {
+        id: 'summary-persisted',
+        role: 'assistant',
+        content: 'Compressed 2 earlier turns.',
+        timestamp: 3,
+        summary: true,
+      },
+    ];
+    const conversation = createConversation('active', { messages: liveMessages });
+
+    const host: Mocked<ConversationSyncBridgeHost> = {
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      syncConversationMessagesFromServer: jest.fn().mockResolvedValue({
+        messages: serverMessages,
+        changed: true,
+        fingerprint: 'server-compacted',
+        revertState: null,
+      }),
+      syncConversationMessagesFromCanonicalState: jest.fn().mockResolvedValue(null),
+    };
+    const runtimeCoordinator: Mocked<ConversationSyncBridgeRuntimeCoordinator> = {
+      runVisibleConversationSync: jest.fn(async (currentConversation, callback) => {
+        if (!currentConversation) return false;
+        await callback({ tabId: 'tab-active', conversation: currentConversation });
+        return true;
+      }),
+    };
+    const orchestration: Mocked<ConversationSyncBridgeOrchestration> = {
+      startConversationSyncLoop: jest.fn(),
+      stopConversationSyncLoop: jest.fn(),
+      clearScheduledSignalConversationSync: jest.fn(),
+      scheduleConversationSyncFromSignal: jest.fn(),
+      syncConversationFromSignal: jest.fn(async (_tabId, _reason, callbacks) => {
+        await callbacks.syncVisibleConversation();
+      }),
+      syncBackgroundTaskTabs: jest.fn().mockResolvedValue(undefined),
+    };
+    const visiblePostSyncRouter: Mocked<
+      Pick<ConversationSyncVisiblePostSyncRouter, 'routeVisibleSyncComplete'>
+    > = {
+      routeVisibleSyncComplete: jest.fn().mockResolvedValue(undefined),
+    };
+    const backgroundPostSyncRouter: Mocked<
+      Pick<
+        ConversationSyncBackgroundPostSyncRouter,
+        'routeBackgroundTabSyncComplete' | 'routeSignalSyncComplete'
+      >
+    > = {
+      routeBackgroundTabSyncComplete: jest.fn().mockResolvedValue(undefined),
+      routeSignalSyncComplete: jest.fn().mockResolvedValue(undefined),
+    };
+    const bridge = new ConversationSyncBridge({
+      host,
+      runtimeCoordinator,
+      orchestrationService: orchestration,
+      visiblePostSyncRouter,
+      backgroundPostSyncRouter,
+    });
+
+    bridge.applySessionSyncEvent('tab-active', {
+      sessionId: conversation.openCodeSessionId,
+      type: 'session.compacted',
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const routedContext = visiblePostSyncRouter.routeVisibleSyncComplete.mock.calls[0]?.[0];
+    expect(routedContext).toBeDefined();
+
+    const previousCompactionMsg = routedContext.previousMessages.find(
+      (m: ChatMessage) => 'compactionDivider' in m,
+    );
+    expect(previousCompactionMsg).toBeDefined();
+
+    const reloadedCompactionMsg = routedContext.syncResult.messages.find(
+      (m: ChatMessage) => 'compactionDivider' in m,
+    );
+    expect(reloadedCompactionMsg).toBeDefined();
+    expect(reloadedCompactionMsg.compactionDivider).toMatchObject({
+      auto: true,
+      overflow: true,
+      tailStartId: 'user-1',
+    });
+    expect(reloadedCompactionMsg.displayStyle).not.toBe('notice');
+
+    const summaryMsg = routedContext.syncResult.messages.find(
+      (m: ChatMessage) => m.summary === true,
+    );
+    expect(summaryMsg).toBeDefined();
+  });
 });

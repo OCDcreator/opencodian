@@ -142,4 +142,59 @@ describe('renderGroups', () => {
       { type: 'text', text: 'answer' },
     ]);
   });
+
+  it('places compaction divider user messages in their own non-merged render group separate from adjacent user and assistant messages', () => {
+    const groups = buildMessageRenderGroups([
+      createMessage({ id: 'user-1', role: 'user', content: 'Question' }),
+      createMessage({
+        id: 'compaction-divider',
+        role: 'user',
+        content: '',
+        compactionDivider: { auto: true, overflow: false, tailStartId: 'user-1' },
+      } as ChatMessage & { compactionDivider: unknown }),
+      createMessage({
+        id: 'summary-1',
+        role: 'assistant',
+        content: 'Compressed 5 turns',
+        summary: true,
+      }),
+      createMessage({ id: 'assistant-post', role: 'assistant', content: 'New answer' }),
+    ]);
+
+    const dividerGroup = groups.find(
+      (g) => g.messages.some((m) => 'compactionDivider' in m),
+    );
+    expect(dividerGroup).toBeDefined();
+    expect(dividerGroup!.messages).toHaveLength(1);
+    expect(dividerGroup!.mergedAssistant).toBe(false);
+
+    const summaryGroup = groups.find(
+      (g) => g.messages.some((m) => m.summary),
+    );
+    expect(summaryGroup).toBeDefined();
+    expect(summaryGroup!.mergedAssistant).toBe(false);
+    expect(summaryGroup!.messages).toHaveLength(1);
+    expect(summaryGroup!.messages[0].id).toBe('summary-1');
+
+    const postGroup = groups.find(
+      (g) => g.messages.some((m) => m.id === 'assistant-post'),
+    );
+    expect(postGroup!.mergedAssistant).toBe(true);
+  });
+
+  it('does not model compaction divider user messages as notice-style render groups', () => {
+    const groups = buildMessageRenderGroups([
+      createMessage({
+        id: 'compaction-divider-1',
+        role: 'user',
+        content: '',
+        compactionDivider: { auto: true, overflow: true, tailStartId: 'msg-1' },
+      } as ChatMessage & { compactionDivider: unknown }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    const dividerMsg = groups[0].messages[0];
+    expect('compactionDivider' in dividerMsg).toBe(true);
+    expect(dividerMsg.displayStyle).not.toBe('notice');
+  });
 });

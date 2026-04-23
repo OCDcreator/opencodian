@@ -225,6 +225,28 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(fixture.host.getTabSessionStatus).toHaveBeenCalledWith('tab-retry', 'tab-retry-session');
   });
 
+  it('does not consider an idle non-streaming tab busy when session status is null', () => {
+    const fixture = createFixture({ sessionStatus: null });
+    fixture.pane.runtimeByTab.set('tab-idle', createRuntimeState({ isStreaming: false }));
+
+    expect(fixture.coordinator.isTabForegroundBusy('tab-idle')).toBe(false);
+  });
+
+  it('considers a retry-status tab busy even when the tab itself is not streaming', () => {
+    const fixture = createFixture({
+      sessionStatus: {
+        type: 'retry',
+        attempt: 3,
+        message: 'rate-limited',
+        next: 5,
+      },
+    });
+    fixture.pane.runtimeByTab.set('tab-retry-nostream', createRuntimeState({ isStreaming: false }));
+
+    expect(fixture.coordinator.isTabForegroundBusy('tab-retry-nostream')).toBe(true);
+    expect(fixture.host.getTabSessionStatus).toHaveBeenCalledWith('tab-retry-nostream', 'tab-retry-nostream-session');
+  });
+
   it('owns turn-body reset, creation, and reuse for tab panes', () => {
     const fixture = createFixture();
     const paneState = fixture.pane.coordinator.ensurePane('tab-1');
