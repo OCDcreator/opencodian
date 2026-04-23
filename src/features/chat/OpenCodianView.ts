@@ -68,6 +68,7 @@ import {
   buildMessageRenderGroups,
   injectLiveCompactionDivider,
   mergeAssistantMessagesForRender,
+  tagCompactionSummaries,
 } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
@@ -3618,6 +3619,8 @@ export class OpenCodianView extends ItemView {
       content: message.content,
       timestamp: message.timestamp,
       modelId: message.modelId ?? null,
+      summaryKind: message.summaryKind ?? null,
+      compactionDivider: message.compactionDivider ?? null,
       noticeTitle: message.noticeTitle ?? null,
       noticeTone: message.noticeTone ?? null,
       noticeActions: message.noticeActions ?? null,
@@ -3943,7 +3946,7 @@ export class OpenCodianView extends ItemView {
     content: HTMLElement,
     message: ChatMessage,
   ): Promise<void> {
-    if (message.summary) {
+    if (message.summary && message.summaryKind === 'compaction') {
       const summaryMetaEl = content.createDiv({ cls: 'opencodian-omo-injection-header' });
       summaryMetaEl.createSpan({
         cls: 'opencodian-omo-injection-badge',
@@ -4647,11 +4650,12 @@ export class OpenCodianView extends ItemView {
     const contextUsage = activeTabId
       ? this.tabManager?.getTabContextUsage(activeTabId) ?? null
       : null;
-    return injectLiveCompactionDivider({
+    const injected = injectLiveCompactionDivider({
       messages: rendered,
       compactingAt: contextUsage?.compactingAt ?? null,
       tabId: activeTabId ?? '',
     });
+    return tagCompactionSummaries(injected);
   }
 
   private isNearBottom(threshold?: number): boolean {

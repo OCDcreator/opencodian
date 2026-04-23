@@ -197,10 +197,19 @@ export class TrailingAssistantPatchPlanningDelegate {
     previousTailMessage: ChatMessage,
     nextTailMessage: ChatMessage,
   ): boolean {
-    return previousTailMessage.role === 'assistant'
-      && nextTailMessage.role === 'assistant'
-      && previousTailMessage.displayStyle !== 'notice'
-      && nextTailMessage.displayStyle !== 'notice';
+    if (previousTailMessage.role !== 'assistant' || nextTailMessage.role !== 'assistant') {
+      return false;
+    }
+
+    if (previousTailMessage.displayStyle === 'notice' || nextTailMessage.displayStyle === 'notice') {
+      return false;
+    }
+
+    if (nextTailMessage.summary && nextTailMessage.summaryKind !== 'compaction') {
+      return false;
+    }
+
+    return true;
   }
 
   private buildNonMergeableTailFailurePlan(

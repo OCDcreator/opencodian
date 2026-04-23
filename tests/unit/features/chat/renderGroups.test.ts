@@ -3,6 +3,7 @@ import {
   buildMessageRenderGroups,
   injectLiveCompactionDivider,
   mergeAssistantMessagesForRender,
+  tagCompactionSummaries,
 } from '../../../../src/features/chat/renderGroups';
 
 function createMessage(overrides: Partial<ChatMessage>): ChatMessage {
@@ -213,5 +214,125 @@ describe('renderGroups', () => {
     expect(liveDividerGroup).toBeDefined();
     expect(liveDividerGroup!.messages).toHaveLength(1);
     expect(liveDividerGroup!.mergedAssistant).toBe(false);
+  });
+});
+
+describe('tagCompactionSummaries', () => {
+  it('tags summaries after a compaction divider as compaction summaries', () => {
+    const messages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi', timestamp: 100 }),
+      createMessage({
+        id: 'divider-1',
+        role: 'user',
+        content: '',
+        timestamp: 200,
+        compactionDivider: { auto: true, overflow: false, tailStartId: '' },
+      } as ChatMessage & { compactionDivider: unknown }),
+      createMessage({ id: 'summary-1', role: 'assistant', content: 'Compressed', timestamp: 300, summary: true }),
+    ];
+
+    const result = tagCompactionSummaries(messages);
+
+    expect(result[2].summaryKind).toBe('compaction');
+  });
+
+  it('does not tag summaries that appear before any compaction divider', () => {
+    const messages = [
+      createMessage({ id: 'summary-early', role: 'assistant', content: 'Early summary', timestamp: 50, summary: true }),
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi', timestamp: 100 }),
+    ];
+
+    const result = tagCompactionSummaries(messages);
+
+    expect(result[0].summaryKind).toBeUndefined();
+  });
+
+  it('resets the compaction context after a non-divider user message', () => {
+    const messages = [
+      createMessage({
+        id: 'divider-1',
+        role: 'user',
+        content: '',
+        timestamp: 100,
+        compactionDivider: { auto: true, overflow: false, tailStartId: '' },
+      } as ChatMessage & { compactionDivider: unknown }),
+      createMessage({ id: 'user-interrupt', role: 'user', content: 'New question', timestamp: 200 }),
+      createMessage({ id: 'summary-orphan', role: 'assistant', content: 'Summary', timestamp: 300, summary: true }),
+    ];
+
+    const result = tagCompactionSummaries(messages);
+
+    expect(result[2].summaryKind).toBeUndefined();
+  });
+
+  it('does not overwrite an already-set summaryKind', () => {
+    const messages = [
+      createMessage({
+        id: 'divider-1',
+        role: 'user',
+        content: '',
+        timestamp: 100,
+        compactionDivider: { auto: true, overflow: false, tailStartId: '' },
+      } as ChatMessage & { compactionDivider: unknown }),
+      createMessage({
+        id: 'summary-preset',
+        role: 'assistant',
+        content: 'Summary',
+        timestamp: 200,
+        summary: true,
+        summaryKind: 'compaction',
+      }),
+    ];
+
+    const result = tagCompactionSummaries(messages);
+
+    expect(result[1].summaryKind).toBe('compaction');
+  });
+
+  it('tags summaries after a live synthetic divider', () => {
+    const base = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi', timestamp: 100 }),
+      createMessage({ id: 'asst-1', role: 'assistant', content: 'Answer', timestamp: 200 }),
+    ];
+    const injected = injectLiveCompactionDivider({ messages: base, compactingAt: 250, tabId: 'tab-1' });
+    const result = tagCompactionSummaries(injected);
+
+    expect(result.some((m) => m.compactionDivider?.live)).toBe(true);
+  });
+
+  it('does not tag non-summary assistant messages after a divider', () => {
+    const messages = [
+      createMessage({
+        id: 'divider-1',
+        role: 'user',
+        content: '',
+        timestamp: 100,
+        compactionDivider: { auto: true, overflow: false, tailStartId: '' },
+      } as ChatMessage & { compactionDivider: unknown }),
+      createMessage({ id: 'asst-normal', role: 'assistant', content: 'Normal answer', timestamp: 200 }),
+    ];
+
+    const result = tagCompactionSummaries(messages);
+
+    expect(result[1].summaryKind).toBeUndefined();
+  });
+
+  it('tags multiple consecutive summaries after a divider as compaction', () => {
+    const messages = [
+      createMessage({
+        id: 'divider-1',
+        role: 'user',
+        content: '',
+        timestamp: 100,
+        compactionDivider: { auto: true, overflow: false, tailStartId: '' },
+      } as ChatMessage & { compactionDivider: unknown }),
+      createMessage({ id: 'summary-1', role: 'assistant', content: 'First', timestamp: 200, summary: true }),
+      createMessage({ id: 'summary-2', role: 'assistant', content: 'Second', timestamp: 300, summary: true }),
+    ];
+
+    const result = tagCompactionSummaries(messages);
+
+    expect(result[1].summaryKind).toBe('compaction');
+    expect(result[2].summaryKind).toBe('compaction');
   });
 });

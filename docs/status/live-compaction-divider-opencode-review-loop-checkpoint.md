@@ -101,3 +101,26 @@ Track each bounded `opencode run` round here so a truncated session can resume s
   - no blocking issues in targeted tests, lint, or typecheck.
 - Exact next corrective prompt: bounded streaming-summary slice. Build the narrow live-summary path so only compaction summaries can patch/grow visibly under the divider; do not broaden that behavior to generic summaries, notices, or question cards. Keep the live divider/tab bridge behavior intact.
 - Verification: passed (`node scripts/run-jest.js tests/unit/features/chat/liveCompactionDividerInjection.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts tests/unit/features/chat/ConversationRenderService.compactionDivider.test.ts tests/unit/features/chat/compactionDividerI18n.test.ts`, `npm run lint -- --quiet`, `npm run typecheck`).
+
+## 2026-04-24 01:41:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: bounded streaming-summary slice only.
+- Changed: added `summaryKind?: 'compaction'` to `ChatMessage`; added `tagCompactionSummaries()` in `src/features/chat/renderGroups.ts`; updated `src/features/chat/OpenCodianView.ts` so rendered messages get `summaryKind` and only compaction summaries show the compaction report badge; expanded `renderGroups` tests.
+- Reviewed: the badge is now narrowed correctly to compaction summaries; summary tagging lives in an existing owner.
+- Problems found:
+  - the worker did **not** actually gate the trailing-assistant patch/live-growth path on `summaryKind === 'compaction'`; `ConversationTrailingAssistantPatchPlanner` / equivalent patch eligibility logic is unchanged.
+  - targeted tests also missed that gap; there is still no focused test proving ordinary non-compaction summaries do **not** use the compaction live patch path.
+  - module docs remain deferred.
+- Exact next corrective prompt: stay in this slice. Implement the missing gate in the real trailing-assistant patch eligibility path so ordinary summaries without `summaryKind: 'compaction'` are not treated as compaction live-growth candidates. Add focused tests in the real owner path (for example `ConversationRenderService.trailingAssistantPatch.test.ts`) that prove: compaction summaries under a divider still patch, while generic summaries without compaction context do not. Keep the badge narrowing and summary tagging intact. Do not start reload stabilization yet.
+- Verification: partially passed (summary tagging/badge tests, lint, typecheck), but failed review because the live-patch gate itself is still missing.
+
+## 2026-04-24 01:48:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: corrective streaming-summary round for the real trailing-assistant gate.
+- Changed: updated `src/features/chat/services/ConversationTrailingAssistantPatchPlanner.ts`; kept `summaryKind` tagging/badge changes in `src/core/types/chat.ts`, `src/features/chat/renderGroups.ts`, and `src/features/chat/OpenCodianView.ts`; expanded `tests/unit/features/chat/ConversationRenderService.trailingAssistantPatch.test.ts` and `tests/unit/features/chat/renderGroups.test.ts`.
+- Reviewed: compaction summaries under a divider still patch/grow; generic summaries without compaction context are now rejected from the compaction live patch path; non-summary assistant updates still patch normally.
+- Problems found:
+  - module docs remain stale for the changed source modules and will need a dedicated docs-sync pass before final verification.
+  - no blocking issues in the focused tests.
+- Exact next corrective prompt: bounded reload-stabilization/docs pass. Make sure `session.compacted` reload keeps the just-rendered compaction boundary stable, then sync the mapped docs for all changed source modules and run the full verification/build/deploy loop.
+- Verification: passed (`node scripts/run-jest.js tests/unit/features/chat/ConversationRenderService.trailingAssistantPatch.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/chat/ConversationRenderService.compactionDivider.test.ts tests/unit/features/chat/liveCompactionDividerInjection.test.ts tests/unit/features/chat/compactionDividerI18n.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts`).

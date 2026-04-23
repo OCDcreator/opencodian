@@ -147,6 +147,77 @@ describe('ConversationRenderService trailing assistant updates', () => {
   });
 });
 
+describe('ConversationRenderService compaction summary trailing patch gate', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('patches a compaction summary with summaryKind compaction as a trailing assistant', async () => {
+    const previousMessages = [
+      createMessage({ id: 'summary-1', content: 'Compressed 5 turns', timestamp: 1, summary: true, summaryKind: 'compaction' as const }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'summary-1', content: 'Compressed 5 turns. Key decisions.', timestamp: 1, summary: true, summaryKind: 'compaction' as const }),
+    ];
+    const host = createHost();
+    const tailEl = appendAssistantTail(host.messagesEl, 'Compressed 5 turns');
+    const contentEl = tailEl.querySelector('.opencodian-message-content');
+    if (!(contentEl instanceof HTMLElement)) {
+      throw new Error('expected assistant content element');
+    }
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(true);
+    expect(host.assistantTailRender.renderMessageBody).toHaveBeenCalledWith(
+      contentEl,
+      nextMessages[0],
+    );
+  });
+
+  it('rejects a generic summary without summaryKind from the trailing patch path', async () => {
+    const previousMessages = [
+      createMessage({ id: 'summary-1', content: 'Generic summary', timestamp: 1, summary: true }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'summary-1', content: 'Generic summary updated', timestamp: 1, summary: true }),
+    ];
+    const host = createHost();
+    appendAssistantTail(host.messagesEl, 'Generic summary');
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(false);
+    expect(host.assistantTailRender.renderMessageBody).not.toHaveBeenCalled();
+  });
+
+  it('allows a non-summary assistant to patch even without summaryKind', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Partial answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-1', content: 'Partial answer now complete', timestamp: 1 }),
+    ];
+    const host = createHost();
+    const tailEl = appendAssistantTail(host.messagesEl, 'Partial answer');
+    const contentEl = tailEl.querySelector('.opencodian-message-content');
+    if (!(contentEl instanceof HTMLElement)) {
+      throw new Error('expected assistant content element');
+    }
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(true);
+    expect(host.assistantTailRender.renderMessageBody).toHaveBeenCalledWith(
+      contentEl,
+      nextMessages[0],
+    );
+  });
+});
+
 describe('ConversationRenderService trailing assistant diagnostics', () => {
   beforeEach(() => {
     jest.clearAllMocks();

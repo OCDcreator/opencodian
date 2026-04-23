@@ -103,6 +103,26 @@ export function injectLiveCompactionDivider(
   return [...messages, liveDivider];
 }
 
+export function tagCompactionSummaries(messages: ChatMessage[]): ChatMessage[] {
+  let afterCompactionDivider = false;
+  return messages.map((message) => {
+    if (message.compactionDivider) {
+      afterCompactionDivider = true;
+      return message;
+    }
+
+    if (afterCompactionDivider && message.summary && !message.summaryKind) {
+      return { ...message, summaryKind: 'compaction' as const };
+    }
+
+    if (message.role === 'user' && !message.compactionDivider) {
+      afterCompactionDivider = false;
+    }
+
+    return message;
+  });
+}
+
 export function buildMessageRenderGroups(messages: ChatMessage[]): MessageRenderGroup[] {
   const groups: MessageRenderGroup[] = [];
 

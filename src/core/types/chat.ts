@@ -191,6 +191,7 @@ export interface ChatMessage {
   timestamp: number;
   modelId?: string;
   summary?: boolean;
+  summaryKind?: 'compaction';
   sourceMessageId?: string;
   streamState?: 'interrupted';
   displayStyle?: 'default' | 'notice';
