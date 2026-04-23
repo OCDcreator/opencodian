@@ -60,7 +60,7 @@
 - `tool_use` chunk 只透传可渲染白名单 metadata；当前保留 `toolMetadata.sessionId` 用于 OpenCode 原生 subagent/task 卡片，并对 `task` 补 `toolResultVisibility: 'hidden'`，避免在流式/part-helper 路径丢 child session id 或误渲染 raw result
 - 对 `message.part.updated` 记录 part type/message id，并产出 assistant message + part upsert mutations
 - 对 `message.part.delta` 复用 part type/message id，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`，同时产出 part delta mutation；reasoning delta 会更新 dedupe 游标，避免后续 `part.updated` 重复渲染，空白 delta 只保留 canonical mutation 不触发 UI thinking 块
-- 对 `permission.asked`、`file.edited`、`question.asked` 做结构化 chunk 映射
+- 对 `permission.asked`、`file.edited`、`question.asked` 做结构化 chunk 映射；其中 permission chunk 会复用同一套请求归一化，保留 `always` 与可选 `tool` 引用，避免流式路径和 polling 路径的权限语义漂移
 - 对 `session.error` / `session.idle` 返回 stop 信号，同时保留错误与 debug 信息
 
 ### `parseSSEEvents()`

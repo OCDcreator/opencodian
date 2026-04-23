@@ -9,6 +9,7 @@ import type {
   QuestionRequest as ChatQuestionRequest,
   StreamChunk,
 } from '../types';
+import { normalizePermissionRequest } from './OpenCodeQuestionPermissionHub';
 import type {
   Message,
   Part,
@@ -800,14 +801,16 @@ export class OpenCodeStreamEventTransformer {
     chunks,
     mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
-    const permission = eventData.properties;
-    if (permission?.id) {
+    const permission = normalizePermissionRequest(eventData.properties);
+    if (permission) {
       chunks.push({
         type: 'permission_request',
         id: permission.id,
-        permission: permission.permission || 'unknown',
-        patterns: permission.patterns || [],
-        metadata: permission.metadata || {},
+        permission: permission.permission,
+        patterns: permission.patterns,
+        metadata: permission.metadata,
+        always: permission.always,
+        ...(permission.tool ? { tool: permission.tool } : {}),
       });
     }
 

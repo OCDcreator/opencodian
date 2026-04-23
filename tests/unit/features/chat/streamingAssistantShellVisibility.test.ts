@@ -82,6 +82,7 @@ describe('OpenCodianView streaming assistant shell visibility', () => {
         permission: 'websearch_web_search',
         patterns: ['src/**'],
         metadata: { command: 'npm test' },
+        always: ['src/**'],
       },
       'tab-1',
     );

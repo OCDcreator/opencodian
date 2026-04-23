@@ -316,7 +316,18 @@ export type StreamChunk =
   | { type: 'message_stop' }
   | { type: 'content_block_start'; index: number }
   | { type: 'content_block_stop'; index: number }
-  | { type: 'permission_request'; id: string; permission: string; patterns: string[]; metadata: Record<string, unknown> }
+  | {
+      type: 'permission_request';
+      id: string;
+      permission: string;
+      patterns: string[];
+      metadata: Record<string, unknown>;
+      always: string[];
+      tool?: {
+        messageID: string;
+        callID: string;
+      };
+    }
   | { type: 'question_request'; request: QuestionRequest };
 
 /** Conversation metadata */

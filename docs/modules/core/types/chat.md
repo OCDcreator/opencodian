@@ -48,7 +48,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `StreamChunk` | 联合类型，14 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`） |
+| `StreamChunk` | 联合类型，14 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 可带 `always` 与可选 `tool` 引用） |
 
 ### OMO 兼容
 
@@ -118,6 +118,8 @@
 4. 交互事件：`permission_request`, `question_request`
 5. 结构事件：`content_block_start`, `content_block_stop`
 6. 错误：`error`
+
+`permission_request` 现在保留 upstream permission request 的关键审批字段：`id`、`permission`、`patterns`、`metadata`、`always`，以及可选的 `tool.messageID/callID` 链接。
 
 ### 会话差异
 `SessionDiffEntry` 记录单轮对话中的文件变更：

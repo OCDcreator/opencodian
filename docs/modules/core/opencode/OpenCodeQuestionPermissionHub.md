@@ -43,7 +43,7 @@ hub 现在统一承接：
 
 同一个 hub 也承接 permission 侧的交互式协商：
 
-- `getPendingPermissions()`：按 `sdkCrud` 选择 SDK `permission.list()` 或 legacy `/permission`，并过滤成稳定的 `PermissionRequest` 形状。
+- `getPendingPermissions()`：按 `sdkCrud` 选择 SDK `permission.list()` 或 legacy `/permission`，兼容 `Array` 与 `{ data }` 两种返回形状，并过滤成稳定的 `PermissionRequest` 形状。
 - `respondToPermission()`：保持现有“`sdkCrud` 启用时走 SDK reply，否则走 legacy `/permission/:id/reply`”的语义，同时保留 mutation 失败时直接抛错。
 - `respondToSessionPermission()`：继续走 SDK session permission responder，但由同一个 owner 收口 permission responder surface。
 
@@ -54,7 +54,7 @@ hub 现在统一承接：
 hub 当前还负责两类轻量过滤：
 
 - question list 会统一兼容 array 与 `{ data }` 两种返回形状，再借助 host mapper 过滤掉无效 request。
-- permission list 会过滤掉缺少 `id` / `sessionID` / `permission` 的无效项，并标准化 `patterns`、`always`、`metadata` 与可选 `tool` 引用。
+- permission list 会统一兼容 `Array` / `{ data }` 返回形状，过滤掉缺少 `id` / `sessionID` / `permission` 的无效项，并标准化 `patterns`、`always`、`metadata` 与可选 `tool` 引用。
 
 它刻意不处理 session lifecycle、session control/message operations、broad query gateway、streaming runtime 或 settings/model catalog 逻辑。
 

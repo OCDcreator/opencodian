@@ -65,7 +65,7 @@ function createHost(
   } as MockHost;
 }
 
-describe('OpenCodeQuestionPermissionHub', () => {
+describe('OpenCodeQuestionPermissionHub question negotiation', () => {
   it('normalizes question requests and routes SDK question responders', async () => {
     const questionSdk = createQuestionSdk({
       list: jest.fn().mockResolvedValue({
@@ -178,6 +178,9 @@ describe('OpenCodeQuestionPermissionHub', () => {
     );
   });
 
+});
+
+describe('OpenCodeQuestionPermissionHub permission negotiation', () => {
   it('normalizes permission requests and routes SDK permission responders', async () => {
     const permissionSdk = createPermissionSdk({
       list: jest.fn().mockResolvedValue([
@@ -227,6 +230,37 @@ describe('OpenCodeQuestionPermissionHub', () => {
       permissionID: 'permission-1',
       response: 'always',
     });
+  });
+
+  it('accepts wrapped permission list payloads from SDK or legacy transports', async () => {
+    const permissionSdk = createPermissionSdk({
+      list: jest.fn().mockResolvedValue({
+        data: [
+          {
+            id: 'permission-1',
+            sessionID: 'session-1',
+            permission: 'external_directory',
+            patterns: ['/shared/libs/*'],
+            metadata: { filepath: '/shared/libs/tool.ts' },
+            always: ['/shared/libs/*'],
+            tool: { messageID: 'message-1', callID: 'call-1' },
+          },
+        ],
+      }),
+    });
+    const hub = new OpenCodeQuestionPermissionHub(createHost(createQuestionSdk(), permissionSdk));
+
+    await expect(hub.getPendingPermissions()).resolves.toEqual([
+      {
+        id: 'permission-1',
+        sessionID: 'session-1',
+        permission: 'external_directory',
+        patterns: ['/shared/libs/*'],
+        metadata: { filepath: '/shared/libs/tool.ts' },
+        always: ['/shared/libs/*'],
+        tool: { messageID: 'message-1', callID: 'call-1' },
+      },
+    ]);
   });
 
   it('falls back to legacy permission APIs when needed', async () => {

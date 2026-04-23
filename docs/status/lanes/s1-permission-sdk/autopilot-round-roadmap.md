@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] P1 - Complete SDK-backed permission runtime wiring
+### [DONE] P1 - Complete SDK-backed permission runtime wiring
 
 - **Lane**: Permission runtime
 - **Goal**: Confirm and complete SDK-backed pending-permission fetch/reply/runtime event handling without breaking legacy fallback or current inline permission UX.
@@ -20,7 +20,7 @@
   - Targeted tests cover the touched behavior
   - The post-change OpenCode CLI review passes
 
-### [QUEUED] P2 - Align security settings wording and config semantics
+### [NEXT] P2 - Align security settings wording and config semantics
 
 - **Lane**: Permission settings
 - **Goal**: Make the security/settings surface describe the real upstream permission model in a human-readable way.

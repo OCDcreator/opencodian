@@ -31,6 +31,89 @@ export interface OpenCodeQuestionPermissionHubHost {
   logServiceError(key: string, message: string, error: unknown): void;
 }
 
+function normalizePermissionToolReference(raw: unknown): PermissionRequest['tool'] | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+
+  const tool = raw as {
+    messageID?: unknown;
+    callID?: unknown;
+  };
+
+  if (typeof tool.messageID !== 'string' || typeof tool.callID !== 'string') {
+    return undefined;
+  }
+
+  return {
+    messageID: tool.messageID,
+    callID: tool.callID,
+  };
+}
+
+function normalizeStringArray(raw: unknown): string[] {
+  return Array.isArray(raw)
+    ? raw.filter((value): value is string => typeof value === 'string')
+    : [];
+}
+
+export function normalizePermissionRequest(raw: unknown): PermissionRequest | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const request = raw as {
+    id?: unknown;
+    sessionID?: unknown;
+    permission?: unknown;
+    patterns?: unknown;
+    metadata?: unknown;
+    always?: unknown;
+    tool?: unknown;
+  };
+
+  if (
+    typeof request.id !== 'string'
+    || typeof request.sessionID !== 'string'
+    || typeof request.permission !== 'string'
+  ) {
+    return null;
+  }
+
+  const patterns = normalizeStringArray(request.patterns);
+  const always = normalizeStringArray(request.always);
+  const metadata = request.metadata && typeof request.metadata === 'object' && !Array.isArray(request.metadata)
+    ? request.metadata as Record<string, unknown>
+    : {};
+  const tool = normalizePermissionToolReference(request.tool);
+
+  return {
+    id: request.id,
+    sessionID: request.sessionID,
+    permission: request.permission,
+    patterns,
+    metadata,
+    always,
+    ...(tool ? { tool } : {}),
+  };
+}
+
+export function normalizePermissionResponse(response: unknown): PermissionRequest[] {
+  const rawRequests = Array.isArray(response)
+    ? response
+    : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
+      ? (response as { data: unknown[] }).data
+      : [];
+
+  return rawRequests.reduce<PermissionRequest[]>((requests, rawRequest) => {
+    const normalized = normalizePermissionRequest(rawRequest);
+    if (normalized) {
+      requests.push(normalized);
+    }
+    return requests;
+  }, []);
+}
+
 export class OpenCodeQuestionPermissionHub {
   constructor(private readonly host: OpenCodeQuestionPermissionHubHost) {}
 
@@ -100,7 +183,7 @@ export class OpenCodeQuestionPermissionHub {
     if (this.host.shouldUseSdkCrud()) {
       try {
         const response = await this.host.getSdkPermission().list();
-        return this.normalizePermissionResponse(response);
+        return normalizePermissionResponse(response);
       } catch (error) {
         this.host.logServiceWarning('permission.list', 'SDK permission.list failed, falling back to legacy HTTP', error);
       }
@@ -108,7 +191,7 @@ export class OpenCodeQuestionPermissionHub {
 
     try {
       const response = await this.host.getLegacy<unknown>('/permission');
-      return this.normalizePermissionResponse(response);
+      return normalizePermissionResponse(response);
     } catch (error) {
       this.host.logServiceError('permission.list', 'Failed to get pending permissions:', error);
       return [];
@@ -153,84 +236,4 @@ export class OpenCodeQuestionPermissionHub {
     }, []);
   }
 
-  private normalizePermissionResponse(response: unknown): PermissionRequest[] {
-    if (!Array.isArray(response)) {
-      return [];
-    }
-
-    return response.reduce<PermissionRequest[]>((requests, rawRequest) => {
-      const normalized = this.normalizePermissionRequest(rawRequest);
-      if (normalized) {
-        requests.push(normalized);
-      }
-      return requests;
-    }, []);
-  }
-
-  private normalizePermissionRequest(raw: unknown): PermissionRequest | null {
-    if (!raw || typeof raw !== 'object') {
-      return null;
-    }
-
-    const request = raw as {
-      id?: unknown;
-      sessionID?: unknown;
-      permission?: unknown;
-      patterns?: unknown;
-      metadata?: unknown;
-      always?: unknown;
-      tool?: unknown;
-    };
-
-    if (
-      typeof request.id !== 'string'
-      || typeof request.sessionID !== 'string'
-      || typeof request.permission !== 'string'
-    ) {
-      return null;
-    }
-
-    const patterns = this.normalizeStringArray(request.patterns);
-    const always = this.normalizeStringArray(request.always);
-    const metadata = request.metadata && typeof request.metadata === 'object' && !Array.isArray(request.metadata)
-      ? request.metadata as Record<string, unknown>
-      : {};
-    const tool = this.normalizePermissionToolReference(request.tool);
-
-    return {
-      id: request.id,
-      sessionID: request.sessionID,
-      permission: request.permission,
-      patterns,
-      metadata,
-      always,
-      ...(tool ? { tool } : {}),
-    };
-  }
-
-  private normalizePermissionToolReference(raw: unknown): PermissionRequest['tool'] | undefined {
-    if (!raw || typeof raw !== 'object') {
-      return undefined;
-    }
-
-    const tool = raw as {
-      messageID?: unknown;
-      callID?: unknown;
-    };
-
-    if (typeof tool.messageID !== 'string' || typeof tool.callID !== 'string') {
-      return undefined;
-    }
-
-    return {
-      messageID: tool.messageID,
-      callID: tool.callID,
-    };
-  }
-
-  private normalizeStringArray(raw: unknown): string[] {
-    return Array.isArray(raw)
-      ? raw.filter((value): value is string => typeof value === 'string')
-      : [];
-  }
 }
