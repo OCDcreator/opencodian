@@ -13,6 +13,7 @@
     "release:major": "node scripts/release.mjs major",
     "doctor:esbuild": "node scripts/doctor-esbuild.mjs",
     "doctor:esbuild:fix": "node scripts/doctor-esbuild.mjs --fix",
+    "graphify:update:src": "node scripts/update-graphify-src.mjs",
     "check:devlog-order": "node scripts/check-devlog-order.mjs",
     "check:module-docs:coverage": "node scripts/check-module-doc-coverage.mjs",
     "check:module-docs:diff": "node scripts/check-module-doc-diff.mjs --range HEAD",
