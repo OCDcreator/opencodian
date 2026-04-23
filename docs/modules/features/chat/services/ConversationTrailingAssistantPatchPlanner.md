@@ -47,6 +47,7 @@ export class TrailingAssistantPatchPlanningDelegate {
 - non-tail mismatch 继续携带 `mismatchIndex`，用于 skipped debug payload
 - `tail-message-not-mergeable-assistant` 继续携带 previous/next tail summary，不改变 diagnostics shape
 - DOM target 解析仍排除 `.opencodian-message--notice`，只选择最后一个普通 assistant element
+- `isPatchableAssistantTail()` 拒绝 generic summary 消息（`summary === true` 但没有 `summaryKind === 'compaction'`），只有 compaction summary（`summaryKind === 'compaction'`）才能通过 trailing assistant live-patch 路径，避免非 compaction 的 generic summary 被误当作 streaming tail 进行 patch
 
 ## 与 `ConversationRenderService` 的边界
 

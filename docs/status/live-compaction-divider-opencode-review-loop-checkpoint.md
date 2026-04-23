@@ -124,3 +124,13 @@ Track each bounded `opencode run` round here so a truncated session can resume s
   - no blocking issues in the focused tests.
 - Exact next corrective prompt: bounded reload-stabilization/docs pass. Make sure `session.compacted` reload keeps the just-rendered compaction boundary stable, then sync the mapped docs for all changed source modules and run the full verification/build/deploy loop.
 - Verification: passed (`node scripts/run-jest.js tests/unit/features/chat/ConversationRenderService.trailingAssistantPatch.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/chat/ConversationRenderService.compactionDivider.test.ts tests/unit/features/chat/liveCompactionDividerInjection.test.ts tests/unit/features/chat/compactionDividerI18n.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts`).
+
+## 2026-04-24 01:58:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: final code/doc slice for reload stability verification plus mapped docs sync.
+- Changed: updated mapped docs for `OpenCodianView`, `renderGroups`, `ConversationRenderRuntime`, `ConversationTabRuntimeCoordinator`, `ConversationTrailingAssistantPatchPlanner`, and `chat-user.css`.
+- Reviewed: `session.compacted` stability is satisfied by the current chain (`session.compacted` authoritative reload + `compactingAt` refresh to null + persisted divider suppression of synthetic live divider); focused compaction suites and lint stayed green; fixed one doc wording/class-name mismatch locally and removed the stray `nul` artifact.
+- Problems found:
+  - branch-level module-doc guard still requires these updated docs to be committed before it will pass against `origin/main...HEAD`.
+- Exact next corrective prompt: none for OpenCode. Next step is local final verification/build/deploy and final checkpoint status.
+- Verification: passed for focused compaction checks and lint; pending branch-level doc-guard pass until docs are committed.

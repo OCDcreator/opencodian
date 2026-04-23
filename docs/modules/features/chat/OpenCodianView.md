@@ -222,13 +222,13 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 `session.diff` 现在不再触发 message authoritative sync/reload：view 会把 sync-event 自带的 diff entries 记在独立的 `sessionDiffEntriesBySessionId` 缓存里，只把它作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
 
-`session.compacted` 现在会沿着同一条 session signal runtime 进入 `ConversationSyncBridge`，但 visible current conversation 会强制走 authoritative server sync，而不是先信任可能已过期的 canonical graph；sync 收尾继续复用 active-tab context usage refresh，以便清掉/更新 `Session.time.compacting` 驱动的 live 状态。
+`session.compacted` 现在会沿着同一条 session signal runtime 进入 `ConversationSyncBridge`，但 visible current conversation 会强制走 authoritative server sync，而不是先信任可能已过期的 canonical graph；sync 收尾继续复用 active-tab context usage refresh，以便清掉/更新 `Session.time.compacting` 驱动的 live 状态。reload 之后，服务端返回的已持久化 `compactionDivider` 会替代 `injectLiveCompactionDivider` 合成的虚拟 divider，`compactingAt` 则在 context usage refresh 时被置为 null。
 
 这里的 conversation sync fingerprint 现在直接复用 `OpenCodeService.getCanonicalConversationFingerprint()`：它会把 `contentBlocks`、tool call、context attachment、OMO/notice 元数据和原始 `parts` 一起写入 fingerprint，从而让 authoritative reload/finalization 以 canonical payload 漂移为准，而不是继续依赖 view 层单独维护一套 visual-only 对比。
 
 与此同时，view 自己的 assistant body / visual signature 也需要把 `contentBlocks[].toolMetadata` 与 `contentBlocks[].toolResultVisibility` 纳入比较；否则 task 卡片在 authoritative hydration 后即使拿到了 child session id，也可能因为 signature 误判“未变化”而错过重渲。
 
-assistant `summary === true` 的消息会在正文上方渲染一个 compaction report badge，并纳入 assistant body signature；user 消息渲染现在也会跳过没有 visible content / attachments / images / OMO 的空壳消息，用于隐藏 OpenCode `metadata.compaction_continue` 这类内部续跑提示。
+assistant `summary === true` 的消息会在正文上方渲染一个 compaction report badge，并纳入 assistant body signature；user 消息渲染现在也会跳过没有 visible content / attachments / images / OMO 的空壳消息，用于隐藏 OpenCode `metadata.compaction_continue` 这类内部续跑提示。`compactionDivider` 消息不以 notice card 形式渲染，而是作为全宽分割线展示：`renderCompactionDivider()` 根据 `divider.live` 决定渲染活跃标签还是已完成 badge+标签；`shouldRenderConversationMessage` 会放行 `compactionDivider` 类型的消息；`getMessageVisualSignature` 会把 `summaryKind` 和 `compactionDivider` 纳入签名比较，以支持增量更新检测。
 
 与此同时，server message 拉取→hydrate→authoritative merge、latest optimistic user bubble hydration、client-only/interrupted message preservation，以及 sync debug payload / fingerprint 组装现在统一收束到 `services/ConversationAuthoritativeSyncCoordinator.ts`。`OpenCodianView` 只再保留 host seam：OpenCode message/revert 查询、runtime fingerprint/anchor 写回、context usage refresh、background-task authoritative-sync 标记，以及 hydrated single-message rerender。
 
@@ -422,7 +422,7 @@ model selector 现在拆成了几层协作：
 - 渲染 OMO 注入面板
 - 通过 `UserMessageFooterRenderer` 追加 footer，并把 copy / rewind / fork 的真实副作用留在 host
 
-渲染消息列表前还会经过 `getMessagesForRender()`，也就是先用 `renderGroups` 合并连续 assistant message。
+渲染消息列表前还会经过 `getMessagesForRender()`，也就是先用 `renderGroups` 合并连续 assistant message，再对合并结果跑 `injectLiveCompactionDivider`（把活跃压缩过程插入为虚拟 `compactionDivider` 消息）和 `tagCompactionSummaries`（标记已完成压缩的 assistant summary 消息）。
 
 ### context、选区与文件目录
 

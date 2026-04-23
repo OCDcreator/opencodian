@@ -45,6 +45,12 @@ export class ConversationSyncedUpdateApplyDelegate {
 - plain text assistant append 继续走 pseudo-stream reveal；notice、assistant `summary`、question resolution 与 structured blocks 仍直接使用 persisted assistant shell，避免 compaction report 被伪流式展开
 - user message rerender 继续复用 host 提供的 frame/body/footer callbacks，不在 runtime 内创建新的 view dependency
 
+## Compaction Divider 渲染
+
+- `ConversationUserMessageRenderDelegate.renderMessageIntoFrame()` 对 compaction divider 消息有专用 early-return 分支：命中时给容器添加 `opencodian-message--compaction-divider` CSS class，调用 `host.renderCompactionDivider(el, divider)`，然后跳过 content 和 footer 渲染
+- `ConversationRenderHost` 接口新增 `renderCompactionDivider(el: HTMLElement, divider: CompactionDividerMeta): void` 方法，由 host 实现具体的 divider DOM 构造
+- incremental update check（`getIncrementalRenderedMessageUpdate()`）不对 compaction divider 消息做特殊处理，它们遵循普通 user message 的增量判定规则
+
 ## 与 `ConversationRenderService` 的边界
 
 - `ConversationRenderService` 保留 full rerender、scroll restore、trailing assistant patch success/failure logging 与 public API

@@ -11,8 +11,12 @@
 
 - `.opencodian-message--user`：用户消息容器与右对齐布局。
 - `.opencodian-message--user .opencodian-message-content`：玻璃态气泡本体。
-- `.opencodian-collapsible*`：长内容折叠遮罩与“展开/收起”按钮。
+- `.opencodian-collapsible*`：长内容折叠遮罩与"展开/收起"按钮。
 - `.opencodian-selection-highlight` 与 `::highlight(opencodian-selection)`：选区高亮。
+- `.opencodian-message--compaction-divider`：全宽居中 compaction 分割线容器，区别于用户气泡与 notice 卡片。
+- `.opencodian-compaction-divider-line`：分割线内部的水平线元素。
+- `.opencodian-compaction-divider-badge`：显示 compaction 状态（completed / overflow / auto）的徽章元素。
+- `.opencodian-compaction-divider--live`：进行中 compaction 的修饰类。
 - 动画：`@keyframes messageSlideIn`，并通过 `nth-child` 做轻度错峰。
 
 ## 关联 TS 组件
