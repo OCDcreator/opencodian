@@ -53,7 +53,8 @@
   - provider 图标缓存工具区新增全局 `providerIconColorMode` 与 `providerIconDefaultVariant`：前者控制运行时颜色策略（跟随系统 / 单色 / 彩色），后者控制 `auto` 条目优先尝试的 LobeHub 静态 variant；内置图标选择器会实时预览当前模式并允许显式保存 variant
 - **Conversation**
   - `SettingsConversationSection` 现在接管 title mode、`aiTitleModel` picker、project-scoped compaction editor（写入 `.opencode/opencode.json`）、global chat font size、question card display/position、answered-card toggle 与 user-markup render toggle
-  - `OpenCodianSettings` 不再直接铺开 conversation section 的 DOM/state/model-picker wiring，只保留 owner 装配
+  - conversation section 现在复用 `createSettingsBlock()` 拆成“会话标题 / 上下文压缩（项目级） / 阅读与显示 / 提问交互 / 消息渲染”五个二级分组，而不是单层平铺
+  - `OpenCodianSettings` 不再直接铺开 conversation section 的 DOM/state/model-picker wiring，只保留 owner 装配与 block seam 透传
 - **Agents**
   - `SettingsAgentsSection` 现在接管 agent 目录壳层：合并 runtime built-in/project agent 与 project `.opencode/opencode.json` override
   - 当前已暴露默认主代理下拉、project agent 核心字段 create/edit/delete（`mode`、`disable`、`description`、`prompt`、`model`、`temperature`、`top_p`、`steps`、`color`）、project-scoped `permission.task` allowlist、raw `options` JSON，以及 `mode: 'subagent'` 的 `hidden` 可见性开关，写回路径统一走 `OpencodeConfigManager`
@@ -172,7 +173,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
 - `SettingsModelSection`: 管理模型 section 的 block shell、callback bridge 与 `SettingsModelCatalogPresenter` host；source mode、refresh 链路、workspace 卡片和 icon cache 工具区继续委托给相邻 model-section owners
-- `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、project-scoped compaction editor、global chat font size、question card display/position、answered-card toggle 与 user-markup render toggle；`OpenCodianSettings` 只保留 owner 装配与 title-model refresh callback bridge
+- `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、project-scoped compaction editor、global chat font size、question card display/position、answered-card toggle 与 user-markup render toggle，并复用主设置页 block 组件把它们拆成多层级分组；`OpenCodianSettings` 只保留 owner 装配、block seam 与 title-model refresh callback bridge
 - `SettingsAgentsSection`: 管理 Agents section 的 runtime+project agent catalog、默认主代理选择、project agent 核心字段 CRUD（含 `disable`）与基础 subagent `hidden` 可见性写回；project agent 表单细节继续委托给 companion owner `SettingsProjectAgentEditor`，`OpenCodianSettings` 只保留 owner 装配
 - `SettingsCommandsSection`: 管理 Commands section 的 runtime+project slash-command catalog、project command editor shell / placeholder reference、`hiddenSlashCommands` 用户可见性写回与 `slashCommandSkillMode`；project command 表单细节继续委托给 companion owner `SettingsProjectCommandEditor`，runtime placeholder expansion 与 slash execution 则分别留在 `OpenCodeSessionControlOrchestrator` / `SlashCommandExecutionService`
 - `SettingsPluginSection`: 管理 plugin section 的 environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config open/create action；`OpenCodianSettings` 只保留 owner 装配与 formatting bridge

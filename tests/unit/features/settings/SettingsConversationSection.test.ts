@@ -57,6 +57,11 @@ interface TextRecord {
   onChange?: (value: string) => void | Promise<void>;
 }
 
+interface BlockRecord {
+  title: string;
+  description: string;
+}
+
 type ConversationSectionPlugin = Pick<
   OpenCodianPlugin,
   | 'settings'
@@ -71,6 +76,7 @@ type ConversationSectionPlugin = Pick<
 const dropdownRecords: DropdownRecord[] = [];
 const toggleRecords: ToggleRecord[] = [];
 const textRecords: TextRecord[] = [];
+const blockRecords: BlockRecord[] = [];
 
 function createDropdownRecord(name: string): DropdownRecord {
   const record: DropdownRecord = {
@@ -193,11 +199,29 @@ function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHead
   return headingEl;
 }
 
+function createSettingsBlock(
+  containerEl: HTMLElement,
+  options: { title: string; description: string },
+): HTMLElement {
+  const hostEl = document.createElement('section');
+  hostEl.dataset.blockTitle = options.title;
+  hostEl.dataset.blockDescription = options.description;
+  const bodyEl = document.createElement('div');
+  hostEl.appendChild(bodyEl);
+  containerEl.appendChild(hostEl);
+  blockRecords.push({
+    title: options.title,
+    description: options.description,
+  });
+  return bodyEl;
+}
+
 function createSection(plugin = createPlugin(), app = createApp()) {
   const section = new SettingsConversationSection({
     app,
     plugin: plugin as unknown as OpenCodianPlugin,
     createSectionHeading,
+    createSettingsBlock,
     setRefreshTitleModelsCallback: jest.fn(),
   });
   const containerEl = document.createElement('div');
@@ -219,65 +243,80 @@ function findText(name: string): TextRecord | undefined {
   return textRecords.find((record) => record.name === name);
 }
 
+function resetHarnessState(): void {
+  setLocale('en');
+  document.body.innerHTML = '';
+  dropdownRecords.length = 0;
+  toggleRecords.length = 0;
+  textRecords.length = 0;
+  blockRecords.length = 0;
+}
+
+function installSettingMocks(options: { includeSetClass?: boolean } = {}): void {
+  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
+    (this as Setting & { __settingName?: string }).__settingName = name;
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+    return this;
+  });
+
+  if (options.includeSetClass) {
+    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
+      return this;
+    });
+  }
+
+  jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
+    this: Setting,
+    callback: (control: MockDropdownControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createDropdownRecord(name);
+    dropdownRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
+    this: Setting,
+    callback: (control: MockToggleControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createToggleRecord(name);
+    toggleRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
+    this: Setting,
+    callback: (control: MockTextControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createTextRecord(name);
+    textRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
+    this: Setting,
+    callback: (control: MockButtonControl) => unknown,
+  ) {
+    callback(createButtonControl());
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
+    this: Setting,
+    callback: (control: MockExtraButtonControl) => unknown,
+  ) {
+    callback(createExtraButtonControl());
+    return this;
+  });
+}
+
 describe('SettingsConversationSection', () => {
   beforeEach(() => {
-    setLocale('en');
-    document.body.innerHTML = '';
-    dropdownRecords.length = 0;
-    toggleRecords.length = 0;
-    textRecords.length = 0;
-
-    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
-      (this as Setting & { __settingName?: string }).__settingName = name;
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
-      this: Setting,
-      callback: (control: MockDropdownControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createDropdownRecord(name);
-      dropdownRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
-      this: Setting,
-      callback: (control: MockToggleControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createToggleRecord(name);
-      toggleRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
-      this: Setting,
-      callback: (control: MockTextControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createTextRecord(name);
-      textRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
-      this: Setting,
-      callback: (control: MockButtonControl) => unknown,
-    ) {
-      callback(createButtonControl());
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
-      this: Setting,
-      callback: (control: MockExtraButtonControl) => unknown,
-    ) {
-      callback(createExtraButtonControl());
-      return this;
-    });
+    resetHarnessState();
+    installSettingMocks();
   });
 
   afterEach(() => {
@@ -293,6 +332,7 @@ describe('SettingsConversationSection', () => {
         settings: {},
       } as never,
       createSectionHeading: () => document.createElement('h2'),
+      createSettingsBlock: () => document.createElement('div'),
       setRefreshTitleModelsCallback: (callback) => {
         refreshTitleModelsCallback = callback;
       },
@@ -357,73 +397,42 @@ describe('SettingsConversationSection', () => {
     );
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
+
+  it('renders conversation settings as grouped blocks instead of a flat list', () => {
+    createSection();
+
+    expect(blockRecords).toEqual([
+      {
+        title: t('settings.titleGeneration.title'),
+        description: t('settings.titleGeneration.groupDesc'),
+      },
+      {
+        title: t('settings.conversation.compaction.projectNote'),
+        description: t('settings.conversation.compaction.projectNoteDesc'),
+      },
+      {
+        title: t('settings.conversation.display.title'),
+        description: t('settings.conversation.display.desc'),
+      },
+      {
+        title: t('settings.conversation.questions.title'),
+        description: t('settings.conversation.questions.desc'),
+      },
+      {
+        title: t('settings.conversation.rendering.title'),
+        description: t('settings.conversation.rendering.desc'),
+      },
+    ]);
+  });
 });
 
 describe('SettingsConversationSection compaction fields', () => {
   let noticeSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    setLocale('en');
-    document.body.innerHTML = '';
-    dropdownRecords.length = 0;
-    toggleRecords.length = 0;
-    textRecords.length = 0;
+    resetHarnessState();
     noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
-
-    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
-      (this as Setting & { __settingName?: string }).__settingName = name;
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
-      this: Setting,
-      callback: (control: MockDropdownControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createDropdownRecord(name);
-      dropdownRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
-      this: Setting,
-      callback: (control: MockToggleControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createToggleRecord(name);
-      toggleRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
-      this: Setting,
-      callback: (control: MockTextControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createTextRecord(name);
-      textRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
-      this: Setting,
-      callback: (control: MockButtonControl) => unknown,
-    ) {
-      callback(createButtonControl());
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
-      this: Setting,
-      callback: (control: MockExtraButtonControl) => unknown,
-    ) {
-      callback(createExtraButtonControl());
-      return this;
-    });
+    installSettingMocks({ includeSetClass: true });
   });
 
   afterEach(() => {

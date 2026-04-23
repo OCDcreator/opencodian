@@ -7,6 +7,14 @@
 
 `SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与 AI 标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
 
+当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成五个二级分组：
+
+- 会话标题
+- 上下文压缩（项目级）
+- 阅读与显示
+- 提问交互
+- 消息渲染
+
 这个 owner 的职责边界刻意保持在"**conversation section 装配 + title-model refresh orchestration**"：
 
 - 持有 conversation section 级别的 DOM 组装与设置写回
@@ -23,12 +31,15 @@
 `attach()` 会在一个 owner 内完成 conversation section 的主要阶段：
 
 - 创建 section heading
-- 装配 title mode dropdown、AI title model picker 与 global session default controls
-- 装配 question display mode、question card position、answered-card toggle
-- 装配 user markup 渲染 toggle
+- 通过 `OpenCodianSettings.createSettingsBlock()` 创建五个 conversation 二级分组卡片
+- 在“会话标题”块装配 title mode dropdown 与 AI title model picker
+- 在“上下文压缩（项目级）”块装配 compaction controls
+- 在“阅读与显示”块装配 global session default chat font size
+- 在“提问交互”块装配 question display mode、question card position、answered-card toggle
+- 在“消息渲染”块装配 user markup 渲染 toggle
 - 注册首次与后续模型目录变化时复用的 title-model refresh callback
 
-这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建与 callback bridge。
+这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建、block 样式 seam 与 callback bridge。
 
 ### title-model refresh orchestration
 
@@ -66,7 +77,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 
 ## 与其他模块的交互
 
-- `OpenCodianSettings.ts`: 创建并复用 owner，向其提供 section heading seam 与 title-model refresh callback 注册位
+- `OpenCodianSettings.ts`: 创建并复用 owner，向其提供 section heading seam、settings block seam 与 title-model refresh callback 注册位
 - `main.ts`: 提供 `reapplyConversationSessionDefaults()`，把 settings 保存后的默认值变化桥接到当前聊天视图运行时
 - `OpencodeConfigManager.ts`: 提供 `getCompactionConfig()` / `updateCompactionConfig()` 读写项目 `.opencode/opencode.json` 中的 compaction 配置
 - `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置
@@ -82,6 +93,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 - settings 页面打开期间，如果外部工具直接改动或删除 `.opencode/opencode.json`，compaction controls 会自动回读项目配置并刷新到最新状态；不需要手动重开设置页。
 - 手动触发的 `session.summarize()` 是 per-session 操作，不受本项目配置 UI 管理。
 - 如果后续继续推进 conversation lane，优先在这个 owner 内扩展完整 section lifecycle，而不是回到 `OpenCodianSettings` 主类里追加闭包。
+- conversation section 的新增设置应先判断归属到哪个现有二级分组；只有在职责明显独立时才新增第六个 block。
 
 ## 2026-04-23 Compaction config alignment
 

@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近一轮还扩展了会话设置弹窗分组布局相关键：继承说明、会话覆盖 badge、上下文压缩分组与显示分组，并新增了 backend-first compaction apply 的 deferred notice 文案；本轮又补了原生 compaction transcript/context-state 所需的 `chat.compaction.*` 与 `context.usage.compacting/status` 键。
+OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近几轮先后扩展了会话设置弹窗分组布局相关键、project-scoped compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（conversation title、reading/display、question interaction、message rendering）。
 
 源码约 1000 行。
 
@@ -124,3 +124,11 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
 2. Locale keys for `autoCompactionEnabled` and `compactionReservedTokens` per-session overrides have been removed; new project-scoped compaction keys were added under `settings.conversation.compaction.*`.
 3. Manual `session.summarize()` remains a per-session action, not managed by compaction locale keys.
+
+## 2026-04-23 Conversation settings grouping
+
+The main settings conversation section now uses nested blocks. Locale additions:
+1. `settings.titleGeneration.groupDesc`
+2. `settings.conversation.display.*`
+3. `settings.conversation.questions.*`
+4. `settings.conversation.rendering.*`

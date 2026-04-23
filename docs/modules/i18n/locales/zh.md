@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近一轮还扩展了会话设置弹窗分组布局相关键：继承说明、会话覆盖 badge、上下文压缩分组与显示分组，并新增了 backend-first compaction apply 的 deferred notice 文案；本轮又补了原生 compaction transcript/context-state 所需的 `chat.compaction.*` 与 `context.usage.compacting/status` 键。
+OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近几轮先后扩展了会话设置弹窗分组布局相关键、项目级 compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（会话标题、阅读与显示、提问交互、消息渲染）。
 
 源码约 1000 行。
 
@@ -124,3 +124,11 @@ t('settings.server.started')
 1. 压缩配置真相源为 `.opencode/opencode.json`，而非插件设置或会话设置。
 2. 会话级 `autoCompactionEnabled` / `compactionReservedTokens` locale 键已移除；新增项目级 `settings.conversation.compaction.*` 键。
 3. 手动 `session.summarize()` 仍为 per-session 操作，不由本 locale 管理。
+
+## 2026-04-23 Conversation settings grouping
+
+主设置页的 conversation section 现在拆成多层级 block。Locale 侧新增：
+1. `settings.titleGeneration.groupDesc`
+2. `settings.conversation.display.*`
+3. `settings.conversation.questions.*`
+4. `settings.conversation.rendering.*`

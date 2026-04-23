@@ -43,6 +43,16 @@ interface SettingsConversationSectionOptions {
     title: string,
     tooltip?: string,
   ) => HTMLHeadingElement;
+  createSettingsBlock: (
+    containerEl: HTMLElement,
+    options: {
+      title: string;
+      description: string;
+      collapsible?: boolean;
+      defaultOpen?: boolean;
+      onToggle?: (isOpen: boolean) => void;
+    },
+  ) => HTMLElement;
   setRefreshTitleModelsCallback: (callback?: () => void) => void;
 }
 
@@ -62,6 +72,16 @@ export class SettingsConversationSection {
     title: string,
     tooltip?: string,
   ) => HTMLHeadingElement;
+  private readonly createSettingsBlock: (
+    containerEl: HTMLElement,
+    options: {
+      title: string;
+      description: string;
+      collapsible?: boolean;
+      defaultOpen?: boolean;
+      onToggle?: (isOpen: boolean) => void;
+    },
+  ) => HTMLElement;
   private readonly setRefreshTitleModelsCallback: (callback?: () => void) => void;
   private titleModelSetting: Setting | null = null;
   private titleModelButton: ButtonComponent | null = null;
@@ -85,6 +105,7 @@ export class SettingsConversationSection {
     this.app = options.app;
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
+    this.createSettingsBlock = options.createSettingsBlock;
     this.setRefreshTitleModelsCallback = options.setRefreshTitleModelsCallback;
   }
 
@@ -124,16 +145,37 @@ export class SettingsConversationSection {
       void this.loadTitleModels();
     });
 
-    this.addTitleModeSetting(containerEl);
-    this.addProjectCompactionSettings(containerEl);
-    this.addChatFontSizeSetting(containerEl);
-    this.addQuestionDisplayModeSetting(containerEl);
-    this.addQuestionCardPositionSetting(containerEl);
-    this.addAnsweredQuestionCardsSetting(containerEl);
-    this.addTitleModelSetting(containerEl);
+    const titleGenerationBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.titleGeneration.title'),
+      description: t('settings.titleGeneration.groupDesc'),
+    });
+    const compactionBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.compaction.projectNote'),
+      description: t('settings.conversation.compaction.projectNoteDesc'),
+    });
+    const displayBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.display.title'),
+      description: t('settings.conversation.display.desc'),
+    });
+    const questionBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.questions.title'),
+      description: t('settings.conversation.questions.desc'),
+    });
+    const renderingBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.rendering.title'),
+      description: t('settings.conversation.rendering.desc'),
+    });
+
+    this.addTitleModeSetting(titleGenerationBodyEl);
+    this.addTitleModelSetting(titleGenerationBodyEl);
+    this.addProjectCompactionSettings(compactionBodyEl);
+    this.addChatFontSizeSetting(displayBodyEl);
+    this.addQuestionDisplayModeSetting(questionBodyEl);
+    this.addQuestionCardPositionSetting(questionBodyEl);
+    this.addAnsweredQuestionCardsSetting(questionBodyEl);
     this.updateTitleModelSettingVisibility();
     void this.loadTitleModels();
-    this.addUserMarkupRenderSetting(containerEl);
+    this.addUserMarkupRenderSetting(renderingBodyEl);
 
     this.registerProjectCompactionConfigListeners();
     void this.loadProjectCompactionConfig();
@@ -259,11 +301,6 @@ export class SettingsConversationSection {
   }
 
   private addProjectCompactionSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.conversation.compaction.projectNote'))
-      .setClass('opencodian-setting-description')
-      .setDesc(t('settings.conversation.compaction.projectNoteDesc'));
-
     new Setting(containerEl)
       .setName(t('settings.conversation.compaction.auto.name'))
       .setDesc(t('settings.conversation.compaction.auto.desc'))
