@@ -5337,6 +5337,66 @@ body[data-opencodian-provider-icon-mode="color"] {
   background: var(--text-selection);
 }
 
+/* ============================================================
+   Compaction Divider - Lightweight horizontal separator
+   ============================================================ */
+
+.opencodian-message--compaction-divider {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 28px 4px;
+  max-width: 100%;
+  animation: none;
+}
+
+.opencodian-compaction-divider-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.opencodian-compaction-divider-line::before,
+.opencodian-compaction-divider-line::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+}
+
+.opencodian-compaction-divider-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--background-modifier-border) 30%, transparent);
+  white-space: nowrap;
+}
+
+.opencodian-compaction-divider-badge.is-overflow {
+  color: var(--text-muted);
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.opencodian-message--compaction-divider .opencodian-message-content {
+  display: none;
+}
+
+.opencodian-message--compaction-divider .opencodian-user-message-footer {
+  display: none;
+}
+
 
 
 /* features/chat-assistant.css */
