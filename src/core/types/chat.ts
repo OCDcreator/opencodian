@@ -177,6 +177,12 @@ export interface OmoSystemReminderMeta {
 
 export type OmoMessageMeta = OmoUserInjectionMeta | OmoSystemReminderMeta;
 
+export interface CompactionDividerMeta {
+  auto: boolean;
+  overflow: boolean;
+  tailStartId: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -197,6 +203,7 @@ export interface ChatMessage {
   contextAttachments?: MessageContextAttachment[];
   questionResolution?: QuestionResolution;
   omo?: OmoMessageMeta;
+  compactionDivider?: CompactionDividerMeta;
   structured?: unknown;
   // OpenCode-specific: store original parts for advanced features
   parts?: unknown[];

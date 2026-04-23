@@ -36,7 +36,8 @@
 
 | 类型 | 说明 |
 |------|------|
-| `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `summary?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
+| `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `summary?`, `compactionDivider?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
+| `CompactionDividerMeta` | 结构化 compaction 分界元数据（`auto`, `overflow`, `tailStartId`） |
 | `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
 | `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
 | `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
@@ -163,6 +164,7 @@
 ## 注意事项
 
 - `ChatMessage.parts` 类型为 `unknown[]`，存储 OpenCode 原始 SDK parts 用于高级功能
+- `ChatMessage.compactionDivider` 携带结构化 compaction 分界元数据（`auto`, `overflow`, `tailStartId`），替代旧 plain-text marker
 - `ChatMessage.summary` 当前由 OpenCode 原生 assistant `summary` 字段透传，主要用于 compaction report 的 merge/render 语义
 - `ChatMessage.streamState` 目前仅支持 `'interrupted'`，标记被取消的流
 - `Conversation.openCodeSessionId` 是 OpenCode 服务端的会话 ID，与本地 `Conversation.id` 不同

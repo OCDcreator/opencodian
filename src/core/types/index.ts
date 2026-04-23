@@ -1,6 +1,7 @@
 // Chat types
 export {
   type ChatMessage,
+  type CompactionDividerMeta,
   type ContentBlock,
   type ContextBreakdownKey,
   type ContextBreakdownSegment,

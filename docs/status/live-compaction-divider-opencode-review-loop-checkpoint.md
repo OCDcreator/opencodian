@@ -47,3 +47,23 @@ Track each bounded `opencode run` round here so a truncated session can resume s
   - remaining failures are intentional: mapper does not yet emit structured `compactionDivider` metadata.
 - Exact next corrective prompt: bounded production slice for the render model only. Implement `ChatMessage` compaction divider metadata and any minimal summary-kind metadata needed for this slice. Map user `part.type === "compaction"` into structured metadata, keep `compaction_continue` hidden, and do not render compaction as a notice card or plain markdown text. Do not touch live divider insertion, tab bridge, or summary streaming yet except for the minimum types needed by the mapper tests.
 - Verification: passed for review shape; failed intentionally for missing behavior (`node scripts/run-jest.js tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/chat/ConversationRenderRuntime.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts tests/unit/features/chat/ConversationSyncBridge.compaction.test.ts`).
+
+## 2026-04-24 00:42:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: bounded production slice for compaction render model / normalization only.
+- Changed: updated `src/core/types/chat.ts`, `src/core/types/index.ts`, `src/core/opencode/OpenCodeMessageContextOmoAssembler.ts`, `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`, matching module docs, and refreshed mapper tests to the new structured behavior.
+- Reviewed: diff is scoped to types + mapper/assembler + mapped docs; targeted compaction suite passes; `check:module-docs` passes.
+- Problems found:
+  - the worker broadened scope by updating docs earlier than planned and by running full `verify`; the code/docs themselves look aligned, so no revert is needed.
+  - lint still reports 2 warnings in `tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.test.ts` (`max-lines` / `max-lines-per-function`), which violates repo guardrails for a clean merge.
+- Exact next corrective prompt: keep the production code unchanged. Do a bounded cleanup round that moves the newly added compaction mapper tests into a dedicated focused test file (for example `tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.compaction.test.ts`) or otherwise reduces `OpenCodeMessageNormalizationMapper.test.ts` below the lint thresholds. Preserve the same assertions, keep the targeted suite green, and stop once `npm run lint -- --quiet` is clean.
+- Verification: passed (`node scripts/run-jest.js ...`, `npm run check:module-docs`); failed guardrail cleanliness on lint warnings (`npm run lint -- --quiet`).
+
+## 2026-04-24 00:47:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: bounded warning-cleanup round only; keep production code unchanged and split the new compaction mapper tests into a dedicated file.
+- Changed: extracted compaction mapper assertions into `tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.compaction.test.ts`; shrank `tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.test.ts`; kept the mapper production slice unchanged.
+- Reviewed: reran the focused compaction suite including the new test file; reran quiet lint locally.
+- Problems found: none for this slice. The earlier early-doc-sync scope drift is acceptable because the mapped docs now match the production change and guardrails are green.
+- Exact next corrective prompt: bounded divider/render slice. Implement the lightweight compaction divider render path and minimal i18n/style hooks, plus the narrow render/runtime behavior needed so compaction divider messages render as in-chat dividers rather than ordinary user markdown. Do not implement live `compactingAt` injection or tab bridge yet unless the divider render path strictly needs shared plumbing.
+- Verification: passed (`node scripts/run-jest.js tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.test.ts tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.compaction.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/chat/ConversationRenderRuntime.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts tests/unit/features/chat/ConversationSyncBridge.compaction.test.ts`, `npm run lint -- --quiet`).

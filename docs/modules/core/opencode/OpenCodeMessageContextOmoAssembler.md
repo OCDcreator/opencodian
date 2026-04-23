@@ -9,7 +9,7 @@
 
 - 从 hydrated OpenCode message parts 收束 renderable text 与 `contextAttachments`
 - 统一解析 Obsidian context tag、`file` part 与 inline Read tool 文本里的上下文引用
-- 把 OpenCode 原生 `compaction` part 归一化为可读 marker，并隐藏 `metadata.compaction_continue` synthetic follow-up
+- 把 OpenCode 原生 `compaction` part 归一化为结构化 `compactionDivider` 元数据（`auto`, `overflow`, `tailStartId`），并隐藏 `metadata.compaction_continue` synthetic follow-up
 - 对 attachment 路径、行号和 MIME 做跨平台归一化与去重
 - 识别 OMO user injection / system reminder metadata，并产出 mapper 继续组装 `ChatMessage` 所需的显示字段
 
@@ -35,7 +35,7 @@
 
 - 先收集 message parts 中可见文本与 context attachments
 - 对 user message 额外补充 `file` part 与 inline Read tool context
-- 在保持 pre-OMO `renderableContent` 的同时，生成 UI 使用的 `content` / `displayStyle` / `noticeTone` / `omo`
+- 在保持 pre-OMO `renderableContent` 的同时，生成 UI 使用的 `content` / `displayStyle` / `noticeTone` / `omo` / `compactionDivider`
 - 对重复 attachment 按 kind/path/line-range 去重
 
 ### Context attachment 收集
@@ -44,7 +44,7 @@
 - `normalizeTextPart()` 现在也会过滤 `metadata.compaction_continue === true` 的内部续跑 user text，避免 transcript 泄露“Continue...”提示
 - `parseFileContextAttachment()` 统一处理 `file` part 的 path/url/line-range/mime/textSnapshot
 - `extractInlineReadToolContext()` 从历史 Read tool 文本中恢复 file/selection attachment，并剥离用户可见文本
-- `buildCompactionNotice()` 会把 user `compaction` part 投影成可读文本（自动/手动、overflow 触发）
+- `collectRenderableTextState()` 现在把 user `compaction` part 投影成结构化 `compactionDivider` 元数据（`auto`, `overflow`, `tailStartId`），不再生成 plain-text marker；`buildCompactionNotice()` 保留为遗留参考但不再在主路径调用
 
 ### OMO 归一化
 

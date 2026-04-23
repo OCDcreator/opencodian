@@ -50,7 +50,7 @@
 ### Context attachment 与 OMO 委托
 
 - `OpenCodeMessageContextOmoAssembler` 现在是同目录的独立 owner，识别 Obsidian context tag、`file` part 与 inline Read tool 记录
-- 它也负责把 OpenCode 原生 `compaction` part 还原成用户可读 marker，并过滤 `metadata.compaction_continue` synthetic user follow-up
+- 它也负责把 OpenCode 原生 `compaction` part 还原成结构化 `compactionDivider` 元数据，并过滤 `metadata.compaction_continue` synthetic user follow-up
 - 该 owner 统一处理路径/行号归一化、attachment 去重与 OMO metadata 映射，并保留 tool/content seam 继续使用的 pre-OMO `renderableContent`
 - 本文件只消费它的归一化结果，不再直接铺开 context/OMO 细节
 
@@ -74,7 +74,8 @@ graph LR
 
 ## 注意事项
 
-- 当前 mapper 会把 upstream assistant `summary` 继续投影到本地 `ChatMessage.summary`；如果调整 compaction report 语义，先补 history/render tests。
+- 当前 mapper 会把 upstream assistant `summary` 继续投影到本地 `ChatMessage.summary`；如果调整 compaction report 语义，先补 history/render tests
+- `compactionDivider` 现在由 `OpenCodeMessageContextOmoAssembler` 在 user `compaction` part 上产出结构化元数据，mapper 透传到 `ChatMessage.compactionDivider`；compaction divider 消息不再成为 notice card。
 - 不要把 tool icon / summary 规则搬回 UI；这里只产出结构化 `toolKind` / `toolSourceKey`。
 - `toolMetadata` 当前刻意只投影可渲染的白名单字段（现阶段是 `sessionId`），不要把整份 OpenCode metadata 原样暴露到 UI schema。
 - `task` 的 `toolResult` 可以保留原始 OpenCode 输出供内部匹配/审计，但必须带 `toolResultVisibility: 'hidden'`，调用方不得把它当普通工具结果直接渲染。

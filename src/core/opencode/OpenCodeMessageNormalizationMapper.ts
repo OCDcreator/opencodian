@@ -325,6 +325,7 @@ export class OpenCodeMessageNormalizationMapper {
       displayStyle: normalizedMessageContent.displayStyle,
       noticeTone: normalizedMessageContent.noticeTone,
       omo: normalizedMessageContent.omo,
+      compactionDivider: normalizedMessageContent.compactionDivider,
       structured,
       parts,
     };

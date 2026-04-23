@@ -21,6 +21,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | 导出 | 类型 | 说明 |
 |------|------|------|
 | `ChatMessage` | type | 聊天消息结构 |
+| `CompactionDividerMeta` | type | 结构化 compaction 分界元数据 |
 | `ContentBlock` | type | 内容块（text/thinking/tool_use/tool_result/subagent） |
 | `Conversation` | type | 完整会话（含消息数组） |
 | `ConversationMeta` | type | 会话元数据 |

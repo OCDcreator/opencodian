@@ -11,6 +11,7 @@ import {
 } from '../../shared/contextPath';
 import type {
   ChatMessage,
+  CompactionDividerMeta,
   MessageContextAttachment,
   PromptContextLineRange,
 } from '../types';
@@ -44,6 +45,7 @@ export interface OpenCodeMessageContextOmoAssembly extends Pick<
 > {
   renderableContent: string;
   contextAttachments: MessageContextAttachment[];
+  compactionDivider?: CompactionDividerMeta;
 }
 
 interface OpenCodeFilePart extends OpenCodeMessagePart {
@@ -64,7 +66,11 @@ export class OpenCodeMessageContextOmoAssembler {
     parts: OpenCodeMessagePart[],
     vaultPath?: string,
   ): OpenCodeMessageContextOmoAssembly {
-    const { content: renderableContent, contextAttachments } = this.collectRenderableTextState(
+    const {
+      content: renderableContent,
+      contextAttachments,
+      compactionDivider,
+    } = this.collectRenderableTextState(
       role,
       parts,
       vaultPath,
@@ -80,6 +86,7 @@ export class OpenCodeMessageContextOmoAssembler {
       displayStyle: normalizedContent.displayStyle,
       noticeTone: normalizedContent.noticeTone,
       omo: normalizedContent.omo,
+      compactionDivider,
     };
   }
 
@@ -87,16 +94,19 @@ export class OpenCodeMessageContextOmoAssembler {
     role: OpenCodeChatRole,
     parts: OpenCodeMessagePart[],
     vaultPath?: string,
-  ): { content: string; contextAttachments: MessageContextAttachment[] } {
+  ): { content: string; contextAttachments: MessageContextAttachment[]; compactionDivider?: CompactionDividerMeta } {
     const visibleTextParts: string[] = [];
     const contextAttachments: MessageContextAttachment[] = [];
+    let compactionDivider: CompactionDividerMeta | undefined;
 
     for (const part of parts) {
       if (part.type === 'compaction' && role === 'user') {
-        const compactionNotice = this.buildCompactionNotice(part);
-        if (compactionNotice) {
-          visibleTextParts.push(compactionNotice);
-        }
+        const tailStartId = typeof part.tail_start_id === 'string' ? part.tail_start_id : '';
+        compactionDivider = {
+          auto: part.auto === true,
+          overflow: part.overflow === true,
+          tailStartId,
+        };
         continue;
       }
 
@@ -115,7 +125,7 @@ export class OpenCodeMessageContextOmoAssembler {
 
     const content = visibleTextParts.join('');
     if (role !== 'user') {
-      return { content, contextAttachments };
+      return { content, contextAttachments, compactionDivider };
     }
 
     contextAttachments.push(...this.collectFileContextAttachments(parts, vaultPath));
@@ -124,6 +134,7 @@ export class OpenCodeMessageContextOmoAssembler {
     return {
       content: inlineReadContext.content,
       contextAttachments: contextAttachments.concat(inlineReadContext.attachments),
+      compactionDivider,
     };
   }
 
