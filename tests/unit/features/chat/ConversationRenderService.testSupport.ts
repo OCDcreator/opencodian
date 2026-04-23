@@ -209,6 +209,15 @@ export function createHost(
       return message.content;
     }),
     addUserMessageFooter: jest.fn(),
+    renderCompactionDivider: jest.fn().mockImplementation((
+      messageEl: HTMLElement,
+      divider: { auto: boolean; overflow: boolean; tailStartId: string },
+    ) => {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'opencodian-compaction-divider-line';
+      lineEl.textContent = divider.auto ? 'Auto' : 'Manual';
+      messageEl.appendChild(lineEl);
+    }),
     renderMarkdownInto: jest.fn().mockImplementation(async (
       contentEl: HTMLElement,
       markdown: string,

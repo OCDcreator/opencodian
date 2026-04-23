@@ -1,5 +1,6 @@
 import {
   type ChatMessage,
+  type CompactionDividerMeta,
   type Conversation,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
@@ -101,6 +102,7 @@ export interface ConversationRenderHost {
   createEmptyConversationNoticeMessage(): ChatMessage;
   createUserMessageFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null;
   renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string>;
+  renderCompactionDivider(messageEl: HTMLElement, divider: CompactionDividerMeta): void;
   addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void;
   renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
@@ -287,6 +289,12 @@ class ConversationUserMessageRenderDelegate {
     frame: ConversationUserMessageRenderFrame,
     message: ChatMessage,
   ): Promise<void> {
+    if (message.compactionDivider) {
+      frame.messageEl.addClass('opencodian-message--compaction-divider');
+      this.host.renderCompactionDivider(frame.messageEl, message.compactionDivider);
+      return;
+    }
+
     const copyContent = await this.host.renderUserMessageContent(frame.contentEl, message);
     this.host.addUserMessageFooter(frame.messageEl, message, copyContent);
   }

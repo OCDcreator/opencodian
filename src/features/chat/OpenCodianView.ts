@@ -22,6 +22,7 @@ import {
 } from '../../core/theme';
 import {
   type ChatMessage,
+  type CompactionDividerMeta,
   type ContentBlock,
   type Conversation,
   createEmptyTabContextState,
@@ -2252,6 +2253,8 @@ export class OpenCodianView extends ItemView {
         this.createUserMessageRenderFrame(message),
       renderUserMessageContent: (container, message) =>
         this.renderUserMessageContent(container, message),
+      renderCompactionDivider: (messageEl, divider) =>
+        this.renderCompactionDivider(messageEl, divider),
       addUserMessageFooter: (messageEl, message, content) => {
         this.addUserMessageFooter(messageEl, message, content);
       },
@@ -3994,6 +3997,22 @@ export class OpenCodianView extends ItemView {
         subagentMode: block.subagentMode ?? null,
       })),
     });
+  }
+
+  private renderCompactionDivider(messageEl: HTMLElement, divider: CompactionDividerMeta): void {
+    const lineEl = messageEl.createDiv({ cls: 'opencodian-compaction-divider-line' });
+
+    const badgeEl = lineEl.createSpan({ cls: 'opencodian-compaction-divider-badge' });
+    badgeEl.textContent = divider.auto
+      ? t('chat.compaction.divider.autoLabel')
+      : t('chat.compaction.divider.manualLabel');
+
+    lineEl.appendText(t('chat.compaction.divider.completed'));
+
+    if (divider.overflow) {
+      const overflowEl = lineEl.createSpan({ cls: 'opencodian-compaction-divider-badge is-overflow' });
+      overflowEl.textContent = t('chat.compaction.divider.overflow');
+    }
   }
 
   private async renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string> {

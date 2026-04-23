@@ -67,3 +67,14 @@ Track each bounded `opencode run` round here so a truncated session can resume s
 - Problems found: none for this slice. The earlier early-doc-sync scope drift is acceptable because the mapped docs now match the production change and guardrails are green.
 - Exact next corrective prompt: bounded divider/render slice. Implement the lightweight compaction divider render path and minimal i18n/style hooks, plus the narrow render/runtime behavior needed so compaction divider messages render as in-chat dividers rather than ordinary user markdown. Do not implement live `compactingAt` injection or tab bridge yet unless the divider render path strictly needs shared plumbing.
 - Verification: passed (`node scripts/run-jest.js tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.test.ts tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.compaction.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/chat/ConversationRenderRuntime.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts tests/unit/features/chat/ConversationSyncBridge.compaction.test.ts`, `npm run lint -- --quiet`).
+
+## 2026-04-24 01:08:00 +08:00
+- Current branch: `feat/live-compaction-divider-opencode-review-loop`
+- OpenCode CLI ask: bounded persisted divider UI slice only.
+- Changed: updated `src/features/chat/OpenCodianView.ts`, `src/features/chat/services/ConversationRenderRuntime.ts`, `src/i18n/locales/en.ts`, `src/i18n/locales/zh.ts`, `src/style/features/chat-user.css`, `tests/unit/features/chat/ConversationRenderService.testSupport.ts`; added `tests/unit/features/chat/ConversationRenderService.compactionDivider.test.ts` and `tests/unit/features/chat/compactionDividerI18n.test.ts`.
+- Reviewed: diff stays inside persisted divider rendering, host plumbing, localized strings, and focused tests; no live `compactingAt` injection or summary-streaming logic landed in this slice.
+- Problems found:
+  - module docs for `src/features/chat/OpenCodianView.ts` and `src/features/chat/services/ConversationRenderRuntime.ts` are now stale, but docs sync is intentionally deferred to the later docs slice.
+  - no blocking issues in targeted tests, lint, or typecheck.
+- Exact next corrective prompt: bounded `compactingAt` bridge slice. Keep the persisted divider render path intact, and now bridge active-tab `compactingAt` into conversation rendering so a synthetic live divider appears only in the owning tab while compaction is active. Preserve close-tab busy protection and do not start summary-streaming changes yet except for the minimum metadata/runtime plumbing required by the approved plan.
+- Verification: passed (`node scripts/run-jest.js tests/unit/features/chat/ConversationRenderService.compactionDivider.test.ts tests/unit/features/chat/compactionDividerI18n.test.ts`, `npm run lint -- --quiet`, `npm run typecheck`).
