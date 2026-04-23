@@ -132,3 +132,10 @@ t('settings.server.started')
 2. `settings.conversation.display.*`
 3. `settings.conversation.questions.*`
 4. `settings.conversation.rendering.*`
+
+## 2026-04-23 Conversation compaction help modal
+
+会话设置里的“上下文压缩（项目级）”现在也支持按字段打开帮助弹窗。Locale 侧新增：
+1. `settings.conversation.compaction.help.openDoc`
+2. `settings.conversation.compaction.help.{whatItMeans|opencodeDefault|adjustmentEffect|moreNotes|tipsLabel}`
+3. `settings.conversation.compaction.help.{auto|prune|tailTurns|preserveRecentTokens|reserved}.*`

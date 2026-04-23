@@ -222,6 +222,7 @@ function createSection(plugin = createPlugin(), app = createApp()) {
     plugin: plugin as unknown as OpenCodianPlugin,
     createSectionHeading,
     createSettingsBlock,
+    addSettingHelpButton: jest.fn(),
     setRefreshTitleModelsCallback: jest.fn(),
   });
   const containerEl = document.createElement('div');
@@ -333,6 +334,7 @@ describe('SettingsConversationSection', () => {
       } as never,
       createSectionHeading: () => document.createElement('h2'),
       createSettingsBlock: () => document.createElement('div'),
+      addSettingHelpButton: jest.fn(),
       setRefreshTitleModelsCallback: (callback) => {
         refreshTitleModelsCallback = callback;
       },
@@ -380,7 +382,6 @@ describe('SettingsConversationSection', () => {
   it('saves compaction settings through project config with full-object save', async () => {
     const plugin = createPlugin();
     createSection(plugin);
-
     const autoToggle = findToggle(t('settings.conversation.compaction.auto.name'));
     expect(autoToggle).toBeDefined();
 
@@ -446,7 +447,6 @@ describe('SettingsConversationSection compaction fields', () => {
 
     const pruneToggle = findToggle(t('settings.conversation.compaction.prune.name'));
     expect(pruneToggle).toBeDefined();
-
     await pruneToggle?.onChange?.(false);
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
@@ -520,8 +520,7 @@ describe('SettingsConversationSection compaction fields', () => {
     const plugin = createPlugin();
     createSection(plugin);
 
-    const preserveText = findText(t('settings.conversation.compaction.preserveRecentTokens.name'));
-    await preserveText?.onChange?.('');
+    const preserveText = findText(t('settings.conversation.compaction.preserveRecentTokens.name')); await preserveText?.onChange?.('');
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
     expect(updateCompactionConfig).toHaveBeenCalledWith(

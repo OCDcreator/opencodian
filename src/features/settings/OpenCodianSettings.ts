@@ -273,6 +273,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
       createSettingsBlock: (hostEl, options) => this.createSettingsBlock(hostEl, options),
+      addSettingHelpButton: (setting, helpButton) => this.addSettingHelpButton(setting, helpButton),
       setRefreshTitleModelsCallback: (callback) => {
         this.refreshTitleModelsCallback = callback;
       },

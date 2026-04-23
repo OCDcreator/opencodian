@@ -10,6 +10,7 @@
 ## 关键类名 / CSS 变量
 
 - 配置编辑：`.opencodian-config-editor*`、`.opencodian-config-help*`、`.opencodian-config-buttons`。
+- 压缩帮助弹窗：`.opencodian-conversation-compaction-help-modal`、`.opencodian-conversation-compaction-help`、`.opencodian-compaction-help-*`（宽桌面卡片式 help modal，避免沿用默认窄容器和内部滚动）。
 - 会话设置：`.opencodian-session-settings-*`（中性 hero、分组 card、两栏字段、内容自适应三态 segmented button、数字输入与错误提示）。
 - 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`、`.opencodian-context-detail-modal*`。
 - 模型开关管理：`.opencodian-model-toggle-*`。
@@ -23,6 +24,7 @@
 - `src/features/settings/ModelConfigJsonModal.ts`
 - `src/features/settings/ModelConfigModal.ts`
 - `src/features/settings/OpenCodianSettings.ts`
+- `src/features/settings/ConversationCompactionHelpModal.ts`
 - `src/features/chat/ui/ConversationSessionSettingsModal.ts`
 - `src/features/chat/ui/ContextDetailModal.ts`
 
@@ -31,4 +33,5 @@
 - 该文件是“设置弹窗样式聚合点”，命名冲突风险高，新增类建议保持 `opencodian-<feature>-*` 前缀。
 - 含较多响应式规则（`@media`），改网格列数、工具条折行或 footer 粘底时需同时检查窄屏可读性。
 - `ContextDetailModal` 通过 `.opencodian-context-detail-modal` 直接覆盖 Obsidian 默认 modal 宽度；若切回 `:has(...)` 或改 class 名，需确认 raw message JSON 在宽窗口下不会再次被默认壳层截断。
+- `ConversationCompactionHelpModal` 也通过专用 class 直接放宽 modal 宽度，并把内容做成 2×2 信息卡；如果改回 `.opencodian-config-help` 默认壳层，容易重新出现内容过窄和内部滚动问题。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

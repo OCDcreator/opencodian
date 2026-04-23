@@ -15,6 +15,8 @@
 - 提问交互
 - 消息渲染
 
+其中“上下文压缩（项目级）”分组现在为每个压缩字段都挂了帮助按钮，点击后会打开 `ConversationCompactionHelpModal`，用通俗语言解释字段语义、OpenCode 默认策略和调参影响。
+
 这个 owner 的职责边界刻意保持在"**conversation section 装配 + title-model refresh orchestration**"：
 
 - 持有 conversation section 级别的 DOM 组装与设置写回
@@ -78,6 +80,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 ## 与其他模块的交互
 
 - `OpenCodianSettings.ts`: 创建并复用 owner，向其提供 section heading seam、settings block seam 与 title-model refresh callback 注册位
+- `ConversationCompactionHelpModal.ts`: 为 compaction 字段提供 topic-driven help modal
 - `main.ts`: 提供 `reapplyConversationSessionDefaults()`，把 settings 保存后的默认值变化桥接到当前聊天视图运行时
 - `OpencodeConfigManager.ts`: 提供 `getCompactionConfig()` / `updateCompactionConfig()` 读写项目 `.opencode/opencode.json` 中的 compaction 配置
 - `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置
@@ -94,6 +97,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 - 手动触发的 `session.summarize()` 是 per-session 操作，不受本项目配置 UI 管理。
 - 如果后续继续推进 conversation lane，优先在这个 owner 内扩展完整 section lifecycle，而不是回到 `OpenCodianSettings` 主类里追加闭包。
 - conversation section 的新增设置应先判断归属到哪个现有二级分组；只有在职责明显独立时才新增第六个 block。
+- 新增的 compaction 字段如果需要解释，优先继续复用现有 help-button + topic modal，而不是把长说明直接塞进 setting desc。
 
 ## 2026-04-23 Compaction config alignment
 

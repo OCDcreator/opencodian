@@ -7911,6 +7911,92 @@ body[data-opencodian-provider-icon-mode="color"] {
   max-width: 840px;
 }
 
+.opencodian-conversation-compaction-help-modal {
+  width: min(920px, calc(100vw - 40px));
+  max-width: 920px;
+}
+
+.opencodian-conversation-compaction-help-modal .modal-content {
+  padding: 10px 24px 24px;
+}
+
+.opencodian-conversation-compaction-help {
+  margin-top: 8px;
+  overflow: visible;
+}
+
+.opencodian-compaction-help-header {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background-secondary) 92%, var(--background-primary)) 0%,
+    color-mix(in srgb, var(--background-secondary) 70%, var(--background-primary)) 100%
+  );
+}
+
+.opencodian-compaction-help-header > h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.opencodian-compaction-help-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.opencodian-compaction-help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.opencodian-compaction-help-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 84%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--background-secondary) 78%, var(--background-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 4%, transparent),
+    0 8px 20px color-mix(in srgb, var(--background-modifier-box-shadow) 12%, transparent);
+}
+
+.opencodian-compaction-help-card-title {
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.opencodian-compaction-help-card-body {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.opencodian-compaction-help-tip-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.opencodian-compaction-help-tip-list li + li {
+  margin-top: 6px;
+}
+
 .opencodian-session-settings-modal {
   width: min(680px, calc(100vw - 32px));
   max-width: 680px;
@@ -8175,6 +8261,18 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 @media (max-width: 640px) {
+  .opencodian-conversation-compaction-help-modal {
+    width: min(100vw - 24px, 920px);
+  }
+
+  .opencodian-conversation-compaction-help-modal .modal-content {
+    padding: 8px 16px 18px;
+  }
+
+  .opencodian-compaction-help-grid {
+    grid-template-columns: 1fr;
+  }
+
   .opencodian-session-settings-hero {
     flex-direction: column;
     gap: 10px;

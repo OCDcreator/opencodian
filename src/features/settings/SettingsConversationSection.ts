@@ -18,12 +18,17 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import {
+  ConversationCompactionHelpModal,
+  type ConversationCompactionHelpTopic,
+} from './ConversationCompactionHelpModal';
+import {
   buildModelPickerGroups,
   findModelPickerOptionByRef,
   type ModelPickerGroup,
 } from './modelPicker';
 import { ModelPickerModal } from './ModelPickerModal';
 import { ProjectConfigFileWatcher } from './ProjectConfigFileWatcher';
+import type { SettingHelpButtonConfig } from './settingsStyleControls';
 
 const logger = createLogger('SettingsConversationSection');
 
@@ -53,6 +58,7 @@ interface SettingsConversationSectionOptions {
       onToggle?: (isOpen: boolean) => void;
     },
   ) => HTMLElement;
+  addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
   setRefreshTitleModelsCallback: (callback?: () => void) => void;
 }
 
@@ -82,6 +88,7 @@ export class SettingsConversationSection {
       onToggle?: (isOpen: boolean) => void;
     },
   ) => HTMLElement;
+  private readonly addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
   private readonly setRefreshTitleModelsCallback: (callback?: () => void) => void;
   private titleModelSetting: Setting | null = null;
   private titleModelButton: ButtonComponent | null = null;
@@ -106,6 +113,7 @@ export class SettingsConversationSection {
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
     this.createSettingsBlock = options.createSettingsBlock;
+    this.addSettingHelpButton = options.addSettingHelpButton;
     this.setRefreshTitleModelsCallback = options.setRefreshTitleModelsCallback;
   }
 
@@ -301,7 +309,7 @@ export class SettingsConversationSection {
   }
 
   private addProjectCompactionSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const autoSetting = new Setting(containerEl)
       .setName(t('settings.conversation.compaction.auto.name'))
       .setDesc(t('settings.conversation.compaction.auto.desc'))
       .addToggle((toggle) => {
@@ -313,8 +321,9 @@ export class SettingsConversationSection {
             await this.saveProjectCompactionConfig();
           });
       });
+    this.addCompactionHelpButton(autoSetting, 'auto');
 
-    new Setting(containerEl)
+    const pruneSetting = new Setting(containerEl)
       .setName(t('settings.conversation.compaction.prune.name'))
       .setDesc(t('settings.conversation.compaction.prune.desc'))
       .addToggle((toggle) => {
@@ -326,8 +335,9 @@ export class SettingsConversationSection {
             await this.saveProjectCompactionConfig();
           });
       });
+    this.addCompactionHelpButton(pruneSetting, 'prune');
 
-    new Setting(containerEl)
+    const tailTurnsSetting = new Setting(containerEl)
       .setName(t('settings.conversation.compaction.tailTurns.name'))
       .setDesc(t('settings.conversation.compaction.tailTurns.desc'))
       .addText((text) => {
@@ -346,8 +356,9 @@ export class SettingsConversationSection {
             await this.saveProjectCompactionConfig();
           });
       });
+    this.addCompactionHelpButton(tailTurnsSetting, 'tailTurns');
 
-    new Setting(containerEl)
+    const preserveRecentTokensSetting = new Setting(containerEl)
       .setName(t('settings.conversation.compaction.preserveRecentTokens.name'))
       .setDesc(t('settings.conversation.compaction.preserveRecentTokens.desc'))
       .addText((text) => {
@@ -372,8 +383,9 @@ export class SettingsConversationSection {
             await this.saveProjectCompactionConfig();
           });
       });
+    this.addCompactionHelpButton(preserveRecentTokensSetting, 'preserveRecentTokens');
 
-    new Setting(containerEl)
+    const reservedSetting = new Setting(containerEl)
       .setName(t('settings.conversation.compaction.reserved.name'))
       .setDesc(t('settings.conversation.compaction.reserved.desc'))
       .addText((text) => {
@@ -398,6 +410,7 @@ export class SettingsConversationSection {
             await this.saveProjectCompactionConfig();
           });
       });
+    this.addCompactionHelpButton(reservedSetting, 'reserved');
   }
 
   private async loadProjectCompactionConfig(): Promise<void> {
@@ -610,5 +623,14 @@ export class SettingsConversationSection {
   private async saveGlobalSessionDefaults(): Promise<void> {
     await this.plugin.saveSettings({ reloadModels: false });
     await this.plugin.reapplyConversationSessionDefaults();
+  }
+
+  private addCompactionHelpButton(setting: Setting, topic: ConversationCompactionHelpTopic): void {
+    this.addSettingHelpButton(setting, {
+      tooltip: t('settings.conversation.compaction.help.openDoc'),
+      onClick: () => {
+        new ConversationCompactionHelpModal(this.app, topic).open();
+      },
+    });
   }
 }

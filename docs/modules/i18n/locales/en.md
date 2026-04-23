@@ -132,3 +132,10 @@ The main settings conversation section now uses nested blocks. Locale additions:
 2. `settings.conversation.display.*`
 3. `settings.conversation.questions.*`
 4. `settings.conversation.rendering.*`
+
+## 2026-04-23 Conversation compaction help modal
+
+The conversation settings "project compaction" block now supports per-field help modals. Locale additions:
+1. `settings.conversation.compaction.help.openDoc`
+2. `settings.conversation.compaction.help.{whatItMeans|opencodeDefault|adjustmentEffect|moreNotes|tipsLabel}`
+3. `settings.conversation.compaction.help.{auto|prune|tailTurns|preserveRecentTokens|reserved}.*`
