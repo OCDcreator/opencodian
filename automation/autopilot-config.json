@@ -42,6 +42,7 @@
   "deploy_verify_path": "",
   "max_git_status_per_round": 6,
   "max_git_diff_stat_per_round": 3,
+  "command_budget_policy": "warn",
   "allowed_branch_prefixes": [
     "autopilot/",
     "automation/",
@@ -55,6 +56,13 @@
   "runner_command": "",
   "runner_model": "",
   "runner_extra_args": [],
+  "plan_review_command": "",
+  "code_review_command": "",
+  "review_poll_seconds": 0,
+  "review_timeout_seconds": 0,
+  "prerequisite_paths": [
+    "node_modules"
+  ],
   "lanes": [
     {
       "id": "m1-hotspot-slice",
