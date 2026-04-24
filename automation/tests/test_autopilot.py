@@ -1,4 +1,6 @@
 import unittest
+import json
+from pathlib import Path
 
 from _autopilot.validation import (
     path_matches_any,
@@ -84,6 +86,14 @@ class RestartParserTests(unittest.TestCase):
         self.assertEqual("origin/automation/maintainability-cutover", args.restart_sync_ref)
         self.assertEqual(60, args.restart_sync_timeout_seconds)
         self.assertEqual(3, args.restart_sync_refresh_seconds)
+
+
+class RoundResultSchemaTests(unittest.TestCase):
+    def test_round_result_schema_requires_every_property_for_codex_output(self) -> None:
+        schema = json.loads(Path("automation/round-result.schema.json").read_text(encoding="utf-8"))
+        property_names = set(schema.get("properties", {}).keys())
+        required_names = set(schema.get("required", []))
+        self.assertEqual(set(), property_names - required_names)
 
 
 if __name__ == "__main__":
