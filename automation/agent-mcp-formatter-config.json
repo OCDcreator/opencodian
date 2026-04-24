@@ -1,0 +1,119 @@
+{
+  "objective": "Implement the newly committed OpenCodian agent surface, MCP settings/tooling, and formatter settings specs in strict order, using OpenCode for implementation passes and Codex for every review gate until each queued slice is genuinely complete.",
+  "focus_hint": "A1 - Establish agent surface core seams and catalog truth",
+  "next_phase_number": 1,
+  "max_rounds": 60,
+  "max_consecutive_failures": 6,
+  "lint_command": "",
+  "typecheck_command": "",
+  "full_test_command": "npm run verify",
+  "targeted_test_required": true,
+  "targeted_test_prefixes": [
+    "npm test --",
+    "npm run test --"
+  ],
+  "targeted_test_required_paths": [
+    "src/",
+    "tests/",
+    "package.json",
+    "package-lock.json",
+    "manifest.json",
+    "styles.css",
+    "assets/",
+    "src/style/",
+    "src/core/theme/"
+  ],
+  "full_test_cadence_rounds": 1,
+  "full_test_required_paths": [
+    "src/",
+    "tests/",
+    "package.json",
+    "package-lock.json",
+    "manifest.json",
+    "styles.css",
+    "assets/",
+    "src/style/",
+    "src/core/theme/"
+  ],
+  "build_command": "npm run build",
+  "build_required_paths": [
+    "src/",
+    "tests/",
+    "package.json",
+    "package-lock.json",
+    "manifest.json",
+    "styles.css",
+    "assets/",
+    "src/style/",
+    "src/core/theme/"
+  ],
+  "vulture_command": "",
+  "deploy_after_build": false,
+  "deploy_policy": "targeted",
+  "deploy_required_paths": [
+    "src/main.ts",
+    "manifest.json",
+    "styles.css",
+    "assets/",
+    "src/style/",
+    "src/core/theme/",
+    "src/features/settings/"
+  ],
+  "deploy_verify_path": "/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js",
+  "max_git_status_per_round": 6,
+  "max_git_diff_stat_per_round": 3,
+  "command_budget_policy": "warn",
+  "allowed_branch_prefixes": [
+    "autopilot/",
+    "automation/",
+    "quality/",
+    "bugfix/"
+  ],
+  "commit_prefix": "autopilot",
+  "prompt_template": "automation/agent-mcp-formatter-round-prompt.md",
+  "result_schema": "automation/round-result.schema.json",
+  "runner_kind": "codex",
+  "runner_command": "",
+  "runner_model": "",
+  "runner_extra_args": [],
+  "plan_review_command": "codex self-review of the round design against the active roadmap, spec, and upstream docs",
+  "code_review_command": "codex review of OpenCode-applied changes against the active roadmap, spec, tests, and deploy rules",
+  "review_poll_seconds": 15,
+  "review_timeout_seconds": 3600,
+  "platform_note": "Execution host is the macOS mirrored workspace. Test Vault deploy path: /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/ . Every OpenCode implementation pass must allow up to 3600 seconds before timing out.",
+  "prerequisite_paths": [
+    "node_modules"
+  ],
+  "lanes": [
+    {
+      "id": "a1-agent-surface",
+      "label": "Agent surface mapping",
+      "focus_hint": "A1-A4 - catalog truth, invocation wiring, child-session graph, and agent studio management",
+      "phase_doc_prefix": "docs/status/lanes/a1-agent-surface/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/a1-agent-surface/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/a1-agent-surface/autopilot-round-roadmap.md",
+      "prompt_template": "automation/agent-mcp-formatter-round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "a2-mcp-settings",
+      "label": "MCP settings and tooling",
+      "focus_hint": "M1-M3 - Server > MCP UI, server operations, and stable MCP tool-call rendering",
+      "phase_doc_prefix": "docs/status/lanes/a2-mcp-settings/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/a2-mcp-settings/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/a2-mcp-settings/autopilot-round-roadmap.md",
+      "prompt_template": "automation/agent-mcp-formatter-round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "a3-formatter-settings",
+      "label": "Formatter settings integration",
+      "focus_hint": "F1-F3 - formatter config types, settings UI, advanced editor, runtime status, and closeout verification",
+      "phase_doc_prefix": "docs/status/lanes/a3-formatter-settings/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/a3-formatter-settings/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/a3-formatter-settings/autopilot-round-roadmap.md",
+      "prompt_template": "automation/agent-mcp-formatter-round-prompt.md",
+      "commit_prefix": "autopilot"
+    }
+  ]
+}
