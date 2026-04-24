@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] F1 - Final verification and review-driven checkpoint
+### [DONE] F1 - Final verification and review-driven checkpoint
 
 - **Lane**: Final checkpoint
 - **Goal**: Finish the queue with full verification, directly related docs updates, and a final statement of what is now SDK-backed versus still intentionally falling back.
