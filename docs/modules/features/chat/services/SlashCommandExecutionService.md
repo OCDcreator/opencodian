@@ -5,12 +5,12 @@
 
 ## 概述
 
-`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，只为当前 vault 已知的 project/runtime slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。
+`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，只为当前 runtime 已注册的 backend slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。project config 仍会参与 override语义判断，但单独存在于 `.opencode/opencode.json` 的 command 不会在 runtime 注册前被当作可执行命令。
 
 这层 owner 当前只覆盖：
 
 - 解析 `/command arguments` 形式的输入
-- 识别 project `.opencode/opencode.json` `command.<id>` 与 runtime `sdk.command.list()` 返回的普通 commands / skill commands
+- 识别 runtime `sdk.command.list()` 返回的普通 commands / skill commands，并在命令 ID 同时出现在 project config 时保留 override 语义
 - 按插件设置 `slashCommandSkillMode` 决定 skill 是直接 `/skill args`，还是 `/skills skill args`
 - 复用现有 foreground busy / server readiness gate
 - 从活动会话与 focus preview 收集 OpenCodian placeholder runtime context：
@@ -40,16 +40,16 @@ export class SlashCommandExecutionService {
 
 - 非 `/` 前缀输入直接返回 `false`
 - `//` 与 `/ ` 这种非命令输入也直接放回普通消息路径
-- project commands 优先用 `OpencodeConfigManager.getCommandConfig()` 判断
-- runtime commands 再使用 `sdk.command.list()` 判断
+- runtime commands 统一使用 `sdk.command.list()` 判断
+- project config 只用于识别“这个 runtime command 是否同时存在 project override”，不会让 runtime 未注册的 command 提前执行
 - runtime catalog 会过滤掉 `source === 'mcp'` 的条目
 - `slashCommandSkillMode === 'direct'` 时，runtime `source === 'skill'` 可以直接用 `/skill-id arguments` 执行
 - `slashCommandSkillMode === 'skills-command'` 时，直接 `/skill-id` 不接管；只有 `/skills skill-id arguments` 会映射为真实 `session.command({ command: 'skill-id' })`
-- 如果 prefixed mode 下某个 skill ID 同时也是 project command，则直接 `/skill-id` 仍按 project command 处理
+- 如果某个 runtime command 同时也有 project override，direct `/command` 仍按该 runtime command 执行，不会被 `/skills` 前缀规则错误降级
 
 ### 执行前 gate
 
-- 先复用现有 server readiness / badge refresh seam，保证 runtime command 场景能拉起服务
+- 先复用现有 server readiness / badge refresh seam，保证任何需要 runtime catalog truth 的 slash command 场景都能拉起服务
 - 再复用现有 conversation/tab/foreground busy gate，避免和前台 busy/retry 状态打架
 - foreground busy 时只走现有 blocked notice，不会退回普通发送路径
 

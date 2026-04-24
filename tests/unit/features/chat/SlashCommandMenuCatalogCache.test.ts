@@ -261,3 +261,26 @@ describe('SlashCommandMenuCatalogCache', () => {
     ]));
   });
 });
+
+describe('SlashCommandMenuCatalogCache — project-only filtering', () => {
+  it('keeps project-only commands out of the chat menu until the runtime exposes them', async () => {
+    const host = createHost({
+      loadRuntimeCommands: jest.fn().mockResolvedValue([
+        createRuntimeCommand({ name: 'review', source: 'command' }),
+      ]),
+      loadProjectCommands: jest.fn().mockResolvedValue({
+        review: {
+          description: 'Review override',
+        },
+        deploy: {
+          description: 'Project-only deploy command',
+        },
+      }),
+    });
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    await expect(cache.load()).resolves.toEqual([
+      expect.objectContaining({ id: 'review', source: 'command' }),
+    ]);
+  });
+});

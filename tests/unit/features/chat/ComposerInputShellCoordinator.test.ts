@@ -465,7 +465,7 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
       slashItem('review', 'Review changes', { hasProjectOverride: true }),
-      slashItem('deploy', 'Deploy project', { runtimeAvailable: false }),
+      slashItem('build-mcp-server', 'Build an MCP server', { source: 'skill' }),
     ]);
 
     fixture.textarea.value = '/';

@@ -22,7 +22,7 @@ function createRuntimeCommand(
 }
 
 describe('slashCommandCatalog', () => {
-  it('merges runtime and project commands before building visible slash menu items', () => {
+  it('keeps project-only commands in the merged catalog but out of the chat-visible slash menu', () => {
     const projectCommands: OpencodeCommandConfigRecord = {
       review: {
         description: 'Project review override',
@@ -113,14 +113,6 @@ describe('slashCommandCatalog', () => {
         hasProjectOverride: false,
         runtimeAvailable: true,
         source: 'skill',
-        subtask: false,
-      },
-      {
-        id: 'deploy',
-        description: 'Project-only deploy command',
-        hasProjectOverride: true,
-        runtimeAvailable: false,
-        source: 'project',
         subtask: false,
       },
     ]);

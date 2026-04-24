@@ -29,6 +29,7 @@ owner 会并行读取：
 - project `template` / `description` / `agent` / `model` / `subtask` 优先覆盖 runtime metadata
 - 如果 project command 指向 `opencodian-command:<id>` 这类 hidden agent，则 section 会把该 agent 的 `temperature` / `top_p` 回填给 editor，并尽量显示 metadata 里的 base agent，而不是暴露内部 agent ID
 - runtime 中不存在、但 project config 存在的条目会保留成 `projectOnly`
+- 这些 `projectOnly` 条目会继续显示在 settings catalog / editor 中，但不会进入 chat slash autocomplete；要等 runtime reload 后才会出现在聊天菜单里
 - `source: 'mcp'` 的 runtime 条目不会进入这个 catalog shell；`source: 'skill'` 会保留并显示为 Skill 来源
 
 ### project command editor 壳层

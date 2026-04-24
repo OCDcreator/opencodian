@@ -91,7 +91,7 @@ describe('SlashCommandExecutionService', () => {
     expect(host.runSessionCommand).not.toHaveBeenCalled();
   });
 
-  it('executes project commands with runtime placeholder context from the active conversation', async () => {
+  it('executes project commands after the runtime catalog confirms they are available', async () => {
     const callOrder: string[] = [];
     const conversation = createConversation();
     const focusPreview: FocusContextPreview = {
@@ -112,6 +112,9 @@ describe('SlashCommandExecutionService', () => {
     const host = createHost({
       ensureConversationReady: jest.fn().mockResolvedValue(conversation),
       getProjectCommands: jest.fn().mockResolvedValue(projectCommands),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'review', source: 'command' },
+      ]),
       getActiveFocusContextPreview: jest.fn().mockReturnValue(focusPreview),
       startConversationSyncLoop: jest.fn().mockImplementation(() => {
         callOrder.push('startConversationSyncLoop');
@@ -138,7 +141,7 @@ describe('SlashCommandExecutionService', () => {
       service.tryRunSlashCommand('/review Include {{current_selection}}'),
     ).resolves.toBe(true);
 
-    expect(host.getRuntimeCommands).not.toHaveBeenCalled();
+    expect(host.getRuntimeCommands).toHaveBeenCalledTimes(1);
     expect(host.refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
     expect(host.runSessionCommand).toHaveBeenCalledWith('session-1', {
       command: 'review',
@@ -241,19 +244,19 @@ describe('SlashCommandExecutionService', () => {
     expect(host.runSessionCommand).not.toHaveBeenCalled();
   });
 
-  it('bypasses server readiness for project commands', async () => {
+  it('returns false for project-only commands until the runtime loads them', async () => {
     const host = createHost({
       getProjectCommands: jest.fn().mockResolvedValue({
         review: { template: 'Review' },
       }),
-      getServerAvailability: jest.fn().mockResolvedValue('offline'),
+      getRuntimeCommands: jest.fn().mockResolvedValue([]),
     });
     const service = new SlashCommandExecutionService(host);
 
-    await expect(service.tryRunSlashCommand('/review')).resolves.toBe(true);
+    await expect(service.tryRunSlashCommand('/review')).resolves.toBe(false);
 
-    expect(host.getServerAvailability).not.toHaveBeenCalled();
-    expect(host.runSessionCommand).toHaveBeenCalledTimes(1);
+    expect(host.getServerAvailability).toHaveBeenCalledTimes(1);
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
   });
 
   it('consumes known commands through the foreground busy notice path', async () => {
@@ -261,6 +264,9 @@ describe('SlashCommandExecutionService', () => {
       getProjectCommands: jest.fn().mockResolvedValue({
         review: { template: 'Review' },
       }),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'review', source: 'command' },
+      ]),
       isTabForegroundBusy: jest.fn().mockReturnValue(true),
     });
     const service = new SlashCommandExecutionService(host);

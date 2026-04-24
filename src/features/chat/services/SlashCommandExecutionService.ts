@@ -88,18 +88,27 @@ function hasProjectCommand(
   return Object.prototype.hasOwnProperty.call(projectCommands, commandId);
 }
 
+interface RuntimeCommandMatchOptions {
+  skillMode: SlashCommandSkillMode;
+  runtimeSkillNames: Set<string>;
+  hasProjectOverride: boolean;
+}
+
 function isRunnableRuntimeCommand(
   command: SlashCommandRuntimeCatalogEntry,
   commandId: string,
-  skillMode: SlashCommandSkillMode,
-  runtimeSkillNames: Set<string>,
+  options: RuntimeCommandMatchOptions,
 ): boolean {
   if (command.name !== commandId || command.source === 'mcp') {
     return false;
   }
 
-  const isRuntimeSkill = command.source === 'skill' || runtimeSkillNames.has(commandId);
-  return !isRuntimeSkill || skillMode === 'direct';
+  if (options.hasProjectOverride) {
+    return true;
+  }
+
+  const isRuntimeSkill = command.source === 'skill' || options.runtimeSkillNames.has(commandId);
+  return !isRuntimeSkill || options.skillMode === 'direct';
 }
 
 function isRuntimeSkillCommand(
@@ -175,24 +184,25 @@ export class SlashCommandExecutionService {
 
         executableCommand = prefixedSkillCommand;
       } else {
-        const isProjectCommand = hasProjectCommand(projectCommands, parsedCommand.command);
+        const ready = await this.ensureServerReadyForCommand();
+        if (!ready) {
+          return true;
+        }
 
-        if (!isProjectCommand) {
-          const ready = await this.ensureServerReadyForCommand();
-          if (!ready) {
-            return true;
-          }
-
-          const runtimeCommands = await this.host.getRuntimeCommands();
-          const runtimeSkillNames = skillMode === 'skills-command'
-            ? collectRuntimeSkillNames(await this.host.getRuntimeSkills())
-            : new Set<string>();
-          const isRuntimeCommand = runtimeCommands.some((command) =>
-            isRunnableRuntimeCommand(command, parsedCommand.command, skillMode, runtimeSkillNames)
-          );
-          if (!isRuntimeCommand) {
-            return false;
-          }
+        const hasProjectOverride = hasProjectCommand(projectCommands, parsedCommand.command);
+        const runtimeCommands = await this.host.getRuntimeCommands();
+        const runtimeSkillNames = skillMode === 'skills-command'
+          ? collectRuntimeSkillNames(await this.host.getRuntimeSkills())
+          : new Set<string>();
+        const isRuntimeCommand = runtimeCommands.some((command) =>
+          isRunnableRuntimeCommand(
+            command,
+            parsedCommand.command,
+            { skillMode, runtimeSkillNames, hasProjectOverride },
+          )
+        );
+        if (!isRuntimeCommand) {
+          return false;
         }
       }
 

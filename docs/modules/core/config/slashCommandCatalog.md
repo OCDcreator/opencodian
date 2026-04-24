@@ -5,7 +5,7 @@
 
 ## 概述
 
-`slashCommandCatalog.ts` 是 commands item 6 新抽出的共享 helper owner。它把 settings/catalog 与 chat/slash menu 都会复用的 slash command 合并规则收口到同一处，避免 `SettingsCommandsSection` 与输入区 autocomplete 再各自维护一套 runtime+project merge 逻辑。
+`slashCommandCatalog.ts` 是 commands item 6 新抽出的共享 helper owner。它把 settings/catalog 与 chat/slash menu 都会复用的 slash command 合并规则收口到同一处，避免 `SettingsCommandsSection` 与输入区 autocomplete 再各自维护一套 runtime+project merge 逻辑；同时把“settings 可见的 merged catalog”与“chat 真正可执行的 runtime-backed menu projection”明确分开。
 
 它负责：
 
@@ -39,7 +39,7 @@ export function buildVisibleSlashCommandMenuItems(
 
 - project 字段继续覆盖 runtime `template` / `description` / `agent` / `model` / `subtask`
 - `command.agent === opencodian-command:<id>` 时，会尝试从对应 hidden agent `options.opencodianCommand.baseAgent` 回填 editor/menu 看到的 agent，而不是泄露内部 agent id
-- runtime 不存在、但 project config 存在的命令会保留为 `runtimeAvailable: false`
+- runtime 不存在、但 project config 存在的命令会保留为 `runtimeAvailable: false`，供 settings/catalog/editor 继续显示
 - runtime skill 会保留为 `source: 'skill'`，后续由 chat/menu 层按用户设置决定显示成 `/skill` 还是 `/skills skill`
 - runtime skill 若能从 `location` 识别出 plugin cache、project `.claude/.agents`、project `.opencode` 等路径，会把结果写入 `skillSource`，供聊天输入区渲染多语言来源说明；识别失败时回落到 `custom`
 
@@ -47,7 +47,8 @@ export function buildVisibleSlashCommandMenuItems(
 
 - `mergeSlashCommandCatalog()` 保留 `hidden` 状态，供 settings/catalog shell 继续显示 visible toggle
 - `buildVisibleSlashCommandMenuItems()` 再只投影 chat slash menu 真正需要的 `id` / `description` / `runtimeAvailable` / `hasProjectOverride` / `source` / `skillSource` / `subtask`
-- 因此 `hiddenSlashCommands` 只影响 autocomplete/menu 可见性，不影响 command config 本身
+- 这一步会额外丢弃 `runtimeAvailable: false` 的 project-only 条目，避免 autocomplete 提前暴露 runtime 尚未注册的命令
+- 因此 `hiddenSlashCommands` 只影响 autocomplete/menu 可见性，不影响 command config 本身；project-only command 仍然只留在 settings catalog
 
 ## 使用方
 

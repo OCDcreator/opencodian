@@ -384,7 +384,7 @@ export function buildVisibleSlashCommandMenuItems(
   catalog: SlashCommandCatalogEntry[],
 ): SlashCommandMenuItem[] {
   return catalog
-    .filter((entry) => !entry.hidden)
+    .filter((entry) => !entry.hidden && entry.runtimeAvailable)
     .map((entry) => ({
       id: entry.id,
       description: entry.description,

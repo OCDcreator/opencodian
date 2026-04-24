@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] C1 - Complete runtime slash catalog and execution alignment
+### [DONE] C1 - Complete runtime slash catalog and execution alignment
 
 - **Lane**: Slash runtime
 - **Goal**: Confirm runtime/project/skill command loading and invalidation behavior matches the upstream slash command architecture and current OpenCodian SDK integration goals.
@@ -20,7 +20,7 @@
   - Cache invalidation / warm preload behavior stays coherent
   - The post-change OpenCode CLI review passes
 
-### [QUEUED] C2 - Align command settings wording and human-facing semantics
+### [NEXT] C2 - Align command settings wording and human-facing semantics
 
 - **Lane**: Slash settings
 - **Goal**: Make the command settings/editor surface reflect the real runtime behavior, including skill mode and generated command-local agent semantics.
