@@ -328,7 +328,6 @@ describe('SettingsSecuritySection', () => {
     buttonRecords.length = 0;
     settingRecords.length = 0;
     tempDirs.length = 0;
-
     jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
       ensureSettingRecord(this).name = name;
       return this;
@@ -383,7 +382,6 @@ describe('SettingsSecuritySection', () => {
       fs.rmSync(dir, { force: true, recursive: true });
     });
   });
-
   it('renders config status, permission controls, and blocklist text areas', async () => {
     const { app, plugin } = createPlugin();
     const section = new SettingsSecuritySection({
@@ -392,10 +390,8 @@ describe('SettingsSecuritySection', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-
     section.attach(containerEl);
     await flushAsync();
-
     expect(dropdownRecords.map((record) => record.name)).toEqual([t('settings.security.permissionMode.name')]);
     expect(toggleRecords.map((record) => record.name)).toEqual([
       t('settings.security.autoRestart.name'),
@@ -411,7 +407,6 @@ describe('SettingsSecuritySection', () => {
     }
     expect(textAreaRecords.map((record) => record.name)).toEqual(expectedTextAreaNames);
     expect(buttonRecords.filter((record) => record.name === t('settings.security.configFile.name'))).toHaveLength(2);
-
     const configStatusRecord = await waitForSettingRecord(
       t('settings.security.configStatus.name'),
       (record) => record.desc === t('settings.security.configStatus.notCreated'),
@@ -424,10 +419,7 @@ describe('SettingsSecuritySection', () => {
     const { app, plugin } = createPlugin({
       settings: {
         autoRestartOnPermissionChange: true,
-        server: {
-          ...DEFAULT_SETTINGS.server,
-          mode: 'remote',
-        },
+        server: { ...DEFAULT_SETTINGS.server, mode: 'remote' },
       },
     });
     const section = new SettingsSecuritySection({
@@ -436,16 +428,13 @@ describe('SettingsSecuritySection', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-
     section.attach(containerEl);
     await flushAsync();
-
     const permissionModeRecord = dropdownRecords.find(
       (record) => record.name === t('settings.security.permissionMode.name'),
     );
     await permissionModeRecord?.onChange?.('plan');
     await flushAsync();
-
     const configStatusRecord = await waitForSettingRecord(
       t('settings.security.configStatus.name'),
       (record) => record.desc === t('settings.security.configStatus.plan'),
@@ -457,9 +446,34 @@ describe('SettingsSecuritySection', () => {
     expect(configStatusRecord?.instance.settingEl.hasClass('opencodian-status-plan')).toBe(true);
   });
 
+  it('reports task allowlists and external-directory rules as custom config status', async () => {
+    const { app, configManager, plugin } = createPlugin();
+    await configManager?.write({
+      permission: {
+        '*': 'ask',
+        task: { '*': 'deny', 'review-*': 'allow' },
+        external_directory: { '*': 'ask', '/shared/libs/*': 'allow' },
+      },
+    });
+    const section = new SettingsSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+    await flushAsync();
+    const configStatusRecord = await waitForSettingRecord(
+      t('settings.security.configStatus.name'),
+      (record) => record.desc.includes(t('settings.security.configStatus.custom')),
+    );
+    const details = [t('settings.security.configStatus.detail.externalDirectory'), t('settings.security.configStatus.detail.taskAllowlist')].join(', ');
+    expect(configStatusRecord.desc).toBe(t('settings.security.configStatus.customWithDetails', { details }));
+    expect(configStatusRecord.instance.settingEl.hasClass('opencodian-status-custom')).toBe(true);
+  });
+
   it('restarts the local service from the config action button', async () => {
     jest.useFakeTimers();
-
     const { app, plugin } = createPlugin();
     const section = new SettingsSecuritySection({
       app,
@@ -467,13 +481,10 @@ describe('SettingsSecuritySection', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-
     section.attach(containerEl);
-
     const applyButtonRecord = buttonRecords.filter(
       (record) => record.name === t('settings.security.configFile.name'),
     )[1];
-
     const restartPromise = applyButtonRecord?.onClick?.();
     await Promise.resolve();
     await Promise.resolve();
@@ -485,8 +496,8 @@ describe('SettingsSecuritySection', () => {
     expect(plugin.openCodeService.start).toHaveBeenCalledTimes(1);
     expect(applyButtonRecord?.control.setDisabled).toHaveBeenNthCalledWith(1, true);
     expect(applyButtonRecord?.control.setDisabled).toHaveBeenLastCalledWith(false);
-    expect(applyButtonRecord?.control.setButtonText).toHaveBeenCalledWith('Restarting...');
-    expect(applyButtonRecord?.control.setButtonText).toHaveBeenLastCalledWith('Apply & Restart');
+    expect(applyButtonRecord?.control.setButtonText).toHaveBeenCalledWith(t('settings.security.configFile.restarting'));
+    expect(applyButtonRecord?.control.setButtonText).toHaveBeenLastCalledWith(t('settings.security.configFile.applyBtn'));
   });
 
   it('parses export paths and blocked commands before saving', async () => {
@@ -497,19 +508,15 @@ describe('SettingsSecuritySection', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-
     section.attach(containerEl);
-
     const exportPathsRecord = textAreaRecords.find(
       (record) => record.name === t('settings.security.exportPaths.name'),
     );
     await exportPathsRecord?.onChange?.(' ~/Desktop \n\n /tmp/export ');
-
     const blockedCommandsRecord = textAreaRecords.find(
       (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
     );
     await blockedCommandsRecord?.onChange?.('rm -rf\n\n chmod 777 ');
-
     expect(plugin.settings.allowedExportPaths).toEqual(['~/Desktop', '/tmp/export']);
     expect(plugin.settings.blockedCommands[currentPlatformKey]).toEqual(['rm -rf', 'chmod 777']);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(2);

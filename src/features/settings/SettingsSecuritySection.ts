@@ -77,7 +77,7 @@ export class SettingsSecuritySection {
   private renderUnavailableConfigStatus(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.security.configStatus.name'))
-      .setDesc('Vault path unavailable');
+      .setDesc(t('settings.security.configStatus.unavailable'));
   }
 
   private renderConfigStatusSetting(containerEl: HTMLElement): Setting {
@@ -114,28 +114,39 @@ export class SettingsSecuritySection {
       };
     }
 
-    if (permission === 'allow') {
+    const summary = OpencodeConfigManager.summarizePermissionConfig(permission);
+
+    if (summary.templateMode === 'yolo') {
       return {
         statusText: t('settings.security.configStatus.yolo'),
         statusClass: 'opencodian-status-yolo',
       };
     }
 
-    if (permission && typeof permission === 'object' && permission['*'] === 'ask') {
-      const hasDeny = Object.values(permission).some((value) => value === 'deny');
-      return hasDeny
-        ? {
-            statusText: t('settings.security.configStatus.plan'),
-            statusClass: 'opencodian-status-plan',
-          }
-        : {
-            statusText: t('settings.security.configStatus.normal'),
-            statusClass: 'opencodian-status-normal',
-          };
+    if (summary.templateMode === 'normal') {
+      return {
+        statusText: t('settings.security.configStatus.normal'),
+        statusClass: 'opencodian-status-normal',
+      };
     }
 
+    if (summary.templateMode === 'plan') {
+      return {
+        statusText: t('settings.security.configStatus.plan'),
+        statusClass: 'opencodian-status-plan',
+      };
+    }
+
+    const customDetails = summary.customFeatures
+      .map((feature) => this.getCustomConfigStatusDetail(feature))
+      .filter((detail): detail is string => detail.length > 0);
+
     return {
-      statusText: t('settings.security.configStatus.custom'),
+      statusText: customDetails.length > 0
+        ? t('settings.security.configStatus.customWithDetails', {
+            details: customDetails.join(', '),
+          })
+        : t('settings.security.configStatus.custom'),
       statusClass: 'opencodian-status-custom',
     };
   }
@@ -166,7 +177,9 @@ export class SettingsSecuritySection {
     this.plugin.settings.permissionMode = permissionMode;
     await this.plugin.saveSettings();
 
-    new Notice(t('settings.security.permissionMode.updated', { mode: permissionMode }));
+    new Notice(t('settings.security.permissionMode.updated', {
+      mode: this.getPermissionModeLabel(permissionMode),
+    }));
     await refreshConfigStatus();
     await this.handlePermissionModeRestart();
   }
@@ -218,7 +231,7 @@ export class SettingsSecuritySection {
       .addButton((btn) => {
         btn
           .setButtonText(t('settings.security.configFile.editBtn'))
-          .setTooltip('Open configuration editor')
+          .setTooltip(t('settings.security.configFile.editTooltip'))
           .onClick(() => {
             new OpencodeConfigModal(this.app, configManager).open();
           });
@@ -235,7 +248,7 @@ export class SettingsSecuritySection {
 
   private async applyConfigRestart(btn: ButtonComponent): Promise<void> {
     btn.setDisabled(true);
-    btn.setButtonText('Restarting...');
+    btn.setButtonText(t('settings.security.configFile.restarting'));
 
     try {
       if (this.plugin.settings.server.mode !== 'local') {
@@ -247,17 +260,17 @@ export class SettingsSecuritySection {
 
       if (isRunning) {
         await this.restartRunningService();
-        new Notice('OpenCode service restarted. New permission settings are now active.');
+        new Notice(t('settings.security.configFile.restarted'));
       } else {
         await this.plugin.openCodeService.start();
-        new Notice('OpenCode service started with new permission settings.');
+        new Notice(t('settings.security.configFile.started'));
       }
     } catch (error) {
       logger.error('Failed to restart OpenCode:', error);
-      new Notice('Failed to restart OpenCode service. Please restart manually.');
+      new Notice(t('settings.security.configFile.restartFailed'));
     } finally {
       btn.setDisabled(false);
-      btn.setButtonText('Apply & Restart');
+      btn.setButtonText(t('settings.security.configFile.applyBtn'));
     }
   }
 
@@ -367,5 +380,32 @@ export class SettingsSecuritySection {
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
+  }
+
+  private getPermissionModeLabel(permissionMode: PermissionMode): string {
+    switch (permissionMode) {
+      case 'yolo':
+        return t('settings.security.permissionMode.yolo');
+      case 'plan':
+        return t('settings.security.permissionMode.plan');
+      case 'normal':
+      default:
+        return t('settings.security.permissionMode.normal');
+    }
+  }
+
+  private getCustomConfigStatusDetail(
+    feature: ReturnType<typeof OpencodeConfigManager.summarizePermissionConfig>['customFeatures'][number],
+  ): string {
+    switch (feature) {
+      case 'external-directory':
+        return t('settings.security.configStatus.detail.externalDirectory');
+      case 'task-allowlist':
+        return t('settings.security.configStatus.detail.taskAllowlist');
+      case 'patterned-rules':
+        return t('settings.security.configStatus.detail.patternedRules');
+      default:
+        return '';
+    }
   }
 }

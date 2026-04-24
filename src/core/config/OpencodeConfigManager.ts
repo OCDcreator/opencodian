@@ -13,6 +13,8 @@ import type {
   OpencodePluginSpec,
   PermissionAction,
   PermissionConfig,
+  PermissionMode,
+  ToolPermission,
 } from '../types';
 import {
   prepareCommandPatchWithScopedAgent,
@@ -21,6 +23,44 @@ import {
 import { isRecord, OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
 const logger = createLogger('OpencodeConfigManager');
+
+export type PermissionConfigCustomFeature =
+  | 'external-directory'
+  | 'task-allowlist'
+  | 'patterned-rules';
+
+export interface PermissionConfigSummary {
+  templateMode: PermissionMode | null;
+  customFeatures: PermissionConfigCustomFeature[];
+}
+
+const NORMAL_PERMISSION_TEMPLATE: PermissionConfig = {
+  '*': 'ask',
+  read: 'ask',
+  edit: 'ask',
+  write: 'ask',
+  bash: 'ask',
+  websearch: 'ask',
+  webfetch: 'ask',
+  glob: 'ask',
+  grep: 'ask',
+  list: 'ask',
+  task: 'ask',
+  skill: 'ask',
+};
+
+const PLAN_PERMISSION_TEMPLATE: PermissionConfig = {
+  '*': 'ask',
+  edit: 'deny',
+  write: 'deny',
+  bash: 'ask',
+};
+
+const PERMISSION_MODE_TEMPLATES: Record<PermissionMode, PermissionAction | PermissionConfig> = {
+  yolo: 'allow',
+  normal: NORMAL_PERMISSION_TEMPLATE,
+  plan: PLAN_PERMISSION_TEMPLATE,
+};
 
 export class OpencodeConfigManager {
   private vaultPath: string;
@@ -283,51 +323,27 @@ export class OpencodeConfigManager {
   }
 
   async setYoloMode(): Promise<void> {
-    await this.updatePermission('allow');
+    await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('yolo'));
   }
 
   async setNormalMode(): Promise<void> {
-    await this.updatePermission({
-      '*': 'ask',
-      read: 'ask',
-      edit: 'ask',
-      write: 'ask',
-      bash: 'ask',
-      websearch: 'ask',
-      webfetch: 'ask',
-      glob: 'ask',
-      grep: 'ask',
-      list: 'ask',
-      task: 'ask',
-      skill: 'ask',
-    });
+    await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('normal'));
   }
 
   async setPlanMode(): Promise<void> {
-    await this.updatePermission({
-      '*': 'ask',
-      edit: 'deny',
-      write: 'deny',
-      bash: 'ask',
-    });
+    await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('plan'));
   }
 
   async setToolPermission(tool: string, action: PermissionAction): Promise<void> {
     const config = await this.read();
-    
-    // If current permission is a string, convert to object
     if (typeof config.permission === 'string') {
       config.permission = { '*': config.permission };
     }
-
-    // Ensure permission is an object
     if (!config.permission || typeof config.permission !== 'object') {
       config.permission = {};
     }
-
     const permission = config.permission as PermissionConfig;
     permission[tool as keyof PermissionConfig] = action;
-    
     await this.write(config);
   }
 
@@ -360,6 +376,60 @@ export class OpencodeConfigManager {
       permission: {
         '*': 'ask',
       },
+    };
+  }
+
+  static getPermissionTemplate(mode: PermissionMode): PermissionConfig | PermissionAction {
+    const template = PERMISSION_MODE_TEMPLATES[mode];
+    return typeof template === 'string'
+      ? template
+      : Object.fromEntries(Object.entries(template)) as PermissionConfig;
+  }
+
+  static summarizePermissionConfig(
+    permission: PermissionConfig | PermissionAction | undefined,
+  ): PermissionConfigSummary {
+    const templateMode = (['yolo', 'normal', 'plan'] as const).find((mode) =>
+      OpencodeConfigManager.permissionConfigEquals(permission, PERMISSION_MODE_TEMPLATES[mode])
+    ) ?? null;
+
+    if (templateMode) {
+      return { templateMode, customFeatures: [] };
+    }
+
+    if (!permission || typeof permission === 'string') {
+      return { templateMode: null, customFeatures: [] };
+    }
+
+    const customFeatures: PermissionConfigCustomFeature[] = [];
+
+    if (permission.external_directory !== undefined) {
+      customFeatures.push('external-directory');
+    }
+
+    if (OpencodeConfigManager.isTaskAllowlist(permission.task)) {
+      customFeatures.push('task-allowlist');
+    }
+
+    const hasPatternedRules = Object.entries(permission).some(([permissionName, value]) => {
+      if (!OpencodeConfigManager.hasSpecificPatterns(value)) {
+        return false;
+      }
+
+      if (permissionName === 'external_directory') {
+        return false;
+      }
+
+      return !(permissionName === 'task' && OpencodeConfigManager.isTaskAllowlist(value));
+    });
+
+    if (hasPatternedRules) {
+      customFeatures.push('patterned-rules');
+    }
+
+    return {
+      templateMode: null,
+      customFeatures,
     };
   }
 
@@ -427,6 +497,74 @@ export class OpencodeConfigManager {
 
   private cloneConfigObject<T extends Record<string, unknown>>(value: T): T {
     return this.cloneConfigValue(value);
+  }
+
+  private static permissionConfigEquals(
+    left: PermissionConfig | PermissionAction | undefined,
+    right: PermissionConfig | PermissionAction,
+  ): boolean {
+    if (typeof left !== typeof right) {
+      return false;
+    }
+
+    if (typeof left === 'string' || typeof right === 'string') {
+      return left === right;
+    }
+
+    if (!left || !right) {
+      return false;
+    }
+
+    const leftEntries = Object.entries(left);
+    const rightEntries = Object.entries(right);
+    if (leftEntries.length !== rightEntries.length) {
+      return false;
+    }
+
+    return leftEntries.every(([key, value]) =>
+      OpencodeConfigManager.toolPermissionEquals(
+        value,
+        right[key as keyof PermissionConfig],
+      )
+    );
+  }
+
+  private static toolPermissionEquals(
+    left: ToolPermission | undefined,
+    right: ToolPermission | undefined,
+  ): boolean {
+    if (left === right) {
+      return true;
+    }
+
+    if (!left || !right) {
+      return false;
+    }
+
+    if (typeof left === 'string' || typeof right === 'string') {
+      return false;
+    }
+
+    const leftEntries = Object.entries(left);
+    const rightEntries = Object.entries(right);
+    if (leftEntries.length !== rightEntries.length) {
+      return false;
+    }
+
+    return leftEntries.every(([key, value]) => right[key] === value);
+  }
+
+  private static hasSpecificPatterns(value: ToolPermission | undefined): boolean {
+    return typeof value === 'object'
+      && value !== null
+      && Object.keys(value).some((pattern) => pattern !== '*');
+  }
+
+  private static isTaskAllowlist(value: ToolPermission | undefined): boolean {
+    return typeof value === 'object'
+      && value !== null
+      && value['*'] === 'deny'
+      && Object.entries(value).some(([pattern, action]) => pattern !== '*' && action === 'allow');
   }
 
   private cloneConfigValue<T>(value: T): T {

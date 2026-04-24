@@ -20,7 +20,7 @@
   - Targeted tests cover the touched behavior
   - The post-change OpenCode CLI review passes
 
-### [NEXT] P2 - Align security settings wording and config semantics
+### [DONE] P2 - Align security settings wording and config semantics
 
 - **Lane**: Permission settings
 - **Goal**: Make the security/settings surface describe the real upstream permission model in a human-readable way.

@@ -24,6 +24,8 @@
 
 ```typescript
 class OpencodeConfigManager {
+  static getPermissionTemplate(mode: PermissionMode): PermissionConfig | PermissionAction;
+  static summarizePermissionConfig(permission: PermissionConfig | PermissionAction | undefined): PermissionConfigSummary;
   exists(): Promise<boolean>;
   read(): Promise<OpencodeConfig>;
   write(config: OpencodeConfig): Promise<void>;
@@ -87,13 +89,21 @@ getCommandScopedAgentId(commandId: string): string
 
 ### 权限配置快捷模式
 
-这个类内置了 3 套权限模板：
+这个类内置了 3 套 **OpenCodian shorthand template**，并把“写模板”和“识别模板 / 自定义规则”放到同一处：
 
 | 方法 | 写入内容 |
 |------|------|
 | `setYoloMode()` | `permission = 'allow'` |
 | `setNormalMode()` | `* / read / edit / write / bash / websearch / webfetch / glob / grep / list / task / skill` 全部设为 `ask` |
 | `setPlanMode()` | `* = ask`，`edit = deny`，`write = deny`，`bash = ask` |
+
+其中：
+
+- `getPermissionTemplate(mode)` 返回上述模板的标准对象 / 字符串形态，避免 writer 与 reader 各自维护一份模式定义
+- `summarizePermissionConfig(permission)` 会先尝试 **精确匹配** 这 3 套模板；只有完全一致时才返回 `templateMode`
+- 如果不是精确模板，summary 会额外标记 `external-directory`、`task-allowlist`、`patterned-rules` 等自定义特征，供 settings UI 用人话展示
+
+这点很重要：`plan` 只是 OpenCodian 的 shorthand，不是上游 OpenCode 的原生权限模式；上游仍是 rule-based `permission + pattern + action` 语义。
 
 `setToolPermission()` 允许增量改某一个工具权限；如果原始 `permission` 是字符串，会先转成对象形态 `{ '*': 原值 }`。
 
@@ -140,6 +150,8 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 
 | 方法 | 说明 |
 |------|------|
+| `getPermissionTemplate(mode)` | 返回 OpenCodian 的标准权限模板 |
+| `summarizePermissionConfig(permission)` | 识别精确模板或提取自定义权限特征 |
 | `read()` | 读取并解析项目级 OpenCode 配置，失败时回退默认值 |
 | `write(config)` | 写入项目级配置并强制附带 `$schema` |
 | `updatePermission(permission)` | 直接替换 `permission` 字段 |
@@ -159,6 +171,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 ## 与其他模块的交互
 
 - `src/main.ts` 会在设置同步时创建并使用它来落地 `permissionMode`。
+- `src/features/settings/SettingsSecuritySection.ts` 通过 `summarizePermissionConfig()` 把 `.opencode` 权限规则转成 template/custom 状态文案。
 - `src/core/config/ModelConfigService.ts` 通过它读写模型相关字段所在的完整配置文件。
 - `src/core/config/PluginManagementService.ts` 通过它读写项目级 `plugin` 配置，并复用它暴露的 `.opencode` 路径。
 - `src/features/settings/OpencodeConfigModal.ts` 直接接受这个管理器实例，用于编辑项目配置。

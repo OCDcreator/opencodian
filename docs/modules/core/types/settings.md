@@ -202,6 +202,16 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 因此这份文件现在不仅定义“有没有这个字段”，还负责把颜色、字号和字重收敛到安全范围。
 
+### 安全设置的心智模型
+
+当前安全相关字段里有一组需要特别注意的“插件侧 helper”语义：
+
+- `permissionMode` 代表 **OpenCodian shorthand template**，用于把 3 套常见权限模板写入 `.opencode/opencode.json`
+- `allowExternalAccess` 不会直接放行 `external_directory`；真正的 OpenCode 外部目录权限仍由 `.opencode` 规则决定
+- `allowedExportPaths` 也不是运行时 allowlist，而是供 debug/export 与手动编辑规则时复用的路径列表
+
+因此在设置 UI 中，真正的运行时权限真相源仍然是项目级 `.opencode/opencode.json`，而不是这些插件字段本身。
+
 ## OpenCodianSettings 字段参考
 
 | 字段 | 类型 | 默认值 | 说明 |
@@ -209,9 +219,9 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `userName` | `string` | `''` | 用户名称 |
 | `server` | `ServerConfig` | 本地模式 | 服务器配置 |
 | `enableBlocklist` | `boolean` | `true` | 启用命令黑名单 |
-| `allowExternalAccess` | `boolean` | `false` | 允许外部文件访问 |
+| `allowExternalAccess` | `boolean` | `false` | 插件侧的外部访问偏好记录；不直接改写 OpenCode 运行时权限 |
 | `blockedCommands` | `PlatformBlockedCommands` | 预定义 | 平台黑名单 |
-| `permissionMode` | `PermissionMode` | `'yolo'` | 权限模式 |
+| `permissionMode` | `PermissionMode` | `'yolo'` | OpenCodian 的权限模板选择（YOLO / ask-by-default / review） |
 | `autoRestartOnPermissionChange` | `boolean` | `false` | 权限变更自动重启 |
 | `modelSourceMode` | `ModelSourceMode` | `'merge'` | 模型来源模式 |
 | `defaultProvider` | `string` | `'anthropic'` | 默认提供商 |
@@ -233,7 +243,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `excludedTags` | `string[]` | `[]` | 排除标签 |
 | `mediaFolder` | `string` | `''` | 媒体文件夹 |
 | `systemPrompt` | `string` | `''` | 系统提示词 |
-| `allowedExportPaths` | `string[]` | `['~/Desktop', '~/Downloads']` | 允许导出路径 |
+| `allowedExportPaths` | `string[]` | `['~/Desktop', '~/Downloads']` | 保存的外部路径列表，供调试导出与手动规则编辑复用 |
 | `maxTabs` | `number` | `3` | 最大标签数 |
 | `tabBarPosition` | `TabBarPosition` | `'below-header'` | 标签栏位置 |
 | `belowHeaderTabBarLayout` | `BelowHeaderTabBarLayout` | `'grid'` | 下方标签布局 |
