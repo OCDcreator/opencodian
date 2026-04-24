@@ -267,7 +267,7 @@ export class SettingsModelSection {
       modelPickerGroups: [],
       commonSummaryEl: commonBodyEl.createDiv({ cls: 'opencodian-model-common-summary' }),
       configBodyEl,
-      availabilityManagementEl: availabilityBodyEl.createDiv({ cls: 'opencodian-model-toggle-management' }),
+      availabilityManagementEl: availabilityBodyEl,
       iconCacheOverviewSetting: null,
       defaultModelButton: null,
       refreshModelsButton: null,
@@ -276,6 +276,7 @@ export class SettingsModelSection {
       viewIconCacheButton: null,
       isRefreshingModelCatalog: false,
     };
+    this.runtime.availabilityManagementEl.addClass('opencodian-model-toggle-management');
 
     this.setRefreshModelsCallback(() => {
       void this.catalogCoordinator.refreshModelSettings();

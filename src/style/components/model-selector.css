@@ -368,7 +368,11 @@
 }
 
 .opencodian-settings.opencodian-settings--tabbed {
-  padding-top: 14px;
+  padding-top: 34px;
+}
+
+.opencodian-settings.opencodian-settings--tabbed .opencodian-settings-panel-title {
+  margin-left: -20px;
 }
 
 .opencodian-settings:hover {
@@ -443,9 +447,42 @@
 
 .opencodian-settings h2 {
   margin-top: 0;
-  margin-bottom: 24px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  margin-left: 0;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.opencodian-settings-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.opencodian-settings-panel-title .opencodian-title {
+  flex: 0 0 auto;
+}
+
+.opencodian-settings-panel-title .opencodian-title-text {
+  height: 20px;
+}
+
+.opencodian-settings-title-wordmark.is-dark {
+  display: none;
+}
+
+.theme-dark .opencodian-settings-title-wordmark.is-light {
+  display: none;
+}
+
+.theme-dark .opencodian-settings-title-wordmark.is-dark {
+  display: block;
+}
+
+.opencodian-settings-panel-title-fallback {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-normal);
 }
 
 .opencodian-settings-tabs-primary {

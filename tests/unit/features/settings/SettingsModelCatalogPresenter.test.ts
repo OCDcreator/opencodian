@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { SettingsModelCatalogPresenter } from '../../../../src/features/settings/SettingsModelCatalogPresenter';
 import * as i18n from '../../../../src/i18n';
 
@@ -192,6 +195,8 @@ describe('SettingsModelCatalogPresenter', () => {
     expect(containerEl.querySelector('.opencodian-model-toggle-desc')).toBeNull();
     expect(containerEl.querySelector('.opencodian-model-availability-controls')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-model-catalog-summary-grid')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-model-toggle-provider-list')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-model-toggle-provider-scrollbar-proxy')).toBeNull();
   });
 
   it('skips the secondary availability description when the copy is empty', () => {
@@ -215,5 +220,74 @@ describe('SettingsModelCatalogPresenter', () => {
     });
 
     expect(containerEl.querySelector('.opencodian-model-toggle-desc')).toBeNull();
+  });
+
+  it('hides the provider list scrollbar while keeping the list scrollable', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.opencodian-model-toggle-provider-list\s*\{[\s\S]*padding-right:\s*0;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-model-toggle-provider-list\s*\{[\s\S]*scrollbar-width:\s*none;[\s\S]*-ms-overflow-style:\s*none;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-model-toggle-provider-list::\-webkit-scrollbar\s*\{[\s\S]*display:\s*none;/,
+    );
+  });
+
+  it('preserves the outer settings scroll position when expanding a provider', () => {
+    const rafSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    const { presenter } = createPresenter();
+    const scrollHost = document.createElement('div');
+    scrollHost.style.overflowY = 'auto';
+    let outerScrollTop = 240;
+    Object.defineProperty(scrollHost, 'clientHeight', {
+      configurable: true,
+      get: () => 300,
+    });
+    Object.defineProperty(scrollHost, 'scrollHeight', {
+      configurable: true,
+      get: () => 1200,
+    });
+    Object.defineProperty(scrollHost, 'scrollTop', {
+      configurable: true,
+      get: () => outerScrollTop,
+      set: (value: number) => {
+        outerScrollTop = value;
+      },
+    });
+
+    const containerEl = document.createElement('div');
+    scrollHost.appendChild(containerEl);
+    document.body.appendChild(scrollHost);
+
+    presenter.setPreferredCatalogTab('merge');
+    presenter.render({
+      containerEl,
+      catalogState: createCatalogState() as never,
+    });
+
+    const originalEmpty = containerEl.empty.bind(containerEl);
+    Object.defineProperty(containerEl, 'empty', {
+      configurable: true,
+      value: () => {
+        scrollHost.scrollTop = 0;
+        originalEmpty();
+      },
+    });
+
+    (presenter as unknown as {
+      toggleProviderExpanded: (providerId: string) => void;
+    }).toggleProviderExpanded('openai');
+
+    expect(scrollHost.scrollTop).toBe(240);
+    rafSpy.mockRestore();
   });
 });

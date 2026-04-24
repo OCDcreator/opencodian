@@ -2195,7 +2195,11 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-settings.opencodian-settings--tabbed {
-  padding-top: 14px;
+  padding-top: 34px;
+}
+
+.opencodian-settings.opencodian-settings--tabbed .opencodian-settings-panel-title {
+  margin-left: -20px;
 }
 
 .opencodian-settings:hover {
@@ -2270,9 +2274,42 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-settings h2 {
   margin-top: 0;
-  margin-bottom: 24px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  margin-left: 0;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.opencodian-settings-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.opencodian-settings-panel-title .opencodian-title {
+  flex: 0 0 auto;
+}
+
+.opencodian-settings-panel-title .opencodian-title-text {
+  height: 20px;
+}
+
+.opencodian-settings-title-wordmark.is-dark {
+  display: none;
+}
+
+.theme-dark .opencodian-settings-title-wordmark.is-light {
+  display: none;
+}
+
+.theme-dark .opencodian-settings-title-wordmark.is-dark {
+  display: block;
+}
+
+.opencodian-settings-panel-title-fallback {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-normal);
 }
 
 .opencodian-settings-tabs-primary {
@@ -8757,6 +8794,10 @@ body[data-opencodian-provider-icon-mode="color"] {
   overflow: hidden;
 }
 
+.opencodian-settings-general-merged-block {
+  margin: 0;
+}
+
 .opencodian-settings-block > .opencodian-settings-subsection-heading,
 .opencodian-settings-block-summary > .opencodian-settings-subsection-heading {
   margin: 0;
@@ -8923,7 +8964,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-model-toggle-management {
-  margin: 14px 0 18px;
+  margin: 0;
 }
 
 .opencodian-model-toggle-block {
@@ -8944,7 +8985,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-model-toggle-catalogs {
-  margin-bottom: 18px;
+  margin-bottom: 8px;
 }
 
 .opencodian-model-toggle-catalogs .opencodian-model-catalog {
@@ -8954,35 +8995,39 @@ body[data-opencodian-provider-icon-mode="color"] {
 .opencodian-model-catalog-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  justify-content: flex-start;
+  gap: 12px 18px;
   flex-wrap: wrap;
-  margin-top: 14px;
-  padding: 12px 14px;
+  margin-top: 12px;
+  padding: 9px 14px;
   border: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
-  border-radius: 14px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--background-primary) 72%, var(--background-secondary));
 }
 
 .opencodian-model-catalog-actions-info {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px 14px;
+  flex-wrap: wrap;
   min-width: 0;
-  flex: 1 1 220px;
+  flex: 1 1 260px;
 }
 
 .opencodian-model-catalog-actions-title {
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.3;
   color: var(--text-normal);
+  flex: 0 0 auto;
 }
 
 .opencodian-model-catalog-actions-meta {
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.4;
   color: var(--text-muted);
+  flex: 0 1 auto;
 }
 
 .opencodian-model-catalog-actions-buttons {
@@ -8990,6 +9035,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+  margin-left: auto;
 }
 
 .opencodian-model-toggle-block > .opencodian-settings-subsection-heading {
@@ -9021,11 +9067,18 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-model-toggle-provider-list {
   --opencodian-model-toggle-provider-preview-height: 112px;
-  margin-top: 8px;
+  min-width: 0;
+  margin-top: 2px;
   max-height: calc(var(--opencodian-model-toggle-provider-preview-height) * 4 + 48px);
   overflow-y: auto;
-  padding-right: 6px;
+  padding-right: 0;
   overscroll-behavior: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.opencodian-model-toggle-provider-list::-webkit-scrollbar {
+  display: none;
 }
 
 .opencodian-model-toggle-provider-list > .opencodian-model-toggle-provider {
@@ -9765,8 +9818,8 @@ body[data-opencodian-provider-icon-mode="color"] {
 .opencodian-model-catalog-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .opencodian-model-catalog-summary-card {
@@ -9774,10 +9827,10 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
-  min-height: 74px;
-  padding: 12px;
+  min-height: 62px;
+  padding: 10px 12px;
   border-radius: 12px;
   appearance: none;
   -webkit-appearance: none;

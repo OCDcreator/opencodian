@@ -107,7 +107,7 @@ export class SettingsTabbedRenderer {
 
     // Secondary tab bar
     const primaryDef = SETTINGS_PRIMARY_TABS.find((pt) => pt.id === activePrimaryId);
-    if (primaryDef && primaryDef.secondaryTabs.length > 0) {
+    if (primaryDef && primaryDef.secondaryTabs.length > 0 && activePrimaryId !== 'general') {
       const secondaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-secondary' });
       for (const secondaryTab of primaryDef.secondaryTabs) {
         const tabEl = secondaryBarEl.createEl('button', {
@@ -130,7 +130,7 @@ export class SettingsTabbedRenderer {
   }
 
   private shouldUsePanelShell(primaryTabId: string): boolean {
-    return primaryTabId !== 'style' && primaryTabId !== 'plugins' && primaryTabId !== 'model';
+    return primaryTabId !== 'general' && primaryTabId !== 'style' && primaryTabId !== 'plugins' && primaryTabId !== 'model';
   }
 
   switchToPrimaryTab(primaryTabId: string, secondaryTabId?: string): void {
@@ -208,16 +208,12 @@ export class SettingsTabbedRenderer {
 
   // ─── Per-section tabbed content ────────────────────────────────────
 
-  private renderGeneralContent(containerEl: HTMLElement, secondaryTabId: string): void {
-    switch (secondaryTabId) {
-      case 'language':
-        this.deps.renderLanguageSetting(containerEl);
-        break;
-      case 'basic':
-      default:
-        this.deps.renderLayoutModeSetting(containerEl);
-        break;
-    }
+  private renderGeneralContent(containerEl: HTMLElement, _secondaryTabId: string): void {
+    const blockBodyEl = containerEl
+      .createDiv({ cls: 'opencodian-settings-block opencodian-settings-general-merged-block' })
+      .createDiv({ cls: 'opencodian-settings-block-body' });
+    this.deps.renderLayoutModeSetting(blockBodyEl);
+    this.deps.renderLanguageSetting(blockBodyEl);
   }
 
   private renderServerContent(containerEl: HTMLElement, secondaryTabId: string): void {

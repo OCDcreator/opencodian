@@ -5,7 +5,7 @@
  * Supports two layout modes: classic flat and tabbed primary/secondary tabs.
  */
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
 
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -31,6 +31,9 @@ interface SettingHelpButtonConfig {
   tooltip: string;
   onClick: () => void;
 }
+
+const SETTINGS_TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-light.svg';
+const SETTINGS_TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
 
 interface SettingsBlockOptions {
   title: string;
@@ -288,7 +291,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   // ─── Classic layout ────────────────────────────────────────────────
 
   private renderClassicDisplay(containerEl: HTMLElement): void {
-    this.sectionCoordinator.beginDisplay(t('settings.title'));
+    this.sectionCoordinator.beginDisplay(t('settings.title'), {
+      renderPanelTitle: (hostEl) => { this.renderPanelTitle(hostEl); },
+    });
     containerEl.classList.remove('opencodian-settings--tabbed');
     containerEl.classList.add('opencodian-settings--classic');
 
@@ -312,13 +317,74 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   private renderTabbedDisplay(containerEl: HTMLElement): void {
     containerEl.empty();
-    this.sectionCoordinator.beginDisplay(t('settings.title'), { showQuickNav: false });
+    this.sectionCoordinator.beginDisplay(t('settings.title'), {
+      showQuickNav: false,
+      renderPanelTitle: (hostEl) => { this.renderPanelTitle(hostEl); },
+    });
     containerEl.classList.remove('opencodian-settings--classic');
     containerEl.classList.add('opencodian-settings--tabbed');
 
     this.getOrCreateTabbedRenderer().renderDisplay(containerEl);
 
     this.sectionCoordinator.finishDisplay();
+  }
+
+  private renderPanelTitle(containerEl: HTMLElement): void {
+    const headingEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
+    const brandEl = headingEl.createSpan({ cls: 'opencodian-title' });
+    const logoEl = brandEl.createSpan({ cls: 'opencodian-logo' });
+    setIcon(logoEl, 'opencodian-app-icon');
+
+    const wordmarks = [
+      {
+        className: 'is-light',
+        src: this.resolvePluginAssetUrl(SETTINGS_TITLE_WORDMARK_LIGHT_ASSET_PATH),
+      },
+      {
+        className: 'is-dark',
+        src: this.resolvePluginAssetUrl(SETTINGS_TITLE_WORDMARK_DARK_ASSET_PATH),
+      },
+    ];
+
+    let renderedWordmark = false;
+    for (const wordmark of wordmarks) {
+      if (!wordmark.src) {
+        continue;
+      }
+
+      renderedWordmark = true;
+      brandEl.createEl('img', {
+        cls: `opencodian-title-text opencodian-settings-title-wordmark ${wordmark.className}`,
+        attr: {
+          src: wordmark.src,
+          alt: t('plugin.name'),
+          draggable: 'false',
+        },
+      });
+    }
+
+    if (!renderedWordmark) {
+      brandEl.createSpan({
+        cls: 'opencodian-settings-panel-title-fallback',
+        text: t('plugin.name'),
+      });
+    }
+
+  }
+
+  private resolvePluginAssetUrl(relativePath: string): string | null {
+    const pluginDir = this.plugin.manifest.dir?.trim();
+    if (!pluginDir) {
+      return null;
+    }
+
+    const adapter = this.app.vault?.adapter ?? this.plugin.app?.vault?.adapter;
+    if (!adapter || typeof adapter.getResourcePath !== 'function') {
+      return null;
+    }
+
+    const assetPath = `${pluginDir}/${relativePath}`.replace(/\\/g, '/');
+    return adapter.getResourcePath(assetPath);
   }
 
   // ─── Layout mode control ───────────────────────────────────────────
@@ -349,17 +415,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.quickNav.generalDesc'),
     );
 
-    const basicBlockEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.general.basic.title'),
-      description: t('settings.general.basic.desc'),
-    });
-    this.renderLayoutModeSetting(basicBlockEl);
-
-    const languageBlockEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.general.language.title'),
-      description: t('settings.general.language.desc'),
-    });
-    this.renderLanguageSetting(languageBlockEl);
+    const blockBodyEl = containerEl
+      .createDiv({ cls: 'opencodian-settings-block' })
+      .createDiv({ cls: 'opencodian-settings-block-body' });
+    this.renderLayoutModeSetting(blockBodyEl);
+    this.renderLanguageSetting(blockBodyEl);
   }
 
   private addServerSettings(containerEl: HTMLElement): HTMLHeadingElement {

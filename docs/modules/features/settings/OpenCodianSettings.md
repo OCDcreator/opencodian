@@ -9,8 +9,8 @@
 
 当前文件支持两种布局模式：
 
-- **经典平铺模式**: 所有 section 完整平铺展示，但首个一级分区现在是 `General`，内部再拆成 `Basic` / `Language`
-- **多级标签分类模式**: 标题下直接显示一级标签栏、其下显示二级标签栏，再下面是内容区；这个模式不显示 quick-nav，也不显示左侧竖排 section 列表
+- **经典平铺模式**: 所有 section 完整平铺展示，但首个一级分区现在是 `General`，其中设置界面模式与界面语言合并到同一张通用卡片里，不再额外显示 `Basic` / `Language` 小标题
+- **多级标签分类模式**: 标题下显示一级标签栏；多数分区会继续显示二级标签栏，但 `General` 现在直接显示合并卡片，不再拆 `Basic` / `Language`；这个模式不显示 quick-nav，也不显示左侧竖排 section 列表
 
 布局模式通过 `settingsLayoutMode` settings 字段持久化，新用户默认 `'tabbed'`，老用户升级默认 `'classic'`。标签模式的标签结构定义在 `settingsLayoutRegistry.ts`，渲染委托给 `SettingsTabbedRenderer`。
 
@@ -99,6 +99,8 @@
 
 从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式现在还会通过 `beginDisplay({ showQuickNav: false })` 关闭 quick-nav，只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 
+设置页最上方的 panel title 现在不再直接复用纯文本 `h2`；`OpenCodianSettings` 会在 classic / tabbed 两种布局里都传入自定义标题渲染器，让顶部标题使用和聊天头部 `opencodian-title` 一致的品牌逻辑：左侧 `opencodian-app-icon` + 亮/暗主题 wordmark，不再额外拼接 `Settings / 设置` 文本后缀。
+
 ### 模型目录与可用性控制
 
 模型分区现在显式区分：
@@ -164,8 +166,8 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
 | `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区（经典模式滚动，标签模式切标签） |
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
-| `renderLanguageSetting()` | 渲染语言选择器（经典模式在 `General > Language`，标签模式在 `General > Language` 二级面板内） |
-| `renderLayoutModeSetting()` | 渲染设置界面模式切换控件（经典模式在 `General > Basic`，标签模式在 `General > Basic`） |
+| `renderLanguageSetting()` | 渲染语言选择器（经典模式在 `General` 合并卡片内，标签模式在 `General > Language` 二级面板内） |
+| `renderLayoutModeSetting()` | 渲染设置界面模式切换控件（经典模式在 `General` 合并卡片内，标签模式在 `General > Basic`） |
 | `addServerSettings()` | 创建并挂载 `SettingsServerSection` owner，把 server section lifecycle 从主类中收口出去 |
 | `addSecuritySettings()` | 创建并挂载 `SettingsSecuritySection` owner，把 security section lifecycle 从主类中收口出去 |
 | `addModelSettings()` | 创建并挂载 `SettingsModelSection` owner，把模型 section lifecycle 从主类中收口出去 |

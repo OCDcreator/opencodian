@@ -57,6 +57,11 @@ interface SettingsModelCatalogPresenterRenderOptions {
   restoreSearchSelection?: ModelAvailabilitySearchSelection;
 }
 
+interface ScrollHostSnapshot {
+  element: HTMLElement;
+  scrollTop: number;
+}
+
 interface ModelCatalogRenderContext {
   catalogState: ModelCatalogState;
   selectedCatalog: ModelCatalog;
@@ -132,6 +137,7 @@ export class SettingsModelCatalogPresenter {
     options: SettingsModelCatalogPresenterRenderOptions = {},
   ): void {
     this.lastRenderState = state;
+    const outerScrollHostSnapshot = this.captureOuterScrollHostSnapshot(state.containerEl);
     this.captureProviderListScrollPosition(state.containerEl);
 
     const { containerEl, catalogState } = state;
@@ -152,6 +158,7 @@ export class SettingsModelCatalogPresenter {
     }
 
     this.renderProviderList(blockEl, catalogContext, disabledModelRefs);
+    this.restoreOuterScrollHostPosition(outerScrollHostSnapshot);
   }
 
   private captureProviderListScrollPosition(containerEl: HTMLElement): void {
@@ -159,6 +166,18 @@ export class SettingsModelCatalogPresenter {
     if (existingProviderListEl instanceof HTMLElement) {
       this.providerListScrollTop = existingProviderListEl.scrollTop;
     }
+  }
+
+  private captureOuterScrollHostSnapshot(containerEl: HTMLElement): ScrollHostSnapshot | null {
+    const scrollHostEl = this.findOuterScrollHost(containerEl);
+    if (!scrollHostEl) {
+      return null;
+    }
+
+    return {
+      element: scrollHostEl,
+      scrollTop: scrollHostEl.scrollTop,
+    };
   }
 
   private renderModelToggleBlock(
@@ -438,6 +457,23 @@ export class SettingsModelCatalogPresenter {
       this.providerListScrollTop = providerListEl.scrollTop;
     });
     return providerListEl;
+  }
+
+  private findOuterScrollHost(startEl: HTMLElement): HTMLElement | null {
+    let current = startEl.parentElement;
+    while (current) {
+      const style = window.getComputedStyle(current);
+      const overflowY = style.overflowY;
+      const isScrollable = (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay')
+        && current.scrollHeight > current.clientHeight + 1;
+      if (isScrollable) {
+        return current;
+      }
+
+      current = current.parentElement;
+    }
+
+    return null;
   }
 
   private createProviderRenderState(
@@ -855,6 +891,20 @@ export class SettingsModelCatalogPresenter {
       }
 
       providerListEl.scrollTop = this.providerListScrollTop;
+    });
+  }
+
+  private restoreOuterScrollHostPosition(snapshot: ScrollHostSnapshot | null): void {
+    if (!snapshot) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (!snapshot.element.isConnected) {
+        return;
+      }
+
+      snapshot.element.scrollTop = snapshot.scrollTop;
     });
   }
 

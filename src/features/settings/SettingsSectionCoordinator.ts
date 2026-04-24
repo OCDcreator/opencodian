@@ -34,6 +34,7 @@ interface SettingsSectionCoordinatorOptions {
 
 interface BeginDisplayOptions {
   showQuickNav?: boolean;
+  renderPanelTitle?: (containerEl: HTMLElement, panelTitle: string) => void;
 }
 
 export class SettingsSectionCoordinator {
@@ -113,6 +114,11 @@ export class SettingsSectionCoordinator {
       this.quickNavEl = document.createElement('div');
       this.quickNavEl.className = 'opencodian-settings-quick-nav';
       this.containerEl.appendChild(this.quickNavEl);
+    }
+
+    if (options?.renderPanelTitle) {
+      options.renderPanelTitle(this.containerEl, panelTitle);
+      return;
     }
 
     const headingEl = document.createElement('h2');

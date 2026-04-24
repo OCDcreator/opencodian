@@ -9,6 +9,7 @@ export const enTranslations = {
 
   // Settings sections
   'settings.title': 'OpenCodian Settings',
+  'settings.titleSuffix': 'Settings',
   'settings.server.title': 'Server',
   'settings.model.title': 'Model',
   'settings.conversation.title': 'Conversation',

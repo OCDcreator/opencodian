@@ -79,7 +79,7 @@ describe('SettingsTabbedRenderer', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders the general primary tab with basic/language secondary tabs', () => {
+  it('renders the general primary tab as one merged panel without secondary tabs', () => {
     const { renderer, renderLayoutModeSetting, renderLanguageSetting } = createRendererState();
     const containerEl = document.createElement('div');
 
@@ -94,13 +94,17 @@ describe('SettingsTabbedRenderer', () => {
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual(['Basic', 'Language']);
+    ).toEqual([]);
     expect(renderLayoutModeSetting).toHaveBeenCalledTimes(1);
-    expect(renderLanguageSetting).not.toHaveBeenCalled();
+    expect(renderLanguageSetting).toHaveBeenCalledTimes(1);
+    expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
     expect(containerEl.querySelector('.layout-mode-marker')?.textContent).toBe('layout-mode-setting');
+    expect(containerEl.querySelector('.language-marker')?.textContent).toBe('language-setting');
+    expect(containerEl.querySelectorAll('.opencodian-settings-block')).toHaveLength(1);
+    expect(containerEl.querySelector('.opencodian-settings-general-merged-block')).not.toBeNull();
   });
 
-  it('switches general secondary tabs and persists the new selection', () => {
+  it('does not expose general secondary tab switching anymore', () => {
     const { plugin, renderer, requestDisplayRefresh } = createRendererState();
     const containerEl = document.createElement('div');
 
@@ -109,13 +113,13 @@ describe('SettingsTabbedRenderer', () => {
     const secondaryTabs = Array.from(
       containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary'),
     );
-    secondaryTabs[1]?.click();
+    expect(secondaryTabs).toHaveLength(0);
 
     expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({
-      general: 'language',
+      general: 'basic',
     });
-    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-    expect(requestDisplayRefresh).toHaveBeenCalledTimes(1);
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    expect(requestDisplayRefresh).not.toHaveBeenCalled();
   });
 
   it('does not wrap style tabs with the extra tab-panel shell', () => {

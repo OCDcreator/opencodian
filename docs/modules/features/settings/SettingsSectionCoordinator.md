@@ -19,7 +19,7 @@
 
 | 方法 | 说明 |
 |------|------|
-| `beginDisplay()` | 清空 panel chrome、按需准备 quick-nav host，并保留本次 display 的 pending scroll intent；tabbed 布局可以关闭 quick-nav |
+| `beginDisplay()` | 清空 panel chrome、按需准备 quick-nav host，并保留本次 display 的 pending scroll intent；tabbed 布局可以关闭 quick-nav。调用方现在还可以传入自定义 panel title renderer，用品牌标题替代默认纯文本 `h2` |
 | `createSectionHeading()` | 创建 section heading，同时把该分区注册到 quick-nav 数据集 |
 | `finishDisplay()` | 构建 quick-nav、安排 post-render setup，并在初次打开时清理 quick-nav 焦点 |
 | `restoreScrollPosition()` | 执行带 settle/retry 的滚动恢复 |

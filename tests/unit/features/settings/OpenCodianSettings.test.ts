@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
 import { SettingsSectionCoordinator } from '../../../../src/features/settings/SettingsSectionCoordinator';
@@ -355,7 +358,18 @@ describe('SettingsSectionCoordinator quick nav', () => {
 });
 
 function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
+  const app = {
+    vault: {
+      adapter: {
+        getResourcePath: (assetPath: string) => `app://opencodian/${assetPath}`,
+      },
+    },
+  };
   const plugin = {
+    app,
+    manifest: {
+      dir: '/plugins/opencodian',
+    },
     settings: {
       ...DEFAULT_SETTINGS,
       settingsLayoutMode: layoutMode,
@@ -366,9 +380,9 @@ function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
     saveSettings: jest.fn().mockResolvedValue(undefined),
     scheduleSettingsUiStateSave: jest.fn(),
   };
-  const tab = new OpenCodianSettingTab({} as never, plugin as never);
+  const tab = new OpenCodianSettingTab(app as never, plugin as never);
   document.body.appendChild(tab.containerEl);
-  return { plugin, tab };
+  return { app, plugin, tab };
 }
 
 describe('OpenCodianSettingTab layout shell', () => {
@@ -420,7 +434,12 @@ describe('OpenCodianSettingTab layout shell', () => {
       Array.from(tab.containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual(['Basic', 'Language']);
+    ).toEqual([]);
+
+    const generalBlocks = Array.from(tab.containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-block'));
+    expect(generalBlocks).toHaveLength(1);
+    expect(generalBlocks[0]?.querySelector('.layout-mode-setting')).not.toBeNull();
+    expect(generalBlocks[0]?.querySelector('.language-setting')).not.toBeNull();
   });
 
   it('does not render quick-nav in tabbed layout mode', () => {
@@ -441,5 +460,63 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(renderDisplay).toHaveBeenCalledTimes(1);
     expect(tab.containerEl.querySelector('.opencodian-settings-quick-nav')).toBeNull();
     expect(tab.containerEl.querySelector('.tabbed-render-marker')?.textContent).toBe('tabbed-rendered');
+  });
+
+  it('renders a branded settings title using the shared OpenCodian title logic', () => {
+    const { tab } = createSettingsTab('classic');
+    Object.assign(tab as unknown as Record<string, unknown>, {
+      addServerSettings: jest.fn(),
+      addModelSettings: jest.fn(),
+      addConversationSettings: jest.fn(),
+      addAgentsSettings: jest.fn(),
+      addCommandsSettings: jest.fn(),
+      addPluginSettings: jest.fn(),
+      addSecuritySettings: jest.fn(),
+      addUISettings: jest.fn(),
+      addStyleSettings: jest.fn(),
+      addDebugSettings: jest.fn(),
+      addUserSettings: jest.fn(),
+      renderLayoutModeSetting: jest.fn(),
+      renderLanguageSetting: jest.fn(),
+    });
+
+    tab.display();
+
+    const headingEl = tab.containerEl.querySelector<HTMLElement>('.opencodian-settings-panel-title');
+    expect(headingEl).not.toBeNull();
+    expect(headingEl?.querySelector('.opencodian-title')).not.toBeNull();
+    expect(headingEl?.querySelector('.opencodian-logo')).not.toBeNull();
+    expect(
+      Array.from(headingEl?.querySelectorAll<HTMLImageElement>('.opencodian-settings-title-wordmark') ?? []).map(
+        (element) => element.getAttribute('src'),
+      ),
+    ).toEqual([
+      'app://opencodian//plugins/opencodian/assets/branding/opencodian-wordmark-light.svg',
+      'app://opencodian//plugins/opencodian/assets/branding/opencodian-wordmark-dark.svg',
+    ]);
+    expect(headingEl?.querySelector('.opencodian-settings-panel-title-suffix')).toBeNull();
+  });
+
+  it('styles the settings title flush-left, borderless, and slightly larger', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/model-selector.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.opencodian-settings h2\s*\{[\s\S]*margin-left:\s*0;[\s\S]*margin-bottom:\s*12px;[\s\S]*padding-bottom:\s*0;[\s\S]*border-bottom:\s*none;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings-panel-title\s*\{[\s\S]*gap:\s*0;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings-panel-title \.opencodian-title-text\s*\{[\s\S]*height:\s*18px;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings\.opencodian-settings--tabbed\s*\{[\s\S]*padding-top:\s*34px;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings\.opencodian-settings--tabbed\s+\.opencodian-settings-panel-title\s*\{[\s\S]*margin-left:\s*-20px;/,
+    );
   });
 });

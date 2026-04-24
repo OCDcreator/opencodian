@@ -9,6 +9,7 @@ export const zhTranslations = {
 
   // Settings sections
   'settings.title': 'OpenCodian 设置',
+  'settings.titleSuffix': '设置',
   'settings.server.title': '服务器',
   'settings.model.title': '模型',
   'settings.conversation.title': '会话',
