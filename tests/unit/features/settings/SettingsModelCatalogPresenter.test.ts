@@ -1,4 +1,5 @@
 import { SettingsModelCatalogPresenter } from '../../../../src/features/settings/SettingsModelCatalogPresenter';
+import * as i18n from '../../../../src/i18n';
 
 function createCatalogState() {
   const provider = {
@@ -174,5 +175,45 @@ describe('SettingsModelCatalogPresenter', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(onProviderAvailabilityChange).toHaveBeenCalledWith(['openai'], false);
+  });
+
+  it('renders model availability content directly into the provided host without an extra inner shell', () => {
+    const { presenter } = createPresenter();
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    presenter.setPreferredCatalogTab('merge');
+
+    presenter.render({
+      containerEl,
+      catalogState: createCatalogState() as never,
+    });
+
+    expect(containerEl.querySelector('.opencodian-model-toggle-block')).toBeNull();
+    expect(containerEl.querySelector('.opencodian-model-toggle-desc')).toBeNull();
+    expect(containerEl.querySelector('.opencodian-model-availability-controls')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-model-catalog-summary-grid')).not.toBeNull();
+  });
+
+  it('skips the secondary availability description when the copy is empty', () => {
+    const { presenter } = createPresenter();
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    presenter.setPreferredCatalogTab('merge');
+    const originalT = i18n.t;
+    const tSpy = jest.spyOn(i18n, 't');
+    tSpy.mockImplementation(((key: string, vars?: Record<string, string>) => {
+      if (key === 'settings.model.toggle.desc') {
+        return '';
+      }
+
+      return originalT(key as never, vars as never);
+    }) as typeof i18n.t);
+
+    presenter.render({
+      containerEl,
+      catalogState: createCatalogState() as never,
+    });
+
+    expect(containerEl.querySelector('.opencodian-model-toggle-desc')).toBeNull();
   });
 });

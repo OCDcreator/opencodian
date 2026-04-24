@@ -71,6 +71,38 @@ export class SettingsStyleSection {
     return headingEl;
   }
 
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.dispose();
+    const runtime = this.initializeRuntime();
+
+    switch (secondaryTabId) {
+      case 'presets':
+        runtime.presetSection.attach(containerEl);
+        break;
+      case 'background':
+        runtime.backgroundStyleSection.attach(containerEl);
+        break;
+      case 'layout':
+        this.addLayoutStyleGroup(containerEl);
+        break;
+      case 'user':
+        this.addUserStyleGroup(containerEl);
+        break;
+      case 'assistant':
+        this.addAssistantStyleGroup(containerEl);
+        break;
+      case 'input':
+        runtime.inputPanelSection.attach(containerEl);
+        break;
+      case 'scrollbar':
+        this.addScrollbarStyleGroup(containerEl);
+        break;
+      case 'advanced':
+        this.addAdvancedStyleGroup(containerEl);
+        break;
+    }
+  }
+
   dispose(): void {
     this.styleControls.dispose();
     const runtime = this.runtime;

@@ -24,6 +24,9 @@ import {
   normalizeModelProviderPluginDebugSettings,
   normalizePersistedTabState,
   normalizeQuestionCardSettings,
+  normalizeSettingsLayoutMode,
+  normalizeSettingsTabbedPrimaryTab,
+  normalizeSettingsTabbedSecondaryTabByPrimary,
   normalizeSlashCommandSkillMode,
   normalizeTabBarPosition,
   normalizeThemeSettings,
@@ -398,6 +401,24 @@ function buildNormalizedLoadedSettings(
   };
 }
 
+function resolveInitialLayoutMode(
+  savedSettings: LoadedSettingsSnapshot | null,
+): 'classic' | 'tabbed' {
+  const explicitValue = normalizeSettingsLayoutMode(savedSettings?.settingsLayoutMode);
+  if (savedSettings?.settingsLayoutMode !== undefined) {
+    return explicitValue;
+  }
+
+  // Existing users with pre-existing settings data default to classic so they
+  // are not forcibly switched. Truly fresh installs (no saved snapshot) use
+  // the DEFAULT_SETTINGS value (tabbed).
+  if (savedSettings) {
+    return 'classic';
+  }
+
+  return explicitValue;
+}
+
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
   const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
@@ -448,6 +469,14 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       providerIconLibrary: normalizedModelProviderPluginDebugSettings.providerIconLibrary,
       providerIconColorMode: normalizedModelProviderPluginDebugSettings.providerIconColorMode,
       providerIconDefaultVariant: normalizedModelProviderPluginDebugSettings.providerIconDefaultVariant,
+      settingsLayoutMode: resolveInitialLayoutMode(savedSettings),
+      settingsTabbedPrimaryTab: normalizeSettingsTabbedPrimaryTab(
+        savedSettings?.settingsTabbedPrimaryTab,
+        'server',
+      ),
+      settingsTabbedSecondaryTabByPrimary: normalizeSettingsTabbedSecondaryTabByPrimary(
+        savedSettings?.settingsTabbedSecondaryTabByPrimary,
+      ),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

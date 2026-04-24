@@ -57,3 +57,13 @@
 
 - 这里的 owner seam 必须继续保留 permission writeback、auto-restart 条件、remote-manage 限制与平台 blocklist 语义
 - 如果只改 security section，优先扩展这个 owner；不要再把 config-status/restart/blocklist/export-path 细节塞回 `OpenCodianSettings`
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `config` — renders config status + permission template + restart action
+- `permissions` — renders blocklist + external access reminder + saved paths
+- `safety` — renders platform blocked commands
+
+The classic `attach()` method remains unchanged.

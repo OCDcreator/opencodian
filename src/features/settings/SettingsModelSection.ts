@@ -154,6 +154,56 @@ export class SettingsModelSection {
     return headingEl;
   }
 
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.dispose();
+
+    const modelConfigService = this.plugin.modelConfigService;
+
+    if (!modelConfigService) {
+      this.dispose();
+      new Setting(containerEl)
+        .setName(t('settings.model.config.unavailableTitle'))
+        .setDesc(t('settings.model.config.unavailable'));
+      return;
+    }
+
+    const { commonBodyEl, toolsBodyEl } = this.initializeRuntime(containerEl, modelConfigService);
+    const runtime = this.runtime!;
+    const configBodyEl = runtime.configBodyEl;
+    const availabilityBodyEl = runtime.availabilityManagementEl.parentElement!;
+
+    const commonWrapper = commonBodyEl.closest<HTMLElement>('.opencodian-settings-block') ?? commonBodyEl.parentElement!;
+    const configWrapper = configBodyEl.closest<HTMLElement>('.opencodian-settings-block') ?? configBodyEl.parentElement!;
+    const availabilityWrapper = availabilityBodyEl.closest<HTMLElement>('.opencodian-settings-block') ?? availabilityBodyEl.parentElement!;
+    const toolsWrapper = toolsBodyEl.closest<HTMLElement>('.opencodian-settings-block') ?? toolsBodyEl.parentElement!;
+
+    commonWrapper.setAttribute('data-section-block', 'common');
+    configWrapper.setAttribute('data-section-block', 'project-config');
+    availabilityWrapper.setAttribute('data-section-block', 'availability');
+    toolsWrapper.setAttribute('data-section-block', 'tools');
+
+    this.attachCommonSettings(commonBodyEl);
+    this.iconCacheManager.attachTools(toolsBodyEl);
+    this.catalogCoordinator.updateCommonSummary();
+    this.catalogCoordinator.updateDefaultModelButton();
+
+    const blocks: Record<string, HTMLElement> = {
+      common: commonWrapper,
+      'project-config': configWrapper,
+      availability: availabilityWrapper,
+      tools: toolsWrapper,
+    };
+
+    for (const [tabId, el] of Object.entries(blocks)) {
+      if (tabId !== secondaryTabId) {
+        el.style.display = 'none';
+      }
+    }
+
+    void this.iconCacheManager.refreshIconCacheOverview();
+    void this.bootstrapModelSection();
+  }
+
   private initializeRuntime(
     containerEl: HTMLElement,
     modelConfigService: ModelConfigService,

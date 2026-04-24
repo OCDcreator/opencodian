@@ -60,3 +60,14 @@ owner 内部把快照刷新链路集中起来：
 - `pluginIsolationMode` 写回后必须保存设置并刷新 snapshot；OpenCode 服务是否需要重启仍通过既有 notice 告知。
 - OMO action 需要先确保 project OMO config 存在，再把文件镜像进 vault adapter 并用 `workspace.openLinkText()` 打开。
 - 如果后续继续推进 plugins lane，优先在这个 owner 内扩展完整 section lifecycle，而不是回到 `OpenCodianSettings` 主类里追加闭包。
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `overview` — renders environment snapshot overview
+- `global` — renders global plugin source display
+- `project-directory` — renders project plugin directory management
+- `omo` — renders OMO config management
+
+The classic `attach()` method remains unchanged.

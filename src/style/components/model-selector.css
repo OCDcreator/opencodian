@@ -367,6 +367,10 @@
   padding: 0 20px 20px;
 }
 
+.opencodian-settings.opencodian-settings--tabbed {
+  padding-top: 14px;
+}
+
 .opencodian-settings:hover {
   scrollbar-color: var(--opencodian-settings-scrollbar-thumb-hover) transparent;
 }
@@ -442,6 +446,119 @@
   margin-bottom: 24px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-settings-tabs-primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.opencodian-settings-tab-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 76%, transparent);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 92%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 82%, transparent) 100%
+    );
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 65%, transparent),
+    0 6px 16px color-mix(in srgb, var(--text-normal) 6%, transparent);
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.opencodian-settings-tab-primary:hover {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border-hover));
+  transform: translateY(-1px);
+}
+
+.opencodian-settings-tab-primary.opencodian-settings-tab-active {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 52%, var(--background-modifier-border-hover));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 20%, transparent) 0%,
+      color-mix(in srgb, var(--background-primary) 90%, transparent) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 72%, transparent),
+    0 10px 24px color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+
+.opencodian-settings-tab-primary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.opencodian-settings-tab-primary-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.opencodian-settings-tabs-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.opencodian-settings-tab-secondary {
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.opencodian-settings-tab-secondary:hover {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border-hover));
+}
+
+.opencodian-settings-tab-secondary.opencodian-settings-tab-active {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border-hover));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+}
+
+.opencodian-settings-tab-panel {
+  padding: 18px 18px 8px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
+  background: color-mix(in srgb, var(--background-secondary) 78%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 62%, transparent),
+    0 12px 28px color-mix(in srgb, var(--text-normal) 6%, transparent);
 }
 
 .opencodian-settings code,

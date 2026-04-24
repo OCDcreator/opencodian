@@ -90,5 +90,15 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 - 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`。
 - project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀。
 - `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径。
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `mode` — renders skill invocation mode dropdown + catalog listing
+- `editor` — renders project command editor form
+- `catalog` — renders full command catalog with visibility toggles
+
+The classic `attach()` method remains unchanged.
 - `slashCommandSkillMode` 只改变 chat menu/执行入口形态，不改变 OpenCode runtime 的 skill catalog。
 - runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有共享 catalog seam。

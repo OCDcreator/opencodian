@@ -54,3 +54,13 @@
 
 - 这里的 owner seam 必须继续保留 local/remote mode 语义、managed/external/conflict 判定、auth fallback 与 restart/test 行为
 - 如果只改 server section，优先扩展这个 owner；不要再把 mode/auth/status/action 细节塞回 `OpenCodianSettings`
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content to the appropriate secondary tab:
+
+- `connection` — renders mode + local/remote host/port settings
+- `auth` — renders auth type + credentials
+- `status` — renders status display with polling interval
+
+The classic `attach()` method remains unchanged for the classic flat layout.

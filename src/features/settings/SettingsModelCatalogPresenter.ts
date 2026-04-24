@@ -165,14 +165,16 @@ export class SettingsModelCatalogPresenter {
     containerEl: HTMLElement,
     options: SettingsModelCatalogPresenterRenderOptions,
   ): HTMLElement {
-    const blockEl = containerEl.createDiv({ cls: 'opencodian-model-toggle-block' });
-    const descEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-desc' });
-    this.applyInlineCodeText(descEl, t('settings.model.toggle.desc'));
+    const descText = t('settings.model.toggle.desc');
+    if (descText.trim().length > 0) {
+      const descEl = containerEl.createDiv({ cls: 'opencodian-model-toggle-desc' });
+      this.applyInlineCodeText(descEl, descText);
+    }
 
-    const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
+    const controlsEl = containerEl.createDiv({ cls: 'opencodian-model-availability-controls' });
     this.renderAvailabilityControls(controlsEl, options);
 
-    return blockEl;
+    return containerEl;
   }
 
   private renderAvailabilityControls(

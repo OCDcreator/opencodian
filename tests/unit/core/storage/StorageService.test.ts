@@ -770,6 +770,9 @@ describe('StorageService persisted ui settings', () => {
         settingsPanelScrollTop: 42,
         modelAvailabilitySectionOpen: true,
         modelToolsSectionOpen: false,
+        settingsLayoutMode: 'tabbed',
+        settingsTabbedPrimaryTab: 'model',
+        settingsTabbedSecondaryTabByPrimary: { model: 'common' },
         enableDebugLogging: false,
         inlineSerializedDebugLogArgs: false,
         debugLogPaths: { unix: '', windows: '' },
@@ -796,6 +799,18 @@ describe('StorageService persisted ui settings', () => {
       expect(mockAdapter.write).toHaveBeenCalledWith(
         '.opencodian/settings.ui.json',
         expect.stringContaining('"settingsPanelScrollTop": 42'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.ui.json',
+        expect.stringContaining('"settingsLayoutMode": "tabbed"'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.ui.json',
+        expect.stringContaining('"settingsTabbedPrimaryTab": "model"'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.ui.json',
+        expect.stringContaining('"settingsTabbedSecondaryTabByPrimary"'),
       );
     });
   });

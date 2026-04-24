@@ -52,3 +52,7 @@ UI owner 内的每个控件都继续沿用既有语义：
 
 - 不要改变 tab bar layout 语义、scroll mode 语义、默认值或保存时机。
 - 如果后续继续推进 UI lane，优先在这个 owner 内扩展完整 UI section lifecycle，而不是回到 `OpenCodianSettings` 主类里追加 setting 闭包。
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. The UI section has a single secondary tab (`general`), so the secondary tab parameter is ignored — the method simply delegates to `attach()`.

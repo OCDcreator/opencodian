@@ -333,3 +333,21 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 
 - `inputPanelGlassRefractionGlassDefaultsVersion: 2` 表示当前玻璃默认值版本
 - 未来版本升级时可通过比较版本号触发默认值迁移
+
+## 2026-04-24 Dual-layout settings fields
+
+New fields added to `OpenCodianSettings` for the dual-layout settings UI:
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `settingsLayoutMode` | `'classic' \| 'tabbed'` | `'tabbed'` | 设置页面布局模式 |
+| `settingsTabbedPrimaryTab` | `string` | `'server'` | 标签模式下当前激活的一级标签 |
+| `settingsTabbedSecondaryTabByPrimary` | `Record<string, string>` | `{}` | 每个一级标签上次选择的二级标签 |
+
+New normalize functions added:
+
+- `normalizeSettingsLayoutMode(value)` — validates and defaults to `'tabbed'`
+- `normalizeSettingsTabbedPrimaryTab(value, fallback)` — validates string, falls back to given value, and migrates legacy `'language'` primary ids to `'general'`
+- `normalizeSettingsTabbedSecondaryTabByPrimary(value)` — filters to `Record<string, string>` of trimmed non-empty entries, remaps legacy `{ language: 'general' }` memory to `{ general: 'language' }`, and downgrades stale `{ general: 'general' }` to `{ general: 'basic' }`
+
+`DEFAULT_SETTINGS` defaults to `settingsLayoutMode: 'tabbed'` for new installs. Existing users are migrated to `'classic'` in `settingsLoadNormalization.ts` via `resolveInitialLayoutMode()`.

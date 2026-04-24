@@ -277,3 +277,13 @@ OpenCodianView 会话变更
 - 第一次升级到这套 sidecar 方案的冷启动，可能仍会看到若干 full-session fallback；完成一次启动后，后续冷启动应该更多命中 `session-metas/`。
 - 设置恢复把“损坏/不可解析”与“文件不存在”区分开处理，避免把损坏文件误当首次安装再写默认值覆盖。
 - 模块里声明了 `vaultPath`，但当前公开 API 并不直接使用这个字段。
+
+## 2026-04-24 Dual-layout settings persistence
+
+Settings UI now supports dual-layout mode (classic flat / tabbed primary+secondary tabs). `PersistedUiSettings` gained three new keys:
+
+- `settingsLayoutMode` — user's preferred layout mode (`'classic'` or `'tabbed'`)
+- `settingsTabbedPrimaryTab` — active primary tab in tabbed mode (e.g. `'server'`, `'model'`)
+- `settingsTabbedSecondaryTabByPrimary` — saved secondary tab IDs keyed by primary tab ID
+
+These are persisted in `settings.ui.json` alongside existing UI state (tab state, scroll position, model section open states). The split persists — core settings go to `settings.core.json`, UI-only state (including layout preferences) to `settings.ui.json`.

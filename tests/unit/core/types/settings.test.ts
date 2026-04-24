@@ -31,6 +31,9 @@ import {
   normalizeQuestionCardPosition,
   normalizeQuestionCardSettings,
   normalizeQuestionDisplayMode,
+  normalizeSettingsLayoutMode,
+  normalizeSettingsTabbedPrimaryTab,
+  normalizeSettingsTabbedSecondaryTabByPrimary,
   normalizeSlashCommandSkillMode,
   normalizeTabBarPosition,
 } from '../../../../src/core/types/settings';
@@ -52,67 +55,13 @@ import {
     });
 
     it('preserves provider icon entry variant metadata', () => {
-      const normalized = normalizeProviderIconLibrary({
-        adobe: [
-          {
-            id: 'builtin:lobehub:adobe',
-            type: 'builtin',
-            source: 'lobehub:adobe',
-            variant: 'color',
-            resolvedVariant: 'color',
-            resolvedFormat: 'svg',
-            addedAt: 1,
-          },
-        ],
-      });
-
-      expect(normalized.adobe?.[0]).toMatchObject({
-        variant: 'color',
-        resolvedVariant: 'color',
-        resolvedFormat: 'svg',
-      });
+      const normalized = normalizeProviderIconLibrary({ adobe: [{ id: 'builtin:lobehub:adobe', type: 'builtin', source: 'lobehub:adobe', variant: 'color', resolvedVariant: 'color', resolvedFormat: 'svg', addedAt: 1 }] });
+      expect(normalized.adobe?.[0]).toMatchObject({ variant: 'color', resolvedVariant: 'color', resolvedFormat: 'svg' });
     });
 
     it('filters invalid provider icon entries while trimming persisted fields', () => {
-      const normalized = normalizeProviderIconLibrary({
-        ' openai ': [
-          {
-            id: ' builtin:lobehub:openai ',
-            type: 'builtin',
-            source: ' lobehub:openai ',
-            mimeType: ' image/svg+xml ',
-            cacheFileName: ' openai.svg ',
-            resolvedVariant: 'auto',
-            addedAt: 1,
-          },
-          {
-            id: 'builtin:bad:openai',
-            type: 'builtin',
-            source: 'bad:openai',
-            addedAt: 2,
-          },
-          {
-            id: 'mapped:openai',
-            type: 'invalid',
-            source: 'openai',
-            addedAt: 3,
-          },
-        ],
-      });
-
-      expect(normalized).toEqual({
-        openai: [
-          expect.objectContaining({
-            id: 'builtin:lobehub:openai',
-            type: 'builtin',
-            source: 'lobehub:openai',
-            mimeType: 'image/svg+xml',
-            cacheFileName: 'openai.svg',
-            resolvedVariant: undefined,
-            addedAt: 1,
-          }),
-        ],
-      });
+      const normalized = normalizeProviderIconLibrary({ ' openai ': [{ id: ' builtin:lobehub:openai ', type: 'builtin', source: ' lobehub:openai ', mimeType: ' image/svg+xml ', cacheFileName: ' openai.svg ', resolvedVariant: 'auto', addedAt: 1 }, { id: 'builtin:bad:openai', type: 'builtin', source: 'bad:openai', addedAt: 2 }, { id: 'mapped:openai', type: 'invalid', source: 'openai', addedAt: 3 }] });
+      expect(normalized).toEqual({ openai: [expect.objectContaining({ id: 'builtin:lobehub:openai', type: 'builtin', source: 'lobehub:openai', mimeType: 'image/svg+xml', cacheFileName: 'openai.svg', resolvedVariant: undefined, addedAt: 1 })] });
     });
   });
 
@@ -257,6 +206,64 @@ import {
       expect(normalizeSlashCommandSkillMode('direct')).toBe('direct');
       expect(normalizeSlashCommandSkillMode('skills-command')).toBe('skills-command');
       expect(normalizeSlashCommandSkillMode('invalid')).toBe('direct');
+    });
+
+    it('should have settings ui layout fields with correct defaults', () => {
+      expect(DEFAULT_SETTINGS.settingsLayoutMode).toBe('tabbed');
+      expect(DEFAULT_SETTINGS.settingsTabbedPrimaryTab).toBe('server');
+      expect(DEFAULT_SETTINGS.settingsTabbedSecondaryTabByPrimary).toEqual({});
+    });
+  });
+
+  describe('settings layout mode normalization', () => {
+    it('normalizes invalid layout modes to tabbed', () => {
+      expect(normalizeSettingsLayoutMode('classic')).toBe('classic');
+      expect(normalizeSettingsLayoutMode('tabbed')).toBe('tabbed');
+      expect(normalizeSettingsLayoutMode('flat')).toBe('tabbed');
+      expect(normalizeSettingsLayoutMode(undefined)).toBe('tabbed');
+    });
+  });
+
+  describe('settings tabbed primary tab normalization', () => {
+    it('keeps valid primary tab ids and falls back for invalid ones', () => {
+      expect(normalizeSettingsTabbedPrimaryTab('general', 'server')).toBe('general');
+      expect(normalizeSettingsTabbedPrimaryTab('server', 'server')).toBe('server');
+      expect(normalizeSettingsTabbedPrimaryTab('  model  ', 'server')).toBe('model');
+      expect(normalizeSettingsTabbedPrimaryTab('', 'server')).toBe('server');
+      expect(normalizeSettingsTabbedPrimaryTab(undefined, 'server')).toBe('server');
+      expect(normalizeSettingsTabbedPrimaryTab(42, 'server')).toBe('server');
+    });
+
+    it('migrates the removed language primary tab to general', () => {
+      expect(normalizeSettingsTabbedPrimaryTab('language', 'server')).toBe('general');
+      expect(normalizeSettingsTabbedPrimaryTab(undefined, 'language')).toBe('general');
+    });
+  });
+
+  describe('settings tabbed secondary tab by primary normalization', () => {
+    it('normalizes the secondary tab record to a clean string map', () => {
+      expect(normalizeSettingsTabbedSecondaryTabByPrimary({
+        server: 'connection',
+        model: '  common  ',
+        conversation: '',
+      })).toEqual({
+        server: 'connection',
+        model: 'common',
+      });
+    });
+
+    it('drops invalid entries', () => {
+      expect(normalizeSettingsTabbedSecondaryTabByPrimary(undefined)).toEqual({});
+      expect(normalizeSettingsTabbedSecondaryTabByPrimary('invalid')).toEqual({});
+      expect(normalizeSettingsTabbedSecondaryTabByPrimary([])).toEqual({});
+    });
+
+    it('migrates the removed language tab memory to general/language', () => {
+      expect(normalizeSettingsTabbedSecondaryTabByPrimary({
+        language: 'general',
+      })).toEqual({
+        general: 'language',
+      });
     });
 
     it('should have allowed export paths', () => {

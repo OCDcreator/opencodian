@@ -67,11 +67,8 @@ export class SettingsServerSection {
     );
 
     this.renderModeSetting(containerEl);
-    if (this.isLocalMode()) {
-      this.renderLocalSettings(containerEl);
-    } else {
-      this.renderRemoteSettings(containerEl);
-    }
+    if (this.isLocalMode()) this.renderLocalSettings(containerEl);
+    else this.renderRemoteSettings(containerEl);
     this.renderAuthSettings(containerEl);
     this.renderStatusSetting(containerEl);
     this.registerContainerCleanup(containerEl);
@@ -80,6 +77,24 @@ export class SettingsServerSection {
     this.statusIntervalId = window.setInterval(() => void this.refreshStatus(), 2000);
 
     return headingEl;
+  }
+
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    switch (secondaryTabId) {
+      case 'connection':
+        this.renderModeSetting(containerEl);
+        if (this.isLocalMode()) this.renderLocalSettings(containerEl);
+        else this.renderRemoteSettings(containerEl);
+        break;
+      case 'auth':
+        this.renderAuthSettings(containerEl);
+        break;
+      case 'status':
+        this.renderStatusSetting(containerEl);
+        this.registerContainerCleanup(containerEl);
+        void this.refreshStatus();
+        this.statusIntervalId = window.setInterval(() => void this.refreshStatus(), 2000);
+    }
   }
 
   dispose(): void {
@@ -133,12 +148,8 @@ export class SettingsServerSection {
             if (value === 'local' && this.plugin.settings.server.auth.type === 'bearer') {
               this.plugin.settings.server.auth.type = 'none';
             }
-            if (
-              value === 'remote'
-              && !this.plugin.settings.server.remote.baseUrl.trim()
-            ) {
-              this.plugin.settings.server.remote.baseUrl =
-                `http://${this.plugin.settings.server.local.host}:${this.plugin.settings.server.local.port}`;
+            if (value === 'remote' && !this.plugin.settings.server.remote.baseUrl.trim()) {
+              this.plugin.settings.server.remote.baseUrl = `http://${this.plugin.settings.server.local.host}:${this.plugin.settings.server.local.port}`;
             }
             await this.plugin.saveSettings();
             this.requestDisplayRefresh();

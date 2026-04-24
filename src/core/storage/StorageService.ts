@@ -45,7 +45,10 @@ export type PersistedUiSettingsKey =
   | 'tabState'
   | 'settingsPanelScrollTop'
   | 'modelAvailabilitySectionOpen'
-  | 'modelToolsSectionOpen';
+  | 'modelToolsSectionOpen'
+  | 'settingsLayoutMode'
+  | 'settingsTabbedPrimaryTab'
+  | 'settingsTabbedSecondaryTabByPrimary';
 
 export type PersistedUiSettings = Pick<OpenCodianSettings, PersistedUiSettingsKey>;
 export type PersistedCoreSettings = Omit<OpenCodianSettings, PersistedUiSettingsKey>;
@@ -100,6 +103,9 @@ const PERSISTED_UI_SETTINGS_KEYS = [
   'settingsPanelScrollTop',
   'modelAvailabilitySectionOpen',
   'modelToolsSectionOpen',
+  'settingsLayoutMode',
+  'settingsTabbedPrimaryTab',
+  'settingsTabbedSecondaryTabByPrimary',
 ] as const satisfies readonly PersistedUiSettingsKey[];
 
 function extractPersistedUiSettings(
@@ -110,6 +116,9 @@ function extractPersistedUiSettings(
     settingsPanelScrollTop: settings.settingsPanelScrollTop,
     modelAvailabilitySectionOpen: settings.modelAvailabilitySectionOpen,
     modelToolsSectionOpen: settings.modelToolsSectionOpen,
+    settingsLayoutMode: settings.settingsLayoutMode,
+    settingsTabbedPrimaryTab: settings.settingsTabbedPrimaryTab,
+    settingsTabbedSecondaryTabByPrimary: settings.settingsTabbedSecondaryTabByPrimary,
   };
 }
 

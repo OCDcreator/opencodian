@@ -145,3 +145,23 @@ The conversation settings "project compaction" block now supports per-field help
 1. `settings.conversation.compaction.help.openDoc`
 2. `settings.conversation.compaction.help.{whatItMeans|opencodeDefault|adjustmentEffect|moreNotes|tipsLabel}`
 3. `settings.conversation.compaction.help.{auto|prune|tailTurns|preserveRecentTokens|reserved}.*`
+
+## 2026-04-24 Settings dual-layout locale keys
+
+New keys added for the tabbed settings layout:
+
+- `settings.layoutMode.*` — layout mode dropdown labels (classic/tabbed)
+- `settings.general.*` — General primary tab title, Basic/Language secondary labels, and classic-mode subgroup copy
+- `settings.model.availability.desc` — now carries the old toggle-persistence explanation too, so the model availability header uses one merged sentence instead of two stacked descriptions
+- `settings.language.tab.*` — language tab labels
+- `settings.server.tab.*` — server secondary tab labels (connection/auth/status)
+- `settings.model.tab.*` — model secondary tab labels (common/projectConfig/availability/tools)
+- `settings.conversation.tab.*` — conversation secondary tab labels (title/compaction/display/questions/rendering)
+- `settings.agents.tab.*` — agents secondary tab labels (default/catalog/editor)
+- `settings.commands.tab.*` — commands secondary tab labels (mode/editor/catalog)
+- `settings.plugins.tab.*` — plugins secondary tab labels (overview/global/projectDirectory/omo)
+- `settings.security.tab.*` — security secondary tab labels (config/permissions/safety)
+- `settings.ui.tab.*` — UI secondary tab labels (general)
+- `settings.style.tab.*` — style secondary tab labels (presets/background/layout/user/assistant/input/scrollbar/advanced)
+- `settings.debug.tab.*` — debug secondary tab labels (general/modules/logs/actions)
+- `settings.user.tab.*` — user secondary tab labels (profile/prompt/tags)

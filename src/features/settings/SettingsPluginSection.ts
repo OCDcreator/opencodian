@@ -60,6 +60,62 @@ export class SettingsPluginSection {
     this.refreshRunId += 1;
   }
 
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.dispose();
+    const currentRunId = this.refreshRunId;
+    const vaultPath = getVaultBasePath(this.plugin.app);
+
+    if (!vaultPath) {
+      new Setting(containerEl)
+        .setName(t('settings.plugins.unavailable.name'))
+        .setDesc(t('settings.plugins.unavailable.desc'));
+      return;
+    }
+
+    const pluginService = new PluginManagementService(vaultPath);
+    const refreshPluginSnapshot = async (showNotice = false) => {
+      try {
+        const snapshot = await pluginService.inspect(
+          this.plugin.settings.server.mode,
+          this.plugin.settings.pluginIsolationMode,
+        );
+        if (currentRunId !== this.refreshRunId) return;
+
+        const overviewEl = containerEl.querySelector('[data-section-block="overview"] .opencodian-plugin-block-body') as HTMLElement;
+        const globalSourcesEl = containerEl.querySelector('[data-section-block="global"] .opencodian-plugin-block-body') as HTMLElement;
+        const projectDirEl = containerEl.querySelector('[data-section-block="project-directory"] .opencodian-plugin-block-body') as HTMLElement;
+        const omoEl = containerEl.querySelector('[data-section-block="omo"] .opencodian-plugin-block-body') as HTMLElement;
+
+        if (overviewEl) this.renderPluginOverview(overviewEl, snapshot);
+        if (globalSourcesEl) this.renderPluginSources(globalSourcesEl, snapshot);
+        if (projectDirEl) this.renderPluginProjectDirectory(projectDirEl, snapshot);
+        if (omoEl) this.renderPluginOmoSection(omoEl, snapshot);
+
+        if (showNotice) new Notice(t('settings.plugins.refresh.success'));
+      } catch (error) {
+        if (currentRunId !== this.refreshRunId) return;
+        logger.error('Failed to refresh plugin snapshot:', error);
+        if (showNotice) new Notice(t('settings.plugins.refresh.failed'));
+      }
+    };
+
+    if (secondaryTabId === 'overview') {
+      const overviewEl = containerEl.createDiv({ attr: { 'data-section-block': 'overview' } });
+      this.createPluginSubsection(overviewEl, t('settings.plugins.overview.title'), t('settings.plugins.overview.desc'));
+    } else if (secondaryTabId === 'global') {
+      const globalSourcesEl = containerEl.createDiv({ attr: { 'data-section-block': 'global' } });
+      this.createPluginSubsection(globalSourcesEl, t('settings.plugins.global.title'), t('settings.plugins.global.desc'));
+    } else if (secondaryTabId === 'project-directory') {
+      const projectDirEl = containerEl.createDiv({ attr: { 'data-section-block': 'project-directory' } });
+      this.createPluginSubsection(projectDirEl, t('settings.plugins.projectDirectory.title'), t('settings.plugins.projectDirectory.desc'));
+    } else if (secondaryTabId === 'omo') {
+      const omoEl = containerEl.createDiv({ attr: { 'data-section-block': 'omo' } });
+      this.createPluginSubsection(omoEl, t('settings.plugins.omo.title'), t('settings.plugins.omo.desc'));
+    }
+
+    void refreshPluginSnapshot(false);
+  }
+
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     this.dispose();
     const currentRunId = this.refreshRunId;

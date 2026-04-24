@@ -50,3 +50,14 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 - 这里的模块开关只控制 `info` / `debug`；`always` / `warn` / `error` 不应被隐藏。
 - 导出路径的选择、确认后持久化语义保持不变。
 - 如果后续继续扩展 debug 面板，优先继续在这个 owner 收口，不要把逻辑重新散回 `OpenCodianSettings.ts`。
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `general` — renders debug toggle + module toggles + refresh interval
+- `modules` — renders module-level debug switches
+- `logs` — renders log path picker + export/log actions
+- `actions` — renders diagnostic copy/generate/clear actions + console help
+
+The classic `attach()` method remains unchanged.

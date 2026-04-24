@@ -38,5 +38,6 @@
 - `ContextDetailModal` 通过 `.opencodian-context-detail-modal` 直接覆盖 Obsidian 默认 modal 宽度；若切回 `:has(...)` 或改 class 名，需确认 raw message JSON 在宽窗口下不会再次被默认壳层截断。
 - `ConversationCompactionHelpModal` 也通过专用 class 直接放宽 modal 宽度，并把内容做成 2×2 信息卡；如果改回 `.opencodian-config-help` 默认壳层，容易重新出现内容过窄和内部滚动问题。
 - 代理设置相关样式现在混合了静态卡片和 `details/summary` 折叠区；如果修改 `.opencodian-agent-editor-group-summary` 的交互样式，需同时确认默认折叠的“高级配置”仍能看出可展开状态。
+- `model availability` 里的 `.opencodian-model-availability-controls` 现在只负责布局，不再自带分组大卡片壳；如果后续想恢复这层视觉容器，先确认不会重新出现“外层模型 block 里再包一层 controls 大卡片”的双层嵌套感。
 - `opencodian-agent-catalog-scroll` 只负责目录块的内部滚动高度，不应把整个 settings 容器再次改成双滚动。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

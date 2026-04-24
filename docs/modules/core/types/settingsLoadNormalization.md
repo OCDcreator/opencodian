@@ -63,3 +63,13 @@ Ownership facts:
 1. Compaction config is project-scoped and stored in `.opencode/opencode.json`.
 2. Conversation session settings no longer own compaction, and `OpenCodianSettings` no longer normalizes `autoCompactionEnabled` / `compactionReservedTokens` during bootstrap.
 3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not a settings bootstrap concern.
+
+## 2026-04-24 Dual-layout mode bootstrap
+
+`resolveInitialLayoutMode()` was added to decide the layout mode on plugin start:
+
+- If `settingsLayoutMode` is explicitly saved, use the normalized value
+- If settings exist (existing user) but no explicit layout mode, default to `'classic'` to avoid forced migration
+- If no saved settings at all (fresh install), return the `DEFAULT_SETTINGS` value (`'tabbed'`)
+
+`normalizeLoadedPluginSettings()` now also normalizes `settingsTabbedPrimaryTab` (with `'server'` fallback) and `settingsTabbedSecondaryTabByPrimary` from saved snapshots during bootstrap. This bootstrap path also migrates legacy dual-layout memory from `language` to `general`, so old saved `{ settingsTabbedPrimaryTab: 'language', settingsTabbedSecondaryTabByPrimary: { language: 'general' } }` becomes `general -> language`.

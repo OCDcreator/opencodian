@@ -98,6 +98,27 @@ export class SettingsDebugSection {
     return headingEl;
   }
 
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    const platformKey = getCurrentPlatformKey();
+
+    const generalBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'general' } });
+    this.addDebugLoggingSetting(generalBlockEl);
+
+    const modulesBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'modules' } });
+    this.addDebugModuleSettings(modulesBlockEl);
+
+    const logsBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'logs' } });
+    this.addDebugRefreshIntervalSetting(logsBlockEl);
+    this.addInlineSerializedArgsSetting(logsBlockEl);
+    const logPathText = this.addLogPathSetting(logsBlockEl, platformKey);
+
+    const actionsBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'actions' } });
+    this.addDiagnosticActionsSetting(actionsBlockEl, logPathText);
+    this.addConsoleHelpBlock(actionsBlockEl);
+
+    this.showActiveBlock(containerEl, secondaryTabId);
+  }
+
   private addDebugLoggingSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.debug.logging.name'))
@@ -409,4 +430,12 @@ export class SettingsDebugSection {
     }
     return candidatePath;
   }
+
+  private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
+    containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
+      const blockEl = el as HTMLElement;
+      blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
+    });
+  }
+
 }

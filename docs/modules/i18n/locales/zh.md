@@ -145,3 +145,23 @@ t('settings.server.started')
 1. `settings.conversation.compaction.help.openDoc`
 2. `settings.conversation.compaction.help.{whatItMeans|opencodeDefault|adjustmentEffect|moreNotes|tipsLabel}`
 3. `settings.conversation.compaction.help.{auto|prune|tailTurns|preserveRecentTokens|reserved}.*`
+
+## 2026-04-24 Settings dual-layout locale keys
+
+New Chinese keys added for the tabbed settings layout:
+
+- `settings.layoutMode.*` — 布局模式下拉选项（经典/标签）
+- `settings.general.*` — 通用一级标签标题、基础/语言二级标签，以及 classic 模式分组文案
+- `settings.model.availability.desc` — 现在合并了原先 toggle 持久化说明，模型可用性头部改成一条合并文案，不再上下两句分开显示
+- `settings.language.tab.*` — 语言标签页标签
+- `settings.server.tab.*` — 服务器二级标签（连接/认证/状态）
+- `settings.model.tab.*` — 模型二级标签（常用/项目配置/可用性/工具）
+- `settings.conversation.tab.*` — 对话二级标签（标题/压缩/显示/提问/渲染）
+- `settings.agents.tab.*` — 代理二级标签（默认/目录/编辑器）
+- `settings.commands.tab.*` — 命令二级标签（模式/编辑器/目录）
+- `settings.plugins.tab.*` — 插件二级标签（概览/全局/项目目录/OMO）
+- `settings.security.tab.*` — 安全二级标签（配置/权限/安全）
+- `settings.ui.tab.*` — UI 二级标签（通用）
+- `settings.style.tab.*` — 样式二级标签（预设/背景/布局/用户/助手/输入/滚动条/高级）
+- `settings.debug.tab.*` — 调试二级标签（通用/模块/日志/操作）
+- `settings.user.tab.*` — 用户二级标签（档案/提示词/标签）

@@ -105,3 +105,15 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
 2. `SettingsConversationSection` writes compaction config directly to `.opencode/opencode.json` via `OpencodeConfigManager`; `autoCompactionEnabled` and `compactionReservedTokens` were removed from `OpenCodianSettings`.
 3. Manual `session.summarize()` remains a per-session action available through session control, not managed by this configuration surface.
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `title` — renders title mode settings + AI title model picker
+- `compaction` — renders project-scoped compaction controls
+- `display` — renders chat font size settings
+- `questions` — renders question card display/position/answered-card toggles
+- `rendering` — renders user markup render toggle
+
+The classic `attach()` method remains unchanged.

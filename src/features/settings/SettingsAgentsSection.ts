@@ -224,6 +224,55 @@ export class SettingsAgentsSection {
     return headingEl;
   }
 
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.dispose();
+    const currentRunId = this.refreshRunId;
+
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      const defaultBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'default' } });
+      new Setting(defaultBlockEl)
+        .setName(t('settings.agents.unavailable.name'))
+        .setDesc(t('settings.agents.unavailable.desc'));
+      this.showActiveBlock(containerEl, secondaryTabId);
+      return;
+    }
+    this.projectAgentEditor ??= new SettingsProjectAgentEditor(configManager);
+
+    const defaultBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'default' } });
+    let defaultAgentDropdown: DropdownComponent | null = null;
+    new Setting(defaultBlockEl)
+      .setName(t('settings.agents.default.name'))
+      .setDesc(t('settings.agents.default.desc'))
+      .addDropdown((dropdown) => {
+        defaultAgentDropdown = dropdown;
+        dropdown
+          .addOption('', t('settings.agents.default.followOpenCode'))
+          .setValue('')
+          .onChange(async (value) => {
+            await configManager.updateDefaultAgent(value || undefined);
+          });
+      });
+
+    const editorBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'editor' } });
+    const editorBodyEl = this.createProjectAgentEditorBlock(editorBlockEl);
+
+    const catalogBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'catalog' } });
+    const catalogBodyEl = this.createCatalogBlock(catalogBlockEl);
+
+    this.showActiveBlock(containerEl, secondaryTabId);
+
+    if (defaultAgentDropdown) {
+      void this.refreshCatalog({
+        catalogBodyEl,
+        configManager,
+        currentRunId,
+        defaultAgentDropdown,
+        editorBodyEl,
+      });
+    }
+  }
+
   private createCatalogBlock(containerEl: HTMLElement): HTMLElement {
     const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block' });
     blockEl.createEl('h4', {
@@ -476,4 +525,11 @@ export class SettingsAgentsSection {
 
     await configManager.upsertAgentConfig(agentId, nextProjectAgent);
   }
+  private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
+    containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
+      const blockEl = el as HTMLElement;
+      blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
+    });
+  }
+
 }

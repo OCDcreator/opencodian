@@ -417,3 +417,67 @@ function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): 
       (plugin.settings as unknown as Record<string, unknown>).experimentalComposerGlassRefractionEnabled,
     ).toBeUndefined();
   });
+
+  it('defaults existing users to classic layout mode when they have no explicit choice', async () => {
+    const plugin = createPluginWithSavedSettings({
+      defaultProvider: 'openai',
+    });
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.settingsLayoutMode).toBe('classic');
+    expect(plugin.settings.settingsTabbedPrimaryTab).toBe('server');
+    expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({});
+  });
+
+  it('preserves explicit tabbed layout mode for existing users', async () => {
+    const plugin = createPluginWithSavedSettings({
+      defaultProvider: 'openai',
+      settingsLayoutMode: 'tabbed',
+      settingsTabbedPrimaryTab: 'model',
+      settingsTabbedSecondaryTabByPrimary: { model: 'common' },
+    });
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.settingsLayoutMode).toBe('tabbed');
+    expect(plugin.settings.settingsTabbedPrimaryTab).toBe('model');
+    expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({ model: 'common' });
+  });
+
+  it('migrates saved language tab memory to general on load', async () => {
+    const plugin = createPluginWithSavedSettings({
+      defaultProvider: 'openai',
+      settingsLayoutMode: 'tabbed',
+      settingsTabbedPrimaryTab: 'language',
+      settingsTabbedSecondaryTabByPrimary: { language: 'general' },
+    });
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.settingsLayoutMode).toBe('tabbed');
+    expect(plugin.settings.settingsTabbedPrimaryTab).toBe('general');
+    expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({ general: 'language' });
+  });
+
+  it('defaults new users to tabbed layout mode when no settings snapshot exists', async () => {
+    // Simulate a fresh install where no settings files exist
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      storage: Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
+    };
+
+    plugin.storage = {
+      loadPersistedSettings: jest.fn().mockResolvedValue({
+        core: { data: null, filePath: '.opencodian/settings.core.json', source: 'missing', shouldPersist: false },
+        ui: { data: null, filePath: '.opencodian/settings.ui.json', source: 'missing', shouldPersist: false },
+        writable: true,
+        shouldPersist: false,
+      }),
+      saveCoreSettings: jest.fn().mockResolvedValue(undefined),
+      saveUiSettings: jest.fn().mockResolvedValue(undefined),
+    } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.settingsLayoutMode).toBe('tabbed');
+  });

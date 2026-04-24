@@ -1696,6 +1696,11 @@ export interface OpenCodianSettings {
   tabState: PersistedTabState;
   theme: ThemeSettings;
 
+  // Settings UI layout
+  settingsLayoutMode: 'classic' | 'tabbed';
+  settingsTabbedPrimaryTab: string;
+  settingsTabbedSecondaryTabByPrimary: Record<string, string>;
+
   // Language
   locale: string;
 
@@ -1704,6 +1709,61 @@ export interface OpenCodianSettings {
 
   // OpenCode skill slash command invocation mode
   slashCommandSkillMode: SlashCommandSkillMode;
+}
+
+export type SettingsLayoutMode = 'classic' | 'tabbed';
+
+export function normalizeSettingsLayoutMode(value: unknown): SettingsLayoutMode {
+  switch (value) {
+    case 'classic':
+    case 'tabbed':
+      return value;
+    default:
+      return 'tabbed';
+  }
+}
+
+export function normalizeSettingsTabbedPrimaryTab(value: unknown, fallback: string): string {
+  const normalizePrimaryTabId = (candidate: string): string => {
+    const trimmed = candidate.trim();
+    if (trimmed === 'language') {
+      return 'general';
+    }
+    return trimmed;
+  };
+
+  const normalizedFallback = normalizePrimaryTabId(fallback);
+  return typeof value === 'string' && value.trim().length > 0
+    ? normalizePrimaryTabId(value)
+    : normalizedFallback;
+}
+
+export function normalizeSettingsTabbedSecondaryTabByPrimary(
+  value: unknown,
+): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const normalized: Record<string, string> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof val === 'string' && val.trim().length > 0 && key.trim().length > 0) {
+      const trimmedKey = key.trim();
+      const trimmedValue = val.trim();
+      if (trimmedKey === 'language') {
+        normalized.general = trimmedValue === 'general' ? 'language' : trimmedValue;
+        continue;
+      }
+
+      if (trimmedKey === 'general' && trimmedValue === 'general') {
+        normalized.general = 'basic';
+        continue;
+      }
+
+      normalized[trimmedKey] = trimmedValue;
+    }
+  }
+  return normalized;
 }
 
 /** Default settings */
@@ -1786,6 +1846,10 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   openInMainTab: false,
   tabState: getDefaultPersistedTabState(),
   theme: getDefaultThemeSettings(),
+
+  settingsLayoutMode: 'tabbed',
+  settingsTabbedPrimaryTab: 'server',
+  settingsTabbedSecondaryTabByPrimary: {},
 
   locale: 'en',
 

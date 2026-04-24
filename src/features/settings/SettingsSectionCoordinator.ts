@@ -32,6 +32,10 @@ interface SettingsSectionCoordinatorOptions {
   scheduleScrollStateSave: () => void;
 }
 
+interface BeginDisplayOptions {
+  showQuickNav?: boolean;
+}
+
 export class SettingsSectionCoordinator {
   private readonly containerEl: HTMLElement;
   private readonly getSavedScrollTop: () => number;
@@ -83,7 +87,7 @@ export class SettingsSectionCoordinator {
     this.pendingOpenScrollTop = null;
   }
 
-  beginDisplay(panelTitle: string): void {
+  beginDisplay(panelTitle: string, options?: BeginDisplayOptions): void {
     this.displayPendingOpenScrollTop = this.pendingOpenScrollTop;
     this.displayPendingOpenSectionTitle = this.pendingOpenSectionTitle;
     this.sections = [];
@@ -105,9 +109,11 @@ export class SettingsSectionCoordinator {
       this.containerEl.style.removeProperty('visibility');
     }
 
-    this.quickNavEl = document.createElement('div');
-    this.quickNavEl.className = 'opencodian-settings-quick-nav';
-    this.containerEl.appendChild(this.quickNavEl);
+    if (options?.showQuickNav !== false) {
+      this.quickNavEl = document.createElement('div');
+      this.quickNavEl.className = 'opencodian-settings-quick-nav';
+      this.containerEl.appendChild(this.quickNavEl);
+    }
 
     const headingEl = document.createElement('h2');
     headingEl.textContent = panelTitle;

@@ -35,14 +35,22 @@ export class SettingsUiSection {
       t('settings.quickNav.uiDesc'),
     );
 
+    this.renderAllContent(containerEl);
+
+    return headingEl;
+  }
+
+  attachTabbed(containerEl: HTMLElement, _secondaryTabId: string): void {
+    this.renderAllContent(containerEl);
+  }
+
+  private renderAllContent(containerEl: HTMLElement): void {
     this.addMaxTabsSetting(containerEl);
     this.addTabPositionSetting(containerEl);
     this.addBelowHeaderTabLayoutSetting(containerEl);
     this.addAutoScrollSetting(containerEl);
     this.addChatScrollModeSetting(containerEl);
     this.addOpenInMainTabSetting(containerEl);
-
-    return headingEl;
   }
 
   private addMaxTabsSetting(containerEl: HTMLElement): void {

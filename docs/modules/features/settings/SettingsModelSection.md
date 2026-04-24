@@ -59,3 +59,14 @@
 - 不要把 provider/model accordion、probe badge/detail 或 catalog filter 逻辑重新塞回这里；那仍属于 `SettingsModelCatalogPresenter`。
 - 不要改变 model availability layering、`disabledModelRefs` 过滤、provider icon fallback 或 title-generation fallback 语义。
 - 如果后续继续推进 settings/model lane，优先扩展 `SettingsModelCatalogCoordinator` 或 `SettingsModelIconCacheManager` 这类相邻 owner，而不是回到 `OpenCodianSettings` 主类或 `SettingsModelSection` shell 里追加大段闭包。
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `common` — renders default model picker + source mode + refresh
+- `project-config` — renders provider workspace cards
+- `availability` — renders provider/model catalog with accordion/search/toggle
+- `tools` — renders provider icon cache tools
+
+The classic `attach()` method remains unchanged.

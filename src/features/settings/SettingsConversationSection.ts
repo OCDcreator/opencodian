@@ -132,26 +132,14 @@ export class SettingsConversationSection {
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
-    this.disposeProjectCompactionConfigListeners();
-    this.titleModelSetting = null;
-    this.titleModelButton = null;
-    this.titleModelWarningButton = null;
-    this.titleModelGroups = [];
-    this.projectCompactionAutoControl = null;
-    this.projectCompactionPruneControl = null;
-    this.projectCompactionTailTurnsControl = null;
-    this.projectCompactionPreserveRecentTokensControl = null;
-    this.projectCompactionReservedControl = null;
+    this.resetState();
+    this.setSharedCallbacks();
 
     const headingEl = this.createSectionHeading(
       containerEl,
       t('settings.conversation.title'),
       t('settings.quickNav.conversationDesc'),
     );
-
-    this.setRefreshTitleModelsCallback(() => {
-      void this.loadTitleModels();
-    });
 
     const titleGenerationBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.titleGeneration.title'),
@@ -174,21 +162,87 @@ export class SettingsConversationSection {
       description: t('settings.conversation.rendering.desc'),
     });
 
-    this.addTitleModeSetting(titleGenerationBodyEl);
-    this.addTitleModelSetting(titleGenerationBodyEl);
-    this.addProjectCompactionSettings(compactionBodyEl);
-    this.addChatFontSizeSetting(displayBodyEl);
-    this.addQuestionDisplayModeSetting(questionBodyEl);
-    this.addQuestionCardPositionSetting(questionBodyEl);
-    this.addAnsweredQuestionCardsSetting(questionBodyEl);
-    this.updateTitleModelSettingVisibility();
-    void this.loadTitleModels();
-    this.addUserMarkupRenderSetting(renderingBodyEl);
+    this.renderTitleBlock(titleGenerationBodyEl);
+    this.renderCompactionBlock(compactionBodyEl);
+    this.renderDisplayBlock(displayBodyEl);
+    this.renderQuestionsBlock(questionBodyEl);
+    this.renderRenderingBlock(renderingBodyEl);
 
-    this.registerProjectCompactionConfigListeners();
-    void this.loadProjectCompactionConfig();
+    this.finishAttach();
 
     return headingEl;
+  }
+
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.resetState();
+    this.setSharedCallbacks();
+
+    const blocks: { id: string; render: (el: HTMLElement) => void }[] = [
+      { id: 'title', render: (el) => this.renderTitleBlock(el) },
+      { id: 'compaction', render: (el) => this.renderCompactionBlock(el) },
+      { id: 'display', render: (el) => this.renderDisplayBlock(el) },
+      { id: 'questions', render: (el) => this.renderQuestionsBlock(el) },
+      { id: 'rendering', render: (el) => this.renderRenderingBlock(el) },
+    ];
+
+    for (const block of blocks) {
+      const blockEl = containerEl.createDiv({ attr: { 'data-section-block': block.id } });
+      block.render(blockEl);
+      if (block.id !== secondaryTabId) {
+        blockEl.style.display = 'none';
+      }
+    }
+
+    this.finishAttach();
+  }
+
+  private resetState(): void {
+    this.disposeProjectCompactionConfigListeners();
+    this.titleModelSetting = null;
+    this.titleModelButton = null;
+    this.titleModelWarningButton = null;
+    this.titleModelGroups = [];
+    this.projectCompactionAutoControl = null;
+    this.projectCompactionPruneControl = null;
+    this.projectCompactionTailTurnsControl = null;
+    this.projectCompactionPreserveRecentTokensControl = null;
+    this.projectCompactionReservedControl = null;
+  }
+
+  private setSharedCallbacks(): void {
+    this.setRefreshTitleModelsCallback(() => {
+      void this.loadTitleModels();
+    });
+  }
+
+  private renderTitleBlock(containerEl: HTMLElement): void {
+    this.addTitleModeSetting(containerEl);
+    this.addTitleModelSetting(containerEl);
+  }
+
+  private renderCompactionBlock(containerEl: HTMLElement): void {
+    this.addProjectCompactionSettings(containerEl);
+  }
+
+  private renderDisplayBlock(containerEl: HTMLElement): void {
+    this.addChatFontSizeSetting(containerEl);
+  }
+
+  private renderQuestionsBlock(containerEl: HTMLElement): void {
+    this.addQuestionDisplayModeSetting(containerEl);
+    this.addQuestionCardPositionSetting(containerEl);
+    this.addAnsweredQuestionCardsSetting(containerEl);
+  }
+
+  private renderRenderingBlock(containerEl: HTMLElement): void {
+    this.addUserMarkupRenderSetting(containerEl);
+  }
+
+  private finishAttach(): void {
+    this.updateTitleModelSettingVisibility();
+    void this.loadTitleModels();
+    this.registerProjectCompactionConfigListeners();
+    void this.loadProjectCompactionConfig();
   }
 
   private registerProjectCompactionConfigListeners(): void {

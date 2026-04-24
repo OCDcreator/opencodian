@@ -28,7 +28,7 @@
 
 这样 `SettingsModelSection` 只需要负责 catalog host、refresh/save orchestration 与周边工具区，而不再直接持有大段 catalog UI DOM 组装和状态切换分支。
 
-当前 owner 内部又按 render lifecycle 拆成了几段稳定阶段：block shell / controls、catalog summary + bulk provider actions、provider accordion header/actions，以及 expanded model list + bulk model toggles。这样后续继续收束时，优先在 presenter 内沿这些生命周期 helper 延伸，而不是把 catalog availability 语义重新摊回调用方。
+当前 owner 内部又按 render lifecycle 拆成了几段稳定阶段：controls、catalog summary + bulk provider actions、provider accordion header/actions，以及 expanded model list + bulk model toggles。2026-04-24 起，availability 内容不再额外创建一层 `.opencodian-model-toggle-block` inner shell，而是直接渲染进 `SettingsModelSection` 提供的外层 block body，这样 classic / tabbed 两种模式都不会出现“外层 block 再包一层大卡片”的双层容器感。这样后续继续收束时，优先在 presenter 内沿这些生命周期 helper 延伸，而不是把 catalog availability 语义重新摊回调用方。
 
 ### provider / model availability 表达
 

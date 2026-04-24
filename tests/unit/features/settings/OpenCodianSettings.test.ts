@@ -1,4 +1,7 @@
+import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
 import { SettingsSectionCoordinator } from '../../../../src/features/settings/SettingsSectionCoordinator';
+import { setLocale } from '../../../../src/i18n';
 import { setDebugLoggingEnabled } from '../../../../src/shared';
 
 class MutationObserverMock {
@@ -348,5 +351,95 @@ describe('SettingsSectionCoordinator quick nav', () => {
       behavior: 'smooth',
       block: 'start',
     });
+  });
+});
+
+function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
+  const plugin = {
+    settings: {
+      ...DEFAULT_SETTINGS,
+      settingsLayoutMode: layoutMode,
+      settingsTabbedPrimaryTab: 'general',
+      settingsTabbedSecondaryTabByPrimary: { general: 'basic' },
+      settingsPanelScrollTop: 0,
+    },
+    saveSettings: jest.fn().mockResolvedValue(undefined),
+    scheduleSettingsUiStateSave: jest.fn(),
+  };
+  const tab = new OpenCodianSettingTab({} as never, plugin as never);
+  document.body.appendChild(tab.containerEl);
+  return { plugin, tab };
+}
+
+describe('OpenCodianSettingTab layout shell', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('uses General as the first classic quick-nav section', () => {
+    const { tab } = createSettingsTab('classic');
+    const appendMarker = (className: string) => (containerEl: HTMLElement) => {
+      containerEl.createDiv({ cls: className, text: className });
+    };
+
+    Object.assign(tab as unknown as Record<string, unknown>, {
+      addServerSettings: jest.fn(),
+      addModelSettings: jest.fn(),
+      addConversationSettings: jest.fn(),
+      addAgentsSettings: jest.fn(),
+      addCommandsSettings: jest.fn(),
+      addPluginSettings: jest.fn(),
+      addSecuritySettings: jest.fn(),
+      addUISettings: jest.fn(),
+      addStyleSettings: jest.fn(),
+      addDebugSettings: jest.fn(),
+      addUserSettings: jest.fn(),
+      renderLayoutModeSetting: appendMarker('layout-mode-setting'),
+      renderLanguageSetting: appendMarker('language-setting'),
+    });
+
+    tab.display();
+
+    expect(
+      Array.from(tab.containerEl.querySelectorAll<HTMLHeadingElement>('.opencodian-settings-section-heading')).map(
+        (element) => element.textContent?.trim(),
+      ),
+    ).toContain('General');
+    expect(
+      Array.from(tab.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn')).map(
+        (element) => element.textContent?.trim(),
+      ),
+    ).toEqual(['General']);
+    expect(
+      Array.from(tab.containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
+        (element) => element.textContent?.trim(),
+      ),
+    ).toEqual(['Basic', 'Language']);
+  });
+
+  it('does not render quick-nav in tabbed layout mode', () => {
+    const { tab } = createSettingsTab('tabbed');
+    const renderDisplay = jest.fn((containerEl: HTMLElement) => {
+      containerEl.createDiv({ cls: 'tabbed-render-marker', text: 'tabbed-rendered' });
+    });
+
+    Object.assign(tab as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderDisplay,
+        switchToPrimaryTab: jest.fn(),
+      }),
+    });
+
+    tab.display();
+
+    expect(renderDisplay).toHaveBeenCalledTimes(1);
+    expect(tab.containerEl.querySelector('.opencodian-settings-quick-nav')).toBeNull();
+    expect(tab.containerEl.querySelector('.tabbed-render-marker')?.textContent).toBe('tabbed-rendered');
   });
 });

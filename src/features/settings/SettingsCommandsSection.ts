@@ -107,6 +107,40 @@ export class SettingsCommandsSection {
     return headingEl;
   }
 
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.dispose();
+    const currentRunId = this.refreshRunId;
+
+    const modeBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'mode' } });
+    this.createSkillModeSetting(modeBlockEl);
+
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      new Setting(modeBlockEl)
+        .setName(t('settings.commands.unavailable.name'))
+        .setDesc(t('settings.commands.unavailable.desc'));
+      this.showActiveBlock(containerEl, secondaryTabId);
+      return;
+    }
+
+    this.projectCommandEditor ??= new SettingsProjectCommandEditor(configManager);
+
+    const editorBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'editor' } });
+    const editorBodyEl = this.createProjectCommandEditorBlock(editorBlockEl);
+
+    const catalogBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'catalog' } });
+    const catalogBodyEl = this.createCatalogBlock(catalogBlockEl);
+
+    this.showActiveBlock(containerEl, secondaryTabId);
+
+    void this.refreshCatalog({
+      catalogBodyEl,
+      configManager,
+      currentRunId,
+      editorBodyEl,
+    });
+  }
+
   private createSkillModeSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.commands.skillMode.name'))
@@ -361,4 +395,12 @@ export class SettingsCommandsSection {
       applyUi: false,
     });
   }
+
+  private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
+    containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
+      const blockEl = el as HTMLElement;
+      blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
+    });
+  }
+
 }

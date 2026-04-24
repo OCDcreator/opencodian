@@ -43,6 +43,8 @@ export class SettingsSecuritySection {
     this.createSectionHeading = options.createSectionHeading;
   }
 
+  dispose(): void {}
+
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     const headingEl = this.createSectionHeading(
       containerEl,
@@ -72,6 +74,39 @@ export class SettingsSecuritySection {
     this.renderBlocklistSettings(containerEl);
 
     return headingEl;
+  }
+
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    const vaultPath = getVaultBasePath(this.plugin.app);
+
+    if (secondaryTabId === 'config') {
+      if (!vaultPath) {
+        this.renderUnavailableConfigStatus(containerEl);
+        return;
+      }
+      const configManager = new OpencodeConfigManager(vaultPath);
+      const configStatusSetting = this.renderConfigStatusSetting(containerEl);
+      this.renderPermissionModeSetting(containerEl, () =>
+        this.updateConfigStatus(configStatusSetting, configManager)
+      );
+      void this.updateConfigStatus(configStatusSetting, configManager).catch(() => {});
+      this.renderAutoRestartSetting(containerEl);
+      this.renderConfigFileSetting(containerEl, configManager);
+    } else if (secondaryTabId === 'permissions') {
+      if (!vaultPath) {
+        this.renderUnavailableConfigStatus(containerEl);
+        return;
+      }
+      const configManager = new OpencodeConfigManager(vaultPath);
+      const configStatusSetting = this.renderConfigStatusSetting(containerEl);
+      this.renderPermissionModeSetting(containerEl, () =>
+        this.updateConfigStatus(configStatusSetting, configManager)
+      );
+      void this.updateConfigStatus(configStatusSetting, configManager).catch(() => {});
+      this.renderAutoRestartSetting(containerEl);
+    } else if (secondaryTabId === 'safety') {
+      this.renderBlocklistSettings(containerEl);
+    }
   }
 
   private renderUnavailableConfigStatus(containerEl: HTMLElement): void {

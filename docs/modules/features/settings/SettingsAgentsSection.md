@@ -109,3 +109,13 @@ owner 现在在同一分区内提供一个 project agent editor：
 - 不要在 `OpenCodianView.ts` 或 `OpenCodeService.ts` 中追加 Agents settings ownership；设置页写回应继续留在本 owner 与 `OpencodeConfigManager` seam 内。
 - 当前 owner 只写项目级 `.opencode/opencode.json`，不要读写全局 OpenCode 配置。
 - 表单当前已覆盖 project agent 核心字段、`permission.task` allowlist 与 `options`；commands/slash runtime 应保持在相邻 command-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `default` — renders default agent dropdown + catalog listing
+- `catalog` — renders full agent catalog
+- `editor` — renders project agent editor form
+
+The classic `attach()` method remains unchanged.

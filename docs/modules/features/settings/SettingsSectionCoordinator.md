@@ -10,7 +10,7 @@
 ## 核心职责
 
 - 在 `beginDisplay()` / `finishDisplay()` 之间管理 settings panel 的顶层重建流程
-- 通过 `createSectionHeading()` 记录 section heading，并在完成渲染后统一生成 quick-nav
+- 通过 `createSectionHeading()` 记录 section heading，并在完成渲染后按需生成 quick-nav
 - 维护 `prepareRestoreScrollOnNextOpen()` / `prepareScrollToSectionOnNextOpen()` 的打开意图
 - 在 post-render 阶段绑定 scroll persistence，并用 `MutationObserver` + retry timers 恢复滚动位置
 - 在 `hide()` 时收尾 restore work、capture 当前 scrollTop，并清理监听器
@@ -19,7 +19,7 @@
 
 | 方法 | 说明 |
 |------|------|
-| `beginDisplay()` | 清空 panel chrome、准备 quick-nav host，并保留本次 display 的 pending scroll intent |
+| `beginDisplay()` | 清空 panel chrome、按需准备 quick-nav host，并保留本次 display 的 pending scroll intent；tabbed 布局可以关闭 quick-nav |
 | `createSectionHeading()` | 创建 section heading，同时把该分区注册到 quick-nav 数据集 |
 | `finishDisplay()` | 构建 quick-nav、安排 post-render setup，并在初次打开时清理 quick-nav 焦点 |
 | `restoreScrollPosition()` | 执行带 settle/retry 的滚动恢复 |

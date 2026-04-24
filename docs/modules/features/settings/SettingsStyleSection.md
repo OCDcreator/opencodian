@@ -54,3 +54,18 @@
 - 如果只调整 style section orchestration、custom CSS 或 reset-all 流程，优先改这里；preset 专属 UI/state 与通用 numeric/color/reset 不要重新堆回本文件
 - input subsection 的局部重绘必须继续由 `SettingsStyleInputPanelSection` 保留，避免切换 input theme 时触发整页 settings 重建
 - background subsection、preset subsection 与 shared control primitives 都已经是相邻 owner；不要把 preview/upload/drag/reset、preset chips/status，或单控件实现逻辑重新并回这里
+
+## 2026-04-24 Tabbed layout support
+
+Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
+
+- `presets` — renders theme preset cards + scheme chips
+- `background` — renders background upload/preview/fit controls
+- `layout` — renders layout settings
+- `user` — renders user message bubble appearance
+- `assistant` — renders assistant message bubble appearance
+- `input` — renders input panel theme + glass refraction settings
+- `scrollbar` — renders scrollbar appearance
+- `advanced` — renders custom CSS editor
+
+The classic `attach()` method remains unchanged.

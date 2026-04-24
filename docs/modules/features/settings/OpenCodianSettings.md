@@ -7,6 +7,13 @@
 
 `OpenCodianSettings.ts` 是插件的主设置面板。它继承 `PluginSettingTab`，负责组合各个设置分区，并把模型、样式、调试与 modal 编排挂到 Obsidian 的 settings UI 上。
 
+当前文件支持两种布局模式：
+
+- **经典平铺模式**: 所有 section 完整平铺展示，但首个一级分区现在是 `General`，内部再拆成 `Basic` / `Language`
+- **多级标签分类模式**: 标题下直接显示一级标签栏、其下显示二级标签栏，再下面是内容区；这个模式不显示 quick-nav，也不显示左侧竖排 section 列表
+
+布局模式通过 `settingsLayoutMode` settings 字段持久化，新用户默认 `'tabbed'`，老用户升级默认 `'classic'`。标签模式的标签结构定义在 `settingsLayoutRegistry.ts`，渲染委托给 `SettingsTabbedRenderer`。
+
 当前文件的重点不只是“渲染设置项”，还包括：
 
 - 模型 / 样式 / server / security owner 的装配与跨 section 桥接
@@ -26,7 +33,7 @@
 
 `display()` 会重建整个设置面板，并依次挂载这些分区：
 
-- Language
+- General
 - Server
 - Model
 - Conversation
@@ -90,7 +97,7 @@
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
 
-从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 Language / Server / Model / Conversation / Agents / Commands / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。
+从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式现在还会通过 `beginDisplay({ showQuickNav: false })` 关闭 quick-nav，只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 
 ### 模型目录与可用性控制
 
@@ -152,11 +159,13 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 | 方法 | 说明 |
 |------|------|
-| `display()` | 重建完整设置面板，并委托 `SettingsSectionCoordinator` 收口 section scaffolding |
+| `display()` | 重建完整设置面板，根据 `settingsLayoutMode` 分发到经典或标签布局 |
 | `hide()` | 清理轮询、样式绑定，并让 `SettingsSectionCoordinator` 收尾滚动状态 |
 | `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
-| `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区 |
+| `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区（经典模式滚动，标签模式切标签） |
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
+| `renderLanguageSetting()` | 渲染语言选择器（经典模式在 `General > Language`，标签模式在 `General > Language` 二级面板内） |
+| `renderLayoutModeSetting()` | 渲染设置界面模式切换控件（经典模式在 `General > Basic`，标签模式在 `General > Basic`） |
 | `addServerSettings()` | 创建并挂载 `SettingsServerSection` owner，把 server section lifecycle 从主类中收口出去 |
 | `addSecuritySettings()` | 创建并挂载 `SettingsSecuritySection` owner，把 security section lifecycle 从主类中收口出去 |
 | `addModelSettings()` | 创建并挂载 `SettingsModelSection` owner，把模型 section lifecycle 从主类中收口出去 |
@@ -171,6 +180,9 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 ## 与其他模块的交互
 
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
+- `SettingsTabbedRenderer`: 标签模式下的标签栏渲染与内容路由，从 `OpenCodianSettings` 中提取以控制代码行数
+- `SettingsUserSection`: 用户 profile/prompt/tags 设置的独立渲染函数，从 `OpenCodianSettings` 中提取
+- `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
 - `SettingsModelSection`: 管理模型 section 的 block shell、callback bridge 与 `SettingsModelCatalogPresenter` host；source mode、refresh 链路、workspace 卡片和 icon cache 工具区继续委托给相邻 model-section owners
 - `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、project-scoped compaction editor、global chat font size、question card display/position、answered-card toggle 与 user-markup render toggle，并复用主设置页 block 组件把它们拆成多层级分组；`OpenCodianSettings` 只保留 owner 装配、block seam 与 title-model refresh callback bridge
