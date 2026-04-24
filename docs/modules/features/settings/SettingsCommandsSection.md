@@ -30,6 +30,7 @@ owner 会并行读取：
 - 如果 project command 指向 `opencodian-command:<id>` 这类 hidden agent，则 section 会把该 agent 的 `temperature` / `top_p` 回填给 editor，并尽量显示 metadata 里的 base agent，而不是暴露内部 agent ID
 - runtime 中不存在、但 project config 存在的条目会保留成 `projectOnly`
 - 这些 `projectOnly` 条目会继续显示在 settings catalog / editor 中，但不会进入 chat slash autocomplete；要等 runtime reload 后才会出现在聊天菜单里
+- settings catalog 对这类条目会直接提示“仅保存在项目配置中；当前 runtime 尚未提供”，避免让用户误以为它已经能从聊天里直接运行
 - `source: 'mcp'` 的 runtime 条目不会进入这个 catalog shell；`source: 'skill'` 会保留并显示为 Skill 来源
 
 ### project command editor 壳层
@@ -60,6 +61,7 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 
 - `direct` 是默认值，chat slash menu 直接显示 OpenCode skill，例如 `/build-mcp-server`
 - `skills-command` 会在顶层 slash menu 显示合成的 `/skills` 入口，具体 skill 通过 `/skills build-mcp-server` 调用
+- 当 `skills-command` 生效时，settings catalog 里的 skill 条目也会改用 `/skills <skill>` 标签，并把可见性文案切换成 `/skills` browser 语义，和聊天端当前行为保持一致
 - 写回只更新插件设置，不触发 OpenCode config sync、模型重载或 UI theme 应用
 
 ## 关键方法
@@ -70,7 +72,7 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 | `createSkillModeSetting()` | 渲染 skill invocation mode 下拉框并写回 `slashCommandSkillMode` |
 | `dispose()` | 递增 refresh run id，避免旧异步请求回写已重建的设置页 |
 | `refreshCatalog()` | 并行加载 runtime/project commands，合并后同时刷新 editor 与 catalog |
-| `renderCatalog()` | 先委托 `SettingsProjectCommandEditor` 渲染项目命令表单，再为每个 slash command 渲染 `/<id>` setting 与 visible toggle |
+| `renderCatalog()` | 先委托 `SettingsProjectCommandEditor` 渲染项目命令表单，再按当前 skill mode 为每个 command 渲染人类可读的 slash label 与 visible toggle |
 | `updateCommandVisibility()` | 把用户 hide/unhide 操作写回 `hiddenSlashCommands` |
 
 ## 与其他模块的交互

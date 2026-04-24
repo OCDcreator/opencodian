@@ -1,8 +1,10 @@
 import { Notice, Setting } from 'obsidian';
 
+import type { SlashCommandCatalogSource } from '../../core/config/slashCommandCatalog';
 import type {
   OpencodeCommandConfig,
   OpencodeCommandConfigRecord,
+  SlashCommandSkillMode,
 } from '../../core/types';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -52,6 +54,7 @@ export interface ProjectCommandEditorSource {
   topP?: number;
   hasProjectOverride: boolean;
   runtimeAvailable: boolean;
+  source: SlashCommandCatalogSource;
   subtask: boolean;
 }
 
@@ -80,6 +83,7 @@ interface SettingsProjectCommandEditorRenderOptions {
   containerEl: HTMLElement;
   onConfigChanged: () => Promise<void>;
   projectCommands: OpencodeCommandConfigRecord;
+  skillMode?: SlashCommandSkillMode;
 }
 
 export class SettingsProjectCommandEditor {
@@ -93,6 +97,7 @@ export class SettingsProjectCommandEditor {
       containerEl,
       onConfigChanged,
       projectCommands,
+      skillMode = 'direct',
     } = options;
 
     containerEl.replaceChildren();
@@ -147,7 +152,10 @@ export class SettingsProjectCommandEditor {
           const sourceTag = command.runtimeAvailable
             ? (command.hasProjectOverride ? '⟳' : '●')
             : '○';
-          dropdown.addOption(command.id, `${sourceTag} /${command.id}`);
+          dropdown.addOption(
+            command.id,
+            `${sourceTag} ${this.buildCommandSelectionLabel(command, skillMode)}`,
+          );
         }
         dropdown.setValue('');
         dropdown.onChange((value) => {
@@ -341,6 +349,17 @@ export class SettingsProjectCommandEditor {
       temperature: stringifyConfigNumber(command?.temperature),
       topP: stringifyConfigNumber(command?.topP),
     };
+  }
+
+  private buildCommandSelectionLabel(
+    command: ProjectCommandEditorSource,
+    skillMode: SlashCommandSkillMode,
+  ): string {
+    if (command.source === 'skill' && skillMode === 'skills-command') {
+      return `/skills ${command.id}`;
+    }
+
+    return `/${command.id}`;
   }
 
   private buildProjectCommandPatch(state: ProjectCommandEditorState): OpencodeCommandConfig {

@@ -20,7 +20,7 @@
   - Cache invalidation / warm preload behavior stays coherent
   - The post-change OpenCode CLI review passes
 
-### [NEXT] C2 - Align command settings wording and human-facing semantics
+### [DONE] C2 - Align command settings wording and human-facing semantics
 
 - **Lane**: Slash settings
 - **Goal**: Make the command settings/editor surface reflect the real runtime behavior, including skill mode and generated command-local agent semantics.

@@ -45,6 +45,7 @@ interface MockButtonControl {
 
 interface ToggleRecord {
   control: MockToggleControl;
+  description?: string;
   name: string;
   onChange?: (value: boolean) => void | Promise<void>;
 }
@@ -282,7 +283,12 @@ beforeEach(() => {
     (this as Setting & { __settingName?: string }).__settingName = name;
     return this;
   });
-  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(
+    this: Setting,
+    desc: string | DocumentFragment | HTMLElement,
+  ) {
+    (this as Setting & { __settingDesc?: string }).__settingDesc =
+      typeof desc === 'string' ? desc : desc.textContent ?? '';
     return this;
   });
   jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
@@ -301,6 +307,7 @@ beforeEach(() => {
   ) {
     const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
     const record = createToggleRecord(name);
+    record.description = (this as Setting & { __settingDesc?: string }).__settingDesc;
     toggleRecords.push(record);
     callback(record.control);
     return this;
@@ -482,5 +489,47 @@ describe('SettingsCommandsSection catalog shell', () => {
       .toHaveBeenLastCalledWith('0.2');
     expect(textRecords.find((record) => record.name === t('settings.commands.editor.topP.name'))?.control.setValue)
       .toHaveBeenLastCalledWith('0.85');
+  });
+
+  it('describes project-only commands as saved config that is not available in the current runtime yet', async () => {
+    const plugin = createPlugin({
+      projectCommands: {
+        deploy: {
+          description: 'Project-only deploy command',
+          agent: 'ops',
+          template: 'Deploy the plugin.',
+        },
+      },
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    expect(findToggle('/deploy')?.description).toContain(
+      'Saved in project config only; not available in the current runtime yet.',
+    );
+  });
+
+  it('renders skill entries with `/skills <skill>` semantics when skill mode uses the prefix flow', async () => {
+    const plugin = createPlugin({
+      runtimeCommands: [
+        createRuntimeCommand({
+          name: 'summarize-notes',
+          source: 'skill',
+          description: 'Summarize the current note',
+        }),
+      ],
+      slashCommandSkillMode: 'skills-command',
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    const skillToggle = findToggle('/skills summarize-notes');
+
+    expect(skillToggle?.control.setValue).toHaveBeenCalledWith(true);
+    expect(findToggle('/summarize-notes')).toBeUndefined();
+    expect(skillToggle?.description).toContain('Visible in `/skills` browser');
+    expect(skillToggle?.description).toContain('Run with `/skills summarize-notes`');
   });
 });

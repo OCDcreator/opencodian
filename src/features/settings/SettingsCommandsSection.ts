@@ -7,6 +7,7 @@ import {
 import {
   normalizeSlashCommandSkillMode,
   type OpencodeCommandConfigRecord,
+  type SlashCommandSkillMode,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -226,6 +227,7 @@ export class SettingsCommandsSection {
         });
       },
       projectCommands,
+      skillMode: this.getSkillMode(),
     });
 
     catalogBodyEl.replaceChildren();
@@ -237,7 +239,7 @@ export class SettingsCommandsSection {
 
     for (const command of mergedCommands) {
       const setting = new Setting(catalogBodyEl)
-        .setName(`/${command.id}`)
+        .setName(this.buildCommandSettingName(command))
         .setDesc(this.buildCommandDescription(command));
 
       setting.addToggle((toggle) => {
@@ -267,10 +269,14 @@ export class SettingsCommandsSection {
   private buildCommandDescription(command: SlashCommandCatalogEntry): string {
     const parts = [
       this.getSourceLabel(command),
-      command.hidden
-        ? t('settings.commands.catalog.visibility.hidden')
-        : t('settings.commands.catalog.visibility.visible'),
+      this.getVisibilityLabel(command),
     ];
+
+    if (this.isSkillsCommandSkill(command)) {
+      parts.push(t('settings.commands.catalog.status.skillRunsViaSkillsCommand', {
+        command: command.id,
+      }));
+    }
 
     if (!command.runtimeAvailable) {
       parts.push(t('settings.commands.catalog.status.runtimeUnavailable'));
@@ -295,6 +301,28 @@ export class SettingsCommandsSection {
     return parts.join(' · ');
   }
 
+  private buildCommandSettingName(command: SlashCommandCatalogEntry): string {
+    return `/${this.getCommandDisplayId(command)}`;
+  }
+
+  private getCommandDisplayId(command: SlashCommandCatalogEntry): string {
+    return this.isSkillsCommandSkill(command)
+      ? `skills ${command.id}`
+      : command.id;
+  }
+
+  private getVisibilityLabel(command: SlashCommandCatalogEntry): string {
+    if (this.isSkillsCommandSkill(command)) {
+      return command.hidden
+        ? t('settings.commands.catalog.visibility.skillHiddenViaSkillsCommand')
+        : t('settings.commands.catalog.visibility.skillVisibleViaSkillsCommand');
+    }
+
+    return command.hidden
+      ? t('settings.commands.catalog.visibility.hidden')
+      : t('settings.commands.catalog.visibility.visible');
+  }
+
   private getSourceLabel(command: SlashCommandCatalogEntry): string {
     if (command.source === 'skill') {
       return t('settings.commands.catalog.source.skill');
@@ -309,6 +337,14 @@ export class SettingsCommandsSection {
     }
 
     return t('settings.commands.catalog.source.projectOnly');
+  }
+
+  private isSkillsCommandSkill(command: SlashCommandCatalogEntry): boolean {
+    return command.source === 'skill' && this.getSkillMode() === 'skills-command';
+  }
+
+  private getSkillMode(): SlashCommandSkillMode {
+    return normalizeSlashCommandSkillMode(this.plugin.settings.slashCommandSkillMode);
   }
 
   private async updateCommandVisibility(commandId: string, visible: boolean): Promise<void> {

@@ -1,6 +1,7 @@
 import { Setting } from 'obsidian';
 import * as obsidian from 'obsidian';
 
+import type { SlashCommandCatalogSource } from '../../../../src/core/config/slashCommandCatalog';
 import type { OpencodeCommandConfigRecord } from '../../../../src/core/types';
 import {
   type ProjectCommandEditorSource,
@@ -43,30 +44,35 @@ interface MockButtonControl {
 
 interface DropdownRecord {
   control: MockDropdownControl;
+  description?: string;
   name: string;
   onChange?: (value: string) => void | Promise<void>;
 }
 
 interface ToggleRecord {
   control: MockToggleControl;
+  description?: string;
   name: string;
   onChange?: (value: boolean) => void | Promise<void>;
 }
 
 interface TextRecord {
   control: MockTextControl;
+  description?: string;
   name: string;
   onChange?: (value: string) => void | Promise<void>;
 }
 
 interface TextAreaRecord {
   control: MockTextAreaControl;
+  description?: string;
   name: string;
   onChange?: (value: string) => void | Promise<void>;
 }
 
 interface ButtonRecord {
   control: MockButtonControl;
+  description?: string;
   label?: string;
   name: string;
   onClick?: () => void | Promise<void>;
@@ -206,12 +212,14 @@ function createCommandSource(
     subtask: overrides.subtask ?? false,
     hasProjectOverride: overrides.hasProjectOverride ?? false,
     runtimeAvailable: overrides.runtimeAvailable ?? true,
+    source: overrides.source ?? 'command',
   };
 }
 
 function renderEditor(options: {
   commands?: ProjectCommandEditorSource[];
   projectCommands?: OpencodeCommandConfigRecord;
+  skillMode?: 'direct' | 'skills-command';
 } = {}) {
   const configManager = createConfigManager();
   const onConfigChanged = jest.fn().mockResolvedValue(undefined);
@@ -225,6 +233,7 @@ function renderEditor(options: {
     commands: options.commands ?? [],
     onConfigChanged,
     projectCommands: options.projectCommands ?? {},
+    skillMode: options.skillMode,
   });
   return {
     containerEl,
@@ -271,7 +280,12 @@ beforeEach(() => {
     (this as Setting & { __settingName?: string }).__settingName = name;
     return this;
   });
-  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(
+    this: Setting,
+    desc: string | DocumentFragment | HTMLElement,
+  ) {
+    (this as Setting & { __settingDesc?: string }).__settingDesc =
+      typeof desc === 'string' ? desc : desc.textContent ?? '';
     return this;
   });
   jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
@@ -280,6 +294,7 @@ beforeEach(() => {
   ) {
     const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
     const record = createDropdownRecord(name);
+    record.description = (this as Setting & { __settingDesc?: string }).__settingDesc;
     dropdownRecords.push(record);
     callback(record.control);
     return this;
@@ -290,6 +305,7 @@ beforeEach(() => {
   ) {
     const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
     const record = createToggleRecord(name);
+    record.description = (this as Setting & { __settingDesc?: string }).__settingDesc;
     toggleRecords.push(record);
     callback(record.control);
     return this;
@@ -300,6 +316,7 @@ beforeEach(() => {
   ) {
     const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
     const record = createTextRecord(name);
+    record.description = (this as Setting & { __settingDesc?: string }).__settingDesc;
     textRecords.push(record);
     callback(record.control);
     return this;
@@ -310,6 +327,7 @@ beforeEach(() => {
   ) {
     const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
     const record = createTextAreaRecord(name);
+    record.description = (this as Setting & { __settingDesc?: string }).__settingDesc;
     textAreaRecords.push(record);
     callback(record.control);
     return this;
@@ -320,6 +338,7 @@ beforeEach(() => {
   ) {
     const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
     const record = createButtonRecord(name);
+    record.description = (this as Setting & { __settingDesc?: string }).__settingDesc;
     buttonRecords.push(record);
     callback(record.control);
     return this;
@@ -500,5 +519,33 @@ describe('SettingsProjectCommandEditor', () => {
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.commands.editor.notice.invalidNumber', {
       field: t('settings.commands.editor.temperature.name'),
     }));
+  });
+
+  it('labels skill entries with `/skills <skill>` when the prefix mode is active', () => {
+    renderEditor({
+      commands: [
+        createCommandSource({
+          id: 'summarize-notes',
+          source: 'skill' satisfies SlashCommandCatalogSource,
+        }),
+      ],
+      skillMode: 'skills-command',
+    });
+
+    expect(findDropdown(t('settings.commands.editor.select.name'))?.control.addOption).toHaveBeenCalledWith(
+      'summarize-notes',
+      '● /skills summarize-notes',
+    );
+  });
+
+  it('explains command-local sampling as a hidden helper agent workflow', () => {
+    renderEditor();
+
+    expect(findText(t('settings.commands.editor.temperature.name'))?.description).toContain(
+      'hidden helper agent',
+    );
+    expect(findText(t('settings.commands.editor.topP.name'))?.description).toContain(
+      'hidden helper agent',
+    );
   });
 });

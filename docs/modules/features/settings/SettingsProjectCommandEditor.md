@@ -23,6 +23,7 @@ runtime placeholder 展开与 slash execution runtime 已落地在相邻 runtime
 
 - runtime/project catalog 由上层 `SettingsCommandsSection` 先合并，再把当前可编辑 command 列表传给 editor
 - 选中 runtime command 时，editor 会直接用合并后的 `template` / `description` / `agent` / `model` / `temperature` / `top_p` / `subtask` 回填，因此 built-in slash command 也能直接生成 project override
+- 如果上层当前把 skill 暴露成 `/skills <skill>` 模式，editor dropdown 也会沿用这个 label，而不是继续假装它是直接 `/<skill>` 命令
 - 选中 project-only command 时，editor 会回填当前 project config 里的值
 - 如果当前 project command 的 `agent` 实际上是 command-owned hidden agent，editor 会显示该 hidden agent 对应的 base agent（若 metadata 可用），而不会把内部 agent ID 暴露给用户
 - 选择“新建项目命令”时，editor 重置为空白状态，并重新允许编辑 ID
@@ -34,7 +35,7 @@ runtime placeholder 展开与 slash execution runtime 已落地在相邻 runtime
 - `description` / `agent` / `model` 会做 trim，空字符串转成 `undefined`
 - `temperature` / `top_p` 会解析为可选数字；非法输入会立即给出 `Notice`
 - `subtask` 会明确写回布尔值，让 project command 能表达“强制作为子任务运行”或显式关闭该行为
-- 命令级 sampling 不会直接保留在 native `command` schema 里，而是委托 manager 生成 / 清理 hidden agent
+- 命令级 sampling 不会直接保留在 native `command` schema 里，而是委托 manager 生成 / 清理 hidden agent；设置文案则把这件事解释成“后台隐藏辅助代理”，避免把内部 agent ID 暴露给用户
 - 未触碰的未知字段由 `OpencodeConfigManager.upsertCommandConfig()` 的 merge 行为保留
 
 ### placeholder reference
