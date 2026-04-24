@@ -7,6 +7,15 @@
 
 `SettingsProjectAgentEditor` 是 `SettingsAgentsSection` 下拆出的 companion owner，专门负责项目级 agent 核心字段表单。它把 project agent 的 create/edit/delete 写回、表单回填、数值解析与错误提示从 agent catalog owner 中分离出来，避免 `SettingsAgentsSection.ts` 继续膨胀。
 
+当前 editor 不再把所有字段平铺到一个长表单里，而是按用途拆成多组：
+
+- `基础信息`：project agent 选择、新建 ID、mode、disable、description
+- `行为定义`：prompt
+- `模型与采样`：model、temperature、top_p、steps
+- `高级配置`：color、`permission.task` allowlist、`options`
+
+其中 `高级配置` 默认折叠，避免长文本 area 把整个设置面撑得过长。
+
 这个 editor 覆盖 project agent 表单字段：
 
 - `mode`
@@ -30,6 +39,7 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 - dropdown 只列出当前 vault 的 project agent override
 - 选择已有条目后，会把当前 `agent.<id>` 的核心字段回填到表单
 - 未选择条目时，表单保持“新建 project agent”状态
+- `syncEditorControls()` 仍统一回填全部 control；分组只影响展示结构，不改变 state ownership
 
 ### 保存与删除
 
@@ -54,6 +64,7 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 | 方法 | 说明 |
 |------|------|
 | `render()` | 渲染 project agent picker、字段表单与 save/delete action |
+| `createEditorGroup()` | 创建分组卡片 / 可折叠高级区外壳，并返回字段挂载 body |
 | `saveProjectAgentFromEditor()` | 归一化表单值并写回 project agent override |
 | `deleteSelectedProjectAgent()` | 删除当前选中的 project agent override |
 

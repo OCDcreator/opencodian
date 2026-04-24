@@ -12,7 +12,7 @@
 - 读取 runtime agent 目录与 `OpencodeConfigManager.getAgentConfig()`
 - 用 `OpencodeConfigManager.getDefaultAgent()` 初始化默认主代理下拉框
 - 通过 `updateDefaultAgent()` 写回项目级 `default_agent`
-- 为 `mode: 'subagent'` 的条目提供基础 `hidden` 可见性开关
+- 为 `mode: 'subagent'` 的条目提供基础 `@` 菜单可见性开关
 - 通过 `upsertAgentConfig()` / `removeAgentConfig()` 写回或清理 `agent.<id>.hidden`
 - 提供项目 agent 编辑器，支持 create/edit/delete 以下核心字段：
   - `mode`
@@ -45,11 +45,18 @@ owner 会并行读取：
 
 当前 slice 只处理 OpenCode 原生 `hidden` 字段的基础路径：
 
-- 打开开关时写入 `agent.<id>.hidden = true`
-- 关闭开关时，如果 project override 只剩 `hidden` 字段，则删除该 agent override
-- 关闭开关时，如果 project override 还有其他字段，则删除 `hidden` 后通过 `upsertAgentConfig()` 保留其余配置
+- UI 开关采用正向语义：`true` 表示“在 `@` 菜单中显示”，`false` 表示“从 `@` 菜单隐藏”
+- 用户关闭可见性时会写入 `agent.<id>.hidden = true`
+- 用户重新开启可见性时，如果 project override 只剩 `hidden` 字段，则删除该 agent override
+- 用户重新开启可见性时，如果 project override 还有其他字段，则删除 `hidden` 后通过 `upsertAgentConfig()` 保留其余配置
 
 这条路径只对 `mode: 'subagent'` 且未 `disable` 的条目开放，因为 OpenCode 的 `hidden` 语义主要用于子代理 `@` 菜单可见性。
+
+### agent catalog shell height
+
+- agent 目录 block body 现在额外挂 `opencodian-agent-catalog-scroll`
+- 目录区使用最大高度 + 内部滚动，避免大量代理把整个 settings 页拉得过长
+- 这一层只负责 catalog 可滚动外壳，不改变 runtime/project agent merge 语义
 
 ### 项目 agent 核心字段编辑器 / disable / task allowlist 写回
 

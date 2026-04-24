@@ -234,7 +234,7 @@ export class SettingsAgentsSection {
       cls: 'opencodian-plugin-block-desc',
       text: t('settings.agents.catalog.desc'),
     });
-    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
+    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body opencodian-agent-catalog-scroll' });
   }
 
   private createProjectAgentEditorBlock(containerEl: HTMLElement): HTMLElement {
@@ -365,9 +365,9 @@ export class SettingsAgentsSection {
       if (agent.mode === 'subagent' && !agent.disabled) {
         setting.addToggle((toggle) => {
           toggle
-            .setValue(agent.hidden)
+            .setValue(!agent.hidden)
             .onChange(async (value) => {
-              await this.updateAgentVisibility(agent.id, value, projectAgents);
+              await this.updateAgentVisibility(agent.id, !value, projectAgents);
               await this.refreshCatalog({
                 catalogBodyEl,
                 configManager,

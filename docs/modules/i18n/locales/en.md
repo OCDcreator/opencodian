@@ -11,6 +11,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 2026-04-24 的本轮还补了一组 `settings.commands.*` / `settings.quickNav.commandsDesc` 文案，把 Commands settings 的心智模型对齐到当前 slash runtime truth：project-only command 只是“已写入项目配置、等待 runtime 暴露”的草稿，skill mode 只改变 `/skill` vs `/skills <skill>` 的入口形态，命令级 `Temperature` / `Top P` 则用 “hidden helper agent” 的 plain-language 语义解释。
 
+同一天的后续 UI 微调还新增了 `settings.agents.editor.group.*` 文案，并把 `settings.agents.catalog.desc` 改成正向可见性语义，明确说明：agent catalog 中的子代理开关现在是 **on = visible in `@` menu / off = hidden**。
+
 源码约 1000 行。
 
 ## 导入关系

@@ -328,7 +328,7 @@ describe('SettingsAgentsSection catalog shell', () => {
     expect(defaultDropdown?.control.addOption).toHaveBeenCalledWith('design', 'design');
     expect(defaultDropdown?.control.addOption).not.toHaveBeenCalledWith('plan', 'plan');
     expect(defaultDropdown?.control.setValue).toHaveBeenLastCalledWith('design');
-    expect(findToggle('plan')?.control.setValue).toHaveBeenCalledWith(true);
+    expect(findToggle('plan')?.control.setValue).toHaveBeenCalledWith(false);
     expect(findToggle('build')).toBeUndefined();
     expect(findToggle('design')).toBeUndefined();
   });
@@ -355,7 +355,7 @@ describe('SettingsAgentsSection catalog shell', () => {
     expect(plugin.opencodeConfigManager?.updateDefaultAgent).toHaveBeenNthCalledWith(2, undefined);
   });
 
-  it('writes and cleans up project hidden overrides for subagents', async () => {
+  it('writes and cleans up project hidden overrides for subagents through a positive visible toggle', async () => {
     const hiddenPlugin = createPlugin({
       runtimeAgents: [
         createRuntimeAgent({
@@ -368,7 +368,7 @@ describe('SettingsAgentsSection catalog shell', () => {
     createSection(hiddenPlugin);
     await flushAsync();
 
-    await findToggle('plan')?.onChange?.(true);
+    await findToggle('plan')?.onChange?.(false);
     await flushAsync();
 
     expect(hiddenPlugin.opencodeConfigManager?.upsertAgentConfig).toHaveBeenCalledWith('plan', {
@@ -396,10 +396,27 @@ describe('SettingsAgentsSection catalog shell', () => {
     createSection(restoredPlugin);
     await flushAsync();
 
-    await findToggle('plan')?.onChange?.(false);
+    await findToggle('plan')?.onChange?.(true);
     await flushAsync();
 
     expect(restoredPlugin.opencodeConfigManager?.removeAgentConfig).toHaveBeenCalledWith('plan');
+  });
+
+  it('wraps the catalog list in an internal scroll container', async () => {
+    const plugin = createPlugin({
+      runtimeAgents: [
+        createRuntimeAgent({
+          name: 'plan',
+          mode: 'subagent',
+        }),
+      ],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    const scrollEl = containerEl.querySelector('.opencodian-agent-catalog-scroll');
+    expect(scrollEl).not.toBeNull();
   });
 });
 

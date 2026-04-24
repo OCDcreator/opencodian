@@ -1697,6 +1697,83 @@
   padding: 14px 16px 16px;
 }
 
+.opencodian-agent-catalog-scroll {
+  max-height: min(460px, 52vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.opencodian-agent-editor-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-agent-editor-group {
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--background-primary) 76%, var(--background-secondary));
+  overflow: hidden;
+}
+
+.opencodian-agent-editor-group-header,
+.opencodian-agent-editor-group-summary {
+  padding: 14px 16px 12px;
+  background: color-mix(in srgb, var(--background-secondary) 76%, var(--background-primary));
+}
+
+.opencodian-agent-editor-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.opencodian-agent-editor-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.opencodian-agent-editor-group-summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+
+.opencodian-agent-editor-group-collapsible[open] > .opencodian-agent-editor-group-summary::after {
+  transform: rotate(180deg);
+  color: var(--text-muted);
+}
+
+.opencodian-agent-editor-group-summary-copy {
+  min-width: 0;
+}
+
+.opencodian-agent-editor-group-title {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-agent-editor-group-description {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-agent-editor-group-body {
+  padding: 6px 16px 14px;
+}
+
+.opencodian-agent-editor-group-body > .setting-item:first-child {
+  border-top: none;
+}
+
 .opencodian-plugin-summary-list,
 .opencodian-plugin-source-list {
   display: flex;

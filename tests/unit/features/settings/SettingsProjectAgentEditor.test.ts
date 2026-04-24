@@ -151,6 +151,7 @@ function renderEditor(options: { projectAgents?: OpencodeAgentConfigRecord } = {
     projectAgents: options.projectAgents ?? {},
   });
   return {
+    containerEl,
     configManager,
     onConfigChanged,
   };
@@ -244,7 +245,28 @@ beforeEach(() => {
 
 afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
 
-describe('SettingsProjectAgentEditor', () => {
+describe('SettingsProjectAgentEditor layout and creation', () => {
+  it('renders grouped editor sections and keeps advanced settings collapsed by default', () => {
+    const { containerEl } = renderEditor();
+
+    const groups = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.opencodian-agent-editor-group'),
+    );
+
+    expect(groups.map((group) => group.dataset.group)).toEqual([
+      'identity',
+      'behavior',
+      'model',
+      'advanced',
+    ]);
+
+    const advancedGroup = containerEl.querySelector<HTMLDetailsElement>(
+      '.opencodian-agent-editor-group[data-group="advanced"]',
+    );
+    expect(advancedGroup).not.toBeNull();
+    expect(advancedGroup?.open).toBe(false);
+  });
+
   it('creates a project agent with editable core fields', async () => {
     const { configManager } = renderEditor();
 
@@ -369,6 +391,9 @@ describe('SettingsProjectAgentEditor', () => {
     });
   });
 
+});
+
+describe('SettingsProjectAgentEditor existing agent workflows', () => {
   it('edits and deletes a selected project agent without overwriting unrelated fields', async () => {
     const { configManager } = renderEditor({
       projectAgents: {
