@@ -42,7 +42,7 @@
   - Users can switch between default / disabled / custom formatter modes.
   - Tests cover render state and mode-switch behavior.
 
-### [NEXT] F3 - Finish formatter editors, advanced JSON, and closeout verification
+### [DONE] F3 - Finish formatter editors, advanced JSON, and closeout verification
 
 - **Lane**: Formatter editing and final closeout
 - **Goal**: Finish builtin/custom formatter editing, advanced JSON editing, runtime status failure handling, docs sync, and final queue closeout verification.

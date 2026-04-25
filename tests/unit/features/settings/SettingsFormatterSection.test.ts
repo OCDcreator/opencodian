@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { Setting } from 'obsidian';
 
 import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
@@ -112,7 +113,7 @@ function createPlugin(overrides?: {
 }
 
 async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 10; i++) {
     await Promise.resolve();
   }
 }
@@ -402,5 +403,330 @@ describe('SettingsFormatterSection dispose', () => {
     });
 
     expect(() => section.dispose()).not.toThrow();
+  });
+});
+
+describe('SettingsFormatterSection config tab — custom mode rendering', () => {
+  it('does not render builtin/custom/advanced sections in default mode', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: undefined,
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const headings = containerEl.querySelectorAll('.opencodian-settings-subsection-heading');
+    const headingTexts = Array.from(headings).map((h) => h.textContent);
+    expect(headingTexts).not.toContain(t('settings.formatter.config.builtinList.title'));
+    expect(headingTexts).not.toContain(t('settings.formatter.config.customList.title'));
+    expect(headingTexts).not.toContain(t('settings.formatter.config.advanced.title'));
+  });
+
+  it('renders builtin list, custom list, and advanced JSON when in custom mode', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {},
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const headings = containerEl.querySelectorAll('.opencodian-settings-subsection-heading');
+    const headingTexts = Array.from(headings).map((h) => h.textContent);
+    expect(headingTexts).toContain(t('settings.formatter.config.builtinList.title'));
+    expect(headingTexts).toContain(t('settings.formatter.config.customList.title'));
+    expect(headingTexts).toContain(t('settings.formatter.config.advanced.title'));
+  });
+
+  it('renders builtin formatter rows with action dropdowns', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {},
+      runtimeStatus: [
+        { name: 'prettier', extensions: ['.js', '.ts'], enabled: true },
+        { name: 'gofmt', extensions: ['.go'], enabled: false },
+      ],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    expect(findDropdown('prettier')).toBeDefined();
+    expect(findDropdown('gofmt')).toBeDefined();
+  });
+
+  it('shows disabled status for a builtin formatter with disabled:true', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: { prettier: { disabled: true } },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const prettierDropdown = findDropdown('prettier');
+    expect(prettierDropdown).toBeDefined();
+    expect(prettierDropdown?.control.setValue).toHaveBeenCalledWith('disable');
+  });
+
+  it('shows override status for a builtin formatter with command override', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: { prettier: { command: ['npx', 'prettier', '--write', '$FILE'] } },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const prettierDropdown = findDropdown('prettier');
+    expect(prettierDropdown).toBeDefined();
+    expect(prettierDropdown?.control.setValue).toHaveBeenCalledWith('override');
+  });
+});
+
+describe('SettingsFormatterSection builtin formatter action changes', () => {
+  it('disables a builtin formatter via action dropdown', async () => {
+    const { plugin, updateFormatterConfig } = createPlugin({
+      formatterConfig: {},
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const prettierDropdown = findDropdown('prettier');
+    await prettierDropdown?.onChange?.('disable');
+    await flushPromises();
+
+    expect(updateFormatterConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prettier: expect.objectContaining({ disabled: true }),
+      }),
+    );
+  });
+
+  it('reverts a disabled builtin to default via action dropdown', async () => {
+    const { plugin, updateFormatterConfig } = createPlugin({
+      formatterConfig: { prettier: { disabled: true } },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const prettierDropdown = findDropdown('prettier');
+    await prettierDropdown?.onChange?.('default');
+    await flushPromises();
+
+    expect(updateFormatterConfig).toHaveBeenCalledWith({});
+  });
+});
+
+describe('SettingsFormatterSection custom formatter list', () => {
+  it('still renders builtin formatter editors when runtime status fetch fails', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {},
+      runtimeError: new Error('offline'),
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    expect(findDropdown('prettier')).toBeDefined();
+    expect(findDropdown('gofmt')).toBeDefined();
+  });
+
+  it('shows empty message when no custom formatters', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: { prettier: { disabled: true } },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    expect(findSettingRecordByDesc(t('settings.formatter.config.customList.empty'))).toBeDefined();
+  });
+
+  it('renders custom formatter entries that are not in the builtin list', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        prettier: { disabled: true },
+        'my-custom': { command: ['deno', 'fmt', '$FILE'], extensions: ['.md'] },
+      },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    expect(findSettingRecord('my-custom')).toBeDefined();
+  });
+
+  it('renders environment editing for custom formatters', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        'my-custom': {
+          command: ['deno', 'fmt', '$FILE'],
+          environment: { FMT_MODE: 'strict' },
+          extensions: ['.md'],
+        },
+      },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    expect(settingRecords.filter((record) => record.name === t('settings.formatter.config.builtin.environment')).length)
+      .toBeGreaterThan(0);
+  });
+});
+
+describe('SettingsFormatterSection advanced JSON editor', () => {
+  it('renders the JSON textarea with current config', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: { prettier: { disabled: true } },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const textarea = containerEl.querySelector('.opencodian-formatter-json-textarea') as HTMLTextAreaElement | null;
+    expect(textarea).not.toBeNull();
+
+    const parsed = JSON.parse(textarea!.value);
+    expect(parsed).toEqual({ prettier: { disabled: true } });
+  });
+
+  it('renders the JSON textarea with empty object when formatter is absent', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {},
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const textarea = containerEl.querySelector('.opencodian-formatter-json-textarea') as HTMLTextAreaElement | null;
+    expect(textarea).not.toBeNull();
+    expect(JSON.parse(textarea!.value)).toEqual({});
+  });
+});
+
+describe('SettingsFormatterSection runtime failure does not block config editing', () => {
+  it('renders config tab with all editing sections even when runtime fails in custom mode', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {},
+      runtimeError: new Error('server offline'),
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    expect(findSettingRecordByDesc(t('settings.formatter.config.runtimeOfflineNote'))).toBeDefined();
+
+    const headings = containerEl.querySelectorAll('.opencodian-settings-subsection-heading');
+    const headingTexts = Array.from(headings).map((h) => h.textContent);
+    expect(headingTexts).toContain(t('settings.formatter.config.advanced.title'));
   });
 });

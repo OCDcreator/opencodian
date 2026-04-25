@@ -70,6 +70,7 @@ def build_command(args: argparse.Namespace, message: str) -> list[str]:
     command = [
         "opencode",
         "run",
+        "--pure",
         "--dangerously-skip-permissions",
         "--print-logs",
         "--dir",

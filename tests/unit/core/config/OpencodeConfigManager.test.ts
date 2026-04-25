@@ -705,4 +705,52 @@ describe('OpencodeConfigManager formatter config', () => {
       },
     });
   });
+
+  it('formatter update preserves unknown fields round-trip through write and read', async () => {
+    await manager.updateFormatterConfig({
+      prettier: {
+        disabled: false,
+        futureField: 'keep-me',
+        nestedUnknown: { deep: true },
+      },
+    });
+
+    const readback = await manager.getFormatterConfig();
+    expect(readback).toEqual({
+      prettier: {
+        disabled: false,
+        futureField: 'keep-me',
+        nestedUnknown: { deep: true },
+      },
+    });
+  });
+
+  it('formatter update exact-write removes entries not in the new value while keeping unknown fields on surviving entries', async () => {
+    await manager.updateFormatterConfig({
+      prettier: { disabled: true, futureField: 'keep' },
+      biome: { command: ['biome', 'fmt', '$FILE'] },
+    });
+
+    await manager.updateFormatterConfig({
+      prettier: { disabled: false, futureField: 'keep' },
+    });
+
+    const config = await manager.getFormatterConfig();
+    expect(config).toEqual({
+      prettier: { disabled: false, futureField: 'keep' },
+    });
+  });
+
+  it('formatter update writes boolean false while preserving other top-level config', async () => {
+    await manager.write({
+      provider: { demo: { name: 'Demo' } },
+      formatter: { prettier: { disabled: true } },
+    });
+
+    await manager.updateFormatterConfig(false);
+
+    const config = await manager.read();
+    expect(config.formatter).toBe(false);
+    expect(config.provider?.demo?.name).toBe('Demo');
+  });
 });
