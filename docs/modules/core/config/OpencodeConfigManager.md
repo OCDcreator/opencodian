@@ -33,6 +33,8 @@ class OpencodeConfigManager {
   getPluginConfig(): Promise<OpencodePluginSpec[]>;
   updatePluginConfig(plugins: OpencodePluginSpec[]): Promise<void>;
   getCompactionConfig(): Promise<OpencodeCompactionConfig | undefined>;
+  getFormatterConfig(): Promise<OpencodeFormatterConfig | undefined>;
+  updateFormatterConfig(formatter: OpencodeFormatterConfig | null | undefined): Promise<void>;
   updateCompactionConfig(compaction: OpencodeCompactionConfig | null | undefined): Promise<void>;
   getDefaultAgent(): Promise<string | undefined>;
   updateDefaultAgent(defaultAgent: string | null | undefined): Promise<void>;
@@ -114,11 +116,21 @@ getCommandScopedAgentId(commandId: string): string
 - 读取时如果不是数组，返回空数组
 - 写入时如果传入空数组，会删除 `plugin` 字段而不是写 `[]`
 
+### formatter 精确子树写入
+
+`getFormatterConfig()` / `updateFormatterConfig()` 封装了 project-scoped `formatter` 字段的读写：
+
+- 读取时支持三态：字段缺失返回 `undefined`、布尔值原样返回、对象时返回深拷贝副本
+- 写入时**不会**像 `compaction` / `agent` helper 那样 deep merge，而是直接替换整个 `formatter` 子树
+- 这让 UI / runtime 可以安全删除某个 formatter entry；如果还走 merge，旧 entry 会残留在磁盘上
+- 传入 `null` 或 `undefined` 时会删除 `formatter` 字段；传入空对象 `{}` 时会保留显式 custom mode（无额外 per-formatter override）
+
 ### 会话/Agent/Command 配置 helper
 
 manager 内提供了更细粒度的项目配置 helper，供当前 session settings、Agents settings 与 Commands/slash-command UI/runtime 共同复用：
 
 - `getCompactionConfig()` / `updateCompactionConfig()`：读写 `compaction`，并在 patch 时保留已有未知字段
+- `getFormatterConfig()` / `updateFormatterConfig()`：读写 `formatter`，采用 exact subtree write，允许删除 formatter 条目并保留 formatter entry 内未知字段
 - `getDefaultAgent()` / `updateDefaultAgent()`：读写并 trim `default_agent`，空字符串会删除字段
 - `getAgentConfig()`：把 native `agent` 与 deprecated `mode` 合并成单个 map，读取时优先返回 native `agent`
 - `upsertAgentConfig()`：写入 native `agent` 条目时，会先吸收同名 deprecated `mode` 条目，再递归 merge，避免丢失未知字段 / `tools` / `options`
@@ -158,6 +170,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 | `getPluginConfig()` | 返回 `plugin` 数组副本 |
 | `updatePluginConfig(plugins)` | 更新或删除 `plugin` 字段 |
 | `getCompactionConfig()` / `updateCompactionConfig()` | 读写 `compaction`，支持 patch merge 与删除 |
+| `getFormatterConfig()` / `updateFormatterConfig()` | 读写 `formatter`，使用 exact subtree write 而不是 deep merge |
 | `getDefaultAgent()` / `updateDefaultAgent()` | 读写 `default_agent`，空值时删除 |
 | `getAgentConfig()` / `upsertAgentConfig()` / `removeAgentConfig()` | 兼容 deprecated `mode` 导入的 agent helper |
 | `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()` | 命令 map 的细粒度 helper，必要时维护 command-owned hidden agent |

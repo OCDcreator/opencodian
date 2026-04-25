@@ -5,7 +5,7 @@
 
 ## 概述
 
-定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、结构化 agent / command / compaction 配置，以及 OpenCode 仍兼容的 deprecated `mode` / top-level `tools` 字段。供 `ModelConfigService` 和 `OpencodeConfigManager` 读写 OpenCode 原生配置时使用。类型设计允许完整配置与 provider 级配置保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
+定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、结构化 agent / command / compaction / formatter 配置，以及 OpenCode 仍兼容的 deprecated `mode` / top-level `tools` 字段。供 `ModelConfigService` 和 `OpencodeConfigManager` 读写 OpenCode 原生配置时使用。类型设计允许完整配置、provider 级配置与 formatter entry 保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
 
 ## 导入关系
 
@@ -31,16 +31,19 @@
 | `OpencodeCommandConfig` | 结构化命令配置（`template?`, `description?`, `agent?`, `subtask?`, `model?`, `temperature?`, `top_p?`） |
 | `OpencodeCommandConfigRecord` | `Record<string, OpencodeCommandConfig>` — 命令 map |
 | `OpencodeCompactionConfig` | 压缩配置（`auto?`, `prune?`, `tail_turns?`, `preserve_recent_tokens?`, `reserved?`） |
+| `OpencodeFormatterEntryConfig` | 单个 formatter 条目配置（`disabled?`, `command?`, `environment?`, `extensions?`, `[key: string]: unknown`） |
+| `OpencodeFormatterConfig` | formatter 配置联合：`false`（全部禁用）或 `Record<string, OpencodeFormatterEntryConfig>`（按 formatter 覆盖） |
+| `OpencodeFormatterStatus` | SDK `formatter.status()` 返回的运行时状态（`name`, `extensions`, `enabled`） |
 | `OpencodeToolConfig` | `Record<string, boolean>` — top-level 工具开关 |
 | `OpencodeModelConfigSubset` | 模型相关配置子集（`model?`, `small_model?`, `provider?`, `enabled_providers?`, `disabled_providers?`） |
-| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `compaction?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
+| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `compaction?`, `formatter?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
 
 ## 核心逻辑
 
 ### 配置层级
 
 - `OpencodeModelConfigSubset` — 仅模型/提供商相关字段，供 `ModelConfigService` 局部读写
-- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`compaction`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
+- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`compaction`、`formatter`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
 
 ### 插件声明格式
 
@@ -163,6 +166,16 @@ Ownership facts:
 }
 ```
 
+### Formatter 三态语义
+
+`formatter` 是 **project-scoped** 的 `.opencode/opencode.json` 字段，并保留 OpenCode 上游的三种语义：
+
+- 字段缺失 / `undefined`：默认模式，由 OpenCode 自动探测 formatter
+- `false`：禁用全部 formatter
+- `Record<string, OpencodeFormatterEntryConfig>`：自定义模式；空对象 `{}` 表示显式 custom mode 但暂时没有额外 per-formatter override
+
+`OpencodeFormatterEntryConfig` 带有 `[key: string]: unknown`，因此当 OpenCode 将来为 formatter entry 增加新字段时，插件仍能无损 round-trip 这些未知字段。
+
 ### command-local sampling patch
 
 `OpencodeCommandConfig` 里的 `temperature?` / `top_p?` 在 OpenCodian 内部表示“命令级 sampling patch”。`OpencodeConfigManager.upsertCommandConfig()` 会消费它们，并把真实持久化落到一个 command-owned hidden agent，而不是把这两个字段长期保留在 native OpenCode `command` schema 里。
@@ -191,5 +204,6 @@ Ownership facts:
 | `command` | `Record<string, OpencodeCommandConfig>?` | 命令配置；OpenCodian 会消费 `temperature` / `top_p` patch 并转换成 command-owned hidden agent |
 | `default_agent` | `string?` | 默认 primary agent |
 | `compaction` | `OpencodeCompactionConfig?` | 压缩配置 |
+| `formatter` | `OpencodeFormatterConfig?` | 项目级 formatter 配置；缺失表示默认自动探测，`false` 表示全部禁用，对象表示 per-formatter 覆盖 |
 | `mode` | `Record<string, OpencodeAgentConfig>?` | deprecated 旧 agent map，读写 helper 仍会导入 |
 | `tools` | `Record<string, boolean>?` | top-level 工具开关，helper 会原样保留 |

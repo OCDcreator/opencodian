@@ -70,6 +70,39 @@ export interface OpencodeCompactionConfig {
   [key: string]: unknown;
 }
 
+/**
+ * Single formatter entry configuration.
+ * Mirrors the upstream OpenCode schema from packages/opencode/src/config/formatter.ts.
+ * The index signature preserves unknown fields that OpenCode may add in the future.
+ */
+export interface OpencodeFormatterEntryConfig {
+  disabled?: boolean;
+  command?: string[];
+  environment?: Record<string, string>;
+  extensions?: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * Formatter configuration in .opencode/opencode.json.
+ * - `undefined` (field absent) → default mode (OpenCode auto-detects formatters)
+ * - `false` → all formatters disabled
+ * - `Record<string, OpencodeFormatterEntryConfig>` → custom mode (per-formatter overrides)
+ */
+export type OpencodeFormatterConfig =
+  | boolean
+  | Record<string, OpencodeFormatterEntryConfig>;
+
+/**
+ * Runtime formatter status returned by SDK formatter.status().
+ * Mirrors the upstream OpenCode Format.Status type.
+ */
+export interface OpencodeFormatterStatus {
+  name: string;
+  extensions: string[];
+  enabled: boolean;
+}
+
 export type OpencodeToolConfig = Record<string, boolean>;
 
 export interface OpencodeModelConfigSubset {
@@ -88,6 +121,7 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   command?: OpencodeCommandConfigRecord;
   default_agent?: string;
   compaction?: OpencodeCompactionConfig;
+  formatter?: OpencodeFormatterConfig;
   mode?: OpencodeAgentConfigRecord;
   tools?: OpencodeToolConfig;
   [key: string]: unknown;

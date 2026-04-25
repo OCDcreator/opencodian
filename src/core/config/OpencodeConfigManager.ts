@@ -10,6 +10,7 @@ import type {
   OpencodeCommandConfigRecord,
   OpencodeCompactionConfig,
   OpencodeConfig,
+  OpencodeFormatterConfig,
   OpencodePluginSpec,
   PermissionAction,
   PermissionConfig,
@@ -156,6 +157,42 @@ export class OpencodeConfigManager {
     }
 
     return this.cloneConfigObject(config.compaction);
+  }
+
+  async getFormatterConfig(): Promise<OpencodeFormatterConfig | undefined> {
+    const config = await this.read();
+    const formatter = config.formatter;
+    if (formatter === undefined) {
+      return undefined;
+    }
+    if (typeof formatter === 'boolean') {
+      return formatter;
+    }
+    if (isRecord(formatter)) {
+      return this.cloneConfigObject(formatter);
+    }
+    return undefined;
+  }
+
+  /**
+   * Write the formatter subtree exactly. Unlike compaction/agent helpers that use
+   * deep merge, this replaces the entire formatter value so that removed entries
+   * are actually deleted on disk.
+   */
+  async updateFormatterConfig(
+    formatter: OpencodeFormatterConfig | null | undefined,
+  ): Promise<void> {
+    const config = await this.read();
+    if (formatter === null || formatter === undefined) {
+      delete config.formatter;
+    } else if (typeof formatter === 'boolean') {
+      config.formatter = formatter;
+    } else if (isRecord(formatter)) {
+      config.formatter = this.cloneConfigObject(formatter);
+    } else {
+      delete config.formatter;
+    }
+    await this.write(config);
   }
 
   async updateCompactionConfig(

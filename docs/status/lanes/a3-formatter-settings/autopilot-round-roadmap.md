@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] F1 - Add formatter config types and runtime/config helpers
+### [DONE] F1 - Add formatter config types and runtime/config helpers
 
 - **Lane**: Formatter data foundation
 - **Goal**: Make formatter config a typed, first-class part of the OpenCodian config model and add the minimum `OpencodeConfigManager` helpers needed for the settings UI.
@@ -21,7 +21,7 @@
   - Formatter config is explicitly typed and helper methods can read/update just the formatter subtree.
   - Tests cover formatter config read/write behavior.
 
-### [QUEUED] F2 - Add the Formatter top-level settings UI
+### [NEXT] F2 - Add the Formatter top-level settings UI
 
 - **Lane**: Formatter settings surface
 - **Goal**: Add the top-level `Formatter` settings page with `overview` and `config` secondary views, including runtime status presentation and mode switching.
