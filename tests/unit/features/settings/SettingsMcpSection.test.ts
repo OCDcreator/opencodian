@@ -1,100 +1,29 @@
-import { Setting } from 'obsidian';
+import { Notice } from 'obsidian';
+
+jest.mock('obsidian', () => ({
+  ...jest.requireActual('obsidian'),
+  Notice: jest.fn(),
+}));
 
 import type { McpServerSnapshot, McpServerStatus } from '../../../../src/core/opencode/types';
 import { SettingsMcpSection } from '../../../../src/features/settings/SettingsMcpSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
-
-interface MockButtonControl {
-  buttonEl: HTMLButtonElement;
-  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
-  setButtonText: jest.MockedFunction<(value: string) => MockButtonControl>;
-  setCta: jest.MockedFunction<() => MockButtonControl>;
-  setDisabled: jest.MockedFunction<(value: boolean) => MockButtonControl>;
-}
-
-interface ButtonRecord {
-  control: MockButtonControl;
-  name: string;
-  onClick?: () => void | Promise<void>;
-}
-
-type McpSectionPlugin = Pick<OpenCodianPlugin, 'openCodeService'>;
-
-const buttonRecords: ButtonRecord[] = [];
-
-function createButtonRecord(name: string): ButtonRecord {
-  const record: ButtonRecord = {
-    name,
-    control: {
-      buttonEl: document.createElement('button'),
-      onClick: jest.fn(),
-      setButtonText: jest.fn(),
-      setCta: jest.fn(),
-      setDisabled: jest.fn(),
-    },
-  };
-  record.control.onClick.mockImplementation((callback) => {
-    record.onClick = callback;
-    return record.control;
-  });
-  record.control.setButtonText.mockReturnValue(record.control);
-  record.control.setCta.mockReturnValue(record.control);
-  record.control.setDisabled.mockReturnValue(record.control);
-  return record;
-}
-
-function createPlugin(snapshot?: Partial<McpServerSnapshot>): McpSectionPlugin {
-  const currentSnapshot: McpServerSnapshot = {
-    servers: {},
-    updatedAt: null,
-    ...snapshot,
-  };
-
-  return {
-    openCodeService: {
-      getMcpServerSnapshot: jest.fn().mockReturnValue(currentSnapshot),
-      refreshMcpServerStatus: jest.fn().mockResolvedValue(currentSnapshot.servers),
-      subscribeToCatalogUpdates: jest.fn().mockReturnValue(jest.fn()),
-    } as unknown as McpSectionPlugin['openCodeService'],
-  };
-}
-
-function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
-  const headingEl = document.createElement('h3');
-  headingEl.textContent = title;
-  containerEl.appendChild(headingEl);
-  return headingEl;
-}
-
-async function flushAsync(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
-function mockSettingPrototype(): void {
-  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting) {
-    return this;
-  });
-  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
-    return this;
-  });
-  jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
-    this: Setting,
-    callback: (control: MockButtonControl) => unknown,
-  ) {
-    const record = createButtonRecord('');
-    buttonRecords.push(record);
-    callback(record.control);
-    return this;
-  });
-}
+import {
+  buttonRecords,
+  clearRecordArrays,
+  createPlugin,
+  createSectionHeading,
+  flushAsync,
+  mockSettingPrototype,
+} from './helpers/mcpSectionTestHelpers';
 
 describe('SettingsMcpSection', () => {
   beforeEach(() => {
     setLocale('en');
     document.body.innerHTML = '';
-    buttonRecords.length = 0;
+    clearRecordArrays();
+    (Notice as unknown as jest.Mock).mockClear();
     mockSettingPrototype();
   });
 
@@ -219,7 +148,8 @@ describe('SettingsMcpSection subscriptions and status', () => {
   beforeEach(() => {
     setLocale('en');
     document.body.innerHTML = '';
-    buttonRecords.length = 0;
+    clearRecordArrays();
+    (Notice as unknown as jest.Mock).mockClear();
     mockSettingPrototype();
   });
 

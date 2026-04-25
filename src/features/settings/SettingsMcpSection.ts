@@ -3,12 +3,13 @@
  * Renders runtime MCP status from OpenCodeService seams.
  */
 
-import { type ButtonComponent, Setting } from 'obsidian';
+import { type ButtonComponent, Notice, Setting } from 'obsidian';
 
 import type { McpServerSnapshot, McpServerStatus } from '../../core/opencode/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { SettingsMcpAddForm } from './SettingsMcpAddForm';
 
 const logger = createLogger('SettingsMcpSection');
 
@@ -98,7 +99,10 @@ export class SettingsMcpSection {
   private overviewContainerEl: HTMLElement | null = null;
   private serverListContainerEl: HTMLElement | null = null;
   private isRefreshing = false;
+  private isActionPending = false;
   private lastRefreshTime: number | null = null;
+  private readonly actionButtons: ButtonComponent[] = [];
+  private addForm: SettingsMcpAddForm | null = null;
 
   constructor(options: SettingsMcpSectionOptions) {
     this.plugin = options.plugin;
@@ -126,6 +130,9 @@ export class SettingsMcpSection {
     this.refreshButton = null;
     this.overviewContainerEl = null;
     this.serverListContainerEl = null;
+    this.actionButtons.length = 0;
+    this.addForm?.dispose();
+    this.addForm = null;
   }
 
   async triggerRefresh(): Promise<void> {
@@ -175,6 +182,15 @@ export class SettingsMcpSection {
     const serverBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     const serverBody = serverBlock.createDiv({ cls: 'opencodian-settings-block-body' });
     this.serverListContainerEl = serverBody.createDiv({ cls: 'opencodian-mcp-server-list' });
+
+    const addBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    addBlock.createEl('h4', {
+      text: t('settings.server.mcp.add.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+    const addBody = addBlock.createDiv({ cls: 'opencodian-settings-block-body' });
+    this.addForm = new SettingsMcpAddForm(this.plugin);
+    this.addForm.render(addBody);
 
     this.renderFromSnapshot(this.plugin.openCodeService.getMcpServerSnapshot());
   }
@@ -231,6 +247,7 @@ export class SettingsMcpSection {
       return;
     }
     this.serverListContainerEl.empty();
+    this.actionButtons.length = 0;
 
     const servers = snapshot.servers;
     const names = Object.keys(servers);
@@ -246,6 +263,7 @@ export class SettingsMcpSection {
     const header = this.serverListContainerEl.createDiv({ cls: 'opencodian-mcp-server-header' });
     header.createDiv({ cls: 'opencodian-mcp-server-header-name', text: t('settings.server.mcp.server.name') });
     header.createDiv({ cls: 'opencodian-mcp-server-header-status', text: t('settings.server.mcp.server.status') });
+    header.createDiv({ text: '' });
 
     for (const name of names) {
       const status = servers[name];
@@ -263,6 +281,12 @@ export class SettingsMcpSection {
       cls: `opencodian-mcp-badge ${statusBadgeClass(status.status)}`,
       text: statusLabel(status.status),
     });
+
+    const actionsCell = row.createDiv();
+    actionsCell.style.display = 'flex';
+    actionsCell.style.gap = '8px';
+    actionsCell.style.flexWrap = 'wrap';
+    this.renderServerActions(actionsCell, name, status);
 
     if ((status.status === 'failed' || status.status === 'needs_client_registration') && 'error' in status && status.error) {
       row.createDiv({
@@ -282,5 +306,60 @@ export class SettingsMcpSection {
         : t('settings.server.mcp.refresh'),
     );
     this.refreshButton.setDisabled(this.isRefreshing);
+  }
+
+  private renderServerActions(parent: HTMLElement, name: string, status: McpServerStatus): void {
+    const addActionButton = (label: string, onClick: () => Promise<void>) => {
+      new Setting(parent).addButton((button) => {
+        this.actionButtons.push(button);
+        button
+          .setButtonText(label)
+          .setDisabled(this.isActionPending)
+          .onClick(async () => {
+            this.isActionPending = true;
+            this.updateActionButtons();
+            try {
+              await onClick();
+              void this.triggerRefresh();
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              new Notice(t('settings.server.mcp.notice.actionFailed', { error: message }));
+            } finally {
+              this.isActionPending = false;
+              this.updateActionButtons();
+            }
+          });
+      });
+    };
+
+    switch (status.status) {
+      case 'connected':
+        addActionButton(t('settings.server.mcp.action.disconnect'), async () => {
+          await this.plugin.openCodeService.disconnectMcpServer(name);
+        });
+        break;
+      case 'disabled':
+      case 'failed':
+        addActionButton(t('settings.server.mcp.action.connect'), async () => {
+          await this.plugin.openCodeService.connectMcpServer(name);
+        });
+        break;
+      case 'needs_auth':
+        addActionButton(t('settings.server.mcp.action.authenticate'), async () => {
+          await this.plugin.openCodeService.authenticateMcp(name);
+        });
+        addActionButton(t('settings.server.mcp.action.clearAuth'), async () => {
+          await this.plugin.openCodeService.removeMcpAuth(name);
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
+  private updateActionButtons(): void {
+    for (const button of this.actionButtons) {
+      button.setDisabled(this.isActionPending);
+    }
   }
 }

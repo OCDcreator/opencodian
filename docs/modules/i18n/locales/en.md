@@ -17,7 +17,9 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 2026-04-25 新增 `settings.server.tab.mcp` 和 `settings.server.mcp.*` 系列键，为 Server > MCP 设置标签页提供 MCP 服务器概览、状态徽章和刷新操作的英文文案。
 
-源码约 1000 行。
+同日 M2 继续扩展 `settings.server.mcp.*` 键空间，新增 MCP 操作按钮（connect / disconnect / authenticate / clearAuth）、新增服务器表单（local / remote 类型切换、command / environment / url / headers / OAuth 等字段）、校验错误（nameRequired / nameDuplicate / commandRequired / urlRequired / urlInvalid / timeoutPositive / emptyKey）和操作反馈通知（added / addFailed / actionFailed）对应的英文文案。
+
+源码约 1100 行。
 
 ## 导入关系
 

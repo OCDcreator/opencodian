@@ -25,7 +25,7 @@
   - Opening or refreshing the tab triggers MCP status refresh.
   - Tests cover rendered state combinations and refresh behavior.
 
-### [NEXT] M2 - Implement MCP server operations and add-server forms
+### [DONE] M2 - Implement MCP server operations and add-server forms
 
 - **Lane**: MCP management actions
 - **Goal**: Add connect, disconnect, authenticate, clear-auth, and local/remote add-server flows with user-facing validation and error handling.
@@ -44,7 +44,7 @@
   - Users can add local/remote MCP servers and run the supported MCP actions from settings.
   - Tests cover validation, button visibility, and post-action refresh behavior.
 
-### [QUEUED] M3 - Stabilize MCP tool identity across history and streaming
+### [NEXT] M3 - Stabilize MCP tool identity across history and streaming
 
 - **Lane**: Tool-call rendering consistency
 - **Goal**: Make known MCP tool names render as MCP consistently across hydrate, streaming, and completed-tool states without changing builtin/custom behavior.
