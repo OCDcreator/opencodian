@@ -13,6 +13,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 同一天的后续 UI 微调还新增了 `settings.agents.editor.group.*` 文案，并把 `settings.agents.catalog.desc` 改成正向可见性语义，明确说明 agent catalog 中的子代理开关现在是 **开 = 在 `@` 菜单显示 / 关 = 隐藏**。
 
+当前 A3 child-session graph 收尾还补了一组 `chat.childSessionTree.*` 文案，把会话树 header、打开按钮、orphan fallback、partial graph badge 与提醒文案收进 locale，避免继续在 `OpenCodianView.ts` 中硬编码用户可见文本。
+
 源码约 1000 行。
 
 ## 导入关系
@@ -96,6 +98,7 @@ t('settings.server.started')
 - `settings.model.*` — 模型设置
 - `chat.context.*` — 上下文操作
 - `chat.sessionSettings.*` — 会话级覆盖设置弹窗与保存结果提示（含 deferred backend apply notice）
+- `chat.childSessionTree.*` — child-session tree header / open action / partial-graph 文案
 - `chat.question.*` — 问题系统
 - `chat.omo.*` — OMO 相关
 

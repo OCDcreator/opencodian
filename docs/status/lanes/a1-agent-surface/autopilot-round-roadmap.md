@@ -48,7 +48,7 @@
   - Chat can explicitly choose a main agent and route `@subagent` / subtask intent through native request parts.
   - Tests cover prompt mapping and reject paths.
 
-### [NEXT] A3 - Restore child-session graph tracking and session-tree UI
+### [DONE] A3 - Restore child-session graph tracking and session-tree UI
 
 - **Lane**: Child session graph
 - **Goal**: Reconstruct task -> child-session relationships from metadata, persisted parts, and `session.children()` so the active conversation can surface a stable child-session tree.
@@ -67,7 +67,7 @@
   - The active session can restore and navigate child-session edges.
   - Tests cover task-edge recovery and partial-graph fallback.
 
-### [QUEUED] A4 - Finish Agent Studio management surfaces
+### [NEXT] A4 - Finish Agent Studio management surfaces
 
 - **Lane**: Settings and file workspace
 - **Goal**: Complete project-config agent management, Markdown agent CRUD/sync state, and system-agent expert override surfaces without bloating settings owners.

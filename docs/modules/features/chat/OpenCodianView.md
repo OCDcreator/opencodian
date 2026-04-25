@@ -94,6 +94,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - 一个面向 settings shell 的公开 bridge：`reapplyCurrentConversationSessionSettings()` 会直接复用上述 coordinator，让 settings/conversation 里的 global session default 修改可以立刻落回当前聊天运行时
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
+- `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height 与 toolbar slot mount
 - `SlashCommandMenuCatalogCache`：缓存 runtime commands + skills 与项目级 command/agent 配置合并后的 slash 一级菜单目录；现在支持由插件入口在设置保存、server 恢复到 `running` 时主动失效
@@ -202,6 +203,7 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 - 清空当前消息区并重置 turn 状态
 - 把 `openCodeSessionId` 交给 `openCodeService`
 - 在必要时调用 `syncConversationMessagesFromServer()`
+- 在 load 完成与 authoritative sync 完成后额外调用 `ChildSessionGraphCoordinator.refreshGraph()`，让 child-session tree 跟随当前可见对话的 persisted/live child-session 数据刷新
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
 - 重新渲染消息、背景任务指示器、todo dock、question dock
 - 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSessionSignalRuntime` 接入 session sync event + todo/status live signal 的订阅、session→tab 匹配与 cleanup 生命周期
@@ -217,6 +219,15 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 session sync event 与 session todo/status 的 live signal 入口都不再由 view 自己持有 `subscribeToSessionSyncEvents()` / `subscribeToSessionTodoUpdates()` / `subscribeToSessionStatusUpdates()` 及其 dispose 状态：`ConversationSessionSignalRuntime` 会统一接管三条 listener 的生命周期、session→tab 匹配与 active-tab fallback，再把 signal sync 调度交回 `ConversationSyncOrchestrationService`，把命中的 todo/status update 交回 `SessionTodoCoordinator`，并在每次 live update 后继续调用 `BackgroundTaskLiveSignalCoordinator`。
 
 signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conversation 选择、conversation 加载和 dispatch 编排现在先交给 `ConversationSyncOrchestrationService`。它会判断 signal 是否应回到当前可见会话，或转向 hidden tab sync；会把同一 tab 上短时间内连续到达的 signal reason 合并；轮询时也只会在确实存在 visible/background sync 目标时持有 interval，并只枚举非活动、仍有 background task、且 runtime 当前允许同步的 tab。
+
+### Child session tree
+
+`OpenCodianView` 现在会在当前消息区底部维护一个最小 `childSessionTreeEl` 容器，用来渲染 `ChildSessionGraphCoordinator` 产出的 graph：
+
+- `renderSessionTree()` 只负责 DOM 显示：`complete`/`partial` graph 渲染折叠区，`empty` graph 直接隐藏整块
+- 普通 edge 行显示状态点、title/description 与 `Open` 按钮；按钮继续复用既有 `openTaskToolSession()` 路径
+- orphaned session 行固定显示 `Unknown task`，同时标记 partial graph badge，并在 graph 为 `partial` 时显示提醒文案
+- graph state 不落进 `TabRuntimeState`；view 只在 active pane 切换时重建/隐藏容器，真正的 graph snapshot 仍留在 coordinator 内部
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 

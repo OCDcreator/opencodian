@@ -416,3 +416,159 @@ export type InvocationPromptPart =
       /** Optional command. */
       command?: string;
     };
+
+// ---------------------------------------------------------------------------
+// Child session graph — task → child-session edge tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * Status of a reconstructed child-session edge.
+ * - `active` — child session is running or recently seen
+ * - `completed` — child session finished normally
+ * - `error` — child session ended with error
+ * - `unknown` — status could not be determined from metadata
+ */
+export type ChildSessionEdgeStatus = 'active' | 'completed' | 'error' | 'unknown';
+
+/**
+ * A single edge in the child-session graph, representing one task tool call
+ * that spawned a child session. Edges are recovered from persisted task
+ * metadata first; `session.children()` supplements orphan detection.
+ */
+export interface ChildSessionEdge {
+  /** The parent session that owns the task tool call. */
+  readonly parentSessionId: string;
+
+  /** The message in the parent session containing the task tool call. */
+  readonly parentMessageId: string;
+
+  /** The tool call ID of the `task` invocation. */
+  readonly toolCallId: string;
+
+  /** The child session ID created by the task tool. */
+  readonly childSessionId: string;
+
+  /** The subagent/agent type specified in the task call input, if any. */
+  readonly subagentId?: string;
+
+  /** Human-readable description from the task call input. */
+  readonly description?: string;
+
+  /** Current status of the child session edge. */
+  readonly status: ChildSessionEdgeStatus;
+
+  /**
+   * Title for the child session, derived from task input or session metadata.
+   * May be undefined when the graph is partial.
+   */
+  readonly title?: string;
+
+  /** Last known update timestamp for the child session. */
+  readonly lastUpdatedAt?: number;
+}
+
+/**
+ * Overall status of the reconstructed child-session graph.
+ * - `complete` — all children are accounted for with matching edges
+ * - `partial` — some children have no matching task edges (orphaned)
+ * - `empty` — no child sessions found
+ */
+export type ChildSessionGraphStatus = 'complete' | 'partial' | 'empty';
+
+/**
+ * A child session present in `session.children()` but NOT matched to any
+ * recovered task edge. Provides enough display data for the UI to show a
+ * stable partial-graph entry with an open action.
+ */
+export interface OrphanedChildSession {
+  readonly id: string;
+  readonly title?: string;
+  readonly createdAt?: number;
+  readonly updatedAt?: number;
+}
+
+/**
+ * A reconstructed child-session graph for a single parent session.
+ *
+ * The graph is built from persisted task metadata first, then
+ * cross-referenced with `session.children()` to detect orphaned
+ * children that lack a matching task edge.
+ */
+export interface ChildSessionGraph {
+  /** The parent session this graph belongs to. */
+  readonly parentSessionId: string;
+
+  /** Recovered task → child-session edges. */
+  readonly edges: readonly ChildSessionEdge[];
+
+  /**
+   * Child sessions seen in `session.children()` but NOT matched to any task
+   * edge. Each entry carries stable display data so the UI can render
+   * meaningful partial-graph rows even without task metadata.
+   */
+  readonly orphanedSessions: readonly OrphanedChildSession[];
+
+  /**
+   * Child session IDs seen in `session.children()` but NOT matched to
+   * any task edge. These represent orphaned children with incomplete
+   * metadata.
+   */
+  readonly orphanedSessionIds: readonly string[];
+
+  /** Overall graph completeness status. */
+  readonly status: ChildSessionGraphStatus;
+}
+
+/**
+ * Minimal shape of a child session returned by `session.children()`.
+ * Decoupled from the exact SDK Session type.
+ */
+export interface ChildSessionInfo {
+  readonly id: string;
+  readonly title?: string;
+  readonly createdAt?: number;
+  readonly updatedAt?: number;
+}
+
+/**
+ * Input for child-session graph reconstruction.
+ *
+ * The service scans persisted messages for task tool metadata, then
+ * optionally cross-references with live child session data to detect
+ * orphaned children and fill missing metadata.
+ */
+export interface ChildSessionGraphInput {
+  /** The parent session ID being reconstructed. */
+  readonly parentSessionId: string;
+
+  /**
+   * Persisted messages from the conversation. Must include
+   * `contentBlocks` and/or `toolCalls` with task tool metadata.
+   */
+  readonly messages: readonly {
+    readonly id: string;
+    readonly contentBlocks?: readonly {
+      readonly type: string;
+      readonly toolKind?: string;
+      readonly toolId?: string;
+      readonly toolName?: string;
+      readonly toolMetadata?: Record<string, unknown>;
+      readonly toolInput?: Record<string, unknown>;
+      readonly toolStatus?: string;
+    }[];
+    readonly toolCalls?: readonly {
+      readonly id: string;
+      readonly name: string;
+      readonly kind?: string;
+      readonly toolMetadata?: Record<string, unknown>;
+      readonly input: Record<string, unknown>;
+      readonly status?: string;
+    }[];
+  }[];
+
+  /**
+   * Live child sessions from `session.children()`.
+   * Optional — when absent, only persisted metadata is used.
+   */
+  readonly childSessions?: readonly ChildSessionInfo[];
+}

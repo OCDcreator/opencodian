@@ -7,6 +7,7 @@
 import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope } from 'obsidian';
 
+import type { ChildSessionGraph } from '../../core/agents';
 import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
@@ -180,6 +181,10 @@ import {
   ChatSelectionControlsCoordinator,
   type ChatSelectionControlsCoordinatorHost,
 } from './services/ChatSelectionControlsCoordinator';
+import {
+  ChildSessionGraphCoordinator,
+  type ChildSessionGraphCoordinatorHost,
+} from './services/ChildSessionGraphCoordinator';
 import {
   ComposerContextViewFacade,
   type ComposerContextViewHost,
@@ -399,6 +404,7 @@ interface OpenCodianViewSurfaceRuntimeWiring {
   tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
   persistentAssistantNoticeService: PersistentAssistantNoticeService;
   sessionTodoCoordinator: SessionTodoCoordinator;
+  childSessionGraphCoordinator: ChildSessionGraphCoordinator;
   questionDockSlotCoordinator: QuestionDockSlotCoordinator;
   assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
 }
@@ -500,6 +506,106 @@ type TabPaneState = TabMessagesPaneState<TabRuntimeState>;
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
 const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="scale(4.166667)"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></g>`;
+const SESSION_TREE_BASE_CSS = `
+.opencodian-session-tree {
+  margin: 8px 12px 0;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 8px;
+}
+
+.opencodian-session-tree-details {
+  display: block;
+}
+
+.opencodian-session-tree-header {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.opencodian-session-tree-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-session-tree-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+
+.opencodian-session-tree-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.opencodian-session-tree-dot--completed { background: var(--text-success, var(--color-green)); }
+.opencodian-session-tree-dot--active { background: var(--text-warning, var(--color-orange)); }
+.opencodian-session-tree-dot--error { background: var(--text-error, var(--color-red)); }
+.opencodian-session-tree-dot--unknown { background: var(--text-muted); }
+
+.opencodian-session-tree-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.opencodian-session-tree-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-normal);
+}
+
+.opencodian-session-tree-description {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.opencodian-session-tree-row--orphaned .opencodian-session-tree-title {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.opencodian-session-tree-badge {
+  border-radius: 999px;
+  padding: 1px 6px;
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-session-tree-open-btn {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  border: none;
+}
+
+.opencodian-session-tree-open-btn:hover {
+  background: var(--background-modifier-active-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-session-tree-notice {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 6px;
+}
+`;
 
 addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
@@ -511,6 +617,7 @@ export class OpenCodianView extends ItemView {
   private messagesShellEl: HTMLElement | null = null;
   private themeBackgroundImageEl: HTMLDivElement | null = null;
   private messagesContainer: HTMLElement | null = null;
+  private childSessionTreeEl: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private glassOctahedronDemoController: GlassOctahedronDemoController | null = null;
   private liquidDiamondDemoController: LiquidDiamondDemoController | null = null;
@@ -559,6 +666,7 @@ export class OpenCodianView extends ItemView {
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
   private sessionTodoCoordinator: SessionTodoCoordinator;
+  private childSessionGraphCoordinator: ChildSessionGraphCoordinator;
   private questionDockSlotCoordinator: QuestionDockSlotCoordinator;
   private activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
@@ -643,6 +751,24 @@ export class OpenCodianView extends ItemView {
       },
       openSettings: () => {
         this.openPluginSettingsPreservingScroll();
+      },
+    };
+  }
+
+  private createChildSessionGraphCoordinatorHost(): ChildSessionGraphCoordinatorHost {
+    return {
+      getCurrentConversation: () => this.currentConversation,
+      getSessionChildren: async (sessionId) => {
+        const sessions = await this.plugin.openCodeService.getSessionChildren(sessionId);
+        return sessions.map((session) => ({
+          id: session.id,
+          title: session.title,
+          createdAt: session.time?.created,
+          updatedAt: session.time?.updated,
+        }));
+      },
+      onGraphUpdated: (graph) => {
+        this.renderSessionTree(graph);
       },
     };
   }
@@ -973,6 +1099,11 @@ export class OpenCodianView extends ItemView {
       getMessagesContainer: () => this.messagesContainer,
       setMessagesContainer: (messagesEl) => {
         this.messagesContainer = messagesEl;
+        this.childSessionTreeEl = null;
+        const currentGraph = this.childSessionGraphCoordinator?.getGraph() ?? null;
+        if (currentGraph) {
+          this.renderSessionTree(currentGraph);
+        }
       },
       getActiveTabId: () => this.getActiveTabId(),
       createRuntimeState: () => this.createTabRuntimeState(),
@@ -1216,6 +1347,7 @@ export class OpenCodianView extends ItemView {
       surfaceRuntime.tabConversationSyncFingerprintRuntimePort;
     this.persistentAssistantNoticeService = surfaceRuntime.persistentAssistantNoticeService;
     this.sessionTodoCoordinator = surfaceRuntime.sessionTodoCoordinator;
+    this.childSessionGraphCoordinator = surfaceRuntime.childSessionGraphCoordinator;
     this.questionDockSlotCoordinator = surfaceRuntime.questionDockSlotCoordinator;
     this.assistantShellViewHostAdapter = surfaceRuntime.assistantShellViewHostAdapter;
 
@@ -1342,6 +1474,9 @@ export class OpenCodianView extends ItemView {
         this.createPersistentAssistantNoticeServiceHost(),
       ),
       sessionTodoCoordinator: createSessionTodoCoordinator(this.createSessionTodoViewHost()),
+      childSessionGraphCoordinator: new ChildSessionGraphCoordinator(
+        this.createChildSessionGraphCoordinatorHost(),
+      ),
       questionDockSlotCoordinator,
       assistantShellViewHostAdapter: new AssistantShellViewHostAdapter(
         this.createAssistantShellViewHostAdapterHost(),
@@ -1759,6 +1894,10 @@ export class OpenCodianView extends ItemView {
       getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
       setCurrentConversation: (conversation) => {
         this.currentConversation = conversation;
+        if (!conversation) {
+          this.childSessionGraphCoordinator.clearGraph();
+          this.hideSessionTree();
+        }
       },
       setCurrentConversationRevertState: (revertState) => {
         this.currentConversationRevertState = revertState;
@@ -1803,6 +1942,7 @@ export class OpenCodianView extends ItemView {
       },
       clearMessagesContainer: () => {
         this.messagesContainer?.empty();
+        this.childSessionTreeEl = null;
       },
       resetTurnState: () => {
         this.resetTurnState();
@@ -2701,6 +2841,8 @@ export class OpenCodianView extends ItemView {
     this.clearScheduledScrollToBottom();
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
+    this.childSessionGraphCoordinator.clearGraph();
+    this.hideSessionTree();
     this.titleGenerationService.cancelAll();
     this.chatSelectionControlsCoordinator.destroy();
     this.inputPanelAppearanceCoordinator.destroy();
@@ -2754,6 +2896,7 @@ export class OpenCodianView extends ItemView {
     this.themeBackgroundImageEl = themeBackgroundLayerEl.createDiv({ cls: 'opencodian-theme-background-image' });
     this.themeBackgroundImageEl.setAttribute('aria-hidden', 'true');
     this.messagesContainer = null;
+    this.childSessionTreeEl = null;
 
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
@@ -2933,14 +3076,15 @@ export class OpenCodianView extends ItemView {
     const customCss = buildChatAppearanceCustomCss(
       this.plugin.settings.chatAppearance.advanced.customCssDeclarations,
     );
+    const combinedCss = `${SESSION_TREE_BASE_CSS}\n${customCss}`.trim();
 
-    if (customCss) {
+    if (combinedCss) {
       if (!this.chatAppearanceStyleEl) {
         this.chatAppearanceStyleEl = document.createElement('style');
         this.chatAppearanceStyleEl.className = 'opencodian-chat-appearance-style';
         this.chatContainerEl.appendChild(this.chatAppearanceStyleEl);
       }
-      this.chatAppearanceStyleEl.textContent = customCss;
+      this.chatAppearanceStyleEl.textContent = combinedCss;
     } else if (this.chatAppearanceStyleEl) {
       this.chatAppearanceStyleEl.remove();
       this.chatAppearanceStyleEl = null;
@@ -3564,6 +3708,7 @@ export class OpenCodianView extends ItemView {
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
   ): Promise<void> {
     await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
+    await this.childSessionGraphCoordinator.refreshGraph();
   }
 
   private getConversationSyncFingerprint(messages: ChatMessage[]): string {
@@ -4606,12 +4751,14 @@ export class OpenCodianView extends ItemView {
     fingerprint: string;
     revertState: ConversationRevertState | null;
   }> {
-    return this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromServer(
+    const result = await this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromServer(
       conversation,
       tabId,
       reason,
       options,
     );
+    await this.refreshChildSessionGraphIfVisibleConversation(conversation, tabId);
+    return result;
   }
 
   private async syncConversationMessagesFromCanonicalState(
@@ -4625,12 +4772,27 @@ export class OpenCodianView extends ItemView {
     fingerprint: string;
     revertState: ConversationRevertState | null;
   } | null> {
-    return this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromCanonicalState(
+    const result = await this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromCanonicalState(
       conversation,
       tabId,
       reason,
       options,
     );
+    if (result) {
+      await this.refreshChildSessionGraphIfVisibleConversation(conversation, tabId);
+    }
+    return result;
+  }
+
+  private async refreshChildSessionGraphIfVisibleConversation(
+    conversation: Conversation,
+    tabId: TabId | null,
+  ): Promise<void> {
+    if (this.currentConversation?.id !== conversation.id || this.getActiveTabId() !== tabId) {
+      return;
+    }
+
+    await this.childSessionGraphCoordinator.refreshGraph();
   }
 
   private async refreshContextUsageAfterActiveConversationSync(
@@ -4642,6 +4804,126 @@ export class OpenCodianView extends ItemView {
     }
 
     await this.activeTabContextUsageCoordinator.refreshFromServer();
+  }
+
+  private ensureChildSessionTreeContainer(): HTMLElement | null {
+    if (!this.messagesContainer) {
+      this.childSessionTreeEl = null;
+      return null;
+    }
+
+    if (this.childSessionTreeEl?.parentElement !== this.messagesContainer) {
+      this.childSessionTreeEl?.remove();
+      this.childSessionTreeEl = this.messagesContainer.createDiv({ cls: 'opencodian-session-tree' });
+    }
+
+    return this.childSessionTreeEl;
+  }
+
+  private hideSessionTree(): void {
+    if (!this.childSessionTreeEl) {
+      return;
+    }
+
+    this.childSessionTreeEl.empty();
+    this.childSessionTreeEl.style.display = 'none';
+  }
+
+  private renderSessionTree(graph: ChildSessionGraph): void {
+    const container = this.ensureChildSessionTreeContainer();
+    if (!container) {
+      return;
+    }
+
+    container.empty();
+    if (graph.status === 'empty') {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = '';
+
+    const detailsEl = container.createEl('details', {
+      cls: 'opencodian-session-tree-details',
+    });
+    detailsEl.open = true;
+
+    detailsEl.createEl('summary', {
+      cls: 'opencodian-session-tree-header',
+      text: t('chat.childSessionTree.header', {
+        count: String(graph.edges.length + graph.orphanedSessions.length),
+      }),
+    });
+
+    const listEl = detailsEl.createDiv({ cls: 'opencodian-session-tree-list' });
+
+    for (const edge of graph.edges) {
+      const rowEl = listEl.createDiv({ cls: 'opencodian-session-tree-row' });
+      rowEl.createSpan({
+        cls: `opencodian-session-tree-dot opencodian-session-tree-dot--${edge.status}`,
+      });
+
+      const contentEl = rowEl.createDiv({ cls: 'opencodian-session-tree-content' });
+      contentEl.createDiv({
+        cls: 'opencodian-session-tree-title',
+        text: edge.title ?? edge.subagentId ?? edge.childSessionId,
+      });
+      if (edge.description && edge.description !== edge.title) {
+        contentEl.createDiv({
+          cls: 'opencodian-session-tree-description',
+          text: edge.description,
+        });
+      }
+
+      const openBtn = rowEl.createEl('button', {
+        cls: 'opencodian-session-tree-open-btn',
+        text: t('chat.childSessionTree.open'),
+      });
+      openBtn.addEventListener('click', () => {
+        void this.openTaskToolSession(edge.childSessionId);
+      });
+    }
+
+    for (const orphaned of graph.orphanedSessions) {
+      const rowEl = listEl.createDiv({
+        cls: 'opencodian-session-tree-row opencodian-session-tree-row--orphaned',
+      });
+      rowEl.createSpan({
+        cls: 'opencodian-session-tree-dot opencodian-session-tree-dot--unknown',
+      });
+
+      const contentEl = rowEl.createDiv({ cls: 'opencodian-session-tree-content' });
+      contentEl.createDiv({
+        cls: 'opencodian-session-tree-title',
+        text: t('chat.childSessionTree.unknownTask'),
+      });
+      const metaEl = contentEl.createDiv({ cls: 'opencodian-session-tree-description' });
+      metaEl.createSpan({
+        cls: 'opencodian-session-tree-badge',
+        text: t('chat.childSessionTree.partialBadge'),
+      });
+      if (orphaned.title) {
+        metaEl.createSpan({
+          cls: 'opencodian-session-tree-orphaned-title',
+          text: orphaned.title,
+        });
+      }
+
+      const openBtn = rowEl.createEl('button', {
+        cls: 'opencodian-session-tree-open-btn',
+        text: t('chat.childSessionTree.open'),
+      });
+      openBtn.addEventListener('click', () => {
+        void this.openTaskToolSession(orphaned.id);
+      });
+    }
+
+    if (graph.status === 'partial') {
+      detailsEl.createDiv({
+        cls: 'opencodian-session-tree-notice',
+        text: t('chat.childSessionTree.partialNotice'),
+      });
+    }
   }
 
   private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {

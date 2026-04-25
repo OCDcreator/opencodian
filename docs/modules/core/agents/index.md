@@ -12,13 +12,14 @@
 | 来源模块 | 导出 |
 |----------|------|
 | `AgentCatalogService` | 类 `AgentCatalogService` |
+| `ChildSessionGraphService` | 类 `ChildSessionGraphService` |
 | `AgentInvocationService` | 类 `AgentInvocationService` |
 | `SystemAgentGuardService` | 类 `SystemAgentGuardService` |
-| `types` | 常量 `SYSTEM_AGENT_IDS`、函数 `isSystemAgentId`、类型 `AgentCatalogInput`、`RuntimeAgentShape`、`SurfaceAgent`、`SurfaceAgentFile`、`SurfaceAgentFileParseStatus`、`SurfaceAgentFileScope`、`SurfaceAgentSource`、`SystemAgentGuardResult`、`SystemAgentId`、`SurfaceInvocationIntent`、`AgentMentionIntent`、`SubtaskIntent`、`InvocationPromptPart`、`ResolvedAgentInvocation` |
+| `types` | 常量 `SYSTEM_AGENT_IDS`、函数 `isSystemAgentId`、类型 `AgentCatalogInput`、`RuntimeAgentShape`、`SurfaceAgent`、`SurfaceAgentFile`、`SurfaceAgentFileParseStatus`、`SurfaceAgentFileScope`、`SurfaceAgentSource`、`SystemAgentGuardResult`、`SystemAgentId`、`SurfaceInvocationIntent`、`AgentMentionIntent`、`SubtaskIntent`、`InvocationPromptPart`、`ResolvedAgentInvocation`、`ChildSessionEdge`、`ChildSessionEdgeStatus`、`ChildSessionGraph`、`ChildSessionGraphInput`、`ChildSessionGraphStatus`、`ChildSessionInfo` |
 
 ## 消费方
 
-未来由 chat 入口、settings Agent Studio、command editor 等通过此 barrel 导入；A2 之后聊天发送链路也通过它拿到 `AgentInvocationService` 与显式调用类型。
+未来由 chat 入口、settings Agent Studio、command editor 等通过此 barrel 导入；A2 之后聊天发送链路也通过它拿到 `AgentInvocationService` 与显式调用类型，A3 会话树 / child-session 关系层也通过这里获取 `ChildSessionGraphService` 与相关图类型。
 
 ## 注意事项
 

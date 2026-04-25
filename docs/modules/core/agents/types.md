@@ -11,7 +11,7 @@ Agent surface layer 的统一类型定义。定义了三层真相源（runtime /
 
 ```text
 上游: src/core/types/opencodeConfig.ts (OpencodeAgentConfig, OpencodeAgentMode)
-下游: src/core/agents/AgentCatalogService.ts, src/core/agents/SystemAgentGuardService.ts, src/core/agents/index.ts
+下游: src/core/agents/AgentCatalogService.ts, src/core/agents/ChildSessionGraphService.ts, src/core/agents/SystemAgentGuardService.ts, src/core/agents/index.ts
 ```
 
 ## 核心类型
@@ -32,6 +32,13 @@ Agent surface layer 的统一类型定义。定义了三层真相源（runtime /
 | `SubtaskIntent` | 原生 `subtask` 部分的结构化描述 |
 | `InvocationPromptPart` | `agent` / `subtask` 原生 request part 变体 |
 | `ResolvedAgentInvocation` | `AgentInvocationService` 输出的 top-level `agent` + native invocation parts |
+| `ChildSessionEdgeStatus` | child-session 边状态：`active` / `completed` / `error` / `unknown` |
+| `ChildSessionEdge` | 一条 task 调用到 child session 的重建边 |
+| `ChildSessionGraphStatus` | child-session 图状态：`complete` / `partial` / `empty` |
+| `OrphanedChildSession` | 未匹配到任何 task 边、但出现在 `session.children()` 里的 orphaned child session 显示条目 |
+| `ChildSessionGraph` | 单个父会话的重建 child-session 图 |
+| `ChildSessionInfo` | `session.children()` 返回的最小子会话形状 |
+| `ChildSessionGraphInput` | child-session 图重建输入：父会话、消息、可选 live children |
 
 ## 核心常量与函数
 
@@ -48,9 +55,12 @@ Agent surface layer 的统一类型定义。定义了三层真相源（runtime /
 - `builtin` 来自运行时 `native` 或 `builtIn` 字段，config-only agent 无此值
 - `rawConfig` 保留原始 config 条目供上层使用
 - A2 新增的 invocation 类型刻意继续放在 `core/agents`，因为它们也是 agent surface 的一部分；聊天发送链路只消费这些结构，不直接发明插件私有语法
+- A3 新增 child-session 图类型，专门承载从持久化 task 元数据恢复 `task → child session` 边的结果；SDK 实时子会话只作为补充输入，不和持久化边混成单一真相
+- `ChildSessionGraph.orphanedSessions` 为 orphan child session 提供稳定展示字段（`id` / `title` / `createdAt` / `updatedAt`），而 `orphanedSessionIds` 继续保留给旧消费方做兼容读取
 
 ## 注意事项
 
 - `fileAgents` 输入在 A1 slice 中为可选；完整 Markdown 扫描推迟到 A4
 - 不在此模块做任何 runtime/config/file 合并逻辑——合并由 `AgentCatalogService` 负责
 - `SurfaceInvocationIntent.kind` 目前只有 `'prompt'` 会被 A2 发送链路消费；`command` / `shell` 仅作为未来扩展占位
+- child-session 图输入中的 `toolMetadata.sessionId` 是持久化层唯一可靠的父子会话链接字段；该模块只建模，不负责扫描/恢复逻辑

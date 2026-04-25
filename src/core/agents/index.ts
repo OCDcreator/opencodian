@@ -1,11 +1,19 @@
 export { AgentCatalogService } from './AgentCatalogService';
 export { AgentInvocationService } from './AgentInvocationService';
+export { ChildSessionGraphService } from './ChildSessionGraphService';
 export { SystemAgentGuardService } from './SystemAgentGuardService';
 export {
   type AgentCatalogInput,
   type AgentMentionIntent,
+  type ChildSessionEdge,
+  type ChildSessionEdgeStatus,
+  type ChildSessionGraph,
+  type ChildSessionGraphInput,
+  type ChildSessionGraphStatus,
+  type ChildSessionInfo,
   type InvocationPromptPart,
   isSystemAgentId,
+  type OrphanedChildSession,
   type ResolvedAgentInvocation,
   type RuntimeAgentShape,
   type SubtaskIntent,

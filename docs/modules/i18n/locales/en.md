@@ -13,6 +13,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 同一天的后续 UI 微调还新增了 `settings.agents.editor.group.*` 文案，并把 `settings.agents.catalog.desc` 改成正向可见性语义，明确说明：agent catalog 中的子代理开关现在是 **on = visible in `@` menu / off = hidden**。
 
+当前 A3 child-session graph 收尾又补了一组 `chat.childSessionTree.*` 文案，把会话树 header、open 按钮、orphan fallback、partial-graph badge 与提醒文案收进 locale，而不是继续把这些 user-facing copy 硬编码在 `OpenCodianView.ts` 里。
+
 源码约 1000 行。
 
 ## 导入关系
@@ -51,6 +53,7 @@ export const enTranslations: Record<string, string> = {
 - 插件基础信息（`plugin.*`）
 - 设置页各分组（`settings.server.*`, `settings.model.*`, `settings.style.*` 等）
 - 会话与聊天交互（`chat.input.*`, `chat.context.*`, `chat.tab.*`, `chat.sessionSettings.*` 等）
+- child-session tree UI（`chat.childSessionTree.*`）
 - 权限 / question / 调试提示
 - 主题与 Liquid Glass 参数说明（大量 `settings.style.input.liquidGlass.*` 键）
 - 会话设置保存结果提示（`chat.sessionSettings.saved*`，区分普通保存、deferred backend apply 和 runtime reapply warning）
