@@ -63,9 +63,12 @@ Mandatory design -> OpenCode -> Codex review loop:
    - remind OpenCode that the implementation subprocess is allowed to run for up to `3600` seconds
 5. Run OpenCode for implementation with this exact wrapper pattern, adjusting only the brief/log paths and optional attachments:
    - `python3 automation/run_opencode_implementation.py --timeout-seconds 3600 --dir . --agent build --message-file "{{current_round_directory}}/opencode-implementation-brief.md" --log-path "{{current_round_directory}}/opencode-implementation.log"`
-6. If the OpenCode wrapper exits with `124`, treat it as a timeout rather than an automatic round failure. Inspect the partial diff and the implementation log, tighten the brief if needed, and run another OpenCode pass unless a real blocker is proven.
-7. After every OpenCode pass, review the full diff yourself as Codex against the active roadmap/spec/reference docs. Record the result in `{{next_phase_doc}}` under `## Code Review Result`.
-8. If the Codex code review finds blockers, update the OpenCode brief and run another OpenCode pass. Keep iterating until the review result is `PASS` or you can prove a real blocker.
+6. Once the OpenCode wrapper starts, do not kill it early just because the repo diff is still empty or the pass is still reading files. Discovery, reference-reading, and long planning inside the child run are expected for this program.
+7. Treat a still-growing `{{current_round_directory}}/opencode-implementation.log` or a still-live wrapper/opencode PID as proof that the pass is still working, even if no repo edits have landed yet.
+8. Only interrupt or retry an OpenCode implementation pass early when there is a hard failure signal: the wrapper exits non-zero, the log proves a concrete blocker, or the operator explicitly asks to stop. Lack of edits alone is not a blocker.
+9. If the OpenCode wrapper exits with `124`, treat it as a timeout rather than an automatic round failure. Inspect the partial diff and the implementation log, tighten the brief if needed, and run another OpenCode pass unless a real blocker is proven.
+10. After every OpenCode pass, review the full diff yourself as Codex against the active roadmap/spec/reference docs. Record the result in `{{next_phase_doc}}` under `## Code Review Result`.
+11. If the Codex code review finds blockers, update the OpenCode brief and run another OpenCode pass. Keep iterating until the review result is `PASS` or you can prove a real blocker.
 9. Run targeted tests first for changed code. If targeted tests fail, fix the smallest justified issue (prefer another OpenCode pass for substantive changes), rerun the Codex review, and rerun the targeted tests.
 10. Run the configured full validation command: `{{full_test_command}}`.
 11. If the changed files touch any deploy-required path (`src/main.ts`, `manifest.json`, `styles.css`, `assets/`, `src/style/`, `src/core/theme/`, `src/features/settings/`), immediately deploy the built artifacts produced by the successful validation build:

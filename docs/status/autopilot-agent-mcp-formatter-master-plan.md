@@ -39,6 +39,7 @@
 - No lane advance until the active slice has a `PASS` design review, a `PASS` code review, green targeted tests, green `npm run verify`, and required deploy verification.
 - Every OpenCode implementation pass must be invoked through `automation/run_opencode_implementation.py` with `--timeout-seconds 3600`.
 - If OpenCode times out, inspect the partial diff and retry with a narrower brief before declaring a blocker.
+- Do not abort an OpenCode pass early only because it is still reading references or the repo diff is empty; as long as the wrapper log is advancing or the child PID is alive, that counts as active work until timeout or a concrete blocker.
 - The controller keeps queue truth in the lane roadmap files only. Do not invent new work once a roadmap is empty.
 
 ## Shared validation baseline
