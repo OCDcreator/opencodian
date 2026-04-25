@@ -5,16 +5,17 @@
 
 ## 概述
 
-`SettingsAgentsSection` 是 settings/agents 分区的 owner。它负责加载当前 OpenCode 运行时返回的 built-in / project agent 目录，并与当前 vault 的 `.opencode/opencode.json` 中的 project agent 覆盖合并展示，同时承接项目级 agent 的核心字段编辑器。
+`SettingsAgentsSection` 是 settings/agents 分区的 owner。它现在会把 runtime、project config、Markdown agent file 三层真相一起拉进来，通过 `AgentCatalogService` 生成统一 catalog，同时承接 project override editor、system-agent expert-mode gate，以及 Markdown workspace 的 CRUD / sync-state 展示。
 
-当前实现覆盖了 Agents settings 的项目级配置范围：
+当前实现覆盖了 A4 slice 的 Agent Studio 管理范围：
 
-- 读取 runtime agent 目录与 `OpencodeConfigManager.getAgentConfig()`
+- 读取 runtime agent 目录、project `agent` 配置，以及 Markdown agent file scan 结果
 - 用 `OpencodeConfigManager.getDefaultAgent()` 初始化默认主代理下拉框
+- 在 classic / tabbed 两种 layout 中都渲染 system-agent `expert mode` toggle
 - 通过 `updateDefaultAgent()` 写回项目级 `default_agent`
 - 为 `mode: 'subagent'` 的条目提供基础 `@` 菜单可见性开关
 - 通过 `upsertAgentConfig()` / `removeAgentConfig()` 写回或清理 `agent.<id>.hidden`
-- 提供项目 agent 编辑器，支持 create/edit/delete 以下核心字段：
+- 提供项目 agent 编辑器，支持从 project override 或 runtime/system 条目出发创建 / 编辑 / 删除以下核心字段：
   - `mode`
   - `disable`
   - `description`
@@ -26,20 +27,43 @@
   - `color`
   - `permission.task` allowlist
   - `options`
+- 提供 Markdown workspace：
+  - 创建默认 project-root Markdown agent 文件
+  - 查看每个 Markdown agent 文件的 scope / parseStatus / runtimeSeen / path
+  - 行内编辑 frontmatter + prompt body
+  - 删除 Markdown agent 文件
 
 commands/slash runtime 与 command-owned hidden-agent flows 不属于本 owner；它们分别由 command config、Commands settings 和 chat runtime seams 维护。
 
 ## 核心逻辑
 
-### runtime + project catalog 合并
+### runtime + config + file catalog 合并
 
 owner 会并行读取：
 
-- `openCodeService.sdk.app.agents()`：当前 runtime scope 下的 agent 目录，包含 OpenCode built-in agent 与 runtime 已识别的 project agent
+- `openCodeService.sdk.app.agents()`：当前 runtime scope 下的 agent 目录，包含 OpenCode built-in agent、system agent 与 runtime 已识别的 project/file agent
 - `OpencodeConfigManager.getAgentConfig()`：当前 vault 的项目配置 agent map，兼容 native `agent` 与 deprecated `mode`
 - `OpencodeConfigManager.getDefaultAgent()`：项目级默认主代理
+- `MarkdownAgentWorkspaceService.scan()`：四个 agent roots 下的 Markdown 文件扫描结果，再由 `markRuntimeSeen()` 标记 runtime 是否已看到该 agent ID
 
-合并时优先用 project 配置里的 `description` / `mode` 覆盖 runtime 元数据，并保留 runtime-only、runtime+project-override、project-only 三类条目。`default_agent` 下拉只列出 `primary` / `all` 且未 `disable` 的条目；如果当前配置值已不在可选列表中，会保留一个 unavailable 选项，避免静默丢失现有配置。
+合并时统一走 `AgentCatalogService.aggregate()`：config 覆盖 runtime 默认值，file frontmatter 只在 runtime/config 尚未给出基础显示值时补位；source label 会区分 builtin、builtin+override、Markdown、Markdown+override、project-only 和 system-agent risk labels。`default_agent` 下拉现在直接依赖 `SurfaceAgent.defaultEligible`，因此 hidden system agents 不会再被错误地列进默认主代理选择。
+
+### system-agent expert mode
+
+- `SystemAgentGuardService` 现在由本 owner 持有，并在 classic / tabbed layout 都暴露 toggle
+- 写入和删除 system-agent project override 都会先经过 guarded config manager；未开启 expert mode 时只弹 notice，不做写入
+- catalog label 使用 locale 层的 `settings.agents.guard.*`，核心 guard 只返回结构化 risk kind / reason token
+
+### Markdown workspace
+
+- workspace block 由 `MarkdownAgentWorkspaceService` 驱动，不把 file truth 混进 project config writer
+- 每个文件 row 展示：
+  - scope（project/root）
+  - parse status（ok / parse-error / duplicate-id）
+  - runtime seen / runtime pending
+  - vault-relative path
+- `Create` 先写一个默认 `.opencode/agents/<id>.md` 文件；后续 `Edit` 打开行内 editor，允许改 frontmatter 和 prompt body；`Delete` 删除该文件
+- workspace block 只说明 file state + runtime visibility state，不假装“写文件 = runtime 已刷新”
 
 ### subagent visibility 写回
 
@@ -88,16 +112,19 @@ owner 现在在同一分区内提供一个 project agent editor：
 
 | 方法 | 说明 |
 |------|------|
-| `attach()` | 挂载 Agents section，创建默认主代理下拉与 agent 目录容器，并启动首次异步刷新 |
+| `attach()` | classic layout：挂载默认主代理、expert toggle、project editor、Markdown workspace 和统一 catalog |
+| `attachTabbed()` | tabbed layout：按 `default` / `catalog` / `editor` / `workspace` 二级标签挂载对应 block |
 | `dispose()` | 递增 refresh run id，防止旧异步加载结果回写已重建的设置页 |
-| `renderProjectAgentEditor()` | 渲染项目 agent 选择器与核心字段编辑表单 |
-| `saveProjectAgentFromEditor()` | 归一化表单值并写回 project `agent.<id>` |
-| `deleteSelectedProjectAgent()` | 删除当前选中的 project agent override |
+| `renderMarkdownWorkspaceBlock()` | 渲染 Markdown file workspace rows 以及 create/edit/delete actions |
+| `createGuardedConfigManager()` | 用 expert-mode gate 包装 `upsertAgentConfig()` / `removeAgentConfig()` |
 
 ## 与其他模块的交互
 
 - `OpenCodianSettings.ts`: 创建并挂载本 owner，把 Agents section 从主设置页中独立出来
 - `OpenCodeService`: 通过 SDK facade 的 `app.agents()` 读取 runtime agent 目录
+- `AgentCatalogService`: 统一 runtime/config/file 聚合
+- `MarkdownAgentWorkspaceService`: 负责 Markdown file scan / create / update / delete
+- `SystemAgentGuardService`: 提供 system-agent risk kind 与 expert-mode write guard
 - `OpencodeConfigManager`: 读取 / 写回 project `agent`、legacy `mode` import、`default_agent`
 - `SettingsProjectAgentEditor.ts`: 负责 project agent 核心字段表单、保存 / 删除 action 与 notice
 - `projectAgentEditorConfig.ts`: 为 project agent editor 提供字段归一化与 delete-aware patch helper
@@ -107,15 +134,16 @@ owner 现在在同一分区内提供一个 project agent editor：
 ## 注意事项
 
 - 不要在 `OpenCodianView.ts` 或 `OpenCodeService.ts` 中追加 Agents settings ownership；设置页写回应继续留在本 owner 与 `OpencodeConfigManager` seam 内。
-- 当前 owner 只写项目级 `.opencode/opencode.json`，不要读写全局 OpenCode 配置。
-- 表单当前已覆盖 project agent 核心字段、`permission.task` allowlist 与 `options`；commands/slash runtime 应保持在相邻 command-specific owner，而不是把逻辑塞回 `OpenCodianSettings.ts`。
+- 当前 owner 只写项目级 `.opencode/opencode.json` 与当前 vault 内的 Markdown agent 文件；不要读写全局 OpenCode 配置。
+- file write success、project config write success、runtime seen 是三个不同状态；本 owner 只负责把差异显式显示出来。
 
 ## 2026-04-24 Tabbed layout support
 
 Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
 
-- `default` — renders default agent dropdown + catalog listing
-- `catalog` — renders full agent catalog
-- `editor` — renders project agent editor form
+- `default` — renders default agent dropdown + expert toggle
+- `catalog` — renders full unified agent catalog
+- `editor` — renders project/system agent override editor
+- `workspace` — renders Markdown agent file workspace
 
-The classic `attach()` method remains unchanged.
+The classic `attach()` method now renders the same surfaces in a stacked layout.

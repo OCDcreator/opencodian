@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import { Notice, Setting } from 'obsidian';
 
+import type { SurfaceAgent } from '../../core/agents';
 import type {
   OpencodeAgentConfig,
   OpencodeAgentConfigRecord,
@@ -55,6 +56,7 @@ interface SettingsProjectAgentEditorRenderOptions {
   containerEl: HTMLElement;
   onConfigChanged: () => Promise<void>;
   projectAgents: OpencodeAgentConfigRecord;
+  mergedAgents?: readonly SurfaceAgent[];
 }
 
 interface EditorGroupOptions {
@@ -76,6 +78,7 @@ export class SettingsProjectAgentEditor {
       containerEl,
       onConfigChanged,
       projectAgents,
+      mergedAgents,
     } = options;
 
     containerEl.replaceChildren();
@@ -86,6 +89,7 @@ export class SettingsProjectAgentEditor {
       identityBodyEl,
       modelBodyEl,
     } = this.createEditorGroups(layoutEl);
+    const mergedAgentById = new Map((mergedAgents ?? []).map((agent) => [agent.id, agent]));
     const projectAgentIds = Object.keys(projectAgents).sort((left, right) => left.localeCompare(right));
     const state = this.createProjectAgentEditorState('', undefined);
     let selectedProjectAgentId = '';
@@ -135,10 +139,39 @@ export class SettingsProjectAgentEditor {
         for (const agentId of projectAgentIds) {
           dropdown.addOption(agentId, agentId);
         }
+        if (mergedAgents && mergedAgents.length > 0) {
+          const runtimeOnlyAgents = mergedAgents.filter(
+            (agent) => !projectAgents[agent.id] && agent.sources.includes('runtime'),
+          );
+          if (runtimeOnlyAgents.length > 0) {
+            dropdown.addOption(
+              '__separator__',
+              t('settings.agents.editor.select.runtimeSection'),
+            );
+            dropdown.selectEl.querySelector('option[value="__separator__"]')?.setAttribute('disabled', 'true');
+            for (const agent of runtimeOnlyAgents) {
+              const label = agent.system
+                ? `${agent.id} ${t('settings.agents.editor.select.systemBadge')}`
+                : agent.id;
+              dropdown.addOption(agent.id, label);
+            }
+          }
+        }
         dropdown.setValue('');
         dropdown.onChange((value) => {
+          if (value === '__separator__') {
+            dropdown.setValue('');
+            return;
+          }
           selectedProjectAgentId = value;
-          Object.assign(state, this.createProjectAgentEditorState(value, projectAgents[value]));
+          Object.assign(
+            state,
+            this.createProjectAgentEditorState(
+              value,
+              projectAgents[value],
+              mergedAgentById.get(value),
+            ),
+          );
           syncEditorControls();
         });
       });
@@ -297,13 +330,17 @@ export class SettingsProjectAgentEditor {
   private createProjectAgentEditorState(
     agentId: string,
     agent: OpencodeAgentConfig | undefined,
+    mergedAgent?: SurfaceAgent,
   ): ProjectAgentEditorState {
     return {
       agentId,
       color: stringifyConfigText(agent?.color),
-      description: stringifyConfigText(agent?.description),
+      description: stringifyConfigText(agent?.description)
+        || (mergedAgent?.description ?? ''),
       disabled: agent?.disable === true,
-      mode: normalizeProjectAgentEditorMode(agent?.mode) ?? 'primary',
+      mode: normalizeProjectAgentEditorMode(agent?.mode)
+        ?? normalizeProjectAgentEditorMode(mergedAgent?.mode)
+        ?? 'primary',
       model: stringifyConfigText(agent?.model),
       options: cloneOptions(agent?.options),
       optionsDirty: false,

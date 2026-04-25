@@ -13,7 +13,7 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 同一天的后续 UI 微调还新增了 `settings.agents.editor.group.*` 文案，并把 `settings.agents.catalog.desc` 改成正向可见性语义，明确说明 agent catalog 中的子代理开关现在是 **开 = 在 `@` 菜单显示 / 关 = 隐藏**。
 
-当前 A3 child-session graph 收尾还补了一组 `chat.childSessionTree.*` 文案，把会话树 header、打开按钮、orphan fallback、partial graph badge 与提醒文案收进 locale，避免继续在 `OpenCodianView.ts` 中硬编码用户可见文本。
+当前 A4 agent-surface 收尾还补了一组 `settings.agents.expert.*`、`settings.agents.workspace.*`、`settings.agents.guard.*`、`settings.agents.editor.select.runtimeSection` / `systemBadge` 以及 `settings.agents.tab.workspace` 文案，把 system-agent 专家模式、Markdown workspace CRUD / 状态、runtime/system editor 标签与新的 workspace 二级标签都收进 locale，避免继续在 settings owner 中硬编码用户可见文本。
 
 源码约 1000 行。
 
@@ -160,7 +160,7 @@ New Chinese keys added for the tabbed settings layout:
 - `settings.server.tab.*` — 服务器二级标签（连接/认证/状态）
 - `settings.model.tab.*` — 模型二级标签（常用/项目配置/可用性/工具）
 - `settings.conversation.tab.*` — 对话二级标签（标题/压缩/显示/提问/渲染）
-- `settings.agents.tab.*` — 代理二级标签（默认/目录/编辑器）
+- `settings.agents.tab.*` — 代理二级标签（默认/目录/编辑器/workspace）
 - `settings.commands.tab.*` — 命令二级标签（模式/编辑器/目录）
 - `settings.plugins.tab.*` — 插件二级标签（概览/全局/项目目录/OMO）
 - `settings.security.tab.*` — 安全二级标签（配置/权限/安全）

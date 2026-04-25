@@ -19,16 +19,16 @@
 | 方法 | 说明 |
 |------|------|
 | `checkWriteAllowed(agentId)` | 检查写入是否允许：非系统 agent 总是允许；系统 agent 需专家模式 |
-| `getRiskLabel(agentId)` | 返回系统 agent 风险标签，或非系统 agent 返回 `null` |
+| `getRiskLabelKind(agentId)` | 返回结构化风险标签：`read-only` / `expert-override-allowed` / `null` |
 | `setExpertMode(enabled)` | 设置专家模式开关 |
 | `expertMode` (getter) | 读取当前专家模式状态 |
 
 ## 行为规则
 
 - 非系统 agent：`allowed: true`
-- 系统 agent + 专家模式关闭：`allowed: false`，附带原因文案
+- 系统 agent + 专家模式关闭：`allowed: false`，`reason` 返回稳定的 machine-readable token `system-agent-expert-required`
 - 系统 agent + 专家模式开启：`allowed: true`
-- 专家模式允许 project override，但继续强调是 project 层覆盖而非修改 builtin 定义
+- 专家模式允许 project override，但具体用户文案由 settings / locale 层决定，而不是在核心服务里硬编码英文字符串
 
 ## 注意事项
 

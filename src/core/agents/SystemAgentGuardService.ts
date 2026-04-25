@@ -1,12 +1,7 @@
 import { isSystemAgentId, type SystemAgentGuardResult } from './types';
 
-/**
- * Handles system-agent risk boundaries.
- *
- * System agents (`title`, `summary`, `compaction`) are always visible in the
- * catalog but are guarded from casual override. Expert mode must be enabled
- * before any write action targeting a system agent is allowed.
- */
+export type SystemAgentRiskLabel = 'expert-override-allowed' | 'read-only' | null;
+
 export class SystemAgentGuardService {
   private expertModeEnabled = false;
 
@@ -18,12 +13,6 @@ export class SystemAgentGuardService {
     this.expertModeEnabled = enabled;
   }
 
-  /**
-   * Check whether a write/override action is allowed for the given agent.
-   *
-   * Non-system agents are always allowed.
-   * System agents require expert mode to be enabled.
-   */
   checkWriteAllowed(agentId: string): SystemAgentGuardResult {
     if (!isSystemAgentId(agentId)) {
       return { agentId, isSystem: false, allowed: true };
@@ -37,23 +26,15 @@ export class SystemAgentGuardService {
       agentId,
       isSystem: true,
       allowed: false,
-      reason: `Agent "${agentId}" is a built-in system agent. Enable expert mode to allow project overrides.`,
+      reason: 'system-agent-expert-required',
     };
   }
 
-  /**
-   * Inject system-agent metadata into a catalog entry for display purposes.
-   * Returns the risk label or `null` when the agent is not a system agent.
-   */
-  getRiskLabel(agentId: string): string | null {
+  getRiskLabelKind(agentId: string): SystemAgentRiskLabel {
     if (!isSystemAgentId(agentId)) {
       return null;
     }
 
-    if (this.expertModeEnabled) {
-      return 'Built-in System Agent (expert override allowed)';
-    }
-
-    return 'Built-in System Agent (read-only)';
+    return this.expertModeEnabled ? 'expert-override-allowed' : 'read-only';
   }
 }

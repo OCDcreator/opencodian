@@ -36,8 +36,9 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 
 ### project agent 选择与表单回填
 
-- dropdown 只列出当前 vault 的 project agent override
-- 选择已有条目后，会把当前 `agent.<id>` 的核心字段回填到表单
+- dropdown 仍支持当前 vault 的 project agent override，但现在也会在同一选择器里补充 runtime / system agents，允许直接从现有 runtime 条目创建 project override
+- runtime-only / system 条目会在 dropdown 中放到单独分区，并为系统 agent 附加 badge
+- 选择已有条目后，会把当前 `agent.<id>` 的核心字段回填到表单；如果当前只是 runtime 条目，则至少会用 merged catalog 的 `description` / `mode` 做回填基础值
 - 未选择条目时，表单保持“新建 project agent”状态
 - `syncEditorControls()` 仍统一回填全部 control；分组只影响展示结构，不改变 state ownership
 

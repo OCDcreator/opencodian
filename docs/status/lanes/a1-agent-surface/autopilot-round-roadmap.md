@@ -67,7 +67,7 @@
   - The active session can restore and navigate child-session edges.
   - Tests cover task-edge recovery and partial-graph fallback.
 
-### [NEXT] A4 - Finish Agent Studio management surfaces
+### [DONE] A4 - Finish Agent Studio management surfaces
 
 - **Lane**: Settings and file workspace
 - **Goal**: Complete project-config agent management, Markdown agent CRUD/sync state, and system-agent expert override surfaces without bloating settings owners.

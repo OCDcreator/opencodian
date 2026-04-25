@@ -26,7 +26,7 @@
 
 1. Runtime 层提供 `name`、`mode`、`hidden`、`native`、`description`
 2. Config 层提供 project override 和 config-only agent
-3. File 层提供 markdown-originated entries（A4 补全）
+3. File 层提供 markdown-originated entries；当 runtime/config 尚未给出 `description` / `mode` / `hidden` 时，会用 `SurfaceAgentFile.frontmatter` 的同名字段回填这些基础显示值
 
 当同名 agent 在多层出现时，config 值覆盖 runtime 默认值，但 sources 数组保留所有层标记。
 
@@ -45,3 +45,4 @@ runtime app.agents() + config agent map + file scan
 - `disabled` 仅来自 config `disable: true`
 - `defaultEligible` = mode 是 `primary` 或 `all`，且非 hidden 非 disabled
 - `subagentVisible` = mode 是 `subagent` 或 `all`，且非 hidden
+- file frontmatter 只在 file `parseStatus` 为 `ok` / `duplicate-id` 时参与回填；parse-error/conflict 不会被伪装成可用 catalog 值

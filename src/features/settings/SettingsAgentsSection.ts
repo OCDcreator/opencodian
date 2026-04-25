@@ -1,11 +1,16 @@
-import type { Agent as RuntimeAgent } from '@opencode-ai/sdk/v2/client';
-import { type DropdownComponent, Setting } from 'obsidian';
+/* eslint-disable max-lines */
+import { type DropdownComponent, normalizePath, Notice, Setting } from 'obsidian';
 
-import type {
-  OpencodeAgentConfig,
-  OpencodeAgentConfigRecord,
-  OpencodeAgentMode,
-} from '../../core/types';
+import {
+  AgentCatalogService,
+  type MarkdownAgentFs,
+  MarkdownAgentWorkspaceService,
+  type SurfaceAgent,
+  type SurfaceAgentFile,
+  type SurfaceAgentSource,
+  SystemAgentGuardService,
+} from '../../core/agents';
+import type { OpencodeAgentConfig, OpencodeAgentConfigRecord, OpencodeAgentMode } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -28,136 +33,19 @@ interface SettingsAgentsSectionOptions {
   ) => HTMLHeadingElement;
 }
 
-interface AgentCatalogEntry {
-  id: string;
-  description: string;
-  mode: OpencodeAgentMode | null;
-  builtIn: boolean;
-  disabled: boolean;
-  hasProjectOverride: boolean;
-  hidden: boolean;
-  runtimeAvailable: boolean;
-}
-
 interface AgentCatalogRenderContext {
   catalogBodyEl: HTMLElement;
   configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
   currentRunId: number;
   defaultAgentDropdown: DropdownComponent;
   editorBodyEl: HTMLElement;
-  mergedAgents: AgentCatalogEntry[];
+  mergedAgents: SurfaceAgent[];
   projectAgents: OpencodeAgentConfigRecord;
-}
-
-function isRuntimeBuiltInAgent(agent: RuntimeAgent): boolean {
-  const legacyBuiltIn = (agent as RuntimeAgent & { builtIn?: unknown }).builtIn;
-  if (typeof legacyBuiltIn === 'boolean') {
-    return legacyBuiltIn;
-  }
-
-  return agent.native === true;
-}
-
-function normalizeAgentDescription(
-  runtimeAgent: RuntimeAgent | undefined,
-  projectAgent: OpencodeAgentConfig | undefined,
-): string {
-  const projectDescription = typeof projectAgent?.description === 'string'
-    ? projectAgent.description.trim()
-    : '';
-  if (projectDescription) {
-    return projectDescription;
-  }
-
-  const runtimeDescription = typeof runtimeAgent?.description === 'string'
-    ? runtimeAgent.description.trim()
-    : '';
-  return runtimeDescription;
-}
-
-function normalizeAgentMode(
-  runtimeAgent: RuntimeAgent | undefined,
-  projectAgent: OpencodeAgentConfig | undefined,
-): OpencodeAgentMode | null {
-  if (projectAgent?.mode === 'primary' || projectAgent?.mode === 'all' || projectAgent?.mode === 'subagent') {
-    return projectAgent.mode;
-  }
-
-  if (runtimeAgent?.mode === 'primary' || runtimeAgent?.mode === 'all' || runtimeAgent?.mode === 'subagent') {
-    return runtimeAgent.mode;
-  }
-
-  return null;
-}
-
-function resolveAgentHidden(
-  runtimeAgent: RuntimeAgent | undefined,
-  projectAgent: OpencodeAgentConfig | undefined,
-): boolean {
-  if (projectAgent?.hidden === true) {
-    return true;
-  }
-
-  if (projectAgent?.hidden === false) {
-    return false;
-  }
-
-  return runtimeAgent?.hidden === true;
-}
-
-function mergeAgentCatalog(
-  runtimeAgents: RuntimeAgent[],
-  projectAgents: OpencodeAgentConfigRecord,
-): AgentCatalogEntry[] {
-  const mergedEntries = new Map<string, AgentCatalogEntry>();
-
-  for (const runtimeAgent of runtimeAgents) {
-    const projectAgent = projectAgents[runtimeAgent.name];
-    mergedEntries.set(runtimeAgent.name, {
-      id: runtimeAgent.name,
-      description: normalizeAgentDescription(runtimeAgent, projectAgent),
-      mode: normalizeAgentMode(runtimeAgent, projectAgent),
-      builtIn: isRuntimeBuiltInAgent(runtimeAgent),
-      disabled: projectAgent?.disable === true,
-      hasProjectOverride: projectAgent !== undefined,
-      hidden: resolveAgentHidden(runtimeAgent, projectAgent),
-      runtimeAvailable: true,
-    });
-  }
-
-  for (const [agentId, projectAgent] of Object.entries(projectAgents)) {
-    if (mergedEntries.has(agentId)) {
-      continue;
-    }
-
-    mergedEntries.set(agentId, {
-      id: agentId,
-      description: normalizeAgentDescription(undefined, projectAgent),
-      mode: normalizeAgentMode(undefined, projectAgent),
-      builtIn: false,
-      disabled: projectAgent.disable === true,
-      hasProjectOverride: true,
-      hidden: resolveAgentHidden(undefined, projectAgent),
-      runtimeAvailable: false,
-    });
-  }
-
-  return Array.from(mergedEntries.values()).sort((left, right) => {
-    const leftOrder = left.mode ? AGENT_MODE_SORT_ORDER[left.mode] : Number.MAX_SAFE_INTEGER;
-    const rightOrder = right.mode ? AGENT_MODE_SORT_ORDER[right.mode] : Number.MAX_SAFE_INTEGER;
-    if (leftOrder !== rightOrder) {
-      return leftOrder - rightOrder;
-    }
-
-    if (left.builtIn !== right.builtIn) {
-      return left.builtIn ? -1 : 1;
-    }
-
-    return left.id.localeCompare(right.id);
-  });
+  workspaceBodyEl?: HTMLElement;
 }
 
 export class SettingsAgentsSection {
+  private readonly agentCatalogService = new AgentCatalogService();
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: (
     containerEl: HTMLElement,
@@ -165,7 +53,9 @@ export class SettingsAgentsSection {
     tooltip?: string,
   ) => HTMLHeadingElement;
   private projectAgentEditor: SettingsProjectAgentEditor | null = null;
+  private markdownWorkspaceService: MarkdownAgentWorkspaceService | null = null;
   private refreshRunId = 0;
+  private systemAgentGuard: SystemAgentGuardService | null = null;
 
   constructor(options: SettingsAgentsSectionOptions) {
     this.plugin = options.plugin;
@@ -192,7 +82,7 @@ export class SettingsAgentsSection {
         .setDesc(t('settings.agents.unavailable.desc'));
       return headingEl;
     }
-    this.projectAgentEditor ??= new SettingsProjectAgentEditor(configManager);
+    this.ensureProjectAgentEditor(configManager);
 
     let defaultAgentDropdown: DropdownComponent | null = null;
     new Setting(containerEl)
@@ -207,9 +97,18 @@ export class SettingsAgentsSection {
             await configManager.updateDefaultAgent(value || undefined);
           });
       });
-
     const editorBodyEl = this.createProjectAgentEditorBlock(containerEl);
+    const workspaceBodyEl = this.createWorkspaceBlock(containerEl);
     const catalogBodyEl = this.createCatalogBlock(containerEl);
+
+    this.renderExpertModeToggle(containerEl, {
+      configManager,
+      currentRunId,
+      defaultAgentDropdown,
+      editorBodyEl,
+      catalogBodyEl,
+      workspaceBodyEl,
+    });
 
     if (defaultAgentDropdown) {
       void this.refreshCatalog({
@@ -218,6 +117,7 @@ export class SettingsAgentsSection {
         currentRunId,
         defaultAgentDropdown,
         editorBodyEl,
+        workspaceBodyEl,
       });
     }
 
@@ -237,7 +137,7 @@ export class SettingsAgentsSection {
       this.showActiveBlock(containerEl, secondaryTabId);
       return;
     }
-    this.projectAgentEditor ??= new SettingsProjectAgentEditor(configManager);
+    this.ensureProjectAgentEditor(configManager);
 
     const defaultBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'default' } });
     let defaultAgentDropdown: DropdownComponent | null = null;
@@ -260,6 +160,17 @@ export class SettingsAgentsSection {
     const catalogBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'catalog' } });
     const catalogBodyEl = this.createCatalogBlock(catalogBlockEl);
 
+    const workspaceBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'workspace' } });
+    const workspaceBodyEl = this.createWorkspaceBlock(workspaceBlockEl);
+    this.renderExpertModeToggle(defaultBlockEl, {
+      configManager,
+      currentRunId,
+      defaultAgentDropdown,
+      editorBodyEl,
+      catalogBodyEl,
+      workspaceBodyEl,
+    });
+
     this.showActiveBlock(containerEl, secondaryTabId);
 
     if (defaultAgentDropdown) {
@@ -269,6 +180,7 @@ export class SettingsAgentsSection {
         currentRunId,
         defaultAgentDropdown,
         editorBodyEl,
+        workspaceBodyEl,
       });
     }
   }
@@ -299,12 +211,60 @@ export class SettingsAgentsSection {
     return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
   }
 
+  private createWorkspaceBlock(containerEl: HTMLElement): HTMLElement {
+    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block' });
+    blockEl.createEl('h4', {
+      text: t('settings.agents.workspace.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+    blockEl.createDiv({
+      cls: 'opencodian-plugin-block-desc',
+      text: t('settings.agents.workspace.desc'),
+    });
+    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
+  }
+
+  private renderExpertModeToggle(
+    containerEl: HTMLElement,
+    context: {
+      configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
+      currentRunId: number;
+      defaultAgentDropdown: DropdownComponent | null;
+      editorBodyEl: HTMLElement | null;
+      catalogBodyEl: HTMLElement | null;
+      workspaceBodyEl: HTMLElement | null;
+    },
+  ): void {
+    new Setting(containerEl)
+      .setName(t('settings.agents.expert.name'))
+      .setDesc(t('settings.agents.expert.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.getSystemAgentGuard().expertMode)
+          .onChange(async (value) => {
+            this.getSystemAgentGuard().setExpertMode(value);
+            if (!context.defaultAgentDropdown || !context.editorBodyEl || !context.catalogBodyEl) {
+              return;
+            }
+            await this.refreshCatalog({
+              catalogBodyEl: context.catalogBodyEl,
+              configManager: context.configManager,
+              currentRunId: context.currentRunId,
+              defaultAgentDropdown: context.defaultAgentDropdown,
+              editorBodyEl: context.editorBodyEl,
+              workspaceBodyEl: context.workspaceBodyEl ?? undefined,
+            });
+          });
+      });
+  }
+
   private async refreshCatalog(options: {
     catalogBodyEl: HTMLElement;
     configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
     currentRunId: number;
     defaultAgentDropdown: DropdownComponent;
     editorBodyEl: HTMLElement;
+    workspaceBodyEl?: HTMLElement;
   }): Promise<void> {
     const {
       catalogBodyEl,
@@ -312,20 +272,28 @@ export class SettingsAgentsSection {
       currentRunId,
       defaultAgentDropdown,
       editorBodyEl,
+      workspaceBodyEl,
     } = options;
 
     try {
-      const [runtimeAgentsResult, projectAgents, defaultAgent] = await Promise.all([
+      const [runtimeAgentsResult, projectAgents, defaultAgent, fileScan] = await Promise.all([
         this.plugin.openCodeService.sdk.app.agents(),
         configManager.getAgentConfig(),
         configManager.getDefaultAgent(),
+        this.getMarkdownWorkspaceService().scan(),
       ]);
 
       if (currentRunId !== this.refreshRunId) {
         return;
       }
       const runtimeAgents = Array.isArray(runtimeAgentsResult) ? runtimeAgentsResult : [];
-      const mergedAgents = mergeAgentCatalog(runtimeAgents, projectAgents);
+      const runtimeAgentIds = new Set(runtimeAgents.map((agent) => agent.name));
+      const fileAgents = this.getMarkdownWorkspaceService().markRuntimeSeen(fileScan.files, runtimeAgentIds);
+      const mergedAgents = this.sortAgents(this.agentCatalogService.aggregate({
+        runtimeAgents,
+        configAgents: projectAgents,
+        fileAgents,
+      }));
       this.renderDefaultAgentDropdown(defaultAgentDropdown, mergedAgents, defaultAgent);
       this.projectAgentEditor?.render({
         containerEl: editorBodyEl,
@@ -336,9 +304,11 @@ export class SettingsAgentsSection {
             currentRunId,
             defaultAgentDropdown,
             editorBodyEl,
+            workspaceBodyEl,
           });
         },
         projectAgents,
+        mergedAgents,
       });
       this.renderCatalog({
         catalogBodyEl,
@@ -348,7 +318,18 @@ export class SettingsAgentsSection {
         mergedAgents,
         projectAgents,
         currentRunId,
+        workspaceBodyEl,
       });
+      if (workspaceBodyEl) {
+        this.renderMarkdownWorkspaceBlock(workspaceBodyEl, {
+          catalogBodyEl,
+          configManager,
+          currentRunId,
+          defaultAgentDropdown,
+          editorBodyEl,
+          fileAgents,
+        });
+      }
     } catch (error) {
       if (currentRunId !== this.refreshRunId) {
         return;
@@ -358,12 +339,13 @@ export class SettingsAgentsSection {
       this.renderDefaultAgentDropdown(defaultAgentDropdown, [], undefined);
       editorBodyEl.replaceChildren();
       this.renderCatalogLoadFailure(catalogBodyEl, error);
+      workspaceBodyEl?.replaceChildren();
     }
   }
 
   private renderDefaultAgentDropdown(
     dropdown: DropdownComponent,
-    mergedAgents: AgentCatalogEntry[],
+    mergedAgents: SurfaceAgent[],
     defaultAgent: string | undefined,
   ): void {
     dropdown.selectEl.replaceChildren();
@@ -371,7 +353,7 @@ export class SettingsAgentsSection {
 
     const defaultEligibleIds = new Set<string>();
     for (const agent of mergedAgents) {
-      if ((agent.mode === 'primary' || agent.mode === 'all') && !agent.disabled) {
+      if (agent.defaultEligible) {
         defaultEligibleIds.add(agent.id);
         dropdown.addOption(agent.id, agent.id);
       }
@@ -397,6 +379,7 @@ export class SettingsAgentsSection {
       editorBodyEl,
       mergedAgents,
       projectAgents,
+      workspaceBodyEl,
     } = context;
 
     catalogBodyEl.replaceChildren();
@@ -423,6 +406,7 @@ export class SettingsAgentsSection {
                 currentRunId,
                 defaultAgentDropdown,
                 editorBodyEl,
+                workspaceBodyEl,
               });
             });
         });
@@ -438,7 +422,7 @@ export class SettingsAgentsSection {
       .setDesc(t('settings.agents.loadFailed.desc', { message }));
   }
 
-  private buildAgentDescription(agent: AgentCatalogEntry): string {
+  private buildAgentDescription(agent: SurfaceAgent): string {
     const parts = [
       this.getSourceLabel(agent),
       this.getModeLabel(agent.mode),
@@ -465,16 +449,37 @@ export class SettingsAgentsSection {
     return parts.join(' · ');
   }
 
-  private getSourceLabel(agent: AgentCatalogEntry): string {
-    if (agent.builtIn && agent.hasProjectOverride) {
+  private getSourceLabel(agent: SurfaceAgent): string {
+    const riskLabelKind = this.getSystemAgentGuard().getRiskLabelKind(agent.id);
+    if (riskLabelKind === 'expert-override-allowed') {
+      return t('settings.agents.guard.expertOverrideAllowed');
+    }
+    if (riskLabelKind === 'read-only') {
+      return t('settings.agents.guard.readOnly');
+    }
+
+    const sources = new Set<SurfaceAgentSource>(agent.sources);
+    if (sources.has('file') && sources.has('config')) {
+      return t('settings.agents.catalog.source.markdownOverride');
+    }
+
+    if (sources.has('file')) {
+      return t('settings.agents.catalog.source.markdown');
+    }
+
+    if (agent.builtin && sources.has('config')) {
       return t('settings.agents.catalog.source.builtinOverride');
     }
 
-    if (agent.builtIn) {
+    if (agent.builtin) {
       return t('settings.agents.catalog.source.builtin');
     }
 
-    if (agent.runtimeAvailable) {
+    if (sources.has('runtime') && sources.has('config')) {
+      return t('settings.agents.catalog.source.project');
+    }
+
+    if (sources.has('runtime')) {
       return t('settings.agents.catalog.source.project');
     }
 
@@ -525,6 +530,342 @@ export class SettingsAgentsSection {
 
     await configManager.upsertAgentConfig(agentId, nextProjectAgent);
   }
+
+  private ensureProjectAgentEditor(
+    configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  ): void {
+    this.projectAgentEditor ??= new SettingsProjectAgentEditor(
+      this.createGuardedConfigManager(configManager),
+    );
+  }
+
+  private createGuardedConfigManager(
+    configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  ): NonNullable<OpenCodianPlugin['opencodeConfigManager']> {
+    const guarded = Object.create(configManager) as NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
+    const originalUpsert = configManager.upsertAgentConfig.bind(configManager);
+    const originalRemove = configManager.removeAgentConfig.bind(configManager);
+    guarded.upsertAgentConfig = async (agentId: string, patch: OpencodeAgentConfig) => {
+      const guardResult = this.getSystemAgentGuard().checkWriteAllowed(agentId);
+      if (!guardResult.allowed) {
+        new Notice(t('settings.agents.expert.blocked'));
+        return;
+      }
+      await originalUpsert(agentId, patch);
+    };
+    guarded.removeAgentConfig = async (agentId: string) => {
+      const guardResult = this.getSystemAgentGuard().checkWriteAllowed(agentId);
+      if (!guardResult.allowed) {
+        new Notice(t('settings.agents.expert.blocked'));
+        return;
+      }
+      await originalRemove(agentId);
+    };
+    return guarded;
+  }
+
+  private getMarkdownWorkspaceService(): MarkdownAgentWorkspaceService {
+    this.markdownWorkspaceService ??= new MarkdownAgentWorkspaceService(this.createMarkdownAgentFs());
+    return this.markdownWorkspaceService;
+  }
+
+  private getSystemAgentGuard(): SystemAgentGuardService {
+    this.systemAgentGuard ??= new SystemAgentGuardService();
+    return this.systemAgentGuard;
+  }
+
+  private createMarkdownAgentFs(): MarkdownAgentFs {
+    const adapter = this.plugin.app.vault.adapter;
+    const walk = async (dirPath: string): Promise<string[]> => {
+      const normalizedDirPath = normalizePath(dirPath);
+      const listing = await adapter.list(normalizedDirPath);
+      const childFiles = listing.files.filter((filePath) => filePath.endsWith('.md'));
+      const childResults = await Promise.all(listing.folders.map((folderPath) => walk(folderPath)));
+      return [...childFiles, ...childResults.flat()];
+    };
+
+    const ensureParentDir = async (filePath: string): Promise<void> => {
+      const segments = normalizePath(filePath).split('/');
+      segments.pop();
+      if (segments.length === 0) {
+        return;
+      }
+      let currentPath = '';
+      for (const segment of segments) {
+        currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+        if (!(await adapter.exists(currentPath))) {
+          await adapter.mkdir(currentPath);
+        }
+      }
+    };
+
+    return {
+      listFiles: async (dirPath) => {
+        if (!(await adapter.exists(normalizePath(dirPath)))) {
+          return [];
+        }
+        return walk(dirPath);
+      },
+      read: async (path) => adapter.read(normalizePath(path)),
+      write: async (path, content) => {
+        const normalizedPath = normalizePath(path);
+        await ensureParentDir(normalizedPath);
+        await adapter.write(normalizedPath, content);
+      },
+      delete: async (path) => adapter.remove(normalizePath(path)),
+      getModifiedTime: async (path) => {
+        const stat = await adapter.stat(normalizePath(path));
+        return stat?.mtime;
+      },
+    };
+  }
+
+  private renderMarkdownWorkspaceBlock(
+    containerEl: HTMLElement,
+    options: {
+      catalogBodyEl: HTMLElement;
+      configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
+      currentRunId: number;
+      defaultAgentDropdown: DropdownComponent;
+      editorBodyEl: HTMLElement;
+      fileAgents: readonly SurfaceAgentFile[];
+    },
+  ): void {
+    const {
+      catalogBodyEl,
+      configManager,
+      currentRunId,
+      defaultAgentDropdown,
+      editorBodyEl,
+      fileAgents,
+    } = options;
+
+    containerEl.replaceChildren();
+    new Setting(containerEl)
+      .setName(t('settings.agents.workspace.actions.create'))
+      .setDesc(t('settings.agents.workspace.actions.createDesc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.agents.workspace.actions.create'))
+          .onClick(async () => {
+            const agentId = this.nextMarkdownAgentId(fileAgents);
+            const createdPath = await this.getMarkdownWorkspaceService().create({
+              agentId,
+              root: '.opencode/agents',
+              frontmatter: { mode: 'primary' },
+              promptBody: '',
+            });
+            new Notice(t('settings.agents.workspace.notice.created', { path: createdPath }));
+            await this.refreshCatalog({
+              catalogBodyEl,
+              configManager,
+              currentRunId,
+              defaultAgentDropdown,
+              editorBodyEl,
+              workspaceBodyEl: containerEl,
+            });
+          });
+      });
+
+    const bodyEl = containerEl.createDiv();
+    if (fileAgents.length === 0) {
+      bodyEl.createDiv({ text: t('settings.agents.workspace.empty') });
+      return;
+    }
+
+    for (const file of fileAgents) {
+      new Setting(bodyEl)
+        .setName(file.agentId)
+        .setDesc([
+          t(`settings.agents.workspace.scope.${file.scope}`),
+          this.getFileStatusLabel(file.parseStatus),
+          file.runtimeSeen
+            ? t('settings.agents.workspace.status.runtimeSeen')
+            : t('settings.agents.workspace.status.runtimePending'),
+          file.path,
+        ].join(' · '))
+        .addButton((button) => {
+          button
+            .setButtonText(t('settings.agents.workspace.actions.edit'))
+            .onClick(() => {
+              this.toggleMarkdownFileEditor(bodyEl, file, {
+                catalogBodyEl,
+                configManager,
+                currentRunId,
+                defaultAgentDropdown,
+                editorBodyEl,
+                workspaceBodyEl: containerEl,
+              });
+            });
+        })
+        .addButton((button) => {
+          button
+            .setButtonText(t('settings.agents.workspace.actions.delete'))
+            .onClick(async () => {
+              await this.getMarkdownWorkspaceService().deleteFile(file.path);
+              new Notice(t('settings.agents.workspace.notice.deleted', { path: file.path }));
+              await this.refreshCatalog({
+                catalogBodyEl,
+                configManager,
+                currentRunId,
+                defaultAgentDropdown,
+                editorBodyEl,
+                workspaceBodyEl: containerEl,
+              });
+            });
+        });
+    }
+  }
+
+  private getFileStatusLabel(
+    status: SurfaceAgentFile['parseStatus'],
+  ): string {
+    switch (status) {
+      case 'ok': return t('settings.agents.workspace.status.ok');
+      case 'parse-error': return t('settings.agents.workspace.status.parseError');
+      case 'duplicate-id': return t('settings.agents.workspace.status.duplicateId');
+      case 'conflict': return t('settings.agents.workspace.status.ok');
+      default: return t('settings.agents.workspace.status.ok');
+    }
+  }
+
+  private toggleMarkdownFileEditor(
+    containerEl: HTMLElement,
+    file: SurfaceAgentFile,
+    refreshContext: {
+      catalogBodyEl: HTMLElement;
+      configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>;
+      currentRunId: number;
+      defaultAgentDropdown: DropdownComponent;
+      editorBodyEl: HTMLElement;
+      workspaceBodyEl: HTMLElement;
+    },
+  ): void {
+    const editorId = `markdown-agent-editor-${file.agentId}`;
+    const existing = containerEl.querySelector(`[data-markdown-editor="${editorId}"]`);
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    const editorEl = containerEl.createDiv({
+      cls: 'opencodian-plugin-block opencodian-markdown-agent-editor',
+      attr: { 'data-markdown-editor': editorId },
+    });
+
+    let frontmatterText = '';
+    for (const [key, value] of Object.entries(file.frontmatter)) {
+      if (value !== undefined) {
+        frontmatterText += `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}\n`;
+      }
+    }
+    if (frontmatterText.endsWith('\n')) {
+      frontmatterText = frontmatterText.slice(0, -1);
+    }
+
+    let currentFrontmatter = frontmatterText;
+    let currentPromptBody = file.promptBody;
+
+    new Setting(editorEl)
+      .setName(t('settings.agents.workspace.edit.frontmatter'))
+      .addTextArea((text) => {
+        text
+          .setValue(frontmatterText)
+          .onChange((value) => { currentFrontmatter = value; });
+      });
+
+    new Setting(editorEl)
+      .setName(t('settings.agents.workspace.edit.promptBody'))
+      .addTextArea((text) => {
+        text
+          .setValue(file.promptBody)
+          .onChange((value) => { currentPromptBody = value; });
+      });
+
+    new Setting(editorEl)
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.agents.workspace.actions.save'))
+          .onClick(async () => {
+            try {
+              const frontmatter = this.parseSimpleFrontmatter(currentFrontmatter);
+              await this.getMarkdownWorkspaceService().update(file.path, {
+                agentId: file.agentId,
+                frontmatter,
+                promptBody: currentPromptBody,
+              });
+              new Notice(t('settings.agents.workspace.notice.updated', { path: file.path }));
+              editorEl.remove();
+              await this.refreshCatalog(refreshContext);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              new Notice(t('settings.agents.workspace.notice.updateFailed', { message }));
+            }
+          });
+      })
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.agents.workspace.actions.cancel'))
+          .onClick(() => { editorEl.remove(); });
+      });
+  }
+
+  private parseSimpleFrontmatter(text: string): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const match = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*)$/);
+      if (!match) continue;
+      const key = match[1]!;
+      let value: unknown = match[2]!.trim();
+      if (value === '' || value === 'null' || value === '~') {
+        value = undefined;
+      } else if (value === 'true') {
+        value = true;
+      } else if (value === 'false') {
+        value = false;
+      } else {
+        const num = Number(value);
+        if (!Number.isNaN(num) && value !== '') value = num;
+      }
+      if (value !== undefined) result[key] = value;
+    }
+    return result;
+  }
+
+  private nextMarkdownAgentId(fileAgents: readonly SurfaceAgentFile[]): string {
+    const existingIds = new Set(fileAgents.map((file) => file.agentId));
+    if (!existingIds.has('new-agent')) {
+      return 'new-agent';
+    }
+
+    let index = 2;
+    while (existingIds.has(`new-agent-${index}`)) {
+      index += 1;
+    }
+
+    return `new-agent-${index}`;
+  }
+
+  private sortAgents(agents: readonly SurfaceAgent[]): SurfaceAgent[] {
+    return [...agents].sort((left, right) => {
+      const leftOrder = left.mode ? AGENT_MODE_SORT_ORDER[left.mode] : Number.MAX_SAFE_INTEGER;
+      const rightOrder = right.mode ? AGENT_MODE_SORT_ORDER[right.mode] : Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+
+      const leftBuiltin = left.system || left.builtin === true;
+      const rightBuiltin = right.system || right.builtin === true;
+      if (leftBuiltin !== rightBuiltin) {
+        return leftBuiltin ? -1 : 1;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+  }
+
   private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
     containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
       const blockEl = el as HTMLElement;

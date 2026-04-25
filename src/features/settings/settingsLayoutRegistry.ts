@@ -79,6 +79,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'default', labelKey: 'settings.agents.tab.default' },
       { id: 'catalog', labelKey: 'settings.agents.tab.catalog' },
       { id: 'editor', labelKey: 'settings.agents.tab.editor' },
+      { id: 'workspace', labelKey: 'settings.agents.tab.workspace' },
     ],
   },
   {

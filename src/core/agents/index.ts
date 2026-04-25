@@ -1,7 +1,18 @@
 export { AgentCatalogService } from './AgentCatalogService';
 export { AgentInvocationService } from './AgentInvocationService';
 export { ChildSessionGraphService } from './ChildSessionGraphService';
-export { SystemAgentGuardService } from './SystemAgentGuardService';
+export {
+  AGENT_FILE_ROOTS,
+  type AgentFileRoot,
+  type MarkdownAgentFileInput,
+  type MarkdownAgentFs,
+  type MarkdownAgentScanResult,
+  MarkdownAgentWorkspaceService,
+} from './MarkdownAgentWorkspaceService';
+export {
+  SystemAgentGuardService,
+  type SystemAgentRiskLabel,
+} from './SystemAgentGuardService';
 export {
   type AgentCatalogInput,
   type AgentMentionIntent,

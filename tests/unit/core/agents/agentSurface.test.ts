@@ -71,8 +71,7 @@ describe('SystemAgentGuardService', () => {
         const result = guard.checkWriteAllowed(id);
         expect(result.isSystem).toBe(true);
         expect(result.allowed).toBe(false);
-        expect(result.reason).toContain(id);
-        expect(result.reason).toContain('expert mode');
+        expect(result.reason).toBe('system-agent-expert-required');
       }
     });
 
@@ -95,19 +94,19 @@ describe('SystemAgentGuardService', () => {
     });
   });
 
-  describe('getRiskLabel', () => {
+  describe('getRiskLabelKind', () => {
     it('returns null for non-system agents', () => {
-      expect(guard.getRiskLabel('build')).toBeNull();
-      expect(guard.getRiskLabel('custom')).toBeNull();
+      expect(guard.getRiskLabelKind('build')).toBeNull();
+      expect(guard.getRiskLabelKind('custom')).toBeNull();
     });
 
-    it('returns read-only label when expert mode is off', () => {
-      expect(guard.getRiskLabel('title')).toBe('Built-in System Agent (read-only)');
+    it('returns read-only kind when expert mode is off', () => {
+      expect(guard.getRiskLabelKind('title')).toBe('read-only');
     });
 
-    it('returns expert-override label when expert mode is on', () => {
+    it('returns expert-override-allowed kind when expert mode is on', () => {
       guard.setExpertMode(true);
-      expect(guard.getRiskLabel('title')).toBe('Built-in System Agent (expert override allowed)');
+      expect(guard.getRiskLabelKind('title')).toBe('expert-override-allowed');
     });
   });
 });
@@ -294,9 +293,9 @@ describe('AgentCatalogService - source layers', () => {
       expect(agent.originPath).toBe('.opencode/agents/researcher.md');
       expect(agent.runtimeAvailable).toBe(false);
       expect(agent.hasProjectOverride).toBe(false);
-      expect(agent.mode).toBeNull();
-      expect(agent.defaultEligible).toBe(false);
-      expect(agent.subagentVisible).toBe(false);
+      expect(agent.mode).toBe('all');
+      expect(agent.defaultEligible).toBe(true);
+      expect(agent.subagentVisible).toBe(true);
     });
   });
 

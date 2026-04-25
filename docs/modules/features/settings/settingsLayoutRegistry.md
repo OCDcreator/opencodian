@@ -24,7 +24,7 @@
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
 | `conversation` | `title`, `compaction`, `display`, `questions`, `rendering` |
-| `agents` | `default`, `catalog`, `editor` |
+| `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
 | `plugins` | `overview`, `global`, `project-directory`, `omo` |
 | `security` | `config`, `permissions`, `safety` |

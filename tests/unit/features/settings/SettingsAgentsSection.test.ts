@@ -1,4 +1,6 @@
+/* eslint-disable max-lines */
 import type { Agent as RuntimeAgent } from '@opencode-ai/sdk/v2/client';
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import type { OpencodeAgentConfigRecord } from '../../../../src/core/types';
@@ -16,14 +18,26 @@ interface ToggleRecord { control: MockToggleControl; name: string; onChange?: (v
 interface TextRecord { control: MockTextControl; name: string; onChange?: (value: string) => void | Promise<void>; }
 interface TextAreaRecord { control: MockTextAreaControl; name: string; onChange?: (value: string) => void | Promise<void>; }
 interface ButtonRecord { control: MockButtonControl; label?: string; name: string; onClick?: () => void | Promise<void>; }
+interface SettingDescriptionRecord { desc: string; name: string; }
 
-type AgentsSectionPlugin = Pick<OpenCodianPlugin, 'openCodeService' | 'opencodeConfigManager'>;
+type AgentsSectionPlugin = Pick<OpenCodianPlugin, 'app' | 'openCodeService' | 'opencodeConfigManager'>;
+
+interface MockVaultAdapter {
+  exists: jest.MockedFunction<(path: string) => Promise<boolean>>;
+  list: jest.MockedFunction<(path: string) => Promise<{ files: string[]; folders: string[] }>>;
+  mkdir: jest.MockedFunction<(path: string) => Promise<void>>;
+  read: jest.MockedFunction<(path: string) => Promise<string>>;
+  remove: jest.MockedFunction<(path: string) => Promise<void>>;
+  stat: jest.MockedFunction<(path: string) => Promise<{ mtime: number } | null>>;
+  write: jest.MockedFunction<(path: string, content: string) => Promise<void>>;
+}
 
 const dropdownRecords: DropdownRecord[] = [];
 const toggleRecords: ToggleRecord[] = [];
 const textRecords: TextRecord[] = [];
 const textAreaRecords: TextAreaRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
+const settingDescriptionRecords: SettingDescriptionRecord[] = [];
 
 function createDropdownRecord(name: string): DropdownRecord {
   const record: DropdownRecord = {
@@ -150,8 +164,32 @@ function createPlugin(options: {
   runtimeAgents?: RuntimeAgent[];
   projectAgents?: OpencodeAgentConfigRecord;
   defaultAgent?: string | undefined;
+  fileContents?: Record<string, string>;
+  fileMtims?: Record<string, number>;
+  listResults?: Record<string, { files: string[]; folders: string[] }>;
 } = {}): AgentsSectionPlugin {
+  const listResults = options.listResults ?? {};
+  const fileContents = options.fileContents ?? {};
+  const fileMtims = options.fileMtims ?? {};
+  const adapter: MockVaultAdapter = {
+    exists: jest.fn().mockResolvedValue(true),
+    list: jest.fn().mockImplementation(async (path: string) => listResults[path] ?? { files: [], folders: [] }),
+    mkdir: jest.fn().mockResolvedValue(undefined),
+    read: jest.fn().mockImplementation(async (path: string) => fileContents[path] ?? ''),
+    remove: jest.fn().mockResolvedValue(undefined),
+    stat: jest.fn().mockImplementation(async (path: string) => {
+      const mtime = fileMtims[path];
+      return typeof mtime === 'number' ? { mtime } : null;
+    }),
+    write: jest.fn().mockResolvedValue(undefined),
+  };
+
   return {
+    app: {
+      vault: {
+        adapter,
+      },
+    },
     openCodeService: {
       sdk: {
         app: {
@@ -192,6 +230,24 @@ function createSection(plugin = createPlugin()) {
   };
 }
 
+function createTabbedSection(
+  secondaryTabId: string,
+  plugin = createPlugin(),
+) {
+  const section = new SettingsAgentsSection({
+    plugin: plugin as unknown as OpenCodianPlugin,
+    createSectionHeading,
+  });
+  const containerEl = document.createElement('div');
+  document.body.appendChild(containerEl);
+  section.attachTabbed(containerEl, secondaryTabId);
+  return {
+    containerEl,
+    plugin,
+    section,
+  };
+}
+
 function findDropdown(name: string): DropdownRecord | undefined {
   return dropdownRecords.find((record) => record.name === name);
 }
@@ -204,7 +260,18 @@ function findButton(label: string): ButtonRecord | undefined {
   return buttonRecords.find((record) => record.label === label);
 }
 
-async function flushAsync(): Promise<void> { await Promise.resolve(); await Promise.resolve(); }
+function findSettingDescriptions(name: string): string[] {
+  return settingDescriptionRecords
+    .filter((record) => record.name === name)
+    .map((record) => record.desc);
+}
+
+async function flushAsync(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 beforeEach(() => {
   setLocale('en');
@@ -214,12 +281,22 @@ beforeEach(() => {
   textRecords.length = 0;
   textAreaRecords.length = 0;
   buttonRecords.length = 0;
+  settingDescriptionRecords.length = 0;
 
   jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
     (this as Setting & { __settingName?: string }).__settingName = name;
     return this;
   });
-  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(
+    this: Setting,
+    desc: string | DocumentFragment | HTMLElement,
+  ) {
+    const text = typeof desc === 'string' ? desc : desc.textContent ?? '';
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const existing = settingDescriptionRecords.find((record) => record.name === name && record.desc === text);
+    if (!existing) {
+      settingDescriptionRecords.push({ name, desc: text });
+    }
     return this;
   });
   jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
@@ -418,6 +495,40 @@ describe('SettingsAgentsSection catalog shell', () => {
     const scrollEl = containerEl.querySelector('.opencodian-agent-catalog-scroll');
     expect(scrollEl).not.toBeNull();
   });
+
+  it('shows system-agent and markdown source labels in the catalog', async () => {
+    const plugin = createPlugin({
+      runtimeAgents: [
+        createRuntimeAgent({
+          name: 'title',
+          mode: 'primary',
+          hidden: true,
+          native: true,
+        }),
+      ],
+      projectAgents: {
+        researcher: {
+          description: 'Workspace override',
+        },
+      },
+      fileContents: {
+        '.opencode/agents/researcher.md': 'Research the repo.',
+      },
+      listResults: {
+        '.opencode/agents': { files: ['.opencode/agents/researcher.md'], folders: [] },
+      },
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    expect(findSettingDescriptions('title').some((desc) =>
+      desc.includes(t('settings.agents.guard.readOnly'))
+    )).toBe(true);
+    expect(findSettingDescriptions('researcher').some((desc) =>
+      desc.includes(t('settings.agents.catalog.source.markdownOverride'))
+    )).toBe(true);
+  });
 });
 
 describe('SettingsAgentsSection project agent editor', () => {
@@ -470,5 +581,108 @@ describe('SettingsAgentsSection project agent editor', () => {
       color: undefined,
       disable: undefined,
     });
+  });
+
+  it('blocks saving system-agent overrides until expert mode is enabled', async () => {
+    const plugin = createPlugin();
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+
+    createSection(plugin);
+    await flushAsync();
+
+    await findDropdown(t('settings.agents.editor.select.name'))?.onChange?.('');
+    const idInput = textRecords.find((record) => record.name === t('settings.agents.editor.id.name'));
+    await idInput?.onChange?.('title');
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(plugin.opencodeConfigManager?.upsertAgentConfig).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(
+      t('settings.agents.expert.blocked'),
+    );
+  });
+
+  it('blocks deleting system-agent overrides until expert mode is enabled', async () => {
+    const plugin = createPlugin({
+      projectAgents: {
+        title: {
+          description: 'Override title agent',
+          mode: 'primary',
+        },
+      },
+    });
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+
+    createSection(plugin);
+    await flushAsync();
+
+    await findDropdown(t('settings.agents.editor.select.name'))?.onChange?.('title');
+    await findButton(t('settings.agents.editor.actions.delete'))?.onClick?.();
+    await flushAsync();
+
+    expect(plugin.opencodeConfigManager?.removeAgentConfig).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.agents.expert.blocked'));
+  });
+});
+
+describe('SettingsAgentsSection tabbed workspace', () => {
+  it('renders expert mode and workspace blocks in classic layout too', async () => {
+    const plugin = createPlugin();
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    expect(findToggle(t('settings.agents.expert.name'))).toBeDefined();
+    expect(containerEl.textContent).toContain(t('settings.agents.workspace.title'));
+  });
+
+  it('renders the expert toggle in the default tab and refreshes when toggled', async () => {
+    const plugin = createPlugin({
+      runtimeAgents: [createRuntimeAgent({ name: 'title', mode: 'primary', hidden: true })],
+    });
+
+    createTabbedSection('default', plugin);
+    await flushAsync();
+
+    const expertToggle = findToggle(t('settings.agents.expert.name'));
+    expect(expertToggle?.control.setValue).toHaveBeenCalledWith(false);
+
+    await expertToggle?.onChange?.(true);
+    await flushAsync();
+
+    expect(plugin.openCodeService.sdk.app.agents).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders markdown workspace rows and supports create/delete actions', async () => {
+    const plugin = createPlugin({
+      runtimeAgents: [createRuntimeAgent({ name: 'researcher', mode: 'all' })],
+      fileContents: {
+        '.opencode/agents/researcher.md': '---\nmode: all\n---\nResearch the repo.',
+      },
+      fileMtims: {
+        '.opencode/agents/researcher.md': 123,
+      },
+      listResults: {
+        '.opencode/agents': { files: ['.opencode/agents/researcher.md'], folders: [] },
+      },
+    });
+
+    const { containerEl } = createTabbedSection('workspace', plugin);
+    await flushAsync();
+
+    expect(containerEl.textContent).toContain(t('settings.agents.workspace.title'));
+    expect(findSettingDescriptions('researcher').some((desc) =>
+      desc.includes(t('settings.agents.workspace.scope.project'))
+      && desc.includes(t('settings.agents.workspace.status.ok'))
+      && desc.includes(t('settings.agents.workspace.status.runtimeSeen'))
+    )).toBe(true);
+
+    await findButton(t('settings.agents.workspace.actions.create'))?.onClick?.();
+    await flushAsync();
+    expect(plugin.app.vault.adapter.write).toHaveBeenCalled();
+
+    await findButton(t('settings.agents.workspace.actions.delete'))?.onClick?.();
+    await flushAsync();
+    expect(plugin.app.vault.adapter.remove).toHaveBeenCalledWith('.opencode/agents/researcher.md');
   });
 });

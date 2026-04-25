@@ -4,6 +4,7 @@ import {
   isSystemAgentId,
   type RuntimeAgentShape,
   type SurfaceAgent,
+  type SurfaceAgentFile,
   type SurfaceAgentSource,
 } from './types';
 
@@ -46,12 +47,13 @@ export class AgentCatalogService {
       builder.applyConfigOverride(config);
     }
 
-    // Layer 3: File agents (minimal in A1; full scan deferred to A4)
+    // Layer 3: File agents (frontmatter fills gaps not provided by runtime/config)
     if (fileAgents) {
       for (const file of fileAgents) {
         const builder = this.getOrCreate(seen, file.agentId);
         builder.addSource('file');
         builder.setFileOrigin(file.path);
+        builder.applyFileDefaults(file);
       }
     }
 
@@ -148,6 +150,23 @@ class SurfaceAgentBuilder {
 
   setFileOrigin(vaultRelativePath: string): void {
     this.originPath = vaultRelativePath;
+  }
+
+  applyFileDefaults(file: SurfaceAgentFile): void {
+    if (file.parseStatus !== 'ok' && file.parseStatus !== 'duplicate-id') {
+      return;
+    }
+
+    const fm = file.frontmatter;
+    if (this.description === undefined && typeof fm.description === 'string') {
+      this.description = fm.description;
+    }
+    if (this.mode === undefined && typeof fm.mode === 'string') {
+      this.mode = fm.mode;
+    }
+    if (this.hidden === undefined && typeof fm.hidden === 'boolean') {
+      this.hidden = fm.hidden;
+    }
   }
 
   build(): SurfaceAgent {

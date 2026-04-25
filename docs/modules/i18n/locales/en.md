@@ -13,7 +13,7 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 同一天的后续 UI 微调还新增了 `settings.agents.editor.group.*` 文案，并把 `settings.agents.catalog.desc` 改成正向可见性语义，明确说明：agent catalog 中的子代理开关现在是 **on = visible in `@` menu / off = hidden**。
 
-当前 A3 child-session graph 收尾又补了一组 `chat.childSessionTree.*` 文案，把会话树 header、open 按钮、orphan fallback、partial-graph badge 与提醒文案收进 locale，而不是继续把这些 user-facing copy 硬编码在 `OpenCodianView.ts` 里。
+当前 A4 agent-surface 收尾又补了一组 `settings.agents.expert.*`、`settings.agents.workspace.*`、`settings.agents.guard.*`、`settings.agents.editor.select.runtimeSection` / `systemBadge` 以及 `settings.agents.tab.workspace` 文案，把 system-agent expert gate、Markdown workspace CRUD / status、runtime-system editor labels 和新的 workspace tab 都放进 locale，而不是继续在 settings owner 中硬编码文本。
 
 源码约 1000 行。
 
@@ -160,7 +160,7 @@ New keys added for the tabbed settings layout:
 - `settings.server.tab.*` — server secondary tab labels (connection/auth/status)
 - `settings.model.tab.*` — model secondary tab labels (common/projectConfig/availability/tools)
 - `settings.conversation.tab.*` — conversation secondary tab labels (title/compaction/display/questions/rendering)
-- `settings.agents.tab.*` — agents secondary tab labels (default/catalog/editor)
+- `settings.agents.tab.*` — agents secondary tab labels (default/catalog/editor/workspace)
 - `settings.commands.tab.*` — commands secondary tab labels (mode/editor/catalog)
 - `settings.plugins.tab.*` — plugins secondary tab labels (overview/global/projectDirectory/omo)
 - `settings.security.tab.*` — security secondary tab labels (config/permissions/safety)
