@@ -495,12 +495,15 @@ export class OpenCodeStreamEventTransformer {
       chunks,
     }: OpenCodeStreamingPartUpdatedHandlerContext,
   ): void {
+    const preClassifiedToolName = toolPart.tool || 'unknown';
+    if (!isInternalStructuredOutputTool(preClassifiedToolName)) {
+      this.host.observeRuntimeToolNames([preClassifiedToolName]);
+    }
+
     const classifiedToolPart = this.resolveToolPartClassification(toolPart);
     if (!classifiedToolPart) {
       return;
     }
-
-    this.host.observeRuntimeToolNames([classifiedToolPart.toolName]);
 
     const {
       toolId,
@@ -610,6 +613,11 @@ export class OpenCodeStreamEventTransformer {
     part: OpenCodeStreamPart,
     chunks: StreamChunk[],
   ): void {
+    const preClassifiedToolName = part.tool || 'unknown';
+    if (!isInternalStructuredOutputTool(preClassifiedToolName)) {
+      this.host.observeRuntimeToolNames([preClassifiedToolName]);
+    }
+
     const classifiedToolPart = this.resolveToolPartClassification(part, {
       requireState: true,
     });

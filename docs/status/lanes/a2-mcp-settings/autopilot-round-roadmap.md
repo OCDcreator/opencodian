@@ -44,7 +44,7 @@
   - Users can add local/remote MCP servers and run the supported MCP actions from settings.
   - Tests cover validation, button visibility, and post-action refresh behavior.
 
-### [NEXT] M3 - Stabilize MCP tool identity across history and streaming
+### [DONE] M3 - Stabilize MCP tool identity across history and streaming
 
 - **Lane**: Tool-call rendering consistency
 - **Goal**: Make known MCP tool names render as MCP consistently across hydrate, streaming, and completed-tool states without changing builtin/custom behavior.

@@ -97,6 +97,7 @@ graph LR
 - 不要在这里改 SDK 首事件失败才 fallback 到 legacy SSE 的策略；那属于 `OpenCodeService` transport owner。
 - 不要把 question normalization 或 tool identity 规则搬进 transformer；保持 host seam 注入。
 - 不要让 `message.part.delta` 只走 loose text chunk；如果能解析出 `partID + messageID`，必须同时输出 canonical part mutation。
-- `transformPartToChunks()` 目前仍保持原有“只直接处理 `reasoning` part，不单独处理 `thinking` part”的兼容语义。
+- `transformPartToChunks()` 目前仍保持原有"只直接处理 `reasoning` part，不单独处理 `thinking` part"的兼容语义。
 - `toolMetadata` 是 UI-safe 白名单字段，不要把 OpenCode `part.state.metadata` 整对象直接塞进 `StreamChunk`。
 - `task` 的 result visibility 同样属于流式 contract；如果以后新增 part-to-chunk helper，必须同时保留 `toolMetadata.sessionId` 与 hidden-result 标记。
+- MCP 工具名观察必须在分类之前执行（`observeRuntimeToolNames` → `resolveToolPartClassification`），确保首次出现的 MCP 工具在第一个 `tool_use` chunk 里就拿到正确的 `mcp` kind，而不是先 `custom` 后 `mcp` 的漂移。这个观察-分类顺序在 `handleToolPartUpdated` 和 `appendToolPartChunks` 两条路径都保持一致。

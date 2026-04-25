@@ -273,3 +273,193 @@ describe('OpenCodeStreamEventTransformer task metadata', () => {
     }));
   });
 });
+
+describe('OpenCodeStreamEventTransformer MCP identity stability', () => {
+  it('observes tool names before classification so first-seen MCP tools emit mcp on first event', () => {
+    const observedTools = new Set<string>();
+    const host = createHost({
+      observeRuntimeToolNames: jest.fn((toolNames: Iterable<string>) => {
+        for (const name of toolNames) {
+          if (typeof name === 'string') observedTools.add(name);
+        }
+        return true;
+      }),
+      getOpenCodeToolKind: jest.fn((toolName: string | undefined | null) => {
+        if (!toolName) return 'unknown';
+        if (observedTools.has(toolName)) return 'mcp';
+        return 'custom';
+      }),
+    });
+
+    const transformer = new OpenCodeStreamEventTransformer(host);
+    const state = createState();
+
+    const firstOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-first-seen-mcp',
+            sessionID: 'test-session',
+            messageID: 'assistant-first',
+            type: 'tool',
+            callID: 'call-first-seen',
+            tool: 'new_mcp_tool',
+            state: {
+              status: 'running',
+              input: { query: 'test' },
+            },
+          },
+        },
+      },
+      'test-session',
+      state,
+      createStreamContext(),
+    );
+
+    expect(host.observeRuntimeToolNames).toHaveBeenCalledWith(['new_mcp_tool']);
+    expect(firstOutcome.chunks).toContainEqual(expect.objectContaining({
+      type: 'tool_use',
+      id: 'call-first-seen',
+      name: 'new_mcp_tool',
+      kind: 'mcp',
+    }));
+  });
+
+  it('keeps MCP tool kind stable across running to completed lifecycle', () => {
+    const observedTools = new Set<string>();
+    const host = createHost({
+      observeRuntimeToolNames: jest.fn((toolNames: Iterable<string>) => {
+        for (const name of toolNames) {
+          if (typeof name === 'string') observedTools.add(name);
+        }
+        return true;
+      }),
+      getOpenCodeToolKind: jest.fn((toolName: string | undefined | null) => {
+        if (!toolName) return 'unknown';
+        if (observedTools.has(toolName)) return 'mcp';
+        return 'custom';
+      }),
+    });
+
+    const transformer = new OpenCodeStreamEventTransformer(host);
+    const state = createState();
+    const streamContext = createStreamContext();
+
+    transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-lifecycle',
+            sessionID: 'test-session',
+            messageID: 'assistant-lifecycle',
+            type: 'tool',
+            callID: 'call-lifecycle',
+            tool: 'lifecycle_mcp_search',
+            state: {
+              status: 'running',
+              input: { query: 'find docs' },
+            },
+          },
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+
+    const completedOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-lifecycle',
+            sessionID: 'test-session',
+            messageID: 'assistant-lifecycle',
+            type: 'tool',
+            callID: 'call-lifecycle',
+            tool: 'lifecycle_mcp_search',
+            state: {
+              status: 'completed',
+              output: 'result data',
+            },
+          },
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+
+    const toolUseChunks = completedOutcome.chunks.filter((c) => c.type === 'tool_use');
+    const toolResultChunks = completedOutcome.chunks.filter((c) => c.type === 'tool_result');
+    expect(toolUseChunks).toContainEqual(expect.objectContaining({
+      type: 'tool_use',
+      id: 'call-lifecycle',
+      name: 'lifecycle_mcp_search',
+      kind: 'mcp',
+    }));
+    expect(toolResultChunks).toContainEqual(expect.objectContaining({
+      type: 'tool_result',
+      toolUseId: 'call-lifecycle',
+      content: 'result data',
+    }));
+  });
+
+  it('preserves registry tool as custom even when observed', () => {
+    const registryTools = new Set(['registry_custom_tool']);
+    const observedTools = new Set<string>();
+    const host = createHost({
+      observeRuntimeToolNames: jest.fn((toolNames: Iterable<string>) => {
+        for (const name of toolNames) {
+          if (typeof name === 'string') observedTools.add(name);
+        }
+        return true;
+      }),
+      getOpenCodeToolKind: jest.fn((toolName: string | undefined | null) => {
+        if (!toolName) return 'unknown';
+        if (registryTools.has(toolName)) return 'custom';
+        if (observedTools.has(toolName)) return 'mcp';
+        return 'custom';
+      }),
+    });
+
+    const transformer = new OpenCodeStreamEventTransformer(host);
+
+    const outcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-registry-tool',
+            sessionID: 'test-session',
+            messageID: 'assistant-registry',
+            type: 'tool',
+            callID: 'call-registry',
+            tool: 'registry_custom_tool',
+            state: {
+              status: 'running',
+              input: { path: '/test' },
+            },
+          },
+        },
+      },
+      'test-session',
+      createState(),
+      createStreamContext(),
+    );
+
+    expect(host.observeRuntimeToolNames).toHaveBeenCalledWith(['registry_custom_tool']);
+    expect(outcome.chunks).toContainEqual(expect.objectContaining({
+      type: 'tool_use',
+      id: 'call-registry',
+      name: 'registry_custom_tool',
+      kind: 'custom',
+    }));
+  });
+});

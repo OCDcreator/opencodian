@@ -60,6 +60,43 @@ describe('toolIdentity', () => {
     });
   });
 
+  it('preserves registry tool as custom even when also observed as external', () => {
+    expect(getToolIdentity('my_mcp_search', {
+      source: 'opencode',
+      registryTools: ['my_mcp_search'],
+      observedExternalTools: ['my_mcp_search'],
+    })).toMatchObject({
+      normalizedName: 'my_mcp_search',
+      kind: 'custom',
+      icon: 'layers',
+      isMcp: false,
+    });
+  });
+
+  it('classifies observed external tools as mcp over the opencode external fallback', () => {
+    expect(getToolIdentity('some_mcp_tool', {
+      source: 'opencode',
+      observedExternalTools: ['some_mcp_tool'],
+    })).toMatchObject({
+      normalizedName: 'some_mcp_tool',
+      kind: 'mcp',
+      icon: 'opencodian-tool-mcp',
+      isMcp: true,
+    });
+  });
+
+  it('classifies known MCP tools as mcp even without observed context', () => {
+    expect(getToolIdentity('context7_search', {
+      source: 'opencode',
+      knownMcpTools: ['context7_search'],
+    })).toMatchObject({
+      normalizedName: 'context7_search',
+      kind: 'mcp',
+      icon: 'opencodian-tool-mcp',
+      isMcp: true,
+    });
+  });
+
   it('keeps structured output aliases normalized for internal filtering', () => {
     expect(getNormalizedToolName('StructuredOutput')).toBe('structuredoutput');
     expect(getNormalizedToolName('structured_output')).toBe('structuredoutput');
