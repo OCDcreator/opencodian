@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-04-25 Lane a3-formatter-settings — F2 Formatter top-level settings UI
+
+Added the top-level Formatter settings page with two secondary views (overview, config).
+
+### Files created
+
+- `src/features/settings/SettingsFormatterSection.ts` — section owner for formatter settings; renders overview (runtime status, summary cards, detected formatter table) and config (mode switch dropdown) in both classic and tabbed layouts
+- `tests/unit/features/settings/SettingsFormatterSection.test.ts` — 10 tests covering attach/attachTabbed render state, mode-switch behavior (default/disabled/custom), config manager unavailability, and display refresh
+- `docs/modules/features/settings/SettingsFormatterSection.md` — module doc for the new section
+
+### Files modified
+
+- `src/features/settings/settingsLayoutRegistry.ts` — added `formatter` primary tab with `overview`/`config` secondary tabs
+- `src/features/settings/SettingsTabbedRenderer.ts` — imported and wired `SettingsFormatterSection`, added `formatter` render case and `shouldUsePanelShell` exclusion
+- `src/features/settings/OpenCodianSettings.ts` — imported `SettingsFormatterSection`, added `addFormatterSettings()` classic method, wired dispose and `formatterSection` field
+- `src/i18n/locales/en.ts` — added `settings.formatter.*` and `settings.quickNav.formatterDesc` i18n keys
+- `src/i18n/locales/zh.ts` — added corresponding Chinese translations
+- `tests/unit/features/settings/settingsLayoutRegistry.test.ts` — updated expected primary tab list to include `formatter`
+- `tests/unit/features/settings/OpenCodianSettings.test.ts` — stubbed `addFormatterSettings` in two tests
+- Updated 5 module docs to reflect the formatter addition
+
+### Verification
+
+- `npm run verify` green: lint (0 new errors), typecheck, 1647 tests passing, production build successful
+
+---
+
 ## 2026-04-23 Project-scoped compaction config alignment — Round 3 review fixes
 
 - Fixed all trailing whitespace; `git diff --check` now clean.

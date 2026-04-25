@@ -16,7 +16,7 @@
 
 ## 一级/二级标签结构
 
-当前涵盖 12 个一级标签：
+当前涵盖 13 个一级标签：
 
 | 一级标签 | 二级标签 |
 |---------|---------|
@@ -26,6 +26,7 @@
 | `conversation` | `title`, `compaction`, `display`, `questions`, `rendering` |
 | `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
+| `formatter` | `overview`, `config` |
 | `plugins` | `overview`, `global`, `project-directory`, `omo` |
 | `security` | `config`, `permissions`, `safety` |
 | `ui` | `general` |

@@ -21,7 +21,7 @@
   - Formatter config is explicitly typed and helper methods can read/update just the formatter subtree.
   - Tests cover formatter config read/write behavior.
 
-### [NEXT] F2 - Add the Formatter top-level settings UI
+### [DONE] F2 - Add the Formatter top-level settings UI
 
 - **Lane**: Formatter settings surface
 - **Goal**: Add the top-level `Formatter` settings page with `overview` and `config` secondary views, including runtime status presentation and mode switching.
@@ -42,7 +42,7 @@
   - Users can switch between default / disabled / custom formatter modes.
   - Tests cover render state and mode-switch behavior.
 
-### [QUEUED] F3 - Finish formatter editors, advanced JSON, and closeout verification
+### [NEXT] F3 - Finish formatter editors, advanced JSON, and closeout verification
 
 - **Lane**: Formatter editing and final closeout
 - **Goal**: Finish builtin/custom formatter editing, advanced JSON editing, runtime status failure handling, docs sync, and final queue closeout verification.

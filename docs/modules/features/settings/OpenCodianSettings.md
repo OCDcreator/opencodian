@@ -40,6 +40,7 @@
 - Conversation
 - Agents
 - Commands
+- Formatter
 - Plugins
 - Security
 - UI
@@ -98,7 +99,7 @@
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
 
-从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式现在还会通过 `beginDisplay({ showQuickNav: false })` 关闭 quick-nav，只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
+从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / Formatter / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式现在还会通过 `beginDisplay({ showQuickNav: false })` 关闭 quick-nav，只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 
 设置页最上方的 panel title 现在不再直接复用纯文本 `h2`；`OpenCodianSettings` 会在 classic / tabbed 两种布局里都传入自定义标题渲染器，让顶部标题使用和聊天头部 `opencodian-title` 一致的品牌逻辑：左侧 `opencodian-app-icon` + 亮/暗主题 wordmark，不再额外拼接 `Settings / 设置` 文本后缀。
 
@@ -179,6 +180,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `addUISettings()` | 创建并挂载 `SettingsUiSection` owner，把 UI section lifecycle 从主类中收口出去 |
 | `addStyleSettings()` | 创建并挂载 `SettingsStyleSection` owner，把完整 style section lifecycle 从主类中收口出去 |
 | `addDebugSettings()` | 创建并挂载 `SettingsDebugSection` owner，把 debug log path / export / help lifecycle 从主类中收口出去 |
+| `addFormatterSettings()` | 创建并挂载 `SettingsFormatterSection` owner，把 formatter runtime status / config / mode-switch lifecycle 从主类中收口出去 |
 | `addMcpSettings()` | 创建并挂载 `SettingsMcpSection` owner，把 MCP 服务器状态概览与刷新 lifecycle 从主类中收口出去 |
 
 ## 与其他模块的交互
@@ -199,6 +201,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsDebugSection`: 管理 debug section 的 logging toggle、inline serialized args、log path picker、diagnostic copy/generate action 与 console help；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsSecuritySection`: 管理 security section 的 config status、permission mode 写回、restart action 与 blocklist/export-path 输入；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsStyleSection`: 管理 style section 的 theme preset、binding sync、background/input 子 owner 装配与 custom CSS；`OpenCodianSettings` 只保留 owner 装配
+- `SettingsFormatterSection`: 管理 formatter section 的 runtime status 展示、project config 模式切换（default/disabled/custom）与 formatter 子树读写；`OpenCodianSettings` 只保留 owner 装配与 display refresh bridge
 - `SettingsStyleInputPanelSection`: 管理 input panel theme family/variant、glass-refraction 参数与 input subsection rerender；`SettingsStyleSection` 只向它提供通用 style-control seam
 - `ModelCatalogStateService`: 提供 settings/model 分区使用的 catalog state API，并集中 provider/model availability 的 core 写回操作
 - `SettingsModelCatalogPresenter`: 管理 provider/model accordion、search、bulk toggle、catalog summary 卡片与 provider probe presentation；`SettingsModelSection` 只向它提供 settings writeback 与 icon/inline-code host seam

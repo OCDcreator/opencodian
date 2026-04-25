@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
 import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
 import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
 import { SettingsTabbedRenderer } from '../../../../src/features/settings/SettingsTabbedRenderer';
@@ -172,6 +173,27 @@ describe('SettingsTabbedRenderer', () => {
 
     expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
     expect(containerEl.querySelector('.model-tab-marker')?.textContent).toBe('model-tab-rendered');
+  });
+
+  it('renders formatter tabs without the extra tab-panel shell', () => {
+    jest.spyOn(SettingsFormatterSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'formatter-tab-marker', text: 'formatter-tab-rendered' });
+    });
+    const { renderer } = createRendererState({
+      primaryTabId: 'formatter',
+      secondaryTabs: { formatter: 'overview' },
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
+    expect(containerEl.querySelector('.formatter-tab-marker')?.textContent).toBe('formatter-tab-rendered');
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
+        (element) => element.textContent?.trim(),
+      ),
+    ).toEqual(['Overview', 'Config']);
   });
 });
 

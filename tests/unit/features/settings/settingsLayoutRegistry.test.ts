@@ -34,6 +34,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'conversation',
       'agents',
       'commands',
+      'formatter',
       'plugins',
       'security',
       'ui',

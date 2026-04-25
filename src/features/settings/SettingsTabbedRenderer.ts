@@ -14,6 +14,7 @@ import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
+import { SettingsFormatterSection } from './SettingsFormatterSection';
 import {
   getActiveSecondaryTabId,
   resolvePrimaryTabId,
@@ -132,7 +133,7 @@ export class SettingsTabbedRenderer {
   }
 
   private shouldUsePanelShell(primaryTabId: string): boolean {
-    return primaryTabId !== 'general' && primaryTabId !== 'style' && primaryTabId !== 'plugins' && primaryTabId !== 'model';
+    return primaryTabId !== 'general' && primaryTabId !== 'style' && primaryTabId !== 'plugins' && primaryTabId !== 'model' && primaryTabId !== 'formatter';
   }
 
   switchToPrimaryTab(primaryTabId: string, secondaryTabId?: string): void {
@@ -186,6 +187,9 @@ export class SettingsTabbedRenderer {
         break;
       case 'commands':
         this.renderCommandsContent(containerEl, secondaryTabId);
+        break;
+      case 'formatter':
+        this.renderFormatterContent(containerEl, secondaryTabId);
         break;
       case 'plugins':
         this.renderPluginsContent(containerEl, secondaryTabId);
@@ -293,6 +297,15 @@ export class SettingsTabbedRenderer {
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     });
     commandsSection.attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private renderFormatterContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const formatterSection = new SettingsFormatterSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+      requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+    });
+    formatterSection.attachTabbed(containerEl, secondaryTabId);
   }
 
   private renderPluginsContent(containerEl: HTMLElement, secondaryTabId: string): void {

@@ -13,6 +13,7 @@ import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
+import { SettingsFormatterSection } from './SettingsFormatterSection';
 import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
@@ -65,6 +66,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private serverSection: SettingsServerSection | null = null;
   private mcpSection: SettingsMcpSection | null = null;
   private securitySection: SettingsSecuritySection | null = null;
+  private formatterSection: SettingsFormatterSection | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -287,9 +289,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.serverSection?.dispose();
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
+    this.formatterSection?.dispose();
     this.serverSection = null;
     this.mcpSection = null;
     this.securitySection = null;
+    this.formatterSection = null;
     this.refreshModelCatalogStatusCallback = undefined;
   }
 
@@ -309,6 +313,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.addConversationSettings(containerEl);
     this.addAgentsSettings(containerEl);
     this.addCommandsSettings(containerEl);
+    this.addFormatterSettings(containerEl);
     this.addPluginSettings(containerEl);
     this.addSecuritySettings(containerEl);
     this.addUISettings(containerEl);
@@ -549,6 +554,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }).attach(containerEl);
   }
 
+  private addFormatterSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    this.formatterSection ??= new SettingsFormatterSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+      requestDisplayRefresh: () => { this.display(); },
+    });
+    return this.formatterSection.attach(containerEl);
+  }
+
   private addUISettings(containerEl: HTMLElement): HTMLHeadingElement {
     this.uiSection ??= new SettingsUiSection({
       plugin: this.plugin,
@@ -608,6 +622,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.debugSection?.dispose();
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
+    this.formatterSection?.dispose();
     this.refreshModelsCallback = undefined;
     this.refreshTitleModelsCallback = undefined;
     super.hide();
