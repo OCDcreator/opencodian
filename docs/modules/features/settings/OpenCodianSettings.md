@@ -29,6 +29,8 @@
 - 通过 `SettingsStyleBackgroundSection` 协调 style owner 下的聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
 
+最近还把一组稳定的 panel chrome 逻辑（标题品牌、通用 block 壳层、inline-code 格式化、help button、语言选择器）抽到 companion 模块 `SettingsPanelChrome.ts`，让主设置页 owner 更聚焦于 section 装配与跨 owner bridge。
+
 ## 主要分区
 
 `display()` 会重建整个设置面板，并依次挂载这些分区：
@@ -182,6 +184,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 ## 与其他模块的交互
 
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
+- `SettingsPanelChrome`: 管理 panel title 品牌渲染、通用 block shell、inline-code 格式化、help button 和语言选择器这类稳定展示壳层
 - `SettingsTabbedRenderer`: 标签模式下的标签栏渲染与内容路由，从 `OpenCodianSettings` 中提取以控制代码行数
 - `SettingsUserSection`: 用户 profile/prompt/tags 设置的独立渲染函数，从 `OpenCodianSettings` 中提取
 - `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数

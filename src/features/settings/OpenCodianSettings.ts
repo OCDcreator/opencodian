@@ -5,15 +5,24 @@
  * Supports two layout modes: classic flat and tabbed primary/secondary tabs.
  */
 
-import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
+import { App, PluginSettingTab, Setting } from 'obsidian';
 
-import { setLocale, t } from '../../i18n';
+import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
 import { SettingsModelSection } from './SettingsModelSection';
+import {
+  addSettingHelpButton,
+  applyInlineCodeText,
+  createSettingsBlock,
+  renderLanguageSetting,
+  renderSettingsPanelTitle,
+  setSettingDescWithFormatting,
+  setSettingNameWithFormatting,
+} from './SettingsPanelChrome';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
@@ -26,22 +35,6 @@ import {
   renderUserProfileSetting,
   renderUserPromptSetting,
 } from './SettingsUserSection';
-
-interface SettingHelpButtonConfig {
-  tooltip: string;
-  onClick: () => void;
-}
-
-const SETTINGS_TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-light.svg';
-const SETTINGS_TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
-
-interface SettingsBlockOptions {
-  title: string;
-  description: string;
-  collapsible?: boolean;
-  defaultOpen?: boolean;
-  onToggle?: (isOpen: boolean) => void;
-}
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
@@ -83,11 +76,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         app: this.app,
         plugin: this.plugin,
         createHeading: (containerEl, title, tooltip) => this.createSectionHeading(containerEl, title, tooltip),
-        createSettingsBlock: (containerEl, options) => this.createSettingsBlock(containerEl, options),
-        setSettingDescWithFormatting: (setting, text) => this.setSettingDescWithFormatting(setting, text),
-        applyInlineCodeText: (targetEl, text) => this.applyInlineCodeText(targetEl, text),
-        setSettingNameWithFormatting: (setting, text) => this.setSettingNameWithFormatting(setting, text),
-        addSettingHelpButton: (setting, helpButton) => this.addSettingHelpButton(setting, helpButton),
+        createSettingsBlock: (containerEl, options) => createSettingsBlock(containerEl, options, applyInlineCodeText),
+        setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
+        applyInlineCodeText,
+        setSettingNameWithFormatting: (setting, text) => setSettingNameWithFormatting(setting, text, applyInlineCodeText),
+        addSettingHelpButton,
         notifyModelCatalogStatus: () => { this.refreshModelCatalogStatusCallback?.(); },
         setModelCatalogStatusCallback: (cb) => { this.refreshModelCatalogStatusCallback = cb; },
         setServerSection: (section) => { this.serverSection = section; },
@@ -131,94 +124,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.refreshModelCatalogStatusCallback?.();
   }
 
-  // ─── Public helpers needed by SettingsTabbedRenderer ───────────────
-
-  /** Render language selector (used by classic heading + tabbed panel) */
   renderLanguageSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.language.select.name'))
-      .setDesc(t('settings.language.select.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('en', t('settings.language.en'));
-        dropdown.addOption('zh', t('settings.language.zh'));
-        dropdown
-          .setValue(this.plugin.settings.locale)
-          .onChange(async (value) => {
-            this.plugin.settings.locale = value as 'en' | 'zh';
-            setLocale(value as 'en' | 'zh');
-            await this.plugin.saveSettings();
-            this.display();
-          });
-      });
-  }
-
-  // ─── Public display helpers accessed by SettingsTabbedRenderer ─────
-
-  createSettingsBlock(containerEl: HTMLElement, options: SettingsBlockOptions): HTMLElement {
-    const {
-      title,
-      description,
-      collapsible = false,
-      defaultOpen = true,
-      onToggle,
-    } = options;
-
-    const hostEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
-    if (!collapsible) {
-      hostEl.createEl('h4', {
-        text: title,
-        cls: 'opencodian-settings-subsection-heading',
-      });
-      const descEl = hostEl.createDiv({ cls: 'opencodian-settings-block-desc' });
-      this.applyInlineCodeText(descEl, description);
-      return hostEl.createDiv({ cls: 'opencodian-settings-block-body' });
-    }
-
-    const detailsEl = hostEl.createEl('details', { cls: 'opencodian-settings-block-details' });
-    detailsEl.open = defaultOpen;
-    detailsEl.addEventListener('toggle', () => {
-      onToggle?.(detailsEl.open);
-    });
-
-    const summaryEl = detailsEl.createEl('summary', { cls: 'opencodian-settings-block-summary' });
-    summaryEl.createDiv({
-      cls: 'opencodian-settings-subsection-heading',
-      text: title,
-    });
-    const descEl = summaryEl.createDiv({ cls: 'opencodian-settings-block-desc' });
-    this.applyInlineCodeText(descEl, description);
-
-    return detailsEl.createDiv({ cls: 'opencodian-settings-block-body' });
-  }
-
-  setSettingDescWithFormatting(setting: Setting, text: string): void {
-    setting.setDesc(text);
-    const descEl = setting.settingEl.querySelector<HTMLElement>('.setting-item-description');
-    this.applyInlineCodeText(descEl, text);
-  }
-
-  setSettingNameWithFormatting(setting: Setting, text: string): void {
-    setting.setName(text);
-    const nameEl = setting.settingEl.querySelector<HTMLElement>('.setting-item-name');
-    this.applyInlineCodeText(nameEl, text);
-  }
-
-  applyInlineCodeText(targetEl: HTMLElement | null, text: string): void {
-    if (!targetEl) {
-      return;
-    }
-
-    targetEl.empty();
-    targetEl.appendChild(this.buildInlineCodeFragment(text));
-  }
-
-  addSettingHelpButton(setting: Setting, helpButton: SettingHelpButtonConfig): void {
-    setting.addExtraButton((button) => {
-      button
-        .setIcon('help-circle')
-        .setTooltip(helpButton.tooltip)
-        .onClick(helpButton.onClick);
-    });
+    renderLanguageSetting(containerEl, this.plugin, () => { this.display(); });
   }
 
   // ─── Navigation ────────────────────────────────────────────────────
@@ -330,61 +237,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private renderPanelTitle(containerEl: HTMLElement): void {
-    const headingEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
-    const brandEl = headingEl.createSpan({ cls: 'opencodian-title' });
-    const logoEl = brandEl.createSpan({ cls: 'opencodian-logo' });
-    setIcon(logoEl, 'opencodian-app-icon');
-
-    const wordmarks = [
-      {
-        className: 'is-light',
-        src: this.resolvePluginAssetUrl(SETTINGS_TITLE_WORDMARK_LIGHT_ASSET_PATH),
-      },
-      {
-        className: 'is-dark',
-        src: this.resolvePluginAssetUrl(SETTINGS_TITLE_WORDMARK_DARK_ASSET_PATH),
-      },
-    ];
-
-    let renderedWordmark = false;
-    for (const wordmark of wordmarks) {
-      if (!wordmark.src) {
-        continue;
-      }
-
-      renderedWordmark = true;
-      brandEl.createEl('img', {
-        cls: `opencodian-title-text opencodian-settings-title-wordmark ${wordmark.className}`,
-        attr: {
-          src: wordmark.src,
-          alt: t('plugin.name'),
-          draggable: 'false',
-        },
-      });
-    }
-
-    if (!renderedWordmark) {
-      brandEl.createSpan({
-        cls: 'opencodian-settings-panel-title-fallback',
-        text: t('plugin.name'),
-      });
-    }
-
-  }
-
-  private resolvePluginAssetUrl(relativePath: string): string | null {
-    const pluginDir = this.plugin.manifest.dir?.trim();
-    if (!pluginDir) {
-      return null;
-    }
-
-    const adapter = this.app.vault?.adapter ?? this.plugin.app?.vault?.adapter;
-    if (!adapter || typeof adapter.getResourcePath !== 'function') {
-      return null;
-    }
-
-    const assetPath = `${pluginDir}/${relativePath}`.replace(/\\/g, '/');
-    return adapter.getResourcePath(assetPath);
+    renderSettingsPanelTitle(containerEl, this.app, this.plugin);
   }
 
   // ─── Layout mode control ───────────────────────────────────────────
@@ -454,9 +307,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       app: this.app,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-      createSettingsBlock: (hostEl, options) => this.createSettingsBlock(hostEl, options),
-      setSettingDescWithFormatting: (setting, text) => this.setSettingDescWithFormatting(setting, text),
-      applyInlineCodeText: (targetEl, text) => this.applyInlineCodeText(targetEl, text),
+      createSettingsBlock: (hostEl, options) => createSettingsBlock(hostEl, options, applyInlineCodeText),
+      setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
+      applyInlineCodeText,
       refreshTitleModels: () => {
         this.refreshTitleModelsCallback?.();
       },
@@ -483,8 +336,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       app: this.app,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-      createSettingsBlock: (hostEl, options) => this.createSettingsBlock(hostEl, options),
-      addSettingHelpButton: (setting, helpButton) => this.addSettingHelpButton(setting, helpButton),
+      createSettingsBlock: (hostEl, options) => createSettingsBlock(hostEl, options, applyInlineCodeText),
+      addSettingHelpButton,
       setRefreshTitleModelsCallback: (callback) => {
         this.refreshTitleModelsCallback = callback;
       },
@@ -513,15 +366,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       app: this.app,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-      applyInlineCodeText: (targetEl, text) => {
-        this.applyInlineCodeText(targetEl, text);
-      },
-      setSettingNameWithFormatting: (setting, text) => {
-        this.setSettingNameWithFormatting(setting, text);
-      },
-      setSettingDescWithFormatting: (setting, text) => {
-        this.setSettingDescWithFormatting(setting, text);
-      },
+      applyInlineCodeText,
+      setSettingNameWithFormatting: (setting, text) => setSettingNameWithFormatting(setting, text, applyInlineCodeText),
+      setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
     });
     return this.pluginSection.attach(containerEl);
   }
@@ -547,8 +394,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       app: this.app,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-      setSettingDescWithFormatting: (setting, text) => this.setSettingDescWithFormatting(setting, text),
-      addSettingHelpButton: (setting, helpButton) => this.addSettingHelpButton(setting, helpButton),
+      setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
+      addSettingHelpButton,
     });
     return this.styleSection.attach(containerEl);
   }
@@ -606,35 +453,5 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       title,
       tooltip,
     });
-  }
-
-  private buildInlineCodeFragment(text: string): DocumentFragment {
-    const fragment = document.createDocumentFragment();
-    const segments = text.split(/(`[^`\n]+`)/g);
-
-    for (const segment of segments) {
-      if (!segment) {
-        continue;
-      }
-
-      if (segment.startsWith('`') && segment.endsWith('`') && segment.length >= 2) {
-        const codeEl = document.createElement('code');
-        codeEl.setText(segment.slice(1, -1));
-        fragment.appendChild(codeEl);
-        continue;
-      }
-
-      const lines = segment.split('\n');
-      lines.forEach((line, index) => {
-        if (line.length > 0) {
-          fragment.appendChild(document.createTextNode(line));
-        }
-        if (index < lines.length - 1) {
-          fragment.appendChild(document.createElement('br'));
-        }
-      });
-    }
-
-    return fragment;
   }
 }
