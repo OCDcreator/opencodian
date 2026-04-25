@@ -404,6 +404,7 @@ describe('OpenCodianSettingTab layout shell', () => {
 
     Object.assign(tab as unknown as Record<string, unknown>, {
       addServerSettings: jest.fn(),
+      addMcpSettings: jest.fn(),
       addModelSettings: jest.fn(),
       addConversationSettings: jest.fn(),
       addAgentsSettings: jest.fn(),
@@ -466,6 +467,7 @@ describe('OpenCodianSettingTab layout shell', () => {
     const { tab } = createSettingsTab('classic');
     Object.assign(tab as unknown as Record<string, unknown>, {
       addServerSettings: jest.fn(),
+      addMcpSettings: jest.fn(),
       addModelSettings: jest.fn(),
       addConversationSettings: jest.fn(),
       addAgentsSettings: jest.fn(),

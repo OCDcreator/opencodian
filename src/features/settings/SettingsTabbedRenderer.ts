@@ -20,6 +20,7 @@ import {
   resolveSecondaryTabId,
   SETTINGS_PRIMARY_TABS,
 } from './settingsLayoutRegistry';
+import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
@@ -54,6 +55,7 @@ export interface TabRendererDependencies {
   notifyModelCatalogStatus: () => void;
   setModelCatalogStatusCallback: (cb: (() => void) | undefined) => void;
   setServerSection: (section: SettingsServerSection | null) => void;
+  setMcpSection: (section: SettingsMcpSection | null) => void;
   setModelSection: (section: SettingsModelSection | null) => void;
   setSecuritySection: (section: SettingsSecuritySection | null) => void;
   getRefreshModelsCallback: () => (() => void) | undefined;
@@ -217,6 +219,17 @@ export class SettingsTabbedRenderer {
   }
 
   private renderServerContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    if (secondaryTabId === 'mcp') {
+      const mcpSection = new SettingsMcpSection({
+        plugin: this.deps.plugin,
+        createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+        requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+      });
+      this.deps.setMcpSection(mcpSection);
+      mcpSection.attachTabbed(containerEl, secondaryTabId);
+      return;
+    }
+
     let serverSection: SettingsServerSection | null = null;
     serverSection = new SettingsServerSection({
       app: this.deps.app,

@@ -35,6 +35,7 @@
 
 - General
 - Server
+- MCP
 - Model
 - Conversation
 - Agents
@@ -178,6 +179,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `addUISettings()` | 创建并挂载 `SettingsUiSection` owner，把 UI section lifecycle 从主类中收口出去 |
 | `addStyleSettings()` | 创建并挂载 `SettingsStyleSection` owner，把完整 style section lifecycle 从主类中收口出去 |
 | `addDebugSettings()` | 创建并挂载 `SettingsDebugSection` owner，把 debug log path / export / help lifecycle 从主类中收口出去 |
+| `addMcpSettings()` | 创建并挂载 `SettingsMcpSection` owner，把 MCP 服务器状态概览与刷新 lifecycle 从主类中收口出去 |
 
 ## 与其他模块的交互
 
@@ -186,6 +188,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsUserSection`: 用户 profile/prompt/tags 设置的独立渲染函数，从 `OpenCodianSettings` 中提取
 - `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
+- `SettingsMcpSection`: 管理 MCP 服务器状态概览、逐服务器行渲染、catalog subscription 与显式刷新 action；tabbed 模式下路由到 `Server > MCP`，classic 模式下紧跟 Server 部分之后；M1 范围内为只读状态展示
 - `SettingsModelSection`: 管理模型 section 的 block shell、callback bridge 与 `SettingsModelCatalogPresenter` host；source mode、refresh 链路、workspace 卡片和 icon cache 工具区继续委托给相邻 model-section owners
 - `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、project-scoped compaction editor、global chat font size、question card display/position、answered-card toggle 与 user-markup render toggle，并复用主设置页 block 组件把它们拆成多层级分组；`OpenCodianSettings` 只保留 owner 装配、block seam 与 title-model refresh callback bridge
 - `ConversationCompactionHelpModal`: 作为 conversation section compaction 子区块的帮助入口；`OpenCodianSettings` 继续通过共享 `addSettingHelpButton()` seam 提供统一的 `help-circle` 交互

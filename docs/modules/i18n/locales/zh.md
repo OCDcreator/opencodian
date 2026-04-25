@@ -15,6 +15,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 当前 A4 agent-surface 收尾还补了一组 `settings.agents.expert.*`、`settings.agents.workspace.*`、`settings.agents.guard.*`、`settings.agents.editor.select.runtimeSection` / `systemBadge` 以及 `settings.agents.tab.workspace` 文案，把 system-agent 专家模式、Markdown workspace CRUD / 状态、runtime/system editor 标签与新的 workspace 二级标签都收进 locale，避免继续在 settings owner 中硬编码用户可见文本。
 
+2026-04-25 新增 `settings.server.tab.mcp` 和 `settings.server.mcp.*` 系列键，为 Server > MCP 设置标签页提供 MCP 服务器概览、状态徽章和刷新操作的中文文案。
+
 源码约 1000 行。
 
 ## 导入关系

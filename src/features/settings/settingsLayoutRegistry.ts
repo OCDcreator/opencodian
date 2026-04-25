@@ -43,6 +43,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'connection', labelKey: 'settings.server.tab.connection' },
       { id: 'auth', labelKey: 'settings.server.tab.auth' },
       { id: 'status', labelKey: 'settings.server.tab.status' },
+      { id: 'mcp', labelKey: 'settings.server.tab.mcp' },
     ],
   },
   {

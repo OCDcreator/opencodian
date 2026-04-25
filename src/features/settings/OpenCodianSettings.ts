@@ -13,6 +13,7 @@ import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
+import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
@@ -62,6 +63,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private uiSection: SettingsUiSection | null = null;
   private debugSection: SettingsDebugSection | null = null;
   private serverSection: SettingsServerSection | null = null;
+  private mcpSection: SettingsMcpSection | null = null;
   private securitySection: SettingsSecuritySection | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
@@ -91,6 +93,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         notifyModelCatalogStatus: () => { this.refreshModelCatalogStatusCallback?.(); },
         setModelCatalogStatusCallback: (cb) => { this.refreshModelCatalogStatusCallback = cb; },
         setServerSection: (section) => { this.serverSection = section; },
+        setMcpSection: (section) => { this.mcpSection = section; },
         setModelSection: (section) => { this.modelSection = section; },
         setSecuritySection: (section) => { this.securitySection = section; },
         getRefreshModelsCallback: () => this.refreshModelsCallback,
@@ -282,8 +285,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.uiSection?.dispose();
     this.debugSection?.dispose();
     this.serverSection?.dispose();
+    this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.serverSection = null;
+    this.mcpSection = null;
     this.securitySection = null;
     this.refreshModelCatalogStatusCallback = undefined;
   }
@@ -299,6 +304,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     this.renderClassicGeneralSection(containerEl);
     this.addServerSettings(containerEl);
+    this.addMcpSettings(containerEl);
     this.addModelSettings(containerEl);
     this.addConversationSettings(containerEl);
     this.addAgentsSettings(containerEl);
@@ -449,6 +455,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     return serverSection.attach(containerEl);
   }
 
+  private addMcpSettings(containerEl: HTMLElement): void {
+    this.mcpSection = new SettingsMcpSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+      requestDisplayRefresh: () => { this.display(); },
+    });
+    this.mcpSection.attach(containerEl);
+  }
+
   private addModelSettings(containerEl: HTMLElement): HTMLHeadingElement {
     this.modelSection ??= new SettingsModelSection({
       app: this.app,
@@ -591,6 +606,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.pluginSection?.dispose();
     this.uiSection?.dispose();
     this.debugSection?.dispose();
+    this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.refreshModelsCallback = undefined;
     this.refreshTitleModelsCallback = undefined;

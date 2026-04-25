@@ -44,6 +44,7 @@ function createRendererState(options?: {
     notifyModelCatalogStatus: () => undefined,
     setModelCatalogStatusCallback: () => undefined,
     setServerSection: () => undefined,
+    setMcpSection: () => undefined,
     setModelSection: () => undefined,
     setSecuritySection: () => undefined,
     getRefreshModelsCallback: () => undefined,

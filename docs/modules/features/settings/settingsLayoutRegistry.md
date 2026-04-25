@@ -21,7 +21,7 @@
 | 一级标签 | 二级标签 |
 |---------|---------|
 | `general` | `basic`, `language` |
-| `server` | `connection`, `auth`, `status` |
+| `server` | `connection`, `auth`, `status`, `mcp` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
 | `conversation` | `title`, `compaction`, `display`, `questions`, `rendering` |
 | `agents` | `default`, `catalog`, `editor`, `workspace` |

@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] M1 - Add the Server > MCP settings surface and runtime status refresh
+### [DONE] M1 - Add the Server > MCP settings surface and runtime status refresh
 
 - **Lane**: MCP settings shell
 - **Goal**: Add the `Server > MCP` secondary tab and the initial `SettingsMcpSection` owner that can render runtime MCP status, summary counts, and refresh state through existing OpenCode service/query seams.
@@ -25,7 +25,7 @@
   - Opening or refreshing the tab triggers MCP status refresh.
   - Tests cover rendered state combinations and refresh behavior.
 
-### [QUEUED] M2 - Implement MCP server operations and add-server forms
+### [NEXT] M2 - Implement MCP server operations and add-server forms
 
 - **Lane**: MCP management actions
 - **Goal**: Add connect, disconnect, authenticate, clear-auth, and local/remote add-server flows with user-facing validation and error handling.
