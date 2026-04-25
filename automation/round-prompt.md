@@ -1,6 +1,6 @@
 # Repository Autopilot Round — Maintainability / Refactor
 
-You are running one unattended repository autopilot round inside the `opencodian` repository.
+You are running one unattended repository autopilot round inside the `opencodian-autopilot-agent-mcp-formatter` repository.
 
 Read these files first, in order:
 - `AGENTS.md` if it exists

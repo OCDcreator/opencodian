@@ -47,6 +47,21 @@ Before starting unattended rounds:
 
 Running `doctor` on `main` right after scaffold may fail the branch guard by design. That is a safety signal, not an installation failure.
 
+## Keep-running startup contract
+
+Do not confuse "scaffold installed" with "autopilot is running." A chat agent or terminal session can stop; this repo-local controller is the durable runner.
+
+When the operator asks for continuous unattended work:
+
+1. Commit the scaffolded files.
+2. Switch to a dedicated branch/worktree.
+3. Run `doctor` for the target profile.
+4. Run a dry-run or foreground first-round smoke if requested.
+5. Start the durable path with `bootstrap-and-daemonize` or the platform background wrapper.
+6. Verify with `health` bound to the intended state file before reporting success.
+
+Only claim the next round is running when `health` shows the autopilot parent PID alive, a fresh `progress.log`, and a live `codex exec` child recorded in `automation/runtime/round-XYZ/runner-status.json` with `exec_confirmed_at`.
+
 ## Commit Prefix Gate
 
 `automation/autopilot.py` validates successful round commits against `commit_prefix` in `automation/autopilot-config.json`.
@@ -128,9 +143,10 @@ ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot 
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json'
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac'
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && bash ./automation/start-autopilot.sh --background -- --profile mac'
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json'
 ```
 
-Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep runtime state in the Mac worktree you intend to watch.
+Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep runtime state in the Mac worktree you intend to watch, and use Mac-side `health` with the same parent-PID / fresh-log / runner-status proof before reporting that the remote runner is alive.
 
 ### Helpful modes
 
@@ -201,7 +217,7 @@ If this repo ever accumulates multiple autopilot runs or old `round-*` directori
 ```powershell
 python .\automation\autopilot.py status --state-path automation\runtime\<state-file>.json
 python .\automation\autopilot.py health --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json
-python .\automation\autopilot.py watch --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json --tail 80
+python .\automation\autopilot.py watch --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json --tail 80 --prefix-format short
 Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 ```
 
@@ -210,8 +226,16 @@ Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 ```bash
 python3 ./automation/autopilot.py status --state-path automation/runtime/<state-file>.json
 python3 ./automation/autopilot.py health --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json
-python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80
+python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80 --prefix-format short
 tail -n 80 -F automation/runtime/round-XYZ/progress.log
+```
+
+### Windows -> `ssh mac`
+
+When the operator is on Windows but the live unattended runner is on the Mac, the default handoff should be the remote scaffold watch command, not a local `python ... watch` and not a raw `tail`:
+
+```powershell
+ssh mac 'cd "/Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot" && python3 -u ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80 --prefix-format short'
 ```
 
 The scaffolded `watch` output shows:
@@ -226,11 +250,15 @@ The scaffolded `watch` output shows:
 - `phase doc`
 - `focus`
 - the exact `progress.log` path being followed
-- a default long prefix on every streamed detail line, for example `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]`
+- a per-line prefix on every streamed detail line, with `--prefix-format short` recommended for operator handoff by default
+- the long form `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]` when you need the fully spelled-out header
 - Vulture count and delta when `vulture_command` is configured
 - latest plan/code review verdicts and last blocker when the round recorded them
 
-Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[b1-backlog-slice q1/3 r006 p005 active f0]`.
+Default operator handoff should use `watch ... --prefix-format short` so every streamed line stays attributable even after copy/paste into another terminal or log collector.
+For Windows-to-Mac monitoring, make that the full `ssh mac 'cd ... && python3 -u ./automation/autopilot.py watch ...'` command so remote Python stdout stays unbuffered and the prefixed lines appear immediately.
+
+Use raw `Get-Content` / `tail -F` only when you explicitly want the underlying `progress.log` without autopilot metadata prefixes.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 
