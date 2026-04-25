@@ -5,7 +5,7 @@
  * Supports two layout modes: classic flat and tabbed primary/secondary tabs.
  */
 
-import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
+import { App, PluginSettingTab, setIcon,Setting } from 'obsidian';
 
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';

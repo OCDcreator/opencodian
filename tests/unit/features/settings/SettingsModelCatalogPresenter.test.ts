@@ -235,7 +235,7 @@ describe('SettingsModelCatalogPresenter', () => {
       /\.opencodian-model-toggle-provider-list\s*\{[\s\S]*scrollbar-width:\s*none;[\s\S]*-ms-overflow-style:\s*none;/,
     );
     expect(css).toMatch(
-      /\.opencodian-model-toggle-provider-list::\-webkit-scrollbar\s*\{[\s\S]*display:\s*none;/,
+      /\.opencodian-model-toggle-provider-list::-webkit-scrollbar\s*\{[\s\S]*display:\s*none;/,
     );
   });
 

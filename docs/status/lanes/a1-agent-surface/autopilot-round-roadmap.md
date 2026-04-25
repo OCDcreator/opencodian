@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] A1 - Establish agent surface core seams and catalog truth
+### [DONE] A1 - Establish agent surface core seams and catalog truth
 
 - **Lane**: Agent surface foundations
 - **Goal**: Introduce the core `src/core/agents` types/services and make runtime/config/file agent aggregation a first-class, testable seam without inventing plugin-private agent semantics.
@@ -27,7 +27,7 @@
   - Tests cover catalog/source classification and default eligibility.
   - Matching module docs are updated for every touched module.
 
-### [QUEUED] A2 - Wire explicit agent invocation into chat send paths
+### [NEXT] A2 - Wire explicit agent invocation into chat send paths
 
 - **Lane**: Chat invocation
 - **Goal**: Wire main-agent selection, `@subagent`, and subtask intent through the existing chat send path and OpenCode invocation owners without ad-hoc fallback behavior.

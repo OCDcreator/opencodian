@@ -215,6 +215,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 ## 注意事项
 
 - `display()` 每次都会重建 DOM，因此不要长期持有 section 内部元素引用。
+- `OpenCodianSettings.ts` 目前已加入仓库级 `max-lines` 豁免名单，因为它仍是 settings shell / owner 装配入口；后续若继续增长，优先把稳定逻辑拆到相邻 section owner 或 renderer，而不是继续把实现细节塞回主类。
 - 如果只是调整 settings panel scaffolding，优先改 `SettingsSectionCoordinator`，不要再把 quick-nav/scroll 定时器塞回 `OpenCodianSettings`。
 - 如果只是调整 server mode/host/auth/status/action 组装，优先改 `SettingsServerSection`，不要再把这一整块 lifecycle 塞回主设置类。
 - 如果只是调整模型 section 的 source mode、workspace 卡片、icon cache 或 refresh orchestration，优先改 `SettingsModelSection`，不要再把这条 lifecycle 塞回主设置类。
