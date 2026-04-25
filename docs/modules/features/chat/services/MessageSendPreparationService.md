@@ -10,6 +10,7 @@
 - 确认当前 conversation、active tab 与 tab runtime 是否可发送
 - 处理 foreground busy、server readiness、model catalog 与 selected model availability 检查
 - 在发送前解析 `Conversation.externalContextPaths`，并与一次性的 composer draft context 合并
+- 在 preparation 阶段通过 `AgentInvocationService` 把显式 agent intent 翻译成 top-level main `agent` 与 native invocation parts
 - 先构造稳定 `messageID + parts[]` send payload、seed canonical user message，再落地 optimistic user message，并保持现有 save / render / scroll 时序
 - 维持首条 user message 的 fallback title 与 AI title kickoff 条件
 - 在 stream 真正开始前，统一进入 streaming 状态并通过 composer send-context 端口清理 pending edited files / draft context items
@@ -46,6 +47,7 @@ export class MessageSendPreparationService {
 - 再通过 `ComposerContextViewFacade.sendContext` 读取 draft context，并把 `Conversation.externalContextPaths` 解析成持久 `PromptContextItem[]`
 - 两类上下文按 target key 合并：持久路径先铺底，同 target 的一次性 draft context 覆盖旧条目
 - 基于合并后的 context items 向 `OpenCodeService` 请求稳定 `messageID + parts[]` send payload；如果上游额外提供 `syntheticTextParts`，这些插件注入文本会继续以结构化 synthetic parts 进入 payload，而不是改写 `userMessage.content`
+- 如果上游提供 `invocationIntent`，`AgentInvocationService` 会先把它解析成 top-level main `agent` 与 `agent` / `subtask` native parts；这些 invocation parts 会和普通 parts 一起进入稳定 payload，而不是被拼回纯文本
 - 先把同一批稳定 `optimisticUserParts` seed 到 canonical session graph，再构造本地 optimistic user message；plugin synthetic parts 因此属于 canonical part truth，而不是靠 fallback `Conversation.messages.content` 重建
 - optimistic user message 继续使用合并后的 context items 构造 `contextAttachments`，但不把本地 UI bubble 直接当成最终真相
 - 保持既有顺序：
@@ -79,6 +81,6 @@ export class MessageSendPreparationService {
 
 - `SendPipelineRuntime` 负责真实 `sendMessage()` stream 调用与 chunk 消费
 - `MessageSendPreparationService` 只负责决定“能不能发、发之前先做什么、optimistic user message 是否已落地”
-- `PreparedMessageSend` 现在还会把稳定 `messageID`、transport `requestParts` 与 canonical `optimisticUserParts` 继续交给 `SendPipelineRuntime`
+- `PreparedMessageSend` 现在还会把稳定 `messageID`、transport `requestParts`、canonical `optimisticUserParts`，以及解析后的 `resolvedAgentInvocation` 一并交给 `SendPipelineRuntime`
 - `MessageSendPreparationService` 只消费 `ComposerSendContextPort`，不需要知道完整 composer/context facade 的 action、picker、focus-preview 或 lifecycle 入口
 - `MessageFinalizationService` 继续负责 stream 结束之后的 final sync、patch/rerender、todo/save/attention 收尾

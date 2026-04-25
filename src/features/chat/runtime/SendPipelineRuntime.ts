@@ -1,4 +1,7 @@
-import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
+import type {
+  PreparedMessageSend,
+  PrepareMessageSendOptions,
+} from '../services/MessageSendPreparationService';
 import type {
   SendPipelineExecutionHost,
   SendPipelineFinalizationPort,
@@ -45,12 +48,15 @@ export class SendPipelineRuntime {
     private readonly slashCommandExecutionService?: SendPipelineSlashCommandPort,
   ) {}
 
-  async sendMessage(content: string): Promise<void> {
+  async sendMessage(input: string | PrepareMessageSendOptions): Promise<void> {
+    const preparationOptions = typeof input === 'string' ? { content: input } : input;
+    const content = preparationOptions.content;
+
     if (await this.slashCommandExecutionService?.tryRunSlashCommand(content)) {
       return;
     }
 
-    const preparedSend = await this.messageSendPreparationService.prepareMessageSend({ content });
+    const preparedSend = await this.messageSendPreparationService.prepareMessageSend(preparationOptions);
     if (!preparedSend) {
       return;
     }
@@ -103,6 +109,9 @@ export class SendPipelineRuntime {
     const stream = this.host.sendStreamMessage(content, {
       sessionId: preparedSend.conversation.openCodeSessionId,
       ...preparedSend.modelOptions,
+      ...(preparedSend.resolvedAgentInvocation?.agent
+        ? { agent: preparedSend.resolvedAgentInvocation.agent }
+        : {}),
       contextItems: preparedSend.contextItems,
       messageID: preparedSend.messageID,
       requestParts: preparedSend.requestParts,

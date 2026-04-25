@@ -5,7 +5,7 @@
 
 ## 概述
 
-`OpenCodePromptRequestBuilder` 是 `OpenCodeService` 内部的 prompt option assembly owner。它把稳定 `messageID + parts[]` send payload、SDK prompt parameters、legacy request body、allowed-tools / output-format / variant / reasoning 映射，以及默认 provider/model 选择收束到同一个 builder，避免这些请求拼装细节继续散落在主服务里。
+`OpenCodePromptRequestBuilder` 是 `OpenCodeService` 内部的 prompt option assembly owner。它把稳定 `messageID + parts[]` send payload、SDK prompt parameters、legacy request body、allowed-tools / output-format / variant / reasoning 映射，以及默认 provider/model 选择收束到同一个 builder，避免这些请求拼装细节继续散落在主服务里。A2 之后它也负责给显式代理调用生成稳定 part id：`agent` 与 `subtask` parts 会和普通 text/file parts 一起进入同一批 payload cloning 逻辑。
 
 builder 不负责 transport 分流，也不负责 context/image request part 序列化；`OpenCodeService` 仍决定走 SDK 还是 legacy，而 request-part assembly 现在由相邻的 `OpenCodeContextPartSerializer` 负责。
 
@@ -24,7 +24,7 @@ builder 不负责 transport 分流，也不负责 context/image request part 序
 
 ## 核心类型 / 状态
 
-- `PromptRequestPart`: prompt 请求里的 text/file part 结构，包含可选稳定 `id`，供 `OpenCodeContextPartSerializer` 与 builder 共享。
+- `PromptRequestPart`: prompt 请求里的 text/file/agent/subtask part 结构，包含可选稳定 `id`，供 `OpenCodeContextPartSerializer`、`AgentInvocationService` 与 builder 共享。
 - `PromptSyntheticTextPartInput`: 供插件 hook / reminder / 其他注入层传入的“附加 synthetic text part”输入；builder 会统一补上 `synthetic: true` 与稳定 `part.id`。
 - `BuiltPromptSendPayload`: 发送层共享的结构化 payload，集中持有稳定 `messageID`、transport `requestParts` 与 optimistic seed `optimisticUserParts`。
 - `PromptRequestOptions`: `QueryOptions` 加上可选 `system` 的 prompt 组装输入。
@@ -62,7 +62,8 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 ### 稳定 send payload
 
 - `buildStructuredPromptSendPayload()` 会先为用户消息生成稳定 `messageID`
-- 每个 text/file request part 也会在这里拿到稳定 `part.id`
+- 每个 text/file/agent/subtask request part 也会在这里拿到稳定 `part.id`
+- `invocationParts` 会在普通 request parts 之后、synthetic text parts 之前并入最终 payload，保持显式代理调用仍属于同一条用户消息的 stable part truth
 - 若调用方额外提供 `syntheticTextParts`，builder 会把它们追加成结构化 synthetic text parts，而不是要求上游把注入文本直接拼回 user content string
 - builder 会复制出两份 part 数组：一份给 SDK/legacy transport，一份给 optimistic canonical seed
 - 两份 part 共享同一批稳定 id，但不会共享同一对象引用，避免后续 mutation 泄漏
@@ -96,6 +97,7 @@ graph TD
 - `OpenCodeService` 仍持有对外 `requestAssistantResponse()` / `sendMessage()` / `sendMessageWithSdk()` 门面，但 prompt option assembly 与稳定 send payload 组装已统一委托给 builder。
 - `OpenCodeCatalogStateStore` 继续通过 `observeRuntimeToolNames()` 收集 runtime 外部工具名；builder 只负责在 allowed-tools 组装时触发观察。
 - `OpenCodeContextPartSerializer` 负责 request parts；builder 与它共享 `PromptRequestPart`，并在 serializer 之后补上稳定 `messageID` / `part.id`。
+- `AgentInvocationService` 负责把聊天意图翻成 `agent` / `subtask` native parts；builder 只负责把这些 part 纳入稳定 payload 并 clone。
 
 ## 配置项
 

@@ -20,7 +20,7 @@
 
 ```typescript
 export class SendPipelineRuntime {
-  sendMessage(content: string): Promise<void>;
+  sendMessage(input: string | PrepareMessageSendOptions): Promise<void>;
 }
 ```
 
@@ -58,11 +58,12 @@ export class SendPipelineRuntime {
 ### stream bootstrap
 
 - 先调用可选的 `tryRunSlashCommand()`；如果输入已经被已知 slash command 消费，整个普通 streaming send path 直接短路
-- 先调用 `prepareMessageSend()` 获取 `PreparedMessageSend`
+- 先把字符串或结构化 prompt input 归一化，再调用 `prepareMessageSend()` 获取 `PreparedMessageSend`
 - 如果 active tab runtime 在 preparation 之后已经失效，直接中止，不继续发流
 - 进入 streaming 状态后，再创建真实 stream、streaming shell 和 `StreamController`
 - transport 层收到的是 `PreparedMessageSend.contextItems`，也就是“持久路径 + 一次性 composer context”的合并结果，而不是单独的 draft context
 - transport 层现在还会直接复用 `PreparedMessageSend.messageID` 与 `requestParts`，避免 send preparation 和真正 transport 再各自生成一批不同的 part id
+- 如果 preparation 阶段解析出了显式 main agent，transport 层还会把它透传给 `openCodeService.sendMessage()` 的 top-level `agent`
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
 
 ### chunk router
@@ -105,7 +106,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只保留 `createSendPipelineRuntimeHost()` 与 `sendMessage()` bridge
+- `OpenCodianView` 只保留 `createSendPipelineRuntimeHost()` 与 prompt submission bridge；A2 之后这个 bridge 也会把 `syntheticTextParts` / `invocationIntent` 透传进 runtime
 - slash command 识别与 `runSessionCommand()` delegation 继续留在专用 `SlashCommandExecutionService`
 - `createSendPipelineRuntimeHost()` 现在把 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
 - `MessageSendPreparationService` 只负责“发之前能不能发、optimistic user message 何时落地、何时进入 streaming state”

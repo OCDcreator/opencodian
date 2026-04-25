@@ -292,7 +292,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 
 第七阶段后，`OpenCodianView.sendMessage()` 已经退化成 UI 事件到 `runtime/SendPipelineRuntime.ts` 的薄桥接。完整发送子系统现在按下面的边界协作：
 
-1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`
+1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`；A2 之后 prompt submission 还会把 `syntheticTextParts` 与显式 `invocationIntent` 一并透传
 2. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
 3. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
 4. `createMessageSendPreparationHost()` 会把 `openCodeService.buildStructuredPromptSendPayload()` 与 `seedCanonicalUserMessage()` 接进准备阶段，先把 stable `messageID + parts[]` 写到 canonical session graph

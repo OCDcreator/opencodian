@@ -75,6 +75,7 @@ export interface SendPipelineTransportPort {
     content: string,
     options: SendMessageModelOptions & {
       sessionId?: string;
+      agent?: string;
       contextItems: PromptContextItem[];
       messageID: PreparedMessageSend['messageID'];
       requestParts: PreparedMessageSend['requestParts'];

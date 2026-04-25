@@ -28,6 +28,28 @@ export type PromptRequestPart =
           end: number;
         };
       };
+    }
+  | {
+      id?: string;
+      type: 'agent';
+      name: string;
+      source?: {
+        value: string;
+        start: number;
+        end: number;
+      };
+    }
+  | {
+      id?: string;
+      type: 'subtask';
+      description: string;
+      prompt: string;
+      agent: string;
+      model?: {
+        providerID: string;
+        modelID: string;
+      };
+      command?: string;
     };
 
 type PromptRequestOptions = QueryOptions & { system?: string };
@@ -43,6 +65,7 @@ export interface PromptBuildInput {
   messageID?: string;
   parts: PromptRequestPart[];
   syntheticTextParts?: PromptSyntheticTextPartInput[];
+  invocationParts?: readonly PromptRequestPart[];
 }
 
 export interface BuiltPromptSendPayload {
@@ -107,6 +130,7 @@ export class OpenCodePromptRequestBuilder {
       : this.host.createPromptEntityId('message');
     const requestParts = [
       ...input.parts,
+      ...(input.invocationParts ?? []),
       ...this.buildSyntheticTextParts(input.syntheticTextParts),
     ].map((part) => this.withStablePartId(part));
 
@@ -343,14 +367,35 @@ export class OpenCodePromptRequestBuilder {
       };
     }
 
-    return {
-      ...part,
-      ...(part.source ? {
-        source: {
-          ...part.source,
-          text: { ...part.source.text },
-        },
-      } : {}),
-    };
+    if (part.type === 'file') {
+      return {
+        ...part,
+        ...(part.source ? {
+          source: {
+            ...part.source,
+            text: { ...part.source.text },
+          },
+        } : {}),
+      };
+    }
+
+    if (part.type === 'agent') {
+      return {
+        ...part,
+        ...(part.source ? {
+          source: { ...part.source },
+        } : {}),
+      };
+    }
+
+    if (part.type === 'subtask') {
+      return {
+        ...part,
+        ...(part.model ? { model: { ...part.model } } : {}),
+      };
+    }
+
+    const exhaustivePart: never = part;
+    throw new Error(`Unsupported prompt request part: ${JSON.stringify(exhaustivePart)}`);
   }
 }

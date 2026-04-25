@@ -27,7 +27,7 @@
   - Tests cover catalog/source classification and default eligibility.
   - Matching module docs are updated for every touched module.
 
-### [NEXT] A2 - Wire explicit agent invocation into chat send paths
+### [DONE] A2 - Wire explicit agent invocation into chat send paths
 
 - **Lane**: Chat invocation
 - **Goal**: Wire main-agent selection, `@subagent`, and subtask intent through the existing chat send path and OpenCode invocation owners without ad-hoc fallback behavior.
@@ -48,7 +48,7 @@
   - Chat can explicitly choose a main agent and route `@subagent` / subtask intent through native request parts.
   - Tests cover prompt mapping and reject paths.
 
-### [QUEUED] A3 - Restore child-session graph tracking and session-tree UI
+### [NEXT] A3 - Restore child-session graph tracking and session-tree UI
 
 - **Lane**: Child session graph
 - **Goal**: Reconstruct task -> child-session relationships from metadata, persisted parts, and `session.children()` so the active conversation can surface a stable child-session tree.

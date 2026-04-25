@@ -227,9 +227,10 @@
 
 - 先通过 `OpenCodeContextPartSerializer` + `OpenCodePromptRequestBuilder` 组装稳定 `messageID + requestParts[]`
 - 如果上游已经在 preparation 阶段构造好稳定 request parts，transport 会直接复用，不再重建另一批临时 part id
+- preparation 阶段现在也可以额外传入显式代理调用生成的 `invocationParts`，让 native `agent` / `subtask` request parts 复用同一批 stable payload 组装逻辑
 - 再统一委托 `streamingRuntime.streamResponse()`：coordinator 依据 `sdkStream` flag 选择 SDK 或 legacy transport，并继续持有首事件前失败时的 legacy SSE fallback 与最终 assistant message completion
 
-对应的 prompt option assembly 仍全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 现在只保留 session 选择、payload 组装与 transport callback 注入，不再直接铺开 SDK/legacy 入口分流、transport/fallback/read/finalize 细节。
+对应的 prompt option assembly 仍全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 现在只保留 session 选择、payload 组装与 transport callback 注入，不再直接铺开 SDK/legacy 入口分流、transport/fallback/read/finalize 细节。top-level main `agent` 仍通过 `QueryOptions.agent` 透传，显式 `@subagent` / subtask 则通过 request parts 透传。
 
 ### 流式事件处理与取消
 

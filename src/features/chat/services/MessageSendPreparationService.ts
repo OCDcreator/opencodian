@@ -1,4 +1,10 @@
 import type {
+  ResolvedAgentInvocation,
+  SurfaceInvocationIntent,
+} from '../../../core/agents';
+import type { InvocationPromptPart } from '../../../core/agents';
+import { AgentInvocationService } from '../../../core/agents';
+import type {
   BuiltPromptSendPayload,
   PromptRequestPart,
   PromptSyntheticTextPartInput,
@@ -34,6 +40,7 @@ export interface PromptComposerSubmission {
   kind: 'prompt';
   content: string;
   syntheticTextParts?: PromptSyntheticTextPartInput[];
+  invocationIntent?: SurfaceInvocationIntent;
 }
 
 export interface CommandComposerSubmission {
@@ -58,6 +65,7 @@ export type ComposerInputSubmission =
 export interface PrepareMessageSendOptions {
   content: string;
   syntheticTextParts?: PromptSyntheticTextPartInput[];
+  invocationIntent?: SurfaceInvocationIntent;
 }
 
 export interface PreparedMessageSend {
@@ -71,6 +79,7 @@ export interface PreparedMessageSend {
   modelOptions: SendMessageModelOptions;
   activeModelId?: string;
   userMessage: ChatMessage;
+  resolvedAgentInvocation?: ResolvedAgentInvocation;
 }
 
 export function buildOptimisticUserMessage(
@@ -115,6 +124,7 @@ export interface MessageSendPreparationHost {
     options: {
       contextItems: PromptContextItem[];
       syntheticTextParts?: PromptSyntheticTextPartInput[];
+      invocationParts?: readonly InvocationPromptPart[];
     },
   ): BuiltPromptSendPayload;
   seedCanonicalUserMessage(input: {
@@ -144,6 +154,8 @@ export interface MessageSendPreparationHost {
 }
 
 export class MessageSendPreparationService {
+  private readonly agentInvocationService = new AgentInvocationService();
+
   constructor(
     private readonly host: MessageSendPreparationHost,
     private readonly composerSendContext: ComposerSendContextPort,
@@ -196,9 +208,17 @@ export class MessageSendPreparationService {
       conversation.externalContextPaths,
     );
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
+
+    const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(
+      options.invocationIntent,
+    );
+
     const structuredSend = this.host.buildStructuredPromptSendPayload(options.content, {
       contextItems,
-      syntheticTextParts: options.syntheticTextParts,
+      ...(options.syntheticTextParts ? { syntheticTextParts: options.syntheticTextParts } : {}),
+      ...(resolvedAgentInvocation.invocationParts.length > 0
+        ? { invocationParts: resolvedAgentInvocation.invocationParts }
+        : {}),
     });
     const userMessage = buildOptimisticUserMessage(
       options.content,
@@ -240,6 +260,9 @@ export class MessageSendPreparationService {
       modelOptions,
       activeModelId,
       userMessage,
+      resolvedAgentInvocation: resolvedAgentInvocation.invocationParts.length > 0 || resolvedAgentInvocation.agent
+        ? resolvedAgentInvocation
+        : undefined,
     };
   }
 

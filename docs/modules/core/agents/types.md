@@ -27,6 +27,11 @@ Agent surface layer 的统一类型定义。定义了三层真相源（runtime /
 | `AgentCatalogInput` | Catalog 聚合输入：runtime / config / file 三层快照 |
 | `SystemAgentGuardResult` | 系统 agent 写入检查结果 |
 | `SystemAgentId` | 已知系统 agent ID 联合类型 |
+| `SurfaceInvocationIntent` | 单次聊天发送的显式代理调用意图 |
+| `AgentMentionIntent` | `@subagent` mention 的结构化描述 |
+| `SubtaskIntent` | 原生 `subtask` 部分的结构化描述 |
+| `InvocationPromptPart` | `agent` / `subtask` 原生 request part 变体 |
+| `ResolvedAgentInvocation` | `AgentInvocationService` 输出的 top-level `agent` + native invocation parts |
 
 ## 核心常量与函数
 
@@ -42,8 +47,10 @@ Agent surface layer 的统一类型定义。定义了三层真相源（runtime /
 - `defaultEligible` 和 `subagentVisible` 由 mode + hidden + disabled 推导
 - `builtin` 来自运行时 `native` 或 `builtIn` 字段，config-only agent 无此值
 - `rawConfig` 保留原始 config 条目供上层使用
+- A2 新增的 invocation 类型刻意继续放在 `core/agents`，因为它们也是 agent surface 的一部分；聊天发送链路只消费这些结构，不直接发明插件私有语法
 
 ## 注意事项
 
 - `fileAgents` 输入在 A1 slice 中为可选；完整 Markdown 扫描推迟到 A4
 - 不在此模块做任何 runtime/config/file 合并逻辑——合并由 `AgentCatalogService` 负责
+- `SurfaceInvocationIntent.kind` 目前只有 `'prompt'` 会被 A2 发送链路消费；`command` / `shell` 仅作为未来扩展占位

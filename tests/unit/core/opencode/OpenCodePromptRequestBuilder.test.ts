@@ -120,6 +120,98 @@ describe('OpenCodePromptRequestBuilder', () => {
       (payload.optimisticUserParts[1] as Extract<PromptRequestPart, { type: 'text' }>).metadata,
     );
   });
+
+  it('appends invocation parts with stable ids and cloned nested fields', () => {
+    const { builder } = createBuilder();
+
+    const payload = builder.buildStructuredPromptSendPayload({
+      parts: [{ type: 'text', text: 'Hello' }],
+      invocationParts: [
+        {
+          type: 'agent',
+          name: 'explorer',
+          source: {
+            value: '@explorer',
+            start: 0,
+            end: 9,
+          },
+        },
+        {
+          type: 'subtask',
+          description: 'Audit routes',
+          prompt: 'Inspect the router implementation',
+          agent: 'reviewer',
+          model: {
+            providerID: 'openai',
+            modelID: 'gpt-5.4',
+          },
+        },
+      ],
+    });
+
+    expect(payload).toEqual({
+      messageID: 'msg_1',
+      requestParts: [
+        { id: 'prt_1', type: 'text', text: 'Hello' },
+        {
+          id: 'prt_2',
+          type: 'agent',
+          name: 'explorer',
+          source: {
+            value: '@explorer',
+            start: 0,
+            end: 9,
+          },
+        },
+        {
+          id: 'prt_3',
+          type: 'subtask',
+          description: 'Audit routes',
+          prompt: 'Inspect the router implementation',
+          agent: 'reviewer',
+          model: {
+            providerID: 'openai',
+            modelID: 'gpt-5.4',
+          },
+        },
+      ],
+      optimisticUserParts: [
+        { id: 'prt_1', type: 'text', text: 'Hello' },
+        {
+          id: 'prt_2',
+          type: 'agent',
+          name: 'explorer',
+          source: {
+            value: '@explorer',
+            start: 0,
+            end: 9,
+          },
+        },
+        {
+          id: 'prt_3',
+          type: 'subtask',
+          description: 'Audit routes',
+          prompt: 'Inspect the router implementation',
+          agent: 'reviewer',
+          model: {
+            providerID: 'openai',
+            modelID: 'gpt-5.4',
+          },
+        },
+      ],
+    });
+    expect(payload.requestParts[1]).not.toBe(payload.optimisticUserParts[1]);
+    expect(
+      (payload.requestParts[1] as Extract<PromptRequestPart, { type: 'agent' }>).source,
+    ).not.toBe(
+      (payload.optimisticUserParts[1] as Extract<PromptRequestPart, { type: 'agent' }>).source,
+    );
+    expect(
+      (payload.requestParts[2] as Extract<PromptRequestPart, { type: 'subtask' }>).model,
+    ).not.toBe(
+      (payload.optimisticUserParts[2] as Extract<PromptRequestPart, { type: 'subtask' }>).model,
+    );
+  });
 });
 
 describe('OpenCodePromptRequestBuilder transport payloads', () => {

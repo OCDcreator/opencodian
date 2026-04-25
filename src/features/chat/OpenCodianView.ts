@@ -774,10 +774,15 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const content = submission.kind === 'prompt'
-      ? submission.content
-      : submission.rawContent;
-    return this.sendPipelineRuntime.sendMessage(content);
+    if (submission.kind === 'prompt') {
+      return this.sendPipelineRuntime.sendMessage({
+        content: submission.content,
+        ...(submission.syntheticTextParts ? { syntheticTextParts: submission.syntheticTextParts } : {}),
+        ...(submission.invocationIntent ? { invocationIntent: submission.invocationIntent } : {}),
+      });
+    }
+
+    return this.sendPipelineRuntime.sendMessage(submission.rawContent);
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {

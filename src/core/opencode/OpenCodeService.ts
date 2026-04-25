@@ -890,12 +890,14 @@ export class OpenCodeService {
     message: string,
     options: QueryOptions & {
       syntheticTextParts?: PromptSyntheticTextPartInput[];
+      invocationParts?: readonly PromptRequestPart[];
     } = {},
   ): BuiltPromptSendPayload {
     const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
     return this.promptRequestBuilder.buildStructuredPromptSendPayload({
       parts,
       syntheticTextParts: options.syntheticTextParts,
+      invocationParts: options.invocationParts,
     });
   }
 
@@ -1516,17 +1518,37 @@ export class OpenCodeService {
       };
     }
 
+    if (part.type === 'file') {
+      return {
+        ...part,
+        id: part.id ?? this.createPromptEntityId('part'),
+        sessionID,
+        messageID,
+        ...(part.source ? {
+          source: {
+            ...part.source,
+            text: { ...part.source.text },
+          },
+        } : {}),
+      } as Part;
+    }
+
+    if (part.type === 'agent') {
+      return {
+        ...part,
+        id: part.id ?? this.createPromptEntityId('part'),
+        sessionID,
+        messageID,
+        ...(part.source ? { source: { ...part.source } } : {}),
+      } as Part;
+    }
+
     return {
       ...part,
       id: part.id ?? this.createPromptEntityId('part'),
       sessionID,
       messageID,
-      ...(part.source ? {
-        source: {
-          ...part.source,
-          text: { ...part.source.text },
-        },
-      } : {}),
+      ...(part.model ? { model: { ...part.model } } : {}),
     } as Part;
   }
 

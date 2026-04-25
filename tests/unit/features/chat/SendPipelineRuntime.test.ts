@@ -55,6 +55,9 @@ function createPreparedSend(overrides: Partial<PreparedMessageSend> = {}): Prepa
     },
     activeModelId: overrides.activeModelId ?? 'openai/gpt-5.4',
     userMessage,
+    ...(overrides.resolvedAgentInvocation
+      ? { resolvedAgentInvocation: overrides.resolvedAgentInvocation }
+      : {}),
   };
 }
 

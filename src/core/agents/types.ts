@@ -240,3 +240,179 @@ export interface SystemAgentGuardResult {
   /** Human-readable reason when `allowed` is `false`. */
   readonly reason?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Invocation intent — describes what the user explicitly requested
+// ---------------------------------------------------------------------------
+
+/**
+ * Describes a single `@subagent` mention intent within a user message.
+ * The user explicitly referenced a subagent by name during composition.
+ */
+export interface AgentMentionIntent {
+  /** The agent ID (name) of the subagent being mentioned. */
+  readonly agentId: string;
+
+  /**
+   * Optional source span for the mention in the original user text.
+   * Used to preserve the mention's position when constructing native parts.
+   */
+  readonly source?: {
+    readonly value: string;
+    readonly start: number;
+    readonly end: number;
+  };
+}
+
+/**
+ * Describes an explicit subtask intent embedded in a user message.
+ * Unlike `@subagent` mentions (which hint to the model), subtasks are
+ * direct structured instructions that the backend processes natively.
+ */
+export interface SubtaskIntent {
+  /** The agent ID that should handle this subtask. */
+  readonly agentId: string;
+
+  /** Human-readable description of the subtask. */
+  readonly description: string;
+
+  /** The actual subtask prompt / instruction text. */
+  readonly prompt: string;
+
+  /**
+   * Optional model override for the subtask.
+   * When provided, the backend should use this model instead of the agent default.
+   */
+  readonly model?: {
+    readonly providerID: string;
+    readonly modelID: string;
+  };
+
+  /**
+   * Optional command to execute as part of the subtask.
+   * Maps to the native `command` field on `SubtaskPartInput`.
+   */
+  readonly command?: string;
+}
+
+/**
+ * The kind of invocation: `prompt` is a normal chat send, `command` routes
+ * through the command template system, and `shell` is a shell invocation.
+ * Currently only `prompt` is wired for agent invocation in A2.
+ */
+export type SurfaceInvocationKind = 'prompt' | 'command' | 'shell';
+
+/**
+ * Describes a single user send's explicit agent invocation intent.
+ *
+ * This is the unified input that `AgentInvocationService` translates into
+ * native OpenCode prompt-level fields (top-level `agent`, `AgentPartInput`
+ * parts, and `SubtaskPartInput` parts).
+ *
+ * When no fields are set (the no-intent path), existing chat behavior is
+ * preserved unchanged.
+ */
+export interface SurfaceInvocationIntent {
+  /** The kind of invocation. Defaults to `'prompt'` for normal chat sends. */
+  readonly kind?: SurfaceInvocationKind;
+
+  /**
+   * Explicit main agent selection.
+   * When set, this overrides the backend's default agent selection for
+   * the prompt's top-level `agent` field.
+   * `undefined` means "use whatever the backend defaults to".
+   */
+  readonly primaryAgent?: string;
+
+  /**
+   * Explicit `@subagent` mention intents.
+   * Each mention maps to a native `AgentPartInput` part in the prompt.
+   */
+  readonly mentions?: readonly AgentMentionIntent[];
+
+  /**
+   * Explicit subtask intents.
+   * Each subtask maps to a native `SubtaskPartInput` part in the prompt.
+   */
+  readonly subtasks?: readonly SubtaskIntent[];
+
+  /**
+   * Optional model selection override for this invocation.
+   * Separate from the existing model picker; this would be an invocation-level
+   * override carried alongside agent intent.
+   */
+  readonly modelSelection?: {
+    readonly providerID: string;
+    readonly modelID: string;
+  };
+
+  /**
+   * If this invocation originates from a specific message (e.g. a retry or
+   * follow-up), the originating message ID.
+   */
+  readonly sourceMessageId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Invocation resolution result
+// ---------------------------------------------------------------------------
+
+/**
+ * The resolved output of translating a `SurfaceInvocationIntent` into
+ * native OpenCode prompt-level structures.
+ *
+ * This is what the send pipeline consumes — not the raw user intent.
+ */
+export interface ResolvedAgentInvocation {
+  /**
+   * The resolved main agent ID for the prompt's top-level `agent` field.
+   * `undefined` when no explicit main agent was selected (use backend default).
+   */
+  readonly agent?: string;
+
+  /**
+   * Additional prompt parts generated from the invocation intent.
+   * These are `agent`-type and `subtask`-type parts that get appended
+   * to the prompt's `parts` array alongside text and file parts.
+   */
+  readonly invocationParts: readonly InvocationPromptPart[];
+}
+
+/**
+ * A prompt part originating from agent invocation resolution.
+ * These map 1:1 to OpenCode's native `AgentPartInput` and `SubtaskPartInput`.
+ */
+export type InvocationPromptPart =
+  | {
+      /** Maps to native `AgentPartInput`. */
+      type: 'agent';
+      /** Stable part ID, assigned by the prompt builder. */
+      id?: string;
+      /** The subagent name being mentioned. */
+      name: string;
+      /** Source span of the mention in the original text. */
+      source?: {
+        value: string;
+        start: number;
+        end: number;
+      };
+    }
+  | {
+      /** Maps to native `SubtaskPartInput`. */
+      type: 'subtask';
+      /** Stable part ID, assigned by the prompt builder. */
+      id?: string;
+      /** Human-readable description. */
+      description: string;
+      /** The subtask prompt text. */
+      prompt: string;
+      /** The agent to delegate this subtask to. */
+      agent: string;
+      /** Optional model override. */
+      model?: {
+        providerID: string;
+        modelID: string;
+      };
+      /** Optional command. */
+      command?: string;
+    };
