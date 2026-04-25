@@ -10,7 +10,15 @@
   "targeted_test_required": true,
   "targeted_test_prefixes": [
   "npm test --",
-  "npm run test --"
+  "npm run test --",
+  "npx jest ",
+  "npx vitest ",
+  "pnpm test --",
+  "pnpm exec jest ",
+  "pnpm exec vitest ",
+  "yarn test ",
+  "yarn jest ",
+  "yarn vitest "
 ],
   "targeted_test_required_paths": [
   "src/",

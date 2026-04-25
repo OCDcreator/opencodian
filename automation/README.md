@@ -35,6 +35,7 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 - Diagnostic command budget findings default to warnings, so repeated `git status --short` or `git diff --stat` reports do not roll back otherwise successful commits
 - `health` is the truth source for runner liveness because it checks state, lock, pid, and progress-artifact freshness together
 - Successful rounds must write a phase doc and create a commit
+- Successful rounds must satisfy the background-task-aware completion contract before final JSON is accepted
 - A runtime lock prevents two machines from driving the same branch simultaneously
 
 ## Main commands
@@ -46,6 +47,17 @@ Before starting unattended rounds:
 3. Then run `doctor` and `start`.
 
 Running `doctor` on `main` right after scaffold may fail the branch guard by design. That is a safety signal, not an installation failure.
+
+## Startup intent confirmation
+
+Before launch, resolve:
+
+- whether the operator wants preview-only, one real round, or keep-running,
+- whether execution is local Windows, local macOS, or remote Mac,
+- which preset/work mode is intended,
+- whether queue authority comes from a seed plan/spec or the preset backlog.
+
+If those fields are still ambiguous, ask once before launch instead of guessing.
 
 ## Keep-running startup contract
 
@@ -59,6 +71,14 @@ When the operator asks for continuous unattended work:
 4. Run a dry-run or foreground first-round smoke if requested.
 5. Start the durable path with `bootstrap-and-daemonize` or the platform background wrapper.
 6. Verify with `health` bound to the intended state file before reporting success.
+
+If the operator intent is keep-running:
+
+- A dry-run preview cannot count as success.
+- A single foreground round cannot count as success by itself.
+- Smoke is only a checkpoint before durable launch.
+- The run is incomplete until durable background launch happens.
+- the run is incomplete until `health` proves the target state line is live.
 
 Only claim the next round is running when `health` shows the autopilot parent PID alive, a fresh `progress.log`, and a live `codex exec` child recorded in `automation/runtime/round-XYZ/runner-status.json` with `exec_confirmed_at`.
 
@@ -79,6 +99,25 @@ The controller also validates build/deploy result fields in the final JSON:
 - If the round did not produce a trustworthy build marker, report `build_ran=false` instead of fabricating a `build_id`.
 - `deploy_ran=true` is only valid when the round actually performed a deploy required by config.
 - `deploy_ran=true` also requires `deploy_verified=true`, and deploy verification may additionally check that the configured artifact contains the reported `build_id`.
+
+## Background Task Completion Gate
+
+Background tasks are allowed, including repo-specific implementation helpers that spawn detached work. The round completion boundary is not the main helper response or main process exit.
+
+The final JSON must include:
+
+- `background_tasks_used`
+- `background_tasks_completed`
+- `repo_visible_work_landed`
+- `final_artifacts_written`
+
+For `success`, validation rejects:
+
+- `background_tasks_used=true` with `background_tasks_completed=false`
+- `repo_visible_work_landed=false`
+- `final_artifacts_written=false`
+
+If `Agent output JSON was not created.` appears after a main pass exit, treat it as a completion-lifecycle failure: the round ended before all background work drained and before the final output artifact was written. It does not prove that the target code failed, and it does not prove that background tasks are forbidden.
 
 ## Command Budget Policy
 
@@ -104,8 +143,10 @@ If the scaffold was created with `--seed-plan` or `--seed-spec`, the source is c
 
 ```powershell
 python .\automation\autopilot.py doctor --profile windows
+python .\automation\autopilot.py doctor --profile windows --check-validation-commands
 python .\automation\autopilot.py health --state-path automation\runtime\autopilot-state.json
 python .\automation\autopilot.py start --profile windows
+python .\automation\autopilot.py start --profile windows --require-green-baseline
 python .\automation\autopilot.py bootstrap-and-daemonize --profile windows
 ```
 
@@ -119,8 +160,10 @@ For a true no-window unattended launch on Windows, prefer the wrapper's backgrou
 
 ```bash
 python3 ./automation/autopilot.py doctor --profile mac
+python3 ./automation/autopilot.py doctor --profile mac --check-validation-commands
 python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json
 python3 ./automation/autopilot.py start --profile mac
+python3 ./automation/autopilot.py start --profile mac --require-green-baseline
 python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac
 ```
 
@@ -147,6 +190,7 @@ ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot 
 ```
 
 Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep runtime state in the Mac worktree you intend to watch, and use Mac-side `health` with the same parent-PID / fresh-log / runner-status proof before reporting that the remote runner is alive.
+If the execution target is remote Mac, local Windows artifacts are not valid proof that the unattended runner is alive.
 
 ### Helpful modes
 
@@ -155,14 +199,23 @@ python automation/autopilot.py version
 python automation/autopilot.py status
 python automation/autopilot.py health
 python automation/autopilot.py watch
+python automation/autopilot.py doctor --profile windows --check-validation-commands
 python automation/autopilot.py start --profile windows --dry-run --single-round
+python automation/autopilot.py start --profile windows --dry-run --single-round --require-green-baseline
 python automation/autopilot.py start --profile windows --single-round
+python automation/autopilot.py start --profile windows --single-round --fail-on-round-failure
 python automation/autopilot.py bootstrap-and-daemonize --profile windows
 python automation/autopilot.py restart-after-next-commit --profile windows
 bash ./automation/start-autopilot.sh --background -- --profile mac
 ```
 
 `start --dry-run --single-round` only renders the next prompt. It leaves the state in `stopped_dry_run` so `status` / `health` do not pretend a live unattended runner exists, and a later real `start` automatically resumes from that preview state.
+
+`doctor --check-validation-commands` is an optional preflight. It executes the currently configured `lint_command`, `typecheck_command`, `full_test_command`, and `build_command`, prints which ones are missing versus green versus failing, and returns non-zero only when a configured command fails.
+
+`start --require-green-baseline` runs the same preflight before the first round and refuses to launch when a configured validation command is already red. It is intentionally opt-in, so existing workflows continue to behave the same unless you request the extra gate.
+
+Use `--fail-on-round-failure` when a CI job or outer wrapper must receive a non-zero shell return code for a validation or completion-contract failure. The controller still writes state/history first, then returns `1` for that process. Windows and macOS expose the same Python return code; PowerShell reads `$LASTEXITCODE`, while bash/zsh reads `$?`.
 
 ## Review-gated preset
 
@@ -254,11 +307,14 @@ The scaffolded `watch` output shows:
 - the long form `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]` when you need the fully spelled-out header
 - Vulture count and delta when `vulture_command` is configured
 - latest plan/code review verdicts and last blocker when the round recorded them
+- a human-friendly default detail stream that summarizes docs/spec reading, phase-doc writing, OpenCode implementation, waiting-on-wrapper, targeted tests, verify, deploy/BUILD_ID checks, and failures
+- raw `progress.log` detail on demand via `watch --view raw`
 
 Default operator handoff should use `watch ... --prefix-format short` so every streamed line stays attributable even after copy/paste into another terminal or log collector.
 For Windows-to-Mac monitoring, make that the full `ssh mac 'cd ... && python3 -u ./automation/autopilot.py watch ...'` command so remote Python stdout stays unbuffered and the prefixed lines appear immediately.
 
-Use raw `Get-Content` / `tail -F` only when you explicitly want the underlying `progress.log` without autopilot metadata prefixes.
+Use `watch --view raw` when you want the exact underlying `progress.log` lines with autopilot prefixes intact.
+Use raw `Get-Content` / `tail -F` only when you explicitly want the underlying `progress.log` without any autopilot metadata or summary layer.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 

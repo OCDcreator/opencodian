@@ -29,6 +29,16 @@ def add_start_subcommand(subparsers: argparse._SubParsersAction[argparse.Argumen
     start_parser.add_argument("--state-path", default=support.default_state_path, help="State JSON path.")
     start_parser.add_argument("--max-rounds-this-run", type=int, default=0, help="Limit rounds for this process only.")
     start_parser.add_argument("--single-round", action="store_true", help="Run exactly one unattended round.")
+    start_parser.add_argument(
+        "--fail-on-round-failure",
+        action="store_true",
+        help="Return exit code 1 when a round records failure, useful for CI or wrapper supervision.",
+    )
+    start_parser.add_argument(
+        "--require-green-baseline",
+        action="store_true",
+        help="Run configured lint/typecheck/test/build commands before the first round and abort if any fail.",
+    )
     start_parser.add_argument("--dry-run", action="store_true", help="Render the next prompt only.")
     start_parser.add_argument("--no-branch-guard", action="store_true", help="Skip allowed-branch validation.")
     start_parser.add_argument("--allow-dirty-worktree", action="store_true", help="Skip clean-worktree validation.")
@@ -53,6 +63,12 @@ def add_watch_subcommand(subparsers: argparse._SubParsersAction[argparse.Argumen
         choices=["long", "short"],
         default="long",
         help="Prefix style for streamed progress.log lines.",
+    )
+    watch_parser.add_argument(
+        "--view",
+        choices=["human", "raw"],
+        default="human",
+        help="Render a human-friendly summary stream or the raw progress.log lines.",
     )
     watch_parser.add_argument("--once", action="store_true", help="Print current status once and exit.")
     watch_parser.set_defaults(handler=support.run_watch)
@@ -84,6 +100,11 @@ def add_doctor_subcommand(subparsers: argparse._SubParsersAction[argparse.Argume
     doctor_parser.add_argument("--profile-path", help="Explicit profile JSON path.")
     doctor_parser.add_argument("--config-path", default=support.default_config_path, help="Base config JSON path.")
     doctor_parser.add_argument("--runtime-path", default=support.default_runtime_path, help="Runtime directory path.")
+    doctor_parser.add_argument(
+        "--check-validation-commands",
+        action="store_true",
+        help="Also run configured lint/typecheck/test/build commands and fail if any configured command exits non-zero.",
+    )
     doctor_parser.set_defaults(handler=support.run_doctor)
 
 
