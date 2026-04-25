@@ -21,6 +21,10 @@ import {
   prepareCommandPatchWithScopedAgent,
   removeCommandScopedAgent,
 } from './commandScopedAgent';
+import {
+  readFormatterConfigValue,
+  writeFormatterConfigValue,
+} from './formatterConfig';
 import { isRecord, OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
 const logger = createLogger('OpencodeConfigManager');
@@ -151,27 +155,12 @@ export class OpencodeConfigManager {
   }
 
   async getCompactionConfig(): Promise<OpencodeCompactionConfig | undefined> {
-    const config = await this.read();
-    if (!isRecord(config.compaction)) {
-      return undefined;
-    }
-
-    return this.cloneConfigObject(config.compaction);
+    const compaction = (await this.read()).compaction;
+    return isRecord(compaction) ? this.cloneConfigObject(compaction) : undefined;
   }
 
   async getFormatterConfig(): Promise<OpencodeFormatterConfig | undefined> {
-    const config = await this.read();
-    const formatter = config.formatter;
-    if (formatter === undefined) {
-      return undefined;
-    }
-    if (typeof formatter === 'boolean') {
-      return formatter;
-    }
-    if (isRecord(formatter)) {
-      return this.cloneConfigObject(formatter);
-    }
-    return undefined;
+    return readFormatterConfigValue(await this.read());
   }
 
   /**
@@ -183,15 +172,7 @@ export class OpencodeConfigManager {
     formatter: OpencodeFormatterConfig | null | undefined,
   ): Promise<void> {
     const config = await this.read();
-    if (formatter === null || formatter === undefined) {
-      delete config.formatter;
-    } else if (typeof formatter === 'boolean') {
-      config.formatter = formatter;
-    } else if (isRecord(formatter)) {
-      config.formatter = this.cloneConfigObject(formatter);
-    } else {
-      delete config.formatter;
-    }
+    writeFormatterConfigValue(config, formatter);
     await this.write(config);
   }
 
@@ -218,11 +199,9 @@ export class OpencodeConfigManager {
   }
 
   async getDefaultAgent(): Promise<string | undefined> {
-    const config = await this.read();
-    const defaultAgent = typeof config.default_agent === 'string'
-      ? config.default_agent.trim()
-      : '';
-    return defaultAgent || undefined;
+    const defaultAgent = (await this.read()).default_agent;
+    const normalizedDefaultAgent = typeof defaultAgent === 'string' ? defaultAgent.trim() : '';
+    return normalizedDefaultAgent || undefined;
   }
 
   async updateDefaultAgent(defaultAgent: string | null | undefined): Promise<void> {
@@ -354,22 +333,13 @@ export class OpencodeConfigManager {
     await this.write(config);
   }
 
-  async getPermissionConfig(): Promise<PermissionConfig | PermissionAction | undefined> {
-    const config = await this.read();
-    return config.permission;
-  }
+  async getPermissionConfig(): Promise<PermissionConfig | PermissionAction | undefined> { return (await this.read()).permission; }
 
-  async setYoloMode(): Promise<void> {
-    await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('yolo'));
-  }
+  async setYoloMode(): Promise<void> { await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('yolo')); }
 
-  async setNormalMode(): Promise<void> {
-    await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('normal'));
-  }
+  async setNormalMode(): Promise<void> { await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('normal')); }
 
-  async setPlanMode(): Promise<void> {
-    await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('plan'));
-  }
+  async setPlanMode(): Promise<void> { await this.updatePermission(OpencodeConfigManager.getPermissionTemplate('plan')); }
 
   async setToolPermission(tool: string, action: PermissionAction): Promise<void> {
     const config = await this.read();
@@ -384,17 +354,11 @@ export class OpencodeConfigManager {
     await this.write(config);
   }
 
-  getConfigDir(): string {
-    return this.configDir;
-  }
+  getConfigDir(): string { return this.configDir; }
 
-  getPluginDir(): string {
-    return path.join(this.configDir, 'plugins');
-  }
+  getPluginDir(): string { return path.join(this.configDir, 'plugins'); }
 
-  getConfigPath(): string {
-    return this.configPath;
-  }
+  getConfigPath(): string { return this.configPath; }
 
   async remove(): Promise<void> {
     try {
@@ -609,10 +573,5 @@ export class OpencodeConfigManager {
     return serialized === undefined ? value : JSON.parse(serialized) as T;
   }
 
-  async notifyRestartRequired(): Promise<void> {
-    new Notice(
-      'OpenCode configuration updated. Restart the OpenCode service for changes to take effect.',
-      5000
-    );
-  }
+  async notifyRestartRequired(): Promise<void> { new Notice('OpenCode configuration updated. Restart the OpenCode service for changes to take effect.', 5000); }
 }

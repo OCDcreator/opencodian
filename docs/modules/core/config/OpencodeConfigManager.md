@@ -118,7 +118,7 @@ getCommandScopedAgentId(commandId: string): string
 
 ### formatter 精确子树写入
 
-`getFormatterConfig()` / `updateFormatterConfig()` 封装了 project-scoped `formatter` 字段的读写：
+`getFormatterConfig()` / `updateFormatterConfig()` 封装了 project-scoped `formatter` 字段的读写；formatter 专属的 exact-write 细节现在委托给 `src/core/config/formatterConfig.ts`：
 
 - 读取时支持三态：字段缺失返回 `undefined`、布尔值原样返回、对象时返回深拷贝副本
 - 写入时**不会**像 `compaction` / `agent` helper 那样 deep merge，而是直接替换整个 `formatter` 子树
@@ -130,7 +130,7 @@ getCommandScopedAgentId(commandId: string): string
 manager 内提供了更细粒度的项目配置 helper，供当前 session settings、Agents settings 与 Commands/slash-command UI/runtime 共同复用：
 
 - `getCompactionConfig()` / `updateCompactionConfig()`：读写 `compaction`，并在 patch 时保留已有未知字段
-- `getFormatterConfig()` / `updateFormatterConfig()`：读写 `formatter`，采用 exact subtree write，允许删除 formatter 条目并保留 formatter entry 内未知字段
+- `getFormatterConfig()` / `updateFormatterConfig()`：读写 `formatter`，具体 exact-write 规则委托给 `formatterConfig.ts`，允许删除 formatter 条目并保留 formatter entry 内未知字段
 - `getDefaultAgent()` / `updateDefaultAgent()`：读写并 trim `default_agent`，空字符串会删除字段
 - `getAgentConfig()`：把 native `agent` 与 deprecated `mode` 合并成单个 map，读取时优先返回 native `agent`
 - `upsertAgentConfig()`：写入 native `agent` 条目时，会先吸收同名 deprecated `mode` 条目，再递归 merge，避免丢失未知字段 / `tools` / `options`
@@ -170,7 +170,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 | `getPluginConfig()` | 返回 `plugin` 数组副本 |
 | `updatePluginConfig(plugins)` | 更新或删除 `plugin` 字段 |
 | `getCompactionConfig()` / `updateCompactionConfig()` | 读写 `compaction`，支持 patch merge 与删除 |
-| `getFormatterConfig()` / `updateFormatterConfig()` | 读写 `formatter`，使用 exact subtree write 而不是 deep merge |
+| `getFormatterConfig()` / `updateFormatterConfig()` | 读写 `formatter`，具体 exact subtree write 规则委托给 `formatterConfig.ts` |
 | `getDefaultAgent()` / `updateDefaultAgent()` | 读写 `default_agent`，空值时删除 |
 | `getAgentConfig()` / `upsertAgentConfig()` / `removeAgentConfig()` | 兼容 deprecated `mode` 导入的 agent helper |
 | `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()` | 命令 map 的细粒度 helper，必要时维护 command-owned hidden agent |
