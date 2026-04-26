@@ -68,7 +68,7 @@
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk + OpenCodeStreamMutation` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、当前 prompt `messageID` 透传、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、stream mutation 应用顺序、final response completion，以及 active stream registry、session-scoped abort controller、part metadata tracking、cancel/detach lifecycle。服务层现在也把统一的 `delay(ms, signal)` seam 注入给它，用于 bounded assistant-tail retry 等需要和 sync/open-code event runtime 保持一致的短等待逻辑。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、session info lookup、session abort fallback、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
-- `sessionStateStore`: `OpenCodeSessionStateStore` 实例，负责 canonical `session/message/part` graph 的 snapshot replace、增量 mutation 与只读 state clone。
+- `sessionStateStore`: `OpenCodeSessionStateStore` 实例，负责 canonical `session/message/part` graph 的 snapshot replace、增量 mutation、diff entries 缓存与只读 state clone。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
 - `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、SDK health response normalization / health probe fallback、vault path scope refresh、server status/diagnostics proxy，以及 settings update / rollback 与 sync/open-code event subscription 的 lifecycle 编排；其与 `ServerManager` 的共享装配集中在 `OpenCodeServiceLifecycleCoordinator.createAssembly()`。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
@@ -154,7 +154,7 @@
 - `getCanonicalConversationFingerprint(messages)` 会把 `ChatMessage` 的可见字段、结构化 blocks、上下文附件、OMO metadata 与原始 `parts` 一起做稳定 fingerprint，供 reload/finalization 把“隐藏 graph 已纠偏但文本未变”的情况也视为 canonical drift。
 - `seedCanonicalUserMessage()` 提供发送前的 optimistic canonical seed seam，让准备阶段可以先把稳定 `messageID + parts[]` 写进同一个 graph owner，再等待 authoritative reload 覆盖。
 
-除此之外，`OpenCodeService` 现在还会在 sync-event runtime host seam 上直接执行 `applyCanonicalSyncEvent()`：`message.updated` / `message.removed` / `message.part.updated` / `message.part.removed` / `message.part.delta` 会先归并到 `sessionStateStore`，`session.diff` 与 `session.compacted` 则继续保留给上层做 authoritative reload / gap recovery / compaction 收尾 refresh。
+除此之外，`OpenCodeService` 现在还会在 sync-event runtime host seam 上直接执行 `applyCanonicalSyncEvent()`：`message.updated` / `message.removed` / `message.part.updated` / `message.part.removed` / `message.part.delta` 会先归并到 `sessionStateStore`，`session.diff` 会写入同一个 store 的 diff entry 缓存，`session.compacted` 则继续保留给上层做 authoritative reload / gap recovery / compaction 收尾 refresh。
 
 流式路径也会写入同一个 canonical graph：`OpenCodeStreamEventTransformer` 从 `message.part.updated` / `message.part.delta` 产出 stream mutations，`OpenCodeStreamingRuntimeCoordinator` 在 yield legacy chunks 前把 mutations 交回服务层。服务层会为缺失的 assistant message 建立最小 canonical info、合并 part upsert（避免空字段覆盖已有 text/tool state），并在 delta 先到时补建对应 part；最终 `finishStreamingResponse()` 的 authoritative snapshot 仍会覆盖这些实时状态。
 
@@ -362,6 +362,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `createSession()` | 创建 session，并可同时写入 `currentSessionId` |
 | `getSessionMessages()` | 读取消息、应用 revert 过滤，并刷新 canonical session graph snapshot |
 | `getCanonicalSessionState()` | 读取指定 session 的只读 canonical `message/part` 图状态 |
+| `getCachedSessionDiffEntries()` | 读取指定 session 的 `session.diff` sync event 缓存 diff entries |
 | `requestAssistantResponse()` | 非流式请求，返回归一化后的 `ChatMessage` |
 | `probeProviderResponse(providerId, modelId)` | 用临时 session 做一次最小真实发送探测 |
 | `sendMessage()` | 流式请求入口，按 flag 选择 SDK 或 legacy SSE |

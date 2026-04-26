@@ -1,7 +1,7 @@
 # Agent Surface Barrel
 
 > **源码**: `src/core/agents/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -12,12 +12,11 @@
 | 来源模块 | 导出 |
 |----------|------|
 | `AgentCatalogService` | 类 `AgentCatalogService` |
-| `ChildSessionGraphService` | 类 `ChildSessionGraphService` |
-| `MarkdownAgentWorkspaceService` | 类 `MarkdownAgentWorkspaceService` |
 | `AgentInvocationService` | 类 `AgentInvocationService` |
-| `SystemAgentGuardService` | 类 `SystemAgentGuardService` |
-| `MarkdownAgentWorkspaceService` | 常量 `AGENT_FILE_ROOTS`、类型 `AgentFileRoot`、`MarkdownAgentFs`、`MarkdownAgentFileInput`、`MarkdownAgentScanResult` |
-| `types` | 常量 `SYSTEM_AGENT_IDS`、函数 `isSystemAgentId`、类型 `AgentCatalogInput`、`RuntimeAgentShape`、`SurfaceAgent`、`SurfaceAgentFile`、`SurfaceAgentFileParseStatus`、`SurfaceAgentFileScope`、`SurfaceAgentSource`、`SystemAgentGuardResult`、`SystemAgentId`、`SurfaceInvocationIntent`、`AgentMentionIntent`、`SubtaskIntent`、`InvocationPromptPart`、`ResolvedAgentInvocation`、`ChildSessionEdge`、`ChildSessionEdgeStatus`、`ChildSessionGraph`、`ChildSessionGraphInput`、`ChildSessionGraphStatus`、`ChildSessionInfo` |
+| `ChildSessionGraphService` | 类 `ChildSessionGraphService` |
+| `MarkdownAgentWorkspaceService` | 类 `MarkdownAgentWorkspaceService`、常量 `AGENT_FILE_ROOTS`、类型 `AgentFileRoot`、`MarkdownAgentFs`、`MarkdownAgentFileInput`、`MarkdownAgentScanResult` |
+| `SystemAgentGuardService` | 类 `SystemAgentGuardService`、类型 `SystemAgentRiskLabel` |
+| `types` | 常量 `SYSTEM_AGENT_IDS`、函数 `isSystemAgentId`、类型 `AgentCatalogInput`、`RuntimeAgentShape`、`SurfaceAgent`、`SurfaceAgentFile`、`SurfaceAgentFileParseStatus`、`SurfaceAgentFileScope`、`SurfaceAgentSource`、`SystemAgentGuardResult`、`SystemAgentId`、`SurfaceInvocationIntent`、`SurfaceInvocationKind`、`AgentMentionIntent`、`SubtaskIntent`、`InvocationPromptPart`、`ResolvedAgentInvocation`、`ChildSessionEdge`、`ChildSessionEdgeStatus`、`ChildSessionGraph`、`ChildSessionGraphInput`、`ChildSessionGraphStatus`、`ChildSessionInfo`、`OrphanedChildSession` |
 
 ## 消费方
 

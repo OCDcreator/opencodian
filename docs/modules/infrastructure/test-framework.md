@@ -1,7 +1,7 @@
 # 测试框架
 
 > **源码**: `jest.config.js`, `tests/setup.ts`, `tests/__mocks__/`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 

@@ -40,7 +40,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - `src/main.ts`: plugin entry point. It initializes storage, settings normalization, locale, OpenCode services, commands, and view registration.
 - `src/core/opencode/OpenCodeService.ts`: hybrid OpenCode facade. SDK v2 is the main path, but legacy HTTP/SSE fallback paths still exist and must not be removed casually.
 - `src/core/opencode/OpenCodeSdkFacade.ts`: thin SDK namespace wrapper. Keep request option injection, response unwrapping, and error normalization centralized here instead of reimplementing them ad hoc in callers.
-- `src/core/opencode/OpenCodeService.ts`: `global.syncEvent.subscribe()` now also bridges `message.updated`, `message.part.updated`, and `session.diff` for the view; keep message-layer sync signals separate from foreground `session.status`.
+- `src/core/opencode/OpenCodeService.ts`: sync event subscriptions (message.updated, message.part.updated, session.diff) are managed by `OpenCodeSyncEventRuntimeCoordinator`; keep message-layer sync signals separate from foreground `session.status`.
 - `src/core/opencode/ServerManager.ts`: owns the local OpenCode process lifecycle and managed-server adoption; if a previously managed local `4096` server no longer matches the current vault/mode/config signature, restart it instead of silently reusing it.
 - `src/features/chat/OpenCodianView.ts`: main chat runtime. It supports concurrent tab/session streaming; do not collapse it back to a single global stream state. Background tasks now render as inline per-turn status plus delayed persisted completion notices, and `session.status` only reflects the foreground runner, not background-task completion.
 - `src/features/chat/OpenCodianView.ts`: conversation reload now has a hydration/auth-sync phase; do not eagerly downgrade background tasks to stale before at least one authoritative message sync finishes, and preserve the current bottom/distance/anchor scroll-restore behavior.
@@ -112,7 +112,7 @@ This project has a graphify knowledge graph at graphify-out/.
 Rules:
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
-- On this Windows machine, do not assume a `graphify` shim exists on `PATH`; local shell calls should use `py -m graphify ...`
+- The graphify Python tool must be available on `PATH` or invocable via `py -m graphify ...` on Windows
 - This repo's committed graph is `src`-scoped, not whole-repo scoped; refresh it with `npm run graphify:update:src`, not `graphify update .`
 - `npm run verify` includes `npm run check:graphify`, so stale committed `src` history or local `src` edits without a later graph refresh should fail fast
 - The repo-local graphify wrapper updates `src`, syncs committed artifacts back to root `graphify-out/`, and removes transient `src/graphify-out/` so git does not fill with generated noise

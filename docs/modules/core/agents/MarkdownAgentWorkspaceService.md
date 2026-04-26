@@ -1,7 +1,7 @@
 # MarkdownAgentWorkspaceService
 
 > File: `src/core/agents/MarkdownAgentWorkspaceService.ts`
-> Status: [DRAFT]
+> Status: [REVIEW]
 
 Manages the file-truth layer for Markdown agent definitions.
 

@@ -231,7 +231,7 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
-`session.diff` 现在不再触发 message authoritative sync/reload：view 会把 sync-event 自带的 diff entries 记在独立的 `sessionDiffEntriesBySessionId` 缓存里，只把它作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
+`session.diff` 现在不再触发 message authoritative sync/reload：sync-event 自带的 diff entries 由 `OpenCodeSessionStateStore.setSessionDiffEntries()` 统一缓存，view 通过 `OpenCodeService.getCachedSessionDiffEntries()` 读取作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
 
 `session.compacted` 现在会沿着同一条 session signal runtime 进入 `ConversationSyncBridge`，但 visible current conversation 会强制走 authoritative server sync，而不是先信任可能已过期的 canonical graph；sync 收尾继续复用 active-tab context usage refresh，以便清掉/更新 `Session.time.compacting` 驱动的 live 状态。reload 之后，服务端返回的已持久化 `compactionDivider` 会替代 `injectLiveCompactionDivider` 合成的虚拟 divider，`compactingAt` 则在 context usage refresh 时被置为 null。
 

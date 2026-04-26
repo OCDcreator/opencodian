@@ -1,12 +1,12 @@
 # Graph Report - src  (2026-04-27)
 
 ## Corpus Check
-- 355 files · ~302,868 words
+- 355 files · ~302,937 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4691 nodes · 10447 edges · 48 communities detected
-- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 2738 edges (avg confidence: 0.8)
+- 4695 nodes · 10456 edges · 46 communities detected
+- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 2743 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -56,13 +56,11 @@
 - [[_COMMUNITY_Community 43|Community 43]]
 - [[_COMMUNITY_Community 44|Community 44]]
 - [[_COMMUNITY_Community 45|Community 45]]
-- [[_COMMUNITY_Community 46|Community 46]]
-- [[_COMMUNITY_Community 47|Community 47]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `t()` - 437 edges
 2. `OpenCodianView` - 252 edges
-3. `OpenCodeService` - 146 edges
+3. `OpenCodeService` - 147 edges
 4. `OpenCodianPlugin` - 88 edges
 5. `ServerManager` - 81 edges
 6. `SettingsModelCatalogPresenter` - 57 edges
@@ -73,235 +71,227 @@
 
 ## Surprising Connections (you probably didn't know these)
 - `normalizeSessionCommandPath()` --calls--> `normalizeContextPath()`  [INFERRED]
-  src\core\opencode\OpenCodeSessionControlOrchestrator.ts → src\shared\contextPath.ts
+  src/core/opencode/OpenCodeSessionControlOrchestrator.ts → src/shared/contextPath.ts
+- `renderLanguageSetting()` --calls--> `t()`  [INFERRED]
+  src/features/settings/SettingsPanelChrome.ts → src/i18n/index.ts
 - `buildQuestionAnswerMarkdown()` --calls--> `t()`  [INFERRED]
-  src\features\chat\runtime\QuestionResolutionCardRenderer.ts → src\i18n\index.ts
+  src/features/chat/runtime/QuestionResolutionCardRenderer.ts → src/i18n/index.ts
 - `buildQuestionRejectedMarkdown()` --calls--> `t()`  [INFERRED]
-  src\features\chat\runtime\QuestionResolutionCardRenderer.ts → src\i18n\index.ts
+  src/features/chat/runtime/QuestionResolutionCardRenderer.ts → src/i18n/index.ts
 - `getQuestionResolutionAnswerText()` --calls--> `t()`  [INFERRED]
-  src\features\chat\runtime\QuestionResolutionCardRenderer.ts → src\i18n\index.ts
-- `assertModelExtraFieldKeyAllowed()` --calls--> `t()`  [INFERRED]
-  src\features\settings\modelConfigWorkspace.ts → src\i18n\index.ts
+  src/features/chat/runtime/QuestionResolutionCardRenderer.ts → src/i18n/index.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (61): AssistantNoticeCardRenderer, buildInterruptedAssistantNotice(), ConversationCompactionHelpModal, ConversationHistoryDialogService, t(), LiquidGlassSettingHelpModal, McpServerEditorModal, McpServerStatusModal (+53 more)
+Nodes (77): AssistantNoticeCardRenderer, ComposerContextEventBridge, ContextFilePickerModal, ConversationCompactionHelpModal, cloneFormatterConfigValue(), readFormatterConfigValue(), writeFormatterConfigValue(), t() (+69 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.01
-Nodes (33): AssistantShellViewHostAdapter, applyPassiveScrollMeasurement(), applyUserScrollIntent(), getDistanceFromBottom(), getProgrammaticScrollGuardDelayMs(), hasProgrammaticScrollGuard(), isNearBottom(), createConversationHydrationRuntimeViewHosts() (+25 more)
+Nodes (51): buildInterruptedAssistantNotice(), buildStreamErrorNotice(), renderAssistantNoticeCardAndFooter(), renderAssistantPlaceholderAsNotice(), renderPersistedAssistantNotice(), AssistantShellRenderer, buildLocalStreamOutcome(), ChildSessionGraphCoordinator (+43 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.01
-Nodes (34): AssistantShellRenderer, BackgroundTaskCompletionNoticeService, BackgroundTaskIndicatorCoordinator, BackgroundTaskInlinePanelRenderer, BackgroundTaskLiveSignalCoordinator, createBackgroundTaskLiveSignalCoordinatorHost(), BackgroundTaskNoticeStateService, BackgroundTaskStreamTriggerCoordinator (+26 more)
+Nodes (31): BackgroundConversationAttentionCoordinator, BackgroundConversationPostSyncHandoffCoordinator, BackgroundConversationPostSyncRefreshExecutor, BackgroundConversationSignalSyncStateCoordinator, BackgroundTaskCompletionNoticeService, BackgroundTaskIndicatorCoordinator, BackgroundTaskInlinePanelRenderer, BackgroundTaskLiveSignalCoordinator (+23 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.02
-Nodes (55): ConversationTurnViewModelBuilder, getMessageParentId(), getRecordString(), createSdkClient(), extractRenderableToolMetadata(), OpenCodeMessageNormalizationMapper, OpenCodeToolContentAssembler, resolveOpenCodeToolKind() (+47 more)
+Nodes (51): createSdkClient(), extractRenderableToolMetadata(), OpenCodeMessageNormalizationMapper, OpenCodeToolContentAssembler, resolveOpenCodeToolKind(), resolveToolResultVisibility(), extractRenderableToolMetadata(), extractStructuredErrorMessage() (+43 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.02
-Nodes (95): buildChatAppearanceCustomCss(), getChatAppearanceBackgroundSizeValue(), getChatAppearanceCssVariables(), getInputPanelGlassRefractionCssVariables(), areChatAppearanceSettingsEqual(), diffObject(), getBuiltinThemePresets(), getThemeAppearanceOverridesFromBase() (+87 more)
+Nodes (22): applyPassiveScrollMeasurement(), applyUserScrollIntent(), getDistanceFromBottom(), getProgrammaticScrollGuardDelayMs(), hasProgrammaticScrollGuard(), isNearBottom(), createEmptyTabContextState(), ContextUsageService (+14 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.02
-Nodes (20): BackgroundConversationAttentionCoordinator, createEmptyTabContextState(), ContextDetailModal, ContextRing, ContextUsageService, ConversationHistoryActionsCoordinator, ConversationLoadRecoveryCoordinator, ConversationTabLifecycleRecoveryCoordinator (+12 more)
+Nodes (88): areChatAppearanceSettingsEqual(), diffObject(), getBuiltinThemePresets(), getThemeAppearanceOverridesFromBase(), getThemePresetDefinition(), hasThemeAppearanceOverrides(), mergePartialChatAppearanceSettings(), resolveThemeChatAppearance() (+80 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.02
-Nodes (38): buildConversationMetaFromStoredRecord(), cloneConversationListDiagnostics(), ConversationMetadataCache, getUtf8ByteLength(), trackTopDiagnosticEntries(), isRecord(), cloneFormatterConfigValue(), readFormatterConfigValue() (+30 more)
+Nodes (14): OpenCodePromptRequestBuilder, buildCanonicalConversationFingerprintPayload(), cloneSettings(), getDebugTextPreview(), isPlainRecord(), OpenCodeService, cloneMessage(), clonePart() (+6 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.03
-Nodes (12): OpenCodeEventSubscriptionCoordinator, cloneSettings(), OpenCodeServiceLifecycleCoordinator, normalizeDiffEntries(), normalizeMessageInfo(), normalizePart(), OpenCodeSyncEventRuntimeCoordinator, resolveSessionId() (+4 more)
+Cohesion: 0.02
+Nodes (49): ActiveTabContextUsageCoordinator, AgentInvocationService, ChatSelectionControlsCoordinator, ConversationViewStateService, getDefaultDebugModuleSettings(), isDebugModuleKey(), normalizeDebugModuleSettings(), normalizeDebugRefreshIntervalMs() (+41 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.02
-Nodes (10): OpenCodePromptRequestBuilder, buildCanonicalConversationFingerprintPayload(), cloneSettings(), getDebugTextPreview(), isPlainRecord(), OpenCodeService, cloneMessage(), clonePart() (+2 more)
+Nodes (69): BackgroundTaskActivationIndicatorCoordinator, ConversationHydrationOutcomeBridge, ConversationHydrationRenderBridge, ConversationMessageRenderDelegate, ConversationSyncedUpdateApplyDelegate, ConversationUserMessageRenderDelegate, getIncrementalRenderedMessageUpdate(), ConversationRenderService (+61 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.02
-Nodes (20): OpenCodeCatalogQueryCoordinator, OpenCodeCatalogStateStore, normalizePermissionRequest(), normalizePermissionResponse(), normalizePermissionToolReference(), normalizeStringArray(), OpenCodeQuestionPermissionHub, appendSdkErrorStatus() (+12 more)
+Nodes (28): MarkdownAgentWorkspaceService, McpConfigService, buildModelPickerGroups(), filterModelPickerGroups(), findModelPickerOption(), findModelPickerOptionByRef(), OpencodeConfigManager, PluginManagementService (+20 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.02
-Nodes (63): BackgroundTaskActivationIndicatorCoordinator, ConversationHydrationOutcomeBridge, ConversationHydrationRenderBridge, ConversationAssistantMessageRenderDelegate, ConversationMessageRenderDelegate, ConversationSyncedUpdateApplyDelegate, ConversationUserMessageRenderDelegate, getIncrementalRenderedMessageUpdate() (+55 more)
+Cohesion: 0.03
+Nodes (13): OpenCodeEventSubscriptionCoordinator, cloneSettings(), OpenCodeServiceLifecycleCoordinator, normalizeDiffEntries(), normalizeMessageInfo(), normalizePart(), OpenCodeSyncEventRuntimeCoordinator, resolveSessionId() (+5 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.03
-Nodes (29): buildStreamErrorNotice(), renderAssistantNoticeCardAndFooter(), renderAssistantPlaceholderAsNotice(), renderPersistedAssistantNotice(), buildLocalStreamOutcome(), normalizeConversationSessionSettings(), ConversationAuthoritativeMessageMergeCoordinator, ConversationAuthoritativeReloadCoordinator (+21 more)
+Cohesion: 0.02
+Nodes (20): OpenCodeCatalogQueryCoordinator, OpenCodeCatalogStateStore, normalizePermissionRequest(), normalizePermissionResponse(), normalizePermissionToolReference(), normalizeStringArray(), OpenCodeQuestionPermissionHub, appendSdkErrorStatus() (+12 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.02
-Nodes (24): buildComposerContextChipStates(), createFocusContextPreview(), getContextTargetKey(), getPromptContextTargetKey(), removeDraftContextItemsByTarget(), resolveFocusContextPreview(), upsertDraftContextItem(), ComposerContextActionService (+16 more)
+Cohesion: 0.03
+Nodes (96): buildLobehubDefinitions(), buildOpencodeDefinitions(), computeMatchScore(), createDefinition(), findBuiltinIcon(), formatBuiltinSource(), getBuiltinIcon(), getDisplayName() (+88 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.03
-Nodes (12): OpenCodianSettingTab, PermissionModeSelectorCoordinator, getActiveSecondaryTabId(), getPrimaryTabDefinition(), resolvePrimaryTabId(), resolveSecondaryTabId(), SettingsSectionCoordinator, SettingsTabbedRenderer (+4 more)
+Cohesion: 0.02
+Nodes (39): renderAssistantPlainTextFallbackContent(), renderAssistantStructuredContent(), resetLogEmissionThrottleState(), PermissionInlineCardRenderer, clearProviderIconCache(), QuestionDock, QuestionDockCoordinator, applyQuestionDockSelection() (+31 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.04
-Nodes (76): buildLobehubDefinitions(), buildOpencodeDefinitions(), computeMatchScore(), createDefinition(), findBuiltinIcon(), formatBuiltinSource(), getBuiltinIcon(), getDisplayName() (+68 more)
+Cohesion: 0.03
+Nodes (52): clamp(), createStageLayerElement(), createSvgElement(), estimateProjectionDelta(), formatNumber(), generateFilterId(), GlassOctahedronDemoController, maxRenderQuality() (+44 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.03
-Nodes (35): renderAssistantPlainTextFallbackContent(), renderAssistantStructuredContent(), QuestionDock, QuestionDockCoordinator, applyQuestionDockSelection(), getQuestionDockActiveInteractionState(), getQuestionDockDraftAnswers(), sanitizeQuestionDockAnswer() (+27 more)
+Nodes (14): SettingsModelCatalogCoordinator, SettingsModelCatalogPresenter, SettingsModelIconCacheManager, SettingsModelSection, applyInlineCodeText(), buildInlineCodeFragment(), createSettingsBlock(), renderLanguageSetting() (+6 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.04
-Nodes (36): ModelConfigModal, createModelConfigKeyValueState(), createModelConfigModalSnapshot(), isBlankProviderState(), parseAddProviderJsonDraft(), readProviderOptionString(), resolveModelConfigJsonDraftValue(), syncProviderFormFromJsonDraft() (+28 more)
+Cohesion: 0.03
+Nodes (23): buildComposerContextChipStates(), createFocusContextPreview(), getContextTargetKey(), getPromptContextTargetKey(), removeDraftContextItemsByTarget(), resolveFocusContextPreview(), upsertDraftContextItem(), ComposerContextActionService (+15 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.04
-Nodes (39): clamp(), createStageLayerElement(), createSvgElement(), estimateProjectionDelta(), formatNumber(), generateFilterId(), GlassOctahedronDemoController, maxRenderQuality() (+31 more)
+Nodes (42): ContextAttachmentBuilder, ContextFileCatalogBuildRunner, ContextFileCatalogIndex, createContextFileEntry(), ContextFileCatalogService, contextPathFromFileUrl(), isAbsoluteContextPath(), isWindowsDrivePath() (+34 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.04
-Nodes (16): ChatHeaderPresenter, buildComposerInputSubmission(), ComposerInputShellCoordinator, parseCommandSubmission(), InputPanelAppearanceCoordinator, createComposerGlassFilterElement(), createSvgElement(), ensureComposerGlassSvgDefs() (+8 more)
+Nodes (20): ChatHeaderPresenter, ComposerContextViewFacade, createComposerContextServices(), ComposerContextViewHostAdapter, buildComposerInputSubmission(), ComposerInputShellCoordinator, parseCommandSubmission(), createFocusContextServices() (+12 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.04
-Nodes (4): SettingsModelCatalogCoordinator, SettingsModelCatalogPresenter, SettingsModelIconCacheManager, SettingsModelSection
+Cohesion: 0.05
+Nodes (6): OpenCodianSettingTab, SettingsSectionCoordinator, SettingsTabbedRenderer, renderUserExcludedTagsSetting(), renderUserProfileSetting(), renderUserPromptSetting()
 
 ### Community 20 - "Community 20"
-Cohesion: 0.05
-Nodes (48): ModelCatalogStateService, assembleModelCatalog(), assembleServerModelCatalog(), filterCatalogToProviderIds(), projectEffectiveCatalog(), resolveProviderAvailabilityProbePlan(), selectProviderProbeModelId(), filterCatalog() (+40 more)
+Cohesion: 0.04
+Nodes (13): buildChatAppearanceCustomCss(), getChatAppearanceBackgroundSizeValue(), getChatAppearanceCssVariables(), getInputPanelGlassRefractionCssVariables(), getAllGlassAdapters(), getInputPanelThemeFamily(), getLiquidGlassAdapterIdForInputPanelTheme(), isValidChatAppearanceCustomCssDeclarations() (+5 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.04
-Nodes (9): ActiveTabContextUsageCoordinator, AgentInvocationService, ChatSelectionControlsCoordinator, getPerformanceTimestampMs(), buildOptimisticUserMessage(), MessageSendPreparationService, ModelSelectionRuntime, TabConversationActivationBridge (+1 more)
+Cohesion: 0.05
+Nodes (87): clamp(), compileGlShader(), createGlProgram(), createLiquidDiamondDemoWebGlRenderer(), createPlane(), cross3(), dot3(), estimateAdaptiveDisplacementRangePx() (+79 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.04
-Nodes (41): ContextFileCatalogBuildRunner, ContextFileCatalogIndex, createContextFileEntry(), ContextFileCatalogService, contextPathFromFileUrl(), isAbsoluteContextPath(), isWindowsDrivePath(), normalizeContextAttachmentPath() (+33 more)
+Nodes (14): normalizeConversationSessionSettings(), ConversationLoadRuntimeBridge, buildConversationMetaFromStoredRecord(), cloneConversationListDiagnostics(), ConversationMetadataCache, getUtf8ByteLength(), trackTopDiagnosticEntries(), ConversationSessionSettingsCoordinator (+6 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.06
-Nodes (72): measureDisplacementRangeAtUv(), add3(), applyEdgeBulge(), applyFilterLayerState(), bounds2(), buildBackdropFilterValue(), buildDisplacementTrace(), buildFallbackBackdropFilterValue() (+64 more)
+Cohesion: 0.05
+Nodes (40): ModelCatalogStateService, assembleModelCatalog(), assembleServerModelCatalog(), filterCatalogToProviderIds(), projectEffectiveCatalog(), resolveProviderAvailabilityProbePlan(), selectProviderProbeModelId(), filterCatalog() (+32 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.04
-Nodes (35): registerBuiltinGlassAdapters(), getDefaultDebugModuleSettings(), isDebugModuleKey(), normalizeDebugModuleSettings(), normalizeDebugRefreshIntervalMs(), resolveDebugModuleKey(), setLocale(), createLogger() (+27 more)
+Cohesion: 0.07
+Nodes (53): createComposerGlassFilterElement(), createSvgElement(), ensureComposerGlassSvgDefs(), ensureComposerGlassSvgRootElement(), InputPanelThemeRuntime, applyBackdropFilterValue(), applyGlassTint(), applyInstanceMarker() (+45 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.05
-Nodes (48): applyDisplacementSnapshot(), applyHostTransform(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), clamp(), createFaceSvgElement(), createStageLayerElement(), createState() (+40 more)
+Cohesion: 0.06
+Nodes (5): AgentCatalogService, SurfaceAgentBuilder, SettingsAgentsSection, SystemAgentGuardService, isSystemAgentId()
 
 ### Community 26 - "Community 26"
-Cohesion: 0.05
-Nodes (8): ConversationSessionSettingsModal, buildModelPickerGroups(), filterModelPickerGroups(), findModelPickerOption(), findModelPickerOptionByRef(), ModelPickerModal, normalizeChatFontSizePx(), SettingsConversationSection
+Cohesion: 0.06
+Nodes (8): registerBuiltinGlassAdapters(), ContextDetailModal, ContextUsageDisplayService, getLocale(), setLocale(), getGlassAdapter(), registerGlassAdapter(), unregisterGlassAdapter()
 
 ### Community 27 - "Community 27"
-Cohesion: 0.07
-Nodes (44): applyFilterLayerStyles(), applyShellStyles(), buildBackdropFilterValue(), buildEdgeBandWeight(), buildFallbackBackdropFilterValue(), buildFilterLayerBoxShadow(), captureDatasetSnapshot(), captureStyleSnapshot() (+36 more)
-
-### Community 28 - "Community 28"
-Cohesion: 0.11
-Nodes (48): applyBackdropFilterValue(), applyGlassTint(), applyInstanceMarker(), applyShellInteractiveStyles(), buildFallbackBackdropFilterValue(), buildSvgBackdropFilterValue(), clamp(), cleanupInstanceArtifacts() (+40 more)
-
-### Community 29 - "Community 29"
 Cohesion: 0.12
 Nodes (47): add3(), buildClipPath(), buildDisplacementTrace(), clamp(), computeBounds(), convexHull(), createFace(), createGlassOctahedronProjectionContext() (+39 more)
 
-### Community 30 - "Community 30"
+### Community 28 - "Community 28"
 Cohesion: 0.09
 Nodes (2): BackgroundTaskTimelineAssemblyService, BackgroundTaskTimelineLaunchService
 
+### Community 29 - "Community 29"
+Cohesion: 0.11
+Nodes (40): applyFilterLayerStyles(), applyShellStyles(), buildBackdropFilterValue(), buildEdgeBandWeight(), buildFallbackBackdropFilterValue(), buildFilterLayerBoxShadow(), captureDatasetSnapshot(), captureStyleSnapshot() (+32 more)
+
+### Community 30 - "Community 30"
+Cohesion: 0.1
+Nodes (11): McpServerStatusModal, redactMcpSensitiveText(), redactMcpTechnicalDetails(), redactUnknownSecretValues(), statusLabel(), summarizeCommand(), transportSummary(), countByStatus() (+3 more)
+
 ### Community 31 - "Community 31"
+Cohesion: 0.07
+Nodes (12): extractAssistantStructuredTextCopyContent(), resolveAssistantCopyContent(), AssistantErrorRenderer, buildErrorAssistantFooterPayload(), buildNoticeAssistantFooterPayload(), buildPersistedAssistantFooterPayload(), buildPseudoStreamAssistantFooterPayload(), resolvePersistedAssistantFooterStatusLabel() (+4 more)
+
+### Community 32 - "Community 32"
 Cohesion: 0.13
 Nodes (31): buildCommandScopedAgent(), cloneConfigObject(), cloneConfigValue(), getCommandScopedAgentId(), getCommandScopedAgentMetadata(), isCommandScopedAgentForCommand(), isCommandScopedAgentId(), mergeConfigObjects() (+23 more)
 
-### Community 32 - "Community 32"
-Cohesion: 0.07
-Nodes (7): BackgroundConversationPostSyncHandoffCoordinator, BackgroundConversationPostSyncRefreshExecutor, BackgroundConversationSignalSyncStateCoordinator, PostSyncQuestionTodoRefreshFacade, PostSyncQuestionTodoRefreshPlanBuilder, VisibleConversationPostSyncCoordinator, VisibleConversationPostSyncStateCoordinator
-
 ### Community 33 - "Community 33"
-Cohesion: 0.09
-Nodes (11): extractAssistantStructuredTextCopyContent(), resolveAssistantCopyContent(), AssistantErrorRenderer, buildErrorAssistantFooterPayload(), buildNoticeAssistantFooterPayload(), buildPersistedAssistantFooterPayload(), buildPseudoStreamAssistantFooterPayload(), resolvePersistedAssistantFooterStatusLabel() (+3 more)
-
-### Community 34 - "Community 34"
 Cohesion: 0.11
 Nodes (16): buildFragmentWithLinks(), createWikilinkElement(), createWikilinkPattern(), extractLinkTarget(), fileExistsInVault(), findWikilinks(), processFileLinks(), processTextNode() (+8 more)
 
-### Community 35 - "Community 35"
-Cohesion: 0.14
-Nodes (1): ContextUsageDisplayService
-
-### Community 36 - "Community 36"
-Cohesion: 0.09
-Nodes (5): ComposerContextViewFacade, createComposerContextServices(), ComposerContextViewHostAdapter, createFocusContextServices(), FocusContextViewHostAdapter
-
-### Community 37 - "Community 37"
+### Community 34 - "Community 34"
 Cohesion: 0.15
-Nodes (2): ChildSessionGraphCoordinator, ChildSessionGraphService
-
-### Community 38 - "Community 38"
-Cohesion: 0.14
 Nodes (3): EffortSelector, isAdaptiveThinkingModel(), UserMessageFooterRenderer
 
-### Community 39 - "Community 39"
-Cohesion: 0.13
-Nodes (4): AgentCatalogService, SurfaceAgentBuilder, SystemAgentGuardService, isSystemAgentId()
-
-### Community 40 - "Community 40"
+### Community 35 - "Community 35"
 Cohesion: 0.19
 Nodes (20): buildTrailingAssistantPatchCompletionDebugPlan(), buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(), buildTrailingAssistantPatchCompletionDebugPlanningContext(), buildTrailingAssistantPatchCompletionDebugPlanningContextInputs(), buildTrailingAssistantPatchCompletionDebugPlanningContextShape(), buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract(), buildTrailingAssistantPatchCompletionDebugSourceContractFromTailOutcomePlanningContext(), buildTrailingAssistantPatchCompletionDebugSummaryPlan() (+12 more)
 
-### Community 41 - "Community 41"
+### Community 36 - "Community 36"
 Cohesion: 0.15
 Nodes (13): createBackgroundConversationPostSyncHandoffServices(), createBackgroundConversationPostSyncHandoffViewHostAdapter(), createPostSyncQuestionTodoRefreshHosts(), createPostSyncQuestionTodoRefreshServices(), createQuestionTodoBackgroundTaskActivationHosts(), createQuestionTodoBackgroundTaskActivationServices(), createQuestionTodoBackgroundTaskActivationViewHostAdapter(), createQuestionTodoBackgroundTaskRefreshServices() (+5 more)
 
-### Community 42 - "Community 42"
-Cohesion: 0.26
-Nodes (1): TabBar
+### Community 37 - "Community 37"
+Cohesion: 0.17
+Nodes (1): AssistantShellViewHostAdapter
 
-### Community 43 - "Community 43"
+### Community 38 - "Community 38"
+Cohesion: 0.28
+Nodes (1): ChildSessionGraphService
+
+### Community 39 - "Community 39"
+Cohesion: 0.26
+Nodes (1): ProjectConfigFileWatcher
+
+### Community 40 - "Community 40"
+Cohesion: 0.29
+Nodes (1): ModelPickerModal
+
+### Community 41 - "Community 41"
 Cohesion: 0.2
 Nodes (6): buildModelOptionValue(), parseModelOptionValue(), scrollToCurrentModel(), selectHighlightedModel(), renderModelList(), bindModelSelectorStickyHeaders()
 
-### Community 44 - "Community 44"
+### Community 42 - "Community 42"
 Cohesion: 0.44
 Nodes (8): formatMcpSummaryField(), getFirstScalarMcpFallback(), getMcpSummaryFromFields(), getMcpToolSummary(), getPathTail(), resolveMcpSummaryCategory(), tokenizeMcpToolName(), truncateMcpSummaryText()
 
+### Community 43 - "Community 43"
+Cohesion: 0.39
+Nodes (1): ServerSettingHelpModal
+
+### Community 44 - "Community 44"
+Cohesion: 0.47
+Nodes (4): buildCodeFence(), prepareUserMessageMarkdownForDisplay(), replaceOutsideMarkdownCode(), trimFenceContent()
+
 ### Community 45 - "Community 45"
-Cohesion: 0.4
-Nodes (1): FocusContextMarkdownViewLocator
-
-### Community 46 - "Community 46"
-Cohesion: 0.4
-Nodes (1): ComposerContextEventBridge
-
-### Community 47 - "Community 47"
 Cohesion: 0.4
 Nodes (1): ContextFileCatalogEventBridge
 
 ## Knowledge Gaps
-- **Thin community `Community 30`** (42 nodes): `BackgroundTaskTimelineAssemblyService`, `.addCompletionToSegment()`, `.applyReminderToSegment()`, `.captureUserSegmentAnchor()`, `.collectCompletionReminderSegments()`, `.collectDiagnostics()`, `.collectMessageSegments()`, `.collectSegments()`, `.collectTaskLaunchBlock()`, `.constructor()`, `.createEmptySegment()`, `.createSegment()`, `.createSegmentCollectionState()`, `.finalizeCollectedSegments()`, `.finalizeSegment()`, `.findBackgroundTaskAnchorIndex()`, `.findSegmentByTaskId()`, `.getLatestSearchModeSegment()`, `.getLatestSegmentWithActivity()`, `.getOrCreateRuntimeSegment()`, `.getOrCreateSegment()`, `.getPendingLaunches()`, `.isBackgroundTaskCompletionReminder()`, `.isSearchModeAnchorMessage()`, `.mergeRuntimeSegmentState()`, `.mergeSegmentCompletions()`, `.mergeSegmentLaunches()`, `.resolvePendingState()`, `.resolveReminderSegments()`, `.segmentHasTaskActivity()`, `.upsertLaunch()`, `.upsertSegmentLaunch()`, `BackgroundTaskTimelineLaunchService`, `.addCompletedTasksFromMessage()`, `.extractBackgroundTaskId()`, `.filterPendingLaunches()`, `.getBackgroundTaskDescription()`, `.isLaunchMatchedByCompletion()`, `.upsertLaunch()`, `BackgroundTaskTimelineAssemblyService.ts`, `BackgroundTaskTimelineLaunchService.ts`, `.getMessageAnchorKey()`
+- **Thin community `Community 28`** (42 nodes): `BackgroundTaskTimelineAssemblyService`, `.addCompletionToSegment()`, `.applyReminderToSegment()`, `.captureUserSegmentAnchor()`, `.collectCompletionReminderSegments()`, `.collectDiagnostics()`, `.collectMessageSegments()`, `.collectSegments()`, `.collectTaskLaunchBlock()`, `.constructor()`, `.createEmptySegment()`, `.createSegment()`, `.createSegmentCollectionState()`, `.finalizeCollectedSegments()`, `.finalizeSegment()`, `.findBackgroundTaskAnchorIndex()`, `.findSegmentByTaskId()`, `.getLatestSearchModeSegment()`, `.getLatestSegmentWithActivity()`, `.getOrCreateRuntimeSegment()`, `.getOrCreateSegment()`, `.isBackgroundTaskCompletionReminder()`, `.isSearchModeAnchorMessage()`, `.mergeRuntimeSegmentState()`, `.mergeSegmentCompletions()`, `.mergeSegmentLaunches()`, `.resolvePendingState()`, `.resolveReminderSegments()`, `.segmentHasTaskActivity()`, `.upsertSegmentLaunch()`, `BackgroundTaskTimelineLaunchService`, `.addCompletedTasksFromMessage()`, `.extractBackgroundTaskId()`, `.filterPendingLaunches()`, `.getBackgroundTaskDescription()`, `.isLaunchMatchedByCompletion()`, `.upsertLaunch()`, `BackgroundTaskTimelineAssemblyService.ts`, `BackgroundTaskTimelineLaunchService.ts`, `.collectBackgroundTaskDiagnostics()`, `.collectBackgroundTaskSegments()`, `.getMessageAnchorKey()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 35`** (28 nodes): `ContextUsageDisplayService`, `.buildBreakdownSegments()`, `.buildDisplayTokenBreakdown()`, `.calculatePercentage()`, `.collectBreakdownChars()`, `.estimateBreakdownTokens()`, `.estimateTokens()`, `.fitBreakdownTokens()`, `.formatCurrency()`, `.formatNumber()`, `.formatPercent()`, `.getAssistantCharsFromMessage()`, `.getAssistantCharsFromPart()`, `.getContextBreakdown()`, `.getDisplaySnapshot()`, `.getDisplayTokenBreakdown()`, `.getNestedStringField()`, `.getObjectField()`, `.getParts()`, `.getStringField()`, `.getToolChars()`, `.getUnknownField()`, `.getUserCharsFromMessage()`, `.getUserCharsFromPart()`, `.isRecord()`, `.stringifyUnknown()`, `.summarize()`, `ContextUsageDisplayService.ts`
+- **Thin community `Community 37`** (16 nodes): `.createPersistedAssistantMessageElement()`, `AssistantShellViewHostAdapter`, `.addTimestampWithCopyButton()`, `.constructor()`, `.createAssistantMessageElement()`, `.createAssistantNoticeRenderHost()`, `.finalizeNoticeFooter()`, `.finalizePersistedFooter()`, `.finalizePseudoStreamFooter()`, `.renderAssistantPlaceholderAsNotice()`, `.renderPersistedAssistantMessage()`, `.renderPersistedAssistantNotice()`, `.renderPersistedAssistantNoticeMessage()`, `.renderStreamError()`, `.revealStreamingAssistantMessageElement()`, `AssistantShellViewHostAdapter.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 37`** (23 nodes): `ChildSessionGraphCoordinator`, `.clearGraph()`, `.constructor()`, `.getGraph()`, `.refreshGraph()`, `ChildSessionGraphService`, `.buildEdge()`, `.canonicalizeToolName()`, `.computeGraphStatus()`, `.deduplicateEdges()`, `.enrichEdgesWithChildSessions()`, `.extractSessionId()`, `.findOrphanedSessions()`, `.isTaskToolBlock()`, `.isTaskToolCall()`, `.reconstructGraph()`, `.resolveEdgeStatus()`, `.tryBuildEdgeFromBlock()`, `.tryBuildEdgeFromToolCall()`, `ChildSessionGraphService.ts`, `ChildSessionGraphCoordinator.ts`, `.getSessionChildren()`, `.loadConversation()`
+- **Thin community `Community 38`** (15 nodes): `ChildSessionGraphService`, `.buildEdge()`, `.canonicalizeToolName()`, `.computeGraphStatus()`, `.deduplicateEdges()`, `.enrichEdgesWithChildSessions()`, `.extractSessionId()`, `.findOrphanedSessions()`, `.isTaskToolBlock()`, `.isTaskToolCall()`, `.reconstructGraph()`, `.resolveEdgeStatus()`, `.tryBuildEdgeFromBlock()`, `.tryBuildEdgeFromToolCall()`, `ChildSessionGraphService.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 42`** (15 nodes): `TabBar.ts`, `TabBar`, `.attachTooltipLabel()`, `.closeOverflowMenu()`, `.constructor()`, `.destroy()`, `.getMaxVisibleTabs()`, `.openOverflowMenu()`, `.partitionItems()`, `.positionOverflowMenu()`, `.render()`, `.renderBackgroundTaskState()`, `.renderOverflowButton()`, `.renderTabItem()`, `.shouldOpenOverflowAbove()`
+- **Thin community `Community 39`** (13 nodes): `ProjectConfigFileWatcher.ts`, `ProjectConfigFileWatcher`, `.clearPendingChange()`, `.constructor()`, `.dispose()`, `.getAbstractFilePath()`, `.handleMutation()`, `.handleRename()`, `.matchesProjectConfig()`, `.resolveRelativeConfigPath()`, `.runChangeHandler()`, `.scheduleChange()`, `.start()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 45`** (6 nodes): `FocusContextMarkdownViewLocator.ts`, `FocusContextMarkdownViewLocator`, `.constructor()`, `.getActiveMarkdownView()`, `.getMarkdownViews()`, `.rememberMarkdownFilePath()`
+- **Thin community `Community 40`** (12 nodes): `ModelPickerModal.ts`, `ModelPickerModal`, `.choose()`, `.constructor()`, `.getFilteredGroups()`, `.getOptionValues()`, `.navigate()`, `.onOpen()`, `.renderList()`, `.renderOption()`, `.selectHighlighted()`, `.syncHighlight()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 46`** (5 nodes): `ComposerContextEventBridge`, `.constructor()`, `.dispose()`, `.start()`, `ComposerContextEventBridge.ts`
+- **Thin community `Community 43`** (8 nodes): `ServerSettingHelpModal.ts`, `ServerSettingHelpModal`, `.constructor()`, `.escapeHtml()`, `.getHelpContent()`, `.onClose()`, `.onOpen()`, `.tr()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (5 nodes): `ContextFileCatalogEventBridge`, `.constructor()`, `.dispose()`, `.start()`, `ContextFileCatalogEventBridge.ts`
+- **Thin community `Community 45`** (5 nodes): `ContextFileCatalogEventBridge`, `.constructor()`, `.dispose()`, `.start()`, `ContextFileCatalogEventBridge.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 22`, `Community 24`, `Community 25`, `Community 26`, `Community 30`, `Community 33`, `Community 35`, `Community 38`, `Community 42`?**
-  _High betweenness centrality (0.427) - this node is a cross-community bridge._
-- **Why does `OpenCodianView` connect `Community 1` to `Community 0`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 37`, `Community 38`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 15`, `Community 17`, `Community 18`, `Community 21`, `Community 30`?**
-  _High betweenness centrality (0.124) - this node is a cross-community bridge._
-- **Why does `OpenCodeService` connect `Community 8` to `Community 0`, `Community 3`, `Community 6`, `Community 7`, `Community 9`, `Community 11`, `Community 15`, `Community 19`, `Community 20`, `Community 27`?**
-  _High betweenness centrality (0.074) - this node is a cross-community bridge._
+- **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 9`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 22`, `Community 25`, `Community 26`, `Community 28`, `Community 30`, `Community 31`, `Community 34`, `Community 40`, `Community 43`?**
+  _High betweenness centrality (0.401) - this node is a cross-community bridge._
+- **Why does `OpenCodianView` connect `Community 1` to `Community 0`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 13`, `Community 16`, `Community 18`, `Community 19`, `Community 20`, `Community 22`, `Community 28`?**
+  _High betweenness centrality (0.199) - this node is a cross-community bridge._
+- **Why does `OpenCodeService` connect `Community 6` to `Community 0`, `Community 2`, `Community 3`, `Community 5`, `Community 9`, `Community 10`, `Community 11`, `Community 13`, `Community 15`, `Community 22`, `Community 23`, `Community 30`?**
+  _High betweenness centrality (0.075) - this node is a cross-community bridge._
 - **Are the 436 inferred relationships involving `t()` (e.g. with `.getEmptyConversationTitle()` and `.generateDefaultTitle()`) actually correct?**
   _`t()` has 436 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**

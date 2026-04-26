@@ -1,7 +1,7 @@
 # 构建管线
 
 > **源码**: `esbuild.config.mjs`, `scripts/build.mjs`, `scripts/build-css.mjs`, `scripts/build-utils.mjs`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 

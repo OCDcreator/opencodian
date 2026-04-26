@@ -15,8 +15,10 @@ function resolveGraphifyCommand() {
     };
   }
 
-  const pythonCandidates = ['python3', 'python'];
-  for (const command of pythonCandidates) {
+  // Check repo-local venv first (created via: python3.13 -m venv .graphify-venv && pip install graphifyy)
+  const localVenvPython = join(repoRoot, '.graphify-venv', 'bin', 'python3');
+  const allCandidates = [localVenvPython, 'python3', 'python'];
+  for (const command of allCandidates) {
     const probe = spawnSync(command, ['-c', 'import graphify'], {
       cwd: repoRoot,
       stdio: 'ignore',
@@ -31,7 +33,7 @@ function resolveGraphifyCommand() {
 
   throw new Error(
     'Could not find a Python interpreter with graphify installed. '
-    + 'Install graphify first, then rerun this script.',
+    + 'Create a venv with: python3.13 -m venv .graphify-venv && .graphify-venv/bin/pip install graphifyy',
   );
 }
 

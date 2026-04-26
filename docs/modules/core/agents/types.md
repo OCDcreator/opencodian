@@ -1,7 +1,7 @@
 # Agent Surface Types
 
 > **源码**: `src/core/agents/types.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -28,6 +28,7 @@ Agent surface layer 的统一类型定义。定义了三层真相源（runtime /
 | `SystemAgentGuardResult` | 系统 agent 写入检查结果 |
 | `SystemAgentId` | 已知系统 agent ID 联合类型 |
 | `SurfaceInvocationIntent` | 单次聊天发送的显式代理调用意图 |
+| `SurfaceInvocationKind` | 调用意图类型：`'prompt'` / `'command'` / `'shell'`（当前仅 `prompt` 被消费） |
 | `AgentMentionIntent` | `@subagent` mention 的结构化描述 |
 | `SubtaskIntent` | 原生 `subtask` 部分的结构化描述 |
 | `InvocationPromptPart` | `agent` / `subtask` 原生 request part 变体 |

@@ -76,6 +76,7 @@ automation/**/__pycache__/
 automation/**/*.pyc
 
 # Graphify local state
+.graphify-venv/
 graphify-out/.graphify-venv/
 graphify-out/.graphify_python
 graphify-out/cache/
