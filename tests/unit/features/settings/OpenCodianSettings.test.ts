@@ -323,7 +323,41 @@ describe('SettingsSectionCoordinator scroll restore logging', () => {
 describe('SettingsSectionCoordinator quick nav', () => {
   it('builds quick-nav buttons from registered section headings', () => {
     const { coordinator, containerEl } = createCoordinator();
-    document.body.appendChild(containerEl);
+    const scrollContainer = document.createElement('div');
+    scrollContainer.className = 'vertical-tab-content-container';
+    let scrollTop = 320;
+    const scrollTo = jest.fn(({ top }: { top: number }) => {
+      scrollTop = top;
+    });
+
+    Object.defineProperty(scrollContainer, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => {
+        scrollTop = value;
+      },
+    });
+    Object.defineProperty(scrollContainer, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+    Object.defineProperty(scrollContainer, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 100,
+        right: 800,
+        bottom: 700,
+        width: 800,
+        height: 600,
+        x: 0,
+        y: 100,
+        toJSON: () => '',
+      }),
+    });
+
+    document.body.appendChild(scrollContainer);
+    scrollContainer.appendChild(containerEl);
 
     coordinator.beginDisplay('Settings');
     const serverHeadingEl = coordinator.createSectionHeading(containerEl, {
@@ -341,6 +375,36 @@ describe('SettingsSectionCoordinator quick nav', () => {
 
     coordinator.finishDisplay();
 
+    const quickNavEl = containerEl.querySelector<HTMLElement>('.opencodian-settings-quick-nav');
+    Object.defineProperty(quickNavEl as HTMLElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 100,
+        right: 800,
+        bottom: 220,
+        width: 800,
+        height: 120,
+        x: 0,
+        y: 100,
+        toJSON: () => '',
+      }),
+    });
+    Object.defineProperty(modelHeadingEl, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 560,
+        right: 800,
+        bottom: 596,
+        width: 800,
+        height: 36,
+        x: 0,
+        y: 560,
+        toJSON: () => '',
+      }),
+    });
+
     const buttons = Array.from(
       containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn'),
     );
@@ -351,9 +415,10 @@ describe('SettingsSectionCoordinator quick nav', () => {
     buttons[1]?.click();
 
     expect(serverScrollIntoView).not.toHaveBeenCalled();
-    expect(modelScrollIntoView).toHaveBeenCalledWith({
+    expect(modelScrollIntoView).not.toHaveBeenCalled();
+    expect(scrollTo).toHaveBeenCalledWith({
       behavior: 'smooth',
-      block: 'start',
+      top: 660,
     });
   });
 

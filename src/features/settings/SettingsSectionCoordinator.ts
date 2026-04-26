@@ -78,10 +78,11 @@ export class SettingsSectionCoordinator {
       this.containerEl.querySelectorAll<HTMLHeadingElement>('.opencodian-settings-section-heading'),
     ).find((candidate) => candidate.dataset.sectionTitle === sectionTitle);
 
-    headingEl?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
+    if (!headingEl) {
+      return;
+    }
+
+    this.scrollHeadingIntoView(headingEl);
   }
 
   prepareRestoreScrollOnNextOpen(scrollTop = this.getSavedScrollTop()): void {
@@ -390,13 +391,48 @@ export class SettingsSectionCoordinator {
       });
       buttonEl.addEventListener('click', () => {
         this.hideQuickNavTooltip(buttonEl);
-        sectionEl.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
+        this.scrollHeadingIntoView(sectionEl);
       });
       chipsEl.appendChild(buttonEl);
     }
+  }
+
+  private scrollHeadingIntoView(headingEl: HTMLHeadingElement): void {
+    const scrollContainer = this.getSettingsScrollContainer();
+    const targetScrollTop = this.resolveHeadingScrollTop(headingEl, scrollContainer);
+
+    if (typeof scrollContainer.scrollTo === 'function') {
+      scrollContainer.scrollTo({
+        behavior: 'smooth',
+        top: targetScrollTop,
+      });
+      return;
+    }
+
+    scrollContainer.scrollTop = targetScrollTop;
+  }
+
+  private resolveHeadingScrollTop(headingEl: HTMLHeadingElement, scrollContainer: HTMLElement): number {
+    const headingRect = headingEl.getBoundingClientRect();
+    const scrollContainerRect = scrollContainer.getBoundingClientRect();
+    const stickyOffset = this.resolveQuickNavStickyOffset(scrollContainerRect);
+
+    return Math.max(
+      0,
+      scrollContainer.scrollTop + (headingRect.top - scrollContainerRect.top) - stickyOffset,
+    );
+  }
+
+  private resolveQuickNavStickyOffset(scrollContainerRect: DOMRect | Pick<DOMRect, 'top' | 'bottom'>): number {
+    if (!this.quickNavEl || !this.quickNavEl.isConnected) {
+      return 0;
+    }
+
+    const quickNavRect = this.quickNavEl.getBoundingClientRect();
+    const visibleTop = Math.max(quickNavRect.top, scrollContainerRect.top);
+    const visibleBottom = Math.min(quickNavRect.bottom, scrollContainerRect.bottom);
+
+    return Math.max(0, visibleBottom - visibleTop);
   }
 
   private scheduleSettingsPanelPostRenderSetup(
