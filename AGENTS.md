@@ -17,6 +17,7 @@ npm run build
 npm run test
 npm run lint
 npm run check:module-docs
+npm run check:graphify
 npm run check:devlog-order
 ```
 
@@ -27,6 +28,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - Treat `npm run verify` as the default pre-merge gate: lint, typecheck, full tests, and production build must stay green.
 - Treat lint warnings as blockers; do not merge with anything above `0 errors / 0 warnings`.
 - Treat `npm run check:module-docs` as a hard gate: added, changed, renamed, and deleted source modules must keep `docs/modules/**` in sync.
+- Treat `npm run check:graphify` as a graph freshness gate: committed or local `src/` changes must be followed by `npm run graphify:update:src`.
 - Do not add thin helper / adapter / provider / factory files unless reused in 3+ places or isolating a high-risk dependency.
 - Prefer extending existing service / coordinator / runtime owners over adding new indirection layers.
 - Do not grow `src/features/chat/OpenCodianView.ts` or `src/core/opencode/OpenCodeService.ts` with new runtime ownership; move stable responsibilities to adjacent owners when touching them.
@@ -85,6 +87,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - SDK v2 rollout status: `docs/status/sdk-v2-rollout.md`
 - SDK manual verification: `docs/status/sdk-v2-manual-checklist.md`
 - Obsidian linkage status: `docs/requirements/obsidian-linkage.md`
+- Agent-oriented maintainability requirements: `docs/requirements/agent-maintainability.md`
 - OMO compatibility / plugin requirements: `docs/requirements/`
 - Server API reference: `SERVER_API.md`
 - Development log: `devlog.md`
@@ -111,5 +114,6 @@ Rules:
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - On this Windows machine, do not assume a `graphify` shim exists on `PATH`; local shell calls should use `py -m graphify ...`
 - This repo's committed graph is `src`-scoped, not whole-repo scoped; refresh it with `npm run graphify:update:src`, not `graphify update .`
+- `npm run verify` includes `npm run check:graphify`, so stale committed `src` history or local `src` edits without a later graph refresh should fail fast
 - The repo-local graphify wrapper updates `src`, syncs committed artifacts back to root `graphify-out/`, and removes transient `src/graphify-out/` so git does not fill with generated noise
 - If the local package and installed agent skill drift, check `py -m graphify --help` and refresh the Codex install with `py -m graphify install --platform codex`

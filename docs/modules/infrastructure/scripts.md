@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、devlog 排序验证和模块文档硬约束。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。
+项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证和模块文档硬约束。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`
@@ -60,6 +60,18 @@ esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run docto
 
 检查 `devlog.md` 中 `## YYYY-MM-DD ...` 标题是否按降序排列。新条目必须插入到第一个日期标题之前，不能追加到文件末尾。
 
+### update-graphify-src.mjs — src-scoped graphify 刷新
+
+运行当前平台可用的 Python graphify 入口，对 `src/` 做增量 code graph 更新；Windows 使用 `py -m graphify update src`。刷新完成后，把 `src/graphify-out/GRAPH_REPORT.md` 和 `src/graphify-out/graph.json` 同步回根目录 `graphify-out/`，再删除临时的 `src/graphify-out/`。
+
+### check-graphify-freshness.mjs — graphify 新鲜度检查
+
+验证根目录 `graphify-out/GRAPH_REPORT.md` 和 `graphify-out/graph.json` 是否跟上 `src/`：
+- 对已提交历史，比较最近 `src/` commit 与最近 graphify artifact commit。
+- 对本地未提交 `src/` 改动，比较源码文件 mtime 与 graphify artifact mtime；已刷新但尚未提交的 `graphify-out/` 改动会被接受。
+
+检查失败时提示运行 `npm run graphify:update:src`。该脚本不自动运行 graphify，避免常规验证时触发昂贵或会改动工作区的生成流程。
+
 ### module-doc-guard-lib.mjs — 模块文档 guard 共享库
 
 读取 `module-docs.config.json`，统一处理路径归一化、glob 匹配、源码到文档映射、git diff name-status 解析，以及新增 / 删除 / rename 时需要检查的聚合文档推导。
@@ -96,6 +108,8 @@ Node.js 脚本形式的 Jest 启动包装器。
 | `build-utils.mjs` | — | 共享工具（被其他脚本 import） |
 | `doctor-esbuild.mjs` | `npm run doctor:esbuild` / `doctor:esbuild:fix` | esbuild 平台检查/修复 |
 | `release.mjs` | `npm run release:patch/minor/major` | 版本发布 |
+| `update-graphify-src.mjs` | `npm run graphify:update:src` | 刷新 `src` 范围 graphify artifacts |
+| `check-graphify-freshness.mjs` | `npm run check:graphify` | 检查 graphify artifacts 是否跟上 `src` |
 | `check-devlog-order.mjs` | `npm run check:devlog-order` | Devlog 排序验证 |
 | `check-module-doc-coverage.mjs` | `npm run check:module-docs:coverage` | 模块文档覆盖 / orphan 检查 |
 | `check-module-doc-diff.mjs` | `npm run check:module-docs:diff` | 源码 diff 必须同步触碰映射文档 |
@@ -132,6 +146,17 @@ npm run check:devlog-order
   → 提取 ## YYYY-MM-DD 标题
   → 验证降序排列
 
+npm run graphify:update:src
+  → scripts/update-graphify-src.mjs
+  → py/python -m graphify update src
+  → 同步 src/graphify-out/{GRAPH_REPORT.md,graph.json}
+  → 清理 src/graphify-out/
+
+npm run check:graphify
+  → scripts/check-graphify-freshness.mjs
+  → 比较 src commit/mtime 与 graphify artifacts commit/mtime
+  → graphify stale 时失败并提示刷新命令
+
 npm run check:module-docs
   → scripts/check-module-doc-coverage.mjs
   → module-docs.config.json 映射源码与 docs/modules
@@ -150,12 +175,14 @@ npm run list:module-docs -- --range origin/main...HEAD
 - **package.json**: 定义所有 npm scripts
 - **esbuild.config.mjs**: 开发模式使用相同的 build-utils.mjs
 - **devlog.md**: 被 check-devlog-order.mjs 验证
+- **graphify-out/**: 被 update-graphify-src.mjs 刷新，被 check-graphify-freshness.mjs 验证
 - **module-docs.config.json**: 被模块文档 guard 脚本读取，定义源码根、文档根、例外和特殊映射
 - **docs/modules/**: 被模块文档 coverage / diff gate 强制和 `src/` 保持同步
 
 ## 配置项
 
 - 构建、release、devlog 等脚本主要通过 npm scripts 配置。
+- graphify graph 固定为 `src/` 范围；不要把 `npm run graphify:update:src` 替换成 whole-repo `graphify update .`。
 - 模块文档 guard 通过 `module-docs.config.json` 配置；新增源码根、样式根、特殊入口或非源码文档例外时必须同步更新该文件。
 - `check-module-doc-diff.mjs` 支持 `--range <range>` 或 `MODULE_DOC_DIFF_RANGE`，本地 verify 默认使用 `HEAD`，分支审核建议使用 `origin/main...HEAD`。
 
@@ -166,6 +193,7 @@ npm run list:module-docs -- --range origin/main...HEAD
 - `doctor-esbuild.mjs` 的平台映射表需要随 esbuild 更新而维护
 - `release.mjs` 使用 `npm install --package-lock-only` 更新 lockfile
 - `check-devlog-order.mjs` 在 CI/handoff 前应运行
+- `check:graphify` 已接入 `npm run verify`；如果修改了 `src/`，通常需要先运行 `npm run graphify:update:src`
 - `check-module-docs` 已接入 `npm run verify`，源码模块新增、修改、删除时不能跳过对应文档
 - `sync-version.js` 应在 release 后自动运行
 

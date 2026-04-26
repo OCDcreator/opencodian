@@ -6,11 +6,12 @@
 ## Baseline
 
 - `npm run check:module-docs` must pass.
+- `npm run check:graphify` must pass after `src/` changes.
 - `npm run lint` must stay at `0 errors / 0 warnings`.
 - `npm run typecheck` must pass.
 - Full `npm test` must pass before merge.
 - `npm run build` must pass before merge.
-- Use `npm run verify` as the default local pre-merge command; it now includes the module-doc hard gate.
+- Use `npm run verify` as the default local pre-merge command; it now includes the module-doc and graphify freshness gates.
 
 ## Ownership Rules
 
