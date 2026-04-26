@@ -3,6 +3,7 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 import { OpencodeConfigManager } from '../../../../src/core/config/OpencodeConfigManager';
@@ -12,22 +13,32 @@ jest.mock('obsidian', () => ({
   Notice: jest.fn(),
 }));
 
-const testVaultPath = path.join(__dirname, 'test-vault');
+let testVaultPath: string;
 let manager: OpencodeConfigManager;
 
-beforeEach(() => {
-  if (fs.existsSync(testVaultPath)) {
-    fs.rmSync(testVaultPath, { recursive: true });
-  }
-  fs.mkdirSync(testVaultPath, { recursive: true });
+function createTempVaultPath(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-config-manager-'));
+}
 
+function cleanupTestVault(targetPath: string | undefined): void {
+  if (!targetPath || !fs.existsSync(targetPath)) {
+    return;
+  }
+  fs.rmSync(targetPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 8,
+    retryDelay: 50,
+  });
+}
+
+beforeEach(() => {
+  testVaultPath = createTempVaultPath();
   manager = new OpencodeConfigManager(testVaultPath);
 });
 
 afterEach(() => {
-  if (fs.existsSync(testVaultPath)) {
-    fs.rmSync(testVaultPath, { recursive: true });
-  }
+  cleanupTestVault(testVaultPath);
 });
 
 describe('OpencodeConfigManager file operations', () => {
