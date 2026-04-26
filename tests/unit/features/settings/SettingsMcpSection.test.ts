@@ -56,6 +56,27 @@ describe('SettingsMcpSection', () => {
     );
   });
 
+  it('renders MCP-specific grouped layout shells for overview, servers, and add form', async () => {
+    const plugin = createPlugin({ servers: {}, updatedAt: null });
+    const section = new SettingsMcpSection({
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+
+    expect(containerEl.querySelector('.opencodian-mcp-overview-shell')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-toolbar')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-server-list-shell')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-add-form-layout')).not.toBeNull();
+
+    const addGroups = containerEl.querySelectorAll('.opencodian-mcp-form-group');
+    expect(addGroups).toHaveLength(2);
+  });
+
   it('registers a classic settings section heading when attached outside tabbed mode', async () => {
     const plugin = createPlugin({ servers: {}, updatedAt: null });
     const requestDisplayRefresh = jest.fn();
@@ -115,6 +136,8 @@ describe('SettingsMcpSection', () => {
     const errorRow = Array.from(rows).find(
       (row) => row.querySelector('.opencodian-mcp-server-row-name')?.textContent === 'broken',
     );
+    expect(errorRow?.querySelector('.opencodian-mcp-server-row-main')).not.toBeNull();
+    expect(errorRow?.querySelector('.opencodian-mcp-server-row-actions')).not.toBeNull();
     expect(errorRow?.querySelector('.opencodian-mcp-server-row-error')?.textContent).toContain(
       'connection refused',
     );

@@ -56,20 +56,7 @@ export class SettingsMcpAddForm {
   }
 
   render(parent: HTMLElement): void {
-    new Setting(parent)
-      .setName(t('settings.server.mcp.add.title'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('local', t('settings.server.mcp.add.typeLocal'))
-          .addOption('remote', t('settings.server.mcp.add.typeRemote'))
-          .setValue(this.addFormState.type)
-          .onChange((value) => {
-            this.addFormState.type = value === 'remote' ? 'remote' : 'local';
-            this.renderAddFormFields();
-          });
-      });
-
-    this.addFormContainerEl = parent.createDiv();
+    this.addFormContainerEl = parent;
     this.renderAddFormFields();
   }
 
@@ -104,7 +91,25 @@ export class SettingsMcpAddForm {
     this.addFormContainerEl.empty();
     this.addSubmitButton = null;
 
-    new Setting(this.addFormContainerEl)
+    const basicsGroup = this.createFormGroup(
+      this.addFormContainerEl,
+      t('settings.server.mcp.add.group.basics'),
+    );
+
+    new Setting(basicsGroup)
+      .setName(t('settings.server.mcp.add.type'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('local', t('settings.server.mcp.add.typeLocal'))
+          .addOption('remote', t('settings.server.mcp.add.typeRemote'))
+          .setValue(this.addFormState.type)
+          .onChange((value) => {
+            this.addFormState.type = value === 'remote' ? 'remote' : 'local';
+            this.renderAddFormFields();
+          });
+      });
+
+    new Setting(basicsGroup)
       .setName(t('settings.server.mcp.add.name'))
       .addText((text) => {
         text
@@ -115,13 +120,7 @@ export class SettingsMcpAddForm {
           });
       });
 
-    if (this.addFormState.type === 'local') {
-      this.renderLocalFields();
-    } else {
-      this.renderRemoteFields();
-    }
-
-    new Setting(this.addFormContainerEl)
+    new Setting(basicsGroup)
       .setName(t('settings.server.mcp.add.enabled'))
       .addToggle((toggle) => {
         toggle.setValue(this.addFormState.enabled).onChange((value) => {
@@ -129,7 +128,7 @@ export class SettingsMcpAddForm {
         });
       });
 
-    new Setting(this.addFormContainerEl)
+    new Setting(basicsGroup)
       .setName(t('settings.server.mcp.add.timeout'))
       .addText((text) => {
         text
@@ -140,7 +139,19 @@ export class SettingsMcpAddForm {
           });
       });
 
-    new Setting(this.addFormContainerEl)
+    const connectionGroup = this.createFormGroup(
+      this.addFormContainerEl,
+      t('settings.server.mcp.add.group.connection'),
+    );
+
+    if (this.addFormState.type === 'local') {
+      this.renderLocalFields(connectionGroup);
+    } else {
+      this.renderRemoteFields(connectionGroup);
+    }
+
+    const actionRow = this.addFormContainerEl.createDiv({ cls: 'opencodian-mcp-form-actions' });
+    new Setting(actionRow)
       .addButton((button) => {
         this.addSubmitButton = button;
         button.onClick(async () => {
@@ -151,9 +162,13 @@ export class SettingsMcpAddForm {
     this.updateSubmitButton();
   }
 
-  private renderLocalFields(): void {
-    const container = this.addFormContainerEl!;
+  private createFormGroup(parent: HTMLElement, title: string): HTMLElement {
+    const groupEl = parent.createDiv({ cls: 'opencodian-mcp-form-group' });
+    groupEl.createDiv({ cls: 'opencodian-mcp-form-group-title', text: title });
+    return groupEl.createDiv({ cls: 'opencodian-mcp-form-group-body' });
+  }
 
+  private renderLocalFields(container: HTMLElement): void {
     new Setting(container)
       .setName(t('settings.server.mcp.add.command'))
       .setDesc(t('settings.server.mcp.add.commandDesc'))
@@ -181,9 +196,7 @@ export class SettingsMcpAddForm {
       });
   }
 
-  private renderRemoteFields(): void {
-    const container = this.addFormContainerEl!;
-
+  private renderRemoteFields(container: HTMLElement): void {
     new Setting(container)
       .setName(t('settings.server.mcp.add.url'))
       .addText((text) => {
@@ -208,10 +221,14 @@ export class SettingsMcpAddForm {
           });
       });
 
-    this.renderOAuthDropdown(container);
+    const oauthGroup = this.createFormGroup(
+      this.addFormContainerEl!,
+      t('settings.server.mcp.add.group.oauth'),
+    );
+    this.renderOAuthDropdown(oauthGroup);
 
     if (this.addFormState.oauthMode === 'configured') {
-      this.renderOAuthConfiguredFields(container);
+      this.renderOAuthConfiguredFields(oauthGroup);
     }
   }
 

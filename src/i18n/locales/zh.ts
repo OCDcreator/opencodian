@@ -1867,6 +1867,10 @@ export const zhTranslations = {
 
   // MCP 添加服务器表单
   'settings.server.mcp.add.title': '添加 MCP 服务器',
+  'settings.server.mcp.add.group.basics': '基础信息',
+  'settings.server.mcp.add.group.connection': '连接配置',
+  'settings.server.mcp.add.group.oauth': 'OAuth',
+  'settings.server.mcp.add.type': '类型',
   'settings.server.mcp.add.typeLocal': '本地',
   'settings.server.mcp.add.typeRemote': '远程',
   'settings.server.mcp.add.name': '名称',

@@ -159,7 +159,7 @@ describe('SettingsMcpSection add-server form', () => {
     await submit();
     expectLastNotice(t('settings.server.mcp.validation.commandRequired'));
 
-    await changeDropdown(t('settings.server.mcp.add.title'), 'remote');
+    await changeDropdown(t('settings.server.mcp.add.type'), 'remote');
     await submit();
     expectLastNotice(t('settings.server.mcp.validation.urlRequired'));
 
@@ -248,7 +248,7 @@ describe('SettingsMcpSection add-server form', () => {
     section.attachTabbed(containerEl, 'mcp');
     await flushAsync();
 
-    await changeDropdown(t('settings.server.mcp.add.title'), 'remote');
+    await changeDropdown(t('settings.server.mcp.add.type'), 'remote');
     await changeText(t('settings.server.mcp.add.name'), 'oauth-server');
     await changeText(t('settings.server.mcp.add.url'), 'https://mcp.example.com/mcp');
     await changeDropdown(t('settings.server.mcp.add.oauth'), 'configured');
@@ -287,7 +287,7 @@ describe('SettingsMcpSection add-server form', () => {
     section.attachTabbed(containerEl, 'mcp');
     await flushAsync();
 
-    await changeDropdown(t('settings.server.mcp.add.title'), 'remote');
+    await changeDropdown(t('settings.server.mcp.add.type'), 'remote');
     await changeText(t('settings.server.mcp.add.name'), 'configured-blank');
     await changeText(t('settings.server.mcp.add.url'), 'https://mcp.example.com/mcp');
     await changeDropdown(t('settings.server.mcp.add.oauth'), 'configured');
@@ -315,7 +315,7 @@ describe('SettingsMcpSection add-server form', () => {
     section.attachTabbed(containerEl, 'mcp');
     await flushAsync();
 
-    await changeDropdown(t('settings.server.mcp.add.title'), 'remote');
+    await changeDropdown(t('settings.server.mcp.add.type'), 'remote');
     await changeText(t('settings.server.mcp.add.name'), 'disabled-remote');
     await changeText(t('settings.server.mcp.add.url'), 'https://mcp.example.com/mcp');
     await changeToggle(t('settings.server.mcp.add.enabled'), false);

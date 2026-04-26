@@ -19,6 +19,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 同日 M2 继续扩展 `settings.server.mcp.*` 键空间，新增 MCP 操作按钮（连接 / 断开 / 认证 / 清除认证）、新增服务器表单（本地 / 远程类型切换、命令 / 环境变量 / URL / 请求头 / OAuth 等字段）、校验错误（nameRequired / nameDuplicate / commandRequired / urlRequired / urlInvalid / timeoutPositive / emptyKey）和操作反馈通知（added / addFailed / actionFailed）对应的中文文案。
 
+2026-04-26 的 MCP 设置页布局收口又补了一组 `settings.server.mcp.add.group.*` 和 `settings.server.mcp.add.type` 文案，用于把新增服务器表单整理成 `基础信息` / `连接配置` / `OAuth` 分组卡片，并把原先直接借标题承载的类型切换改成独立 `类型` 字段标签。
+
 同日 F2 新增 `settings.formatter.*` 和 `settings.quickNav.formatterDesc` 系列键，为 Formatter 一级设置页提供概览（runtime status / summary cards / detected formatter table）、配置（mode switch）和模式切换通知的中文文案。
 
 同日 F3 扩展 `settings.formatter.config.*` 键空间，新增内置格式化器编辑（builtin list / action dropdown / override fields for command/environment/extensions）、自定义格式化器 CRUD（add / save / delete / nameConflict）、高级 JSON 编辑器（format / reload / save / invalidJson）和运行时离线提示对应的中文文案。

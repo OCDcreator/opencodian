@@ -164,15 +164,16 @@ export class SettingsMcpSection {
       text: t('settings.server.mcp.overview.title'),
       cls: 'opencodian-settings-subsection-heading',
     });
-    overviewBlock.createDiv({
-      cls: 'opencodian-settings-block-desc',
+
+    const overviewBody = overviewBlock.createDiv({ cls: 'opencodian-settings-block-body' });
+    const overviewShell = overviewBody.createDiv({ cls: 'opencodian-mcp-overview-shell' });
+    const overviewToolbar = overviewShell.createDiv({ cls: 'opencodian-mcp-overview-toolbar' });
+    overviewToolbar.createDiv({
+      cls: 'opencodian-mcp-overview-toolbar-copy',
       text: t('settings.server.mcp.overview.desc'),
     });
 
-    const overviewBody = overviewBlock.createDiv({ cls: 'opencodian-settings-block-body' });
-    this.overviewContainerEl = overviewBody.createDiv({ cls: 'opencodian-mcp-overview' });
-
-    new Setting(overviewBody)
+    new Setting(overviewToolbar.createDiv({ cls: 'opencodian-mcp-overview-toolbar-action' }))
       .addButton((button) => {
         this.refreshButton = button;
         button
@@ -183,10 +184,12 @@ export class SettingsMcpSection {
           });
       })
       .settingEl.classList.add('opencodian-mcp-refresh-setting');
+    this.overviewContainerEl = overviewShell.createDiv({ cls: 'opencodian-mcp-overview' });
 
     const serverBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     const serverBody = serverBlock.createDiv({ cls: 'opencodian-settings-block-body' });
-    this.serverListContainerEl = serverBody.createDiv({ cls: 'opencodian-mcp-server-list' });
+    const serverListShell = serverBody.createDiv({ cls: 'opencodian-mcp-server-list-shell' });
+    this.serverListContainerEl = serverListShell.createDiv({ cls: 'opencodian-mcp-server-list' });
 
     const addBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     addBlock.createEl('h4', {
@@ -195,7 +198,7 @@ export class SettingsMcpSection {
     });
     const addBody = addBlock.createDiv({ cls: 'opencodian-settings-block-body' });
     this.addForm = new SettingsMcpAddForm(this.plugin);
-    this.addForm.render(addBody);
+    this.addForm.render(addBody.createDiv({ cls: 'opencodian-mcp-add-form-layout' }));
 
     this.renderFromSnapshot(this.plugin.openCodeService.getMcpServerSnapshot());
   }
@@ -278,19 +281,17 @@ export class SettingsMcpSection {
 
   private renderServerRow(parent: HTMLElement, name: string, status: McpServerStatus): void {
     const row = parent.createDiv({ cls: 'opencodian-mcp-server-row' });
+    const rowMain = row.createDiv({ cls: 'opencodian-mcp-server-row-main' });
 
-    row.createDiv({ cls: 'opencodian-mcp-server-row-name', text: name });
+    rowMain.createDiv({ cls: 'opencodian-mcp-server-row-name', text: name });
 
-    const statusCell = row.createDiv({ cls: 'opencodian-mcp-server-row-status' });
+    const statusCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-row-status' });
     statusCell.createSpan({
       cls: `opencodian-mcp-badge ${statusBadgeClass(status.status)}`,
       text: statusLabel(status.status),
     });
 
-    const actionsCell = row.createDiv();
-    actionsCell.style.display = 'flex';
-    actionsCell.style.gap = '8px';
-    actionsCell.style.flexWrap = 'wrap';
+    const actionsCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-row-actions' });
     this.renderServerActions(actionsCell, name, status);
 
     if ((status.status === 'failed' || status.status === 'needs_client_registration') && 'error' in status && status.error) {

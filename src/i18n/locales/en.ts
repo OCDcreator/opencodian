@@ -1867,6 +1867,10 @@ export const enTranslations = {
 
   // MCP add-server form
   'settings.server.mcp.add.title': 'Add MCP Server',
+  'settings.server.mcp.add.group.basics': 'Basics',
+  'settings.server.mcp.add.group.connection': 'Connection',
+  'settings.server.mcp.add.group.oauth': 'OAuth',
+  'settings.server.mcp.add.type': 'Type',
   'settings.server.mcp.add.typeLocal': 'Local',
   'settings.server.mcp.add.typeRemote': 'Remote',
   'settings.server.mcp.add.name': 'Name',
