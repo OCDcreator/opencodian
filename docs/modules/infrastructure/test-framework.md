@@ -5,7 +5,7 @@
 
 ## 概述
 
-基于 Jest 30.2+ 的测试框架，支持 unit 和 integration 两个项目。Unit 测试使用 jsdom 环境，集成 Obsidian API mock。Integration 测试使用 node 环境。路径别名 `@/*` 映射到 `src/*`，Obsidian SDK 模块通过 mock 文件替换。
+基于 Jest 30.2+ 的测试框架，支持 unit、integration 和 scripts 三个项目。Unit 测试使用 jsdom 环境，集成 Obsidian API mock。Integration 测试使用 node 环境。Scripts 测试使用 node 环境且不做 transform，用于测试 ESM (.mjs) 工具脚本的纯逻辑函数。路径别名 `@/*` 映射到 `src/*`，Obsidian SDK 模块通过 mock 文件替换。
 
 ## 导入关系
 上游: `jest`, `ts-jest`, `jest.config.js`
@@ -23,6 +23,7 @@
 |------|------|----------|
 | unit | jsdom | `tests/unit/**/*.test.ts` |
 | integration | node | `tests/integration/**/*.test.ts` |
+| scripts | node | `tests/unit/infrastructure/**/*.test.mjs` |
 
 ### 模块映射
 
@@ -82,6 +83,10 @@ npm run test
       → node 环境
       → ts-jest transform
       → tests/integration/**/*.test.ts
+    → scripts 项目:
+      → node 环境
+      → 无 transform（原生 ESM）
+      → tests/unit/infrastructure/**/*.test.mjs
     → 覆盖率收集 → coverage/
 ```
 
@@ -107,6 +112,7 @@ npm run test
 - `reference-projects/` 目录被全局排除
 - `tsconfig.jest.json` 可能与主 `tsconfig.json` 有差异（如 module resolution）
 - 覆盖率排除 `index.ts` barrel 文件和 `.d.ts` 类型声明
+- Scripts 测试项目不使用 ts-jest，不 mock 模块，仅测试 `.mjs` 脚本的纯逻辑导出函数
 
 ## 待补充
 - [ ] Obsidian API mock 的覆盖范围和限制

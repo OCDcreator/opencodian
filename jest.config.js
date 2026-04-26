@@ -43,6 +43,14 @@ module.exports = {
         '^@/(.*)$': '<rootDir>/src/$1',
       },
     },
+    {
+      displayName: 'scripts',
+      roots: ['<rootDir>/tests'],
+      testEnvironment: 'node',
+      testMatch: ['<rootDir>/tests/unit/infrastructure/**/*.test.mjs'],
+      transform: {},
+      moduleFileExtensions: ['js', 'mjs', 'json'],
+    },
   ],
   collectCoverageFrom: [
     'src/**/*.ts',

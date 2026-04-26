@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证和模块文档硬约束。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。
+项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证和模块文档硬约束。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs`。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`
@@ -198,6 +198,7 @@ npm run list:module-docs -- --range origin/main...HEAD
 - `doctor-esbuild.mjs` 的平台映射表需要随 esbuild 更新而维护
 - `release.mjs` 使用 `npm install --package-lock-only` 更新 lockfile
 - `check-devlog-order.mjs` 在 CI/handoff 前应运行
+- `check:devlog-order` 已接入 `npm run verify`；新 devlog 条目必须插入到第一个日期标题之前
 - `check:graphify` 已接入 `npm run verify`；如果修改了 `src/`，通常需要先运行 `npm run graphify:update:src`
 - `check-module-docs` 已接入 `npm run verify`，源码模块新增、修改、删除时不能跳过对应文档
 - `sync-version.js` 应在 release 后自动运行
