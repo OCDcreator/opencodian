@@ -96,3 +96,24 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 - `OpenCodianView` 仍定义完整 `TabRuntimeState` shape，并保留真实 DOM slots、settings、plugin save、session status 与 pane host wiring
 - `ConversationTabRuntimeCoordinator` 只负责 tab runtime lifecycle 的编排，不接管 message render、send pipeline、opencode transport、question dock 或 todo runtime 语义
 - `ConversationLoadRecoveryCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationViewStateService` 继续拥有各自 conversation/recovery/load 细节；本模块只是把 tab-facing lifecycle 入口收束成单一 coordinator surface
+
+## 注意事项
+
+### 优先扩展的相邻模块
+
+| 功能类型 | 优先扩展 |
+|----------|----------|
+| Tab pane DOM / scroll / pane state | `TabMessagesPaneCoordinator` |
+| 会话加载 / 恢复 / fallback | `ConversationLoadRecoveryCoordinator` |
+| Close/delete 后的 active-tab recovery | `ConversationTabLifecycleRecoveryCoordinator` |
+| Tab activation 后的 load/empty/streaming 分支 | `ConversationViewStateService` |
+| Tab badge / background-task badge / attention | `TabRuntimeStateBridge` |
+| Message render | `ConversationRenderService` |
+| Send pipeline | `SendPipelineRuntime` / `MessageSendPreparationService` |
+
+### 不可移除的关键行为
+
+1. **Per-tab streaming 隔离**：每个 tab 拥有独立的 runtime state 和 pane state；不能退化为全局单一 stream 状态，否则并发 tab 会互相干扰。
+2. **`isTabForegroundBusy()` 的 compaction 优先检查**：先检查 `compactingAt`，再回落到 streaming/session busy；这个优先级不能颠倒，否则 compaction 期间用户可能触发冲突操作。
+3. **`initializeTabSystem()` 的原子性**：TabBar、TabManager 与 tab bar mount 在一次调用中创建，`TabManager.onChanged` 统一接到 `renderTabBar()` + `persistTabState()`；不能拆成多次独立初始化，否则中间状态会渲染不完整的 tab bar。
+4. **`persistTabState()` 的 scheduled vs flush 区分**：常规切换用 scheduled save，关闭/销毁用 flush immediate save；不能统一用 scheduled，否则快速关闭 tab 可能丢失状态。

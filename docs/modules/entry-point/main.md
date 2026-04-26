@@ -226,12 +226,33 @@ graph TD
 
 ## 注意事项
 
+### 优先扩展的相邻模块
+
+新功能不应直接加入 `main.ts`。根据功能类型，优先扩展以下 owner：
+
+| 功能类型 | 优先扩展 |
+|----------|----------|
+| OpenCode 运行时行为 | `src/core/opencode/OpenCodeService.ts` |
+| 会话 / tab 生命周期 | `ConversationTabRuntimeCoordinator` / `ConversationViewStateService` |
+| 模型目录 / provider 逻辑 | `ModelConfigService` / `OpencodeConfigManager` |
+| 设置 UI | `OpenCodianSettings` / 对应 section owner |
+| 主题 / 外观 | `src/core/theme/` 下对应模块 |
+| 存储层 | `StorageService` |
+| 聊天视图行为 | `OpenCodianView` 的各 coordinator / service |
+
+### 不可移除的关键行为
+
+1. **`loadConversations()` 必须在视图注册之前完成**：`onload()` 先预载会话再注册 `OpenCodianView`，这是热重载/恢复链路的顺序约束；违反会导致视图恢复时拿不到会话数据。
+2. **`loadSettings()` 归一化链路**：分层设置读取（`primary/backup/legacy/missing/blocked`）+ 历史字段迁移 + 归一化是不可切断的启动前置；跳过任何环节都可能导致旧版设置被默认值覆盖。
+3. **`saveSettings()` 的服务层回滚**：先同步服务层、失败时回滚到旧快照，再写磁盘；这个顺序不能颠倒，否则磁盘写成功但服务层失败会导致运行时状态不一致。
+4. **`settingsPersistenceWritable` 只读保护**：当启动阶段判定设置不可恢复时，插件进入持久化只读保护，通过 `Notice` 告警而非写入默认值；不能绕过此保护写盘。
+
+### 其他注意事项
+
 - `loadConversations()` 只加载元数据，不加载消息正文；正文由 `getConversationById()` 按需补读。
-- `onload()` 仍然先预载会话，再注册 `OpenCodianView`，这是热重载/恢复链路的顺序约束。
-- 本地 server auto-start 已改成注册完成后的后台 warmup；冷启动 trace 现在更接近“插件何时可见”，而不是“sidecar 何时 ready”。
+- 本地 server auto-start 已改成注册完成后的后台 warmup；冷启动 trace 现在更接近"插件何时可见"，而不是"sidecar 何时 ready"。
 - 启动 trace 会同时记录顶层 phase 和嵌套子步骤；诊断报告里的总耗时只汇总顶层 phase，避免双重累计。
 - `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。
-- 当启动阶段判定设置不可恢复时，插件会进入持久化只读保护，并通过 `Notice` 告警，而不是把默认值写回磁盘。
-- `measureStartupStep()` 现在只在 trace 处于 `running` 时记录条目，避免后续手动刷新历史列表时污染“本次启动”快照。
+- `measureStartupStep()` 现在只在 trace 处于 `running` 时记录条目，避免后续手动刷新历史列表时污染"本次启动"快照。
 - 慢启动自动快照不依赖用户先打开 debug；只要启动失败，或顶层总耗时 / 主导 phase 超过阈值，就会把 trace 写到 `.opencodian/debug/startup-perf-latest.log`。
 - `onunload()` 当前没有显式调用 `clearSettingsUiStateSaveTimer()`；卸载时只清除了 chat appearance timer 与 model refresh 帧请求。

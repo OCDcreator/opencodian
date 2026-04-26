@@ -191,12 +191,33 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 
 ## 注意事项
 
+### 优先扩展的相邻模块
+
+新配置行为不应直接加入本模块。根据功能类型，优先扩展以下 owner：
+
+| 功能类型 | 优先扩展 |
+|----------|----------|
+| 模型目录展示 / provider 筛选 | `ModelConfigService` |
+| 设置页项目配置编辑 UI | `OpencodeConfigModal` |
+| 设置页权限 UI / 安全区 | `SettingsSecuritySection` |
+| 插件管理 UI / 运行时 | `PluginManagementService` |
+| Formatter 配置读写细节 | `src/core/config/formatterConfig.ts` |
+| Agent 配置 schema / 类型 | `src/core/types/opencodeConfig.ts` |
+| Command 配置 UI | `SettingsCommandsSection` / `SettingsProjectCommandEditor` |
+
+### 不可移除的关键行为
+
+1. **`write()` 的 `$schema` 强制注入**：每次写入都会把 `$schema` 设为 `https://opencode.ai/config.json`；即使调用方传入别的值也会被覆盖。这是为了保证 OpenCode CLI 和编辑器扩展总能正确识别配置 schema。
+2. **Formatter 的 exact subtree write**：`updateFormatterConfig()` 不做 deep merge，而是直接替换整个 `formatter` 子树。这让 UI 可以安全删除 formatter entry；如果改为 merge，旧 entry 会残留在磁盘上。
+3. **Agent helper 的 deprecated `mode` 兼容**：读取时会合并 deprecated `mode` 和 native `agent`；删除时同步清理两个位置的条目。不能只清理 `agent` 而留下 `mode`，否则 helper 读取时"复活"旧配置。
+4. **`read()` 的静默回退默认值**：文件不存在或解析失败时返回默认配置（`$schema` + `permission: '*': 'ask'`），不抛异常。下游依赖这个行为——不能改为抛异常，否则启动流程会中断。
+5. **Command-owned hidden agent 命名空间**：`opencodian-command:` 前缀是 OpenCodian 保留的 project agent 命名空间；不能被其他用途占用。
+
+### 其他注意事项
+
 - 仓库源码的实际文件名是 `.opencode/opencode.json`，不是 `config.json`。
-- `read()` 的失败策略是“记录日志后静默回退默认值”，不会把错误向上抛。
 - `write()` 失败时会抛出新的通用错误 `Failed to write OpenCode configuration`，原始错误只写日志。
 - `remove()` 只删除配置文件，不会删除 `.opencode` 目录或其子目录。
-- 新增的 agent helper 会读取 deprecated `mode` 作为 legacy import source，但写回目标始终是 native `agent`；只有显式删除某个 agent 时才会同步清理对应的 `mode` 条目。
-- command-owned hidden agent 采用固定前缀 `opencodian-command:`；这是 OpenCodian 保留的 project agent 命名空间。
 
 ## 2026-04-23 Compaction config alignment
 
