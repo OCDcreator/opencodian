@@ -94,6 +94,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `OpencodeCommandConfig` / `OpencodeCommandConfigRecord` | type | slash command 配置与按名称聚合的 map |
 | `OpencodeCompactionConfig` | type | 会话压缩配置 |
 | `OpencodeFormatterEntryConfig` / `OpencodeFormatterConfig` / `OpencodeFormatterStatus` | type | formatter 条目、项目级 formatter 配置与运行时 formatter 状态 |
+| `OpencodeMcpConfigRecord` / `OpencodeMcpEntryConfig` / `OpencodeMcpOAuthConfig` / `OpencodeMcpTransportType` | type | 项目级 MCP server 配置、entry、OAuth 子配置和 transport 类型 |
 | `OpencodeProviderConfig` | type | 提供商配置 |
 | `OpencodeProviderModelConfig` | type | 模型配置 |
 | `OpencodePluginSpec` | type | 插件声明格式 |
@@ -111,7 +112,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 - **settings**: 默认设置、normalize 工具、主题与服务器配置（约 40+ 个字段）
 - **tools**: 工具调用数据结构
 - **permission**: 权限请求与审批结构
-- **opencodeConfig**: 本地 OpenCode 配置文件 schema，以及 agent / command / compaction / formatter / legacy tools typing
+- **opencodeConfig**: 本地 OpenCode 配置文件 schema，以及 agent / command / compaction / formatter / MCP / legacy tools typing
 
 ### 为上层提供稳定类型入口
 

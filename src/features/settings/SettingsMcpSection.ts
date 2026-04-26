@@ -3,13 +3,20 @@
  * Renders runtime MCP status from OpenCodeService seams.
  */
 
-import { type ButtonComponent, Notice, Setting } from 'obsidian';
+import { type App, type ButtonComponent, Notice, Setting } from 'obsidian';
 
+import { McpConfigService } from '../../core/config/McpConfigService';
 import type { McpServerSnapshot, McpServerStatus } from '../../core/opencode/types';
+import type { OpencodeMcpConfigRecord, OpencodeMcpEntryConfig } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
-import { SettingsMcpAddForm } from './SettingsMcpAddForm';
+import { McpServerEditorModal } from './McpServerEditorModal';
+import {
+  McpServerStatusModal,
+  redactMcpSensitiveText,
+  summarizeCommand,
+} from './McpServerStatusModal';
 
 const logger = createLogger('SettingsMcpSection');
 
@@ -30,6 +37,15 @@ interface McpOverviewCounts {
   connected: number;
   needsAuth: number;
   failed: number;
+}
+
+interface McpServerActionContext {
+  snapshot: McpServerSnapshot;
+  name: string;
+  status: McpServerStatus;
+  projectOwned: boolean;
+  projectEntry?: OpencodeMcpEntryConfig;
+  projectEntryEditable: boolean;
 }
 
 function countByStatus(servers: Record<string, McpServerStatus>): McpOverviewCounts {
@@ -101,13 +117,17 @@ export class SettingsMcpSection {
   private isRefreshing = false;
   private isActionPending = false;
   private lastRefreshTime: number | null = null;
-  private readonly actionButtons: ButtonComponent[] = [];
-  private addForm: SettingsMcpAddForm | null = null;
+  private readonly actionButtons: Array<{ button: ButtonComponent; stickyDisabled: boolean }> = [];
+  private readonly configService: McpConfigService | null;
+  private projectServers: OpencodeMcpConfigRecord = {};
 
   constructor(options: SettingsMcpSectionOptions) {
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
     this.requestDisplayRefresh = options.requestDisplayRefresh;
+    this.configService = this.plugin.opencodeConfigManager
+      ? new McpConfigService(this.plugin.opencodeConfigManager)
+      : null;
   }
 
   attachTabbed(containerEl: HTMLElement, _secondaryTabId: string): void {
@@ -136,8 +156,6 @@ export class SettingsMcpSection {
     this.overviewContainerEl = null;
     this.serverListContainerEl = null;
     this.actionButtons.length = 0;
-    this.addForm?.dispose();
-    this.addForm = null;
   }
 
   async triggerRefresh(): Promise<void> {
@@ -173,7 +191,9 @@ export class SettingsMcpSection {
       text: t('settings.server.mcp.overview.desc'),
     });
 
-    new Setting(overviewToolbar.createDiv({ cls: 'opencodian-mcp-overview-toolbar-action' }))
+    const toolbarActions = overviewToolbar.createDiv({ cls: 'opencodian-mcp-overview-toolbar-actions' });
+    const addActionEl = toolbarActions.createDiv({ cls: 'opencodian-mcp-toolbar-add' });
+    new Setting(addActionEl)
       .addButton((button) => {
         this.refreshButton = button;
         button
@@ -184,21 +204,23 @@ export class SettingsMcpSection {
           });
       })
       .settingEl.classList.add('opencodian-mcp-refresh-setting');
+    new Setting(toolbarActions)
+      .addButton((button) => {
+        this.actionButtons.push({ button, stickyDisabled: false });
+        button
+          .setButtonText(t('settings.server.mcp.add.submit'))
+          .setCta()
+          .onClick(() => {
+            this.openAddModal();
+          });
+      })
+      .settingEl.classList.add('opencodian-mcp-toolbar-add-setting');
     this.overviewContainerEl = overviewShell.createDiv({ cls: 'opencodian-mcp-overview' });
 
     const serverBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     const serverBody = serverBlock.createDiv({ cls: 'opencodian-settings-block-body' });
     const serverListShell = serverBody.createDiv({ cls: 'opencodian-mcp-server-list-shell' });
     this.serverListContainerEl = serverListShell.createDiv({ cls: 'opencodian-mcp-server-list' });
-
-    const addBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
-    addBlock.createEl('h4', {
-      text: t('settings.server.mcp.add.title'),
-      cls: 'opencodian-settings-subsection-heading',
-    });
-    const addBody = addBlock.createDiv({ cls: 'opencodian-settings-block-body' });
-    this.addForm = new SettingsMcpAddForm(this.plugin);
-    this.addForm.render(addBody.createDiv({ cls: 'opencodian-mcp-add-form-layout' }));
 
     this.renderFromSnapshot(this.plugin.openCodeService.getMcpServerSnapshot());
   }
@@ -218,6 +240,19 @@ export class SettingsMcpSection {
   private renderFromSnapshot(snapshot: McpServerSnapshot): void {
     this.renderOverviewCards(snapshot);
     this.renderServerRows(snapshot);
+    void this.refreshProjectOwnership(snapshot);
+  }
+
+  private async refreshProjectOwnership(snapshot: McpServerSnapshot): Promise<void> {
+    if (!this.configService) {
+      return;
+    }
+    try {
+      this.projectServers = await this.configService.readProjectServers();
+      this.renderServerRows(snapshot);
+    } catch (error) {
+      logger.warn('Failed to read project MCP config ownership', error);
+    }
   }
 
   private renderOverviewCards(snapshot: McpServerSnapshot): void {
@@ -268,38 +303,67 @@ export class SettingsMcpSection {
       return;
     }
 
-    const header = this.serverListContainerEl.createDiv({ cls: 'opencodian-mcp-server-header' });
-    header.createDiv({ cls: 'opencodian-mcp-server-header-name', text: t('settings.server.mcp.server.name') });
-    header.createDiv({ cls: 'opencodian-mcp-server-header-status', text: t('settings.server.mcp.server.status') });
-    header.createDiv({ text: '' });
-
     for (const name of names) {
       const status = servers[name];
-      this.renderServerRow(this.serverListContainerEl!, name, status);
+      this.renderServerCard(this.serverListContainerEl!, snapshot, name, status);
     }
   }
 
-  private renderServerRow(parent: HTMLElement, name: string, status: McpServerStatus): void {
-    const row = parent.createDiv({ cls: 'opencodian-mcp-server-row' });
-    const rowMain = row.createDiv({ cls: 'opencodian-mcp-server-row-main' });
+  private renderServerCard(
+    parent: HTMLElement,
+    snapshot: McpServerSnapshot,
+    name: string,
+    status: McpServerStatus,
+  ): void {
+    const projectEntry = this.projectServers[name];
+    const projectOwned = Boolean(projectEntry);
+    const row = parent.createDiv({ cls: 'opencodian-mcp-server-card' });
+    const rowMain = row.createDiv({ cls: 'opencodian-mcp-server-card-main' });
+    const identity = rowMain.createDiv({ cls: 'opencodian-mcp-server-card-identity' });
 
-    rowMain.createDiv({ cls: 'opencodian-mcp-server-row-name', text: name });
+    identity.createDiv({ cls: 'opencodian-mcp-server-card-name', text: name });
+    identity.createDiv({ cls: 'opencodian-mcp-server-card-endpoint', text: this.getEndpointSummary(projectEntry) });
+    identity.createDiv({ cls: 'opencodian-mcp-server-card-ownership', text: projectOwned ? t('settings.server.mcp.ownership.project') : t('settings.server.mcp.ownership.runtimeOnly') });
 
-    const statusCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-row-status' });
+    const statusCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-card-status' });
     statusCell.createSpan({
       cls: `opencodian-mcp-badge ${statusBadgeClass(status.status)}`,
       text: statusLabel(status.status),
     });
+    statusCell.createSpan({ cls: 'opencodian-mcp-transport-badge', text: projectEntry ? projectEntry.type === 'remote' ? 'HTTP' : 'STDIO' : t('settings.server.mcp.transportUnknown') });
 
-    const actionsCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-row-actions' });
-    this.renderServerActions(actionsCell, name, status);
+    const actionsCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-card-actions' });
+    this.renderServerActions(actionsCell, {
+      snapshot,
+      name,
+      status,
+      projectOwned,
+      projectEntry,
+      projectEntryEditable: this.isEditableProjectEntry(projectEntry),
+    });
 
     if ((status.status === 'failed' || status.status === 'needs_client_registration') && 'error' in status && status.error) {
       row.createDiv({
-        cls: 'opencodian-mcp-server-row-error',
-        text: `${t('settings.server.mcp.server.error')}: ${status.error}`,
+        cls: 'opencodian-mcp-server-card-helper is-error',
+        text: `${t('settings.server.mcp.server.error')}: ${redactMcpSensitiveText(status.error)}`,
       });
+    } else {
+      row.createDiv({ cls: 'opencodian-mcp-server-card-helper', text: projectOwned ? this.isEditableProjectEntry(projectEntry) ? t('settings.server.mcp.card.projectHint') : t('settings.server.mcp.card.overrideOnlyHint') : t('settings.server.mcp.card.runtimeOnlyHint') });
     }
+  }
+
+  private getEndpointSummary(entry: OpencodeMcpEntryConfig | undefined): string {
+    if (!entry) {
+      return t('settings.server.mcp.details.runtimeOnly');
+    }
+    if (entry.type === 'remote') {
+      return typeof entry.url === 'string' && entry.url.trim()
+        ? redactMcpSensitiveText(entry.url.trim())
+        : 'remote';
+    }
+    return Array.isArray(entry.command) && entry.command.length > 0
+      ? summarizeCommand(entry.command)
+      : 'local';
   }
 
   private updateRefreshButton(): void {
@@ -314,14 +378,30 @@ export class SettingsMcpSection {
     this.refreshButton.setDisabled(this.isRefreshing);
   }
 
-  private renderServerActions(parent: HTMLElement, name: string, status: McpServerStatus): void {
-    const addActionButton = (label: string, onClick: () => Promise<void>) => {
+  private renderServerActions(parent: HTMLElement, context: McpServerActionContext): void {
+    const {
+      snapshot,
+      name,
+      status,
+      projectOwned,
+      projectEntry,
+      projectEntryEditable,
+    } = context;
+    parent.createDiv({ cls: 'opencodian-mcp-runtime-switch-label', text: t('settings.server.mcp.runtimeSwitch.label') });
+    const addActionButton = (
+      label: string,
+      onClick: () => Promise<void>,
+      options: { disabled?: boolean } = {},
+    ) => {
       new Setting(parent).addButton((button) => {
-        this.actionButtons.push(button);
+        this.actionButtons.push({ button, stickyDisabled: options.disabled === true });
         button
           .setButtonText(label)
-          .setDisabled(this.isActionPending)
+          .setDisabled(this.isActionPending || options.disabled === true)
           .onClick(async () => {
+            if (options.disabled) {
+              return;
+            }
             this.isActionPending = true;
             this.updateActionButtons();
             try {
@@ -329,7 +409,7 @@ export class SettingsMcpSection {
               void this.triggerRefresh();
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
-              new Notice(t('settings.server.mcp.notice.actionFailed', { error: message }));
+              new Notice(t('settings.server.mcp.notice.actionFailed', { error: redactMcpSensitiveText(message) }));
             } finally {
               this.isActionPending = false;
               this.updateActionButtons();
@@ -361,11 +441,110 @@ export class SettingsMcpSection {
       default:
         break;
     }
+
+    addActionButton(t('settings.server.mcp.action.monitor'), async () => {
+      new McpServerStatusModal(this.getApp(), {
+        name,
+        status,
+        updatedAt: snapshot.updatedAt ?? this.lastRefreshTime,
+        projectOwned,
+        entry: projectEntry,
+      }).open();
+    });
+
+    addActionButton(t('settings.server.mcp.action.edit'), async () => {
+      if (!projectOwned || !projectEntry) {
+        new Notice(t('settings.server.mcp.notice.readOnly'));
+        return;
+      }
+      this.openEditModal(name, projectEntry);
+    }, { disabled: !projectOwned || !projectEntry || !projectEntryEditable });
+
+    addActionButton(t('settings.server.mcp.action.delete'), async () => {
+      await this.deleteProjectServer(name, status, projectOwned);
+    }, { disabled: !projectOwned });
   }
 
   private updateActionButtons(): void {
-    for (const button of this.actionButtons) {
-      button.setDisabled(this.isActionPending);
+    for (const { button, stickyDisabled } of this.actionButtons) {
+      button.setDisabled(this.isActionPending || stickyDisabled);
     }
+  }
+
+  private openAddModal(): void {
+    if (!this.configService) {
+      new Notice(t('settings.server.mcp.notice.configUnavailable'));
+      return;
+    }
+    new McpServerEditorModal(this.getApp(), {
+      mode: 'add',
+      existingNames: Object.keys({ ...this.plugin.openCodeService.getMcpServerSnapshot().servers, ...this.projectServers }),
+      configService: this.configService,
+      onSaved: async ({ name, config }) => {
+        try {
+          await this.plugin.openCodeService.addMcpServer(name, config);
+        } finally {
+          await this.triggerRefresh();
+        }
+      },
+    }).open();
+  }
+
+  private openEditModal(name: string, entry: OpencodeMcpEntryConfig): void {
+    if (!this.configService) {
+      new Notice(t('settings.server.mcp.notice.configUnavailable'));
+      return;
+    }
+    new McpServerEditorModal(this.getApp(), {
+      mode: 'edit',
+      serverName: name,
+      existingEntry: entry,
+      existingNames: Object.keys(this.projectServers),
+      configService: this.configService,
+      onSaved: async ({ name: nextName, config }) => {
+        try {
+          await this.plugin.openCodeService.addMcpServer(nextName, config);
+        } finally {
+          await this.triggerRefresh();
+        }
+      },
+    }).open();
+  }
+
+  private async deleteProjectServer(
+    name: string,
+    status: McpServerStatus,
+    projectOwned: boolean,
+  ): Promise<void> {
+    if (!this.configService || !projectOwned) {
+      new Notice(t('settings.server.mcp.notice.readOnly'));
+      return;
+    }
+    if (!window.confirm(t('settings.server.mcp.delete.confirm', { name }))) {
+      return;
+    }
+    if (status.status === 'connected') {
+      try {
+        await this.plugin.openCodeService.disconnectMcpServer(name);
+      } catch (error) {
+        logger.warn('Best-effort MCP disconnect before delete failed', error);
+      }
+    }
+    await this.configService.deleteServer(name);
+    delete this.projectServers[name];
+    await this.triggerRefresh();
+    if (this.plugin.openCodeService.getMcpServerSnapshot().servers[name]) {
+      new Notice(t('settings.server.mcp.notice.deletedRuntimeMayPersist', { name }));
+      return;
+    }
+    new Notice(t('settings.server.mcp.notice.deleted', { name }));
+  }
+
+  private isEditableProjectEntry(entry: OpencodeMcpEntryConfig | undefined): boolean {
+    return entry?.type === 'local' || entry?.type === 'remote';
+  }
+
+  private getApp(): App {
+    return (this.plugin as OpenCodianPlugin & { app?: App }).app ?? ({} as App);
   }
 }

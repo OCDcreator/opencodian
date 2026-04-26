@@ -69,7 +69,7 @@ export interface TextAreaRecord {
   onChange?: (value: string) => void | Promise<void>;
 }
 
-export type McpSectionPlugin = Pick<OpenCodianPlugin, 'openCodeService'>;
+export type McpSectionPlugin = Pick<OpenCodianPlugin, 'openCodeService' | 'opencodeConfigManager' | 'app'>;
 
 export const buttonRecords: ButtonRecord[] = [];
 export const dropdownRecords: DropdownRecord[] = [];
@@ -216,6 +216,13 @@ export function createPlugin(snapshot?: Partial<McpServerSnapshot>): McpSectionP
   };
 
   return {
+    app: {},
+    opencodeConfigManager: {
+      exists: jest.fn().mockResolvedValue(false),
+      read: jest.fn().mockResolvedValue({}),
+      write: jest.fn().mockResolvedValue(undefined),
+      getConfigPath: jest.fn().mockReturnValue('C:/vault/.opencode/opencode.json'),
+    } as unknown as McpSectionPlugin['opencodeConfigManager'],
     openCodeService: {
       getMcpServerSnapshot: jest.fn().mockReturnValue(currentSnapshot),
       refreshMcpServerStatus: jest.fn().mockResolvedValue(currentSnapshot.servers),

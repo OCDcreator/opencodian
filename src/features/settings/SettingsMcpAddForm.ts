@@ -1,11 +1,9 @@
-/** Add-server form sub-component extracted from SettingsMcpSection. */
-
-import { type ButtonComponent, Notice, Setting } from 'obsidian';
-
+import type { OpencodeMcpEntryConfig } from '../../core/types';
 import { t } from '../../i18n';
-import type OpenCodianPlugin from '../../main';
 
-function parseKvPairs(text: string): Array<[string, string]> {
+export const MCP_REDACTED_VALUE = '[redacted]';
+
+export function parseMcpKvPairs(text: string): Array<[string, string]> {
   return text.split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
@@ -18,9 +16,9 @@ function parseKvPairs(text: string): Array<[string, string]> {
     });
 }
 
-function parseKvPairsToRecord(text: string): Record<string, string> {
+export function parseMcpKvPairsToRecord(text: string): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [key, value] of parseKvPairs(text)) {
+  for (const [key, value] of parseMcpKvPairs(text)) {
     if (key) {
       result[key] = value;
     }
@@ -42,385 +40,215 @@ export interface AddFormState {
   oauthClientSecret: string;
   oauthScope: string;
   oauthRedirectUri: string;
+  originalEnvironment: Record<string, string>;
+  originalHeaders: Record<string, string>;
+  originalOauthClientSecret: string | null;
 }
 
-export class SettingsMcpAddForm {
-  private readonly plugin: OpenCodianPlugin;
-  private addFormContainerEl: HTMLElement | null = null;
-  private isAdding = false;
-  private addSubmitButton: ButtonComponent | null = null;
-  private addFormState: AddFormState = SettingsMcpAddForm.createDefaultAddFormState();
+export interface McpFormValidationOptions {
+  existingNames?: string[];
+  originalName?: string;
+}
 
-  constructor(plugin: OpenCodianPlugin) {
-    this.plugin = plugin;
+export function createDefaultMcpFormState(): AddFormState {
+  return {
+    type: 'local',
+    name: '',
+    command: '',
+    environment: '',
+    enabled: true,
+    timeout: '',
+    url: '',
+    headers: '',
+    oauthMode: 'auto',
+    oauthClientId: '',
+    oauthClientSecret: '',
+    oauthScope: '',
+    oauthRedirectUri: '',
+    originalEnvironment: {},
+    originalHeaders: {},
+    originalOauthClientSecret: null,
+  };
+}
+
+function recordToKvText(value: unknown): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return '';
+  }
+  return Object.entries(value as Record<string, unknown>)
+    .map(([key]) => `${key}=${MCP_REDACTED_VALUE}`)
+    .join('\n');
+}
+
+export function mcpEntryToFormState(name: string, entry: OpencodeMcpEntryConfig): AddFormState {
+  const oauth = entry.oauth;
+  const oauthRecord = oauth && typeof oauth === 'object' && !Array.isArray(oauth)
+    ? oauth as Record<string, unknown>
+    : {};
+  const originalEnvironment = isStringRecord(entry.environment);
+  const originalHeaders = isStringRecord(entry.headers);
+  const originalOauthClientSecret = typeof oauthRecord.clientSecret === 'string'
+    ? oauthRecord.clientSecret
+    : null;
+  return {
+    ...createDefaultMcpFormState(),
+    type: entry.type === 'remote' ? 'remote' : 'local',
+    name,
+    command: Array.isArray(entry.command) ? entry.command.join('\n') : '',
+    environment: recordToKvText(entry.environment),
+    enabled: entry.enabled !== false,
+    timeout: typeof entry.timeout === 'number' ? String(entry.timeout) : '',
+    url: typeof entry.url === 'string' ? entry.url : '',
+    headers: recordToKvText(entry.headers),
+    oauthMode: oauth === false ? 'disabled' : oauth && typeof oauth === 'object' ? 'configured' : 'auto',
+    oauthClientId: typeof oauthRecord.clientId === 'string' ? oauthRecord.clientId : '',
+    oauthClientSecret: originalOauthClientSecret ? MCP_REDACTED_VALUE : '',
+    oauthScope: typeof oauthRecord.scope === 'string' ? oauthRecord.scope : '',
+    oauthRedirectUri: typeof oauthRecord.redirectUri === 'string' ? oauthRecord.redirectUri : '',
+    originalEnvironment,
+    originalHeaders,
+    originalOauthClientSecret,
+  };
+}
+
+function isStringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
+}
+
+export function validateMcpFormState(
+  state: AddFormState,
+  options: McpFormValidationOptions = {},
+): string | null {
+  const name = state.name.trim();
+  if (!name) {
+    return t('settings.server.mcp.validation.nameRequired');
   }
 
-  render(parent: HTMLElement): void {
-    this.addFormContainerEl = parent;
-    this.renderAddFormFields();
+  if (
+    name !== options.originalName
+    && options.existingNames?.includes(name)
+  ) {
+    return t('settings.server.mcp.validation.nameDuplicate');
   }
 
-  dispose(): void {
-    this.addFormContainerEl = null;
-    this.addSubmitButton = null;
-  }
-
-  private static createDefaultAddFormState(): AddFormState {
-    return {
-      type: 'local',
-      name: '',
-      command: '',
-      environment: '',
-      enabled: true,
-      timeout: '',
-      url: '',
-      headers: '',
-      oauthMode: 'auto',
-      oauthClientId: '',
-      oauthClientSecret: '',
-      oauthScope: '',
-      oauthRedirectUri: '',
-    };
-  }
-
-  private renderAddFormFields(): void {
-    if (!this.addFormContainerEl) {
-      return;
+  if (state.type === 'local') {
+    const commandLines = state.command
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (commandLines.length === 0) {
+      return t('settings.server.mcp.validation.commandRequired');
     }
-
-    this.addFormContainerEl.empty();
-    this.addSubmitButton = null;
-
-    const basicsGroup = this.createFormGroup(
-      this.addFormContainerEl,
-      t('settings.server.mcp.add.group.basics'),
-    );
-
-    new Setting(basicsGroup)
-      .setName(t('settings.server.mcp.add.type'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('local', t('settings.server.mcp.add.typeLocal'))
-          .addOption('remote', t('settings.server.mcp.add.typeRemote'))
-          .setValue(this.addFormState.type)
-          .onChange((value) => {
-            this.addFormState.type = value === 'remote' ? 'remote' : 'local';
-            this.renderAddFormFields();
-          });
+    const envKeys = parseMcpKvPairs(state.environment);
+    if (envKeys.some(([key]) => key.length === 0)) {
+      return t('settings.server.mcp.validation.emptyKey', {
+        field: t('settings.server.mcp.add.environment'),
       });
-
-    new Setting(basicsGroup)
-      .setName(t('settings.server.mcp.add.name'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.server.mcp.add.namePlaceholder'))
-          .setValue(this.addFormState.name)
-          .onChange((value) => {
-            this.addFormState.name = value;
-          });
-      });
-
-    new Setting(basicsGroup)
-      .setName(t('settings.server.mcp.add.enabled'))
-      .addToggle((toggle) => {
-        toggle.setValue(this.addFormState.enabled).onChange((value) => {
-          this.addFormState.enabled = value;
-        });
-      });
-
-    new Setting(basicsGroup)
-      .setName(t('settings.server.mcp.add.timeout'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.server.mcp.add.timeoutPlaceholder'))
-          .setValue(this.addFormState.timeout)
-          .onChange((value) => {
-            this.addFormState.timeout = value;
-          });
-      });
-
-    const connectionGroup = this.createFormGroup(
-      this.addFormContainerEl,
-      t('settings.server.mcp.add.group.connection'),
-    );
-
-    if (this.addFormState.type === 'local') {
-      this.renderLocalFields(connectionGroup);
-    } else {
-      this.renderRemoteFields(connectionGroup);
-    }
-
-    const actionRow = this.addFormContainerEl.createDiv({ cls: 'opencodian-mcp-form-actions' });
-    new Setting(actionRow)
-      .addButton((button) => {
-        this.addSubmitButton = button;
-        button.onClick(async () => {
-          await this.handleAddServer();
-        });
-      });
-
-    this.updateSubmitButton();
-  }
-
-  private createFormGroup(parent: HTMLElement, title: string): HTMLElement {
-    const groupEl = parent.createDiv({ cls: 'opencodian-mcp-form-group' });
-    groupEl.createDiv({ cls: 'opencodian-mcp-form-group-title', text: title });
-    return groupEl.createDiv({ cls: 'opencodian-mcp-form-group-body' });
-  }
-
-  private renderLocalFields(container: HTMLElement): void {
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.command'))
-      .setDesc(t('settings.server.mcp.add.commandDesc'))
-      .addTextArea((text) => {
-        text.inputEl.rows = 3;
-        text
-          .setPlaceholder(t('settings.server.mcp.add.commandPlaceholder'))
-          .setValue(this.addFormState.command)
-          .onChange((value) => {
-            this.addFormState.command = value;
-          });
-      });
-
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.environment'))
-      .setDesc(t('settings.server.mcp.add.environmentDesc'))
-      .addTextArea((text) => {
-        text.inputEl.rows = 2;
-        text
-          .setPlaceholder(t('settings.server.mcp.add.environmentPlaceholder'))
-          .setValue(this.addFormState.environment)
-          .onChange((value) => {
-            this.addFormState.environment = value;
-          });
-      });
-  }
-
-  private renderRemoteFields(container: HTMLElement): void {
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.url'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.server.mcp.add.urlPlaceholder'))
-          .setValue(this.addFormState.url)
-          .onChange((value) => {
-            this.addFormState.url = value;
-          });
-      });
-
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.headers'))
-      .setDesc(t('settings.server.mcp.add.headersDesc'))
-      .addTextArea((text) => {
-        text.inputEl.rows = 2;
-        text
-          .setPlaceholder(t('settings.server.mcp.add.headersPlaceholder'))
-          .setValue(this.addFormState.headers)
-          .onChange((value) => {
-            this.addFormState.headers = value;
-          });
-      });
-
-    const oauthGroup = this.createFormGroup(
-      this.addFormContainerEl!,
-      t('settings.server.mcp.add.group.oauth'),
-    );
-    this.renderOAuthDropdown(oauthGroup);
-
-    if (this.addFormState.oauthMode === 'configured') {
-      this.renderOAuthConfiguredFields(oauthGroup);
     }
   }
 
-  private renderOAuthDropdown(container: HTMLElement): void {
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.oauth'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('auto', t('settings.server.mcp.add.oauthAuto'))
-          .addOption('disabled', t('settings.server.mcp.add.oauthDisabled'))
-          .addOption('configured', t('settings.server.mcp.add.oauthConfigured'))
-          .setValue(this.addFormState.oauthMode)
-          .onChange((value) => {
-            this.addFormState.oauthMode = value as AddFormState['oauthMode'];
-            this.renderAddFormFields();
-          });
-      });
-  }
-
-  private renderOAuthConfiguredFields(container: HTMLElement): void {
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.oauthClientId'))
-      .addText((text) => {
-        text.setValue(this.addFormState.oauthClientId).onChange((value) => {
-          this.addFormState.oauthClientId = value;
-        });
-      });
-
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.oauthClientSecret'))
-      .addText((text) => {
-        text.setValue(this.addFormState.oauthClientSecret).onChange((value) => {
-          this.addFormState.oauthClientSecret = value;
-        });
-      });
-
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.oauthScope'))
-      .addText((text) => {
-        text.setValue(this.addFormState.oauthScope).onChange((value) => {
-          this.addFormState.oauthScope = value;
-        });
-      });
-
-    new Setting(container)
-      .setName(t('settings.server.mcp.add.oauthRedirectUri'))
-      .addText((text) => {
-        text.setValue(this.addFormState.oauthRedirectUri).onChange((value) => {
-          this.addFormState.oauthRedirectUri = value;
-        });
-      });
-  }
-
-  private validateAddForm(): string | null {
-    const name = this.addFormState.name.trim();
-    if (!name) {
-      return t('settings.server.mcp.validation.nameRequired');
+  if (state.type === 'remote') {
+    if (!state.url.trim()) {
+      return t('settings.server.mcp.validation.urlRequired');
     }
-
-    const snapshot = this.plugin.openCodeService.getMcpServerSnapshot();
-    if (name in snapshot.servers) {
-      return t('settings.server.mcp.validation.nameDuplicate');
-    }
-
-    if (this.addFormState.type === 'local') {
-      const commandLines = this.addFormState.command
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-      if (commandLines.length === 0) {
-        return t('settings.server.mcp.validation.commandRequired');
-      }
-      const envKeys = parseKvPairs(this.addFormState.environment);
-      if (envKeys.some(([key]) => key.length === 0)) {
-        return t('settings.server.mcp.validation.emptyKey', {
-          field: t('settings.server.mcp.add.environment'),
-        });
-      }
-    }
-
-    if (this.addFormState.type === 'remote') {
-      if (!this.addFormState.url.trim()) {
-        return t('settings.server.mcp.validation.urlRequired');
-      }
-      try {
-        // eslint-disable-next-line no-new
-        new URL(this.addFormState.url.trim());
-      } catch {
-        return t('settings.server.mcp.validation.urlInvalid');
-      }
-      const headerKeys = parseKvPairs(this.addFormState.headers);
-      if (headerKeys.some(([key]) => key.length === 0)) {
-        return t('settings.server.mcp.validation.emptyKey', {
-          field: t('settings.server.mcp.add.headers'),
-        });
-      }
-    }
-
-    if (this.addFormState.timeout !== '') {
-      const timeout = parseInt(this.addFormState.timeout, 10);
-      if (!Number.isInteger(timeout) || timeout <= 0) {
-        return t('settings.server.mcp.validation.timeoutPositive');
-      }
-    }
-
-    return null;
-  }
-
-  private async handleAddServer(): Promise<void> {
-    const validationError = this.validateAddForm();
-    if (validationError) {
-      new Notice(validationError);
-      return;
-    }
-
-    const name = this.addFormState.name.trim();
-    const config: Record<string, unknown> = { type: this.addFormState.type };
-
-    if (this.addFormState.type === 'local') {
-      config.command = this.addFormState.command
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-      const environment = parseKvPairsToRecord(this.addFormState.environment);
-      if (Object.keys(environment).length > 0) {
-        config.environment = environment;
-      }
-    } else {
-      config.url = this.addFormState.url.trim();
-      const headers = parseKvPairsToRecord(this.addFormState.headers);
-      if (Object.keys(headers).length > 0) {
-        config.headers = headers;
-      }
-      if (this.addFormState.oauthMode === 'disabled') {
-        config.oauth = false;
-      } else if (this.addFormState.oauthMode === 'configured') {
-        const oauth: Record<string, string> = {};
-        if (this.addFormState.oauthClientId) {
-          oauth.clientId = this.addFormState.oauthClientId;
-        }
-        if (this.addFormState.oauthClientSecret) {
-          oauth.clientSecret = this.addFormState.oauthClientSecret;
-        }
-        if (this.addFormState.oauthScope) {
-          oauth.scope = this.addFormState.oauthScope;
-        }
-        if (this.addFormState.oauthRedirectUri) {
-          oauth.redirectUri = this.addFormState.oauthRedirectUri;
-        }
-        config.oauth = oauth;
-      }
-    }
-
-    config.enabled = this.addFormState.enabled;
-    if (this.addFormState.timeout) {
-      const timeout = parseInt(this.addFormState.timeout, 10);
-      if (Number.isInteger(timeout) && timeout > 0) {
-        config.timeout = timeout;
-      }
-    }
-
-    this.isAdding = true;
-    this.updateSubmitButton();
-
     try {
-      await this.plugin.openCodeService.addMcpServer(name, config);
-      new Notice(t('settings.server.mcp.notice.added', { name }));
-      this.resetAddForm();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      new Notice(t('settings.server.mcp.notice.addFailed', { error: message }));
-    } finally {
-      this.isAdding = false;
-      this.updateSubmitButton();
+      // eslint-disable-next-line no-new
+      new URL(state.url.trim());
+    } catch {
+      return t('settings.server.mcp.validation.urlInvalid');
+    }
+    const headerKeys = parseMcpKvPairs(state.headers);
+    if (headerKeys.some(([key]) => key.length === 0)) {
+      return t('settings.server.mcp.validation.emptyKey', {
+        field: t('settings.server.mcp.add.headers'),
+      });
     }
   }
 
-  private resetAddForm(): void {
-    this.addFormState = SettingsMcpAddForm.createDefaultAddFormState();
-    this.renderAddFormFields();
+  if (state.timeout !== '') {
+    const timeout = parseInt(state.timeout, 10);
+    if (!Number.isInteger(timeout) || timeout <= 0) {
+      return t('settings.server.mcp.validation.timeoutPositive');
+    }
   }
 
-  private updateSubmitButton(): void {
-    if (!this.addSubmitButton) {
-      return;
+  return null;
+}
+
+export function buildMcpConfigFromFormState(state: AddFormState): OpencodeMcpEntryConfig {
+  const config: OpencodeMcpEntryConfig = { type: state.type };
+
+  if (state.type === 'local') {
+    config.command = state.command
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const environment = parseSensitiveKvRecord(state.environment, state.originalEnvironment);
+    if (environment) {
+      config.environment = environment;
     }
-    this.addSubmitButton
-      .setButtonText(
-        this.isAdding
-          ? t('settings.server.mcp.add.adding')
-          : t('settings.server.mcp.add.submit'),
-      )
-      .setDisabled(this.isAdding);
+  } else {
+    config.url = state.url.trim();
+    const headers = parseSensitiveKvRecord(state.headers, state.originalHeaders);
+    if (headers) {
+      config.headers = headers;
+    }
+    if (state.oauthMode === 'disabled') {
+      config.oauth = false;
+    } else if (state.oauthMode === 'configured') {
+      const oauth: Record<string, string> = {};
+      if (state.oauthClientId) {
+        oauth.clientId = state.oauthClientId;
+      }
+      if (state.oauthClientSecret === MCP_REDACTED_VALUE && state.originalOauthClientSecret) {
+        oauth.clientSecret = state.originalOauthClientSecret;
+      } else if (state.oauthClientSecret) {
+        oauth.clientSecret = state.oauthClientSecret;
+      }
+      if (state.oauthScope) {
+        oauth.scope = state.oauthScope;
+      }
+      if (state.oauthRedirectUri) {
+        oauth.redirectUri = state.oauthRedirectUri;
+      }
+      config.oauth = oauth;
+    }
   }
+
+  config.enabled = state.enabled;
+  if (state.timeout) {
+    const timeout = parseInt(state.timeout, 10);
+    if (Number.isInteger(timeout) && timeout > 0) {
+      config.timeout = timeout;
+    }
+  }
+  return config;
+}
+
+function parseSensitiveKvRecord(
+  text: string,
+  originals: Record<string, string>,
+): Record<string, string> | undefined {
+  const parsed = parseMcpKvPairs(text);
+  if (parsed.length === 0) {
+    return undefined;
+  }
+  const result: Record<string, string> = {};
+  for (const [key, value] of parsed) {
+    if (!key) {
+      continue;
+    }
+    if (value === MCP_REDACTED_VALUE && Object.prototype.hasOwnProperty.call(originals, key)) {
+      result[key] = originals[key];
+      continue;
+    }
+    result[key] = value;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }

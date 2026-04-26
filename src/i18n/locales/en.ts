@@ -1864,6 +1864,16 @@ export const enTranslations = {
   'settings.server.mcp.action.disconnect': 'Disconnect',
   'settings.server.mcp.action.authenticate': 'Authenticate',
   'settings.server.mcp.action.clearAuth': 'Clear Auth',
+  'settings.server.mcp.action.monitor': 'Monitor',
+  'settings.server.mcp.action.edit': 'Edit',
+  'settings.server.mcp.action.delete': 'Delete',
+  'settings.server.mcp.runtimeSwitch.label': 'Runtime connection',
+  'settings.server.mcp.ownership.project': 'Project-owned',
+  'settings.server.mcp.ownership.runtimeOnly': 'Runtime-only or inherited',
+  'settings.server.mcp.transportUnknown': 'UNKNOWN',
+  'settings.server.mcp.card.projectHint': 'Defined in the current project config. Edit and delete are available.',
+  'settings.server.mcp.card.overrideOnlyHint': 'Project override entry without explicit transport. Delete is available; visual edit is read-only.',
+  'settings.server.mcp.card.runtimeOnlyHint': 'Visible from runtime status but not defined in this project config.',
 
   // MCP add-server form
   'settings.server.mcp.add.title': 'Add MCP Server',
@@ -1899,6 +1909,16 @@ export const enTranslations = {
   'settings.server.mcp.add.oauthRedirectUri': 'Redirect URI',
   'settings.server.mcp.add.submit': 'Add Server',
   'settings.server.mcp.add.adding': 'Adding…',
+  'settings.server.mcp.editor.titleAdd': 'Add MCP Server',
+  'settings.server.mcp.editor.titleEdit': 'Edit MCP Server',
+  'settings.server.mcp.editor.save': 'Save Server',
+  'settings.server.mcp.editor.saving': 'Saving…',
+  'settings.server.mcp.details.title': '{name} status',
+  'settings.server.mcp.details.runtimeOnly': 'Runtime config details unavailable',
+  'settings.server.mcp.details.toolsTitle': 'Tools',
+  'settings.server.mcp.details.toolsUnavailable': 'Tool details are not reliably exposed by the current OpenCode runtime seam',
+  'settings.server.mcp.details.technicalTitle': 'Technical details',
+  'settings.server.mcp.delete.confirm': 'Delete MCP server "{name}" from the current project config?',
 
   // MCP validation
   'settings.server.mcp.validation.nameRequired': 'Server name is required',
@@ -1911,8 +1931,14 @@ export const enTranslations = {
 
   // MCP notices
   'settings.server.mcp.notice.added': 'MCP server "{name}" added',
+  'settings.server.mcp.notice.updated': 'MCP server "{name}" updated',
+  'settings.server.mcp.notice.deleted': 'MCP server "{name}" deleted',
+  'settings.server.mcp.notice.deletedRuntimeMayPersist': 'MCP server "{name}" was removed from project config, but runtime state may persist until OpenCode reloads MCP config.',
   'settings.server.mcp.notice.addFailed': 'Failed to add MCP server: {error}',
+  'settings.server.mcp.notice.savedRuntimeFailed': 'Saved MCP server "{name}" to project config, but runtime update failed: {error}',
   'settings.server.mcp.notice.actionFailed': 'Action failed: {error}',
+  'settings.server.mcp.notice.readOnly': 'This MCP server is runtime-only or inherited, so project edit/delete is unavailable.',
+  'settings.server.mcp.notice.configUnavailable': 'Project MCP config is unavailable.',
   'settings.model.tab.common': 'Common',
   'settings.model.tab.projectConfig': 'Project config',
   'settings.model.tab.availability': 'Availability',

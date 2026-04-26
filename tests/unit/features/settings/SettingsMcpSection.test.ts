@@ -56,7 +56,7 @@ describe('SettingsMcpSection', () => {
     );
   });
 
-  it('renders MCP-specific grouped layout shells for overview, servers, and add form', async () => {
+  it('renders MCP management panel shells for toolbar, stats, and server cards', async () => {
     const plugin = createPlugin({ servers: {}, updatedAt: null });
     const section = new SettingsMcpSection({
       plugin: plugin as unknown as OpenCodianPlugin,
@@ -70,11 +70,27 @@ describe('SettingsMcpSection', () => {
 
     expect(containerEl.querySelector('.opencodian-mcp-overview-shell')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-overview-toolbar')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-toolbar-add')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-server-list-shell')).not.toBeNull();
-    expect(containerEl.querySelector('.opencodian-mcp-add-form-layout')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-add-form-layout')).toBeNull();
+  });
 
-    const addGroups = containerEl.querySelectorAll('.opencodian-mcp-form-group');
-    expect(addGroups).toHaveLength(2);
+  it('marks runtime-only servers as unknown transport', async () => {
+    const plugin = createPlugin({
+      servers: { inherited: { status: 'connected' } },
+      updatedAt: null,
+    });
+    const section = new SettingsMcpSection({
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+
+    expect(containerEl.textContent).toContain(t('settings.server.mcp.transportUnknown'));
   });
 
   it('registers a classic settings section heading when attached outside tabbed mode', async () => {
@@ -123,22 +139,22 @@ describe('SettingsMcpSection', () => {
     ).map((el) => el.textContent);
     expect(values).toEqual(['3', '1', '1', '1']);
 
-    const rows = containerEl.querySelectorAll('.opencodian-mcp-server-row');
+    const rows = containerEl.querySelectorAll('.opencodian-mcp-server-card');
     expect(rows).toHaveLength(3);
 
     const rowNames = Array.from(rows).map(
-      (row) => row.querySelector('.opencodian-mcp-server-row-name')?.textContent,
+      (row) => row.querySelector('.opencodian-mcp-server-card-name')?.textContent,
     );
     expect(rowNames).toContain('my-server');
     expect(rowNames).toContain('broken');
     expect(rowNames).toContain('needs-oauth');
 
     const errorRow = Array.from(rows).find(
-      (row) => row.querySelector('.opencodian-mcp-server-row-name')?.textContent === 'broken',
+      (row) => row.querySelector('.opencodian-mcp-server-card-name')?.textContent === 'broken',
     );
-    expect(errorRow?.querySelector('.opencodian-mcp-server-row-main')).not.toBeNull();
-    expect(errorRow?.querySelector('.opencodian-mcp-server-row-actions')).not.toBeNull();
-    expect(errorRow?.querySelector('.opencodian-mcp-server-row-error')?.textContent).toContain(
+    expect(errorRow?.querySelector('.opencodian-mcp-server-card-main')).not.toBeNull();
+    expect(errorRow?.querySelector('.opencodian-mcp-server-card-actions')).not.toBeNull();
+    expect(errorRow?.querySelector('.opencodian-mcp-server-card-helper')?.textContent).toContain(
       'connection refused',
     );
   });
@@ -236,7 +252,7 @@ describe('SettingsMcpSection subscriptions and status', () => {
     });
 
     expect(containerEl.querySelector('.opencodian-mcp-empty')).toBeNull();
-    expect(containerEl.querySelectorAll('.opencodian-mcp-server-row')).toHaveLength(1);
+    expect(containerEl.querySelectorAll('.opencodian-mcp-server-card')).toHaveLength(1);
   });
 
   it('cleans up catalog subscription on dispose', async () => {
@@ -306,7 +322,7 @@ describe('SettingsMcpSection subscriptions and status', () => {
     await flushAsync();
 
     expect(containerEl.querySelector('.opencodian-mcp-badge--needs-client-registration')).not.toBeNull();
-    expect(containerEl.querySelector('.opencodian-mcp-server-row-error')?.textContent).toContain(
+    expect(containerEl.querySelector('.opencodian-mcp-server-card-helper')?.textContent).toContain(
       'missing clientId',
     );
   });
@@ -327,6 +343,6 @@ describe('SettingsMcpSection subscriptions and status', () => {
     section.attachTabbed(containerEl, 'mcp');
     await flushAsync();
 
-    expect(containerEl.querySelectorAll('.opencodian-mcp-server-row-error')).toHaveLength(0);
+    expect(containerEl.querySelectorAll('.opencodian-mcp-server-card-helper.is-error')).toHaveLength(0);
   });
 });

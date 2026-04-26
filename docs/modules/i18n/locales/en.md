@@ -19,7 +19,7 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 同日 M2 继续扩展 `settings.server.mcp.*` 键空间，新增 MCP 操作按钮（connect / disconnect / authenticate / clearAuth）、新增服务器表单（local / remote 类型切换、command / environment / url / headers / OAuth 等字段）、校验错误（nameRequired / nameDuplicate / commandRequired / urlRequired / urlInvalid / timeoutPositive / emptyKey）和操作反馈通知（added / addFailed / actionFailed）对应的英文文案。
 
-2026-04-26 的 MCP settings UI 收口又补了一组 `settings.server.mcp.add.group.*` 和 `settings.server.mcp.add.type` 文案，用于把新增服务器表单重组为 `Basics` / `Connection` / `OAuth` 分组卡片，并把原先直接用标题占位的类型切换改成独立 `Type` 字段标签。
+2026-04-26 的 MCP settings UI 收口又补了一组 `settings.server.mcp.add.group.*` 和 `settings.server.mcp.add.type` 文案，用于把新增服务器表单重组为 `Basics` / `Connection` / `OAuth` 分组卡片，并把原先直接用标题占位的类型切换改成独立 `Type` 字段标签。随后 MCP management panel 又新增 `action.monitor/edit/delete`、`runtimeSwitch.*`、`ownership.*`、`editor.*`、`details.*`、`delete.confirm` 和 project config mutation notices，用于区分 runtime truth 与 project config truth。
 
 同日 F2 新增 `settings.formatter.*` 和 `settings.quickNav.formatterDesc` 系列键，为 Formatter 一级设置页提供概览（runtime status / summary cards / detected formatter table）、配置（mode switch）和模式切换通知的英文文案。
 

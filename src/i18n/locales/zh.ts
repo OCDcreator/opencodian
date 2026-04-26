@@ -1864,6 +1864,16 @@ export const zhTranslations = {
   'settings.server.mcp.action.disconnect': '断开',
   'settings.server.mcp.action.authenticate': '认证',
   'settings.server.mcp.action.clearAuth': '清除认证',
+  'settings.server.mcp.action.monitor': '监控',
+  'settings.server.mcp.action.edit': '编辑',
+  'settings.server.mcp.action.delete': '删除',
+  'settings.server.mcp.runtimeSwitch.label': '运行时连接',
+  'settings.server.mcp.ownership.project': '项目配置拥有',
+  'settings.server.mcp.ownership.runtimeOnly': '仅运行时或继承',
+  'settings.server.mcp.transportUnknown': '未知',
+  'settings.server.mcp.card.projectHint': '定义在当前项目配置中，可以编辑和删除。',
+  'settings.server.mcp.card.overrideOnlyHint': '这是没有显式传输类型的项目覆盖项；可以删除，但图形编辑为只读。',
+  'settings.server.mcp.card.runtimeOnlyHint': '来自运行时状态，但未定义在当前项目配置中。',
 
   // MCP 添加服务器表单
   'settings.server.mcp.add.title': '添加 MCP 服务器',
@@ -1899,6 +1909,16 @@ export const zhTranslations = {
   'settings.server.mcp.add.oauthRedirectUri': '重定向 URI',
   'settings.server.mcp.add.submit': '添加服务器',
   'settings.server.mcp.add.adding': '添加中…',
+  'settings.server.mcp.editor.titleAdd': '添加 MCP 服务器',
+  'settings.server.mcp.editor.titleEdit': '编辑 MCP 服务器',
+  'settings.server.mcp.editor.save': '保存服务器',
+  'settings.server.mcp.editor.saving': '保存中…',
+  'settings.server.mcp.details.title': '{name} 状态',
+  'settings.server.mcp.details.runtimeOnly': '运行时配置详情不可用',
+  'settings.server.mcp.details.toolsTitle': '工具',
+  'settings.server.mcp.details.toolsUnavailable': '当前 OpenCode 运行时接口尚未可靠暴露工具详情',
+  'settings.server.mcp.details.technicalTitle': '技术详情',
+  'settings.server.mcp.delete.confirm': '从当前项目配置中删除 MCP 服务器“{name}”？',
 
   // MCP 校验
   'settings.server.mcp.validation.nameRequired': '服务器名称不能为空',
@@ -1911,8 +1931,14 @@ export const zhTranslations = {
 
   // MCP 通知
   'settings.server.mcp.notice.added': '已添加 MCP 服务器 "{name}"',
+  'settings.server.mcp.notice.updated': '已更新 MCP 服务器 "{name}"',
+  'settings.server.mcp.notice.deleted': '已删除 MCP 服务器 "{name}"',
+  'settings.server.mcp.notice.deletedRuntimeMayPersist': '已从项目配置中移除 MCP 服务器 "{name}"，但运行时状态可能会保留，直到 OpenCode 重新加载 MCP 配置。',
   'settings.server.mcp.notice.addFailed': '添加 MCP 服务器失败: {error}',
+  'settings.server.mcp.notice.savedRuntimeFailed': '已将 MCP 服务器 "{name}" 保存到项目配置，但运行时更新失败：{error}',
   'settings.server.mcp.notice.actionFailed': '操作失败: {error}',
+  'settings.server.mcp.notice.readOnly': '此 MCP 服务器仅来自运行时或继承配置，无法在当前项目中编辑/删除。',
+  'settings.server.mcp.notice.configUnavailable': '项目 MCP 配置不可用。',
   'settings.model.tab.common': '通用',
   'settings.model.tab.projectConfig': '项目配置',
   'settings.model.tab.availability': '可用性',

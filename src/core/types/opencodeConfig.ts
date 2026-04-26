@@ -93,6 +93,30 @@ export type OpencodeFormatterConfig =
   | boolean
   | Record<string, OpencodeFormatterEntryConfig>;
 
+export type OpencodeMcpTransportType = 'local' | 'remote';
+
+export interface OpencodeMcpOAuthConfig {
+  clientId?: string;
+  clientSecret?: string;
+  scope?: string;
+  redirectUri?: string;
+  [key: string]: unknown;
+}
+
+export interface OpencodeMcpEntryConfig {
+  type?: OpencodeMcpTransportType | string;
+  command?: string[];
+  environment?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  enabled?: boolean;
+  timeout?: number;
+  oauth?: boolean | OpencodeMcpOAuthConfig;
+  [key: string]: unknown;
+}
+
+export type OpencodeMcpConfigRecord = Record<string, OpencodeMcpEntryConfig>;
+
 /**
  * Runtime formatter status returned by SDK formatter.status().
  * Mirrors the upstream OpenCode Format.Status type.
@@ -122,6 +146,7 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   default_agent?: string;
   compaction?: OpencodeCompactionConfig;
   formatter?: OpencodeFormatterConfig;
+  mcp?: OpencodeMcpConfigRecord;
   mode?: OpencodeAgentConfigRecord;
   tools?: OpencodeToolConfig;
   [key: string]: unknown;

@@ -5,62 +5,43 @@
 
 ## 概述
 
-`SettingsMcpSection` 是设置页独立 `MCP` 一级类目的 owner。在 tabbed 布局里它直接承接 `MCP` 主标签内容，在 classic 布局里它也会注册自己的 section heading，从而进入顶部 quick-nav。它负责从 OpenCodeService 已有的 MCP 运行时接口读取并渲染 MCP 服务器状态概览和逐服务器行，提供 MCP 操作按钮（连接/断开/认证/清除认证），并通过 catalog subscription 实时响应运行时状态变化。新增 MCP 服务器表单委托给 `SettingsMcpAddForm`。2026-04-26 的布局整理又给 overview、server list 和 add form 都补上了 MCP 专用 grouped-card shell，让这个一级设置页在不改行为的前提下回到和其他 OpenCodian settings 一致的视觉层级。
+`SettingsMcpSection` 是设置页独立 `MCP` 一级类目的 owner。它现在渲染一个 MCP management panel：顶部说明与工具条、运行时状态统计卡片、逐服务器管理卡片。它只负责页面壳层、运行时操作分发和 modal 打开；项目 `.opencode/opencode.json` 的 MCP 增删改由 `McpConfigService` 负责。
 
 ## 核心逻辑
 
-### 概览卡片
+### 管理面板结构
 
-渲染四个计数卡片（Total / Connected / Needs auth / Failed），从 `McpServerSnapshot.servers` 按状态分类统计。同时显示上次刷新时间。刷新按钮现在位于独立的 overview toolbar 壳层里，而不是继续作为一条裸 `Setting` 混在统计卡之间。
+- toolbar: 显示说明、`Refresh` 和 `Add Server`
+- stats: Total / Connected / Needs auth / Failed
+- server cards: 名称、transport badge、endpoint summary、运行时状态、项目拥有/运行时只读提示、操作按钮
 
-### 服务器行列表
+### 运行时操作
 
-对 `McpServerSnapshot.servers` 中的每个服务器渲染一行，显示名称、状态 badge（带 CSS class 区分）、可选的错误信息（仅 `failed` / `needs_client_registration`）和状态感知的操作按钮。主行现在固定在 `opencodian-mcp-server-row-main` 三列壳层内对齐，错误信息则落到次级说明行，不再挤坏主轴布局。
+Connect / Disconnect / Authenticate / Clear Auth 仍全部走 `OpenCodeService` 的 MCP runtime seam。卡片里的“Runtime connection”只表达运行时连接/断开，不等同于 project config 的 `enabled` 字段。
 
-### 操作按钮（按服务器状态）
+### 项目配置操作
 
-- **connected**: Disconnect
-- **disabled / failed**: Connect
-- **needs_auth**: Authenticate + Clear Auth
-- **needs_client_registration**: 不提供操作按钮，仅显示错误说明
+Add/Edit 打开 `McpServerEditorModal`，Delete 只允许 project-owned server。删除前如果当前已连接，会先 best-effort disconnect，再调用 `McpConfigService.deleteServer()` 从当前项目配置中真正移除该 entry。
 
-操作期间所有操作按钮禁用，成功后自动触发 `triggerRefresh()`，失败时用 Notice 反馈错误。
+### Runtime-only / inherited 服务器
 
-### 新增服务器表单
+运行时可见但不在当前项目 `mcp` 配置中的服务器会显示为 runtime-only/inherited。它们仍可 monitor 和运行时 connect/disconnect，但 edit/delete 会被阻止并显示 Notice。
 
-由 `SettingsMcpAddForm` 子组件渲染和验证，详见 [SettingsMcpAddForm](./SettingsMcpAddForm.md)。
+### Monitor modal
 
-### 刷新行为
-
-- `attachTabbed` / `attach` 调用时立即触发 `refreshMcpServerStatus()`
-- 刷新按钮在刷新期间显示 "Refreshing…" 并禁用
-- 通过 `subscribeToCatalogUpdates` 监听运行时状态变化自动重渲染
-- 操作（connect/disconnect/authenticate/clearAuth）和新增服务器成功后触发刷新
-
-### 生命周期
-
-- `dispose()` 清理 catalog subscription，防止内存泄漏
-- `OpenCodianSettings.disposeSections()` 和 `hide()` 都会调用 `dispose()`
+每张卡片都能打开 `McpServerStatusModal`。该 modal 展示运行时状态、transport summary、错误/认证状态和经过 redaction 的技术详情；当前不伪造 server->tools mapping。
 
 ## 与其他模块的交互
 
-- `src/features/settings/SettingsMcpAddForm.ts`: 新增 MCP 服务器表单子组件，渲染和验证委托给它
-- `src/core/opencode/OpenCodeService.ts`: 提供 `getMcpServerSnapshot()`、`refreshMcpServerStatus()`、`subscribeToCatalogUpdates()`、`addMcpServer()`、`connectMcpServer()`、`disconnectMcpServer()`、`authenticateMcp()`、`removeMcpAuth()`
-- `src/core/opencode/types.ts`: 定义 `McpServerSnapshot`、`McpServerStatus`
-- `src/core/opencode/OpenCodeCatalogStateStore.ts`: 存储 MCP 状态快照并发射更新事件
-- `src/features/settings/settingsLayoutRegistry.ts`: 注册独立的 `mcp` 一级标签
-- `src/features/settings/SettingsTabbedRenderer.ts`: 在 `renderMcpContent()` 中路由 `MCP` 主标签到本 section
-- `src/features/settings/OpenCodianSettings.ts`: 管理 section 生命周期（tabbed 和 classic 两种布局）
-
-## 配置项
-
-无。本 section 不持有持久化配置，只消费运行时状态和表单本地状态。
+- `src/core/config/McpConfigService.ts`: 读取/写入项目 MCP 配置，判断 project ownership，安全 add/edit/delete。
+- `src/features/settings/McpServerEditorModal.ts`: Add/Edit 共用表单 modal。
+- `src/features/settings/McpServerStatusModal.ts`: Monitor/details modal，负责 secret redaction 和 tools-unavailable 文案。
+- `src/features/settings/SettingsMcpAddForm.ts`: 提供 MCP 表单状态、校验和 payload 构建 helper。
+- `src/core/opencode/OpenCodeService.ts`: 提供 MCP runtime snapshot、refresh、connect/disconnect/auth flows。
 
 ## 注意事项
 
-- 不直接调用 SDK 命名空间，所有数据访问和操作通过 `OpenCodeService` 公共接口
-- classic 布局中 MCP 部分紧跟在 Server 部分之后，并会注册独立 section heading 进入 quick-nav
-- 操作按钮在任意一个操作执行期间全部禁用，防止并发冲突
-- `addMcpServer` 的 config 参数只组装最小必要 payload，不做完整 JSON 编辑器
-- OAuth 处理保持在 trigger/feedback 层：`authenticateMcp` 一键触发浏览器流程，不做手动 code 输入表单
-- `opencodian-mcp-*` 的布局类由 `config-editor-modal.css` 统一托管；如果后续继续改这个页面，优先补 MCP 专用壳层 class，而不是在 TS 里继续写内联样式
+- Runtime truth 和 project config truth 必须分开，不要用运行时状态推断可编辑配置。
+- Delete 是从 `.opencode/opencode.json` 删除 project-owned entry，不是设置 `enabled: false`。
+- 不要展示 resources/prompts，也不要伪造工具数量或 per-server tool list。
+- 技术详情默认 redacted；headers、environment values、OAuth client secret 不应明文显示在 editor 之外。
