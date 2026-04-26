@@ -205,5 +205,4 @@ npm run list:module-docs -- --range origin/main...HEAD
 
 ## 待补充
 - [ ] 脚本间的依赖关系图
-- [ ] CI 集成脚本
 - [ ] 自动 changelog 生成
