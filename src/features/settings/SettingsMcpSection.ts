@@ -1,5 +1,5 @@
 /**
- * MCP settings section owner for the Server > MCP secondary tab.
+ * MCP settings section owner for the dedicated MCP settings category.
  * Renders runtime MCP status from OpenCodeService seams.
  */
 
@@ -117,6 +117,11 @@ export class SettingsMcpSection {
   }
 
   attach(containerEl: HTMLElement): void {
+    this.createSectionHeading(
+      containerEl,
+      t('settings.mcp.title'),
+      t('settings.quickNav.mcpDesc'),
+    );
     this.renderMcpContent(containerEl);
     this.subscribeToCatalog();
     void this.triggerRefresh();

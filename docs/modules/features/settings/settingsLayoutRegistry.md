@@ -5,7 +5,7 @@
 
 ## 概述
 
-`settingsLayoutRegistry.ts` 定义设置页多级标签分类模式的标签结构。它是一个纯数据 registry，不包含任何设置保存逻辑，但现在也负责把旧的 `language` 一级标签记忆兼容到新的 `general`。
+`settingsLayoutRegistry.ts` 定义设置页多级标签分类模式的标签结构。它是一个纯数据 registry，不包含任何设置保存逻辑，但现在也负责把旧的 `language` 一级标签记忆兼容到新的 `general`，并把旧的 `Server > MCP` 停留位置迁移到新的一级 `MCP` 类目。
 
 ## 主要定义
 
@@ -16,16 +16,17 @@
 
 ## 一级/二级标签结构
 
-当前涵盖 13 个一级标签：
+当前涵盖 14 个一级标签：
 
 | 一级标签 | 二级标签 |
 |---------|---------|
 | `general` | `basic`, `language` |
-| `server` | `connection`, `auth`, `status`, `mcp` |
+| `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
 | `conversation` | `title`, `compaction`, `display`, `questions`, `rendering` |
 | `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
+| `mcp` | `overview` |
 | `formatter` | `overview`, `config` |
 | `plugins` | `overview`, `global`, `project-directory`, `omo` |
 | `security` | `config`, `permissions`, `safety` |

@@ -110,7 +110,12 @@ export class SettingsTabbedRenderer {
 
     // Secondary tab bar
     const primaryDef = SETTINGS_PRIMARY_TABS.find((pt) => pt.id === activePrimaryId);
-    if (primaryDef && primaryDef.secondaryTabs.length > 0 && activePrimaryId !== 'general') {
+    if (
+      primaryDef
+      && primaryDef.secondaryTabs.length > 0
+      && activePrimaryId !== 'general'
+      && activePrimaryId !== 'mcp'
+    ) {
       const secondaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-secondary' });
       for (const secondaryTab of primaryDef.secondaryTabs) {
         const tabEl = secondaryBarEl.createEl('button', {
@@ -190,6 +195,9 @@ export class SettingsTabbedRenderer {
         break;
       case 'formatter':
         this.renderFormatterContent(containerEl, secondaryTabId);
+        break;
+      case 'mcp':
+        this.renderMcpContent(containerEl, secondaryTabId);
         break;
       case 'plugins':
         this.renderPluginsContent(containerEl, secondaryTabId);
@@ -306,6 +314,16 @@ export class SettingsTabbedRenderer {
       requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
     });
     formatterSection.attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private renderMcpContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const mcpSection = new SettingsMcpSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+      requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+    });
+    this.deps.setMcpSection(mcpSection);
+    mcpSection.attachTabbed(containerEl, secondaryTabId);
   }
 
   private renderPluginsContent(containerEl: HTMLElement, secondaryTabId: string): void {

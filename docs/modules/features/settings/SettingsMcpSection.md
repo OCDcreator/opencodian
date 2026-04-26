@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsMcpSection` 是设置页 Server > MCP 二级标签的 owner。它负责从 OpenCodeService 已有的 MCP 运行时接口读取并渲染 MCP 服务器状态概览和逐服务器行，提供 MCP 操作按钮（连接/断开/认证/清除认证），并通过 catalog subscription 实时响应运行时状态变化。新增 MCP 服务器表单委托给 `SettingsMcpAddForm`。
+`SettingsMcpSection` 是设置页独立 `MCP` 一级类目的 owner。在 tabbed 布局里它直接承接 `MCP` 主标签内容，在 classic 布局里它也会注册自己的 section heading，从而进入顶部 quick-nav。它负责从 OpenCodeService 已有的 MCP 运行时接口读取并渲染 MCP 服务器状态概览和逐服务器行，提供 MCP 操作按钮（连接/断开/认证/清除认证），并通过 catalog subscription 实时响应运行时状态变化。新增 MCP 服务器表单委托给 `SettingsMcpAddForm`。
 
 ## 核心逻辑
 
@@ -48,8 +48,8 @@
 - `src/core/opencode/OpenCodeService.ts`: 提供 `getMcpServerSnapshot()`、`refreshMcpServerStatus()`、`subscribeToCatalogUpdates()`、`addMcpServer()`、`connectMcpServer()`、`disconnectMcpServer()`、`authenticateMcp()`、`removeMcpAuth()`
 - `src/core/opencode/types.ts`: 定义 `McpServerSnapshot`、`McpServerStatus`
 - `src/core/opencode/OpenCodeCatalogStateStore.ts`: 存储 MCP 状态快照并发射更新事件
-- `src/features/settings/settingsLayoutRegistry.ts`: 注册 `server > mcp` 二级标签
-- `src/features/settings/SettingsTabbedRenderer.ts`: 在 `renderServerContent` 中路由 `mcp` 标签到本 section
+- `src/features/settings/settingsLayoutRegistry.ts`: 注册独立的 `mcp` 一级标签
+- `src/features/settings/SettingsTabbedRenderer.ts`: 在 `renderMcpContent()` 中路由 `MCP` 主标签到本 section
 - `src/features/settings/OpenCodianSettings.ts`: 管理 section 生命周期（tabbed 和 classic 两种布局）
 
 ## 配置项
@@ -59,7 +59,7 @@
 ## 注意事项
 
 - 不直接调用 SDK 命名空间，所有数据访问和操作通过 `OpenCodeService` 公共接口
-- classic 布局中 MCP 部分紧跟在 Server 部分之后
+- classic 布局中 MCP 部分紧跟在 Server 部分之后，并会注册独立 section heading 进入 quick-nav
 - 操作按钮在任意一个操作执行期间全部禁用，防止并发冲突
 - `addMcpServer` 的 config 参数只组装最小必要 payload，不做完整 JSON 编辑器
 - OAuth 处理保持在 trigger/feedback 层：`authenticateMcp` 一键触发浏览器流程，不做手动 code 输入表单

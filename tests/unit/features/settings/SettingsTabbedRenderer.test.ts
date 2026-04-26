@@ -106,6 +106,20 @@ describe('SettingsTabbedRenderer', () => {
     expect(containerEl.querySelector('.opencodian-settings-general-merged-block')).not.toBeNull();
   });
 
+  it('shows MCP as a top-level tab between Commands and Formatter', () => {
+    const { renderer } = createRendererState();
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    const primaryLabels = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'),
+    ).map((element) => element.textContent?.trim());
+    expect(primaryLabels).toContain('MCP');
+    expect(primaryLabels.indexOf('Commands')).toBeLessThan(primaryLabels.indexOf('MCP'));
+    expect(primaryLabels.indexOf('MCP')).toBeLessThan(primaryLabels.indexOf('Formatter'));
+  });
+
   it('does not expose general secondary tab switching anymore', () => {
     const { plugin, renderer, requestDisplayRefresh } = createRendererState();
     const containerEl = document.createElement('div');
@@ -194,6 +208,22 @@ describe('SettingsTabbedRenderer', () => {
         (element) => element.textContent?.trim(),
       ),
     ).toEqual(['Overview', 'Config']);
+  });
+
+  it('renders MCP as its own primary tab instead of a server secondary tab', () => {
+    const { renderer } = createRendererState({
+      primaryTabId: 'server',
+      secondaryTabs: { server: 'connection', mcp: 'overview' },
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
+        (element) => element.textContent?.trim(),
+      ),
+    ).toEqual(['Connection', 'Authentication', 'Status']);
   });
 });
 

@@ -73,3 +73,5 @@ Ownership facts:
 - If no saved settings at all (fresh install), return the `DEFAULT_SETTINGS` value (`'tabbed'`)
 
 `normalizeLoadedPluginSettings()` now also normalizes `settingsTabbedPrimaryTab` (with `'server'` fallback) and `settingsTabbedSecondaryTabByPrimary` from saved snapshots during bootstrap. This bootstrap path also migrates legacy dual-layout memory from `language` to `general`, so old saved `{ settingsTabbedPrimaryTab: 'language', settingsTabbedSecondaryTabByPrimary: { language: 'general' } }` becomes `general -> language`.
+
+It also migrates the old `Server > MCP` remembered location into the new top-level `MCP` tab. A saved snapshot like `{ settingsTabbedPrimaryTab: 'server', settingsTabbedSecondaryTabByPrimary: { server: 'mcp' } }` now becomes `settingsTabbedPrimaryTab: 'mcp'` with `settingsTabbedSecondaryTabByPrimary.mcp = 'overview'`.

@@ -56,6 +56,30 @@ describe('SettingsMcpSection', () => {
     );
   });
 
+  it('registers a classic settings section heading when attached outside tabbed mode', async () => {
+    const plugin = createPlugin({ servers: {}, updatedAt: null });
+    const requestDisplayRefresh = jest.fn();
+    const createSectionHeadingSpy = jest.fn(createSectionHeading);
+    const section = new SettingsMcpSection({
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading: createSectionHeadingSpy,
+      requestDisplayRefresh,
+    });
+    const containerEl = document.createElement('div');
+
+    section.attach(containerEl);
+    await flushAsync();
+
+    expect(createSectionHeadingSpy).toHaveBeenCalledWith(
+      containerEl,
+      t('settings.mcp.title'),
+      t('settings.quickNav.mcpDesc'),
+    );
+    expect(containerEl.querySelector<HTMLHeadingElement>('h3')?.textContent).toBe(
+      t('settings.mcp.title'),
+    );
+  });
+
   it('renders overview counts and server rows from runtime snapshot', async () => {
     const servers: Record<string, McpServerStatus> = {
       'my-server': { status: 'connected' },

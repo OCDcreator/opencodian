@@ -33,4 +33,4 @@
 
 ## 内容路由
 
-`renderContent()` 根据 `primaryTabId` 分发到对应 section 的 tabbed 渲染。`server` 标签下的 `mcp` 二级标签会路由到 `SettingsMcpSection`，其余 server 二级标签（`connection` / `auth` / `status`）仍路由到 `SettingsServerSection`。`formatter` 标签路由到 `SettingsFormatterSection`，该 section 自行处理 overview/config 两个二级面板的渲染。`general` 是一个特殊主类目：它不创建独立 section owner，也不再展示 `Basic / Language` 二级标签，而是直接在一张合并卡片里同时渲染 `settingsLayoutMode` 与语言切换；现在它和 `style` / `plugins` / `model` / `formatter` 一样，不再套 `.opencodian-settings-tab-panel` 外层壳，避免出现额外边框与不对称留白。
+`renderContent()` 根据 `primaryTabId` 分发到对应 section 的 tabbed 渲染。`server` 现在只保留 `connection` / `auth` / `status` 三个二级标签；`MCP` 已提升为独立一级标签，并单独路由到 `SettingsMcpSection`。`formatter` 标签路由到 `SettingsFormatterSection`，该 section 自行处理 overview/config 两个二级面板的渲染。`general` 是一个特殊主类目：它不创建独立 section owner，也不再展示 `Basic / Language` 二级标签，而是直接在一张合并卡片里同时渲染 `settingsLayoutMode` 与语言切换；`MCP` 现在也不再显示单独的二级标签条，而是直接展示自己的内容面板。`general` 继续和 `style` / `plugins` / `model` / `formatter` 一样，不再套 `.opencodian-settings-tab-panel` 外层壳，避免出现额外边框与不对称留白。

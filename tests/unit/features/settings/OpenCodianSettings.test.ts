@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This file covers both SettingsSectionCoordinator integration and OpenCodianSettingTab layout shell behavior; keeping those regression cases together makes the settings-surface contract easier to review. */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -355,6 +356,88 @@ describe('SettingsSectionCoordinator quick nav', () => {
       block: 'start',
     });
   });
+
+  it('renders quick-nav tooltip content in a body-level overlay instead of inside the settings container', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    document.body.appendChild(containerEl);
+
+    coordinator.beginDisplay('Settings');
+    coordinator.createSectionHeading(containerEl, {
+      title: 'Server',
+      tooltip: 'Server settings',
+    });
+    coordinator.finishDisplay();
+
+    const button = containerEl.querySelector<HTMLButtonElement>('.opencodian-settings-quick-nav-btn');
+    expect(button).not.toBeNull();
+
+    Object.defineProperty(button as HTMLButtonElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 140,
+        right: 180,
+        bottom: 172,
+        width: 80,
+        height: 32,
+        x: 100,
+        y: 140,
+        toJSON: () => '',
+      }),
+    });
+
+    button?.dispatchEvent(new Event('mouseenter'));
+
+    const overlay = document.body.querySelector<HTMLElement>('.opencodian-settings-quick-nav-tooltip-layer');
+    expect(overlay).not.toBeNull();
+    expect(overlay?.textContent).toContain('Server settings');
+    expect(containerEl.contains(overlay)).toBe(false);
+
+    button?.dispatchEvent(new Event('mouseleave'));
+    expect(document.body.querySelector('.opencodian-settings-quick-nav-tooltip-layer')).toBeNull();
+  });
+
+  it('keeps quick-nav tooltip overlay center-aligned even for edge buttons', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    document.body.appendChild(containerEl);
+
+    coordinator.beginDisplay('Settings');
+    coordinator.createSectionHeading(containerEl, {
+      title: 'Server',
+      tooltip: 'Server settings',
+    });
+    coordinator.createSectionHeading(containerEl, {
+      title: 'Model',
+      tooltip: 'Model settings',
+    });
+    coordinator.finishDisplay();
+
+    const button = containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn')[0];
+    expect(button?.dataset.tooltipAlign).toBe('left');
+
+    Object.defineProperty(button as HTMLButtonElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 12,
+        top: 140,
+        right: 92,
+        bottom: 172,
+        width: 80,
+        height: 32,
+        x: 12,
+        y: 140,
+        toJSON: () => '',
+      }),
+    });
+
+    button?.dispatchEvent(new Event('mouseenter'));
+
+    const overlay = document.body.querySelector<HTMLElement>('.opencodian-settings-quick-nav-tooltip-layer');
+    expect(overlay).not.toBeNull();
+    expect(overlay?.dataset.align ?? 'center').toBe('center');
+
+    button?.dispatchEvent(new Event('mouseleave'));
+  });
 });
 
 function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
@@ -444,6 +527,40 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(generalBlocks[0]?.querySelector('.language-setting')).not.toBeNull();
   });
 
+  it('places MCP between Commands and Formatter in classic quick-nav order', () => {
+    const { tab } = createSettingsTab('classic');
+    const appendHeading = (title: string) => (containerEl: HTMLElement) => {
+      (tab as unknown as { createSectionHeading: (host: HTMLElement, heading: string, tooltip?: string) => HTMLHeadingElement })
+        .createSectionHeading(containerEl, title, `${title} tooltip`);
+    };
+
+    Object.assign(tab as unknown as Record<string, unknown>, {
+      addServerSettings: appendHeading('Server'),
+      addMcpSettings: appendHeading('MCP'),
+      addModelSettings: appendHeading('Model'),
+      addConversationSettings: appendHeading('Conversation'),
+      addAgentsSettings: appendHeading('Agents'),
+      addCommandsSettings: appendHeading('Commands'),
+      addFormatterSettings: appendHeading('Formatter'),
+      addPluginSettings: appendHeading('Plugins'),
+      addSecuritySettings: appendHeading('Security'),
+      addUISettings: appendHeading('UI'),
+      addStyleSettings: appendHeading('Style'),
+      addDebugSettings: appendHeading('Debug'),
+      addUserSettings: appendHeading('User'),
+      renderLayoutModeSetting: jest.fn(),
+      renderLanguageSetting: jest.fn(),
+    });
+
+    tab.display();
+
+    const labels = Array.from(
+      tab.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn'),
+    ).map((element) => element.textContent?.trim());
+    expect(labels.indexOf('Commands')).toBeLessThan(labels.indexOf('MCP'));
+    expect(labels.indexOf('MCP')).toBeLessThan(labels.indexOf('Formatter'));
+  });
+
   it('does not render quick-nav in tabbed layout mode', () => {
     const { tab } = createSettingsTab('tabbed');
     const renderDisplay = jest.fn((containerEl: HTMLElement) => {
@@ -522,5 +639,22 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(css).toMatch(
       /\.opencodian-settings\.opencodian-settings--tabbed\s+\.opencodian-settings-panel-title\s*\{[\s\S]*margin-left:\s*-20px;/,
     );
+    expect(css).toMatch(
+      /\.opencodian-settings-quick-nav\s*\{[\s\S]*padding:\s*24px\s+20px\s+14px;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2200;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*gap:\s*0;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings-quick-nav-tooltip-layer\.is-visible\s*\{[\s\S]*translateY\(-2px\);/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings-quick-nav-tooltip-bubble\s*\{[\s\S]*max-width:\s*min\(240px,\s*calc\(100vw\s*-\s*48px\)\);/,
+    );
+    expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="left"\]/);
+    expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="right"\]/);
   });
 });

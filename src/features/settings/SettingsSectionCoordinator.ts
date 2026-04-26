@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This owner intentionally keeps settings panel scaffolding together: quick-nav, scroll restore, and the body-level tooltip overlay share the same lifecycle and should stay co-located. */
 import { t } from '../../i18n';
 import { createLogger } from '../../shared';
 
@@ -59,6 +60,11 @@ export class SettingsSectionCoordinator {
   private settingsScrollPersistenceSuspended = false;
   private displayPendingOpenScrollTop: number | null = null;
   private displayPendingOpenSectionTitle: string | null = null;
+  private quickNavTooltipLayerEl: HTMLElement | null = null;
+  private quickNavTooltipBubbleEl: HTMLElement | null = null;
+  private quickNavTooltipArrowEl: HTMLElement | null = null;
+  private quickNavTooltipActiveButton: HTMLButtonElement | null = null;
+  private quickNavTooltipWindowListenersBound = false;
 
   constructor(options: SettingsSectionCoordinatorOptions) {
     this.containerEl = options.containerEl;
@@ -154,6 +160,8 @@ export class SettingsSectionCoordinator {
   }
 
   hide(): void {
+    this.hideQuickNavTooltip();
+    this.destroyQuickNavTooltipLayer();
     this.clearSettingsPanelRestoreWork();
     this.captureSettingsPanelScrollPosition();
     this.teardownScrollPersistence();
@@ -360,7 +368,7 @@ export class SettingsSectionCoordinator {
       buttonEl.className = 'opencodian-settings-quick-nav-btn';
       buttonEl.textContent = title;
       buttonEl.type = 'button';
-      buttonEl.dataset.tooltip = tooltip;
+      buttonEl.dataset.quickNavTooltip = tooltip;
       if (sections.length > 1) {
         if (index <= 1) {
           buttonEl.dataset.tooltipAlign = 'left';
@@ -368,7 +376,20 @@ export class SettingsSectionCoordinator {
           buttonEl.dataset.tooltipAlign = 'right';
         }
       }
+      buttonEl.addEventListener('mouseenter', () => {
+        this.showQuickNavTooltip(buttonEl, tooltip);
+      });
+      buttonEl.addEventListener('mouseleave', () => {
+        this.hideQuickNavTooltip(buttonEl);
+      });
+      buttonEl.addEventListener('focus', () => {
+        this.showQuickNavTooltip(buttonEl, tooltip);
+      });
+      buttonEl.addEventListener('blur', () => {
+        this.hideQuickNavTooltip(buttonEl);
+      });
       buttonEl.addEventListener('click', () => {
+        this.hideQuickNavTooltip(buttonEl);
         sectionEl.scrollIntoView({
           behavior: 'smooth',
           block: 'start',
@@ -425,6 +446,8 @@ export class SettingsSectionCoordinator {
         return;
       }
 
+      this.positionQuickNavTooltip();
+
       if (!this.containerEl.isConnected || !resolvedScrollContainer.contains(this.containerEl)) {
         return;
       }
@@ -471,6 +494,131 @@ export class SettingsSectionCoordinator {
 
       activeEl.blur();
     });
+  }
+
+  private ensureQuickNavTooltipLayer(): HTMLElement {
+    if (
+      this.quickNavTooltipLayerEl
+      && this.quickNavTooltipLayerEl.isConnected
+      && this.quickNavTooltipBubbleEl
+      && this.quickNavTooltipArrowEl
+    ) {
+      return this.quickNavTooltipLayerEl;
+    }
+
+    const document = this.containerEl.ownerDocument;
+    const layerEl = document.createElement('div');
+    layerEl.className = 'opencodian-settings-quick-nav-tooltip-layer';
+    layerEl.setAttribute('aria-hidden', 'true');
+
+    const bubbleEl = document.createElement('div');
+    bubbleEl.className = 'opencodian-settings-quick-nav-tooltip-bubble';
+    layerEl.appendChild(bubbleEl);
+
+    const arrowEl = document.createElement('div');
+    arrowEl.className = 'opencodian-settings-quick-nav-tooltip-arrow';
+    layerEl.appendChild(arrowEl);
+
+    document.body.appendChild(layerEl);
+
+    this.quickNavTooltipLayerEl = layerEl;
+    this.quickNavTooltipBubbleEl = bubbleEl;
+    this.quickNavTooltipArrowEl = arrowEl;
+
+    return layerEl;
+  }
+
+  private showQuickNavTooltip(buttonEl: HTMLButtonElement, tooltip: string): void {
+    const layerEl = this.ensureQuickNavTooltipLayer();
+    if (!this.quickNavTooltipBubbleEl) {
+      return;
+    }
+
+    this.quickNavTooltipActiveButton = buttonEl;
+    this.quickNavTooltipBubbleEl.textContent = tooltip;
+    layerEl.classList.add('is-visible');
+    this.positionQuickNavTooltip();
+    this.bindQuickNavTooltipWindowListeners();
+  }
+
+  private hideQuickNavTooltip(buttonEl?: HTMLButtonElement): void {
+    if (buttonEl && this.quickNavTooltipActiveButton !== buttonEl) {
+      return;
+    }
+
+    this.quickNavTooltipActiveButton = null;
+    this.destroyQuickNavTooltipLayer();
+  }
+
+  private positionQuickNavTooltip(): void {
+    if (
+      !this.quickNavTooltipActiveButton
+      || !this.quickNavTooltipLayerEl
+      || !this.quickNavTooltipBubbleEl
+      || !this.quickNavTooltipArrowEl
+    ) {
+      return;
+    }
+
+    const rect = this.quickNavTooltipActiveButton.getBoundingClientRect();
+    const bubbleWidth = Math.max(this.quickNavTooltipBubbleEl.offsetWidth, 0);
+    const tooltipWidth = Math.min(240, bubbleWidth > 0 ? bubbleWidth : 240);
+    const viewportWidth = this.containerEl.ownerDocument.defaultView?.innerWidth ?? 0;
+    const margin = 24;
+    const halfWidth = tooltipWidth / 2;
+    const centerX = rect.left + (rect.width / 2);
+    const left = Math.min(
+      Math.max(centerX, margin + halfWidth),
+      Math.max(margin + halfWidth, viewportWidth - margin - halfWidth),
+    );
+
+    this.quickNavTooltipLayerEl.style.left = `${Math.round(left)}px`;
+    this.quickNavTooltipLayerEl.style.top = `${Math.round(rect.top - 10)}px`;
+    this.quickNavTooltipLayerEl.dataset.align = 'center';
+  }
+
+  private bindQuickNavTooltipWindowListeners(): void {
+    if (this.quickNavTooltipWindowListenersBound) {
+      return;
+    }
+
+    const view = this.containerEl.ownerDocument.defaultView;
+    if (!view) {
+      return;
+    }
+
+    view.addEventListener('resize', this.handleQuickNavTooltipViewportChange, { passive: true });
+    view.addEventListener('scroll', this.handleQuickNavTooltipViewportChange, { passive: true });
+    this.quickNavTooltipWindowListenersBound = true;
+  }
+
+  private unbindQuickNavTooltipWindowListeners(): void {
+    if (!this.quickNavTooltipWindowListenersBound) {
+      return;
+    }
+
+    const view = this.containerEl.ownerDocument.defaultView;
+    if (view) {
+      view.removeEventListener('resize', this.handleQuickNavTooltipViewportChange);
+      view.removeEventListener('scroll', this.handleQuickNavTooltipViewportChange);
+    }
+    this.quickNavTooltipWindowListenersBound = false;
+  }
+
+  private readonly handleQuickNavTooltipViewportChange = (): void => {
+    if (!this.quickNavTooltipActiveButton) {
+      return;
+    }
+    this.positionQuickNavTooltip();
+  };
+
+  private destroyQuickNavTooltipLayer(): void {
+    this.unbindQuickNavTooltipWindowListeners();
+    this.quickNavTooltipLayerEl?.remove();
+    this.quickNavTooltipLayerEl = null;
+    this.quickNavTooltipBubbleEl = null;
+    this.quickNavTooltipArrowEl = null;
+    this.quickNavTooltipActiveButton = null;
   }
 
   private getSettingsScrollContainer(): HTMLElement {
@@ -545,6 +693,7 @@ export class SettingsSectionCoordinator {
   }
 
   private teardownScrollPersistence(): void {
+    this.hideQuickNavTooltip();
     if (this.settingsScrollHandler) {
       this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
       this.settingsScrollHandler = undefined;

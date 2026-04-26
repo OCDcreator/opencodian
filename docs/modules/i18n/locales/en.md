@@ -15,13 +15,15 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 当前 A4 agent-surface 收尾又补了一组 `settings.agents.expert.*`、`settings.agents.workspace.*`、`settings.agents.guard.*`、`settings.agents.editor.select.runtimeSection` / `systemBadge` 以及 `settings.agents.tab.workspace` 文案，把 system-agent expert gate、Markdown workspace CRUD / status、runtime-system editor labels 和新的 workspace tab 都放进 locale，而不是继续在 settings owner 中硬编码文本。
 
-2026-04-25 新增 `settings.server.tab.mcp` 和 `settings.server.mcp.*` 系列键，为 Server > MCP 设置标签页提供 MCP 服务器概览、状态徽章和刷新操作的英文文案。
+2026-04-25 新增 `settings.server.tab.mcp` 和 `settings.server.mcp.*` 系列键，为早期的 `Server > MCP` 设置标签页提供 MCP 服务器概览、状态徽章和刷新操作的英文文案。
 
 同日 M2 继续扩展 `settings.server.mcp.*` 键空间，新增 MCP 操作按钮（connect / disconnect / authenticate / clearAuth）、新增服务器表单（local / remote 类型切换、command / environment / url / headers / OAuth 等字段）、校验错误（nameRequired / nameDuplicate / commandRequired / urlRequired / urlInvalid / timeoutPositive / emptyKey）和操作反馈通知（added / addFailed / actionFailed）对应的英文文案。
 
 同日 F2 新增 `settings.formatter.*` 和 `settings.quickNav.formatterDesc` 系列键，为 Formatter 一级设置页提供概览（runtime status / summary cards / detected formatter table）、配置（mode switch）和模式切换通知的英文文案。
 
 同日 F3 扩展 `settings.formatter.config.*` 键空间，新增内置格式化器编辑（builtin list / action dropdown / override fields for command/environment/extensions）、自定义格式化器 CRUD（add / save / delete / nameConflict）、高级 JSON 编辑器（format / reload / save / invalidJson）和运行时离线提示对应的英文文案。
+
+2026-04-26 navigation reorg added `settings.mcp.title`, `settings.mcp.tab.overview`, and `settings.quickNav.mcpDesc`, because MCP has been promoted to its own primary settings tab and classic quick-nav entry. `settings.server.tab.*` now only describes the remaining server secondary tabs (connection/auth/status).
 
 源码约 2050 行。
 

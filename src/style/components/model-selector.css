@@ -627,7 +627,8 @@
   flex-direction: column;
   gap: 10px;
   margin: 0 0 20px;
-  padding: 14px 20px;
+  padding: 24px 20px 14px;
+  overflow: visible;
   background: color-mix(in srgb, var(--background-secondary) 94%, transparent);
   border: 1px solid var(--opencodian-border-soft);
   border-top: none;
@@ -662,7 +663,6 @@
 }
 
 .opencodian-settings-quick-nav-btn {
-  position: relative;
   padding: 6px 12px;
   border: 1px solid var(--opencodian-border-soft);
   border-radius: 999px;
@@ -845,12 +845,29 @@
   transform: translateY(-50%) rotate(-45deg) translateX(0);
 }
 
-.opencodian-settings-quick-nav-btn::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 10px);
-  transform: translateX(-50%) translateY(4px);
+.opencodian-settings-quick-nav-tooltip-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+  z-index: 2200;
+}
+
+.opencodian-settings-quick-nav-tooltip-layer.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -100%) translateY(-2px);
+}
+
+.opencodian-settings-quick-nav-tooltip-bubble {
   width: max-content;
   max-width: min(240px, calc(100vw - 48px));
   padding: 8px 11px;
@@ -863,90 +880,20 @@
   line-height: 1.35;
   text-align: left;
   white-space: normal;
-  opacity: 0;
-  pointer-events: none;
   backdrop-filter: blur(18px) saturate(1.04);
   -webkit-backdrop-filter: blur(18px) saturate(1.04);
   box-shadow:
     0 12px 28px color-mix(in srgb, var(--text-normal) 14%, transparent),
     0 1px 0 color-mix(in srgb, var(--background-modifier-hover) 45%, transparent) inset;
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
 }
 
-.opencodian-settings-quick-nav-btn::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 4px);
+.opencodian-settings-quick-nav-tooltip-arrow {
   width: 8px;
   height: 8px;
   background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
   border-right: 1px solid var(--opencodian-border-strong);
-  border-top: 1px solid var(--opencodian-border-strong);
-  border-left: 1px solid var(--opencodian-border-strong);
-  transform: translateX(-50%) rotate(45deg) translateY(4px);
-  opacity: 0;
-  pointer-events: none;
-  backdrop-filter: blur(18px) saturate(1.04);
-  -webkit-backdrop-filter: blur(18px) saturate(1.04);
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
-}
-
-.opencodian-settings-quick-nav-btn[data-tooltip-align="left"]::after {
-  left: 0;
-  transform: translateX(0) translateY(4px);
-}
-
-.opencodian-settings-quick-nav-btn[data-tooltip-align="left"]::before {
-  left: 18px;
-  transform: translateX(0) rotate(45deg) translateY(4px);
-}
-
-.opencodian-settings-quick-nav-btn[data-tooltip-align="right"]::after {
-  left: auto;
-  right: 0;
-  transform: translateX(0) translateY(4px);
-}
-
-.opencodian-settings-quick-nav-btn[data-tooltip-align="right"]::before {
-  left: auto;
-  right: 18px;
-  transform: translateX(0) rotate(45deg) translateY(4px);
-}
-
-.opencodian-settings-quick-nav-btn:hover::after,
-.opencodian-settings-quick-nav-btn:hover::before,
-.opencodian-settings-quick-nav-btn:focus-visible::after,
-.opencodian-settings-quick-nav-btn:focus-visible::before {
-  opacity: 1;
-}
-
-.opencodian-settings-quick-nav-btn:hover::after,
-.opencodian-settings-quick-nav-btn:focus-visible::after {
-  transform: translateX(-50%) translateY(0);
-}
-
-.opencodian-settings-quick-nav-btn:hover::before,
-.opencodian-settings-quick-nav-btn:focus-visible::before {
-  transform: translateX(-50%) rotate(45deg) translateY(0);
-}
-
-.opencodian-settings-quick-nav-btn[data-tooltip-align="left"]:hover::after,
-.opencodian-settings-quick-nav-btn[data-tooltip-align="left"]:focus-visible::after,
-.opencodian-settings-quick-nav-btn[data-tooltip-align="right"]:hover::after,
-.opencodian-settings-quick-nav-btn[data-tooltip-align="right"]:focus-visible::after {
-  transform: translateX(0) translateY(0);
-}
-
-.opencodian-settings-quick-nav-btn[data-tooltip-align="left"]:hover::before,
-.opencodian-settings-quick-nav-btn[data-tooltip-align="left"]:focus-visible::before,
-.opencodian-settings-quick-nav-btn[data-tooltip-align="right"]:hover::before,
-.opencodian-settings-quick-nav-btn[data-tooltip-align="right"]:focus-visible::before {
-  transform: translateX(0) rotate(45deg) translateY(0);
+  border-bottom: 1px solid var(--opencodian-border-strong);
+  transform: rotate(45deg);
 }
 
 .opencodian-settings-section-heading {

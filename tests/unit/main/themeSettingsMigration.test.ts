@@ -460,6 +460,24 @@ function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): 
     expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({ general: 'language' });
   });
 
+  it('migrates saved Server > MCP tab memory to the MCP primary tab on load', async () => {
+    const plugin = createPluginWithSavedSettings({
+      defaultProvider: 'openai',
+      settingsLayoutMode: 'tabbed',
+      settingsTabbedPrimaryTab: 'server',
+      settingsTabbedSecondaryTabByPrimary: { server: 'mcp' },
+    });
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.settingsLayoutMode).toBe('tabbed');
+    expect(plugin.settings.settingsTabbedPrimaryTab).toBe('mcp');
+    expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({
+      server: 'mcp',
+      mcp: 'overview',
+    });
+  });
+
   it('defaults new users to tabbed layout mode when no settings snapshot exists', async () => {
     // Simulate a fresh install where no settings files exist
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {

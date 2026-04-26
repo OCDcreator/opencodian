@@ -215,11 +215,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     this.renderClassicGeneralSection(containerEl);
     this.addServerSettings(containerEl);
-    this.addMcpSettings(containerEl);
     this.addModelSettings(containerEl);
     this.addConversationSettings(containerEl);
     this.addAgentsSettings(containerEl);
     this.addCommandsSettings(containerEl);
+    this.addMcpSettings(containerEl);
     this.addFormatterSettings(containerEl);
     this.addPluginSettings(containerEl);
     this.addSecuritySettings(containerEl);

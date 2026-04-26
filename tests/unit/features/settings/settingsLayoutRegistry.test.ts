@@ -34,6 +34,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'conversation',
       'agents',
       'commands',
+      'mcp',
       'formatter',
       'plugins',
       'security',
@@ -90,7 +91,7 @@ describe('resolveSecondaryTabId', () => {
   it('returns the candidate if it exists for the given primary', () => {
     expect(resolveSecondaryTabId('server', 'connection')).toBe('connection');
     expect(resolveSecondaryTabId('server', 'auth')).toBe('auth');
-    expect(resolveSecondaryTabId('server', 'mcp')).toBe('mcp');
+    expect(resolveSecondaryTabId('mcp', 'overview')).toBe('overview');
     expect(resolveSecondaryTabId('model', 'common')).toBe('common');
     expect(resolveSecondaryTabId('model', 'availability')).toBe('availability');
   });
@@ -118,7 +119,7 @@ describe('getActiveSecondaryTabId', () => {
   it('resolves stale saved values to valid secondary ids', () => {
     const saved = { server: 'stale-invalid-subtab' };
     const result = getActiveSecondaryTabId('server', saved);
-    expect(['connection', 'auth', 'status', 'mcp']).toContain(result);
+    expect(['connection', 'auth', 'status']).toContain(result);
     const primaryDef = getPrimaryTabDefinition('server');
     expect(result).toBe(primaryDef!.defaultSecondaryTabId);
   });

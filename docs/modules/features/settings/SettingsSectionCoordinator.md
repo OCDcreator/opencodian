@@ -11,6 +11,7 @@
 
 - 在 `beginDisplay()` / `finishDisplay()` 之间管理 settings panel 的顶层重建流程
 - 通过 `createSectionHeading()` 记录 section heading，并在完成渲染后按需生成 quick-nav
+- 在 classic quick-nav 上管理 body-level tooltip overlay，让提示可以越过 settings 滚动容器而不被裁切
 - 维护 `prepareRestoreScrollOnNextOpen()` / `prepareScrollToSectionOnNextOpen()` 的打开意图
 - 在 post-render 阶段绑定 scroll persistence，并用 `MutationObserver` + retry timers 恢复滚动位置
 - 在 `hide()` 时收尾 restore work、capture 当前 scrollTop，并清理监听器
@@ -22,6 +23,7 @@
 | `beginDisplay()` | 清空 panel chrome、按需准备 quick-nav host，并保留本次 display 的 pending scroll intent；tabbed 布局可以关闭 quick-nav。调用方现在还可以传入自定义 panel title renderer，用品牌标题替代默认纯文本 `h2` |
 | `createSectionHeading()` | 创建 section heading，同时把该分区注册到 quick-nav 数据集 |
 | `finishDisplay()` | 构建 quick-nav、安排 post-render setup，并在初次打开时清理 quick-nav 焦点 |
+| quick-nav tooltip overlay helpers | 在 hover/focus 时把 tooltip layer 挂到 `document.body`，并随滚动/窗口变化重定位 |
 | `restoreScrollPosition()` | 执行带 settle/retry 的滚动恢复 |
 | `hide()` | 捕获当前 scrollTop 并清理 restore / persistence 监听器 |
 

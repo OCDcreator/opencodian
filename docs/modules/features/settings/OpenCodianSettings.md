@@ -101,7 +101,9 @@
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
 
-从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / Formatter / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式现在还会通过 `beginDisplay({ showQuickNav: false })` 关闭 quick-nav，只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
+从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / MCP / Formatter / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式现在还会通过 `beginDisplay({ showQuickNav: false })` 关闭 quick-nav，只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
+
+2026-04-26 的后续导航微调又把 `MCP` 固定到 `Commands` 和 `Formatter` 之间：一级标签顺序、classic section 挂载顺序和 quick-nav 按钮顺序都保持一致，避免在两种布局之间切换时看到不同的导航位置。
 
 设置页最上方的 panel title 现在不再直接复用纯文本 `h2`；`OpenCodianSettings` 会在 classic / tabbed 两种布局里都传入自定义标题渲染器，让顶部标题使用和聊天头部 `opencodian-title` 一致的品牌逻辑：左侧 `opencodian-app-icon` + 亮/暗主题 wordmark，不再额外拼接 `Settings / 设置` 文本后缀。
 
@@ -193,7 +195,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsUserSection`: 用户 profile/prompt/tags 设置的独立渲染函数，从 `OpenCodianSettings` 中提取
 - `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
-- `SettingsMcpSection`: 管理 MCP 服务器状态概览、逐服务器行渲染、catalog subscription 与显式刷新 action；tabbed 模式下路由到 `Server > MCP`，classic 模式下紧跟 Server 部分之后；M1 范围内为只读状态展示
+- `SettingsMcpSection`: 管理 MCP 服务器状态概览、逐服务器行渲染、catalog subscription 与显式刷新 action；tabbed 模式下路由到独立一级 `MCP` 标签，classic 模式下紧跟 Server 部分之后并进入 quick-nav
 - `SettingsModelSection`: 管理模型 section 的 block shell、callback bridge 与 `SettingsModelCatalogPresenter` host；source mode、refresh 链路、workspace 卡片和 icon cache 工具区继续委托给相邻 model-section owners
 - `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、project-scoped compaction editor、global chat font size、question card display/position、answered-card toggle 与 user-markup render toggle，并复用主设置页 block 组件把它们拆成多层级分组；`OpenCodianSettings` 只保留 owner 装配、block seam 与 title-model refresh callback bridge
 - `ConversationCompactionHelpModal`: 作为 conversation section compaction 子区块的帮助入口；`OpenCodianSettings` 继续通过共享 `addSettingHelpButton()` seam 提供统一的 `help-circle` 交互

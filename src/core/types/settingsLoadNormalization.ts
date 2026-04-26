@@ -443,6 +443,26 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
     context,
     normalizedModelProviderPluginDebugSettings,
   );
+  const normalizedTabbedSecondaryTabByPrimary = normalizeSettingsTabbedSecondaryTabByPrimary(
+    savedSettings?.settingsTabbedSecondaryTabByPrimary,
+  );
+  const normalizedTabbedPrimaryTab = normalizeSettingsTabbedPrimaryTab(
+    savedSettings?.settingsTabbedPrimaryTab,
+    'server',
+  );
+  const migratedTabbedSettings = normalizedTabbedPrimaryTab === 'server'
+    && normalizedTabbedSecondaryTabByPrimary.server === 'mcp'
+    ? {
+        primaryTab: 'mcp',
+        secondaryTabByPrimary: {
+          ...normalizedTabbedSecondaryTabByPrimary,
+          mcp: normalizedTabbedSecondaryTabByPrimary.mcp ?? 'overview',
+        },
+      }
+    : {
+        primaryTab: normalizedTabbedPrimaryTab,
+        secondaryTabByPrimary: normalizedTabbedSecondaryTabByPrimary,
+      };
 
   return {
     settings: {
@@ -470,13 +490,8 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       providerIconColorMode: normalizedModelProviderPluginDebugSettings.providerIconColorMode,
       providerIconDefaultVariant: normalizedModelProviderPluginDebugSettings.providerIconDefaultVariant,
       settingsLayoutMode: resolveInitialLayoutMode(savedSettings),
-      settingsTabbedPrimaryTab: normalizeSettingsTabbedPrimaryTab(
-        savedSettings?.settingsTabbedPrimaryTab,
-        'server',
-      ),
-      settingsTabbedSecondaryTabByPrimary: normalizeSettingsTabbedSecondaryTabByPrimary(
-        savedSettings?.settingsTabbedSecondaryTabByPrimary,
-      ),
+      settingsTabbedPrimaryTab: migratedTabbedSettings.primaryTab,
+      settingsTabbedSecondaryTabByPrimary: migratedTabbedSettings.secondaryTabByPrimary,
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,
