@@ -249,10 +249,27 @@ graph TD
 
 ## 注意事项
 
-- 远程模式下 `start()` 不是空操作；它会做健康检查并把状态置为 `running`。
+### 优先扩展的相邻模块
+
+`ServerManager` 的下游只有 `OpenCodeService`，它不直接被 UI 或其他模块消费。新功能类型应优先扩展：
+
+| 功能类型 | 优先扩展 |
+|----------|----------|
+| 服务状态 / 模型目录 / catalog bootstrap | `OpenCodeServiceLifecycleCoordinator` |
+| 本地 server 配置 UI | `SettingsServerSection` |
+| 远程连接配置 | `SettingsServerSection` + `OpenCodeService` |
+| Managed server state 持久化 | `main.ts` (通过 runtime options callback) |
+| Server 健康检查 / diagnostics | `OpenCodeServiceLifecycleCoordinator` (health probe) |
+
+### 不可移除的关键行为
+
+1. **签名过期的 managed server 必须重启**：对“之前插件自己拉起、但当前签名已过期”的本地服务，不会再无条件接管；会先重启，让 provider/runtime 目录重新和当前 vault 配置、全局配置保持一致。不能跳过签名检查直接复用旧进程。
+2. **未知健康服务只回收默认端口 sidecar**：对未知健康服务，只有“确认是插件默认 `4196` 端点上的插件 sidecar”才允许自动回收；自定义端口上的未知健康服务一律进入 `conflict`。不能放宽回收条件。
+3. **`pid` 不等于 launcher pid**：`pid` 不再等同于“最初 spawn 出来的 child pid”；Windows 上应优先把 `listenerPid` 视为真实 sidecar 生命周期真值。adopt / recycle / stop 不能把单一 `pid` 当成永久真值。
+4. **远程模式 `start()` 不是空操作**：远程模式下 `start()` 会做健康检查并把状态置为 `running`；不能跳过健康检查直接标记为 running。
+
+### 其他注意事项
+
 - `findOpenCodeBinary()` 会显式探测候选路径和 `PATH`，不再只是“构造候选字符串后交给 shell”。
 - `setWorkingDirectory()` 只会额外检查 `.opencode/opencode.json` 的存在并写日志，不会在这里解析 `.jsonc`。
-- 对未知健康服务，只有“确认是插件默认 `4196` 端点上的插件 sidecar”才允许自动回收；自定义端口上的未知健康服务一律进入 `conflict`。
-- 对“之前插件自己拉起、但当前签名已过期”的本地服务，不会再无条件接管；它现在会先重启，以便让 provider/runtime 目录重新和当前 vault 配置、全局配置保持一致。
-- `pid` 不再等同于“最初 spawn 出来的 child pid”；Windows 上应优先把 `listenerPid` 视为真实 sidecar 生命周期真值。
 - 如果未来又出现“服务器目录突然只剩 deepseek / 1 个 provider / 3 个 provider”这类问题，第一排查项不是 SDK 返回解包，而是：插件默认 `4196` 端点是否被孤儿 sidecar / 冲突进程占用、`runtime.json` 的 managed server 签名是否过期、当前 `cwd` 是否真的指向目标 vault。

@@ -431,19 +431,45 @@ graph TD
 
 ## 注意事项
 
+### 优先扩展的相邻模块
+
+新行为不应直接加入 `OpenCodeService`。根据功能类型，优先扩展以下 owner：
+
+| 功能类型 | 优先扩展 |
+|----------|----------|
+| Streaming transport / abort / fallback | `OpenCodeStreamingRuntimeCoordinator` |
+| Session create/list/delete/update | `OpenCodeSessionLifecycleCoordinator` |
+| Session state (message/part graph) | `OpenCodeSessionStateStore` |
+| Fork/revert/diff/context usage | `OpenCodeSessionControlOrchestrator` |
+| Question / permission negotiation | `OpenCodeQuestionPermissionHub` |
+| Directory-scoped config/tool/MCP query | `OpenCodeCatalogQueryCoordinator` |
+| Tool/MCP catalog state | `OpenCodeCatalogStateStore` |
+| Sync event subscription / mutation | `OpenCodeSyncEventRuntimeCoordinator` |
+| Service lifecycle / start/stop | `OpenCodeServiceLifecycleCoordinator` |
+| Prompt payload assembly | `OpenCodePromptRequestBuilder` |
+| Stream event transform / SSE parser | `OpenCodeStreamEventTransformer` |
+| Message normalization / hydration | `OpenCodeMessageNormalizationMapper` |
+| Context part serialization | `OpenCodeContextPartSerializer` |
+| SDK error formatting / diagnostics | `OpenCodeSdkFacade` diagnostics owner |
+
+### 不可移除的关键行为
+
+1. **Legacy SSE fallback 不可删除**：`connectSSE()` / `parseSSEEvents()` 仍然是有效回滚路径，不能在 SDK rollout 未完全收口前删除。
+2. **SDK `directory` scope 语义**：SDK client 会把 `directory` 作为查询参数和 `x-opencode-directory` 头一起传给服务端；直接手写 HTTP 请求如果不带这个作用域，`/config` 和 `/config/providers` 看到的通常是全局层结果。所有 SDK facade 调用都必须带正确的 directory scope。
+3. **Stale managed server 优先排查**：本地模式下如果 `4096` 是旧的 managed server，`getAvailableModels()` / `getResolvedModelConfig()` 即使代码本身没错，也会返回“上一份 vault / 上一份配置”对应的结果；先重启 stale server，再判断是不是 SDK/归一化问题。
+4. **Canonical session state 归属**：`OpenCodeSessionStateStore` 拥有 canonical session/message/part graph；不要在 `OpenCodeService` 或 chat view-model 里重新引入 ad-hoc graph state。
+5. **Config/provider query 不可拆成薄 wrapper**：`OpenCodeCatalogQueryCoordinator` 拥有 directory-scoped config/tool-catalog/MCP/query owner；不要把 `config.providers()`、`provider.list()`、`config.get()`、`tool.ids()`、`tool.list()`、provider/file/find/MCP auth 再拆成多个薄 wrapper。
+6. **Windows path 兼容集中处理**：`OpenCodeService` 不再直接使用宿主平台 `path.resolve()` / `path.relative()` 处理 context attachment 的 Windows path；相关兼容逻辑集中在 `shared/contextPath.ts`。
+
+### 其他注意事项
+
 - `OpenCodeService.initialize()` 仍然存在，但运行时入口 `main.ts` 并不调用它；主要使用方是测试。
-- `OpenCodeQuestionPermissionHub` 现在拥有 question / permission negotiation owner；`OpenCodeService` 只保留 host seam 与对外 façade。
-- `OpenCodeCatalogQueryCoordinator` 现在拥有 directory-scoped config/tool-catalog/MCP/query owner；不要把 `config.providers()`、`provider.list()`、`config.get()`、`tool.ids()`、`tool.list()`、provider/file/find/MCP auth 再拆成多个薄 wrapper，也不要把 `OpenCodeSdkFacade` 的 request option injection 逻辑复制进来。
-- compaction 配置现在由 `SettingsConversationSection` 直接通过 `OpencodeConfigManager.updateCompactionConfig()` 写入 `.opencode/opencode.json`，然后通过 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读；`applyCompactionConfig()` 已移除。
-- `getPendingPermissions()` / `respondToPermission()` 当前仍跟随 `sdkCrud`，不是单独的 permission flag；`respondToSessionPermission()` 继续直接走 SDK permission responder。
-- `checkHealth()`、`getAvailableModels()`、`getProviderDirectory()` 和 `getResolvedModelConfig()` 都跟随 `sdkCrud`，而不是独立的 health/models flag。
+- compaction 配置现在由 `SettingsConversationSection` 直接通过 `OpencodeConfigManager.updateCompactionConfig()` 写入 `.opencode/opencode.json`；`applyCompactionConfig()` 已移除。
+- `getPendingPermissions()` / `respondToPermission()` 当前仍跟随 `sdkCrud`，不是单独的 permission flag。
+- `checkHealth()`、`getAvailableModels()`、`getProviderDirectory()` 和 `getResolvedModelConfig()` 都跟随 `sdkCrud`。
 - `getAvailableModels()` 是运行时可用列表，也是最接近 OpenCode 主界面当前 provider 列表的数据源。
-- `getProviderDirectory()` 返回的是 connect-provider 目录；如果只禁用了少量 provider，它仍可能返回上百个可连接项，所以不要把它当成设置页服务器模型目录。
-- SDK client 会把 `directory` 作为查询参数和 `x-opencode-directory` 头一起传给服务端；直接手写 HTTP 请求如果不带这个作用域，`/config` 和 `/config/providers` 看到的通常是全局层结果。
-- `OpenCodeService` 不再直接使用宿主平台 `path.resolve()` / `path.relative()` 处理 context attachment 的 Windows path；相关兼容逻辑集中在 `shared/contextPath.ts`。
-- 本地模式下如果 `4096` 是旧的 managed server，`getAvailableModels()` / `getResolvedModelConfig()` 即使代码本身没错，也会返回“上一份 vault / 上一份配置”对应的结果；先重启 stale server，再判断是不是 SDK/归一化问题。
-- legacy `connectSSE()` / `parseSSEEvents()` 仍然是有效回滚路径，不能在 SDK rollout 未完全收口前删除。
-- 文件里的 `transformEventToChunks()` / `transformPartToChunks()` 仍保留，但当前主流式路径实际走的是 `handleStreamingEvent()`。
+- `getProviderDirectory()` 返回的是 connect-provider 目录；不要把它当成设置页服务器模型目录。
+- `transformEventToChunks()` / `transformPartToChunks()` 仍保留，但当前主流式路径实际走的是 `handleStreamingEvent()`。
 
 ## 2026-04-23 Compaction config alignment
 

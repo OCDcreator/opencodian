@@ -595,13 +595,39 @@ background task notice 这条子链路现在的边界是：
 
 ## 注意事项
 
+### 优先扩展的相邻模块
+
+新运行时行为不应直接加入 `OpenCodianView`。根据功能类型，优先扩展以下 owner：
+
+| 功能类型 | 优先扩展 |
+|----------|----------|
+| Tab 生命周期 / pane / scroll | `ConversationTabRuntimeCoordinator` / `TabMessagesPaneCoordinator` |
+| Question dock / 答复编排 | `QuestionDockCoordinator` |
+| Background task timeline / indicator | `BackgroundTaskTimelineService` / `BackgroundTaskCompletionNoticeService` |
+| Conversation 加载 / 恢复 | `ConversationLoadRecoveryCoordinator` / `ConversationViewStateService` |
+| Authoritative server sync | `ConversationAuthoritativeSyncCoordinator` / `ConversationAuthoritativeReloadCoordinator` |
+| Send pipeline / 用户消息准备 | `SendPipelineRuntime` / `MessageSendPreparationService` |
+| 流式 assistant 本地持久化 | `LocalStreamMessagePersistence` |
+| Child session graph | `ChildSessionGraphCoordinator` |
+| Header 状态 / 控件 | `ChatHeaderPresenter` |
+| Selection controls / model selector | `ChatSelectionControlsCoordinator` |
+| Composer input shell | `ComposerInputShellCoordinator` |
+| Slash command catalog 缓存 | `SlashCommandMenuCatalogCache` |
+| Notice 持久化 | `PersistentAssistantNoticeService` |
+| Trailing assistant patch | `trailingAssistantPatchPlanning` / `trailingAssistantPatchExecution` |
+
+### 不可移除的关键行为
+
+1. **Per-tab streaming 隔离**：streaming、conversation sync、background task 和 question 队列都已经做成按 tab 隔离，不能再退回单全局状态。每个 tab 有独立的 streaming controller、DOM pane、todo/status/background-task 状态、context 草稿和 question 草稿。
+2. **会话同步只保留 client-only decoration**：只保留明确的 client-only decoration（interrupted assistant placeholder、本地 notice、question resolution recap）；assistant 正文、tool、structured payload 和 canonical message/part 内容不能从这些 decoration 反向推导。
+3. **`session.status` 只代表 foreground runner**：`session.status` 只能代表主 runner 是否 `busy/retry/idle`；后台任务是否完成要看后续消息/提醒是否真正回写到会话历史。
+4. **三态滚动恢复**：重新渲染消息列表时，滚动恢复不再只按旧 `scrollTop`，而是按“到底 / 保持距底距离 / 保持可见 anchor”三态恢复，避免 hydration 后补写 inline/notice 时把视图重新顶上去。
+5. **Streaming + background task 优先级**：当 tab 同时处于前台流式和后台任务存活状态时，tab 样式遵循“streaming 主态、background 次级标记”的优先级；不要把二者重新合并成同一套阻塞语义。
+6. **Shell composer 提交仍被显式忽略**：如果未来启用 shell，必须经由 `OpenCodeService.runSessionShell()` / `session.shell`，再投影回 canonical session graph，不能新增本地 shell 真相路径。
+
+### 其他注意事项
+
 - 这个文件的大部分便捷 getter/setter 都默认指向“活动 tab”；改逻辑时必须先确认是不是应该改成显式 `tabId`。
-- streaming、conversation sync、background task 和 question 队列都已经做成按 tab 隔离，不能再退回单全局状态。
-- 会话同步只保留明确的 client-only decoration（例如 interrupted assistant placeholder、本地 notice、question resolution recap）；assistant 正文、tool、structured payload 和 canonical message/part 内容不能从这些 decoration 反向推导。
-- stable `OpenCodianView` 仍显式忽略 shell composer submission；如果未来启用 shell，必须经由 `OpenCodeService.runSessionShell()` / `session.shell`，再投影回 canonical session graph，不能新增本地 shell 真相路径。
-- `session.status` 只能代表主 runner 是否 `busy/retry/idle`；后台任务是否完成要看后续消息/提醒是否真正回写到会话历史。
-- 重新渲染消息列表时，滚动恢复不再只按旧 `scrollTop`，而是按“到底 / 保持距底距离 / 保持可见 anchor”三态恢复，避免 hydration 后补写 inline/notice 时把视图重新顶上去。
-- 当 tab 同时处于前台流式和后台任务存活状态时，tab 样式遵循“streaming 主态、background 次级标记”的优先级；不要把二者重新合并成同一套阻塞语义。
 
 ## 2026-04-23 Compaction config alignment
 
