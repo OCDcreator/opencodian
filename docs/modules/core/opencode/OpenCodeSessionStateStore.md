@@ -10,6 +10,7 @@
 - 全量 session snapshot replace
 - message / part 的 upsert 与 remove
 - `message.part.delta` 风格的字符串字段增量合并
+- `session.diff` sync event 的 diff entries 缓存
 - 对外提供稳定、克隆后的 canonical state 读取视图
 
 它不负责 SDK/legacy transport，也不负责 turn 渲染；当前只承接 session graph 状态本身。
@@ -30,6 +31,7 @@
 - `OpenCodeCanonicalSessionState`: 单个 session 的规范状态，包含保留 authoritative / mutation 插入顺序的 `messages` 与按 message 聚合的 `partsByMessageID`。
 - `OpenCodeSessionMessageWithParts`: `session.messages()` / legacy `/message` 读回的 `{ info, parts[] }` 结构。
 - `sessions`: 以 `sessionID` 为键的内存状态表。
+- `diffEntriesBySessionId`: 以 `sessionID` 为键的 diff entry 缓存表，由 `session.diff` sync event 写入。
 
 ## 核心逻辑
 
@@ -64,6 +66,9 @@
 | `upsertPart()` | 写入或覆盖单条 message part |
 | `removePart()` | 删除单条 part |
 | `appendPartDelta()` | 向现有字符串字段追加 delta |
+| `setSessionDiffEntries()` | 缓存 `session.diff` sync event 的 diff entries |
+| `getSessionDiffEntries()` | 读取某个 session 的克隆后 diff entries |
+| `removeSessionDiffEntries()` | 删除某个 session 的 diff entries |
 | `getSessionState()` | 读取某个 session 的克隆后 canonical state |
 
 ## 数据流

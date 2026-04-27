@@ -33,7 +33,7 @@ describe('OpenCodianView turn diff notice routing', () => {
     ]);
     const saveConversation = jest.fn().mockResolvedValue(undefined);
     const view = createView({
-      openCodeService: { getSessionDiff },
+      openCodeService: { getSessionDiff, getCachedSessionDiffEntries: jest.fn().mockReturnValue([]) },
       saveConversation,
     }) as unknown as {
       currentConversation: { id: string; messages: unknown[] } | null;
@@ -117,14 +117,21 @@ describe('OpenCodianView turn diff notice routing', () => {
 
   it('uses cached session.diff entries when the final diff fetch is empty', async () => {
     const getSessionDiff = jest.fn().mockResolvedValue([]);
+    const getCachedSessionDiffEntries = jest.fn().mockReturnValue([
+      {
+        file: 'notes.md',
+        additions: 5,
+        deletions: 2,
+        status: 'modified',
+      },
+    ]);
     const saveConversation = jest.fn().mockResolvedValue(undefined);
     const view = createView({
-      openCodeService: { getSessionDiff },
+      openCodeService: { getSessionDiff, getCachedSessionDiffEntries },
       saveConversation,
     }) as unknown as {
       currentConversation: { id: string; messages: unknown[] } | null;
       tabManager: { setTabNeedsAttention: jest.Mock };
-      sessionDiffEntriesBySessionId: Map<string, Array<Record<string, unknown>>>;
       appendTurnDiffNoticeIfNeeded: (
         conversation: {
           id: string;
@@ -145,14 +152,6 @@ describe('OpenCodianView turn diff notice routing', () => {
       messages: [],
     };
     view.tabManager = { setTabNeedsAttention: jest.fn() };
-    view.sessionDiffEntriesBySessionId.set('session-old', [
-      {
-        file: 'notes.md',
-        additions: 5,
-        deletions: 2,
-        status: 'modified',
-      },
-    ]);
     jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-new');
 
     const sendingConversation = {
@@ -173,6 +172,7 @@ describe('OpenCodianView turn diff notice routing', () => {
     await view.appendTurnDiffNoticeIfNeeded(sendingConversation, ['notes.md'], 'tab-old');
 
     expect(getSessionDiff).toHaveBeenCalledWith('session-old', 'msg-user-1');
+    expect(getCachedSessionDiffEntries).toHaveBeenCalledWith('session-old');
     expect(sendingConversation.messages[1]).toEqual(expect.objectContaining({
       role: 'assistant',
       content: expect.stringContaining('(+5 / -2)'),

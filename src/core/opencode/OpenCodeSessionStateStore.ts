@@ -1,3 +1,4 @@
+import type { SessionDiffEntry } from '../types';
 import type {
   OpenCodeCanonicalMessageInfo,
   OpenCodeCanonicalPart,
@@ -44,6 +45,7 @@ function cloneState(state: OpenCodeCanonicalSessionState): OpenCodeCanonicalSess
 
 export class OpenCodeSessionStateStore {
   private readonly sessions = new Map<string, OpenCodeCanonicalSessionState>();
+  private readonly diffEntriesBySessionId = new Map<string, SessionDiffEntry[]>();
 
   replaceSessionSnapshot(
     sessionID: string,
@@ -147,6 +149,23 @@ export class OpenCodeSessionStateStore {
     }
 
     return null;
+  }
+
+  setSessionDiffEntries(sessionID: string, entries: SessionDiffEntry[]): void {
+    if (entries.length > 0) {
+      this.diffEntriesBySessionId.set(sessionID, entries.map((entry) => ({ ...entry })));
+    } else {
+      this.diffEntriesBySessionId.delete(sessionID);
+    }
+  }
+
+  getSessionDiffEntries(sessionID: string): SessionDiffEntry[] {
+    const entries = this.diffEntriesBySessionId.get(sessionID);
+    return entries ? entries.map((entry) => ({ ...entry })) : [];
+  }
+
+  removeSessionDiffEntries(sessionID: string): void {
+    this.diffEntriesBySessionId.delete(sessionID);
   }
 
   getSessionState(sessionID: string): OpenCodeCanonicalSessionState | null {

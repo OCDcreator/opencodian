@@ -150,4 +150,53 @@ describe('OpenCodeSessionStateStore', () => {
     expect(fresh?.messages[0]?.role).toBe('user');
     expect(fresh?.partsByMessageID['msg-1']?.[0]?.text).toBe('Original');
   });
+
+  describe('session diff entries', () => {
+    it('stores and retrieves diff entries per session', () => {
+      const store = new OpenCodeSessionStateStore();
+      const entries = [
+        { file: 'a.ts', additions: 3, deletions: 1, status: 'modified' as const },
+        { file: 'b.ts', additions: 0, deletions: 5, status: 'deleted' as const },
+      ];
+
+      store.setSessionDiffEntries('session-1', entries);
+
+      expect(store.getSessionDiffEntries('session-1')).toEqual(entries);
+      expect(store.getSessionDiffEntries('session-2')).toEqual([]);
+    });
+
+    it('returns cloned entries to prevent mutation', () => {
+      const store = new OpenCodeSessionStateStore();
+      store.setSessionDiffEntries('session-1', [
+        { file: 'a.ts', additions: 1, deletions: 0 },
+      ]);
+
+      const retrieved = store.getSessionDiffEntries('session-1');
+      retrieved[0].file = 'changed.ts';
+
+      expect(store.getSessionDiffEntries('session-1')[0].file).toBe('a.ts');
+    });
+
+    it('removes entries when set to empty array', () => {
+      const store = new OpenCodeSessionStateStore();
+      store.setSessionDiffEntries('session-1', [
+        { file: 'a.ts', additions: 1, deletions: 0 },
+      ]);
+
+      store.setSessionDiffEntries('session-1', []);
+
+      expect(store.getSessionDiffEntries('session-1')).toEqual([]);
+    });
+
+    it('removes entries explicitly', () => {
+      const store = new OpenCodeSessionStateStore();
+      store.setSessionDiffEntries('session-1', [
+        { file: 'a.ts', additions: 1, deletions: 0 },
+      ]);
+
+      store.removeSessionDiffEntries('session-1');
+
+      expect(store.getSessionDiffEntries('session-1')).toEqual([]);
+    });
+  });
 });

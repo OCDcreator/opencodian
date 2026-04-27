@@ -1,7 +1,7 @@
 # Agent Catalog Service
 
 > **源码**: `src/core/agents/AgentCatalogService.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 

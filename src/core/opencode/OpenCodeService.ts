@@ -684,6 +684,10 @@ export class OpenCodeService {
     return this.sessionStateStore.getSessionState(sessionId);
   }
 
+  getCachedSessionDiffEntries(sessionId: string): SessionDiffEntry[] {
+    return this.sessionStateStore.getSessionDiffEntries(sessionId);
+  }
+
   getCanonicalSessionMessages(sessionId: string): OpenCodeSessionMessageWithParts[] | null {
     const state = this.sessionStateStore.getSessionState(sessionId);
     if (!state) {
@@ -1254,6 +1258,8 @@ export class OpenCodeService {
         );
         return;
       case 'session.diff':
+        this.sessionStateStore.setSessionDiffEntries(update.sessionId, update.diff ?? []);
+        return;
       case 'session.compacted':
         return;
     }

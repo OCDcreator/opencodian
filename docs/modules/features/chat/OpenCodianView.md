@@ -231,7 +231,7 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
-`session.diff` 现在不再触发 message authoritative sync/reload：view 会把 sync-event 自带的 diff entries 记在独立的 `sessionDiffEntriesBySessionId` 缓存里，只把它作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
+`session.diff` 现在不再触发 message authoritative sync/reload：sync-event 自带的 diff entries 由 `OpenCodeSessionStateStore.setSessionDiffEntries()` 统一缓存，view 通过 `OpenCodeService.getCachedSessionDiffEntries()` 读取作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
 
 `session.compacted` 现在会沿着同一条 session signal runtime 进入 `ConversationSyncBridge`，但 visible current conversation 会强制走 authoritative server sync，而不是先信任可能已过期的 canonical graph；sync 收尾继续复用 active-tab context usage refresh，以便清掉/更新 `Session.time.compacting` 驱动的 live 状态。reload 之后，服务端返回的已持久化 `compactionDivider` 会替代 `injectLiveCompactionDivider` 合成的虚拟 divider，`compactingAt` 则在 context usage refresh 时被置为 null。
 
@@ -595,13 +595,39 @@ background task notice 这条子链路现在的边界是：
 
 ## 注意事项
 
+### 优先扩展的相邻模块
+
+新运行时行为不应直接加入 `OpenCodianView`。根据功能类型，优先扩展以下 owner：
+
+| 功能类型 | 优先扩展 |
+|----------|----------|
+| Tab 生命周期 / pane / scroll | `ConversationTabRuntimeCoordinator` / `TabMessagesPaneCoordinator` |
+| Question dock / 答复编排 | `QuestionDockCoordinator` |
+| Background task timeline / indicator | `BackgroundTaskTimelineService` / `BackgroundTaskCompletionNoticeService` |
+| Conversation 加载 / 恢复 | `ConversationLoadRecoveryCoordinator` / `ConversationViewStateService` |
+| Authoritative server sync | `ConversationAuthoritativeSyncCoordinator` / `ConversationAuthoritativeReloadCoordinator` |
+| Send pipeline / 用户消息准备 | `SendPipelineRuntime` / `MessageSendPreparationService` |
+| 流式 assistant 本地持久化 | `LocalStreamMessagePersistence` |
+| Child session graph | `ChildSessionGraphCoordinator` |
+| Header 状态 / 控件 | `ChatHeaderPresenter` |
+| Selection controls / model selector | `ChatSelectionControlsCoordinator` |
+| Composer input shell | `ComposerInputShellCoordinator` |
+| Slash command catalog 缓存 | `SlashCommandMenuCatalogCache` |
+| Notice 持久化 | `PersistentAssistantNoticeService` |
+| Trailing assistant patch | `trailingAssistantPatchPlanning` / `trailingAssistantPatchExecution` |
+
+### 不可移除的关键行为
+
+1. **Per-tab streaming 隔离**：streaming、conversation sync、background task 和 question 队列都已经做成按 tab 隔离，不能再退回单全局状态。每个 tab 有独立的 streaming controller、DOM pane、todo/status/background-task 状态、context 草稿和 question 草稿。
+2. **会话同步只保留 client-only decoration**：只保留明确的 client-only decoration（interrupted assistant placeholder、本地 notice、question resolution recap）；assistant 正文、tool、structured payload 和 canonical message/part 内容不能从这些 decoration 反向推导。
+3. **`session.status` 只代表 foreground runner**：`session.status` 只能代表主 runner 是否 `busy/retry/idle`；后台任务是否完成要看后续消息/提醒是否真正回写到会话历史。
+4. **三态滚动恢复**：重新渲染消息列表时，滚动恢复不再只按旧 `scrollTop`，而是按“到底 / 保持距底距离 / 保持可见 anchor”三态恢复，避免 hydration 后补写 inline/notice 时把视图重新顶上去。
+5. **Streaming + background task 优先级**：当 tab 同时处于前台流式和后台任务存活状态时，tab 样式遵循“streaming 主态、background 次级标记”的优先级；不要把二者重新合并成同一套阻塞语义。
+6. **Shell composer 提交仍被显式忽略**：如果未来启用 shell，必须经由 `OpenCodeService.runSessionShell()` / `session.shell`，再投影回 canonical session graph，不能新增本地 shell 真相路径。
+
+### 其他注意事项
+
 - 这个文件的大部分便捷 getter/setter 都默认指向“活动 tab”；改逻辑时必须先确认是不是应该改成显式 `tabId`。
-- streaming、conversation sync、background task 和 question 队列都已经做成按 tab 隔离，不能再退回单全局状态。
-- 会话同步只保留明确的 client-only decoration（例如 interrupted assistant placeholder、本地 notice、question resolution recap）；assistant 正文、tool、structured payload 和 canonical message/part 内容不能从这些 decoration 反向推导。
-- stable `OpenCodianView` 仍显式忽略 shell composer submission；如果未来启用 shell，必须经由 `OpenCodeService.runSessionShell()` / `session.shell`，再投影回 canonical session graph，不能新增本地 shell 真相路径。
-- `session.status` 只能代表主 runner 是否 `busy/retry/idle`；后台任务是否完成要看后续消息/提醒是否真正回写到会话历史。
-- 重新渲染消息列表时，滚动恢复不再只按旧 `scrollTop`，而是按“到底 / 保持距底距离 / 保持可见 anchor”三态恢复，避免 hydration 后补写 inline/notice 时把视图重新顶上去。
-- 当 tab 同时处于前台流式和后台任务存活状态时，tab 样式遵循“streaming 主态、background 次级标记”的优先级；不要把二者重新合并成同一套阻塞语义。
 
 ## 2026-04-23 Compaction config alignment
 

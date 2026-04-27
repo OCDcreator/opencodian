@@ -23,6 +23,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Module doc coverage and diff
+        run: npm run check:module-docs
+
+      - name: Graphify freshness
+        run: npm run check:graphify
+
+      - name: Devlog order
+        run: npm run check:devlog-order
+
       - name: Lint
         run: npm run lint
 

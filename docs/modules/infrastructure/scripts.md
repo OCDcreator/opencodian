@@ -1,11 +1,11 @@
 # 构建 & 工具脚本
 
 > **源码**: `scripts/`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证和模块文档硬约束。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。
+项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证和模块文档硬约束。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs`。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`
@@ -99,6 +99,10 @@ Node.js 脚本形式的 Jest 启动包装器。
 
 确保 `manifest.json` 的 `version` 字段与 `package.json` 保持一致。
 
+### sync-lobehub-icons.mjs — LobeHub 图标清单同步
+
+从 `@lobehub/icons` 包读取 provider icon 目录（toc），按 variant（mono/color/brand/brand-color/text/text-cn/text-color/combine/avatar）生成 TypeScript manifest 文件 `src/utils/icons/lobehubIconManifest.ts`。每个 provider entry 包含可用 variant 列表、静态 SVG CDN URL 和 CDN base URL。生成的 manifest 供 `ProviderIconService` 和 `lobehubIconManifest.ts` 消费，避免运行时动态 import 整个 LobeHub 图标包。
+
 ## 关键方法
 
 | 脚本 | npm 命令 | 说明 |
@@ -116,6 +120,7 @@ Node.js 脚本形式的 Jest 启动包装器。
 | `list-module-doc-targets-from-diff.mjs` | `npm run list:module-docs` | 输出本次 diff 的文档同步目标 |
 | `run-jest.js` | `npm run test` | Jest 启动 |
 | `sync-version.js` | — | 版本同步 |
+| `sync-lobehub-icons.mjs` | `npm run sync:lobehub-icons` | 从 `@lobehub/icons` 生成 provider icon manifest |
 
 ## 数据流
 
@@ -193,11 +198,11 @@ npm run list:module-docs -- --range origin/main...HEAD
 - `doctor-esbuild.mjs` 的平台映射表需要随 esbuild 更新而维护
 - `release.mjs` 使用 `npm install --package-lock-only` 更新 lockfile
 - `check-devlog-order.mjs` 在 CI/handoff 前应运行
+- `check:devlog-order` 已接入 `npm run verify`；新 devlog 条目必须插入到第一个日期标题之前
 - `check:graphify` 已接入 `npm run verify`；如果修改了 `src/`，通常需要先运行 `npm run graphify:update:src`
 - `check-module-docs` 已接入 `npm run verify`，源码模块新增、修改、删除时不能跳过对应文档
 - `sync-version.js` 应在 release 后自动运行
 
 ## 待补充
 - [ ] 脚本间的依赖关系图
-- [ ] CI 集成脚本
 - [ ] 自动 changelog 生成

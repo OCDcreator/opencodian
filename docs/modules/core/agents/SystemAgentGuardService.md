@@ -1,7 +1,7 @@
 # System Agent Guard Service
 
 > **源码**: `src/core/agents/SystemAgentGuardService.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -13,6 +13,12 @@
 上游: src/core/agents/types.ts (isSystemAgentId, SystemAgentGuardResult)
 下游: src/core/agents/index.ts, 未来 settings / Agent Studio 消费方
 ```
+
+## 核心类型
+
+| 类型 | 说明 |
+|------|------|
+| `SystemAgentRiskLabel` | 风险标签联合类型：`'expert-override-allowed'` / `'read-only'` / `null` |
 
 ## 核心方法
 
