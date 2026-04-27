@@ -5,9 +5,7 @@ import {
 } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
 
 function createBuilder() {
-  const generatedIds = ['msg_1', 'prt_1', 'prt_2', 'prt_3'];
   const host = {
-    createPromptEntityId: jest.fn(() => generatedIds.shift() ?? `generated-${Date.now()}`),
     getDefaultModelSelection: jest.fn(() => ({
       providerID: 'openai',
       modelID: 'gpt-5',
@@ -22,8 +20,19 @@ function createBuilder() {
 }
 
 describe('OpenCodePromptRequestBuilder', () => {
+  it('generates OpenCode-compatible entity ids directly from the builder', () => {
+    const { builder } = createBuilder();
+
+    const messageId = builder.createPromptEntityId('message');
+    const partId = builder.createPromptEntityId('part');
+
+    expect(messageId).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(partId).toMatch(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(messageId).not.toBe(partId);
+  });
+
   it('returns stable message and part ids for the optimistic seed and the request payload', () => {
-    const { builder, host } = createBuilder();
+    const { builder } = createBuilder();
 
     const payload: BuiltPromptSendPayload = builder.buildStructuredPromptSendPayload({
       parts: [
@@ -37,36 +46,23 @@ describe('OpenCodePromptRequestBuilder', () => {
       ],
     });
 
-    expect(payload).toEqual({
-      messageID: 'msg_1',
-      requestParts: [
-        { id: 'prt_1', type: 'text', text: 'Hello' },
-        {
-          id: 'prt_2',
-          type: 'file',
-          mime: 'text/plain',
-          filename: 'notes.md',
-          url: 'file:///vault/notes.md',
-        },
-      ],
-      optimisticUserParts: [
-        { id: 'prt_1', type: 'text', text: 'Hello' },
-        {
-          id: 'prt_2',
-          type: 'file',
-          mime: 'text/plain',
-          filename: 'notes.md',
-          url: 'file:///vault/notes.md',
-        },
-      ],
-    });
-    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(1, 'message');
-    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(2, 'part');
-    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(3, 'part');
+    expect(payload.messageID).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(payload.requestParts).toEqual([
+      { id: expect.stringMatching(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/), type: 'text', text: 'Hello' },
+      {
+        id: expect.stringMatching(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/),
+        type: 'file',
+        mime: 'text/plain',
+        filename: 'notes.md',
+        url: 'file:///vault/notes.md',
+      },
+    ]);
+    expect(payload.optimisticUserParts).toEqual(payload.requestParts);
+    expect(payload.requestParts[0]?.id).not.toBe(payload.requestParts[1]?.id);
   });
 
   it('appends plugin-injected synthetic text parts without flattening them into user text', () => {
-    const { builder, host } = createBuilder();
+    const { builder } = createBuilder();
 
     const payload = builder.buildStructuredPromptSendPayload({
       parts: [{ type: 'text', text: 'Hello' }],
@@ -81,38 +77,21 @@ describe('OpenCodePromptRequestBuilder', () => {
       ],
     });
 
-    expect(payload).toEqual({
-      messageID: 'msg_1',
-      requestParts: [
-        { id: 'prt_1', type: 'text', text: 'Hello' },
-        {
-          id: 'prt_2',
-          type: 'text',
-          text: 'Injected plugin prompt',
-          synthetic: true,
-          metadata: {
-            source: 'plugin',
-            pluginName: 'opencode-plugin-x',
-          },
+    expect(payload.messageID).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(payload.requestParts).toEqual([
+      { id: expect.stringMatching(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/), type: 'text', text: 'Hello' },
+      {
+        id: expect.stringMatching(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/),
+        type: 'text',
+        text: 'Injected plugin prompt',
+        synthetic: true,
+        metadata: {
+          source: 'plugin',
+          pluginName: 'opencode-plugin-x',
         },
-      ],
-      optimisticUserParts: [
-        { id: 'prt_1', type: 'text', text: 'Hello' },
-        {
-          id: 'prt_2',
-          type: 'text',
-          text: 'Injected plugin prompt',
-          synthetic: true,
-          metadata: {
-            source: 'plugin',
-            pluginName: 'opencode-plugin-x',
-          },
-        },
-      ],
-    });
-    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(1, 'message');
-    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(2, 'part');
-    expect(host.createPromptEntityId).toHaveBeenNthCalledWith(3, 'part');
+      },
+    ]);
+    expect(payload.optimisticUserParts).toEqual(payload.requestParts);
     expect(payload.requestParts[1]).not.toBe(payload.optimisticUserParts[1]);
     expect(
       (payload.requestParts[1] as Extract<PromptRequestPart, { type: 'text' }>).metadata,
@@ -149,57 +128,33 @@ describe('OpenCodePromptRequestBuilder', () => {
       ],
     });
 
-    expect(payload).toEqual({
-      messageID: 'msg_1',
-      requestParts: [
-        { id: 'prt_1', type: 'text', text: 'Hello' },
-        {
-          id: 'prt_2',
-          type: 'agent',
-          name: 'explorer',
-          source: {
-            value: '@explorer',
-            start: 0,
-            end: 9,
-          },
+    expect(payload.messageID).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(payload.requestParts).toEqual([
+      { id: expect.stringMatching(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/), type: 'text', text: 'Hello' },
+      {
+        id: expect.stringMatching(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/),
+        type: 'agent',
+        name: 'explorer',
+        source: {
+          value: '@explorer',
+          start: 0,
+          end: 9,
         },
-        {
-          id: 'prt_3',
-          type: 'subtask',
-          description: 'Audit routes',
-          prompt: 'Inspect the router implementation',
-          agent: 'reviewer',
-          model: {
-            providerID: 'openai',
-            modelID: 'gpt-5.4',
-          },
+      },
+      {
+        id: expect.stringMatching(/^prt_[0-9a-f]{12}[0-9A-Za-z]{14}$/),
+        type: 'subtask',
+        description: 'Audit routes',
+        prompt: 'Inspect the router implementation',
+        agent: 'reviewer',
+        model: {
+          providerID: 'openai',
+          modelID: 'gpt-5.4',
         },
-      ],
-      optimisticUserParts: [
-        { id: 'prt_1', type: 'text', text: 'Hello' },
-        {
-          id: 'prt_2',
-          type: 'agent',
-          name: 'explorer',
-          source: {
-            value: '@explorer',
-            start: 0,
-            end: 9,
-          },
-        },
-        {
-          id: 'prt_3',
-          type: 'subtask',
-          description: 'Audit routes',
-          prompt: 'Inspect the router implementation',
-          agent: 'reviewer',
-          model: {
-            providerID: 'openai',
-            modelID: 'gpt-5.4',
-          },
-        },
-      ],
-    });
+      },
+    ]);
+    expect(payload.optimisticUserParts).toEqual(payload.requestParts);
+    expect(new Set(payload.requestParts.map((part) => part.id)).size).toBe(3);
     expect(payload.requestParts[1]).not.toBe(payload.optimisticUserParts[1]);
     expect(
       (payload.requestParts[1] as Extract<PromptRequestPart, { type: 'agent' }>).source,

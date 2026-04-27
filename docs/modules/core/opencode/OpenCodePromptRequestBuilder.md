@@ -29,7 +29,7 @@ builder 不负责 transport 分流，也不负责 context/image request part 序
 - `BuiltPromptSendPayload`: 发送层共享的结构化 payload，集中持有稳定 `messageID`、transport `requestParts` 与 optimistic seed `optimisticUserParts`。
 - `PromptRequestOptions`: `QueryOptions` 加上可选 `system` 的 prompt 组装输入。
 - `host.getDefaultModelSelection()`: 提供当前默认 `providerID` / `modelID`，让 builder 不直接持有 settings 副本。
-- `host.createPromptEntityId()`: 生成稳定 `message` / `part` id；当前会使用 OpenCode 兼容的 `msg_*` / `prt_*` 前缀，避免 optimistic seed 与 transport 各自临时造号，并满足服务端对 prompt id 格式的校验。
+- `createPromptEntityId(kind)`: **公共方法**，生成稳定 `message` / `part` id。内部使用 OpenCode 兼容的 `msg_*` / `prt_*` 前缀 + 时间递增编码 + 随机后缀，避免 optimistic seed 与 transport 各自临时造号，并满足服务端对 prompt id 格式的校验。`OpenCodeService` 的 `createCanonicalUserPart()` 也直接调用此方法。序列状态（`promptRequestEntitySequence` / `promptRequestEntityLastTimestamp`）与常量（`OPEN_CODE_ID_*`）全部内聚在 builder 内。
 - `host.observeRuntimeToolNames()`: 在 allowed-tools 装配阶段把 runtime 外部工具名交回 `OpenCodeService` / `OpenCodeCatalogStateStore` 观察。
 
 ## 核心逻辑
@@ -72,6 +72,7 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 
 | 方法 / 导出 | 说明 |
 |-------------|------|
+| `createPromptEntityId(kind)` | 生成稳定 `msg_*` / `prt_*` prompt entity id |
 | `buildSdkPromptParameters()` | 组装 SDK prompt / promptAsync 参数 |
 | `buildLegacyMessageRequestBody()` | 组装 legacy 非流式 `/message` body |
 | `buildLegacyStreamRequestBody()` | 组装 legacy 流式 `/prompt_async` body |
@@ -89,7 +90,8 @@ graph TD
     B --> E[SDK prompt parameters]
     B --> F[legacy message body]
     B --> G[legacy prompt_async body]
-    B --> H[observeRuntimeToolNames host seam]
+    B --> H[createPromptEntityId - stable msg/prt IDs]
+    B --> I[observeRuntimeToolNames host seam]
 ```
 
 ## 与其他模块的交互
@@ -105,6 +107,7 @@ graph TD
 
 ## 注意事项
 
+- `createPromptEntityId()` 的调用方包括 builder 自身与 `OpenCodeService.createCanonicalUserPart()`；不要把它再抽成独立工具模块，因为 ID 生成序列状态必须与 builder 的 payload 组装生命周期绑定。
 - 不要把它重新拆成 `AllowedToolsHelper`、`OutputFormatHelper` 之类更薄文件；R22 的目标是把 prompt option assembly 收口到一个较厚 owner。
 - SDK 路径对 `thinkingBudget` 的“只记录 debug log、不入 payload”行为是刻意保留的兼容边界。
 - legacy `/message` 与 `/prompt_async` 对 `model.options` 的差异也是兼容语义，不要在没有专门迁移计划时擅自统一。

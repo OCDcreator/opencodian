@@ -44,7 +44,6 @@ import { OpenCodeMessageNormalizationMapper } from './OpenCodeMessageNormalizati
 import {
   type BuiltPromptSendPayload,
   OpenCodePromptRequestBuilder,
-  type PromptRequestEntityKind,
   type PromptRequestPart,
   type PromptSyntheticTextPartInput,
 } from './OpenCodePromptRequestBuilder';
@@ -103,10 +102,6 @@ import type {
 } from './types';
 
 const logger = createLogger('OpenCodeService');
-const OPEN_CODE_ID_RANDOM_LENGTH = 14;
-const OPEN_CODE_ID_RANDOM_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-const OPEN_CODE_ID_TIMESTAMP_MULTIPLIER = 0x1000;
-const OPEN_CODE_ID_TIMESTAMP_MODULUS = 0x1000000000000;
 
 export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeSyncEventRuntimeCoordinator';
 
@@ -267,8 +262,6 @@ export class OpenCodeService {
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
-  private promptRequestEntitySequence = 0;
-  private promptRequestEntityLastTimestamp = 0;
   private readonly assistantCanonicalDiagnosticFingerprints = new Map<string, string>();
   private vaultPath?: string;
 
@@ -382,7 +375,6 @@ export class OpenCodeService {
       getVaultPath: () => this.vaultPath,
     });
     this.promptRequestBuilder = new OpenCodePromptRequestBuilder({
-      createPromptEntityId: (kind) => this.createPromptEntityId(kind),
       getDefaultModelSelection: () => ({
         providerID: this.settings.defaultProvider,
         modelID: this.settings.defaultModel,
@@ -1479,36 +1471,6 @@ export class OpenCodeService {
     return this.buildStructuredPromptSendPayload(message, options);
   }
 
-  private createPromptEntityId(kind: PromptRequestEntityKind): string {
-    const prefix = kind === 'message' ? 'msg' : 'prt';
-    const timestamp = Date.now();
-    if (timestamp !== this.promptRequestEntityLastTimestamp) {
-      this.promptRequestEntityLastTimestamp = timestamp;
-      this.promptRequestEntitySequence = 0;
-    }
-
-    this.promptRequestEntitySequence += 1;
-    const encodedTimestamp = (
-      ((timestamp * OPEN_CODE_ID_TIMESTAMP_MULTIPLIER) + this.promptRequestEntitySequence)
-      % OPEN_CODE_ID_TIMESTAMP_MODULUS
-    ).toString(16).padStart(12, '0');
-
-    return `${prefix}_${encodedTimestamp}${this.createPromptEntityRandomSuffix()}`;
-  }
-
-  private createPromptEntityRandomSuffix(): string {
-    const bytes = new Uint8Array(OPEN_CODE_ID_RANDOM_LENGTH);
-    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-      crypto.getRandomValues(bytes);
-    } else {
-      for (let index = 0; index < bytes.length; index += 1) {
-        bytes[index] = Math.floor(Math.random() * 256);
-      }
-    }
-
-    return Array.from(bytes, (byte) => OPEN_CODE_ID_RANDOM_CHARS[byte % OPEN_CODE_ID_RANDOM_CHARS.length]).join('');
-  }
-
   private createCanonicalUserPart(
     sessionID: string,
     messageID: string,
@@ -1517,7 +1479,7 @@ export class OpenCodeService {
     if (part.type === 'text') {
       return {
         ...part,
-        id: part.id ?? this.createPromptEntityId('part'),
+        id: part.id ?? this.promptRequestBuilder.createPromptEntityId('part'),
         sessionID,
         messageID,
         ...(part.metadata ? { metadata: { ...part.metadata } } : {}),
@@ -1527,7 +1489,7 @@ export class OpenCodeService {
     if (part.type === 'file') {
       return {
         ...part,
-        id: part.id ?? this.createPromptEntityId('part'),
+        id: part.id ?? this.promptRequestBuilder.createPromptEntityId('part'),
         sessionID,
         messageID,
         ...(part.source ? {
@@ -1542,7 +1504,7 @@ export class OpenCodeService {
     if (part.type === 'agent') {
       return {
         ...part,
-        id: part.id ?? this.createPromptEntityId('part'),
+        id: part.id ?? this.promptRequestBuilder.createPromptEntityId('part'),
         sessionID,
         messageID,
         ...(part.source ? { source: { ...part.source } } : {}),
@@ -1551,7 +1513,7 @@ export class OpenCodeService {
 
     return {
       ...part,
-      id: part.id ?? this.createPromptEntityId('part'),
+      id: part.id ?? this.promptRequestBuilder.createPromptEntityId('part'),
       sessionID,
       messageID,
       ...(part.model ? { model: { ...part.model } } : {}),
