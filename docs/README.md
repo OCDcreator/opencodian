@@ -14,6 +14,7 @@
   - 也放阶段性维护/重构说明，例如 `status/maintainability-phase-1.md`、`status/maintainability-phase-4.md`、`status/maintainability-phase-5.md`、`status/maintainability-phase-7.md`。
 - `requirements/`
   - 仍有维护价值的功能需求、实现状态和产品约束说明。
+  - 当前维护期的项目级开发基线见 `requirements/maintenance-development-baseline.md`，应与 `status/development-maintainability-rules.md` 一起阅读。
 - `reference/`
   - 外部资料或文档快照，作为项目内参考，不直接代表当前实现。
 
@@ -28,8 +29,10 @@
 ## 建议阅读顺序
 
 1. `architecture/README.md`
-2. `modules/README.md`
-3. 需要时再查 `status/`、`requirements/`、`reference/`
+2. `requirements/maintenance-development-baseline.md`
+3. `status/development-maintainability-rules.md`
+4. `modules/README.md`
+5. 需要时再查 `status/` 里的专题文档、其他 `requirements/` 文档和 `reference/`
 
 ## 本次整理说明
 
