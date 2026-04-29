@@ -31,7 +31,11 @@ All changes pass `npm run verify` (372/372 module-doc coverage, 339 test suites,
 
 Net new code in recipients: +473 lines. Net removed from thick owners: -488 lines. Near-parity confirms extraction, not expansion.
 
-## Baseline Compliance Assessment
+## Ownership Outcome
+
+This section records the Ownership outcome: whether the completed changes reduced ownership density without thin-helper proliferation.
+
+### Baseline Compliance Assessment
 
 ### 1. Did this change reduce or at least preserve ownership clarity?
 
@@ -88,6 +92,10 @@ Baseline anti-fragmentation warning signs:
 The thick owners remain above the review threshold (1000 lines) but the baseline explicitly states:
 
 > "The goal is not to force these files below an arbitrary number. The goal is to make them safer to understand and change."
+
+## Follow-Up Decision
+
+Follow-up decision: high-confidence candidates exist for future maintenance backlog; no immediate follow-up is required.
 
 ### High-confidence follow-up candidates
 
