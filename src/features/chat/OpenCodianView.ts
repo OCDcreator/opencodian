@@ -24,7 +24,6 @@ import {
 import {
   type ChatMessage,
   type CompactionDividerMeta,
-  type ContentBlock,
   type Conversation,
   createEmptyTabContextState,
   getDefaultPersistedTabState,
@@ -45,15 +44,12 @@ import {
   getPerformanceTimestampMs,
   getVaultBasePath,
   isInternalStructuredOutputTool,
-  resolveToolExecutionStatus,
 } from '../../shared';
 import { chooseForkTarget } from '../../shared/modals';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import {
   StreamController,
-  ThinkingBlockRenderer,
-  ToolCallRenderer,
 } from '../../utils/streaming';
 import {
   buildChatAppearanceCustomCss,
@@ -80,15 +76,9 @@ import {
   buildStreamErrorNotice,
 } from './runtime/AssistantNoticeRenderer';
 import {
-  renderAssistantPlainTextFallbackContent,
-} from './runtime/AssistantPlainTextFallbackRenderer';
-import {
   AssistantShellViewHostAdapter,
   type AssistantShellViewHostAdapterHost,
 } from './runtime/AssistantShellViewHostAdapter';
-import {
-  renderAssistantStructuredContent,
-} from './runtime/AssistantStructuredContentRenderer';
 import {
   BackgroundTaskIndicatorCoordinator,
   type BackgroundTaskIndicatorCoordinatorHost,
@@ -115,9 +105,6 @@ import {
 import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
-import {
-  buildQuestionResolutionCardRenderPlan,
-} from './runtime/QuestionResolutionCardRenderer';
 import {
   type SendPipelineDebugContentBlock,
   type SendPipelineDebugPort,
@@ -2455,9 +2442,9 @@ export class OpenCodianView extends ItemView {
 
   private createConversationAssistantTailRenderPort(): ConversationAssistantTailRenderPort {
     return {
-      getBodySignature: (message) => this.getAssistantBodySignature(message),
+      getBodySignature: (message) => this.assistantShellViewHostAdapter.getAssistantBodySignature(message),
       renderMessageBody: (contentEl, message) =>
-        this.renderAssistantMessageBody(contentEl, message),
+        this.assistantShellViewHostAdapter.renderMessageBody(contentEl, message),
       finalizePersistedFooter: (messageEl, message) => {
         this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
       },
@@ -2739,8 +2726,10 @@ export class OpenCodianView extends ItemView {
       },
       renderNoticeCard: (container, message) =>
         this.assistantNoticeCardRenderer.render(container, message),
-      renderPersistedAssistantMessageBody: (container, message) =>
-        this.renderAssistantMessageBody(container, message),
+      shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
+      suppressActiveLayoutAutoScrollOnce: () => this.suppressActiveLayoutAutoScrollOnce(),
+      openTaskToolSession: (sessionId, toolCall) => this.openTaskToolSession(sessionId, toolCall),
+      getMarkdownService: () => this.markdownService,
     };
   }
 
@@ -4091,72 +4080,6 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private async renderAssistantMessageBody(
-    content: HTMLElement,
-    message: ChatMessage,
-  ): Promise<void> {
-    if (message.summary && message.summaryKind === 'compaction') {
-      const summaryMetaEl = content.createDiv({ cls: 'opencodian-omo-injection-header' });
-      summaryMetaEl.createSpan({
-        cls: 'opencodian-omo-injection-badge',
-        text: t('chat.compaction.reportBadge'),
-      });
-    }
-
-    const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan({
-      contentBlocks: message.contentBlocks,
-      questionResolution: message.questionResolution,
-      shouldRenderQuestionResolutionCard: this.shouldRenderQuestionResolutionCards(),
-    });
-
-    if (questionResolutionRenderPlan.hasContentBlocks) {
-      await renderAssistantStructuredContent({
-        containerEl: content,
-        questionResolutionRenderPlan,
-        renderContentBlock: async (containerEl, block) => {
-          await this.renderContentBlock(containerEl, block);
-        },
-      });
-    } else {
-      await renderAssistantPlainTextFallbackContent({
-        containerEl: content,
-        messageContent: message.content,
-        markdownService: this.markdownService,
-        questionResolutionRenderPlan,
-      });
-    }
-  }
-
-  private getAssistantBodySignature(message: ChatMessage): string {
-    return JSON.stringify({
-      displayStyle: message.displayStyle ?? null,
-      summary: message.summary ?? null,
-      content: message.content,
-      omo: message.omo ?? null,
-      questionResolution: message.questionResolution ? {
-        requestId: message.questionResolution.request.id,
-        status: message.questionResolution.status,
-        answers: message.questionResolution.answers ?? null,
-      } : null,
-      contentBlocks: (message.contentBlocks ?? []).map((block) => ({
-        type: block.type,
-        text: block.text ?? null,
-        thinking: block.thinking ?? null,
-        durationSeconds: block.durationSeconds ?? null,
-        toolId: block.toolId ?? null,
-        toolName: block.toolName ?? null,
-        toolKind: block.toolKind ?? null,
-        toolInput: block.toolInput ?? null,
-        toolMetadata: block.toolMetadata ?? null,
-        toolStatus: block.toolStatus ?? null,
-        toolResult: block.toolResult ?? null,
-        toolResultVisibility: block.toolResultVisibility ?? null,
-        subagentId: block.subagentId ?? null,
-        subagentMode: block.subagentMode ?? null,
-      })),
-    });
-  }
-
   private renderCompactionDivider(messageEl: HTMLElement, divider: CompactionDividerMeta): void {
     const lineEl = messageEl.createDiv({ cls: 'opencodian-compaction-divider-line' });
 
@@ -4402,72 +4325,6 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
     await this.backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
-  }
-
-  /** Render a content block using the same renderers as streaming */
-  private async renderContentBlock(container: HTMLElement, block: ContentBlock) {
-    if (!this.markdownService) return;
-
-    switch (block.type) {
-      case 'thinking':
-        if (block.thinking) {
-          const thinkingRenderer = new ThinkingBlockRenderer(this.markdownService, {
-            collapsedByDefault: true,
-            showTimer: false,
-            onCollapsibleToggle: () => this.suppressActiveLayoutAutoScrollOnce(),
-          });
-          thinkingRenderer.renderStored(container, block.thinking, block.durationSeconds);
-        }
-        break;
-
-      case 'tool_use':
-        if (isInternalStructuredOutputTool(block.toolName)) {
-          break;
-        }
-
-        if (block.toolName && block.toolId) {
-          const toolRenderer = new ToolCallRenderer({
-            onCollapsibleToggle: () => this.suppressActiveLayoutAutoScrollOnce(),
-            onOpenToolSession: (sessionId, toolCall) => {
-              void this.openTaskToolSession(sessionId, toolCall);
-            },
-          });
-          const toolCall: ToolCallInfo = {
-            id: block.toolId,
-            name: block.toolName,
-            kind: block.toolKind,
-            input: block.toolInput || {},
-            toolMetadata: block.toolMetadata,
-            status: this.getStoredToolStatus(block),
-            result: block.toolResult,
-            resultVisibility: block.toolResultVisibility,
-          };
-          toolRenderer.render(container, toolCall);
-        }
-        break;
-
-      case 'tool_result':
-        // Tool results are rendered as part of tool_use or separately if needed
-        // For now, skip as they're typically shown within the tool call UI
-        break;
-
-      case 'text':
-      default:
-        if (block.text) {
-          const textEl = container.createDiv({ cls: 'opencodian-message-text' });
-          await this.markdownService.render(textEl, block.text);
-        }
-        break;
-    }
-  }
-
-  /** Resolve persisted tool status, with fallback for older stored messages */
-  private getStoredToolStatus(block: ContentBlock): ToolCallInfo['status'] {
-    return resolveToolExecutionStatus({
-      toolName: block.toolName,
-      storedStatus: block.toolStatus,
-      result: block.toolResult,
-    });
   }
 
   private hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean {

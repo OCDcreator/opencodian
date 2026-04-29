@@ -1,5 +1,14 @@
 import type { ChatMessage } from '../../../../src/core/types';
 import { AssistantShellViewHostAdapter } from '../../../../src/features/chat/runtime/AssistantShellViewHostAdapter';
+import type { MarkdownRenderService } from '../../../../src/utils/markdown';
+
+function createMockMarkdownService() {
+  return {
+    render: jest.fn(async (el: HTMLElement, markdown: string) => {
+      el.createDiv({ cls: 'opencodian-message-text', text: markdown });
+    }),
+  } as unknown as MarkdownRenderService;
+}
 
 describe('AssistantShellViewHostAdapter', () => {
   function createAdapter() {
@@ -15,15 +24,14 @@ describe('AssistantShellViewHostAdapter', () => {
         text: `${message.noticeTitle ?? 'Notice'}:${message.content}`,
       });
     });
-    const renderPersistedAssistantMessageBody = jest.fn(async (container: HTMLElement, message: ChatMessage) => {
-      container.createDiv({
-        cls: 'persisted-assistant-body',
-        text: message.content,
-      });
-    });
     const initializeAssistantCopyButton = jest.fn((copyBtn: HTMLElement, content: string) => {
       copyBtn.setText(`copy:${content}`);
     });
+    const markdownService = createMockMarkdownService();
+    const getMarkdownService = jest.fn(() => markdownService);
+    const shouldRenderQuestionResolutionCards = jest.fn(() => false);
+    const suppressActiveLayoutAutoScrollOnce = jest.fn();
+    const openTaskToolSession = jest.fn();
     const adapter = new AssistantShellViewHostAdapter({
       getActiveTabId: () => 'tab-1',
       getTabRuntimeState: () => runtime,
@@ -35,14 +43,17 @@ describe('AssistantShellViewHostAdapter', () => {
       },
       initializeAssistantCopyButton,
       renderNoticeCard,
-      renderPersistedAssistantMessageBody,
+      getMarkdownService,
+      shouldRenderQuestionResolutionCards,
+      suppressActiveLayoutAutoScrollOnce,
+      openTaskToolSession,
     });
 
     return {
       adapter,
       initializeAssistantCopyButton,
+      markdownService,
       renderNoticeCard,
-      renderPersistedAssistantMessageBody,
       runtime,
       scrollSpy,
       turnBody,
@@ -106,7 +117,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('renders persisted assistant messages through the shared body and footer helpers', async () => {
-    const { adapter, renderPersistedAssistantMessageBody, initializeAssistantCopyButton, turnBody } = createAdapter();
+    const { adapter, markdownService, initializeAssistantCopyButton, turnBody } = createAdapter();
     const message: ChatMessage = {
       id: 'assistant-persisted-1',
       role: 'assistant',
@@ -119,11 +130,10 @@ describe('AssistantShellViewHostAdapter', () => {
 
     expect(turnBody.contains(messageEl)).toBe(true);
     expect(messageEl.dataset.messageId).toBe('assistant-persisted-1');
-    expect(renderPersistedAssistantMessageBody).toHaveBeenCalledWith(
+    expect(markdownService.render).toHaveBeenCalledWith(
       expect.any(HTMLElement),
-      message,
+      'Persisted assistant answer',
     );
-    expect(messageEl.querySelector('.persisted-assistant-body')?.textContent).toBe('Persisted assistant answer');
     expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
       expect.any(HTMLElement),
       'Persisted assistant answer',
