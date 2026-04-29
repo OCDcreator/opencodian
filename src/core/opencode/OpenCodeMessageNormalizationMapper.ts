@@ -11,6 +11,7 @@ import type {
   QuestionOption,
   QuestionPrompt,
   QuestionRequest as ChatQuestionRequest,
+  SessionTodo,
   ToolCallInfo,
 } from '../types';
 import type { OpenCodeCatalogToolIdentityContext } from './OpenCodeCatalogStateStore';
@@ -20,6 +21,13 @@ import {
   type OpenCodeMessagePart,
   type OpenCodeTextPart,
 } from './OpenCodeMessageContextOmoAssembler';
+import type {
+  Message,
+  Part,
+} from './OpenCodeSessionLifecycleCoordinator';
+import type {
+  SessionActivityStatus,
+} from './OpenCodeSyncEventRuntimeCoordinator';
 
 interface OpenCodeMessageRecord {
   id: string;
@@ -393,6 +401,112 @@ export class OpenCodeMessageNormalizationMapper {
       multiple: prompt.multiple === true,
       custom: prompt.custom !== false,
     };
+  }
+
+  normalizeSessionId(response: unknown): string {
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      return String((response as { id: unknown }).id);
+    }
+
+    throw new Error(`Invalid session response: ${JSON.stringify(response)}`);
+  }
+
+  normalizeSessionMessages(response: unknown): Array<{ info: Message; parts: Part[] }> {
+    return Array.isArray(response) ? response as Array<{ info: Message; parts: Part[] }> : [];
+  }
+
+  normalizeSessionTodos(response: unknown): SessionTodo[] {
+    const rawTodos = Array.isArray(response)
+      ? response
+      : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
+        ? (response as { data: unknown[] }).data
+        : [];
+
+    return rawTodos.reduce<SessionTodo[]>((todos, rawTodo) => {
+      const todo = this.normalizeSessionTodo(rawTodo);
+      if (todo) {
+        todos.push(todo);
+      }
+      return todos;
+    }, []);
+  }
+
+  normalizeSessionStatuses(response: unknown): Record<string, SessionActivityStatus> {
+    const rawStatuses = response && typeof response === 'object' && 'data' in response
+      ? (response as { data?: unknown }).data
+      : response;
+    if (!rawStatuses || typeof rawStatuses !== 'object' || Array.isArray(rawStatuses)) {
+      return {};
+    }
+
+    return Object.entries(rawStatuses).reduce<Record<string, SessionActivityStatus>>((statuses, [sessionId, rawStatus]) => {
+      const status = this.normalizeSessionStatus(rawStatus);
+      if (status) {
+        statuses[sessionId] = status;
+      }
+      return statuses;
+    }, {});
+  }
+
+  private normalizeSessionTodo(todo: unknown): SessionTodo | null {
+    if (!todo || typeof todo !== 'object') {
+      return null;
+    }
+
+    const raw = todo as Record<string, unknown>;
+    const content = typeof raw.content === 'string' ? raw.content.trim() : '';
+    const status = raw.status;
+    if (!content) {
+      return null;
+    }
+
+    if (
+      status !== 'pending'
+      && status !== 'in_progress'
+      && status !== 'completed'
+      && status !== 'cancelled'
+    ) {
+      return null;
+    }
+
+    const priority = raw.priority;
+    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : undefined;
+
+    return {
+      id,
+      content,
+      status,
+      priority: priority === 'low' || priority === 'medium' || priority === 'high'
+        ? priority
+        : undefined,
+    };
+  }
+
+  normalizeSessionStatus(status: unknown): SessionActivityStatus | null {
+    if (!status || typeof status !== 'object') {
+      return null;
+    }
+
+    const raw = status as Record<string, unknown>;
+    if (raw.type === 'idle' || raw.type === 'busy') {
+      return { type: raw.type };
+    }
+
+    if (
+      raw.type === 'retry'
+      && typeof raw.attempt === 'number'
+      && typeof raw.message === 'string'
+      && typeof raw.next === 'number'
+    ) {
+      return {
+        type: 'retry',
+        attempt: raw.attempt,
+        message: raw.message,
+        next: raw.next,
+      };
+    }
+
+    return null;
   }
 
 }

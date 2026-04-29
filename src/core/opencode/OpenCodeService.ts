@@ -290,8 +290,8 @@ export class OpenCodeService {
         const response = await this.getSdkFacade({ includeDirectory: false }).global.event({ signal } as never);
         return (response as { stream: AsyncIterable<unknown> }).stream;
       },
-      normalizeSessionTodos: (response) => this.normalizeSessionTodos(response),
-      normalizeSessionStatus: (status) => this.normalizeSessionStatus(status),
+      normalizeSessionTodos: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionTodos(response),
+      normalizeSessionStatus: (status) => OpenCodeService.messageNormalizationMapper.normalizeSessionStatus(status),
       applySessionSyncEvent: (update) => this.applyCanonicalSyncEvent(update),
       isTransientConnectivityError: (error) => this.diagnostics.isTransientConnectivityError(error),
       logSyncEventStreamFailure: (error) =>
@@ -307,10 +307,10 @@ export class OpenCodeService {
       getLegacy: (path) => this.get(path),
       patchLegacy: (path, body) => this.patch(path, body),
       deleteLegacy: (path) => this.delete(path),
-      normalizeSessionId: (response) => this.normalizeSessionId(response),
-      normalizeSessionMessages: (response) => this.normalizeSessionMessages(response),
-      normalizeSessionTodos: (response) => this.normalizeSessionTodos(response),
-      normalizeSessionStatuses: (response) => this.normalizeSessionStatuses(response),
+      normalizeSessionId: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionId(response),
+      normalizeSessionMessages: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionMessages(response),
+      normalizeSessionTodos: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionTodos(response),
+      normalizeSessionStatuses: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionStatuses(response),
       applySessionRevertState: (sessionId, messages) => this.applySessionRevertState(sessionId, messages),
       observeToolNamesInMessages: (messages) => this.observeToolNamesInMessages(messages),
       logServiceWarning,
@@ -1034,112 +1034,6 @@ export class OpenCodeService {
         this.catalogQueries.observeRuntimeToolNames([toolName]);
       }
     }
-  }
-
-  private normalizeSessionId(response: unknown): string {
-    if (typeof response === 'object' && response !== null && 'id' in response) {
-      return String((response as { id: unknown }).id);
-    }
-
-    throw new Error(`Invalid session response: ${JSON.stringify(response)}`);
-  }
-
-  private normalizeSessionMessages(response: unknown): Array<{ info: Message; parts: Part[] }> {
-    return Array.isArray(response) ? response as Array<{ info: Message; parts: Part[] }> : [];
-  }
-
-  private normalizeSessionTodos(response: unknown): SessionTodo[] {
-    const rawTodos = Array.isArray(response)
-      ? response
-      : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
-        ? (response as { data: unknown[] }).data
-        : [];
-
-    return rawTodos.reduce<SessionTodo[]>((todos, rawTodo) => {
-      const todo = this.normalizeSessionTodo(rawTodo);
-      if (todo) {
-        todos.push(todo);
-      }
-      return todos;
-    }, []);
-  }
-
-  private normalizeSessionStatuses(response: unknown): Record<string, SessionActivityStatus> {
-    const rawStatuses = response && typeof response === 'object' && 'data' in response
-      ? (response as { data?: unknown }).data
-      : response;
-    if (!rawStatuses || typeof rawStatuses !== 'object' || Array.isArray(rawStatuses)) {
-      return {};
-    }
-
-    return Object.entries(rawStatuses).reduce<Record<string, SessionActivityStatus>>((statuses, [sessionId, rawStatus]) => {
-      const status = this.normalizeSessionStatus(rawStatus);
-      if (status) {
-        statuses[sessionId] = status;
-      }
-      return statuses;
-    }, {});
-  }
-
-  private normalizeSessionTodo(todo: unknown): SessionTodo | null {
-    if (!todo || typeof todo !== 'object') {
-      return null;
-    }
-
-    const raw = todo as Record<string, unknown>;
-    const content = typeof raw.content === 'string' ? raw.content.trim() : '';
-    const status = raw.status;
-    if (!content) {
-      return null;
-    }
-
-    if (
-      status !== 'pending'
-      && status !== 'in_progress'
-      && status !== 'completed'
-      && status !== 'cancelled'
-    ) {
-      return null;
-    }
-
-    const priority = raw.priority;
-    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : undefined;
-
-    return {
-      id,
-      content,
-      status,
-      priority: priority === 'low' || priority === 'medium' || priority === 'high'
-        ? priority
-        : undefined,
-    };
-  }
-
-  private normalizeSessionStatus(status: unknown): SessionActivityStatus | null {
-    if (!status || typeof status !== 'object') {
-      return null;
-    }
-
-    const raw = status as Record<string, unknown>;
-    if (raw.type === 'idle' || raw.type === 'busy') {
-      return { type: raw.type };
-    }
-
-    if (
-      raw.type === 'retry'
-      && typeof raw.attempt === 'number'
-      && typeof raw.message === 'string'
-      && typeof raw.next === 'number'
-    ) {
-      return {
-        type: 'retry',
-        attempt: raw.attempt,
-        message: raw.message,
-        next: raw.next,
-      };
-    }
-
-    return null;
   }
 
   private async delay(ms: number, signal?: AbortSignal): Promise<void> {

@@ -11,6 +11,7 @@
 - 统一 question request / prompt 的结构化归一化
 - 统一历史消息里的 tool identity 判断，保持 builtin / MCP / custom 语义和流式路径一致
 - 委托邻近的 `OpenCodeMessageContextOmoAssembler` 收束用户消息里的 `contextAttachments` 与 OMO metadata，同时在本文件内保留 tool/content seam
+- session response 归一化（`normalizeSessionId` / `normalizeSessionMessages` / `normalizeSessionTodos` / `normalizeSessionStatuses`），供 `OpenCodeSessionLifecycleCoordinator` 与 `OpenCodeSyncEventRuntimeCoordinator` 的注入回调使用
 
 它不负责 message fetch、session CRUD、transport、stream lifecycle 或 tool catalog state；这些仍留在 `OpenCodeService` 及相邻 coordinator/store。
 
@@ -22,6 +23,8 @@
 - `../types`
 - `./OpenCodeMessageContextOmoAssembler`
 - `./OpenCodeCatalogStateStore`
+- `./OpenCodeSessionLifecycleCoordinator`
+- `./OpenCodeSyncEventRuntimeCoordinator`
 
 下游:
 - `src/core/opencode/OpenCodeService.ts`
@@ -53,6 +56,15 @@
 - 它也负责把 OpenCode 原生 `compaction` part 还原成结构化 `compactionDivider` 元数据，并过滤 `metadata.compaction_continue` synthetic user follow-up
 - 该 owner 统一处理路径/行号归一化、attachment 去重与 OMO metadata 映射，并保留 tool/content seam 继续使用的 pre-OMO `renderableContent`
 - 本文件只消费它的归一化结果，不再直接铺开 context/OMO 细节
+
+### Session response normalization
+
+- `normalizeSessionId(response)`: 从 server response 中提取 string session ID，无效响应时 throw
+- `normalizeSessionMessages(response)`: 把 server 返回的 message 数组做类型断言，无效时返回空数组
+- `normalizeSessionTodos(response)`: 归一化 todo 数组（支持 `{ data: [...] }` 包装格式），逐条校验 `content` / `status` / `priority`
+- `normalizeSessionStatuses(response)`: 归一化 session status map（支持 `{ data: {...} }` 包装格式），逐条校验 `idle` / `busy` / `retry` 结构
+
+这些方法通过 `OpenCodeService` 构造函数的回调注入提供给 `OpenCodeSessionLifecycleCoordinator` 和 `OpenCodeSyncEventRuntimeCoordinator`，mapper 不直接持有 coordinator 引用。
 
 ## 数据流
 
