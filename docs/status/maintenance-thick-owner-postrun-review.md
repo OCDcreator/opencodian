@@ -110,3 +110,16 @@ Follow-up decision: high-confidence candidates exist for future maintenance back
 ### No immediate follow-up required
 
 The changes achieved their stated goal: reduce ownership density in four thick owners without creating thin helpers or expanding the overall codebase surface. The follow-up candidates above are **future maintenance backlog items**, not urgent regression risks.
+
+## postrun-2 No-Op Decision
+
+Task postrun-2 evaluated whether a code-level follow-up was warranted based on the audit above.
+
+**Decision: no follow-up code change is warranted.**
+
+Rationale:
+- All four high-confidence candidates are explicitly future backlog items, not regressions.
+- Candidate 1 (OpenCodeService state mutation slice) touches the session hot path and requires careful TDD — out of scope for a bounded follow-up.
+- Candidate 2 (OpenCodianView tab lifecycle) must preserve per-tab concurrent-session behavior — too risky for a single bounded fix.
+- Candidates 3 and 4 were explicitly marked "no further extraction recommended."
+- The thick-owner thinning run achieved its goal (-488 lines, zero thin helpers). No corrective action is needed.
