@@ -2,103 +2,80 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
-        "title": "Finalize thick-owner-thinning OpenSpec artifacts",
-        "description": "Keep the OpenSpec change as the source-of-truth contract for thinning `OpenCodianView.ts` and `OpenCodeService.ts` without fragmenting files.",
-        "details": "Review and refine `openspec/changes/thick-owner-thinning/proposal.md`, `design.md`, `specs/high-connection-owner-thinning/spec.md`, and `tasks.md` so they all encode the same rules: alternating service/view lanes, exactly one stable ownership slice per round, preference for existing adjacent owners, and full guardrail verification. The output of this task is a valid OpenSpec change that Task Master and `opencode-loop` can consume.",
-        "testStrategy": "Run `openspec validate thick-owner-thinning` and `openspec status --change thick-owner-thinning` to confirm the change is valid and all artifacts are complete.",
+        "id": 9,
+        "title": "Analyze current ownership and identify thick owners",
+        "description": "Run graphify and module-doc checks to identify high-connection files and current ownership boundaries. Document the current state of thick owners (OpenCodianView.ts, OpenCodeService.ts, main.ts, ServerManager.ts) and their responsibility density.",
+        "details": "Execute `npm run check:graphify` and `npm run check:module-docs` to generate reports. Review `graphify-out/GRAPH_REPORT.md` and existing `docs/modules/**` files. For each thick owner, list its current responsibilities, import surface, and adjacent owners. This analysis will inform task selection and ensure each subsequent task improves ownership shape.",
+        "testStrategy": "Verify that the analysis produces a clear mapping of thick files to their responsibilities and adjacent owners. No code changes are made; validation is manual review of generated reports.",
         "priority": "high",
         "dependencies": [],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 2,
-        "title": "Initialize Task Master for the thick-owner-thinning change",
-        "description": "Configure Task Master to parse the OpenSpec proposal using a provider that is actually available in this environment.",
-        "details": "Keep `.taskmaster/config.json` aligned with the available DeepSeek-compatible setup, then parse `openspec/changes/thick-owner-thinning/proposal.md` into `.taskmaster/tasks/tasks.json`. The resulting tasks must stay centered on the OpenSpec contract rather than inventing unrelated automation layers.",
-        "testStrategy": "Run `task-master parse-prd openspec/changes/thick-owner-thinning/proposal.md --num-tasks 8` with the required OpenAI-compatible environment variable bridge and confirm `.taskmaster/tasks/tasks.json` is generated.",
+        "id": 10,
+        "title": "Thin ServerManager.ts by moving a complete behavior slice to an adjacent owner",
+        "description": "Identify a complete local-server lifecycle or endpoint-resolution slice in ServerManager.ts that can be moved into an existing adjacent owner (e.g., a config or storage owner) without changing behavior. Perform the extraction, update module docs, and run verification.",
+        "details": "Primary owner type: domain runtime owner. Analyze ServerManager.ts for a slice that is self-contained (e.g., server configuration loading or endpoint resolution). Move that slice into an existing adjacent owner (e.g., a config owner in `src/core/config/` or storage owner in `src/core/storage/`). Ensure the new location is a durable owner (not a thin wrapper). Update `docs/modules/` files to reflect the boundary change. Do not create new one-off files. Run `npm run verify`, `npm run check:module-docs`, and `npm run check:graphify`.",
+        "testStrategy": "Write focused Jest tests for the moved slice in its new owner. Verify that existing tests still pass. Run `npm run verify` and confirm no regression. Check that module docs are updated and graphify report shows improved ownership.",
         "priority": "high",
         "dependencies": [
-          1
+          9
         ],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 3,
-        "title": "Normalize Task Master tasks to the real refactor lanes",
-        "description": "Replace any Task Master output that invents unrelated scripts or templates with tasks that match the actual maintainability program.",
-        "details": "Edit `.taskmaster/tasks/tasks.json` so the queue aligns with the OpenSpec tasks: pipeline setup, queue enrichment, alternating service/view lanes, and execute-mode hardening. Every task must map to a real repo action and avoid introducing speculative helper scripts, fake templates, or behavior not requested by the OpenSpec change.",
-        "testStrategy": "Review `.taskmaster/tasks/tasks.json` and confirm every task maps back to `openspec/changes/thick-owner-thinning/tasks.md` and the anti-fragmentation contract.",
+        "id": 11,
+        "title": "Thin OpenCodeService.ts by moving facade-adjacent logic into existing opencode owners",
+        "description": "Move compatibility/facade-adjacent logic from OpenCodeService.ts into existing opencode owners such as lifecycle, prompt, session-control, query, state, or streaming coordinators. Do not add new runtime ownership to OpenCodeService.ts.",
+        "details": "Primary owner type: high-connection facade owner. Review OpenCodeService.ts for methods that delegate to other services or coordinate between subsystems. Move those delegations into the appropriate existing owners (e.g., move prompt-related logic to a prompt owner, session control to a session owner). Ensure OpenCodeService.ts remains as a thin facade that only composes lifecycle. Update module docs. Run verification.",
+        "testStrategy": "Ensure that after extraction, OpenCodeService.ts has fewer responsibilities. Run existing tests and add focused tests for the moved logic in their new owners. Run `npm run verify` and `npm run check:module-docs`.",
         "priority": "high",
         "dependencies": [
-          2
+          9
         ],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 4,
-        "title": "Import Task Master tasks into opencode-loop execute mode",
-        "description": "Create `.opencode-loop/queue.json` from the normalized Task Master task list instead of continuing to rely on the broad `dev` loop program.",
-        "details": "Use `opencode-loop plan --dir /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian --from-taskmaster --tag master` to import `.taskmaster/tasks/tasks.json` into execute mode. Ensure the import does not overwrite unrelated state unexpectedly and that the resulting queue starts with tasks in draft status.",
-        "testStrategy": "Run `opencode-loop plan --dir /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian --from-taskmaster --tag master`, then verify `.opencode-loop/queue.json` exists and contains imported draft tasks.",
+        "id": 12,
+        "title": "Thin OpenCodianView.ts by extending existing chat services/coordinators",
+        "description": "Reduce shell assembly or callback-surface density in OpenCodianView.ts by moving behavior into existing chat services or coordinators. Do not create one-off helpers. Do not add new runtime ownership to OpenCodianView.ts.",
+        "details": "Primary owner type: high-connection facade owner. Identify callback handlers or UI assembly logic in OpenCodianView.ts that can be moved into existing chat services (e.g., message handling, view state management). Extend those services to own the behavior. Keep OpenCodianView.ts as a thin shell that wires UI components. Update module docs. Run verification.",
+        "testStrategy": "Write tests for the moved behavior in the target services. Ensure OpenCodianView.ts tests still pass. Run `npm run verify` and `npm run check:module-docs`.",
         "priority": "high",
         "dependencies": [
-          3
+          9
         ],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 5,
-        "title": "Enrich queue tasks with repo-specific verification and acceptance checks",
-        "description": "Add the concrete gate contract each execute-mode task must satisfy in this repo.",
-        "details": "Update `.opencode-loop/queue.json` so each task carries appropriate `verification` commands and `acceptance_checks`. The checks must encode the real contract for this program: single-slice ownership movement, updated module docs, graphify freshness when `src/` changes, and `npm run verify`. Use focused checks for setup tasks and full verify for refactor tasks.",
-        "testStrategy": "Run `opencode-loop queue validate --dir /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian` and inspect the enriched queue entries to confirm verification and acceptance fields are present.",
-        "priority": "high",
-        "dependencies": [
-          4
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 6,
-        "title": "Finalize execute-mode readiness",
-        "description": "Record that the execute queue is ready and the repo has been initialized for execute-mode runs.",
-        "details": "Complete the local bootstrap so `opencode-loop` can run in `execute` mode against the imported queue. This includes validating the queue, initializing execute mode for the repo, and making sure the next code-bearing task can start from a clean, resumable baseline.",
-        "testStrategy": "Run `opencode-loop init --dir /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian --mode execute`, then confirm `opencode-loop status --dir /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian --json` reports execute-mode runtime settings.",
-        "priority": "high",
-        "dependencies": [
-          5
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 7,
-        "title": "Thin OpenCodeService request and transport ownership",
-        "description": "Move one low-risk `OpenCodeService.ts` behavior slice into existing adjacent owners without creating helper-file fragments.",
-        "details": "Target a single stable `OpenCodeService.ts` slice, preferably request assembly or transport/config ownership that already borders existing owners such as `OpenCodePromptRequestBuilder`, `OpenCodeCatalogQueryCoordinator`, or `OpenCodeServiceLifecycleCoordinator`. The task must explicitly avoid multi-slice refactors and thin helper proliferation.",
-        "testStrategy": "Run focused OpenCodeService unit tests, refresh graphify if `src/` changes, and finish with `npm run verify`. Review the diff to confirm exactly one service-lane slice moved.",
-        "priority": "high",
-        "dependencies": [
-          6
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 8,
-        "title": "Thin OpenCodianView message rendering ownership",
-        "description": "Move one low-risk `OpenCodianView.ts` message-rendering slice into existing adjacent owners without fragmenting the chat runtime.",
-        "details": "After the first service-lane round lands, target one stable `OpenCodianView.ts` message-rendering slice that already touches adjacent owners such as existing renderers, runtime bridges, or user-message helpers. Keep the work to one slice, preserve per-tab behavior, and avoid creating a spray of tiny helper files.",
-        "testStrategy": "Run focused chat rendering tests, refresh graphify if `src/` changes, and finish with `npm run verify`. Review the diff to confirm exactly one view-lane slice moved.",
+        "id": 13,
+        "title": "Thin main.ts by moving config/bootstrap slices into existing owners",
+        "description": "Move complete config/bootstrap slices from main.ts into existing config, storage, or theme owners. Preserve plugin lifecycle ownership in main.ts.",
+        "details": "Primary owner type: lifecycle composition owner. Identify initialization logic in main.ts that belongs to config (e.g., plugin settings loading), storage (e.g., data directory setup), or theme (e.g., applying theme). Move those slices into the respective owners. Ensure main.ts retains only lifecycle orchestration (onload, onunload, etc.). Update module docs. Run verification.",
+        "testStrategy": "Verify that main.ts is thinner and that moved logic works in its new owner. Run existing tests and add focused tests for the moved slices. Run `npm run verify` and `npm run check:module-docs`.",
         "priority": "medium",
         "dependencies": [
-          7
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Update module documentation and verify ownership improvements",
+        "description": "Update all affected `docs/modules/**` files to reflect boundary changes from tasks 10-13. Run full verification suite and confirm that ownership shape has improved or been explicitly preserved.",
+        "details": "For each module boundary change, update the corresponding markdown file in `docs/modules/` to describe the new ownership. Ensure that the documentation clearly states the primary owner type and responsibilities. Run `npm run verify`, `npm run check:module-docs`, `npm run check:graphify`, and `npm run check:devlog-order`. Confirm that no thick files have grown and that ownership is clearer.",
+        "testStrategy": "Run the full verification suite. Check that `npm run check:module-docs` passes and that graphify report shows reduced connection density for the thinned files. Manual review of documentation accuracy.",
+        "priority": "medium",
+        "dependencies": [
+          10,
+          11,
+          12,
+          13
         ],
         "status": "pending",
         "subtasks": []
@@ -106,7 +83,7 @@
     ],
     "metadata": {
       "created": "2026-04-27T18:32:57.559Z",
-      "updated": "2026-04-27T18:32:57.559Z",
+      "updated": "2026-04-29T17:20:48.645Z",
       "description": "Tasks for master context"
     }
   }
