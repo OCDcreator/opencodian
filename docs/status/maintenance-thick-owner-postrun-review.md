@@ -123,3 +123,48 @@ Rationale:
 - Candidate 2 (OpenCodianView tab lifecycle) must preserve per-tab concurrent-session behavior — too risky for a single bounded fix.
 - Candidates 3 and 4 were explicitly marked "no further extraction recommended."
 - The thick-owner thinning run achieved its goal (-488 lines, zero thin helpers). No corrective action is needed.
+
+## Final verification
+
+Run against the full commit stack (master-10 through postrun-2, 9 commits):
+
+| Gate | Result | Evidence |
+|---|---|---|
+| `npm run lint` | 0 errors, 0 warnings | Clean |
+| `npm run typecheck` | Pass | No type errors |
+| `npm run test` | 339 suites, 1729 tests passed | No regressions |
+| `npm run build` | Production build OK | BUILD_ID: autopilot-maintenance-thick-owner-full-auto.202604300312 |
+| `npm run check:module-docs` | 372/372 modules covered | 100% coverage |
+| `npm run check:graphify` | Pass | Graph artifacts fresh |
+| `npm run check:devlog-order` | Pass | Chronological order maintained |
+| `npm run verify` (composite) | Pass | All sub-gates green |
+
+No runtime source files were changed by postrun-1, postrun-2, or postrun-3.
+
+## Merge readiness
+
+**Status: ready to merge.**
+
+Evidence:
+- All verification gates green. No pre-existing failures introduced or masked.
+- Zero new thin helpers, zero new adapters/factories/providers created.
+- Net line change across thick owners: -488 lines extracted, +473 lines in recipients (near-parity).
+- Module documentation coverage maintained at 100% (372/372).
+- Test count unchanged (1729 passed, 0 skipped, 0 failed).
+- No acceptance criteria violations across any task in this run.
+- postrun-2 concluded no immediate follow-up code change is warranted; remaining candidates are future backlog items.
+
+Remaining risk:
+- Thick owners remain above 1000-line review threshold (range: 1418–5418). This is acceptable per baseline: direction of travel matters more than absolute count.
+- Future extraction of OpenCodeService state mutation slice (~250 lines) and OpenCodianView tab lifecycle coordination are the highest-value backlog items, but both require careful TDD and are not urgent.
+
+Commits in this run (oldest → newest):
+1. `2729eece` feat(master-10): Extract OS process inspection from ServerManager to LocalSidecarProcessInspector
+2. `a2b0a335` feat(master-11): Move session normalization methods from OpenCodeService to OpenCodeMessageNormalizationMapper
+3. `2c8db0c1` feat(master-12): Move assistant body rendering from OpenCodianView to AssistantShellViewHostAdapter
+4. `7701c572` feat(master-13): Move opencode config bootstrap from main.ts to OpencodeConfigManager
+5. `f3183b3b` docs(master-14): Update entry-point/main.md to reflect config bootstrap ownership move
+6. `03cc8a23` docs(postrun-1): Add thick-owner thinning run audit against maintenance baseline
+7. `e2ba1e05` fix(postrun-1): Rename audit doc to expected gate filename
+8. `e4dbe1df` fix(postrun-1): Add required acceptance text markers to postrun review
+9. `a7b5d992` docs(postrun-2): Record no-op follow-up decision
