@@ -228,6 +228,7 @@ docs/modules/
 │       ├── ServerSettingHelpModal.md
 │       ├── SettingsCommandsSection.md
 │       ├── SettingsModelCatalogCoordinator.md
+│       ├── SettingsModelCatalogAvailability.md
 │       ├── SettingsModelCatalogPresenter.md
 │       ├── SettingsModelIconCacheManager.md
 │       ├── SettingsModelSection.md

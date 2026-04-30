@@ -7,11 +7,11 @@
 
 `SettingsModelCatalogPresenter` 是 settings/model 目录展示的厚 owner。它把原本散落在 `OpenCodianSettings.ts` 里的 provider accordion、search、catalog summary card、bulk toggle、provider probe badge/detail 和过滤状态收束到一个专门 presenter；现在外层的 section lifecycle 则由 `SettingsModelSection.ts` 持有，让主设置页回到“owner 装配 + callback bridge”的角色。
 
-这个 presenter 的职责边界刻意偏向 **presentation state + semantic events**：
+这个 presenter 的职责边界刻意偏向 **presentation state + semantic events**。provider availability 的纯描述规则已经下沉到 `SettingsModelCatalogAvailability.ts`，presenter 只消费这些 descriptor 来组装 DOM：
 
 - 持有当前激活的 catalog tab、provider 展开态、搜索词、`仅看已禁用` / `仅看已启用` 过滤状态
 - 根据 `ModelCatalogStateService` 提供的 `ModelCatalogState` 渲染 provider/model availability 视图
-- 展示 provider probe loading / success / error / catalog-only 等 badge 与 detail
+- 展示 provider probe loading / success / error / catalog-only 等 badge 与 detail（文案/class 由 `SettingsModelCatalogAvailability.ts` 计算）
 - 发出 provider/model availability semantic toggle 事件，真正的 settings 写回由 `SettingsModelSection` 提供 callback
 
 ## 核心逻辑
@@ -32,14 +32,14 @@
 
 ### provider / model availability 表达
 
-presenter 会把 `ModelCatalogState` 里的几层 availability 信号叠加到 UI 上：
+presenter 会把 `ModelCatalogState` 里的几层 availability 信号叠加到 UI 上，并把纯展示推导委托给 `SettingsModelCatalogAvailability.ts`：
 
 - `displayCatalogs` / `providerStatusCatalogs` 对 provider 当前目录、disabled placeholder 与 disabled scope 的表达
 - `currentEnabledProviderIds` 对 provider 当前是否真的进入有效目录的判断
 - `disabledModelRefs` 对 model 级禁用的表达
 - `ModelCatalogStateService.probeProvider()` 结果对 provider probe badge/detail 的表达
 
-它只负责**呈现**这些状态；并不改 `ModelConfigService` 的 merge 规则，也不改变 provider availability 语义。
+它只负责**呈现**这些状态；并不改 `ModelConfigService` 的 merge 规则，也不改变 provider availability 语义。若后续要新增 availability 文案、badge class、placeholder reason 或 disabled-scope 优先级，应先扩展 `SettingsModelCatalogAvailability.ts`，避免把纯 descriptor 逻辑重新塞回 presenter。
 
 ## 关键方法
 
@@ -53,6 +53,7 @@ presenter 会把 `ModelCatalogState` 里的几层 availability 信号叠加到 U
 ## 与其他模块的交互
 
 - `SettingsModelSection.ts`: 提供 host seam，包括 inline-code 文案、provider icon 渲染、provider/model toggle 写回 callback，以及 refresh/save orchestration
+- `SettingsModelCatalogAvailability.ts`: 计算 provider availability status、probe badge/detail、summary、placeholder reason 与 provider model preview 文案
 - `ModelCatalogStateService.ts`: 提供目录状态、provider/model availability 写回和 provider probe
 - `searchInputEnhancer.ts`: 为 model availability search 输入框提供历史记录与清空按钮
 - `ProviderIconService`: 通过 host callback 复用现有 provider icon fallback 顺序，不在 presenter 内重新实现图标解析

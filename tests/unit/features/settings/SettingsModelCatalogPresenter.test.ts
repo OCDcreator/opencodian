@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { getProviderPrimaryDisabledReason } from '../../../../src/features/settings/SettingsModelCatalogAvailability';
 import { SettingsModelCatalogPresenter } from '../../../../src/features/settings/SettingsModelCatalogPresenter';
 import * as i18n from '../../../../src/i18n';
 
@@ -101,21 +102,7 @@ describe('SettingsModelCatalogPresenter', () => {
   });
 
   it('prefers project-disabled over server-disabled when provider scopes include both', () => {
-    const { presenter } = createPresenter();
-    const reason = (presenter as unknown as {
-      getProviderPrimaryDisabledReason: (
-        provider: {
-          id: string;
-          name: string;
-          models: [];
-          source: 'server';
-          existsInLocal: boolean;
-          existsInServer: boolean;
-          disabledScopes?: Array<'global' | 'project'>;
-        },
-        providerEnabled: boolean,
-      ) => 'project' | 'server' | null;
-    }).getProviderPrimaryDisabledReason(
+    const reason = getProviderPrimaryDisabledReason(
       {
         id: 'alibaba',
         name: 'Alibaba',

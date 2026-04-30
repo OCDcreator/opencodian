@@ -28,7 +28,7 @@
   - No runtime behavior shifts into anemic wrappers.
 - **Validation**: `npm test -- --runInBand tests/unit/main.test.ts tests/unit/main/themeSettingsMigration.test.ts`
 
-### [NEXT] Task 3 - Package model-catalog presentation pressure and checkpoint settings-shell deltas
+### [DONE] Task 3 - Package model-catalog presentation pressure and checkpoint settings-shell deltas
 
 - **Goal**: Tighten the boundary between `SettingsModelCatalogPresenter.ts` and adjacent owners so presentation state becomes more focused and the lane can record before/after hotspot deltas.
 - **Key files**:

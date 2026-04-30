@@ -4,7 +4,6 @@ import {
   type ModelCatalogState,
   type ModelCatalogStateMode,
   type ModelCatalogStateService,
-  type ProviderAvailabilityProbe,
 } from '../../core/config';
 import {
   formatModelReference,
@@ -15,24 +14,22 @@ import type { ModelSourceMode } from '../../core/types';
 import { t } from '../../i18n';
 import { createLogger } from '../../shared';
 import { enhanceSearchInput } from './searchInputEnhancer';
+import {
+  describeModelAvailabilitySummary,
+  describeProviderAvailabilityProbe,
+  describeProviderModels,
+  getCatalogPlaceholderReason,
+  getProviderAvailabilityProbeBadge,
+  getProviderAvailabilityStatusClass,
+  getProviderAvailabilityStatusLabel,
+  getProviderPrimaryDisabledReason,
+  getProviderServerConstraintBadge,
+  isProviderDisabledByScope,
+  type ProviderAvailabilityCheckState,
+  type ProviderAvailabilityDisplayState,
+} from './SettingsModelCatalogAvailability';
 
 const logger = createLogger('SettingsModelCatalogPresenter');
-
-interface ProviderAvailabilityCheckState {
-  status: 'idle' | 'loading' | 'ready' | 'error';
-  probe?: ProviderAvailabilityProbe;
-  error?: string;
-}
-
-type ProviderDisabledReason = 'project' | 'server' | null;
-
-interface ProviderAvailabilityDisplayState {
-  provider: ModelCatalogProvider;
-  providerEnabled: boolean;
-  disabledCount: number;
-  primaryDisabledReason: ProviderDisabledReason;
-  mode: ModelCatalogStateMode;
-}
 
 interface SettingsModelCatalogPresenterOptions {
   catalogStateService: ModelCatalogStateService;
@@ -318,7 +315,7 @@ export class SettingsModelCatalogPresenter {
     ));
     const catalogScopedProviderIds = selectedCatalogProviderIds.filter((providerId) => {
       const provider = providerStatusById.get(providerId);
-      return provider ? !this.isProviderDisabledByScope(provider, 'global') : true;
+      return provider ? !isProviderDisabledByScope(provider, 'global') : true;
     });
 
     return {
@@ -484,7 +481,7 @@ export class SettingsModelCatalogPresenter {
   ): ProviderRenderState | null {
     const providerStatusSource = catalogContext.providerStatusById.get(provider.id) ?? provider;
     const providerEnabled = this.isProviderCurrentlyEnabled(provider.id, catalogContext.catalogState);
-    const primaryDisabledReason = this.getProviderPrimaryDisabledReason(providerStatusSource, providerEnabled);
+    const primaryDisabledReason = getProviderPrimaryDisabledReason(providerStatusSource, providerEnabled);
     const providerSearchText = `${provider.name || provider.id} ${provider.id}`.toLowerCase();
     const providerMatchesQuery = normalizedQuery.length > 0 && providerSearchText.includes(normalizedQuery);
     const disabledCount = providerEnabled
@@ -621,7 +618,7 @@ export class SettingsModelCatalogPresenter {
     });
     providerInfoEl.createDiv({
       cls: 'opencodian-model-toggle-provider-meta',
-      text: this.describeModelAvailabilitySummary(availabilityDisplayState),
+      text: describeModelAvailabilitySummary(availabilityDisplayState),
     });
     this.renderProviderBadges(providerInfoEl, provider, availabilityDisplayState, providerCheckState);
   }
@@ -647,18 +644,18 @@ export class SettingsModelCatalogPresenter {
       text: t(`settings.model.sourceBadge.${provider.source}` as const),
     });
     badgesEl.createSpan({
-      cls: `opencodian-model-status-badge ${this.getProviderAvailabilityStatusClass(availabilityDisplayState)}`,
-      text: this.getProviderAvailabilityStatusLabel(availabilityDisplayState),
+      cls: `opencodian-model-status-badge ${getProviderAvailabilityStatusClass(availabilityDisplayState)}`,
+      text: getProviderAvailabilityStatusLabel(availabilityDisplayState),
     });
 
-    const serverDisabledBadge = this.getProviderServerConstraintBadge(availabilityDisplayState);
+    const serverDisabledBadge = getProviderServerConstraintBadge(availabilityDisplayState);
     if (serverDisabledBadge) {
       badgesEl.createSpan({
         cls: `opencodian-model-status-badge ${serverDisabledBadge.className}`,
         text: serverDisabledBadge.text,
       });
     }
-    const probeBadge = this.getProviderAvailabilityProbeBadge(providerCheckState);
+    const probeBadge = getProviderAvailabilityProbeBadge(providerCheckState);
     if (probeBadge) {
       badgesEl.createSpan({
         cls: `opencodian-model-status-badge ${probeBadge.className}`,
@@ -666,7 +663,7 @@ export class SettingsModelCatalogPresenter {
       });
     }
 
-    const probeDetail = this.describeProviderAvailabilityProbe(providerCheckState);
+    const probeDetail = describeProviderAvailabilityProbe(providerCheckState);
     if (probeDetail) {
       providerInfoEl.createDiv({
         cls: `opencodian-model-toggle-provider-probe ${probeDetail.className}`,
@@ -752,10 +749,10 @@ export class SettingsModelCatalogPresenter {
   private renderProviderEmptyModels(providerEl: HTMLElement, state: ProviderRenderState): void {
     providerEl.createDiv({
       cls: 'opencodian-model-toggle-empty',
-      text: this.describeProviderModels(
+      text: describeProviderModels(
         state.provider,
         (this.activeCatalogTab === 'server' || this.activeCatalogTab === 'disabled') && !state.providerEnabled
-          ? this.getCatalogPlaceholderReason(state.provider, this.activeCatalogTab)
+          ? getCatalogPlaceholderReason(state.provider, this.activeCatalogTab)
           : null,
       ) || t('settings.model.toggle.emptyModels'),
     });
@@ -1032,274 +1029,6 @@ export class SettingsModelCatalogPresenter {
     this.rerender();
   }
 
-  private describeModelAvailabilitySummary(
-    state: ProviderAvailabilityDisplayState,
-  ): string {
-    const { provider, providerEnabled, disabledCount, primaryDisabledReason, mode } = state;
-
-    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
-      return t('settings.model.availability.summary.serverDisabled', {
-        id: provider.id,
-        count: String(provider.models.length),
-      });
-    }
-
-    if (!providerEnabled) {
-      if (primaryDisabledReason === 'project') {
-        return t('settings.model.availability.summary.projectDisabled', {
-          id: provider.id,
-          count: String(provider.models.length),
-        });
-      }
-
-      if (primaryDisabledReason === 'server') {
-        return t('settings.model.availability.summary.serverDisabled', {
-          id: provider.id,
-          count: String(provider.models.length),
-        });
-      }
-
-      return t('settings.model.availability.summary.providerDisabled', {
-        id: provider.id,
-        count: String(provider.models.length),
-      });
-    }
-
-    if (disabledCount > 0) {
-      return t('settings.model.availability.summary.partial', {
-        id: provider.id,
-        count: String(provider.models.length),
-        disabled: String(disabledCount),
-      });
-    }
-
-    if (this.isProviderDisabledByScope(provider, 'global')) {
-      return t('settings.model.availability.summary.serverDisabledOverridden', {
-        id: provider.id,
-        count: String(provider.models.length),
-      });
-    }
-
-    return t('settings.model.availability.summary.available', {
-      id: provider.id,
-      count: String(provider.models.length),
-    });
-  }
-
-  private getProviderPrimaryDisabledReason(
-    provider: ModelCatalogProvider,
-    providerEnabled: boolean,
-  ): ProviderDisabledReason {
-    if (providerEnabled) {
-      return null;
-    }
-
-    if (this.isProviderDisabledByScope(provider, 'project')) {
-      return 'project';
-    }
-
-    if (this.isProviderDisabledByScope(provider, 'global')) {
-      return 'server';
-    }
-
-    return null;
-  }
-
-  private getProviderAvailabilityStatusClass(
-    state: ProviderAvailabilityDisplayState,
-  ): 'is-disabled' | 'is-partial' | 'is-available' {
-    const { provider, providerEnabled, disabledCount, mode } = state;
-
-    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
-      return 'is-disabled';
-    }
-
-    if (!providerEnabled) {
-      return 'is-disabled';
-    }
-
-    if (disabledCount > 0) {
-      return 'is-partial';
-    }
-
-    return 'is-available';
-  }
-
-  private getProviderAvailabilityStatusLabel(
-    state: ProviderAvailabilityDisplayState,
-  ): string {
-    const { provider, providerEnabled, disabledCount, primaryDisabledReason, mode } = state;
-
-    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
-      return t('settings.model.availability.status.serverDisabled');
-    }
-
-    if (!providerEnabled) {
-      if (primaryDisabledReason === 'project') {
-        return t('settings.model.availability.status.projectDisabled');
-      }
-
-      if (primaryDisabledReason === 'server') {
-        return t('settings.model.availability.status.serverDisabled');
-      }
-
-      return t('settings.model.availability.status.providerDisabled');
-    }
-
-    return disabledCount > 0
-      ? t('settings.model.availability.status.partial')
-      : t('settings.model.availability.status.available');
-  }
-
-  private getProviderServerConstraintBadge(
-    state: ProviderAvailabilityDisplayState,
-  ): { text: string; className: 'is-disabled' | 'is-partial' } | null {
-    const { provider, providerEnabled, primaryDisabledReason, mode } = state;
-
-    if (!this.isProviderDisabledByScope(provider, 'global')) {
-      return null;
-    }
-
-    if (mode === 'server' || primaryDisabledReason === 'server') {
-      return null;
-    }
-
-    return {
-      text: providerEnabled
-        ? t('settings.model.availability.status.serverDisabledInherited')
-        : t('settings.model.availability.status.serverDisabled'),
-      className: providerEnabled ? 'is-partial' : 'is-disabled',
-    };
-  }
-
-  private getProviderAvailabilityProbeBadge(
-    state: ProviderAvailabilityCheckState,
-  ): { text: string; className: 'is-available' | 'is-partial' | 'is-disabled' } | null {
-    switch (state.status) {
-      case 'loading':
-        return {
-          text: t('settings.model.availability.check.loading'),
-          className: 'is-partial',
-        };
-      case 'error':
-        return {
-          text: t('settings.model.availability.check.failedBadge'),
-          className: 'is-disabled',
-        };
-      case 'ready':
-        if (!state.probe) {
-          return null;
-        }
-
-        switch (state.probe.status) {
-          case 'available':
-            return {
-              text: t('settings.model.availability.check.availableBadge'),
-              className: 'is-available',
-            };
-          case 'send_failed':
-            return {
-              text: t('settings.model.availability.check.failedBadge'),
-              className: 'is-disabled',
-            };
-          case 'catalog_only':
-            return {
-              text: t('settings.model.availability.check.catalogOnlyBadge'),
-              className: 'is-partial',
-            };
-          case 'project_disabled':
-            return {
-              text: t('settings.model.availability.check.projectDisabledBadge'),
-              className: 'is-disabled',
-            };
-          case 'server_disabled':
-            return {
-              text: t('settings.model.availability.check.serverDisabledBadge'),
-              className: 'is-disabled',
-            };
-          case 'missing':
-          default:
-            return {
-              text: t('settings.model.availability.check.missingBadge'),
-              className: 'is-disabled',
-            };
-        }
-      case 'idle':
-      default:
-        return null;
-    }
-  }
-
-  private describeProviderAvailabilityProbe(
-    state: ProviderAvailabilityCheckState,
-  ): { text: string; className: string } | null {
-    if (state.status === 'loading') {
-      return {
-        text: t('settings.model.availability.check.loadingDetail'),
-        className: 'is-loading',
-      };
-    }
-
-    if (state.status === 'error') {
-      return {
-        text: t('settings.model.availability.check.failedDetail', {
-          message: state.error ?? t('settings.model.availability.check.unknownError'),
-        }),
-        className: 'is-error',
-      };
-    }
-
-    if (state.status !== 'ready' || !state.probe) {
-      return null;
-    }
-
-    const runtimeCount = String(state.probe.runtimeModelCount);
-    const catalogCount = String(state.probe.catalogModelCount);
-    const testedModelId = state.probe.testedModelId ?? t('settings.model.availability.check.unknownModel');
-    switch (state.probe.status) {
-      case 'available':
-        return {
-          text: state.probe.overridesServerDisabled
-            ? t('settings.model.availability.check.availableOverrideDetail', { model: testedModelId })
-            : t('settings.model.availability.check.availableDetail', { model: testedModelId }),
-          className: 'is-success',
-        };
-      case 'send_failed':
-        return {
-          text: t('settings.model.availability.check.sendFailedDetail', {
-            model: testedModelId,
-            message: state.probe.sendTestError ?? t('settings.model.availability.check.unknownError'),
-          }),
-          className: 'is-error',
-        };
-      case 'project_disabled':
-        return {
-          text: state.probe.runtimeModelCount > 0
-            ? t('settings.model.availability.check.projectDisabledWithRuntimeDetail', { count: runtimeCount })
-            : t('settings.model.availability.check.projectDisabledDetail'),
-          className: 'is-error',
-        };
-      case 'server_disabled':
-        return {
-          text: t('settings.model.availability.check.serverDisabledDetail'),
-          className: 'is-error',
-        };
-      case 'catalog_only':
-        return {
-          text: state.probe.serverDisabled && state.probe.overridesServerDisabled
-            ? t('settings.model.availability.check.catalogOnlyOverrideDetail', { count: catalogCount })
-            : t('settings.model.availability.check.catalogOnlyDetail', { count: catalogCount }),
-          className: 'is-warning',
-        };
-      case 'missing':
-      default:
-        return {
-          text: t('settings.model.availability.check.missingDetail'),
-          className: 'is-warning',
-        };
-    }
-  }
-
   private getProviderStatusCatalogForMode(
     mode: ModelCatalogStateMode,
     catalogState: ModelCatalogState,
@@ -1307,56 +1036,8 @@ export class SettingsModelCatalogPresenter {
     return catalogState.providerStatusCatalogs[mode];
   }
 
-  private isProviderDisabledByScope(provider: ModelCatalogProvider, scope: 'global' | 'project'): boolean {
-    return provider.disabledScopes?.includes(scope) ?? false;
-  }
-
   private isProviderCurrentlyEnabled(providerId: string, catalogState: ModelCatalogState): boolean {
     return catalogState.catalogs.currentEnabledProviderIds.includes(providerId);
   }
 
-  private describeProviderModels(
-    provider: ModelCatalogProvider,
-    placeholderReason: 'project' | 'server' | null = null,
-  ): string {
-    if (provider.models.length === 0 && placeholderReason === 'project') {
-      return t('settings.model.catalog.hiddenByProjectDisable');
-    }
-
-    if (provider.models.length === 0 && placeholderReason === 'server') {
-      return t('settings.model.catalog.hiddenByServerDisable');
-    }
-
-    const modelNames = provider.models.map((model) => model.name);
-    if (modelNames.length <= 6) {
-      return modelNames.join(' · ');
-    }
-
-    const preview = modelNames.slice(0, 6).join(' · ');
-    return `${preview} · +${modelNames.length - 6}`;
-  }
-
-  private getCatalogPlaceholderReason(
-    provider: ModelCatalogProvider,
-    mode: ModelCatalogStateMode,
-  ): 'project' | 'server' | null {
-    if (provider.models.length > 0) {
-      return null;
-    }
-
-    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
-      return 'server';
-    }
-
-    if (mode === 'disabled') {
-      if (this.isProviderDisabledByScope(provider, 'project')) {
-        return 'project';
-      }
-      if (this.isProviderDisabledByScope(provider, 'global')) {
-        return 'server';
-      }
-    }
-
-    return null;
-  }
 }
