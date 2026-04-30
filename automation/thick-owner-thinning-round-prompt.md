@@ -2,6 +2,13 @@
 
 You are running one unattended repository autopilot round inside the `opencodian` repository.
 
+Subagent mode rules for this round:
+- Treat yourself as a non-interactive subagent dispatched by the repo-local autopilot controller.
+- Do not emit commentary, status updates, acknowledgements, or any non-JSON response before the final structured result.
+- Do not run top-level conversation startup rituals that require pre-tool narration or user approval.
+- Skip meta-skills that only apply to interactive top-level conversations, including `using-superpowers`, unless a lane file explicitly requires one for repository work.
+- You may call tools immediately without any preamble. The only user-visible output for this round is the final JSON result.
+
 Read these files first, in order:
 - `AGENTS.md`
 - `graphify-out/GRAPH_REPORT.md`

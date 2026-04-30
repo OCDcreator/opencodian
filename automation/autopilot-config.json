@@ -53,7 +53,7 @@
   "result_schema": "automation/round-result.schema.json",
   "runner_kind": "codex",
   "runner_command": "",
-  "runner_model": "",
+  "runner_model": "gpt-5.3-codex",
   "runner_extra_args": [],
   "plan_review_command": "codex self-review of the active lane design against AGENTS.md, graphify evidence, and the lane roadmap",
   "code_review_command": "codex review of the landed diff against the lane acceptance criteria, tests, and maintainability guardrails",
