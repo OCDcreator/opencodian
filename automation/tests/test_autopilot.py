@@ -1,8 +1,10 @@
 import unittest
 import json
+import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
-from _autopilot.validation import (
+from automation._autopilot.validation import (
     path_matches_any,
     test_command_budget_exceeded,
     test_deploy_required,
@@ -11,6 +13,7 @@ from _autopilot.validation import (
     test_runs_include_targeted_tests,
 )
 from automation import autopilot
+from automation._autopilot.bootstrap_runtime import BootstrapRuntimeSupport, run_bootstrap_and_daemonize
 
 
 class AutopilotPolicyTests(unittest.TestCase):
@@ -86,6 +89,53 @@ class RestartParserTests(unittest.TestCase):
         self.assertEqual("origin/automation/maintainability-cutover", args.restart_sync_ref)
         self.assertEqual(60, args.restart_sync_timeout_seconds)
         self.assertEqual(3, args.restart_sync_refresh_seconds)
+
+
+class BootstrapRuntimeTests(unittest.TestCase):
+    def test_bootstrap_injects_fail_on_round_failure_default(self) -> None:
+        captured: dict[str, object] = {}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            state_path = repo_root / "automation/runtime/autopilot-state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"status": "stopped_failures", "last_commit_sha": "abc123"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            def fake_run_start(namespace: object) -> int:
+                captured["namespace"] = namespace
+                return 0
+
+            support = BootstrapRuntimeSupport(
+                error_type=RuntimeError,
+                clean_string=autopilot.clean_string,
+                info=lambda *_args, **_kwargs: None,
+                read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+                resolve_repo_path=lambda relative: repo_root / relative,
+                run_start=fake_run_start,
+                spawn_background_autopilot=lambda *_args, **_kwargs: 999,
+            )
+            args = SimpleNamespace(
+                profile="mac",
+                profile_path="",
+                config_path="automation/autopilot-config.json",
+                state_path="automation/runtime/autopilot-state.json",
+                no_branch_guard=False,
+                allow_dirty_worktree=False,
+                force_lock=False,
+                daemon_output_path="automation/runtime/autopilot.out",
+                daemon_pid_path="automation/runtime/autopilot.pid",
+            )
+
+            result = run_bootstrap_and_daemonize(args, support=support)
+
+        self.assertEqual(0, result)
+        namespace = captured["namespace"]
+        self.assertFalse(getattr(namespace, "fail_on_round_failure"))
+        self.assertTrue(getattr(namespace, "single_round"))
+        self.assertEqual(0, getattr(namespace, "max_rounds_this_run"))
+        self.assertFalse(getattr(namespace, "dry_run"))
 
 
 class RoundResultSchemaTests(unittest.TestCase):
