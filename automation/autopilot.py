@@ -100,7 +100,7 @@ if TYPE_CHECKING:
 ensure_console_streams()
 
 AUTOPILOT_SCAFFOLD_NAME = cast(str, "codex-autopilot-scaffold")
-AUTOPILOT_SCAFFOLD_VERSION = cast(str, "1.1.9")
+AUTOPILOT_SCAFFOLD_VERSION = cast(str, "1.1.10")
 
 
 def new_state(config: dict[str, Any]) -> dict[str, Any]:
