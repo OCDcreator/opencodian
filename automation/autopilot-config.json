@@ -1,8 +1,8 @@
 {
-  "objective": "Reduce ownership concentration and maintainability hotspots one queued slice at a time while keeping configured validation commands green.",
-  "focus_hint": "R1 - First maintainability / refactor slice",
+  "objective": "Package the current hotspot core files into stronger single-responsibility owners one queued slice at a time while keeping lint, typecheck, tests, build, module docs, and graphify gates trustworthy.",
+  "focus_hint": "H1 - Package the chat runtime hotspot without thin-wrapper sprawl",
   "next_phase_number": 1,
-  "max_rounds": 200,
+  "max_rounds": 60,
   "max_consecutive_failures": 3,
   "lint_command": "npm run lint",
   "typecheck_command": "npm run typecheck",
@@ -21,42 +21,42 @@
   "yarn vitest "
 ],
   "targeted_test_required_paths": [
-  "src/",
-  "tests/",
-  "docs/",
-  "package.json",
-  "package-lock.json"
-],
+    "src/",
+    "tests/",
+    "docs/modules/",
+    "package.json",
+    "package-lock.json"
+  ],
   "full_test_cadence_rounds": 1,
   "full_test_required_paths": [
-  "src/",
-  "tests/",
-  "docs/",
-  "package.json",
-  "package-lock.json"
-],
+    "src/",
+    "tests/",
+    "docs/modules/",
+    "package.json",
+    "package-lock.json"
+  ],
   "build_command": "npm run build",
   "build_required_paths": [
-  "src/",
-  "tests/",
-  "docs/",
-  "package.json",
-  "package-lock.json"
-],
+    "src/",
+    "tests/",
+    "docs/modules/",
+    "package.json",
+    "package-lock.json"
+  ],
   "vulture_command": "",
   "deploy_after_build": false,
   "deploy_policy": "never",
   "deploy_required_paths": [],
   "deploy_verify_path": "",
-  "max_git_status_per_round": 6,
-  "max_git_diff_stat_per_round": 3,
+  "max_git_status_per_round": 4,
+  "max_git_diff_stat_per_round": 2,
   "command_budget_policy": "warn",
   "allowed_branch_prefixes": [
-  "autopilot/",
-  "automation/",
-  "quality/",
-  "bugfix/"
-],
+    "autopilot/",
+    "automation/",
+    "quality/",
+    "bugfix/"
+  ],
   "commit_prefix": "autopilot",
   "prompt_template": "automation/round-prompt.md",
   "result_schema": "automation/round-result.schema.json",
@@ -69,38 +69,48 @@
   "review_poll_seconds": 0,
   "review_timeout_seconds": 0,
   "prerequisite_paths": [
-  "node_modules"
-],
+    "node_modules"
+  ],
   "lanes": [
-  {
-    "id": "m1-hotspot-slice",
-    "label": "R1 - First maintainability / refactor slice",
-    "focus_hint": "R1 - First maintainability / refactor slice",
-    "phase_doc_prefix": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-",
-    "starting_phase_doc": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-0.md",
-    "roadmap_path": "docs/status/lanes/m1-hotspot-slice/autopilot-round-roadmap.md",
-    "prompt_template": "automation/round-prompt.md",
-    "commit_prefix": "autopilot"
-  },
-  {
-    "id": "m2-followup-slice",
-    "label": "R2 - Follow-up maintainability / refactor slice",
-    "focus_hint": "R2 - Follow-up maintainability / refactor slice",
-    "phase_doc_prefix": "docs/status/lanes/m2-followup-slice/autopilot-phase-",
-    "starting_phase_doc": "docs/status/lanes/m2-followup-slice/autopilot-phase-0.md",
-    "roadmap_path": "docs/status/lanes/m2-followup-slice/autopilot-round-roadmap.md",
-    "prompt_template": "automation/round-prompt.md",
-    "commit_prefix": "autopilot"
-  },
-  {
-    "id": "m3-checkpoint",
-    "label": "R3 - Checkpoint after first refactor batch",
-    "focus_hint": "R3 - Checkpoint after first refactor batch",
-    "phase_doc_prefix": "docs/status/lanes/m3-checkpoint/autopilot-phase-",
-    "starting_phase_doc": "docs/status/lanes/m3-checkpoint/autopilot-phase-0.md",
-    "roadmap_path": "docs/status/lanes/m3-checkpoint/autopilot-round-roadmap.md",
-    "prompt_template": "automation/round-prompt.md",
-    "commit_prefix": "autopilot"
-  }
-]
+    {
+      "id": "h1-chat-runtime-package",
+      "label": "H1 - Package the chat runtime hotspot",
+      "focus_hint": "H1 - Reduce OpenCodianView assembly pressure without adding thin wrappers",
+      "phase_doc_prefix": "docs/status/lanes/h1-chat-runtime-package/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/h1-chat-runtime-package/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/h1-chat-runtime-package/autopilot-round-roadmap.md",
+      "prompt_template": "automation/round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "h2-opencode-runtime-package",
+      "label": "H2 - Package the OpenCode service hotspot",
+      "focus_hint": "H2 - Reduce OpenCodeService and ServerManager ownership concentration",
+      "phase_doc_prefix": "docs/status/lanes/h2-opencode-runtime-package/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/h2-opencode-runtime-package/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/h2-opencode-runtime-package/autopilot-round-roadmap.md",
+      "prompt_template": "automation/round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "h3-settings-bootstrap-package",
+      "label": "H3 - Package the settings and bootstrap hotspot",
+      "focus_hint": "H3 - Reduce OpenCodianSettings, main.ts, and model-catalog shell churn",
+      "phase_doc_prefix": "docs/status/lanes/h3-settings-bootstrap-package/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/h3-settings-bootstrap-package/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/h3-settings-bootstrap-package/autopilot-round-roadmap.md",
+      "prompt_template": "automation/round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "h4-checkpoint",
+      "label": "H4 - Hotspot checkpoint and closeout",
+      "focus_hint": "H4 - Recompute hotspot metrics, close residual seams, and stop only on a clean checkpoint",
+      "phase_doc_prefix": "docs/status/lanes/h4-checkpoint/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/h4-checkpoint/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/h4-checkpoint/autopilot-round-roadmap.md",
+      "prompt_template": "automation/round-prompt.md",
+      "commit_prefix": "autopilot"
+    }
+  ]
 }
