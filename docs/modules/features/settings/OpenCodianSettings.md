@@ -186,13 +186,14 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `addDebugSettings()` | 创建并挂载 `SettingsDebugSection` owner，把 debug log path / export / help lifecycle 从主类中收口出去 |
 | `addFormatterSettings()` | 创建并挂载 `SettingsFormatterSection` owner，把 formatter runtime status / config / mode-switch lifecycle 从主类中收口出去 |
 | `addMcpSettings()` | 创建并挂载 `SettingsMcpSection` owner，把 MCP 服务器状态概览与刷新 lifecycle 从主类中收口出去 |
+| `addUserSettings()` | 创建并挂载 `SettingsUserSection` owner，把用户 profile/prompt/tags 的经典 section shell 从主类中收口出去 |
 
 ## 与其他模块的交互
 
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `SettingsPanelChrome`: 管理 panel title 品牌渲染、通用 block shell、inline-code 格式化、help button 和语言选择器这类稳定展示壳层
-- `SettingsTabbedRenderer`: 标签模式下的标签栏渲染与内容路由，从 `OpenCodianSettings` 中提取以控制代码行数
-- `SettingsUserSection`: 用户 profile/prompt/tags 设置的独立渲染函数，从 `OpenCodianSettings` 中提取
+- `SettingsTabbedRenderer`: 标签模式下的标签栏渲染与内容路由，从 `OpenCodianSettings` 中提取以控制代码行数；用户标签内容通过单一 `renderUserContent` seam 委托给 user section owner
+- `SettingsUserSection`: 用户 profile/prompt/tags 设置的经典 section shell 与 tabbed content routing owner，从 `OpenCodianSettings` 中提取
 - `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
 - `SettingsMcpSection`: 管理 MCP 服务器状态概览、逐服务器行渲染、catalog subscription 与显式刷新 action；tabbed 模式下路由到独立一级 `MCP` 标签，classic 模式下紧跟 Server 部分之后并进入 quick-nav

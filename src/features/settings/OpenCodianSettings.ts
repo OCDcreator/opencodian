@@ -32,11 +32,7 @@ import { SettingsServerSection } from './SettingsServerSection';
 import { SettingsStyleSection } from './SettingsStyleSection';
 import { SettingsTabbedRenderer } from './SettingsTabbedRenderer';
 import { SettingsUiSection } from './SettingsUiSection';
-import {
-  renderUserExcludedTagsSetting,
-  renderUserProfileSetting,
-  renderUserPromptSetting,
-} from './SettingsUserSection';
+import { SettingsUserSection } from './SettingsUserSection';
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
@@ -60,6 +56,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private mcpSection: SettingsMcpSection | null = null;
   private securitySection: SettingsSecuritySection | null = null;
   private formatterSection: SettingsFormatterSection | null = null;
+  private userSection: SettingsUserSection | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -101,9 +98,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           this.lastKnownServerStatus = status;
         },
         requestDisplayRefresh: () => { this.display(); },
-        renderUserProfileSetting: (el) => { renderUserProfileSetting(el, this.plugin); },
-        renderUserPromptSetting: (el) => { renderUserPromptSetting(el, this.plugin); },
-        renderUserExcludedTagsSetting: (el) => { renderUserExcludedTagsSetting(el, this.plugin); },
+        renderUserContent: (el, secondaryTabId) => {
+          this.createUserSection().attachTabbed(el, secondaryTabId);
+        },
         renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
         renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
       });
@@ -197,6 +194,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.formatterSection?.dispose();
+    this.userSection = null;
     this.serverSection = null;
     this.mcpSection = null;
     this.securitySection = null;
@@ -438,17 +436,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private addUserSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(
-      containerEl,
-      t('settings.user.title'),
-      t('settings.quickNav.userDesc'),
-    );
-
-    renderUserProfileSetting(containerEl, this.plugin);
-    renderUserPromptSetting(containerEl, this.plugin);
-    renderUserExcludedTagsSetting(containerEl, this.plugin);
-
-    return headingEl;
+    return this.createUserSection().attach(containerEl);
   }
 
   // ─── Shared helpers ────────────────────────────────────────────────
@@ -484,5 +472,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       title,
       tooltip,
     });
+  }
+
+  private createUserSection(): SettingsUserSection {
+    this.userSection ??= new SettingsUserSection(this.plugin, {
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return this.userSection;
   }
 }

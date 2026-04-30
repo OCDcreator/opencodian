@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 1 - Package `OpenCodianSettings` section-shell bridges
+### [DONE] Task 1 - Package `OpenCodianSettings` section-shell bridges
 
 - **Goal**: Remove one durable cross-section bridge or shell-construction slice from `OpenCodianSettings.ts` by leaning harder on the existing section owners and chrome helpers.
 - **Key files**:
@@ -16,7 +16,7 @@
   - No new thin settings shells are introduced.
 - **Validation**: `npm test -- --runInBand tests/unit/features/settings/OpenCodianSettings.test.ts tests/unit/features/settings/SettingsTabbedRenderer.test.ts tests/unit/features/settings/SettingsModelSection.test.ts tests/unit/features/settings/SettingsCommandsSection.test.ts`
 
-### [QUEUED] Task 2 - Package plugin startup, warmup, and refresh orchestration out of `main.ts`
+### [NEXT] Task 2 - Package plugin startup, warmup, and refresh orchestration out of `main.ts`
 
 - **Goal**: Reduce one startup/runtime orchestration cluster in `main.ts` by strengthening an existing or clearly durable plugin-adjacent owner.
 - **Key files**:

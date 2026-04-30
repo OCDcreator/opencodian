@@ -28,6 +28,9 @@ function createRendererState(options?: {
   const renderLanguageSetting = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'language-marker', text: 'language-setting' });
   });
+  const renderUserContent = jest.fn((containerEl: HTMLElement, secondaryTabId: string) => {
+    containerEl.createDiv({ cls: 'user-marker', text: secondaryTabId });
+  });
 
   const renderer = new SettingsTabbedRenderer({
     app: {} as App,
@@ -55,9 +58,7 @@ function createRendererState(options?: {
     getServerState: () => ({ healthy: false, status: 'stopped' as const }),
     setServerState: () => undefined,
     requestDisplayRefresh,
-    renderUserProfileSetting: () => undefined,
-    renderUserPromptSetting: () => undefined,
-    renderUserExcludedTagsSetting: () => undefined,
+    renderUserContent,
     renderLayoutModeSetting,
     renderLanguageSetting,
   });
@@ -68,6 +69,7 @@ function createRendererState(options?: {
     requestDisplayRefresh,
     renderLayoutModeSetting,
     renderLanguageSetting,
+    renderUserContent,
   };
 }
 
@@ -208,6 +210,19 @@ describe('SettingsTabbedRenderer', () => {
         (element) => element.textContent?.trim(),
       ),
     ).toEqual(['Overview', 'Config']);
+  });
+
+  it('delegates user secondary panels through one user content seam', () => {
+    const { renderer, renderUserContent } = createRendererState({
+      primaryTabId: 'user',
+      secondaryTabs: { user: 'prompt' },
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expect(renderUserContent).toHaveBeenCalledWith(expect.any(HTMLElement), 'prompt');
+    expect(containerEl.querySelector('.user-marker')?.textContent).toBe('prompt');
   });
 
   it('renders MCP as its own primary tab instead of a server secondary tab', () => {

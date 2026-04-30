@@ -66,9 +66,7 @@ export interface TabRendererDependencies {
   getServerState: () => { healthy: boolean; status: ServerStatus };
   setServerState: (state: { healthy: boolean; status: ServerStatus }) => void;
   requestDisplayRefresh: () => void;
-  renderUserProfileSetting: (containerEl: HTMLElement) => void;
-  renderUserPromptSetting: (containerEl: HTMLElement) => void;
-  renderUserExcludedTagsSetting: (containerEl: HTMLElement) => void;
+  renderUserContent: (containerEl: HTMLElement, secondaryTabId: string) => void;
   renderLayoutModeSetting: (containerEl: HTMLElement) => void;
   renderLanguageSetting: (containerEl: HTMLElement) => void;
 }
@@ -376,16 +374,6 @@ export class SettingsTabbedRenderer {
   }
 
   private renderUserContent(containerEl: HTMLElement, secondaryTabId: string): void {
-    switch (secondaryTabId) {
-      case 'profile':
-        this.deps.renderUserProfileSetting(containerEl);
-        break;
-      case 'prompt':
-        this.deps.renderUserPromptSetting(containerEl);
-        break;
-      case 'tags':
-        this.deps.renderUserExcludedTagsSetting(containerEl);
-        break;
-    }
+    this.deps.renderUserContent(containerEl, secondaryTabId);
   }
 }

@@ -21,7 +21,7 @@
 - 创建 heading、settings block、帮助按钮等共享 UI 回调
 - 模型/服务器状态回调
 - section owner 实例注册回调
-- 用户设置渲染回调
+- 用户设置 content panel 渲染回调（单一 seam，具体 profile/prompt/tags 路由留给 `SettingsUserSection`）
 - `General` 合并面板里的布局模式渲染回调
 - `General` 合并面板里的语言切换渲染回调
 
@@ -33,4 +33,4 @@
 
 ## 内容路由
 
-`renderContent()` 根据 `primaryTabId` 分发到对应 section 的 tabbed 渲染。`server` 现在只保留 `connection` / `auth` / `status` 三个二级标签；`MCP` 已提升为独立一级标签，并单独路由到 `SettingsMcpSection`。`formatter` 标签路由到 `SettingsFormatterSection`，该 section 自行处理 overview/config 两个二级面板的渲染。`general` 是一个特殊主类目：它不创建独立 section owner，也不再展示 `Basic / Language` 二级标签，而是直接在一张合并卡片里同时渲染 `settingsLayoutMode` 与语言切换；`MCP` 现在也不再显示单独的二级标签条，而是直接展示自己的内容面板。`general` 继续和 `style` / `plugins` / `model` / `formatter` 一样，不再套 `.opencodian-settings-tab-panel` 外层壳，避免出现额外边框与不对称留白。
+`renderContent()` 根据 `primaryTabId` 分发到对应 section 的 tabbed 渲染。`server` 现在只保留 `connection` / `auth` / `status` 三个二级标签；`MCP` 已提升为独立一级标签，并单独路由到 `SettingsMcpSection`。`formatter` 标签路由到 `SettingsFormatterSection`，该 section 自行处理 overview/config 两个二级面板的渲染。`user` 标签通过 `renderUserContent(containerEl, secondaryTabId)` 委托回 `SettingsUserSection`，renderer 不直接了解 profile/prompt/tags 的具体字段渲染。`general` 是一个特殊主类目：它不创建独立 section owner，也不再展示 `Basic / Language` 二级标签，而是直接在一张合并卡片里同时渲染 `settingsLayoutMode` 与语言切换；`MCP` 现在也不再显示单独的二级标签条，而是直接展示自己的内容面板。`general` 继续和 `style` / `plugins` / `model` / `formatter` 一样，不再套 `.opencodian-settings-tab-panel` 外层壳，避免出现额外边框与不对称留白。

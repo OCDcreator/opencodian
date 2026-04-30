@@ -9,6 +9,48 @@ import { Setting } from 'obsidian';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 
+interface SettingsUserSectionOptions {
+  createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
+}
+
+export class SettingsUserSection {
+  private readonly plugin: OpenCodianPlugin;
+  private readonly createSectionHeading: SettingsUserSectionOptions['createSectionHeading'];
+
+  constructor(plugin: OpenCodianPlugin, options: SettingsUserSectionOptions) {
+    this.plugin = plugin;
+    this.createSectionHeading = options.createSectionHeading;
+  }
+
+  attach(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.user.title'),
+      t('settings.quickNav.userDesc'),
+    );
+
+    renderUserProfileSetting(containerEl, this.plugin);
+    renderUserPromptSetting(containerEl, this.plugin);
+    renderUserExcludedTagsSetting(containerEl, this.plugin);
+
+    return headingEl;
+  }
+
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    switch (secondaryTabId) {
+      case 'profile':
+        renderUserProfileSetting(containerEl, this.plugin);
+        break;
+      case 'prompt':
+        renderUserPromptSetting(containerEl, this.plugin);
+        break;
+      case 'tags':
+        renderUserExcludedTagsSetting(containerEl, this.plugin);
+        break;
+    }
+  }
+}
+
 export function renderUserProfileSetting(containerEl: HTMLElement, plugin: OpenCodianPlugin): void {
   new Setting(containerEl)
     .setName(t('settings.user.name.name'))
