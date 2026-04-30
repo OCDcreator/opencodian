@@ -86,5 +86,118 @@
       "updated": "2026-04-29T17:20:48.645Z",
       "description": "Tasks for master context"
     }
+  },
+  "thick-owner-long": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Create runtime startup bootstrap owner",
+        "description": "Move startup preparation/bootstrap sequencing from main.ts into a new cohesive runtime owner in src/core/runtime/. Keep plugin lifecycle ownership in main.ts.",
+        "details": "Create src/core/runtime/StartupBootstrap.ts. Extract the startup sequence (e.g., initialization of services, configuration loading, plugin registration) from main.ts into a class or function. main.ts should call this new owner. Follow AGENTS.md and maintainability rules. Do not create thin helpers; the new file should be a durable responsibility boundary.",
+        "testStrategy": "Write Jest tests for StartupBootstrap covering normal startup, error handling, and idempotency. Ensure tests are focused on the new owner.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Update docs and verify startup move",
+        "description": "Update docs/modules/ to reflect the new startup bootstrap owner. Run npm run check:module-docs, npm run check:graphify, and npm run verify. Update docs/status/lanes/t3-remaining-thick-owner-long-queue/autopilot-status.md.",
+        "details": "After task 1, sync documentation. Ensure docs/modules/ includes the new owner. Run verification commands and fix any issues. Record progress in autopilot-status.md.",
+        "testStrategy": "Manual verification of docs and successful execution of verification commands.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Create settings runtime owner",
+        "description": "Move service update rollback, settings persistence, cross-view refresh, slash invalidation, and config sync from main.ts into a new cohesive runtime owner in src/core/runtime/. Keep plugin lifecycle shell in main.ts.",
+        "details": "Create src/core/runtime/SettingsRuntime.ts. Extract all settings-related logic from main.ts into this owner. It should handle save, refresh, config sync, and related operations. Do not split into multiple helpers.",
+        "testStrategy": "Write Jest tests for SettingsRuntime covering save/refresh, rollback, cross-view refresh, and config sync. Test error scenarios.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Update docs and verify settings move",
+        "description": "Update docs/modules/ to reflect the new settings runtime owner. Run verification commands and update autopilot-status.md.",
+        "details": "After task 3, sync documentation and run npm run check:module-docs, npm run check:graphify, npm run verify. Record progress.",
+        "testStrategy": "Manual verification of docs and successful execution of verification commands.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Move project-compaction reload lifecycle to existing lifecycle owner",
+        "description": "Move project-compaction reload and resolved-config validation from OpenCodeService.ts into the existing lifecycle owner (e.g., src/core/lifecycle/ or similar). Keep OpenCodeService.ts as a facade.",
+        "details": "Identify the existing lifecycle owner (e.g., LifecycleManager or similar). Add project-compaction reload and resolved-config validation methods there. Update OpenCodeService.ts to delegate to this owner. Do not create a new file.",
+        "testStrategy": "Write Jest tests for the lifecycle owner covering compaction reload and config validation. Ensure OpenCodeService tests still pass.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Update docs and verify lifecycle move",
+        "description": "Update docs/modules/ to reflect changes in lifecycle owner. Run verification commands and update autopilot-status.md.",
+        "details": "After task 5, sync documentation and run verification commands. Record progress.",
+        "testStrategy": "Manual verification of docs and successful execution of verification commands.",
+        "priority": "high",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Create checkpoint documentation",
+        "description": "After the above slices, record the next remaining thick-owner order. Explicitly state whether OpenCodianView.ts has a safe next unattended slice. If unclear, pause at the checkpoint.",
+        "details": "Update docs/status/lanes/t3-remaining-thick-owner-long-queue/autopilot-status.md with a checkpoint entry. Include lane, last commit, next focus, and assessment of OpenCodianView.ts readiness. Do not force a risky refactor if unclear.",
+        "testStrategy": "Manual review of checkpoint documentation for completeness and clarity.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          4,
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Final verification and queue resume readiness",
+        "description": "Run full verification suite (npm run verify) across all changes. Ensure the queue is machine-verifiable, resume-safe, and human-readable. Update autopilot-status.md with final status.",
+        "details": "Run npm run verify, npm run check:module-docs, npm run check:graphify. Fix any issues. Ensure autopilot-status.md encodes real task order and acceptance.",
+        "testStrategy": "Successful execution of all verification commands and documentation review.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-04-30T15:51:30.788Z",
+      "updated": "2026-04-30T15:51:30.788Z",
+      "description": "Tasks for thick-owner-long context"
+    }
   }
 }

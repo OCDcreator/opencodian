@@ -1,0 +1,70 @@
+# Remaining Thick Owner Long Queue PRD
+
+## Objective
+
+Create a long-running unattended execute queue for the remaining thick-owner maintenance batch in OpenCodian. The queue must start from current `main`, use a dedicated worktree, and keep running overnight until the queued batch finishes, a real blocker appears, or a documented checkpoint justifies pause.
+
+## Governing Constraints
+
+- Follow `AGENTS.md`, `docs/requirements/maintenance-development-baseline.md`, `docs/status/development-maintainability-rules.md`, and `graphify-out/GRAPH_REPORT.md`.
+- Maintenance-first only; no generic feature work.
+- Do not repeat ServerManager seams already landed on `main`.
+- Do not add new runtime ownership to `OpenCodeService.ts` or `OpenCodianView.ts`.
+- Do not create thin helper / adapter / provider / factory files.
+- Prefer existing adjacent owners; create a new file only when it is one durable, complete responsibility boundary.
+- Every code round requires targeted tests, docs/modules sync, graphify freshness, and `npm run verify`.
+- Every code round requires blocking Codex review.
+
+## Batch Order
+
+1. `main.ts` startup bootstrap shell -> one durable adjacent runtime owner
+2. doc/verify startup move
+3. `main.ts` settings save/refresh/config-sync shell -> one durable adjacent runtime owner
+4. doc/verify settings move
+5. `OpenCodeService.ts` project-compaction reload lifecycle seam -> existing lifecycle owner
+6. doc/verify lifecycle move
+7. checkpoint doc recording round, lane, last commit, next focus, and whether `OpenCodianView.ts` is ready for the next batch
+
+## Owner Expectations
+
+### `main.ts` startup bootstrap
+
+- Keep plugin lifecycle ownership in `main.ts`
+- Move startup preparation/bootstrap sequencing into one cohesive runtime owner
+- Prefer `src/core/runtime/` adjacency over creating a generic new subtree
+
+### `main.ts` settings runtime
+
+- Keep plugin lifecycle shell in `main.ts`
+- Move service update rollback, settings persistence, cross-view refresh, slash invalidation, and config sync into one cohesive runtime owner
+- Do not split this into several tiny helpers
+
+### `OpenCodeService.ts` compaction lifecycle
+
+- Keep `OpenCodeService.ts` a facade/compatibility boundary
+- Move project-compaction reload + resolved-config validation into the existing lifecycle owner if cohesive
+- Do not create a new helper file for this slice
+
+### Checkpoint
+
+- After the above slices, record the next remaining thick-owner order
+- Explicitly state whether `OpenCodianView.ts` has a safe next unattended slice
+- If unclear, pause at the checkpoint instead of forcing a risky refactor
+
+## Verification
+
+Every code task must include:
+
+- focused Jest tests for the touched owner
+- `npm run check:module-docs`
+- `npm run check:graphify`
+- `npm run verify`
+
+Each task must also update:
+
+- matching `docs/modules/**`
+- `docs/status/lanes/t3-remaining-thick-owner-long-queue/autopilot-status.md`
+
+## Deliverable Shape
+
+The queue must be machine-verifiable, resume-safe, and human-readable. It must encode real task order and acceptance instead of saying "continue maintenance" generically.
