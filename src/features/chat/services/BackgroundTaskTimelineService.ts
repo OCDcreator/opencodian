@@ -1,5 +1,6 @@
 import type { ChatMessage, Conversation } from '../../../core/types';
 import { t } from '../../../i18n';
+import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import {
   type BackgroundTaskDiagnostics,
@@ -9,6 +10,14 @@ import {
   BackgroundTaskTimelineAssemblyService,
   type BackgroundTaskTimelineRuntime,
 } from './BackgroundTaskTimelineAssemblyService';
+
+const logger = createLogger('BackgroundTaskTimelineService');
+
+export interface OmoBackgroundTaskLogState {
+  anchorKey: string;
+  loggedPendingTaskIds: Set<string>;
+  completionLogged: boolean;
+}
 
 export interface BackgroundTaskInlineCopy {
   title: string;
@@ -40,7 +49,10 @@ export interface BackgroundTaskTimelineServiceHost extends BackgroundTaskTimelin
 export class BackgroundTaskTimelineService {
   private readonly assemblyService: BackgroundTaskTimelineAssemblyService;
 
-  constructor(private readonly host: BackgroundTaskTimelineServiceHost) {
+  constructor(
+    private readonly host: BackgroundTaskTimelineServiceHost,
+    private readonly omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>(),
+  ) {
     this.assemblyService = new BackgroundTaskTimelineAssemblyService(host);
   }
 
@@ -230,6 +242,66 @@ export class BackgroundTaskTimelineService {
     return this.assemblyService.collectDiagnostics(messages);
   }
 
+  logOmoBackgroundTaskDiagnostics(
+    conversation: Conversation,
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): void {
+    const diagnostics = this.collectDiagnostics(nextMessages);
+    if (!diagnostics) {
+      this.omoBackgroundTaskLogStates.delete(conversation.id);
+      return;
+    }
+
+    const previousDiagnostics = this.collectDiagnostics(previousMessages);
+    const previousHasSameAnchor = previousDiagnostics?.anchorKey === diagnostics.anchorKey;
+    const previousPendingTaskIds = new Set(
+      previousHasSameAnchor
+        ? previousDiagnostics.pending
+          .map((task) => task.taskId)
+          .filter((taskId): taskId is string => Boolean(taskId))
+        : [],
+    );
+    const previousCompletionLogged = previousHasSameAnchor && (
+      previousDiagnostics.sawAllTasksComplete
+      || (previousDiagnostics.pending.length === 0 && previousDiagnostics.completed.length > 0)
+    );
+
+    let state = this.omoBackgroundTaskLogStates.get(conversation.id);
+    if (!state || state.anchorKey !== diagnostics.anchorKey) {
+      state = {
+        anchorKey: diagnostics.anchorKey,
+        loggedPendingTaskIds: new Set(previousPendingTaskIds),
+        completionLogged: previousCompletionLogged,
+      };
+    } else if (previousCompletionLogged) {
+      state.completionLogged = true;
+    }
+
+    for (const task of diagnostics.pending) {
+      if (!task.taskId || previousPendingTaskIds.has(task.taskId) || state.loggedPendingTaskIds.has(task.taskId)) {
+        continue;
+      }
+
+      logger.debug(`OMO background task running: ${task.taskId} - ${this.getLogPreview(task.description, 140)}`);
+      state.loggedPendingTaskIds.add(task.taskId);
+    }
+
+    if (!state.completionLogged && (diagnostics.sawAllTasksComplete || (diagnostics.pending.length === 0 && diagnostics.completed.length > 0))) {
+      logger.debug(`OMO background tasks completed: ${this.stringifyLogPayload({
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        completedTasks: diagnostics.completed.map((task) => ({
+          id: task.taskId,
+          description: task.description,
+        })),
+      })}`);
+      state.completionLogged = true;
+    }
+
+    this.omoBackgroundTaskLogStates.set(conversation.id, state);
+  }
+
   getLaunchDisplayId(launch: BackgroundTaskLaunchInfo): string {
     if (launch.taskId) {
       return launch.taskId;
@@ -260,6 +332,22 @@ export class BackgroundTaskTimelineService {
     this.host.clearAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     return runtime;
+  }
+
+  private getLogPreview(text: string, maxLength = 180): string {
+    if (text.length <= maxLength) {
+      return text;
+    }
+
+    return `${text.slice(0, maxLength - 1)}…`;
+  }
+
+  private stringifyLogPayload(payload: unknown): string {
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return String(payload);
+    }
   }
 
   private buildTasksMarkdown(segment: BackgroundTaskSegment): string | undefined {

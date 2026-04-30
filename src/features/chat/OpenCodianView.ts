@@ -350,12 +350,6 @@ const ASSISTANT_DEBUG_STAGE_ALLOWLIST = new Set([
 
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
 
-interface OmoBackgroundTaskLogState {
-  anchorKey: string;
-  loggedPendingTaskIds: Set<string>;
-  completionLogged: boolean;
-}
-
 interface ConversationRevertState {
   messageID: string;
   partID?: string;
@@ -684,7 +678,6 @@ export class OpenCodianView extends ItemView {
   private sendPipelineRuntime: SendPipelineRuntime;
   private conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   private composerContextViewFacade: ComposerContextViewFacade;
-  private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -4238,73 +4231,16 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskTimelineService.syncStateFromConversation(conversation, tabId);
   }
 
-  private collectBackgroundTaskDiagnostics(messages: ChatMessage[]): {
-    anchorKey: string;
-    completed: BackgroundTaskCompletionInfo[];
-    pending: BackgroundTaskLaunchInfo[];
-    sawAllTasksComplete: boolean;
-  } | null {
-    return this.backgroundTaskTimelineService.collectDiagnostics(messages);
-  }
-
   private logOmoBackgroundTaskDiagnostics(
     conversation: Conversation,
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
   ): void {
-    const diagnostics = this.collectBackgroundTaskDiagnostics(nextMessages);
-    if (!diagnostics) {
-      this.omoBackgroundTaskLogStates.delete(conversation.id);
-      return;
-    }
-
-    const previousDiagnostics = this.collectBackgroundTaskDiagnostics(previousMessages);
-    const previousHasSameAnchor = previousDiagnostics?.anchorKey === diagnostics.anchorKey;
-    const previousPendingTaskIds = new Set(
-      previousHasSameAnchor
-        ? previousDiagnostics.pending
-          .map((task) => task.taskId)
-          .filter((taskId): taskId is string => Boolean(taskId))
-        : [],
+    this.backgroundTaskTimelineService.logOmoBackgroundTaskDiagnostics(
+      conversation,
+      previousMessages,
+      nextMessages,
     );
-    const previousCompletionLogged = previousHasSameAnchor && (
-      previousDiagnostics.sawAllTasksComplete
-      || (previousDiagnostics.pending.length === 0 && previousDiagnostics.completed.length > 0)
-    );
-
-    let state = this.omoBackgroundTaskLogStates.get(conversation.id);
-    if (!state || state.anchorKey !== diagnostics.anchorKey) {
-      state = {
-        anchorKey: diagnostics.anchorKey,
-        loggedPendingTaskIds: new Set(previousPendingTaskIds),
-        completionLogged: previousCompletionLogged,
-      };
-    } else if (previousCompletionLogged) {
-      state.completionLogged = true;
-    }
-
-    for (const task of diagnostics.pending) {
-      if (!task.taskId || previousPendingTaskIds.has(task.taskId) || state.loggedPendingTaskIds.has(task.taskId)) {
-        continue;
-      }
-
-      logger.debug(`OMO background task running: ${task.taskId} - ${this.getLogPreview(task.description, 140)}`);
-      state.loggedPendingTaskIds.add(task.taskId);
-    }
-
-    if (!state.completionLogged && (diagnostics.sawAllTasksComplete || (diagnostics.pending.length === 0 && diagnostics.completed.length > 0))) {
-      logger.debug(`OMO background tasks completed: ${this.stringifyLogPayload({
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        completedTasks: diagnostics.completed.map((task) => ({
-          id: task.taskId,
-          description: task.description,
-        })),
-      })}`);
-      state.completionLogged = true;
-    }
-
-    this.omoBackgroundTaskLogStates.set(conversation.id, state);
   }
 
   private async renderBackgroundTaskIndicatorIfNeeded(

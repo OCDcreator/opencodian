@@ -1,11 +1,11 @@
 # Graph Report - src  (2026-04-30)
 
 ## Corpus Check
-- 356 files · ~303,031 words
+- 356 files · ~303,082 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4699 nodes · 8731 edges · 150 communities detected
+- 4701 nodes · 8733 edges · 147 communities detected
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 1017 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -157,13 +157,10 @@
 - [[_COMMUNITY_Community 144|Community 144]]
 - [[_COMMUNITY_Community 145|Community 145]]
 - [[_COMMUNITY_Community 146|Community 146]]
-- [[_COMMUNITY_Community 147|Community 147]]
-- [[_COMMUNITY_Community 148|Community 148]]
-- [[_COMMUNITY_Community 149|Community 149]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `t()` - 437 edges
-2. `OpenCodianView` - 248 edges
+2. `OpenCodianView` - 247 edges
 3. `OpenCodeService` - 139 edges
 4. `OpenCodianPlugin` - 86 edges
 5. `ServerManager` - 73 edges
@@ -180,16 +177,16 @@
   features/settings/SettingsPanelChrome.ts → i18n/index.ts
 - `assertModelExtraFieldKeyAllowed()` --calls--> `t()`  [INFERRED]
   features/settings/modelConfigWorkspace.ts → i18n/index.ts
-- `normalizeModelProviderPluginDebugSettings()` --calls--> `normalizeDebugModuleSettings()`  [INFERRED]
-  core/types/settings.ts → shared/debugModules.ts
-- `normalizeModelProviderPluginDebugSettings()` --calls--> `normalizeDebugRefreshIntervalMs()`  [INFERRED]
-  core/types/settings.ts → shared/debugModules.ts
+- `buildAvailabilitySubset()` --calls--> `setProviderEnabled()`  [INFERRED]
+  features/settings/modelConfigSavePlan.ts → core/config/modelConfigAvailability.ts
+- `buildNextDisabledModelRefs()` --calls--> `formatModelReference()`  [INFERRED]
+  features/settings/modelConfigSavePlan.ts → core/config/modelConfigShared.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (46): t(), buildInterruptedAssistantNotice(), PermissionInlineCardRenderer, QuestionInlineCardRenderer, appendQuestionResolutionCard(), appendQuestionResolutionCardFromRenderPlan(), buildQuestionAnswerMarkdown(), buildQuestionRejectedMarkdown() (+38 more)
+Nodes (49): t(), AssistantNoticeCardRenderer, buildInterruptedAssistantNotice(), PermissionInlineCardRenderer, appendQuestionResolutionCard(), appendQuestionResolutionCardFromRenderPlan(), buildQuestionAnswerMarkdown(), buildQuestionRejectedMarkdown() (+41 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.01
@@ -197,7 +194,7 @@ Nodes (37): buildChatAppearanceCustomCss(), getChatAppearanceBackgroundSizeValue
 
 ### Community 2 - "Community 2"
 Cohesion: 0.02
-Nodes (45): TabViewActivationBridge, ActiveTabContextUsageCoordinator, ConversationViewStateService, SettingsPluginSection, getDefaultDebugModuleSettings(), isDebugModuleKey(), normalizeDebugModuleSettings(), normalizeDebugRefreshIntervalMs() (+37 more)
+Nodes (113): SettingsStyleInputPanelSection, getDefaultDebugModuleSettings(), isDebugModuleKey(), normalizeDebugModuleSettings(), normalizeDebugRefreshIntervalMs(), resolveDebugModuleKey(), createLogger(), createLoggerCall() (+105 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.02
@@ -208,44 +205,44 @@ Cohesion: 0.03
 Nodes (94): computeMatchScore(), createDefinition(), findBuiltinIcon(), formatBuiltinSource(), getBuiltinIcon(), getDisplayName(), isBuiltinIconLibraryId(), listBuiltinIcons() (+86 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.03
-Nodes (26): extractRenderableToolMetadata(), extractStructuredErrorMessage(), extractStructuredErrorName(), getDebugTextPreview(), inferSseEventName(), OpenCodeStreamEventTransformer, parseJsonRecord(), resolveReasoningDurationSeconds() (+18 more)
-
-### Community 6 - "Community 6"
 Cohesion: 0.04
 Nodes (24): cloneFormatterConfigValue(), readFormatterConfigValue(), writeFormatterConfigValue(), OpencodeConfigManager, ContextUsageDisplayService, buildObjectReplacementPatch(), buildProjectAgentOptionsPatch(), buildProjectAgentPermissionPatch() (+16 more)
 
-### Community 7 - "Community 7"
+### Community 6 - "Community 6"
 Cohesion: 0.04
 Nodes (42): McpConfigService, ModelCatalogStateService, assembleModelCatalog(), assembleServerModelCatalog(), filterCatalogToProviderIds(), projectEffectiveCatalog(), resolveProviderAvailabilityProbePlan(), selectProviderProbeModelId() (+34 more)
 
-### Community 8 - "Community 8"
+### Community 7 - "Community 7"
 Cohesion: 0.04
-Nodes (74): SettingsStyleInputPanelSection, hasThemeAppearanceOverrides(), getBashToolBlockedCommands(), getCurrentPlatformBlockedCommands(), getCurrentPlatformDebugLogPath(), getCurrentPlatformKey(), getDefaultInputPanelGlassRefractionSettings(), getDefaultInputPanelGlassRefractionSvgFilterSettings() (+66 more)
+Nodes (17): findCatalogModel(), findCatalogProvider(), pickCatalogDefaultModel(), pickCatalogProviderDefaultModel(), pickCatalogProviderFirstModel(), pickFirstCatalogModel(), resolveModelSelection(), resolvePreferredAvailableModel() (+9 more)
+
+### Community 8 - "Community 8"
+Cohesion: 0.03
+Nodes (27): normalizePermissionRequest(), normalizePermissionResponse(), normalizePermissionToolReference(), normalizeStringArray(), OpenCodeQuestionPermissionHub, extractRenderableToolMetadata(), extractStructuredErrorMessage(), extractStructuredErrorName() (+19 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.05
-Nodes (61): clamp(), createStageLayerElement(), createSvgElement(), estimateProjectionDelta(), formatNumber(), generateFilterId(), GlassOctahedronDemoController, maxRenderQuality() (+53 more)
+Cohesion: 0.04
+Nodes (5): ServerManager, TabViewActivationBridge, ActiveTabContextUsageCoordinator, ConversationViewStateService, getPerformanceTimestampMs()
 
 ### Community 10 - "Community 10"
 Cohesion: 0.05
-Nodes (40): classifyReminderType(), detectOmoMessageMeta(), detectSystemReminder(), detectUserInjection(), getFirstMeaningfulLine(), normalizeMultilineText(), parseCompletedBackgroundTasks(), parseReminderTasks() (+32 more)
+Nodes (61): clamp(), createStageLayerElement(), createSvgElement(), estimateProjectionDelta(), formatNumber(), generateFilterId(), GlassOctahedronDemoController, maxRenderQuality() (+53 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.04
-Nodes (16): OpenCodeCatalogStateStore, extractRenderableToolMetadata(), OpenCodeMessageNormalizationMapper, OpenCodeToolContentAssembler, resolveOpenCodeToolKind(), resolveToolResultVisibility(), AssistantNoticeCardRenderer, canonicalizeToolName() (+8 more)
+Cohesion: 0.05
+Nodes (40): classifyReminderType(), detectOmoMessageMeta(), detectSystemReminder(), detectUserInjection(), getFirstMeaningfulLine(), normalizeMultilineText(), parseCompletedBackgroundTasks(), parseReminderTasks() (+32 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.05
 Nodes (34): ModelConfigModal, createModelConfigKeyValueState(), createModelConfigModalSnapshot(), isBlankProviderState(), parseAddProviderJsonDraft(), readProviderOptionString(), resolveModelConfigJsonDraftValue(), syncProviderFormFromJsonDraft() (+26 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.06
-Nodes (72): add3(), applyEdgeBulge(), applyFilterLayerState(), bounds2(), buildBackdropFilterValue(), buildDisplacementTrace(), buildFallbackBackdropFilterValue(), buildHullEdges() (+64 more)
+Cohesion: 0.04
+Nodes (15): OpenCodeCatalogStateStore, extractRenderableToolMetadata(), OpenCodeMessageNormalizationMapper, OpenCodeToolContentAssembler, resolveOpenCodeToolKind(), resolveToolResultVisibility(), canonicalizeToolName(), createIdentity() (+7 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.06
-Nodes (1): ServerManager
+Nodes (72): add3(), applyEdgeBulge(), applyFilterLayerState(), bounds2(), buildBackdropFilterValue(), buildDisplacementTrace(), buildFallbackBackdropFilterValue(), buildHullEdges() (+64 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.05
@@ -256,8 +253,8 @@ Cohesion: 0.05
 Nodes (21): QuestionDockCoordinator, applyQuestionDockSelection(), getQuestionDockActiveInteractionState(), getQuestionDockDraftAnswers(), sanitizeQuestionDockAnswer(), selectQuestionDockGroup(), selectQuestionDockQuestion(), setQuestionDockDraftAnswer() (+13 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.05
-Nodes (16): findCatalogModel(), findCatalogProvider(), pickCatalogDefaultModel(), pickCatalogProviderDefaultModel(), pickCatalogProviderFirstModel(), pickFirstCatalogModel(), resolveModelSelection(), resolvePreferredAvailableModel() (+8 more)
+Cohesion: 0.06
+Nodes (8): extractStructuredErrorMessage(), getDebugTextPreview(), logAssistantFinalizationDebug(), OpenCodeStreamingRuntimeContext, OpenCodeStreamingRuntimeCoordinator, resolveReasoningDurationSeconds(), stringifyDebugPayload(), summarizeAssistantParts()
 
 ### Community 18 - "Community 18"
 Cohesion: 0.05
@@ -356,440 +353,426 @@ Cohesion: 0.12
 Nodes (1): SettingsSectionCoordinator
 
 ### Community 42 - "Community 42"
-Cohesion: 0.13
-Nodes (1): ChatSelectionControlsCoordinator
-
-### Community 43 - "Community 43"
 Cohesion: 0.11
 Nodes (1): TabManager
 
-### Community 44 - "Community 44"
+### Community 43 - "Community 43"
 Cohesion: 0.14
 Nodes (6): ConversationAuthoritativeReloadCoordinator, findLatestInterruptedNotice(), findLatestUserBeforeTimestamp(), isInterruptedNoticeMessage(), shouldBypassCanonicalSyncForInterruptedNotice(), shouldPreserveInterruptedNoticeOnSync()
 
-### Community 45 - "Community 45"
+### Community 44 - "Community 44"
 Cohesion: 0.11
 Nodes (16): buildFragmentWithLinks(), createWikilinkElement(), createWikilinkPattern(), extractLinkTarget(), fileExistsInVault(), findWikilinks(), processFileLinks(), processTextNode() (+8 more)
 
-### Community 46 - "Community 46"
+### Community 45 - "Community 45"
 Cohesion: 0.13
 Nodes (9): appendSdkErrorStatus(), describeSdkError(), extractSdkErrorMessage(), getSdkErrorRecordBaseMessage(), getSdkErrorRecordStatusCode(), getSdkErrorText(), normalizeSdkError(), OpenCodeSdkFacade (+1 more)
 
-### Community 47 - "Community 47"
+### Community 46 - "Community 46"
 Cohesion: 0.14
 Nodes (4): getActiveSecondaryTabId(), resolvePrimaryTabId(), resolveSecondaryTabId(), SettingsTabbedRenderer
 
-### Community 48 - "Community 48"
-Cohesion: 0.1
-Nodes (4): renderAssistantPlainTextFallbackContent(), AssistantShellViewHostAdapter, renderAssistantStructuredContent(), buildQuestionResolutionCardRenderPlan()
-
-### Community 49 - "Community 49"
+### Community 47 - "Community 47"
 Cohesion: 0.09
 Nodes (10): extractAssistantStructuredTextCopyContent(), resolveAssistantCopyContent(), buildErrorAssistantFooterPayload(), buildNoticeAssistantFooterPayload(), buildPersistedAssistantFooterPayload(), buildPseudoStreamAssistantFooterPayload(), resolvePersistedAssistantFooterStatusLabel(), AssistantFooterRenderer (+2 more)
 
-### Community 50 - "Community 50"
+### Community 48 - "Community 48"
 Cohesion: 0.16
 Nodes (4): RetainedSelectionHighlightService, ensureSelectionHighlightField(), hideSelectionHighlight(), showSelectionHighlight()
 
-### Community 51 - "Community 51"
+### Community 49 - "Community 49"
 Cohesion: 0.13
 Nodes (4): AgentCatalogService, SurfaceAgentBuilder, SystemAgentGuardService, isSystemAgentId()
 
-### Community 52 - "Community 52"
+### Community 50 - "Community 50"
 Cohesion: 0.17
 Nodes (6): normalizeDiffEntries(), normalizeMessageInfo(), normalizePart(), OpenCodeSyncEventRuntimeCoordinator, resolveSessionId(), resolveStringProperty()
 
-### Community 53 - "Community 53"
+### Community 51 - "Community 51"
 Cohesion: 0.13
 Nodes (1): SettingsStyleControls
 
-### Community 54 - "Community 54"
+### Community 52 - "Community 52"
 Cohesion: 0.15
 Nodes (2): ContextUsageService, getDefaultContextWindow()
 
-### Community 55 - "Community 55"
+### Community 53 - "Community 53"
 Cohesion: 0.15
 Nodes (1): SessionTodoCoordinator
 
-### Community 56 - "Community 56"
+### Community 54 - "Community 54"
 Cohesion: 0.21
 Nodes (1): ProviderIconCacheModal
 
-### Community 57 - "Community 57"
+### Community 55 - "Community 55"
 Cohesion: 0.14
 Nodes (2): cloneMessagesBeforeForkTarget(), ConversationLoadRecoveryCoordinator
 
-### Community 58 - "Community 58"
+### Community 56 - "Community 56"
+Cohesion: 0.15
+Nodes (1): BackgroundTaskTimelineService
+
+### Community 57 - "Community 57"
 Cohesion: 0.15
 Nodes (13): createBackgroundConversationPostSyncHandoffServices(), createBackgroundConversationPostSyncHandoffViewHostAdapter(), createPostSyncQuestionTodoRefreshHosts(), createPostSyncQuestionTodoRefreshServices(), createQuestionTodoBackgroundTaskActivationHosts(), createQuestionTodoBackgroundTaskActivationServices(), createQuestionTodoBackgroundTaskActivationViewHostAdapter(), createQuestionTodoBackgroundTaskRefreshServices() (+5 more)
 
-### Community 59 - "Community 59"
+### Community 58 - "Community 58"
 Cohesion: 0.22
 Nodes (4): cloneMessage(), clonePart(), cloneState(), OpenCodeSessionStateStore
 
-### Community 60 - "Community 60"
+### Community 59 - "Community 59"
 Cohesion: 0.12
 Nodes (1): OpenCodeSessionLifecycleCoordinator
 
-### Community 61 - "Community 61"
+### Community 60 - "Community 60"
 Cohesion: 0.16
 Nodes (3): ComposerContextPickerActionService, chooseContextFile(), ContextFilePickerModal
 
-### Community 62 - "Community 62"
+### Community 61 - "Community 61"
 Cohesion: 0.18
 Nodes (3): getLocale(), setLocale(), ContextDetailModal
 
-### Community 63 - "Community 63"
+### Community 62 - "Community 62"
 Cohesion: 0.24
 Nodes (1): PermissionModeSelectorCoordinator
 
-### Community 64 - "Community 64"
-Cohesion: 0.16
-Nodes (1): BackgroundTaskTimelineService
-
-### Community 65 - "Community 65"
+### Community 63 - "Community 63"
 Cohesion: 0.22
 Nodes (1): ThemeBackgroundStorage
 
-### Community 66 - "Community 66"
+### Community 64 - "Community 64"
 Cohesion: 0.23
 Nodes (1): TrailingAssistantPatchPlanningDelegate
 
-### Community 67 - "Community 67"
+### Community 65 - "Community 65"
 Cohesion: 0.22
 Nodes (1): ChatHeaderPresenter
 
-### Community 68 - "Community 68"
+### Community 66 - "Community 66"
 Cohesion: 0.28
 Nodes (1): ChildSessionGraphService
 
-### Community 69 - "Community 69"
-Cohesion: 0.17
-Nodes (5): normalizePermissionRequest(), normalizePermissionResponse(), normalizePermissionToolReference(), normalizeStringArray(), OpenCodeQuestionPermissionHub
-
-### Community 70 - "Community 70"
+### Community 67 - "Community 67"
 Cohesion: 0.26
 Nodes (1): TabBar
 
-### Community 71 - "Community 71"
+### Community 68 - "Community 68"
 Cohesion: 0.14
 Nodes (3): ComposerContextViewFacade, createComposerContextServices(), createFocusContextServices()
 
-### Community 72 - "Community 72"
+### Community 69 - "Community 69"
 Cohesion: 0.22
 Nodes (5): collectRuntimeSkillNames(), hasProjectCommand(), parsePrefixedSkillCommand(), parseSlashCommandInput(), SlashCommandExecutionService
 
-### Community 73 - "Community 73"
+### Community 70 - "Community 70"
 Cohesion: 0.2
 Nodes (1): InputPanelAppearanceCoordinator
 
-### Community 74 - "Community 74"
+### Community 71 - "Community 71"
 Cohesion: 0.14
 Nodes (2): ConversationSyncBridge, createConversationSyncBridgePorts()
 
-### Community 75 - "Community 75"
+### Community 72 - "Community 72"
 Cohesion: 0.3
 Nodes (4): ConversationTurnViewModelBuilder, getMessageParentId(), getRecordString(), isRecord()
 
-### Community 76 - "Community 76"
+### Community 73 - "Community 73"
 Cohesion: 0.29
 Nodes (1): OpenCodeEventSubscriptionCoordinator
 
-### Community 77 - "Community 77"
+### Community 74 - "Community 74"
 Cohesion: 0.25
 Nodes (2): EffortSelector, isAdaptiveThinkingModel()
 
-### Community 78 - "Community 78"
+### Community 75 - "Community 75"
 Cohesion: 0.24
 Nodes (1): ConversationAuthoritativeSyncCoordinator
 
-### Community 79 - "Community 79"
+### Community 76 - "Community 76"
 Cohesion: 0.26
 Nodes (1): ProjectConfigFileWatcher
 
-### Community 80 - "Community 80"
+### Community 77 - "Community 77"
+Cohesion: 0.24
+Nodes (1): ConversationSessionSettingsModal
+
+### Community 78 - "Community 78"
 Cohesion: 0.26
 Nodes (1): NavigationSidebar
 
-### Community 81 - "Community 81"
+### Community 79 - "Community 79"
+Cohesion: 0.28
+Nodes (1): QuestionInlineCardRenderer
+
+### Community 80 - "Community 80"
 Cohesion: 0.19
 Nodes (1): RetainedSelectionRuntimeCoordinator
 
-### Community 82 - "Community 82"
+### Community 81 - "Community 81"
 Cohesion: 0.27
 Nodes (3): formatDurationSeconds(), normalizeDurationSeconds(), ThinkingBlockRenderer
 
-### Community 83 - "Community 83"
+### Community 82 - "Community 82"
 Cohesion: 0.2
 Nodes (1): MarkdownAgentWorkspaceService
 
-### Community 84 - "Community 84"
+### Community 83 - "Community 83"
 Cohesion: 0.2
 Nodes (5): createSdkClient(), createSdkFetch(), normalizeDirectoryPath(), normalizeScopedHeaderValue(), rewriteScopedRequest()
 
-### Community 85 - "Community 85"
+### Community 84 - "Community 84"
 Cohesion: 0.2
 Nodes (6): buildModelOptionValue(), parseModelOptionValue(), scrollToCurrentModel(), selectHighlightedModel(), renderModelList(), bindModelSelectorStickyHeaders()
 
-### Community 86 - "Community 86"
+### Community 85 - "Community 85"
 Cohesion: 0.27
 Nodes (2): buildHiddenCommandCacheKey(), SlashCommandMenuCatalogCache
 
-### Community 87 - "Community 87"
+### Community 86 - "Community 86"
 Cohesion: 0.23
 Nodes (1): ConversationSyncOrchestrationService
 
-### Community 88 - "Community 88"
+### Community 87 - "Community 87"
 Cohesion: 0.24
 Nodes (2): BackgroundTaskLiveSignalCoordinator, createBackgroundTaskLiveSignalCoordinatorHost()
 
-### Community 89 - "Community 89"
+### Community 88 - "Community 88"
 Cohesion: 0.29
 Nodes (1): LocalSidecarProcessInspector
 
-### Community 90 - "Community 90"
+### Community 89 - "Community 89"
 Cohesion: 0.31
 Nodes (1): ConversationAuthoritativeMessageMergeCoordinator
 
-### Community 91 - "Community 91"
+### Community 90 - "Community 90"
 Cohesion: 0.33
 Nodes (1): ContextFileCatalogService
 
-### Community 92 - "Community 92"
+### Community 91 - "Community 91"
 Cohesion: 0.36
 Nodes (1): BackgroundTaskNoticeStateService
 
-### Community 93 - "Community 93"
-Cohesion: 0.42
-Nodes (1): BackgroundTaskCompletionNoticeService
-
-### Community 94 - "Community 94"
+### Community 92 - "Community 92"
 Cohesion: 0.44
 Nodes (8): formatMcpSummaryField(), getFirstScalarMcpFallback(), getMcpSummaryFromFields(), getMcpToolSummary(), getPathTail(), resolveMcpSummaryCategory(), tokenizeMcpToolName(), truncateMcpSummaryText()
 
-### Community 95 - "Community 95"
+### Community 93 - "Community 93"
 Cohesion: 0.39
 Nodes (1): ServerSettingHelpModal
 
-### Community 96 - "Community 96"
+### Community 94 - "Community 94"
 Cohesion: 0.39
 Nodes (1): ConversationCompactionHelpModal
 
-### Community 97 - "Community 97"
+### Community 95 - "Community 95"
 Cohesion: 0.32
 Nodes (1): TabConversationActivationBridge
 
-### Community 98 - "Community 98"
+### Community 96 - "Community 96"
 Cohesion: 0.32
 Nodes (1): AssistantShellRenderer
 
-### Community 99 - "Community 99"
+### Community 97 - "Community 97"
 Cohesion: 0.25
 Nodes (1): PendingIndicatorController
 
-### Community 100 - "Community 100"
+### Community 98 - "Community 98"
 Cohesion: 0.25
 Nodes (1): ConversationTransitionBridge
 
-### Community 101 - "Community 101"
+### Community 99 - "Community 99"
 Cohesion: 0.29
 Nodes (2): syncUserMessageStreamingActionState(), TabRuntimeStateBridge
 
-### Community 102 - "Community 102"
+### Community 100 - "Community 100"
 Cohesion: 0.36
 Nodes (1): BackgroundTaskStreamTriggerCoordinator
 
-### Community 103 - "Community 103"
+### Community 101 - "Community 101"
 Cohesion: 0.29
 Nodes (1): ConversationSessionSignalRuntime
 
-### Community 104 - "Community 104"
-Cohesion: 0.32
-Nodes (1): BackgroundTaskTimelineLaunchService
-
-### Community 105 - "Community 105"
+### Community 102 - "Community 102"
 Cohesion: 0.32
 Nodes (1): QuestionDockSlotCoordinator
 
-### Community 106 - "Community 106"
+### Community 103 - "Community 103"
 Cohesion: 0.32
 Nodes (1): SessionTodoDockCoordinator
 
-### Community 107 - "Community 107"
+### Community 104 - "Community 104"
 Cohesion: 0.32
 Nodes (1): ConversationTabLifecycleRecoveryCoordinator
 
-### Community 108 - "Community 108"
+### Community 105 - "Community 105"
 Cohesion: 0.33
 Nodes (1): TabConversationStateBridge
 
-### Community 109 - "Community 109"
+### Community 106 - "Community 106"
+Cohesion: 0.43
+Nodes (1): UserMessageFooterRenderer
+
+### Community 107 - "Community 107"
 Cohesion: 0.29
 Nodes (1): ComposerContextViewHostAdapter
 
-### Community 110 - "Community 110"
+### Community 108 - "Community 108"
 Cohesion: 0.38
 Nodes (1): PostSyncQuestionTodoRefreshPlanBuilder
 
-### Community 111 - "Community 111"
+### Community 109 - "Community 109"
 Cohesion: 0.29
 Nodes (1): BackgroundTaskActivationIndicatorCoordinator
 
-### Community 112 - "Community 112"
+### Community 110 - "Community 110"
 Cohesion: 0.33
 Nodes (1): ForkTargetModal
 
-### Community 113 - "Community 113"
+### Community 111 - "Community 111"
 Cohesion: 0.4
 Nodes (1): BackgroundTaskInlinePanelRenderer
 
-### Community 114 - "Community 114"
+### Community 112 - "Community 112"
 Cohesion: 0.47
 Nodes (1): BackgroundTaskIndicatorCoordinator
 
-### Community 115 - "Community 115"
+### Community 113 - "Community 113"
 Cohesion: 0.47
 Nodes (1): ComposerContextActionService
 
-### Community 116 - "Community 116"
+### Community 114 - "Community 114"
 Cohesion: 0.47
 Nodes (1): ConversationSyncRuntimeCoordinator
 
-### Community 117 - "Community 117"
+### Community 115 - "Community 115"
 Cohesion: 0.4
 Nodes (1): FocusContextPreviewCoordinator
 
-### Community 118 - "Community 118"
+### Community 116 - "Community 116"
 Cohesion: 0.33
 Nodes (1): QuestionTodoActivationRefreshCoordinator
 
-### Community 119 - "Community 119"
+### Community 117 - "Community 117"
 Cohesion: 0.47
 Nodes (1): BackgroundConversationAttentionCoordinator
 
-### Community 120 - "Community 120"
+### Community 118 - "Community 118"
 Cohesion: 0.4
 Nodes (1): QuestionTodoStatusRefreshCoordinator
 
-### Community 121 - "Community 121"
+### Community 119 - "Community 119"
 Cohesion: 0.4
 Nodes (1): FocusContextMarkdownViewLocator
 
-### Community 122 - "Community 122"
+### Community 120 - "Community 120"
 Cohesion: 0.47
 Nodes (1): BackgroundConversationPostSyncRefreshExecutor
 
-### Community 123 - "Community 123"
+### Community 121 - "Community 121"
 Cohesion: 0.33
 Nodes (1): ChildSessionGraphCoordinator
 
-### Community 124 - "Community 124"
+### Community 122 - "Community 122"
 Cohesion: 0.6
 Nodes (1): AgentInvocationService
 
-### Community 125 - "Community 125"
-Cohesion: 0.5
-Nodes (1): QuestionResolutionCoordinator
-
-### Community 126 - "Community 126"
+### Community 123 - "Community 123"
 Cohesion: 0.5
 Nodes (1): SendPipelineRuntime
 
-### Community 127 - "Community 127"
+### Community 124 - "Community 124"
 Cohesion: 0.5
 Nodes (1): StreamingInlineCardRenderer
 
-### Community 128 - "Community 128"
+### Community 125 - "Community 125"
 Cohesion: 0.4
 Nodes (1): ConversationLoadRuntimeBridge
 
-### Community 129 - "Community 129"
+### Community 126 - "Community 126"
 Cohesion: 0.4
 Nodes (1): ContextPickerInteractionBridge
 
-### Community 130 - "Community 130"
+### Community 127 - "Community 127"
 Cohesion: 0.4
 Nodes (1): ConversationSyncBackgroundPostSyncRouter
 
-### Community 131 - "Community 131"
+### Community 128 - "Community 128"
 Cohesion: 0.4
 Nodes (1): ContextFileCatalogEventBridge
 
-### Community 132 - "Community 132"
+### Community 129 - "Community 129"
 Cohesion: 0.4
 Nodes (1): BackgroundConversationPostSyncHandoffCoordinator
 
-### Community 133 - "Community 133"
+### Community 130 - "Community 130"
 Cohesion: 0.5
 Nodes (1): ComposerContextCoordinator
 
-### Community 134 - "Community 134"
+### Community 131 - "Community 131"
 Cohesion: 0.5
 Nodes (1): QuestionDockRenderStateFacade
 
-### Community 135 - "Community 135"
+### Community 132 - "Community 132"
 Cohesion: 0.4
 Nodes (1): FocusContextViewHostAdapter
 
-### Community 136 - "Community 136"
+### Community 133 - "Community 133"
 Cohesion: 0.5
 Nodes (1): QuestionPostResolutionRuntimeFacade
 
-### Community 137 - "Community 137"
+### Community 134 - "Community 134"
 Cohesion: 0.5
 Nodes (1): ConversationSessionTabResolver
 
-### Community 138 - "Community 138"
+### Community 135 - "Community 135"
 Cohesion: 0.4
 Nodes (1): PersistentAssistantNoticeService
 
-### Community 139 - "Community 139"
+### Community 136 - "Community 136"
 Cohesion: 0.4
 Nodes (1): FocusContextEventBridge
 
-### Community 140 - "Community 140"
+### Community 137 - "Community 137"
 Cohesion: 0.4
 Nodes (1): ContextFileCatalogBuildRunner
 
-### Community 141 - "Community 141"
+### Community 138 - "Community 138"
 Cohesion: 0.4
 Nodes (1): ComposerContextEventBridge
 
-### Community 142 - "Community 142"
+### Community 139 - "Community 139"
 Cohesion: 0.5
 Nodes (1): ConversationHydrationOutcomeBridge
 
-### Community 143 - "Community 143"
+### Community 140 - "Community 140"
 Cohesion: 0.5
 Nodes (1): AssistantErrorRenderer
 
-### Community 144 - "Community 144"
+### Community 141 - "Community 141"
 Cohesion: 0.5
 Nodes (1): QuestionResolutionFlowCoordinator
 
-### Community 145 - "Community 145"
+### Community 142 - "Community 142"
 Cohesion: 0.5
 Nodes (1): VisibleConversationPostSyncCoordinator
 
-### Community 146 - "Community 146"
+### Community 143 - "Community 143"
 Cohesion: 0.5
 Nodes (1): ConversationSyncVisiblePostSyncRouter
 
-### Community 147 - "Community 147"
+### Community 144 - "Community 144"
 Cohesion: 0.5
 Nodes (1): BackgroundConversationSignalSyncStateCoordinator
 
-### Community 148 - "Community 148"
+### Community 145 - "Community 145"
 Cohesion: 0.5
 Nodes (1): PostSyncQuestionTodoRefreshFacade
 
-### Community 149 - "Community 149"
+### Community 146 - "Community 146"
 Cohesion: 0.5
 Nodes (1): VisibleConversationPostSyncStateCoordinator
 
 ## Knowledge Gaps
-- **Thin community `Community 14`** (74 nodes): `ServerManager.ts`, `ServerManager`, `.attachLaunchTracking()`, `.buildConflictMessage()`, `.buildHealthyLocalConflictDiagnostics()`, `.buildLaunchFailureError()`, `.buildOrphanRestartDiagnostics()`, `.canBindLocalEndpoint()`, `.checkHealth()`, `.cleanup()`, `.clearLaunchState()`, `.clearManagedServerState()`, `.collectManagedPidCandidates()`, `.constructor()`, `.createCurrentManagedShutdownPlan()`, `.createLaunchOutputHandler()`, `.dispose()`, `.doStart()`, `.findOpenCodeBinary()`, `.formatLaunchOutputTail()`, `.getActiveLaunchSnapshot()`, `.getAdoptableManagedServerState()`, `.getAuthHeaders()`, `.getConfigFingerprint()`, `.getCurrentPluginManagedListenerPid()`, `.getCurrentPluginManagedListenerPidSync()`, `.getLaunchExitSuffix()`, `.getManagedConfigDir()`, `.getManagedLauncherPid()`, `.getManagedListenerPid()`, `.getManagedServerStateSnapshot()`, `.getRelevantConfigPaths()`, `.getServerDiagnosticsSnapshot()`, `.getSpawnEnv()`, `.getStatus()`, `.handleHealthyOccupiedLocalEndpoint()`, `.inspectExistingHealthyServer()`, `.isDefaultManagedLocalEndpoint()`, `.isLegacyManagedServerState()`, `.isPortAvailable()`, `.isRunning()`, `.killWindowsProcessTree()`, `.killWindowsProcessTreeSync()`, `.launchLocalServerRuntime()`, `.looksLikeOpenCodeServeCommand()`, `.looksLikePluginManagedSidecarCommand()`, `.matchesManagedServerSignature()`, `.normalizeManagedWorkingDirectory()`, `.pushLaunchOutput()`, `.recycleUnknownLocalServer()`, `.refreshManagedListenerPid()`, `.resolveExecutableCandidate()`, `.resolveOccupiedHealthyLocalEndpoint()`, `.restart()`, `.restartManagedServer()`, `.runManagedShutdownLifecycle()`, `.runManagedShutdownLifecycleSync()`, `.setDiagnostics()`, `.setManagedServerState()`, `.setStatus()`, `.setWorkingDirectory()`, `.shouldRecycleUnknownLocalServer()`, `.shouldSpawnViaShell()`, `.spawnServer()`, `.start()`, `.stop()`, `.terminateManagedPid()`, `.terminateManagedPidSync()`, `.terminateManagedProcess()`, `.throwIfLaunchFailed()`, `.tryAdoptManagedServer()`, `.updateConfig()`, `.waitForHealthy()`, `.waitForPortAvailability()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 23`** (56 nodes): `SettingsModelCatalogPresenter.ts`, `SettingsModelCatalogPresenter`, `.captureOuterScrollHostSnapshot()`, `.captureProviderListScrollPosition()`, `.constructor()`, `.createActionButton()`, `.createCatalogRenderContext()`, `.createProviderList()`, `.createProviderRenderState()`, `.describeModelAvailabilitySummary()`, `.describeProviderAvailabilityProbe()`, `.describeProviderModels()`, `.findOuterScrollHost()`, `.getCatalogModelCount()`, `.getCatalogPlaceholderReason()`, `.getCatalogTabTitle()`, `.getDisplayCatalogForMode()`, `.getModelToggleLabel()`, `.getProviderAvailabilityProbeBadge()`, `.getProviderAvailabilityStatusClass()`, `.getProviderAvailabilityStatusLabel()`, `.getProviderPrimaryDisabledReason()`, `.getProviderServerConstraintBadge()`, `.getProviderStatusCatalogForMode()`, `.getProviderToggleLabel()`, `.handleModelToggleChange()`, `.handleProviderToggleChange()`, `.isProviderCurrentlyEnabled()`, `.isProviderDisabledByScope()`, `.render()`, `.renderAvailabilityControls()`, `.renderAvailabilityFilterToggle()`, `.renderCatalogActions()`, `.renderCatalogOverview()`, `.renderModelCatalogSummaryCards()`, `.renderModelToggleBlock()`, `.renderProviderAccordion()`, `.renderProviderActions()`, `.renderProviderBadges()`, `.renderProviderEmptyModels()`, `.renderProviderExpandButton()`, `.renderProviderList()`, `.renderProviderModelBulkToolbar()`, `.renderProviderModelRow()`, `.renderProviderModels()`, `.renderProviderToggle()`, `.rerender()`, `.restoreAvailabilitySearchSelection()`, `.restoreOuterScrollHostPosition()`, `.restoreProviderListScrollPosition()`, `.runPairedButtonAction()`, `.runProviderAvailabilityCheck()`, `.setPreferredCatalogTab()`, `.shouldUseFilteredModels()`, `.toggleProviderExpanded()`, `.updateAvailabilityFilter()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 24`** (51 nodes): `OpenCodeCatalogQueryCoordinator.ts`, `OpenCodeCatalogQueryCoordinator`, `.addMcpServer()`, `.authenticateMcp()`, `.authorizeProviderOAuth()`, `.buildOpenCodeToolIdentityContext()`, `.clearToolSchemaCacheIfScopeChanged()`, `.completeMcpAuth()`, `.completeProviderOAuth()`, `.connectMcpServer()`, `.constructor()`, `.disconnectMcpServer()`, `.findFiles()`, `.findSymbols()`, `.findText()`, `.getAvailableModels()`, `.getCurrentProject()`, `.getFileStatus()`, `.getFormatterStatus()`, `.getLspStatus()`, `.getPaths()`, `.getProviderAuthMethods()`, `.getProviderDirectory()`, `.getResolvedModelConfig()`, `.getToolCatalogScopeKey()`, `.getToolCatalogSnapshot()`, `.getToolSchemaCacheKey()`, `.getVcsDiff()`, `.getVcsInfo()`, `.initializeProjectGit()`, `.listFiles()`, `.listProjects()`, `.listTools()`, `.logCatalogRequest()`, `.logProviderCatalogResponse()`, `.logResolvedModelConfigResponse()`, `.normalizeAvailableModels()`, `.normalizeDebugReason()`, `.normalizeProviderDefaults()`, `.normalizeProviderDirectory()`, `.normalizeResolvedModelConfigData()`, `.normalizeSingleMcpServerStatus()`, `.normalizeToolCatalogEntries()`, `.observeRuntimeToolNames()`, `.readFile()`, `.refreshMcpServerStatus()`, `.refreshToolIds()`, `.removeMcpAuth()`, `.startMcpAuth()`, `.storeMcpServerStatus()`, `.updateProject()`
@@ -806,190 +789,188 @@ Nodes (1): VisibleConversationPostSyncStateCoordinator
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 41`** (31 nodes): `SettingsSectionCoordinator.ts`, `SettingsSectionCoordinator`, `.beginDisplay()`, `.bindQuickNavTooltipWindowListeners()`, `.bindSettingsPanelScrollPersistence()`, `.buildQuickNav()`, `.captureSettingsPanelScrollPosition()`, `.clearInitialQuickNavFocus()`, `.clearSettingsPanelRestoreWork()`, `.constructor()`, `.createSectionHeading()`, `.destroyQuickNavTooltipLayer()`, `.ensureQuickNavTooltipLayer()`, `.finishDisplay()`, `.finishPendingOpenVisibility()`, `.getSettingsScrollContainer()`, `.hide()`, `.hideQuickNavTooltip()`, `.looksLikeSettingsScrollContainer()`, `.positionQuickNavTooltip()`, `.prepareRestoreScrollOnNextOpen()`, `.prepareScrollToSectionOnNextOpen()`, `.resolveHeadingScrollTop()`, `.resolveQuickNavStickyOffset()`, `.restoreScrollPosition()`, `.scheduleSettingsPanelPostRenderSetup()`, `.scrollHeadingIntoView()`, `.scrollToSectionByTitle()`, `.showQuickNavTooltip()`, `.teardownScrollPersistence()`, `.unbindQuickNavTooltipWindowListeners()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 42`** (31 nodes): `ChatSelectionControlsCoordinator.ts`, `ChatSelectionControlsCoordinator`, `.applyLocaleTexts()`, `.build()`, `.buildModelDropdown()`, `.closeModelDropdown()`, `.constructor()`, `.destroy()`, `.ensureSelectedModelAvailable()`, `.findKnownModelInfo()`, `.formatModelId()`, `.getAvailableProviders()`, `.getCurrentSessionModel()`, `.getCurrentSessionModelResolution()`, `.getModelUnavailableNoticeContent()`, `.hasLoadedModelCatalog()`, `.highlightModelOption()`, `.mountModelSelector()`, `.navigateModelList()`, `.openModelDropdown()`, `.refreshModelOptions()`, `.registerEscapeHandler()`, `.reloadModelCatalog()`, `.renderModelList()`, `.scrollToCurrentModel()`, `.selectHighlightedModel()`, `.selectModel()`, `.toggleModelDropdown()`, `.updateModelSelectorDisplay()`, `.updateModelSelectorIcon()`, `.updatePermissionTriggerDisplay()`
+- **Thin community `Community 42`** (29 nodes): `TabManager.ts`, `TabManager`, `.canCreateTab()`, `.closeTab()`, `.closeTabs()`, `.constructor()`, `.createTab()`, `.getActiveTab()`, `.getActiveTabContextUsage()`, `.getActiveTabModelOverride()`, `.getAllTabs()`, `.getTab()`, `.getTabBarItems()`, `.getTabContextUsage()`, `.getTabCount()`, `.notifyChanged()`, `.restoreTabs()`, `.setActiveTabBackgroundTaskRunning()`, `.setActiveTabContextUsage()`, `.setActiveTabConversation()`, `.setActiveTabModelOverride()`, `.setActiveTabStreaming()`, `.setActiveTabTitle()`, `.setTabBackgroundTaskRunning()`, `.setTabContextUsage()`, `.setTabNeedsAttention()`, `.setTabStreaming()`, `.switchToTab()`, `.syncConversationTitle()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 43`** (29 nodes): `TabManager.ts`, `TabManager`, `.canCreateTab()`, `.closeTab()`, `.closeTabs()`, `.constructor()`, `.createTab()`, `.getActiveTab()`, `.getActiveTabContextUsage()`, `.getActiveTabModelOverride()`, `.getAllTabs()`, `.getTab()`, `.getTabBarItems()`, `.getTabContextUsage()`, `.getTabCount()`, `.notifyChanged()`, `.restoreTabs()`, `.setActiveTabBackgroundTaskRunning()`, `.setActiveTabContextUsage()`, `.setActiveTabConversation()`, `.setActiveTabModelOverride()`, `.setActiveTabStreaming()`, `.setActiveTabTitle()`, `.setTabBackgroundTaskRunning()`, `.setTabContextUsage()`, `.setTabNeedsAttention()`, `.setTabStreaming()`, `.switchToTab()`, `.syncConversationTitle()`
+- **Thin community `Community 51`** (23 nodes): `settingsStyleControls.ts`, `SettingsStyleControls`, `.addColorStyleControl()`, `.addNumericControl()`, `.addNumericStyleControl()`, `.clampNumericControlValue()`, `.clampStyleNumber()`, `.clearStyleControlBindings()`, `.commitColorStyleControlValue()`, `.constructor()`, `.createStyleResetSetting()`, `.dispose()`, `.formatNumericControlValue()`, `.getNumericControlInputChars()`, `.getNumericControlPrecision()`, `.isStableNumericControlDraft()`, `.openStyleColorPicker()`, `.parseCssColorToHex()`, `.refreshStyleControlValues()`, `.registerStyleControlBinding()`, `.renderColorStyleControlValue()`, `.resolveCssColorToHex()`, `.resolveStyleColorPickerHex()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 53`** (23 nodes): `settingsStyleControls.ts`, `SettingsStyleControls`, `.addColorStyleControl()`, `.addNumericControl()`, `.addNumericStyleControl()`, `.clampNumericControlValue()`, `.clampStyleNumber()`, `.clearStyleControlBindings()`, `.commitColorStyleControlValue()`, `.constructor()`, `.createStyleResetSetting()`, `.dispose()`, `.formatNumericControlValue()`, `.getNumericControlInputChars()`, `.getNumericControlPrecision()`, `.isStableNumericControlDraft()`, `.openStyleColorPicker()`, `.parseCssColorToHex()`, `.refreshStyleControlValues()`, `.registerStyleControlBinding()`, `.renderColorStyleControlValue()`, `.resolveCssColorToHex()`, `.resolveStyleColorPickerHex()`
+- **Thin community `Community 52`** (23 nodes): `models.ts`, `ContextUsageService.ts`, `ContextUsageService`, `.applyPreciseUsage()`, `.applyUsageChunk()`, `.applyUsageSnapshot()`, `.beginStream()`, `.buildPreciseTokens()`, `.calculatePercentage()`, `.cloneState()`, `.completeStream()`, `.createState()`, `.finalizeState()`, `.formatCurrency()`, `.formatNumber()`, `.formatPercent()`, `.getContextBreakdown()`, `.getDisplayTokenBreakdown()`, `.getTotalTokens()`, `.resolveContextWindow()`, `.summarize()`, `.syncStateIdentity()`, `getDefaultContextWindow()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 54`** (23 nodes): `models.ts`, `ContextUsageService.ts`, `ContextUsageService`, `.applyPreciseUsage()`, `.applyUsageChunk()`, `.applyUsageSnapshot()`, `.beginStream()`, `.buildPreciseTokens()`, `.calculatePercentage()`, `.cloneState()`, `.completeStream()`, `.createState()`, `.finalizeState()`, `.formatCurrency()`, `.formatNumber()`, `.formatPercent()`, `.getContextBreakdown()`, `.getDisplayTokenBreakdown()`, `.getTotalTokens()`, `.resolveContextWindow()`, `.summarize()`, `.syncStateIdentity()`, `getDefaultContextWindow()`
+- **Thin community `Community 53`** (21 nodes): `SessionTodoCoordinator.ts`, `SessionTodoCoordinator`, `.applySessionStatusUpdate()`, `.applySessionTodoUpdate()`, `.applyStreamingTodoSnapshotFromTool()`, `.attach()`, `.clearTabSessionState()`, `.constructor()`, `.destroy()`, `.getTabSessionStatus()`, `.getTabSessionTodos()`, `.hasIncompleteTabSessionTodos()`, `.hasIncompleteTodos()`, `.reconcileStaleSessionTodoState()`, `.refreshTabSessionStatus()`, `.refreshTabSessionTodos()`, `.render()`, `.resetTabSessionState()`, `.updateForTab()`, `.writeSessionStatus()`, `.writeSessionTodos()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 55`** (21 nodes): `SessionTodoCoordinator.ts`, `SessionTodoCoordinator`, `.applySessionStatusUpdate()`, `.applySessionTodoUpdate()`, `.applyStreamingTodoSnapshotFromTool()`, `.attach()`, `.clearTabSessionState()`, `.constructor()`, `.destroy()`, `.getTabSessionStatus()`, `.getTabSessionTodos()`, `.hasIncompleteTabSessionTodos()`, `.hasIncompleteTodos()`, `.reconcileStaleSessionTodoState()`, `.refreshTabSessionStatus()`, `.refreshTabSessionTodos()`, `.render()`, `.resetTabSessionState()`, `.updateForTab()`, `.writeSessionStatus()`, `.writeSessionTodos()`
+- **Thin community `Community 54`** (20 nodes): `ProviderIconCacheModal.ts`, `ProviderIconCacheModal`, `.addCustomSource()`, `.captureScrollRestoreState()`, `.constructor()`, `.getEditableEntries()`, `.getElementOffsetWithinContainer()`, `.getQuickJumpScrollMargin()`, `.getScrollContainer()`, `.moveEntryToFront()`, `.onClose()`, `.onOpen()`, `.openBuiltinPicker()`, `.persistLibrary()`, `.removeCustomEntry()`, `.render()`, `.renderProviderSection()`, `.reorderProviderEntries()`, `.restoreScrollPosition()`, `.scrollToProviderSection()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 56`** (20 nodes): `ProviderIconCacheModal.ts`, `ProviderIconCacheModal`, `.addCustomSource()`, `.captureScrollRestoreState()`, `.constructor()`, `.getEditableEntries()`, `.getElementOffsetWithinContainer()`, `.getQuickJumpScrollMargin()`, `.getScrollContainer()`, `.moveEntryToFront()`, `.onClose()`, `.onOpen()`, `.openBuiltinPicker()`, `.persistLibrary()`, `.removeCustomEntry()`, `.render()`, `.renderProviderSection()`, `.reorderProviderEntries()`, `.restoreScrollPosition()`, `.scrollToProviderSection()`
+- **Thin community `Community 55`** (20 nodes): `cloneMessagesBeforeForkTarget()`, `forkMessages.ts`, `ConversationLoadRecoveryCoordinator.ts`, `ConversationLoadRecoveryCoordinator`, `.activateTab()`, `.buildForkTitle()`, `.constructor()`, `.createConversationInCurrentTab()`, `.createConversationInNewTab()`, `.createForkConversation()`, `.deleteAllConversationsAndReset()`, `.deleteConversationsAndRecover()`, `.handleForkRequest()`, `.handleRestoreRewindRequest()`, `.handleRewindRequest()`, `.initializeFirstTab()`, `.loadConversation()`, `.openForkInCurrentTab()`, `.openForkInNewTab()`, `.restorePersistedTabs()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 57`** (20 nodes): `cloneMessagesBeforeForkTarget()`, `forkMessages.ts`, `ConversationLoadRecoveryCoordinator.ts`, `ConversationLoadRecoveryCoordinator`, `.activateTab()`, `.buildForkTitle()`, `.constructor()`, `.createConversationInCurrentTab()`, `.createConversationInNewTab()`, `.createForkConversation()`, `.deleteAllConversationsAndReset()`, `.deleteConversationsAndRecover()`, `.handleForkRequest()`, `.handleRestoreRewindRequest()`, `.handleRewindRequest()`, `.initializeFirstTab()`, `.loadConversation()`, `.openForkInCurrentTab()`, `.openForkInNewTab()`, `.restorePersistedTabs()`
+- **Thin community `Community 56`** (20 nodes): `BackgroundTaskTimelineService.ts`, `BackgroundTaskTimelineService`, `.armIndicatorForUserMessage()`, `.buildTasksMarkdown()`, `.collectDiagnostics()`, `.collectInlineSegments()`, `.collectSegments()`, `.constructor()`, `.getInlineCopy()`, `.getLaunchDisplayId()`, `.getLogPreview()`, `.getPendingLaunches()`, `.logOmoBackgroundTaskDiagnostics()`, `.resetIndicatorState()`, `.resetRuntimeState()`, `.shouldRenderInlineSegment()`, `.shouldRenderPreparingInlineSegment()`, `.stringifyLogPayload()`, `.syncStateFromConversation()`, `.upsertLaunch()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (17 nodes): `OpenCodeSessionLifecycleCoordinator.ts`, `OpenCodeSessionLifecycleCoordinator`, `.abortSession()`, `.constructor()`, `.createSession()`, `.deleteSession()`, `.getSessionId()`, `.getSessionInfo()`, `.getSessionMessages()`, `.getSessionStatuses()`, `.getSessionTodos()`, `.listSessions()`, `.setSessionId()`, `.subscribeToSessionStatusUpdates()`, `.subscribeToSessionSyncEvents()`, `.subscribeToSessionTodoUpdates()`, `.updateSessionTitle()`
+- **Thin community `Community 59`** (17 nodes): `OpenCodeSessionLifecycleCoordinator.ts`, `OpenCodeSessionLifecycleCoordinator`, `.abortSession()`, `.constructor()`, `.createSession()`, `.deleteSession()`, `.getSessionId()`, `.getSessionInfo()`, `.getSessionMessages()`, `.getSessionStatuses()`, `.getSessionTodos()`, `.listSessions()`, `.setSessionId()`, `.subscribeToSessionStatusUpdates()`, `.subscribeToSessionSyncEvents()`, `.subscribeToSessionTodoUpdates()`, `.updateSessionTitle()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 63`** (17 nodes): `PermissionModeSelectorCoordinator.ts`, `PermissionModeSelectorCoordinator`, `.applyLocaleTexts()`, `.applyTriggerDisplay()`, `.buildDropdown()`, `.closeDropdown()`, `.constructor()`, `.destroy()`, `.getPermissionModeOptions()`, `.getTriggerDisplayState()`, `.isOpen()`, `.mount()`, `.openDropdown()`, `.selectPermissionMode()`, `.toggleDropdown()`, `.updateDropdownSelection()`, `.updateTriggerDisplay()`
+- **Thin community `Community 62`** (17 nodes): `PermissionModeSelectorCoordinator.ts`, `PermissionModeSelectorCoordinator`, `.applyLocaleTexts()`, `.applyTriggerDisplay()`, `.buildDropdown()`, `.closeDropdown()`, `.constructor()`, `.destroy()`, `.getPermissionModeOptions()`, `.getTriggerDisplayState()`, `.isOpen()`, `.mount()`, `.openDropdown()`, `.selectPermissionMode()`, `.toggleDropdown()`, `.updateDropdownSelection()`, `.updateTriggerDisplay()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 64`** (17 nodes): `BackgroundTaskTimelineService.ts`, `BackgroundTaskTimelineService`, `.armIndicatorForUserMessage()`, `.buildTasksMarkdown()`, `.collectDiagnostics()`, `.collectInlineSegments()`, `.collectSegments()`, `.constructor()`, `.getInlineCopy()`, `.getLaunchDisplayId()`, `.getPendingLaunches()`, `.resetIndicatorState()`, `.resetRuntimeState()`, `.shouldRenderInlineSegment()`, `.shouldRenderPreparingInlineSegment()`, `.syncStateFromConversation()`, `.upsertLaunch()`
+- **Thin community `Community 63`** (16 nodes): `ThemeBackgroundStorage.ts`, `ThemeBackgroundStorage`, `.assertByteLength()`, `.constructor()`, `.detectBinaryMimeType()`, `.detectMimeType()`, `.detectMimeTypeFromExtension()`, `.detectSvgMimeType()`, `.ensureDir()`, `.initialize()`, `.matchesSignature()`, `.normalizeMimeHint()`, `.readDataUrl()`, `.remove()`, `.saveAsset()`, `.throwUnsupportedMimeType()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (16 nodes): `ThemeBackgroundStorage.ts`, `ThemeBackgroundStorage`, `.assertByteLength()`, `.constructor()`, `.detectBinaryMimeType()`, `.detectMimeType()`, `.detectMimeTypeFromExtension()`, `.detectSvgMimeType()`, `.ensureDir()`, `.initialize()`, `.matchesSignature()`, `.normalizeMimeHint()`, `.readDataUrl()`, `.remove()`, `.saveAsset()`, `.throwUnsupportedMimeType()`
+- **Thin community `Community 64`** (16 nodes): `ConversationTrailingAssistantPatchPlanner.ts`, `TrailingAssistantPatchPlanningDelegate`, `.buildDomTarget()`, `.buildNonMergeableTailFailurePlan()`, `.buildPlanningContext()`, `.buildTargetFailureResult()`, `.buildTargetSuccessResult()`, `.constructor()`, `.findExistingTrailingAssistantElement()`, `.isPatchableAssistantTail()`, `.resolveActiveContainer()`, `.resolveNonTailSignatureMismatch()`, `.resolvePatchTargets()`, `.resolvePreflight()`, `.resolveRenderedMessages()`, `.resolveTailMessages()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (16 nodes): `ConversationTrailingAssistantPatchPlanner.ts`, `TrailingAssistantPatchPlanningDelegate`, `.buildDomTarget()`, `.buildNonMergeableTailFailurePlan()`, `.buildPlanningContext()`, `.buildTargetFailureResult()`, `.buildTargetSuccessResult()`, `.constructor()`, `.findExistingTrailingAssistantElement()`, `.isPatchableAssistantTail()`, `.resolveActiveContainer()`, `.resolveNonTailSignatureMismatch()`, `.resolvePatchTargets()`, `.resolvePreflight()`, `.resolveRenderedMessages()`, `.resolveTailMessages()`
+- **Thin community `Community 65`** (16 nodes): `ChatHeaderPresenter.ts`, `ChatHeaderPresenter`, `.applyLocaleTexts()`, `.build()`, `.buildActionButton()`, `.buildStatusBadge()`, `.constructor()`, `.destroy()`, `.getLogoSvg()`, `.getServerStatusLabel()`, `.getTabBarSlotEl()`, `.getTitleWordmarkSrc()`, `.refreshServerStatusBadge()`, `.startServerStatusLoop()`, `.stopServerStatusLoop()`, `.syncThemeAssets()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 67`** (16 nodes): `ChatHeaderPresenter.ts`, `ChatHeaderPresenter`, `.applyLocaleTexts()`, `.build()`, `.buildActionButton()`, `.buildStatusBadge()`, `.constructor()`, `.destroy()`, `.getLogoSvg()`, `.getServerStatusLabel()`, `.getTabBarSlotEl()`, `.getTitleWordmarkSrc()`, `.refreshServerStatusBadge()`, `.startServerStatusLoop()`, `.stopServerStatusLoop()`, `.syncThemeAssets()`
+- **Thin community `Community 66`** (15 nodes): `ChildSessionGraphService`, `.buildEdge()`, `.canonicalizeToolName()`, `.computeGraphStatus()`, `.deduplicateEdges()`, `.enrichEdgesWithChildSessions()`, `.extractSessionId()`, `.findOrphanedSessions()`, `.isTaskToolBlock()`, `.isTaskToolCall()`, `.reconstructGraph()`, `.resolveEdgeStatus()`, `.tryBuildEdgeFromBlock()`, `.tryBuildEdgeFromToolCall()`, `ChildSessionGraphService.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (15 nodes): `ChildSessionGraphService`, `.buildEdge()`, `.canonicalizeToolName()`, `.computeGraphStatus()`, `.deduplicateEdges()`, `.enrichEdgesWithChildSessions()`, `.extractSessionId()`, `.findOrphanedSessions()`, `.isTaskToolBlock()`, `.isTaskToolCall()`, `.reconstructGraph()`, `.resolveEdgeStatus()`, `.tryBuildEdgeFromBlock()`, `.tryBuildEdgeFromToolCall()`, `ChildSessionGraphService.ts`
+- **Thin community `Community 67`** (15 nodes): `TabBar.ts`, `TabBar`, `.attachTooltipLabel()`, `.closeOverflowMenu()`, `.constructor()`, `.destroy()`, `.getMaxVisibleTabs()`, `.openOverflowMenu()`, `.partitionItems()`, `.positionOverflowMenu()`, `.render()`, `.renderBackgroundTaskState()`, `.renderOverflowButton()`, `.renderTabItem()`, `.shouldOpenOverflowAbove()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (15 nodes): `TabBar.ts`, `TabBar`, `.attachTooltipLabel()`, `.closeOverflowMenu()`, `.constructor()`, `.destroy()`, `.getMaxVisibleTabs()`, `.openOverflowMenu()`, `.partitionItems()`, `.positionOverflowMenu()`, `.render()`, `.renderBackgroundTaskState()`, `.renderOverflowButton()`, `.renderTabItem()`, `.shouldOpenOverflowAbove()`
+- **Thin community `Community 70`** (15 nodes): `InputPanelAppearanceCoordinator.ts`, `InputPanelAppearanceCoordinator`, `.applyActionButtonStyleState()`, `.applyThemeState()`, `.collectLiquidGlassAncestorChain()`, `.collectLiquidGlassBackdropOverlapDiagnostics()`, `.collectLiquidGlassBackdropPointSamples()`, `.constructor()`, `.describeLiquidGlassDiagnosticElement()`, `.destroy()`, `.getLiquidGlassRectIntersectionArea()`, `.logDiagnosticsEntry()`, `.logLiquidGlassDiagnostics()`, `.scheduleLiquidGlassDiagnostics()`, `.syncAppearanceState()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 73`** (15 nodes): `InputPanelAppearanceCoordinator.ts`, `InputPanelAppearanceCoordinator`, `.applyActionButtonStyleState()`, `.applyThemeState()`, `.collectLiquidGlassAncestorChain()`, `.collectLiquidGlassBackdropOverlapDiagnostics()`, `.collectLiquidGlassBackdropPointSamples()`, `.constructor()`, `.describeLiquidGlassDiagnosticElement()`, `.destroy()`, `.getLiquidGlassRectIntersectionArea()`, `.logDiagnosticsEntry()`, `.logLiquidGlassDiagnostics()`, `.scheduleLiquidGlassDiagnostics()`, `.syncAppearanceState()`
+- **Thin community `Community 71`** (15 nodes): `ConversationSyncBridge.ts`, `ConversationSyncBridge`, `.applySessionSyncEvent()`, `.clearScheduledSignalConversationSync()`, `.constructor()`, `.scheduleConversationSyncFromSignal()`, `.startConversationSyncLoop()`, `.stopConversationSyncLoop()`, `.syncBackgroundTaskTabsInBackground()`, `.syncSignalTabConversation()`, `.syncSignalTabConversationFromCanonicalState()`, `.syncVisibleConversationFromCanonicalState()`, `.syncVisibleConversationFromServer()`, `.syncVisibleConversationInBackground()`, `createConversationSyncBridgePorts()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 74`** (15 nodes): `ConversationSyncBridge.ts`, `ConversationSyncBridge`, `.applySessionSyncEvent()`, `.clearScheduledSignalConversationSync()`, `.constructor()`, `.scheduleConversationSyncFromSignal()`, `.startConversationSyncLoop()`, `.stopConversationSyncLoop()`, `.syncBackgroundTaskTabsInBackground()`, `.syncSignalTabConversation()`, `.syncSignalTabConversationFromCanonicalState()`, `.syncVisibleConversationFromCanonicalState()`, `.syncVisibleConversationFromServer()`, `.syncVisibleConversationInBackground()`, `createConversationSyncBridgePorts()`
+- **Thin community `Community 73`** (14 nodes): `OpenCodeEventSubscriptionCoordinator.ts`, `OpenCodeEventSubscriptionCoordinator`, `.constructor()`, `.emitOpenCodeEvent()`, `.ensureSourceSubscription()`, `.ensureSubscriptions()`, `.getEventPayload()`, `.handleCatalogRelevantEvent()`, `.handleSdkEventEnvelope()`, `.hasListeners()`, `.restartSubscriptions()`, `.runLoop()`, `.stopSubscriptions()`, `.subscribeToOpenCodeEvents()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (14 nodes): `OpenCodeEventSubscriptionCoordinator.ts`, `OpenCodeEventSubscriptionCoordinator`, `.constructor()`, `.emitOpenCodeEvent()`, `.ensureSourceSubscription()`, `.ensureSubscriptions()`, `.getEventPayload()`, `.handleCatalogRelevantEvent()`, `.handleSdkEventEnvelope()`, `.hasListeners()`, `.restartSubscriptions()`, `.runLoop()`, `.stopSubscriptions()`, `.subscribeToOpenCodeEvents()`
+- **Thin community `Community 74`** (14 nodes): `EffortSelector.ts`, `EffortSelector`, `.attachTooltipLabel()`, `.closeMenus()`, `.constructor()`, `.destroy()`, `.getElement()`, `.isEffortModel()`, `.render()`, `.renderBudgetGears()`, `.renderEffortGears()`, `.toggleMenu()`, `.updateDisplay()`, `isAdaptiveThinkingModel()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (14 nodes): `EffortSelector.ts`, `EffortSelector`, `.attachTooltipLabel()`, `.closeMenus()`, `.constructor()`, `.destroy()`, `.getElement()`, `.isEffortModel()`, `.render()`, `.renderBudgetGears()`, `.renderEffortGears()`, `.toggleMenu()`, `.updateDisplay()`, `isAdaptiveThinkingModel()`
+- **Thin community `Community 75`** (14 nodes): `ConversationAuthoritativeSyncCoordinator.ts`, `ConversationAuthoritativeSyncCoordinator`, `.applyHydratedOptimisticUserMessage()`, `.constructor()`, `.getLatestServerUserMessageHydration()`, `.getVisibleUserMessageText()`, `.hasHydratedOptimisticUserMessageChanged()`, `.hasVisibleTextMismatchForHydratedUserMessage()`, `.logLatestServerUserMessageHydration()`, `.logSkippedUnchangedHydratedUserMessage()`, `.mergeClientOnlyMessageFields()`, `.syncConversationMessagesFromCanonicalState()`, `.syncConversationMessagesFromServer()`, `.syncLatestUserMessageFromServer()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (14 nodes): `ConversationAuthoritativeSyncCoordinator.ts`, `ConversationAuthoritativeSyncCoordinator`, `.applyHydratedOptimisticUserMessage()`, `.constructor()`, `.getLatestServerUserMessageHydration()`, `.getVisibleUserMessageText()`, `.hasHydratedOptimisticUserMessageChanged()`, `.hasVisibleTextMismatchForHydratedUserMessage()`, `.logLatestServerUserMessageHydration()`, `.logSkippedUnchangedHydratedUserMessage()`, `.mergeClientOnlyMessageFields()`, `.syncConversationMessagesFromCanonicalState()`, `.syncConversationMessagesFromServer()`, `.syncLatestUserMessageFromServer()`
+- **Thin community `Community 76`** (13 nodes): `ProjectConfigFileWatcher.ts`, `ProjectConfigFileWatcher`, `.clearPendingChange()`, `.constructor()`, `.dispose()`, `.getAbstractFilePath()`, `.handleMutation()`, `.handleRename()`, `.matchesProjectConfig()`, `.resolveRelativeConfigPath()`, `.runChangeHandler()`, `.scheduleChange()`, `.start()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (13 nodes): `ProjectConfigFileWatcher.ts`, `ProjectConfigFileWatcher`, `.clearPendingChange()`, `.constructor()`, `.dispose()`, `.getAbstractFilePath()`, `.handleMutation()`, `.handleRename()`, `.matchesProjectConfig()`, `.resolveRelativeConfigPath()`, `.runChangeHandler()`, `.scheduleChange()`, `.start()`
+- **Thin community `Community 77`** (13 nodes): `ConversationSessionSettingsModal.ts`, `ConversationSessionSettingsModal`, `.buildOverrides()`, `.constructor()`, `.createFieldShell()`, `.createHero()`, `.createNumberField()`, `.createSection()`, `.handleSave()`, `.onClose()`, `.onOpen()`, `.setBusy()`, `.setError()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (13 nodes): `NavigationSidebar.ts`, `NavigationSidebar`, `.constructor()`, `.createButton()`, `.destroy()`, `.getElementScrollTop()`, `.getMessageScrollPadding()`, `.getMessageTargetScrollTop()`, `.isStickyScrollMode()`, `.scrollToMessage()`, `.setupEventListeners()`, `.updatePosition()`, `.updateVisibility()`
+- **Thin community `Community 78`** (13 nodes): `NavigationSidebar.ts`, `NavigationSidebar`, `.constructor()`, `.createButton()`, `.destroy()`, `.getElementScrollTop()`, `.getMessageScrollPadding()`, `.getMessageTargetScrollTop()`, `.isStickyScrollMode()`, `.scrollToMessage()`, `.setupEventListeners()`, `.updatePosition()`, `.updateVisibility()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (13 nodes): `RetainedSelectionRuntimeCoordinator.ts`, `RetainedSelectionRuntimeCoordinator`, `.constructor()`, `.dispose()`, `.handleComposerFocusIn()`, `.handleComposerFocusOut()`, `.handleComposerPointerDown()`, `.pollRetainedSelectionState()`, `.primeRetainedSelectionHighlightFromActiveEditor()`, `.shouldRetainPreviewDuringTransition()`, `.startPolling()`, `.stopPolling()`, `.syncFromPreview()`
+- **Thin community `Community 79`** (13 nodes): `QuestionInlineCardRenderer.ts`, `QuestionInlineCardRenderer`, `.clear()`, `.collectAction()`, `.collectAnswerFromInputState()`, `.collectGroupedQuestionAction()`, `.collectSequentialQuestionAction()`, `.constructor()`, `.getOrCreateCard()`, `.promptForSingleQuestion()`, `.renderButtons()`, `.renderQuestionHeader()`, `.renderQuestionSection()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (12 nodes): `agentIdFromPath()`, `MarkdownAgentWorkspaceService`, `.constructor()`, `.create()`, `.deleteFile()`, `.markRuntimeSeen()`, `.scan()`, `.serializeMarkdown()`, `.update()`, `parseFrontmatter()`, `scopeFromPath()`, `MarkdownAgentWorkspaceService.ts`
+- **Thin community `Community 80`** (13 nodes): `RetainedSelectionRuntimeCoordinator.ts`, `RetainedSelectionRuntimeCoordinator`, `.constructor()`, `.dispose()`, `.handleComposerFocusIn()`, `.handleComposerFocusOut()`, `.handleComposerPointerDown()`, `.pollRetainedSelectionState()`, `.primeRetainedSelectionHighlightFromActiveEditor()`, `.shouldRetainPreviewDuringTransition()`, `.startPolling()`, `.stopPolling()`, `.syncFromPreview()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 86`** (12 nodes): `SlashCommandMenuCatalogCache.ts`, `buildHiddenCommandCacheKey()`, `normalizeRuntimeCommands()`, `normalizeRuntimeSkills()`, `SlashCommandMenuCatalogCache`, `.buildCacheKey()`, `.constructor()`, `.invalidate()`, `.load()`, `.now()`, `.startLoad()`, `.warm()`
+- **Thin community `Community 82`** (12 nodes): `agentIdFromPath()`, `MarkdownAgentWorkspaceService`, `.constructor()`, `.create()`, `.deleteFile()`, `.markRuntimeSeen()`, `.scan()`, `.serializeMarkdown()`, `.update()`, `parseFrontmatter()`, `scopeFromPath()`, `MarkdownAgentWorkspaceService.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 87`** (12 nodes): `ConversationSyncOrchestrationService.ts`, `ConversationSyncOrchestrationService`, `.clearScheduledSignalConversationSync()`, `.constructor()`, `.getBackgroundTaskConversationId()`, `.scheduleConversationSyncFromSignal()`, `.shouldSkipBackgroundTaskTab()`, `.shouldStartConversationSyncLoop()`, `.startConversationSyncLoop()`, `.stopConversationSyncLoop()`, `.syncBackgroundTaskTabs()`, `.syncConversationFromSignal()`
+- **Thin community `Community 85`** (12 nodes): `SlashCommandMenuCatalogCache.ts`, `buildHiddenCommandCacheKey()`, `normalizeRuntimeCommands()`, `normalizeRuntimeSkills()`, `SlashCommandMenuCatalogCache`, `.buildCacheKey()`, `.constructor()`, `.invalidate()`, `.load()`, `.now()`, `.startLoad()`, `.warm()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 88`** (11 nodes): `BackgroundTaskLiveSignalCoordinator.ts`, `BackgroundTaskLiveSignalCoordinator`, `.armAuthoritativeSyncGate()`, `.clearAuthoritativeSyncGate()`, `.constructor()`, `.hasIndicator()`, `.isGracePeriodActive()`, `.isSessionLive()`, `.markAuthoritativeSync()`, `.reconcileStateFromLiveSignals()`, `createBackgroundTaskLiveSignalCoordinatorHost()`
+- **Thin community `Community 86`** (12 nodes): `ConversationSyncOrchestrationService.ts`, `ConversationSyncOrchestrationService`, `.clearScheduledSignalConversationSync()`, `.constructor()`, `.getBackgroundTaskConversationId()`, `.scheduleConversationSyncFromSignal()`, `.shouldSkipBackgroundTaskTab()`, `.shouldStartConversationSyncLoop()`, `.startConversationSyncLoop()`, `.stopConversationSyncLoop()`, `.syncBackgroundTaskTabs()`, `.syncConversationFromSignal()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 89`** (10 nodes): `LocalSidecarProcessInspector.ts`, `LocalSidecarProcessInspector`, `.captureCommandOutput()`, `.getListeningProcessId()`, `.getListeningProcessIdSync()`, `.getProcessCommandLine()`, `.getProcessCommandLineSync()`, `.isLocalPortAvailableSync()`, `.isPidRunning()`, `.isPidRunningSync()`
+- **Thin community `Community 87`** (11 nodes): `BackgroundTaskLiveSignalCoordinator.ts`, `BackgroundTaskLiveSignalCoordinator`, `.armAuthoritativeSyncGate()`, `.clearAuthoritativeSyncGate()`, `.constructor()`, `.hasIndicator()`, `.isGracePeriodActive()`, `.isSessionLive()`, `.markAuthoritativeSync()`, `.reconcileStateFromLiveSignals()`, `createBackgroundTaskLiveSignalCoordinatorHost()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 90`** (9 nodes): `ConversationAuthoritativeMessageMergeCoordinator.ts`, `ConversationAuthoritativeMessageMergeCoordinator`, `.constructor()`, `.getClientOnlyMessagePreservationFlags()`, `.isMatchingMessageContextAttachment()`, `.logClientOnlyMessageFieldPreservation()`, `.mergeClientOnlyMessageFields()`, `.mergeSyncedConversationMessages()`, `.mergeSyncedMessageContextAttachments()`
+- **Thin community `Community 88`** (10 nodes): `LocalSidecarProcessInspector.ts`, `LocalSidecarProcessInspector`, `.captureCommandOutput()`, `.getListeningProcessId()`, `.getListeningProcessIdSync()`, `.getProcessCommandLine()`, `.getProcessCommandLineSync()`, `.isLocalPortAvailableSync()`, `.isPidRunning()`, `.isPidRunningSync()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 91`** (9 nodes): `ContextFileCatalogService.ts`, `ContextFileCatalogService`, `.buildCatalogIndex()`, `.constructor()`, `.getCatalog()`, `.handleCreate()`, `.handleDelete()`, `.handleRename()`, `.invalidate()`
+- **Thin community `Community 89`** (9 nodes): `ConversationAuthoritativeMessageMergeCoordinator.ts`, `ConversationAuthoritativeMessageMergeCoordinator`, `.constructor()`, `.getClientOnlyMessagePreservationFlags()`, `.isMatchingMessageContextAttachment()`, `.logClientOnlyMessageFieldPreservation()`, `.mergeClientOnlyMessageFields()`, `.mergeSyncedConversationMessages()`, `.mergeSyncedMessageContextAttachments()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 92`** (9 nodes): `BackgroundTaskNoticeStateService.ts`, `BackgroundTaskNoticeStateService`, `.appendStoppedNoticeIfPossible()`, `.buildStoppedNoticeContent()`, `.constructor()`, `.getLaunchDisplayId()`, `.handleStoppedPendingLaunches()`, `.hasPersistedStoppedNotice()`, `.isPendingLaunchSetSuppressed()`
+- **Thin community `Community 90`** (9 nodes): `ContextFileCatalogService.ts`, `ContextFileCatalogService`, `.buildCatalogIndex()`, `.constructor()`, `.getCatalog()`, `.handleCreate()`, `.handleDelete()`, `.handleRename()`, `.invalidate()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 93`** (9 nodes): `BackgroundTaskCompletionNoticeService.ts`, `BackgroundTaskCompletionNoticeService`, `.buildBackgroundTaskCompletionNoticeContent()`, `.constructor()`, `.flushQueuedNotices()`, `.getBackgroundTaskCompletionNoticeFingerprint()`, `.getPersistedBackgroundTaskCompletionNoticeFingerprints()`, `.getQueuedNotices()`, `.queueNotices()`
+- **Thin community `Community 91`** (9 nodes): `BackgroundTaskNoticeStateService.ts`, `BackgroundTaskNoticeStateService`, `.appendStoppedNoticeIfPossible()`, `.buildStoppedNoticeContent()`, `.constructor()`, `.getLaunchDisplayId()`, `.handleStoppedPendingLaunches()`, `.hasPersistedStoppedNotice()`, `.isPendingLaunchSetSuppressed()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 95`** (8 nodes): `ServerSettingHelpModal.ts`, `ServerSettingHelpModal`, `.constructor()`, `.escapeHtml()`, `.getHelpContent()`, `.onClose()`, `.onOpen()`, `.tr()`
+- **Thin community `Community 93`** (8 nodes): `ServerSettingHelpModal.ts`, `ServerSettingHelpModal`, `.constructor()`, `.escapeHtml()`, `.getHelpContent()`, `.onClose()`, `.onOpen()`, `.tr()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 96`** (8 nodes): `ConversationCompactionHelpModal.ts`, `ConversationCompactionHelpModal`, `.constructor()`, `.createCard()`, `.createTipsCard()`, `.onClose()`, `.onOpen()`, `.tr()`
+- **Thin community `Community 94`** (8 nodes): `ConversationCompactionHelpModal.ts`, `ConversationCompactionHelpModal`, `.constructor()`, `.createCard()`, `.createTipsCard()`, `.onClose()`, `.onOpen()`, `.tr()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 97`** (8 nodes): `TabConversationActivationBridge.ts`, `TabConversationActivationBridge`, `.applyEmptyTabActivation()`, `.applyLoadedConversationActivation()`, `.applyStreamingConversationActivation()`, `.constructor()`, `.openConversation()`, `.resetActivePaneShell()`
+- **Thin community `Community 95`** (8 nodes): `TabConversationActivationBridge.ts`, `TabConversationActivationBridge`, `.applyEmptyTabActivation()`, `.applyLoadedConversationActivation()`, `.applyStreamingConversationActivation()`, `.constructor()`, `.openConversation()`, `.resetActivePaneShell()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 98`** (8 nodes): `AssistantShellRenderer.ts`, `AssistantShellRenderer`, `.addTimestampWithCopyButton()`, `.constructor()`, `.createAssistantMessageElement()`, `.createPersistedAssistantMessageElement()`, `.ensureAssistantTimestampRow()`, `.revealStreamingAssistantMessageElement()`
+- **Thin community `Community 96`** (8 nodes): `AssistantShellRenderer.ts`, `AssistantShellRenderer`, `.addTimestampWithCopyButton()`, `.constructor()`, `.createAssistantMessageElement()`, `.createPersistedAssistantMessageElement()`, `.ensureAssistantTimestampRow()`, `.revealStreamingAssistantMessageElement()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 99`** (8 nodes): `PendingIndicatorController.ts`, `getRandomPendingMessage()`, `PendingIndicatorController`, `.clear()`, `.constructor()`, `.isVisible()`, `.message()`, `.schedule()`
+- **Thin community `Community 97`** (8 nodes): `PendingIndicatorController.ts`, `getRandomPendingMessage()`, `PendingIndicatorController`, `.clear()`, `.constructor()`, `.isVisible()`, `.message()`, `.schedule()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 100`** (8 nodes): `ConversationTransitionBridge.ts`, `ConversationTransitionBridge`, `.beginLoadedConversationTransition()`, `.captureLoadedConversationTransition()`, `.constructor()`, `.endLoadedConversationTransition()`, `.prepareLoadedConversationTransition()`, `.restoreLoadedConversationTransition()`
+- **Thin community `Community 98`** (8 nodes): `ConversationTransitionBridge.ts`, `ConversationTransitionBridge`, `.beginLoadedConversationTransition()`, `.captureLoadedConversationTransition()`, `.constructor()`, `.endLoadedConversationTransition()`, `.prepareLoadedConversationTransition()`, `.restoreLoadedConversationTransition()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 101`** (8 nodes): `syncUserMessageStreamingActionState()`, `TabRuntimeStateBridge.ts`, `userMessageActions.ts`, `TabRuntimeStateBridge`, `.constructor()`, `.setNeedsAttention()`, `.syncActiveStreamLikeState()`, `.syncStreamLikeState()`
+- **Thin community `Community 99`** (8 nodes): `syncUserMessageStreamingActionState()`, `TabRuntimeStateBridge.ts`, `userMessageActions.ts`, `TabRuntimeStateBridge`, `.constructor()`, `.setNeedsAttention()`, `.syncActiveStreamLikeState()`, `.syncStreamLikeState()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 102`** (8 nodes): `BackgroundTaskStreamTriggerCoordinator.ts`, `BackgroundTaskStreamTriggerCoordinator`, `.constructor()`, `.finalizeAfterPrimaryStream()`, `.handleToolCallEnd()`, `.handleToolCallStart()`, `.isBackgroundTaskTool()`, `.isTodoTool()`
+- **Thin community `Community 100`** (8 nodes): `BackgroundTaskStreamTriggerCoordinator.ts`, `BackgroundTaskStreamTriggerCoordinator`, `.constructor()`, `.finalizeAfterPrimaryStream()`, `.handleToolCallEnd()`, `.handleToolCallStart()`, `.isBackgroundTaskTool()`, `.isTodoTool()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 103`** (8 nodes): `ConversationSessionSignalRuntime.ts`, `ConversationSessionSignalRuntime`, `.constructor()`, `.handleSessionStatusUpdate()`, `.handleSessionSyncEvent()`, `.handleSessionTodoUpdate()`, `.start()`, `.stop()`
+- **Thin community `Community 101`** (8 nodes): `ConversationSessionSignalRuntime.ts`, `ConversationSessionSignalRuntime`, `.constructor()`, `.handleSessionStatusUpdate()`, `.handleSessionSyncEvent()`, `.handleSessionTodoUpdate()`, `.start()`, `.stop()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 104`** (8 nodes): `BackgroundTaskTimelineLaunchService.ts`, `BackgroundTaskTimelineLaunchService`, `.addCompletedTasksFromMessage()`, `.extractBackgroundTaskId()`, `.filterPendingLaunches()`, `.getBackgroundTaskDescription()`, `.isLaunchMatchedByCompletion()`, `.upsertLaunch()`
+- **Thin community `Community 102`** (8 nodes): `QuestionDockSlotCoordinator.ts`, `QuestionDockSlotCoordinator`, `.attach()`, `.constructor()`, `.destroy()`, `.getQuestionDock()`, `.render()`, `.shouldUseAboveInputQuestionDock()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 105`** (8 nodes): `QuestionDockSlotCoordinator.ts`, `QuestionDockSlotCoordinator`, `.attach()`, `.constructor()`, `.destroy()`, `.getQuestionDock()`, `.render()`, `.shouldUseAboveInputQuestionDock()`
+- **Thin community `Community 103`** (8 nodes): `SessionTodoDockCoordinator.ts`, `SessionTodoDockCoordinator`, `.attach()`, `.constructor()`, `.destroy()`, `.getRenderSessionId()`, `.render()`, `.updateForTab()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 106`** (8 nodes): `SessionTodoDockCoordinator.ts`, `SessionTodoDockCoordinator`, `.attach()`, `.constructor()`, `.destroy()`, `.getRenderSessionId()`, `.render()`, `.updateForTab()`
+- **Thin community `Community 104`** (8 nodes): `ConversationTabLifecycleRecoveryCoordinator.ts`, `ConversationTabLifecycleRecoveryCoordinator`, `.closeTabAndRecover()`, `.constructor()`, `.createSilentFallbackTab()`, `.deleteAllConversationsAndReset()`, `.deleteConversationsAndRecover()`, `.shouldRecoverCurrentConversation()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 107`** (8 nodes): `ConversationTabLifecycleRecoveryCoordinator.ts`, `ConversationTabLifecycleRecoveryCoordinator`, `.closeTabAndRecover()`, `.constructor()`, `.createSilentFallbackTab()`, `.deleteAllConversationsAndReset()`, `.deleteConversationsAndRecover()`, `.shouldRecoverCurrentConversation()`
+- **Thin community `Community 105`** (7 nodes): `TabConversationStateBridge.ts`, `TabConversationStateBridge`, `.applyActiveConversation()`, `.clearActiveConversation()`, `.commitConversationSyncBaseline()`, `.constructor()`, `.syncActiveTabConversation()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 108`** (7 nodes): `TabConversationStateBridge.ts`, `TabConversationStateBridge`, `.applyActiveConversation()`, `.clearActiveConversation()`, `.commitConversationSyncBaseline()`, `.constructor()`, `.syncActiveTabConversation()`
+- **Thin community `Community 106`** (7 nodes): `UserMessageFooterRenderer.ts`, `UserMessageFooterRenderer`, `.constructor()`, `.render()`, `.renderActionButton()`, `.renderCopyButton()`, `.renderTimestamp()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 109`** (7 nodes): `ComposerContextViewHostAdapter.ts`, `ComposerContextViewHostAdapter`, `.constructor()`, `.createActionServiceHost()`, `.createChipActionServiceHost()`, `.createCoordinatorHost()`, `.createPickerActionServiceHost()`
+- **Thin community `Community 107`** (7 nodes): `ComposerContextViewHostAdapter.ts`, `ComposerContextViewHostAdapter`, `.constructor()`, `.createActionServiceHost()`, `.createChipActionServiceHost()`, `.createCoordinatorHost()`, `.createPickerActionServiceHost()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 110`** (7 nodes): `PostSyncQuestionTodoRefreshPlanBuilder.ts`, `PostSyncQuestionTodoRefreshPlanBuilder`, `.constructor()`, `.createBackgroundConversationPlan()`, `.createBackgroundTabConversationPlan()`, `.createSignalSyncedBackgroundConversationPlan()`, `.createVisibleConversationPlan()`
+- **Thin community `Community 108`** (7 nodes): `PostSyncQuestionTodoRefreshPlanBuilder.ts`, `PostSyncQuestionTodoRefreshPlanBuilder`, `.constructor()`, `.createBackgroundConversationPlan()`, `.createBackgroundTabConversationPlan()`, `.createSignalSyncedBackgroundConversationPlan()`, `.createVisibleConversationPlan()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 111`** (7 nodes): `BackgroundTaskActivationIndicatorCoordinator.ts`, `BackgroundTaskActivationIndicatorCoordinator`, `.constructor()`, `.prepareOpenConversation()`, `.renderLoadedConversationIndicator()`, `.renderOpenConversationIndicator()`, `.syncOpenConversationState()`
+- **Thin community `Community 109`** (7 nodes): `BackgroundTaskActivationIndicatorCoordinator.ts`, `BackgroundTaskActivationIndicatorCoordinator`, `.constructor()`, `.prepareOpenConversation()`, `.renderLoadedConversationIndicator()`, `.renderOpenConversationIndicator()`, `.syncOpenConversationState()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 112`** (7 nodes): `chooseForkTarget()`, `ForkTargetModal`, `.constructor()`, `.createOption()`, `.onClose()`, `.onOpen()`, `ForkTargetModal.ts`
+- **Thin community `Community 110`** (7 nodes): `chooseForkTarget()`, `ForkTargetModal`, `.constructor()`, `.createOption()`, `.onClose()`, `.onOpen()`, `ForkTargetModal.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 113`** (6 nodes): `BackgroundTaskInlinePanelRenderer.ts`, `BackgroundTaskInlinePanelRenderer`, `.clear()`, `.constructor()`, `.render()`, `.renderSegment()`
+- **Thin community `Community 111`** (6 nodes): `BackgroundTaskInlinePanelRenderer.ts`, `BackgroundTaskInlinePanelRenderer`, `.clear()`, `.constructor()`, `.render()`, `.renderSegment()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 114`** (6 nodes): `BackgroundTaskIndicatorCoordinator.ts`, `BackgroundTaskIndicatorCoordinator`, `.constructor()`, `.flushCompletionNoticesAndSyncStreamLikeState()`, `.queueAndFlushCompletionNotices()`, `.renderIfNeeded()`
+- **Thin community `Community 112`** (6 nodes): `BackgroundTaskIndicatorCoordinator.ts`, `BackgroundTaskIndicatorCoordinator`, `.constructor()`, `.flushCompletionNoticesAndSyncStreamLikeState()`, `.queueAndFlushCompletionNotices()`, `.renderIfNeeded()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 115`** (6 nodes): `ComposerContextActionService.ts`, `ComposerContextActionService`, `.addBuiltContextItem()`, `.addCurrentNoteContextFromActiveEditor()`, `.addSelectionContextFromActiveEditor()`, `.constructor()`
+- **Thin community `Community 113`** (6 nodes): `ComposerContextActionService.ts`, `ComposerContextActionService`, `.addBuiltContextItem()`, `.addCurrentNoteContextFromActiveEditor()`, `.addSelectionContextFromActiveEditor()`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 116`** (6 nodes): `ConversationSyncRuntimeCoordinator.ts`, `ConversationSyncRuntimeCoordinator`, `.constructor()`, `.runTabConversationSync()`, `.runVisibleConversationSync()`, `.withConversationSyncLock()`
+- **Thin community `Community 114`** (6 nodes): `ConversationSyncRuntimeCoordinator.ts`, `ConversationSyncRuntimeCoordinator`, `.constructor()`, `.runTabConversationSync()`, `.runVisibleConversationSync()`, `.withConversationSyncLock()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 117`** (6 nodes): `FocusContextPreviewCoordinator.ts`, `FocusContextPreviewCoordinator`, `.constructor()`, `.handleFileOpen()`, `.refreshActiveFocusContextPreview()`, `.scheduleFocusContextPreviewRefresh()`
+- **Thin community `Community 115`** (6 nodes): `FocusContextPreviewCoordinator.ts`, `FocusContextPreviewCoordinator`, `.constructor()`, `.handleFileOpen()`, `.refreshActiveFocusContextPreview()`, `.scheduleFocusContextPreviewRefresh()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 118`** (6 nodes): `QuestionTodoActivationRefreshCoordinator.ts`, `QuestionTodoActivationRefreshCoordinator`, `.applyActivationPreflight()`, `.applyConversationActivation()`, `.applyEmptyActivation()`, `.constructor()`
+- **Thin community `Community 116`** (6 nodes): `QuestionTodoActivationRefreshCoordinator.ts`, `QuestionTodoActivationRefreshCoordinator`, `.applyActivationPreflight()`, `.applyConversationActivation()`, `.applyEmptyActivation()`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 119`** (6 nodes): `BackgroundConversationAttentionCoordinator.ts`, `BackgroundConversationAttentionCoordinator`, `.commitBackgroundTabSyncAttention()`, `.commitSignalSyncAttention()`, `.constructor()`, `.didConversationChange()`
+- **Thin community `Community 117`** (6 nodes): `BackgroundConversationAttentionCoordinator.ts`, `BackgroundConversationAttentionCoordinator`, `.commitBackgroundTabSyncAttention()`, `.commitSignalSyncAttention()`, `.constructor()`, `.didConversationChange()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 120`** (6 nodes): `QuestionTodoStatusRefreshCoordinator.ts`, `QuestionTodoStatusRefreshCoordinator`, `.constructor()`, `.refreshAfterActivation()`, `.refreshAfterPostSync()`, `.shouldRefreshTodoStatus()`
+- **Thin community `Community 118`** (6 nodes): `QuestionTodoStatusRefreshCoordinator.ts`, `QuestionTodoStatusRefreshCoordinator`, `.constructor()`, `.refreshAfterActivation()`, `.refreshAfterPostSync()`, `.shouldRefreshTodoStatus()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 121`** (6 nodes): `FocusContextMarkdownViewLocator.ts`, `FocusContextMarkdownViewLocator`, `.constructor()`, `.getActiveMarkdownView()`, `.getMarkdownViews()`, `.rememberMarkdownFilePath()`
+- **Thin community `Community 119`** (6 nodes): `FocusContextMarkdownViewLocator.ts`, `FocusContextMarkdownViewLocator`, `.constructor()`, `.getActiveMarkdownView()`, `.getMarkdownViews()`, `.rememberMarkdownFilePath()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 122`** (6 nodes): `BackgroundConversationPostSyncRefreshExecutor.ts`, `BackgroundConversationPostSyncRefreshExecutor`, `.constructor()`, `.refreshBackgroundConversation()`, `.refreshBackgroundTabConversation()`, `.refreshSignalSyncedBackgroundConversation()`
+- **Thin community `Community 120`** (6 nodes): `BackgroundConversationPostSyncRefreshExecutor.ts`, `BackgroundConversationPostSyncRefreshExecutor`, `.constructor()`, `.refreshBackgroundConversation()`, `.refreshBackgroundTabConversation()`, `.refreshSignalSyncedBackgroundConversation()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 123`** (6 nodes): `ChildSessionGraphCoordinator.ts`, `ChildSessionGraphCoordinator`, `.clearGraph()`, `.constructor()`, `.getGraph()`, `.refreshGraph()`
+- **Thin community `Community 121`** (6 nodes): `ChildSessionGraphCoordinator.ts`, `ChildSessionGraphCoordinator`, `.clearGraph()`, `.constructor()`, `.getGraph()`, `.refreshGraph()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 124`** (5 nodes): `AgentInvocationService`, `.resolveInvocationIntent()`, `.resolveMention()`, `.resolveSubtask()`, `AgentInvocationService.ts`
+- **Thin community `Community 122`** (5 nodes): `AgentInvocationService`, `.resolveInvocationIntent()`, `.resolveMention()`, `.resolveSubtask()`, `AgentInvocationService.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 125`** (5 nodes): `QuestionResolutionCoordinator.ts`, `QuestionResolutionCoordinator`, `.applyResolvedQuestionState()`, `.constructor()`, `.renderQuestionResolutionCard()`
+- **Thin community `Community 123`** (5 nodes): `SendPipelineRuntime.ts`, `SendPipelineRuntime`, `.constructor()`, `.createStreamingExecution()`, `.sendMessage()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 126`** (5 nodes): `SendPipelineRuntime.ts`, `SendPipelineRuntime`, `.constructor()`, `.createStreamingExecution()`, `.sendMessage()`
+- **Thin community `Community 124`** (5 nodes): `StreamingInlineCardRenderer.ts`, `StreamingInlineCardRenderer`, `.constructor()`, `.createStreamingInlineCard()`, `.insertCard()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 127`** (5 nodes): `StreamingInlineCardRenderer.ts`, `StreamingInlineCardRenderer`, `.constructor()`, `.createStreamingInlineCard()`, `.insertCard()`
+- **Thin community `Community 125`** (5 nodes): `ConversationLoadRuntimeBridge.ts`, `ConversationLoadRuntimeBridge`, `.constructor()`, `.loadConversationMessages()`, `.resolveConversation()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 128`** (5 nodes): `ConversationLoadRuntimeBridge.ts`, `ConversationLoadRuntimeBridge`, `.constructor()`, `.loadConversationMessages()`, `.resolveConversation()`
+- **Thin community `Community 126`** (5 nodes): `ContextPickerInteractionBridge.ts`, `ContextPickerInteractionBridge`, `.beginContextPickerInteraction()`, `.completeContextPickerInteraction()`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 129`** (5 nodes): `ContextPickerInteractionBridge.ts`, `ContextPickerInteractionBridge`, `.beginContextPickerInteraction()`, `.completeContextPickerInteraction()`, `.constructor()`
+- **Thin community `Community 127`** (5 nodes): `ConversationSyncBackgroundPostSyncRouter.ts`, `ConversationSyncBackgroundPostSyncRouter`, `.constructor()`, `.routeBackgroundTabSyncComplete()`, `.routeSignalSyncComplete()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 130`** (5 nodes): `ConversationSyncBackgroundPostSyncRouter.ts`, `ConversationSyncBackgroundPostSyncRouter`, `.constructor()`, `.routeBackgroundTabSyncComplete()`, `.routeSignalSyncComplete()`
+- **Thin community `Community 128`** (5 nodes): `ContextFileCatalogEventBridge.ts`, `ContextFileCatalogEventBridge`, `.constructor()`, `.dispose()`, `.start()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 131`** (5 nodes): `ContextFileCatalogEventBridge.ts`, `ContextFileCatalogEventBridge`, `.constructor()`, `.dispose()`, `.start()`
+- **Thin community `Community 129`** (5 nodes): `BackgroundConversationPostSyncHandoffCoordinator.ts`, `BackgroundConversationPostSyncHandoffCoordinator`, `.constructor()`, `.handleBackgroundTabSyncComplete()`, `.handleSignalSyncComplete()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 132`** (5 nodes): `BackgroundConversationPostSyncHandoffCoordinator.ts`, `BackgroundConversationPostSyncHandoffCoordinator`, `.constructor()`, `.handleBackgroundTabSyncComplete()`, `.handleSignalSyncComplete()`
+- **Thin community `Community 130`** (5 nodes): `ComposerContextCoordinator.ts`, `ComposerContextCoordinator`, `.constructor()`, `.render()`, `.setContextRowElement()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 133`** (5 nodes): `ComposerContextCoordinator.ts`, `ComposerContextCoordinator`, `.constructor()`, `.render()`, `.setContextRowElement()`
+- **Thin community `Community 131`** (5 nodes): `QuestionDockRenderStateFacade.ts`, `QuestionDockRenderStateFacade`, `.constructor()`, `.getActivePendingQuestionRequest()`, `.resolveRenderState()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 134`** (5 nodes): `QuestionDockRenderStateFacade.ts`, `QuestionDockRenderStateFacade`, `.constructor()`, `.getActivePendingQuestionRequest()`, `.resolveRenderState()`
+- **Thin community `Community 132`** (5 nodes): `FocusContextViewHostAdapter.ts`, `FocusContextViewHostAdapter`, `.constructor()`, `.createFocusContextPreviewCoordinatorHost()`, `.createFocusContextRuntimeServiceHost()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 135`** (5 nodes): `FocusContextViewHostAdapter.ts`, `FocusContextViewHostAdapter`, `.constructor()`, `.createFocusContextPreviewCoordinatorHost()`, `.createFocusContextRuntimeServiceHost()`
+- **Thin community `Community 133`** (5 nodes): `QuestionPostResolutionRuntimeFacade.ts`, `QuestionPostResolutionRuntimeFacade`, `.constructor()`, `.followUpAfterResolution()`, `.shouldSyncVisibleConversation()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 136`** (5 nodes): `QuestionPostResolutionRuntimeFacade.ts`, `QuestionPostResolutionRuntimeFacade`, `.constructor()`, `.followUpAfterResolution()`, `.shouldSyncVisibleConversation()`
+- **Thin community `Community 134`** (5 nodes): `ConversationSessionTabResolver.ts`, `ConversationSessionTabResolver`, `.constructor()`, `.resolveActiveTabFallback()`, `.resolveMatchedTabIds()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 137`** (5 nodes): `ConversationSessionTabResolver.ts`, `ConversationSessionTabResolver`, `.constructor()`, `.resolveActiveTabFallback()`, `.resolveMatchedTabIds()`
+- **Thin community `Community 135`** (5 nodes): `PersistentAssistantNoticeService.ts`, `PersistentAssistantNoticeService`, `.appendMessage()`, `.constructor()`, `.hasMatchingMessage()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 138`** (5 nodes): `PersistentAssistantNoticeService.ts`, `PersistentAssistantNoticeService`, `.appendMessage()`, `.constructor()`, `.hasMatchingMessage()`
+- **Thin community `Community 136`** (5 nodes): `FocusContextEventBridge.ts`, `FocusContextEventBridge`, `.constructor()`, `.dispose()`, `.start()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 139`** (5 nodes): `FocusContextEventBridge.ts`, `FocusContextEventBridge`, `.constructor()`, `.dispose()`, `.start()`
+- **Thin community `Community 137`** (5 nodes): `ContextFileCatalogBuildRunner.ts`, `ContextFileCatalogBuildRunner`, `.buildIndex()`, `.constructor()`, `yieldContextFileCatalogBuild()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 140`** (5 nodes): `ContextFileCatalogBuildRunner.ts`, `ContextFileCatalogBuildRunner`, `.buildIndex()`, `.constructor()`, `yieldContextFileCatalogBuild()`
+- **Thin community `Community 138`** (5 nodes): `ComposerContextEventBridge.ts`, `ComposerContextEventBridge`, `.constructor()`, `.dispose()`, `.start()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 141`** (5 nodes): `ComposerContextEventBridge.ts`, `ComposerContextEventBridge`, `.constructor()`, `.dispose()`, `.start()`
+- **Thin community `Community 139`** (4 nodes): `ConversationHydrationOutcomeBridge.ts`, `ConversationHydrationOutcomeBridge`, `.applyLoadedConversationOutcome()`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 142`** (4 nodes): `ConversationHydrationOutcomeBridge.ts`, `ConversationHydrationOutcomeBridge`, `.applyLoadedConversationOutcome()`, `.constructor()`
+- **Thin community `Community 140`** (4 nodes): `AssistantErrorRenderer.ts`, `AssistantErrorRenderer`, `.constructor()`, `.renderStreamError()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 143`** (4 nodes): `AssistantErrorRenderer.ts`, `AssistantErrorRenderer`, `.constructor()`, `.renderStreamError()`
+- **Thin community `Community 141`** (4 nodes): `QuestionResolutionFlowCoordinator.ts`, `QuestionResolutionFlowCoordinator`, `.constructor()`, `.showQuestionDialog()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 144`** (4 nodes): `QuestionResolutionFlowCoordinator.ts`, `QuestionResolutionFlowCoordinator`, `.constructor()`, `.showQuestionDialog()`
+- **Thin community `Community 142`** (4 nodes): `VisibleConversationPostSyncCoordinator.ts`, `VisibleConversationPostSyncCoordinator`, `.constructor()`, `.handleVisibleConversationSyncComplete()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 145`** (4 nodes): `VisibleConversationPostSyncCoordinator.ts`, `VisibleConversationPostSyncCoordinator`, `.constructor()`, `.handleVisibleConversationSyncComplete()`
+- **Thin community `Community 143`** (4 nodes): `ConversationSyncVisiblePostSyncRouter.ts`, `ConversationSyncVisiblePostSyncRouter`, `.constructor()`, `.routeVisibleSyncComplete()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 146`** (4 nodes): `ConversationSyncVisiblePostSyncRouter.ts`, `ConversationSyncVisiblePostSyncRouter`, `.constructor()`, `.routeVisibleSyncComplete()`
+- **Thin community `Community 144`** (4 nodes): `BackgroundConversationSignalSyncStateCoordinator.ts`, `BackgroundConversationSignalSyncStateCoordinator`, `.commitSignalSyncState()`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 147`** (4 nodes): `BackgroundConversationSignalSyncStateCoordinator.ts`, `BackgroundConversationSignalSyncStateCoordinator`, `.commitSignalSyncState()`, `.constructor()`
+- **Thin community `Community 145`** (4 nodes): `PostSyncQuestionTodoRefreshFacade.ts`, `PostSyncQuestionTodoRefreshFacade`, `.constructor()`, `.refreshVisibleConversation()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 148`** (4 nodes): `PostSyncQuestionTodoRefreshFacade.ts`, `PostSyncQuestionTodoRefreshFacade`, `.constructor()`, `.refreshVisibleConversation()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 149`** (4 nodes): `VisibleConversationPostSyncStateCoordinator.ts`, `VisibleConversationPostSyncStateCoordinator`, `.commitPostSyncState()`, `.constructor()`
+- **Thin community `Community 146`** (4 nodes): `VisibleConversationPostSyncStateCoordinator.ts`, `VisibleConversationPostSyncStateCoordinator`, `.commitPostSyncState()`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 6`, `Community 8`, `Community 10`, `Community 11`, `Community 12`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 23`, `Community 25`, `Community 29`, `Community 30`, `Community 33`, `Community 34`, `Community 35`, `Community 37`, `Community 41`, `Community 42`, `Community 47`, `Community 48`, `Community 49`, `Community 53`, `Community 55`, `Community 56`, `Community 57`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 67`, `Community 70`, `Community 77`, `Community 80`, `Community 92`, `Community 93`, `Community 95`, `Community 96`, `Community 104`, `Community 107`, `Community 112`?**
-  _High betweenness centrality (0.418) - this node is a cross-community bridge._
-- **Why does `OpenCodianView` connect `Community 1` to `Community 26`, `Community 5`?**
-  _High betweenness centrality (0.209) - this node is a cross-community bridge._
-- **Why does `isInternalStructuredOutputTool()` connect `Community 5` to `Community 48`, `Community 11`, `Community 3`, `Community 36`?**
-  _High betweenness centrality (0.069) - this node is a cross-community bridge._
+- **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 5`, `Community 7`, `Community 8`, `Community 11`, `Community 12`, `Community 16`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 23`, `Community 25`, `Community 29`, `Community 30`, `Community 33`, `Community 34`, `Community 35`, `Community 37`, `Community 41`, `Community 46`, `Community 47`, `Community 51`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 60`, `Community 61`, `Community 62`, `Community 65`, `Community 67`, `Community 74`, `Community 77`, `Community 78`, `Community 79`, `Community 91`, `Community 93`, `Community 94`, `Community 104`, `Community 106`, `Community 110`?**
+  _High betweenness centrality (0.406) - this node is a cross-community bridge._
+- **Why does `OpenCodianView` connect `Community 1` to `Community 8`, `Community 26`?**
+  _High betweenness centrality (0.197) - this node is a cross-community bridge._
+- **Why does `isInternalStructuredOutputTool()` connect `Community 8` to `Community 17`, `Community 3`, `Community 36`, `Community 13`?**
+  _High betweenness centrality (0.067) - this node is a cross-community bridge._
 - **Are the 436 inferred relationships involving `t()` (e.g. with `.getEmptyConversationTitle()` and `.generateDefaultTitle()`) actually correct?**
   _`t()` has 436 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**

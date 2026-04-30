@@ -8,7 +8,10 @@ import type { ChatMessage } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import { BackgroundTaskIndicatorCoordinator } from '../../../../src/features/chat/runtime/BackgroundTaskIndicatorCoordinator';
 import { BackgroundTaskCompletionNoticeService } from '../../../../src/features/chat/services/BackgroundTaskCompletionNoticeService';
-import { BackgroundTaskTimelineService } from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
+import {
+  BackgroundTaskTimelineService,
+  type OmoBackgroundTaskLogState,
+} from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
 
 function createView(): OpenCodianView {
   return new OpenCodianView(new WorkspaceLeaf(), {
@@ -48,6 +51,57 @@ function createReminderMessage(
   };
 }
 
+function createBackgroundTaskUserMessage(): ChatMessage {
+  return {
+    id: 'user-local-1',
+    role: 'user',
+    content: 'find docs',
+    timestamp: 1,
+    sourceMessageId: 'msg-user-1',
+    omo: {
+      kind: 'user-injection',
+      modeTag: 'search-mode',
+      injectedPrompt: 'search',
+      originalText: 'find docs',
+      rawText: 'raw',
+      headline: 'search',
+    },
+  };
+}
+
+function createBackgroundTaskToolMessage(): ChatMessage {
+  return {
+    id: 'assistant-1',
+    role: 'assistant',
+    content: '',
+    timestamp: 2,
+    sourceMessageId: 'msg-assistant-1',
+    contentBlocks: [{
+      type: 'tool_use',
+      toolId: 'call-1',
+      toolName: 'task',
+      toolInput: { description: 'Search docs', taskId: 'bg_1' },
+      toolResult: 'started bg_1',
+      toolStatus: 'completed',
+    }],
+  };
+}
+
+function createTimelineServiceForDiagnostics(
+  logStates: Map<string, OmoBackgroundTaskLogState>,
+): BackgroundTaskTimelineService {
+  return new BackgroundTaskTimelineService({
+    getTabRuntimeState: jest.fn().mockReturnValue(null),
+    getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+    getMessageAnchorKey: (message) => message.sourceMessageId ?? message.id,
+    clearInlinePanel: jest.fn(),
+    armAuthoritativeSyncGate: jest.fn(),
+    clearAuthoritativeSyncGate: jest.fn(),
+    syncTabStreamLikeState: jest.fn(),
+    isSuppressedBackgroundTaskSegment: jest.fn().mockReturnValue(false),
+  }, logStates);
+}
+
 describe('OpenCodianView background task timeline', () => {
   it('hides raw background completion reminder messages from the rendered timeline', () => {
     const view = createView() as unknown as {
@@ -84,36 +138,8 @@ describe('OpenCodianView background task timeline', () => {
     jest.spyOn(view, 'getTabRuntimeState').mockReturnValue(null);
 
     const messages: ChatMessage[] = [
-      {
-        id: 'user-local-1',
-        role: 'user',
-        content: 'find docs',
-        timestamp: 1,
-        sourceMessageId: 'msg-user-1',
-        omo: {
-          kind: 'user-injection',
-          modeTag: 'search-mode',
-          injectedPrompt: 'search',
-          originalText: 'find docs',
-          rawText: 'raw',
-          headline: 'search',
-        },
-      },
-      {
-        id: 'assistant-1',
-        role: 'assistant',
-        content: '',
-        timestamp: 2,
-        sourceMessageId: 'msg-assistant-1',
-        contentBlocks: [{
-          type: 'tool_use',
-          toolId: 'call-1',
-          toolName: 'task',
-          toolInput: { description: 'Search docs', taskId: 'bg_1' },
-          toolResult: 'started bg_1',
-          toolStatus: 'completed',
-        }],
-      },
+      createBackgroundTaskUserMessage(),
+      createBackgroundTaskToolMessage(),
       {
         id: 'user-local-2',
         role: 'user',
@@ -154,21 +180,7 @@ describe('OpenCodianView background task timeline', () => {
       updatedAt: 1,
       openCodeSessionId: 'session-1',
       messages: [
-        {
-          id: 'user-local-1',
-          role: 'user' as const,
-          content: 'find docs',
-          timestamp: 1,
-          sourceMessageId: 'msg-user-1',
-          omo: {
-            kind: 'user-injection' as const,
-            modeTag: 'search-mode',
-            injectedPrompt: 'search',
-            originalText: 'find docs',
-            rawText: 'raw',
-            headline: 'search',
-          },
-        },
+        createBackgroundTaskUserMessage(),
         createReminderMessage('msg-reminder-1'),
       ],
     };
@@ -226,5 +238,35 @@ describe('OpenCodianView background task timeline', () => {
 
     await coordinator.queueAndFlushCompletionNotices('tab-1', conversation as never);
     expect(appendSpy).not.toHaveBeenCalled();
+  });
+
+  it('tracks OMO background task diagnostic logging state inside the timeline owner', () => {
+    const logStates = new Map<string, OmoBackgroundTaskLogState>();
+    const timelineService = createTimelineServiceForDiagnostics(logStates);
+    const conversation = {
+      id: 'conversation-1',
+      title: 'Conversation',
+      createdAt: 1,
+      updatedAt: 1,
+      openCodeSessionId: 'session-1',
+      messages: [],
+    };
+    const previousMessages = [createBackgroundTaskUserMessage()];
+    const nextMessages = [
+      ...previousMessages,
+      createBackgroundTaskToolMessage(),
+    ];
+
+    timelineService.logOmoBackgroundTaskDiagnostics(
+      conversation,
+      previousMessages,
+      nextMessages,
+    );
+
+    expect(logStates.get('conversation-1')).toEqual({
+      anchorKey: 'msg-user-1',
+      loggedPendingTaskIds: new Set(['bg_1']),
+      completionLogged: false,
+    });
   });
 });

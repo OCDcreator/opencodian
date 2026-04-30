@@ -56,6 +56,7 @@ export class BackgroundTaskTimelineService {
 ### timeline facade
 
 - `collectSegments()` 与 `collectDiagnostics()` 委托 `BackgroundTaskTimelineAssemblyService`，保留原 public API 与排序/diagnostics 语义。
+- `logOmoBackgroundTaskDiagnostics()` 现在在 timeline owner 内维护每个 conversation 的 `OmoBackgroundTaskLogState`，负责 pending/completed background-task diagnostics 的去重记录，`OpenCodianView` 只触发这个入口。
 - `upsertLaunch()` 与 `getPendingLaunches()` 通过 assembly/launch service 复用同一套 task id、description、completion matching 规则。
 - `collectInlineSegments()` 在 assembly 输出之上叠加 stale suppression 与 renderability 过滤，供 `BackgroundTaskInlinePanelRenderer` 直接渲染。
 
@@ -67,6 +68,7 @@ export class BackgroundTaskTimelineService {
 ## 与相邻模块的边界
 
 - `BackgroundTaskTimelineAssemblyService`：负责 persisted messages + runtime state 的 segment assembly、completion event 收集与 diagnostics 快照。
+- `OpenCodianView`：只保留 background-task lifecycle host seam，并把 OMO diagnostics logging 委托回本 service。
 - `BackgroundTaskTimelineLaunchService`：负责 task launch upsert、`bg_*` id 抽取、description fallback、completion matching 与 pending 过滤。
 - `BackgroundTaskInlinePanelRenderer`：负责真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用。
 - `BackgroundTaskIndicatorCoordinator`：负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序。
