@@ -1,42 +1,34 @@
-# Autopilot Lane Map — Hotspot Core Packaging
+# Autopilot Lane Map — Thick Owner Thinning (2h Batch)
 
 > **Preset**: `Maintainability / Refactor`
 > **Scheduling**: Sequential lane controller
-> **Live queue source**: lane-local roadmaps indexed below
-> **Note**: Historical `docs/status/maintainability-*.md` files are background context only. The active lane always comes from `automation/autopilot-config.json` plus the lane roadmap below.
+> **Live queue source**: `automation/autopilot-config.json`
+> **Note**: This worktree's live unattended queue is the thick-owner thinning batch below, not the historical hotspot packaging or older maintainability docs.
 
 ## Lane Directories
 
-- `h1-chat-runtime-package` — package `OpenCodianView` and adjacent chat runtime owners
-  - roadmap: `docs/status/lanes/h1-chat-runtime-package/autopilot-round-roadmap.md`
-  - baseline: `docs/status/lanes/h1-chat-runtime-package/autopilot-phase-0.md`
-  - queued tasks: 3
-- `h2-opencode-runtime-package` — package `OpenCodeService`, `ServerManager`, and adjacent runtime owners
-  - roadmap: `docs/status/lanes/h2-opencode-runtime-package/autopilot-round-roadmap.md`
-  - baseline: `docs/status/lanes/h2-opencode-runtime-package/autopilot-phase-0.md`
-  - queued tasks: 3
-- `h3-settings-bootstrap-package` — package `OpenCodianSettings`, `main.ts`, and settings-shell hotspots
-  - roadmap: `docs/status/lanes/h3-settings-bootstrap-package/autopilot-round-roadmap.md`
-  - baseline: `docs/status/lanes/h3-settings-bootstrap-package/autopilot-phase-0.md`
-  - queued tasks: 3
-- `h4-checkpoint` — recompute hotspot metrics, close residual seams, and stop only on a clean checkpoint
-  - roadmap: `docs/status/lanes/h4-checkpoint/autopilot-round-roadmap.md`
-  - baseline: `docs/status/lanes/h4-checkpoint/autopilot-phase-0.md`
-  - queued tasks: 2
+- `t1-servermanager-probe` — process/port probe extraction
+  - roadmap: `docs/status/lanes/t1-servermanager-probe/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/t1-servermanager-probe/autopilot-phase-0.md`
+  - queued tasks: Task 1
+- `t2-servermanager-launch` — local sidecar launch-context extraction
+  - roadmap: `docs/status/lanes/t2-servermanager-launch/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/t2-servermanager-launch/autopilot-phase-0.md`
+  - queued tasks: Task 1
+- `t3-checkpoint` — final verification and next-target note
+  - roadmap: `docs/status/lanes/t3-checkpoint/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/t3-checkpoint/autopilot-phase-0.md`
+  - queued tasks: Task 1
 
-## Primary Reference Files
+## Primary Source Modules
 
-- `graphify-out/GRAPH_REPORT.md`
-- `docs/modules/features/chat/OpenCodianView.md`
-- `docs/modules/core/opencode/OpenCodeService.md`
+- `src/core/opencode/ServerManager.ts`
+- `src/core/opencode/LocalSidecarProcessInspector.ts`
+- `src/core/opencode/LocalSidecarEndpointResolver.ts`
 - `docs/modules/core/opencode/ServerManager.md`
-- `docs/modules/features/settings/OpenCodianSettings.md`
-- `docs/modules/features/settings/SettingsModelCatalogPresenter.md`
-- `docs/modules/entry-point/main.md`
 
 ## Boundaries
 
-- Lane roadmaps are the autopilot scheduling source of truth.
-- Historical `docs/status/maintainability-*.md` files must not be used to decide the next task for this run.
-- Each round must shrink a real hotspot boundary, not just move code sideways.
-- Every round must finish with Codex plan review plus Codex code review recorded in the phase doc.
+- `ServerManager.ts` is the only code hotspot in scope for code-bearing lanes.
+- `OpenCodianView.ts`, `OpenCodeService.ts`, `main.ts`, and settings owners are out of scope for this batch.
+- The queue stops after the checkpoint lane even if additional residual hotspots remain.

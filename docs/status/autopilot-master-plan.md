@@ -1,79 +1,71 @@
-# Autopilot Master Plan — Hotspot Core Packaging
+# Autopilot Master Plan — Thick Owner Thinning (2h Batch)
 
 > **Preset**: `Maintainability / Refactor`
 > **Repository**: `opencodian`
 > **Controller mode**: Explicit sequential lanes from `automation/autopilot-config.json`
-> **Live queue source**: `docs/status/autopilot-lane-map.md` plus lane-local roadmaps under `docs/status/lanes/`
-> **Important**: `docs/status/maintainability-*.md` is the finished historical maintainability run. This branch reopens work with a new hotspot queue and must not inherit `[NEXT]` items from the paused queue.
+> **Runtime shape**: Codex-only unattended rounds with mandatory Codex design review and code review
 
 ## Overall Objective
 
-Package the current hotspot core files into stronger single-responsibility owners one queued slice at a time:
+Complete one conservative thick-owner thinning batch that can plausibly close within two hours:
 
-- Reduce direct ownership, assembly pressure, and import surface in the hottest files without creating thin-wrapper sprawl.
-- Preserve OpenCodian's existing runtime behavior, especially concurrent chat tabs, SDK-first plus legacy fallback, settings persistence, and local sidecar lifecycle.
-- Keep `docs/modules/**`, graphify artifacts, and verification gates aligned after each landed slice.
-- Stop only on a clean checkpoint with fresh hotspot evidence, not on a vague “looks better” judgment.
+- reduce `ServerManager.ts` ownership through two durable, adjacent seams
+- keep behavior unchanged for local sidecar lifecycle, adoption, restart, conflict, and health semantics
+- preserve the maintenance-phase anti-fragmentation rules
+- stop after a checkpoint instead of inventing more backlog
 
-## Current Hotspot Inventory
+This queue intentionally does **not** try to thin every residual hotspot at once. The current goal is a high-confidence batch that lands real maintainability movement without touching deploy-relevant runtime files or drifting into `OpenCodianView.ts` / `OpenCodeService.ts`.
 
-- `src/features/chat/OpenCodianView.ts`
-  - about `5418` lines, `91` imports, `306` touches in the last 120 days
-  - dominant chat runtime owner and the highest combined size/churn hotspot
-- `src/core/opencode/OpenCodeService.ts`
-  - about `1867` lines, `25` imports, `103` touches in the last 120 days
-  - central OpenCode runtime facade with session, stream, sync, and transport pressure
-- `src/features/settings/OpenCodianSettings.ts`
-  - `96` touches in the last 120 days and very high churn despite adjacent section owners already existing
-  - still acts as the settings shell and cross-section bridge hotspot
-- `src/main.ts`
-  - about `1546` lines, `16` imports, `67` touches in the last 120 days
-  - startup, runtime warmup, and cross-view refresh orchestration hotspot
-- `src/core/opencode/ServerManager.ts`
-  - about `1418` lines, `9` imports, `29` touches in the last 120 days
-  - local sidecar lifecycle, adopt/restart, and diagnostics hotspot
-- `src/features/settings/SettingsModelCatalogPresenter.ts`
-  - about `1362` lines, `7` imports
-  - dense presentation-state shell that is adjacent to the settings hotspot and may need packaging or consolidation
+## Why This Queue First
 
-## Packaging Strategy
+Current residual hotspot evidence from the latest checkpoint:
 
-1. Start with the highest-risk hot owner, `OpenCodianView`, and package one stable assembly slice at a time into existing chat runtime owners.
-2. Move next to `OpenCodeService` and `ServerManager`, where service/runtime boundaries already exist but still need tighter ownership.
-3. Then package the settings and bootstrap shell hotspots so the repo does not simply shift pressure from chat/service into setup/config shells.
-4. Finish with a checkpoint lane that recomputes hotspot metrics, trims any thin seams introduced during the run, and confirms the queue can safely stop.
+- `src/core/opencode/ServerManager.ts` remains at `1298` lines and `9` imports
+- `src/main.ts` remains at `1417` lines and `17` imports
+- `src/core/opencode/OpenCodeService.ts` and `src/features/chat/OpenCodianView.ts` remain higher-risk shells and are explicitly out of scope for this short batch
+
+`ServerManager.ts` is the best first target because:
+
+- it is still thick enough to warrant another controlled slice
+- it has clear adjacent seams for process/port probing and local launch-context ownership
+- it can be improved without touching deploy-relevant plugin entry or settings surfaces
+- earlier unattended exploration already proved these seams are real rather than line-count theater
 
 ## Lane Order
 
-1. `h1-chat-runtime-package` — package the `OpenCodianView` hotspot.
-2. `h2-opencode-runtime-package` — package `OpenCodeService` and `ServerManager`.
-3. `h3-settings-bootstrap-package` — package `OpenCodianSettings`, `main.ts`, and nearby settings shells.
-4. `h4-checkpoint` — recompute hotspot metrics and close the queue only if the checkpoint is clean.
+1. `t1-servermanager-probe` — move cross-platform process/port probing into a durable adjacent owner
+2. `t2-servermanager-launch` — move local sidecar launch-context ownership into a durable adjacent owner
+3. `t3-checkpoint` — re-measure the hotspot, verify the delta, record next-manual-target order, and stop
 
 ## Required Reading At Every Round
 
 - `AGENTS.md`
 - `graphify-out/GRAPH_REPORT.md`
+- `docs/requirements/maintenance-development-baseline.md`
+- `docs/status/development-maintainability-rules.md`
 - `docs/status/autopilot-master-plan.md`
 - `docs/status/autopilot-lane-map.md`
 - the active `docs/status/lanes/<lane-id>/autopilot-round-roadmap.md`
 - the active lane's latest `autopilot-phase-*.md`
-- the matching `docs/modules/**` pages for the files named by the active slice
+- the matching module docs before source edits
 
 ## Validation Baseline
 
-- Targeted tests named in each queued task are required when that task changes code/tests.
-- Every successful round must fresh-run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`.
-- `npm run check:module-docs` is required when source module boundaries are added, changed, renamed, or deleted.
-- `npm run graphify:update:src` plus the repo's graphify freshness gate are required when `src/` changes make the committed graph stale.
-- Build/Test Vault deployment is not required for this automation setup change; follow `AGENTS.md` only if a future slice touches deploy-relevant runtime files.
+- Focused Jest coverage is required first for code-bearing rounds.
+- `npm run check:module-docs` is required whenever module boundaries change.
+- `npm run graphify:update:src` is required whenever `src/` changes so `npm run verify` stays truthful.
+- `npm run verify` is the final gate for every successful round.
+- Deploy is intentionally out of scope for this batch; no lane should touch deploy-relevant files.
 
 ## Guardrails
 
 - Do not modify `reference-projects/`.
-- Do not reopen the old paused maintainability queue by inventing `R163+`. This branch has its own explicit hotspot queue.
-- Prefer strengthening existing adjacent owners over creating new thin helper, adapter, provider, or factory files.
-- Do not push new runtime ownership back into `src/features/chat/OpenCodianView.ts` or `src/core/opencode/OpenCodeService.ts`.
-- For settings work, favor section owners and plugin-adjacent startup owners over growing `OpenCodianSettings.ts` or `main.ts`.
-- Every successful round must include a Codex design review verdict and a Codex code review verdict.
-- Commit every successful round with the configured `autopilot:` prefix.
+- Do not touch `src/main.ts`, `src/features/chat/OpenCodianView.ts`, `src/core/opencode/OpenCodeService.ts`, or deploy-relevant settings files in this batch.
+- Do not introduce thin helper / adapter / provider / factory files.
+- Prefer one cohesive adjacent owner over multiple tiny seams.
+- Keep `ServerManager.ts` as the lifecycle/state owner; only durable sub-ownership moves out.
+- If a queued slice proves larger than expected, land the smaller durable seam and stop rather than widening scope.
+
+## Completion Rule
+
+When `t1`, `t2`, and `t3` have no remaining `[NEXT]` or `[QUEUED]` items, this queue is complete. The controller must stop and leave the next target as a manual follow-up decision instead of auto-extending into `main.ts` or another hotspot.
