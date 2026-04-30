@@ -1,6 +1,6 @@
 import type { ChatMessage, Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
-import type { TabConversationSyncFingerprintRuntimePort } from './TabConversationSyncFingerprintPortProvider';
+import type { TabConversationSyncFingerprintRuntimePort } from './QuestionTodoBackgroundTaskRuntimeServiceBundle';
 
 export interface PersistentAssistantNoticeMessageOptions {
   title: string;

@@ -63,6 +63,8 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
 - `VisibleConversationPostSyncStateCoordinator` 继续作为 bundle 内部依赖存在，而 activation/open 与 post-sync 共用的 supplemental refresh 则直接复用 bundle 内部的 `QuestionTodoStatusRefreshCoordinator`
 - 返回值只暴露 visible/background post-sync、activation 两侧真正需要的 coordinator，以及 stream-trigger runtime host，缩小 view 构造函数对中间 wiring 细节的感知面
 
+- `TabConversationSyncFingerprintRuntimePort` 是本 bundle 与 `PersistentAssistantNoticeService` 共用的最小 conversation-sync port；它覆盖 fingerprint 计算与 tab-scoped fingerprint 写回，避免为同一组函数再保留单独的 pass-through provider。
+
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在只提供一份更扁平的 P2 runtime seam，并消费这一个 bundle factory 返回的 coordinators + stream-trigger host

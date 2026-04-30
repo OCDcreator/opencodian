@@ -271,6 +271,7 @@ import {
 import {
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
   type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
+  type TabConversationSyncFingerprintRuntimePort,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
   isElementNearBottom,
@@ -295,11 +296,6 @@ import {
   type TabActivationConversationSyncRuntimePort,
   type TabActivationConversationSyncRuntimePortHost,
 } from './services/TabActivationRuntimeViewHostFactory';
-import {
-  createTabConversationSyncFingerprintRuntimePort,
-  type TabConversationSyncFingerprintPortProviderHost,
-  type TabConversationSyncFingerprintRuntimePort,
-} from './services/TabConversationSyncFingerprintPortProvider';
 import {
   TabMessagesPaneCoordinator,
   type TabMessagesPaneCoordinatorHost,
@@ -1437,10 +1433,7 @@ export class OpenCodianView extends ItemView {
       ),
       conversationSessionSettingsCoordinator,
       composerContextViewFacade,
-      tabConversationSyncFingerprintRuntimePort:
-        createTabConversationSyncFingerprintRuntimePort(
-          this.createTabConversationSyncFingerprintPortProviderHost(),
-        ),
+      tabConversationSyncFingerprintRuntimePort: this.createTabConversationSyncFingerprintRuntimePort(),
       persistentAssistantNoticeService: new PersistentAssistantNoticeService(
         this.createPersistentAssistantNoticeServiceHost(),
       ),
@@ -2097,8 +2090,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createTabConversationSyncFingerprintPortProviderHost():
-  TabConversationSyncFingerprintPortProviderHost {
+  private createTabConversationSyncFingerprintRuntimePort():
+    TabConversationSyncFingerprintRuntimePort {
     return {
       getConversationSyncFingerprint: (messages) =>
         this.getConversationSyncFingerprint(messages),

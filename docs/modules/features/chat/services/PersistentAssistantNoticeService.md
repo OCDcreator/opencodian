@@ -49,5 +49,5 @@ export class PersistentAssistantNoticeService {
 ## 与 `OpenCodianView` 的边界
 
 - `SessionTodoStateService`、`BackgroundTaskNoticeStateService`、`BackgroundTaskCompletionNoticeService` 仍负责各自 notice 的状态机、文案和 dedupe 时机
-- `OpenCodianView` 只提供 assistant-message render/save/tab-runtime host bridge，并通过 `TabConversationSyncFingerprintPortProvider` 复用 fingerprint 计算与 tab writeback seam
+- `OpenCodianView` 只提供 assistant-message render/save/tab-runtime host bridge，并把 fingerprint 计算与 tab writeback seam 作为 `TabConversationSyncFingerprintRuntimePort` 直接交给本服务；该 port 类型与 question/todo/background-task runtime bundle 共用，避免保留额外 pass-through provider
 - 这让 P2 `question / todo / background task` lane 继续把 session todo 与 background task 共用的 persisted-notice ownership 从主 view 迁到 dedicated service

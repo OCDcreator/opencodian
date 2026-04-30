@@ -1,7 +1,9 @@
+import type { ChatMessage } from '../../../core/types';
 import type {
   BackgroundTaskStreamTriggerCoordinatorHost,
   BackgroundTaskStreamTriggerRuntime,
 } from '../runtime/BackgroundTaskStreamTriggerCoordinator';
+import type { TabId } from '../tabs';
 import {
   type BackgroundConversationPostSyncHandoffViewHost,
   type BackgroundConversationPostSyncHandoffViewHostAdapterDependencies,
@@ -25,11 +27,15 @@ import {
   type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
 } from './QuestionTodoBackgroundTaskRefreshHostAdapter';
 import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
-import type { TabConversationSyncFingerprintRuntimePort } from './TabConversationSyncFingerprintPortProvider';
 import {
   createVisibleConversationPostSyncStateServices,
   type VisibleConversationPostSyncStateViewHost,
 } from './VisibleConversationPostSyncStateHostAdapter';
+
+export interface TabConversationSyncFingerprintRuntimePort {
+  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  setTabConversationSyncFingerprint(tabId: TabId | null, fingerprint: string): void;
+}
 
 export interface QuestionTodoBackgroundTaskRuntimeServiceBundle
   extends Pick<

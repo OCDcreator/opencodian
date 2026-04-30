@@ -4,7 +4,7 @@ import {
 } from '../../../../src/features/chat/services/PersistentAssistantNoticeService';
 import type {
   TabConversationSyncFingerprintRuntimePort,
-} from '../../../../src/features/chat/services/TabConversationSyncFingerprintPortProvider';
+} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 
 describe('PersistentAssistantNoticeService', () => {
   function createHost(options?: {

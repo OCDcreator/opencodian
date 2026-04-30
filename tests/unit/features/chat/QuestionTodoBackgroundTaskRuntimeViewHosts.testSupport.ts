@@ -2,13 +2,11 @@ import type { SessionActivityStatus } from '../../../../src/core/opencode';
 import type { Conversation, QuestionRequest, SessionTodo } from '../../../../src/core/types';
 import type {
   QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
+  TabConversationSyncFingerprintRuntimePort,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import type {
   QuestionTodoStatusRefreshRuntime,
 } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
-import type {
-  TabConversationSyncFingerprintRuntimePort,
-} from '../../../../src/features/chat/services/TabConversationSyncFingerprintPortProvider';
 
 type Mocked<T> = {
   [Key in keyof T]:

@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 1 - Recompute hotspot metrics and close residual thin seams
+### [DONE] Task 1 - Recompute hotspot metrics and close residual thin seams
 
 - **Goal**: Re-measure the hotspot files, verify that earlier rounds produced real ownership shrinkage, and remove only residual thin seams that block a clean checkpoint.
 - **Key files**:
@@ -15,7 +15,7 @@
   - Any residual cleanup stays tightly bounded to the checkpoint purpose.
 - **Validation**: `npm run lint && npm run typecheck && npm test && npm run build`
 
-### [QUEUED] Task 2 - Write final checkpoint summary and stop the queue cleanly
+### [NEXT] Task 2 - Write final checkpoint summary and stop the queue cleanly
 
 - **Goal**: Leave the branch in a resumable, evidence-backed checkpoint state with no fabricated backlog and no stale `[NEXT]` item left behind.
 - **Key files**:
