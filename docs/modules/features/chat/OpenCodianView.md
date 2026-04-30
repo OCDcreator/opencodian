@@ -297,7 +297,7 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 
 否则回退到整段重渲。
 
-assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block、notice action label 等 DOM 细节现在由 `runtime/AssistantNoticeCardRenderer.ts` 承接；persisted assistant shell / notice / footer / timestamp 组装则进一步统一交给 `runtime/AssistantShellViewHostAdapter.ts`；而 user message footer 的 copy / rewind / fork / timestamp 组装由 `runtime/UserMessageFooterRenderer.ts` 承接。`OpenCodianView` 只保留 Markdown 渲染、assistant 正文 block 渲染与 rewind/fork 等副作用的 host 回调。
+assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block、notice action label 等 DOM 细节现在由 `runtime/AssistantNoticeCardRenderer.ts` 承接；persisted assistant shell / notice / footer / timestamp / body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodySignature` / `getStoredToolStatus`）组装则进一步统一交给 `runtime/AssistantShellViewHostAdapter.ts`；而 user message footer 的 copy / rewind / fork / timestamp 组装由 `runtime/UserMessageFooterRenderer.ts` 承接。`OpenCodianView` 只保留 Markdown 渲染与 rewind/fork 等副作用的 host 回调。
 
 ### 发送与流式渲染
 

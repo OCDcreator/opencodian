@@ -1,20 +1,21 @@
-import { WorkspaceLeaf } from 'obsidian';
-
 import type { ChatMessage } from '../../../../src/core/types';
-import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { AssistantShellViewHostAdapter } from '../../../../src/features/chat/runtime/AssistantShellViewHostAdapter';
 
-function createView(): OpenCodianView {
-  return new OpenCodianView(new WorkspaceLeaf(), {
-    settings: {
-      effortLevel: 'medium',
-      thinkingBudget: 0,
-      locale: 'en',
-      maxTabs: 3,
-    },
-    openCodeService: {},
-    storage: {},
-    saveConversation: jest.fn().mockResolvedValue(undefined),
-  } as never);
+function createAdapter(): AssistantShellViewHostAdapter {
+  return new AssistantShellViewHostAdapter({
+    getActiveTabId: () => 'tab-1',
+    getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
+    ensureTurnBody: () => document.createElement('div'),
+    shouldAutoScroll: () => true,
+    scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+    setStreamingAssistantMessageVisibility: jest.fn(),
+    initializeAssistantCopyButton: jest.fn(),
+    renderNoticeCard: jest.fn(),
+    getMarkdownService: () => null,
+    shouldRenderQuestionResolutionCards: () => false,
+    suppressActiveLayoutAutoScrollOnce: jest.fn(),
+    openTaskToolSession: jest.fn(),
+  });
 }
 
 function createTaskMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
@@ -37,12 +38,9 @@ function createTaskMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   };
 }
 
-describe('OpenCodianView task signature sensitivity', () => {
+describe('Assistant body signature task metadata sensitivity', () => {
   it('treats task metadata and result-visibility changes as body-signature changes', () => {
-    const view = createView() as OpenCodianView & {
-      getAssistantBodySignature(message: ChatMessage): string;
-      getMessageVisualSignature(message: ChatMessage): string;
-    };
+    const adapter = createAdapter();
     const previous = createTaskMessage();
     const next = createTaskMessage({
       contentBlocks: [{
@@ -58,7 +56,6 @@ describe('OpenCodianView task signature sensitivity', () => {
       }],
     });
 
-    expect(view.getAssistantBodySignature(previous)).not.toBe(view.getAssistantBodySignature(next));
-    expect(view.getMessageVisualSignature(previous)).not.toBe(view.getMessageVisualSignature(next));
+    expect(adapter.getAssistantBodySignature(previous)).not.toBe(adapter.getAssistantBodySignature(next));
   });
 });

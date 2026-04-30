@@ -26,6 +26,8 @@
 class OpencodeConfigManager {
   static getPermissionTemplate(mode: PermissionMode): PermissionConfig | PermissionAction;
   static summarizePermissionConfig(permission: PermissionConfig | PermissionAction | undefined): PermissionConfigSummary;
+  static ensureInitialized(vaultPath: string, permissionMode: PermissionMode): Promise<void>;
+  static syncPermissionMode(vaultPath: string, permissionMode: PermissionMode, options?: { healthCheck?: () => Promise<boolean> }): Promise<void>;
   exists(): Promise<boolean>;
   read(): Promise<OpencodeConfig>;
   write(config: OpencodeConfig): Promise<void>;

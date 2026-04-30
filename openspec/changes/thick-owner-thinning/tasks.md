@@ -1,29 +1,31 @@
-## 1. Pipeline Setup
+# Tasks
 
-- [ ] 1.1 Finalize the OpenSpec artifacts for `thick-owner-thinning`, including the anti-fragmentation and alternating-lane contract.
-- [ ] 1.2 Initialize Task Master in the repo and parse `openspec/changes/thick-owner-thinning/proposal.md` into structured tasks.
-- [ ] 1.3 Import the Task Master tasks into `.opencode-loop/queue.json` for execute mode without overwriting unrelated queue state accidentally.
+## 1. Pipeline Contract
 
-## 2. Queue Enrichment
+- [ ] 1.1 Confirm `docs/requirements/maintenance-development-baseline.md` is the controlling baseline.
+- [ ] 1.2 Import this OpenSpec proposal into Task Master without replacing the runtime truth source; `.opencode-loop/queue.json` remains canonical after import.
+- [ ] 1.3 Reject task wording that describes generic cleanup, net-new feature work, or line-count-only splitting.
 
-- [ ] 2.1 Add repo-specific verification commands to each imported task, including `npm run verify` and any focused checks needed for the touched owner.
-- [ ] 2.2 Add acceptance checks that enforce single-slice ownership moves, updated module docs, and no thin helper fragmentation.
-- [ ] 2.3 Order and promote the queue into alternating `OpenCodeService.ts` and `OpenCodianView.ts` lanes.
+## 2. Owner-First Selection
 
-## 3. Service Lane
+- [ ] 2.1 Inspect the current thick-owner candidates and choose one primary owner for the first execute task.
+- [ ] 2.2 Name the owner type before implementation: facade, domain runtime, domain UI, state, config, storage, test, or documentation.
+- [ ] 2.3 Prefer an existing adjacent owner before creating any new module.
 
-- [ ] 3.1 Move one complete `OpenCodeService.ts` behavior slice into existing adjacent owners, starting with the lowest-risk stable slice.
-- [ ] 3.2 Verify the service-lane round with focused tests, module docs updates, graphify freshness, and full `npm run verify`.
-- [ ] 3.3 Record the next service-lane ownership slice only after the current one lands cleanly.
+## 3. First Maintenance Slice
 
-## 4. View Lane
+- [ ] 3.1 Move or consolidate one complete behavior slice so ownership clarity improves or is explicitly preserved.
+- [ ] 3.2 Avoid creating thin helper, adapter, provider, factory, or bridge files unless the new module owns a complete behavior slice or isolates a real protocol boundary.
+- [ ] 3.3 Keep the primary task scope narrow and behavior-preserving.
 
-- [ ] 4.1 Move one complete `OpenCodianView.ts` behavior slice into existing adjacent owners, starting with the lowest-risk stable slice.
-- [ ] 4.2 Verify the view-lane round with focused tests, module docs updates, graphify freshness, and full `npm run verify`.
-- [ ] 4.3 Record the next view-lane ownership slice only after the current one lands cleanly.
+## 4. Documentation And Verification
 
-## 5. Execute-Mode Hardening
+- [ ] 4.1 Update matching `docs/modules/**` documentation when a module boundary changes.
+- [ ] 4.2 Run focused checks for the touched owner when available.
+- [ ] 4.3 Run `npm run verify`.
 
-- [ ] 5.1 Validate the queue and confirm every promoted task is independently resumable and verifiable.
-- [ ] 5.2 Optionally add a `gate-review` hook once the first execute-mode round proves stable.
-- [ ] 5.3 Switch future unattended thick-file thinning for this program from broad `dev` mode to queue-gated `execute` mode.
+## 5. Completion Bar
+
+- [ ] 5.1 Mark the task complete only when verification is green and ownership shape is improved or explicitly preserved.
+- [ ] 5.2 If the result only moves complexity sideways into more files, treat the task as failed even if tests pass.
+- [ ] 5.3 Record any blocker in queue state instead of broadening the task ad hoc.

@@ -165,7 +165,12 @@ export default class OpenCodianPlugin extends Plugin {
   private async bootstrapOpenCodeRuntime(
     initialManagedServerState: LoadedManagedServerState,
   ): Promise<void> {
-    await this.measureStartupStep('initializeOpencodeConfig', () => this.initializeOpencodeConfig());
+    await this.measureStartupStep('initializeOpencodeConfig', () => {
+      const vaultPath = getVaultBasePath(this.app);
+      if (vaultPath) {
+        return OpencodeConfigManager.ensureInitialized(vaultPath, this.settings.permissionMode);
+      }
+    });
     await this.measureStartupStep('constructOpenCodeService', () => {
         this.openCodeService = new OpenCodeService(
         this.settings,
@@ -435,7 +440,14 @@ export default class OpenCodianPlugin extends Plugin {
     
     // Sync OpenCode config with permission mode
     if (syncConfig) {
-      await this.syncOpencodeConfig();
+      const vaultPath = getVaultBasePath(this.app);
+      if (vaultPath) {
+        await OpencodeConfigManager.syncPermissionMode(
+          vaultPath,
+          this.settings.permissionMode,
+          { healthCheck: () => this.openCodeService.checkHealth() },
+        );
+      }
     }
   }
 
@@ -1022,85 +1034,6 @@ export default class OpenCodianPlugin extends Plugin {
 
   getDebugBuildIdentityText(): string {
     return `OpenCodian ${this.manifest.version} BUILD_ID=${BUILD_ID}`;
-  }
-
-  /** Sync OpenCode config with current permission mode */
-  private async syncOpencodeConfig(): Promise<void> {
-    try {
-      const vaultPath = getVaultBasePath(this.app);
-      if (!vaultPath) {
-        logger.warn('Could not get vault path, skipping OpenCode config sync');
-        return;
-      }
-      const configManager = new OpencodeConfigManager(vaultPath);
-      
-      // Always update config to match current permission mode
-      switch (this.settings.permissionMode) {
-        case 'yolo':
-          await configManager.setYoloMode();
-          break;
-        case 'normal':
-          await configManager.setNormalMode();
-          break;
-        case 'plan':
-          await configManager.setPlanMode();
-          break;
-      }
-      
-      // Verify the config was written correctly
-      const config = await configManager.read();
-      logger.debug(`OpenCode config updated to mode: ${this.settings.permissionMode}`);
-      logger.debug(`Config file location: ${configManager.getConfigPath()}`);
-      logger.debug('Config permissions:', JSON.stringify(config.permission, null, 2));
-      
-      // Show notice if server is running (needs restart)
-      if (await this.openCodeService.checkHealth()) {
-        logger.debug('OpenCode server is running. Config changes require restart to take effect.');
-      }
-    } catch (error) {
-      logger.error('Failed to sync OpenCode config:', error);
-    }
-  }
-
-  /** Initialize OpenCode config file based on current permission mode */
-  private async initializeOpencodeConfig(): Promise<void> {
-    try {
-      const vaultPath = getVaultBasePath(this.app);
-      if (!vaultPath) {
-        logger.warn('Could not get vault path, skipping OpenCode config initialization');
-        return;
-      }
-      const configManager = new OpencodeConfigManager(vaultPath);
-      
-      // Check if config already exists
-      const exists = await configManager.exists();
-      if (exists) {
-        // Config exists, no need to create
-        return;
-      }
-
-      // Create config based on current permission mode
-      logger.debug(`Creating OpenCode config with mode: ${this.settings.permissionMode}`);
-      
-      switch (this.settings.permissionMode) {
-        case 'yolo':
-          await configManager.setYoloMode();
-          break;
-        case 'normal':
-          await configManager.setNormalMode();
-          break;
-        case 'plan':
-          await configManager.setPlanMode();
-          break;
-        default:
-          await configManager.setNormalMode();
-      }
-      
-      logger.debug(`OpenCode config created at: ${configManager.getConfigPath()}`);
-    } catch (error) {
-      logger.error('Failed to initialize OpenCode config:', error);
-      // Don't throw - plugin should still work even if config creation fails
-    }
   }
 
   /** Load conversations from storage */

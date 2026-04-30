@@ -4,35 +4,18 @@ import * as path from 'path';
 
 import { createLogger } from '../../shared';
 import type {
-  OpencodeAgentConfig,
-  OpencodeAgentConfigRecord,
-  OpencodeCommandConfig,
-  OpencodeCommandConfigRecord,
-  OpencodeCompactionConfig,
-  OpencodeConfig,
-  OpencodeFormatterConfig,
-  OpencodePluginSpec,
-  PermissionAction,
-  PermissionConfig,
-  PermissionMode,
-  ToolPermission,
+  OpencodeAgentConfig, OpencodeAgentConfigRecord, OpencodeCommandConfig,
+  OpencodeCommandConfigRecord, OpencodeCompactionConfig, OpencodeConfig,
+  OpencodeFormatterConfig, OpencodePluginSpec, PermissionAction, PermissionConfig,
+  PermissionMode, ToolPermission,
 } from '../types';
-import {
-  prepareCommandPatchWithScopedAgent,
-  removeCommandScopedAgent,
-} from './commandScopedAgent';
-import {
-  readFormatterConfigValue,
-  writeFormatterConfigValue,
-} from './formatterConfig';
+import { prepareCommandPatchWithScopedAgent, removeCommandScopedAgent } from './commandScopedAgent';
+import { readFormatterConfigValue, writeFormatterConfigValue } from './formatterConfig';
 import { isRecord, OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
 const logger = createLogger('OpencodeConfigManager');
 
-export type PermissionConfigCustomFeature =
-  | 'external-directory'
-  | 'task-allowlist'
-  | 'patterned-rules';
+export type PermissionConfigCustomFeature = 'external-directory' | 'task-allowlist' | 'patterned-rules';
 
 export interface PermissionConfigSummary {
   templateMode: PermissionMode | null;
@@ -370,14 +353,39 @@ export class OpencodeConfigManager {
     }
   }
 
+  static async ensureInitialized(vaultPath: string, permissionMode: PermissionMode): Promise<void> {
+    try {
+      const configManager = new OpencodeConfigManager(vaultPath);
+      if (await configManager.exists()) return;
+
+      logger.debug(`Creating OpenCode config with mode: ${permissionMode}`);
+      await configManager.updatePermission(OpencodeConfigManager.getPermissionTemplate(permissionMode));
+      logger.debug(`OpenCode config created at: ${configManager.getConfigPath()}`);
+    } catch (error) {
+      logger.error('Failed to initialize OpenCode config:', error);
+      // Don't throw - plugin should still work even if config creation fails
+    }
+  }
+
+  static async syncPermissionMode(vaultPath: string, permissionMode: PermissionMode, options?: { healthCheck?: () => Promise<boolean> }): Promise<void> {
+    try {
+      const configManager = new OpencodeConfigManager(vaultPath);
+      await configManager.updatePermission(OpencodeConfigManager.getPermissionTemplate(permissionMode));
+      const config = await configManager.read();
+      logger.debug(`OpenCode config updated to mode: ${permissionMode}`);
+      logger.debug(`Config file location: ${configManager.getConfigPath()}`);
+      logger.debug('Config permissions:', JSON.stringify(config.permission, null, 2));
+
+      if (options?.healthCheck && await options.healthCheck()) {
+        logger.debug('OpenCode server is running. Config changes require restart to take effect.');
+      }
+    } catch (error) {
+      logger.error('Failed to sync OpenCode config:', error);
+    }
+  }
+
   private getDefaultConfig(): OpencodeConfig {
-    return {
-      $schema: 'https://opencode.ai/config.json',
-      model: undefined,
-      permission: {
-        '*': 'ask',
-      },
-    };
+    return { $schema: 'https://opencode.ai/config.json', model: undefined, permission: { '*': 'ask' } };
   }
 
   static getPermissionTemplate(mode: PermissionMode): PermissionConfig | PermissionAction {
@@ -450,10 +458,7 @@ export class OpencodeConfigManager {
     return next;
   }
 
-  private normalizeConfigRecord<T extends Record<string, unknown>>(
-    entryKind: string,
-    entries: Record<string, T>,
-  ): Record<string, T> {
+  private normalizeConfigRecord<T extends Record<string, unknown>>(entryKind: string, entries: Record<string, T>): Record<string, T> {
     const next: Record<string, T> = {};
     for (const [entryId, entry] of Object.entries(entries)) {
       const normalizedEntryId = this.normalizeConfigEntryId(entryKind, entryId);

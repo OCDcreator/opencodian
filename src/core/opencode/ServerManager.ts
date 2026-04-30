@@ -20,6 +20,7 @@ import {
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
 } from '../types/settings';
+import { LocalSidecarProcessInspector } from './LocalSidecarProcessInspector';
 import type { ManagedServerState, OpenCodeServerConfig, ServerDiagnostics, ServerStatus } from './types';
 
 const logger = createLogger('ServerManager');
@@ -103,6 +104,7 @@ export class ServerManager {
   private onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   private diagnostics: ServerDiagnostics = { reason: 'none' };
   private activeLaunch: LocalServerLaunch | null = null;
+  private processInspector = new LocalSidecarProcessInspector();
 
   constructor(
     config: OpenCodeServerConfig,
@@ -344,7 +346,7 @@ export class ServerManager {
       }
     }
 
-    if (plan.waitForPortReleaseMessage && !this.isLocalPortAvailableSync(this.config.local.port)) {
+    if (plan.waitForPortReleaseMessage && !this.processInspector.isLocalPortAvailableSync(this.config.local.port)) {
       logger.warn(plan.waitForPortReleaseMessage);
       return;
     }
@@ -888,7 +890,7 @@ export class ServerManager {
       return;
     }
 
-    const listenerPid = await this.getListeningProcessId(this.config.local.port);
+    const listenerPid = await this.processInspector.getListeningProcessId(this.config.local.port);
     if (!listenerPid) {
       logger.warn('Unable to resolve live OpenCode listener pid after startup; preserving launcher pid only');
       return;
@@ -974,7 +976,7 @@ export class ServerManager {
   }
 
   private async tryAdoptManagedServer(): Promise<ManagedServerAdoptionOutcome> {
-    const liveListenerPid = await this.getListeningProcessId(this.config.local.port);
+    const liveListenerPid = await this.processInspector.getListeningProcessId(this.config.local.port);
     const persistedListenerPid = this.getManagedListenerPid(this.managedServerState);
     if (persistedListenerPid && liveListenerPid && persistedListenerPid !== liveListenerPid) {
       return 'restart';
@@ -1005,8 +1007,8 @@ export class ServerManager {
       return null;
     }
 
-    const liveListenerPid = await this.getListeningProcessId(this.config.local.port);
-    const commandLine = await this.getProcessCommandLine(liveListenerPid ?? state.pid);
+    const liveListenerPid = await this.processInspector.getListeningProcessId(this.config.local.port);
+    const commandLine = await this.processInspector.getProcessCommandLine(liveListenerPid ?? state.pid);
     if (!commandLine) {
       this.clearManagedServerState();
       return null;
@@ -1026,8 +1028,8 @@ export class ServerManager {
   }
 
   private async inspectExistingHealthyServer(): Promise<ExistingServerProcessInfo> {
-    const pid = await this.getListeningProcessId(this.config.local.port);
-    const commandLine = pid ? await this.getProcessCommandLine(pid) : null;
+    const pid = await this.processInspector.getListeningProcessId(this.config.local.port);
+    const commandLine = pid ? await this.processInspector.getProcessCommandLine(pid) : null;
     return {
       pid,
       commandLine,
@@ -1251,7 +1253,7 @@ export class ServerManager {
 
       killer.once('exit', (code) => {
         if (code !== 0) {
-          void this.isPidRunning(pid).then((stillRunning) => {
+          void this.processInspector.isPidRunning(pid).then((stillRunning) => {
             if (!stillRunning) {
               resolve(true);
               return;
@@ -1278,7 +1280,7 @@ export class ServerManager {
     });
 
     if (result.error || result.status !== 0) {
-      if (!this.isPidRunningSync(pid)) {
+      if (!this.processInspector.isPidRunningSync(pid)) {
         return true;
       }
       logger.warn('Failed to synchronously terminate OpenCode process tree during dispose', {
@@ -1334,198 +1336,24 @@ export class ServerManager {
     }
   }
 
-  private isLocalPortAvailableSync(port: number): boolean {
-    const result = process.platform === 'win32'
-      ? spawnSync(
-        'powershell',
-        [
-          '-NoProfile',
-          '-Command',
-          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { exit 1 } else { exit 0 }`,
-        ],
-        {
-          stdio: 'ignore',
-          windowsHide: true,
-        },
-      )
-      : spawnSync(
-        'sh',
-        [
-          '-lc',
-          `if lsof -nP -iTCP:${port} -sTCP:LISTEN -t >/dev/null 2>&1; then exit 1; else exit 0; fi`,
-        ],
-        {
-          stdio: 'ignore',
-          windowsHide: true,
-        },
-      );
-
-    if (result.error) {
-      return false;
-    }
-
-    return result.status === 0;
-  }
-
-  private async isPidRunning(pid: number): Promise<boolean> {
-    const commandLine = await this.getProcessCommandLine(pid);
-    return Boolean(commandLine);
-  }
-
-  private isPidRunningSync(pid: number): boolean {
-    return Boolean(this.getProcessCommandLineSync(pid));
-  }
-
-  private async getListeningProcessId(port: number): Promise<number | null> {
-    const output = process.platform === 'win32'
-      ? await this.captureCommandOutput(
-        'powershell',
-        [
-          '-NoProfile',
-          '-Command',
-          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $conn.OwningProcess }`,
-        ],
-      )
-      : await this.captureCommandOutput(
-        'sh',
-        [
-          '-lc',
-          `lsof -nP -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null | head -n 1`,
-        ],
-      );
-
-    if (!output) {
-      return null;
-    }
-
-    const parsed = Number.parseInt(output.trim(), 10);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-  }
-
-  private getListeningProcessIdSync(port: number): number | null {
-    const result = process.platform === 'win32'
-      ? spawnSync(
-        'powershell',
-        [
-          '-NoProfile',
-          '-Command',
-          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $conn.OwningProcess }`,
-        ],
-        {
-          encoding: 'utf-8',
-          windowsHide: true,
-        },
-      )
-      : spawnSync(
-        'sh',
-        [
-          '-lc',
-          `lsof -nP -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null | head -n 1`,
-        ],
-        {
-          encoding: 'utf-8',
-          windowsHide: true,
-        },
-      );
-
-    if (result.error || result.status !== 0) {
-      return null;
-    }
-
-    const output = typeof result.stdout === 'string' ? result.stdout.trim() : '';
-    const parsed = Number.parseInt(output, 10);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-  }
-
-  private getProcessCommandLine(pid: number): Promise<string | null> {
-    if (process.platform === 'win32') {
-      return this.captureCommandOutput(
-        'powershell',
-        [
-          '-NoProfile',
-          '-Command',
-          `$p = Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction SilentlyContinue; if ($p) { $p.CommandLine }`,
-        ],
-      );
-    }
-
-    return this.captureCommandOutput('ps', ['-p', String(pid), '-o', 'command=']);
-  }
-
-  private getProcessCommandLineSync(pid: number): string | null {
-    const result = process.platform === 'win32'
-      ? spawnSync(
-        'powershell',
-        [
-          '-NoProfile',
-          '-Command',
-          `$p = Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction SilentlyContinue; if ($p) { $p.CommandLine }`,
-        ],
-        {
-          encoding: 'utf-8',
-          windowsHide: true,
-        },
-      )
-      : spawnSync(
-        'ps',
-        ['-p', String(pid), '-o', 'command='],
-        {
-          encoding: 'utf-8',
-          windowsHide: true,
-        },
-      );
-
-    if (result.error || result.status !== 0) {
-      return null;
-    }
-
-    const output = typeof result.stdout === 'string' ? result.stdout.trim() : '';
-    return output || null;
-  }
-
   private async getCurrentPluginManagedListenerPid(): Promise<number | null> {
-    const pid = await this.getListeningProcessId(this.config.local.port);
+    const pid = await this.processInspector.getListeningProcessId(this.config.local.port);
     if (!pid) {
       return null;
     }
 
-    const commandLine = await this.getProcessCommandLine(pid);
+    const commandLine = await this.processInspector.getProcessCommandLine(pid);
     return this.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
   }
 
   private getCurrentPluginManagedListenerPidSync(): number | null {
-    const pid = this.getListeningProcessIdSync(this.config.local.port);
+    const pid = this.processInspector.getListeningProcessIdSync(this.config.local.port);
     if (!pid) {
       return null;
     }
 
-    const commandLine = this.getProcessCommandLineSync(pid);
+    const commandLine = this.processInspector.getProcessCommandLineSync(pid);
     return this.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
-  }
-
-
-  private captureCommandOutput(command: string, args: string[]): Promise<string | null> {
-    return new Promise((resolve) => {
-      let stdout = '';
-      const child = spawn(command, args, {
-        stdio: ['ignore', 'pipe', 'ignore'],
-        windowsHide: true,
-      });
-
-      child.stdout?.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      child.once('error', () => resolve(null));
-      child.once('exit', (code) => {
-        if (code !== 0) {
-          resolve(null);
-          return;
-        }
-
-        resolve(stdout.trim() || null);
-      });
-    });
   }
 
   private getAuthHeaders(): Record<string, string> | undefined {

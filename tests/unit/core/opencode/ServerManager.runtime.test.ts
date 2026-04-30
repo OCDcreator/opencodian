@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { LocalSidecarProcessInspector } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
 jest.mock('obsidian', () => ({
@@ -37,6 +38,10 @@ const { Notice: mockNotice } = jest.requireMock('obsidian') as {
   Notice: jest.Mock;
   requestUrl: jest.Mock;
 };
+
+function getProcessInspector(manager: ServerManager): LocalSidecarProcessInspector {
+  return (manager as unknown as { processInspector: LocalSidecarProcessInspector }).processInspector;
+}
 
 const defaultConfig = {
   mode: 'local' as const,
@@ -78,10 +83,10 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
         },
       ));
 
-      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+      jest.spyOn(getProcessInspector(manager), 'getProcessCommandLine').mockResolvedValue(
         'opencode serve --port 4196 --hostname 127.0.0.1',
       );
-      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(1234);
+      jest.spyOn(getProcessInspector(manager), 'getListeningProcessId').mockResolvedValue(1234);
 
       await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('restart');
     });
@@ -117,10 +122,10 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       ));
       manager.setWorkingDirectory(context.testVaultPath);
 
-      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+      jest.spyOn(getProcessInspector(manager), 'getProcessCommandLine').mockResolvedValue(
         'opencode serve --port 4196 --hostname 127.0.0.1',
       );
-      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(1234);
+      jest.spyOn(getProcessInspector(manager), 'getListeningProcessId').mockResolvedValue(1234);
 
       await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('adopted');
     });
@@ -158,10 +163,10 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       ));
       manager.setWorkingDirectory(context.testVaultPath);
 
-      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+      jest.spyOn(getProcessInspector(manager), 'getProcessCommandLine').mockResolvedValue(
         'opencode serve --port 4196 --hostname 127.0.0.1 --cors app://obsidian.md --cors app://obsidian',
       );
-      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(9999);
+      jest.spyOn(getProcessInspector(manager), 'getListeningProcessId').mockResolvedValue(9999);
 
       await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('restart');
     });
@@ -197,8 +202,8 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       ));
       manager.setWorkingDirectory(context.testVaultPath);
 
-      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(23332);
-      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+      jest.spyOn(getProcessInspector(manager), 'getListeningProcessId').mockResolvedValue(23332);
+      jest.spyOn(getProcessInspector(manager), 'getProcessCommandLine').mockResolvedValue(
         'opencode serve --port 4196 --hostname 127.0.0.1 --cors app://obsidian.md --cors app://obsidian',
       );
 
@@ -229,7 +234,7 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       const restartManagedServer = jest.spyOn(manager as never, 'restartManagedServer').mockResolvedValue(undefined);
       const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
       const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
-      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(1234);
+      jest.spyOn(getProcessInspector(manager), 'getListeningProcessId').mockResolvedValue(1234);
 
       await expect(manager.start()).resolves.toBeUndefined();
 
@@ -368,7 +373,7 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
         };
       });
       const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
-      jest.spyOn(manager as never, 'getListeningProcessId').mockResolvedValue(2468);
+      jest.spyOn(getProcessInspector(manager), 'getListeningProcessId').mockResolvedValue(2468);
 
       await expect((manager as never).launchLocalServerRuntime()).resolves.toBeUndefined();
 

@@ -65,7 +65,7 @@
 6. 注册内置 glass adapter，并按设置启用/关闭调试日志。
 7. 设置 i18n locale。
 8. 从存储中读取上次保存的 `ManagedServerState`。
-9. 若 vault 下还没有 `.opencode` 配置，按当前 `permissionMode` 调用 `initializeOpencodeConfig()` 创建。
+9. 若 vault 下还没有 `.opencode` 配置，按当前 `permissionMode` 调用 `OpencodeConfigManager.ensureInitialized()` 创建。
 10. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
 11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
@@ -106,7 +106,7 @@
 1. 清掉延迟保存/延迟 UI 状态的 timer。
 2. 先把新设置同步到 `OpenCodeService.updateSettings()`；若服务层更新失败，就回滚到旧快照。
 3. 把归一化后的设置拆成 `core/ui` 两个域，再写回 `StorageService` 的串行写队列。
-4. 刷新所有已打开的 `OpenCodianView`，并在需要时调用 `syncOpencodeConfig()` 让 `.opencode` 权限配置与 `permissionMode` 对齐。
+4. 刷新所有已打开的 `OpenCodianView`，并在需要时调用 `OpencodeConfigManager.syncPermissionMode()` 让 `.opencode` 权限配置与 `permissionMode` 对齐。
 
 此外，保存完成后入口层现在会主动广播一次 slash command catalog 失效，让 `OpenCodianView` 内部的 `SlashCommandMenuCatalogCache` 不必再等 120 秒 TTL 才看到新的项目命令/Skill 可见性变化。
 
@@ -190,7 +190,7 @@ graph TD
     A[Obsidian 加载插件] --> B[StorageService.initialize]
     B --> C[loadSettings / 迁移旧设置]
     C --> D[setLocale + registerBuiltinGlassAdapters]
-    D --> E[initializeOpencodeConfig]
+    D --> E[OpencodeConfigManager.ensureInitialized]
     E --> F[创建 OpenCodeService]
     F --> G[设置 vaultPath / ConfigManager / ModelConfigService]
     G --> H[loadConversations 预载元数据]

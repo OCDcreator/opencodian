@@ -5,20 +5,24 @@
 
 ## 概述
 
-`AssistantShellViewHostAdapter` 是 assistant shell / notice / footer / local stream-error block 的 view host adapter。它把 `OpenCodianView` 里原本分散的 `AssistantShellRendererHost`、`AssistantNoticeRenderHost`、persisted assistant body render seam、assistant footer finalizer/renderer 与本地错误块 renderer 装配收束到一个更窄的 runtime bridge。
+`AssistantShellViewHostAdapter` 是 assistant shell / notice / footer / local stream-error block / body rendering 的 view host adapter。它把 `OpenCodianView` 里原本分散的 `AssistantShellRendererHost`、`AssistantNoticeRenderHost`、persisted assistant body render seam、assistant footer finalizer/renderer、content block rendering 与本地错误块 renderer 装配收束到一个更窄的 runtime bridge。
+
+body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodySignature` / `getStoredToolStatus`）现在内聚在 adapter 内部，不再回弹到 `OpenCodianView`。
 
 ## 公开接口
 
 - `AssistantShellViewHostAdapter`：统一持有 `AssistantShellRenderer`、`AssistantFooterRenderer`、`AssistantNoticeFooterFinalizer` 的 host seam，以及 `AssistantErrorRenderer`
 - `createAssistantMessageElement()` / `revealStreamingAssistantMessageElement()`：透传 streaming assistant shell 创建与 reveal
 - `addTimestampWithCopyButton()`：透传 footer timestamp / copy button 收尾
-- `renderPersistedAssistantMessage()`：通过内部 shell + persisted-body host + footer renderer，一次性完成普通 persisted assistant message 的壳层、正文与 footer 组装；notice message 也会在这里统一分派到 notice 渲染路径
+- `renderPersistedAssistantMessage()`：通过内部 shell + body render + footer renderer，一次性完成普通 persisted assistant message 的壳层、正文与 footer 组装；notice message 也会在这里统一分派到 notice 渲染路径
+- `renderMessageBody()`：公开入口，渲染 assistant message 正文（structured content blocks 或 plain text fallback），供 `ConversationAssistantTailRenderPort` 直接调用
+- `getAssistantBodySignature()`：公开入口，为 body 内容生成可序列化的比较指纹，供 render pipeline 判断是否需要重渲染
 - `renderPersistedAssistantNoticeMessage()`：通过内部 shell + notice host 一次性完成 persisted assistant notice 的 shell、card 与 footer 编排
 - `renderAssistantPlaceholderAsNotice()`：通过内部 notice host 把已有 shell 改写成 notice card
 - `finalizePersistedFooter()` / `finalizeNoticeFooter()` / `finalizePseudoStreamFooter()`：让 persisted、notice 与 pseudo-stream assistant footer 变体都复用同一条 footer renderer seam
 - `renderStreamError()`：通过 `AssistantErrorRenderer` 统一渲染本地 stream-error block，并复用既有 error footer 收尾
 - `createSendPipelineShellPort()`：导出 `SendPipelineRuntime` 需要的 shell port，而不是让 view 自己重新拼一次 notice / footer wiring
-- `AssistantShellViewHostAdapterHost`：只暴露 shell/notice/footer 真正需要的 runtime state、scroll、visibility、copy-button 初始化、persisted body 渲染与 notice-card 渲染能力
+- `AssistantShellViewHostAdapterHost`：只暴露 shell/notice/footer 真正需要的 runtime state、scroll、visibility、copy-button 初始化、notice-card 渲染能力，以及 body rendering 所需的 `shouldRenderQuestionResolutionCards` / `suppressActiveLayoutAutoScrollOnce` / `openTaskToolSession` / `getMarkdownService` 回调
 
 ## 设计目的
 
