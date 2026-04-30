@@ -2,7 +2,7 @@
   "objective": "Land a conservative two-hour thick-owner thinning batch focused on ServerManager, with Codex design review and code review required on every round, then stop after the queued seams and checkpoint closeout are complete.",
   "focus_hint": "T1 - Extract ServerManager process and port probing into a durable adjacent owner",
   "next_phase_number": 1,
-  "max_rounds": 5,
+  "max_rounds": 6,
   "max_consecutive_failures": 4,
   "lint_command": "",
   "typecheck_command": "",
@@ -20,7 +20,6 @@
   "targeted_test_required_paths": [
     "src/",
     "tests/",
-    "docs/",
     "package.json",
     "package-lock.json"
   ],
