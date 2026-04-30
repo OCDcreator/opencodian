@@ -16,7 +16,7 @@
   - No public behavior regresses across CRUD, session control, or catalog query flows.
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodeService.sdkCrudSync.test.ts tests/unit/core/opencode/OpenCodeSessionLifecycleCoordinator.test.ts tests/unit/core/opencode/OpenCodeSessionControlOrchestrator.test.ts tests/unit/core/opencode/OpenCodeCatalogQueryCoordinator.test.ts`
 
-### [NEXT] Task 2 - Package stream and sync mutation ownership
+### [DONE] Task 2 - Package stream and sync mutation ownership
 
 - **Goal**: Reduce direct stream/sync mutation pressure in `OpenCodeService.ts` by tightening ownership with the existing streaming and sync runtime coordinators.
 - **Key files**:
@@ -30,7 +30,7 @@
   - SDK-first plus legacy fallback semantics remain intact.
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts tests/unit/core/opencode/OpenCodeSyncEventRuntimeCoordinator.test.ts tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts tests/unit/core/opencode/OpenCodeService.sdkStreamEvents.test.ts`
 
-### [QUEUED] Task 3 - Package local sidecar adopt/restart diagnostics
+### [NEXT] Task 3 - Package local sidecar adopt/restart diagnostics
 
 - **Goal**: Shrink a concentrated lifecycle/diagnostics slice in `ServerManager.ts` while preserving managed-sidecar adoption, restart, conflict detection, and endpoint ownership semantics.
 - **Key files**:

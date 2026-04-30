@@ -1,10 +1,15 @@
 import type { SessionDiffEntry } from '../types';
+import type { OpenCodeStreamMutation } from './OpenCodeStreamEventTransformer';
 import type {
   OpenCodeCanonicalMessageInfo,
   OpenCodeCanonicalPart,
   OpenCodeCanonicalSessionState,
   OpenCodeSessionMessageWithParts,
 } from './types';
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
 
 function compareById<T extends { id: string }>(left: T, right: T): number {
   return left.id.localeCompare(right.id);
@@ -149,6 +154,120 @@ export class OpenCodeSessionStateStore {
     }
 
     return null;
+  }
+
+  applyStreamMutations(mutations: OpenCodeStreamMutation[]): void {
+    for (const mutation of mutations) {
+      this.applyStreamMutation(mutation);
+    }
+  }
+
+  private applyStreamMutation(mutation: OpenCodeStreamMutation): void {
+    switch (mutation.type) {
+      case 'message.upserted':
+        this.ensureStreamMessage(mutation);
+        break;
+      case 'part.upserted':
+        this.ensureStreamMessage(mutation);
+        if (mutation.part) {
+          this.upsertStreamPart(mutation.part as OpenCodeCanonicalPart);
+        }
+        break;
+      case 'part.delta':
+        this.ensureStreamMessage(mutation);
+        this.applyStreamPartDelta(mutation);
+        break;
+      case 'part.completed':
+        this.ensureStreamMessage(mutation);
+        break;
+    }
+  }
+
+  private ensureStreamMessage(mutation: Pick<
+    OpenCodeStreamMutation,
+    'sessionID' | 'messageID' | 'role' | 'createdAt'
+  >): void {
+    const existing = this.sessions.get(mutation.sessionID)?.messages.find(
+      (message) => message.id === mutation.messageID,
+    );
+    if (existing) {
+      return;
+    }
+
+    this.upsertMessage({
+      id: mutation.messageID,
+      sessionID: mutation.sessionID,
+      role: mutation.role ?? 'assistant',
+      time: {
+        created: mutation.createdAt ?? Date.now(),
+      },
+    });
+  }
+
+  private upsertStreamPart(part: OpenCodeCanonicalPart): void {
+    const existing = this.sessions.get(part.sessionID)?.partsByMessageID[part.messageID]
+      ?.find((candidate) => candidate.id === part.id);
+    const nextPart = existing ? this.mergeStreamPart(existing, part) : part;
+    this.upsertPart(nextPart);
+  }
+
+  private mergeStreamPart(
+    existing: OpenCodeCanonicalPart,
+    incoming: OpenCodeCanonicalPart,
+  ): OpenCodeCanonicalPart {
+    return this.mergeDefinedRecords(
+      existing as Record<string, unknown>,
+      incoming as Record<string, unknown>,
+    ) as OpenCodeCanonicalPart;
+  }
+
+  private mergeDefinedRecords(
+    existing: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const merged: Record<string, unknown> = { ...existing };
+    for (const [key, value] of Object.entries(incoming)) {
+      if (value === undefined) {
+        continue;
+      }
+
+      if (isPlainRecord(value) && isPlainRecord(merged[key])) {
+        merged[key] = this.mergeDefinedRecords(
+          merged[key] as Record<string, unknown>,
+          value,
+        );
+        continue;
+      }
+
+      merged[key] = value;
+    }
+
+    return merged;
+  }
+
+  private applyStreamPartDelta(mutation: OpenCodeStreamMutation): void {
+    if (!mutation.partID || !mutation.field || typeof mutation.delta !== 'string') {
+      return;
+    }
+
+    const nextState = this.appendPartDelta({
+      messageID: mutation.messageID,
+      partID: mutation.partID,
+      field: mutation.field,
+      delta: mutation.delta,
+    });
+    if (nextState) {
+      return;
+    }
+
+    const nextPart: Record<string, unknown> = {
+      id: mutation.partID,
+      sessionID: mutation.sessionID,
+      messageID: mutation.messageID,
+      type: mutation.partType ?? 'text',
+    };
+    nextPart[mutation.field] = mutation.delta;
+    this.upsertPart(nextPart as OpenCodeCanonicalPart);
   }
 
   setSessionDiffEntries(sessionID: string, entries: SessionDiffEntry[]): void {

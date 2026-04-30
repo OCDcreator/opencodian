@@ -11,7 +11,7 @@
 - 单一 streaming 入口下的 SDK/legacy transport 选择
 - SDK stream 订阅、prompt 启动顺序与“首事件前失败 → legacy SSE”降级策略
 - legacy `/event` SSE reader / parser / abort-detach 生命周期
-- 在交付 legacy `StreamChunk` 前先把 stream mutations 转交给 canonical session graph
+- 在交付 legacy `StreamChunk` 前先把 stream mutations 转交给 canonical session graph；具体 message/part reducer 由 `OpenCodeSessionStateStore.applyStreamMutations()` 拥有
 - `session.idle` / `session.error` 停止判定后的 final assistant message completion
 - `cancelStream()` / `detachStream()` 的协议语义
 
@@ -35,7 +35,7 @@
 
 ## 核心类型 / 状态
 
-- `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供 stream mutation 应用、服务端 abort、legacy SSE 请求参数、session messages 读取、warning log、短延迟重试能力，以及共享的 `streamEventTransformer`。
+- `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供 stream mutation 应用入口、服务端 abort、legacy SSE 请求参数、session messages 读取、warning log、短延迟重试能力，以及共享的 `streamEventTransformer`。应用入口现在委托 `OpenCodeSessionStateStore.applyStreamMutations()`，coordinator 不直接了解 canonical store 内部细节。
 - `OpenCodeStreamingRuntimeContext`: 单条活动流的 session-scoped runtime context，封装 `AbortController.signal`、part type map 与 part message-id map。
 - `OpenCodeStreamingRuntimeRequest`: 单一 transport 入口；调用方传入 `useSdkStream`、当前 prompt 的 `promptMessageId`、SDK callbacks 与 legacy callbacks，coordinator 负责选择实际 transport。
 - `OpenCodeStreamingLegacyStreamRequest`: legacy transport 入口；调用方可传入 `startPrompt()` 与 `promptMessageId`，coordinator 随后接手 `/event` 读取。
@@ -57,7 +57,7 @@
 - 如果 SDK iterator 在第一条事件前抛错，coordinator 会通过 host 的 legacy SSE 请求参数立即切到 `/event`，保持既有 SDK-first / legacy fallback 策略。
 - 一旦已经收到首个 SDK event，后续异常不会再切回 legacy，而是直接产出 `error` chunk。
 - `streamLegacyResponse()` 则直接执行 legacy prompt 启动后进入 `/event` 读取。
-- 每个 event outcome 都会先调用 `applyStreamMutations()`，再 yield 对应 `StreamChunk`，避免 canonical graph 落后于本地 loose chunk。
+- 每个 event outcome 都会先调用 host `applyStreamMutations()`，再 yield 对应 `StreamChunk`，避免 canonical graph 落后于本地 loose chunk；message/part merge 和 delta fallback 由 `OpenCodeSessionStateStore` 处理。
 
 ### SSE reader 与 finalize lifecycle
 
@@ -95,7 +95,7 @@ graph LR
     F --> G
     G --> H[StreamChunk + StreamMutation]
     H --> M[applyStreamMutations]
-    M --> N[OpenCodeService canonical graph]
+    M --> N[OpenCodeSessionStateStore canonical graph]
     B --> I[finishStreamingResponse]
     I --> J[getSessionMessages host seam]
     A --> K[cancelStream / detachStream]

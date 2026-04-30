@@ -32,6 +32,56 @@ function createPart(
   };
 }
 
+function applyRepresentativeStreamMutations(store: OpenCodeSessionStateStore): void {
+  store.applyStreamMutations([
+    {
+      type: 'message.upserted',
+      sessionID: 'session-1',
+      messageID: 'msg-stream',
+      role: 'assistant',
+      createdAt: 10,
+    },
+    {
+      type: 'part.upserted',
+      sessionID: 'session-1',
+      messageID: 'msg-stream',
+      partID: 'part-1',
+      part: createPart('part-1', 'msg-stream', {
+        text: 'Hello',
+        time: { start: 11 },
+      }),
+    },
+    {
+      type: 'part.upserted',
+      sessionID: 'session-1',
+      messageID: 'msg-stream',
+      partID: 'part-1',
+      part: createPart('part-1', 'msg-stream', {
+        text: undefined,
+        time: { end: 12 },
+      }),
+    },
+    {
+      type: 'part.delta',
+      sessionID: 'session-1',
+      messageID: 'msg-stream',
+      partID: 'part-1',
+      partType: 'text',
+      field: 'text',
+      delta: ' world',
+    },
+    {
+      type: 'part.delta',
+      sessionID: 'session-1',
+      messageID: 'msg-stream',
+      partID: 'part-2',
+      partType: 'text',
+      field: 'text',
+      delta: 'fallback',
+    },
+  ]);
+}
+
 describe('OpenCodeSessionStateStore', () => {
   it('preserves message insertion order while keeping parts sorted and merging part deltas', () => {
     const store = new OpenCodeSessionStateStore();
@@ -116,6 +166,33 @@ describe('OpenCodeSessionStateStore', () => {
       'msg_assistant_monotonic',
       'msg-user-2',
       'msg-user-3',
+    ]);
+  });
+
+  it('applies stream mutations while preserving existing part fields and creating delta fallback parts', () => {
+    const store = new OpenCodeSessionStateStore();
+
+    applyRepresentativeStreamMutations(store);
+
+    const state = store.getSessionState('session-1');
+
+    expect(state?.messages).toEqual([
+      expect.objectContaining({
+        id: 'msg-stream',
+        role: 'assistant',
+        time: { created: 10 },
+      }),
+    ]);
+    expect(state?.partsByMessageID['msg-stream']).toEqual([
+      expect.objectContaining({
+        id: 'part-1',
+        text: 'Hello world',
+        time: { start: 11, end: 12 },
+      }),
+      expect.objectContaining({
+        id: 'part-2',
+        text: 'fallback',
+      }),
     ]);
   });
 

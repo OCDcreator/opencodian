@@ -10,6 +10,7 @@
 - 全量 session snapshot replace
 - message / part 的 upsert 与 remove
 - `message.part.delta` 风格的字符串字段增量合并
+- stream mutation 的 message/part upsert、part merge、delta fallback part 补建
 - `session.diff` sync event 的 diff entries 缓存
 - 对外提供稳定、克隆后的 canonical state 读取视图
 
@@ -51,6 +52,7 @@
 - `removeMessage()`：删除 message 并一并清掉其 parts
 - `removePart()`：删除指定 part；最后一个 part 删除后清掉对应 message bucket
 - `appendPartDelta()`：把 `delta` 追加到现有字符串字段，供后续 sync-event / streaming reducer 复用
+- `applyStreamMutations()`：按 `OpenCodeStreamEventTransformer` 产出的 mutation 顺序应用 stream message/part upsert、nested part merge、part delta 与 delta-first fallback part 补建
 
 ### Read isolation
 
@@ -66,6 +68,7 @@
 | `upsertPart()` | 写入或覆盖单条 message part |
 | `removePart()` | 删除单条 part |
 | `appendPartDelta()` | 向现有字符串字段追加 delta |
+| `applyStreamMutations()` | 应用 stream mutation 序列并维护 canonical message/part graph |
 | `setSessionDiffEntries()` | 缓存 `session.diff` sync event 的 diff entries |
 | `getSessionDiffEntries()` | 读取某个 session 的克隆后 diff entries |
 | `removeSessionDiffEntries()` | 删除某个 session 的 diff entries |
@@ -75,16 +78,16 @@
 
 ```mermaid
 graph TD
-    A[OpenCodeService getSessionMessages] --> B[OpenCodeSessionStateStore]
+    A[OpenCodeService getSessionMessages / stream mutations] --> B[OpenCodeSessionStateStore]
     B --> C[canonical session graph]
     C --> D[getCanonicalSessionState]
 ```
 
 ## 与其他模块的交互
 
-- `OpenCodeService` 保留对外 session façade，但 authoritative `getSessionMessages()` snapshot 会立即写入本 store。
+- `OpenCodeService` 保留对外 session façade，但 authoritative `getSessionMessages()` snapshot 与 streaming runtime 的 mutation 序列都会立即写入本 store。
 - `types.ts` 现在提供 canonical message/part/session state 类型，避免服务层和测试各自再定义一份结构。
-- 后续 sync-event graph mutation slice 会继续复用同一个 owner，而不是重新引入第三份临时消息状态。
+- stream mutation graph reducer 已经复用同一个 owner；后续 sync-event graph mutation slice 也应继续复用这里，而不是重新引入第三份临时消息状态。
 
 ## 配置项
 
