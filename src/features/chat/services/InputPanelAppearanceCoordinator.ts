@@ -1,5 +1,6 @@
 import type { LiquidGlassAdapterId } from '../../../core/types';
 import { createLogger } from '../../../shared';
+import { getInputPanelGlassRefractionCssVariables } from '../chatAppearance';
 import {
   InputPanelThemeRuntime,
   type InputPanelThemeRuntimeHost,
@@ -58,6 +59,9 @@ export interface InputPanelAppearanceCoordinatorHost extends InputPanelThemeRunt
   getChatContainerEl(): HTMLElement | null;
   getMessagesShellEl(): HTMLElement | null;
   getMessagesContainerEl(): HTMLElement | null;
+  getInputPanelGlassRefractionSettings(): Parameters<
+    typeof getInputPanelGlassRefractionCssVariables
+  >[0];
   scheduleChatSurfaceColorSync(): void;
   scheduleComposerLayoutSync(): void;
   isDebugLoggingEnabled(): boolean;
@@ -74,6 +78,7 @@ export class InputPanelAppearanceCoordinator {
   }
 
   syncAppearanceState(): void {
+    this.applyGlassRefractionCssVariables();
     const liquidGlassAdapterId = this.themeRuntime.syncAppearanceState();
     this.host.scheduleChatSurfaceColorSync();
     this.host.scheduleComposerLayoutSync();
@@ -102,6 +107,20 @@ export class InputPanelAppearanceCoordinator {
 
     this.lastLiquidGlassDiagnosticsFingerprint = fingerprint;
     logger.debug(`${label}: ${serializedPayload}`);
+  }
+
+  private applyGlassRefractionCssVariables(): void {
+    const chatContainerEl = this.host.getChatContainerEl();
+    if (!chatContainerEl) {
+      return;
+    }
+
+    const cssVariables = getInputPanelGlassRefractionCssVariables(
+      this.host.getInputPanelGlassRefractionSettings(),
+    );
+    for (const [cssVar, cssValue] of Object.entries(cssVariables)) {
+      chatContainerEl.style.setProperty(cssVar, cssValue);
+    }
   }
 
   private scheduleLiquidGlassDiagnostics(adapterId: LiquidGlassAdapterId | null): void {

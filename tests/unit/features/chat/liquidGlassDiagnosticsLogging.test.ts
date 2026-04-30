@@ -32,12 +32,23 @@ describe('OpenCodianView liquid glass diagnostics logging', () => {
   it('suppresses identical liquid glass diagnostic log payloads until they change', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const view = createView() as unknown as {
-      logLiquidGlassDiagnosticsEntry: (label: string, payload: unknown) => void;
+      inputPanelAppearanceCoordinator: {
+        logDiagnosticsEntry: (label: string, payload: unknown) => void;
+      };
     };
 
-    view.logLiquidGlassDiagnosticsEntry('Liquid glass diagnostics', { adapterId: 'shuding', shellWidth: 320 });
-    view.logLiquidGlassDiagnosticsEntry('Liquid glass diagnostics', { adapterId: 'shuding', shellWidth: 320 });
-    view.logLiquidGlassDiagnosticsEntry('Liquid glass diagnostics', { adapterId: 'shuding', shellWidth: 360 });
+    view.inputPanelAppearanceCoordinator.logDiagnosticsEntry('Liquid glass diagnostics', {
+      adapterId: 'shuding',
+      shellWidth: 320,
+    });
+    view.inputPanelAppearanceCoordinator.logDiagnosticsEntry('Liquid glass diagnostics', {
+      adapterId: 'shuding',
+      shellWidth: 320,
+    });
+    view.inputPanelAppearanceCoordinator.logDiagnosticsEntry('Liquid glass diagnostics', {
+      adapterId: 'shuding',
+      shellWidth: 360,
+    });
 
     const matchingLogs = consoleSpy.mock.calls
       .map((call) => String(call[0] ?? ''))

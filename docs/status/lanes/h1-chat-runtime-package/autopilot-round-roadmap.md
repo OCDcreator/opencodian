@@ -31,7 +31,7 @@
   - Ownership lands in existing chat owners or a clearly durable multi-call owner.
 - **Validation**: `npm test -- --runInBand tests/unit/features/chat/QuestionDockCoordinator.test.ts tests/unit/features/chat/QuestionRuntimeHostAdapter.test.ts tests/unit/features/chat/BackgroundTaskCompletionNoticeService.test.ts tests/unit/features/chat/backgroundTaskTimeline.test.ts`
 
-### [NEXT] Task 3 - Package chat shell control seams and checkpoint hotspot deltas
+### [DONE] Task 3 - Package chat shell control seams and checkpoint hotspot deltas
 
 - **Goal**: Reduce one more slice of view-local shell wiring around input/selection/render refresh while documenting before/after hotspot evidence for the lane handoff.
 - **Key files**:

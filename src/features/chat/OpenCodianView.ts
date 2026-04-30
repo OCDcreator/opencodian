@@ -54,7 +54,6 @@ import {
 import {
   buildChatAppearanceCustomCss,
   getChatAppearanceCssVariables,
-  getInputPanelGlassRefractionCssVariables,
 } from './chatAppearance';
 import {
   type FocusContextPreview,
@@ -930,6 +929,7 @@ export class OpenCodianView extends ItemView {
       getMessagesContainerEl: () => this.messagesContainer,
       getInputPanelTheme: () => this.plugin.settings.inputPanelTheme,
       getInputActionButtonStyle: () => this.plugin.settings.chatAppearance.input.actionButtonStyle,
+      getInputPanelGlassRefractionSettings: () => this.plugin.settings.inputPanelGlassRefraction,
       getInputPanelGlassRefractionSvgFilterSettings: () =>
         this.plugin.settings.inputPanelGlassRefractionSvgFilter,
       getLiquidGlassAdapterSettings: (adapterId) => this.plugin.settings.inputPanelLiquidGlass[adapterId],
@@ -3028,13 +3028,6 @@ export class OpenCodianView extends ItemView {
       this.currentConversation,
     );
 
-    const glassRefractionCssVariables = getInputPanelGlassRefractionCssVariables(
-      this.plugin.settings.inputPanelGlassRefraction,
-    );
-    for (const [cssVar, cssValue] of Object.entries(glassRefractionCssVariables)) {
-      this.chatContainerEl.style.setProperty(cssVar, cssValue);
-    }
-
     this.themeBackgroundRequestId += 1;
     this.chatContainerEl.removeClass('opencodian-container--theme-background');
     this.themeBackgroundImageEl?.style.removeProperty('background-image');
@@ -3375,14 +3368,6 @@ export class OpenCodianView extends ItemView {
     return adapter.getResourcePath(assetPath);
   }
 
-  private applyInputPanelThemeState(): void {
-    this.inputPanelAppearanceCoordinator.applyThemeState();
-  }
-
-  private logLiquidGlassDiagnosticsEntry(label: string, payload: unknown): void {
-    this.inputPanelAppearanceCoordinator.logDiagnosticsEntry(label, payload);
-  }
-
   private shouldLogAssistantFinalizationDebug(label: string): boolean {
     return ASSISTANT_DEBUG_STAGE_ALLOWLIST.has(label);
   }
@@ -3601,10 +3586,6 @@ export class OpenCodianView extends ItemView {
       default:
         return { type: 'unknown' };
     }
-  }
-
-  private applyInputActionButtonStyleState(): void {
-    this.inputPanelAppearanceCoordinator.applyActionButtonStyleState();
   }
 
   private scheduleComposerLayoutSync(): void {

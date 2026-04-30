@@ -29,8 +29,10 @@ type InputPanelThemeViewHarness = {
       inputPanelLiquidGlass: ReturnType<typeof getDefaultInputPanelLiquidGlassSettings>;
     };
   };
-  applyInputPanelThemeState: () => void;
-  applyInputActionButtonStyleState: () => void;
+  inputPanelAppearanceCoordinator: {
+    applyThemeState: () => void;
+    applyActionButtonStyleState: () => void;
+  };
   updateSendButtonState: () => void;
 };
 
@@ -111,7 +113,7 @@ describe('OpenCodianView input panel theme shell state', () => {
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
     attachComposerShell(view, { shellEl });
 
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
 
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(false);
@@ -130,7 +132,7 @@ describe('OpenCodianView input panel theme shell state', () => {
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
     attachComposerShell(view, { shellEl });
 
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
 
     expect(shellEl.classList.contains(className)).toBe(true);
   });
@@ -140,7 +142,7 @@ describe('OpenCodianView input panel theme shell state', () => {
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
     attachComposerShell(view, { shellEl });
 
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
 
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(true);
     expect(document.body.querySelector('.opencodian-composer-glass-fx')).toBeNull();
@@ -159,7 +161,7 @@ describe('OpenCodianView input panel theme shell state', () => {
       strongScale: 16,
     };
 
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
 
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(true);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-svg-filter-subtle')).toBe(true);
@@ -182,7 +184,7 @@ describe('OpenCodianView input panel theme shell state', () => {
       strongScale: 21,
     };
 
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-svg-filter-strong')).toBe(true);
     expect(
       document.querySelector('#opencodian-glass-refract-strong feDisplacementMap')?.getAttribute('scale'),
@@ -194,7 +196,7 @@ describe('OpenCodianView input panel theme shell state', () => {
       subtleScale: 8,
       strongScale: 21,
     };
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
 
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-svg-filter-strong')).toBe(false);
     expect(shellEl.querySelector('.opencodian-composer-svg-filter-layer')).toBeNull();
@@ -205,11 +207,11 @@ describe('OpenCodianView input panel theme shell state', () => {
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
     attachComposerShell(view, { shellEl });
 
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(true);
 
     view.plugin.settings.inputPanelTheme = 'glass-refraction-card';
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(true);
     expect(document.body.querySelector('.opencodian-composer-glass-fx')).toBeNull();
@@ -217,7 +219,7 @@ describe('OpenCodianView input panel theme shell state', () => {
     expect(shellEl.dataset.opencodianGlassFilter).toBeUndefined();
 
     view.plugin.settings.inputPanelTheme = 'preset';
-    view.applyInputPanelThemeState();
+    view.inputPanelAppearanceCoordinator.applyThemeState();
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-pill')).toBe(false);
   });
@@ -229,15 +231,15 @@ describe('OpenCodianView input action buttons', () => {
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
     attachComposerShell(view, { shellEl });
 
-    view.applyInputActionButtonStyleState();
+    view.inputPanelAppearanceCoordinator.applyActionButtonStyleState();
     expect(shellEl.classList.contains('opencodian-composer-shell--action-buttons-etched')).toBe(false);
 
     view.plugin.settings.chatAppearance.input.actionButtonStyle = 'etched';
-    view.applyInputActionButtonStyleState();
+    view.inputPanelAppearanceCoordinator.applyActionButtonStyleState();
     expect(shellEl.classList.contains('opencodian-composer-shell--action-buttons-etched')).toBe(true);
 
     view.plugin.settings.chatAppearance.input.actionButtonStyle = 'default';
-    view.applyInputActionButtonStyleState();
+    view.inputPanelAppearanceCoordinator.applyActionButtonStyleState();
     expect(shellEl.classList.contains('opencodian-composer-shell--action-buttons-etched')).toBe(false);
   });
 
@@ -309,7 +311,7 @@ describe('OpenCodianView liquid glass input panel theme', () => {
       const inputWrapperEl = shellEl.createDiv({ cls: 'opencodian-input-wrapper' });
       attachComposerShell(view, { shellEl, inputWrapperEl });
 
-      view.applyInputPanelThemeState();
+      view.inputPanelAppearanceCoordinator.applyThemeState();
 
       const filterLayerEl = shellEl.querySelector<HTMLElement>('.opencodian-composer-svg-filter-layer');
       expect(shellEl.classList.contains('opencodian-composer-shell--liquid-glass')).toBe(true);
@@ -322,7 +324,7 @@ describe('OpenCodianView liquid glass input panel theme', () => {
       expect(shellEl.style.borderRadius).toBe('20px');
 
       view.plugin.settings.inputPanelTheme = 'glass-refraction-card';
-      view.applyInputPanelThemeState();
+      view.inputPanelAppearanceCoordinator.applyThemeState();
 
       expect(shellEl.classList.contains('opencodian-composer-shell--liquid-glass')).toBe(false);
       expect(shellEl.dataset.opencodianLgShuding).toBeUndefined();

@@ -1,5 +1,6 @@
 import type {
   InputPanelActionButtonStyleId,
+  InputPanelGlassRefractionSettings,
   InputPanelGlassRefractionSvgFilterSettings,
   InputPanelThemeId,
 } from '../../../../src/core/types';
@@ -19,6 +20,7 @@ import {
 interface FixtureOptions {
   actionButtonStyle?: InputPanelActionButtonStyleId;
   theme?: InputPanelThemeId;
+  glassRefractionSettings?: InputPanelGlassRefractionSettings;
   svgFilterSettings?: InputPanelGlassRefractionSvgFilterSettings;
   debugLoggingEnabled?: boolean;
 }
@@ -29,6 +31,26 @@ function createFixture(options: FixtureOptions = {}) {
   const chatContainerEl = document.body.createDiv({ cls: 'opencodian-chat-container' });
   let actionButtonStyle = options.actionButtonStyle ?? 'default';
   let theme = options.theme ?? 'preset';
+  let glassRefractionSettings = options.glassRefractionSettings ?? {
+    glass: {
+      backgroundOpacity: 48,
+      blur: 26,
+      saturation: 170,
+      brightness: 108,
+    },
+    card: {
+      backgroundOpacity: 52,
+      blur: 20,
+      saturation: 150,
+      brightness: 100,
+    },
+    pill: {
+      backgroundOpacity: 5,
+      blur: 8,
+      saturation: 130,
+      brightness: 100,
+    },
+  };
   let svgFilterSettings = options.svgFilterSettings ?? {
     preset: 'none',
     subtleScale: 8,
@@ -44,6 +66,7 @@ function createFixture(options: FixtureOptions = {}) {
     getMessagesContainerEl: jest.fn(() => null),
     getInputPanelTheme: jest.fn(() => theme),
     getInputActionButtonStyle: jest.fn(() => actionButtonStyle),
+    getInputPanelGlassRefractionSettings: jest.fn(() => glassRefractionSettings),
     getInputPanelGlassRefractionSvgFilterSettings: jest.fn(() => svgFilterSettings),
     getLiquidGlassAdapterSettings: jest.fn(() => ({ blur: 12 })),
     scheduleChatSurfaceColorSync: jest.fn(),
@@ -59,11 +82,15 @@ function createFixture(options: FixtureOptions = {}) {
     host,
     shellEl,
     inputWrapperEl,
+    chatContainerEl,
     setActionButtonStyle: (next: InputPanelActionButtonStyleId) => {
       actionButtonStyle = next;
     },
     setTheme: (next: InputPanelThemeId) => {
       theme = next;
+    },
+    setGlassRefractionSettings: (next: InputPanelGlassRefractionSettings) => {
+      glassRefractionSettings = next;
     },
     setSvgFilterSettings: (next: InputPanelGlassRefractionSvgFilterSettings) => {
       svgFilterSettings = next;
@@ -112,6 +139,9 @@ describe('InputPanelAppearanceCoordinator', () => {
       fixture.shellEl.classList.contains('opencodian-composer-shell--gr-svg-filter-subtle'),
     ).toBe(true);
     expect(fixture.shellEl.querySelector('.opencodian-composer-svg-filter-layer')).not.toBeNull();
+    expect(fixture.chatContainerEl.style.getPropertyValue('--opencodian-gr-glass-blur')).toBe(
+      '26px',
+    );
     expect(fixture.host.scheduleChatSurfaceColorSync).toHaveBeenCalledTimes(1);
     expect(fixture.host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(1);
 
@@ -122,6 +152,26 @@ describe('InputPanelAppearanceCoordinator', () => {
       subtleScale: 8,
       strongScale: 16,
     });
+    fixture.setGlassRefractionSettings({
+      glass: {
+        backgroundOpacity: 40,
+        blur: 18,
+        saturation: 140,
+        brightness: 102,
+      },
+      card: {
+        backgroundOpacity: 45,
+        blur: 16,
+        saturation: 135,
+        brightness: 98,
+      },
+      pill: {
+        backgroundOpacity: 8,
+        blur: 10,
+        saturation: 120,
+        brightness: 99,
+      },
+    });
 
     fixture.coordinator.syncAppearanceState();
 
@@ -130,6 +180,9 @@ describe('InputPanelAppearanceCoordinator', () => {
     ).toBe(false);
     expect(fixture.shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(false);
     expect(fixture.shellEl.querySelector('.opencodian-composer-svg-filter-layer')).toBeNull();
+    expect(fixture.chatContainerEl.style.getPropertyValue('--opencodian-gr-glass-blur')).toBe(
+      '18px',
+    );
     expect(fixture.host.scheduleChatSurfaceColorSync).toHaveBeenCalledTimes(2);
     expect(fixture.host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(2);
   });
