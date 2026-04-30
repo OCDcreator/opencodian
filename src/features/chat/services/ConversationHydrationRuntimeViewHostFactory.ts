@@ -1,12 +1,17 @@
-import type {
-  ConversationHydrationOutcomeBridgeHost,
+import {
+  ConversationHydrationOutcomeBridge,
+  type ConversationHydrationOutcomeBridgeHost,
 } from '../runtime/ConversationHydrationOutcomeBridge';
-import type {
-  ConversationHydrationRenderBridgeHost,
+import {
+  ConversationHydrationRenderBridge,
+  type ConversationHydrationRenderBridgeHost,
 } from '../runtime/ConversationHydrationRenderBridge';
-import type {
-  ConversationTransitionBridgeHost,
+import {
+  ConversationTransitionBridge,
+  type ConversationTransitionBridgeHost,
 } from '../runtime/ConversationTransitionBridge';
+import type { TabConversationStateBridge } from '../runtime/TabConversationStateBridge';
+import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 
 type ConversationHydrationRenderRuntimePort = Pick<
   ConversationHydrationRenderBridgeHost,
@@ -37,6 +42,13 @@ type ConversationTransitionWritebackPort = Pick<
   | 'resetTurnState'
   | 'endConversationHydration'
 >;
+
+
+export interface ConversationHydrationRuntimeBridges {
+  conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
+  conversationTransitionBridge: ConversationTransitionBridge;
+  conversationHydrationOutcomeBridge: ConversationHydrationOutcomeBridge;
+}
 
 export interface ConversationHydrationRuntimeViewHosts {
   conversationHydrationRenderBridgeHost: ConversationHydrationRenderBridgeHost;
@@ -101,5 +113,31 @@ export function createConversationHydrationRuntimeViewHosts(
         host.endConversationHydration(tabId);
       },
     },
+  };
+}
+
+export function createConversationHydrationRuntimeBridges(
+  host: ConversationHydrationRuntimeViewHost,
+  tabConversationStateBridge: TabConversationStateBridge,
+  tabViewActivationBridge: TabViewActivationBridge,
+): ConversationHydrationRuntimeBridges {
+  const viewHosts = createConversationHydrationRuntimeViewHosts(host);
+  const conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
+    viewHosts.conversationHydrationRenderBridgeHost,
+  );
+  const conversationTransitionBridge = new ConversationTransitionBridge(
+    viewHosts.conversationTransitionBridgeHost,
+    conversationHydrationRenderBridge,
+  );
+  const conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
+    viewHosts.conversationHydrationOutcomeBridgeHost,
+    tabConversationStateBridge,
+    tabViewActivationBridge,
+  );
+
+  return {
+    conversationHydrationRenderBridge,
+    conversationTransitionBridge,
+    conversationHydrationOutcomeBridge,
   };
 }

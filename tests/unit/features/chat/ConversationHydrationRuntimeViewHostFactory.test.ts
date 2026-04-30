@@ -1,5 +1,11 @@
+import { ConversationHydrationOutcomeBridge } from '../../../../src/features/chat/runtime/ConversationHydrationOutcomeBridge';
+import { ConversationHydrationRenderBridge } from '../../../../src/features/chat/runtime/ConversationHydrationRenderBridge';
+import { ConversationTransitionBridge } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
+import { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
+import { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import {
   type ConversationHydrationRuntimeViewHost,
+  createConversationHydrationRuntimeBridges,
   createConversationHydrationRuntimeViewHosts,
 } from '../../../../src/features/chat/services/ConversationHydrationRuntimeViewHostFactory';
 
@@ -171,5 +177,25 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
     expect(fixture.host.getCurrentConversation).toHaveBeenCalledTimes(1);
     expect(fixture.host.clearMessagesContainer).toHaveBeenCalledTimes(1);
     expect(fixture.host.renderMessages).toHaveBeenCalledWith([]);
+  });
+
+  it('packages hydration bridge construction from the same flattened view seam', () => {
+    const fixture = createFixture();
+    const tabConversationStateBridge = {} as TabConversationStateBridge;
+    const tabViewActivationBridge = {} as TabViewActivationBridge;
+
+    const bridges = createConversationHydrationRuntimeBridges(
+      fixture.host,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+    );
+
+    expect(bridges.conversationHydrationRenderBridge)
+      .toBeInstanceOf(ConversationHydrationRenderBridge);
+    expect(bridges.conversationTransitionBridge).toBeInstanceOf(ConversationTransitionBridge);
+    expect(bridges.conversationHydrationOutcomeBridge)
+      .toBeInstanceOf(ConversationHydrationOutcomeBridge);
+    expect(bridges.conversationTransitionBridge.captureLoadedConversationTransition(false))
+      .toMatchObject({ activeTabId: 'tab-active' });
   });
 });

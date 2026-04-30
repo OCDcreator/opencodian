@@ -91,17 +91,8 @@ import {
   BackgroundTaskStreamTriggerCoordinator,
 } from './runtime/BackgroundTaskStreamTriggerCoordinator';
 import {
-  ConversationHydrationOutcomeBridge,
-} from './runtime/ConversationHydrationOutcomeBridge';
-import {
-  ConversationHydrationRenderBridge,
-} from './runtime/ConversationHydrationRenderBridge';
-import {
   ConversationLoadRuntimeBridge,
 } from './runtime/ConversationLoadRuntimeBridge';
-import {
-  ConversationTransitionBridge,
-} from './runtime/ConversationTransitionBridge';
 import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
@@ -192,8 +183,9 @@ import {
   type ConversationHistoryActionsHost,
 } from './services/ConversationHistoryActionsCoordinator';
 import {
+  type ConversationHydrationRuntimeBridges,
   type ConversationHydrationRuntimeViewHost,
-  createConversationHydrationRuntimeViewHosts,
+  createConversationHydrationRuntimeBridges,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
 import {
   ConversationLoadRecoveryCoordinator,
@@ -415,11 +407,11 @@ interface OpenCodianViewBackgroundTaskRuntimeWiring {
 
 interface OpenCodianViewConversationRuntimeWiring {
   conversationAuthoritativeSyncCoordinator: ConversationAuthoritativeSyncCoordinator;
-  conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
-  conversationTransitionBridge: ConversationTransitionBridge;
+  conversationHydrationRenderBridge: ConversationHydrationRuntimeBridges['conversationHydrationRenderBridge'];
+  conversationTransitionBridge: ConversationHydrationRuntimeBridges['conversationTransitionBridge'];
   tabConversationStateBridge: TabConversationStateBridge;
   tabViewActivationBridge: TabViewActivationBridge;
-  conversationHydrationOutcomeBridge: ConversationHydrationOutcomeBridge;
+  conversationHydrationOutcomeBridge: ConversationHydrationRuntimeBridges['conversationHydrationOutcomeBridge'];
   tabConversationActivationBridge: TabConversationActivationBridge;
   tabRuntimeStateBridge: TabRuntimeStateBridge;
   conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
@@ -659,9 +651,9 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
-  private conversationHydrationOutcomeBridge: ConversationHydrationOutcomeBridge;
-  private conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
-  private conversationTransitionBridge: ConversationTransitionBridge;
+  private conversationHydrationOutcomeBridge: ConversationHydrationRuntimeBridges['conversationHydrationOutcomeBridge'];
+  private conversationHydrationRenderBridge: ConversationHydrationRuntimeBridges['conversationHydrationRenderBridge'];
+  private conversationTransitionBridge: ConversationHydrationRuntimeBridges['conversationTransitionBridge'];
   private conversationAuthoritativeSyncCoordinator!: ConversationAuthoritativeSyncCoordinator;
   private tabConversationStateBridge: TabConversationStateBridge;
   private tabConversationActivationBridge: TabConversationActivationBridge;
@@ -1510,16 +1502,6 @@ export class OpenCodianView extends ItemView {
       this.createConversationAuthoritativeSyncHost(conversationRenderService),
     );
     this.conversationAuthoritativeSyncCoordinator = conversationAuthoritativeSyncCoordinator;
-    const conversationHydrationRuntimeViewHosts = createConversationHydrationRuntimeViewHosts(
-      this.createConversationHydrationRuntimeViewHost(conversationRenderService),
-    );
-    const conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
-      conversationHydrationRuntimeViewHosts.conversationHydrationRenderBridgeHost,
-    );
-    const conversationTransitionBridge = new ConversationTransitionBridge(
-      conversationHydrationRuntimeViewHosts.conversationTransitionBridgeHost,
-      conversationHydrationRenderBridge,
-    );
     const tabActivationRuntimeBridgeHosts = createTabActivationRuntimeViewHosts(
       createTabActivationRuntimeViewHostFactoryHost(
         this.createTabActivationRuntimeHostProviderHost(),
@@ -1537,8 +1519,12 @@ export class OpenCodianView extends ItemView {
         backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
       activeTabContextUsageCoordinator: backgroundTaskRuntime.activeTabContextUsageCoordinator,
     });
-    const conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
-      conversationHydrationRuntimeViewHosts.conversationHydrationOutcomeBridgeHost,
+    const {
+      conversationHydrationRenderBridge,
+      conversationTransitionBridge,
+      conversationHydrationOutcomeBridge,
+    } = createConversationHydrationRuntimeBridges(
+      this.createConversationHydrationRuntimeViewHost(conversationRenderService),
       tabConversationStateBridge,
       tabViewActivationBridge,
     );

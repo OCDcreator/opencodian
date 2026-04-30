@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 1 - Package `OpenCodianView` hydration and activation assembly
+### [DONE] Task 1 - Package `OpenCodianView` hydration and activation assembly
 
 - **Goal**: Move one durable hydration/activation assembly slice out of `OpenCodianView.ts` into existing chat runtime owners so the view stops directly coordinating as many transition details.
 - **Key files**:
@@ -17,7 +17,7 @@
   - Hydration/auth-sync, tab activation, and conversation load semantics remain behavior-equivalent.
 - **Validation**: `npm test -- --runInBand tests/unit/features/chat/ConversationLoadRecoveryCoordinator.test.ts tests/unit/features/chat/ConversationTabRuntimeCoordinator.test.ts tests/unit/features/chat/ConversationTransitionBridge.test.ts tests/unit/features/chat/ConversationHydrationOutcomeBridge.test.ts`
 
-### [QUEUED] Task 2 - Package question and background-task orchestration out of `OpenCodianView`
+### [NEXT] Task 2 - Package question and background-task orchestration out of `OpenCodianView`
 
 - **Goal**: Remove one stable question/background-task orchestration cluster from `OpenCodianView.ts` by strengthening the existing runtime owners around question refresh, reminder fallback, and inline completion state.
 - **Key files**:
