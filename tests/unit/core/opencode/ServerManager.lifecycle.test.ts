@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { LocalSidecarLauncher } from '../../../../src/core/opencode/LocalSidecarLauncher';
 import { LocalProcessProbe } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
@@ -47,9 +48,12 @@ function getProcessProbe(manager: ServerManager): LocalProcessProbe {
 }
 
 type ServerManagerTestAccess = ServerManager & {
+  localSidecarLauncher: LocalSidecarLauncher;
+};
+
+type LocalSidecarLauncherTestAccess = LocalSidecarLauncher & {
   getSpawnEnv(): NodeJS.ProcessEnv;
   findOpenCodeBinary(): string | null;
-  spawnServer(): Promise<void>;
 };
 
 const defaultConfig = {
@@ -73,10 +77,14 @@ const defaultConfig = {
 type ServerManagerContext = {
   defaultConfig: typeof defaultConfig;
   getManager(): ServerManager;
-  getTestAccess(): ServerManagerTestAccess;
+  getLauncherTestAccess(): LocalSidecarLauncherTestAccess;
   setManager(nextManager: ServerManager): ServerManager;
   testVaultPath: string;
 };
+
+function getLocalSidecarLauncher(manager: ServerManager): LocalSidecarLauncher {
+  return (manager as unknown as ServerManagerTestAccess).localSidecarLauncher;
+}
 
 function registerStateAndHealthTests(context: ServerManagerContext): void {
   describe('constructor', () => {
@@ -251,7 +259,7 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
       );
 
       context.getManager().setWorkingDirectory(context.testVaultPath);
-      const env = context.getTestAccess().getSpawnEnv();
+      const env = context.getLauncherTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
       expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
@@ -280,7 +288,7 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
       );
 
       context.getManager().setWorkingDirectory(context.testVaultPath);
-      const env = context.getTestAccess().getSpawnEnv();
+      const env = context.getLauncherTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
       expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
@@ -300,7 +308,7 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
         modelSourceMode: 'local',
       }));
 
-      const env = context.getTestAccess().getSpawnEnv();
+      const env = context.getLauncherTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_CONFIG).toBeUndefined();
       expect(env.OPENCODE_TUI_CONFIG).toBeUndefined();
@@ -325,7 +333,7 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
         pluginIsolationMode: 'pure',
       }));
 
-      const env = context.getTestAccess().getSpawnEnv();
+      const env = context.getLauncherTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_PURE).toBe('true');
     });
@@ -348,7 +356,7 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
         process.env.LOCALAPPDATA = path.join(context.testVaultPath, 'LocalAppData');
         process.env.PATH = pathBinDir;
 
-        const resolved = context.getTestAccess().findOpenCodeBinary();
+        const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
 
         expect(resolved).toBe(npmBinary);
       });
@@ -366,7 +374,7 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
       delete process.env.LOCALAPPDATA;
       process.env.PATH = pathBinDir;
 
-      const resolved = context.getTestAccess().findOpenCodeBinary();
+      const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
 
       expect(resolved).toBe(binaryPath);
     });
@@ -382,7 +390,11 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
         process.env.LOCALAPPDATA = path.join(context.testVaultPath, 'LocalAppData');
         process.env.PATH = '';
 
-        await context.getTestAccess().spawnServer();
+        await getLocalSidecarLauncher(context.getManager()).launchRuntime({
+          timeout: 30000,
+          checkHealth: async () => true,
+          managedServerStateSnapshot: null,
+        });
 
         expect(mockSpawn).toHaveBeenCalledWith(
           npmBinary,
@@ -406,7 +418,9 @@ describe('ServerManager lifecycle and environment', () => {
     manager = nextManager;
     return manager;
   };
-  const getTestAccess = (): ServerManagerTestAccess => manager as unknown as ServerManagerTestAccess;
+  const getLauncherTestAccess = (): LocalSidecarLauncherTestAccess => (
+    getLocalSidecarLauncher(manager) as LocalSidecarLauncherTestAccess
+  );
 
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -427,7 +441,7 @@ describe('ServerManager lifecycle and environment', () => {
   const context: ServerManagerContext = {
     defaultConfig,
     getManager,
-    getTestAccess,
+    getLauncherTestAccess,
     setManager,
     testVaultPath,
   };

@@ -26,6 +26,7 @@
 - `../../shared/logger`
 - `../config/modelConfig`
 - `./LocalSidecarEndpointResolver`
+- `./LocalSidecarLauncher`
 - `./LocalSidecarProcessInspector`
 - `./types`
 
@@ -123,10 +124,10 @@ Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；
 
 真正 spawn 时会：
 
-- 调用 `findOpenCodeBinary()`
+- 调用 `LocalSidecarLauncher` 内部 binary resolver
 - 用 `spawn(opencodePath, ['serve', '--port', ..., '--hostname', ..., '--cors', ...])`
 - 把 `cwd` 设为 `workingDirectory`
-- 注入由 `getSpawnEnv()` 生成的环境变量
+- 注入由 `LocalSidecarLauncher` 生成的环境变量
 - 记录 managed pid
 - 启动成功后再用“当前端口 owner 反查”刷新 `listenerPid`，把 launcher / listener 双 pid 一起写回 runtime state
 - 挂上 stdout/stderr tail、`error` / `exit` 追踪
@@ -169,14 +170,15 @@ Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；
 
 - `checkHealth(timeout)` 通过 `requestUrl(GET ${baseUrl}/global/health)` 判断服务是否健康，只有 HTTP 200 才返回 `true`
 - `canBindLocalEndpoint(host, port)` 通过 `LocalProcessProbe.canBindLocalEndpoint()` 做真实 bind 预检
-- `waitForHealthy(timeout)` 轮询健康检查，并在进程提前退出时立刻失败
+- `waitForHealthy(timeout)` 与 launch failure assembly 已委托给 `LocalSidecarLauncher`
 - 对“旧 managed server 需要重启”的情况，会通过 `LocalProcessProbe.waitForPortAvailability()` 轮询端口释放后再重新 spawn；目标不是单纯让 `4196` 有服务，而是让插件默认 sidecar 端点对应**当前 vault 的正确服务**
 - OS 级别的进程查询（`lsof`/`netstat`、命令行解析、PID 存活检查）与 managed pid 终止 primitive 已委托给 `LocalProcessProbe` / `LocalSidecarProcessInspector`
 - 健康本地端点被占用时的 command classification、adopt / restart / recycle / conflict 判定和 diagnostics 文案已委托给 `LocalSidecarEndpointResolver`；`ServerManager` 只保留生命周期执行、状态变更和 managed state 持久化
+- 本地 sidecar 启动上下文（spawn、输出 tail 跟踪、ready wait、启动失败错误组装）已委托给 `LocalSidecarLauncher`
 
 ### Spawn 环境变量与模型来源模式
 
-`getSpawnEnv()` 会根据配置生成不同的 OpenCode 运行环境：
+`LocalSidecarLauncher` 中的 `getSpawnEnv()` 会根据配置生成不同的 OpenCode 运行环境：
 
 - `pluginIsolationMode === 'pure'`: 设置 `OPENCODE_PURE=true`
 - basic auth: 设置 `OPENCODE_SERVER_USERNAME` / `OPENCODE_SERVER_PASSWORD`
@@ -196,7 +198,7 @@ Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；
 
 ### OpenCode 可执行文件解析
 
-`findOpenCodeBinary()` 现在会真正按候选列表解析可执行文件，而不是只返回字面量命令名：
+`LocalSidecarLauncher` 中的 `findOpenCodeBinary()` 会按候选列表解析可执行文件，而不是只返回字面量命令名：
 
 - Windows：优先 `%APPDATA%\\npm\\opencode.cmd`，再尝试 `%LOCALAPPDATA%\\npm\\opencode.cmd`，最后才回退到 `PATH` 里的 `opencode.cmd` / `opencode`
 - macOS / Linux：优先常见绝对路径，再回退到 `PATH`
@@ -275,6 +277,6 @@ graph TD
 
 ### 其他注意事项
 
-- `findOpenCodeBinary()` 会显式探测候选路径和 `PATH`，不再只是“构造候选字符串后交给 shell”。
+- `LocalSidecarLauncher.findOpenCodeBinary()` 会显式探测候选路径和 `PATH`，不再只是“构造候选字符串后交给 shell”。
 - `setWorkingDirectory()` 只会额外检查 `.opencode/opencode.json` 的存在并写日志，不会在这里解析 `.jsonc`。
 - 如果未来又出现“服务器目录突然只剩 deepseek / 1 个 provider / 3 个 provider”这类问题，第一排查项不是 SDK 返回解包，而是：插件默认 `4196` 端点是否被孤儿 sidecar / 冲突进程占用、`runtime.json` 的 managed server 签名是否过期、当前 `cwd` 是否真的指向目标 vault。

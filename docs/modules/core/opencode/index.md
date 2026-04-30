@@ -23,6 +23,7 @@
 - `./OpenCodeSdkFacade`
 - `./sdkFeatureFlags`
 - `./ServerManager`
+- `./LocalSidecarLauncher`
 - `./LocalSidecarProcessInspector`
 - `./types`
 
@@ -39,6 +40,7 @@
 | `OpenCodeSdkFacade` | `./OpenCodeSdkFacade` | 对齐 SDK v2 全 namespace 的薄包装层 |
 | `SessionActivityStatus` | `./OpenCodeService` | session 忙闲/重试状态的类型 |
 | `ServerManager` | `./ServerManager` | 本地/远程服务生命周期管理 |
+| `LocalSidecarLauncher` | `./LocalSidecarLauncher` | 本地 sidecar launch-context owner（spawn、ready wait、launch output/failure assembly） |
 | `LocalProcessProbe` | `./LocalSidecarProcessInspector` | process/port probing、端口释放轮询、managed pid 终止 primitive |
 | `LocalSidecarProcessInspector` | `./LocalSidecarProcessInspector` | OS 级进程查询原语（供 `LocalProcessProbe` 组合） |
 | `resolveSdkFeatureFlags` | `./sdkFeatureFlags` | 合并 SDK rollout 开关 |
@@ -52,7 +54,7 @@
 
 barrel 的作用是给上层提供稳定入口，而不是把整个目录平铺导出。当前公开面聚焦在两类东西：
 
-- 运行时类：`OpenCodeService`、`ServerManager`、`LocalProcessProbe`、`LocalSidecarProcessInspector`
+- 运行时类：`OpenCodeService`、`ServerManager`、`LocalSidecarLauncher`、`LocalProcessProbe`、`LocalSidecarProcessInspector`
 - SDK 原子 façade：`OpenCodeSdkFacade`
 - 调用方会直接引用的类型/常量：`SdkFeatureFlags`、`QueryOptions`、`ServerStatus` 与 canonical session graph 类型等
 

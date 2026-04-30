@@ -3,6 +3,7 @@
  */
 
 import { LocalSidecarEndpointResolver } from '../../../../src/core/opencode/LocalSidecarEndpointResolver';
+import { LocalSidecarLauncher } from '../../../../src/core/opencode/LocalSidecarLauncher';
 import { LocalProcessProbe } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
@@ -12,6 +13,10 @@ function getProcessProbe(manager: ServerManager): LocalProcessProbe {
 
 function getEndpointResolver(manager: ServerManager): LocalSidecarEndpointResolver {
   return (manager as unknown as { endpointResolver: LocalSidecarEndpointResolver }).endpointResolver;
+}
+
+function getLocalSidecarLauncher(manager: ServerManager): LocalSidecarLauncher {
+  return (manager as unknown as { localSidecarLauncher: LocalSidecarLauncher }).localSidecarLauncher;
 }
 
 jest.mock('obsidian', () => ({
@@ -164,15 +169,20 @@ describe('ServerManager occupied local endpoint resolution', () => {
       looksLikePluginManagedSidecar: true,
     });
     const recycleUnknownLocalServer = jest.spyOn(manager as never, 'recycleUnknownLocalServer').mockResolvedValue(undefined);
-    const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
-    const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+    const launchRuntime = jest.spyOn(getLocalSidecarLauncher(manager), 'launchRuntime').mockResolvedValue({
+      process: { pid: 5678 } as never,
+      launchStartedAt: 0,
+      spawnedAt: 10,
+      healthyAt: 20,
+    });
     jest.spyOn(getProcessProbe(manager), 'getListeningProcessId').mockResolvedValue(5678);
 
     await expect(manager.start()).resolves.toBeUndefined();
 
     expect(recycleUnknownLocalServer).toHaveBeenCalled();
-    expect(spawnServer).toHaveBeenCalled();
-    expect(waitForHealthy).toHaveBeenCalledWith(30000);
+    expect(launchRuntime).toHaveBeenCalledWith(expect.objectContaining({
+      timeout: 30000,
+    }));
     expect(manager.getStatus()).toBe('running');
     expect(manager.getServerDiagnosticsSnapshot()).toMatchObject({
       reason: 'local-orphan-restarted',

@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { LocalSidecarLauncher } from '../../../../src/core/opencode/LocalSidecarLauncher';
 import { LocalProcessProbe } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
@@ -41,6 +42,20 @@ const { Notice: mockNotice } = jest.requireMock('obsidian') as {
 
 function getProcessProbe(manager: ServerManager): LocalProcessProbe {
   return (manager as unknown as { processProbe: LocalProcessProbe }).processProbe;
+}
+
+type LocalSidecarLauncherTestAccess = LocalSidecarLauncher & {
+  getActiveLaunchSnapshot(): { outputTail: string[] } | null;
+  buildLaunchFailureError(message: string, launch?: unknown): Error;
+  waitForHealthy(timeout: number, checkHealth: (timeout: number) => Promise<boolean>): Promise<void>;
+};
+
+function getLocalSidecarLauncher(manager: ServerManager): LocalSidecarLauncher {
+  return (manager as unknown as { localSidecarLauncher: LocalSidecarLauncher }).localSidecarLauncher;
+}
+
+function getLocalSidecarLauncherTestAccess(manager: ServerManager): LocalSidecarLauncherTestAccess {
+  return getLocalSidecarLauncher(manager) as LocalSidecarLauncherTestAccess;
 }
 
 const defaultConfig = {
@@ -232,15 +247,20 @@ function registerManagedLifecycleTests(context: ServerManagerRuntimeContext): vo
       jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
       jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('restart');
       const restartManagedServer = jest.spyOn(manager as never, 'restartManagedServer').mockResolvedValue(undefined);
-      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
-      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+      const launchRuntime = jest.spyOn(getLocalSidecarLauncher(manager), 'launchRuntime').mockResolvedValue({
+        process: { pid: 1234 } as never,
+        launchStartedAt: 0,
+        spawnedAt: 10,
+        healthyAt: 20,
+      });
       jest.spyOn(getProcessProbe(manager), 'getListeningProcessId').mockResolvedValue(1234);
 
       await expect(manager.start()).resolves.toBeUndefined();
 
       expect(restartManagedServer).toHaveBeenCalled();
-      expect(spawnServer).toHaveBeenCalled();
-      expect(waitForHealthy).toHaveBeenCalledWith(30000);
+      expect(launchRuntime).toHaveBeenCalledWith(expect.objectContaining({
+        timeout: 30000,
+      }));
       expect(manager.getStatus()).toBe('running');
     });
 
@@ -346,13 +366,19 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
         pid: 5678,
         message: 'Detected and restarted an orphaned plugin sidecar.',
       };
-      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
-      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+      const launchRuntime = jest.spyOn(getLocalSidecarLauncher(manager), 'launchRuntime').mockResolvedValue({
+        process: { pid: 4321 } as never,
+        launchStartedAt: 0,
+        spawnedAt: 10,
+        healthyAt: 20,
+      });
+      jest.spyOn(getProcessProbe(manager), 'getListeningProcessId').mockResolvedValue(4321);
 
       await expect((manager as never).launchLocalServerRuntime(successDiagnostics)).resolves.toBeUndefined();
 
-      expect(spawnServer).toHaveBeenCalled();
-      expect(waitForHealthy).toHaveBeenCalledWith(30000);
+      expect(launchRuntime).toHaveBeenCalledWith(expect.objectContaining({
+        timeout: 30000,
+      }));
       expect(manager.getServerDiagnosticsSnapshot()).toMatchObject(successDiagnostics);
       expect(manager.getStatus()).toBe('running');
       expect(mockNotice).toHaveBeenCalledWith('OpenCode server started');
@@ -360,25 +386,19 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
 
     it('refreshes the managed state with the live listener pid after startup succeeds', async () => {
       const manager = context.getManager();
-      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockImplementation(async () => {
-        (manager as unknown as { managedServerState: Record<string, unknown> }).managedServerState = {
-          pid: 1111,
-          host: '127.0.0.1',
-          port: 4196,
-          signatureVersion: 1,
-          workingDirectory: path.resolve(context.testVaultPath),
-          modelSourceMode: 'merge',
-          pluginIsolationMode: 'default',
-          configFingerprint: 'fp',
-        };
+      const launchRuntime = jest.spyOn(getLocalSidecarLauncher(manager), 'launchRuntime').mockResolvedValue({
+        process: { pid: 1111 } as never,
+        launchStartedAt: 0,
+        spawnedAt: 10,
+        healthyAt: 20,
       });
-      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
       jest.spyOn(getProcessProbe(manager), 'getListeningProcessId').mockResolvedValue(2468);
 
       await expect((manager as never).launchLocalServerRuntime()).resolves.toBeUndefined();
 
-      expect(spawnServer).toHaveBeenCalled();
-      expect(waitForHealthy).toHaveBeenCalledWith(30000);
+      expect(launchRuntime).toHaveBeenCalledWith(expect.objectContaining({
+        timeout: 30000,
+      }));
       expect(manager.getManagedServerStateSnapshot()).toMatchObject({
         listenerPid: 2468,
         pid: 2468,
@@ -395,9 +415,9 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
         error: null,
         cleanup: jest.fn(),
       };
-      (manager as unknown as { activeLaunch: typeof activeLaunch }).activeLaunch = activeLaunch;
+      (getLocalSidecarLauncher(manager) as unknown as { activeLaunch: typeof activeLaunch }).activeLaunch = activeLaunch;
 
-      const snapshot = (manager as never).getActiveLaunchSnapshot() as { outputTail: string[] } | null;
+      const snapshot = getLocalSidecarLauncherTestAccess(manager).getActiveLaunchSnapshot();
       expect(snapshot).not.toBeNull();
       if (!snapshot) {
         return;
@@ -405,7 +425,7 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
 
       activeLaunch.outputTail.push('mutated later\n');
 
-      const error = (manager as never).buildLaunchFailureError('Launch failed', snapshot) as Error;
+      const error = getLocalSidecarLauncherTestAccess(manager).buildLaunchFailureError('Launch failed', snapshot) as Error;
 
       expect(error.message).toContain('boot log');
       expect(error.message).not.toContain('mutated later');
@@ -415,7 +435,7 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
   describe('launch failures', () => {
     it('includes captured server output when startup fails early', async () => {
       const manager = context.getManager();
-      (manager as unknown as { activeLaunch: Record<string, unknown> }).activeLaunch = {
+      (getLocalSidecarLauncher(manager) as unknown as { activeLaunch: Record<string, unknown> }).activeLaunch = {
         outputTail: ['boot log\n', 'fatal: bad config\n'],
         exited: true,
         exitCode: 1,
@@ -424,7 +444,9 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
         cleanup: jest.fn(),
       };
 
-      await expect((manager as never).waitForHealthy(100)).rejects.toThrow(/Server output:\nboot log\nfatal: bad config/i);
+      await expect(
+        getLocalSidecarLauncherTestAccess(manager).waitForHealthy(100, async () => false),
+      ).rejects.toThrow(/Server output:\nboot log\nfatal: bad config/i);
     });
   });
 }

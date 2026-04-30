@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 1 - Package `ServerManager` local sidecar launch context into `LocalSidecarLauncher`
+### [DONE] Task 1 - Package `ServerManager` local sidecar launch context into `LocalSidecarLauncher`
 
 - **Goal**: Move spawn, launch tracking, launch failure assembly, and health-ready waiting out of `ServerManager.ts` into one durable adjacent owner.
 - **Key files**:
@@ -19,4 +19,4 @@
 
 ## Lane State
 
-- When Task 1 is complete and no `[NEXT]` or `[QUEUED]` items remain here, the controller switches to `t3-checkpoint`.
+- No remaining `[NEXT]` or `[QUEUED]` items in this lane. Controller should switch to `t3-checkpoint`.
