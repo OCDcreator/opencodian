@@ -1,0 +1,91 @@
+# PluginRuntimeCoordinator
+
+> **源码**: `src/core/runtime/PluginRuntimeCoordinator.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`PluginRuntimeCoordinator` 是插件入口旁的 runtime orchestration owner。它把原本集中在 `main.ts` 里的跨视图刷新、模型目录刷新调度、slash command catalog invalidation，以及 deferred local runtime warmup 收束到一个 durable coordinator 中。
+
+`OpenCodianPlugin` 仍然负责 Obsidian lifecycle、settings/storage/service 构造和诊断导出；本模块只持有启动后 runtime 调度所需的 timer / animation-frame / promise 状态，并通过 host seam 回调入口拥有的服务能力。
+
+## 导入关系
+
+```text
+上游:
+- Obsidian `WorkspaceLeaf` 类型
+- `src/core/opencode/OpenCodeService`
+- `src/core/types`
+- `src/features/chat/OpenCodianView`
+- `src/shared`
+
+下游:
+- `src/main.ts`
+```
+
+## 核心类型 / 状态
+
+- `PluginRuntimeCoordinatorHost`: 入口注入的 host seam，提供 settings、OpenCode service、当前 OpenCodian leaves、provider icon color mode 应用、本地服务启动、server snapshot 记录和 settings tab model-loaded 通知。
+- `RuntimeRefreshOptions`: 控制跨视图刷新是否 reload models、是否 apply UI。
+- `SlashCommandCatalogInvalidationOptions`: 透传给 `OpenCodianView.invalidateSlashCommandMenuCatalog()` 的 preload 选项。
+- `RuntimeWarmupSource`: 区分 startup deferred warmup 和 session-bootstrap 强制 warmup。
+- `modelRefreshFrameId`: 模型目录刷新 requestAnimationFrame 句柄。
+- `deferredRuntimeWarmupTimerId`: onload 后延迟 warmup 的 setTimeout 句柄。
+- `deferredRuntimeWarmupPromise`: 正在执行的 runtime warmup promise，用于 session bootstrap 复用或等待。
+
+## 核心逻辑
+
+### Cross-view refresh
+
+- `refreshOpenCodianViews()` 通过 host 提供的 leaves 找到所有 `OpenCodianView` 实例。
+- `applyUi` 为 true 时先应用 provider icon color mode，再同步 locale、chat appearance、scroll mode 和 tab bar layout。
+- `reloadModels` 为 true 时触发每个打开视图的 `reloadModelCatalog()`。
+
+### Slash command catalog invalidation
+
+- `invalidateSlashCommandMenuCatalogs()` 只遍历当前打开的 OpenCodian view，并把 preload 选项传给视图自己的 catalog cache invalidation seam。
+- 入口的 server-status callback 仍决定何时在 `running` 状态触发 preload；本模块只拥有 fan-out 行为。
+
+### Model refresh scheduling
+
+- `queueModelRefresh()` 会取消上一帧 pending refresh，再用 `requestAnimationFrame` 合并模型目录刷新。
+- frame callback 完成 view model reload fan-out 后调用 host `onModelsLoaded()`，保持 settings tab 的模型加载提示与原入口行为一致。
+- `dispose()` 会清理 pending model refresh frame，供插件 unload 调用。
+
+### Deferred runtime warmup
+
+- `scheduleDeferredRuntimeWarmup()` 只在当前 settings 是 local server mode 且 `autoStart` 为 true 时排队 warmup。
+- 如果 timer 或 warmup promise 已存在，不重复排队。
+- `ensureRuntimeWarmupReadyForSessionBootstrap()` 用于创建 session 前的安全栅栏：如果 deferred timer 还没跑，先取消 timer 并以 `session-bootstrap` source 立即 warmup；如果 warmup 已在运行则等待同一个 promise。
+- `runDeferredRuntimeWarmup()` 保持原启动语义：记录开始日志，调用 host 启动本地服务，再写 server status snapshot，最后记录耗时。
+
+## 数据流
+
+```mermaid
+graph LR
+    A[OpenCodianPlugin] --> B[PluginRuntimeCoordinator]
+    B --> C[OpenCodianView refresh fan-out]
+    B --> D[Slash catalog invalidation]
+    B --> E[requestAnimationFrame model refresh]
+    B --> F[deferred local runtime warmup]
+    F --> G[startConfiguredLocalServerIfNeeded host callback]
+    F --> H[logServerStatusSnapshot host callback]
+```
+
+## 与其他模块的交互
+
+- `main.ts` 构造本模块并提供 host callbacks；入口仍保留 lifecycle order、service construction、settings persistence、diagnostic report 和 command registration。
+- `OpenCodianView` 继续拥有实际 UI refresh 和 slash catalog cache 行为，本模块只负责找到当前打开的 view 并按入口策略调用它们。
+- `OpenCodeService` 仍拥有 server lifecycle；本模块只通过入口 host seam 触发 configured local server startup 和 readiness check。
+- `core/types` 的 `isLocalServerMode()` 是 warmup eligibility 的唯一设置判断，避免把 server mode 结构判断留在入口层重复实现。
+
+## 配置项
+
+本模块没有独立配置项。它读取 host 暴露的 `OpenCodianSettings.server`，并只关心 local server mode 与 `server.local.autoStart`。
+
+## 注意事项
+
+- 不要把 Obsidian plugin lifecycle、storage/config/model-service construction 或 diagnostic report 逻辑搬入本模块；这些仍属于 `main.ts`。
+- 不要把 view 级 UI 细节复制进 coordinator；新增视图刷新行为优先由 `OpenCodianView` 提供稳定方法后再由本模块 fan out。
+- `ensureRuntimeWarmupReadyForSessionBootstrap()` 的 timer cancellation 和 promise reuse 是创建会话前的竞态保护，不要拆成 fire-and-forget。
+- `dispose()` 必须在 plugin unload 时调用，避免 pending timeout/frame 在卸载后继续触发。

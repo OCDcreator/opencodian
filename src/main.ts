@@ -12,6 +12,7 @@ import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
+import { PluginRuntimeCoordinator } from './core/runtime/PluginRuntimeCoordinator';
 import { splitPersistedSettings, StorageService } from './core/storage';
 import {
   getThemeAppearanceOverridesFromBase,
@@ -102,9 +103,15 @@ export default class OpenCodianPlugin extends Plugin {
   private conversationsLoadPromise: Promise<void> | null = null;
   private chatAppearanceSaveTimeoutId: number | null = null;
   private settingsUiStateSaveTimeoutId: number | null = null;
-  private modelRefreshFrameId: number | null = null;
-  private deferredRuntimeWarmupTimerId: number | null = null;
-  private deferredRuntimeWarmupPromise: Promise<void> | null = null;
+  private runtimeCoordinator = new PluginRuntimeCoordinator({
+    getSettings: () => this.settings ?? null,
+    getOpenCodeService: () => this.openCodeService ?? null,
+    getOpenCodianLeaves: () => this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN),
+    applyProviderIconColorMode: () => this.applyProviderIconColorMode(),
+    startConfiguredLocalServerIfNeeded: () => this.startConfiguredLocalServerIfNeeded(),
+    logServerStatusSnapshot: (source?: string) => this.logServerStatusSnapshot(source),
+    onModelsLoaded: () => this.settingsTab?.onModelsLoaded(),
+  });
   private themeBackgroundDataUrlCache = new Map<string, string | null>();
   private themeBackgroundDataUrlRequests = new Map<string, Promise<string | null>>();
   private settingsPersistenceWritable = true;
@@ -135,7 +142,7 @@ export default class OpenCodianPlugin extends Plugin {
       logger.info('[startup] deferring runtime warmup until after workspace integration');
       this.completeStartupPerfTrace('completed');
       await this.persistStartupPerfTraceSnapshot();
-      this.scheduleDeferredRuntimeWarmup();
+      this.runtimeCoordinator.scheduleDeferredRuntimeWarmup();
     } catch (error) {
       this.completeStartupPerfTrace('failed');
       await this.persistStartupPerfTraceSnapshot().catch((persistError) => {
@@ -322,13 +329,12 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   onunload() {
-    this.clearDeferredRuntimeWarmupTimer();
+    this.runtimeCoordinator.dispose();
     this.openCodeService?.dispose();
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
     });
     this.clearChatAppearanceSaveTimer();
-    this.clearQueuedModelRefresh();
     delete document.body.dataset.opencodianProviderIconMode;
 
   }
@@ -435,8 +441,8 @@ export default class OpenCodianPlugin extends Plugin {
 
     await this.persistSettingsDomains({ core: true, ui: true });
 
-    this.refreshOpenCodianViews({ reloadModels, applyUi });
-    this.invalidateSlashCommandMenuCatalogs();
+    this.runtimeCoordinator.refreshOpenCodianViews({ reloadModels, applyUi });
+    this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs();
     
     // Sync OpenCode config with permission mode
     if (syncConfig) {
@@ -702,7 +708,7 @@ export default class OpenCodianPlugin extends Plugin {
       }
     } catch (error) {
       this.setEffectiveChatAppearance(previousAppearance);
-      this.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
+      this.runtimeCoordinator.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
       throw error;
     }
 
@@ -810,150 +816,15 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   private handleModelsLoaded(): void {
-    this.queueModelRefresh();
+    this.runtimeCoordinator.queueModelRefresh();
   }
 
   private handleOpenCodeServerStatusChange(status: string): void {
     logger.debug(`Server status changed: ${status}`);
     this.settingsTab?.refreshServerStatusDisplay();
     if (status === 'running') {
-      this.invalidateSlashCommandMenuCatalogs({ preload: true });
+      this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
     }
-  }
-
-  private refreshOpenCodianViews(options: { reloadModels?: boolean; applyUi?: boolean } = {}): void {
-    const { reloadModels = true, applyUi = true } = options;
-
-    if (applyUi) {
-      this.applyProviderIconColorMode();
-    }
-
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
-      const view = leaf.view;
-      if (view instanceof OpenCodianView) {
-        if (applyUi) {
-          view.applyLocaleTexts();
-          view.applyChatAppearanceSettings();
-          view.applyChatScrollMode();
-          view.applyTabBarLayout();
-        }
-        if (reloadModels) {
-          void view.reloadModelCatalog();
-        }
-      }
-    }
-  }
-
-  private invalidateSlashCommandMenuCatalogs(options: { preload?: boolean } = {}): void {
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
-      const view = leaf.view;
-      if (view instanceof OpenCodianView) {
-        view.invalidateSlashCommandMenuCatalog(options);
-      }
-    }
-  }
-
-  private queueModelRefresh(): void {
-    this.clearQueuedModelRefresh();
-    this.modelRefreshFrameId = window.requestAnimationFrame(() => {
-      this.modelRefreshFrameId = null;
-      this.refreshOpenCodianViews({ reloadModels: true, applyUi: false });
-      this.settingsTab?.onModelsLoaded();
-    });
-  }
-
-  private clearQueuedModelRefresh(): void {
-    if (this.modelRefreshFrameId !== null) {
-      window.cancelAnimationFrame(this.modelRefreshFrameId);
-      this.modelRefreshFrameId = null;
-    }
-  }
-
-  private scheduleDeferredRuntimeWarmup(): void {
-    if (!this.shouldWarmupRuntimeAfterStartup()) {
-      return;
-    }
-
-    if (this.deferredRuntimeWarmupTimerId !== null || this.deferredRuntimeWarmupPromise) {
-      return;
-    }
-
-    this.deferredRuntimeWarmupTimerId = window.setTimeout(() => {
-      this.deferredRuntimeWarmupTimerId = null;
-      void this.startDeferredRuntimeWarmup('deferred-onload');
-    }, 0);
-  }
-
-  async ensureRuntimeWarmupReadyForSessionBootstrap(): Promise<void> {
-    if (!this.shouldWarmupRuntimeAfterStartup() || this.openCodeService.isReady()) {
-      return;
-    }
-
-    if (this.deferredRuntimeWarmupTimerId !== null) {
-      this.clearDeferredRuntimeWarmupTimer();
-      await this.startDeferredRuntimeWarmup('session-bootstrap');
-      return;
-    }
-
-    if (this.deferredRuntimeWarmupPromise) {
-      await this.deferredRuntimeWarmupPromise;
-      return;
-    }
-
-    await this.startDeferredRuntimeWarmup('session-bootstrap');
-  }
-
-  private clearDeferredRuntimeWarmupTimer(): void {
-    if (this.deferredRuntimeWarmupTimerId !== null) {
-      window.clearTimeout(this.deferredRuntimeWarmupTimerId);
-      this.deferredRuntimeWarmupTimerId = null;
-    }
-  }
-
-  private shouldWarmupRuntimeAfterStartup(): boolean {
-    return Boolean(
-      this.openCodeService
-      && this.settings
-      && isLocalServerMode(this.settings.server)
-      && this.settings.server.local.autoStart,
-    );
-  }
-
-  private async startDeferredRuntimeWarmup(
-    source: 'deferred-onload' | 'session-bootstrap',
-  ): Promise<void> {
-    if (this.deferredRuntimeWarmupPromise) {
-      return this.deferredRuntimeWarmupPromise;
-    }
-
-    this.deferredRuntimeWarmupPromise = this.runDeferredRuntimeWarmup(source)
-      .catch((error) => {
-        logger.warn('Deferred runtime warmup failed', error);
-        throw error;
-      })
-      .finally(() => {
-        this.deferredRuntimeWarmupPromise = null;
-      });
-
-    return this.deferredRuntimeWarmupPromise;
-  }
-
-  private async runDeferredRuntimeWarmup(
-    source: 'deferred-onload' | 'session-bootstrap',
-  ): Promise<void> {
-    if (!this.openCodeService) {
-      return;
-    }
-
-    const startedAt = getPerformanceTimestampMs();
-    logger.debug(`[startup] deferred runtime warmup started (${source})`);
-
-    await this.startConfiguredLocalServerIfNeeded();
-    await this.logServerStatusSnapshot(source);
-
-    logger.info(
-      `[startup] deferred runtime warmup completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} (${source})`,
-    );
   }
 
   async logServerStatusSnapshot(source = 'manual'): Promise<void> {
@@ -1082,7 +953,7 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Create a new conversation */
   async createConversation(): Promise<Conversation> {
-    await this.ensureRuntimeWarmupReadyForSessionBootstrap();
+    await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
 
     // Create session in OpenCode
     const sessionId = await this.openCodeService.createSession();

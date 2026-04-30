@@ -16,7 +16,7 @@
   - No new thin settings shells are introduced.
 - **Validation**: `npm test -- --runInBand tests/unit/features/settings/OpenCodianSettings.test.ts tests/unit/features/settings/SettingsTabbedRenderer.test.ts tests/unit/features/settings/SettingsModelSection.test.ts tests/unit/features/settings/SettingsCommandsSection.test.ts`
 
-### [NEXT] Task 2 - Package plugin startup, warmup, and refresh orchestration out of `main.ts`
+### [DONE] Task 2 - Package plugin startup, warmup, and refresh orchestration out of `main.ts`
 
 - **Goal**: Reduce one startup/runtime orchestration cluster in `main.ts` by strengthening an existing or clearly durable plugin-adjacent owner.
 - **Key files**:
@@ -28,7 +28,7 @@
   - No runtime behavior shifts into anemic wrappers.
 - **Validation**: `npm test -- --runInBand tests/unit/main.test.ts tests/unit/main/themeSettingsMigration.test.ts`
 
-### [QUEUED] Task 3 - Package model-catalog presentation pressure and checkpoint settings-shell deltas
+### [NEXT] Task 3 - Package model-catalog presentation pressure and checkpoint settings-shell deltas
 
 - **Goal**: Tighten the boundary between `SettingsModelCatalogPresenter.ts` and adjacent owners so presentation state becomes more focused and the lane can record before/after hotspot deltas.
 - **Key files**:

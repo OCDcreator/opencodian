@@ -13,7 +13,7 @@
 - 注册 ribbon、明暗主题自适应品牌图标、命令、设置页与视图
 - 协调主题外观、日志、诊断导出和本地 `.opencode` 权限配置同步
 
-它不是单纯的“入口壳”，还承担了插件级状态缓存、UI 刷新调度和诊断导出；但启动期的 persisted-settings merge / normalization 已收束到相邻 bootstrap owner。
+它不是单纯的“入口壳”，还承担了插件级状态缓存和诊断导出；但启动期的 persisted-settings merge / normalization 已收束到相邻 bootstrap owner，启动后的 runtime warmup / cross-view refresh 调度也已委托给 `PluginRuntimeCoordinator`。
 
 ## 导入关系
 
@@ -47,8 +47,9 @@
 - `opencodeConfigManager` / `modelConfigService`: 只有拿到 vault 路径后才创建。
 - `conversations`: 只在内存里缓存会话元数据；正文按需从 `StorageService.loadFullConversation()` 读取。
 - `themeBackgroundDataUrlCache` / `themeBackgroundDataUrlRequests`: 聊天背景图 data URL 缓存与并发去重。
-- `chatAppearanceSaveTimeoutId` / `settingsUiStateSaveTimeoutId` / `modelRefreshFrameId`: 插件级节流与 UI 刷新调度句柄。
+- `chatAppearanceSaveTimeoutId` / `settingsUiStateSaveTimeoutId`: 插件级设置保存节流句柄。
 - `settingsPersistenceWritable`: 启动恢复失败时切到只读保护，阻止默认值覆盖已损坏的设置文件。
+- `runtimeCoordinator`: 插件级 runtime 调度 owner，持有 deferred warmup timer、model refresh frame 与 cross-view refresh fan-out。
 - `startupPerfTrace`: 最近一次插件启动埋点快照，记录分阶段耗时、运行状态、最慢嵌套步骤，以及自动诊断输出，用于冷启动诊断报告和慢启动自动快照。
 
 ## 核心逻辑
@@ -118,7 +119,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 
 ### 视图、命令与插件级 UI 调度
 
-入口层直接注册并调度这些 UI 能力：
+入口层直接注册这些 UI 能力，并把启动后的跨视图刷新调度交给 `PluginRuntimeCoordinator`：
 
 - `activateView()`: 按 `openInMainTab` 决定在主标签页或右侧边栏打开 `OpenCodianView`。
 - ribbon 图标：`bot`
@@ -132,7 +133,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 - `add-current-note-to-context`
 - `add-selection-to-context`
 
-同时，插件实例还向所有已打开的视图广播：
+`PluginRuntimeCoordinator` 会向所有已打开的视图广播：
 
 - `applyLocaleTexts()`
 - `applyChatAppearanceSettings()`
@@ -207,10 +208,11 @@ graph TD
 - `OpenCodeService`: 承担 OpenCode 侧运行时；插件把设置、vault 路径和 managed PID 状态注入进去。
 - `OpencodeConfigManager`: 用于首次创建或后续同步 `.opencode` 权限配置。
 - `ModelConfigService`: 在拿到 vault 路径后构建，供设置页和视图读取模型目录。
+- `PluginRuntimeCoordinator`: 入口旁的 runtime orchestration owner，负责 deferred warmup、session-bootstrap warmup readiness、model refresh frame、slash catalog invalidation 和 cross-view UI refresh fan-out。
 - `OpenCodianView`: 由入口注册，并在运行时回调插件实例获取会话、刷新 UI、附加上下文等能力。
 - `OpenCodianSettingTab`: 通过插件实例保存设置、刷新服务状态和模型目录。
 - `core/theme`: 负责主题预设与外观覆盖的归一化。
-- `i18n`: 由入口设置 locale，并通过视图刷新把文字变更传播出去。
+- `i18n`: 由入口设置 locale，并通过 `PluginRuntimeCoordinator` 的跨视图刷新把文字变更传播出去。
 
 ## 配置项
 

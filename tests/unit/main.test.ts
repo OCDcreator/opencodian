@@ -293,7 +293,11 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
     plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
 
-    plugin.scheduleDeferredRuntimeWarmup();
+    (
+      plugin as unknown as {
+        runtimeCoordinator: { scheduleDeferredRuntimeWarmup: () => void };
+      }
+    ).runtimeCoordinator.scheduleDeferredRuntimeWarmup();
 
     expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
     expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
@@ -344,7 +348,11 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
     plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
 
-    plugin.scheduleDeferredRuntimeWarmup();
+    (
+      plugin as unknown as {
+        runtimeCoordinator: { scheduleDeferredRuntimeWarmup: () => void };
+      }
+    ).runtimeCoordinator.scheduleDeferredRuntimeWarmup();
     const conversation = await plugin.createConversation();
 
     expect(plugin.startConfiguredLocalServerIfNeeded).toHaveBeenCalledTimes(1);
@@ -445,14 +453,18 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       settings: Record<string, unknown>;
       persistSettingsDomains: jest.Mock<Promise<void>, [unknown]>;
-      refreshOpenCodianViews: jest.Mock<void, [unknown]>;
-      invalidateSlashCommandMenuCatalogs: jest.Mock<void, []>;
+      runtimeCoordinator: {
+        refreshOpenCodianViews: jest.Mock<void, [unknown]>;
+        invalidateSlashCommandMenuCatalogs: jest.Mock<void, []>;
+      };
     };
 
     plugin.settings = {};
     plugin.persistSettingsDomains = jest.fn().mockResolvedValue(undefined);
-    plugin.refreshOpenCodianViews = jest.fn();
-    plugin.invalidateSlashCommandMenuCatalogs = jest.fn();
+    plugin.runtimeCoordinator = {
+      refreshOpenCodianViews: jest.fn(),
+      invalidateSlashCommandMenuCatalogs: jest.fn(),
+    };
 
     jest
       .spyOn(
@@ -487,8 +499,8 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
     });
 
     expect(plugin.persistSettingsDomains).toHaveBeenCalledWith({ core: true, ui: true });
-    expect(plugin.refreshOpenCodianViews).toHaveBeenCalledWith({ reloadModels: false, applyUi: false });
-    expect(plugin.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledTimes(1);
+    expect(plugin.runtimeCoordinator.refreshOpenCodianViews).toHaveBeenCalledWith({ reloadModels: false, applyUi: false });
+    expect(plugin.runtimeCoordinator.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledTimes(1);
   });
 
   it('forwards slash command cache invalidation to open OpenCodian views', () => {
@@ -514,9 +526,9 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
 
     (
       plugin as unknown as {
-        invalidateSlashCommandMenuCatalogs: (options?: { preload?: boolean }) => void;
+        runtimeCoordinator: { invalidateSlashCommandMenuCatalogs: (options?: { preload?: boolean }) => void };
       }
-    ).invalidateSlashCommandMenuCatalogs({ preload: true });
+    ).runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
 
     expect(openCodianView.invalidateSlashCommandMenuCatalog).toHaveBeenCalledWith({ preload: true });
   });
@@ -524,13 +536,15 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
   it('warms slash command catalogs when the server becomes running', () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       settingsTab: { refreshServerStatusDisplay: jest.Mock<void, []> } | null;
-      invalidateSlashCommandMenuCatalogs: jest.Mock<void, [options?: { preload?: boolean }]>;
+      runtimeCoordinator: { invalidateSlashCommandMenuCatalogs: jest.Mock<void, [options?: { preload?: boolean }]> };
     };
 
     plugin.settingsTab = {
       refreshServerStatusDisplay: jest.fn(),
     };
-    plugin.invalidateSlashCommandMenuCatalogs = jest.fn();
+    plugin.runtimeCoordinator = {
+      invalidateSlashCommandMenuCatalogs: jest.fn(),
+    };
 
     (
       plugin as unknown as {
@@ -539,6 +553,6 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
     ).handleOpenCodeServerStatusChange('running');
 
     expect(plugin.settingsTab.refreshServerStatusDisplay).toHaveBeenCalledTimes(1);
-    expect(plugin.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledWith({ preload: true });
+    expect(plugin.runtimeCoordinator.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledWith({ preload: true });
   });
 });

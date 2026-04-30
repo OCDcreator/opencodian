@@ -80,6 +80,8 @@ docs/modules/
 │   │   └── types.md
 │   ├── prompts/
 │   │   └── titleGeneration.md
+│   ├── runtime/
+│   │   └── PluginRuntimeCoordinator.md
 │   ├── security/
 │   │   ├── index.md
 │   │   └── BlocklistChecker.md
