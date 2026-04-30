@@ -116,6 +116,7 @@ export interface OpenCodeSessionLifecycleCoordinatorHost {
   normalizeSessionTodos(response: unknown): SessionTodo[];
   normalizeSessionStatuses(response: unknown): Record<string, SessionActivityStatus>;
   applySessionRevertState(sessionId: string, messages: SessionMessage[]): Promise<SessionMessage[]>;
+  applyCanonicalSnapshot(sessionId: string, messages: SessionMessage[]): void;
   observeToolNamesInMessages(messages: SessionMessage[]): void;
   logServiceWarning(key: string, message: string, error: unknown): void;
   logServiceError(key: string, message: string, error: unknown): void;
@@ -218,6 +219,7 @@ export class OpenCodeSessionLifecycleCoordinator {
           this.host.normalizeSessionMessages(response),
         );
         this.host.observeToolNamesInMessages(messages);
+        this.host.applyCanonicalSnapshot(sessionId, messages);
         return messages;
       } catch (error) {
         this.host.logServiceWarning('session.messages', `SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
@@ -231,6 +233,7 @@ export class OpenCodeSessionLifecycleCoordinator {
         Array.isArray(response) ? response as SessionMessage[] : [],
       );
       this.host.observeToolNamesInMessages(messages);
+      this.host.applyCanonicalSnapshot(sessionId, messages);
       return messages;
     } catch (error) {
       this.host.logServiceError('session.messages', `Failed to get messages for session ${sessionId}:`, error);

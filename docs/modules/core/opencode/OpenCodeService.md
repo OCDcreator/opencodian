@@ -144,11 +144,11 @@
 - `runSessionCommand()` / `runSessionShell()`
 - `updateMessagePart()` / `deleteMessagePart()`
 
-其中 `getSessionMessages()` 的共享细节仍然由 `OpenCodeService` 通过 host seam 提供给 coordinator：
+其中 `getSessionMessages()` 的共享细节现在由 `sessionLifecycle` 直接拥有，`OpenCodeService` 只保留公开 wrapper 与 host seam：
 
 - legacy 路径使用的是 `/session/:id/message`，不是 `messages`。
 - 无论 SDK 还是 legacy，读到消息后都会调用 `applySessionRevertState()`，按 session 的 `revert.messageID` / `revert.partID` 过滤被回滚掉的消息或消息尾部 parts。
-- 过滤后的 authoritative snapshot 会立即写入 `sessionStateStore`，让服务层第一次拥有稳定的 canonical `session/message/part` truth layer。
+- 过滤后的 authoritative snapshot 会由 `sessionLifecycle` 通过 host seam 立即写入 `sessionStateStore`，让 lifecycle owner 覆盖完整的 message load side effect sequence。
 - `getCanonicalSessionState(sessionId)` 提供只读读取口，供后续 sync-event / render slice 共享同一份图状态。
 - `getCanonicalSessionMessages(sessionId)` 会把 canonical graph 重新组装成 `[{ info, parts[] }]` 视图，供 chat sync 层在不重拉 server 的情况下复用既有 hydrate / merge 路径。
 - `getCanonicalConversationFingerprint(messages)` 会把 `ChatMessage` 的可见字段、结构化 blocks、上下文附件、OMO metadata 与原始 `parts` 一起做稳定 fingerprint，供 reload/finalization 把“隐藏 graph 已纠偏但文本未变”的情况也视为 canonical drift。
@@ -360,7 +360,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `checkHealth()` | SDK 优先健康检查，失败时回退到 `ServerManager` |
 | `updateSettings()` | 根据新旧设置差异更新 `baseUrl`、`ServerManager` 和订阅状态 |
 | `createSession()` | 创建 session，并可同时写入 `currentSessionId` |
-| `getSessionMessages()` | 读取消息、应用 revert 过滤，并刷新 canonical session graph snapshot |
+| `getSessionMessages()` | 委托 `sessionLifecycle` 读取消息、应用 revert 过滤，并刷新 canonical session graph snapshot |
 | `getCanonicalSessionState()` | 读取指定 session 的只读 canonical `message/part` 图状态 |
 | `getCachedSessionDiffEntries()` | 读取指定 session 的 `session.diff` sync event 缓存 diff entries |
 | `requestAssistantResponse()` | 非流式请求，返回归一化后的 `ChatMessage` |

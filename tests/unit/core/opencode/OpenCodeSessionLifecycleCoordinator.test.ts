@@ -25,6 +25,7 @@ type MockHost = OpenCodeSessionLifecycleCoordinatorHost & {
   normalizeSessionTodos: jest.Mock<SessionTodo[], [unknown]>;
   normalizeSessionStatuses: jest.Mock<Record<string, SessionActivityStatus>, [unknown]>;
   applySessionRevertState: jest.Mock<Promise<SessionMessage[]>, [string, SessionMessage[]]>;
+  applyCanonicalSnapshot: jest.Mock<void, [string, SessionMessage[]]>;
   observeToolNamesInMessages: jest.Mock<void, [SessionMessage[]]>;
   logServiceWarning: jest.Mock<void, [string, string, unknown]>;
   logServiceError: jest.Mock<void, [string, string, unknown]>;
@@ -70,6 +71,7 @@ function createHost(
     normalizeSessionTodos: jest.fn((response) => response as SessionTodo[]),
     normalizeSessionStatuses: jest.fn((response) => response as Record<string, SessionActivityStatus>),
     applySessionRevertState: jest.fn(async (_sessionId, messages) => messages),
+    applyCanonicalSnapshot: jest.fn(),
     observeToolNamesInMessages: jest.fn(),
     logServiceWarning: jest.fn(),
     logServiceError: jest.fn(),
@@ -220,6 +222,7 @@ describe('OpenCodeSessionLifecycleCoordinator', () => {
     expect(sdk.messages).toHaveBeenCalledWith({ sessionID: 'session-1' });
     expect(host.applySessionRevertState).toHaveBeenCalledWith('session-1', rawMessages);
     expect(host.observeToolNamesInMessages).toHaveBeenCalledWith(filteredMessages);
+    expect(host.applyCanonicalSnapshot).toHaveBeenCalledWith('session-1', filteredMessages);
   });
 
   it('falls back to legacy todo and status reads when SDK reads fail', async () => {

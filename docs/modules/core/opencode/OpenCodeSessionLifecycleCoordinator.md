@@ -7,7 +7,7 @@
 
 `OpenCodeSessionLifecycleCoordinator` 是 `OpenCodeService` 内部的 session lifecycle owner。它把 session create/list/get/messages/todos/statuses/delete/update、session abort fallback、默认 current session 指针，以及公开 session sync 订阅 API 的委托，收束到一个较厚 coordinator 里，避免这些共享流程继续铺在 `OpenCodeService` 主门面中。
 
-它不改变 `OpenCodeService` 的对外 API：上层仍然通过 `OpenCodeService.createSession()`、`listSessions()`、`getSessionMessages()`、`getSessionTodos()`、`getSessionStatuses()`、`deleteSession()`、`updateSessionTitle()` 与 session sync 订阅接口访问这条链路；streaming cancel 与 session control 的 shared lookup 也继续经由服务门面进入本 owner。
+它不改变 `OpenCodeService` 的对外 API：上层仍然通过 `OpenCodeService.createSession()`、`listSessions()`、`getSessionMessages()`、`getSessionTodos()`、`getSessionStatuses()`、`deleteSession()`、`updateSessionTitle()` 与 session sync 订阅接口访问这条链路；streaming cancel 仍通过服务门面读取 current session，session control 的 shared message lookup 则直接复用本 owner。
 
 ## 导入关系
 
@@ -27,7 +27,7 @@
 - `Session` / `Message` / `Part` / `SessionMessage`: session lifecycle 公开接口复用的基础形状；其中 `Session.time.compacting`、`Message.summary`、`Part.auto/overflow/tail_start_id/metadata` 已保留 upstream compaction 元字段，供后续 live state / transcript 适配继续消费。
 - `OpenCodeSessionLifecycleSdk`: coordinator 依赖的最小 session SDK 面，只覆盖 abort/create/get/list/messages/todo/status/delete/update；当前 host 可直接注入 `OpenCodeSdkFacade.session`，不再需要 `OpenCodeService` 先包一层 CRUD adapter。
 - `OpenCodeSessionLifecycleSyncRuntime`: 对 `OpenCodeSyncEventRuntimeCoordinator` 的最小订阅面抽象。
-- `OpenCodeSessionLifecycleCoordinatorHost`: host seam，提供 SDK CRUD/abort 开关、legacy HTTP helper、normalizer、revert 过滤、tool 观测与日志。
+- `OpenCodeSessionLifecycleCoordinatorHost`: host seam，提供 SDK CRUD/abort 开关、legacy HTTP helper、normalizer、revert 过滤、canonical snapshot 写入、tool 观测与日志。
 - `OpenCodeSessionLifecycleCoordinator`: 持有 current session 指针，并实现 session lifecycle 公开方法。
 
 ## 核心逻辑
@@ -40,7 +40,7 @@ coordinator 持有以下共享流程：
 - `getSessionInfo()`：按 `sdkCrud` 优先走 SDK `session.get()`，失败后回退到 legacy `GET /session/:id`，供 revert filtering、context usage 与 session control 共用。
 - `abortSession()`：按独立 `sdkAbort` 优先走 SDK `session.abort()`，失败后回退到 legacy `POST /session/:id/abort`；空 session id 仍保持 no-op。
 - `listSessions()`：优先走 SDK，失败后记录 warning 并回退到 legacy `GET /session`。
-- `getSessionMessages()`：优先走 SDK `session.messages()`，统一经过 revert-state 过滤与 tool-name 观测；SDK 失败时回退到 legacy `/session/:id/message`。
+- `getSessionMessages()`：优先走 SDK `session.messages()`，统一经过 revert-state 过滤、tool-name 观测与 canonical snapshot 写入；SDK 失败时回退到 legacy `/session/:id/message`。
 - `getSessionTodos()` / `getSessionStatuses()`：优先走 SDK，失败后分别回退到 legacy `/todo` 与 `/status`，并复用 `OpenCodeService` 的 normalizer。
 - `deleteSession()` / `updateSessionTitle()`：保持现有 mutation 语义，不在 SDK mutation 失败时额外引入新 fallback。
 
@@ -72,7 +72,7 @@ graph TD
     B --> C[OpenCodeService host seam]
     C --> D[OpenCodeSdkFacade session namespace]
     C --> E[legacy HTTP helpers]
-    C --> F[revert filter / normalizers / tool observation]
+    C --> F[revert filter / normalizers / tool observation / canonical snapshot]
     B --> G[OpenCodeSyncEventRuntimeCoordinator]
 ```
 

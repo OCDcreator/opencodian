@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 1 - Package `OpenCodeService` lifecycle/query/control assembly
+### [DONE] Task 1 - Package `OpenCodeService` lifecycle/query/control assembly
 
 - **Goal**: Remove one stable lifecycle/query/control assembly slice from `OpenCodeService.ts` by strengthening existing coordinators instead of piling more orchestration into the service facade.
 - **Key files**:
@@ -16,7 +16,7 @@
   - No public behavior regresses across CRUD, session control, or catalog query flows.
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodeService.sdkCrudSync.test.ts tests/unit/core/opencode/OpenCodeSessionLifecycleCoordinator.test.ts tests/unit/core/opencode/OpenCodeSessionControlOrchestrator.test.ts tests/unit/core/opencode/OpenCodeCatalogQueryCoordinator.test.ts`
 
-### [QUEUED] Task 2 - Package stream and sync mutation ownership
+### [NEXT] Task 2 - Package stream and sync mutation ownership
 
 - **Goal**: Reduce direct stream/sync mutation pressure in `OpenCodeService.ts` by tightening ownership with the existing streaming and sync runtime coordinators.
 - **Key files**:

@@ -312,6 +312,7 @@ export class OpenCodeService {
       normalizeSessionTodos: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionTodos(response),
       normalizeSessionStatuses: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionStatuses(response),
       applySessionRevertState: (sessionId, messages) => this.applySessionRevertState(sessionId, messages),
+      applyCanonicalSnapshot: (sessionId, messages) => this.applyCanonicalSnapshot(sessionId, messages),
       observeToolNamesInMessages: (messages) => this.observeToolNamesInMessages(messages),
       logServiceWarning,
       logServiceError,
@@ -323,8 +324,8 @@ export class OpenCodeService {
       postLegacy: (path, body) => this.post(path, body),
       getLegacy: (path) => this.get(path),
       getSessionInfo: (sessionId) => this.sessionLifecycle.getSessionInfo(sessionId),
-      getSessionMessages: (sessionId) => this.getSessionMessages(sessionId),
-      getAvailableModels: () => this.getAvailableModels(),
+      getSessionMessages: (sessionId) => this.sessionLifecycle.getSessionMessages(sessionId),
+      getAvailableModels: () => this.catalogQueries.getAvailableModels(),
       logServiceWarning,
       logServiceError,
     });
@@ -667,9 +668,7 @@ export class OpenCodeService {
 
   /** Get session messages - OpenCode API returns {info: Message, parts: Part[]}[] */
   async getSessionMessages(sessionId: string): Promise<{ info: Message; parts: Part[] }[]> {
-    const messages = await this.sessionLifecycle.getSessionMessages(sessionId);
-    this.applyCanonicalSnapshot(sessionId, messages);
-    return messages;
+    return this.sessionLifecycle.getSessionMessages(sessionId);
   }
 
   getCanonicalSessionState(sessionId: string): OpenCodeCanonicalSessionState | null {
