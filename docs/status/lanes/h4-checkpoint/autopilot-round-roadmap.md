@@ -15,7 +15,7 @@
   - Any residual cleanup stays tightly bounded to the checkpoint purpose.
 - **Validation**: `npm run lint && npm run typecheck && npm test && npm run build`
 
-### [NEXT] Task 2 - Write final checkpoint summary and stop the queue cleanly
+### [DONE] Task 2 - Write final checkpoint summary and stop the queue cleanly
 
 - **Goal**: Leave the branch in a resumable, evidence-backed checkpoint state with no fabricated backlog and no stale `[NEXT]` item left behind.
 - **Key files**:
@@ -30,3 +30,4 @@
 ## Lane State
 
 - When Task 1-2 are complete and no `[NEXT]` or `[QUEUED]` items remain here, the hotspot core packaging program is complete and the controller should stop rather than inventing new work.
+- Checkpoint status: Task 1 and Task 2 are complete. No `[NEXT]` or `[QUEUED]` items remain in this lane, so the hotspot core packaging program is complete and the controller should stop rather than inventing new work.
