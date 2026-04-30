@@ -2,6 +2,7 @@
  * OpenCode SDK wrapper module
  */
 
+export { LocalProcessProbe, LocalSidecarProcessInspector } from './LocalSidecarProcessInspector';
 export type {
   OpenCodeSdkFacadeClient,
   OpenCodeSdkFacadeNamespace,

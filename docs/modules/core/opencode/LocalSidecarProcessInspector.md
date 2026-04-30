@@ -1,24 +1,30 @@
-# LocalSidecarProcessInspector
+# LocalSidecarProcessInspector / LocalProcessProbe
 
 > **源码**: `src/core/opencode/LocalSidecarProcessInspector.ts`
 > **状态**: [REVIEW]
 
 ## 概述
 
-`LocalSidecarProcessInspector` 负责 OS 级别的进程信息查询，是 `ServerManager` 的相邻运行时拥有者。它封装了跨平台的进程探测逻辑，包括：
+本模块现在包含两个协作 owner：
+
+- `LocalSidecarProcessInspector`：纯 OS 进程信息查询
+- `LocalProcessProbe`：组合端口 bind 探测、端口释放轮询、managed pid 终止（含 Windows 进程树）与 plugin-managed listener 判定包装
+
+`LocalSidecarProcessInspector` 继续负责跨平台查询逻辑，包括：
 
 - 根据本地端口反查监听进程的 PID
 - 根据 PID 获取进程的完整命令行
 - 判断某个 PID 是否仍在运行
 - 同步检查本地端口是否可用
 
-这些操作都直接调用平台原生命令（`lsof`、`ps`、`powershell`），因此构成一个**耐用的协议边界**。
+`LocalProcessProbe` 在其上叠加 lifecycle 侧需要的“可执行动作”与轮询流程，使 `ServerManager` 不再直接持有这批 process/port primitive。
 
 ## 导入关系
 
 ```text
 上游:
-- Node `child_process`
+- Node `child_process`, `net`
+- `../../shared` logger
 
 下游:
 - `src/core/opencode/ServerManager`
@@ -46,7 +52,7 @@
 
 `isPidRunning(pid)` / `isPidRunningSync(pid)` 是命令行查询的便捷包装：当命令行非空时认为进程仍在运行。
 
-### 同步端口可用性检查
+### 同步端口可用性检查（Inspector）
 
 `isLocalPortAvailableSync(port)` 与 `ServerManager` 内部的 `isPortAvailable()`（基于 `net.createServer`）不同：
 
@@ -54,7 +60,7 @@
 - 在 `dispose()` 的同步清理路径中被使用，因为同步场景下无法启动 `net.Server`
 - 返回 `true` 表示端口空闲，`false` 表示端口被占用或查询失败
 
-### 命令输出捕获
+### 命令输出捕获（Inspector）
 
 `captureCommandOutput(command, args)` 是一个内部辅助方法，负责：
 
@@ -62,31 +68,44 @@
 - 捕获 `stdout`
 - 在退出码为 0 时返回 trimmed stdout，否则返回 `null`
 
+### 端口 bind 探测与端口释放轮询（LocalProcessProbe）
+
+- `canBindLocalEndpoint(host, port)` 使用 `net.createServer` 做真实 bind 预检
+- `waitForPortAvailability(host, port, timeout)` 以 200ms 周期轮询端口释放，供 `ServerManager` stop/restart 复用
+- `isLocalPortAvailableSync(port)` 复用 inspector 的同步查询路径，保证 `dispose()` 同步释放检查仍可用
+
+### managed pid 终止 primitive（LocalProcessProbe）
+
+- `terminateManagedPid(pid)`：
+  - Windows: `taskkill /T /F`（失败时二次确认 pid 存活）
+  - 非 Windows: `SIGTERM` 后短等待，再尝试 `SIGKILL`
+- `terminateManagedPidSync(pid)` 提供同步版（主要用于 `dispose()`）
+- `getCurrentPluginManagedListenerPid*` 把“端口监听 pid 查询 + 命令行判定回调”收口到同一边界
+
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `getListeningProcessId(port)` | 异步查询监听端口的 PID |
-| `getListeningProcessIdSync(port)` | 同步查询监听端口的 PID |
-| `getProcessCommandLine(pid)` | 异步获取 PID 对应的命令行 |
-| `getProcessCommandLineSync(pid)` | 同步获取 PID 对应的命令行 |
-| `isPidRunning(pid)` | 异步判断 PID 是否仍在运行 |
-| `isPidRunningSync(pid)` | 同步判断 PID 是否仍在运行 |
-| `isLocalPortAvailableSync(port)` | 同步检查端口是否可用 |
+| `LocalSidecarProcessInspector.getListeningProcessId*` | 查询监听端口 PID（异步/同步） |
+| `LocalSidecarProcessInspector.getProcessCommandLine*` | 查询 PID 命令行（异步/同步） |
+| `LocalSidecarProcessInspector.isPidRunning*` | 查询 PID 存活（异步/同步） |
+| `LocalSidecarProcessInspector.isLocalPortAvailableSync` | 同步端口占用检查 |
+| `LocalProcessProbe.canBindLocalEndpoint` | 真实 bind 预检 host/port |
+| `LocalProcessProbe.waitForPortAvailability` | 轮询端口释放 |
+| `LocalProcessProbe.terminateManagedPid*` | managed pid 终止 primitive（异步/同步） |
+| `LocalProcessProbe.getCurrentPluginManagedListenerPid*` | 查询并判定 plugin-managed listener pid |
 
 ## 与其他模块的交互
 
-- `ServerManager` 是唯一的消费者。它在以下场景委托给本模块：
-  - `refreshManagedListenerPid()` - 启动后刷新 listener PID
-  - `tryAdoptManagedServer()` / `getAdoptableManagedServerState()` - adopt 前确认端口 PID 和命令行
-  - `inspectExistingHealthyServer()` - 检查占用端点的进程信息
-  - `getCurrentPluginManagedListenerPid()` / `getCurrentPluginManagedListenerPidSync()` - 查找插件管理的 listener
-  - `runManagedShutdownLifecycleSync()` - 同步 dispose 时确认端口已释放
-  - `killWindowsProcessTree()` / `killWindowsProcessTreeSync()` - 确认进程是否已终止
+- `ServerManager` 是唯一消费者，并通过 `LocalProcessProbe` 委托：
+  - local endpoint bind 探测与端口释放轮询
+  - 启动后 listener pid 刷新、adopt 前端口 owner/命令行检查
+  - stop/restart/dispose 的 managed pid 终止 primitive
+  - plugin-managed listener pid 查询（通过命令行判定回调）
 
 ## 注意事项
 
-- 所有方法都是纯查询操作，不修改系统状态（除 `isLocalPortAvailableSync` 外，它只是查询）
+- `LocalSidecarProcessInspector` 仍是纯查询 owner；`LocalProcessProbe` 包含有副作用的终止动作
 - 平台判断使用 `process.platform`，不支持运行时切换平台
 - 命令执行失败时统一返回 `null` 而不是抛错，调用方需要自行处理
-- 本模块不缓存任何查询结果，每次调用都会重新执行系统命令
+- 本模块不缓存查询结果，每次调用都会重新执行系统命令

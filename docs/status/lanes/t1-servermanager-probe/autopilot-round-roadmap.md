@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Task 1 - Package `ServerManager` process and port probing into `LocalProcessProbe`
+### [DONE] Task 1 - Package `ServerManager` process and port probing into `LocalProcessProbe`
 
 - **Goal**: Move the cross-platform process/port probe cluster out of `ServerManager.ts` into one durable adjacent owner without changing lifecycle semantics.
 - **Key files**:
@@ -19,4 +19,4 @@
 
 ## Lane State
 
-- When Task 1 is complete and no `[NEXT]` or `[QUEUED]` items remain here, the controller switches to `t2-servermanager-launch`.
+- No remaining `[NEXT]` or `[QUEUED]` items in `t1-servermanager-probe`; controller should switch to `t2-servermanager-launch`.

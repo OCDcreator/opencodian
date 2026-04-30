@@ -3,11 +3,11 @@
  */
 
 import { LocalSidecarEndpointResolver } from '../../../../src/core/opencode/LocalSidecarEndpointResolver';
-import { LocalSidecarProcessInspector } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
+import { LocalProcessProbe } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
-function getProcessInspector(manager: ServerManager): LocalSidecarProcessInspector {
-  return (manager as unknown as { processInspector: LocalSidecarProcessInspector }).processInspector;
+function getProcessProbe(manager: ServerManager): LocalProcessProbe {
+  return (manager as unknown as { processProbe: LocalProcessProbe }).processProbe;
 }
 
 function getEndpointResolver(manager: ServerManager): LocalSidecarEndpointResolver {
@@ -85,7 +85,7 @@ describe('ServerManager occupied local endpoint resolution', () => {
       },
     });
 
-    jest.spyOn(manager as never, 'isPortAvailable').mockResolvedValue(false);
+    jest.spyOn(getProcessProbe(manager), 'canBindLocalEndpoint').mockResolvedValue(false);
     jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
     jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
     jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
@@ -154,7 +154,7 @@ describe('ServerManager occupied local endpoint resolution', () => {
   });
 
   it('recycles an orphaned default-port OpenCode sidecar and restarts the current vault service', async () => {
-    jest.spyOn(manager as never, 'isPortAvailable').mockResolvedValue(false);
+    jest.spyOn(getProcessProbe(manager), 'canBindLocalEndpoint').mockResolvedValue(false);
     jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
     jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
     jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
@@ -166,7 +166,7 @@ describe('ServerManager occupied local endpoint resolution', () => {
     const recycleUnknownLocalServer = jest.spyOn(manager as never, 'recycleUnknownLocalServer').mockResolvedValue(undefined);
     const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
     const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
-    jest.spyOn(getProcessInspector(manager), 'getListeningProcessId').mockResolvedValue(5678);
+    jest.spyOn(getProcessProbe(manager), 'getListeningProcessId').mockResolvedValue(5678);
 
     await expect(manager.start()).resolves.toBeUndefined();
 

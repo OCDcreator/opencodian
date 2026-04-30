@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { LocalProcessProbe } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
 jest.mock('obsidian', () => ({
@@ -40,6 +41,10 @@ const { requestUrl: mockRequestUrl } = jest.requireMock('obsidian') as {
 const { spawn: mockSpawn } = jest.requireMock('child_process') as {
   spawn: jest.Mock;
 };
+
+function getProcessProbe(manager: ServerManager): LocalProcessProbe {
+  return (manager as unknown as { processProbe: LocalProcessProbe }).processProbe;
+}
 
 type ServerManagerTestAccess = ServerManager & {
   getSpawnEnv(): NodeJS.ProcessEnv;
@@ -120,7 +125,7 @@ function registerStateAndHealthTests(context: ServerManagerContext): void {
       (manager as unknown as { process: unknown; status: string }).process = managedProcess;
       (manager as unknown as { status: string }).status = 'running';
       const terminateManagedProcess = jest.spyOn(manager as never, 'terminateManagedProcess').mockResolvedValue(undefined);
-      jest.spyOn(manager as never, 'waitForPortAvailability').mockResolvedValue(true);
+      jest.spyOn(getProcessProbe(manager), 'waitForPortAvailability').mockResolvedValue(true);
 
       await expect(manager.stop()).resolves.toBeUndefined();
 
@@ -141,8 +146,8 @@ function registerStateAndHealthTests(context: ServerManagerContext): void {
         },
       ));
       (manager as unknown as { status: string }).status = 'running';
-      const terminateManagedPid = jest.spyOn(manager as never, 'terminateManagedPid').mockResolvedValue(undefined);
-      jest.spyOn(manager as never, 'waitForPortAvailability').mockResolvedValue(true);
+      const terminateManagedPid = jest.spyOn(getProcessProbe(manager), 'terminateManagedPid').mockResolvedValue(undefined);
+      jest.spyOn(getProcessProbe(manager), 'waitForPortAvailability').mockResolvedValue(true);
 
       await expect(manager.stop()).resolves.toBeUndefined();
 
@@ -163,8 +168,8 @@ function registerStateAndHealthTests(context: ServerManagerContext): void {
           },
         },
       ));
-      jest.spyOn(manager as never, 'getCurrentPluginManagedListenerPidSync').mockReturnValue(23332);
-      const terminateManagedPidSync = jest.spyOn(manager as never, 'terminateManagedPidSync').mockImplementation(() => {});
+      jest.spyOn(getProcessProbe(manager), 'getCurrentPluginManagedListenerPidSync').mockReturnValue(23332);
+      const terminateManagedPidSync = jest.spyOn(getProcessProbe(manager), 'terminateManagedPidSync').mockImplementation(() => {});
 
       manager.dispose();
 

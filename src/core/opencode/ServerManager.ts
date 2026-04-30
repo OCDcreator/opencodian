@@ -5,9 +5,8 @@
  * Handles startup, shutdown, health checks, and crash recovery.
  */
 
-import { type ChildProcess, spawn, spawnSync } from 'child_process';
+import { type ChildProcess, spawn } from 'child_process';
 import * as fs from 'fs';
-import * as net from 'net';
 import { Notice, requestUrl } from 'obsidian';
 import * as path from 'path';
 
@@ -22,7 +21,7 @@ import {
   type ManagedServerAdoptionOutcome,
   type OccupiedLocalEndpointResolution,
 } from './LocalSidecarEndpointResolver';
-import { LocalSidecarProcessInspector } from './LocalSidecarProcessInspector';
+import { LocalProcessProbe } from './LocalSidecarProcessInspector';
 import type { ManagedServerState, OpenCodeServerConfig, ServerDiagnostics, ServerStatus } from './types';
 
 const logger = createLogger('ServerManager');
@@ -87,7 +86,7 @@ export class ServerManager {
   private onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   private diagnostics: ServerDiagnostics = { reason: 'none' };
   private activeLaunch: LocalServerLaunch | null = null;
-  private processInspector = new LocalSidecarProcessInspector();
+  private processProbe = new LocalProcessProbe();
   private endpointResolver: LocalSidecarEndpointResolver;
 
   constructor(
@@ -149,7 +148,7 @@ export class ServerManager {
   }
 
   async canBindLocalEndpoint(host: string, port: number): Promise<boolean> {
-    return this.isPortAvailable(port, host);
+    return this.processProbe.canBindLocalEndpoint(host, port);
   }
 
   /** Start the OpenCode server */
@@ -204,7 +203,10 @@ export class ServerManager {
         return;
       }
 
-      const portAvailable = await this.isPortAvailable(this.config.local.port);
+      const portAvailable = await this.processProbe.canBindLocalEndpoint(
+        this.config.local.host,
+        this.config.local.port,
+      );
       if (!portAvailable) {
         const healthy = await this.checkHealth(5000);
         if (healthy) {
@@ -270,7 +272,10 @@ export class ServerManager {
 
   private createCurrentManagedShutdownPlan(): ManagedServerShutdownPlan {
     const managedState = this.managedServerState;
-    const currentListenerPid = this.getCurrentPluginManagedListenerPidSync();
+    const currentListenerPid = this.processProbe.getCurrentPluginManagedListenerPidSync(
+      this.config.local.port,
+      (commandLine) => this.endpointResolver.looksLikePluginManagedSidecarCommand(commandLine),
+    );
     return {
       process: this.process,
       pids: this.collectManagedPidCandidates(
@@ -297,12 +302,16 @@ export class ServerManager {
         if (pid === plan.process?.pid) {
           continue;
         }
-        await this.terminateManagedPid(pid);
+        await this.processProbe.terminateManagedPid(pid);
       }
     }
 
     if (plan.waitForPortReleaseMessage) {
-      const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
+      const released = await this.processProbe.waitForPortAvailability(
+        this.config.local.host,
+        this.config.local.port,
+        PORT_RELEASE_TIMEOUT_MS,
+      );
       if (!released) {
         throw new Error(plan.waitForPortReleaseMessage);
       }
@@ -319,7 +328,7 @@ export class ServerManager {
 
   private runManagedShutdownLifecycleSync(plan: ManagedServerShutdownPlan): void {
     if (plan.process?.pid) {
-      this.terminateManagedPidSync(plan.process.pid);
+      this.processProbe.terminateManagedPidSync(plan.process.pid);
     }
 
     const shouldSkipAdditionalPids = process.platform === 'win32' && Boolean(plan.process?.pid);
@@ -328,11 +337,11 @@ export class ServerManager {
         if (pid === plan.process?.pid) {
           continue;
         }
-        this.terminateManagedPidSync(pid);
+        this.processProbe.terminateManagedPidSync(pid);
       }
     }
 
-    if (plan.waitForPortReleaseMessage && !this.processInspector.isLocalPortAvailableSync(this.config.local.port)) {
+    if (plan.waitForPortReleaseMessage && !this.processProbe.isLocalPortAvailableSync(this.config.local.port)) {
       logger.warn(plan.waitForPortReleaseMessage);
       return;
     }
@@ -360,7 +369,11 @@ export class ServerManager {
       const timeout = setTimeout(() => {
         try {
           if (process.platform === 'win32') {
-            void this.killWindowsProcessTree(managedProcess.pid).finally(doResolve);
+            if (managedProcess.pid) {
+              void this.processProbe.terminateManagedPid(managedProcess.pid).finally(doResolve);
+            } else {
+              doResolve();
+            }
             return;
           }
 
@@ -380,12 +393,12 @@ export class ServerManager {
       });
 
       if (process.platform === 'win32') {
-        void this.killWindowsProcessTree(managedProcess.pid).then((terminated) => {
-          if (!terminated) {
-            clearTimeout(timeout);
-            doResolve();
-          }
-        });
+        if (managedProcess.pid) {
+          void this.processProbe.terminateManagedPid(managedProcess.pid);
+        } else {
+          clearTimeout(timeout);
+          doResolve();
+        }
         return;
       }
 
@@ -669,18 +682,6 @@ export class ServerManager {
     return process.platform === 'win32' && /\.(cmd|bat)$/i.test(opencodePath);
   }
 
-  private async isPortAvailable(port: number, host = this.config.local.host): Promise<boolean> {
-    return new Promise((resolve) => {
-      const tester = net.createServer()
-        .once('error', () => resolve(false))
-        .once('listening', () => {
-          tester.close();
-          resolve(true);
-        })
-        .listen(port, host);
-    });
-  }
-
   private async waitForHealthy(timeout: number): Promise<void> {
     const startTime = Date.now();
 
@@ -876,7 +877,7 @@ export class ServerManager {
       return;
     }
 
-    const listenerPid = await this.processInspector.getListeningProcessId(this.config.local.port);
+    const listenerPid = await this.processProbe.getListeningProcessId(this.config.local.port);
     if (!listenerPid) {
       logger.warn('Unable to resolve live OpenCode listener pid after startup; preserving launcher pid only');
       return;
@@ -923,7 +924,7 @@ export class ServerManager {
   }
 
   private async tryAdoptManagedServer(): Promise<ManagedServerAdoptionOutcome> {
-    const liveListenerPid = await this.processInspector.getListeningProcessId(this.config.local.port);
+    const liveListenerPid = await this.processProbe.getListeningProcessId(this.config.local.port);
     const persistedListenerPid = this.getManagedListenerPid(this.managedServerState);
     if (persistedListenerPid && liveListenerPid && persistedListenerPid !== liveListenerPid) {
       return 'restart';
@@ -954,8 +955,8 @@ export class ServerManager {
       return null;
     }
 
-    const liveListenerPid = await this.processInspector.getListeningProcessId(this.config.local.port);
-    const commandLine = await this.processInspector.getProcessCommandLine(liveListenerPid ?? state.pid);
+    const liveListenerPid = await this.processProbe.getListeningProcessId(this.config.local.port);
+    const commandLine = await this.processProbe.getProcessCommandLine(liveListenerPid ?? state.pid);
     if (!commandLine) {
       this.clearManagedServerState();
       return null;
@@ -975,8 +976,8 @@ export class ServerManager {
   }
 
   private async inspectExistingHealthyServer(): Promise<ExistingServerProcessInfo> {
-    const pid = await this.processInspector.getListeningProcessId(this.config.local.port);
-    const commandLine = pid ? await this.processInspector.getProcessCommandLine(pid) : null;
+    const pid = await this.processProbe.getListeningProcessId(this.config.local.port);
+    const commandLine = pid ? await this.processProbe.getProcessCommandLine(pid) : null;
     return {
       pid,
       commandLine,
@@ -1006,7 +1007,10 @@ export class ServerManager {
       return;
     }
 
-    const currentListenerPid = await this.getCurrentPluginManagedListenerPid();
+    const currentListenerPid = await this.processProbe.getCurrentPluginManagedListenerPid(
+      this.config.local.port,
+      (commandLine) => this.endpointResolver.looksLikePluginManagedSidecarCommand(commandLine),
+    );
 
     await this.runManagedShutdownLifecycle({
       process: null,
@@ -1015,20 +1019,6 @@ export class ServerManager {
       cleanup: false,
       waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`,
     });
-  }
-
-  private async waitForPortAvailability(timeout: number): Promise<boolean> {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeout) {
-      if (await this.isPortAvailable(this.config.local.port)) {
-        return true;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-
-    return false;
   }
 
   private matchesManagedServerSignature(state: ManagedServerState): boolean {
@@ -1113,127 +1103,6 @@ export class ServerManager {
       default:
         return '/etc/opencode';
     }
-  }
-
-  private killWindowsProcessTree(pid: number | undefined): Promise<boolean> {
-    if (!pid) {
-      return Promise.resolve(false);
-    }
-
-    return new Promise((resolve) => {
-      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-
-      killer.once('error', (error) => {
-        logger.error('Failed to run taskkill for OpenCode process tree:', error);
-        resolve(false);
-      });
-
-      killer.once('exit', (code) => {
-        if (code !== 0) {
-          void this.processInspector.isPidRunning(pid).then((stillRunning) => {
-            if (!stillRunning) {
-              resolve(true);
-              return;
-            }
-            logger.warn(`taskkill exited with code ${code} while stopping OpenCode`);
-            resolve(false);
-          });
-          return;
-        }
-
-        resolve(true);
-      });
-    });
-  }
-
-  private killWindowsProcessTreeSync(pid: number | undefined): boolean {
-    if (!pid) {
-      return false;
-    }
-
-    const result = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-
-    if (result.error || result.status !== 0) {
-      if (!this.processInspector.isPidRunningSync(pid)) {
-        return true;
-      }
-      logger.warn('Failed to synchronously terminate OpenCode process tree during dispose', {
-        pid,
-        error: result.error ?? null,
-        status: result.status ?? null,
-      });
-      return false;
-    }
-
-    return true;
-  }
-
-  private async terminateManagedPid(pid: number): Promise<void> {
-    if (process.platform === 'win32') {
-      await this.killWindowsProcessTree(pid);
-      return;
-    }
-
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch (error) {
-      logger.error('Error sending SIGTERM to adopted OpenCode process:', error);
-      return;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    try {
-      process.kill(pid, 0);
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // Process already exited after SIGTERM.
-    }
-  }
-
-  private terminateManagedPidSync(pid: number): void {
-    if (process.platform === 'win32') {
-      this.killWindowsProcessTreeSync(pid);
-      return;
-    }
-
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch {
-      return;
-    }
-
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // Process already exited.
-    }
-  }
-
-  private async getCurrentPluginManagedListenerPid(): Promise<number | null> {
-    const pid = await this.processInspector.getListeningProcessId(this.config.local.port);
-    if (!pid) {
-      return null;
-    }
-
-    const commandLine = await this.processInspector.getProcessCommandLine(pid);
-    return this.endpointResolver.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
-  }
-
-  private getCurrentPluginManagedListenerPidSync(): number | null {
-    const pid = this.processInspector.getListeningProcessIdSync(this.config.local.port);
-    if (!pid) {
-      return null;
-    }
-
-    const commandLine = this.processInspector.getProcessCommandLineSync(pid);
-    return this.endpointResolver.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
   }
 
   private getAuthHeaders(): Record<string, string> | undefined {

@@ -21,7 +21,7 @@
 
 ```text
 上游:
-- Node `child_process`, `fs`, `net`, `path`
+- Node `child_process`, `fs`, `path`
 - Obsidian `Notice`, `requestUrl`
 - `../../shared/logger`
 - `../config/modelConfig`
@@ -45,6 +45,7 @@
 - `diagnostics`: 结构化诊断快照，供设置页区分 `managed` / `external` / `conflict` / `orphan restarted`
 - `startPromise`: 避免并发重复启动
 - `workingDirectory`: 通常是 vault 根目录，用来让 OpenCode 读取 `.opencode/`
+- `processProbe`: `LocalProcessProbe`，承载 process/port probe primitive 与 managed pid 终止 primitive
 
 `getStatus()` 和 `isRunning()` 的语义不同：
 
@@ -167,10 +168,10 @@ Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；
 ### 健康检查与端口探测
 
 - `checkHealth(timeout)` 通过 `requestUrl(GET ${baseUrl}/global/health)` 判断服务是否健康，只有 HTTP 200 才返回 `true`
-- `canBindLocalEndpoint(host, port)` 和内部 `isPortAvailable()` 通过真实 bind 一个临时 `net.Server` 来判断端口是否可用
+- `canBindLocalEndpoint(host, port)` 通过 `LocalProcessProbe.canBindLocalEndpoint()` 做真实 bind 预检
 - `waitForHealthy(timeout)` 轮询健康检查，并在进程提前退出时立刻失败
-- 对“旧 managed server 需要重启”的情况，还会额外等待端口释放后再重新 spawn；目标不是单纯让 `4196` 有服务，而是让插件默认 sidecar 端点对应**当前 vault 的正确服务**
-- OS 级别的进程查询（`lsof`/`netstat`、命令行解析、PID 存活检查）已委托给 `LocalSidecarProcessInspector`
+- 对“旧 managed server 需要重启”的情况，会通过 `LocalProcessProbe.waitForPortAvailability()` 轮询端口释放后再重新 spawn；目标不是单纯让 `4196` 有服务，而是让插件默认 sidecar 端点对应**当前 vault 的正确服务**
+- OS 级别的进程查询（`lsof`/`netstat`、命令行解析、PID 存活检查）与 managed pid 终止 primitive 已委托给 `LocalProcessProbe` / `LocalSidecarProcessInspector`
 - 健康本地端点被占用时的 command classification、adopt / restart / recycle / conflict 判定和 diagnostics 文案已委托给 `LocalSidecarEndpointResolver`；`ServerManager` 只保留生命周期执行、状态变更和 managed state 持久化
 
 ### Spawn 环境变量与模型来源模式
