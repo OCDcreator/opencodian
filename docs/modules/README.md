@@ -58,6 +58,7 @@ docs/modules/
 │   │   └── modelConfig.md
 │   ├── opencode/
 │   │   ├── index.md
+│   │   ├── LocalSidecarEndpointResolver.md
 │   │   ├── OpenCodeCatalogStateStore.md
 │   │   ├── OpenCodeContextPartSerializer.md
 │   │   ├── OpenCodeEventSubscriptionCoordinator.md

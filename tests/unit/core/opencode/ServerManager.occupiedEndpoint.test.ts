@@ -2,11 +2,16 @@
  * ServerManager occupied local endpoint resolution tests
  */
 
+import { LocalSidecarEndpointResolver } from '../../../../src/core/opencode/LocalSidecarEndpointResolver';
 import { LocalSidecarProcessInspector } from '../../../../src/core/opencode/LocalSidecarProcessInspector';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
 function getProcessInspector(manager: ServerManager): LocalSidecarProcessInspector {
   return (manager as unknown as { processInspector: LocalSidecarProcessInspector }).processInspector;
+}
+
+function getEndpointResolver(manager: ServerManager): LocalSidecarEndpointResolver {
+  return (manager as unknown as { endpointResolver: LocalSidecarEndpointResolver }).endpointResolver;
 }
 
 jest.mock('obsidian', () => ({
@@ -116,7 +121,7 @@ describe('ServerManager occupied local endpoint resolution', () => {
       commandLine: 'opencode serve --port 5000 --hostname 127.0.0.1',
       looksLikeOpenCodeServe: true,
     });
-    jest.spyOn(manager as never, 'shouldRecycleUnknownLocalServer').mockResolvedValue(false);
+    jest.spyOn(getEndpointResolver(manager), 'shouldRecycleUnknownLocalServer').mockResolvedValue(false);
 
     await expect((manager as never).resolveOccupiedHealthyLocalEndpoint()).resolves.toMatchObject({
       action: 'conflict',

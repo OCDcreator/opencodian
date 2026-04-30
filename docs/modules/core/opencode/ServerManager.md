@@ -25,6 +25,7 @@
 - Obsidian `Notice`, `requestUrl`
 - `../../shared/logger`
 - `../config/modelConfig`
+- `./LocalSidecarEndpointResolver`
 - `./LocalSidecarProcessInspector`
 - `./types`
 
@@ -169,7 +170,8 @@ Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；
 - `canBindLocalEndpoint(host, port)` 和内部 `isPortAvailable()` 通过真实 bind 一个临时 `net.Server` 来判断端口是否可用
 - `waitForHealthy(timeout)` 轮询健康检查，并在进程提前退出时立刻失败
 - 对“旧 managed server 需要重启”的情况，还会额外等待端口释放后再重新 spawn；目标不是单纯让 `4196` 有服务，而是让插件默认 sidecar 端点对应**当前 vault 的正确服务**
-- OS 级别的进程查询（`lsof`/`netstat`、命令行解析、PID 存活检查）已委托给 `LocalSidecarProcessInspector`；`ServerManager` 只保留 domain 层的 adopt / recycle / conflict 判定逻辑
+- OS 级别的进程查询（`lsof`/`netstat`、命令行解析、PID 存活检查）已委托给 `LocalSidecarProcessInspector`
+- 健康本地端点被占用时的 command classification、adopt / restart / recycle / conflict 判定和 diagnostics 文案已委托给 `LocalSidecarEndpointResolver`；`ServerManager` 只保留生命周期执行、状态变更和 managed state 持久化
 
 ### Spawn 环境变量与模型来源模式
 

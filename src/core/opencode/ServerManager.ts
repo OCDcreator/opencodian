@@ -17,9 +17,11 @@ import {
   getPerformanceTimestampMs,
 } from '../../shared';
 import {
-  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
-  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
-} from '../types/settings';
+  type ExistingServerProcessInfo,
+  LocalSidecarEndpointResolver,
+  type ManagedServerAdoptionOutcome,
+  type OccupiedLocalEndpointResolution,
+} from './LocalSidecarEndpointResolver';
 import { LocalSidecarProcessInspector } from './LocalSidecarProcessInspector';
 import type { ManagedServerState, OpenCodeServerConfig, ServerDiagnostics, ServerStatus } from './types';
 
@@ -66,13 +68,6 @@ interface LocalServerLaunchSnapshot {
   error: Error | null;
 }
 
-interface ExistingServerProcessInfo {
-  pid: number | null;
-  commandLine: string | null;
-  looksLikeOpenCodeServe: boolean;
-  looksLikePluginManagedSidecar: boolean;
-}
-
 interface ManagedServerShutdownPlan {
   process: ChildProcess | null;
   pids: number[];
@@ -80,18 +75,6 @@ interface ManagedServerShutdownPlan {
   cleanup: boolean;
   waitForPortReleaseMessage?: string;
 }
-
-type ManagedServerAdoptionOutcome = 'adopted' | 'restart' | 'skip';
-
-type OccupiedLocalEndpointResolution =
-  | { action: 'adopt-managed' }
-  | { action: 'restart-managed' }
-  | { action: 'recycle-orphan'; existingServer: ExistingServerProcessInfo }
-  | {
-      action: 'conflict';
-      existingServer: ExistingServerProcessInfo;
-      diagnostics: ServerDiagnostics;
-    };
 
 export class ServerManager {
   private config: OpenCodeServerConfig;
@@ -105,6 +88,7 @@ export class ServerManager {
   private diagnostics: ServerDiagnostics = { reason: 'none' };
   private activeLaunch: LocalServerLaunch | null = null;
   private processInspector = new LocalSidecarProcessInspector();
+  private endpointResolver: LocalSidecarEndpointResolver;
 
   constructor(
     config: OpenCodeServerConfig,
@@ -115,6 +99,7 @@ export class ServerManager {
     this.events = events;
     this.managedServerState = runtimeOptions.initialManagedServerState ?? null;
     this.onManagedServerStateChange = runtimeOptions.onManagedServerStateChange;
+    this.endpointResolver = new LocalSidecarEndpointResolver(this.config);
   }
 
   /** Set the working directory for the server (vault path) */
@@ -160,6 +145,7 @@ export class ServerManager {
       timeout: this.config.timeout ?? 30000,
       ...config,
     };
+    this.endpointResolver = new LocalSidecarEndpointResolver(this.config);
   }
 
   async canBindLocalEndpoint(host: string, port: number): Promise<boolean> {
@@ -919,60 +905,21 @@ export class ServerManager {
           pid: resolution.existingServer.pid,
         });
         await this.recycleUnknownLocalServer(resolution.existingServer);
-        await this.launchLocalServerRuntime(this.buildOrphanRestartDiagnostics(resolution.existingServer));
+        await this.launchLocalServerRuntime(this.endpointResolver.buildOrphanRestartDiagnostics(resolution.existingServer));
         return;
       case 'conflict':
         this.setDiagnostics(resolution.diagnostics);
         this.setStatus('conflict');
-        throw new Error(this.buildConflictMessage(resolution.existingServer, true));
+        throw new Error(this.endpointResolver.buildConflictMessage(resolution.existingServer, true));
     }
   }
 
   private async resolveOccupiedHealthyLocalEndpoint(): Promise<OccupiedLocalEndpointResolution> {
-    const adoption = await this.tryAdoptManagedServer();
-    if (adoption === 'adopted') {
-      return { action: 'adopt-managed' };
-    }
-
-    if (adoption === 'restart') {
-      return { action: 'restart-managed' };
-    }
-
-    const existingServer = await this.inspectExistingHealthyServer();
-    if (await this.shouldRecycleUnknownLocalServer(existingServer)) {
-      return {
-        action: 'recycle-orphan',
-        existingServer,
-      };
-    }
-
-    return {
-      action: 'conflict',
-      existingServer,
-      diagnostics: this.buildHealthyLocalConflictDiagnostics(existingServer),
-    };
-  }
-
-  private buildOrphanRestartDiagnostics(existingServer: ExistingServerProcessInfo): ServerDiagnostics {
-    return {
-      reason: 'local-orphan-restarted',
-      host: this.config.local.host,
-      port: this.config.local.port,
-      pid: existingServer.pid ?? undefined,
-      commandLine: existingServer.commandLine ?? undefined,
-      message: 'Detected and restarted an orphaned plugin sidecar.',
-    };
-  }
-
-  private buildHealthyLocalConflictDiagnostics(existingServer: ExistingServerProcessInfo): ServerDiagnostics {
-    return {
-      reason: 'local-conflict',
-      host: this.config.local.host,
-      port: this.config.local.port,
-      pid: existingServer.pid ?? undefined,
-      commandLine: existingServer.commandLine ?? undefined,
-      message: 'Another healthy OpenCode server already occupies the configured local endpoint.',
-    };
+    return this.endpointResolver.resolveOccupiedHealthyLocalEndpoint({
+      tryAdoptManagedServer: () => this.tryAdoptManagedServer(),
+      inspectExistingHealthyServer: () => this.inspectExistingHealthyServer(),
+      getManagedServerState: () => this.managedServerState,
+    });
   }
 
   private async tryAdoptManagedServer(): Promise<ManagedServerAdoptionOutcome> {
@@ -1014,7 +961,7 @@ export class ServerManager {
       return null;
     }
 
-    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
+    if (!this.endpointResolver.looksLikeOpenCodeServeCommand(commandLine)) {
       this.clearManagedServerState();
       return null;
     }
@@ -1033,61 +980,8 @@ export class ServerManager {
     return {
       pid,
       commandLine,
-      looksLikeOpenCodeServe: this.looksLikeOpenCodeServeCommand(commandLine),
-      looksLikePluginManagedSidecar: this.looksLikePluginManagedSidecarCommand(commandLine),
+      ...this.endpointResolver.classifyCommandLine(commandLine),
     };
-  }
-
-  private looksLikeOpenCodeServeCommand(commandLine: string | null): boolean {
-    if (!commandLine) {
-      return false;
-    }
-
-    const normalizedCommand = commandLine.toLowerCase();
-    const host = this.config.local.host.toLowerCase();
-    return normalizedCommand.includes('opencode')
-      && normalizedCommand.includes(' serve')
-      && (
-        normalizedCommand.includes(`--port ${this.config.local.port}`)
-        || normalizedCommand.includes(`--port=${this.config.local.port}`)
-      )
-      && (
-        normalizedCommand.includes(`--hostname ${host}`)
-        || normalizedCommand.includes(`--hostname=${host}`)
-      );
-  }
-
-  private looksLikePluginManagedSidecarCommand(commandLine: string | null): boolean {
-    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
-      return false;
-    }
-
-    const normalizedCommand = commandLine?.toLowerCase() ?? '';
-    return (
-      normalizedCommand.includes('--cors app://obsidian.md')
-      && normalizedCommand.includes('--cors app://obsidian')
-    );
-  }
-
-  private async shouldRecycleUnknownLocalServer(existingServer: ExistingServerProcessInfo): Promise<boolean> {
-    if (this.managedServerState) {
-      return false;
-    }
-
-    if (!this.isDefaultManagedLocalEndpoint()) {
-      return false;
-    }
-
-    return existingServer.pid !== null
-      && (
-        existingServer.looksLikePluginManagedSidecar
-        || this.looksLikePluginManagedSidecarCommand(existingServer.commandLine)
-      );
-  }
-
-  private isDefaultManagedLocalEndpoint(): boolean {
-    return this.config.local.host === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST
-      && this.config.local.port === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT;
   }
 
   private async recycleUnknownLocalServer(existingServer: ExistingServerProcessInfo): Promise<void> {
@@ -1104,20 +998,6 @@ export class ServerManager {
       cleanup: false,
       waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the orphaned OpenCode sidecar`,
     });
-  }
-
-  private buildConflictMessage(existingServer: ExistingServerProcessInfo, healthy: boolean): string {
-    const endpoint = `${this.config.local.host}:${this.config.local.port}`;
-    const pidLabel = existingServer.pid ? ` (PID ${existingServer.pid})` : '';
-    if (!healthy) {
-      return `Local endpoint ${endpoint} is already in use by another process${pidLabel}.`;
-    }
-
-    if (existingServer.looksLikeOpenCodeServe) {
-      return `Another OpenCode server already occupies local endpoint ${endpoint}${pidLabel}. Configure a different plugin port or stop the conflicting process.`;
-    }
-
-    return `A healthy server already occupies local endpoint ${endpoint}${pidLabel}. Configure a different plugin port or stop the conflicting process.`;
   }
 
   private async restartManagedServer(): Promise<void> {
@@ -1343,7 +1223,7 @@ export class ServerManager {
     }
 
     const commandLine = await this.processInspector.getProcessCommandLine(pid);
-    return this.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
+    return this.endpointResolver.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
   }
 
   private getCurrentPluginManagedListenerPidSync(): number | null {
@@ -1353,7 +1233,7 @@ export class ServerManager {
     }
 
     const commandLine = this.processInspector.getProcessCommandLineSync(pid);
-    return this.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
+    return this.endpointResolver.looksLikePluginManagedSidecarCommand(commandLine) ? pid : null;
   }
 
   private getAuthHeaders(): Record<string, string> | undefined {

@@ -30,7 +30,7 @@
   - SDK-first plus legacy fallback semantics remain intact.
 - **Validation**: `npm test -- --runInBand tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts tests/unit/core/opencode/OpenCodeSyncEventRuntimeCoordinator.test.ts tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts tests/unit/core/opencode/OpenCodeService.sdkStreamEvents.test.ts`
 
-### [NEXT] Task 3 - Package local sidecar adopt/restart diagnostics
+### [DONE] Task 3 - Package local sidecar adopt/restart diagnostics
 
 - **Goal**: Shrink a concentrated lifecycle/diagnostics slice in `ServerManager.ts` while preserving managed-sidecar adoption, restart, conflict detection, and endpoint ownership semantics.
 - **Key files**:
