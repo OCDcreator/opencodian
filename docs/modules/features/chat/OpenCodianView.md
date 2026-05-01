@@ -229,12 +229,19 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 ### Child session tree
 
-`OpenCodianView` 现在会在当前消息区底部维护一个最小 `childSessionTreeEl` 容器，用来渲染 `ChildSessionGraphCoordinator` 产出的 graph：
+`ChildSessionGraphCoordinator` 现在 owns child-session tree 的完整生命周期，包括 graph 重建和 DOM 渲染：
 
-- `renderSessionTree()` 只负责 DOM 显示：`complete`/`partial` graph 渲染折叠区，`empty` graph 直接隐藏整块
-- 普通 edge 行显示状态点、title/description 与 `Open` 按钮；按钮继续复用既有 `openTaskToolSession()` 路径
+- coordinator 的 `render()` 负责在消息区底部创建/复用 `.opencodian-session-tree` 容器，并渲染 `complete`/`partial` graph 的折叠区；`empty` graph 直接隐藏整块
+- 普通 edge 行显示状态点、title/description 与 `Open` 按钮；按钮通过 host callback 触发 `openTaskToolSession()`
 - orphaned session 行固定显示 `Unknown task`，同时标记 partial graph badge，并在 graph 为 `partial` 时显示提醒文案
-- graph state 不落进 `TabRuntimeState`；view 只在 active pane 切换时重建/隐藏容器，真正的 graph snapshot 仍留在 coordinator 内部
+- graph state 不落进 `TabRuntimeState`；view 只在 active pane 切换时通过 `coordinator.clearContainer()` / `coordinator.render()` 重建，真正的 graph snapshot 仍留在 coordinator 内部
+- `SESSION_TREE_BASE_CSS` 由 coordinator 导出，view 在 `applyChatAppearanceSettings()` 中注入
+
+`OpenCodianView` 只保留：
+- `createChildSessionGraphCoordinatorHost()` 提供 host seam（`getMessagesContainerEl`、`openTaskToolSession`）
+- 在 conversation load / sync 完成后调用 `coordinator.refreshGraph()`
+- 在 pane 切换时调用 `coordinator.clearContainer()` 和 `coordinator.render(currentGraph)`
+- 在 close / empty-tab 路径上调用 `coordinator.hide()` 和 `coordinator.clearGraph()`
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
