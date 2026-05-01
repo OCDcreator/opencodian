@@ -2928,6 +2928,7 @@ export class OpenCodianView extends ItemView {
   /** Apply configured chat scroll mode to the messages container */
   public applyChatScrollMode(): void {
     if (this.tabMessagesPaneCoordinator.applyScrollModeToPanes()) {
+      this.chatSurfaceAppearanceCoordinator.syncChatSurfaceColor();
       return;
     }
 

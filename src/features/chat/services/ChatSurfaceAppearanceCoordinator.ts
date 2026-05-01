@@ -167,7 +167,7 @@ export class ChatSurfaceAppearanceCoordinator {
     chatContainerEl.addClass('opencodian-container--theme-background');
   }
 
-  private syncChatSurfaceColor(): void {
+  syncChatSurfaceColor(): void {
     const chatContainerEl = this.host.getChatContainerEl();
     if (!chatContainerEl) {
       return;

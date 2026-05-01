@@ -48,6 +48,7 @@
 | `syncAppearanceState()` | 同步完整外观状态：主题预设、CSS 变量、背景图、自定义 CSS、委托子系统 |
 | `syncScrollMode()` | 同步滚动模式并触发表面颜色同步 |
 | `applyScrollModeToMessagesEl(messagesEl)` | 对指定元素应用滚动模式类 |
+| `syncChatSurfaceColor()` | 立即同步聊天表面颜色（向上遍历 DOM 计算背景色） |
 | `scheduleSurfaceColorSync()` | 通过双 rAF + 80ms timeout 调度表面颜色同步 |
 | `clearSurfaceSyncTimers()` | 清除 pending 的 rAF 和 timeout |
 | `destroy()` | 清理：清除定时器、移除 style 元素 |

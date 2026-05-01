@@ -29,7 +29,7 @@
 | `applyChatAppearanceSettings()` | 委托 `ChatSurfaceAppearanceCoordinator.syncAppearanceState()` 应用主题 preset、聊天外观变量、主题背景图、自定义 CSS、per-conversation chat font-size CSS variable，并同步输入面板外观 |
 | `refreshCurrentConversationRendering()` | 重新渲染当前对话 |
 | `reapplyCurrentConversationSessionSettings()` | 复用 `ConversationSessionSettingsCoordinator`，把当前会话（或全局默认）的 effective chat font-size 写回，并触发 compaction backend apply / deferred fallback |
-| `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
+| `applyChatScrollMode()` | 把当前滚动模式应用到消息容器；无论 pane coordinator 是否处理滚动模式，都会同步表面颜色 |
 | `applyLocaleTexts()` | 委托 header presenter、selection controls coordinator 与 composer input coordinator 刷新 header/status、selector、placeholder、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `invalidateSlashCommandMenuCatalog()` | 立刻清空 slash command menu catalog 缓存，并可选触发一次后台 warm preload |
@@ -151,7 +151,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 聊天 surface 外观（主题 preset、CSS 变量、主题背景图、自定义 CSS、滚动模式、粘性遮罩颜色同步）由 `services/ChatSurfaceAppearanceCoordinator.ts` 承接。`OpenCodianView` 只保留 host seam：提供 chat container、theme background image element、messages container、settings access，以及 conversation visual state / input panel appearance 的委托回调。
 
-`OpenCodianView` 保留的公开方法 `applyChatAppearanceSettings()`、`applyChatScrollMode()`、`scheduleChatSurfaceColorSync()` 全部委托给该协调器；原来的私有实现（`applyThemeBackgroundImage`、`applyChatScrollModeToMessagesEl`、`scheduleChatSurfaceColorSync`、`clearChatSurfaceSyncTimers`、`syncChatSurfaceColor`）已移至协调器内部。
+`OpenCodianView` 保留的公开方法 `applyChatAppearanceSettings()`、`applyChatScrollMode()`、`scheduleChatSurfaceColorSync()` 全部委托给该协调器；原来的私有实现（`applyThemeBackgroundImage`、`applyChatScrollModeToMessagesEl`、`scheduleChatSurfaceColorSync`、`clearChatSurfaceSyncTimers`、`syncChatSurfaceColor`）已移至协调器内部，其中 `syncChatSurfaceColor()` 作为公开方法供 `applyChatScrollMode()` 在 pane coordinator 提前返回时直接调用，确保表面颜色始终同步。
 
 
 ### Header/status shell 抽离

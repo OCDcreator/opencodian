@@ -180,6 +180,33 @@ describe('ChatSurfaceAppearanceCoordinator', () => {
     });
   });
 
+  describe('syncChatSurfaceColor', () => {
+    it('sets --opencodian-chat-surface CSS variable on chat container', () => {
+      const host = createHost();
+      const coordinator = new ChatSurfaceAppearanceCoordinator(host);
+
+      coordinator.syncChatSurfaceColor();
+
+      const containerEl = host.getChatContainerEl();
+      expect(containerEl.style.getPropertyValue('--opencodian-chat-surface')).toBeTruthy();
+    });
+
+    it('falls back to var(--background-secondary) when no background color is resolved', () => {
+      const isolatedContainerEl = document.createElement('div');
+      isolatedContainerEl.classList.add('opencodian-container');
+      const host = createHost({
+        getChatContainerEl: jest.fn().mockReturnValue(isolatedContainerEl),
+      });
+      const coordinator = new ChatSurfaceAppearanceCoordinator(host);
+
+      coordinator.syncChatSurfaceColor();
+
+      expect(isolatedContainerEl.style.getPropertyValue('--opencodian-chat-surface')).toBe(
+        'var(--background-secondary)',
+      );
+    });
+  });
+
   describe('scheduleSurfaceColorSync', () => {
     it('does not throw when scheduling', () => {
       const host = createHost();
