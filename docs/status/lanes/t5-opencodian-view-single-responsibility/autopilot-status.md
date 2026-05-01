@@ -8,7 +8,7 @@
 
 - round: 1
 - current_task: view-22
-- last_commit: task/view-22 HEAD after final status commit
+- last_commit: aad004a5
 - queue_state: rejected_exhausted
 - next_focus: Open a follow-up lint-guardrail cleanup queue for the remaining max-lines warnings
 - blocker_category: lint-guardrail-blocked
