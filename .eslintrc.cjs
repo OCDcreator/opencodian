@@ -2,6 +2,7 @@ const justifiedMaxLinesFiles = [
   'src/core/opencode/OpenCodeCatalogQueryCoordinator.ts',
   'src/core/opencode/OpenCodeService.ts',
   'src/core/opencode/OpenCodeStreamEventTransformer.ts',
+  'src/core/opencode/OpenCodeStreamingFinalizationCoordinator.ts',
   'src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts',
   'src/core/opencode/ServerManager.ts',
   'src/core/types/settings.ts',
@@ -27,6 +28,7 @@ const justifiedMaxLinesFiles = [
   'src/utils/icons/ProviderIconService.ts',
   'src/utils/icons/builtinIconRegistry.ts',
   'src/utils/streaming/StreamController.ts',
+  'tests/unit/core/opencode/OpenCodeStreamingFinalizationCoordinator.test.ts',
   'tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts',
   'tests/unit/core/storage/StorageService.test.ts',
   'tests/unit/features/chat/glassOctahedronDemo.test.ts',
@@ -35,6 +37,7 @@ const justifiedMaxLinesFiles = [
 const justifiedMaxLinesPerFunctionFiles = [
   'src/features/chat/liquidDiamondDemo.ts',
   'src/features/chat/liquidDiamondDemoWebgl.ts',
+  'tests/unit/core/opencode/OpenCodeStreamingFinalizationCoordinator.test.ts',
 ];
 
 module.exports = {

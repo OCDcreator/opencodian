@@ -69,6 +69,7 @@ docs/modules/
 │   │   ├── OpenCodeService.md
 │   │   ├── OpenCodeSessionStateStore.md
 │   │   ├── OpenCodeStreamEventTransformer.md
+│   │   ├── OpenCodeStreamingFinalizationCoordinator.md
 │   │   ├── OpenCodeStreamingRuntimeCoordinator.md
 │   │   ├── OpenCodeSyncEventRuntimeCoordinator.md
 │   │   ├── ServerManager.md

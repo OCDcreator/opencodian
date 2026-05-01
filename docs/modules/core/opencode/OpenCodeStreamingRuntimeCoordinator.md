@@ -12,10 +12,10 @@
 - SDK stream 订阅、prompt 启动顺序与“首事件前失败 → legacy SSE”降级策略
 - legacy `/event` SSE reader / parser / abort-detach 生命周期
 - 在交付 legacy `StreamChunk` 前先把 stream mutations 转交给 canonical session graph；具体 message/part reducer 由 `OpenCodeSessionStateStore.applyStreamMutations()` 拥有
-- `session.idle` / `session.error` 停止判定后的 final assistant message completion
 - `cancelStream()` / `detachStream()` 的协议语义
+- 流结束后的 finalization 委托给 `OpenCodeStreamingFinalizationCoordinator`
 
-`OpenCodeService` 仍负责 prompt payload 组装、SDK feature-flag 分流与 public API；`OpenCodeStreamEventTransformer` 仍负责 event → `StreamChunk` transform。本模块处在两者之间，承接完整 transport/fallback/read/finalize lifecycle。
+`OpenCodeService` 仍负责 prompt payload 组装、SDK feature-flag 分流与 public API；`OpenCodeStreamEventTransformer` 仍负责 event → `StreamChunk` transform。本模块处在两者之间，承接完整 transport/fallback/read lifecycle，并把 finalize 阶段委托给专门的 finalization owner。
 
 ## 导入关系
 
@@ -23,9 +23,9 @@
 上游:
 - `../../shared`
 - `../types`
-- `./OpenCodeMessageNormalizationMapper`
 - `./OpenCodeSessionLifecycleCoordinator`
 - `./OpenCodeStreamEventTransformer`
+- `./OpenCodeStreamingFinalizationCoordinator`
 - `./sdkTypes`
 
 下游:
@@ -59,18 +59,17 @@
 - `streamLegacyResponse()` 则直接执行 legacy prompt 启动后进入 `/event` 读取。
 - 每个 event outcome 都会先调用 host `applyStreamMutations()`，再 yield 对应 `StreamChunk`，避免 canonical graph 落后于本地 loose chunk；message/part merge 和 delta fallback 由 `OpenCodeSessionStateStore` 处理。
 
-### SSE reader 与 finalize lifecycle
+### SSE reader lifecycle
 
 - `connectSSE()` / `openSseReader()` / `readSseStream()` 负责 legacy fetch reader、abort cancel、partial buffer、tail flush 生命周期。
 - `streamEventTransformer.parseSSEEvents()` 继续负责把 buffer 切成完整 SSE events；coordinator 只维护 reader state 与剩余缓冲区。
-- `finishStreamingResponse()` 会重新拉取最终 assistant message：
-  - 只把 `parentID` 匹配当前 `promptMessageId` 的 assistant 当作本轮收尾候选，避免 silent timeout 后误复用上一轮 assistant
-  - 如果当前 prompt 的 assistant 还没进入 `session.messages()`，会做一次有界短延迟重试，降低“第二次提问刚结束流就收尾，但持久化 assistant 仍未可见”的竞态
-- 基于 canonical assistant tail 的完整 parts 状态补发任何未在流中出现的尾部内容，而不只补文本：文本 delta、`reasoning/thinking`、tool use/result 都会按缺失情况恢复
-- 这条 trailing tool-use recovery 现在也会补发白名单 `toolMetadata.sessionId` 与 `toolResultVisibility: 'hidden'`，避免 task/subagent child session linkage 只在 hydrated path 存在、在 finalize 补发 path 丢失，或把 raw `<task_result>` 重新标成普通输出
-- 补发 `message_metadata`
-  - 如果最终持久化 assistant message 带了结构化错误而流里没显式发出 `session.error`，补发 `error`
-  - 始终以 `message_stop` 结束
+
+### Finalize delegation
+
+- `finishStreamingResponse()` 现在把全部 finalization 工作委托给 `OpenCodeStreamingFinalizationCoordinator.finishStreamingResponse()`。
+- runtime coordinator 在构造时会把自身的 `getSessionMessages` 与 `delay` host seam 适配成 finalization coordinator 所需的更小 host 接口。
+- finalization coordinator 负责：重新拉取 assistant tail、按 `parentID` 过滤、补发 trailing text/reasoning/tool/error chunks、输出 `message_metadata` 与 `message_stop`。
+- 具体的 finalization 行为（重试策略、去重逻辑、tool metadata 处理等）已迁移到 `OpenCodeStreamingFinalizationCoordinator` 文档中描述。
 
 ### Cancel / detach 语义
 
@@ -97,7 +96,8 @@ graph LR
     H --> M[applyStreamMutations]
     M --> N[OpenCodeSessionStateStore canonical graph]
     B --> I[finishStreamingResponse]
-    I --> J[getSessionMessages host seam]
+    I --> FC[OpenCodeStreamingFinalizationCoordinator]
+    FC --> J[getSessionMessages host seam]
     A --> K[cancelStream / detachStream]
     K --> B
     B --> L[abortSessionOnServer host seam]
@@ -105,10 +105,9 @@ graph LR
 
 ## 与其他模块的交互
 
-- `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 transport callback 注入；SDK/legacy 入口分流、完整 transport/fallback/read/finalize 细节都委托给 coordinator。
+- `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 transport callback 注入；SDK/legacy 入口分流、transport/fallback/read 细节都委托给本 coordinator，finalize 则进一步委托给 `OpenCodeStreamingFinalizationCoordinator`。
 - `OpenCodeStreamEventTransformer` 继续负责 `session.error` / `session.idle` 的 stop 判断、tool/question/file/permission 事件映射、canonical stream mutation 输出，以及 SSE event parsing。
-- `OpenCodeSessionLifecycleCoordinator` 的 `getSessionMessages()` 通过 host seam 被用于 finalize 阶段补拉 assistant message。
-- finalize 阶段还会复用 runtime 已记录的 `processedToolIds`、reasoning 文本快照与 tool input 快照，避免 canonical tail recovery 把已在流内发出的 tool/reasoning 块重复发一遍。
+- `OpenCodeStreamingFinalizationCoordinator` 接手了 finalize 阶段的全部行为：补拉 assistant tail、按缺失情况恢复 trailing content、输出 metadata/stop。runtime coordinator 只负责在流结束时触发 finalization。
 - `abortSessionOnServer()` 仍留在 `OpenCodeService`，因此 SDK `session.abort()` 失败后回退 legacy HTTP 的语义不变。
 
 ## 配置项
