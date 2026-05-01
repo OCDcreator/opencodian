@@ -243,7 +243,7 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 - 在 pane 切换时调用 `coordinator.clearContainer()` 和 `coordinator.render(currentGraph)`
 - 在 close / empty-tab 路径上调用 `coordinator.hide()` 和 `coordinator.clearGraph()`
 
-真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
+真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` 留在 view；`renderBackgroundTaskIndicatorIfNeeded()` 已直接委托 `BackgroundTaskIndicatorCoordinator.renderIfNeeded()`。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
 `session.diff` 现在不再触发 message authoritative sync/reload：sync-event 自带的 diff entries 由 `OpenCodeSessionStateStore.setSessionDiffEntries()` 统一缓存，view 通过 `OpenCodeService.getCachedSessionDiffEntries()` 读取作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
 
@@ -275,7 +275,7 @@ loaded-conversation 切换里旧标题生成取消、background-task indicator r
 
 loaded-conversation activate 前的 conversation lookup、reload retry、interrupted-tail 驱动的 server-sync 判定，以及 `load-conversation` sync 返回的 revert-state 写回，也不再由 `ConversationViewStateService` 直接通过散落的 host 回调组合；这些数据解析入口现在先由 `runtime/ConversationLoadRuntimeBridge.ts` 统一桥接，view 只保留真实的 conversation 查询、sync 与 revert-state 落点实现。
 
-loaded-conversation 在消息拿到之后那段 `syncBackgroundTaskStateFromConversation()`、`renderMessages()`、post-render indicator/dock/status-question-todo outcome，以及 sync baseline commit，也不再由 `ConversationViewStateService` 直接握着多段 host 回调串起来；这些 outcome 现在先由 `runtime/ConversationHydrationOutcomeBridge.ts` 统一组合，再分别复用 `TabViewActivationBridge` 与 `TabConversationStateBridge`。
+loaded-conversation 在消息拿到之后那段 background-task rebuild（已直接委托 `BackgroundTaskTimelineService.syncStateFromConversation()`）、`renderMessages()`、post-render indicator/dock/status-question-todo outcome，以及 sync baseline commit，也不再由 `ConversationViewStateService` 直接握着多段 host 回调串起来；这些 outcome 现在先由 `runtime/ConversationHydrationOutcomeBridge.ts` 统一组合，再分别复用 `TabViewActivationBridge` 与 `TabConversationStateBridge`。
 
 tab stream-like badge、background-task badge、rewind/fork 按钮禁用态，以及 attention 标记写回现在也不再由 view 自己散落地直接操作 `TabManager` 或消息区 DOM：这些 runtime→UI 写回统一交给 `runtime/TabRuntimeStateBridge.ts`，view 只保留 wrapper 方法与 host bridge。
 
@@ -497,7 +497,7 @@ session todo 这条子链路现在的边界是：
 
 background task notice 这条子链路现在的边界是：
 
-- `OpenCodianView`：background-task service bundle 返回值消费、indicator coordinator 的最薄 host bridge，以及上层触发入口
+- `OpenCodianView`：通过 `createBackgroundTaskViewHost()` 工厂统一装配 background-task host 回调，再分发到各 host adapter；不再在 view 内联定义这些回调
 - `BackgroundTaskTimelineService`：launch/completion timeline segment 推导、conversation→runtime rebuild、pending matching、completion segment 收集，与 inline copy 组装
 - `BackgroundTaskInlinePanelRenderer`：inline panel DOM 创建、位置挂载、Markdown 渲染、mount 复用与 active indicator element 清理
 - `BackgroundTaskIndicatorCoordinator`：直接组合 live-signal reconcile、inline render、completion notice queue/flush 与 stream-like sync 编排

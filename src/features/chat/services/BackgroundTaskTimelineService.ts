@@ -372,3 +372,47 @@ export class BackgroundTaskTimelineService {
     return lines.join('\n');
   }
 }
+
+export interface BackgroundTaskViewHost {
+  resetBackgroundTaskIndicator(tabId?: TabId | null): void;
+  syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId?: TabId | null): void;
+  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  armBackgroundTaskIndicatorForUserMessage(message: ChatMessage, tabId: TabId | null): void;
+  logOmoBackgroundTaskDiagnostics(
+    conversation: Conversation,
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): void;
+}
+
+export interface BackgroundTaskViewHostDependencies {
+  timelineService: BackgroundTaskTimelineService;
+  indicatorRenderPort: {
+    renderIfNeeded(tabId?: TabId | null): Promise<void>;
+  };
+}
+
+export function createBackgroundTaskViewHost(
+  dependencies: BackgroundTaskViewHostDependencies,
+): BackgroundTaskViewHost {
+  return {
+    resetBackgroundTaskIndicator: (tabId) => {
+      dependencies.timelineService.resetIndicatorState(tabId);
+    },
+    syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
+      dependencies.timelineService.syncStateFromConversation(conversation, tabId);
+    },
+    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+      dependencies.indicatorRenderPort.renderIfNeeded(tabId),
+    armBackgroundTaskIndicatorForUserMessage: (message, tabId) => {
+      dependencies.timelineService.armIndicatorForUserMessage(message, tabId);
+    },
+    logOmoBackgroundTaskDiagnostics: (conversation, previousMessages, nextMessages) => {
+      dependencies.timelineService.logOmoBackgroundTaskDiagnostics(
+        conversation,
+        previousMessages,
+        nextMessages,
+      );
+    },
+  };
+}

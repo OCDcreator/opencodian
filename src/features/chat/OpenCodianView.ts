@@ -147,6 +147,8 @@ import {
   type BackgroundTaskSegment,
   BackgroundTaskTimelineService,
   type BackgroundTaskTimelineServiceHost,
+  type BackgroundTaskViewHost,
+  createBackgroundTaskViewHost,
 } from './services/BackgroundTaskTimelineService';
 import {
   ChatHeaderPresenter,
@@ -561,6 +563,7 @@ export class OpenCodianView extends ItemView {
   private assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
   private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
   private backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
+  private backgroundTaskHost: BackgroundTaskViewHost;
   private backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
@@ -1462,6 +1465,10 @@ export class OpenCodianView extends ItemView {
       tabRuntimeStateBridge,
       host: this.createBackgroundTaskIndicatorCoordinatorHost(),
     });
+    this.backgroundTaskHost = createBackgroundTaskViewHost({
+      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
+      indicatorRenderPort: backgroundTaskIndicatorCoordinator,
+    });
     const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
       backgroundTaskIndicatorCoordinator,
       backgroundTaskRuntime.backgroundTaskTimelineService,
@@ -1709,13 +1716,13 @@ export class OpenCodianView extends ItemView {
       getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
       getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
       resetBackgroundTaskIndicator: (tabId) => {
-        this.resetBackgroundTaskIndicator(tabId);
+        this.backgroundTaskHost.resetBackgroundTaskIndicator(tabId);
       },
       syncBackgroundTaskStateFromConversation: (conversation, tabId?: TabId | null) => {
-        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+        this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation, tabId);
       },
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
       getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
       getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
@@ -1840,7 +1847,7 @@ export class OpenCodianView extends ItemView {
         this.syncTabStreamLikeState(tabId);
       },
       resetBackgroundTaskIndicator: (tabId) => {
-        this.resetBackgroundTaskIndicator(tabId);
+        this.backgroundTaskHost.resetBackgroundTaskIndicator(tabId);
       },
     };
   }
@@ -1906,7 +1913,7 @@ export class OpenCodianView extends ItemView {
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       hasInterruptedLocalAssistantTail: (messages) => this.hasInterruptedLocalAssistantTail(messages),
     };
   }
@@ -1933,7 +1940,9 @@ export class OpenCodianView extends ItemView {
         this.getInterruptedSyncPreservationLogFingerprint(conversation, messages),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       logOmoBackgroundTaskDiagnostics: (conversation, previousMessages, nextMessages) => {
-        this.logOmoBackgroundTaskDiagnostics(conversation, previousMessages, nextMessages);
+        this.backgroundTaskHost.logOmoBackgroundTaskDiagnostics(
+          conversation, previousMessages, nextMessages,
+        );
       },
       markBackgroundTaskAuthoritativeSync: (tabId, reason) => {
         this.markBackgroundTaskAuthoritativeSync(tabId, reason);
@@ -1941,7 +1950,7 @@ export class OpenCodianView extends ItemView {
       refreshContextUsageAfterActiveConversationSync: (conversation, tabId) =>
         this.refreshContextUsageAfterActiveConversationSync(conversation, tabId),
       armBackgroundTaskIndicatorForUserMessage: (message, tabId) => {
-        this.armBackgroundTaskIndicatorForUserMessage(message, tabId);
+        this.backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId);
       },
       updateHydratedUserMessageRuntimeAnchors: (
         conversation,
@@ -1959,7 +1968,7 @@ export class OpenCodianView extends ItemView {
       rerenderSingleUserMessage: (previousMessageId, message) =>
         conversationRenderService.rerenderSingleUserMessage(previousMessageId, message),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
@@ -2071,7 +2080,7 @@ export class OpenCodianView extends ItemView {
       },
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
       syncBackgroundTaskStateFromConversation: (conversation) => {
-        this.syncBackgroundTaskStateFromConversation(conversation);
+        this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
       },
       reapplyConversationSessionVisualState: (conversation) => {
         this.conversationSessionSettingsCoordinator.applyConversationVisualState(conversation);
@@ -2086,7 +2095,7 @@ export class OpenCodianView extends ItemView {
           titleGenerationStatus: undefined,
         }),
       resetBackgroundTaskIndicator: () => {
-        this.resetBackgroundTaskIndicator();
+        this.backgroundTaskHost.resetBackgroundTaskIndicator();
       },
       clearScheduledScrollToBottom: () => {
         this.clearScheduledScrollToBottom();
@@ -2269,9 +2278,9 @@ export class OpenCodianView extends ItemView {
       },
       renderMarkdownInto: (container, markdown) =>
         this.renderMarkdownInto(container, markdown),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       syncBackgroundTaskStateFromConversation: (conversation) => {
-        this.syncBackgroundTaskStateFromConversation(conversation);
+        this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
       },
       shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
       scrollToBottom: (options) => {
@@ -2335,7 +2344,7 @@ export class OpenCodianView extends ItemView {
       getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
         this.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
@@ -2400,10 +2409,10 @@ export class OpenCodianView extends ItemView {
         this.plugin.openCodeService.seedCanonicalUserMessage(input);
       },
       resetBackgroundTaskIndicator: (tabId) => {
-        this.resetBackgroundTaskIndicator(tabId);
+        this.backgroundTaskHost.resetBackgroundTaskIndicator(tabId);
       },
       armBackgroundTaskIndicatorForUserMessage: (message, tabId) => {
-        this.armBackgroundTaskIndicatorForUserMessage(message, tabId);
+        this.backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId);
       },
       startConversationSyncLoop: () => {
         this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
@@ -4070,49 +4079,6 @@ export class OpenCodianView extends ItemView {
     });
   }
 
-  private armBackgroundTaskIndicatorForUserMessage(
-    message: ChatMessage,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    this.backgroundTaskTimelineService.armIndicatorForUserMessage(message, tabId);
-  }
-
-  private resetBackgroundTaskIndicator(tabId: TabId | null = this.getActiveTabId()): void {
-    this.backgroundTaskTimelineService.resetIndicatorState(tabId);
-  }
-
-  private collectBackgroundTaskSegments(
-    messages: ChatMessage[],
-    tabId: TabId | null = this.getActiveTabId(),
-  ): BackgroundTaskSegment[] {
-    return this.backgroundTaskTimelineService.collectSegments(messages, tabId);
-  }
-
-  private syncBackgroundTaskStateFromConversation(
-    conversation: Conversation | null = this.currentConversation,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    this.backgroundTaskTimelineService.syncStateFromConversation(conversation, tabId);
-  }
-
-  private logOmoBackgroundTaskDiagnostics(
-    conversation: Conversation,
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-  ): void {
-    this.backgroundTaskTimelineService.logOmoBackgroundTaskDiagnostics(
-      conversation,
-      previousMessages,
-      nextMessages,
-    );
-  }
-
-  private async renderBackgroundTaskIndicatorIfNeeded(
-    tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<void> {
-    await this.backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
-  }
-
   private hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean {
     return messages.some((message) =>
       message.role === 'assistant'
@@ -4682,7 +4648,7 @@ export class OpenCodianView extends ItemView {
     });
 
     if (tabId === this.getActiveTabId()) {
-      await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
+      await this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
     }
   }
 

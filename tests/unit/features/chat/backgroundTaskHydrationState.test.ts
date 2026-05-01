@@ -32,8 +32,10 @@ describe('OpenCodianView background task hydration state', () => {
       backgroundTaskNoticeStateService: {
         handleStoppedPendingLaunches: (tabId: string, pending: unknown[]) => Promise<void>;
       };
+      backgroundTaskTimelineService: {
+        resetIndicatorState: (tabId: string | null) => void;
+      };
       syncTabStreamLikeState: () => void;
-      resetBackgroundTaskIndicator: () => void;
     };
 
     const runtime = {
@@ -56,7 +58,10 @@ describe('OpenCodianView background task hydration state', () => {
       view.backgroundTaskNoticeStateService,
       'handleStoppedPendingLaunches',
     ).mockResolvedValue(undefined);
-    const resetSpy = jest.spyOn(view, 'resetBackgroundTaskIndicator').mockImplementation(() => {});
+    const resetSpy = jest.spyOn(
+      view.backgroundTaskTimelineService,
+      'resetIndicatorState',
+    ).mockImplementation(() => {});
 
     view.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals('tab-1');
 

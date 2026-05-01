@@ -528,4 +528,71 @@ describe('BackgroundTaskTimelineService runtime state synchronization', () => {
     expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
     expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
   });
+
+  it('arms indicator from user message with correct state and tabId', () => {
+    const runtime = createRuntime();
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const message: ChatMessage = {
+      id: 'user-local-1',
+      role: 'user',
+      content: 'search docs',
+      timestamp: 42,
+      sourceMessageId: 'msg-user-1',
+      omo: {
+        kind: 'user-injection',
+        modeTag: 'search-mode',
+        injectedPrompt: 'search docs',
+        originalText: 'search docs',
+        rawText: 'search docs',
+        headline: 'search docs',
+      },
+    };
+
+    service.armIndicatorForUserMessage(message, 'tab-2');
+
+    expect(runtime.backgroundTaskStartedAt).toBe(42);
+    expect(runtime.backgroundTaskActiveAnchorKey).toBe('msg-user-1');
+    expect(runtime.backgroundTaskModeTag).toBe('search-mode');
+    expect(runtime.backgroundTaskWaitingForFollowUp).toBe(false);
+    expect(host.getMessageAnchorKey).toHaveBeenCalledWith(message);
+    expect(host.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-2');
+    expect(runtime.backgroundTaskStaleNoticeFingerprint).toBeNull();
+    expect(runtime.backgroundTaskSuppressedFingerprint).toBeNull();
+  });
+
+  it('ignores non-search-mode messages when arming indicator', () => {
+    const runtime = createRuntime();
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const message: ChatMessage = {
+      id: 'user-local-1',
+      role: 'user',
+      content: 'hello',
+      timestamp: 42,
+      sourceMessageId: 'msg-user-1',
+    };
+
+    service.armIndicatorForUserMessage(message, 'tab-1');
+
+    expect(runtime.backgroundTaskStartedAt).toBeNull();
+    expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
+  });
+
+  it('clears inline panel then syncs stream state when resetting indicator', () => {
+    const runtime = createRuntime({
+      backgroundTaskStartedAt: 12,
+      backgroundTaskActiveAnchorKey: 'anchor-1',
+    });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+
+    service.resetIndicatorState('tab-3');
+
+    expect(host.clearInlinePanel).toHaveBeenCalledWith('tab-3');
+    expect(host.clearAuthoritativeSyncGate).toHaveBeenCalledWith('tab-3');
+    expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-3');
+    expect(host.clearInlinePanel.mock.invocationCallOrder[0])
+      .toBeLessThan(host.syncTabStreamLikeState.mock.invocationCallOrder[0]);
+  });
 });

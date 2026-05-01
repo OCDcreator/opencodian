@@ -42,6 +42,21 @@ export class BackgroundTaskTimelineService {
   collectDiagnostics(...): BackgroundTaskDiagnostics | null;
   getLaunchDisplayId(...): string;
 }
+
+export interface BackgroundTaskViewHost {
+  resetBackgroundTaskIndicator(tabId?: TabId | null): void;
+  syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId?: TabId | null): void;
+  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  armBackgroundTaskIndicatorForUserMessage(message: ChatMessage, tabId: TabId | null): void;
+  logOmoBackgroundTaskDiagnostics(...): void;
+}
+
+export function createBackgroundTaskViewHost(
+  dependencies: {
+    timelineService: BackgroundTaskTimelineService;
+    indicatorRenderPort: { renderIfNeeded(tabId?: TabId | null): Promise<void> };
+  },
+): BackgroundTaskViewHost;
 ```
 
 ## 关键行为
@@ -68,7 +83,7 @@ export class BackgroundTaskTimelineService {
 ## 与相邻模块的边界
 
 - `BackgroundTaskTimelineAssemblyService`：负责 persisted messages + runtime state 的 segment assembly、completion event 收集与 diagnostics 快照。
-- `OpenCodianView`：只保留 background-task lifecycle host seam，并把 OMO diagnostics logging 委托回本 service。
+- `OpenCodianView`：通过 `createBackgroundTaskViewHost()` 工厂一次性装配 background-task host 回调对象，再分发到各 host adapter；不再在 view 内联定义这些回调。`resetIndicatorState`、`armIndicatorForUserMessage`、`syncStateFromConversation`、`logOmoBackgroundTaskDiagnostics` 等入口均由工厂集中路由到本 service 或 `BackgroundTaskIndicatorCoordinator`。
 - `BackgroundTaskTimelineLaunchService`：负责 task launch upsert、`bg_*` id 抽取、description fallback、completion matching 与 pending 过滤。
 - `BackgroundTaskInlinePanelRenderer`：负责真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用。
 - `BackgroundTaskIndicatorCoordinator`：负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序。

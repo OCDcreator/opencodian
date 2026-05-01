@@ -128,10 +128,7 @@ describe('OpenCodianView background task timeline', () => {
 
   it('matches delayed completion reminders back to the originating background-task turn', () => {
     const view = createView() as unknown as {
-      collectBackgroundTaskSegments: (messages: ChatMessage[], tabId?: string) => Array<{
-        anchorKey: string;
-        completionEvents: Array<{ reminderMessageId: string }>;
-      }>;
+      backgroundTaskTimelineService: BackgroundTaskTimelineService;
       getTabRuntimeState: () => null;
     };
 
@@ -150,7 +147,7 @@ describe('OpenCodianView background task timeline', () => {
       createReminderMessage('msg-reminder-1'),
     ];
 
-    const segments = view.collectBackgroundTaskSegments(messages, 'tab-1');
+    const segments = view.backgroundTaskTimelineService.collectSegments(messages, 'tab-1');
 
     expect(segments).toEqual(expect.arrayContaining([
       expect.objectContaining({
