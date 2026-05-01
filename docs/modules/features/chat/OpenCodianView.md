@@ -26,7 +26,7 @@
 | `onOpen()` | 组装 UI、注册事件、初始化第一个 tab，并输出首开阶段耗时汇总 |
 | `onClose()` | 清理订阅、轮询、观察器、dropdown、demo 和 tab 运行时 |
 | `applyTabBarLayout()` | 根据设置把 tab bar 挂到 header / below-header / input / 外部竖排槽位 |
-| `applyChatAppearanceSettings()` | 应用主题 preset、聊天外观变量、自定义 CSS、per-conversation chat font-size CSS variable，并把输入面板 appearance refresh 委托给 `InputPanelAppearanceCoordinator` |
+| `applyChatAppearanceSettings()` | 委托 `ChatSurfaceAppearanceCoordinator.syncAppearanceState()` 应用主题 preset、聊天外观变量、主题背景图、自定义 CSS、per-conversation chat font-size CSS variable，并同步输入面板外观 |
 | `refreshCurrentConversationRendering()` | 重新渲染当前对话 |
 | `reapplyCurrentConversationSessionSettings()` | 复用 `ConversationSessionSettingsCoordinator`，把当前会话（或全局默认）的 effective chat font-size 写回，并触发 compaction backend apply / deferred fallback |
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
@@ -146,6 +146,13 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 输入面板 action-button/theme/SVG/liquid-glass runtime 与 glass-refraction CSS token refresh 由 `services/InputPanelAppearanceCoordinator.ts` 承接。`OpenCodianView` 只保留 host seam：提供 composer shell、input wrapper、chat container、messages metrics、settings/log helper，以及 surface color / composer layout follow-up callback。
 
 这样 `applyChatAppearanceSettings()` 不再直接展开 input-panel glass-refraction CSS variables，也不再保留只转发到 coordinator 的 input-panel theme / diagnostics wrapper；view 只触发统一的 appearance sync。
+
+### 聊天 surface appearance 边界
+
+聊天 surface 外观（主题 preset、CSS 变量、主题背景图、自定义 CSS、滚动模式、粘性遮罩颜色同步）由 `services/ChatSurfaceAppearanceCoordinator.ts` 承接。`OpenCodianView` 只保留 host seam：提供 chat container、theme background image element、messages container、settings access，以及 conversation visual state / input panel appearance 的委托回调。
+
+`OpenCodianView` 保留的公开方法 `applyChatAppearanceSettings()`、`applyChatScrollMode()`、`scheduleChatSurfaceColorSync()` 全部委托给该协调器；原来的私有实现（`applyThemeBackgroundImage`、`applyChatScrollModeToMessagesEl`、`scheduleChatSurfaceColorSync`、`clearChatSurfaceSyncTimers`、`syncChatSurfaceColor`）已移至协调器内部。
+
 
 ### Header/status shell 抽离
 

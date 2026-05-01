@@ -16,11 +16,6 @@ import {
   type SessionActivityStatus,
 } from '../../core/opencode';
 import {
-  getThemePresetDefinition,
-  THEME_PRESET_CSS_VARIABLE_NAMES,
-  THEME_STYLE_CONTAINER_CLASSES,
-} from '../../core/theme';
-import {
   type ChatMessage,
   type CompactionDividerMeta,
   type Conversation,
@@ -50,10 +45,6 @@ import { MarkdownRenderService } from '../../utils/markdown';
 import {
   StreamController,
 } from '../../utils/streaming';
-import {
-  buildChatAppearanceCustomCss,
-  getChatAppearanceCssVariables,
-} from './chatAppearance';
 import {
   type FocusContextPreview,
 } from './composerContext';
@@ -160,9 +151,12 @@ import {
   type ChatSelectionControlsCoordinatorHost,
 } from './services/ChatSelectionControlsCoordinator';
 import {
+  ChatSurfaceAppearanceCoordinator,
+  type ChatSurfaceAppearanceCoordinatorHost,
+} from './services/ChatSurfaceAppearanceCoordinator';
+import {
   ChildSessionGraphCoordinator,
   type ChildSessionGraphCoordinatorHost,
-  SESSION_TREE_BASE_CSS,
 } from './services/ChildSessionGraphCoordinator';
 import {
   ComposerContextViewFacade,
@@ -369,6 +363,7 @@ interface OpenCodianViewSurfaceRuntimeWiring {
   chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   composerInputShellCoordinator: ComposerInputShellCoordinator;
   inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
+  chatSurfaceAppearanceCoordinator: ChatSurfaceAppearanceCoordinator;
   conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   composerContextViewFacade: ComposerContextViewFacade;
   tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
@@ -522,11 +517,8 @@ export class OpenCodianView extends ItemView {
   private contextRing: ContextRing | null = null;
   private contextRingContainerEl: HTMLElement | null = null;
 
-  private chatSurfaceSyncFrameId: number | null = null;
-  private chatSurfaceSyncTimeoutId: number | null = null;
   private scrollToBottomFrameId: number | null = null;
-  private chatAppearanceStyleEl: HTMLStyleElement | null = null;
-  private themeBackgroundRequestId = 0;
+  private chatSurfaceAppearanceCoordinator: ChatSurfaceAppearanceCoordinator;
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
   private sessionTodoCoordinator: SessionTodoCoordinator;
@@ -841,6 +833,26 @@ export class OpenCodianView extends ItemView {
       resolveAssetUrl: (relativePath) => this.resolvePluginAssetUrl(relativePath),
       getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
       stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
+    };
+  }
+
+  private createChatSurfaceAppearanceCoordinatorHost(): ChatSurfaceAppearanceCoordinatorHost {
+    return {
+      getChatContainerEl: () => this.chatContainerEl,
+      getThemeBackgroundImageEl: () => this.themeBackgroundImageEl,
+      getMessagesContainerEl: () => this.messagesContainer,
+      getChatAppearanceSettings: () => this.plugin.settings.chatAppearance,
+      getActiveThemePresetId: () => this.plugin.settings.theme.activePresetId,
+      getChatScrollMode: () => this.plugin.settings.chatScrollMode,
+      resolveChatThemeBackgroundDataUrl: () => this.plugin.resolveChatThemeBackgroundDataUrl(),
+      applyConversationVisualState: () => {
+        this.conversationSessionSettingsCoordinator.applyConversationVisualState(
+          this.currentConversation,
+        );
+      },
+      syncInputPanelAppearance: () => {
+        this.inputPanelAppearanceCoordinator.syncAppearanceState();
+      },
     };
   }
 
@@ -1209,6 +1221,7 @@ export class OpenCodianView extends ItemView {
     this.chatSelectionControlsCoordinator = surfaceRuntime.chatSelectionControlsCoordinator;
     this.composerInputShellCoordinator = surfaceRuntime.composerInputShellCoordinator;
     this.inputPanelAppearanceCoordinator = surfaceRuntime.inputPanelAppearanceCoordinator;
+    this.chatSurfaceAppearanceCoordinator = surfaceRuntime.chatSurfaceAppearanceCoordinator;
     this.conversationSessionSettingsCoordinator =
       surfaceRuntime.conversationSessionSettingsCoordinator;
     this.composerContextViewFacade = surfaceRuntime.composerContextViewFacade;
@@ -1332,6 +1345,9 @@ export class OpenCodianView extends ItemView {
       ),
       inputPanelAppearanceCoordinator: new InputPanelAppearanceCoordinator(
         this.createInputPanelAppearanceCoordinatorHost(),
+      ),
+      chatSurfaceAppearanceCoordinator: new ChatSurfaceAppearanceCoordinator(
+        this.createChatSurfaceAppearanceCoordinatorHost(),
       ),
       conversationSessionSettingsCoordinator,
       composerContextViewFacade,
@@ -2696,11 +2712,9 @@ export class OpenCodianView extends ItemView {
     this.conversationHistoryActionsCoordinator.destroy();
     this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
     this.composerContextViewFacade.dispose();
-    this.clearChatSurfaceSyncTimers();
+    this.chatSurfaceAppearanceCoordinator.destroy();
     this.clearScheduledComposerLayoutSync();
     this.clearScheduledScrollToBottom();
-    this.chatAppearanceStyleEl?.remove();
-    this.chatAppearanceStyleEl = null;
     this.childSessionGraphCoordinator.clearGraph();
     this.childSessionGraphCoordinator.hide();
     this.titleGenerationService.cancelAll();
@@ -2894,74 +2908,7 @@ export class OpenCodianView extends ItemView {
   }
 
   public applyChatAppearanceSettings(): void {
-    if (!this.chatContainerEl) {
-      return;
-    }
-
-    const activePreset = getThemePresetDefinition(this.plugin.settings.theme.activePresetId);
-    for (const containerClass of THEME_STYLE_CONTAINER_CLASSES) {
-      this.chatContainerEl.removeClass(containerClass);
-    }
-    for (const cssVar of THEME_PRESET_CSS_VARIABLE_NAMES) {
-      this.chatContainerEl.style.removeProperty(cssVar);
-    }
-    if (activePreset) {
-      this.chatContainerEl.addClass(activePreset.containerClass);
-      for (const [cssVar, cssValue] of Object.entries(activePreset.cssVariables)) {
-        this.chatContainerEl.style.setProperty(cssVar, cssValue);
-      }
-    }
-
-    const cssVariables = getChatAppearanceCssVariables(this.plugin.settings.chatAppearance);
-    for (const [cssVar, cssValue] of Object.entries(cssVariables)) {
-      this.chatContainerEl.style.setProperty(cssVar, cssValue);
-    }
-    this.conversationSessionSettingsCoordinator.applyConversationVisualState(
-      this.currentConversation,
-    );
-
-    this.themeBackgroundRequestId += 1;
-    this.chatContainerEl.removeClass('opencodian-container--theme-background');
-    this.themeBackgroundImageEl?.style.removeProperty('background-image');
-    void this.applyThemeBackgroundImage(this.themeBackgroundRequestId);
-
-    const customCss = buildChatAppearanceCustomCss(
-      this.plugin.settings.chatAppearance.advanced.customCssDeclarations,
-    );
-    const combinedCss = `${SESSION_TREE_BASE_CSS}\n${customCss}`.trim();
-
-    if (combinedCss) {
-      if (!this.chatAppearanceStyleEl) {
-        this.chatAppearanceStyleEl = document.createElement('style');
-        this.chatAppearanceStyleEl.className = 'opencodian-chat-appearance-style';
-        this.chatContainerEl.appendChild(this.chatAppearanceStyleEl);
-      }
-      this.chatAppearanceStyleEl.textContent = combinedCss;
-    } else if (this.chatAppearanceStyleEl) {
-      this.chatAppearanceStyleEl.remove();
-      this.chatAppearanceStyleEl = null;
-    }
-
-    this.inputPanelAppearanceCoordinator.syncAppearanceState();
-  }
-
-  private async applyThemeBackgroundImage(requestId: number): Promise<void> {
-    if (!this.chatContainerEl || !this.themeBackgroundImageEl) {
-      return;
-    }
-
-    const backgroundSettings = this.plugin.settings.chatAppearance.background;
-    if (!backgroundSettings.imagePath) {
-      return;
-    }
-
-    const dataUrl = await this.plugin.resolveChatThemeBackgroundDataUrl();
-    if (!this.chatContainerEl || !this.themeBackgroundImageEl || requestId !== this.themeBackgroundRequestId || !dataUrl) {
-      return;
-    }
-
-    this.themeBackgroundImageEl.style.backgroundImage = `url(${JSON.stringify(dataUrl)})`;
-    this.chatContainerEl.addClass('opencodian-container--theme-background');
+    this.chatSurfaceAppearanceCoordinator.syncAppearanceState();
   }
 
   public refreshCurrentConversationRendering(): void {
@@ -2980,83 +2927,20 @@ export class OpenCodianView extends ItemView {
 
   /** Apply configured chat scroll mode to the messages container */
   public applyChatScrollMode(): void {
-    this.syncChatSurfaceColor();
-
     if (this.tabMessagesPaneCoordinator.applyScrollModeToPanes()) {
       return;
     }
 
-    if (this.messagesContainer) {
-      this.applyChatScrollModeToMessagesEl(this.messagesContainer);
-    }
+    this.chatSurfaceAppearanceCoordinator.syncScrollMode();
   }
 
-  private applyChatScrollModeToMessagesEl(messagesEl: HTMLElement): void {
-    messagesEl.removeClass('opencodian-messages--sticky-basic');
-    messagesEl.removeClass('opencodian-messages--sticky-mask');
-    messagesEl.removeClass('opencodian-messages--natural');
-
-    const scrollMode = this.plugin.settings.chatScrollMode;
-    if (scrollMode === 'natural') {
-      messagesEl.addClass('opencodian-messages--natural');
-    } else if (scrollMode === 'sticky-basic') {
-      messagesEl.addClass('opencodian-messages--sticky-basic');
-    } else {
-      messagesEl.addClass('opencodian-messages--sticky-mask');
-    }
+  public applyChatScrollModeToMessagesEl(messagesEl: HTMLElement): void {
+    this.chatSurfaceAppearanceCoordinator.applyScrollModeToMessagesEl(messagesEl);
   }
 
   /** Re-sync sticky mask color after theme/layout changes settle */
-  private scheduleChatSurfaceColorSync(): void {
-    this.clearChatSurfaceSyncTimers();
-
-    this.chatSurfaceSyncFrameId = window.requestAnimationFrame(() => {
-      this.chatSurfaceSyncFrameId = window.requestAnimationFrame(() => {
-        this.syncChatSurfaceColor();
-        this.chatSurfaceSyncFrameId = null;
-      });
-    });
-
-    this.chatSurfaceSyncTimeoutId = window.setTimeout(() => {
-      this.syncChatSurfaceColor();
-      this.chatSurfaceSyncTimeoutId = null;
-    }, 80);
-  }
-
-  /** Clear pending sticky mask sync timers */
-  private clearChatSurfaceSyncTimers(): void {
-    if (this.chatSurfaceSyncFrameId !== null) {
-      window.cancelAnimationFrame(this.chatSurfaceSyncFrameId);
-      this.chatSurfaceSyncFrameId = null;
-    }
-
-    if (this.chatSurfaceSyncTimeoutId !== null) {
-      window.clearTimeout(this.chatSurfaceSyncTimeoutId);
-      this.chatSurfaceSyncTimeoutId = null;
-    }
-  }
-
-  /** Sync sticky mask color to the actual pane background */
-  private syncChatSurfaceColor(): void {
-    if (!this.chatContainerEl) return;
-
-    let currentEl: HTMLElement | null = this.chatContainerEl;
-    let resolvedColor = '';
-
-    while (currentEl) {
-      const backgroundColor = window.getComputedStyle(currentEl).backgroundColor;
-      if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
-        resolvedColor = backgroundColor;
-        break;
-      }
-      currentEl = currentEl.parentElement;
-    }
-
-    if (!resolvedColor) {
-      resolvedColor = 'var(--background-secondary)';
-    }
-
-    this.chatContainerEl.style.setProperty('--opencodian-chat-surface', resolvedColor);
+  public scheduleChatSurfaceColorSync(): void {
+    this.chatSurfaceAppearanceCoordinator.scheduleSurfaceColorSync();
   }
 
   /** Reset active turn references */
