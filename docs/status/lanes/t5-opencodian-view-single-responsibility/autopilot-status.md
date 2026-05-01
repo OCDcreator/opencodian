@@ -8,7 +8,8 @@
 
 - round: 1
 - current_task: view-22
-- last_commit: 645d1ec9
+- last_verified_source_commit: 645d1ec9
+- status_checkpoint_commit: rolling checkpoint; use git HEAD for the current doc-only checkpoint commit
 - queue_state: completed
 - next_focus: none — queue complete
 - blocker_category: none
