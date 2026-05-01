@@ -17,7 +17,6 @@ import {
 } from '../../core/opencode';
 import {
   type ChatMessage,
-  type CompactionDividerMeta,
   type Conversation,
   createEmptyTabContextState,
   getDefaultPersistedTabState,
@@ -56,7 +55,6 @@ import {
   mergeAssistantMessagesForRender,
   tagCompactionSummaries,
 } from './renderGroups';
-import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
   AssistantNoticeCardRenderer,
   type AssistantNoticeCardRendererHost,
@@ -116,6 +114,10 @@ import {
 import {
   TabViewActivationBridge,
 } from './runtime/TabViewActivationBridge';
+import {
+  UserMessageContentRenderer,
+  type UserMessageContentRendererHost,
+} from './runtime/UserMessageContentRenderer';
 import {
   UserMessageFooterRenderer,
   type UserMessageFooterRendererHost,
@@ -312,7 +314,7 @@ import type {
   ModelSelectorSelection,
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
-import { prepareUserMessageMarkdownForDisplay } from './userMessageDisplay';
+
 
 const logger = createLogger('OpenCodianView');
 
@@ -423,6 +425,7 @@ interface OpenCodianViewInteractionRuntimeWiring {
   messageSendPreparationService: MessageSendPreparationService;
   messageFinalizationService: MessageFinalizationService;
   assistantNoticeCardRenderer: AssistantNoticeCardRenderer;
+  userMessageContentRenderer: UserMessageContentRenderer;
   userMessageFooterRenderer: UserMessageFooterRenderer;
   streamingInlineCardRenderer: StreamingInlineCardRenderer;
   permissionInlineCardRenderer: PermissionInlineCardRenderer;
@@ -556,6 +559,7 @@ export class OpenCodianView extends ItemView {
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
   private assistantNoticeCardRenderer: AssistantNoticeCardRenderer;
+  private userMessageContentRenderer: UserMessageContentRenderer;
   private userMessageFooterRenderer: UserMessageFooterRenderer;
   private assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
   private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
@@ -1304,6 +1308,7 @@ export class OpenCodianView extends ItemView {
     this.messageSendPreparationService = interactionRuntime.messageSendPreparationService;
     this.messageFinalizationService = interactionRuntime.messageFinalizationService;
     this.assistantNoticeCardRenderer = interactionRuntime.assistantNoticeCardRenderer;
+    this.userMessageContentRenderer = interactionRuntime.userMessageContentRenderer;
     this.userMessageFooterRenderer = interactionRuntime.userMessageFooterRenderer;
     this.streamingInlineCardRenderer = interactionRuntime.streamingInlineCardRenderer;
     this.permissionInlineCardRenderer = interactionRuntime.permissionInlineCardRenderer;
@@ -1599,6 +1604,9 @@ export class OpenCodianView extends ItemView {
     const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
       this.createAssistantNoticeCardRendererHost(),
     );
+    const userMessageContentRenderer = new UserMessageContentRenderer(
+      this.createUserMessageContentRendererHost(),
+    );
     const userMessageFooterRenderer = new UserMessageFooterRenderer(
       this.createUserMessageFooterRendererHost(),
     );
@@ -1632,6 +1640,7 @@ export class OpenCodianView extends ItemView {
       messageSendPreparationService,
       messageFinalizationService,
       assistantNoticeCardRenderer,
+      userMessageContentRenderer,
       userMessageFooterRenderer,
       streamingInlineCardRenderer,
       permissionInlineCardRenderer,
@@ -2290,10 +2299,7 @@ export class OpenCodianView extends ItemView {
         this.createEmptyConversationNoticeMessage(),
       createUserMessageFrame: (message) =>
         this.createUserMessageRenderFrame(message),
-      renderUserMessageContent: (container, message) =>
-        this.renderUserMessageContent(container, message),
-      renderCompactionDivider: (messageEl, divider) =>
-        this.renderCompactionDivider(messageEl, divider),
+      userMessageContentRenderer: this.userMessageContentRenderer,
       addUserMessageFooter: (messageEl, message, content) => {
         this.addUserMessageFooter(messageEl, message, content);
       },
@@ -2593,6 +2599,19 @@ export class OpenCodianView extends ItemView {
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
       handleNoticeAction: (actionType) => this.handleNoticeAction(actionType),
       handleCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
+    };
+  }
+
+  private createUserMessageContentRendererHost(): UserMessageContentRendererHost {
+    return {
+      getRenderUserMarkupAsCodeBlocks: () => this.plugin.settings.renderUserMarkupAsCodeBlocks,
+      renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
+      scheduleActiveSettledScrollToBottomIfNeeded: () => {
+        this.scheduleActiveSettledScrollToBottomIfNeeded();
+      },
+      openContextAttachment: (path) => {
+        void this.app.workspace.openLinkText(path, '', 'tab');
+      },
     };
   }
 
@@ -3174,17 +3193,6 @@ export class OpenCodianView extends ItemView {
     return this.plugin.settings.showAnsweredQuestionCards;
   }
 
-  private getContextKindLabel(kind: PromptContextItem['kind']): string {
-    switch (kind) {
-      case 'current_note':
-        return t('chat.context.kind.currentNote');
-      case 'selection':
-        return t('chat.context.kind.selection');
-      default:
-        return t('chat.context.kind.file');
-    }
-  }
-
   private getActiveMarkdownView(): MarkdownView | null {
     return this.composerContextViewFacade.getActiveMarkdownView();
   }
@@ -3614,97 +3622,6 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private renderCompactionDivider(messageEl: HTMLElement, divider: CompactionDividerMeta): void {
-    const lineEl = messageEl.createDiv({ cls: 'opencodian-compaction-divider-line' });
-
-    if (divider.live) {
-      messageEl.addClass('opencodian-compaction-divider--live');
-      lineEl.textContent = t('chat.compaction.divider.live');
-      return;
-    }
-
-    const badgeEl = lineEl.createSpan({ cls: 'opencodian-compaction-divider-badge' });
-    badgeEl.textContent = divider.auto
-      ? t('chat.compaction.divider.autoLabel')
-      : t('chat.compaction.divider.manualLabel');
-
-    lineEl.appendText(t('chat.compaction.divider.completed'));
-
-    if (divider.overflow) {
-      const overflowEl = lineEl.createSpan({ cls: 'opencodian-compaction-divider-badge is-overflow' });
-      overflowEl.textContent = t('chat.compaction.divider.overflow');
-    }
-  }
-
-  private async renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string> {
-    const visibleText = this.getVisibleUserMessageText(message);
-    if (visibleText) {
-      const textEl = container.createDiv({ cls: 'opencodian-message-text' });
-      const displayText = this.plugin.settings.renderUserMarkupAsCodeBlocks
-        ? prepareUserMessageMarkdownForDisplay(visibleText)
-        : visibleText;
-      await this.renderMarkdownInto(textEl, displayText);
-      const collapseToggleEl = container.createEl('button');
-      const collapsibleState: CollapsibleState = {
-        isExpanded: false,
-        isCollapsible: false,
-      };
-      setupCollapsible({
-        wrapperEl: container,
-        headerEl: collapseToggleEl,
-        contentEl: textEl,
-        state: collapsibleState,
-        options: {
-          showMoreLabel: t('chat.action.showMore'),
-          showLessLabel: t('chat.action.showLess'),
-        },
-        onToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
-      });
-    }
-
-    if (message.contextAttachments && message.contextAttachments.length > 0) {
-      this.renderUserContextAttachments(container, message.contextAttachments);
-    }
-
-    if (message.omo?.kind === 'user-injection') {
-      await this.renderOmoUserInjection(container, message);
-    }
-
-    return visibleText;
-  }
-
-  private renderUserContextAttachments(
-    container: HTMLElement,
-    attachments: NonNullable<ChatMessage['contextAttachments']>,
-  ): void {
-    const listEl = container.createDiv({ cls: 'opencodian-user-context-list' });
-
-    for (const attachment of attachments) {
-      const openBtn = listEl.createEl('button', {
-        cls: 'opencodian-user-context-chip opencodian-composer-context-chip is-attached',
-        text: attachment.label,
-        attr: {
-          type: 'button',
-          title: attachment.path,
-          'aria-label': `${this.getContextKindLabel(attachment.kind)}: ${attachment.label}`,
-        },
-      });
-      openBtn.dataset.contextKind = attachment.kind;
-      if (attachment.kind === 'selection') {
-        openBtn.addClass('is-selection');
-      }
-      openBtn.addEventListener('click', () => {
-        void this.app.workspace.openLinkText(attachment.path, '', 'tab');
-      });
-    }
-  }
-
-  private getVisibleUserMessageText(message: ChatMessage): string {
-    return message.omo?.kind === 'user-injection'
-      ? message.omo.originalText
-      : message.content;
-  }
-
   private async renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void> {
     if (this.markdownService) {
       await this.markdownService.render(container, markdown);
@@ -3712,53 +3629,6 @@ export class OpenCodianView extends ItemView {
     }
 
     container.setText(markdown);
-  }
-
-  private async renderOmoUserInjection(container: HTMLElement, message: ChatMessage): Promise<void> {
-    if (message.omo?.kind !== 'user-injection') {
-      return;
-    }
-
-    const panelEl = container.createDiv({ cls: 'opencodian-omo-injection' });
-    const headerEl = panelEl.createDiv({ cls: 'opencodian-omo-injection-header' });
-    headerEl.createSpan({
-      cls: 'opencodian-omo-injection-badge',
-      text: this.getOmoModeBadgeLabel(message.omo.modeTag),
-    });
-    headerEl.createSpan({
-      cls: 'opencodian-omo-injection-title',
-      text: t('chat.omo.injected.title'),
-    });
-
-    const summaryEl = panelEl.createDiv({ cls: 'opencodian-omo-injection-summary' });
-    await this.renderMarkdownInto(summaryEl, this.getOmoInjectionSummary(message));
-
-    const rawWrapperEl = panelEl.createDiv({ cls: 'opencodian-omo-raw-block' });
-    rawWrapperEl.createDiv({
-      cls: 'opencodian-omo-raw-label',
-      text: t('chat.omo.injected.rawLabel'),
-    });
-    const rawContentEl = rawWrapperEl.createEl('pre', {
-      cls: 'opencodian-omo-raw-content',
-      text: message.omo.injectedPrompt,
-    });
-    const rawToggleEl = rawWrapperEl.createEl('button');
-    const rawState: CollapsibleState = {
-      isExpanded: false,
-      isCollapsible: false,
-    };
-    setupCollapsible({
-      wrapperEl: rawWrapperEl,
-      headerEl: rawToggleEl,
-      contentEl: rawContentEl,
-      state: rawState,
-      options: {
-        collapsedHeight: 96,
-        showMoreLabel: t('chat.omo.injected.showRaw'),
-        showLessLabel: t('chat.omo.injected.hideRaw'),
-      },
-      onToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
-    });
   }
 
   private hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean {
@@ -4264,26 +4134,6 @@ export class OpenCodianView extends ItemView {
     model: string | undefined,
   ): Promise<boolean> {
     return this.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model);
-  }
-
-  private getOmoModeBadgeLabel(modeTag: string): string {
-    switch (modeTag) {
-      case 'search-mode':
-        return t('chat.omo.mode.search');
-      case 'analyze-mode':
-        return t('chat.omo.mode.analyze');
-      default:
-        return t('chat.omo.mode.custom');
-    }
-  }
-
-  private getOmoInjectionSummary(message: ChatMessage): string {
-    if (message.omo?.kind !== 'user-injection') {
-      return '';
-    }
-
-    const headline = message.omo.headline || t('chat.omo.injected.defaultHeadline');
-    return t('chat.omo.injected.summary', { headline });
   }
 
   private async appendTurnDiffNoticeIfNeeded(

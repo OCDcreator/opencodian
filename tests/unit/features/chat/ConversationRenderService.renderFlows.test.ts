@@ -98,7 +98,7 @@ describe('ConversationRenderService incremental render flows', () => {
 
     await service.rerenderSingleUserMessage('user-1', updatedMessage);
 
-    expect(host.renderUserMessageContent).toHaveBeenCalledWith(
+    expect(host.userMessageContentRenderer.renderUserMessageContent).toHaveBeenCalledWith(
       expect.any(HTMLElement),
       updatedMessage,
     );

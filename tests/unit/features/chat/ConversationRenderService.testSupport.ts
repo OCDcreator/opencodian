@@ -201,23 +201,25 @@ export function createHost(
         contentEl,
       };
     }),
-    renderUserMessageContent: jest.fn().mockImplementation(async (
-      contentEl: HTMLElement,
-      message: ChatMessage,
-    ) => {
-      contentEl.textContent = message.content;
-      return message.content;
-    }),
+    userMessageContentRenderer: {
+      renderUserMessageContent: jest.fn().mockImplementation(async (
+        contentEl: HTMLElement,
+        message: ChatMessage,
+      ) => {
+        contentEl.textContent = message.content;
+        return message.content;
+      }),
+      renderCompactionDivider: jest.fn().mockImplementation((
+        messageEl: HTMLElement,
+        divider: { auto: boolean; overflow: boolean; tailStartId: string },
+      ) => {
+        const lineEl = document.createElement('div');
+        lineEl.className = 'opencodian-compaction-divider-line';
+        lineEl.textContent = divider.auto ? 'Auto' : 'Manual';
+        messageEl.appendChild(lineEl);
+      }),
+    } as never,
     addUserMessageFooter: jest.fn(),
-    renderCompactionDivider: jest.fn().mockImplementation((
-      messageEl: HTMLElement,
-      divider: { auto: boolean; overflow: boolean; tailStartId: string },
-    ) => {
-      const lineEl = document.createElement('div');
-      lineEl.className = 'opencodian-compaction-divider-line';
-      lineEl.textContent = divider.auto ? 'Auto' : 'Manual';
-      messageEl.appendChild(lineEl);
-    }),
     renderMarkdownInto: jest.fn().mockImplementation(async (
       contentEl: HTMLElement,
       markdown: string,

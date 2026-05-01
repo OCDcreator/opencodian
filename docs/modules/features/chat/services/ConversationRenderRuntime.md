@@ -43,12 +43,12 @@ export class ConversationSyncedUpdateApplyDelegate {
 - incremental helper 继续只比较 `getMessagesForRender()` 后的 rendered sequence，非尾部 signature 变化或消息数量回退时返回 `null`
 - synced append path 会先尝试 patch trailing assistant，再渲染新增消息并刷新 background-task indicator
 - plain text assistant append 继续走 pseudo-stream reveal；notice、assistant `summary`、question resolution 与 structured blocks 仍直接使用 persisted assistant shell，避免 compaction report 被伪流式展开
-- user message rerender 继续复用 host 提供的 frame/body/footer callbacks，不在 runtime 内创建新的 view dependency
+- user message rerender 继续复用 host 提供的 frame/body/footer callbacks，其中 body 渲染通过 `host.userMessageContentRenderer` 端口调用 `UserMessageContentRenderer`，不在 runtime 内创建新的 view dependency
 
 ## Compaction Divider 渲染
 
-- `ConversationUserMessageRenderDelegate.renderMessageIntoFrame()` 对 compaction divider 消息有专用 early-return 分支：命中时给容器添加 `opencodian-message--compaction-divider` CSS class，调用 `host.renderCompactionDivider(el, divider)`，然后跳过 content 和 footer 渲染
-- `ConversationRenderHost` 接口新增 `renderCompactionDivider(el: HTMLElement, divider: CompactionDividerMeta): void` 方法，由 host 实现具体的 divider DOM 构造
+- `ConversationUserMessageRenderDelegate.renderMessageIntoFrame()` 对 compaction divider 消息有专用 early-return 分支：命中时给容器添加 `opencodian-message--compaction-divider` CSS class，调用 `host.userMessageContentRenderer.renderCompactionDivider(el, divider)`，然后跳过 content 和 footer 渲染
+- `ConversationRenderHost` 接口通过 `userMessageContentRenderer: UserMessageContentRenderer` 字段暴露 body renderer，由 host 创建并注入具体的 `UserMessageContentRenderer` 实例
 - incremental update check（`getIncrementalRenderedMessageUpdate()`）不对 compaction divider 消息做特殊处理，它们遵循普通 user message 的增量判定规则
 
 ## 与 `ConversationRenderService` 的边界

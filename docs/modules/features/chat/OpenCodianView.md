@@ -263,7 +263,7 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 与此同时，view 自己的 assistant body / visual signature 也需要把 `contentBlocks[].toolMetadata` 与 `contentBlocks[].toolResultVisibility` 纳入比较；否则 task 卡片在 authoritative hydration 后即使拿到了 child session id，也可能因为 signature 误判“未变化”而错过重渲。
 
-assistant `summary === true` 的消息会在正文上方渲染一个 compaction report badge，并纳入 assistant body signature；user 消息渲染现在也会跳过没有 visible content / attachments / images / OMO 的空壳消息，用于隐藏 OpenCode `metadata.compaction_continue` 这类内部续跑提示。`compactionDivider` 消息不以 notice card 形式渲染，而是作为全宽分割线展示：`renderCompactionDivider()` 根据 `divider.live` 决定渲染活跃标签还是已完成 badge+标签；`shouldRenderConversationMessage` 会放行 `compactionDivider` 类型的消息；`getMessageVisualSignature` 会把 `summaryKind` 和 `compactionDivider` 纳入签名比较，以支持增量更新检测。
+assistant `summary === true` 的消息会在正文上方渲染一个 compaction report badge，并纳入 assistant body signature；user 消息渲染现在也会跳过没有 visible content / attachments / images / OMO 的空壳消息，用于隐藏 OpenCode `metadata.compaction_continue` 这类内部续跑提示。`compactionDivider` 消息不以 notice card 形式渲染，而是作为全宽分割线展示，由 `UserMessageContentRenderer.renderCompactionDivider()` 根据 `divider.live` 决定渲染活跃标签还是已完成 badge+标签；`shouldRenderConversationMessage` 会放行 `compactionDivider` 类型的消息；`getMessageVisualSignature` 会把 `summaryKind` 和 `compactionDivider` 纳入签名比较，以支持增量更新检测。
 
 与此同时，server message 拉取→hydrate→authoritative merge、latest optimistic user bubble hydration、client-only/interrupted message preservation，以及 sync debug payload / fingerprint 组装现在统一收束到 `services/ConversationAuthoritativeSyncCoordinator.ts`。`OpenCodianView` 只再保留 host seam：OpenCode message/revert 查询、runtime fingerprint/anchor 写回、context usage refresh、background-task authoritative-sync 标记，以及 hydrated single-message rerender。
 
@@ -419,7 +419,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 `renderMessage()` 根据消息类型分成两路：
 
 - `role === 'assistant'` -> `AssistantShellViewHostAdapter.renderPersistedAssistantMessage()`
-- `role === 'user'` -> `renderUserMessageContent()`
+- `role === 'user'` -> `UserMessageContentRenderer.renderUserMessageContent()`（通过 `ConversationRenderHost.userMessageContentRenderer` 端口调用）
 
 assistant 渲染里：
 
@@ -449,13 +449,12 @@ model selector 现在拆成了几层协作：
 - catalog 加载、tab model override、provider icon 异步解析
 - `switchModel()`、`reloadModelCatalog()`、`syncActiveTabContextUsageIdentity()` 等视图级副作用
 
-用户消息渲染里：
+用户消息渲染现在由 `UserMessageContentRenderer` 统一负责：
 
-- 可选调用 `prepareUserMessageMarkdownForDisplay()`
-- 通过 `setupCollapsible()` 给长文本加折叠
-- 渲染 context attachment chips
-- 渲染 OMO 注入面板
-- 通过 `UserMessageFooterRenderer` 追加 footer，并把 copy / rewind / fork 的真实副作用留在 host
+- `renderUserMessageContent()`：渲染 visible text（含可选 `prepareUserMessageMarkdownForDisplay()` 与 `setupCollapsible()` 折叠）、context attachment chips、OMO 注入面板
+- `renderCompactionDivider()`：渲染 compaction divider 消息（活跃分割线或已完成 badge+标签）
+- 通过 `UserMessageContentRendererHost` 端口向 view 获取 `getRenderUserMarkupAsCodeBlocks()`、`renderMarkdownInto()`、`scheduleActiveSettledScrollToBottomIfNeeded()`、`openContextAttachment()` 等 host 能力
+- footer 仍通过 `UserMessageFooterRenderer` 追加，copy / rewind / fork 的真实副作用留在 view host
 
 渲染消息列表前还会经过 `getMessagesForRender()`，也就是先用 `renderGroups` 合并连续 assistant message，再对合并结果跑 `injectLiveCompactionDivider`（把活跃压缩过程插入为虚拟 `compactionDivider` 消息）和 `tagCompactionSummaries`（标记已完成压缩的 assistant summary 消息）。
 

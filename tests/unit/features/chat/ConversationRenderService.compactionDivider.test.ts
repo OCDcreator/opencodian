@@ -30,8 +30,8 @@ describe('compaction divider render path', () => {
 
     await service.renderMessages([dividerMessage]);
 
-    expect(host.renderCompactionDivider).toHaveBeenCalledTimes(1);
-    expect(host.renderCompactionDivider).toHaveBeenCalledWith(
+    expect(host.userMessageContentRenderer.renderCompactionDivider).toHaveBeenCalledTimes(1);
+    expect(host.userMessageContentRenderer.renderCompactionDivider).toHaveBeenCalledWith(
       expect.any(HTMLElement),
       { auto: true, overflow: false, tailStartId: 'msg-5' },
     );
@@ -47,7 +47,7 @@ describe('compaction divider render path', () => {
 
     await service.renderMessages([dividerMessage]);
 
-    expect(host.renderUserMessageContent).not.toHaveBeenCalled();
+    expect(host.userMessageContentRenderer.renderUserMessageContent).not.toHaveBeenCalled();
     expect(host.addUserMessageFooter).not.toHaveBeenCalled();
   });
 
@@ -76,8 +76,8 @@ describe('compaction divider render path', () => {
 
     await service.renderMessages([normalMessage]);
 
-    expect(host.renderUserMessageContent).toHaveBeenCalledTimes(1);
+    expect(host.userMessageContentRenderer.renderUserMessageContent).toHaveBeenCalledTimes(1);
     expect(host.addUserMessageFooter).toHaveBeenCalledTimes(1);
-    expect(host.renderCompactionDivider).not.toHaveBeenCalled();
+    expect(host.userMessageContentRenderer.renderCompactionDivider).not.toHaveBeenCalled();
   });
 });
