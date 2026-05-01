@@ -8,7 +8,7 @@
 
 - round: 1
 - current_task: view-22
-- last_commit: 5e67c5aa
+- last_commit: be1a1c64
 - next_focus: Queue complete — all extraction tasks finished
 - blocker_category: none
 - continue_loop: false
@@ -43,7 +43,7 @@
 
 ### view-22 — Run full verification and finalize queue (DONE)
 - Ran `npm run verify` — all gates pass (module-docs, graphify, devlog-order, typecheck: clean, 1796 tests pass, build: OK)
-- Lint: 2 pre-existing warnings (OpenCodeService.ts constructor length, BackgroundTaskTimelineService.test.ts file length) — acknowledged, unrelated to queue changes, do not fail the guardrail
+- Lint: 2 pre-existing warnings (OpenCodeService.ts constructor length, BackgroundTaskTimelineService.test.ts file length) — pre-existing technical debt, not introduced by this queue; they violate the `0 errors / 0 warnings` guardrail but fixing them is outside this queue's scope
 - Status doc updated to mark queue complete
 - No blockers; loop can terminate
 
