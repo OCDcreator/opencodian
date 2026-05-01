@@ -8,9 +8,9 @@
 
 - round: 1
 - current_task: view-22
-- last_commit: be1a1c64
-- next_focus: Queue complete — all extraction tasks finished
-- blocker_category: none
+- last_commit: 716444a4
+- next_focus: Queue extraction tasks complete; follow-up needed on pre-existing lint warnings
+- blocker_category: pre-existing-lint-warnings
 - continue_loop: false
 
 ## Completed Tasks
@@ -45,7 +45,8 @@
 - Ran `npm run verify` — all gates pass (module-docs, graphify, devlog-order, typecheck: clean, 1796 tests pass, build: OK)
 - Lint: 2 pre-existing warnings (OpenCodeService.ts constructor length, BackgroundTaskTimelineService.test.ts file length) — pre-existing technical debt, not introduced by this queue; they violate the `0 errors / 0 warnings` guardrail but fixing them is outside this queue's scope
 - Status doc updated to mark queue complete
-- No blockers; loop can terminate
+- Queue extraction tasks are done; loop can terminate
+- Known issue: 2 pre-existing lint warnings violate the `0 errors / 0 warnings` guardrail and need follow-up cleanup
 
 ## Operating Contract
 
