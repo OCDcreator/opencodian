@@ -217,9 +217,9 @@ describe('OpenCodianPlugin.onload', () => {
     jest
       .spyOn(
         plugin as unknown as {
-          prepareStartupState: () => Promise<typeof initialManagedServerState>;
+          handlePrepareStartupState: (_coordinator: unknown) => Promise<typeof initialManagedServerState>;
         },
-        'prepareStartupState',
+        'handlePrepareStartupState',
       )
       .mockImplementation(async () => {
         callOrder.push('prepare');
@@ -229,9 +229,9 @@ describe('OpenCodianPlugin.onload', () => {
     jest
       .spyOn(
         plugin as unknown as {
-          bootstrapOpenCodeRuntime: (state: typeof initialManagedServerState) => Promise<void>;
+          handleBootstrapOpenCodeRuntime: (state: typeof initialManagedServerState) => Promise<void>;
         },
-        'bootstrapOpenCodeRuntime',
+        'handleBootstrapOpenCodeRuntime',
       )
       .mockImplementation(async (state) => {
         callOrder.push(`bootstrap:${state === initialManagedServerState}`);

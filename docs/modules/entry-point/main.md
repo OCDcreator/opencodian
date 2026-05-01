@@ -15,6 +15,8 @@
 
 它不是单纯的“入口壳”，还承担了插件级状态缓存和诊断导出；但启动期的 persisted-settings merge / normalization 已收束到相邻 bootstrap owner，启动后的 runtime warmup / cross-view refresh 调度也已委托给 `PluginRuntimeCoordinator`。
 
+从 `main.ts` 中提取的启动引导序列和性能追踪现已由 `OpenCodianStartupCoordinator` 统一编排。`main.ts` 保留插件生命周期入口所有权，`onload()` 创建 coordinator 实例并通过回调注入具体行为，启动完成后保留 coordinator 引用以供诊断报告读取 perf trace 数据。
+
 ## 导入关系
 
 ```text
@@ -182,23 +184,29 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 | `deleteConversation()` | 删除本地 conversation，并 best-effort 删除远端 session |
 | `buildDiagnosticReport()` | 生成调试报告文本 |
 | `writeDiagnosticLogFile()` | 将调试报告写成日志文件 |
-| `measureStartupStep()` | 统一记录启动阶段耗时、嵌套深度和失败状态 |
+| `handlePrepareStartupState()` | 创建 StorageService、加载设置、应用启动副作用、加载 managed server state |
+| `handleBootstrapOpenCodeRuntime()` | 初始化 `.opencode` 配置、构造 OpenCodeService、配置 vault-scoped 服务、预加载会话 |
 
 ## 数据流
 
 ```mermaid
 graph TD
-    A[Obsidian 加载插件] --> B[StorageService.initialize]
-    B --> C[loadSettings / 迁移旧设置]
-    C --> D[setLocale + registerBuiltinGlassAdapters]
-    D --> E[OpencodeConfigManager.ensureInitialized]
-    E --> F[创建 OpenCodeService]
-    F --> G[设置 vaultPath / ConfigManager / ModelConfigService]
-    G --> H[loadConversations 预载元数据]
-    H --> I[registerView / ribbon / commands / setting tab]
-    I --> J[scheduleDeferredRuntimeWarmup]
-    J --> K[需要新 session 时接管 warmup]
-    K --> L[OpenCodianView 运行时回调插件实例]
+    A[Obsidian 加载插件] --> B[OpenCodianStartupCoordinator.execute]
+    B --> C[registerAppIcon]
+    B --> D[handlePrepareStartupState]
+    D --> D1[StorageService.initialize]
+    D --> D2[loadSettings / 迁移旧设置]
+    D --> D3[setLocale + registerBuiltinGlassAdapters]
+    B --> E[handleBootstrapOpenCodeRuntime]
+    E --> E1[OpencodeConfigManager.ensureInitialized]
+    E --> E2[创建 OpenCodeService]
+    E --> E3[设置 vaultPath / ConfigManager / ModelConfigService]
+    E --> E4[loadConversations 预载元数据]
+    B --> F[registerWorkspaceIntegration]
+    F --> F1[registerView / ribbon / commands / setting tab]
+    B --> G[scheduleDeferredRuntimeWarmup]
+    G --> H[需要新 session 时接管 warmup]
+    H --> I[OpenCodianView 运行时回调插件实例]
 ```
 
 ## 与其他模块的交互
@@ -208,6 +216,7 @@ graph TD
 - `OpenCodeService`: 承担 OpenCode 侧运行时；插件把设置、vault 路径和 managed PID 状态注入进去。
 - `OpencodeConfigManager`: 用于首次创建或后续同步 `.opencode` 权限配置。
 - `ModelConfigService`: 在拿到 vault 路径后构建，供设置页和视图读取模型目录。
+- `OpenCodianStartupCoordinator`: 启动引导运行时 owner，负责编排 `onload` 阶段的启动序列和性能追踪；`main.ts` 通过回调注入具体行为，启动完成后保留 coordinator 引用读取诊断数据。
 - `PluginRuntimeCoordinator`: 入口旁的 runtime orchestration owner，负责 deferred warmup、session-bootstrap warmup readiness、model refresh frame、slash catalog invalidation 和 cross-view UI refresh fan-out。
 - `OpenCodianView`: 由入口注册，并在运行时回调插件实例获取会话、刷新 UI、附加上下文等能力。
 - `OpenCodianSettingTab`: 通过插件实例保存设置、刷新服务状态和模型目录。
@@ -255,6 +264,6 @@ graph TD
 - 本地 server auto-start 已改成注册完成后的后台 warmup；冷启动 trace 现在更接近"插件何时可见"，而不是"sidecar 何时 ready"。
 - 启动 trace 会同时记录顶层 phase 和嵌套子步骤；诊断报告里的总耗时只汇总顶层 phase，避免双重累计。
 - `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。
-- `measureStartupStep()` 现在只在 trace 处于 `running` 时记录条目，避免后续手动刷新历史列表时污染"本次启动"快照。
+- `measureStartupStep()` 现已由 `OpenCodianStartupCoordinator` 持有，但 `main.ts` 中的 handler 方法仍然可以调用 coordinator 的 `measureStartupStep()` 来给子步骤继续嵌套打点。
 - 慢启动自动快照不依赖用户先打开 debug；只要启动失败，或顶层总耗时 / 主导 phase 超过阈值，就会把 trace 写到 `.opencodian/debug/startup-perf-latest.log`。
 - `onunload()` 当前没有显式调用 `clearSettingsUiStateSaveTimer()`；卸载时只清除了 chat appearance timer 与 model refresh 帧请求。
