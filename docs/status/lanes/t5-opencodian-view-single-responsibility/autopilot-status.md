@@ -8,11 +8,11 @@
 
 - round: 1
 - current_task: view-22
-- last_commit: aad004a5
-- queue_state: rejected_exhausted
-- next_focus: Open a follow-up lint-guardrail cleanup queue for the remaining max-lines warnings
-- blocker_category: lint-guardrail-blocked
-- continue_loop: follow-up-required
+- last_commit: cf77a186
+- queue_state: completed
+- next_focus: none — queue complete
+- blocker_category: none
+- continue_loop: false
 
 ## Completed Tasks
 
@@ -42,18 +42,19 @@
 - Updated autopilot-status.md with completed tasks view-16 through view-20
 - Graphify already fresh (no src changes in this task)
 
-### view-22 — Run full verification and record final blocker (BLOCKED CHECKPOINT)
-- Ran `npm run verify` — gate results:
+### view-22 — Run full verification and finalize queue (DONE)
+- Ran `npm run verify` — all gates pass:
   - module-docs: pass
   - graphify: pass
   - devlog-order: pass
-  - lint: **2 warnings** (OpenCodeService.ts constructor length, BackgroundTaskTimelineService.test.ts file length) — violates the repo `0 errors / 0 warnings` guardrail
+  - lint: pass (0 errors, 0 warnings)
   - typecheck: clean
   - tests: 1796 pass
   - build: OK
-- Source extraction tasks are done, but the final checkpoint is blocked by the zero-warning lint guardrail.
-- The queue must not be reported as fully complete until the two max-lines warnings are fixed or the guardrail is explicitly waived.
-- Known issue: `src/core/opencode/OpenCodeService.ts` constructor length and `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts` file length need follow-up cleanup.
+- Fixed 2 pre-existing max-lines lint warnings:
+  1. `src/core/opencode/OpenCodeService.ts`: extracted `createLifecycleAssembly()` private method to reduce constructor from 209 to 176 lines
+  2. `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`: split runtime-state tests into new `BackgroundTaskTimelineService.runtime.test.ts` (main file reduced from 598 to 384 lines)
+- Queue extraction tasks are complete; all source changes verified with zero lint warnings.
 
 ## Operating Contract
 

@@ -253,7 +253,7 @@ export class OpenCodeService {
   private streamEventTransformer: OpenCodeStreamEventTransformer;
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
-  private serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
+    private serviceLifecycle!: OpenCodeServiceLifecycleCoordinator;
   private readonly assistantCanonicalDiagnosticFingerprints = new Map<string, string>();
   private vaultPath?: string;
 
@@ -343,7 +343,6 @@ export class OpenCodeService {
         this.openCodeEventRuntime.stopSubscriptions();
       },
     });
-    let serviceLifecycle: OpenCodeServiceLifecycleCoordinator | null = null;
     this.catalogQueries = new OpenCodeCatalogQueryCoordinator(this.catalogState, {
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       getSdkFacade: (options = {}) => options.includeDirectory === false
@@ -355,7 +354,7 @@ export class OpenCodeService {
       getDebugMetadata: () => ({
         baseUrl: this.baseUrl,
         vaultPath: this.vaultPath ?? null,
-        ...(serviceLifecycle?.getServerRuntimeMetadata() ?? {
+        ...(this.serviceLifecycle?.getServerRuntimeMetadata() ?? {
           serverStatus: 'stopped' as ServerStatus,
           isManagedServerRunning: false,
           managedServerState: null,
@@ -432,7 +431,15 @@ export class OpenCodeService {
       delay: (ms, signal) => this.delay(ms, signal),
     });
 
-    const lifecycleAssembly = OpenCodeServiceLifecycleCoordinator.createAssembly({
+    this.serviceLifecycle = this.createLifecycleAssembly(events, logServiceWarning, runtimeOptions);
+  }
+
+  private createLifecycleAssembly(
+    events: OpenCodeServiceEvents,
+    logServiceWarning: (key: string, message: string, error: unknown) => void,
+    runtimeOptions: OpenCodeServiceRuntimeOptions,
+  ): OpenCodeServiceLifecycleCoordinator {
+    const assembly = OpenCodeServiceLifecycleCoordinator.createAssembly({
       getSettings: () => this.settings,
       setSettings: (nextSettings) => { this.settings = nextSettings; },
       getBaseUrl: () => this.baseUrl,
@@ -467,8 +474,7 @@ export class OpenCodeService {
       initialManagedServerState: runtimeOptions.initialManagedServerState,
       onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
     });
-    serviceLifecycle = lifecycleAssembly.serviceLifecycle;
-    this.serviceLifecycle = lifecycleAssembly.serviceLifecycle;
+    return assembly.serviceLifecycle;
   }
 
   private createSessionControlSdk(): OpenCodeSessionControlSdk {
