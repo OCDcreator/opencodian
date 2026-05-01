@@ -449,47 +449,16 @@ describe('OpenCodianPlugin.loadSettings', () => {
 });
 
 describe('OpenCodianPlugin slash command catalog invalidation', () => {
-  it('invalidates slash command catalogs after settings are saved', async () => {
+  it('delegates saveSettings to the settings runtime coordinator', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       settings: Record<string, unknown>;
-      persistSettingsDomains: jest.Mock<Promise<void>, [unknown]>;
-      runtimeCoordinator: {
-        refreshOpenCodianViews: jest.Mock<void, [unknown]>;
-        invalidateSlashCommandMenuCatalogs: jest.Mock<void, []>;
-      };
+      settingsRuntimeCoordinator: { saveSettings: jest.Mock<Promise<void>, [unknown]> };
     };
 
     plugin.settings = {};
-    plugin.persistSettingsDomains = jest.fn().mockResolvedValue(undefined);
-    plugin.runtimeCoordinator = {
-      refreshOpenCodianViews: jest.fn(),
-      invalidateSlashCommandMenuCatalogs: jest.fn(),
+    plugin.settingsRuntimeCoordinator = {
+      saveSettings: jest.fn().mockResolvedValue(undefined),
     };
-
-    jest
-      .spyOn(
-        plugin as unknown as {
-          clearChatAppearanceSaveTimer: () => void;
-        },
-        'clearChatAppearanceSaveTimer',
-      )
-      .mockImplementation(() => {});
-    jest
-      .spyOn(
-        plugin as unknown as {
-          clearSettingsUiStateSaveTimer: () => void;
-        },
-        'clearSettingsUiStateSaveTimer',
-      )
-      .mockImplementation(() => {});
-    jest
-      .spyOn(
-        plugin as unknown as {
-          applyLoggerSettings: () => void;
-        },
-        'applyLoggerSettings',
-      )
-      .mockImplementation(() => {});
 
     await plugin.saveSettings({
       syncService: false,
@@ -498,9 +467,12 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
       applyUi: false,
     });
 
-    expect(plugin.persistSettingsDomains).toHaveBeenCalledWith({ core: true, ui: true });
-    expect(plugin.runtimeCoordinator.refreshOpenCodianViews).toHaveBeenCalledWith({ reloadModels: false, applyUi: false });
-    expect(plugin.runtimeCoordinator.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledTimes(1);
+    expect(plugin.settingsRuntimeCoordinator.saveSettings).toHaveBeenCalledWith({
+      syncService: false,
+      syncConfig: false,
+      reloadModels: false,
+      applyUi: false,
+    });
   });
 
   it('forwards slash command cache invalidation to open OpenCodian views', () => {

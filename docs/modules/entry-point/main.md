@@ -17,6 +17,8 @@
 
 从 `main.ts` 中提取的启动引导序列和性能追踪现已由 `OpenCodianStartupCoordinator` 统一编排。`main.ts` 保留插件生命周期入口所有权，`onload()` 创建 coordinator 实例并通过回调注入具体行为，启动完成后保留 coordinator 引用以供诊断报告读取 perf trace 数据。
 
+设置保存编排（`saveSettings()`、主题/外观变更、背景资源管理、防抖定时器）已从 `main.ts` 提取到 `OpenCodianSettingsRuntimeCoordinator`。`main.ts` 保留公共 API 表面，所有设置运行时调用委托给该 coordinator。
+
 ## 导入关系
 
 ```text

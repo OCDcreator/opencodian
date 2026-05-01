@@ -5,13 +5,10 @@ import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
+import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
 import { PluginRuntimeCoordinator } from './core/runtime/PluginRuntimeCoordinator';
-import { splitPersistedSettings, StorageService } from './core/storage';
-import {
-  getThemeAppearanceOverridesFromBase,
-  getThemePresetDefinition,
-} from './core/theme';
+import { StorageService } from './core/storage';
 import type {
   ChatAppearanceSettings,
   Conversation,
@@ -22,10 +19,8 @@ import type {
 import {
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
-  getDefaultChatAppearanceSettings,
   getServerBaseUrl,
   isLocalServerMode,
-  normalizeChatAppearanceSettings,
   normalizeLobehubIconVariant,
   normalizeProviderIconColorMode,
   VIEW_TYPE_OPENCODIAN,
@@ -74,8 +69,6 @@ export default class OpenCodianPlugin extends Plugin {
   private conversations: Conversation[] = [];
   private conversationsLoaded = false;
   private conversationsLoadPromise: Promise<void> | null = null;
-  private chatAppearanceSaveTimeoutId: number | null = null;
-  private settingsUiStateSaveTimeoutId: number | null = null;
   private runtimeCoordinator = new PluginRuntimeCoordinator({
     getSettings: () => this.settings ?? null,
     getOpenCodeService: () => this.openCodeService ?? null,
@@ -85,11 +78,28 @@ export default class OpenCodianPlugin extends Plugin {
     logServerStatusSnapshot: (source?: string) => this.logServerStatusSnapshot(source),
     onModelsLoaded: () => this.settingsTab?.onModelsLoaded(),
   });
-  private themeBackgroundDataUrlCache = new Map<string, string | null>();
-  private themeBackgroundDataUrlRequests = new Map<string, Promise<string | null>>();
   private settingsPersistenceWritable = true;
   private settingsPersistenceWarningShown = false;
   private startupCoordinator = new OpenCodianStartupCoordinator();
+  private settingsRuntimeCoordinator: OpenCodianSettingsRuntimeCoordinator | null = null;
+
+  private getSettingsRuntimeCoordinator(): OpenCodianSettingsRuntimeCoordinator {
+    if (!this.settingsRuntimeCoordinator) {
+      this.settingsRuntimeCoordinator = new OpenCodianSettingsRuntimeCoordinator({
+        getSettings: () => this.settings,
+        setSettings: (settings) => { this.settings = settings; },
+        getOpenCodeService: () => this.openCodeService,
+        getStorageService: () => this.storage,
+        getVaultBasePath: () => getVaultBasePath(this.app),
+        refreshOpenCodianViews: (options) => this.runtimeCoordinator.refreshOpenCodianViews(options),
+        invalidateSlashCommandMenuCatalogs: (options) => this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs(options),
+        applyProviderIconColorMode: () => this.applyProviderIconColorMode(),
+        getOpenCodianLeaves: () => this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN),
+        onSettingsPersistenceBlocked: (message) => this.warnSettingsPersistenceBlocked(message),
+      });
+    }
+    return this.settingsRuntimeCoordinator;
+  }
 
   async onload() {
     const startupVaultPath = getVaultBasePath(this.app) ?? 'Unavailable';
@@ -302,7 +312,7 @@ export default class OpenCodianPlugin extends Plugin {
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
     });
-    this.clearChatAppearanceSaveTimer();
+    this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();
     delete document.body.dataset.opencodianProviderIconMode;
 
   }
@@ -371,13 +381,14 @@ export default class OpenCodianPlugin extends Plugin {
     );
     this.settingsPersistenceWritable = loadState.persistedSettings.writable;
     this.settings = loadState.settings;
+    this.getSettingsRuntimeCoordinator().initialize(this.settingsPersistenceWritable);
 
     this.reportSettingsLoadState(loadState.persistedSettings);
 
     if (loadState.shouldPersistNormalizedSettings) {
       await this.startupCoordinator.measureStartupStep(
         'persistNormalizedSettings',
-        () => this.persistSettingsDomains({ core: true, ui: true }),
+        () => this.getSettingsRuntimeCoordinator().persistSettingsDomains({ core: true, ui: true }),
         { detail: 'startup normalization backfill' },
       );
     }
@@ -385,51 +396,15 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Save settings to storage */
   async saveSettings(options: { syncService?: boolean; reloadModels?: boolean; syncConfig?: boolean; applyUi?: boolean } = {}) {
-    const {
-      syncService = true,
-      reloadModels = true,
-      syncConfig = true,
-      applyUi = true,
-    } = options;
-    this.clearChatAppearanceSaveTimer();
-    this.clearSettingsUiStateSaveTimer();
-    this.applyLoggerSettings();
-
-    if (syncService) {
-      const previousSettings = this.openCodeService.getSettingsSnapshot();
-
-      try {
-        await this.openCodeService.updateSettings(this.settings);
-      } catch (error) {
-        this.settings = previousSettings;
-        this.applyLoggerSettings();
-        throw error;
-      }
-    }
-
-    await this.persistSettingsDomains({ core: true, ui: true });
-
-    this.runtimeCoordinator.refreshOpenCodianViews({ reloadModels, applyUi });
-    this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs();
-
-    // Sync OpenCode config with permission mode
-    if (syncConfig) {
-      const vaultPath = getVaultBasePath(this.app);
-      if (vaultPath) {
-        await OpencodeConfigManager.syncPermissionMode(
-          vaultPath,
-          this.settings.permissionMode,
-          { healthCheck: () => this.openCodeService.checkHealth() },
-        );
-      }
-    }
+    return this.getSettingsRuntimeCoordinator().saveSettings(options);
   }
 
   private applyLoggerSettings(): void {
-    setDebugLoggingEnabled(this.settings.enableDebugLogging);
-    setDebugModuleSettings(this.settings.debugModuleSettings);
-    setDebugRefreshIntervalMs(this.settings.debugRefreshIntervalMs);
-    setInlineSerializedDebugLogArgsEnabled(this.settings.inlineSerializedDebugLogArgs);
+    const settings = this.settings;
+    setDebugLoggingEnabled(settings.enableDebugLogging);
+    setDebugModuleSettings(settings.debugModuleSettings);
+    setDebugRefreshIntervalMs(settings.debugRefreshIntervalMs);
+    setInlineSerializedDebugLogArgsEnabled(settings.inlineSerializedDebugLogArgs);
   }
 
   applyProviderIconColorMode(): void {
@@ -451,172 +426,59 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   getActiveThemePresetDefinition(): ThemePresetDefinition | null {
-    return getThemePresetDefinition(this.settings.theme.activePresetId);
+    return this.getSettingsRuntimeCoordinator().getActiveThemePresetDefinition();
   }
 
   getChatAppearanceBaseline(): ChatAppearanceSettings {
-    const activePreset = this.getActiveThemePresetDefinition();
-    return activePreset
-      ? normalizeChatAppearanceSettings(activePreset.appearance)
-      : getDefaultChatAppearanceSettings();
+    return this.getSettingsRuntimeCoordinator().getChatAppearanceBaseline();
   }
 
   selectThemePreset(presetId: ThemePresetId): void {
-    const preset = getThemePresetDefinition(presetId);
-    if (!preset) {
-      return;
-    }
-
-    const preservedBackground = normalizeChatAppearanceSettings(this.settings.chatAppearance).background;
-    this.settings.theme.activePresetId = preset.id;
-    this.settings.theme.customAppearanceOverrides = {};
-    this.settings.chatAppearance = normalizeChatAppearanceSettings({
-      ...preset.appearance,
-      background: preservedBackground,
-    });
+    this.getSettingsRuntimeCoordinator().selectThemePreset(presetId);
   }
 
   updateChatAppearance(mutator: (appearance: ChatAppearanceSettings) => void): void {
-    const nextAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-    mutator(nextAppearance);
-    this.setEffectiveChatAppearance(nextAppearance);
+    this.getSettingsRuntimeCoordinator().updateChatAppearance(mutator);
   }
 
   resetChatAppearanceToBaseline(): void {
-    this.setEffectiveChatAppearance(this.getChatAppearanceBaseline());
+    this.getSettingsRuntimeCoordinator().resetChatAppearanceToBaseline();
   }
 
   resetChatAppearanceGroup(
     group: 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
   ): void {
-    const baseline = this.getChatAppearanceBaseline();
-    const nextAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-
-    if (group === 'layout') {
-      nextAppearance.layout = { ...baseline.layout };
-      nextAppearance.sticky = { ...baseline.sticky };
-    } else if (group === 'background') {
-      nextAppearance.background = { ...baseline.background };
-    } else if (group === 'user') {
-      nextAppearance.user = { ...baseline.user };
-    } else if (group === 'assistant') {
-      nextAppearance.assistant = { ...baseline.assistant };
-    } else if (group === 'input') {
-      nextAppearance.input = { ...baseline.input };
-    } else if (group === 'scrollbar') {
-      nextAppearance.scrollbar = { ...baseline.scrollbar };
-    } else {
-      nextAppearance.advanced = { ...baseline.advanced };
-    }
-
-    this.setEffectiveChatAppearance(nextAppearance);
+    this.getSettingsRuntimeCoordinator().resetChatAppearanceGroup(group);
   }
 
   async selectThemePresetAndSave(presetId: ThemePresetId): Promise<void> {
-    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-    this.selectThemePreset(presetId);
-    await this.saveChatAppearanceImmediately(previousAppearance);
+    return this.getSettingsRuntimeCoordinator().selectThemePresetAndSave(presetId);
   }
 
   async resetChatAppearanceToBaselineAndSave(): Promise<void> {
-    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-    this.resetChatAppearanceToBaseline();
-    await this.saveChatAppearanceImmediately(previousAppearance);
+    return this.getSettingsRuntimeCoordinator().resetChatAppearanceToBaselineAndSave();
   }
 
   async resetThemePresetAppearanceAndSave(): Promise<void> {
-    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-    const preservedBackground = previousAppearance.background;
-    this.resetChatAppearanceToBaseline();
-    this.updateChatAppearance((appearance) => {
-      appearance.background = { ...preservedBackground };
-    });
-    await this.saveChatAppearanceImmediately(previousAppearance);
+    return this.getSettingsRuntimeCoordinator().resetThemePresetAppearanceAndSave();
   }
 
   async resetChatAppearanceGroupAndSave(
     group: 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
   ): Promise<void> {
-    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-    this.resetChatAppearanceGroup(group);
-    await this.saveChatAppearanceImmediately(previousAppearance);
+    return this.getSettingsRuntimeCoordinator().resetChatAppearanceGroupAndSave(group);
   }
 
   async importChatThemeBackgroundFile(file: File): Promise<void> {
-    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-    const asset = await this.storage.saveThemeBackgroundAsset(
-      await file.arrayBuffer(),
-      file.name,
-      file.type,
-    );
-
-    this.updateChatAppearance((appearance) => {
-      appearance.background.imagePath = asset.path;
-      appearance.background.imageMimeType = asset.mimeType;
-      appearance.background.imageDisplayName = asset.displayName;
-    });
-
-    try {
-      await this.saveChatAppearanceImmediately(previousAppearance);
-    } catch (error) {
-      this.clearThemeBackgroundDataUrlCache(asset.path);
-      await this.storage.removeThemeBackground(asset.path);
-      throw error;
-    }
+    return this.getSettingsRuntimeCoordinator().importChatThemeBackgroundFile(file);
   }
 
   async clearChatThemeBackground(): Promise<void> {
-    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
-    const hadBackground = Boolean(
-      previousAppearance.background.imagePath
-      || previousAppearance.background.imageMimeType
-      || previousAppearance.background.imageDisplayName,
-    );
-    if (!hadBackground) {
-      return;
-    }
-
-    this.updateChatAppearance((appearance) => {
-      appearance.background.imagePath = '';
-      appearance.background.imageMimeType = '';
-      appearance.background.imageDisplayName = '';
-    });
-
-    await this.saveChatAppearanceImmediately(previousAppearance);
+    return this.getSettingsRuntimeCoordinator().clearChatThemeBackground();
   }
 
   async resolveChatThemeBackgroundDataUrl(): Promise<string | null> {
-    const { imagePath, imageMimeType } = this.settings.chatAppearance.background;
-    if (!imagePath) {
-      return null;
-    }
-
-    const cacheKey = `${imagePath}::${imageMimeType}`;
-    if (this.themeBackgroundDataUrlCache.has(cacheKey)) {
-      return this.themeBackgroundDataUrlCache.get(cacheKey) ?? null;
-    }
-
-    const inFlightRequest = this.themeBackgroundDataUrlRequests.get(cacheKey);
-    if (inFlightRequest) {
-      return inFlightRequest;
-    }
-
-    const request = this.storage.readThemeBackgroundDataUrl(imagePath, imageMimeType)
-      .then((dataUrl) => {
-        this.themeBackgroundDataUrlCache.set(cacheKey, dataUrl);
-        return dataUrl;
-      })
-      .catch((error) => {
-        logger.warn('Failed to resolve chat theme background asset', error);
-        this.themeBackgroundDataUrlCache.set(cacheKey, null);
-        return null;
-      })
-      .finally(() => {
-        this.themeBackgroundDataUrlRequests.delete(cacheKey);
-      });
-
-    this.themeBackgroundDataUrlRequests.set(cacheKey, request);
-    return request;
+    return this.getSettingsRuntimeCoordinator().resolveChatThemeBackgroundDataUrl();
   }
 
   refreshConversationRendering(): void {
@@ -637,152 +499,16 @@ export default class OpenCodianPlugin extends Plugin {
     }
   }
 
-  private setEffectiveChatAppearance(nextAppearance: ChatAppearanceSettings): void {
-    this.settings.chatAppearance = normalizeChatAppearanceSettings(nextAppearance);
-    const activePreset = this.getActiveThemePresetDefinition();
-    this.settings.theme.customAppearanceOverrides = activePreset
-      ? getThemeAppearanceOverridesFromBase(activePreset.appearance, this.settings.chatAppearance)
-      : {};
-  }
-
-  private clearThemeBackgroundDataUrlCache(path?: string | null): void {
-    if (!path) {
-      this.themeBackgroundDataUrlCache.clear();
-      this.themeBackgroundDataUrlRequests.clear();
-      return;
-    }
-
-    const pathPrefix = `${path}::`;
-    for (const cacheKey of Array.from(this.themeBackgroundDataUrlCache.keys())) {
-      if (cacheKey.startsWith(pathPrefix)) {
-        this.themeBackgroundDataUrlCache.delete(cacheKey);
-      }
-    }
-    for (const cacheKey of Array.from(this.themeBackgroundDataUrlRequests.keys())) {
-      if (cacheKey.startsWith(pathPrefix)) {
-        this.themeBackgroundDataUrlRequests.delete(cacheKey);
-      }
-    }
-  }
-
-  private async saveChatAppearanceImmediately(previousAppearance: ChatAppearanceSettings): Promise<void> {
-    const previousBackgroundPath = previousAppearance.background.imagePath;
-    const nextBackgroundPath = this.settings.chatAppearance.background.imagePath;
-
-    try {
-      const persisted = await this.persistSettingsDomains({ core: true });
-      if (!persisted) {
-        return;
-      }
-    } catch (error) {
-      this.setEffectiveChatAppearance(previousAppearance);
-      this.runtimeCoordinator.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
-      throw error;
-    }
-
-    if (previousBackgroundPath && previousBackgroundPath !== nextBackgroundPath) {
-      this.clearThemeBackgroundDataUrlCache(previousBackgroundPath);
-      try {
-        await this.storage.removeThemeBackground(previousBackgroundPath);
-      } catch (error) {
-        logger.warn('Failed to delete old chat theme background asset', error);
-      }
-    }
-  }
-
   scheduleChatAppearanceSave(delay = 220): void {
-    this.clearChatAppearanceSaveTimer();
-    this.chatAppearanceSaveTimeoutId = window.setTimeout(() => {
-      this.chatAppearanceSaveTimeoutId = null;
-      void this.persistSettingsDomains({ core: true }).catch((error) => {
-        logger.error('Failed to persist core settings', error);
-      });
-    }, delay);
+    this.getSettingsRuntimeCoordinator().scheduleChatAppearanceSave(delay);
   }
 
   scheduleSettingsUiStateSave(delay = 220): void {
-    this.clearSettingsUiStateSaveTimer();
-    this.settingsUiStateSaveTimeoutId = window.setTimeout(() => {
-      this.settingsUiStateSaveTimeoutId = null;
-      void this.persistSettingsDomains({ ui: true }).catch((error) => {
-        logger.error('Failed to persist UI settings state', error);
-      });
-    }, delay);
+    this.getSettingsRuntimeCoordinator().scheduleSettingsUiStateSave(delay);
   }
 
   async saveSettingsUiStateImmediately(): Promise<void> {
-    this.clearSettingsUiStateSaveTimer();
-    await this.persistSettingsDomains({ ui: true });
-  }
-
-  private clearChatAppearanceSaveTimer(): void {
-    if (this.chatAppearanceSaveTimeoutId !== null) {
-      window.clearTimeout(this.chatAppearanceSaveTimeoutId);
-      this.chatAppearanceSaveTimeoutId = null;
-    }
-  }
-
-  private clearSettingsUiStateSaveTimer(): void {
-    if (this.settingsUiStateSaveTimeoutId !== null) {
-      window.clearTimeout(this.settingsUiStateSaveTimeoutId);
-      this.settingsUiStateSaveTimeoutId = null;
-    }
-  }
-
-  private async persistSettingsDomains(options: { core?: boolean; ui?: boolean }): Promise<boolean> {
-    if (!this.settingsPersistenceWritable) {
-      this.warnSettingsPersistenceBlocked(
-        'OpenCodian settings persistence is in recovery-only mode because the saved settings files could not be safely recovered.',
-      );
-      return false;
-    }
-
-    const { core, ui } = splitPersistedSettings(this.settings);
-    if (options.core) {
-      await this.storage.saveCoreSettings(core);
-    }
-    if (options.ui) {
-      await this.storage.saveUiSettings(ui);
-    }
-    return true;
-  }
-
-  private reportSettingsLoadState(result: Awaited<ReturnType<StorageService['loadPersistedSettings']>>): void {
-    const recoveredFromBackup = result.core.source === 'backup' || result.ui.source === 'backup';
-    const migratedFromLegacy = result.core.source === 'legacy' || result.ui.source === 'legacy';
-    const blocked = !result.writable;
-
-    if (recoveredFromBackup) {
-      const message = 'OpenCodian recovered settings from a backup after detecting an unreadable settings file.';
-      logger.warn(message);
-      new Notice(message, 8000);
-    }
-
-    if (migratedFromLegacy) {
-      const message = 'OpenCodian migrated settings to the new split persistence format.';
-      logger.info(message);
-      new Notice(message, 6000);
-    }
-
-    if (blocked) {
-      this.warnSettingsPersistenceBlocked(
-        result.core.message
-        ?? result.ui.message
-        ?? 'OpenCodian could not recover saved settings. Persistence is temporarily disabled to avoid overwriting data.',
-      );
-    }
-  }
-
-  private handleModelsLoaded(): void {
-    this.runtimeCoordinator.queueModelRefresh();
-  }
-
-  private handleOpenCodeServerStatusChange(status: string): void {
-    logger.debug(`Server status changed: ${status}`);
-    this.settingsTab?.refreshServerStatusDisplay();
-    if (status === 'running') {
-      this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
-    }
+    return this.getSettingsRuntimeCoordinator().saveSettingsUiStateImmediately();
   }
 
   async logServerStatusSnapshot(source = 'manual'): Promise<void> {
@@ -1042,6 +768,44 @@ export default class OpenCodianPlugin extends Plugin {
     }
 
     return title + (firstSentence.length > 50 ? '...' : '');
+  }
+
+  private handleModelsLoaded(): void {
+    this.runtimeCoordinator.queueModelRefresh();
+  }
+
+  private handleOpenCodeServerStatusChange(status: string): void {
+    logger.debug(`Server status changed: ${status}`);
+    this.settingsTab?.refreshServerStatusDisplay();
+    if (status === 'running') {
+      this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
+    }
+  }
+
+  private reportSettingsLoadState(result: Awaited<ReturnType<StorageService['loadPersistedSettings']>>): void {
+    const recoveredFromBackup = result.core.source === 'backup' || result.ui.source === 'backup';
+    const migratedFromLegacy = result.core.source === 'legacy' || result.ui.source === 'legacy';
+    const blocked = !result.writable;
+
+    if (recoveredFromBackup) {
+      const message = 'OpenCodian recovered settings from a backup after detecting an unreadable settings file.';
+      logger.warn(message);
+      new Notice(message, 8000);
+    }
+
+    if (migratedFromLegacy) {
+      const message = 'OpenCodian migrated settings to the new split persistence format.';
+      logger.info(message);
+      new Notice(message, 6000);
+    }
+
+    if (blocked) {
+      this.warnSettingsPersistenceBlocked(
+        result.core.message
+        ?? result.ui.message
+        ?? 'OpenCodian could not recover saved settings. Persistence is temporarily disabled to avoid overwriting data.',
+      );
+    }
   }
 
   private describeConversationListDiagnostics(): string {

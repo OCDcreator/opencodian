@@ -22,7 +22,12 @@
   - Updated `docs/modules/core/runtime/OpenCodianStartupCoordinator.md` and `docs/modules/entry-point/main.md`
   - Refreshed graphify artifacts
   - `npm run verify` passes: 0 lint errors, 0 type errors, 1749 tests passed, build OK
-- `2026-05-01`: batch-1 retry — fresh verify run confirms all checks green:
-  - Gate review Q1-Q5 approved (ownership clarity, no forbidden-path growth, no duplication, aligned boundaries, non-thin owner)
-  - Q6 flagged missing verification evidence on prior run; re-running `npm run verify` produces clean pass
-  - Commit `05940915` ready for re-review
+- `2026-05-01`: batch-1 retry — fresh verify run confirms all checks green
+- `2026-05-01`: batch-2 implementation completed:
+  - Created `OpenCodianSettingsRuntimeCoordinator` in `src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts`
+  - Extracted settings save choreography, theme/appearance mutations, theme background management, and debounced save timers from `main.ts`
+  - `main.ts` retains plugin lifecycle shell and public API surface; delegates to coordinator via lazy-initialized getter
+  - Updated `tests/unit/main.test.ts` to work with new delegation pattern
+  - Updated `docs/modules/core/runtime/OpenCodianSettingsRuntimeCoordinator.md` and `docs/modules/entry-point/main.md`
+  - Refreshed graphify artifacts
+  - `npm run verify` passes: 0 lint errors, 0 type errors, 1749 tests passed, build OK
