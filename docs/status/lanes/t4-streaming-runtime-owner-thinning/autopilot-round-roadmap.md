@@ -58,3 +58,13 @@ Extract cohesive behavior slices from `OpenCodeStreamingRuntimeCoordinator.ts` i
 - `docs/modules/core/opencode/OpenCodeLegacySseStreamReader.md`
 - Updated `docs/modules/core/opencode/OpenCodeStreamingRuntimeCoordinator.md`
 - Updated `docs/modules/README.md`
+
+## Lane Completion
+
+- **stream-3**: Checkpoint documentation recorded
+- **Owner shape after lane**:
+  - `OpenCodeStreamingRuntimeCoordinator.ts` (485 lines): transport selection, active stream registry, SDK/legacy fallback, event transformation, cancel/detach lifecycle, finalization delegation
+  - `OpenCodeStreamingFinalizationCoordinator.ts` (641 lines): final assistant tail recovery, final metadata/error chunk assembly, trailing text/reasoning/tool replay, structured error extraction
+  - `OpenCodeLegacySseStreamReader.ts` (181 lines): SSE fetch connection, reader context management, chunk reading/decoding, buffer management, abort handling
+- **Anti-fragmentation assessment**: The two extractions are complete, durable adjacent owners. The runtime coordinator does not hold residual fragments of either extracted responsibility.
+- **Next lane**: explicit design required before resuming unattended execution. `OpenCodianView.ts` and `OpenCodeSessionStateStore` are candidates but need boundary analysis.

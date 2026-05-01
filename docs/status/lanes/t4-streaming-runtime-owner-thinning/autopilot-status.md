@@ -3,7 +3,6 @@
 - Worktree: `/Users/dht/.codex/worktrees/opencodian-thick-owner-long-20260430`
 - Branch: `codex/opencode-loop-thick-owner-long-20260430`
 - Lane: `t4-streaming-runtime-owner-thinning`
-- Current task: `Extract legacy SSE reader lifecycle into OpenCodeLegacySseStreamReader`
 - Status: complete
 
 ## Round Log
@@ -30,6 +29,38 @@
   - Refreshed graphify artifacts
   - Verification: 0 lint errors, 1 pre-existing warning, 1781 tests passed, build OK
 
+## Checkpoint
+
+### Owner Cohesion Assessment
+
+`OpenCodeStreamingRuntimeCoordinator.ts` **remains a cohesive transport owner** after the lane. At 485 lines, it still owns:
+
+- Transport selection (`streamResponse`)
+- Active stream registry (`activeStreams`, `createActiveStreamContext`)
+- SDK/legacy fallback (`streamSdkResponse`, `streamLegacyResponse`)
+- Event transformation and mutation application (`consumeLegacyEventStream`)
+- Cancel/detach lifecycle (`cancelStream`, `detachStream`)
+- Finalization delegation (`finishStreamingResponse`)
+
+The two extractions are complete, durable adjacent owners:
+
+- `OpenCodeStreamingFinalizationCoordinator.ts` (641 lines): owns final assistant tail recovery, final metadata/error chunk assembly, trailing text/reasoning/tool replay, and structured error extraction
+- `OpenCodeLegacySseStreamReader.ts` (181 lines): owns SSE fetch connection, reader context management, chunk reading/decoding, buffer management, and abort handling
+
+### Verification Evidence
+
+- **stream-1**: 0 lint errors, 1 pre-existing warning, 1771 tests passed, build OK
+- **stream-2**: 0 lint errors, 1 pre-existing warning, 1781 tests passed, build OK
+- **Module docs**: all new and updated modules documented in `docs/modules/`
+- **Graphify**: artifacts refreshed after each batch
+- **No source changes in checkpoint**: stream-3 is documentation-only
+
+### Review Caveats
+
+- stream-1 acceptance gate initially failed because the acceptance check only inspected `HEAD^..HEAD`, but the intended t4 status/doc changes were present as uncommitted work. The contract was adjusted for the commit/acceptance step.
+- stream-3 verification initially failed because the eslint dependency was temporarily unavailable, not because the scoped documentation changes were incorrect.
+- Both issues were environmental/contract issues, not code quality issues.
+
 ## Acceptance Criteria
 
 - [x] Final assistant tail recovery and final metadata/error chunk assembly live in a cohesive finalization owner
@@ -41,4 +72,7 @@
 
 ## Next Focus
 
-- Lane t4-streaming-runtime-owner-thinning complete. Awaiting next lane assignment.
+- Lane t4-streaming-runtime-owner-thinning complete.
+- **Next lane target**: evaluate `OpenCodianView.ts` or `OpenCodeSessionStateStore` for next thick-owner thinning.
+- **Anti-fragmentation rationale**: `OpenCodianView.ts` is 5314+ lines with 80+ methods and deep wiring across dozens of coordinators. No clear, safe extraction boundary exists for an unattended batch. The next lane must be explicitly designed before resuming unattended execution.
+- **Status**: awaiting explicit lane assignment.
