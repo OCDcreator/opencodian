@@ -5,10 +5,10 @@
 - Queue source: `openspec/changes/remaining-thick-owner-long-queue/` -> `.taskmaster/docs/remaining-thick-owner-long-queue-prd.txt` -> `.opencode-loop/queue.json`
 - Supervisor: `tmux` session `opencodian-thick-owner-long-20260430`
 - Current lane: `t3-remaining-thick-owner-long-queue`
-- Current round: `batch-1 in progress`
-- Current task: `Package main.ts startup bootstrap into OpenCodianStartupCoordinator`
-- Last commit: `task/batch-1` (pending)
-- Next focus: `Complete batch-1 delivery, then proceed to batch-2 (main.ts settings runtime)`
+- Current round: `batch-3 completed`
+- Current task: `Move OpenCodeService compaction reload lifecycle into OpenCodeServiceLifecycleCoordinator`
+- Last commit: `task/batch-3` (ed9ce032)
+- Next focus: `batch-4: checkpoint doc for remaining thick-owner order and OpenCodianView.ts readiness`
 - Historical stale runtime archived at: `/Users/dht/.codex/worktrees/062e/opencodian/.opencode-loop-archive-20260430T1645`
 
 ## Round Log
@@ -31,3 +31,11 @@
   - Updated `docs/modules/core/runtime/OpenCodianSettingsRuntimeCoordinator.md` and `docs/modules/entry-point/main.md`
   - Refreshed graphify artifacts
   - `npm run verify` passes: 0 lint errors, 0 type errors, 1749 tests passed, build OK
+- `2026-05-01`: batch-3 implementation completed:
+  - Moved compaction reload lifecycle from `OpenCodeService.ts` into existing `OpenCodeServiceLifecycleCoordinator.ts`
+  - Added `OpenCodeServiceLifecycleCompactionPort` to coordinator host interfaces
+  - Moved methods: `reapplyCompactionConfigFromProjectConfig`, `getBackendResolvedConfigForUpdate`, `resolvedCompactionMatches`, `disposeScopedInstance`
+  - `OpenCodeService` retains public facade; delegates compaction reload to `OpenCodeServiceLifecycleCoordinator`
+  - Updated `docs/modules/core/opencode/OpenCodeService.md` and `docs/modules/core/opencode/OpenCodeServiceLifecycleCoordinator.md`
+  - Refreshed graphify artifacts
+  - `npm run verify` passes: 0 lint errors, 1 pre-existing warning (constructor max-lines), 1749 tests passed, build OK
