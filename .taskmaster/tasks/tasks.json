@@ -2,80 +2,106 @@
   "master": {
     "tasks": [
       {
-        "id": 9,
-        "title": "Analyze current ownership and identify thick owners",
-        "description": "Run graphify and module-doc checks to identify high-connection files and current ownership boundaries. Document the current state of thick owners (OpenCodianView.ts, OpenCodeService.ts, main.ts, ServerManager.ts) and their responsibility density.",
-        "details": "Execute `npm run check:graphify` and `npm run check:module-docs` to generate reports. Review `graphify-out/GRAPH_REPORT.md` and existing `docs/modules/**` files. For each thick owner, list its current responsibilities, import surface, and adjacent owners. This analysis will inform task selection and ensure each subsequent task improves ownership shape.",
-        "testStrategy": "Verify that the analysis produces a clear mapping of thick files to their responsibilities and adjacent owners. No code changes are made; validation is manual review of generated reports.",
+        "id": 15,
+        "title": "Set up dedicated worktree and opencode-loop queue",
+        "description": "Create the dedicated worktree at /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian-view-single-responsibility-20260501, configure opencode-loop with a long-running tmux-backed execute profile, install blocking Codex review hooks, and initialize the lane status doc.",
+        "details": "1. Create the worktree: `git worktree add /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian-view-single-responsibility-20260501 main` (or appropriate branch). 2. Copy `.opencode-loop/` config from main checkout or create fresh with execute profile set to `tmux` and a long stale window (e.g., `--stale 3600`). 3. Run `opencode-loop hooks install-review` to install blocking Codex review. 4. Create `docs/status/lanes/t5-opencodian-view-single-responsibility/` with an initial status doc containing: current_task: 'setup', round: 0, last_commit: '', next_focus: 'identify seams', blocker_category: null, continue_loop: true. 5. Ensure `npm run verify` passes in the worktree.",
+        "testStrategy": "Verify worktree exists and is clean. Run `opencode-loop status` to confirm queue is active. Run `npm run verify` to ensure baseline passes.",
         "priority": "high",
         "dependencies": [],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 10,
-        "title": "Thin ServerManager.ts by moving a complete behavior slice to an adjacent owner",
-        "description": "Identify a complete local-server lifecycle or endpoint-resolution slice in ServerManager.ts that can be moved into an existing adjacent owner (e.g., a config or storage owner) without changing behavior. Perform the extraction, update module docs, and run verification.",
-        "details": "Primary owner type: domain runtime owner. Analyze ServerManager.ts for a slice that is self-contained (e.g., server configuration loading or endpoint resolution). Move that slice into an existing adjacent owner (e.g., a config owner in `src/core/config/` or storage owner in `src/core/storage/`). Ensure the new location is a durable owner (not a thin wrapper). Update `docs/modules/` files to reflect the boundary change. Do not create new one-off files. Run `npm run verify`, `npm run check:module-docs`, and `npm run check:graphify`.",
-        "testStrategy": "Write focused Jest tests for the moved slice in its new owner. Verify that existing tests still pass. Run `npm run verify` and confirm no regression. Check that module docs are updated and graphify report shows improved ownership.",
+        "id": 16,
+        "title": "Identify and document safe seams in OpenCodianView.ts",
+        "description": "Analyze OpenCodianView.ts using graphify-out/GRAPH_REPORT.md and docs/modules/features/chat/OpenCodianView.md to identify the safest, low-risk slices that can be moved to existing adjacent owners. Document the candidate slices and their target owners in the lane status doc.",
+        "details": "1. Read `graphify-out/GRAPH_REPORT.md` to understand current dependencies and ownership boundaries. 2. Read `docs/modules/features/chat/OpenCodianView.md` for documented seams. 3. Review `src/features/chat/services/`, `src/features/chat/runtime/`, and `src/features/chat/ui/` for existing owners that could absorb behavior. 4. Identify at least 3 candidate slices: e.g., debug/diagnostics render-support, child-session tree/context-usage, tooltip/copy support. 5. Update lane status doc with candidate list and target owners. 6. No code changes yet.",
+        "testStrategy": "Manual review of documentation and code. No automated tests needed for this analysis task.",
         "priority": "high",
         "dependencies": [
-          9
+          15
         ],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 11,
-        "title": "Thin OpenCodeService.ts by moving facade-adjacent logic into existing opencode owners",
-        "description": "Move compatibility/facade-adjacent logic from OpenCodeService.ts into existing opencode owners such as lifecycle, prompt, session-control, query, state, or streaming coordinators. Do not add new runtime ownership to OpenCodeService.ts.",
-        "details": "Primary owner type: high-connection facade owner. Review OpenCodeService.ts for methods that delegate to other services or coordinate between subsystems. Move those delegations into the appropriate existing owners (e.g., move prompt-related logic to a prompt owner, session control to a session owner). Ensure OpenCodeService.ts remains as a thin facade that only composes lifecycle. Update module docs. Run verification.",
-        "testStrategy": "Ensure that after extraction, OpenCodeService.ts has fewer responsibilities. Run existing tests and add focused tests for the moved logic in their new owners. Run `npm run verify` and `npm run check:module-docs`.",
+        "id": 17,
+        "title": "Move debug/diagnostics or render-support slice to existing adjacent owner",
+        "description": "Extract one complete debug/diagnostics or render-support slice from OpenCodianView.ts into an existing owner in src/features/chat/services/ or src/features/chat/runtime/. Update docs/modules/ and refresh graphify.",
+        "details": "1. Identify the specific slice (e.g., a `renderDebugInfo` method or diagnostic logging). 2. Move the logic to the most appropriate existing service (e.g., `OpenCodeService.ts` or a runtime module). 3. Ensure the moved code is self-contained and does not create new dependencies on OpenCodianView. 4. Update `docs/modules/features/chat/OpenCodianView.md` to reflect the removal. 5. Update or create docs for the target module. 6. Run `npm run graphify:update:src` and `npm run check:graphify`. 7. Run `npm test -- --runInBand` on affected test files. 8. Run `npm run check:module-docs`. 9. Commit with message like 'refactor: move debug diagnostics from OpenCodianView to OpenCodeService'.",
+        "testStrategy": "Verify that existing tests still pass. Add unit tests for the moved behavior in the target module's test file. Run `npm run verify`.",
         "priority": "high",
         "dependencies": [
-          9
+          16
         ],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 12,
-        "title": "Thin OpenCodianView.ts by extending existing chat services/coordinators",
-        "description": "Reduce shell assembly or callback-surface density in OpenCodianView.ts by moving behavior into existing chat services or coordinators. Do not create one-off helpers. Do not add new runtime ownership to OpenCodianView.ts.",
-        "details": "Primary owner type: high-connection facade owner. Identify callback handlers or UI assembly logic in OpenCodianView.ts that can be moved into existing chat services (e.g., message handling, view state management). Extend those services to own the behavior. Keep OpenCodianView.ts as a thin shell that wires UI components. Update module docs. Run verification.",
-        "testStrategy": "Write tests for the moved behavior in the target services. Ensure OpenCodianView.ts tests still pass. Run `npm run verify` and `npm run check:module-docs`.",
+        "id": 18,
+        "title": "Move child-session tree/context-usage slice to existing adjacent owner",
+        "description": "Extract one complete child-session tree or context-usage slice from OpenCodianView.ts into an existing owner in src/features/chat/runtime/ or src/features/chat/ui/. Update docs/modules/ and refresh graphify.",
+        "details": "1. Identify the slice (e.g., methods that manage child session trees or context usage display). 2. Move to an appropriate runtime owner (e.g., `SessionManager` or `ContextService`). 3. Ensure no new thin wrappers are created; extend the existing owner's interface. 4. Update documentation for both OpenCodianView and the target module. 5. Run graphify update and check. 6. Run focused tests and module-docs check. 7. Commit.",
+        "testStrategy": "Verify existing tests pass. Write unit tests for the moved behavior in the target module. Run `npm run verify`.",
         "priority": "high",
         "dependencies": [
-          9
+          17
         ],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 13,
-        "title": "Thin main.ts by moving config/bootstrap slices into existing owners",
-        "description": "Move complete config/bootstrap slices from main.ts into existing config, storage, or theme owners. Preserve plugin lifecycle ownership in main.ts.",
-        "details": "Primary owner type: lifecycle composition owner. Identify initialization logic in main.ts that belongs to config (e.g., plugin settings loading), storage (e.g., data directory setup), or theme (e.g., applying theme). Move those slices into the respective owners. Ensure main.ts retains only lifecycle orchestration (onload, onunload, etc.). Update module docs. Run verification.",
-        "testStrategy": "Verify that main.ts is thinner and that moved logic works in its new owner. Run existing tests and add focused tests for the moved slices. Run `npm run verify` and `npm run check:module-docs`.",
+        "id": 19,
+        "title": "Move tooltip/copy or assistant/user render-support slice to existing adjacent owner",
+        "description": "Extract one complete tooltip/copy or assistant/user render-support slice from OpenCodianView.ts into an existing owner in src/features/chat/ui/ or src/features/chat/services/. Update docs/modules/ and refresh graphify.",
+        "details": "1. Identify the slice (e.g., tooltip rendering logic or copy-to-clipboard handler). 2. Move to an appropriate UI or service owner (e.g., `ChatUI` or `ClipboardService`). 3. Ensure the moved code does not increase OpenCodianView's responsibilities. 4. Update docs and run graphify. 5. Run tests and module-docs check. 6. Commit.",
+        "testStrategy": "Verify existing tests pass. Add unit tests for the moved behavior. Run `npm run verify`.",
         "priority": "medium",
         "dependencies": [
-          9
+          18
         ],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 14,
-        "title": "Update module documentation and verify ownership improvements",
-        "description": "Update all affected `docs/modules/**` files to reflect boundary changes from tasks 10-13. Run full verification suite and confirm that ownership shape has improved or been explicitly preserved.",
-        "details": "For each module boundary change, update the corresponding markdown file in `docs/modules/` to describe the new ownership. Ensure that the documentation clearly states the primary owner type and responsibilities. Run `npm run verify`, `npm run check:module-docs`, `npm run check:graphify`, and `npm run check:devlog-order`. Confirm that no thick files have grown and that ownership is clearer.",
-        "testStrategy": "Run the full verification suite. Check that `npm run check:module-docs` passes and that graphify report shows reduced connection density for the thinned files. Manual review of documentation accuracy.",
+        "id": 20,
+        "title": "Move activation/sync/question/todo/background-task host assembly slice (if safe)",
+        "description": "If feasible, extract one complete activation/sync/question/todo/background-task host assembly slice from OpenCodianView.ts into an existing owner, ensuring it reduces view-owned callback surface without introducing a thin bridge chain. Update docs/modules/ and refresh graphify.",
+        "details": "1. Evaluate if any activation/sync/question/todo/background-task slice can be moved without creating a thin bridge. 2. If yes, move to an appropriate runtime owner (e.g., `TaskService` or `SyncManager`). 3. Ensure the target owner already exists and is not a new thin wrapper. 4. Update docs and run graphify. 5. Run tests and module-docs check. 6. Commit. If not feasible, skip and document reasoning in lane status doc.",
+        "testStrategy": "Verify existing tests pass. Add unit tests for the moved behavior. Run `npm run verify`.",
         "priority": "medium",
         "dependencies": [
-          10,
-          11,
-          12,
-          13
+          19
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 21,
+        "title": "Update lane status doc and refresh graphify after each task",
+        "description": "After each source task (17-20), update the lane status doc with current task, round, last commit, next focus, blocker category if any, and whether the loop should continue. Also refresh graphify-out/ after any src/ changes.",
+        "details": "1. After each commit from tasks 17-20, run `npm run graphify:update:src` and `npm run check:graphify`. 2. Update `docs/status/lanes/t5-opencodian-view-single-responsibility/status.md` with: current_task (the task just completed), round (increment), last_commit (SHA), next_focus (next task ID or 'done'), blocker_category (if any), continue_loop (true unless blocker). 3. Commit the status update. 4. This task runs iteratively after each source task; it is listed as a single task but executed multiple times.",
+        "testStrategy": "Verify that graphify-out/ is updated and consistent. Check that status doc is accurate.",
+        "priority": "medium",
+        "dependencies": [
+          17,
+          18,
+          19,
+          20
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 22,
+        "title": "Run full verification and finalize queue",
+        "description": "Run the full verification gate (`npm run verify`) after all source tasks are complete. If any failures occur, address them as fallout. Update the lane status doc to mark the queue as complete or blocked. Record a rolling status checkpoint.",
+        "details": "1. Run `npm run verify` in the worktree. 2. If failures occur, fix them (limited to test adjustments or minor fallout; no new feature work). 3. Update lane status doc: set continue_loop to false, record final commit, and note any blockers. 4. Ensure all docs/modules/ are up-to-date. 5. Commit final status. 6. Optionally, push the worktree branch for review.",
+        "testStrategy": "Run `npm run verify` and ensure zero failures. Run `npm run check:module-docs` and `npm run check:graphify` as part of verify.",
+        "priority": "high",
+        "dependencies": [
+          21
         ],
         "status": "pending",
         "subtasks": []
@@ -83,7 +109,7 @@
     ],
     "metadata": {
       "created": "2026-04-27T18:32:57.559Z",
-      "updated": "2026-04-29T17:20:48.645Z",
+      "updated": "2026-05-01T15:12:14.119Z",
       "description": "Tasks for master context"
     }
   },
