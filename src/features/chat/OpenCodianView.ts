@@ -86,6 +86,11 @@ import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
 import {
+  summarizeChatMessageForDebug,
+  summarizeContentBlocksForDebug,
+  summarizeCoreStreamChunkForDebug,
+} from './runtime/SendPipelineDebugSummaries';
+import {
   type SendPipelineDebugContentBlock,
   type SendPipelineDebugPort,
   type SendPipelineHost,
@@ -1985,7 +1990,7 @@ export class OpenCodianView extends ItemView {
         conversationRenderService.rerenderSingleUserMessage(previousMessageId, message),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
-      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+      summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
       },
@@ -2316,7 +2321,7 @@ export class OpenCodianView extends ItemView {
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
       },
-      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+      summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
     };
   }
 
@@ -2388,7 +2393,7 @@ export class OpenCodianView extends ItemView {
       },
       refreshActiveTabContextUsageFromServer: () =>
         this.activeTabContextUsageCoordinator.refreshFromServer(),
-      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+      summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
     };
   }
 
@@ -2564,13 +2569,13 @@ export class OpenCodianView extends ItemView {
     };
     const debugPort: SendPipelineDebugPort = {
       summarizeContentBlocksForDebug: (blocks) =>
-        this.summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
+        summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
       },
       getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
-      summarizeCoreStreamChunkForDebug: (chunk) => this.summarizeCoreStreamChunkForDebug(chunk),
-      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+      summarizeCoreStreamChunkForDebug: (chunk) => summarizeCoreStreamChunkForDebug(chunk),
+      summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
       stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
     };
 
@@ -3155,214 +3160,6 @@ export class OpenCodianView extends ItemView {
     }
 
     logger.debug(`Assistant message finalization [${label}]: ${this.stringifyLogPayload(payload)}`);
-  }
-
-  private summarizeContentBlocksForDebug(
-    blocks:
-      | Array<{
-        type?: string;
-        text?: string;
-        content?: string;
-        toolId?: string;
-        toolName?: string;
-        toolCall?: { id?: string; name?: string } | null;
-      }>
-      | undefined,
-  ): {
-    count: number;
-    types: string[];
-    textLength: number;
-    toolCount: number;
-    thinkingCount: number;
-  } {
-    if (!blocks || blocks.length === 0) {
-      return {
-        count: 0,
-        types: [],
-        textLength: 0,
-        toolCount: 0,
-        thinkingCount: 0,
-      };
-    }
-
-    let textLength = 0;
-    let toolCount = 0;
-    let thinkingCount = 0;
-
-    for (const block of blocks) {
-      const type = block.type ?? 'unknown';
-      if (type === 'text') {
-        const text = typeof block.text === 'string'
-          ? block.text
-          : typeof block.content === 'string'
-            ? block.content
-            : '';
-        textLength += text.length;
-      } else if (type === 'tool_use' || type === 'tool_call' || block.toolCall) {
-        toolCount += 1;
-      } else if (type === 'thinking') {
-        thinkingCount += 1;
-      }
-    }
-
-    return {
-      count: blocks.length,
-      types: blocks.map((block) => block.type ?? 'unknown'),
-      textLength,
-      toolCount,
-      thinkingCount,
-    };
-  }
-
-  private summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null {
-    if (!message) {
-      return null;
-    }
-
-    return {
-      id: message.id,
-      sourceMessageId: message.sourceMessageId ?? null,
-      role: message.role,
-      timestamp: message.timestamp,
-      modelId: message.modelId ?? null,
-      streamState: message.streamState ?? null,
-      displayStyle: message.displayStyle ?? 'default',
-      contentLength: message.content.length,
-      contentPreview: this.getLogPreview(message.content, 120),
-      contentBlocks: this.summarizeContentBlocksForDebug(message.contentBlocks),
-      toolCallsCount: message.toolCalls?.length ?? 0,
-      structuredPresent: message.structured !== undefined,
-      partsCount: message.parts?.length ?? 0,
-      questionResolution: message.questionResolution
-        ? {
-            requestId: message.questionResolution.request.id,
-            status: message.questionResolution.status,
-          }
-        : null,
-      omoKind: message.omo?.kind ?? null,
-    };
-  }
-
-  private summarizeCoreStreamChunkForDebug(
-    chunk: import('../../core/types').StreamChunk,
-  ): Record<string, unknown> {
-    switch (chunk.type) {
-      case 'text':
-        return {
-          type: chunk.type,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-        };
-      case 'thinking':
-        return {
-          type: chunk.type,
-          partId: chunk.partId ?? null,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-          durationSeconds: chunk.durationSeconds ?? null,
-        };
-      case 'tool_use':
-        return {
-          type: chunk.type,
-          id: chunk.id,
-          name: chunk.name,
-          inputKeys: Object.keys(chunk.input ?? {}),
-        };
-      case 'tool_result':
-        return {
-          type: chunk.type,
-          toolUseId: chunk.toolUseId,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-          isError: chunk.isError ?? false,
-        };
-      case 'usage':
-        return {
-          type: chunk.type,
-          inputTokens: chunk.inputTokens,
-          outputTokens: chunk.outputTokens,
-          sessionId: chunk.sessionId ?? null,
-        };
-      case 'message_metadata':
-        return {
-          type: chunk.type,
-          messageId: chunk.messageId,
-          timestamp: chunk.timestamp,
-          modelId: chunk.modelId ?? null,
-        };
-      case 'file_edited':
-        return {
-          type: chunk.type,
-          file: chunk.file,
-        };
-      case 'permission_request':
-        return {
-          type: chunk.type,
-          id: chunk.id,
-          permission: chunk.permission,
-          patternCount: chunk.patterns.length,
-        };
-      case 'question_request':
-        return {
-          type: chunk.type,
-          requestId: chunk.request.id,
-          questionCount: chunk.request.questions.length,
-        };
-      case 'error':
-        return {
-          type: chunk.type,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-        };
-      default:
-        return { type: chunk.type };
-    }
-  }
-
-  private summarizeRenderedStreamChunkForDebug(
-    chunk: import('../../utils/streaming').StreamChunk,
-  ): Record<string, unknown> {
-    switch (chunk.type) {
-      case 'text':
-        return {
-          type: chunk.type,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-        };
-      case 'thinking':
-        return {
-          type: chunk.type,
-          partId: chunk.partId ?? null,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-          durationSeconds: chunk.durationSeconds ?? null,
-        };
-      case 'tool_use':
-        return {
-          type: chunk.type,
-          id: chunk.id,
-          name: chunk.name,
-          inputKeys: Object.keys(chunk.input ?? {}),
-        };
-      case 'tool_result':
-        return {
-          type: chunk.type,
-          id: chunk.id,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-          isError: chunk.isError ?? false,
-        };
-      case 'error':
-        return {
-          type: chunk.type,
-          length: chunk.content.length,
-          preview: this.getLogPreview(chunk.content, 120),
-        };
-      case 'done':
-        return { type: chunk.type };
-      default:
-        return { type: 'unknown' };
-    }
   }
 
   private scheduleComposerLayoutSync(): void {

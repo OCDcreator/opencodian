@@ -153,6 +153,9 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 `OpenCodianView` 保留的公开方法 `applyChatAppearanceSettings()`、`applyChatScrollMode()`、`scheduleChatSurfaceColorSync()` 全部委托给该协调器；原来的私有实现（`applyThemeBackgroundImage`、`applyChatScrollModeToMessagesEl`、`scheduleChatSurfaceColorSync`、`clearChatSurfaceSyncTimers`、`syncChatSurfaceColor`）已移至协调器内部，其中 `syncChatSurfaceColor()` 作为公开方法供 `applyChatScrollMode()` 在 pane coordinator 提前返回时直接调用，确保表面颜色始终同步。
 
+### Send pipeline debug summary 边界
+
+send pipeline 调试摘要函数（`summarizeContentBlocksForDebug`、`summarizeChatMessageForDebug`、`summarizeCoreStreamChunkForDebug`、`summarizeRenderedStreamChunkForDebug`）现在由 `runtime/SendPipelineDebugSummaries.ts` 承接。`OpenCodianView` 仅通过 import 调用这些纯函数，并在多个 host seam（`SendPipelineDebugPort`、`ConversationRenderHost`、`MessageFinalizationServiceHost` 等）中直接传递函数引用；view 本身不再保留这些私有实现。
 
 ### Header/status shell 抽离
 
