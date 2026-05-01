@@ -339,7 +339,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 - `getAvailableModels()`: 读取 SDK `config.providers()` 或 legacy `/config/providers`，并把 string-array/object 两种 provider model 结构统一成同一个返回形状。开启 `includeDirectory` 时，它表示“当前项目目录作用域下的 runtime provider/model 列表”，也是设置页复现 `opencode models` 结果的主入口。
 - `getProviderDirectory()`: 读取 SDK `provider.list()` 或 legacy `/provider`，归一化 `all` / `default` / `connected`；它对应的是 connect-provider 目录总览，不是 `opencode models` 的等价接口。
 - `getResolvedModelConfig()`: 读取 SDK `config.get()` 或 legacy `/config`，只提取模型相关配置字段。开启 `includeDirectory` 时返回当前项目作用域的解析结果；关闭时返回服务端“默认工作目录作用域”的解析结果，不能把它简单等同于纯全局配置文件。
-- `reapplyCompactionConfigFromProjectConfig()`: 供 `SettingsConversationSection` 在 `.opencode/opencode.json` 写入后 dispose 当前 scoped instance，再验证项目配置是否被 sidecar 重新读入；`modelSourceMode: 'server'` 会直接 deferred，因为该模式会禁用项目配置。
+- `reapplyCompactionConfigFromProjectConfig()`: 委托 `OpenCodeServiceLifecycleCoordinator` 执行 compaction config reload lifecycle：dispose scoped instance、读取 resolved config、对比 compaction 值，返回 applied/deferred 结果。
 - `getSessionContextUsageSnapshot()`: 现在委托给 `OpenCodeSessionControlOrchestrator`，并发读取 session、messages、providers，计算 provider/model 名称、上下文窗口、token 统计和总 cost。
 - `getPendingPermissions()` / `respondToPermission()` / `respondToSessionPermission()` / `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 现在统一委托给 `OpenCodeQuestionPermissionHub`，由它处理 SDK flag、legacy fallback、question prompt normalization 与 permission request filtering。
 - `getMcpStatus()` / `addMcpServer()` / provider auth / project / file / find / path / VCS / formatter / LSP 查询：现在统一委托给 `OpenCodeCatalogQueryCoordinator`，由它集中处理 SDK query/admin surface 与 MCP status normalization/writeback。
@@ -373,7 +373,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `getAvailableModels()` | 读取并统一 provider/model 目录 |
 | `getProviderDirectory()` | 读取服务端宽 provider 目录，不等同于运行时可用列表 |
 | `getResolvedModelConfig()` | 读取服务器解析后的模型配置子集 |
-| `reapplyCompactionConfigFromProjectConfig()` | dispose 当前 scoped instance，并验证 sidecar 是否重新读到项目 compaction |
+| `reapplyCompactionConfigFromProjectConfig()` | 委托 coordinator 执行 compaction config reload lifecycle |
 | `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
 | `respondToSessionPermission()` | 回传 session-scoped permission 决策 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |

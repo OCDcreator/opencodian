@@ -35,6 +35,8 @@
 - `OpenCodeServiceLifecycleCoordinatorHost`: coordinator 内部运行 seam，注入共享 `ServerManager`、sync/open-code event ports、scope invalidation hook 与对外通知回调。
 - `OpenCodeServiceLifecycleAssembly`: `createAssembly()` 返回的共享装配结果，包含同一个 `ServerManager` 与 `OpenCodeServiceLifecycleCoordinator`。
 - `OpenCodeSettingsUpdatePlan`: 单次 settings 更新的快照，记录新旧 mode/baseUrl/scope、subscription wanted state 与 managed server stop/restart 决策。
+- `OpenCodeCompactionConfigApplyResult`: `reapplyCompactionConfigFromProjectConfig()` 的返回类型，status 为 `applied` 或 `deferred`，可选 reason。
+- `OpenCodeServiceLifecycleCompactionPort`: compaction reload lifecycle 所需的 SDK/HTTP/diagnostics 操作 port。
 
 ## 核心逻辑
 
@@ -73,6 +75,20 @@
 4. 根据 mode/config/auth/source-mode/isolation-mode 决策 stop 或 restart managed server
 5. 失败时回滚 settings/baseUrl/server config，必要时尽力 `start()` 原 managed server，最后恢复 subscriptions 并继续抛出原始错误
 
+### Compaction config reload lifecycle
+
+`reapplyCompactionConfigFromProjectConfig(compaction)` 现在由本 coordinator 直接拥有完整 compaction reload lifecycle：
+
+1. 检查 `modelSourceMode === 'server'`，若是则 deferred（项目配置被禁用）
+2. 检查 `getScopedDirectoryPath()` 是否可用，若否则 deferred
+3. dispose scoped instance（SDK 优先，fallback 到 legacy HTTP）
+4. 读取 resolved config（SDK 优先，fallback 到 legacy HTTP）
+5. 对比 resolved config 中的 `compaction` 字段与传入值
+6. 若匹配则返回 `applied`，否则返回 `deferred` 并附带原因
+7. 任何异常都会被捕获，记录 diagnostic warning，返回 `deferred` 并附带错误描述
+
+该 lifecycle 原先在 `OpenCodeService` 内实现，现已完整迁移到 coordinator；`OpenCodeService` 只保留公开门面并直接委托给 `this.serviceLifecycle.reapplyCompactionConfigFromProjectConfig()`。
+
 ### Subscription restarts
 
 `setVaultPath(path)` 承担 vault path / directory scope 改变时的完整 lifecycle：记录旧 tool catalog scope，写回 `vaultPath`，同步 `ServerManager` 工作目录，按 scope 变化清理 tool schema cache，最后统一重启 sync event runtime 与 open-code event runtime。`restartEventSubscriptions()` 仍作为共享 restart primitive。
@@ -90,7 +106,8 @@
 | `restartEventSubscriptions()` | 统一重启 sync/open-code subscriptions |
 | `checkHealth()` | 执行 SDK-first health probe 与 ServerManager fallback |
 | `updateSettings(settings)` | 执行 settings reconfiguration / rollback lifecycle |
-| `isReady()` / `getServerStatus()` / `getServerDiagnostics()` / `isServerProcessRunning()` | 代理 server status / diagnostics / managed process state |
+| `isReady()` / `getServerStatus()` / `getServerDiagnostics()` / `isServerProcessRunning()` | 代理 server status / diagnostics / managed process状态 |
+| `reapplyCompactionConfigFromProjectConfig(compaction)` | 执行 compaction config reload lifecycle：dispose instance、读取 resolved config、对比并返回 applied/deferred |
 
 ## 数据流
 

@@ -55,6 +55,7 @@ import {
   OpenCodeServiceDiagnostics,
 } from './OpenCodeSdkFacade';
 import {
+  type OpenCodeCompactionConfigApplyResult,
   OpenCodeServiceLifecycleCoordinator,
 } from './OpenCodeServiceLifecycleCoordinator';
 import {
@@ -102,19 +103,11 @@ import type {
 
 const logger = createLogger('OpenCodeService');
 
+export type { OpenCodeCompactionConfigApplyResult } from './OpenCodeServiceLifecycleCoordinator';
 export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeSyncEventRuntimeCoordinator';
-
-export interface OpenCodeCompactionConfigApplyResult {
-  status: 'applied' | 'deferred';
-  reason?: string;
-}
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Service events */
@@ -461,6 +454,16 @@ export class OpenCodeService {
       onModelsLoaded: (providers) => this.events.onModelsLoaded?.(providers),
       syncEvents: this.syncEventRuntime,
       openCodeEvents: this.openCodeEventRuntime,
+      compaction: {
+        getScopedDirectoryPath: () => this.getScopedDirectoryPath(),
+        shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
+        sdkConfigGet: () => this.sdk.config.get(),
+        sdkInstanceDispose: () => this.sdk.instance.dispose(),
+        logServiceWarning: (key, message, error) => this.diagnostics.logServiceWarning(key, message, error),
+        describeError: (error) => this.diagnostics.describeError(error),
+        httpGet: (path, options) => this.get(path, options),
+        httpPost: (path, body, options) => this.post(path, body, options),
+      },
       initialManagedServerState: runtimeOptions.initialManagedServerState,
       onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
     });
@@ -947,83 +950,6 @@ export class OpenCodeService {
     }));
   }
 
-  private async getBackendResolvedConfigForUpdate(): Promise<Record<string, unknown>> {
-    if (this.shouldUseSdk('sdkCrud') && typeof this.sdk.config.get === 'function') {
-      try {
-        return this.normalizeBackendConfig(await this.sdk.config.get());
-      } catch (error) {
-        this.diagnostics.logServiceWarning(
-          'config.get',
-          'SDK config.get failed while preparing compaction config update, falling back to legacy HTTP',
-          error,
-        );
-      }
-    }
-
-    return this.normalizeBackendConfig(
-      await this.get<unknown>('/config', { includeDirectory: true }),
-    );
-  }
-
-  private normalizeBackendConfig(value: unknown): Record<string, unknown> {
-    return isPlainRecord(value) ? this.clonePlainRecord(value) : {};
-  }
-
-  private resolvedCompactionMatches(
-    config: Record<string, unknown>,
-    compaction: OpencodeCompactionConfig | null | undefined,
-  ): boolean {
-    const resolvedCompaction = isPlainRecord(config.compaction)
-      ? config.compaction
-      : {};
-
-    if (!compaction) {
-      return Object.keys(resolvedCompaction).length === 0;
-    }
-
-    return Object.entries(compaction).every(([key, value]) => {
-      if (value === undefined) {
-        return !(key in resolvedCompaction);
-      }
-      return Object.is(resolvedCompaction[key], value);
-    });
-  }
-
-  private async disposeScopedInstance(): Promise<void> {
-    if (this.shouldUseSdk('sdkCrud') && typeof this.sdk.instance.dispose === 'function') {
-      try {
-        await this.sdk.instance.dispose();
-        return;
-      } catch (error) {
-        this.diagnostics.logServiceWarning(
-          'instance.dispose',
-          'SDK instance.dispose failed while reloading project config, falling back to legacy HTTP',
-          error,
-        );
-      }
-    }
-
-    await this.post<boolean>('/instance/dispose', undefined, { includeDirectory: true });
-  }
-
-  private clonePlainRecord(value: Record<string, unknown>): Record<string, unknown> {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, nestedValue]) => [key, this.cloneConfigValue(nestedValue)]),
-    );
-  }
-
-  private cloneConfigValue(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      return value.map((item) => this.cloneConfigValue(item));
-    }
-
-    if (isPlainRecord(value)) {
-      return this.clonePlainRecord(value);
-    }
-
-    return value;
-  }
-
   private observeToolNamesInMessages(messages: Array<{ info: Message; parts: Part[] }>): void {
     for (const message of messages) {
       for (const part of message.parts) {
@@ -1380,43 +1306,7 @@ export class OpenCodeService {
   async reapplyCompactionConfigFromProjectConfig(
     compaction: OpencodeCompactionConfig | null | undefined,
   ): Promise<OpenCodeCompactionConfigApplyResult> {
-    if (this.settings.modelSourceMode === 'server') {
-      return {
-        status: 'deferred',
-        reason: 'Project config is disabled while modelSourceMode is server',
-      };
-    }
-
-    if (!this.getScopedDirectoryPath()) {
-      return {
-        status: 'deferred',
-        reason: 'Vault directory scope is unavailable',
-      };
-    }
-
-    try {
-      await this.disposeScopedInstance();
-      const resolvedConfig = await this.getBackendResolvedConfigForUpdate();
-      if (this.resolvedCompactionMatches(resolvedConfig, compaction)) {
-        return { status: 'applied' };
-      }
-
-      return {
-        status: 'deferred',
-        reason: 'Project compaction config reload did not affect the resolved config',
-      };
-    } catch (error) {
-      const reason = this.diagnostics.describeError(error);
-      this.diagnostics.logServiceWarning(
-        'config.reload',
-        'Project compaction config reload failed; compaction settings are deferred until backend reload',
-        error,
-      );
-      return {
-        status: 'deferred',
-        reason,
-      };
-    }
+    return this.serviceLifecycle.reapplyCompactionConfigFromProjectConfig(compaction);
   }
 
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
