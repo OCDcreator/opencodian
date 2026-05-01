@@ -79,6 +79,16 @@ export class ConversationRenderService {
     nextMessages: ChatMessage[],
     tabId?: TabId | null,
   ): Promise<boolean>;
+
+  // 静态 tooltip / copy-button 工具（已从 OpenCodianView 迁入）
+  static readonly COPY_ICON: string;
+  static attachCopyButtonBehavior(copyBtn: HTMLElement, content: string): void;
+  static setTooltipLabel(
+    buttonEl: HTMLElement,
+    label: string,
+    position?: 'bottom' | 'top' | 'right',
+  ): void;
+  static attachTooltipLabel(buttonEl: HTMLElement, label: string): void;
 }
 ```
 
