@@ -10,8 +10,6 @@
 ## 公开接口
 
 - `UserMessageFooterRenderer.render()`：在指定 user message bubble 下方组装 footer
-- `UserMessageFooterRendererHost.attachTooltipLabel()`：由 view 提供 tooltip label 注入
-- `UserMessageFooterRendererHost.initializeCopyButton()`：由 view 提供 copy 行为初始化
 - `UserMessageFooterRendererHost.handleRewindRequest()`：由 view 提供 rewind 副作用入口
 - `UserMessageFooterRendererHost.handleForkRequest()`：由 view 提供 fork 副作用入口
 

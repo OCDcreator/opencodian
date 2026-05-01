@@ -24,9 +24,6 @@ describe('AssistantShellViewHostAdapter', () => {
         text: `${message.noticeTitle ?? 'Notice'}:${message.content}`,
       });
     });
-    const initializeAssistantCopyButton = jest.fn((copyBtn: HTMLElement, content: string) => {
-      copyBtn.setText(`copy:${content}`);
-    });
     const markdownService = createMockMarkdownService();
     const getMarkdownService = jest.fn(() => markdownService);
     const shouldRenderQuestionResolutionCards = jest.fn(() => false);
@@ -41,7 +38,6 @@ describe('AssistantShellViewHostAdapter', () => {
       setStreamingAssistantMessageVisibility: (messageEl, visible) => {
         messageEl.hidden = !visible;
       },
-      initializeAssistantCopyButton,
       renderNoticeCard,
       getMarkdownService,
       shouldRenderQuestionResolutionCards,
@@ -51,7 +47,6 @@ describe('AssistantShellViewHostAdapter', () => {
 
     return {
       adapter,
-      initializeAssistantCopyButton,
       markdownService,
       renderNoticeCard,
       runtime,
@@ -117,7 +112,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('renders persisted assistant messages through the shared body and footer helpers', async () => {
-    const { adapter, markdownService, initializeAssistantCopyButton, turnBody } = createAdapter();
+    const { adapter, markdownService, turnBody } = createAdapter();
     const message: ChatMessage = {
       id: 'assistant-persisted-1',
       role: 'assistant',
@@ -134,15 +129,11 @@ describe('AssistantShellViewHostAdapter', () => {
       expect.any(HTMLElement),
       'Persisted assistant answer',
     );
-    expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      'Persisted assistant answer',
-    );
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
 
   it('finalizes persisted assistant footers through the shared shell renderer', () => {
-    const { adapter, initializeAssistantCopyButton, scrollSpy, turnBody } = createAdapter();
+    const { adapter, scrollSpy, turnBody } = createAdapter();
     const { messageEl } = adapter.createAssistantMessageElement('tab-1', true);
     const message: ChatMessage = {
       id: 'assistant-1',
@@ -162,15 +153,11 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(messageEl.hidden).toBe(false);
     expect(turnBody.contains(messageEl)).toBe(true);
     expect(scrollSpy).not.toHaveBeenCalled();
-    expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      'Visible answer',
-    );
     expect(messageEl.querySelector('.opencodian-message-time-status')?.textContent).toBe('Interrupted');
   });
 
   it('finalizes pseudo-stream assistant footers through the shared shell renderer', () => {
-    const { adapter, initializeAssistantCopyButton, turnBody } = createAdapter();
+    const { adapter, turnBody } = createAdapter();
     const { messageEl } = adapter.createAssistantMessageElement('tab-1', true);
 
     adapter.finalizePseudoStreamFooter(messageEl, {
@@ -181,15 +168,11 @@ describe('AssistantShellViewHostAdapter', () => {
 
     expect(messageEl.hidden).toBe(false);
     expect(turnBody.contains(messageEl)).toBe(true);
-    expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      'Reveal me',
-    );
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
 
   it('renders local stream errors through the shared assistant error helper', () => {
-    const { adapter, initializeAssistantCopyButton, turnBody } = createAdapter();
+    const { adapter, turnBody } = createAdapter();
     const { messageEl, contentEl } = adapter.createAssistantMessageElement('tab-1', true);
 
     adapter.renderStreamError({
@@ -205,10 +188,6 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(contentEl.querySelector('.streaming-error-block')).not.toBeNull();
     expect(contentEl.querySelector('.streaming-error-icon')?.textContent).toBe('❌');
     expect(contentEl.querySelector('.streaming-error-text')?.textContent).toBe('Server unavailable');
-    expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      'Server unavailable',
-    );
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('claude-sonnet-4');
   });
 });

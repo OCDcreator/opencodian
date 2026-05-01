@@ -14,7 +14,7 @@
 - `revealStreamingAssistantMessageElement()`：把延迟显示的 shell 改为可见，并在当前活动 tab 上按既有规则触发 settled auto-scroll
 - `addTimestampWithCopyButton()`：把 streaming shell 收尾成稳定的 assistant footer，补上时间、model、状态和 copy 按钮
 - `ensureAssistantTimestampRow()`：确保 shell 里只有一个 assistant timestamp row，并支持 pending 占位
-- `AssistantShellRendererHost`：只暴露 shell adapter 真正需要的 tab runtime、turn body、scroll、visibility 与 copy-button 初始化能力
+- `AssistantShellRendererHost`：只暴露 shell adapter 真正需要的 tab runtime、turn body、scroll 与 visibility 能力
 
 ## 设计目的
 

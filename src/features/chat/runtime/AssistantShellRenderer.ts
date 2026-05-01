@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../core/types';
+import { ConversationRenderService } from '../services/ConversationRenderService';
 import type { TabId } from '../tabs';
 import type { SendPipelineStreamElements } from './SendPipelineTypes';
 
@@ -18,7 +19,6 @@ export interface AssistantShellRendererHost {
     visible: boolean,
     reason: string,
   ): void;
-  initializeAssistantCopyButton(copyBtn: HTMLElement, content: string): void;
 }
 
 export interface AssistantShellTimestampOptions {
@@ -151,7 +151,8 @@ export class AssistantShellRenderer {
     if (content) {
       const copyBtn = document.createElement('span');
       copyBtn.className = 'opencodian-copy-btn-inline';
-      this.host.initializeAssistantCopyButton(copyBtn, content);
+      copyBtn.innerHTML = ConversationRenderService.COPY_ICON;
+      ConversationRenderService.attachCopyButtonBehavior(copyBtn, content);
       fragment.appendChild(copyBtn);
     }
 

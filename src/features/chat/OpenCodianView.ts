@@ -470,15 +470,12 @@ interface TabRuntimeState extends ConversationTabRuntimeState {
 
 type TabPaneState = TabMessagesPaneState<TabRuntimeState>;
 
-/** Clipboard icon SVG for copy button */
-const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
 const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="scale(4.166667)"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></g>`;
 addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
 
 export class OpenCodianView extends ItemView {
-  private static tooltipLabelId = 0;
   private plugin: OpenCodianPlugin;
   private chatContainerEl: HTMLElement | null = null;
   private messagesShellEl: HTMLElement | null = null;
@@ -585,7 +582,7 @@ export class OpenCodianView extends ItemView {
   private createChatHeaderPresenterHost(): ChatHeaderPresenterHost {
     return {
       setTooltipLabel: (element, label, position) => {
-        this.setTooltipLabel(element, label, position);
+        ConversationRenderService.setTooltipLabel(element, label, position);
       },
       registerCssChangeListener: (listener) => {
         this.registerEvent(this.app.workspace.on('css-change', listener));
@@ -699,7 +696,7 @@ export class OpenCodianView extends ItemView {
         this.composerContextViewFacade.setContextRowElement(element);
       },
       setTooltipLabel: (element, label, position) => {
-        this.setTooltipLabel(element, label, position);
+        ConversationRenderService.setTooltipLabel(element, label, position);
       },
       getInputPlaceholder: () => this.getInputPlaceholder(),
       getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
@@ -2571,11 +2568,6 @@ export class OpenCodianView extends ItemView {
 
   private createUserMessageFooterRendererHost(): UserMessageFooterRendererHost {
     return {
-      attachTooltipLabel: (buttonEl, label) => this.attachTooltipLabel(buttonEl, label),
-      initializeCopyButton: (copyBtn, content) => {
-        copyBtn.insertAdjacentHTML('afterbegin', COPY_ICON);
-        this.attachCopyButtonBehavior(copyBtn, content);
-      },
       isStreaming: () => this.isActiveTabStreaming(),
       handleRewindRequest: (message) => this.handleRewindRequest(message),
       handleForkRequest: (message) => this.handleForkRequest(message),
@@ -2594,10 +2586,7 @@ export class OpenCodianView extends ItemView {
       setStreamingAssistantMessageVisibility: (messageEl, visible, reason) => {
         this.setStreamingAssistantMessageVisibility(messageEl, visible, reason);
       },
-      initializeAssistantCopyButton: (copyBtn, content) => {
-        copyBtn.innerHTML = COPY_ICON;
-        this.attachCopyButtonBehavior(copyBtn, content);
-      },
+
       renderNoticeCard: (container, message) =>
         this.assistantNoticeCardRenderer.render(container, message),
       shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
@@ -4188,85 +4177,6 @@ export class OpenCodianView extends ItemView {
         hasStreamingClass: messageEl.classList.contains('is-streaming'),
       });
     }
-  }
-
-  private attachCopyButtonBehavior(copyBtn: HTMLElement, content: string): void {
-    let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
-    const labelId = copyBtn.getAttribute('aria-labelledby');
-    const labelText = copyBtn.getAttribute('data-tooltip') ?? '';
-
-    const setButtonContent = (text?: string): void => {
-      copyBtn.empty();
-
-      if (text) {
-        copyBtn.setText(text);
-      } else {
-        copyBtn.innerHTML = COPY_ICON;
-      }
-
-      if (labelId && labelText) {
-        const labelEl = copyBtn.createSpan({
-          cls: 'opencodian-visually-hidden',
-          text: labelText,
-        });
-        labelEl.id = labelId;
-        copyBtn.setAttribute('aria-labelledby', labelId);
-      }
-    };
-
-    copyBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-
-      try {
-        await navigator.clipboard.writeText(content);
-      } catch {
-        // Clipboard API may fail in non-secure contexts
-        return;
-      }
-
-      // Clear any pending timeout from rapid clicks
-      if (feedbackTimeout) {
-        clearTimeout(feedbackTimeout);
-      }
-
-      // Show "copied!" feedback
-      setButtonContent('copied!');
-      copyBtn.classList.add('copied');
-
-      feedbackTimeout = setTimeout(() => {
-        setButtonContent();
-        copyBtn.classList.remove('copied');
-        feedbackTimeout = null;
-      }, 1500);
-    });
-  }
-
-  private setTooltipLabel(buttonEl: HTMLElement, label: string, position?: 'bottom' | 'top' | 'right'): void {
-    buttonEl.setAttribute('data-tooltip', label);
-    buttonEl.removeAttribute('title');
-    buttonEl.removeAttribute('aria-label');
-    if (position) {
-      buttonEl.setAttribute('data-tooltip-position', position);
-    }
-
-    const existingLabelEl = buttonEl.querySelector('.opencodian-visually-hidden[data-tooltip-label="true"]');
-    if (existingLabelEl instanceof HTMLElement) {
-      existingLabelEl.textContent = label;
-      return;
-    }
-
-    this.attachTooltipLabel(buttonEl, label);
-  }
-
-  private attachTooltipLabel(buttonEl: HTMLElement, label: string): void {
-    const labelId = `opencodian-tooltip-label-${OpenCodianView.tooltipLabelId++}`;
-    const labelEl = buttonEl.createSpan({
-      cls: 'opencodian-visually-hidden',
-      text: label,
-    });
-    labelEl.id = labelId;
-    labelEl.setAttribute('data-tooltip-label', 'true');
-    buttonEl.setAttribute('aria-labelledby', labelId);
   }
 
   private removeEmptyAssistantShells(): void {

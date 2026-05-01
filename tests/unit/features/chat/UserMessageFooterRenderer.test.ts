@@ -7,8 +7,6 @@ import {
 describe('UserMessageFooterRenderer', () => {
   function createRenderer(isStreaming = false) {
     const host: UserMessageFooterRendererHost = {
-      attachTooltipLabel: jest.fn(),
-      initializeCopyButton: jest.fn(),
       isStreaming: jest.fn(() => isStreaming),
       handleRewindRequest: jest.fn(),
       handleForkRequest: jest.fn(),
@@ -20,7 +18,7 @@ describe('UserMessageFooterRenderer', () => {
     };
   }
 
-  it('renders copy, rewind, and fork controls through a narrow host seam', () => {
+  it('renders copy, rewind, and fork controls', () => {
     const { host, renderer } = createRenderer();
     const container = document.createElement('div');
     const message: ChatMessage = {
@@ -39,8 +37,7 @@ describe('UserMessageFooterRenderer', () => {
     const forkBtn = actionButtons[1];
 
     expect(copyBtn).not.toBeNull();
-    expect(host.attachTooltipLabel).toHaveBeenCalledTimes(3);
-    expect(host.initializeCopyButton).toHaveBeenCalledWith(copyBtn, 'Visible copy content');
+    expect(copyBtn?.querySelector('svg')).not.toBeNull();
     expect(rewindBtn.disabled).toBe(false);
     expect(forkBtn.disabled).toBe(false);
 

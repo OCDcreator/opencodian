@@ -1,12 +1,11 @@
 import type { ChatMessage } from '../../../core/types';
 import { t } from '../../../i18n';
+import { ConversationRenderService } from '../services/ConversationRenderService';
 
 const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
 const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
 
 export interface UserMessageFooterRendererHost {
-  attachTooltipLabel(buttonEl: HTMLElement, label: string): void;
-  initializeCopyButton(copyBtn: HTMLElement, content: string): void;
   isStreaming(): boolean;
   handleRewindRequest(message: ChatMessage): Promise<void> | void;
   handleForkRequest(message: ChatMessage): Promise<void> | void;
@@ -55,8 +54,9 @@ export class UserMessageFooterRenderer {
       },
     });
 
-    this.host.attachTooltipLabel(copyBtn, copyLabel);
-    this.host.initializeCopyButton(copyBtn, copyContent);
+    copyBtn.insertAdjacentHTML('afterbegin', ConversationRenderService.COPY_ICON);
+    ConversationRenderService.attachTooltipLabel(copyBtn, copyLabel);
+    ConversationRenderService.attachCopyButtonBehavior(copyBtn, copyContent);
   }
 
   private renderActionButton(
@@ -77,7 +77,7 @@ export class UserMessageFooterRenderer {
     });
 
     buttonEl.innerHTML = options.icon;
-    this.host.attachTooltipLabel(buttonEl, options.label);
+    ConversationRenderService.attachTooltipLabel(buttonEl, options.label);
     buttonEl.disabled = options.isDisabled;
     buttonEl.addEventListener('click', (event) => {
       event.stopPropagation();
