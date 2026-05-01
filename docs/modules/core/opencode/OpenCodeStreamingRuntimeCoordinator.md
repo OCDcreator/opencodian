@@ -10,7 +10,7 @@
 - active stream registry 与 `AbortController` 生命周期
 - 单一 streaming 入口下的 SDK/legacy transport 选择
 - SDK stream 订阅、prompt 启动顺序与“首事件前失败 → legacy SSE”降级策略
-- legacy `/event` SSE reader / parser / abort-detach 生命周期
+- legacy `/event` SSE 读取委托给 `OpenCodeLegacySseStreamReader`，coordinator 只消费解析后的事件
 - 在交付 legacy `StreamChunk` 前先把 stream mutations 转交给 canonical session graph；具体 message/part reducer 由 `OpenCodeSessionStateStore.applyStreamMutations()` 拥有
 - `cancelStream()` / `detachStream()` 的协议语义
 - 流结束后的 finalization 委托给 `OpenCodeStreamingFinalizationCoordinator`
@@ -25,6 +25,7 @@
 - `../types`
 - `./OpenCodeSessionLifecycleCoordinator`
 - `./OpenCodeStreamEventTransformer`
+- `./OpenCodeLegacySseStreamReader`
 - `./OpenCodeStreamingFinalizationCoordinator`
 - `./sdkTypes`
 
@@ -59,10 +60,11 @@
 - `streamLegacyResponse()` 则直接执行 legacy prompt 启动后进入 `/event` 读取。
 - 每个 event outcome 都会先调用 host `applyStreamMutations()`，再 yield 对应 `StreamChunk`，避免 canonical graph 落后于本地 loose chunk；message/part merge 和 delta fallback 由 `OpenCodeSessionStateStore` 处理。
 
-### SSE reader lifecycle
+### Legacy SSE delegation
 
-- `connectSSE()` / `openSseReader()` / `readSseStream()` 负责 legacy fetch reader、abort cancel、partial buffer、tail flush 生命周期。
-- `streamEventTransformer.parseSSEEvents()` 继续负责把 buffer 切成完整 SSE events；coordinator 只维护 reader state 与剩余缓冲区。
+- 低层 SSE reader lifecycle（`connectSSE`、`openSseReader`、`readSseStream`、buffer 管理、abort/dispose）已迁移到 `OpenCodeLegacySseStreamReader`。
+- `consumeLegacyEventStream()` 调用 `legacyReader.connectSSE(signal)` 获取解析后的 `OpenCodeSSEEvent` 流，然后继续负责事件语义转换、mutation 应用、和 stop 判断。
+- `streamEventTransformer.parseSSEEvents()` 仍由 `OpenCodeStreamEventTransformer` 拥有；reader 通过 host seam 调用它，coordinator 不再直接维护 reader state 或剩余缓冲区。
 
 ### Finalize delegation
 
@@ -89,7 +91,8 @@ graph LR
     A --> C[startPrompt / subscribe host callbacks]
     B --> D[OpenCodeStreamingRuntimeContext]
     B --> E[SDK event stream]
-    B --> F[legacy /event SSE]
+    B --> LR[OpenCodeLegacySseStreamReader]
+    LR --> F[legacy /event SSE]
     E --> G[OpenCodeStreamEventTransformer]
     F --> G
     G --> H[StreamChunk + StreamMutation]
@@ -105,7 +108,8 @@ graph LR
 
 ## 与其他模块的交互
 
-- `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 transport callback 注入；SDK/legacy 入口分流、transport/fallback/read 细节都委托给本 coordinator，finalize 则进一步委托给 `OpenCodeStreamingFinalizationCoordinator`。
+- `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 transport callback 注入；SDK/legacy 入口分流都委托给本 coordinator，SSE 读取进一步委托给 `OpenCodeLegacySseStreamReader`，finalize 则委托给 `OpenCodeStreamingFinalizationCoordinator`。
+- `OpenCodeLegacySseStreamReader` 拥有低层 SSE reader lifecycle：fetch 连接、reader 打开、分块读取、buffer 缓冲、abort/dispose 清理。coordinator 只消费它 yield 出的解析后事件。
 - `OpenCodeStreamEventTransformer` 继续负责 `session.error` / `session.idle` 的 stop 判断、tool/question/file/permission 事件映射、canonical stream mutation 输出，以及 SSE event parsing。
 - `OpenCodeStreamingFinalizationCoordinator` 接手了 finalize 阶段的全部行为：补拉 assistant tail、按缺失情况恢复 trailing content、输出 metadata/stop。runtime coordinator 只负责在流结束时触发 finalization。
 - `abortSessionOnServer()` 仍留在 `OpenCodeService`，因此 SDK `session.abort()` 失败后回退 legacy HTTP 的语义不变。

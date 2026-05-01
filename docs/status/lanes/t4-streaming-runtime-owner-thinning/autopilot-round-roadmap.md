@@ -6,23 +6,23 @@ Extract cohesive behavior slices from `OpenCodeStreamingRuntimeCoordinator.ts` i
 
 ## Batches
 
-### stream-1: Extract streaming finalization (IN PROGRESS)
+### stream-1: Extract streaming finalization (COMPLETE)
 
 **Target**: `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
 **New owner**: `src/core/opencode/OpenCodeStreamingFinalizationCoordinator.ts`
 
-**Move**:
+**Moved**:
 - Final assistant tail recovery (`loadAssistantTail`, `findLatestAssistantMessage`)
 - Final metadata/error chunk assembly (`buildAssistantMetadataChunk`, `buildAssistantErrorChunk`)
 - Trailing text/reasoning/tool replay (`collectAssistantTrailing*Chunks`)
 - Helper functions (`resolveReasoningDurationSeconds`, `summarizeAssistantParts`, `extractStructuredErrorMessage`, etc.)
 
-**Keep in runtime coordinator**:
+**Kept in runtime coordinator**:
 - Transport selection (`streamResponse`)
 - Active stream registry (`activeStreams`, `createActiveStreamContext`)
 - SDK/legacy fallback (`streamSdkResponse`, `streamLegacyResponse`)
 - Cancel/detach lifecycle (`cancelStream`, `detachStream`)
-- SSE reader lifecycle (`connectSSE`, `readSseStream`, etc.)
+- SSE reader lifecycle (`connectSSE`, `readSseStream`, etc.) — later moved to stream-2
 
 **Deliverables**:
 - `src/core/opencode/OpenCodeStreamingFinalizationCoordinator.ts`
@@ -31,9 +31,30 @@ Extract cohesive behavior slices from `OpenCodeStreamingRuntimeCoordinator.ts` i
 - Updated `docs/modules/core/opencode/OpenCodeStreamingRuntimeCoordinator.md`
 - Updated `docs/modules/README.md`
 
-### stream-2+: TBD
+### stream-2: Extract legacy SSE reader lifecycle (COMPLETE)
 
-Future extractions from `OpenCodeStreamingRuntimeCoordinator.ts` if additional cohesive slices are identified. Must follow the same rules:
-- No thin helper proliferation
-- New owner must own a complete behavior slice
-- Runtime coordinator must not gain new runtime ownership
+**Target**: `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+**New owner**: `src/core/opencode/OpenCodeLegacySseStreamReader.ts`
+
+**Moved**:
+- SSE fetch connection (`openSseReader`)
+- Reader context management (`createSseStreamContext`, `disposeSseStreamContext`)
+- Chunk reading and decoding (`readSseStream`, `readNextSseTextChunk`, `readSseChunk`)
+- Buffer management and event parsing delegation (`emitParsedSseEvents`, `flushRemainingSseEvents`)
+- Abort handling (`createSseAbortHandler`, `shouldStopSseStream`, `isAbortedSseRead`)
+- Public entry (`connectSSE`)
+
+**Kept in runtime coordinator**:
+- Transport selection (`streamResponse`)
+- Active stream registry (`activeStreams`, `createActiveStreamContext`)
+- SDK/legacy fallback (`streamSdkResponse`, `streamLegacyResponse`)
+- Cancel/detach lifecycle (`cancelStream`, `detachStream`)
+- Event transformation and mutation application (`consumeLegacyEventStream`)
+- Finalization delegation (`finishStreamingResponse`)
+
+**Deliverables**:
+- `src/core/opencode/OpenCodeLegacySseStreamReader.ts`
+- `tests/unit/core/opencode/OpenCodeLegacySseStreamReader.test.ts`
+- `docs/modules/core/opencode/OpenCodeLegacySseStreamReader.md`
+- Updated `docs/modules/core/opencode/OpenCodeStreamingRuntimeCoordinator.md`
+- Updated `docs/modules/README.md`
