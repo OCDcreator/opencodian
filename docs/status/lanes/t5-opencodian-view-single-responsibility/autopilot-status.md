@@ -7,11 +7,11 @@
 ## Current State
 
 - round: 1
-- current_task: view-21
-- last_commit: cc4fd2d9
-- next_focus: Continue with next queued extraction tasks
+- current_task: view-22
+- last_commit: 20afbb8f
+- next_focus: Queue complete — all extraction tasks finished
 - blocker_category: none
-- continue_loop: true
+- continue_loop: false
 
 ## Completed Tasks
 
@@ -37,6 +37,15 @@
 - View now reuses centralized `backgroundTaskHost` across all host adapters
 - OpenCodianView.ts reduced by ~45 lines
 
+### view-21 — Update lane status doc (DONE)
+- Updated autopilot-status.md with completed tasks view-16 through view-20
+- Graphify already fresh (no src changes in this task)
+
+### view-22 — Run full verification and finalize queue (DONE)
+- Ran `npm run verify` — all gates pass (module-docs, graphify, devlog-order, lint: 2 pre-existing warnings, typecheck: clean, 1796 tests pass, build: OK)
+- Status doc updated to mark queue complete
+- No blockers; loop can terminate
+
 ## Operating Contract
 
 - Keep running through the queued `OpenCodianView.ts` source-level ownership slices.
@@ -45,9 +54,17 @@
 - Reject thin helper fragmentation even if line count drops.
 - Run focused checks, module-doc checks, graphify freshness, `npm run verify`, and blocking Codex review for source tasks.
 
-## Initial Candidate Lanes
+## Net Impact
+
+| Task | Lines Removed from OpenCodianView.ts | Destination |
+|------|--------------------------------------|-------------|
+| view-17 | ~120 | ChildSessionGraphCoordinator |
+| view-18 | ~55 | ActiveTabContextUsageCoordinator |
+| view-19 | ~30 | ConversationRenderService |
+| view-20 | ~45 | BackgroundTaskTimelineService |
+| **Total** | **~250** | **4 existing owners** |
+
+## Remaining Candidates (not extracted in this round)
 
 - debug or render-support behavior still owned directly by `OpenCodianView.ts`
-- child-session tree or context-usage UI/runtime behavior that can move to existing adjacent owners
-- tooltip/copy or assistant/user render-support behavior that can move to existing render/ui owners
-- activation/sync/question/todo/background-task host assembly only when it reduces callback surface without adding a new bridge chain
+- question/todo activation host assembly (skipped as unsafe — adds bridge chain)
