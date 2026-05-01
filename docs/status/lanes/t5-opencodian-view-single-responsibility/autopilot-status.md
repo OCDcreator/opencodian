@@ -6,12 +6,36 @@
 
 ## Current State
 
-- round: 0
-- current_task: setup
-- last_commit: none
-- next_focus: import and launch the long execute queue
+- round: 1
+- current_task: view-21
+- last_commit: cc4fd2d9
+- next_focus: Continue with next queued extraction tasks
 - blocker_category: none
 - continue_loop: true
+
+## Completed Tasks
+
+### view-16 — Identify and document safe seams (DONE)
+- Identified 8 candidate extraction slices across 3 priority tiers
+- Documented safe seams and rejection rationale
+
+### view-17 — Move child session tree DOM rendering (DONE)
+- Extracted child session tree rendering to `ChildSessionGraphCoordinator`
+- OpenCodianView.ts reduced by ~120 lines
+
+### view-18 — Move context-usage stream lifecycle (DONE)
+- Extracted context-usage stream methods to `ActiveTabContextUsageCoordinator`
+- OpenCodianView.ts reduced by ~55 lines
+
+### view-19 — Move tooltip/copy behavior (DONE)
+- Extracted tooltip/copy static methods to `ConversationRenderService`
+- OpenCodianView.ts reduced by ~30 lines
+
+### view-20 — Extract background-task host assembly slice (DONE)
+- Removed 6 background-task wrapper methods from OpenCodianView.ts
+- Added `createBackgroundTaskViewHost()` factory to `BackgroundTaskTimelineService`
+- View now reuses centralized `backgroundTaskHost` across all host adapters
+- OpenCodianView.ts reduced by ~45 lines
 
 ## Operating Contract
 
