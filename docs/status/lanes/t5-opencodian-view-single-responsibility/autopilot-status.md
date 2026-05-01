@@ -8,7 +8,7 @@
 
 - round: 1
 - current_task: view-22
-- last_commit: 20afbb8f
+- last_commit: 5e67c5aa
 - next_focus: Queue complete — all extraction tasks finished
 - blocker_category: none
 - continue_loop: false
@@ -42,7 +42,8 @@
 - Graphify already fresh (no src changes in this task)
 
 ### view-22 — Run full verification and finalize queue (DONE)
-- Ran `npm run verify` — all gates pass (module-docs, graphify, devlog-order, lint: 2 pre-existing warnings, typecheck: clean, 1796 tests pass, build: OK)
+- Ran `npm run verify` — all gates pass (module-docs, graphify, devlog-order, typecheck: clean, 1796 tests pass, build: OK)
+- Lint: 2 pre-existing warnings (OpenCodeService.ts constructor length, BackgroundTaskTimelineService.test.ts file length) — acknowledged, unrelated to queue changes, do not fail the guardrail
 - Status doc updated to mark queue complete
 - No blockers; loop can terminate
 
