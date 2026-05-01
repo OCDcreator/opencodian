@@ -8,10 +8,11 @@
 
 - round: 1
 - current_task: view-22
-- last_commit: 06a30752
-- next_focus: Queue extraction tasks complete; follow-up needed on pre-existing lint warnings
-- blocker_category: pre-existing-lint-warnings
-- continue_loop: false
+- last_commit: task/view-22 HEAD after final status commit
+- queue_state: rejected_exhausted
+- next_focus: Open a follow-up lint-guardrail cleanup queue for the remaining max-lines warnings
+- blocker_category: lint-guardrail-blocked
+- continue_loop: follow-up-required
 
 ## Completed Tasks
 
@@ -41,18 +42,18 @@
 - Updated autopilot-status.md with completed tasks view-16 through view-20
 - Graphify already fresh (no src changes in this task)
 
-### view-22 — Run full verification and finalize queue (DONE)
+### view-22 — Run full verification and record final blocker (BLOCKED CHECKPOINT)
 - Ran `npm run verify` — gate results:
   - module-docs: pass
   - graphify: pass
   - devlog-order: pass
-  - lint: **2 warnings** (OpenCodeService.ts constructor length, BackgroundTaskTimelineService.test.ts file length) — pre-existing technical debt; violates the `0 errors / 0 warnings` guardrail
+  - lint: **2 warnings** (OpenCodeService.ts constructor length, BackgroundTaskTimelineService.test.ts file length) — violates the repo `0 errors / 0 warnings` guardrail
   - typecheck: clean
   - tests: 1796 pass
   - build: OK
-- Status doc updated to mark queue complete
-- Queue extraction tasks are done; loop can terminate
-- Known issue: 2 pre-existing lint warnings violate the `0 errors / 0 warnings` guardrail and need follow-up cleanup
+- Source extraction tasks are done, but the final checkpoint is blocked by the zero-warning lint guardrail.
+- The queue must not be reported as fully complete until the two max-lines warnings are fixed or the guardrail is explicitly waived.
+- Known issue: `src/core/opencode/OpenCodeService.ts` constructor length and `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts` file length need follow-up cleanup.
 
 ## Operating Contract
 
