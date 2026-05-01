@@ -455,3 +455,77 @@ describe('OpenCodeServiceLifecycleCoordinator settings updates', () => {
     expect(harness.getCurrentBaseUrl()).toBe('https://example.test/opencode');
   });
 });
+
+describe('OpenCodeServiceLifecycleCoordinator compaction reload', () => {
+  function createCompactionHarness(
+    overrides: {
+      settings?: Partial<OpenCodianSettings>;
+      compaction?: Partial<OpenCodeServiceLifecycleCoordinatorHost['compaction']>;
+    } = {},
+  ) {
+    const resolved = { compaction: { auto: false, prune: true, tail_turns: 3, reserved: 16_000 } };
+    const compactionDefaults: jest.Mocked<OpenCodeServiceLifecycleCoordinatorHost['compaction']> = {
+      getScopedDirectoryPath: jest.fn(() => 'C:\\vault'),
+      shouldUseSdkCrud: jest.fn(() => true),
+      sdkConfigGet: jest.fn().mockResolvedValue(resolved),
+      sdkInstanceDispose: jest.fn().mockResolvedValue(undefined),
+      logServiceWarning: jest.fn(),
+      describeError: jest.fn((error) => (error instanceof Error ? error.message : String(error))),
+      httpGet: jest.fn().mockResolvedValue(resolved),
+      httpPost: jest.fn().mockResolvedValue(undefined),
+      ...overrides.compaction,
+    };
+    const settings: OpenCodianSettings = { ...DEFAULT_SETTINGS, ...overrides.settings };
+    const host = createHost({ getSettings: jest.fn(() => settings), compaction: compactionDefaults });
+    return { coordinator: new OpenCodeServiceLifecycleCoordinator(host), host, compaction: host.compaction };
+  }
+
+  it('applies when resolved compaction config matches the project config', async () => {
+    const { coordinator, compaction } = createCompactionHarness();
+    const result = await coordinator.reapplyCompactionConfigFromProjectConfig({ auto: false, prune: true, tail_turns: 3, reserved: 16_000 });
+    expect(result).toEqual({ status: 'applied' });
+    expect(compaction.sdkInstanceDispose).toHaveBeenCalledTimes(1);
+    expect(compaction.sdkConfigGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('defers when resolved compaction config does not match', async () => {
+    const { coordinator, compaction } = createCompactionHarness();
+    const result = await coordinator.reapplyCompactionConfigFromProjectConfig({ auto: true, reserved: 16_000 });
+    expect(result).toMatchObject({ status: 'deferred', reason: expect.stringContaining('resolved config') });
+    expect(compaction.sdkInstanceDispose).toHaveBeenCalledTimes(1);
+    expect(compaction.sdkConfigGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('defers when modelSourceMode is server', async () => {
+    const { coordinator, compaction } = createCompactionHarness({ settings: { modelSourceMode: 'server' } });
+    const result = await coordinator.reapplyCompactionConfigFromProjectConfig({ auto: false, reserved: 16_000 });
+    expect(result).toMatchObject({ status: 'deferred', reason: expect.stringContaining('modelSourceMode') });
+    expect(compaction.sdkInstanceDispose).not.toHaveBeenCalled();
+    expect(compaction.sdkConfigGet).not.toHaveBeenCalled();
+  });
+
+  it('defers when vault directory scope is unavailable', async () => {
+    const { coordinator, compaction } = createCompactionHarness({ compaction: { getScopedDirectoryPath: jest.fn(() => undefined) } });
+    const result = await coordinator.reapplyCompactionConfigFromProjectConfig({ auto: false, reserved: 16_000 });
+    expect(result).toMatchObject({ status: 'deferred', reason: expect.stringContaining('scope') });
+    expect(compaction.sdkInstanceDispose).not.toHaveBeenCalled();
+    expect(compaction.sdkConfigGet).not.toHaveBeenCalled();
+  });
+
+  it('defers with error reason when compaction reload fails', async () => {
+    const { coordinator, compaction } = createCompactionHarness({ compaction: { sdkConfigGet: jest.fn().mockRejectedValue(new Error('SDK fail')), httpGet: jest.fn().mockRejectedValue(new Error('HTTP fail')) } });
+    const result = await coordinator.reapplyCompactionConfigFromProjectConfig({ auto: false, reserved: 16_000 });
+    expect(result).toMatchObject({ status: 'deferred', reason: expect.stringContaining('HTTP fail') });
+    expect(compaction.logServiceWarning).toHaveBeenCalledWith('config.reload', 'Project compaction config reload failed; compaction settings are deferred until backend reload', expect.any(Error));
+  });
+
+  it('uses legacy HTTP when SDK CRUD is disabled', async () => {
+    const { coordinator, compaction } = createCompactionHarness({ compaction: { shouldUseSdkCrud: jest.fn(() => false) } });
+    const result = await coordinator.reapplyCompactionConfigFromProjectConfig({ auto: false, prune: true, tail_turns: 3, reserved: 16_000 });
+    expect(result).toEqual({ status: 'applied' });
+    expect(compaction.sdkConfigGet).not.toHaveBeenCalled();
+    expect(compaction.httpGet).toHaveBeenCalledWith('/config', { includeDirectory: true });
+    expect(compaction.sdkInstanceDispose).not.toHaveBeenCalled();
+    expect(compaction.httpPost).toHaveBeenCalledWith('/instance/dispose', undefined, { includeDirectory: true });
+  });
+});

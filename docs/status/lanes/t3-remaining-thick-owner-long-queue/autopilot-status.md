@@ -39,3 +39,5 @@
   - Updated `docs/modules/core/opencode/OpenCodeService.md` and `docs/modules/core/opencode/OpenCodeServiceLifecycleCoordinator.md`
   - Refreshed graphify artifacts
   - `npm run verify` passes: 0 lint errors, 1 pre-existing warning (constructor max-lines), 1749 tests passed, build OK
+- `2026-05-01`: batch-3 retry — added direct compaction reload tests to `OpenCodeServiceLifecycleCoordinator.test.ts` (6 tests covering applied/deferred paths, SDK/legacy fallback, error handling, and CRUD-disabled mode)
+  - `npm run verify` passes: 0 lint errors, 1 pre-existing warning (constructor max-lines), 1755 tests passed, build OK
