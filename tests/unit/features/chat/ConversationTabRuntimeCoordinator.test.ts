@@ -3,16 +3,15 @@ import type { PersistedTabState, TabContextState } from '../../../../src/core/ty
 import {
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeCoordinatorHost,
-  type ConversationTabRuntimeCoordinatorHostDependencies,
+  type ConversationTabRuntimeCoordinatorHostSource,
   type ConversationTabRuntimeCoordinatorPorts,
   type ConversationTabRuntimeState,
   createConversationTabRuntimeCoordinator,
   createConversationTabRuntimeCoordinatorHost,
   type TabBarMutableState,
-  type TabRuntimeElements,
-  type TabRuntimePersistence,
-  type TabRuntimeSession,
+  type TabRuntimePluginSource,
   type TabRuntimeSettings,
+  type TabRuntimeViewSource,
 } from '../../../../src/features/chat/services/ConversationTabRuntimeCoordinator';
 import {
   type TabMessagesPaneCoordinator,
@@ -364,44 +363,44 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
   function createFactoryDeps(
     overrides: {
       settings?: Partial<TabRuntimeSettings>;
-      persistence?: Partial<TabRuntimePersistence>;
-      elements?: Partial<TabRuntimeElements>;
-      session?: Partial<TabRuntimeSession>;
+      plugin?: Partial<TabRuntimePluginSource>;
+      view?: Partial<TabRuntimeViewSource>;
       tabBarStateOverrides?: Partial<TabBarMutableState>;
     } = {},
-  ): ConversationTabRuntimeCoordinatorHostDependencies {
+  ): ConversationTabRuntimeCoordinatorHostSource {
     const tabBarState: TabBarMutableState = {
       tabManager: null,
       tabBar: null,
       tabBarMountEl: null,
       ...overrides.tabBarStateOverrides,
     };
+    const settings: TabRuntimeSettings = {
+      maxTabs: 4,
+      tabBarPosition: 'below-header' as const,
+      belowHeaderTabBarLayout: 'grid' as const,
+      ...overrides.settings,
+    };
     return {
       tabBarState,
-      settings: {
-        maxTabs: 4,
-        tabBarPosition: 'below-header' as const,
-        belowHeaderTabBarLayout: 'grid' as const,
-        ...overrides.settings,
+      settings,
+      plugin: {
+        settings: {
+          ...settings,
+          tabState: { activeTabId: null, tabs: [] },
+        },
+        saveSettingsUiStateImmediately: jest.fn(),
+        scheduleSettingsUiStateSave: jest.fn(),
+        ...overrides.plugin,
       },
-      persistence: {
-        setPersistedTabState: jest.fn(),
-        saveImmediately: jest.fn(),
-        scheduleSave: jest.fn(),
-        ...overrides.persistence,
-      },
-      elements: {
+      view: {
         getChatContainerEl: jest.fn(() => document.createElement('div')),
         getHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getBelowHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getOuterVerticalTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getInputTabBarSlotEl: jest.fn(() => document.createElement('div')),
-        ...overrides.elements,
-      },
-      session: {
         getSessionIdForTab: jest.fn(() => null),
         getTabSessionStatus: jest.fn(() => null),
-        ...overrides.session,
+        ...overrides.view,
       },
     };
   }
@@ -442,11 +441,11 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
     expect(deps.tabBarState.tabBarMountEl).toBe(mountEl);
   });
 
-  it('delegates savePersistedTabState flush to persistence.saveImmediately', () => {
+  it('delegates savePersistedTabState flush to plugin.saveSettingsUiStateImmediately', () => {
     const saveImmediately = jest.fn();
     const scheduleSave = jest.fn();
     const deps = createFactoryDeps({
-      persistence: { saveImmediately, scheduleSave },
+      plugin: { saveSettingsUiStateImmediately: saveImmediately, scheduleSettingsUiStateSave: scheduleSave },
     });
     const host = createConversationTabRuntimeCoordinatorHost(deps);
 
@@ -455,11 +454,11 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
     expect(scheduleSave).not.toHaveBeenCalled();
   });
 
-  it('delegates savePersistedTabState default to persistence.scheduleSave', () => {
+  it('delegates savePersistedTabState default to plugin.scheduleSettingsUiStateSave', () => {
     const saveImmediately = jest.fn();
     const scheduleSave = jest.fn();
     const deps = createFactoryDeps({
-      persistence: { saveImmediately, scheduleSave },
+      plugin: { saveSettingsUiStateImmediately: saveImmediately, scheduleSettingsUiStateSave: scheduleSave },
     });
     const host = createConversationTabRuntimeCoordinatorHost(deps);
 
@@ -506,26 +505,28 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
       tabBar: null,
       tabBarMountEl: null,
     };
-    const hostDeps: ConversationTabRuntimeCoordinatorHostDependencies = {
+    const settings: TabRuntimeSettings = {
+      maxTabs: 4,
+      tabBarPosition: 'below-header',
+      belowHeaderTabBarLayout: 'grid',
+    };
+    const hostSource: ConversationTabRuntimeCoordinatorHostSource = {
       tabBarState,
-      settings: {
-        maxTabs: 4,
-        tabBarPosition: 'below-header',
-        belowHeaderTabBarLayout: 'grid',
+      settings,
+      plugin: {
+        settings: {
+          ...settings,
+          tabState: { activeTabId: null, tabs: [] },
+        },
+        saveSettingsUiStateImmediately: jest.fn(),
+        scheduleSettingsUiStateSave: jest.fn(),
       },
-      persistence: {
-        setPersistedTabState: jest.fn(),
-        saveImmediately: jest.fn(),
-        scheduleSave: jest.fn(),
-      },
-      elements: {
+      view: {
         getChatContainerEl: jest.fn(() => document.createElement('div')),
         getHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getBelowHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getOuterVerticalTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getInputTabBarSlotEl: jest.fn(() => document.createElement('div')),
-      },
-      session: {
         getSessionIdForTab: jest.fn(() => null),
         getTabSessionStatus: jest.fn(() => null),
       },
@@ -533,7 +534,7 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
 
     return {
       deps: {
-        ...hostDeps,
+        ...hostSource,
         paneCoordinator: pane.coordinator,
         loadRecoveryCoordinator,
         lifecycleRecoveryCoordinator,

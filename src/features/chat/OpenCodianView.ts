@@ -1085,7 +1085,7 @@ export class OpenCodianView extends ItemView {
     return Boolean(activeElement && this.inputContainer?.contains(activeElement));
   }
 
-  private getSessionIdForTab(tabId: TabId | null = this.getActiveTabId()): string | null {
+  getSessionIdForTab(tabId: TabId | null = this.getActiveTabId()): string | null {
     if (!tabId) {
       return null;
     }
@@ -1650,27 +1650,8 @@ export class OpenCodianView extends ItemView {
     const conversationTabRuntimeCoordinator = createConversationTabRuntimeCoordinator({
       tabBarState: this.createTabBarMutableState(),
       settings: this.plugin.settings,
-      persistence: {
-        setPersistedTabState: (tabState) => {
-          this.plugin.settings.tabState = tabState;
-        },
-        saveImmediately: () => {
-          void this.plugin.saveSettingsUiStateImmediately();
-        },
-        scheduleSave: () => this.plugin.scheduleSettingsUiStateSave(),
-      },
-      elements: {
-        getChatContainerEl: () => this.chatContainerEl,
-        getHeaderTabBarSlotEl: () => this.headerTabBarSlotEl,
-        getBelowHeaderTabBarSlotEl: () => this.belowHeaderTabBarSlotEl,
-        getOuterVerticalTabBarSlotEl: () => this.outerVerticalTabBarSlotEl,
-        getInputTabBarSlotEl: () => this.composerInputShellCoordinator.getTabBarSlotEl(),
-      },
-      session: {
-        getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-        getTabSessionStatus: (tabId, sessionId) =>
-          this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
-      },
+      plugin: this.plugin,
+      view: this,
       paneCoordinator: this.tabMessagesPaneCoordinator,
       loadRecoveryCoordinator: conversationLoadRecoveryCoordinator,
       lifecycleRecoveryCoordinator: conversationTabLifecycleRecoveryCoordinator,
@@ -2392,6 +2373,33 @@ export class OpenCodianView extends ItemView {
       configurable: false,
     });
     return state;
+  }
+
+  getInputTabBarSlotEl(): HTMLElement | null {
+    return this.composerInputShellCoordinator.getTabBarSlotEl();
+  }
+
+  getChatContainerEl(): HTMLElement | null {
+    return this.chatContainerEl;
+  }
+
+  getHeaderTabBarSlotEl(): HTMLElement | null {
+    return this.headerTabBarSlotEl;
+  }
+
+  getBelowHeaderTabBarSlotEl(): HTMLElement | null {
+    return this.belowHeaderTabBarSlotEl;
+  }
+
+  getOuterVerticalTabBarSlotEl(): HTMLElement | null {
+    return this.outerVerticalTabBarSlotEl;
+  }
+
+  getTabSessionStatus(
+    tabId: TabId | null,
+    sessionId: string | null,
+  ): SessionActivityStatus | null {
+    return this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId);
   }
 
   private createConversationTabLifecycleRecoveryHost(): ConversationTabLifecycleRecoveryHost {

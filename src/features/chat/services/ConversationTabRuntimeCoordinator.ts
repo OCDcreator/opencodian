@@ -63,6 +63,32 @@ export interface ConversationTabRuntimeCoordinatorPorts {
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
 
+export interface ConversationTabRuntimeCoordinatorHostSource {
+  tabBarState: TabBarMutableState;
+  settings: TabRuntimeSettings;
+  plugin: TabRuntimePluginSource;
+  view: TabRuntimeViewSource;
+}
+
+export interface TabRuntimePluginSource {
+  settings: TabRuntimeSettings & { tabState: PersistedTabState };
+  saveSettingsUiStateImmediately(): Promise<void>;
+  scheduleSettingsUiStateSave(): void;
+}
+
+export interface TabRuntimeViewSource {
+  getChatContainerEl(): HTMLElement | null;
+  getHeaderTabBarSlotEl(): HTMLElement | null;
+  getBelowHeaderTabBarSlotEl(): HTMLElement | null;
+  getOuterVerticalTabBarSlotEl(): HTMLElement | null;
+  getInputTabBarSlotEl(): HTMLElement | null;
+  getSessionIdForTab(tabId: TabId | null): string | null;
+  getTabSessionStatus(
+    tabId: TabId | null,
+    sessionId: string | null,
+  ): SessionActivityStatus | null;
+}
+
 export interface TabBarMutableState {
   tabManager: TabManager | null;
   tabBar: TabBar | null;
@@ -75,40 +101,10 @@ export interface TabRuntimeSettings {
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
 }
 
-export interface TabRuntimePersistence {
-  setPersistedTabState(tabState: PersistedTabState): void;
-  saveImmediately(): void;
-  scheduleSave(): void;
-}
-
-export interface TabRuntimeElements {
-  getChatContainerEl(): HTMLElement | null;
-  getHeaderTabBarSlotEl(): HTMLElement | null;
-  getBelowHeaderTabBarSlotEl(): HTMLElement | null;
-  getOuterVerticalTabBarSlotEl(): HTMLElement | null;
-  getInputTabBarSlotEl(): HTMLElement | null;
-}
-
-export interface TabRuntimeSession {
-  getSessionIdForTab(tabId: TabId | null): string | null;
-  getTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | null,
-  ): SessionActivityStatus | null;
-}
-
-export interface ConversationTabRuntimeCoordinatorHostDependencies {
-  tabBarState: TabBarMutableState;
-  settings: TabRuntimeSettings;
-  persistence: TabRuntimePersistence;
-  elements: TabRuntimeElements;
-  session: TabRuntimeSession;
-}
-
 export function createConversationTabRuntimeCoordinatorHost(
-  deps: ConversationTabRuntimeCoordinatorHostDependencies,
+  source: ConversationTabRuntimeCoordinatorHostSource,
 ): ConversationTabRuntimeCoordinatorHost {
-  const { tabBarState, settings, persistence, elements, session } = deps;
+  const { tabBarState, settings, plugin, view } = source;
   return {
     getMaxTabs: () => settings.maxTabs,
     getTabManager: () => tabBarState.tabManager,
@@ -123,24 +119,25 @@ export function createConversationTabRuntimeCoordinatorHost(
     setTabBarMountEl: (element) => {
       tabBarState.tabBarMountEl = element;
     },
-    getChatContainerEl: () => elements.getChatContainerEl(),
-    getHeaderTabBarSlotEl: () => elements.getHeaderTabBarSlotEl(),
-    getBelowHeaderTabBarSlotEl: () => elements.getBelowHeaderTabBarSlotEl(),
-    getOuterVerticalTabBarSlotEl: () => elements.getOuterVerticalTabBarSlotEl(),
-    getInputTabBarSlotEl: () => elements.getInputTabBarSlotEl(),
+    getChatContainerEl: () => view.getChatContainerEl(),
+    getHeaderTabBarSlotEl: () => view.getHeaderTabBarSlotEl(),
+    getBelowHeaderTabBarSlotEl: () => view.getBelowHeaderTabBarSlotEl(),
+    getOuterVerticalTabBarSlotEl: () => view.getOuterVerticalTabBarSlotEl(),
+    getInputTabBarSlotEl: () => view.getInputTabBarSlotEl(),
     getTabBarPosition: () => settings.tabBarPosition,
     getBelowHeaderTabBarLayout: () => settings.belowHeaderTabBarLayout,
-    setPersistedTabState: (tabState) => persistence.setPersistedTabState(tabState),
+    setPersistedTabState: (tabState) => { plugin.settings.tabState = tabState; },
     savePersistedTabState: (options = {}) => {
       if (options.flush) {
-        persistence.saveImmediately();
+        void plugin.saveSettingsUiStateImmediately();
         return;
       }
 
-      persistence.scheduleSave();
+      plugin.scheduleSettingsUiStateSave();
     },
-    getSessionIdForTab: (tabId) => session.getSessionIdForTab(tabId),
-    getTabSessionStatus: (tabId, sessionId) => session.getTabSessionStatus(tabId, sessionId),
+    getSessionIdForTab: (tabId) => view.getSessionIdForTab(tabId),
+    getTabSessionStatus: (tabId, sessionId) =>
+      view.getTabSessionStatus(tabId, sessionId),
     getTabContextUsage: (tabId) =>
       tabBarState.tabManager?.getTabContextUsage(tabId) ?? null,
   };
@@ -164,7 +161,7 @@ export interface ConversationTabRuntimeCoordinatorPortDependencies {
 
 export interface ConversationTabRuntimeCoordinatorDependencies<
   Runtime extends ConversationTabRuntimeState = ConversationTabRuntimeState,
-> extends ConversationTabRuntimeCoordinatorHostDependencies,
+> extends ConversationTabRuntimeCoordinatorHostSource,
     ConversationTabRuntimeCoordinatorPortDependencies {
   paneCoordinator: TabMessagesPaneCoordinator<Runtime>;
 }

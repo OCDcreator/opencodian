@@ -8,14 +8,14 @@
 `ConversationTabRuntimeCoordinator` 是 `OpenCodianView` 的 tab pane / runtime lifecycle owner。它不直接读取插件实例，也不渲染消息正文；而是通过 host seam 组合现有 tab 相关 owner：
 
 - `TabMessagesPaneCoordinator`：messages pane DOM、pane runtime state、scroll metrics 与 pane cleanup
-- `ConversationViewStateService`：tab activation 后的 conversation load / empty / streaming 分支
-- `ConversationTabLifecycleRecoveryCoordinator`：close/delete 后的 active-tab recovery
-- `ConversationLoadRecoveryCoordinator`：first-open load、persisted restore 与 fallback conversation 创建
-- `TabRuntimeStateBridge`：stream-like tab badge、background-task badge、attention 状态与 send-button writeback
+- `ConversationViewStateService`：tab activation 後的 conversation load / empty / streaming 分支
+- `ConversationTabLifecycleRecoveryCoordinator`：close/delete 後的 active-tab recovery
+- `ConversationLoadRecoveryCoordinator`：first-open load、persisted restore 與 fallback conversation 創建
+- `TabRuntimeStateBridge`：stream-like tab badge、background-task badge、attention 狀態與 send-button writeback
 
-这样 `OpenCodianView` 只保留 DOM/settings/state host wiring，tab manager、tab bar、active pane、persist/restore 与 stream-like state 的编排不再散落在 view 方法里。host 组装已通过 `createConversationTabRuntimeCoordinatorHost(deps)` 工厂函数集中到此文件；工厂吸收了 `savePersistedTabState` 的 flush/schedule 分派逻辑和 `getTabContextUsage` 的 null-safe tabManager 派生。view 通过 `createConversationTabRuntimeCoordinator(deps)` 顶层工厂一次性获得完整协调器实例——host、ports 和 coordinator 构造全部由此文件负责。`ConversationTabRuntimeCoordinatorHostDependencies` 采用扁平依赖设计：`TabBarMutableState` 替代了原来的 6 个 get/set 回调，port 引用直接传入协调器而非由 view 内联组装。
+host 組裝已通過 `createConversationTabRuntimeCoordinatorHost(source)` 工廠函數集中到此文件。工廠接受 `ConversationTabRuntimeCoordinatorHostSource`（含 `plugin`、`view`、`tabBarState`、`settings`），內部分解 `plugin` 的持久化方法和 `view` 的 DOM 存取器與 session 查詢方法，生成完整的 `ConversationTabRuntimeCoordinatorHost`。view 通過 `createConversationTabRuntimeCoordinator(deps)` 頂層工廠一次性獲得完整協調器實例——只需傳入 `plugin: this.plugin` 和 `view: this` 兩個直接引用，無需在調用點構建嵌套回調子對象。
 
-## 公开接口
+## 公開接口
 
 ```typescript
 export interface TabBarMutableState {
@@ -30,23 +30,32 @@ export interface TabRuntimeSettings {
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
 }
 
-export interface TabRuntimePersistence {
-  setPersistedTabState(tabState: PersistedTabState): void;
-  saveImmediately(): void;
-  scheduleSave(): void;
+export interface TabRuntimePluginSource {
+  settings: TabRuntimeSettings & { tabState: PersistedTabState };
+  saveSettingsUiStateImmediately(): Promise<void>;
+  scheduleSettingsUiStateSave(): void;
 }
 
-export interface TabRuntimeElements {
+export interface TabRuntimeViewSource {
   getChatContainerEl(): HTMLElement | null;
   getHeaderTabBarSlotEl(): HTMLElement | null;
   getBelowHeaderTabBarSlotEl(): HTMLElement | null;
   getOuterVerticalTabBarSlotEl(): HTMLElement | null;
   getInputTabBarSlotEl(): HTMLElement | null;
-}
-
-export interface TabRuntimeSession {
   getSessionIdForTab(tabId: TabId | null): string | null;
   getTabSessionStatus(tabId: TabId | null, sessionId: string | null): SessionActivityStatus | null;
+}
+
+export interface TabRuntimeSettings {
+  maxTabs: number;
+  tabBarPosition: TabBarPosition;
+  belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
+}
+
+export interface TabRuntimePersistence {
+  setPersistedTabState(tabState: PersistedTabState): void;
+  saveImmediately(): void;
+  scheduleSave(): void;
 }
 
 export interface ConversationTabRuntimeCoordinatorHost {
@@ -71,16 +80,15 @@ export interface ConversationTabRuntimeCoordinatorHost {
   getTabContextUsage(tabId: TabId | null): TabContextState | null;
 }
 
-export interface ConversationTabRuntimeCoordinatorHostDependencies {
+export interface ConversationTabRuntimeCoordinatorHostSource {
   tabBarState: TabBarMutableState;
   settings: TabRuntimeSettings;
-  persistence: TabRuntimePersistence;
-  elements: TabRuntimeElements;
-  session: TabRuntimeSession;
+  plugin: TabRuntimePluginSource;
+  view: TabRuntimeViewSource;
 }
 
 export function createConversationTabRuntimeCoordinatorHost(
-  deps: ConversationTabRuntimeCoordinatorHostDependencies,
+  source: ConversationTabRuntimeCoordinatorHostSource,
 ): ConversationTabRuntimeCoordinatorHost;
 
 export interface ConversationTabRuntimeCoordinatorPortDependencies {
@@ -90,7 +98,7 @@ export interface ConversationTabRuntimeCoordinatorPortDependencies {
 }
 
 export interface ConversationTabRuntimeCoordinatorDependencies<Runtime>
-  extends ConversationTabRuntimeCoordinatorHostDependencies,
+  extends ConversationTabRuntimeCoordinatorHostSource,
     ConversationTabRuntimeCoordinatorPortDependencies {
   paneCoordinator: TabMessagesPaneCoordinator<Runtime>;
 }
