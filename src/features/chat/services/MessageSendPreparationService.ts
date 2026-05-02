@@ -170,6 +170,84 @@ export interface MessageSendPreparationHost {
   clearPendingEditedFiles(tabId: TabId | null): void;
 }
 
+export interface MessageSendPreparationHostDependencies {
+  getCurrentConversation: () => Conversation | null;
+  createNewConversation: () => Promise<Conversation | null>;
+  saveConversation: (conversation: Conversation) => Promise<void>;
+  getActiveTabId: () => TabId | null;
+  ensureTabRuntimeState: (tabId: TabId) => unknown;
+  isTabForegroundBusy: (tabId: TabId) => boolean;
+  conversationTabRuntimeCoordinator: {
+    setAutoScrollEnabled(tabId: TabId | null, enabled: boolean): void;
+    setStreaming(tabId: TabId | null, value: boolean): void;
+    clearPendingEditedFiles(tabId: TabId | null): void;
+  };
+  getServerAvailability: () => Promise<SendPreparationServerAvailability>;
+  chatHeaderPresenter: { refreshServerStatusBadge(): Promise<void> };
+  settingsTab: { refreshServerStatusDisplay(): void } | null;
+  getServerMode: () => 'local' | 'remote';
+  openPluginSettingsAtServerSection: () => void;
+  startServer: () => Promise<void>;
+  notifyForegroundBusy: () => void;
+  assistantShellViewHostAdapter: { createAssistantShellContainer(): SendPipelineStreamElements };
+  messageFinalizationService: {
+    getUnavailableServerPromptMessage(availability: 'checking' | 'starting' | 'offline'): string;
+    finalizeAssistantMessageWithServerError(
+      messageEl: HTMLElement,
+      contentEl: HTMLElement,
+      error: unknown,
+    ): Promise<void>;
+    finalizeAssistantMessageWithServerUnavailableError(
+      messageEl: HTMLElement,
+      contentEl: HTMLElement,
+      availability: 'checking' | 'starting' | 'offline',
+    ): Promise<void>;
+  };
+  chatSelectionControlsCoordinator: {
+    hasLoadedModelCatalog(): boolean;
+    formatModelId(model: Partial<SendMessageModelOptions> | null | undefined): string | undefined;
+    ensureSelectedModelAvailable(
+      provider: string | undefined,
+      model: string | undefined,
+    ): Promise<boolean>;
+  };
+  reloadModelCatalog: () => Promise<void>;
+  getSendMessageOptions: () => SendMessageModelOptions;
+  appendModelUnavailableNoticeMessage: () => Promise<void>;
+  openCodeService: {
+    buildStructuredPromptSendPayload(
+      content: string,
+      options: {
+        contextItems: PromptContextItem[];
+        syntheticTextParts?: PromptSyntheticTextPartInput[];
+        invocationParts?: readonly InvocationPromptPart[];
+      },
+    ): BuiltPromptSendPayload;
+    seedCanonicalUserMessage(input: {
+      sessionID: string;
+      messageID: string;
+      parts: PromptRequestPart[];
+      timestamp?: number;
+    }): void;
+  };
+  backgroundTaskHost: {
+    resetBackgroundTaskIndicator(tabId: TabId | null): void;
+    armBackgroundTaskIndicatorForUserMessage(message: ChatMessage, tabId: TabId | null): void;
+  };
+  conversationSyncBridgePorts: { getLoopControl(): { startConversationSyncLoop(): void } };
+  conversationRenderService: { renderMessage(message: ChatMessage): Promise<unknown> };
+  scrollToBottom: (options: { tabId: TabId | null; enableAutoScroll?: boolean }) => void;
+  applyFallbackConversationTitle: (conversationId: string, firstMessage: string) => Promise<void>;
+  getTitleMode: () => string;
+  startAiConversationTitleGeneration: (
+    conversationId: string,
+    firstMessage: string,
+    modelOptions: SendMessageModelOptions,
+  ) => void;
+  activeTabContextUsageCoordinator: { beginTabContextUsageStream(tabId: TabId | null): void };
+  syncTabStreamLikeState: (tabId: TabId | null) => void;
+}
+
 export class MessageSendPreparationService {
   private readonly agentInvocationService = new AgentInvocationService();
 
@@ -439,7 +517,71 @@ export class MessageSendPreparationService {
 }
 
 export function createMessageSendPreparationHost(
-  seam: MessageSendPreparationHost,
+  deps: MessageSendPreparationHostDependencies,
 ): MessageSendPreparationHost {
-  return seam;
+  return {
+    ensureConversationReady: async () => {
+      if (!deps.getCurrentConversation()) {
+        await deps.createNewConversation();
+      }
+
+      return deps.getCurrentConversation();
+    },
+    getActiveTabId: () => deps.getActiveTabId(),
+    ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
+    isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),
+    notifyForegroundBusy: () => deps.notifyForegroundBusy(),
+    getServerAvailability: () => deps.getServerAvailability(),
+    refreshServerStatusBadge: () => deps.chatHeaderPresenter.refreshServerStatusBadge(),
+    refreshSettingsTabStatus: () => deps.settingsTab?.refreshServerStatusDisplay(),
+    getServerMode: () => deps.getServerMode(),
+    createAssistantShellContainer: () => deps.assistantShellViewHostAdapter.createAssistantShellContainer(),
+    getUnavailableServerPromptMessage: (availability) =>
+      deps.messageFinalizationService.getUnavailableServerPromptMessage(availability),
+    finalizeAssistantMessageWithServerError: (messageEl, contentEl, error) =>
+      deps.messageFinalizationService.finalizeAssistantMessageWithServerError(
+        messageEl,
+        contentEl,
+        error,
+      ),
+    finalizeAssistantMessageWithServerUnavailableError: (messageEl, contentEl, availability) =>
+      deps.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(
+        messageEl,
+        contentEl,
+        availability,
+      ),
+    openPluginSettingsAtServerSection: () => deps.openPluginSettingsAtServerSection(),
+    startServer: () => deps.startServer(),
+    hasLoadedModelCatalog: () => deps.chatSelectionControlsCoordinator.hasLoadedModelCatalog(),
+    loadAvailableModels: () => deps.reloadModelCatalog(),
+    getSendMessageOptions: () => deps.getSendMessageOptions(),
+    formatModelId: (model) => deps.chatSelectionControlsCoordinator.formatModelId(model),
+    ensureSelectedModelAvailable: (provider, model) =>
+      deps.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model),
+    appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
+    buildStructuredPromptSendPayload: (content, options) =>
+      deps.openCodeService.buildStructuredPromptSendPayload(content, options),
+    seedCanonicalUserMessage: (input) => deps.openCodeService.seedCanonicalUserMessage(input),
+    resetBackgroundTaskIndicator: (tabId) => deps.backgroundTaskHost.resetBackgroundTaskIndicator(tabId),
+    armBackgroundTaskIndicatorForUserMessage: (message, tabId) =>
+      deps.backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId),
+    startConversationSyncLoop: () =>
+      deps.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
+    saveConversation: (conversation) => deps.saveConversation(conversation),
+    setAutoScrollEnabled: (tabId, enabled) =>
+      deps.conversationTabRuntimeCoordinator.setAutoScrollEnabled(tabId, enabled),
+    renderMessage: (message) => deps.conversationRenderService.renderMessage(message),
+    scrollToBottom: (options) => deps.scrollToBottom(options),
+    applyFallbackConversationTitle: (conversationId, firstMessage) =>
+      deps.applyFallbackConversationTitle(conversationId, firstMessage),
+    shouldGenerateAiTitle: () => deps.getTitleMode() === 'ai',
+    startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) =>
+      deps.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions),
+    setStreaming: (tabId, value) => deps.conversationTabRuntimeCoordinator.setStreaming(tabId, value),
+    syncTabStreamLikeState: (tabId) => deps.syncTabStreamLikeState(tabId),
+    beginTabContextUsageStream: (tabId) =>
+      deps.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId),
+    clearPendingEditedFiles: (tabId) =>
+      deps.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId),
+  };
 }

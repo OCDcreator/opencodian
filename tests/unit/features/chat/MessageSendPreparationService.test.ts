@@ -12,6 +12,7 @@ import {
   buildOptimisticUserMessage,
   createMessageSendPreparationHost,
   type MessageSendPreparationHost,
+  type MessageSendPreparationHostDependencies,
   MessageSendPreparationService,
 } from '../../../../src/features/chat/services/MessageSendPreparationService';
 
@@ -61,6 +62,13 @@ type MockedMessageSendPreparationHost = {
     MessageSendPreparationHost[Key] extends (...args: infer Args) => infer Result
       ? jest.Mock<Result, Args>
       : MessageSendPreparationHost[Key];
+};
+
+type MockedMessageSendPreparationHostDependencies = {
+  [Key in keyof MessageSendPreparationHostDependencies]:
+    MessageSendPreparationHostDependencies[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : MessageSendPreparationHostDependencies[Key];
 };
 
 type MockedComposerSendContextPort = {
@@ -832,107 +840,150 @@ describe('MessageSendPreparationService createServerReadinessDelegate', () => {
 });
 
 describe('createMessageSendPreparationHost', () => {
-  it('returns the seam as the host', () => {
-    const seam: MessageSendPreparationHost = {
-      ensureConversationReady: jest.fn().mockResolvedValue(createConversation()),
+  it('wires flat dependencies into the host', () => {
+    const deps: MockedMessageSendPreparationHostDependencies = {
+      getCurrentConversation: jest.fn().mockReturnValue(createConversation()),
+      createNewConversation: jest.fn().mockResolvedValue(null),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
       getActiveTabId: jest.fn().mockReturnValue('tab-1'),
-      ensureTabRuntime: jest.fn().mockReturnValue(true),
+      ensureTabRuntimeState: jest.fn().mockReturnValue({}),
       isTabForegroundBusy: jest.fn().mockReturnValue(false),
-      notifyForegroundBusy: jest.fn(),
+      conversationTabRuntimeCoordinator: {
+        setAutoScrollEnabled: jest.fn(),
+        setStreaming: jest.fn(),
+        clearPendingEditedFiles: jest.fn(),
+      },
       getServerAvailability: jest.fn().mockResolvedValue('running'),
-      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
-      refreshSettingsTabStatus: jest.fn(),
+      chatHeaderPresenter: { refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined) },
+      settingsTab: { refreshServerStatusDisplay: jest.fn() },
       getServerMode: jest.fn().mockReturnValue('local'),
-      createAssistantShellContainer: jest.fn().mockReturnValue({
-        messageEl: document.createElement('div'),
-        contentEl: document.createElement('div'),
-      }),
-      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
-      finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
-      finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
       openPluginSettingsAtServerSection: jest.fn(),
       startServer: jest.fn().mockResolvedValue(undefined),
-      hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
-      loadAvailableModels: jest.fn().mockResolvedValue(undefined),
+      notifyForegroundBusy: jest.fn(),
+      assistantShellViewHostAdapter: {
+        createAssistantShellContainer: jest.fn().mockReturnValue({
+          messageEl: document.createElement('div'),
+          contentEl: document.createElement('div'),
+        }),
+      },
+      messageFinalizationService: {
+        getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+        finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+        finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+      },
+      chatSelectionControlsCoordinator: {
+        hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
+        formatModelId: jest.fn().mockReturnValue(undefined),
+        ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
+      },
+      reloadModelCatalog: jest.fn().mockResolvedValue(undefined),
       getSendMessageOptions: jest.fn().mockReturnValue({}),
-      formatModelId: jest.fn().mockReturnValue(undefined),
-      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
       appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
-      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
-      seedCanonicalUserMessage: jest.fn(),
-      resetBackgroundTaskIndicator: jest.fn(),
-      armBackgroundTaskIndicatorForUserMessage: jest.fn(),
-      startConversationSyncLoop: jest.fn(),
-      saveConversation: jest.fn().mockResolvedValue(undefined),
-      setAutoScrollEnabled: jest.fn(),
-      renderMessage: jest.fn().mockResolvedValue(undefined),
+      openCodeService: {
+        buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+        seedCanonicalUserMessage: jest.fn(),
+      },
+      backgroundTaskHost: {
+        resetBackgroundTaskIndicator: jest.fn(),
+        armBackgroundTaskIndicatorForUserMessage: jest.fn(),
+      },
+      conversationSyncBridgePorts: {
+        getLoopControl: () => ({
+          startConversationSyncLoop: jest.fn(),
+        }),
+      },
+      conversationRenderService: {
+        renderMessage: jest.fn().mockResolvedValue(undefined),
+      },
       scrollToBottom: jest.fn(),
       applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
-      shouldGenerateAiTitle: jest.fn().mockReturnValue(false),
+      getTitleMode: jest.fn().mockReturnValue('manual'),
       startAiConversationTitleGeneration: jest.fn(),
-      setStreaming: jest.fn(),
+      activeTabContextUsageCoordinator: {
+        beginTabContextUsageStream: jest.fn(),
+      },
       syncTabStreamLikeState: jest.fn(),
-      beginTabContextUsageStream: jest.fn(),
-      clearPendingEditedFiles: jest.fn(),
     };
 
-    const host = createMessageSendPreparationHost(seam);
+    const host = createMessageSendPreparationHost(deps);
 
-    expect(host).toBe(seam);
+    expect(host.getActiveTabId()).toBe('tab-1');
+    expect(deps.getActiveTabId).toHaveBeenCalledTimes(1);
   });
 
   it('produces a host usable by MessageSendPreparationService', async () => {
     const conversation = createConversation();
-    const seam: MessageSendPreparationHost = {
-      ensureConversationReady: jest.fn().mockResolvedValue(conversation),
+    const deps: MockedMessageSendPreparationHostDependencies = {
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      createNewConversation: jest.fn().mockResolvedValue(null),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
       getActiveTabId: jest.fn().mockReturnValue('tab-1'),
-      ensureTabRuntime: jest.fn().mockReturnValue(true),
+      ensureTabRuntimeState: jest.fn().mockReturnValue({}),
       isTabForegroundBusy: jest.fn().mockReturnValue(false),
-      notifyForegroundBusy: jest.fn(),
+      conversationTabRuntimeCoordinator: {
+        setAutoScrollEnabled: jest.fn(),
+        setStreaming: jest.fn(),
+        clearPendingEditedFiles: jest.fn(),
+      },
       getServerAvailability: jest.fn().mockResolvedValue('running'),
-      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
-      refreshSettingsTabStatus: jest.fn(),
+      chatHeaderPresenter: { refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined) },
+      settingsTab: { refreshServerStatusDisplay: jest.fn() },
       getServerMode: jest.fn().mockReturnValue('local'),
-      createAssistantShellContainer: jest.fn().mockReturnValue({
-        messageEl: document.createElement('div'),
-        contentEl: document.createElement('div'),
-      }),
-      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
-      finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
-      finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
       openPluginSettingsAtServerSection: jest.fn(),
       startServer: jest.fn().mockResolvedValue(undefined),
-      hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
-      loadAvailableModels: jest.fn().mockResolvedValue(undefined),
+      notifyForegroundBusy: jest.fn(),
+      assistantShellViewHostAdapter: {
+        createAssistantShellContainer: jest.fn().mockReturnValue({
+          messageEl: document.createElement('div'),
+          contentEl: document.createElement('div'),
+        }),
+      },
+      messageFinalizationService: {
+        getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+        finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+        finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+      },
+      chatSelectionControlsCoordinator: {
+        hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
+        formatModelId: jest.fn().mockReturnValue('openai/gpt-5.4'),
+        ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
+      },
+      reloadModelCatalog: jest.fn().mockResolvedValue(undefined),
       getSendMessageOptions: jest.fn().mockReturnValue({ provider: 'openai', model: 'gpt-5.4' }),
-      formatModelId: jest.fn().mockReturnValue('openai/gpt-5.4'),
-      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
       appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
-      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
-      seedCanonicalUserMessage: jest.fn(),
-      resetBackgroundTaskIndicator: jest.fn(),
-      armBackgroundTaskIndicatorForUserMessage: jest.fn(),
-      startConversationSyncLoop: jest.fn(),
-      saveConversation: jest.fn().mockResolvedValue(undefined),
-      setAutoScrollEnabled: jest.fn(),
-      renderMessage: jest.fn().mockResolvedValue(undefined),
+      openCodeService: {
+        buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+        seedCanonicalUserMessage: jest.fn(),
+      },
+      backgroundTaskHost: {
+        resetBackgroundTaskIndicator: jest.fn(),
+        armBackgroundTaskIndicatorForUserMessage: jest.fn(),
+      },
+      conversationSyncBridgePorts: {
+        getLoopControl: () => ({
+          startConversationSyncLoop: jest.fn(),
+        }),
+      },
+      conversationRenderService: {
+        renderMessage: jest.fn().mockResolvedValue(undefined),
+      },
       scrollToBottom: jest.fn(),
       applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
-      shouldGenerateAiTitle: jest.fn().mockReturnValue(false),
+      getTitleMode: jest.fn().mockReturnValue('manual'),
       startAiConversationTitleGeneration: jest.fn(),
-      setStreaming: jest.fn(),
+      activeTabContextUsageCoordinator: {
+        beginTabContextUsageStream: jest.fn(),
+      },
       syncTabStreamLikeState: jest.fn(),
-      beginTabContextUsageStream: jest.fn(),
-      clearPendingEditedFiles: jest.fn(),
     };
 
-    const host = createMessageSendPreparationHost(seam);
+    const host = createMessageSendPreparationHost(deps);
     const service = new MessageSendPreparationService(host, createComposerSendContext());
 
     const result = await service.prepareMessageSend({ content: 'hello' });
 
     expect(result).not.toBeNull();
-    expect(seam.ensureConversationReady).toHaveBeenCalled();
-    expect(seam.hasLoadedModelCatalog).toHaveBeenCalled();
+    expect(deps.getCurrentConversation).toHaveBeenCalled();
+    expect(deps.chatSelectionControlsCoordinator.hasLoadedModelCatalog).toHaveBeenCalled();
   });
 });

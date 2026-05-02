@@ -252,7 +252,6 @@ import {
 import {
   type ComposerInputSubmission,
   createMessageSendPreparationHost,
-  type MessageSendPreparationHost,
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
 import {
@@ -1600,7 +1599,46 @@ export class OpenCodianView extends ItemView {
     conversationRenderService: ConversationRenderService,
   ): OpenCodianViewInteractionRuntimeWiring {
     const messageSendPreparationService = new MessageSendPreparationService(
-      createMessageSendPreparationHost(this.createMessageSendPreparationSeam(conversationRenderService)),
+      createMessageSendPreparationHost({
+        getCurrentConversation: () => this.currentConversation,
+        createNewConversation: async () => {
+          await this.createNewConversation();
+          return this.currentConversation;
+        },
+        saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+        getActiveTabId: () => this.getActiveTabId(),
+        ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
+        isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
+        conversationTabRuntimeCoordinator: this.conversationTabRuntimeCoordinator,
+        getServerAvailability: () => this.getServerAvailability(),
+        chatHeaderPresenter: this.chatHeaderPresenter,
+        settingsTab: this.plugin.settingsTab ?? null,
+        getServerMode: () => this.plugin.settings.server.mode,
+        openPluginSettingsAtServerSection: () => this.openPluginSettingsAtServerSection(),
+        startServer: () => this.plugin.openCodeService.start(),
+        notifyForegroundBusy: () => {
+          new Notice(t('chat.tab.processingBlocked'));
+        },
+        assistantShellViewHostAdapter: this.assistantShellViewHostAdapter,
+        messageFinalizationService: this.messageFinalizationService,
+        chatSelectionControlsCoordinator: this.chatSelectionControlsCoordinator,
+        reloadModelCatalog: () => this.reloadModelCatalog(),
+        getSendMessageOptions: () => this.getSendMessageOptions(),
+        appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
+        openCodeService: this.plugin.openCodeService,
+        backgroundTaskHost: this.backgroundTaskHost,
+        conversationSyncBridgePorts,
+        conversationRenderService,
+        scrollToBottom: (options) => this.scrollToBottom(options),
+        applyFallbackConversationTitle: (conversationId, firstMessage) =>
+          this.applyFallbackConversationTitle(conversationId, firstMessage),
+        getTitleMode: () => this.plugin.settings.titleMode,
+        startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
+          void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
+        },
+        activeTabContextUsageCoordinator: this.activeTabContextUsageCoordinator,
+        syncTabStreamLikeState: (tabId) => this.syncTabStreamLikeState(tabId),
+      }),
       this.composerContextViewFacade.sendContext,
     );
     const messageFinalizationService = new MessageFinalizationService(
@@ -1631,7 +1669,7 @@ export class OpenCodianView extends ItemView {
       },
     );
     const slashCommandExecutionService = new SlashCommandExecutionService(
-      this.createSlashCommandExecutionHost(conversationSyncBridgePorts),
+      this.createSlashCommandExecutionHost(conversationSyncBridgePorts, messageSendPreparationService),
     );
     const sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
@@ -2440,88 +2478,9 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createMessageSendPreparationSeam(
-    conversationRenderService: ConversationRenderService,
-  ): MessageSendPreparationHost {
-    return {
-      ensureConversationReady: async () => {
-        if (!this.currentConversation) {
-          await this.createNewConversation();
-        }
-
-        return this.currentConversation;
-      },
-      getActiveTabId: () => this.getActiveTabId(),
-      ensureTabRuntime: (tabId) => Boolean(this.ensureTabRuntimeState(tabId)),
-      isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
-      notifyForegroundBusy: () => {
-        new Notice(t('chat.tab.processingBlocked'));
-      },
-      getServerAvailability: () => this.getServerAvailability(),
-      refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      refreshSettingsTabStatus: () => this.plugin.settingsTab?.refreshServerStatusDisplay(),
-      getServerMode: () => this.plugin.settings.server.mode,
-      createAssistantShellContainer: () => this.assistantShellViewHostAdapter.createAssistantShellContainer(),
-      getUnavailableServerPromptMessage: (availability) =>
-        this.messageFinalizationService.getUnavailableServerPromptMessage(availability),
-      finalizeAssistantMessageWithServerError: (messageEl, contentEl, error) =>
-        this.messageFinalizationService.finalizeAssistantMessageWithServerError(messageEl, contentEl, error),
-      finalizeAssistantMessageWithServerUnavailableError: (messageEl, contentEl, availability) =>
-        this.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(messageEl, contentEl, availability),
-      openPluginSettingsAtServerSection: () => this.openPluginSettingsAtServerSection(),
-      startServer: () => this.plugin.openCodeService.start(),
-      hasLoadedModelCatalog: () => this.chatSelectionControlsCoordinator.hasLoadedModelCatalog(),
-      loadAvailableModels: () => this.reloadModelCatalog(),
-      getSendMessageOptions: () => this.getSendMessageOptions(),
-      formatModelId: (model) => this.chatSelectionControlsCoordinator.formatModelId(model),
-      ensureSelectedModelAvailable: (provider, model) =>
-        this.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model),
-      appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
-      buildStructuredPromptSendPayload: (content, options) =>
-        this.plugin.openCodeService.buildStructuredPromptSendPayload(content, options),
-      seedCanonicalUserMessage: (input) => {
-        this.plugin.openCodeService.seedCanonicalUserMessage(input);
-      },
-      resetBackgroundTaskIndicator: (tabId) => {
-        this.backgroundTaskHost.resetBackgroundTaskIndicator(tabId);
-      },
-      armBackgroundTaskIndicatorForUserMessage: (message, tabId) => {
-        this.backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId);
-      },
-      startConversationSyncLoop: () => {
-        this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
-      },
-      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
-      setAutoScrollEnabled: (tabId, enabled) => {
-        this.conversationTabRuntimeCoordinator.setAutoScrollEnabled(tabId, enabled);
-      },
-      renderMessage: (message) => conversationRenderService.renderMessage(message),
-      scrollToBottom: (options) => {
-        this.scrollToBottom(options);
-      },
-      applyFallbackConversationTitle: (conversationId, firstMessage) =>
-        this.applyFallbackConversationTitle(conversationId, firstMessage),
-      shouldGenerateAiTitle: () => this.plugin.settings.titleMode === 'ai',
-      startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
-        void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
-      },
-      setStreaming: (tabId, value) => {
-        this.conversationTabRuntimeCoordinator.setStreaming(tabId, value);
-      },
-      syncTabStreamLikeState: (tabId) => {
-        this.syncTabStreamLikeState(tabId);
-      },
-      beginTabContextUsageStream: (tabId) => {
-        this.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId);
-      },
-      clearPendingEditedFiles: (tabId) => {
-        this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId);
-      },
-    };
-  }
-
   private createSlashCommandExecutionHost(
     conversationSyncBridgePorts: ConversationSyncBridgePorts,
+    messageSendPreparationService: MessageSendPreparationService,
   ): SlashCommandExecutionHost {
     return {
       ensureConversationReady: async () => {
@@ -2539,7 +2498,7 @@ export class OpenCodianView extends ItemView {
       },
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      ...this.messageSendPreparationService.createServerReadinessDelegate(),
+      ...messageSendPreparationService.createServerReadinessDelegate(),
       getProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
       getRuntimeCommands: async () => {
         const runtimeCommands = await this.plugin.openCodeService.sdk.command.list();

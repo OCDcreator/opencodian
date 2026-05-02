@@ -34,8 +34,10 @@ export class MessageSendPreparationService {
   completePreparedStreamStart(tabId: TabId | null): void;
 }
 
+export interface MessageSendPreparationHostDependencies { /* flat view deps */ }
+
 export function createMessageSendPreparationHost(
-  seam: MessageSendPreparationHost,
+  deps: MessageSendPreparationHostDependencies,
 ): MessageSendPreparationHost;
 ```
 
@@ -100,4 +102,4 @@ export function createMessageSendPreparationHost(
 - 用户选择"跳过"或"设置"后，重新检查服务器状态，若已就绪则移除 card 继续，否则通过 `MessageFinalizationService` 显示不可用错误
 - `refreshStatusSurfaces()` 统一刷新 badge 和 settings tab 的服务器状态显示
 
-`OpenCodianView` 不再拥有 `ensureServerReadyForChat` 或 `refreshStatusSurfaces`；这些职责通过 host 接口原语（`createAssistantShellContainer`、`getUnavailableServerPromptMessage`、`finalizeAssistantMessageWithServerError` 等）委托回 view。`SlashCommandExecutionService` 通过 `createServerReadinessDelegate()` 获取服务器就绪回调，直接 spread 到 host adapter 中，不再在 OpenCodianView 中出现 `ensureServerReadyForChat`。
+`OpenCodianView` 不再拥有 `ensureServerReadyForChat`、`refreshStatusSurfaces` 或 `createMessageSendPreparationSeam`；这些职责通过 host 接口原语委托回 view。`createMessageSendPreparationHost()` 工厂函数现在接收扁平的 `MessageSendPreparationHostDependencies`（原始 service 引用和简单 lambda），而非预组装的 host 回调——实际的回调装配逻辑由工厂完成，view 只提供原始依赖。`SlashCommandExecutionService` 通过 `createServerReadinessDelegate()` 获取服务器就绪回调，直接 spread 到 host adapter 中。
