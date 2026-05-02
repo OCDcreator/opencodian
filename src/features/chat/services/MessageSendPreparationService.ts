@@ -437,3 +437,9 @@ export class MessageSendPreparationService {
     };
   }
 }
+
+export function createMessageSendPreparationHost(
+  seam: MessageSendPreparationHost,
+): MessageSendPreparationHost {
+  return seam;
+}

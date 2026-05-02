@@ -332,7 +332,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`；A2 之后 prompt submission 还会把 `syntheticTextParts` 与显式 `invocationIntent` 一并透传
 2. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
 3. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
-4. `createMessageSendPreparationHost()` 会把 `openCodeService.buildStructuredPromptSendPayload()` 与 `seedCanonicalUserMessage()` 接进准备阶段，先把 stable `messageID + parts[]` 写到 canonical session graph
+4. `createMessageSendPreparationHost()` 会把 `openCodeService.buildStructuredPromptSendPayload()` 与 `seedCanonicalUserMessage()` 接进准备阶段，先把 stable `messageID + parts[]` 写到 canonical session graph（host assembly 现在由 `MessageSendPreparationService` 文件内的 `createMessageSendPreparationHost()` 工厂函数完成）
 5. `MessageSendPreparationService` 再把 optimistic user message 落到本地 conversation，并保持 save / render / scroll 时序
 6. 首条 user message 时，仍先写 fallback title，再按设置异步触发 AI title generation
 7. `SendPipelineRuntime` 调用 `openCodeService.sendMessage()`，创建 streaming shell 与 `StreamController`

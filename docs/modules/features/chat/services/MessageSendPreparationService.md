@@ -33,6 +33,10 @@ export class MessageSendPreparationService {
   enterStreamingState(tabId: TabId | null): void;
   completePreparedStreamStart(tabId: TabId | null): void;
 }
+
+export function createMessageSendPreparationHost(
+  seam: MessageSendPreparationHost,
+): MessageSendPreparationHost;
 ```
 
 ## 关键行为

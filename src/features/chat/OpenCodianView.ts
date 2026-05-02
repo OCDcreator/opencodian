@@ -251,6 +251,7 @@ import {
 } from './services/MessageFinalizationService';
 import {
   type ComposerInputSubmission,
+  createMessageSendPreparationHost,
   type MessageSendPreparationHost,
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
@@ -1599,7 +1600,7 @@ export class OpenCodianView extends ItemView {
     conversationRenderService: ConversationRenderService,
   ): OpenCodianViewInteractionRuntimeWiring {
     const messageSendPreparationService = new MessageSendPreparationService(
-      this.createMessageSendPreparationHost(conversationRenderService),
+      createMessageSendPreparationHost(this.createMessageSendPreparationSeam(conversationRenderService)),
       this.composerContextViewFacade.sendContext,
     );
     const messageFinalizationService = new MessageFinalizationService(
@@ -2439,7 +2440,7 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createMessageSendPreparationHost(
+  private createMessageSendPreparationSeam(
     conversationRenderService: ConversationRenderService,
   ): MessageSendPreparationHost {
     return {

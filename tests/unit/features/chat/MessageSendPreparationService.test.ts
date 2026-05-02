@@ -10,6 +10,7 @@ import type {
 import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
 import {
   buildOptimisticUserMessage,
+  createMessageSendPreparationHost,
   type MessageSendPreparationHost,
   MessageSendPreparationService,
 } from '../../../../src/features/chat/services/MessageSendPreparationService';
@@ -827,5 +828,111 @@ describe('MessageSendPreparationService createServerReadinessDelegate', () => {
 
     expect(result).toBe(true);
     expect(spy).toHaveBeenCalledWith('offline');
+  });
+});
+
+describe('createMessageSendPreparationHost', () => {
+  it('returns the seam as the host', () => {
+    const seam: MessageSendPreparationHost = {
+      ensureConversationReady: jest.fn().mockResolvedValue(createConversation()),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      ensureTabRuntime: jest.fn().mockReturnValue(true),
+      isTabForegroundBusy: jest.fn().mockReturnValue(false),
+      notifyForegroundBusy: jest.fn(),
+      getServerAvailability: jest.fn().mockResolvedValue('running'),
+      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
+      refreshSettingsTabStatus: jest.fn(),
+      getServerMode: jest.fn().mockReturnValue('local'),
+      createAssistantShellContainer: jest.fn().mockReturnValue({
+        messageEl: document.createElement('div'),
+        contentEl: document.createElement('div'),
+      }),
+      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+      finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+      finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+      openPluginSettingsAtServerSection: jest.fn(),
+      startServer: jest.fn().mockResolvedValue(undefined),
+      hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
+      loadAvailableModels: jest.fn().mockResolvedValue(undefined),
+      getSendMessageOptions: jest.fn().mockReturnValue({}),
+      formatModelId: jest.fn().mockReturnValue(undefined),
+      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
+      appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
+      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+      seedCanonicalUserMessage: jest.fn(),
+      resetBackgroundTaskIndicator: jest.fn(),
+      armBackgroundTaskIndicatorForUserMessage: jest.fn(),
+      startConversationSyncLoop: jest.fn(),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      setAutoScrollEnabled: jest.fn(),
+      renderMessage: jest.fn().mockResolvedValue(undefined),
+      scrollToBottom: jest.fn(),
+      applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
+      shouldGenerateAiTitle: jest.fn().mockReturnValue(false),
+      startAiConversationTitleGeneration: jest.fn(),
+      setStreaming: jest.fn(),
+      syncTabStreamLikeState: jest.fn(),
+      beginTabContextUsageStream: jest.fn(),
+      clearPendingEditedFiles: jest.fn(),
+    };
+
+    const host = createMessageSendPreparationHost(seam);
+
+    expect(host).toBe(seam);
+  });
+
+  it('produces a host usable by MessageSendPreparationService', async () => {
+    const conversation = createConversation();
+    const seam: MessageSendPreparationHost = {
+      ensureConversationReady: jest.fn().mockResolvedValue(conversation),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      ensureTabRuntime: jest.fn().mockReturnValue(true),
+      isTabForegroundBusy: jest.fn().mockReturnValue(false),
+      notifyForegroundBusy: jest.fn(),
+      getServerAvailability: jest.fn().mockResolvedValue('running'),
+      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
+      refreshSettingsTabStatus: jest.fn(),
+      getServerMode: jest.fn().mockReturnValue('local'),
+      createAssistantShellContainer: jest.fn().mockReturnValue({
+        messageEl: document.createElement('div'),
+        contentEl: document.createElement('div'),
+      }),
+      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+      finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+      finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+      openPluginSettingsAtServerSection: jest.fn(),
+      startServer: jest.fn().mockResolvedValue(undefined),
+      hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
+      loadAvailableModels: jest.fn().mockResolvedValue(undefined),
+      getSendMessageOptions: jest.fn().mockReturnValue({ provider: 'openai', model: 'gpt-5.4' }),
+      formatModelId: jest.fn().mockReturnValue('openai/gpt-5.4'),
+      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
+      appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
+      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+      seedCanonicalUserMessage: jest.fn(),
+      resetBackgroundTaskIndicator: jest.fn(),
+      armBackgroundTaskIndicatorForUserMessage: jest.fn(),
+      startConversationSyncLoop: jest.fn(),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      setAutoScrollEnabled: jest.fn(),
+      renderMessage: jest.fn().mockResolvedValue(undefined),
+      scrollToBottom: jest.fn(),
+      applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
+      shouldGenerateAiTitle: jest.fn().mockReturnValue(false),
+      startAiConversationTitleGeneration: jest.fn(),
+      setStreaming: jest.fn(),
+      syncTabStreamLikeState: jest.fn(),
+      beginTabContextUsageStream: jest.fn(),
+      clearPendingEditedFiles: jest.fn(),
+    };
+
+    const host = createMessageSendPreparationHost(seam);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'hello' });
+
+    expect(result).not.toBeNull();
+    expect(seam.ensureConversationReady).toHaveBeenCalled();
+    expect(seam.hasLoadedModelCatalog).toHaveBeenCalled();
   });
 });
