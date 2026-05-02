@@ -4,9 +4,14 @@ import type {
 } from '../../../../src/core/types';
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
 import {
+  createSlashCommandExecutionHost,
   type SlashCommandExecutionHost,
   SlashCommandExecutionService,
 } from '../../../../src/features/chat/services/SlashCommandExecutionService';
+
+type SlashCommandExecutionHostDependencies = Parameters<
+  typeof createSlashCommandExecutionHost
+>[0];
 
 function createConversation(overrides: Partial<Conversation> = {}): Conversation {
   return {
@@ -58,6 +63,75 @@ function createHost(
     }),
     startConversationSyncLoop: jest.fn(),
     syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
+    notifySlashCommandFailed: jest.fn(),
+    ...overrides,
+  };
+}
+
+type MockedSlashCommandExecutionHostDependencies = {
+  [Key in keyof SlashCommandExecutionHostDependencies]:
+    SlashCommandExecutionHostDependencies[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : SlashCommandExecutionHostDependencies[Key] extends null
+        ? null
+        : SlashCommandExecutionHostDependencies[Key] extends object
+          ? MockedObject<SlashCommandExecutionHostDependencies[Key]>
+          : SlashCommandExecutionHostDependencies[Key];
+};
+
+type MockedObject<T> = {
+  [Key in keyof T]: T[Key] extends (...args: infer Args) => infer Result
+    ? jest.Mock<Result, Args>
+    : T[Key] extends object | null
+      ? T[Key]
+      : T[Key];
+};
+
+function createDependencies(
+  overrides: Partial<MockedSlashCommandExecutionHostDependencies> = {},
+): MockedSlashCommandExecutionHostDependencies {
+  return {
+    getCurrentConversation: jest.fn().mockReturnValue(createConversation()),
+    createNewConversation: jest.fn().mockResolvedValue(undefined),
+    getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+    ensureTabRuntimeState: jest.fn().mockReturnValue({ id: 'tab-1' }),
+    isTabForegroundBusy: jest.fn().mockReturnValue(false),
+    notifyForegroundBusy: jest.fn(),
+    getServerAvailability: jest.fn().mockResolvedValue('running'),
+    chatHeaderPresenter: {
+      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
+    },
+    ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
+    opencodeConfigManager: {
+      getCommandConfig: jest.fn().mockResolvedValue({}),
+    },
+    getSlashCommandSkillMode: jest.fn().mockReturnValue('direct'),
+    openCodeServiceSdk: {
+      command: {
+        list: jest.fn().mockResolvedValue([]),
+      },
+      app: {
+        skills: jest.fn().mockResolvedValue([]),
+      },
+    },
+    openCodeService: {
+      runSessionCommand: jest.fn().mockResolvedValue(undefined),
+    },
+    getVaultPath: jest.fn().mockReturnValue('/vault'),
+    composerContextViewFacade: {
+      refreshActiveFocusContextPreview: jest.fn(),
+    },
+    getTabRuntimeState: jest.fn().mockReturnValue({
+      focusContextPreview: null,
+    }),
+    conversationSyncBridgePorts: {
+      getLoopControl: jest.fn().mockReturnValue({
+        startConversationSyncLoop: jest.fn(),
+      }),
+      getVisibleSyncFollowUp: jest.fn().mockReturnValue({
+        syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
+      }),
+    },
     notifySlashCommandFailed: jest.fn(),
     ...overrides,
   };
@@ -275,5 +349,46 @@ describe('SlashCommandExecutionService', () => {
 
     expect(host.notifyForegroundBusy).toHaveBeenCalledTimes(1);
     expect(host.runSessionCommand).not.toHaveBeenCalled();
+  });
+
+  it('creates a host that delegates simple callbacks to the flat dependency object', async () => {
+    const deps = createDependencies();
+    const host = createSlashCommandExecutionHost(deps);
+
+    expect(host.getActiveTabId()).toBe('tab-1');
+    expect(deps.getActiveTabId).toHaveBeenCalledTimes(1);
+
+    await expect(host.getServerAvailability()).resolves.toBe('running');
+    expect(deps.getServerAvailability).toHaveBeenCalledTimes(1);
+
+    await expect(host.refreshServerStatusBadge()).resolves.toBeUndefined();
+    expect(deps.chatHeaderPresenter.refreshServerStatusBadge).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a host that initializes a conversation when none exists yet', async () => {
+    const createdConversation = createConversation({ id: 'conversation-2' });
+    let currentConversation: Conversation | null = null;
+    const deps = createDependencies({
+      getCurrentConversation: jest.fn().mockImplementation(() => currentConversation),
+      createNewConversation: jest.fn().mockImplementation(async () => {
+        currentConversation = createdConversation;
+      }),
+    });
+    const host = createSlashCommandExecutionHost(deps);
+
+    await expect(host.ensureConversationReady()).resolves.toBe(createdConversation);
+
+    expect(deps.createNewConversation).toHaveBeenCalledTimes(1);
+    expect(deps.getCurrentConversation).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates a host that forwards slash command failures to the dependency notifier', () => {
+    const deps = createDependencies();
+    const host = createSlashCommandExecutionHost(deps);
+    const error = new Error('boom');
+
+    host.notifySlashCommandFailed('build', error);
+
+    expect(deps.notifySlashCommandFailed).toHaveBeenCalledWith('build', error);
   });
 });

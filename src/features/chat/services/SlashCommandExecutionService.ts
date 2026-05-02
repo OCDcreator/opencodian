@@ -49,6 +49,39 @@ export interface SlashCommandExecutionHost {
   notifySlashCommandFailed(commandId: string, error: unknown): void;
 }
 
+export interface SlashCommandExecutionHostDependencies {
+  getCurrentConversation: () => Conversation | null;
+  createNewConversation: () => Promise<void>;
+  getActiveTabId: () => TabId | null;
+  ensureTabRuntimeState: (tabId: TabId) => unknown;
+  isTabForegroundBusy: (tabId: TabId) => boolean;
+  notifyForegroundBusy: () => void;
+  getServerAvailability: () => Promise<SlashCommandServerAvailability>;
+  chatHeaderPresenter: { refreshServerStatusBadge(): Promise<void> };
+  ensureServerReadyForChat: (
+    availability: Exclude<SlashCommandServerAvailability, 'running' | 'external'>,
+  ) => Promise<boolean>;
+  opencodeConfigManager: { getCommandConfig(): Promise<OpencodeCommandConfigRecord> } | null;
+  getSlashCommandSkillMode: () => SlashCommandSkillMode;
+  openCodeServiceSdk: {
+    command: { list(): Promise<unknown> };
+    app: { skills(): Promise<unknown> };
+  };
+  openCodeService: {
+    runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<unknown>;
+  };
+  getVaultPath: () => string | null;
+  composerContextViewFacade: { refreshActiveFocusContextPreview(): void };
+  getTabRuntimeState: (
+    tabId: TabId | null,
+  ) => { focusContextPreview?: FocusContextPreview | null } | null;
+  conversationSyncBridgePorts: {
+    getLoopControl(): { startConversationSyncLoop(): void };
+    getVisibleSyncFollowUp(): { syncVisibleConversationInBackground(): Promise<void> };
+  };
+  notifySlashCommandFailed: (commandId: string, error: unknown) => void;
+}
+
 interface ParsedSlashCommandInput {
   arguments: string;
   command: string;
@@ -281,4 +314,48 @@ export class SlashCommandExecutionService {
 
     return focusPreview.textSnapshot ?? '';
   }
+}
+
+export function createSlashCommandExecutionHost(
+  deps: SlashCommandExecutionHostDependencies,
+): SlashCommandExecutionHost {
+  return {
+    ensureConversationReady: async () => {
+      if (!deps.getCurrentConversation()) {
+        await deps.createNewConversation();
+      }
+
+      return deps.getCurrentConversation();
+    },
+    getActiveTabId: () => deps.getActiveTabId(),
+    ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
+    isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),
+    notifyForegroundBusy: () => deps.notifyForegroundBusy(),
+    getServerAvailability: () => deps.getServerAvailability(),
+    refreshServerStatusBadge: () => deps.chatHeaderPresenter.refreshServerStatusBadge(),
+    ensureServerReadyForChat: (availability) => deps.ensureServerReadyForChat(availability),
+    getProjectCommands: async () => deps.opencodeConfigManager?.getCommandConfig() ?? {},
+    getRuntimeCommands: async () => {
+      const runtimeCommands = await deps.openCodeServiceSdk.command.list();
+      return Array.isArray(runtimeCommands) ? runtimeCommands : [];
+    },
+    getRuntimeSkills: async () => {
+      const runtimeSkills = await deps.openCodeServiceSdk.app.skills();
+      return Array.isArray(runtimeSkills) ? runtimeSkills : [];
+    },
+    getSlashCommandSkillMode: () => deps.getSlashCommandSkillMode(),
+    getVaultPath: () => deps.getVaultPath(),
+    refreshActiveFocusContextPreview: () =>
+      deps.composerContextViewFacade.refreshActiveFocusContextPreview(),
+    getActiveFocusContextPreview: () =>
+      deps.getTabRuntimeState(deps.getActiveTabId())?.focusContextPreview ?? null,
+    runSessionCommand: (sessionId, input) =>
+      deps.openCodeService.runSessionCommand(sessionId, input),
+    startConversationSyncLoop: () =>
+      deps.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
+    syncVisibleConversationInBackground: () =>
+      deps.conversationSyncBridgePorts.getVisibleSyncFollowUp().syncVisibleConversationInBackground(),
+    notifySlashCommandFailed: (commandId, error) =>
+      deps.notifySlashCommandFailed(commandId, error),
+  };
 }

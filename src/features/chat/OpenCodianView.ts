@@ -278,7 +278,7 @@ import {
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
 import {
-  type SlashCommandExecutionHost,
+  createSlashCommandExecutionHost,
   SlashCommandExecutionService,
 } from './services/SlashCommandExecutionService';
 import { SlashCommandMenuCatalogCache } from './services/SlashCommandMenuCatalogCache';
@@ -1669,7 +1669,37 @@ export class OpenCodianView extends ItemView {
       },
     );
     const slashCommandExecutionService = new SlashCommandExecutionService(
-      this.createSlashCommandExecutionHost(conversationSyncBridgePorts, messageSendPreparationService),
+      createSlashCommandExecutionHost({
+        getCurrentConversation: () => this.currentConversation,
+        createNewConversation: async () => {
+          await this.createNewConversation();
+        },
+        getActiveTabId: () => this.getActiveTabId(),
+        ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
+        isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
+        notifyForegroundBusy: () => {
+          new Notice(t('chat.tab.processingBlocked'));
+        },
+        getServerAvailability: () => this.getServerAvailability(),
+        chatHeaderPresenter: this.chatHeaderPresenter,
+        ensureServerReadyForChat: (availability) =>
+          messageSendPreparationService.ensureServerReadyForChat(availability),
+        opencodeConfigManager: this.plugin.opencodeConfigManager,
+        getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
+        openCodeServiceSdk: this.plugin.openCodeService.sdk,
+        openCodeService: this.plugin.openCodeService,
+        getVaultPath: () => getVaultBasePath(this.app),
+        composerContextViewFacade: this.composerContextViewFacade,
+        getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+        conversationSyncBridgePorts,
+        notifySlashCommandFailed: (commandId, error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          new Notice(t('chat.slashCommand.executionFailed', {
+            command: commandId,
+            message,
+          }));
+        },
+      }),
     );
     const sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
@@ -2475,60 +2505,6 @@ export class OpenCodianView extends ItemView {
       updateConversationSyncRuntime: (tabId, update) =>
         this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, update),
       scrollToBottom: (options) => this.scrollToBottom(options),
-    };
-  }
-
-  private createSlashCommandExecutionHost(
-    conversationSyncBridgePorts: ConversationSyncBridgePorts,
-    messageSendPreparationService: MessageSendPreparationService,
-  ): SlashCommandExecutionHost {
-    return {
-      ensureConversationReady: async () => {
-        if (!this.currentConversation) {
-          await this.createNewConversation();
-        }
-
-        return this.currentConversation;
-      },
-      getActiveTabId: () => this.getActiveTabId(),
-      ensureTabRuntime: (tabId) => Boolean(this.ensureTabRuntimeState(tabId)),
-      isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
-      notifyForegroundBusy: () => {
-        new Notice(t('chat.tab.processingBlocked'));
-      },
-      getServerAvailability: () => this.getServerAvailability(),
-      refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      ...messageSendPreparationService.createServerReadinessDelegate(),
-      getProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
-      getRuntimeCommands: async () => {
-        const runtimeCommands = await this.plugin.openCodeService.sdk.command.list();
-        return Array.isArray(runtimeCommands) ? runtimeCommands : [];
-      },
-      getRuntimeSkills: async () => {
-        const runtimeSkills = await this.plugin.openCodeService.sdk.app.skills();
-        return Array.isArray(runtimeSkills) ? runtimeSkills : [];
-      },
-      getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
-      getVaultPath: () => getVaultBasePath(this.app),
-      refreshActiveFocusContextPreview: () => {
-        this.composerContextViewFacade.refreshActiveFocusContextPreview();
-      },
-      getActiveFocusContextPreview: () =>
-        this.getTabRuntimeState(this.getActiveTabId())?.focusContextPreview ?? null,
-      runSessionCommand: (sessionId, input) =>
-        this.plugin.openCodeService.runSessionCommand(sessionId, input),
-      startConversationSyncLoop: () => {
-        conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
-      },
-      syncVisibleConversationInBackground: () =>
-        conversationSyncBridgePorts.getVisibleSyncFollowUp().syncVisibleConversationInBackground(),
-      notifySlashCommandFailed: (commandId, error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        new Notice(t('chat.slashCommand.executionFailed', {
-          command: commandId,
-          message,
-        }));
-      },
     };
   }
 

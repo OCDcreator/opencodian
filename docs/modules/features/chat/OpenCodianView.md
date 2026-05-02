@@ -362,7 +362,8 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 第七阶段后，这条链路的边界变成：
 
 - send preflight / optimistic bootstrap / stream-enter state 切换，已迁到 `services/MessageSendPreparationService.ts`
-- server readiness action card 提示流程（`ensureServerReadyForChat` / `refreshStatusSurfaces`），已迁到 `services/MessageSendPreparationService.ts`；view 通过 host 原语（`createAssistantShellContainer`、`getUnavailableServerPromptMessage`、`finalizeAssistantMessageWithServerError` 等）提供 DOM 与服务访问；`SlashCommandExecutionHost` 通过 `createServerReadinessDelegate()` 获取回调，直接 spread 到 host adapter 中
+- server readiness action card 提示流程（`ensureServerReadyForChat` / `refreshStatusSurfaces`），已迁到 `services/MessageSendPreparationService.ts`；view 通过 host 原语提供 DOM 与服务访问
+- slash command execution host 装配，已迁到 `services/SlashCommandExecutionService.ts`；`createSlashCommandExecutionHost()` 工厂函数接收 `SlashCommandExecutionHostDependencies` 扁平依赖，view 只传递原始 service 引用和简单 lambda
 - stream loop、pending/timeout/interruption 已迁到 `runtime/StreamChunkRouter.ts`
 - 本地 streaming shell/notice 渲染、第一次本地保存已迁到 `runtime/StreamLocalFinalizer.ts`
 - post-stream finalization / post-sync orchestration 已迁到 `services/MessageFinalizationService.ts`
