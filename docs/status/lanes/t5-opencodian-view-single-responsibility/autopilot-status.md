@@ -118,7 +118,7 @@ OpenCodianView.ts: 5314 → 4971 lines (**−343 lines**)
   - build: OK
 - Updated lane status doc with second SRP batch results
 - Graphify already fresh (no source ownership changes in this task)
-- No thin helper modules introduced: destinations are 2 existing coordinators extended with same-domain responsibilities plus 3 new modules each with substantive domain ownership
+- No thin helper modules introduced: destinations are 1 existing coordinator extended with same-domain responsibilities (ActiveTabContextUsageCoordinator) plus 3 new modules each with substantive domain ownership (ChatSurfaceAppearanceCoordinator, SendPipelineDebugSummaries, UserMessageContentRenderer)
 
 ### Round 2 Net Impact
 
@@ -130,7 +130,7 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 | view-srp2-02 | ~175 | SendPipelineDebugSummaries (runtime/) |
 | view-srp2-03 | ~155 | UserMessageContentRenderer (runtime/) |
 | view-srp2-04 | ~84 | ActiveTabContextUsageCoordinator (services/) |
-| **Round 2 Total** | **~534** | **4 owners (2 new, 2 extended)** |
+| **Round 2 Total** | **~534** | **4 owners (3 new, 1 extended)** |
 
 ### Cumulative Impact (Rounds 1 + 2)
 
@@ -139,8 +139,8 @@ OpenCodianView.ts: 5314 → 4437 lines (**−877 lines**, **16.5% reduction**)
 | Round | Actual Δ | Per-task Estimates | Destinations |
 |-------|----------|--------------------|-------------|
 | Round 1 (view-17 to view-20) | −343 (5314→4971) | ~120+~55+~30+~45=~250 | 4 existing owners |
-| Round 2 (view-srp2-01 to view-srp2-04) | −534 (4971→4437) | ~120+~175+~155+~84=~534 | 4 owners (2 new, 2 extended) |
-| **Grand Total** | **−877** | *per-task sums undercount Round 1 by ~93 lines due to inline cleanup, import removal, and dead-code elimination not captured in per-slice estimates* | **8 distinct owners** |
+| Round 2 (view-srp2-01 to view-srp2-04) | −534 (4971→4437) | ~120+~175+~155+~84=~534 | 4 owners (3 new, 1 extended) |
+| **Grand Total** | **−877** | *per-task sums undercount Round 1 by ~93 lines due to inline cleanup, import removal, and dead-code elimination not captured in per-slice estimates* | **7 distinct owners** |
 
 ### No Thin Helper Modules Introduced
 
