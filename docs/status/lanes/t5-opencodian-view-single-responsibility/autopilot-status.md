@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 7
-- current_task: view-srp7-03
-- last_verified_source_commit: d1751731 (move question/todo/background host assembly into runtime bundle owner)
+- round: 8
+- current_task: view-srp8-03
+- last_verified_source_commit: d961b9a6 (move host callback assembly into createMessageSendPreparationHost factory)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
 - queue_state: completed
 - next_focus: none — queue complete
@@ -450,6 +450,76 @@ OpenCodianView.ts: 5314 → 3883 lines (**−1431 lines**, **26.9% reduction**)
 | Round 6 (view-srp6-01) | −54 | 3954→3900 | 1 extended owner (MessageFinalizationService) |
 | Round 7 (view-srp7-01 to view-srp7-02) | −17 | 3900→3883 | 2 extended owners (QuestionRuntimeViewHostFactory, QuestionTodoBackgroundTaskRuntimeServiceBundle) |
 | **Grand Total** | **−1431** | **5314→3883** | **17 distinct owners** |
+
+## Round 8 — Eighth SRP Batch (Send-Preparation Ownership)
+
+### view-srp8-01 — Move server readiness prompt orchestration into MessageSendPreparationService (DONE)
+- Moved `ensureServerReadyForChat` and `refreshStatusSurfaces` from OpenCodianView private methods to `MessageSendPreparationService`
+- Added `createServerReadinessDelegate()` factory method: returns `{ ensureServerReadyForChat }` delegate for `SlashCommandExecutionHost` host adapter spread
+- Server-prompt action card lifecycle (create → start/skip/settings → finalize/remove) now fully owned by the service
+- `SlashCommandExecutionHost` spreads `createServerReadinessDelegate()` instead of view-owned callback
+- **Measured**: OpenCodianView.ts 3883→3785 lines (**−98 lines**, diff: +12/−110)
+- Destination: `src/features/chat/services/MessageSendPreparationService.ts` (extended, +162 lines)
+- 19 tests (17 existing + 2 new for server readiness delegate)
+
+### view-srp8-02 — Move host callback assembly into createMessageSendPreparationHost factory (DONE)
+- Added `MessageSendPreparationHostDependencies` flat interface grouping raw view service references
+- Rewrote `createMessageSendPreparationHost()` factory to accept deps and assemble all 30+ `MessageSendPreparationHost` callbacks internally
+- Removed 80-line `createMessageSendPreparationSeam` from OpenCodianView entirely
+- View now passes raw dependencies object (service refs + simple lambdas); assembly logic lives in service owner file
+- Fixed `createSlashCommandExecutionHost` to receive `messageSendPreparationService` via parameter instead of `this.*` (was undefined during construction)
+- **Measured**: OpenCodianView.ts 3785→3745 lines (**−40 lines**, diff: +44/−84)
+- Destination: `src/features/chat/services/MessageSendPreparationService.ts` (extended, +76 lines for Dependencies interface + factory)
+- 20 tests (19 existing + 1 new for factory assembly)
+
+### view-srp8-03 — Finalize eighth SRP batch with measured docs and full verification (DONE)
+- Ran `npm run verify` — all gates pass:
+  - module-docs: pass (385 source modules, 385 mapped docs)
+  - graphify: pass (fresh)
+  - devlog-order: pass (148 dated sections in descending order)
+  - lint: pass (0 errors, 3 pre-existing warnings in test files)
+  - typecheck: clean
+  - tests: 2009 pass
+  - build: OK
+- Updated lane status doc with Round 8 results
+
+### Round 8 Net Impact
+
+OpenCodianView.ts: 3883 → 3745 lines (**−138 lines**)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp8-01 | −98 (3883→3785) | MessageSendPreparationService (services/, extended +162 lines) |
+| view-srp8-02 | −40 (3785→3745) | MessageSendPreparationService (services/, extended +76 lines for factory) |
+| **Round 8 Total** | **−138** | **1 extended owner** |
+
+### Why This Round Is Substantive (Not a Thin Helper Split)
+
+The send-preparation ownership moves are substantive because:
+
+1. **Server readiness prompt orchestration**: `MessageSendPreparationService` now owns the complete server-prompt action card lifecycle: create card, render buttons (start/skip/settings), handle user choice, start server, refresh status surfaces, finalize/remove card on success, or show error on failure. This is a multi-step interactive UI flow with async branching, not a thin wrapper.
+
+2. **Host callback assembly**: The `createMessageSendPreparationHost()` factory now owns the complete assembly logic that wires 30+ `MessageSendPreparationHost` callbacks through a flat `MessageSendPreparationHostDependencies` interface. Previously this 80-line wiring block lived in OpenCodianView as `createMessageSendPreparationSeam`. The factory follows the established `createXxxHost(deps)` pattern used by `createBackgroundTaskViewHost` and 20+ other host factories in the codebase.
+
+3. **No new helper modules introduced**: All behavior went to the existing `MessageSendPreparationService`, extending its domain boundary to cover both preparation orchestration AND host assembly. The service file grew by ~238 lines of substantive logic.
+
+4. **`MessageSendPreparationHostDependencies` is not a thin adapter**: It groups raw service references (coordinators, presenters, services) into a typed interface that the factory consumes. Each callback in the factory contains non-trivial wiring (null guards, async wrapping, parameter reshaping).
+
+### Cumulative Impact (Rounds 1–8)
+
+OpenCodianView.ts: 5314 → 3745 lines (**−1569 lines**, **29.5% reduction**)
+
+| Round | Actual Δ | Measured Before→After | Destinations |
+|-------|----------|----------------------|-------------|
+| Round 1 (view-17 to view-20) | −343 | 5314→4971 | 4 existing owners |
+| Round 2 (view-srp2-01 to view-srp2-04) | −534 | 4971→4437 | 4 owners (3 new, 1 extended) |
+| Round 3 (view-srp3-01 to view-srp3-04) | −229 | 4437→4208 | 6 owners (2 new, 4 extended) |
+| Round 4 (view-srp4-01 to view-srp4-02) | −125 | 4208→4083 | 1 new owner (ConversationNoticeCoordinator) |
+| Round 5 (view-srp5-01 to view-srp5-02) | −129 | 4083→3954 | 3 owners (0 new, 3 extended) |
+| Round 6 (view-srp6-01) | −54 | 3954→3900 | 1 extended owner (MessageFinalizationService) |
+| Round 7 (view-srp7-01 to view-srp7-02) | −17 | 3900→3883 | 2 extended owners (QuestionRuntimeViewHostFactory, QuestionTodoBackgroundTaskRuntimeServiceBundle) |
+| Round 8 (view-srp8-01 to view-srp8-02) | −138 | 3883→3745 | 1 extended owner (MessageSendPreparationService) |
+| **Grand Total** | **−1569** | **5314→3745** | **18 distinct owners** |
 
 ## Remaining Candidates (not extracted across all rounds)
 
