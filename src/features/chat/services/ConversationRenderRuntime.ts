@@ -55,6 +55,18 @@ export function getIncrementalRenderedMessageUpdate(
   };
 }
 
+export function hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean {
+  return messages.some((message) =>
+    message.role === 'assistant'
+    && !message.sourceMessageId
+    && message.displayStyle !== 'notice'
+    && (
+      (message.contentBlocks?.length ?? 0) > 0
+      || Boolean(message.content)
+    ),
+  );
+}
+
 export interface ConversationRenderRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
 }

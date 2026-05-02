@@ -357,4 +357,28 @@ export class ConversationRenderService {
     labelEl.setAttribute('data-tooltip-label', 'true');
     buttonEl.setAttribute('aria-labelledby', labelId);
   }
+
+  static removeEmptyAssistantShells(messagesContainer: HTMLElement): void {
+    const assistantMessages = messagesContainer.querySelectorAll<HTMLElement>(
+      '.opencodian-message--assistant:not(.opencodian-message--notice):not(.opencodian-message--background-task)',
+    );
+
+    for (const messageEl of assistantMessages) {
+      const contentEl = messageEl.querySelector(':scope > .opencodian-message-content');
+      if (!(contentEl instanceof HTMLElement)) {
+        continue;
+      }
+
+      const hasStructuredContent = Boolean(
+        contentEl.querySelector(
+          '.streaming-text-block, .opencodian-message-text, .streaming-error-block, .streaming-tool-call, .streaming-thinking-block, .opencodian-permission-inline, .opencodian-question-inline, .opencodian-chat-notice-card, .opencodian-pending',
+        ),
+      );
+      const hasVisibleText = Boolean(contentEl.textContent?.trim());
+
+      if (!hasStructuredContent && !hasVisibleText) {
+        messageEl.remove();
+      }
+    }
+  }
 }

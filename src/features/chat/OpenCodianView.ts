@@ -188,6 +188,9 @@ import {
   type ConversationNoticeCoordinatorHost,
 } from './services/ConversationNoticeCoordinator';
 import {
+  hasInterruptedLocalAssistantTail,
+} from './services/ConversationRenderRuntime';
+import {
   type ConversationAssistantShellRenderPort,
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
@@ -2009,7 +2012,7 @@ export class OpenCodianView extends ItemView {
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
-      hasInterruptedLocalAssistantTail: (messages) => this.hasInterruptedLocalAssistantTail(messages),
+      hasInterruptedLocalAssistantTail: (messages) => hasInterruptedLocalAssistantTail(messages),
     };
   }
 
@@ -2611,7 +2614,9 @@ export class OpenCodianView extends ItemView {
       finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId) =>
         this.backgroundTaskStreamTriggerCoordinator.finalizeAfterPrimaryStream(tabId),
       removeEmptyAssistantShells: () => {
-        this.removeEmptyAssistantShells();
+        if (this.messagesContainer) {
+          ConversationRenderService.removeEmptyAssistantShells(this.messagesContainer);
+        }
       },
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
@@ -2706,7 +2711,14 @@ export class OpenCodianView extends ItemView {
         this.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
       },
       setStreamingAssistantMessageVisibility: (messageEl, visible, reason) => {
-        this.setStreamingAssistantMessageVisibility(messageEl, visible, reason);
+        this.assistantShellViewHostAdapter.setStreamingAssistantMessageVisibility(
+          messageEl,
+          visible,
+          reason,
+          (payload) => {
+            this.logAssistantFinalizationDebug('stream-visibility-changed', payload);
+          },
+        );
       },
 
       renderNoticeCard: (container, message) =>
@@ -3220,7 +3232,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async ensureServerReadyForChat(availability: Exclude<ChatServerAvailability, 'running' | 'external'>): Promise<boolean> {
-    const { messageEl, contentEl } = this.createAssistantContainerElement();
+    const { messageEl, contentEl } = this.assistantShellViewHostAdapter.createAssistantShellContainer();
     const cardEl = contentEl.createDiv({ cls: 'opencodian-server-action-card' });
     cardEl.createDiv({
       cls: 'opencodian-server-action-title',
@@ -3320,20 +3332,6 @@ export class OpenCodianView extends ItemView {
       );
       return false;
     }
-  }
-
-  private createAssistantContainerElement(): { messageEl: HTMLElement; contentEl: HTMLElement } {
-    const messageEl = this.ensureTurnBody()?.createDiv({
-      cls: 'opencodian-message opencodian-message--assistant',
-    });
-
-    if (!messageEl) {
-      const fallback = document.createElement('div');
-      return { messageEl: fallback, contentEl: fallback };
-    }
-
-    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    return { messageEl, contentEl };
   }
 
   private async finalizeAssistantMessageWithError(
@@ -3466,72 +3464,8 @@ export class OpenCodianView extends ItemView {
     container.setText(markdown);
   }
 
-  private hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean {
-    return messages.some((message) =>
-      message.role === 'assistant'
-      && !message.sourceMessageId
-      && message.displayStyle !== 'notice'
-      && (
-        (message.contentBlocks?.length ?? 0) > 0
-        || Boolean(message.content)
-      ),
-    );
-  }
-
   public shouldRenderConversationMessage(message: ChatMessage): boolean {
     return this.conversationIdentityRuntime.shouldRenderConversationMessage(message);
-  }
-
-  private setStreamingAssistantMessageVisibility(
-    messageEl: HTMLElement | null,
-    visible: boolean,
-    reason = 'unspecified',
-  ): void {
-    if (!messageEl) {
-      return;
-    }
-
-    const previousHidden = messageEl.hidden;
-    const nextHidden = !visible;
-    messageEl.hidden = nextHidden;
-
-    if (previousHidden !== nextHidden) {
-      this.logAssistantFinalizationDebug('stream-visibility-changed', {
-        reason,
-        messageId: messageEl.dataset.messageId ?? null,
-        sourceMessageId: messageEl.dataset.sourceMessageId ?? null,
-        hidden: nextHidden,
-        hasStreamingClass: messageEl.classList.contains('is-streaming'),
-      });
-    }
-  }
-
-  private removeEmptyAssistantShells(): void {
-    if (!this.messagesContainer) {
-      return;
-    }
-
-    const assistantMessages = this.messagesContainer.querySelectorAll<HTMLElement>(
-      '.opencodian-message--assistant:not(.opencodian-message--notice):not(.opencodian-message--background-task)',
-    );
-
-    for (const messageEl of assistantMessages) {
-      const contentEl = messageEl.querySelector(':scope > .opencodian-message-content');
-      if (!(contentEl instanceof HTMLElement)) {
-        continue;
-      }
-
-      const hasStructuredContent = Boolean(
-        contentEl.querySelector(
-          '.streaming-text-block, .opencodian-message-text, .streaming-error-block, .streaming-tool-call, .streaming-thinking-block, .opencodian-permission-inline, .opencodian-question-inline, .opencodian-chat-notice-card, .opencodian-pending',
-        ),
-      );
-      const hasVisibleText = Boolean(contentEl.textContent?.trim());
-
-      if (!hasStructuredContent && !hasVisibleText) {
-        messageEl.remove();
-      }
-    }
   }
 
   private mergeClientOnlyMessageFields(

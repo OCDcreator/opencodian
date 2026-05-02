@@ -314,4 +314,51 @@ export class AssistantShellViewHostAdapter {
       result: block.toolResult,
     });
   }
+
+  createAssistantShellContainer(
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): SendPipelineStreamElements {
+    const messageEl = this.host.ensureTurnBody(tabId)?.createDiv({
+      cls: 'opencodian-message opencodian-message--assistant',
+    });
+
+    if (!messageEl) {
+      const fallback = document.createElement('div');
+      return { messageEl: fallback, contentEl: fallback };
+    }
+
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    return { messageEl, contentEl };
+  }
+
+  setStreamingAssistantMessageVisibility(
+    messageEl: HTMLElement | null,
+    visible: boolean,
+    reason: string,
+    onVisibilityChanged?: (payload: {
+      reason: string;
+      messageId: string | null;
+      sourceMessageId: string | null;
+      hidden: boolean;
+      hasStreamingClass: boolean;
+    }) => void,
+  ): void {
+    if (!messageEl) {
+      return;
+    }
+
+    const previousHidden = messageEl.hidden;
+    const nextHidden = !visible;
+    messageEl.hidden = nextHidden;
+
+    if (previousHidden !== nextHidden) {
+      onVisibilityChanged?.({
+        reason,
+        messageId: messageEl.dataset.messageId ?? null,
+        sourceMessageId: messageEl.dataset.sourceMessageId ?? null,
+        hidden: nextHidden,
+        hasStreamingClass: messageEl.classList.contains('is-streaming'),
+      });
+    }
+  }
 }

@@ -1,5 +1,10 @@
 import type { ChatMessage } from '../../../../src/core/types';
-import { getIncrementalRenderedMessageUpdate } from '../../../../src/features/chat/services/ConversationRenderService';
+import {
+  hasInterruptedLocalAssistantTail,
+} from '../../../../src/features/chat/services/ConversationRenderRuntime';
+import {
+  getIncrementalRenderedMessageUpdate,
+} from '../../../../src/features/chat/services/ConversationRenderService';
 
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -146,5 +151,42 @@ describe('compaction divider incremental rendering', () => {
     expect(result).not.toBeNull();
     expect(result!.appendedRenderedMessages).toHaveLength(0);
     expect(result!.patchTrailingAssistant).toBe(true);
+  });
+});
+
+describe('hasInterruptedLocalAssistantTail', () => {
+  it('returns true when there is a local assistant message with content', () => {
+    const messages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
+      createMessage({ id: 'assistant-1', content: 'Hello' }),
+    ];
+
+    expect(hasInterruptedLocalAssistantTail(messages)).toBe(true);
+  });
+
+  it('returns false when all assistant messages have sourceMessageId', () => {
+    const messages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
+      createMessage({ id: 'assistant-1', content: 'Hello', sourceMessageId: 'remote-1' }),
+    ];
+
+    expect(hasInterruptedLocalAssistantTail(messages)).toBe(false);
+  });
+
+  it('returns false when the only assistant message has displayStyle notice', () => {
+    const messages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
+      createMessage({ id: 'assistant-1', content: 'Error', displayStyle: 'notice' }),
+    ];
+
+    expect(hasInterruptedLocalAssistantTail(messages)).toBe(false);
+  });
+
+  it('returns false when there are no assistant messages', () => {
+    const messages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
+    ];
+
+    expect(hasInterruptedLocalAssistantTail(messages)).toBe(false);
   });
 });

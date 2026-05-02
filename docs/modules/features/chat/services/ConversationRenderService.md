@@ -80,7 +80,7 @@ export class ConversationRenderService {
     tabId?: TabId | null,
   ): Promise<boolean>;
 
-  // 静态 tooltip / copy-button 工具（已从 OpenCodianView 迁入）
+  // 静态 tooltip / copy-button / shell-cleanup 工具（已从 OpenCodianView 迁入）
   static readonly COPY_ICON: string;
   static attachCopyButtonBehavior(copyBtn: HTMLElement, content: string): void;
   static setTooltipLabel(
@@ -89,6 +89,7 @@ export class ConversationRenderService {
     position?: 'bottom' | 'top' | 'right',
   ): void;
   static attachTooltipLabel(buttonEl: HTMLElement, label: string): void;
+  static removeEmptyAssistantShells(messagesContainer: HTMLElement): void;
 }
 ```
 
@@ -101,6 +102,11 @@ export class ConversationRenderService {
 - 空 conversation 且存在 revert state 时，会通过 host 提供的 notice message source 渲染空白 rewind notice
 - persisted user/assistant render、single-user rerender、以及 synced assistant pseudo-stream reveal 现在先经由 service 内部的 message-render delegate，再落回 host ports 执行真实 DOM 更新
 - 基础消息 render delegate 与 synced append apply delegate 现在位于 `ConversationRenderRuntime`，service 只委托这些 runtime owner
+
+### 空壳清理
+
+- `removeEmptyAssistantShells()` 遍历 messagesContainer 内的 assistant shell，跳过 `notice` 和 `background-task` 标记的 shell，移除既无 structured content 又无可见文本的空壳
+- 用于 send-pipeline 预清理和 streaming 中断后清理残留空壳
 
 ### 全量重渲
 

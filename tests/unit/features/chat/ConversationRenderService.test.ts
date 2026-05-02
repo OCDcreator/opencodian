@@ -192,4 +192,50 @@ describe('ConversationRenderService tooltip / copy utilities', () => {
       expect(labels[0].textContent).toBe('Updated');
     });
   });
+
+  describe('removeEmptyAssistantShells', () => {
+    it('removes assistant shells with no content', () => {
+      const container = document.createElement('div');
+      const emptyAssistant = container.createDiv({ cls: 'opencodian-message opencodian-message--assistant' });
+      emptyAssistant.createDiv({ cls: 'opencodian-message-content' });
+
+      ConversationRenderService.removeEmptyAssistantShells(container);
+
+      expect(container.children).toHaveLength(0);
+    });
+
+    it('preserves assistant shells with text content', () => {
+      const container = document.createElement('div');
+      const assistant = container.createDiv({ cls: 'opencodian-message opencodian-message--assistant' });
+      const content = assistant.createDiv({ cls: 'opencodian-message-content' });
+      content.textContent = 'Hello world';
+
+      ConversationRenderService.removeEmptyAssistantShells(container);
+
+      expect(container.children).toHaveLength(1);
+    });
+
+    it('preserves assistant shells with streaming text blocks', () => {
+      const container = document.createElement('div');
+      const assistant = container.createDiv({ cls: 'opencodian-message opencodian-message--assistant' });
+      const content = assistant.createDiv({ cls: 'opencodian-message-content' });
+      content.createDiv({ cls: 'streaming-text-block' });
+
+      ConversationRenderService.removeEmptyAssistantShells(container);
+
+      expect(container.children).toHaveLength(1);
+    });
+
+    it('skips notice and background-task shells', () => {
+      const container = document.createElement('div');
+      const notice = container.createDiv({ cls: 'opencodian-message opencodian-message--assistant opencodian-message--notice' });
+      notice.createDiv({ cls: 'opencodian-message-content' });
+      const bgTask = container.createDiv({ cls: 'opencodian-message opencodian-message--assistant opencodian-message--background-task' });
+      bgTask.createDiv({ cls: 'opencodian-message-content' });
+
+      ConversationRenderService.removeEmptyAssistantShells(container);
+
+      expect(container.children).toHaveLength(2);
+    });
+  });
 });

@@ -191,3 +191,81 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('claude-sonnet-4');
   });
 });
+
+describe('AssistantShellViewHostAdapter shell lifecycle', () => {
+  function createAdapter() {
+    const turnBody = document.createElement('div');
+    const adapter = new AssistantShellViewHostAdapter({
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
+      ensureTurnBody: () => turnBody,
+      shouldAutoScroll: () => true,
+      scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+      setStreamingAssistantMessageVisibility: jest.fn(),
+      renderNoticeCard: jest.fn(),
+      getMarkdownService: () => null,
+      shouldRenderQuestionResolutionCards: () => false,
+      suppressActiveLayoutAutoScrollOnce: jest.fn(),
+      openTaskToolSession: jest.fn(),
+    });
+    return { adapter, turnBody };
+  }
+
+  it('creates a simple assistant container without streaming state', () => {
+    const { adapter, turnBody } = createAdapter();
+    const result = adapter.createAssistantShellContainer('tab-1');
+
+    expect(turnBody.contains(result.messageEl)).toBe(true);
+    expect(result.messageEl.classList.contains('opencodian-message--assistant')).toBe(true);
+    expect(result.messageEl.querySelector('.opencodian-message-content')).toBe(result.contentEl);
+  });
+
+  it('returns fallback when turn body is null', () => {
+    const adapter = new AssistantShellViewHostAdapter({
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
+      ensureTurnBody: () => null,
+      shouldAutoScroll: () => false,
+      scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+      setStreamingAssistantMessageVisibility: jest.fn(),
+      renderNoticeCard: jest.fn(),
+      getMarkdownService: () => null,
+      shouldRenderQuestionResolutionCards: () => false,
+      suppressActiveLayoutAutoScrollOnce: jest.fn(),
+      openTaskToolSession: jest.fn(),
+    });
+
+    const result = adapter.createAssistantShellContainer('tab-1');
+    expect(result.messageEl.isConnected).toBe(false);
+  });
+
+  it('toggles visibility and calls callback when changed', () => {
+    const { adapter } = createAdapter();
+    const el = document.createElement('div');
+    el.hidden = false;
+    const spy = jest.fn();
+
+    adapter.setStreamingAssistantMessageVisibility(el, false, 'test-reason', spy);
+
+    expect(el.hidden).toBe(true);
+    expect(spy).toHaveBeenCalledWith({
+      reason: 'test-reason',
+      messageId: null,
+      sourceMessageId: null,
+      hidden: true,
+      hasStreamingClass: false,
+    });
+  });
+
+  it('does not call callback when visibility did not change', () => {
+    const { adapter } = createAdapter();
+    const el = document.createElement('div');
+    el.hidden = true;
+    const spy = jest.fn();
+
+    adapter.setStreamingAssistantMessageVisibility(el, false, 'test', spy);
+
+    expect(el.hidden).toBe(true);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});

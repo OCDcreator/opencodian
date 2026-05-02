@@ -13,6 +13,8 @@ body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodyS
 
 - `AssistantShellViewHostAdapter`：统一持有 `AssistantShellRenderer`、`AssistantFooterRenderer`、`AssistantNoticeFooterFinalizer` 的 host seam，以及 `AssistantErrorRenderer`
 - `createAssistantMessageElement()` / `revealStreamingAssistantMessageElement()`：透传 streaming assistant shell 创建与 reveal
+- `createAssistantShellContainer()`：创建不绑定 streaming state 的 assistant shell 容器（`messageEl` + `contentEl`），用于 interrupted-tail 保留等场景
+- `setStreamingAssistantMessageVisibility()`：切换 assistant 消息元素的可见性，变化时通过可选回调通知调用方记录调试日志
 - `addTimestampWithCopyButton()`：透传 footer timestamp / copy button 收尾
 - `renderPersistedAssistantMessage()`：通过内部 shell + body render + footer renderer，一次性完成普通 persisted assistant message 的壳层、正文与 footer 组装；notice message 也会在这里统一分派到 notice 渲染路径
 - `renderMessageBody()`：公开入口，渲染 assistant message 正文（structured content blocks 或 plain text fallback），供 `ConversationAssistantTailRenderPort` 直接调用
