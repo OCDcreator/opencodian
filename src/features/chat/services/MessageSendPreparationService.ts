@@ -260,72 +260,33 @@ export class MessageSendPreparationService {
     options: PrepareMessageSendOptions,
   ): Promise<PreparedMessageSend | null> {
     const conversation = await this.host.ensureConversationReady();
-    if (!conversation) {
-      return null;
-    }
-
+    if (!conversation) return null;
     const tabId = this.host.getActiveTabId();
-    if (!tabId || !this.host.ensureTabRuntime(tabId)) {
-      return null;
-    }
-
-    if (this.host.isTabForegroundBusy(tabId)) {
-      this.host.notifyForegroundBusy();
-      return null;
-    }
-
+    if (!tabId || !this.host.ensureTabRuntime(tabId)) return null;
+    if (this.host.isTabForegroundBusy(tabId)) { this.host.notifyForegroundBusy(); return null; }
     const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.refreshStatusSurfaces();
     if (availability !== 'running' && availability !== 'external') {
-      const ready = await this.ensureServerReadyForChat(availability);
-      if (!ready) {
-        return null;
-      }
+      if (!(await this.ensureServerReadyForChat(availability))) return null;
     }
-
-    if (!this.host.hasLoadedModelCatalog()) {
-      await this.host.loadAvailableModels();
-    }
-
+    if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
     const modelOptions = this.host.getSendMessageOptions();
     const activeModelId = this.host.formatModelId(modelOptions);
-    const modelAvailable = await this.host.ensureSelectedModelAvailable(
-      modelOptions.provider,
-      modelOptions.model,
-    );
-    if (!modelAvailable) {
-      await this.host.appendModelUnavailableNoticeMessage();
-      return null;
-    }
-
-    const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(
-      conversation.externalContextPaths,
-    );
+    const modelAvailable = await this.host.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model);
+    if (!modelAvailable) { await this.host.appendModelUnavailableNoticeMessage(); return null; }
+    const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
-
-    const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(
-      options.invocationIntent,
-    );
-
+    const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
     const structuredSend = this.host.buildStructuredPromptSendPayload(options.content, {
       contextItems,
       ...(options.syntheticTextParts ? { syntheticTextParts: options.syntheticTextParts } : {}),
-      ...(resolvedAgentInvocation.invocationParts.length > 0
-        ? { invocationParts: resolvedAgentInvocation.invocationParts }
-        : {}),
+      ...(resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
     });
-    const userMessage = buildOptimisticUserMessage(
-      options.content,
-      contextItems,
-      Date.now(),
-      { optimisticUserParts: structuredSend.optimisticUserParts },
-    );
+    const userMessage = buildOptimisticUserMessage(options.content, contextItems, Date.now(), { optimisticUserParts: structuredSend.optimisticUserParts });
     this.host.seedCanonicalUserMessage({
-      sessionID: conversation.openCodeSessionId,
-      messageID: structuredSend.messageID,
-      parts: structuredSend.optimisticUserParts,
-      timestamp: userMessage.timestamp,
+      sessionID: conversation.openCodeSessionId, messageID: structuredSend.messageID,
+      parts: structuredSend.optimisticUserParts, timestamp: userMessage.timestamp,
     });
     this.host.resetBackgroundTaskIndicator(tabId);
     this.host.armBackgroundTaskIndicatorForUserMessage(userMessage, tabId);
@@ -336,28 +297,15 @@ export class MessageSendPreparationService {
     this.host.setAutoScrollEnabled(tabId, true);
     await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
-
     if (this.isFirstUserMessage(conversation)) {
       await this.host.applyFallbackConversationTitle(conversation.id, options.content);
-      if (this.host.shouldGenerateAiTitle()) {
-        this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
-      }
+      if (this.host.shouldGenerateAiTitle()) this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
     }
-
     return {
-      conversation,
-      tabId,
-      messageID: structuredSend.messageID,
-      requestParts: structuredSend.requestParts,
-      optimisticUserParts: structuredSend.optimisticUserParts,
-      draftContextItems,
-      contextItems,
-      modelOptions,
-      activeModelId,
-      userMessage,
-      resolvedAgentInvocation: resolvedAgentInvocation.invocationParts.length > 0 || resolvedAgentInvocation.agent
-        ? resolvedAgentInvocation
-        : undefined,
+      conversation, tabId, messageID: structuredSend.messageID,
+      requestParts: structuredSend.requestParts, optimisticUserParts: structuredSend.optimisticUserParts,
+      draftContextItems, contextItems, modelOptions, activeModelId, userMessage,
+      resolvedAgentInvocation: resolvedAgentInvocation.invocationParts.length > 0 || resolvedAgentInvocation.agent ? resolvedAgentInvocation : undefined,
     };
   }
 
@@ -440,8 +388,8 @@ export class MessageSendPreparationService {
       settingsBtn.addEventListener('click', () => resolve('settings'));
     });
 
-    if (choice === 'settings') {
-      this.host.openPluginSettingsAtServerSection();
+    if (choice === 'settings') this.host.openPluginSettingsAtServerSection();
+    if (choice === 'settings' || choice === 'skip') {
       await this.refreshStatusSurfaces();
       const latestAvailability = await this.host.getServerAvailability();
       if (latestAvailability === 'running' || latestAvailability === 'external') {
@@ -449,24 +397,7 @@ export class MessageSendPreparationService {
         return true;
       }
       await this.host.finalizeAssistantMessageWithServerUnavailableError(
-        messageEl,
-        contentEl,
-        latestAvailability as 'checking' | 'starting' | 'offline',
-      );
-      return false;
-    }
-
-    if (choice === 'skip') {
-      await this.refreshStatusSurfaces();
-      const latestAvailability = await this.host.getServerAvailability();
-      if (latestAvailability === 'running' || latestAvailability === 'external') {
-        messageEl.remove();
-        return true;
-      }
-      await this.host.finalizeAssistantMessageWithServerUnavailableError(
-        messageEl,
-        contentEl,
-        latestAvailability as 'checking' | 'starting' | 'offline',
+        messageEl, contentEl, latestAvailability as 'checking' | 'starting' | 'offline',
       );
       return false;
     }
@@ -519,12 +450,10 @@ export class MessageSendPreparationService {
 export function createMessageSendPreparationHost(
   deps: MessageSendPreparationHostDependencies,
 ): MessageSendPreparationHost {
+  const { conversationTabRuntimeCoordinator: tabRuntime, chatSelectionControlsCoordinator: selectionCtrl, messageFinalizationService: finalization, assistantShellViewHostAdapter: shellAdapter, chatHeaderPresenter, openCodeService, backgroundTaskHost, conversationSyncBridgePorts, conversationRenderService, activeTabContextUsageCoordinator } = deps;
   return {
     ensureConversationReady: async () => {
-      if (!deps.getCurrentConversation()) {
-        await deps.createNewConversation();
-      }
-
+      if (!deps.getCurrentConversation()) await deps.createNewConversation();
       return deps.getCurrentConversation();
     },
     getActiveTabId: () => deps.getActiveTabId(),
@@ -532,56 +461,36 @@ export function createMessageSendPreparationHost(
     isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),
     notifyForegroundBusy: () => deps.notifyForegroundBusy(),
     getServerAvailability: () => deps.getServerAvailability(),
-    refreshServerStatusBadge: () => deps.chatHeaderPresenter.refreshServerStatusBadge(),
+    refreshServerStatusBadge: () => chatHeaderPresenter.refreshServerStatusBadge(),
     refreshSettingsTabStatus: () => deps.settingsTab?.refreshServerStatusDisplay(),
     getServerMode: () => deps.getServerMode(),
-    createAssistantShellContainer: () => deps.assistantShellViewHostAdapter.createAssistantShellContainer(),
-    getUnavailableServerPromptMessage: (availability) =>
-      deps.messageFinalizationService.getUnavailableServerPromptMessage(availability),
-    finalizeAssistantMessageWithServerError: (messageEl, contentEl, error) =>
-      deps.messageFinalizationService.finalizeAssistantMessageWithServerError(
-        messageEl,
-        contentEl,
-        error,
-      ),
-    finalizeAssistantMessageWithServerUnavailableError: (messageEl, contentEl, availability) =>
-      deps.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(
-        messageEl,
-        contentEl,
-        availability,
-      ),
+    createAssistantShellContainer: () => shellAdapter.createAssistantShellContainer(),
+    getUnavailableServerPromptMessage: (a) => finalization.getUnavailableServerPromptMessage(a),
+    finalizeAssistantMessageWithServerError: (m, c, e) => finalization.finalizeAssistantMessageWithServerError(m, c, e),
+    finalizeAssistantMessageWithServerUnavailableError: (m, c, a) => finalization.finalizeAssistantMessageWithServerUnavailableError(m, c, a),
     openPluginSettingsAtServerSection: () => deps.openPluginSettingsAtServerSection(),
     startServer: () => deps.startServer(),
-    hasLoadedModelCatalog: () => deps.chatSelectionControlsCoordinator.hasLoadedModelCatalog(),
+    hasLoadedModelCatalog: () => selectionCtrl.hasLoadedModelCatalog(),
     loadAvailableModels: () => deps.reloadModelCatalog(),
     getSendMessageOptions: () => deps.getSendMessageOptions(),
-    formatModelId: (model) => deps.chatSelectionControlsCoordinator.formatModelId(model),
-    ensureSelectedModelAvailable: (provider, model) =>
-      deps.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model),
+    formatModelId: (model) => selectionCtrl.formatModelId(model),
+    ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
-    buildStructuredPromptSendPayload: (content, options) =>
-      deps.openCodeService.buildStructuredPromptSendPayload(content, options),
-    seedCanonicalUserMessage: (input) => deps.openCodeService.seedCanonicalUserMessage(input),
-    resetBackgroundTaskIndicator: (tabId) => deps.backgroundTaskHost.resetBackgroundTaskIndicator(tabId),
-    armBackgroundTaskIndicatorForUserMessage: (message, tabId) =>
-      deps.backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId),
-    startConversationSyncLoop: () =>
-      deps.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
+    buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),
+    seedCanonicalUserMessage: (input) => openCodeService.seedCanonicalUserMessage(input),
+    resetBackgroundTaskIndicator: (tabId) => backgroundTaskHost.resetBackgroundTaskIndicator(tabId),
+    armBackgroundTaskIndicatorForUserMessage: (message, tabId) => backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId),
+    startConversationSyncLoop: () => conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
     saveConversation: (conversation) => deps.saveConversation(conversation),
-    setAutoScrollEnabled: (tabId, enabled) =>
-      deps.conversationTabRuntimeCoordinator.setAutoScrollEnabled(tabId, enabled),
-    renderMessage: (message) => deps.conversationRenderService.renderMessage(message),
+    setAutoScrollEnabled: (tabId, enabled) => tabRuntime.setAutoScrollEnabled(tabId, enabled),
+    renderMessage: (message) => conversationRenderService.renderMessage(message),
     scrollToBottom: (options) => deps.scrollToBottom(options),
-    applyFallbackConversationTitle: (conversationId, firstMessage) =>
-      deps.applyFallbackConversationTitle(conversationId, firstMessage),
+    applyFallbackConversationTitle: (conversationId, firstMessage) => deps.applyFallbackConversationTitle(conversationId, firstMessage),
     shouldGenerateAiTitle: () => deps.getTitleMode() === 'ai',
-    startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) =>
-      deps.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions),
-    setStreaming: (tabId, value) => deps.conversationTabRuntimeCoordinator.setStreaming(tabId, value),
+    startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => deps.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions),
+    setStreaming: (tabId, value) => tabRuntime.setStreaming(tabId, value),
     syncTabStreamLikeState: (tabId) => deps.syncTabStreamLikeState(tabId),
-    beginTabContextUsageStream: (tabId) =>
-      deps.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId),
-    clearPendingEditedFiles: (tabId) =>
-      deps.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId),
+    beginTabContextUsageStream: (tabId) => activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId),
+    clearPendingEditedFiles: (tabId) => tabRuntime.clearPendingEditedFiles(tabId),
   };
 }

@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
+> **最近更新**: lint compaction (max-lines-per-function 200 gate)
 
 ## 概述
 

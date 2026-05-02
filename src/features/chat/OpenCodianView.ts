@@ -1508,9 +1508,7 @@ export class OpenCodianView extends ItemView {
       tabViewActivationBridge,
     );
     const tabConversationActivationBridge = new TabConversationActivationBridge({
-      host:
-        tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts
-          .tabConversationActivationBridgeHost,
+      host: tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabConversationActivationBridgeHost,
       tabConversationStateBridge,
       tabViewActivationBridge,
       questionTodoActivationRefreshCoordinator:
@@ -1602,12 +1600,8 @@ export class OpenCodianView extends ItemView {
         getTabManager: () => this.tabManager,
         getMaxTabs: () => this.plugin.settings.maxTabs,
         getPersistedTabState: () => this.plugin.settings.tabState,
-        setPersistedTabState: (state) => {
-          this.plugin.settings.tabState = state;
-        },
-        persistTabState: (options) => {
-          this.persistTabState(options);
-        },
+        setPersistedTabState: (state) => { this.plugin.settings.tabState = state; },
+        persistTabState: (options) => { this.persistTabState(options); },
         loadConversations: () => this.plugin.loadConversations(),
         getConversations: () => this.plugin.getConversations(),
         createConversation: () => this.plugin.createConversation(),
@@ -1625,9 +1619,7 @@ export class OpenCodianView extends ItemView {
         syncActiveTabConversation: (conversation) => {
           this.tabConversationStateBridge.syncActiveTabConversation(conversation);
         },
-        updateModelSelectorDisplay: () => {
-          this.updateModelSelectorDisplay();
-        },
+        updateModelSelectorDisplay: () => { this.updateModelSelectorDisplay(); },
       }),
       {
         activateTab: (tabId) => conversationViewStateService.activateTab(tabId),

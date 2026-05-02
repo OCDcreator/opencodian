@@ -350,6 +350,10 @@ describe('SlashCommandExecutionService', () => {
     expect(host.notifyForegroundBusy).toHaveBeenCalledTimes(1);
     expect(host.runSessionCommand).not.toHaveBeenCalled();
   });
+});
+
+describe('createSlashCommandExecutionHost delegation', () => {
+  beforeEach(() => { jest.clearAllMocks(); });
 
   it('creates a host that delegates simple callbacks to the flat dependency object', async () => {
     const deps = createDependencies();

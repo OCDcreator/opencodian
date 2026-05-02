@@ -48,15 +48,9 @@ function createPaneCoordinator(runtimeByTab = new Map<TabId, TestRuntimeState>()
     getPaneState: jest.fn((tabId: TabId | null) => (tabId ? paneByTab.get(tabId) ?? null : null)),
     getRuntimeState: jest.fn((tabId: TabId | null) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
     ensureRuntimeState: jest.fn((tabId: TabId | null) => {
-      if (!tabId) {
-        return null;
-      }
-
+      if (!tabId) return null;
       let runtime = runtimeByTab.get(tabId);
-      if (!runtime) {
-        runtime = createRuntimeState();
-        runtimeByTab.set(tabId, runtime);
-      }
+      if (!runtime) { runtime = createRuntimeState(); runtimeByTab.set(tabId, runtime); }
       return runtime;
     }),
     ensurePane: jest.fn((tabId: TabId) => {
@@ -64,14 +58,7 @@ function createPaneCoordinator(runtimeByTab = new Map<TabId, TestRuntimeState>()
       if (!pane) {
         const runtime = runtimeByTab.get(tabId) ?? createRuntimeState();
         runtimeByTab.set(tabId, runtime);
-        pane = {
-          tabId,
-          messagesEl: document.createElement('div'),
-          runtime,
-          scrollHandler: jest.fn(),
-          mutationObserver: null,
-          resizeObserver: null,
-        };
+        pane = { tabId, messagesEl: document.createElement('div'), runtime, scrollHandler: jest.fn(), mutationObserver: null, resizeObserver: null };
         paneByTab.set(tabId, pane);
       }
       return pane;
@@ -81,7 +68,6 @@ function createPaneCoordinator(runtimeByTab = new Map<TabId, TestRuntimeState>()
     clearPanes: jest.fn(),
     syncScrollMetrics: jest.fn(() => true),
   } as unknown as jest.Mocked<TabMessagesPaneCoordinator<TestRuntimeState>>;
-
   return { coordinator, paneByTab, runtimeByTab };
 }
 
@@ -107,17 +93,11 @@ function createFixture(options: {
   const host: ConversationTabRuntimeCoordinatorHost = {
     getMaxTabs: jest.fn(() => 4),
     getTabManager: jest.fn(() => tabManager),
-    setTabManager: jest.fn((nextTabManager) => {
-      tabManager = nextTabManager;
-    }),
+    setTabManager: jest.fn((next) => { tabManager = next; }),
     getTabBar: jest.fn(() => tabBar),
-    setTabBar: jest.fn((nextTabBar) => {
-      tabBar = nextTabBar;
-    }),
+    setTabBar: jest.fn((next) => { tabBar = next; }),
     getTabBarMountEl: jest.fn(() => tabBarMountEl),
-    setTabBarMountEl: jest.fn((element) => {
-      tabBarMountEl = element;
-    }),
+    setTabBarMountEl: jest.fn((el) => { tabBarMountEl = el; }),
     getChatContainerEl: jest.fn(() => chatContainerEl),
     getHeaderTabBarSlotEl: jest.fn(() => headerTabBarSlotEl),
     getBelowHeaderTabBarSlotEl: jest.fn(() => belowHeaderTabBarSlotEl),
@@ -125,9 +105,7 @@ function createFixture(options: {
     getInputTabBarSlotEl: jest.fn(() => inputTabBarSlotEl),
     getTabBarPosition: jest.fn(() => options.tabBarPosition ?? 'below-header'),
     getBelowHeaderTabBarLayout: jest.fn(() => options.belowHeaderTabBarLayout ?? 'grid'),
-    setPersistedTabState: jest.fn((tabState) => {
-      persistedTabState = tabState;
-    }),
+    setPersistedTabState: jest.fn((s) => { persistedTabState = s; }),
     savePersistedTabState: jest.fn(),
     getSessionIdForTab: jest.fn((tabId) => (tabId ? `${tabId}-session` : null)),
     getTabSessionStatus: jest.fn(() => options.sessionStatus ?? null),
@@ -398,8 +376,7 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
         getBelowHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getOuterVerticalTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getInputTabBarSlotEl: jest.fn(() => document.createElement('div')),
-        getSessionIdForTab: jest.fn(() => null),
-        getTabSessionStatus: jest.fn(() => null),
+        getSessionIdForTab: jest.fn(() => null), getTabSessionStatus: jest.fn(() => null),
         ...overrides.view,
       },
     };
@@ -410,16 +387,11 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
   });
 
   it('reads maxTabs from settings object', () => {
-    const deps = createFactoryDeps({ settings: { maxTabs: 6 } });
-    const host = createConversationTabRuntimeCoordinatorHost(deps);
-
+    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps({ settings: { maxTabs: 6 } }));
     expect(host.getMaxTabs()).toBe(6);
   });
-
   it('reads tabBarPosition from settings object', () => {
-    const deps = createFactoryDeps({ settings: { tabBarPosition: 'header' as const } });
-    const host = createConversationTabRuntimeCoordinatorHost(deps);
-
+    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps({ settings: { tabBarPosition: 'header' as const } }));
     expect(host.getTabBarPosition()).toBe('header');
   });
 
@@ -444,24 +416,19 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
   it('delegates savePersistedTabState flush to plugin.saveSettingsUiStateImmediately', () => {
     const saveImmediately = jest.fn();
     const scheduleSave = jest.fn();
-    const deps = createFactoryDeps({
+    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps({
       plugin: { saveSettingsUiStateImmediately: saveImmediately, scheduleSettingsUiStateSave: scheduleSave },
-    });
-    const host = createConversationTabRuntimeCoordinatorHost(deps);
-
+    }));
     host.savePersistedTabState({ flush: true });
     expect(saveImmediately).toHaveBeenCalledTimes(1);
     expect(scheduleSave).not.toHaveBeenCalled();
   });
-
   it('delegates savePersistedTabState default to plugin.scheduleSettingsUiStateSave', () => {
     const saveImmediately = jest.fn();
     const scheduleSave = jest.fn();
-    const deps = createFactoryDeps({
+    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps({
       plugin: { saveSettingsUiStateImmediately: saveImmediately, scheduleSettingsUiStateSave: scheduleSave },
-    });
-    const host = createConversationTabRuntimeCoordinatorHost(deps);
-
+    }));
     host.savePersistedTabState();
     expect(scheduleSave).toHaveBeenCalledTimes(1);
     expect(saveImmediately).not.toHaveBeenCalled();
@@ -469,17 +436,11 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
 
   it('derives getTabContextUsage from tabBarState.tabManager with null-safe access', () => {
     const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
-    const deps = createFactoryDeps({ tabBarStateOverrides: { tabManager } });
-    const host = createConversationTabRuntimeCoordinatorHost(deps);
-
-    const result = host.getTabContextUsage('nonexistent-tab');
-    expect(result).toBeNull();
+    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps({ tabBarStateOverrides: { tabManager } }));
+    expect(host.getTabContextUsage('nonexistent-tab')).toBeNull();
   });
-
   it('returns null from getTabContextUsage when tabBarState.tabManager is null', () => {
-    const deps = createFactoryDeps();
-    const host = createConversationTabRuntimeCoordinatorHost(deps);
-
+    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps());
     expect(host.getTabContextUsage('any-tab')).toBeNull();
   });
 });
@@ -492,59 +453,27 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
       initializeFirstTab: jest.fn().mockResolvedValue(undefined),
       restorePersistedTabs: jest.fn(() => null as TabId | null),
     };
-    const lifecycleRecoveryCoordinator = {
-      closeTabAndRecover: jest.fn().mockResolvedValue(undefined),
-    };
+    const lifecycleRecoveryCoordinator = { closeTabAndRecover: jest.fn().mockResolvedValue(undefined) };
     const runtimeStateBridge = {
-      syncStreamLikeState: jest.fn(),
-      syncActiveStreamLikeState: jest.fn(),
-      setNeedsAttention: jest.fn(),
+      syncStreamLikeState: jest.fn(), syncActiveStreamLikeState: jest.fn(), setNeedsAttention: jest.fn(),
     };
-    const tabBarState: TabBarMutableState = {
-      tabManager: null,
-      tabBar: null,
-      tabBarMountEl: null,
-    };
-    const settings: TabRuntimeSettings = {
-      maxTabs: 4,
-      tabBarPosition: 'below-header',
-      belowHeaderTabBarLayout: 'grid',
-    };
+    const settings: TabRuntimeSettings = { maxTabs: 4, tabBarPosition: 'below-header', belowHeaderTabBarLayout: 'grid' };
+    const tabBarState: TabBarMutableState = { tabManager: null, tabBar: null, tabBarMountEl: null };
     const hostSource: ConversationTabRuntimeCoordinatorHostSource = {
-      tabBarState,
-      settings,
-      plugin: {
-        settings: {
-          ...settings,
-          tabState: { activeTabId: null, tabs: [] },
-        },
-        saveSettingsUiStateImmediately: jest.fn(),
-        scheduleSettingsUiStateSave: jest.fn(),
-      },
+      tabBarState, settings,
+      plugin: { settings: { ...settings, tabState: { activeTabId: null, tabs: [] } }, saveSettingsUiStateImmediately: jest.fn(), scheduleSettingsUiStateSave: jest.fn() },
       view: {
         getChatContainerEl: jest.fn(() => document.createElement('div')),
         getHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getBelowHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getOuterVerticalTabBarSlotEl: jest.fn(() => document.createElement('div')),
         getInputTabBarSlotEl: jest.fn(() => document.createElement('div')),
-        getSessionIdForTab: jest.fn(() => null),
-        getTabSessionStatus: jest.fn(() => null),
+        getSessionIdForTab: jest.fn(() => null), getTabSessionStatus: jest.fn(() => null),
       },
     };
-
     return {
-      deps: {
-        ...hostSource,
-        paneCoordinator: pane.coordinator,
-        loadRecoveryCoordinator,
-        lifecycleRecoveryCoordinator,
-        runtimeStateBridge,
-      },
-      pane,
-      tabBarState,
-      loadRecoveryCoordinator,
-      lifecycleRecoveryCoordinator,
-      runtimeStateBridge,
+      deps: { ...hostSource, paneCoordinator: pane.coordinator, loadRecoveryCoordinator, lifecycleRecoveryCoordinator, runtimeStateBridge },
+      pane, tabBarState, loadRecoveryCoordinator, lifecycleRecoveryCoordinator, runtimeStateBridge,
     };
   }
 
@@ -579,25 +508,20 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
   it('writes through tabBarState mutable properties when coordinator mutates', () => {
     const fixture = createTopLevelDeps();
     const coordinator = createConversationTabRuntimeCoordinator(fixture.deps);
-
     coordinator.initializeTabSystem();
     expect(fixture.tabBarState.tabManager).not.toBeNull();
     expect(fixture.tabBarState.tabBar).not.toBeNull();
     expect(fixture.tabBarState.tabBarMountEl).not.toBeNull();
-
     coordinator.destroyTabSystem();
     expect(fixture.tabBarState.tabManager).toBeNull();
     expect(fixture.tabBarState.tabBar).toBeNull();
     expect(fixture.tabBarState.tabBarMountEl).toBeNull();
   });
-
   it('delegates initializeFirstTab and restorePersistedTabs to loadRecoveryCoordinator', async () => {
     const fixture = createTopLevelDeps();
     const coordinator = createConversationTabRuntimeCoordinator(fixture.deps);
-
     await coordinator.initializeFirstTab();
     expect(fixture.loadRecoveryCoordinator.initializeFirstTab).toHaveBeenCalledTimes(1);
-
     coordinator.restorePersistedTabs();
     expect(fixture.loadRecoveryCoordinator.restorePersistedTabs).toHaveBeenCalledTimes(1);
   });

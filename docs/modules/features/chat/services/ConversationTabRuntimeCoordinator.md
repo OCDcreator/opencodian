@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/chat/services/ConversationTabRuntimeCoordinator.ts`
 > **状态**: [REVIEW]
+> **最近更新**: lint compaction (max-lines 500 gate)
 
 ## 概述
 
