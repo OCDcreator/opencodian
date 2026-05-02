@@ -13,6 +13,7 @@ import {
 } from '../../../../src/core/types';
 import { LIQUID_DIAMOND_DEMO_STAGE_SIZE } from '../../../../src/features/chat/liquidDiamondDemo';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { ChatVisualDemoCoordinator } from '../../../../src/features/chat/services/ChatVisualDemoCoordinator';
 
 type DemoViewHarness = OpenCodianView & {
   chatContainerEl: HTMLElement | null;
@@ -150,6 +151,9 @@ function mountViewChrome(view: DemoViewHarness): {
   view.composerShellEl = composerShellEl;
   view.inputWrapperEl = inputWrapperEl;
   view.inputTextarea = inputEl;
+  (view as Record<string, unknown>).chatVisualDemoCoordinator = new ChatVisualDemoCoordinator({
+    getMessagesShellEl: () => view.messagesShellEl,
+  });
 
   return {
     chatContainerEl,

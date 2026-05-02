@@ -155,6 +155,7 @@ docs/modules/
 │   │   │   └── collapsible.md
 │   │   ├── services/
 │   │   │   ├── ChatHeaderPresenter.md
+│   │   │   ├── ChatVisualDemoCoordinator.md
 │   │   │   ├── ChatSelectionControlsCoordinator.md
 │   │   │   ├── ComposerInputShellCoordinator.md
 │   │   │   ├── SlashCommandMenuCatalogCache.md

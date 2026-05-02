@@ -539,7 +539,7 @@ background task notice 这条子链路现在的边界是：
 - toolbar：permission selector、model selector、context ring、effort selector
 - appearance：theme preset、chat appearance CSS variables、自定义 CSS、背景图
 - input panel glass：`InputPanelAppearanceCoordinator` 负责 SVG filter layer、adapter mount/unmount、action button class 与诊断日志
-- experimental demo：`LiquidDiamondDemoController`（CPU / WebGL）与 `GlassOctahedronDemoController`
+- experimental demo：`ChatVisualDemoCoordinator` 负责 toggle、互斥、destroy 和环境失败 Notice
 
 模型选择器本身支持：
 
