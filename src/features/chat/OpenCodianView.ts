@@ -49,12 +49,6 @@ import {
 import { GlassOctahedronDemoController } from './glassOctahedronDemo';
 import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import {
-  buildMessageRenderGroups,
-  injectLiveCompactionDivider,
-  mergeAssistantMessagesForRender,
-  tagCompactionSummaries,
-} from './renderGroups';
-import {
   AssistantNoticeCardRenderer,
   type AssistantNoticeCardRendererHost,
 } from './runtime/AssistantNoticeCardRenderer';
@@ -187,6 +181,7 @@ import {
   type ConversationHydrationRuntimeViewHost,
   createConversationHydrationRuntimeBridges,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
+import { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
 import {
   ConversationLoadRecoveryCoordinator,
   type ConversationLoadRecoveryHost,
@@ -546,6 +541,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
+  private readonly conversationIdentityRuntime: ConversationIdentityRuntime;
   private conversationSyncBridgePorts!: ConversationSyncBridgePorts;
   private tabConversationSyncFingerprintRuntimePort!:
     TabConversationSyncFingerprintRuntimePort;
@@ -1248,6 +1244,19 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskTimelineService = backgroundTaskRuntime.backgroundTaskTimelineService;
     this.backgroundTaskLiveSignalCoordinator =
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator;
+    this.conversationIdentityRuntime = new ConversationIdentityRuntime({
+      getCanonicalConversationFingerprint: (messages) => {
+        const fingerprintBuilder = (
+          this.plugin.openCodeService?.constructor as typeof OpenCodeService | undefined
+        )?.getCanonicalConversationFingerprint;
+        if (typeof fingerprintBuilder === 'function') {
+          return fingerprintBuilder(messages);
+        }
+        return undefined;
+      },
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
+    });
 
     const conversationRenderService = new ConversationRenderService(
       this.createConversationRenderHost(),
@@ -1960,7 +1969,8 @@ export class OpenCodianView extends ItemView {
       getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
       getTab: (tabId) => this.tabManager?.getTab(tabId) ?? null,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      getConversationSyncFingerprint: (messages) =>
+        this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
       syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
       syncConversationMessagesFromCanonicalState: (conversation, tabId, reason, options) =>
@@ -1992,10 +2002,15 @@ export class OpenCodianView extends ItemView {
       getSessionRevertState: (sessionId) => this.plugin.openCodeService.getSessionRevertState(sessionId),
       hydrateOpenCodeMessage: (info, parts, vaultBasePath) =>
         this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts, vaultBasePath),
-      shouldRenderConversationMessage: (message) => this.shouldRenderConversationMessage(message),
-      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      shouldRenderConversationMessage: (message) =>
+        this.conversationIdentityRuntime.shouldRenderConversationMessage(message),
+      getConversationSyncFingerprint: (messages) =>
+        this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
       getInterruptedSyncPreservationLogFingerprint: (conversation, messages) =>
-        this.getInterruptedSyncPreservationLogFingerprint(conversation, messages),
+        this.conversationIdentityRuntime.getInterruptedSyncPreservationLogFingerprint(
+          conversation,
+          messages,
+        ),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       logOmoBackgroundTaskDiagnostics: (conversation, previousMessages, nextMessages) => {
         this.backgroundTaskHost.logOmoBackgroundTaskDiagnostics(
@@ -2060,7 +2075,7 @@ export class OpenCodianView extends ItemView {
     TabConversationSyncFingerprintRuntimePort {
     return {
       getConversationSyncFingerprint: (messages) =>
-        this.getConversationSyncFingerprint(messages),
+        this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
       setTabConversationSyncFingerprint: (tabId, fingerprint) => {
         this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
           fingerprint,
@@ -2073,7 +2088,7 @@ export class OpenCodianView extends ItemView {
   TabActivationConversationSyncRuntimePortHost {
     return {
       getConversationSyncFingerprint: (messages) =>
-        this.getConversationSyncFingerprint(messages),
+        this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
       setLastConversationSyncFingerprint: (fingerprint) => {
         this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
           this.getActiveTabId(),
@@ -2348,8 +2363,10 @@ export class OpenCodianView extends ItemView {
         this.scheduleComposerLayoutSync();
       },
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
-      getMessagesForRender: (messages) => this.getMessagesForRender(messages),
-      getMessageVisualSignature: (message) => this.getMessageVisualSignature(message),
+      getMessagesForRender: (messages) =>
+        this.conversationIdentityRuntime.getMessagesForRender(messages),
+      getMessageVisualSignature: (message) =>
+        this.conversationIdentityRuntime.getMessageVisualSignature(message),
       assistantShellRender,
       assistantTailRender,
       logAssistantFinalizationDebug: (label, payload) => {
@@ -2396,7 +2413,8 @@ export class OpenCodianView extends ItemView {
         this.syncConversationMessagesFromCanonicalState(conversation, tabId, reason),
       syncConversationMessagesFromServer: (conversation, tabId, reason) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason),
-      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      getConversationSyncFingerprint: (messages) =>
+        this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
@@ -3015,14 +3033,6 @@ export class OpenCodianView extends ItemView {
     return message.sourceMessageId ?? message.id;
   }
 
-  private isBackgroundTaskCompletionReminder(message: ChatMessage): boolean {
-    return message.omo?.kind === 'system-reminder'
-      && (
-        message.omo.reminderType === 'background-task-completed'
-        || message.omo.reminderType === 'all-background-tasks-complete'
-      );
-  }
-
   public applyLocaleTexts(): void {
     this.chatHeaderPresenter.applyLocaleTexts();
     this.composerInputShellCoordinator.applyLocaleTexts();
@@ -3269,95 +3279,6 @@ export class OpenCodianView extends ItemView {
     await this.childSessionGraphCoordinator.refreshGraph();
   }
 
-  private getConversationSyncFingerprint(messages: ChatMessage[]): string {
-    const fingerprintBuilder = (
-      this.plugin.openCodeService?.constructor as typeof OpenCodeService | undefined
-    )?.getCanonicalConversationFingerprint;
-    if (typeof fingerprintBuilder === 'function') {
-      return fingerprintBuilder(messages);
-    }
-
-    return JSON.stringify(messages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      modelId: message.modelId ?? null,
-      sourceMessageId: message.sourceMessageId ?? null,
-      streamState: message.streamState ?? null,
-      displayStyle: message.displayStyle ?? null,
-      noticeTitle: message.noticeTitle ?? null,
-      noticeTone: message.noticeTone ?? null,
-      noticeActions: message.noticeActions ?? null,
-      noticeMeta: message.noticeMeta ?? null,
-      content: message.content,
-      timestamp: message.timestamp,
-      images: message.images ?? null,
-      toolCalls: message.toolCalls ?? null,
-      contentBlocks: message.contentBlocks ?? null,
-      contextAttachments: message.contextAttachments ?? null,
-      questionResolution: message.questionResolution ?? null,
-      omo: message.omo ?? null,
-      structured: message.structured ?? null,
-      parts: message.parts ?? null,
-    })));
-  }
-
-  private getInterruptedSyncPreservationLogFingerprint(
-    conversation: Conversation,
-    messages: ChatMessage[],
-  ): string {
-    return JSON.stringify({
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      messages: messages.map((message) => ({
-        id: message.id,
-        sourceMessageId: message.sourceMessageId ?? null,
-        streamState: message.streamState ?? null,
-        timestamp: message.timestamp,
-        content: message.content,
-        contentBlocks: message.contentBlocks ?? [],
-      })),
-    });
-  }
-
-  private getMessageVisualSignature(message: ChatMessage): string {
-    return JSON.stringify({
-      role: message.role,
-      streamState: message.streamState ?? null,
-      displayStyle: message.displayStyle ?? null,
-      content: message.content,
-      timestamp: message.timestamp,
-      modelId: message.modelId ?? null,
-      summaryKind: message.summaryKind ?? null,
-      compactionDivider: message.compactionDivider ?? null,
-      noticeTitle: message.noticeTitle ?? null,
-      noticeTone: message.noticeTone ?? null,
-      noticeActions: message.noticeActions ?? null,
-      images: message.images ?? null,
-      omo: message.omo ?? null,
-      questionResolution: message.questionResolution ? {
-        requestId: message.questionResolution.request.id,
-        status: message.questionResolution.status,
-        answers: message.questionResolution.answers ?? null,
-      } : null,
-      contentBlocks: (message.contentBlocks ?? []).map((block) => ({
-        type: block.type,
-        text: block.text ?? null,
-        thinking: block.thinking ?? null,
-        durationSeconds: block.durationSeconds ?? null,
-        toolId: block.toolId ?? null,
-        toolName: block.toolName ?? null,
-        toolKind: block.toolKind ?? null,
-        toolInput: block.toolInput ?? null,
-        toolMetadata: block.toolMetadata ?? null,
-        toolStatus: block.toolStatus ?? null,
-        toolResult: block.toolResult ?? null,
-        toolResultVisibility: block.toolResultVisibility ?? null,
-        subagentId: block.subagentId ?? null,
-        subagentMode: block.subagentMode ?? null,
-      })),
-    });
-  }
-
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
     await this.conversationLoadRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
   }
@@ -3507,7 +3428,9 @@ export class OpenCodianView extends ItemView {
       this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
         this.getActiveTabId(),
         {
-          fingerprint: this.getConversationSyncFingerprint(this.currentConversation.messages),
+      fingerprint: this.conversationIdentityRuntime.getConversationSyncFingerprint(
+        this.currentConversation.messages,
+      ),
         },
       );
     }
@@ -3671,34 +3594,8 @@ export class OpenCodianView extends ItemView {
     );
   }
 
-  private shouldRenderConversationMessage(message: ChatMessage): boolean {
-    if (this.isBackgroundTaskCompletionReminder(message)) {
-      return false;
-    }
-
-    if (message.displayStyle === 'notice') {
-      return true;
-    }
-
-    if (message.role !== 'assistant') {
-      return Boolean(
-        message.content?.trim()
-        || (message.contentBlocks?.length ?? 0) > 0
-        || (message.contextAttachments?.length ?? 0) > 0
-        || (message.images?.length ?? 0) > 0
-        || message.questionResolution
-        || message.omo
-        || message.compactionDivider,
-      );
-    }
-
-    return Boolean(
-      message.content?.trim()
-      || (message.contentBlocks?.length ?? 0) > 0
-      || (message.toolCalls?.length ?? 0) > 0
-      || message.questionResolution
-      || message.omo,
-    );
+  public shouldRenderConversationMessage(message: ChatMessage): boolean {
+    return this.conversationIdentityRuntime.shouldRenderConversationMessage(message);
   }
 
   private setStreamingAssistantMessageVisibility(
@@ -3789,7 +3686,9 @@ export class OpenCodianView extends ItemView {
       this.getMessageAnchorKey(mergedHydratedMessage),
     );
     this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
-      fingerprint: this.getConversationSyncFingerprint(conversation.messages),
+      fingerprint: this.conversationIdentityRuntime.getConversationSyncFingerprint(
+        conversation.messages,
+      ),
     });
   }
 
@@ -3913,25 +3812,6 @@ export class OpenCodianView extends ItemView {
     }
 
     await this.activeTabContextUsageCoordinator.refreshFromServer();
-  }
-
-  private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {
-    const filtered = messages.filter((message) => this.shouldRenderConversationMessage(message));
-    const rendered = buildMessageRenderGroups(filtered).map((group) =>
-      group.mergedAssistant && group.messages.length > 1
-        ? mergeAssistantMessagesForRender(group.messages)
-        : group.messages[0],
-    );
-    const activeTabId = this.getActiveTabId();
-    const contextUsage = activeTabId
-      ? this.tabManager?.getTabContextUsage(activeTabId) ?? null
-      : null;
-    const injected = injectLiveCompactionDivider({
-      messages: rendered,
-      compactingAt: contextUsage?.compactingAt ?? null,
-      tabId: activeTabId ?? '',
-    });
-    return tagCompactionSummaries(injected);
   }
 
   private isNearBottom(threshold?: number): boolean {

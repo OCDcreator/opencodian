@@ -171,6 +171,7 @@ docs/modules/
 │   │   │   ├── ConversationHistoryDialogService.md
 │   │   │   ├── ConversationRenderService.md
 │   │   │   ├── ConversationRenderRuntime.md
+│   │   │   ├── ConversationIdentityRuntime.md
 │   │   │   ├── ConversationTurnViewModelBuilder.md
 │   │   │   ├── ConversationTrailingAssistantPatchPlanner.md
 │   │   │   ├── ConversationLoadRecoveryCoordinator.md
