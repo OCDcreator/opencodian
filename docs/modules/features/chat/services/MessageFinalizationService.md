@@ -149,16 +149,24 @@ export class MessageFinalizationService {
 3. 通过 host 的 `updateConversationSyncRuntime()` 更新 sync fingerprint
 4. 通过 host 的 `scrollToBottom()` 滚动到底部
 
-`OpenCodianView` 不再拥有 `createMessageFinalizationHost`、`finalizeAssistantMessageWithError`、`getFriendlyServerStartErrorMessage` 或 `getUnavailableServerMessage`；全部委托到此服务。`OpenCodianView` 仅通过 `createMessageFinalizationHost(deps)` 传入扁平依赖对象来构建 host，然后通过 `finalizeAssistantMessageWithServerError` 和 `finalizeAssistantMessageWithServerUnavailableError` 两个 wrapper 方法调用服务。
+`OpenCodianView` 不再拥有 `createMessageFinalizationHost`、`finalizeAssistantMessageWithError`、`getFriendlyServerStartErrorMessage` 或 `getUnavailableServerMessage`；全部委托到此服务。`OpenCodianView` 通过 `createMessageFinalizationHost(deps)` 传入原始 owner 子对象来构建 host，然后通过 `finalizeAssistantMessageWithServerError` 和 `finalizeAssistantMessageWithServerUnavailableError` 两个 wrapper 方法调用服务。
 
 ### Host 组装工厂
 
-`createMessageFinalizationHost(deps)` 从扁平 `MessageFinalizationHostDependencies` 接口组装完整的 `MessageFinalizationHost`。关键映射：
+`createMessageFinalizationHost(deps)` 从 `MessageFinalizationHostDependencies` 的原始 owner 子对象组装完整的 `MessageFinalizationHost`。关键映射：
 
-- `setConversationSyncInFlight(tabId, value)` → `deps.updateConversationSyncRuntime(tabId, { inFlight: value })`
-- `setLastConversationSyncFingerprint(tabId, fingerprint)` → `deps.updateConversationSyncRuntime(tabId, { fingerprint })`
-- `setActiveTabConversation(conversation)` → `deps.syncActiveTabConversation(conversation)`
-- `syncActiveTabContextUsageIdentity()` → `deps.syncActiveTabContextUsageIdentity()`
-- `summarizeChatMessageForDebug` → 直接使用从 `SendPipelineDebugSummaries` 导入的纯函数
+- `setConversationSyncInFlight(tabId, value)` → `deps.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, { inFlight: value })`
+- `setLastConversationSyncFingerprint(tabId, fingerprint)` → `deps.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, { fingerprint })`
+- `clearPendingEditedFiles(tabId)` → `deps.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId)`
+- `setActiveTabConversation(conversation)` → `deps.tabConversationStateBridge.syncActiveTabConversation(conversation)`
+- `syncActiveTabContextUsageIdentity()` → `deps.activeTabContextUsageCoordinator.syncIdentity()`
+- `refreshActiveTabContextUsageFromServer()` → `deps.activeTabContextUsageCoordinator.refreshFromServer()`
+- `getConversationSyncFingerprint(messages)` → `deps.conversationIdentityRuntime.getConversationSyncFingerprint(messages)`
+- `applySyncedConversationUpdate(prev, next)` → `deps.conversationRenderService.applySyncedConversationUpdate(prev, next)`
+- `renderBackgroundTaskIndicatorIfNeeded(tabId)` → `deps.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId)`
+- `appendTurnDiffNoticeIfNeeded(...)` → `deps.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(...)`
+- `refreshTabSessionTodos(...)` → `deps.sessionTodoCoordinator.refreshTabSessionTodos(...)`
+- `renderStreamError(options)` → `deps.assistantShellViewHostAdapter.renderStreamError(options)`
+- `summarizeChatMessageForDebug` → 直接使用从 `SendPipelineDebugSummaries` 导入的纯函数（不来自 deps）
 
-`OpenCodianView` 不再拥有 `createMessageFinalizationHost` 私有方法；组装逻辑完全在此服务文件中。
+`OpenCodianView` 不再拥有 `createMessageFinalizationHost` 私有方法；组装逻辑完全在此服务文件中。deps 接口使用原始 owner 子对象（`conversationIdentityRuntime`、`conversationRenderService`、`backgroundTaskHost`、`conversationNoticeCoordinator`、`sessionTodoCoordinator`、`conversationTabRuntimeCoordinator`、`tabConversationStateBridge`、`activeTabContextUsageCoordinator`、`assistantShellViewHostAdapter`），不再逐字段包装 lambda。
