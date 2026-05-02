@@ -302,6 +302,9 @@ import {
   type TabMessagesPaneState,
 } from './services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from './services/TitleGenerationService';
+import {
+  logAssistantFinalizationDebug,
+} from './services/trailingAssistantPatchDebug';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { ContextDetailModal } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
@@ -314,34 +317,6 @@ import { NavigationSidebar } from './ui/NavigationSidebar';
 
 
 const logger = createLogger('OpenCodianView');
-
-const ASSISTANT_DEBUG_STAGE_ALLOWLIST = new Set([
-  'assistant-message-finalization-complete',
-  'conversation-sync-lock-cleared',
-  'message-metadata-received',
-  'message-start-received',
-  'message-stop-received',
-  'patch-trailing-assistant-render-complete',
-  'patch-trailing-assistant-render-skipped',
-  'pending-indicator-cleared',
-  'pending-indicator-shown',
-  'post-sync-full-rerender-complete',
-  'post-sync-tail-render-attempt',
-  'rerender-conversation-messages-complete',
-  'rerender-conversation-messages-start',
-  'server-sync-complete',
-  'server-sync-failed',
-  'server-sync-requested',
-  'stream-controller-started',
-  'stream-finally-enter',
-  'stream-loop-break-not-streaming',
-  'stream-loop-error',
-  'stream-progress',
-  'stream-visibility-changed',
-  'streaming-shell-finalized',
-  'trace-armed',
-  'turn-diff-processed',
-]);
 
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
 
@@ -2074,7 +2049,7 @@ export class OpenCodianView extends ItemView {
         this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
       logAssistantFinalizationDebug: (label, payload) => {
-        this.logAssistantFinalizationDebug(label, payload);
+        logAssistantFinalizationDebug(label, payload);
       },
       stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
       getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
@@ -2400,7 +2375,7 @@ export class OpenCodianView extends ItemView {
       assistantShellRender,
       assistantTailRender,
       logAssistantFinalizationDebug: (label, payload) => {
-        this.logAssistantFinalizationDebug(label, payload);
+        logAssistantFinalizationDebug(label, payload);
       },
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
     };
@@ -2655,7 +2630,7 @@ export class OpenCodianView extends ItemView {
       summarizeContentBlocksForDebug: (blocks) =>
         summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
       logAssistantFinalizationDebug: (label, payload) => {
-        this.logAssistantFinalizationDebug(label, payload);
+        logAssistantFinalizationDebug(label, payload);
       },
       getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
       summarizeCoreStreamChunkForDebug: (chunk) => summarizeCoreStreamChunkForDebug(chunk),
@@ -2716,7 +2691,7 @@ export class OpenCodianView extends ItemView {
           visible,
           reason,
           (payload) => {
-            this.logAssistantFinalizationDebug('stream-visibility-changed', payload);
+            logAssistantFinalizationDebug('stream-visibility-changed', payload);
           },
         );
       },
@@ -3153,18 +3128,6 @@ export class OpenCodianView extends ItemView {
     }
 
     return adapter.getResourcePath(assetPath);
-  }
-
-  private shouldLogAssistantFinalizationDebug(label: string): boolean {
-    return ASSISTANT_DEBUG_STAGE_ALLOWLIST.has(label);
-  }
-
-  private logAssistantFinalizationDebug(label: string, payload: unknown): void {
-    if (!this.shouldLogAssistantFinalizationDebug(label)) {
-      return;
-    }
-
-    logger.debug(`Assistant message finalization [${label}]: ${this.stringifyLogPayload(payload)}`);
   }
 
   private scheduleComposerLayoutSync(): void {

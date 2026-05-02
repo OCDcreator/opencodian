@@ -2,6 +2,8 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   emitTrailingAssistantPatchCompletionDebugLog,
   emitTrailingAssistantPatchSkippedDebugLog,
+  logAssistantFinalizationDebug,
+  shouldLogAssistantFinalizationDebug,
 } from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
 import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
@@ -96,5 +98,42 @@ describe('TrailingAssistantPatchDebugLogEmitterHelper', () => {
         mismatchIndex: 0,
       },
     );
+  });
+});
+
+describe('shouldLogAssistantFinalizationDebug', () => {
+  it('returns true for allowlisted labels', () => {
+    expect(shouldLogAssistantFinalizationDebug('stream-visibility-changed')).toBe(true);
+    expect(shouldLogAssistantFinalizationDebug('rerender-conversation-messages-start')).toBe(true);
+    expect(shouldLogAssistantFinalizationDebug('server-sync-complete')).toBe(true);
+    expect(shouldLogAssistantFinalizationDebug('patch-trailing-assistant-render-complete')).toBe(true);
+  });
+
+  it('returns false for non-allowlisted labels', () => {
+    expect(shouldLogAssistantFinalizationDebug('unknown-label')).toBe(false);
+    expect(shouldLogAssistantFinalizationDebug('')).toBe(false);
+    expect(shouldLogAssistantFinalizationDebug('STREAM-VISIBILITY-CHANGED')).toBe(false);
+  });
+});
+
+describe('logAssistantFinalizationDebug', () => {
+  it('does not throw for allowlisted labels', () => {
+    expect(() => {
+      logAssistantFinalizationDebug('stream-visibility-changed', { visible: true });
+    }).not.toThrow();
+  });
+
+  it('does not throw for non-allowlisted labels', () => {
+    expect(() => {
+      logAssistantFinalizationDebug('unknown-label', { data: 42 });
+    }).not.toThrow();
+  });
+
+  it('handles unserializable payloads gracefully', () => {
+    const circular: Record<string, unknown> = { a: 1 };
+    circular.self = circular;
+    expect(() => {
+      logAssistantFinalizationDebug('stream-visibility-changed', circular);
+    }).not.toThrow();
   });
 });

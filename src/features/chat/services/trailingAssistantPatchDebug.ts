@@ -1,3 +1,4 @@
+import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type {
   TrailingAssistantPatchCompletionDebugLoggingContext,
@@ -18,6 +19,56 @@ import type {
   TrailingAssistantPatchSkippedDebugPayloadPlan,
   TrailingAssistantPatchSkippedDebugPlanningContext,
 } from './trailingAssistantPatchTypes';
+
+const logger = createLogger('AssistantFinalizationDebug');
+
+const ASSISTANT_DEBUG_STAGE_ALLOWLIST = new Set([
+  'assistant-message-finalization-complete',
+  'conversation-sync-lock-cleared',
+  'message-metadata-received',
+  'message-start-received',
+  'message-stop-received',
+  'patch-trailing-assistant-render-complete',
+  'patch-trailing-assistant-render-skipped',
+  'pending-indicator-cleared',
+  'pending-indicator-shown',
+  'post-sync-full-rerender-complete',
+  'post-sync-tail-render-attempt',
+  'rerender-conversation-messages-complete',
+  'rerender-conversation-messages-start',
+  'server-sync-complete',
+  'server-sync-failed',
+  'server-sync-requested',
+  'stream-controller-started',
+  'stream-finally-enter',
+  'stream-loop-break-not-streaming',
+  'stream-loop-error',
+  'stream-progress',
+  'stream-visibility-changed',
+  'streaming-shell-finalized',
+  'trace-armed',
+  'turn-diff-processed',
+]);
+
+export function shouldLogAssistantFinalizationDebug(label: string): boolean {
+  return ASSISTANT_DEBUG_STAGE_ALLOWLIST.has(label);
+}
+
+export function logAssistantFinalizationDebug(label: string, payload: unknown): void {
+  if (!shouldLogAssistantFinalizationDebug(label)) {
+    return;
+  }
+
+  logger.debug(`Assistant message finalization [${label}]: ${stringifyLogPayload(payload)}`);
+}
+
+function stringifyLogPayload(payload: unknown): string {
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return '[unserializable]';
+  }
+}
 
 export type {
   TrailingAssistantPatchCompletionDebugLoggingContext,
