@@ -8,8 +8,8 @@
 
 - round: 3
 - current_task: view-srp3-05
-- last_verified_source_commit: 68371bc4 (latest source commit; doc-only commits f07522ff + f950d14e follow)
-- status_checkpoint_commit: f950d14e
+- last_verified_source_commit: 68371bc4 (latest source commit with code changes)
+- checkpoint_semantics: source-commit only; doc-only commits (f07522ff, f950d14e, 4c62eee3, and this commit) are not individually tracked because embedding one's own commit hash before committing is a self-referential impossibility
 - queue_state: completed
 - next_focus: none — queue complete
 - blocker_category: none
