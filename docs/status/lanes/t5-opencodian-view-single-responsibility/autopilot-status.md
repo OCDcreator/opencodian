@@ -8,8 +8,8 @@
 
 - round: 3
 - current_task: view-srp3-05
-- last_verified_source_commit: 68371bc4
-- status_checkpoint_commit: rolling checkpoint; use git HEAD for the current doc-only checkpoint commit
+- last_verified_source_commit: 68371bc4 (latest source commit; doc-only commits f07522ff + f950d14e follow)
+- status_checkpoint_commit: f950d14e
 - queue_state: completed
 - next_focus: none — queue complete
 - blocker_category: none
