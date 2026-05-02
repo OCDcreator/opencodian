@@ -194,6 +194,40 @@ describe('ConversationNoticeCoordinator', () => {
     });
   });
 
+  describe('getFriendlyStreamErrorMessage', () => {
+    it('returns server-no-response for empty input', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      expect(coordinator.getFriendlyStreamErrorMessage('')).toBe(t('chat.error.serverNoResponse'));
+      expect(coordinator.getFriendlyStreamErrorMessage('   ')).toBe(t('chat.error.serverNoResponse'));
+    });
+
+    it('returns server-connection for network error patterns', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      expect(coordinator.getFriendlyStreamErrorMessage('Failed to fetch')).toBe(t('chat.error.serverConnection'));
+      expect(coordinator.getFriendlyStreamErrorMessage('ECONNREFUSED')).toBe(t('chat.error.serverConnection'));
+      expect(coordinator.getFriendlyStreamErrorMessage('NetworkError')).toBe(t('chat.error.serverConnection'));
+      expect(coordinator.getFriendlyStreamErrorMessage('SSE connection failed')).toBe(t('chat.error.serverConnection'));
+      expect(coordinator.getFriendlyStreamErrorMessage('fetch failed')).toBe(t('chat.error.serverConnection'));
+      expect(coordinator.getFriendlyStreamErrorMessage('HTTP 0 error')).toBe(t('chat.error.serverConnection'));
+    });
+
+    it('returns server-binary-missing for opencode-not-found', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      expect(coordinator.getFriendlyStreamErrorMessage('opencode not found')).toBe(t('chat.error.serverBinaryMissing'));
+    });
+
+    it('returns send-failed with original message for unknown errors', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      const result = coordinator.getFriendlyStreamErrorMessage('Something went wrong');
+      expect(result).toBe(`${t('chat.error.sendFailed')}\nSomething went wrong`);
+    });
+
+    it('is case-insensitive for network patterns', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      expect(coordinator.getFriendlyStreamErrorMessage('FAILED TO FETCH')).toBe(t('chat.error.serverConnection'));
+    });
+  });
+
   describe('routeNoticeAction', () => {
     it('routes open_model_settings', async () => {
       const coordinator = new ConversationNoticeCoordinator(createHost());

@@ -33,6 +33,7 @@ export interface ConversationNoticeCoordinatorHost {
 }
 
 export class ConversationNoticeCoordinator {
+  getFriendlyStreamErrorMessage(rawMessage: string): string;
   createStreamErrorNotice(message: string): ChatMessage;
   shouldRenderEmptyConversationNotice(): boolean;
   createEmptyConversationNotice(): ChatMessage;
@@ -52,6 +53,7 @@ export class ConversationNoticeCoordinator {
 ### stream error notice
 
 - `createStreamErrorNotice()` 复用 `AssistantNoticeRenderer.buildStreamErrorNotice()`，统一补上当前模型 id
+- `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → no response，其余 → send failed + 原文
 
 ### turn diff notice
 
@@ -68,6 +70,7 @@ export class ConversationNoticeCoordinator {
 
 | 方法 / 导出 | 说明 |
 |-------------|------|
+| `getFriendlyStreamErrorMessage()` | 将原始流错误字符串映射为用户友好文案 |
 | `createStreamErrorNotice()` | 生成 stream error assistant notice |
 | `shouldRenderEmptyConversationNotice()` | 判断是否应显示 empty notice |
 | `createEmptyConversationNotice()` | 生成 normal / rewind empty notice |

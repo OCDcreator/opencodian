@@ -2640,7 +2640,7 @@ export class OpenCodianView extends ItemView {
       showQuestionDialog: (request, tabId) =>
         this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId),
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
-      getFriendlyStreamErrorMessage: (rawMessage) => this.getFriendlyStreamErrorMessage(rawMessage),
+      getFriendlyStreamErrorMessage: (rawMessage) => this.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage),
     };
     const shellPort: SendPipelineShellPort = this.assistantShellViewHostAdapter.createSendPipelineShellPort();
     const persistencePort: SendPipelinePersistencePort = {
@@ -3400,56 +3400,6 @@ export class OpenCodianView extends ItemView {
     }
 
     return t('chat.error.serverOffline');
-  }
-
-  private getFriendlyStreamErrorMessage(rawMessage: string): string {
-    const message = rawMessage.trim();
-    const lowerMessage = message.toLowerCase();
-
-    if (!message) {
-      return t('chat.error.serverNoResponse');
-    }
-
-    if (
-      lowerMessage.includes('failed to fetch')
-      || lowerMessage.includes('econnrefused')
-      || lowerMessage.includes('networkerror')
-      || lowerMessage.includes('sse connection failed')
-      || lowerMessage.includes('fetch failed')
-      || lowerMessage.includes('http 0')
-    ) {
-      return t('chat.error.serverConnection');
-    }
-
-    if (lowerMessage.includes('opencode not found')) {
-      return t('chat.error.serverBinaryMissing');
-    }
-
-    return `${t('chat.error.sendFailed')}\n${message}`;
-  }
-
-  private async appendAssistantErrorMessage(message: string): Promise<void> {
-    const activeTabId = this.getActiveTabId();
-    const activeRuntime = this.getTabRuntimeState(activeTabId);
-    const noticeMessage = this.conversationNoticeCoordinator.createStreamErrorNotice(message);
-    const { messageEl } = this.assistantShellViewHostAdapter.createAssistantMessageElement(activeTabId);
-    await this.assistantShellViewHostAdapter.renderAssistantPlaceholderAsNotice({
-      messageEl,
-      noticeMessage,
-      reason: 'render-stream-error-notice',
-    });
-    if (activeRuntime) {
-      activeRuntime.streamingMessageEl = null;
-      activeRuntime.streamingContentEl = null;
-    }
-
-    if (this.currentConversation) {
-      this.currentConversation.messages.push(noticeMessage);
-      this.currentConversation.updatedAt = Date.now();
-      await this.plugin.storage.saveConversation(this.currentConversation);
-    }
-
-    this.scrollToBottom({ enableAutoScroll: true });
   }
 
   /** Cancel streaming */

@@ -5,6 +5,15 @@ import type { TabId } from '../tabs';
 import type { ModelSelectorSelection } from '../ui/modelSelector/types';
 import type { PersistentAssistantNoticeMessageOptions } from './PersistentAssistantNoticeService';
 
+const NETWORK_ERROR_PATTERNS = [
+  'failed to fetch',
+  'econnrefused',
+  'networkerror',
+  'sse connection failed',
+  'fetch failed',
+  'http 0',
+] as const;
+
 export interface ConversationNoticeCoordinatorHost {
   getCurrentSessionModel(): ModelSelectorSelection | null;
   formatModelId(model: ModelSelectorSelection | null | undefined): string | undefined;
@@ -118,6 +127,25 @@ export class ConversationNoticeCoordinator {
     });
 
     return [t('chat.diffNotice.description'), '', ...lines].join('\n');
+  }
+
+  getFriendlyStreamErrorMessage(rawMessage: string): string {
+    const message = rawMessage.trim();
+    const lowerMessage = message.toLowerCase();
+
+    if (!message) {
+      return t('chat.error.serverNoResponse');
+    }
+
+    if (NETWORK_ERROR_PATTERNS.some((pattern) => lowerMessage.includes(pattern))) {
+      return t('chat.error.serverConnection');
+    }
+
+    if (lowerMessage.includes('opencode not found')) {
+      return t('chat.error.serverBinaryMissing');
+    }
+
+    return `${t('chat.error.sendFailed')}\n${message}`;
   }
 
   async routeNoticeAction(

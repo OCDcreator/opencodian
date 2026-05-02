@@ -530,7 +530,7 @@ background task notice 这条子链路现在的边界是：
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调
 - `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调；queued state 已不再挂在 view runtime 上
 - `PersistentAssistantNoticeService`：session todo / background task / diff / model-unavailable 共享的 persisted notice append、conversation save、sync fingerprint 写回，以及 visible/hidden tab 后续动作
-- `ConversationNoticeCoordinator`：conversation empty / stream error / turn diff / notice action 的编排入口
+- `ConversationNoticeCoordinator`：conversation empty / stream error notice 生成、stream error 友好文案映射（`getFriendlyStreamErrorMessage`）、turn diff / notice action 的编排入口；`OpenCodianView` 不再保留 `getFriendlyStreamErrorMessage` 或 `appendAssistantErrorMessage` 的私有实现
 
 ## 外观与控件
 
