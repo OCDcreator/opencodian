@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 2
-- current_task: view-srp2-05
-- last_verified_source_commit: e39ddb04
+- round: 3
+- current_task: view-srp3-05
+- last_verified_source_commit: 68371bc4
 - status_checkpoint_commit: rolling checkpoint; use git HEAD for the current doc-only checkpoint commit
 - queue_state: completed
 - next_focus: none — queue complete
@@ -61,7 +61,7 @@
 
 - Keep running through the queued `OpenCodianView.ts` source-level ownership slices.
 - Do not stop at analysis-only, checkpoint-only, or documentation-only output.
-- Prefer existing adjacent chat owners before creating any new module.
+- Prefer existing adjacent chat owners before creating any module.
 - Reject thin helper fragmentation even if line count drops.
 - Run focused checks, module-doc checks, graphify freshness, `npm run verify`, and blocking Codex review for source tasks.
 
@@ -132,27 +132,92 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 | view-srp2-04 | ~84 | ActiveTabContextUsageCoordinator (services/) |
 | **Round 2 Total** | **~534** | **4 owners (3 new, 1 extended)** |
 
-### Cumulative Impact (Rounds 1 + 2)
+## Round 3 — Third SRP Batch
 
-OpenCodianView.ts: 5314 → 4437 lines (**−877 lines**, **16.5% reduction**)
+### view-srp3-01 — Extract ConversationIdentityRuntime (DONE)
+- Extracted conversation sync fingerprints, message visual signatures, and render-list shaping to `ConversationIdentityRuntime`
+- New runtime owns: `getConversationSyncFingerprint`, `getInterruptedSyncPreservationLogFingerprint`, `getMessageVisualSignature`, `getMessagesForRender`, `shouldRenderConversationMessage`, `isBackgroundTaskCompletionReminder`
+- Host interface provides: `getCanonicalConversationFingerprint` (canonical fallback), `getActiveTabId` (compaction injection), `getTabContextUsage` (compaction injection)
+- Removed `renderGroups` import block from OpenCodianView (moved to runtime)
+- OpenCodianView.ts reduced by ~120 lines (4437→4317)
+- Destination: `src/features/chat/services/ConversationIdentityRuntime.ts` (167 lines)
+- 26 tests across 2 files (fingerprint/signature + render/visibility)
+
+### view-srp3-02 — Move settled scroll scheduling into ScrollManager ownership (DONE)
+- Added `SettledScrollScheduler` class to `ScrollManager.ts` owning double-rAF frame state and cancellation
+- `TabMessagesPaneCoordinator` now takes `SettledScrollScheduler` as constructor parameter; calls `schedule()` directly
+- Removed `scheduleSettledScrollToBottomIfNeeded` from `TabMessagesPaneCoordinatorHost`
+- OpenCodianView no longer owns `scrollToBottomFrameId`; delegates to `SettledScrollScheduler`
+- Removed dead `isNearBottom()` method from OpenCodianView
+- OpenCodianView.ts reduced by ~50 lines (4317→4267)
+- Destinations: `ScrollManager.ts` (173 lines), `TabMessagesPaneCoordinator.ts` (331 lines)
+- 4 new tests for `SettledScrollScheduler` + updated coordinator tests with mock scheduler
+
+### view-srp3-03 — Move send model option assembly into model selection ownership (DONE)
+- Moved `getSendMessageOptions`, `getReasoningOptionsForModel`, `appendModelUnavailableNoticeMessage`, `getModelUnavailableNoticeContent` to `ModelSelectionRuntime`/`ChatSelectionControlsCoordinator`
+- Added `getEffortLevel`/`getThinkingBudget` to `ModelSelectionRuntimeHost` so runtime uses `isAdaptiveThinkingModel` directly
+- Added `appendModelUnavailableNoticeMessage` to `ChatSelectionControlsCoordinatorHost` for notice delegation through host seam
+- OpenCodianView.ts reduced by ~59 lines (4267→4208)
+- Destinations: `ModelSelectionRuntime.ts` (307 lines), `ChatSelectionControlsCoordinator.ts` (447 lines)
+- 3 new tests for `getSendMessageOptions` covering empty, thinking budget, reasoning effort
+
+### view-srp3-04 — Move chat visual demo lifecycle to ChatVisualDemoCoordinator (DONE)
+- Created `ChatVisualDemoCoordinator` owning all demo lifecycle: Liquid Diamond CPU/WebGL toggle with mutual exclusion, Glass Octahedron async toggle with error handling, `destroyAll()` cleanup
+- Replaced 3 private demo controller fields in OpenCodianView with single coordinator
+- Public toggle methods now one-line delegates using `?.` for null safety
+- Coordinator initialized in `buildUI()` after `messagesShellEl` creation; Notice and log behavior delegated through host interface (`showNotice`, `logWarn`) — coordinator has zero obsidian/shared direct imports
+- OpenCodianView.ts reduced by ~100 lines
+- Destination: `src/features/chat/services/ChatVisualDemoCoordinator.ts` (129 lines)
+- 14 coordinator tests with full mock isolation including host notice/log delegation verification
+
+### view-srp3-05 — Finalize third SRP batch with docs and verification (DONE)
+- Ran `npm run verify` — all gates pass:
+  - module-docs: pass
+  - graphify: pass
+  - devlog-order: pass
+  - lint: pass (0 errors, 0 warnings)
+  - typecheck: clean
+  - tests: 1925 pass
+  - build: OK
+- Updated lane status doc with Round 3 results
+- Graphify artifacts refreshed for all Round 3 source ownership moves
+
+### Round 3 Net Impact
+
+OpenCodianView.ts: 4437 → 4208 lines (**−229 lines**)
+
+| Task | Lines Removed | Destination |
+|------|---------------|-------------|
+| view-srp3-01 | ~120 | ConversationIdentityRuntime (services/, 167 lines) |
+| view-srp3-02 | ~50 | ScrollManager (services/, 173 lines) + TabMessagesPaneCoordinator (extended) |
+| view-srp3-03 | ~59 | ModelSelectionRuntime (services/, 307 lines) + ChatSelectionControlsCoordinator (extended) |
+| view-srp3-04 | ~100 | ChatVisualDemoCoordinator (services/, 129 lines) |
+| **Round 3 Total** | **~229** | **6 owners (2 new, 4 extended)** |
+
+### Cumulative Impact (Rounds 1 + 2 + 3)
+
+OpenCodianView.ts: 5314 → 4208 lines (**−1106 lines**, **20.8% reduction**)
 
 | Round | Actual Δ | Per-task Estimates | Destinations |
 |-------|----------|--------------------|-------------|
 | Round 1 (view-17 to view-20) | −343 (5314→4971) | ~120+~55+~30+~45=~250 | 4 existing owners |
 | Round 2 (view-srp2-01 to view-srp2-04) | −534 (4971→4437) | ~120+~175+~155+~84=~534 | 4 owners (3 new, 1 extended) |
-| **Grand Total** | **−877** | *per-task sums undercount Round 1 by ~93 lines due to inline cleanup, import removal, and dead-code elimination not captured in per-slice estimates* | **7 distinct owners** |
+| Round 3 (view-srp3-01 to view-srp3-04) | −229 (4437→4208) | ~120+~50+~59+~100=~329 | 6 owners (2 new, 4 extended) |
+| **Grand Total** | **−1106** | *per-task sums undercount Round 1 by ~93 lines due to inline cleanup, import removal, and dead-code elimination* | **11 distinct owners** |
 
 ### No Thin Helper Modules Introduced
 
 All extractions went to either:
-1. **Existing coordinators** extended with same-domain responsibilities (ActiveTabContextUsageCoordinator, BackgroundTaskTimelineService, ConversationRenderService, ChildSessionGraphCoordinator)
-2. **New modules with substantive domain ownership** — each owns a clear, non-trivial responsibility surface (ChatSurfaceAppearanceCoordinator, SendPipelineDebugSummaries, UserMessageContentRenderer)
+1. **Existing coordinators** extended with same-domain responsibilities (ActiveTabContextUsageCoordinator, BackgroundTaskTimelineService, ConversationRenderService, ChildSessionGraphCoordinator, ScrollManager, TabMessagesPaneCoordinator, ModelSelectionRuntime, ChatSelectionControlsCoordinator)
+2. **New modules with substantive domain ownership** — each owns a clear, non-trivial responsibility surface (ChatSurfaceAppearanceCoordinator, SendPipelineDebugSummaries, UserMessageContentRenderer, ConversationIdentityRuntime, ChatVisualDemoCoordinator)
 
-No adapter/factory/provider indirection layers were created.
+No adapter/factory/provider indirection layers were created. Each new module was created only because no existing owner covered the extracted domain.
 
-## Remaining Candidates (not extracted in this round)
+## Remaining Candidates (not extracted across all rounds)
 
 - debug or render-support behavior still owned directly by `OpenCodianView.ts`
 - question/todo activation host assembly (skipped as unsafe — adds bridge chain)
 - scroll anchoring and viewport math (complex, intertwined with tab switching)
 - remaining inline event handlers that reference `this.app` or `this.plugin` directly
+- conversation load/hydration bridge assembly (intertwined with tab lifecycle recovery)
+- tab state management delegation (central to view identity, unsafe to fragment)
