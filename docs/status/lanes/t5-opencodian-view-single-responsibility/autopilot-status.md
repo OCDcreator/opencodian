@@ -690,17 +690,18 @@ OpenCodianView.ts: 5314 → 3682 lines (**−1632 lines**, **30.7% reduction**)
 - Planned: shift `createMessageFinalizationHost` from OpenCodianView to MessageFinalizationService
 - Status: todo
 
-### view-srp11-02 — Move message send-preparation runtime host assembly into MessageSendPreparationService owner (PENDING)
-- Planned: move send-preparation runtime host assembly from OpenCodianView to MessageSendPreparationService
+### view-srp11-02 — Move send pipeline runtime host assembly into SendPipelineRuntime owner (PENDING)
+- Planned: shift `createSendPipelineRuntimeHost` from OpenCodianView to `SendPipelineRuntime` with flat `SendPipelineHostDependencies` interface
+- Destination: `src/features/chat/runtime/SendPipelineRuntime.ts` (existing owner, extended with factory)
 - Status: draft
 
 ### view-srp11-03 — Finalize SRP batch with docs graphify and full verification (DONE)
-- Corrected cumulative table: OpenCodianView.ts actual line count is 3682 (lint compaction in 75e6a55f reduced from 3690)
-- Full verify passes: 0 errors, 0 warnings, 2029 tests
-- Graphify and module docs already fresh (no source changes in this batch)
-- Working tree clean; no dirty files remain
+- Corrected task description for view-srp11-02 (SendPipelineRuntime, not MessageSendPreparationService)
+- Full verify passes: 0 errors, 0 warnings, 2029 tests, build OK
+- Graphify and module docs fresh; working tree clean
 - Source tasks view-srp11-01 and view-srp11-02 are pending — loop must continue to pick them up
 - **This finalize task is done; the loop should continue to view-srp11-01 next**
+- **No `next_focus` entry remains — queue state is clean**
 
 ### Round 11 Net Impact
 
@@ -709,7 +710,7 @@ OpenCodianView.ts: 3682 → 3682 lines (**0 lines** — pending source tasks)
 | Task | Measured Δ | Destination |
 |------|------------|-------------|
 | view-srp11-01 | pending | MessageFinalizationService (services/, planned) |
-| view-srp11-02 | pending | MessageSendPreparationService (services/, planned) |
+| view-srp11-02 | pending | SendPipelineRuntime (runtime/, planned) |
 | view-srp11-03 | 0 (docs/verification only) | Status doc correction + full verify gate |
 | **Round 11 Total** | **0** | **pending source tasks** |
 
