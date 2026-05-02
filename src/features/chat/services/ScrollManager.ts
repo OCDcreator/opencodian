@@ -92,6 +92,37 @@ export function captureElementScrollRestoreSnapshot(
   };
 }
 
+/**
+ * Owns the double-requestAnimationFrame scheduling used to defer scroll-to-bottom
+ * until layout has settled. Extracted from OpenCodianView so that the rAF frame
+ * ID and cancellation logic live in scroll-owned code, not in the view itself.
+ */
+export class SettledScrollScheduler {
+  private frameId: number | null = null;
+
+  /**
+   * Schedule a double-rAF settled scroll. Any previously scheduled frame is
+   * cancelled first, ensuring at most one pending settled scroll at a time.
+   */
+  schedule(executor: () => void): void {
+    this.clear();
+    this.frameId = window.requestAnimationFrame(() => {
+      this.frameId = window.requestAnimationFrame(() => {
+        this.frameId = null;
+        executor();
+      });
+    });
+  }
+
+  /** Cancel any pending settled scroll. */
+  clear(): void {
+    if (this.frameId !== null) {
+      window.cancelAnimationFrame(this.frameId);
+      this.frameId = null;
+    }
+  }
+}
+
 export function restoreElementScrollAfterRender(
   messagesEl: HTMLElement,
   snapshot: ConversationScrollRestoreSnapshot,

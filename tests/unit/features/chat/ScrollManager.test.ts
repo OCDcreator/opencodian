@@ -3,6 +3,7 @@ import {
   isElementNearBottom,
   restoreElementScrollAfterRender,
   scrollElementToBottom,
+  SettledScrollScheduler,
 } from '../../../../src/features/chat/services/ScrollManager';
 
 function installScrollMetrics(
@@ -182,5 +183,76 @@ describe('ScrollManager', () => {
 
     expect(messagesEl.scrollTop).toBe(360);
     expect(restored).toHaveBeenLastCalledWith(360);
+  });
+});
+
+describe('SettledScrollScheduler', () => {
+  let rafCallbacks: FrameRequestCallback[];
+  let originalRaf: typeof window.requestAnimationFrame;
+  let originalCancel: typeof window.cancelAnimationFrame;
+
+  beforeEach(() => {
+    rafCallbacks = [];
+    originalRaf = window.requestAnimationFrame;
+    originalCancel = window.cancelAnimationFrame;
+    window.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      rafCallbacks.push(callback);
+      return rafCallbacks.length;
+    };
+    window.cancelAnimationFrame = jest.fn();
+  });
+
+  afterEach(() => {
+    window.requestAnimationFrame = originalRaf;
+    window.cancelAnimationFrame = originalCancel;
+  });
+
+  it('uses double-rAF to defer execution until layout settles', () => {
+    const scheduler = new SettledScrollScheduler();
+    const executed = jest.fn();
+
+    scheduler.schedule(executed);
+
+    expect(executed).not.toHaveBeenCalled();
+    expect(rafCallbacks.length).toBe(1);
+
+    rafCallbacks[0](16);
+    expect(executed).not.toHaveBeenCalled();
+    expect(rafCallbacks.length).toBe(2);
+
+    rafCallbacks[1](16);
+    expect(executed).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels previous frame when scheduling a new one', () => {
+    const scheduler = new SettledScrollScheduler();
+    const first = jest.fn();
+    const second = jest.fn();
+
+    scheduler.schedule(first);
+    scheduler.schedule(second);
+
+    expect(window.cancelAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+  });
+
+  it('clear cancels any pending frame', () => {
+    const scheduler = new SettledScrollScheduler();
+    const executed = jest.fn();
+
+    scheduler.schedule(executed);
+    scheduler.clear();
+
+    expect(window.cancelAnimationFrame).toHaveBeenCalled();
+    rafCallbacks.forEach((cb) => cb(16));
+    expect(executed).not.toHaveBeenCalled();
+  });
+
+  it('clear is a no-op when nothing is scheduled', () => {
+    const scheduler = new SettledScrollScheduler();
+
+    scheduler.clear();
+
+    expect(window.cancelAnimationFrame).not.toHaveBeenCalled();
   });
 });

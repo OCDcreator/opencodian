@@ -31,10 +31,13 @@ export interface TabMessagesPaneCoordinatorHost<Runtime extends TabMessagesPaneR
   updateNavigationSidebarVisibility(): void;
   clearScheduledSignalConversationSync(tabId: TabId): void;
   shouldAutoScroll(tabId: TabId | null): boolean;
-  scheduleSettledScrollToBottomIfNeeded(shouldScroll: boolean, tabId: TabId | null): void;
 }
 
 export class TabMessagesPaneCoordinator<Runtime extends TabMessagesPaneRuntimeState> {
+  constructor(
+    host: TabMessagesPaneCoordinatorHost<Runtime>,
+    scrollScheduler: SettledScrollScheduler,
+  );
   getPaneState(tabId: TabId | null): TabMessagesPaneState<Runtime> | null;
   getRuntimeState(tabId: TabId | null): Runtime | null;
   getMessagesEl(tabId: TabId | null): HTMLElement | null;
@@ -53,7 +56,7 @@ export class TabMessagesPaneCoordinator<Runtime extends TabMessagesPaneRuntimeSt
 ## 关键行为
 
 - `ensurePane()` 一次性组装 tab pane DOM、scroll listener、mutation/resize observers 和新 runtime，并保留同一个 pane state 供 view 其它 host seam 复用
-- `setActivePane()` 会统一切换 `is-active` class、写回 `messagesContainer`、恢复当前 turn body、重建 navigation sidebar，并在需要时安排 settled scroll
+- `setActivePane()` 会统一切换 `is-active` class、写回 `messagesContainer`、恢复当前 turn body、重建 navigation sidebar，并在需要时通过 `SettledScrollScheduler` 安排 settled scroll
 - `syncScrollMetrics()` 只负责 pane 级 near-bottom / passive measurement 和当前活动 pane 的 sidebar 可见性刷新
 - layout 变化若发生在 hydration 期间，只累计 `pendingLayoutMutations` 并刷新 metrics；不会过早触发 settled auto-scroll
 - `suppressNextLayoutAutoScroll()` 会给指定 tab runtime 打一次性标记，让下一次 active-pane layout observer 回调只刷新 metrics、不调度 settled scroll；用于 tool / thinking 等用户主动展开场景
@@ -63,4 +66,4 @@ export class TabMessagesPaneCoordinator<Runtime extends TabMessagesPaneRuntimeSt
 
 - `OpenCodianView` 现在只保留 host wiring、`TabManager` / conversation bridge 入口，以及高层 scroll/business 判断
 - pane DOM map 的主要 lifecycle ownership 已迁到 `TabMessagesPaneCoordinator`
-- `ScrollManager.ts` 继续保持纯 DOM/scroll helper；pane owner 只复用它的底层算法，不回退为新的 view 内联实现
+- settled scroll 的 rAF 帧状态和取消逻辑由 `ScrollManager.SettledScrollScheduler` 拥有，coordinator 直接引用；不再通过宿主回调回退到 view

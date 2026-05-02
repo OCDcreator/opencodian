@@ -8,6 +8,7 @@ import {
   isElementNearBottom,
   scrollElementToBottom,
   type ScrollToBottomOptions,
+  SettledScrollScheduler,
 } from './ScrollManager';
 
 interface CancellableStreamController {
@@ -52,7 +53,6 @@ export interface TabMessagesPaneCoordinatorHost<
   updateNavigationSidebarVisibility(): void;
   clearScheduledSignalConversationSync(tabId: TabId): void;
   shouldAutoScroll(tabId: TabId | null): boolean;
-  scheduleSettledScrollToBottomIfNeeded(shouldScroll: boolean, tabId: TabId | null): void;
 }
 
 export class TabMessagesPaneCoordinator<
@@ -60,7 +60,10 @@ export class TabMessagesPaneCoordinator<
 > {
   private readonly paneStates = new Map<TabId, TabMessagesPaneState<Runtime>>();
 
-  constructor(private readonly host: TabMessagesPaneCoordinatorHost<Runtime>) {}
+  constructor(
+    private readonly host: TabMessagesPaneCoordinatorHost<Runtime>,
+    private readonly scrollScheduler: SettledScrollScheduler,
+  ) {}
 
   getPaneState(tabId: TabId | null): TabMessagesPaneState<Runtime> | null {
     if (!tabId) {
@@ -170,10 +173,11 @@ export class TabMessagesPaneCoordinator<
     this.host.rebuildNavigationSidebar();
     this.syncScrollMetrics(tabId, activePaneState.messagesEl);
     if (activePaneState.runtime.autoScrollEnabled) {
-      this.host.scheduleSettledScrollToBottomIfNeeded(
-        this.host.shouldAutoScroll(tabId),
-        tabId,
-      );
+      if (this.host.shouldAutoScroll(tabId)) {
+        this.scrollScheduler.schedule(() => {
+          this.scrollToBottom(tabId);
+        });
+      }
     }
   }
 
@@ -302,10 +306,11 @@ export class TabMessagesPaneCoordinator<
       if (suppressAutoScroll) {
         return;
       }
-      this.host.scheduleSettledScrollToBottomIfNeeded(
-        this.host.shouldAutoScroll(tabId),
-        tabId,
-      );
+      if (this.host.shouldAutoScroll(tabId)) {
+        this.scrollScheduler.schedule(() => {
+          this.scrollToBottom(tabId);
+        });
+      }
     }
   }
 

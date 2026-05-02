@@ -270,7 +270,7 @@ import {
   type TabConversationSyncFingerprintRuntimePort,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
-  isElementNearBottom,
+  SettledScrollScheduler,
 } from './services/ScrollManager';
 import {
   createSessionTodoCoordinator,
@@ -518,7 +518,7 @@ export class OpenCodianView extends ItemView {
   private contextRing: ContextRing | null = null;
   private contextRingContainerEl: HTMLElement | null = null;
 
-  private scrollToBottomFrameId: number | null = null;
+  private readonly scrollScheduler = new SettledScrollScheduler();
   private chatSurfaceAppearanceCoordinator: ChatSurfaceAppearanceCoordinator;
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
@@ -1016,9 +1016,6 @@ export class OpenCodianView extends ItemView {
         );
       },
       shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
-      scheduleSettledScrollToBottomIfNeeded: (shouldScroll, tabId) => {
-        this.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
-      },
     };
   }
 
@@ -1351,6 +1348,7 @@ export class OpenCodianView extends ItemView {
       titleGenerationService,
       tabMessagesPaneCoordinator: new TabMessagesPaneCoordinator(
         this.createTabMessagesPaneCoordinatorHost(),
+        this.scrollScheduler,
       ),
       chatHeaderPresenter: new ChatHeaderPresenter(this.createChatHeaderPresenterHost()),
       conversationHistoryActionsCoordinator,
@@ -3814,14 +3812,6 @@ export class OpenCodianView extends ItemView {
     await this.activeTabContextUsageCoordinator.refreshFromServer();
   }
 
-  private isNearBottom(threshold?: number): boolean {
-    if (!this.messagesContainer) {
-      return true;
-    }
-
-    return isElementNearBottom(this.messagesContainer, threshold);
-  }
-
   private async applyFallbackConversationTitle(conversationId: string, firstMessage: string): Promise<void> {
     const fallbackTitle = this.plugin.generateDefaultTitle(firstMessage);
     await this.updateConversationTitleState(conversationId, {
@@ -3957,20 +3947,13 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleSettledScrollToBottom(tabId: TabId | null = this.getActiveTabId()): void {
-    this.clearScheduledScrollToBottom();
-    this.scrollToBottomFrameId = window.requestAnimationFrame(() => {
-      this.scrollToBottomFrameId = window.requestAnimationFrame(() => {
-        this.scrollToBottomFrameId = null;
-        this.scrollToBottom({ tabId });
-      });
+    this.scrollScheduler.schedule(() => {
+      this.scrollToBottom({ tabId });
     });
   }
 
   private clearScheduledScrollToBottom(): void {
-    if (this.scrollToBottomFrameId !== null) {
-      window.cancelAnimationFrame(this.scrollToBottomFrameId);
-      this.scrollToBottomFrameId = null;
-    }
+    this.scrollScheduler.clear();
   }
 
   public async reloadModelCatalog(): Promise<void> {

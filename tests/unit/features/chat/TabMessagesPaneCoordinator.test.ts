@@ -1,3 +1,4 @@
+import { SettledScrollScheduler } from '../../../../src/features/chat/services/ScrollManager';
 import {
   TabMessagesPaneCoordinator,
   type TabMessagesPaneCoordinatorHost,
@@ -63,6 +64,15 @@ function flushMutations(): Promise<void> {
   });
 }
 
+function createMockScheduler(): SettledScrollScheduler & { scheduleCalls: Array<() => void> } {
+  const calls: Array<() => void> = [];
+  const scheduler = new SettledScrollScheduler();
+  scheduler.schedule = (executor: () => void) => {
+    calls.push(executor);
+  };
+  return Object.assign(scheduler, { scheduleCalls: calls });
+}
+
 function createFixture(activeTabId = 'tab-1') {
   const messagesShellEl = document.createElement('div');
   document.body.appendChild(messagesShellEl);
@@ -85,12 +95,13 @@ function createFixture(activeTabId = 'tab-1') {
     updateNavigationSidebarVisibility: jest.fn(),
     clearScheduledSignalConversationSync: jest.fn(),
     shouldAutoScroll: jest.fn(() => true),
-    scheduleSettledScrollToBottomIfNeeded: jest.fn(),
   };
+  const scheduler = createMockScheduler();
 
   return {
-    coordinator: new TabMessagesPaneCoordinator(host),
+    coordinator: new TabMessagesPaneCoordinator(host, scheduler),
     host,
+    scheduler,
     messagesShellEl,
     getMessagesContainer: () => messagesContainer,
     setActiveTabId: (tabId: string | null) => {
@@ -146,7 +157,7 @@ describe('TabMessagesPaneCoordinator', () => {
     expect(fixture.host.restoreTurnStateFromActivePane).toHaveBeenCalledTimes(1);
     expect(fixture.host.rebuildNavigationSidebar).toHaveBeenCalledTimes(1);
     expect(fixture.host.updateNavigationSidebarVisibility).toHaveBeenCalledTimes(1);
-    expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).toHaveBeenCalledWith(true, 'tab-1');
+    expect(fixture.scheduler.scheduleCalls.length).toBe(1);
   });
 
   it('defers layout-driven auto-scroll while the tab is hydrating', async () => {
@@ -169,7 +180,7 @@ describe('TabMessagesPaneCoordinator', () => {
 
     expect(pane.runtime.pendingLayoutMutations).toBe(1);
     expect(fixture.host.updateNavigationSidebarVisibility).toHaveBeenCalled();
-    expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).not.toHaveBeenCalled();
+    expect(fixture.scheduler.scheduleCalls.length).toBe(0);
   });
 
   it('suppresses the next active layout auto-scroll when a user-controlled toggle marks it', async () => {
@@ -189,13 +200,13 @@ describe('TabMessagesPaneCoordinator', () => {
     pane.messagesEl.appendChild(document.createElement('div'));
     await flushMutations();
 
-    expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).not.toHaveBeenCalled();
+    expect(fixture.scheduler.scheduleCalls.length).toBe(0);
 
-    fixture.host.scheduleSettledScrollToBottomIfNeeded.mockClear();
+    fixture.scheduler.scheduleCalls.length = 0;
     pane.messagesEl.appendChild(document.createElement('div'));
     await flushMutations();
 
-    expect(fixture.host.scheduleSettledScrollToBottomIfNeeded).toHaveBeenCalledWith(true, 'tab-1');
+    expect(fixture.scheduler.scheduleCalls.length).toBe(1);
   });
 
   it('cleans up active pane state on remove and clear', () => {
