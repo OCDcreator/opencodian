@@ -10,8 +10,8 @@
 - current_task: view-srp11-03
 - last_verified_source_commit: 75e6a55f (fix all 7 lint warnings and update status doc for zero-warning verify)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
-- queue_state: in_progress
-- next_focus: view-srp11-01 (message finalization host assembly) then view-srp11-02 (send-preparation runtime host assembly)
+- queue_state: in_progress — source tasks view-srp11-01/02 must land before this batch can close
+- next_focus: view-srp11-01 (message finalization host assembly)
 - blocker_category: none
 - continue_loop: true
 
@@ -694,11 +694,12 @@ OpenCodianView.ts: 5314 → 3682 lines (**−1632 lines**, **30.7% reduction**)
 - Planned: move send-preparation runtime host assembly from OpenCodianView to MessageSendPreparationService
 - Status: draft
 
-### view-srp11-03 — Finalize SRP batch with docs graphify and full verification (DONE)
+### view-srp11-03 — Finalize SRP batch with docs graphify and full verification (BASELINE VERIFIED — awaiting source tasks)
 - Corrected cumulative table: OpenCodianView.ts actual line count is 3682 (lint compaction in 75e6a55f reduced from 3690)
 - Baseline verify passes: 0 errors, 0 warnings, 2029 tests
-- Source tasks view-srp11-01 and view-srp11-02 are pending; no source ownership changes yet
+- Source tasks view-srp11-01 and view-srp11-02 are still pending (todo/draft); no source ownership changes yet
 - Graphify and module docs already fresh (no source changes)
+- **This batch cannot close until view-srp11-01 and view-srp11-02 land their source changes**
 
 ### Round 11 Net Impact
 
