@@ -15,10 +15,14 @@ import type {
   PromptContextItem,
 } from '../../../core/types';
 import type { EffortLevel, ThinkingBudget } from '../../../core/types/settings';
-import { buildContextAttachment } from '../../../shared';
+import { t } from '../../../i18n';
+import { buildContextAttachment, createLogger } from '../../../shared';
 import { getPromptContextTargetKey } from '../composerContext';
+import type { SendPipelineStreamElements } from '../runtime/SendPipelineTypes';
 import type { TabId } from '../tabs';
 import type { ComposerSendContextPort } from './ComposerContextViewFacade';
+
+const logger = createLogger('MessageSendPreparationService');
 
 export type SendPreparationServerAvailability =
   'checking'
@@ -110,9 +114,22 @@ export interface MessageSendPreparationHost {
   notifyForegroundBusy(): void;
   getServerAvailability(): Promise<SendPreparationServerAvailability>;
   refreshServerStatusBadge(): Promise<void>;
-  ensureServerReadyForChat(
-    availability: Exclude<SendPreparationServerAvailability, 'running' | 'external'>,
-  ): Promise<boolean>;
+  refreshSettingsTabStatus(): void;
+  getServerMode(): 'local' | 'remote';
+  createAssistantShellContainer(): SendPipelineStreamElements;
+  getUnavailableServerPromptMessage(availability: 'checking' | 'starting' | 'offline'): string;
+  finalizeAssistantMessageWithServerError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    error: unknown,
+  ): Promise<void>;
+  finalizeAssistantMessageWithServerUnavailableError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    availability: 'checking' | 'starting' | 'offline',
+  ): Promise<void>;
+  openPluginSettingsAtServerSection(): void;
+  startServer(): Promise<void>;
   hasLoadedModelCatalog(): boolean;
   loadAvailableModels(): Promise<void>;
   getSendMessageOptions(): SendMessageModelOptions;
@@ -181,9 +198,9 @@ export class MessageSendPreparationService {
 
     const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
-    await this.host.refreshServerStatusBadge();
+    await this.refreshStatusSurfaces();
     if (availability !== 'running' && availability !== 'external') {
-      const ready = await this.host.ensureServerReadyForChat(availability);
+      const ready = await this.ensureServerReadyForChat(availability);
       if (!ready) {
         return null;
       }
@@ -296,5 +313,127 @@ export class MessageSendPreparationService {
     }
 
     return [...itemsByTarget.values()];
+  }
+
+  async ensureServerReadyForChat(
+    availability: Exclude<SendPreparationServerAvailability, 'running' | 'external'>,
+  ): Promise<boolean> {
+    const { messageEl, contentEl } = this.host.createAssistantShellContainer();
+    const cardEl = contentEl.createDiv({ cls: 'opencodian-server-action-card' });
+    cardEl.createDiv({
+      cls: 'opencodian-server-action-title',
+      text: t('chat.serverPrompt.title'),
+    });
+    cardEl.createDiv({
+      cls: 'opencodian-server-action-desc',
+      text: this.host.getUnavailableServerPromptMessage(availability),
+    });
+
+    const statusEl = cardEl.createDiv({
+      cls: 'opencodian-server-action-status',
+      text: `${t('chat.serverPrompt.currentStatus')} ${t(
+        availability === 'starting'
+          ? 'chat.serverStatus.starting'
+          : 'chat.serverStatus.offline'
+      )}`,
+    });
+
+    const buttonRow = cardEl.createDiv({ cls: 'opencodian-server-action-buttons' });
+    const serverMode = this.host.getServerMode();
+    const primaryButtonLabel = serverMode === 'local'
+      ? t('chat.serverPrompt.start')
+      : t('chat.serverPrompt.retry');
+    const startBtn = buttonRow.createEl('button', {
+      cls: 'opencodian-server-action-btn mod-cta',
+      text: primaryButtonLabel,
+    });
+    const skipBtn = buttonRow.createEl('button', {
+      cls: 'opencodian-server-action-btn',
+      text: t('chat.serverPrompt.skip'),
+    });
+    const settingsBtn = buttonRow.createEl('button', {
+      cls: 'opencodian-server-action-btn',
+      text: t('chat.serverPrompt.settings'),
+    });
+
+    const choice = await new Promise<'start' | 'skip' | 'settings'>((resolve) => {
+      startBtn.addEventListener('click', () => resolve('start'));
+      skipBtn.addEventListener('click', () => resolve('skip'));
+      settingsBtn.addEventListener('click', () => resolve('settings'));
+    });
+
+    if (choice === 'settings') {
+      this.host.openPluginSettingsAtServerSection();
+      await this.refreshStatusSurfaces();
+      const latestAvailability = await this.host.getServerAvailability();
+      if (latestAvailability === 'running' || latestAvailability === 'external') {
+        messageEl.remove();
+        return true;
+      }
+      await this.host.finalizeAssistantMessageWithServerUnavailableError(
+        messageEl,
+        contentEl,
+        latestAvailability as 'checking' | 'starting' | 'offline',
+      );
+      return false;
+    }
+
+    if (choice === 'skip') {
+      await this.refreshStatusSurfaces();
+      const latestAvailability = await this.host.getServerAvailability();
+      if (latestAvailability === 'running' || latestAvailability === 'external') {
+        messageEl.remove();
+        return true;
+      }
+      await this.host.finalizeAssistantMessageWithServerUnavailableError(
+        messageEl,
+        contentEl,
+        latestAvailability as 'checking' | 'starting' | 'offline',
+      );
+      return false;
+    }
+
+    startBtn.disabled = true;
+    skipBtn.disabled = true;
+    settingsBtn.disabled = true;
+    cardEl.addClass('is-starting');
+    statusEl.setText(
+      serverMode === 'local'
+        ? t('chat.serverPrompt.starting')
+        : t('chat.serverStatus.checking'),
+    );
+
+    try {
+      await this.host.startServer();
+      await this.refreshStatusSurfaces();
+      messageEl.remove();
+      this.host.scrollToBottom({ tabId: this.host.getActiveTabId(), enableAutoScroll: true });
+      return true;
+    } catch (error) {
+      logger.error('Failed to start server from chat prompt:', error);
+      await this.refreshStatusSurfaces();
+      await this.host.finalizeAssistantMessageWithServerError(
+        messageEl,
+        contentEl,
+        error,
+      );
+      return false;
+    }
+  }
+
+  private async refreshStatusSurfaces(): Promise<void> {
+    await this.host.refreshServerStatusBadge();
+    this.host.refreshSettingsTabStatus();
+  }
+
+  createServerReadinessDelegate(): {
+    ensureServerReadyForChat: (
+      availability: Exclude<SendPreparationServerAvailability, 'running' | 'external'>,
+    ) => Promise<boolean>;
+  } {
+    return {
+      ensureServerReadyForChat: (availability) =>
+        this.ensureServerReadyForChat(availability),
+    };
   }
 }

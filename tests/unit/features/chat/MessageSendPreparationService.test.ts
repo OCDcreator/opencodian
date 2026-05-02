@@ -98,7 +98,21 @@ function createHost(
     }),
     getServerAvailability: jest.fn().mockResolvedValue('running'),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
-    ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
+    refreshSettingsTabStatus: jest.fn().mockImplementation(() => {
+      callOrder.push('refreshSettingsTabStatus');
+    }),
+    getServerMode: jest.fn().mockReturnValue('local'),
+    createAssistantShellContainer: jest.fn().mockReturnValue({
+      messageEl: document.createElement('div'),
+      contentEl: document.createElement('div'),
+    }),
+    getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+    finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+    finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+    openPluginSettingsAtServerSection: jest.fn().mockImplementation(() => {
+      callOrder.push('openPluginSettingsAtServerSection');
+    }),
+    startServer: jest.fn().mockResolvedValue(undefined),
     hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
     loadAvailableModels: jest.fn().mockImplementation(async () => {
       callOrder.push('loadAvailableModels');
@@ -207,19 +221,32 @@ describe('MessageSendPreparationService', () => {
 
   it('aborts before optimistic append when server readiness check fails', async () => {
     const conversation = createConversation();
+    const mockMessageEl = document.createElement('div');
+    const mockContentEl = document.createElement('div');
     const host = createHost(conversation, [], {
-      getServerAvailability: jest.fn().mockResolvedValue('offline'),
-      ensureServerReadyForChat: jest.fn().mockResolvedValue(false),
+      getServerAvailability: jest.fn()
+        .mockResolvedValueOnce('offline')
+        .mockResolvedValueOnce('offline'),
+      createAssistantShellContainer: jest.fn().mockReturnValue({
+        messageEl: mockMessageEl,
+        contentEl: mockContentEl,
+      }),
+      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+      getServerMode: jest.fn().mockReturnValue('local'),
     });
     const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const ensureReadySpy = jest.spyOn(service, 'ensureServerReadyForChat').mockResolvedValue(false);
 
     const result = await service.prepareMessageSend({ content: 'Hello' });
 
     expect(result).toBeNull();
-    expect(host.ensureServerReadyForChat).toHaveBeenCalledWith('offline');
+    expect(ensureReadySpy).toHaveBeenCalledWith('offline');
     expect(host.saveConversation).not.toHaveBeenCalled();
     expect(host.renderMessage).not.toHaveBeenCalled();
     expect(conversation.messages).toHaveLength(0);
+
+    ensureReadySpy.mockRestore();
   });
 
   it('loads the model catalog before model availability checks when needed', async () => {
@@ -299,6 +326,7 @@ describe('MessageSendPreparationService optimistic preparation', () => {
     expect(conversation.messages[0]).toBe(result?.userMessage);
     expect(conversation.updatedAt).toBe(result?.userMessage.timestamp);
     expect(callOrder).toEqual([
+      'refreshSettingsTabStatus',
       'ensureSelectedModelAvailable',
       'seedCanonicalUserMessage',
       'resetBackgroundTaskIndicator',
@@ -507,5 +535,297 @@ describe('MessageSendPreparationService synthetic part canonical seeding', () =>
     expect(result?.userMessage.content).toBe('Hello');
     expect(result?.userMessage.parts).toEqual(requestParts);
     expect(result?.userMessage.content).not.toContain('Injected plugin prompt');
+  });
+});
+
+describe('MessageSendPreparationService ensureServerReadyForChat', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function createServerReadinessHost(
+    overrides: Partial<MockedMessageSendPreparationHost> = {},
+  ): { host: MockedMessageSendPreparationHost; container: { messageEl: HTMLElement; contentEl: HTMLElement } } {
+    const container = {
+      messageEl: document.createElement('div'),
+      contentEl: document.createElement('div'),
+    };
+    const host: MockedMessageSendPreparationHost = {
+      ensureConversationReady: jest.fn().mockResolvedValue(createConversation()),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      ensureTabRuntime: jest.fn().mockReturnValue(true),
+      isTabForegroundBusy: jest.fn().mockReturnValue(false),
+      notifyForegroundBusy: jest.fn(),
+      getServerAvailability: jest.fn().mockResolvedValue('running'),
+      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
+      refreshSettingsTabStatus: jest.fn(),
+      getServerMode: jest.fn().mockReturnValue('local'),
+      createAssistantShellContainer: jest.fn().mockReturnValue(container),
+      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+      finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+      finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+      openPluginSettingsAtServerSection: jest.fn(),
+      startServer: jest.fn().mockResolvedValue(undefined),
+      hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
+      loadAvailableModels: jest.fn().mockResolvedValue(undefined),
+      getSendMessageOptions: jest.fn().mockReturnValue({ provider: 'openai', model: 'gpt-5.4' }),
+      formatModelId: jest.fn().mockReturnValue('openai/gpt-5.4'),
+      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
+      appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
+      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+      seedCanonicalUserMessage: jest.fn(),
+      resetBackgroundTaskIndicator: jest.fn(),
+      armBackgroundTaskIndicatorForUserMessage: jest.fn(),
+      startConversationSyncLoop: jest.fn(),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      setAutoScrollEnabled: jest.fn(),
+      renderMessage: jest.fn().mockResolvedValue(undefined),
+      scrollToBottom: jest.fn(),
+      applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
+      shouldGenerateAiTitle: jest.fn().mockReturnValue(false),
+      startAiConversationTitleGeneration: jest.fn(),
+      setStreaming: jest.fn(),
+      syncTabStreamLikeState: jest.fn(),
+      beginTabContextUsageStream: jest.fn(),
+      clearPendingEditedFiles: jest.fn(),
+      ...overrides,
+    };
+    return { host, container };
+  }
+
+  function findButtonByText(container: HTMLElement, text: string): HTMLButtonElement | null {
+    const buttons = container.querySelectorAll('button');
+    for (const btn of buttons) {
+      if (btn.textContent === text) return btn as HTMLButtonElement;
+    }
+    return null;
+  }
+
+  function simulateButtonClickAfterRender(
+    container: HTMLElement,
+    buttonLabel: string,
+  ): void {
+    const btn = findButtonByText(container, buttonLabel);
+    if (!btn) {
+      const allButtons = container.querySelectorAll('button');
+      throw new Error(`Button "${buttonLabel}" not found. Available: ${[...allButtons].map(b => b.textContent).join(', ')}`);
+    }
+    btn.click();
+  }
+
+  it('returns true on successful server start (start button)', async () => {
+    const { host, container } = createServerReadinessHost();
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const resultPromise = service.ensureServerReadyForChat('offline');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    simulateButtonClickAfterRender(container.contentEl, 'Start service');
+
+    const result = await resultPromise;
+
+    expect(result).toBe(true);
+    expect(host.startServer).toHaveBeenCalled();
+    expect(host.refreshServerStatusBadge).toHaveBeenCalled();
+    expect(host.refreshSettingsTabStatus).toHaveBeenCalled();
+    expect(host.scrollToBottom).toHaveBeenCalledWith({ tabId: 'tab-1', enableAutoScroll: true });
+  });
+
+  it('returns false and finalizes with server error when start throws', async () => {
+    const { host, container } = createServerReadinessHost({
+      startServer: jest.fn().mockRejectedValue(new Error('Binary not found')),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const resultPromise = service.ensureServerReadyForChat('offline');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    simulateButtonClickAfterRender(container.contentEl, 'Start service');
+
+    const result = await resultPromise;
+
+    expect(result).toBe(false);
+    expect(host.finalizeAssistantMessageWithServerError).toHaveBeenCalled();
+  });
+
+  it('returns true when skip is chosen and server becomes running', async () => {
+    const { host, container } = createServerReadinessHost({
+      getServerAvailability: jest.fn().mockResolvedValue('running'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const resultPromise = service.ensureServerReadyForChat('offline');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    simulateButtonClickAfterRender(container.contentEl, 'Not now');
+
+    const result = await resultPromise;
+
+    expect(result).toBe(true);
+    expect(host.startServer).not.toHaveBeenCalled();
+  });
+
+  it('returns false when skip is chosen and server stays offline', async () => {
+    const { host, container } = createServerReadinessHost({
+      getServerAvailability: jest.fn().mockResolvedValue('offline'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const resultPromise = service.ensureServerReadyForChat('offline');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    simulateButtonClickAfterRender(container.contentEl, 'Not now');
+
+    const result = await resultPromise;
+
+    expect(result).toBe(false);
+    expect(host.finalizeAssistantMessageWithServerUnavailableError).toHaveBeenCalled();
+  });
+
+  it('returns true when settings is chosen and server becomes running', async () => {
+    const { host, container } = createServerReadinessHost({
+      getServerAvailability: jest.fn().mockResolvedValue('running'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const resultPromise = service.ensureServerReadyForChat('offline');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    simulateButtonClickAfterRender(container.contentEl, 'Open settings');
+
+    const result = await resultPromise;
+
+    expect(result).toBe(true);
+    expect(host.openPluginSettingsAtServerSection).toHaveBeenCalled();
+    expect(host.startServer).not.toHaveBeenCalled();
+  });
+
+  it('returns false when settings is chosen and server stays offline', async () => {
+    const { host, container } = createServerReadinessHost({
+      getServerAvailability: jest.fn().mockResolvedValue('offline'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const resultPromise = service.ensureServerReadyForChat('offline');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    simulateButtonClickAfterRender(container.contentEl, 'Open settings');
+
+    const result = await resultPromise;
+
+    expect(result).toBe(false);
+    expect(host.openPluginSettingsAtServerSection).toHaveBeenCalled();
+    expect(host.finalizeAssistantMessageWithServerUnavailableError).toHaveBeenCalled();
+  });
+});
+
+describe('MessageSendPreparationService createServerReadinessDelegate', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns a delegate that delegates to ensureServerReadyForChat', async () => {
+    const container = {
+      messageEl: document.createElement('div'),
+      contentEl: document.createElement('div'),
+    };
+    const host: MockedMessageSendPreparationHost = {
+      ensureConversationReady: jest.fn().mockResolvedValue(createConversation()),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      ensureTabRuntime: jest.fn().mockReturnValue(true),
+      isTabForegroundBusy: jest.fn().mockReturnValue(false),
+      notifyForegroundBusy: jest.fn(),
+      getServerAvailability: jest.fn().mockResolvedValue('running'),
+      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
+      refreshSettingsTabStatus: jest.fn(),
+      getServerMode: jest.fn().mockReturnValue('local'),
+      createAssistantShellContainer: jest.fn().mockReturnValue(container),
+      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+      finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+      finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+      openPluginSettingsAtServerSection: jest.fn(),
+      startServer: jest.fn().mockResolvedValue(undefined),
+      hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
+      loadAvailableModels: jest.fn().mockResolvedValue(undefined),
+      getSendMessageOptions: jest.fn().mockReturnValue({}),
+      formatModelId: jest.fn().mockReturnValue(undefined),
+      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
+      appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
+      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+      seedCanonicalUserMessage: jest.fn(),
+      resetBackgroundTaskIndicator: jest.fn(),
+      armBackgroundTaskIndicatorForUserMessage: jest.fn(),
+      startConversationSyncLoop: jest.fn(),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      setAutoScrollEnabled: jest.fn(),
+      renderMessage: jest.fn().mockResolvedValue(undefined),
+      scrollToBottom: jest.fn(),
+      applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
+      shouldGenerateAiTitle: jest.fn().mockReturnValue(false),
+      startAiConversationTitleGeneration: jest.fn(),
+      setStreaming: jest.fn(),
+      syncTabStreamLikeState: jest.fn(),
+      beginTabContextUsageStream: jest.fn(),
+      clearPendingEditedFiles: jest.fn(),
+    };
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const delegate = service.createServerReadinessDelegate();
+
+    expect(delegate).toHaveProperty('ensureServerReadyForChat');
+    expect(typeof delegate.ensureServerReadyForChat).toBe('function');
+  });
+
+  it('delegate calls ensureServerReadyForChat on the service', async () => {
+    const container = {
+      messageEl: document.createElement('div'),
+      contentEl: document.createElement('div'),
+    };
+    const host: MockedMessageSendPreparationHost = {
+      ensureConversationReady: jest.fn().mockResolvedValue(createConversation()),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      ensureTabRuntime: jest.fn().mockReturnValue(true),
+      isTabForegroundBusy: jest.fn().mockReturnValue(false),
+      notifyForegroundBusy: jest.fn(),
+      getServerAvailability: jest.fn().mockResolvedValue('running'),
+      refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
+      refreshSettingsTabStatus: jest.fn(),
+      getServerMode: jest.fn().mockReturnValue('local'),
+      createAssistantShellContainer: jest.fn().mockReturnValue(container),
+      getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+      finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+      finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+      openPluginSettingsAtServerSection: jest.fn(),
+      startServer: jest.fn().mockResolvedValue(undefined),
+      hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
+      loadAvailableModels: jest.fn().mockResolvedValue(undefined),
+      getSendMessageOptions: jest.fn().mockReturnValue({}),
+      formatModelId: jest.fn().mockReturnValue(undefined),
+      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
+      appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
+      buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+      seedCanonicalUserMessage: jest.fn(),
+      resetBackgroundTaskIndicator: jest.fn(),
+      armBackgroundTaskIndicatorForUserMessage: jest.fn(),
+      startConversationSyncLoop: jest.fn(),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      setAutoScrollEnabled: jest.fn(),
+      renderMessage: jest.fn().mockResolvedValue(undefined),
+      scrollToBottom: jest.fn(),
+      applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
+      shouldGenerateAiTitle: jest.fn().mockReturnValue(false),
+      startAiConversationTitleGeneration: jest.fn(),
+      setStreaming: jest.fn(),
+      syncTabStreamLikeState: jest.fn(),
+      beginTabContextUsageStream: jest.fn(),
+      clearPendingEditedFiles: jest.fn(),
+    };
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const spy = jest.spyOn(service, 'ensureServerReadyForChat').mockResolvedValue(true);
+    const delegate = service.createServerReadinessDelegate();
+
+    const result = await delegate.ensureServerReadyForChat('offline');
+
+    expect(result).toBe(true);
+    expect(spy).toHaveBeenCalledWith('offline');
   });
 });

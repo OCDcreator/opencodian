@@ -57,7 +57,17 @@ function createHost(conversation: Conversation): MockedHost {
     notifyForegroundBusy: jest.fn(),
     getServerAvailability: jest.fn().mockResolvedValue('running'),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
-    ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
+    refreshSettingsTabStatus: jest.fn(),
+    getServerMode: jest.fn().mockReturnValue('local'),
+    createAssistantShellContainer: jest.fn().mockReturnValue({
+      messageEl: document.createElement('div'),
+      contentEl: document.createElement('div'),
+    }),
+    getUnavailableServerPromptMessage: jest.fn().mockReturnValue('Server is offline'),
+    finalizeAssistantMessageWithServerError: jest.fn().mockResolvedValue(undefined),
+    finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
+    openPluginSettingsAtServerSection: jest.fn(),
+    startServer: jest.fn().mockResolvedValue(undefined),
     hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
     loadAvailableModels: jest.fn().mockResolvedValue(undefined),
     getSendMessageOptions: jest.fn().mockReturnValue({

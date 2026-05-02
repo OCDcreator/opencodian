@@ -2458,7 +2458,17 @@ export class OpenCodianView extends ItemView {
       },
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
+      refreshSettingsTabStatus: () => this.plugin.settingsTab?.refreshServerStatusDisplay(),
+      getServerMode: () => this.plugin.settings.server.mode,
+      createAssistantShellContainer: () => this.assistantShellViewHostAdapter.createAssistantShellContainer(),
+      getUnavailableServerPromptMessage: (availability) =>
+        this.messageFinalizationService.getUnavailableServerPromptMessage(availability),
+      finalizeAssistantMessageWithServerError: (messageEl, contentEl, error) =>
+        this.messageFinalizationService.finalizeAssistantMessageWithServerError(messageEl, contentEl, error),
+      finalizeAssistantMessageWithServerUnavailableError: (messageEl, contentEl, availability) =>
+        this.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(messageEl, contentEl, availability),
+      openPluginSettingsAtServerSection: () => this.openPluginSettingsAtServerSection(),
+      startServer: () => this.plugin.openCodeService.start(),
       hasLoadedModelCatalog: () => this.chatSelectionControlsCoordinator.hasLoadedModelCatalog(),
       loadAvailableModels: () => this.reloadModelCatalog(),
       getSendMessageOptions: () => this.getSendMessageOptions(),
@@ -2528,7 +2538,7 @@ export class OpenCodianView extends ItemView {
       },
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
+      ...this.messageSendPreparationService.createServerReadinessDelegate(),
       getProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
       getRuntimeCommands: async () => {
         const runtimeCommands = await this.plugin.openCodeService.sdk.command.list();
@@ -3173,114 +3183,6 @@ export class OpenCodianView extends ItemView {
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
     await this.conversationLoadRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
-  }
-
-  private async ensureServerReadyForChat(availability: Exclude<ChatServerAvailability, 'running' | 'external'>): Promise<boolean> {
-    const { messageEl, contentEl } = this.assistantShellViewHostAdapter.createAssistantShellContainer();
-    const cardEl = contentEl.createDiv({ cls: 'opencodian-server-action-card' });
-    cardEl.createDiv({
-      cls: 'opencodian-server-action-title',
-      text: t('chat.serverPrompt.title'),
-    });
-    cardEl.createDiv({
-      cls: 'opencodian-server-action-desc',
-      text: this.messageFinalizationService.getUnavailableServerPromptMessage(availability),
-    });
-
-    const statusEl = cardEl.createDiv({
-      cls: 'opencodian-server-action-status',
-      text: `${t('chat.serverPrompt.currentStatus')} ${t(
-        availability === 'starting'
-          ? 'chat.serverStatus.starting'
-          : 'chat.serverStatus.offline'
-      )}`,
-    });
-
-    const buttonRow = cardEl.createDiv({ cls: 'opencodian-server-action-buttons' });
-    const primaryButtonLabel = this.plugin.settings.server.mode === 'local'
-      ? t('chat.serverPrompt.start')
-      : t('chat.serverPrompt.retry');
-    const startBtn = buttonRow.createEl('button', {
-      cls: 'opencodian-server-action-btn mod-cta',
-      text: primaryButtonLabel,
-    });
-    const skipBtn = buttonRow.createEl('button', {
-      cls: 'opencodian-server-action-btn',
-      text: t('chat.serverPrompt.skip'),
-    });
-    const settingsBtn = buttonRow.createEl('button', {
-      cls: 'opencodian-server-action-btn',
-      text: t('chat.serverPrompt.settings'),
-    });
-
-    const choice = await new Promise<'start' | 'skip' | 'settings'>((resolve) => {
-      startBtn.addEventListener('click', () => resolve('start'));
-      skipBtn.addEventListener('click', () => resolve('skip'));
-      settingsBtn.addEventListener('click', () => resolve('settings'));
-    });
-
-    if (choice === 'settings') {
-      this.openPluginSettingsAtServerSection();
-      await this.refreshStatusSurfaces();
-      const latestAvailability = await this.getServerAvailability();
-      if (latestAvailability === 'running' || latestAvailability === 'external') {
-        messageEl.remove();
-        return true;
-      }
-      await this.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(
-        messageEl,
-        contentEl,
-        latestAvailability
-      );
-      return false;
-    }
-
-    if (choice === 'skip') {
-      await this.refreshStatusSurfaces();
-      const latestAvailability = await this.getServerAvailability();
-      if (latestAvailability === 'running' || latestAvailability === 'external') {
-        messageEl.remove();
-        return true;
-      }
-      await this.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(
-        messageEl,
-        contentEl,
-        latestAvailability
-      );
-      return false;
-    }
-
-    startBtn.disabled = true;
-    skipBtn.disabled = true;
-    settingsBtn.disabled = true;
-    cardEl.addClass('is-starting');
-    statusEl.setText(
-      this.plugin.settings.server.mode === 'local'
-        ? t('chat.serverPrompt.starting')
-        : t('chat.serverStatus.checking')
-    );
-
-    try {
-      await this.plugin.openCodeService.start();
-      await this.refreshStatusSurfaces();
-      messageEl.remove();
-      this.scrollToBottom({ enableAutoScroll: true });
-      return true;
-    } catch (error) {
-      logger.error('Failed to start server from chat prompt:', error);
-      await this.refreshStatusSurfaces();
-      await this.messageFinalizationService.finalizeAssistantMessageWithServerError(
-        messageEl,
-        contentEl,
-        error
-      );
-      return false;
-    }
-  }
-
-  private async refreshStatusSurfaces(): Promise<void> {
-    await this.chatHeaderPresenter.refreshServerStatusBadge();
-    this.plugin.settingsTab?.refreshServerStatusDisplay();
   }
 
   /** Cancel streaming */

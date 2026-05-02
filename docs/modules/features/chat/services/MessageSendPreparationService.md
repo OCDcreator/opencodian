@@ -28,6 +28,8 @@ export function buildOptimisticUserMessage(
 
 export class MessageSendPreparationService {
   prepareMessageSend(options: PrepareMessageSendOptions): Promise<PreparedMessageSend | null>;
+  ensureServerReadyForChat(availability: Exclude<SendPreparationServerAvailability, 'running' | 'external'>): Promise<boolean>;
+  createServerReadinessDelegate(): { ensureServerReadyForChat: (availability: ...) => Promise<boolean> };
   enterStreamingState(tabId: TabId | null): void;
   completePreparedStreamStart(tabId: TabId | null): void;
 }
@@ -80,7 +82,18 @@ export class MessageSendPreparationService {
 ## 与 `OpenCodianView` 的边界
 
 - `SendPipelineRuntime` 负责真实 `sendMessage()` stream 调用与 chunk 消费
-- `MessageSendPreparationService` 只负责决定“能不能发、发之前先做什么、optimistic user message 是否已落地”
+- `MessageSendPreparationService` 只负责决定"能不能发、发之前先做什么、optimistic user message 是否已落地"
 - `PreparedMessageSend` 现在还会把稳定 `messageID`、transport `requestParts`、canonical `optimisticUserParts`，以及解析后的 `resolvedAgentInvocation` 一并交给 `SendPipelineRuntime`
 - `MessageSendPreparationService` 只消费 `ComposerSendContextPort`，不需要知道完整 composer/context facade 的 action、picker、focus-preview 或 lifecycle 入口
 - `MessageFinalizationService` 继续负责 stream 结束之后的 final sync、patch/rerender、todo/save/attention 收尾
+
+## 服务器就绪提示编排
+
+`MessageSendPreparationService` 拥有服务器不可用时的 action card 提示流程：
+
+- `ensureServerReadyForChat()` 在服务器不处于 `running` / `external` 时展示交互式 action card，提供三个按钮：启动服务 / 跳过 / 打开设置
+- 用户选择"启动"后，禁用按钮并调用 `startServer()`，成功后刷新状态并移除 card，失败则通过 `MessageFinalizationService` 显示错误
+- 用户选择"跳过"或"设置"后，重新检查服务器状态，若已就绪则移除 card 继续，否则通过 `MessageFinalizationService` 显示不可用错误
+- `refreshStatusSurfaces()` 统一刷新 badge 和 settings tab 的服务器状态显示
+
+`OpenCodianView` 不再拥有 `ensureServerReadyForChat` 或 `refreshStatusSurfaces`；这些职责通过 host 接口原语（`createAssistantShellContainer`、`getUnavailableServerPromptMessage`、`finalizeAssistantMessageWithServerError` 等）委托回 view。`SlashCommandExecutionService` 通过 `createServerReadinessDelegate()` 获取服务器就绪回调，直接 spread 到 host adapter 中，不再在 OpenCodianView 中出现 `ensureServerReadyForChat`。
