@@ -118,7 +118,7 @@ OpenCodianView.ts: 5314 → 4971 lines (**−343 lines**)
   - build: OK
 - Updated lane status doc with second SRP batch results
 - Graphify already fresh (no source ownership changes in this task)
-- No thin helper modules introduced: all destinations are existing coordinators with meaningful domain ownership
+- No thin helper modules introduced: destinations are 2 existing coordinators extended with same-domain responsibilities plus 3 new modules each with substantive domain ownership
 
 ### Round 2 Net Impact
 
