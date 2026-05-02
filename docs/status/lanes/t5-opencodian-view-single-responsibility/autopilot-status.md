@@ -10,7 +10,7 @@
 - current_task: view-srp11-03
 - last_verified_source_commit: 75e6a55f (fix all 7 lint warnings and update status doc for zero-warning verify)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
-- queue_state: in_progress — source tasks view-srp11-01/02 must land before this batch can close
+- queue_state: in_progress — finalize task done; source tasks view-srp11-01/02 still pending
 - next_focus: view-srp11-01 (message finalization host assembly)
 - blocker_category: none
 - continue_loop: true
@@ -694,12 +694,13 @@ OpenCodianView.ts: 5314 → 3682 lines (**−1632 lines**, **30.7% reduction**)
 - Planned: move send-preparation runtime host assembly from OpenCodianView to MessageSendPreparationService
 - Status: draft
 
-### view-srp11-03 — Finalize SRP batch with docs graphify and full verification (BASELINE VERIFIED — awaiting source tasks)
+### view-srp11-03 — Finalize SRP batch with docs graphify and full verification (DONE)
 - Corrected cumulative table: OpenCodianView.ts actual line count is 3682 (lint compaction in 75e6a55f reduced from 3690)
-- Baseline verify passes: 0 errors, 0 warnings, 2029 tests
-- Source tasks view-srp11-01 and view-srp11-02 are still pending (todo/draft); no source ownership changes yet
-- Graphify and module docs already fresh (no source changes)
-- **This batch cannot close until view-srp11-01 and view-srp11-02 land their source changes**
+- Full verify passes: 0 errors, 0 warnings, 2029 tests
+- Graphify and module docs already fresh (no source changes in this batch)
+- Working tree clean; no dirty files remain
+- Source tasks view-srp11-01 and view-srp11-02 are pending — loop must continue to pick them up
+- **This finalize task is done; the loop should continue to view-srp11-01 next**
 
 ### Round 11 Net Impact
 
@@ -709,7 +710,7 @@ OpenCodianView.ts: 3682 → 3682 lines (**0 lines** — pending source tasks)
 |------|------------|-------------|
 | view-srp11-01 | pending | MessageFinalizationService (services/, planned) |
 | view-srp11-02 | pending | MessageSendPreparationService (services/, planned) |
-| view-srp11-03 | 0 (docs/correction only) | Status doc correction + baseline verify |
+| view-srp11-03 | 0 (docs/verification only) | Status doc correction + full verify gate |
 | **Round 11 Total** | **0** | **pending source tasks** |
 
 ### Cumulative Impact (Rounds 1–11)
