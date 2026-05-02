@@ -1,4 +1,7 @@
-import { ConversationRenderService } from '../../../../src/features/chat/services/ConversationRenderService';
+import {
+  ConversationRenderService,
+  createConversationRenderHost,
+} from '../../../../src/features/chat/services/ConversationRenderService';
 import {
   createMessage,
   getIncrementalRenderedMessageUpdate,
@@ -237,5 +240,111 @@ describe('ConversationRenderService tooltip / copy utilities', () => {
 
       expect(container.children).toHaveLength(2);
     });
+  });
+});
+
+describe('createConversationRenderHost', () => {
+  it('assembles the render host from flat dependencies', async () => {
+    const clearedContainer = document.createElement('div');
+    clearedContainer.createDiv({ text: 'stale' });
+    const assistantMessageEl = document.createElement('div');
+    const assistantContentEl = document.createElement('div');
+    const assistantMessage = createMessage({ id: 'assistant-1', content: 'Hello' });
+    const userMessage = createMessage({ id: 'user-1', role: 'user', content: 'Hi' });
+    const persistedResult = document.createElement('article');
+    const deps = {
+      getCurrentConversation: jest.fn().mockReturnValue({ id: 'conversation-1' }),
+      getMessagesContainer: jest.fn().mockReturnValue(clearedContainer),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      getTabRuntimeState: jest.fn().mockReturnValue({
+        autoScrollEnabled: true,
+        currentTurnBodyEl: document.createElement('div'),
+      }),
+      clearScheduledScrollToBottom: jest.fn(),
+      beginConversationHydration: jest.fn(),
+      endConversationHydration: jest.fn(),
+      resetTurnState: jest.fn(),
+      shouldRenderEmptyConversationNotice: jest.fn().mockReturnValue(false),
+      createEmptyConversationNotice: jest.fn().mockReturnValue(createMessage({ id: 'notice-1' })),
+      createUserMessageFrame: jest.fn().mockReturnValue({
+        messageEl: document.createElement('div'),
+        contentEl: document.createElement('div'),
+      }),
+      userMessageContentRenderer: {
+        renderUserMessageContent: jest.fn(),
+      },
+      addUserMessageFooter: jest.fn(),
+      renderMarkdownInto: jest.fn().mockResolvedValue(undefined),
+      renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
+      syncBackgroundTaskStateFromConversation: jest.fn(),
+      shouldAutoScroll: jest.fn().mockReturnValue(true),
+      scrollToBottom: jest.fn(),
+      syncPaneScrollMetrics: jest.fn(),
+      scheduleComposerLayoutSync: jest.fn(),
+      getMessagesForRender: jest.fn().mockImplementation((messages) => messages),
+      getMessageVisualSignature: jest.fn().mockReturnValue('visual-signature'),
+      renderPersistedAssistantMessage: jest.fn().mockResolvedValue(persistedResult),
+      createAssistantMessageElements: jest.fn().mockReturnValue({
+        messageEl: assistantMessageEl,
+        contentEl: assistantContentEl,
+      }),
+      finalizePseudoStreamFooter: jest.fn(),
+      clearStreamingMessageState: jest.fn(),
+      getAssistantBodySignature: jest.fn().mockReturnValue('body-signature'),
+      renderAssistantMessageBody: jest.fn().mockResolvedValue(undefined),
+      finalizePersistedFooter: jest.fn(),
+    };
+
+    const host = createConversationRenderHost(deps as never);
+
+    expect(host.getCurrentConversation()).toEqual({ id: 'conversation-1' });
+    expect(host.getMessagesContainer()).toBe(clearedContainer);
+    expect(host.getActiveTabId()).toBe('tab-1');
+    expect(host.getScrollRuntimeForTab('tab-1')).toEqual({
+      autoScrollEnabled: true,
+      currentTurnBodyEl: expect.any(HTMLElement),
+    });
+    expect(host.getRenderRuntimeForTab('tab-1')).toEqual({
+      autoScrollEnabled: true,
+      currentTurnBodyEl: expect.any(HTMLElement),
+    });
+
+    host.clearScheduledScrollToBottom();
+    host.beginConversationHydration('tab-1');
+    host.endConversationHydration('tab-1');
+    host.clearMessagesContainer();
+    host.resetTurnState();
+    host.createEmptyConversationNoticeMessage();
+    host.createUserMessageFrame(userMessage);
+    host.addUserMessageFooter(document.createElement('div'), userMessage, userMessage.content);
+    await host.renderMarkdownInto(document.createElement('div'), 'markdown');
+    await host.renderBackgroundTaskIndicatorIfNeeded('tab-1');
+    host.syncBackgroundTaskStateFromConversation({ id: 'conversation-1' } as never);
+    host.shouldAutoScroll('tab-1');
+    host.scrollToBottom({ tabId: 'tab-1' });
+    host.syncPaneScrollMetrics('tab-1', document.createElement('div'));
+    host.scheduleComposerLayoutSync();
+    expect(host.getMessagesForRender([assistantMessage])).toEqual([assistantMessage]);
+    expect(host.getMessageVisualSignature(assistantMessage)).toBe('visual-signature');
+
+    expect(await host.assistantShellRender.renderPersistedMessage(assistantMessage)).toBe(persistedResult);
+    expect(host.assistantShellRender.createAssistantMessageElement()).toEqual({
+      messageEl: assistantMessageEl,
+      contentEl: assistantContentEl,
+    });
+    host.assistantShellRender.finalizePseudoStreamFooter(assistantMessageEl, assistantMessage);
+    host.assistantShellRender.clearStreamingMessageState();
+    expect(host.assistantTailRender.getBodySignature(assistantMessage)).toBe('body-signature');
+    await host.assistantTailRender.renderMessageBody(assistantContentEl, assistantMessage);
+    host.assistantTailRender.finalizePersistedFooter(assistantMessageEl, assistantMessage);
+
+    expect(clearedContainer.childElementCount).toBe(0);
+    expect(deps.resetTurnState).toHaveBeenCalledTimes(1);
+    expect(deps.renderPersistedAssistantMessage).toHaveBeenCalledWith({ message: assistantMessage });
+    expect(deps.finalizePseudoStreamFooter).toHaveBeenCalledWith(assistantMessageEl, assistantMessage);
+    expect(deps.clearStreamingMessageState).toHaveBeenCalledTimes(1);
+    expect(deps.getAssistantBodySignature).toHaveBeenCalledWith(assistantMessage);
+    expect(deps.renderAssistantMessageBody).toHaveBeenCalledWith(assistantContentEl, assistantMessage);
+    expect(deps.finalizePersistedFooter).toHaveBeenCalledWith(assistantMessageEl, assistantMessage);
   });
 });

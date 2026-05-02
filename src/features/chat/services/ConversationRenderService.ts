@@ -7,10 +7,15 @@ import {
   type ChatMessage,
   type Conversation,
 } from '../../../core/types';
+import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
+import type { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
 import type { TabId } from '../tabs';
 import {
+  type ConversationAssistantShellRenderPort,
+  type ConversationAssistantTailRenderPort,
   ConversationMessageRenderDelegate,
   type ConversationRenderHost,
+  type ConversationRenderRuntimeState,
   ConversationSyncedUpdateApplyDelegate,
 } from './ConversationRenderRuntime';
 import {
@@ -22,11 +27,13 @@ import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
   restoreElementScrollAfterRender,
+  type ScrollRuntimeState,
 } from './ScrollManager';
 import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
+  createDebugLogCallbacks,
   emitTrailingAssistantPatchCompletionDebugLog,
   emitTrailingAssistantPatchSkippedDebugLog,
 } from './trailingAssistantPatchDebug';
@@ -56,6 +63,123 @@ export interface ConversationCanonicalRenderSource {
     info: OpenCodeCanonicalMessageInfo,
     parts: OpenCodeCanonicalPart[],
   ): ChatMessage;
+}
+
+/** Flat dependency object passed from OpenCodianView to assemble a ConversationRenderHost. */
+export interface ConversationRenderHostDependencies {
+  getCurrentConversation(): Conversation | null;
+  getMessagesContainer(): HTMLElement | null;
+  getActiveTabId(): TabId | null;
+  getTabRuntimeState(tabId: TabId | null): (ScrollRuntimeState & ConversationRenderRuntimeState) | null;
+  clearScheduledScrollToBottom(): void;
+  beginConversationHydration(tabId: TabId | null): void;
+  endConversationHydration(tabId: TabId | null): void;
+  shouldRenderEmptyConversationNotice(): boolean;
+  createEmptyConversationNotice(): ChatMessage;
+  createUserMessageFrame(message: ChatMessage): { messageEl: HTMLElement; contentEl: HTMLElement } | null;
+  userMessageContentRenderer: UserMessageContentRenderer;
+  addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void;
+  renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
+  shouldAutoScroll(tabId?: TabId | null): boolean;
+  scrollToBottom(options?: { tabId?: TabId | null }): void;
+  syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
+  scheduleComposerLayoutSync(): void;
+  getMessagesForRender(messages: ChatMessage[]): ChatMessage[];
+  getMessageVisualSignature(message: ChatMessage): string;
+  resetTurnState(): void;
+  renderPersistedAssistantMessage(options: { message: ChatMessage }): Promise<HTMLElement | void | undefined>;
+  createAssistantMessageElements(): { messageEl: HTMLElement; contentEl: HTMLElement };
+  finalizePseudoStreamFooter(messageEl: HTMLElement, message: Pick<ChatMessage, 'content' | 'timestamp' | 'modelId'>): void;
+  clearStreamingMessageState(): void;
+  getAssistantBodySignature(message: ChatMessage): string;
+  renderAssistantMessageBody(contentEl: HTMLElement, message: ChatMessage): Promise<void>;
+  finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void;
+}
+
+export function createConversationRenderHost(
+  deps: ConversationRenderHostDependencies,
+): ConversationRenderHost {
+  const assistantShellRender: ConversationAssistantShellRenderPort = {
+    renderPersistedMessage: (message) =>
+      deps.renderPersistedAssistantMessage({ message }),
+    createAssistantMessageElement: () =>
+      deps.createAssistantMessageElements(),
+    finalizePseudoStreamFooter: (messageEl, message) => {
+      deps.finalizePseudoStreamFooter(messageEl, message);
+    },
+    clearStreamingMessageState: () => {
+      deps.clearStreamingMessageState();
+    },
+  };
+
+  const assistantTailRender: ConversationAssistantTailRenderPort = {
+    getBodySignature: (message) => deps.getAssistantBodySignature(message),
+    renderMessageBody: (contentEl, message) =>
+      deps.renderAssistantMessageBody(contentEl, message),
+    finalizePersistedFooter: (messageEl, message) => {
+      deps.finalizePersistedFooter(messageEl, message);
+    },
+  };
+
+  return {
+    getCurrentConversation: () => deps.getCurrentConversation(),
+    getMessagesContainer: () => deps.getMessagesContainer(),
+    getActiveTabId: () => deps.getActiveTabId(),
+    getScrollRuntimeForTab: (tabId) => deps.getTabRuntimeState(tabId),
+    getRenderRuntimeForTab: (tabId) => deps.getTabRuntimeState(tabId),
+    clearScheduledScrollToBottom: () => {
+      deps.clearScheduledScrollToBottom();
+    },
+    beginConversationHydration: (tabId) => {
+      deps.beginConversationHydration(tabId);
+    },
+    endConversationHydration: (tabId) => {
+      deps.endConversationHydration(tabId);
+    },
+    clearMessagesContainer: () => {
+      deps.getMessagesContainer()?.empty();
+    },
+    resetTurnState: () => {
+      deps.resetTurnState();
+    },
+    shouldRenderEmptyConversationNotice: () =>
+      deps.shouldRenderEmptyConversationNotice(),
+    createEmptyConversationNoticeMessage: () =>
+      deps.createEmptyConversationNotice(),
+    createUserMessageFrame: (message) =>
+      deps.createUserMessageFrame(message),
+    userMessageContentRenderer: deps.userMessageContentRenderer,
+    addUserMessageFooter: (messageEl, message, content) => {
+      deps.addUserMessageFooter(messageEl, message, content);
+    },
+    renderMarkdownInto: (container, markdown) =>
+      deps.renderMarkdownInto(container, markdown),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId) => deps.renderBackgroundTaskIndicatorIfNeeded(tabId),
+    syncBackgroundTaskStateFromConversation: (conversation) => {
+      deps.syncBackgroundTaskStateFromConversation(conversation);
+    },
+    shouldAutoScroll: (tabId) => deps.shouldAutoScroll(tabId),
+    scrollToBottom: (options) => {
+      deps.scrollToBottom(options);
+    },
+    syncPaneScrollMetrics: (tabId, messagesEl) => {
+      deps.syncPaneScrollMetrics(tabId, messagesEl);
+    },
+    scheduleComposerLayoutSync: () => {
+      deps.scheduleComposerLayoutSync();
+    },
+    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    getMessagesForRender: (messages) =>
+      deps.getMessagesForRender(messages),
+    getMessageVisualSignature: (message) =>
+      deps.getMessageVisualSignature(message),
+    assistantShellRender,
+    assistantTailRender,
+    ...createDebugLogCallbacks(),
+    summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
+  };
 }
 
 export class ConversationRenderService {

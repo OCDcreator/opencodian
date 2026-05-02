@@ -191,11 +191,9 @@ import {
   hasInterruptedLocalAssistantTail,
 } from './services/ConversationRenderRuntime';
 import {
-  type ConversationAssistantShellRenderPort,
-  type ConversationAssistantTailRenderPort,
-  type ConversationRenderHost,
   ConversationRenderService,
   type ConversationUserMessageRenderFrame,
+  createConversationRenderHost,
 } from './services/ConversationRenderService';
 import {
   ConversationSessionSettingsCoordinator,
@@ -1233,7 +1231,71 @@ export class OpenCodianView extends ItemView {
     });
 
     const conversationRenderService = new ConversationRenderService(
-      this.createConversationRenderHost(),
+      createConversationRenderHost({
+        getCurrentConversation: () => this.currentConversation,
+        getMessagesContainer: () => this.messagesContainer,
+        getActiveTabId: () => this.getActiveTabId(),
+        getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+        clearScheduledScrollToBottom: () => {
+          this.clearScheduledScrollToBottom();
+        },
+        beginConversationHydration: (tabId) => {
+          this.beginConversationHydration(tabId);
+        },
+        endConversationHydration: (tabId) => {
+          this.endConversationHydration(tabId);
+        },
+        shouldRenderEmptyConversationNotice: () =>
+          this.conversationNoticeCoordinator.shouldRenderEmptyConversationNotice(),
+        createEmptyConversationNotice: () =>
+          this.conversationNoticeCoordinator.createEmptyConversationNotice(),
+        createUserMessageFrame: (message) =>
+          this.createUserMessageRenderFrame(message),
+        userMessageContentRenderer: this.userMessageContentRenderer,
+        addUserMessageFooter: (messageEl, message, content) => {
+          this.addUserMessageFooter(messageEl, message, content);
+        },
+        renderMarkdownInto: (container, markdown) =>
+          this.renderMarkdownInto(container, markdown),
+        renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        syncBackgroundTaskStateFromConversation: (conversation) => {
+          this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
+        },
+        shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
+        scrollToBottom: (options) => {
+          this.scrollToBottom(options);
+        },
+        syncPaneScrollMetrics: (tabId, messagesEl) => {
+          this.syncPaneScrollMetrics(tabId, messagesEl);
+        },
+        scheduleComposerLayoutSync: () => {
+          this.scheduleComposerLayoutSync();
+        },
+        getMessagesForRender: (messages) =>
+          this.conversationIdentityRuntime.getMessagesForRender(messages),
+        getMessageVisualSignature: (message) =>
+          this.conversationIdentityRuntime.getMessageVisualSignature(message),
+        renderPersistedAssistantMessage: (options) =>
+          this.assistantShellViewHostAdapter.renderPersistedAssistantMessage(options),
+        createAssistantMessageElements: () =>
+          this.assistantShellViewHostAdapter.createAssistantMessageElement(),
+        finalizePseudoStreamFooter: (messageEl, message) => {
+          this.assistantShellViewHostAdapter.finalizePseudoStreamFooter(messageEl, message);
+        },
+        clearStreamingMessageState: () => {
+          this.streamingMessageEl = null;
+          this.streamingContentEl = null;
+        },
+        getAssistantBodySignature: (message) => this.assistantShellViewHostAdapter.getAssistantBodySignature(message),
+        renderAssistantMessageBody: (contentEl, message) =>
+          this.assistantShellViewHostAdapter.renderMessageBody(contentEl, message),
+        finalizePersistedFooter: (messageEl, message) => {
+          this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
+        },
+        resetTurnState: () => {
+          this.resetTurnState();
+        },
+      }),
       {
         getCanonicalSessionState: (sessionId) =>
           this.plugin.openCodeService.getCanonicalSessionState(sessionId),
@@ -2360,98 +2422,6 @@ export class OpenCodianView extends ItemView {
         this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
       getTabContextUsage: (tabId) =>
         this.tabManager?.getTabContextUsage(tabId) ?? null,
-    };
-  }
-
-  private createConversationRenderHost(): ConversationRenderHost {
-    const assistantShellRender: ConversationAssistantShellRenderPort =
-      this.createConversationAssistantShellRenderPort();
-    const assistantTailRender: ConversationAssistantTailRenderPort =
-      this.createConversationAssistantTailRenderPort();
-
-    return {
-      getCurrentConversation: () => this.currentConversation,
-      getMessagesContainer: () => this.messagesContainer,
-      getActiveTabId: () => this.getActiveTabId(),
-      getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
-      getRenderRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
-      clearScheduledScrollToBottom: () => {
-        this.clearScheduledScrollToBottom();
-      },
-      beginConversationHydration: (tabId) => {
-        this.beginConversationHydration(tabId);
-      },
-      endConversationHydration: (tabId) => {
-        this.endConversationHydration(tabId);
-      },
-      clearMessagesContainer: () => {
-        this.messagesContainer?.empty();
-      },
-      resetTurnState: () => {
-        this.resetTurnState();
-      },
-      shouldRenderEmptyConversationNotice: () =>
-        this.conversationNoticeCoordinator.shouldRenderEmptyConversationNotice(),
-      createEmptyConversationNoticeMessage: () =>
-        this.conversationNoticeCoordinator.createEmptyConversationNotice(),
-      createUserMessageFrame: (message) =>
-        this.createUserMessageRenderFrame(message),
-      userMessageContentRenderer: this.userMessageContentRenderer,
-      addUserMessageFooter: (messageEl, message, content) => {
-        this.addUserMessageFooter(messageEl, message, content);
-      },
-      renderMarkdownInto: (container, markdown) =>
-        this.renderMarkdownInto(container, markdown),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
-      syncBackgroundTaskStateFromConversation: (conversation) => {
-        this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
-      },
-      shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
-      scrollToBottom: (options) => {
-        this.scrollToBottom(options);
-      },
-      syncPaneScrollMetrics: (tabId, messagesEl) => {
-        this.syncPaneScrollMetrics(tabId, messagesEl);
-      },
-      scheduleComposerLayoutSync: () => {
-        this.scheduleComposerLayoutSync();
-      },
-      requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
-      getMessagesForRender: (messages) =>
-        this.conversationIdentityRuntime.getMessagesForRender(messages),
-      getMessageVisualSignature: (message) =>
-        this.conversationIdentityRuntime.getMessageVisualSignature(message),
-      assistantShellRender,
-      assistantTailRender,
-      ...createDebugLogCallbacks(),
-      summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
-    };
-  }
-
-  private createConversationAssistantShellRenderPort(): ConversationAssistantShellRenderPort {
-    return {
-      renderPersistedMessage: (message) =>
-        this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({ message }),
-      createAssistantMessageElement: () =>
-        this.assistantShellViewHostAdapter.createAssistantMessageElement(),
-      finalizePseudoStreamFooter: (messageEl, message) => {
-        this.assistantShellViewHostAdapter.finalizePseudoStreamFooter(messageEl, message);
-      },
-      clearStreamingMessageState: () => {
-        this.streamingMessageEl = null;
-        this.streamingContentEl = null;
-      },
-    };
-  }
-
-  private createConversationAssistantTailRenderPort(): ConversationAssistantTailRenderPort {
-    return {
-      getBodySignature: (message) => this.assistantShellViewHostAdapter.getAssistantBodySignature(message),
-      renderMessageBody: (contentEl, message) =>
-        this.assistantShellViewHostAdapter.renderMessageBody(contentEl, message),
-      finalizePersistedFooter: (messageEl, message) => {
-        this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
-      },
     };
   }
 

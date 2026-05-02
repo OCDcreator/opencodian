@@ -23,6 +23,44 @@
 ## 公开接口
 
 ```typescript
+/** Flat dependency object passed from OpenCodianView to assemble a ConversationRenderHost. */
+export interface ConversationRenderHostDependencies {
+  getCurrentConversation(): Conversation | null;
+  getMessagesContainer(): HTMLElement | null;
+  getActiveTabId(): TabId | null;
+  getTabRuntimeState(tabId: TabId | null): (ScrollRuntimeState & ConversationRenderRuntimeState) | null;
+  clearScheduledScrollToBottom(): void;
+  beginConversationHydration(tabId: TabId | null): void;
+  endConversationHydration(tabId: TabId | null): void;
+  resetTurnState(): void;
+  shouldRenderEmptyConversationNotice(): boolean;
+  createEmptyConversationNotice(): ChatMessage;
+  createUserMessageFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null;
+  userMessageContentRenderer: UserMessageContentRenderer;
+  addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void;
+  renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
+  shouldAutoScroll(tabId?: TabId | null): boolean;
+  scrollToBottom(options?: { tabId?: TabId | null }): void;
+  syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
+  scheduleComposerLayoutSync(): void;
+  getMessagesForRender(messages: ChatMessage[]): ChatMessage[];
+  getMessageVisualSignature(message: ChatMessage): string;
+  // Shell port callbacks
+  renderPersistedAssistantMessage(options: { message: ChatMessage }): Promise<HTMLElement | void | undefined>;
+  createAssistantMessageElements(): { messageEl: HTMLElement; contentEl: HTMLElement };
+  finalizePseudoStreamFooter(messageEl: HTMLElement, message: Pick<ChatMessage, 'content' | 'timestamp' | 'modelId'>): void;
+  clearStreamingMessageState(): void;
+  // Tail port callbacks
+  getAssistantBodySignature(message: ChatMessage): string;
+  renderAssistantMessageBody(contentEl: HTMLElement, message: ChatMessage): Promise<void>;
+  finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void;
+}
+
+/** Factory function that assembles a ConversationRenderHost from flat dependencies. */
+export function createConversationRenderHost(deps: ConversationRenderHostDependencies): ConversationRenderHost;
+
 export interface IncrementalRenderedMessageUpdate {
   appendedRenderedMessages: ChatMessage[];
   patchTrailingAssistant: boolean;
@@ -146,10 +184,11 @@ export class ConversationRenderService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在主要保留 `renderAssistantMessageBody()` / `renderUserMessageContent()` / `renderContentBlock()` 这类 leaf renderer，以及 empty-notice 文案、copy/footer、markdown 与 tab runtime host seam
-- `OpenCodianView` 会先组装 `ConversationAssistantShellRenderPort` 与 `ConversationAssistantTailRenderPort`，再把它们作为 `ConversationRenderHost` 的子边界传给 service
+- `OpenCodianView` 不再自行组装 `ConversationRenderHost`；它通过 `createConversationRenderHost(deps)` 工厂函数传入扁平依赖对象，工厂内部负责组装 shell/tail render port 并绑定 debug callbacks
+- `ConversationRenderHostDependencies` 接口定义了视图需要提供的所有回调：conversation/container/runtime 查询、scroll/hydration 控件、notice/message-frame 创建、assistant shell/tail adapter 方法、streaming state 清理等
+- 工厂函数内部创建 `ConversationAssistantShellRenderPort` 与 `ConversationAssistantTailRenderPort`，把适配器方法映射到更窄的 port 接口
 - `OpenCodianView` 另外注入 `ConversationCanonicalRenderSource`，让 service 能读取 `OpenCodeService.getCanonicalSessionState()` 并复用 `hydrateOpenCodeMessage()`，但不把 OpenCode service 直接塞进 DOM host
 - 这条 canonical render input 路径现在也与 authoritative reload coordinator 对齐，避免 reload/sync 再走一套独立 hydrate 顺序
-- `ConversationRenderService` 现在同时负责决定“何时整段重渲、何时 patch 尾部、何时仅追加、何时直接重画单条 user/assistant shell”
+- `ConversationRenderService` 现在同时负责决定"何时整段重渲、何时 patch 尾部、何时仅追加、何时直接重画单条 user/assistant shell"
 - persisted assistant shell / notice / footer 装配已经下沉到 `AssistantShellViewHostAdapter`，所以这里的 tail port 只关心正文重渲与 footer finalization
 - 这样消息区编排逻辑首次拥有独立单测边界，而不用把 assistant renderer 一起打散

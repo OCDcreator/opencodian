@@ -312,7 +312,7 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 - `applySyncedConversationUpdate()`：先判定是否可增量，再决定 append / tail patch / full rerender
 - `patchTrailingAssistantRender()`：只在前缀 rendered message 完全稳定时 patch 最后一条 assistant
 - `getIncrementalRenderedMessageUpdate()`：作为纯 helper 判断当前 sync 是否还能走 append-only 路径
-- `createConversationAssistantTailRenderPort()`：把 assistant tail 的正文签名、正文重渲和 persisted footer finalization 先收束成更小 port，再挂回 `ConversationRenderHost`
+- `createConversationRenderHost(deps)` 工厂函数（定义在 `ConversationRenderService.ts`）接收 `ConversationRenderHostDependencies` 扁平依赖，在工厂内部装配完整的 `ConversationRenderHost` 回调对象（包括 shell/tail render port 和 debug callbacks）；view 只提供原始 service 引用和简单 lambda，不再拥有 `createConversationRenderHost` / `createConversationAssistantShellRenderPort` / `createConversationAssistantTailRenderPort` 私有方法
 - `ConversationCanonicalRenderSource`：把 `OpenCodeService.getCanonicalSessionState()` 与 `hydrateOpenCodeMessage()` 作为独立 source 注入 render service，让 full rerender / synced update 优先走 canonical turn view-model，同时不扩大 DOM host
 
 收到服务端新消息后，`applySyncedConversationUpdate()` 会优先尝试：
