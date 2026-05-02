@@ -246,6 +246,7 @@ import {
   type InputPanelAppearanceCoordinatorHost,
 } from './services/InputPanelAppearanceCoordinator';
 import {
+  getFriendlyServerStartErrorMessage,
   type MessageFinalizationHost,
   MessageFinalizationService,
 } from './services/MessageFinalizationService';
@@ -2446,6 +2447,13 @@ export class OpenCodianView extends ItemView {
       refreshActiveTabContextUsageFromServer: () =>
         this.activeTabContextUsageCoordinator.refreshFromServer(),
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
+      renderStreamError: (options) =>
+        this.assistantShellViewHostAdapter.renderStreamError(options),
+      formatCurrentSessionModelId: () =>
+        this.formatModelId(this.getCurrentSessionModel()) ?? '',
+      updateConversationSyncRuntime: (tabId, update) =>
+        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, update),
+      scrollToBottom: (options) => this.scrollToBottom(options),
     };
   }
 
@@ -3237,7 +3245,7 @@ export class OpenCodianView extends ItemView {
         messageEl.remove();
         return true;
       }
-      await this.finalizeAssistantMessageWithError(
+      await this.messageFinalizationService.finalizeAssistantMessageWithError(
         messageEl,
         contentEl,
         this.getUnavailableServerMessage(latestAvailability)
@@ -3252,7 +3260,7 @@ export class OpenCodianView extends ItemView {
         messageEl.remove();
         return true;
       }
-      await this.finalizeAssistantMessageWithError(
+      await this.messageFinalizationService.finalizeAssistantMessageWithError(
         messageEl,
         contentEl,
         this.getUnavailableServerMessage(latestAvailability)
@@ -3279,71 +3287,18 @@ export class OpenCodianView extends ItemView {
     } catch (error) {
       logger.error('Failed to start server from chat prompt:', error);
       await this.refreshStatusSurfaces();
-      await this.finalizeAssistantMessageWithError(
+      await this.messageFinalizationService.finalizeAssistantMessageWithError(
         messageEl,
         contentEl,
-        this.getFriendlyServerStartErrorMessage(error)
+        getFriendlyServerStartErrorMessage(error)
       );
       return false;
     }
   }
 
-  private async finalizeAssistantMessageWithError(
-    messageEl: HTMLElement,
-    contentEl: HTMLElement,
-    message: string
-  ): Promise<void> {
-    const timestamp = Date.now();
-    const modelId = this.formatModelId(this.getCurrentSessionModel());
-    this.assistantShellViewHostAdapter.renderStreamError({
-      messageEl,
-      contentEl,
-      timestamp,
-      content: message,
-      modelId,
-    });
-
-    if (this.currentConversation) {
-      this.currentConversation.messages.push({
-        id: `assistant-${timestamp}`,
-        role: 'assistant',
-        content: message,
-        timestamp,
-        modelId,
-      });
-      this.currentConversation.updatedAt = Date.now();
-      await this.plugin.storage.saveConversation(this.currentConversation);
-      this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
-        this.getActiveTabId(),
-        {
-      fingerprint: this.conversationIdentityRuntime.getConversationSyncFingerprint(
-        this.currentConversation.messages,
-      ),
-        },
-      );
-    }
-
-    this.scrollToBottom({ enableAutoScroll: true });
-  }
-
   private async refreshStatusSurfaces(): Promise<void> {
     await this.chatHeaderPresenter.refreshServerStatusBadge();
     this.plugin.settingsTab?.refreshServerStatusDisplay();
-  }
-
-  private getFriendlyServerStartErrorMessage(error: unknown): string {
-    const rawMessage = error instanceof Error ? error.message : String(error);
-    const lowerMessage = rawMessage.toLowerCase();
-
-    if (lowerMessage.includes('opencode not found')) {
-      return t('chat.error.serverBinaryMissing');
-    }
-
-    if (lowerMessage.includes('already in use')) {
-      return t('chat.error.serverPortInUse');
-    }
-
-    return `${t('chat.error.serverStartFailed')}\n${rawMessage}`;
   }
 
   private getUnavailableServerMessage(availability: Exclude<ChatServerAvailability, 'running' | 'external'>): string {

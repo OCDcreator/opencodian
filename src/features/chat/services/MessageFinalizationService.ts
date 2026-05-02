@@ -3,6 +3,7 @@ import type {
   Conversation,
   SessionTodo,
 } from '../../../core/types';
+import { t } from '../../../i18n';
 import type { TabId } from '../tabs';
 
 export interface ShouldSyncAfterStreamOptions {
@@ -49,6 +50,14 @@ interface MessageFinalizationSyncAfterStreamFollowUpContext {
   logStage: FinalizeMessageOptions['logStage'];
 }
 
+export interface AssistantErrorRenderOptions {
+  messageEl: HTMLElement;
+  contentEl: HTMLElement;
+  timestamp: number;
+  content: string;
+  modelId: string;
+}
+
 export interface MessageFinalizationHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
@@ -87,6 +96,25 @@ export interface MessageFinalizationHost {
   syncActiveTabContextUsageIdentity(): void;
   refreshActiveTabContextUsageFromServer(): Promise<void>;
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
+  renderStreamError(options: AssistantErrorRenderOptions): void;
+  formatCurrentSessionModelId(): string;
+  updateConversationSyncRuntime(tabId: TabId | null, update: { fingerprint?: string | null }): void;
+  scrollToBottom(options: { enableAutoScroll: boolean }): void;
+}
+
+export function getFriendlyServerStartErrorMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const lowerMessage = rawMessage.toLowerCase();
+
+  if (lowerMessage.includes('opencode not found')) {
+    return t('chat.error.serverBinaryMissing');
+  }
+
+  if (lowerMessage.includes('already in use')) {
+    return t('chat.error.serverPortInUse');
+  }
+
+  return `${t('chat.error.serverStartFailed')}\n${rawMessage}`;
 }
 
 export class MessageFinalizationService {
@@ -264,5 +292,43 @@ export class MessageFinalizationService {
 
   private findLatestAssistantMessage(messages: ChatMessage[]): ChatMessage | null {
     return [...messages].reverse().find((message) => message.role === 'assistant') ?? null;
+  }
+
+  async finalizeAssistantMessageWithError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    errorMessage: string,
+  ): Promise<void> {
+    const timestamp = Date.now();
+    const modelId = this.host.formatCurrentSessionModelId();
+
+    this.host.renderStreamError({
+      messageEl,
+      contentEl,
+      timestamp,
+      content: errorMessage,
+      modelId,
+    });
+
+    const conversation = this.host.getCurrentConversation();
+    if (conversation) {
+      conversation.messages.push({
+        id: `assistant-${timestamp}`,
+        role: 'assistant',
+        content: errorMessage,
+        timestamp,
+        modelId,
+      });
+      conversation.updatedAt = Date.now();
+      await this.host.saveConversation(conversation);
+      this.host.updateConversationSyncRuntime(
+        this.host.getActiveTabId(),
+        {
+          fingerprint: this.host.getConversationSyncFingerprint(conversation.messages),
+        },
+      );
+    }
+
+    this.host.scrollToBottom({ enableAutoScroll: true });
   }
 }

@@ -12,6 +12,11 @@
 - 在 sync 后按需执行 tail patch 或 full rerender
 - 继续推进 background-task indicator、turn diff、session todos 和最终保存
 
+它也拥有 **server-start 助手错误终结流** 和 **server-start 错误分类**：
+
+- `finalizeAssistantMessageWithError()` — 渲染流式错误、持久化错误消息到对话、更新同步 fingerprint
+- `getFriendlyServerStartErrorMessage()` — 纯函数，将 server-start 异常分类为用户友好消息
+
 它不消费流式 chunk，也不直接控制 streaming shell。真实的 chunk 消费、pending/timeout/interruption、本地 assistant/notice 组装与第一次本地保存现在保留在 `runtime/SendPipelineRuntime.ts`。
 
 ## 公开接口
@@ -20,6 +25,8 @@
 export function shouldSyncAfterStream(
   options: ShouldSyncAfterStreamOptions,
 ): boolean;
+
+export function getFriendlyServerStartErrorMessage(error: unknown): string;
 
 export interface FinalizeMessageOptions {
   conversation: Conversation;
@@ -31,6 +38,11 @@ export interface FinalizeMessageOptions {
 
 export class MessageFinalizationService {
   finalizeAfterStream(options: FinalizeMessageOptions): Promise<void>;
+  finalizeAssistantMessageWithError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    errorMessage: string,
+  ): Promise<void>;
 }
 ```
 
@@ -65,5 +77,26 @@ export class MessageFinalizationService {
 ## 与 `OpenCodianView` 的边界
 
 - `SendPipelineRuntime` 仍保留 stream loop、本地 shell finalization、本地 assistant/notice message 构建，以及第一次 `saveConversation()`
-- `MessageFinalizationService` 只负责“stream 结束后是否做 canonical convergence、必要时如何回退服务端 sync、sync 后如何 patch/rerender、最后如何做 todo/save/attention 收尾”
+- `MessageFinalizationService` 只负责"stream 结束后是否做 canonical convergence、必要时如何回退服务端 sync、sync 后如何 patch/rerender、最后如何做 todo/save/attention 收尾"
 - `ConversationRenderService` 继续负责消息区 full rerender、append-only sync 和 tail patch，本服务只决定何时调用它
+
+## 助手错误终结流
+
+### getFriendlyServerStartErrorMessage
+
+纯函数，不依赖 host。将 server-start 异常分类为用户友好的 i18n 消息：
+
+- 错误消息含 `"opencode not found"` → `chat.error.serverBinaryMissing`
+- 错误消息含 `"already in use"` → `chat.error.serverPortInUse`
+- 其他 → `chat.error.serverStartFailed` + 原始错误消息
+
+### finalizeAssistantMessageWithError
+
+当 server-start prompt card 失败时（settings/skip 后仍不可用，或 start 抛异常），`OpenCodianView` 通过此方法完成助手错误终结：
+
+1. 通过 host 的 `renderStreamError()` 渲染错误块（委托 `AssistantShellViewHostAdapter`）
+2. 将错误消息作为 assistant message push 到 conversation 并 save
+3. 通过 host 的 `updateConversationSyncRuntime()` 更新 sync fingerprint
+4. 通过 host 的 `scrollToBottom()` 滚动到底部
+
+`OpenCodianView` 不再拥有 `finalizeAssistantMessageWithError` 或 `getFriendlyServerStartErrorMessage` 私有方法；全部委托到此服务。
