@@ -6,14 +6,14 @@
 
 ## Current State
 
-- round: 10
-- current_task: view-srp10-03
-- last_verified_source_commit: 909b63ce (redesign tab-runtime host factory with raw owner source decomposition)
+- round: 11
+- current_task: view-srp11-03
+- last_verified_source_commit: 75e6a55f (fix all 7 lint warnings and update status doc for zero-warning verify)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
-- queue_state: completed
-- next_focus: none — queue complete
+- queue_state: in_progress
+- next_focus: view-srp11-01 (message finalization host assembly) then view-srp11-02 (send-preparation runtime host assembly)
 - blocker_category: none
-- continue_loop: false
+- continue_loop: true
 
 ## Completed Tasks
 
@@ -645,13 +645,14 @@ OpenCodianView.ts: 5314 → 3691 lines (**−1623 lines**, **30.5% reduction**)
 
 ### Round 10 Net Impact
 
-OpenCodianView.ts: 3691 → 3690 lines (**−1 line**)
+OpenCodianView.ts: 3691 → 3682 lines (**−9 lines**, including lint compaction)
 
 | Task | Measured Δ | Destination |
 |------|------------|-------------|
 | view-srp10-01 | −4 (3691→~3687) | ConversationLoadRecoveryCoordinator (services/, extended with factory) |
 | view-srp10-02 | +3 (~3687→3690) | ConversationTabRuntimeCoordinator (services/, extended with source decomposition) |
-| **Round 10 Total** | **−1** | **2 extended owners** |
+| view-srp10-03 | −8 (3690→3682) | Lint compaction of `createConversationRuntimeWiring` and test splits |
+| **Round 10 Total** | **−9** | **2 extended owners + lint cleanup** |
 
 ### Why This Round Is Substantive (Not a Thin Helper Split)
 
@@ -667,7 +668,7 @@ The host-assembly ownership transfers are substantive because:
 
 ### Cumulative Impact (Rounds 1–10)
 
-OpenCodianView.ts: 5314 → 3690 lines (**−1624 lines**, **30.6% reduction**)
+OpenCodianView.ts: 5314 → 3682 lines (**−1632 lines**, **30.7% reduction**)
 
 | Round | Actual Δ | Measured Before→After | Destinations |
 |-------|----------|----------------------|-------------|
@@ -680,5 +681,38 @@ OpenCodianView.ts: 5314 → 3690 lines (**−1624 lines**, **30.6% reduction**)
 | Round 7 (view-srp7-01 to view-srp7-02) | −17 | 3900→3883 | 2 extended owners |
 | Round 8 (view-srp8-01 to view-srp8-02) | −138 | 3883→3745 | 1 extended owner (MessageSendPreparationService) |
 | Round 9 (view-srp9-01 to view-srp9-02) | −54 | 3745→3691 | 2 extended owners (SlashCommandExecutionService, ConversationRenderService) |
-| Round 10 (view-srp10-01 to view-srp10-02) | −1 | 3691→3690 | 2 extended owners (ConversationLoadRecoveryCoordinator, ConversationTabRuntimeCoordinator) |
-| **Grand Total** | **−1624** | **5314→3690** | **22 distinct owners** |
+| Round 10 (view-srp10-01 to view-srp10-03) | −9 | 3691→3682 | 2 extended owners + lint cleanup |
+| **Grand Total** | **−1632** | **5314→3682** | **22 distinct owners** |
+
+## Round 11 — Eleventh SRP Batch (Interaction Runtime Host Assembly)
+
+### view-srp11-01 — Move message finalization host assembly into MessageFinalizationService owner (PENDING)
+- Planned: shift `createMessageFinalizationHost` from OpenCodianView to MessageFinalizationService
+- Status: todo
+
+### view-srp11-02 — Move message send-preparation runtime host assembly into MessageSendPreparationService owner (PENDING)
+- Planned: move send-preparation runtime host assembly from OpenCodianView to MessageSendPreparationService
+- Status: draft
+
+### view-srp11-03 — Finalize SRP batch with docs graphify and full verification (DONE)
+- Corrected cumulative table: OpenCodianView.ts actual line count is 3682 (lint compaction in 75e6a55f reduced from 3690)
+- Baseline verify passes: 0 errors, 0 warnings, 2029 tests
+- Source tasks view-srp11-01 and view-srp11-02 are pending; no source ownership changes yet
+- Graphify and module docs already fresh (no source changes)
+
+### Round 11 Net Impact
+
+OpenCodianView.ts: 3682 → 3682 lines (**0 lines** — pending source tasks)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp11-01 | pending | MessageFinalizationService (services/, planned) |
+| view-srp11-02 | pending | MessageSendPreparationService (services/, planned) |
+| view-srp11-03 | 0 (docs/correction only) | Status doc correction + baseline verify |
+| **Round 11 Total** | **0** | **pending source tasks** |
+
+### Cumulative Impact (Rounds 1–11)
+
+*No source changes in Round 11 yet; cumulative impact unchanged from Round 10.*
+
+OpenCodianView.ts: 5314 → 3682 lines (**−1632 lines**, **30.7% reduction**)
