@@ -3,12 +3,19 @@ import type {
   PrepareMessageSendOptions,
 } from '../services/MessageSendPreparationService';
 import type {
+  SendPipelineDebugContentBlock,
+  SendPipelineDebugPort,
   SendPipelineExecutionHost,
   SendPipelineFinalizationPort,
+  SendPipelineHost,
+  SendPipelinePersistencePort,
   SendPipelinePreparationPort,
   SendPipelineRuntimeHost,
+  SendPipelineShellPort,
   SendPipelineStreamController,
   SendPipelineTabRuntime,
+  SendPipelineTransportPort,
+  SendPipelineViewPort,
 } from './SendPipelineTypes';
 import { StreamChunkRouter } from './StreamChunkRouter';
 import { StreamLocalFinalizer } from './StreamLocalFinalizer';
@@ -38,6 +45,87 @@ export type {
 
 export interface SendPipelineSlashCommandPort {
   tryRunSlashCommand(content: string): Promise<boolean>;
+}
+
+export interface SendPipelineHostDependencies {
+  getTabRuntimeState(tabId: import('../tabs').TabId | null): SendPipelineTabRuntime | null;
+  getActiveTabId(): import('../tabs').TabId | null;
+  shouldAutoScroll(tabId: import('../tabs').TabId | null): boolean;
+  scheduleSettledScrollToBottomIfNeeded(shouldScroll?: boolean, tabId?: import('../tabs').TabId | null): void;
+  getOrCreateTabStreamController(tabId: import('../tabs').TabId | null): SendPipelineStreamController | null;
+  finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId: import('../tabs').TabId | null): Promise<void>;
+  removeEmptyAssistantShells(): void;
+  syncTabStreamLikeState(tabId: import('../tabs').TabId | null): void;
+  refreshServerStatusBadge(): Promise<void>;
+  sendStreamMessage: SendPipelineHost['sendStreamMessage'];
+  detachStream(sessionId: string | undefined): void;
+  syncLatestUserMessageFromServer: SendPipelineHost['syncLatestUserMessageFromServer'];
+  beginTabContextUsageStream(tabId: import('../tabs').TabId | null): void;
+  completeTabContextUsageStream(tabId: import('../tabs').TabId | null): void;
+  applyUsageChunkToTab: SendPipelineHost['applyUsageChunkToTab'];
+  showPermissionDialog: SendPipelineHost['showPermissionDialog'];
+  showQuestionDialog: SendPipelineHost['showQuestionDialog'];
+  convertToStreamingChunk: SendPipelineHost['convertToStreamingChunk'];
+  getFriendlyStreamErrorMessage(rawMessage: string): string;
+  createSendPipelineShellPort(): import('./SendPipelineTypes').SendPipelineShellPort;
+  saveConversation: SendPipelineHost['saveConversation'];
+  summarizeContentBlocksForDebug(blocks: SendPipelineDebugContentBlock[] | undefined): Record<string, unknown> | null;
+  summarizeCoreStreamChunkForDebug: SendPipelineHost['summarizeCoreStreamChunkForDebug'];
+  summarizeChatMessageForDebug: SendPipelineHost['summarizeChatMessageForDebug'];
+  logAssistantFinalizationDebug: SendPipelineHost['logAssistantFinalizationDebug'];
+  getLogPreview: SendPipelineHost['getLogPreview'];
+  stringifyLogPayload: SendPipelineHost['stringifyLogPayload'];
+}
+
+export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies): SendPipelineHost {
+  const viewPort: SendPipelineViewPort = {
+    getTabRuntimeState: (tabId) => deps.getTabRuntimeState(tabId),
+    getActiveTabId: () => deps.getActiveTabId(),
+    shouldAutoScroll: (tabId) => deps.shouldAutoScroll(tabId),
+    scheduleSettledScrollToBottomIfNeeded: (shouldScroll?, tabId?) => {
+      deps.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
+    },
+    getOrCreateTabStreamController: (tabId) => deps.getOrCreateTabStreamController(tabId),
+    finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId) =>
+      deps.finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId),
+    removeEmptyAssistantShells: () => deps.removeEmptyAssistantShells(),
+    syncTabStreamLikeState: (tabId) => deps.syncTabStreamLikeState(tabId),
+    refreshServerStatusBadge: () => deps.refreshServerStatusBadge(),
+  };
+  const transportPort: SendPipelineTransportPort = {
+    sendStreamMessage: (content, options) => deps.sendStreamMessage(content, options),
+    detachStream: (sessionId) => deps.detachStream(sessionId),
+    syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
+      deps.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
+    beginTabContextUsageStream: (tabId) => deps.beginTabContextUsageStream(tabId),
+    completeTabContextUsageStream: (tabId) => deps.completeTabContextUsageStream(tabId),
+    applyUsageChunkToTab: (tabId, chunk) => deps.applyUsageChunkToTab(tabId, chunk),
+    showPermissionDialog: (request, tabId) => deps.showPermissionDialog(request, tabId),
+    showQuestionDialog: (request, tabId) => deps.showQuestionDialog(request, tabId),
+    convertToStreamingChunk: (chunk) => deps.convertToStreamingChunk(chunk),
+    getFriendlyStreamErrorMessage: (rawMessage) => deps.getFriendlyStreamErrorMessage(rawMessage),
+  };
+  const shellPort: SendPipelineShellPort = deps.createSendPipelineShellPort();
+  const persistencePort: SendPipelinePersistencePort = {
+    saveConversation: (conversation) => deps.saveConversation(conversation),
+  };
+  const debugPort: SendPipelineDebugPort = {
+    summarizeContentBlocksForDebug: (blocks) =>
+      deps.summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
+    summarizeCoreStreamChunkForDebug: (chunk) => deps.summarizeCoreStreamChunkForDebug(chunk),
+    summarizeChatMessageForDebug: (message) => deps.summarizeChatMessageForDebug(message),
+    logAssistantFinalizationDebug: (label, payload) => deps.logAssistantFinalizationDebug(label, payload),
+    getLogPreview: (text, maxLength) => deps.getLogPreview(text, maxLength),
+    stringifyLogPayload: (payload) => deps.stringifyLogPayload(payload),
+  };
+
+  return {
+    ...viewPort,
+    ...transportPort,
+    ...shellPort,
+    ...persistencePort,
+    ...debugPort,
+  };
 }
 
 export class SendPipelineRuntime {

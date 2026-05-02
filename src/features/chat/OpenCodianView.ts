@@ -74,14 +74,10 @@ import {
   summarizeCoreStreamChunkForDebug,
 } from './runtime/SendPipelineDebugSummaries';
 import {
+  createSendPipelineRuntimeHost,
   type SendPipelineDebugContentBlock,
-  type SendPipelineDebugPort,
-  type SendPipelineHost,
-  type SendPipelinePersistencePort,
+  type SendPipelineHostDependencies,
   SendPipelineRuntime,
-  type SendPipelineShellPort,
-  type SendPipelineTransportPort,
-  type SendPipelineViewPort,
 } from './runtime/SendPipelineRuntime';
 import {
   StreamingInlineCardRenderer,
@@ -1804,7 +1800,7 @@ export class OpenCodianView extends ItemView {
       }),
     );
     const sendPipelineRuntime = new SendPipelineRuntime(
-      this.createSendPipelineRuntimeHost(),
+      createSendPipelineRuntimeHost(this.createSendPipelineHostDependencies()),
       messageSendPreparationService,
       messageFinalizationService,
       slashCommandExecutionService,
@@ -2438,8 +2434,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createSendPipelineRuntimeHost(): SendPipelineHost {
-    const viewPort: SendPipelineViewPort = {
+  private createSendPipelineHostDependencies(): SendPipelineHostDependencies {
+    return {
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       getActiveTabId: () => this.getActiveTabId(),
       shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
@@ -2458,8 +2454,6 @@ export class OpenCodianView extends ItemView {
         this.syncTabStreamLikeState(tabId);
       },
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-    };
-    const transportPort: SendPipelineTransportPort = {
       sendStreamMessage: (content, options) => this.plugin.openCodeService.sendMessage(content, options),
       detachStream: (sessionId) => {
         if (sessionId) {
@@ -2482,25 +2476,13 @@ export class OpenCodianView extends ItemView {
         this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId),
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
       getFriendlyStreamErrorMessage: (rawMessage) => this.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage),
-    };
-    const shellPort: SendPipelineShellPort = this.assistantShellViewHostAdapter.createSendPipelineShellPort();
-    const persistencePort: SendPipelinePersistencePort = {
+      createSendPipelineShellPort: () => this.assistantShellViewHostAdapter.createSendPipelineShellPort(),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
-    };
-    const debugPort: SendPipelineDebugPort = {
       summarizeContentBlocksForDebug: (blocks) =>
         summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
       summarizeCoreStreamChunkForDebug: (chunk) => summarizeCoreStreamChunkForDebug(chunk),
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
       ...createDebugLogCallbacks(),
-    };
-
-    return {
-      ...viewPort,
-      ...transportPort,
-      ...shellPort,
-      ...persistencePort,
-      ...debugPort,
     };
   }
 

@@ -371,7 +371,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 - `OpenCodianView` 本身只保留 runtime host 装配与 bridge 方法；streaming tool-call start/end 与 primary-stream background-task finalize 触发也已经下沉到 `runtime/BackgroundTaskStreamTriggerCoordinator.ts`
 - 消息区 patch / rerender 细节仍继续复用 `ConversationRenderService`
 
-第八阶段起，`createSendPipelineRuntimeHost()` 也不再把全部 callback 混在一个匿名对象里，而是先按 host 能力簇分成：
+第八阶段起，host 装配 lifecycle 已移入 `SendPipelineRuntime.createSendPipelineRuntimeHost()`。view 现在只保留 `createSendPipelineHostDependencies()` 扁平依赖工厂，返回 `SendPipelineHostDependencies` 供工厂函数消费。该依赖对象覆盖的能力簇仍为：
 
 - `SendPipelineViewPort`
 - `SendPipelineTransportPort`

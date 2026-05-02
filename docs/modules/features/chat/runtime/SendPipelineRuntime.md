@@ -106,9 +106,10 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只保留 `createSendPipelineRuntimeHost()` 与 prompt submission bridge；A2 之后这个 bridge 也会把 `syntheticTextParts` / `invocationIntent` 透传进 runtime
+- `OpenCodianView` 不再直接拥有 `createSendPipelineRuntimeHost()`；host 装配 lifecycle 已移入本模块的 `createSendPipelineRuntimeHost()` 工厂函数
+- `OpenCodianView` 只保留 `createSendPipelineHostDependencies()` 扁平依赖工厂，返回 `SendPipelineHostDependencies` 对象供 `createSendPipelineRuntimeHost()` 消费
 - slash command 识别与 `runSessionCommand()` delegation 继续留在专用 `SlashCommandExecutionService`
-- `createSendPipelineRuntimeHost()` 现在把 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
+- `createSendPipelineRuntimeHost()` 把 `SendPipelineHostDependencies` 按 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
 - `MessageSendPreparationService` 只负责“发之前能不能发、optimistic user message 何时落地、何时进入 streaming state”
 - `PreparedMessageSend` 现在是 send preparation 与 transport 之间的稳定 payload handoff，负责把 canonical seed 使用的 `messageID + parts[]` 原样带进 `openCodeService.sendMessage()`
 - `SendPipelineRuntime` 负责“真正发流，并装配 chunk router / local finalizer / post-stream finalizer”

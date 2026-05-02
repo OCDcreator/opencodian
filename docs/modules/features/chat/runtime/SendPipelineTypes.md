@@ -14,6 +14,7 @@
 - `SendPipelinePreparationPort` / `SendPipelineFinalizationPort`：对 `MessageSendPreparationService` 与 `MessageFinalizationService` 的窄接口
 - `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port；其中 transport port 现在显式接收 preparation 阶段生成的稳定 `messageID` / `requestParts`，并支持可选 top-level `agent`，shell port 只保留 streaming shell 创建、reveal、notice placeholder 渲染与 timestamp 收尾，并由 `AssistantShellRenderer.ts` 统一实现 shell adapter
 - `SendPipelineHost`：由上述 port 组合出来的完整宿主契约，方便 view 侧一次性装配
+- `SendPipelineHostDependencies`（定义在 `SendPipelineRuntime.ts`）：扁平依赖接口，让 `OpenCodianView` 只需提供原始回调而不负责 port 分组；`createSendPipelineRuntimeHost()` 工厂函数消费此接口并组合成 `SendPipelineHost`
 - `SendPipelineExecutionHost` / `StreamChunkRouterHost` / `StreamLocalFinalizerHost`：runtime、router 与本地收尾各自真正依赖的 host 子集
 - `SendPipelineTraceState`：chunk router 汇总出来的流状态快照
 - `StreamChunkRouterOptions` / `StreamChunkRouterResult`：stream 消费阶段输入输出
