@@ -1,5 +1,13 @@
+import type { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCardRenderer';
 import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
-import type { QuestionRuntimeViewHost } from './QuestionRuntimeHostAdapter';
+import {
+  createQuestionPostResolutionRuntimeHostAdapter,
+  createQuestionRuntimeServices,
+  type QuestionRuntimeConversationSyncPort,
+  type QuestionRuntimeServices,
+  type QuestionRuntimeStatusRefreshPort,
+  type QuestionRuntimeViewHost,
+} from './QuestionRuntimeHostAdapter';
 import {
   createQuestionRuntimeViewHostAdapter,
   type QuestionRuntimeQuestionApiPort,
@@ -18,6 +26,12 @@ export interface QuestionRuntimeViewHostFactoryHost extends QuestionRuntimeViewH
   getQuestionDockSlotCoordinator(): QuestionDockSlotCoordinatorPort;
   getQuestionApi(): QuestionRuntimeQuestionApiPort;
   getTabAttention(): QuestionRuntimeTabAttentionPort;
+}
+
+export interface QuestionRuntimeBundlePorts {
+  conversationSync: QuestionRuntimeConversationSyncPort;
+  statusRefresh: QuestionRuntimeStatusRefreshPort;
+  streamingInlineCardRenderer: StreamingInlineCardRenderer;
 }
 
 export function createQuestionRuntimeViewHost(
@@ -52,4 +66,25 @@ export function createQuestionRuntimeViewHost(
       },
     },
   });
+}
+
+export function createQuestionRuntimeBundle(
+  host: QuestionRuntimeViewHostFactoryHost,
+  ports: QuestionRuntimeBundlePorts,
+): QuestionRuntimeServices {
+  const viewHost = createQuestionRuntimeViewHost(host);
+  const postResolutionHost = createQuestionPostResolutionRuntimeHostAdapter({
+    viewHost: {
+      getActiveTabId: () => host.getActiveTabId(),
+      getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
+      getSessionIdForTab: (tabId) => host.getSessionIdForTab(tabId),
+    },
+    conversationSync: ports.conversationSync,
+    statusRefresh: ports.statusRefresh,
+  });
+  return createQuestionRuntimeServices(
+    viewHost,
+    postResolutionHost,
+    ports.streamingInlineCardRenderer,
+  );
 }

@@ -259,13 +259,9 @@ import {
   type PersistentAssistantNoticeServiceHost,
 } from './services/PersistentAssistantNoticeService';
 import { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
+import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
 import {
-  createQuestionPostResolutionRuntimeHostAdapter,
-  createQuestionRuntimeServices,
-  type QuestionRuntimeServices,
-} from './services/QuestionRuntimeHostAdapter';
-import {
-  createQuestionRuntimeViewHost,
+  createQuestionRuntimeBundle,
   type QuestionRuntimeViewHostFactoryHost,
 } from './services/QuestionRuntimeViewHostFactory';
 import {
@@ -1606,14 +1602,13 @@ export class OpenCodianView extends ItemView {
       streamingInlineCardRenderer,
     );
     const questionRuntimeViewHostFactoryHost = this.createQuestionRuntimeViewHostFactoryHost();
-    const questionRuntimeServices = createQuestionRuntimeServices(
-      createQuestionRuntimeViewHost(questionRuntimeViewHostFactoryHost),
-      createQuestionPostResolutionRuntimeHostAdapter({
-        viewHost: questionRuntimeViewHostFactoryHost,
+    const questionRuntimeServices = createQuestionRuntimeBundle(
+      questionRuntimeViewHostFactoryHost,
+      {
         conversationSync: conversationSyncBridgePorts.getVisibleSyncFollowUp(),
         statusRefresh: this.sessionTodoCoordinator,
-      }),
-      streamingInlineCardRenderer,
+        streamingInlineCardRenderer,
+      },
     );
     const slashCommandExecutionService = new SlashCommandExecutionService(
       this.createSlashCommandExecutionHost(conversationSyncBridgePorts),
