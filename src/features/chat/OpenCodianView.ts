@@ -2450,7 +2450,7 @@ export class OpenCodianView extends ItemView {
       renderStreamError: (options) =>
         this.assistantShellViewHostAdapter.renderStreamError(options),
       formatCurrentSessionModelId: () =>
-        this.formatModelId(this.getCurrentSessionModel()) ?? '',
+        this.formatModelId(this.getCurrentSessionModel()),
       updateConversationSyncRuntime: (tabId, update) =>
         this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, update),
       scrollToBottom: (options) => this.scrollToBottom(options),

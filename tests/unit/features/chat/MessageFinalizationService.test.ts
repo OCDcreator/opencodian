@@ -598,6 +598,27 @@ describe('MessageFinalizationService.finalizeAssistantMessageWithError', () => {
     );
   });
 
+  it('preserves missing current model as undefined during error finalization', async () => {
+    const conversation = createConversation([]);
+    const host = createHost(conversation, {
+      formatCurrentSessionModelId: jest.fn().mockReturnValue(undefined),
+    });
+    const service = new MessageFinalizationService(host);
+
+    await service.finalizeAssistantMessageWithError(
+      document.createElement('div'),
+      document.createElement('div'),
+      'Error',
+    );
+
+    expect(host.renderStreamError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: undefined,
+      }),
+    );
+    expect(conversation.messages[0].modelId).toBeUndefined();
+  });
+
   it('scrolls to bottom after error finalization', async () => {
     const conversation = createConversation([]);
     const host = createHost(conversation);

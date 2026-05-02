@@ -55,7 +55,7 @@ export interface AssistantErrorRenderOptions {
   contentEl: HTMLElement;
   timestamp: number;
   content: string;
-  modelId: string;
+  modelId?: string;
 }
 
 export interface MessageFinalizationHost {
@@ -97,7 +97,7 @@ export interface MessageFinalizationHost {
   refreshActiveTabContextUsageFromServer(): Promise<void>;
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
   renderStreamError(options: AssistantErrorRenderOptions): void;
-  formatCurrentSessionModelId(): string;
+  formatCurrentSessionModelId(): string | undefined;
   updateConversationSyncRuntime(tabId: TabId | null, update: { fingerprint?: string | null }): void;
   scrollToBottom(options: { enableAutoScroll: boolean }): void;
 }
