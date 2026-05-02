@@ -130,6 +130,10 @@ export function getUnavailableServerMessage(availability: UnavailableServerAvail
 export class MessageFinalizationService {
   constructor(private readonly host: MessageFinalizationHost) {}
 
+  getUnavailableServerPromptMessage(availability: UnavailableServerAvailability): string {
+    return getUnavailableServerMessage(availability);
+  }
+
   async finalizeAfterStream(options: FinalizeMessageOptions): Promise<void> {
     const {
       conversation,

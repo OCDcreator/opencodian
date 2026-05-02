@@ -719,6 +719,16 @@ describe('getUnavailableServerMessage', () => {
   });
 });
 
+describe('MessageFinalizationService.getUnavailableServerPromptMessage', () => {
+  it('delegates unavailable-server prompt text through the service owner', () => {
+    const service = new MessageFinalizationService(createHost(createConversation([])));
+
+    const result = service.getUnavailableServerPromptMessage('offline');
+
+    expect(result).toBe(getUnavailableServerMessage('offline'));
+  });
+});
+
 describe('MessageFinalizationService.finalizeAssistantMessageWithServerUnavailableError', () => {
   beforeEach(() => {
     jest.clearAllMocks();

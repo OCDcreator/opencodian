@@ -246,7 +246,6 @@ import {
   type InputPanelAppearanceCoordinatorHost,
 } from './services/InputPanelAppearanceCoordinator';
 import {
-  getUnavailableServerMessage,
   type MessageFinalizationHost,
   MessageFinalizationService,
 } from './services/MessageFinalizationService';
@@ -3202,7 +3201,7 @@ export class OpenCodianView extends ItemView {
     });
     cardEl.createDiv({
       cls: 'opencodian-server-action-desc',
-      text: getUnavailableServerMessage(availability),
+      text: this.messageFinalizationService.getUnavailableServerPromptMessage(availability),
     });
 
     const statusEl = cardEl.createDiv({
