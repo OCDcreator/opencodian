@@ -116,30 +116,51 @@ export interface MessageFinalizationHostDependencies {
     tabId: TabId | null,
     reason: string,
   ): Promise<MessageFinalizationSyncResult>;
-  getConversationSyncFingerprint(messages: ChatMessage[]): string;
-  applySyncedConversationUpdate(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-  ): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
-  appendTurnDiffNoticeIfNeeded(
-    conversation: Conversation,
-    editedFiles: string[],
-    tabId?: TabId | null,
-  ): Promise<void>;
-  refreshTabSessionTodos(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<SessionTodo[]>;
-  saveConversation(conversation: Conversation): Promise<void>;
-  updateConversationSyncRuntime(tabId: TabId | null, update: { inFlight?: boolean; fingerprint?: string | null }): void;
-  clearPendingEditedFiles(tabId: TabId | null): void;
+  conversationIdentityRuntime: {
+    getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  };
+  conversationRenderService: {
+    applySyncedConversationUpdate(
+      previousMessages: ChatMessage[],
+      nextMessages: ChatMessage[],
+    ): Promise<void>;
+  };
+  backgroundTaskHost: {
+    renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  };
+  conversationNoticeCoordinator: {
+    appendTurnDiffNoticeIfNeeded(
+      conversation: Conversation,
+      editedFiles: string[],
+      tabId?: TabId | null,
+    ): Promise<void>;
+  };
+  sessionTodoCoordinator: {
+    refreshTabSessionTodos(
+      tabId: TabId | null,
+      sessionId: string | undefined,
+      options: { suppressErrors?: boolean },
+    ): Promise<SessionTodo[]>;
+  };
+  saveConversation: (conversation: Conversation) => Promise<void>;
+  conversationTabRuntimeCoordinator: {
+    updateConversationSyncRuntime(
+      tabId: TabId | null,
+      update: { inFlight?: boolean; fingerprint?: string | null },
+    ): void;
+    clearPendingEditedFiles(tabId: TabId | null): void;
+  };
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-  syncActiveTabConversation(conversation: Conversation): void;
-  syncActiveTabContextUsageIdentity(): void;
-  refreshActiveTabContextUsageFromServer(): Promise<void>;
-  renderStreamError(options: AssistantErrorRenderOptions): void;
+  tabConversationStateBridge: {
+    syncActiveTabConversation(conversation: Conversation): void;
+  };
+  activeTabContextUsageCoordinator: {
+    syncIdentity(): void;
+    refreshFromServer(): Promise<void>;
+  };
+  assistantShellViewHostAdapter: {
+    renderStreamError(options: AssistantErrorRenderOptions): void;
+  };
   formatCurrentSessionModelId(): string | undefined;
   scrollToBottom(options: { enableAutoScroll: boolean }): void;
 }
@@ -147,6 +168,8 @@ export interface MessageFinalizationHostDependencies {
 export function createMessageFinalizationHost(
   deps: MessageFinalizationHostDependencies,
 ): MessageFinalizationHost {
+  const tabRuntime = deps.conversationTabRuntimeCoordinator;
+  const ctxUsage = deps.activeTabContextUsageCoordinator;
   return {
     getCurrentConversation: () => deps.getCurrentConversation(),
     getActiveTabId: () => deps.getActiveTabId(),
@@ -155,36 +178,35 @@ export function createMessageFinalizationHost(
     syncConversationMessagesFromServer: (conversation, tabId, reason) =>
       deps.syncConversationMessagesFromServer(conversation, tabId, reason),
     getConversationSyncFingerprint: (messages) =>
-      deps.getConversationSyncFingerprint(messages),
+      deps.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
     applySyncedConversationUpdate: (previousMessages, nextMessages) =>
-      deps.applySyncedConversationUpdate(previousMessages, nextMessages),
+      deps.conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
     renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-      deps.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      deps.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
     appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
-      deps.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
+      deps.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
     refreshTabSessionTodos: (tabId, sessionId, options) =>
-      deps.refreshTabSessionTodos(tabId, sessionId, options),
+      deps.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
     saveConversation: (conversation) => deps.saveConversation(conversation),
     setConversationSyncInFlight: (tabId, value) => {
-      deps.updateConversationSyncRuntime(tabId, { inFlight: value });
+      tabRuntime.updateConversationSyncRuntime(tabId, { inFlight: value });
     },
     setLastConversationSyncFingerprint: (tabId, fingerprint) => {
-      deps.updateConversationSyncRuntime(tabId, { fingerprint });
+      tabRuntime.updateConversationSyncRuntime(tabId, { fingerprint });
     },
-    clearPendingEditedFiles: (tabId) => deps.clearPendingEditedFiles(tabId),
+    clearPendingEditedFiles: (tabId) => tabRuntime.clearPendingEditedFiles(tabId),
     setTabNeedsAttention: (tabId, needsAttention) =>
       deps.setTabNeedsAttention(tabId, needsAttention),
     setActiveTabConversation: (conversation) =>
-      deps.syncActiveTabConversation(conversation),
-    syncActiveTabContextUsageIdentity: () =>
-      deps.syncActiveTabContextUsageIdentity(),
-    refreshActiveTabContextUsageFromServer: () =>
-      deps.refreshActiveTabContextUsageFromServer(),
+      deps.tabConversationStateBridge.syncActiveTabConversation(conversation),
+    syncActiveTabContextUsageIdentity: () => ctxUsage.syncIdentity(),
+    refreshActiveTabContextUsageFromServer: () => ctxUsage.refreshFromServer(),
     summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
-    renderStreamError: (options) => deps.renderStreamError(options),
+    renderStreamError: (options) =>
+      deps.assistantShellViewHostAdapter.renderStreamError(options),
     formatCurrentSessionModelId: () => deps.formatCurrentSessionModelId(),
     updateConversationSyncRuntime: (tabId, update) =>
-      deps.updateConversationSyncRuntime(tabId, update),
+      tabRuntime.updateConversationSyncRuntime(tabId, update),
     scrollToBottom: (options) => deps.scrollToBottom(options),
   };
 }

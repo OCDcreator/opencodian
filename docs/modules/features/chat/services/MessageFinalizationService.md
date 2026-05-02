@@ -27,19 +27,20 @@ export interface MessageFinalizationHostDependencies {
   getActiveTabId(): TabId | null;
   syncConversationMessagesFromCanonicalState(...): Promise<MessageFinalizationSyncResult | null>;
   syncConversationMessagesFromServer(...): Promise<MessageFinalizationSyncResult>;
-  getConversationSyncFingerprint(messages: ChatMessage[]): string;
-  applySyncedConversationUpdate(...): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
-  appendTurnDiffNoticeIfNeeded(...): Promise<void>;
-  refreshTabSessionTodos(...): Promise<SessionTodo[]>;
+  conversationIdentityRuntime: { getConversationSyncFingerprint(messages: ChatMessage[]): string };
+  conversationRenderService: { applySyncedConversationUpdate(...): Promise<void> };
+  backgroundTaskHost: { renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void> };
+  conversationNoticeCoordinator: { appendTurnDiffNoticeIfNeeded(...): Promise<void> };
+  sessionTodoCoordinator: { refreshTabSessionTodos(...): Promise<SessionTodo[]> };
   saveConversation(conversation: Conversation): Promise<void>;
-  updateConversationSyncRuntime(tabId, update: { inFlight?: boolean; fingerprint?: string | null }): void;
-  clearPendingEditedFiles(tabId: TabId | null): void;
+  conversationTabRuntimeCoordinator: {
+    updateConversationSyncRuntime(tabId, update: { inFlight?: boolean; fingerprint?: string | null }): void;
+    clearPendingEditedFiles(tabId: TabId | null): void;
+  };
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-  syncActiveTabConversation(conversation: Conversation): void;
-  syncActiveTabContextUsageIdentity(): void;
-  refreshActiveTabContextUsageFromServer(): Promise<void>;
-  renderStreamError(options: AssistantErrorRenderOptions): void;
+  tabConversationStateBridge: { syncActiveTabConversation(conversation: Conversation): void };
+  activeTabContextUsageCoordinator: { syncIdentity(): void; refreshFromServer(): Promise<void> };
+  assistantShellViewHostAdapter: { renderStreamError(options: AssistantErrorRenderOptions): void };
   formatCurrentSessionModelId(): string | undefined;
   scrollToBottom(options: { enableAutoScroll: boolean }): void;
 }

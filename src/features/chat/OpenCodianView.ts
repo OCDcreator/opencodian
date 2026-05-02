@@ -1729,31 +1729,18 @@ export class OpenCodianView extends ItemView {
           this.syncConversationMessagesFromCanonicalState(conversation, tabId, reason),
         syncConversationMessagesFromServer: (conversation, tabId, reason) =>
           this.syncConversationMessagesFromServer(conversation, tabId, reason),
-        getConversationSyncFingerprint: (messages) =>
-          this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
-        applySyncedConversationUpdate: (previousMessages, nextMessages) =>
-          conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
-        renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-          this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
-        appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
-          this.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
-        refreshTabSessionTodos: (tabId, sessionId, options) =>
-          this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
+        conversationIdentityRuntime: this.conversationIdentityRuntime,
+        conversationRenderService,
+        backgroundTaskHost: this.backgroundTaskHost,
+        conversationNoticeCoordinator: this.conversationNoticeCoordinator,
+        sessionTodoCoordinator: this.sessionTodoCoordinator,
         saveConversation: (conversation) => this.plugin.saveConversation(conversation),
-        updateConversationSyncRuntime: (tabId, update) =>
-          this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, update),
-        clearPendingEditedFiles: (tabId) =>
-          this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId),
+        conversationTabRuntimeCoordinator: this.conversationTabRuntimeCoordinator,
         setTabNeedsAttention: (tabId, needsAttention) =>
           this.setTabNeedsAttention(tabId, needsAttention),
-        syncActiveTabConversation: (conversation) =>
-          this.tabConversationStateBridge.syncActiveTabConversation(conversation),
-        syncActiveTabContextUsageIdentity: () =>
-          this.activeTabContextUsageCoordinator.syncIdentity(),
-        refreshActiveTabContextUsageFromServer: () =>
-          this.activeTabContextUsageCoordinator.refreshFromServer(),
-        renderStreamError: (options) =>
-          this.assistantShellViewHostAdapter.renderStreamError(options),
+        tabConversationStateBridge: this.tabConversationStateBridge,
+        activeTabContextUsageCoordinator: this.activeTabContextUsageCoordinator,
+        assistantShellViewHostAdapter: this.assistantShellViewHostAdapter,
         formatCurrentSessionModelId: () =>
           this.formatModelId(this.getCurrentSessionModel()),
         scrollToBottom: (options) => this.scrollToBottom(options),
