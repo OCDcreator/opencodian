@@ -181,7 +181,7 @@ import {
 import { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
 import {
   ConversationLoadRecoveryCoordinator,
-  type ConversationLoadRecoveryHost,
+  createConversationLoadRecoveryHost,
 } from './services/ConversationLoadRecoveryCoordinator';
 import {
   ConversationNoticeCoordinator,
@@ -1597,7 +1597,43 @@ export class OpenCodianView extends ItemView {
         },
       );
     const conversationLoadRecoveryCoordinator = new ConversationLoadRecoveryCoordinator(
-      this.createConversationLoadRecoveryHost(),
+      createConversationLoadRecoveryHost({
+        isActiveTabStreaming: () => this.isActiveTabStreaming(),
+        getCurrentConversation: () => this.currentConversation,
+        getTabManager: () => this.tabManager,
+        getMaxTabs: () => this.plugin.settings.maxTabs,
+        getPersistedTabState: () => this.plugin.settings.tabState,
+        resetPersistedTabState: () => {
+          this.plugin.settings.tabState = getDefaultPersistedTabState();
+        },
+        persistTabState: (options) => {
+          this.persistTabState(options);
+        },
+        loadConversations: () => this.plugin.loadConversations(),
+        getConversations: () => this.plugin.getConversations(),
+        createConversation: () => this.plugin.createConversation(),
+        chooseForkTarget: () => chooseForkTarget(this.app),
+        confirmRewind: () => window.confirm(t('chat.rewind.confirm')),
+        revertSession: (sessionId, messageId) =>
+          this.plugin.openCodeService.revertSession(sessionId, messageId),
+        unrevertSession: (sessionId) =>
+          this.plugin.openCodeService.unrevertSession(sessionId),
+        forkSession: (sessionId, messageId) =>
+          this.plugin.openCodeService.forkSession(sessionId, messageId),
+        createConversationFromSession: (sessionId, initial) =>
+          this.plugin.createConversationFromSession(sessionId, initial),
+        deleteConversation: (conversationId) =>
+          this.plugin.deleteConversation(conversationId),
+        syncActiveTabConversation: (conversation) => {
+          this.tabConversationStateBridge.syncActiveTabConversation(conversation);
+        },
+        updateModelSelectorDisplay: () => {
+          this.updateModelSelectorDisplay();
+        },
+        showNotice: (message) => {
+          new Notice(message);
+        },
+      }),
       {
         activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
         createConversationInNewTab: () =>
@@ -2337,46 +2373,6 @@ export class OpenCodianView extends ItemView {
       },
       removeTabMessagesPane: (tabId) => {
         this.removeTabMessagesPane(tabId);
-      },
-      showNotice: (message) => {
-        new Notice(message);
-      },
-    };
-  }
-
-  private createConversationLoadRecoveryHost(): ConversationLoadRecoveryHost {
-    return {
-      isActiveTabStreaming: () => this.isActiveTabStreaming(),
-      getCurrentConversation: () => this.currentConversation,
-      getTabManager: () => this.tabManager,
-      getMaxTabs: () => this.plugin.settings.maxTabs,
-      getPersistedTabState: () => this.plugin.settings.tabState,
-      resetPersistedTabState: () => {
-        this.plugin.settings.tabState = getDefaultPersistedTabState();
-      },
-      persistTabState: (options) => {
-        this.persistTabState(options);
-      },
-      loadConversations: () => this.plugin.loadConversations(),
-      getConversations: () => this.plugin.getConversations(),
-      createConversation: () => this.plugin.createConversation(),
-      chooseForkTarget: () => chooseForkTarget(this.app),
-      confirmRewind: () => window.confirm(t('chat.rewind.confirm')),
-      revertSession: (sessionId, messageId) =>
-        this.plugin.openCodeService.revertSession(sessionId, messageId),
-      unrevertSession: (sessionId) =>
-        this.plugin.openCodeService.unrevertSession(sessionId),
-      forkSession: (sessionId, messageId) =>
-        this.plugin.openCodeService.forkSession(sessionId, messageId),
-      createConversationFromSession: (sessionId, initial) =>
-        this.plugin.createConversationFromSession(sessionId, initial),
-      deleteConversation: (conversationId) =>
-        this.plugin.deleteConversation(conversationId),
-      syncActiveTabConversation: (conversation) => {
-        this.tabConversationStateBridge.syncActiveTabConversation(conversation);
-      },
-      updateModelSelectorDisplay: () => {
-        this.updateModelSelectorDisplay();
       },
       showNotice: (message) => {
         new Notice(message);

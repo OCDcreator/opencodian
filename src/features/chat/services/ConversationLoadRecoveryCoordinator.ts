@@ -66,6 +66,61 @@ export interface ConversationLoadRecoveryHost {
   showNotice(message: string): void;
 }
 
+/** Flat dependency object passed from OpenCodianView to assemble a ConversationLoadRecoveryHost. */
+export interface ConversationLoadRecoveryHostDependencies {
+  isActiveTabStreaming(): boolean;
+  getCurrentConversation(): Conversation | null;
+  getTabManager(): ConversationLoadRecoveryTabManager | null;
+  getMaxTabs(): number;
+  getPersistedTabState(): PersistedTabState;
+  resetPersistedTabState(): void;
+  persistTabState(options?: { flush?: boolean }): void;
+  loadConversations(): Promise<void>;
+  getConversations(): Conversation[];
+  createConversation(): Promise<Conversation>;
+  chooseForkTarget(): Promise<ForkTarget | null>;
+  confirmRewind(): boolean;
+  revertSession(sessionId: string, messageId: string): Promise<boolean>;
+  unrevertSession(sessionId: string): Promise<boolean>;
+  forkSession(sessionId: string, messageId: string): Promise<{ id: string }>;
+  createConversationFromSession(
+    sessionId: string,
+    initial: ForkConversationInitialState,
+  ): Promise<Conversation>;
+  deleteConversation(conversationId: string): Promise<void>;
+  syncActiveTabConversation(conversation: Conversation): void;
+  updateModelSelectorDisplay(): void;
+  showNotice(message: string): void;
+}
+
+export function createConversationLoadRecoveryHost(
+  deps: ConversationLoadRecoveryHostDependencies,
+): ConversationLoadRecoveryHost {
+  return {
+    isActiveTabStreaming: () => deps.isActiveTabStreaming(),
+    getCurrentConversation: () => deps.getCurrentConversation(),
+    getTabManager: () => deps.getTabManager(),
+    getMaxTabs: () => deps.getMaxTabs(),
+    getPersistedTabState: () => deps.getPersistedTabState(),
+    resetPersistedTabState: () => deps.resetPersistedTabState(),
+    persistTabState: (options) => deps.persistTabState(options),
+    loadConversations: () => deps.loadConversations(),
+    getConversations: () => deps.getConversations(),
+    createConversation: () => deps.createConversation(),
+    chooseForkTarget: () => deps.chooseForkTarget(),
+    confirmRewind: () => deps.confirmRewind(),
+    revertSession: (sessionId, messageId) => deps.revertSession(sessionId, messageId),
+    unrevertSession: (sessionId) => deps.unrevertSession(sessionId),
+    forkSession: (sessionId, messageId) => deps.forkSession(sessionId, messageId),
+    createConversationFromSession: (sessionId, initial) =>
+      deps.createConversationFromSession(sessionId, initial),
+    deleteConversation: (conversationId) => deps.deleteConversation(conversationId),
+    syncActiveTabConversation: (conversation) => deps.syncActiveTabConversation(conversation),
+    updateModelSelectorDisplay: () => deps.updateModelSelectorDisplay(),
+    showNotice: (message) => deps.showNotice(message),
+  };
+}
+
 export interface ConversationLoadRecoveryPort {
   activateTab(tabId: TabId): Promise<void>;
   createConversationInNewTab(): Promise<void>;

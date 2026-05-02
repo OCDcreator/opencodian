@@ -41,6 +41,12 @@ export interface ConversationLoadRecoveryHost {
   showNotice(message: string): void;
 }
 
+export interface ConversationLoadRecoveryHostDependencies { /* same shape as Host */ }
+
+export function createConversationLoadRecoveryHost(
+  deps: ConversationLoadRecoveryHostDependencies,
+): ConversationLoadRecoveryHost;
+
 export interface ConversationLoadRecoveryPort {
   activateTab(tabId: TabId): Promise<void>;
   createConversationInNewTab(): Promise<void>;
@@ -80,7 +86,8 @@ export class ConversationLoadRecoveryCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只提供当前 conversation、tab manager、notice、modal/confirm、OpenCode session API 与 tab-state writeback 这些 host seam
+- `OpenCodianView` 不再拥有 `createConversationLoadRecoveryHost` 私有方法；host 组装已通过 `createConversationLoadRecoveryHost(deps)` 工厂函数集中到此 coordinator 文件
+- `OpenCodianView` 现在只传入扁平依赖对象（`ConversationLoadRecoveryHostDependencies`），由工厂函数组装成 `ConversationLoadRecoveryHost`
 - `ConversationLoadRecoveryCoordinator` 负责把 create/load/bootstrap/delete-recovery/fork/rewind 入口拼成一条可读的 lifecycle surface，并直接承接 first-open / persisted-restore 决策
 - `ConversationViewStateService`、`ConversationTabOpenCoordinator` 与 `ConversationTabLifecycleRecoveryCoordinator` 继续各自保有更细的 activation / open / delete 语义
 - 因此后续若继续推进相邻 residual，只需要沿这个 coordinator surface 往下收，而不必重新回到 `OpenCodianView` 里寻找分散入口

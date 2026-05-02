@@ -5,7 +5,9 @@ import type {
 import {
   ConversationLoadRecoveryCoordinator,
   type ConversationLoadRecoveryHost,
+  type ConversationLoadRecoveryHostDependencies,
   type ConversationLoadRecoveryPort,
+  createConversationLoadRecoveryHost,
 } from '../../../../src/features/chat/services/ConversationLoadRecoveryCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 import { t } from '../../../../src/i18n';
@@ -372,5 +374,76 @@ describe('ConversationLoadRecoveryCoordinator forking', () => {
     expect(host.showNotice).toHaveBeenCalledWith(
       t('chat.fork.maxTabsReached', { count: '1' }),
     );
+  });
+});
+
+describe('createConversationLoadRecoveryHost factory', () => {
+  function createDeps(
+    overrides: Partial<MockedConversationLoadRecoveryHost> = {},
+  ): MockedConversationLoadRecoveryHost & ConversationLoadRecoveryHostDependencies {
+    return {
+      ...createHost(createConversation('factory-test'), overrides),
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('delegates isActiveTabStreaming to the provided dependency', () => {
+    const deps = createDeps({ isActiveTabStreaming: jest.fn(() => true) });
+    const host = createConversationLoadRecoveryHost(deps);
+
+    expect(host.isActiveTabStreaming()).toBe(true);
+    expect(deps.isActiveTabStreaming).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates getCurrentConversation to the provided dependency', () => {
+    const conversation = createConversation('factory-conv');
+    const deps = createDeps({ getCurrentConversation: jest.fn(() => conversation) });
+    const host = createConversationLoadRecoveryHost(deps);
+
+    expect(host.getCurrentConversation()).toBe(conversation);
+    expect(deps.getCurrentConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates revertSession with the correct arguments', async () => {
+    const revertSession = jest.fn().mockResolvedValue(true);
+    const deps = createDeps({ revertSession });
+    const host = createConversationLoadRecoveryHost(deps);
+
+    const result = await host.revertSession('session-1', 'message-1');
+    expect(result).toBe(true);
+    expect(revertSession).toHaveBeenCalledWith('session-1', 'message-1');
+  });
+
+  it('delegates createConversationFromSession with initial state', async () => {
+    const forked = createConversation('forked-from-factory');
+    const createFromSession = jest.fn().mockResolvedValue(forked);
+    const deps = createDeps({ createConversationFromSession: createFromSession });
+    const host = createConversationLoadRecoveryHost(deps);
+
+    const initial = { title: 'Test', messages: [] };
+    const result = await host.createConversationFromSession('session-id', initial);
+    expect(result).toBe(forked);
+    expect(createFromSession).toHaveBeenCalledWith('session-id', initial);
+  });
+
+  it('delegates persistTabState with options', () => {
+    const persistTabState = jest.fn();
+    const deps = createDeps({ persistTabState });
+    const host = createConversationLoadRecoveryHost(deps);
+
+    host.persistTabState({ flush: true });
+    expect(persistTabState).toHaveBeenCalledWith({ flush: true });
+  });
+
+  it('delegates showNotice to the provided dependency', () => {
+    const showNotice = jest.fn();
+    const deps = createDeps({ showNotice });
+    const host = createConversationLoadRecoveryHost(deps);
+
+    host.showNotice('test notice');
+    expect(showNotice).toHaveBeenCalledWith('test notice');
   });
 });
