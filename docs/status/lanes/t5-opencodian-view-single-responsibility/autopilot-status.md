@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 9
-- current_task: view-srp9-03
-- last_verified_source_commit: 175c62f9 (move conversation render host assembly into ConversationRenderService owner)
+- round: 10
+- current_task: view-srp10-03
+- last_verified_source_commit: 909b63ce (redesign tab-runtime host factory with raw owner source decomposition)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
 - queue_state: completed
 - next_focus: none — queue complete
@@ -600,3 +600,75 @@ OpenCodianView.ts: 5314 → 3691 lines (**−1623 lines**, **30.5% reduction**)
 | Round 8 (view-srp8-01 to view-srp8-02) | −138 | 3883→3745 | 1 extended owner (MessageSendPreparationService) |
 | Round 9 (view-srp9-01 to view-srp9-02) | −54 | 3745→3691 | 2 extended owners (SlashCommandExecutionService, ConversationRenderService) |
 | **Grand Total** | **−1623** | **5314→3691** | **20 distinct owners** |
+
+## Round 10 — Tenth SRP Batch (Host-Assembly Ownership Transfer)
+
+### view-srp10-01 — Move conversation load recovery host assembly into ConversationLoadRecoveryCoordinator owner (DONE)
+- Added `createConversationLoadRecoveryHost()` factory to `ConversationLoadRecoveryCoordinator.ts`
+- Factory absorbs host assembly logic: constructs full `ConversationLoadRecoveryHost` from `ConversationLoadRecoveryHostDependencies`, including `resetPersistedTabState()` with default state, `chooseForkTarget()` with app window, `showNotice()` with `new Notice()`, and `confirmRewind()` with `window.confirm()`
+- OpenCodianView no longer owns `createConversationLoadRecoveryHost` private method; view passes flat dependency object
+- Added 6 factory tests covering host assembly correctness
+- **Measured**: OpenCodianView.ts 3691→~3687 lines (**−4 lines** net across initial + fix commits; structural ownership transfer)
+- Destination: `src/features/chat/services/ConversationLoadRecoveryCoordinator.ts` (extended with factory)
+
+### view-srp10-02 — Move conversation tab runtime coordinator host assembly into ConversationTabRuntimeCoordinator owner (DONE)
+- Redesigned `ConversationTabRuntimeCoordinatorHostSource` to accept raw owner references instead of nested callback sub-objects
+- Factory internally decomposes `plugin: TabRuntimePluginSource` (persistence: settings.tabState write + save methods) and `view: TabRuntimeViewSource` (DOM element getters + session queries)
+- OpenCodianView call site now passes `plugin: this.plugin` and `view: this` — no inline closure assembly for persistence, elements, or session
+- Added public getter methods to OpenCodianView: `getChatContainerEl()`, `getHeaderTabBarSlotEl()`, `getBelowHeaderTabBarSlotEl()`, `getOuterVerticalTabBarSlotEl()`, `getInputTabBarSlotEl()`, `getTabSessionStatus()`
+- Made `getSessionIdForTab` public (was private)
+- Removed dead `TabRuntimePersistence`, `TabRuntimeElements`, `TabRuntimeSession`, `ConversationTabRuntimeCoordinatorHostDependencies` interfaces
+- Added 18 coordinator tests (8 original + 4 host factory + 6 top-level factory)
+- **Measured**: OpenCodianView.ts ~3687→3690 lines (**+3 lines**; structural ownership transfer with added public getters)
+- Destination: `src/features/chat/services/ConversationTabRuntimeCoordinator.ts` (extended with source decomposition)
+
+### view-srp10-03 — Finalize tenth SRP batch with measured docs and full verification (DONE)
+- Ran `npm run verify` — verification results:
+  - module-docs: pass (385 source modules, 385 mapped docs)
+  - graphify: pass (fresh)
+  - devlog-order: pass (148 dated sections in descending order)
+  - lint: 0 errors; **7 pre-existing warnings** violate the zero-warning guardrail but are outside this queue's scope (max-lines/max-lines-per-function on ConversationTabRuntimeCoordinator, MessageSendPreparationService, and test files)
+  - typecheck: clean
+  - tests: 2029 pass
+  - build: OK
+- Updated lane status doc with Round 10 results
+
+### Round 10 Net Impact
+
+OpenCodianView.ts: 3691 → 3690 lines (**−1 line**)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp10-01 | −4 (3691→~3687) | ConversationLoadRecoveryCoordinator (services/, extended with factory) |
+| view-srp10-02 | +3 (~3687→3690) | ConversationTabRuntimeCoordinator (services/, extended with source decomposition) |
+| **Round 10 Total** | **−1** | **2 extended owners** |
+
+### Why This Round Is Substantive (Not a Thin Helper Split)
+
+The host-assembly ownership transfers are substantive because:
+
+1. **ConversationLoadRecoveryCoordinator** now owns the complete load-recovery host assembly lifecycle: `createConversationLoadRecoveryHost()` constructs the full host from dependencies, absorbing `resetPersistedTabState()` default-state logic, `chooseForkTarget()` app-window integration, `showNotice()` Obsidian Notice construction, and `confirmRewind()` browser confirm dialog. Previously these were scattered across OpenCodianView's inline callback construction.
+
+2. **ConversationTabRuntimeCoordinator** now owns the complete tab-runtime host assembly lifecycle with raw owner source decomposition: the factory accepts `plugin` and `view` as direct object references and internally extracts persistence, DOM element, and session query methods. This eliminates OpenCodianView's inline construction of nested callback sub-objects (`persistence: { ... }`, `elements: { ... }`, `session: { ... }`). The `ConversationTabRuntimeCoordinatorHostSource` interface enforces a narrow contract between view and coordinator.
+
+3. **No new helper modules introduced**: Both destinations were existing owners extended with same-domain responsibilities.
+
+4. **Value is ownership transfer, not line reduction**: The small net delta reflects that public getter methods were added to OpenCodianView to satisfy the narrow `TabRuntimeViewSource` interface. The real value is that host assembly logic — the knowledge of how to build coordinator hosts — now lives in the coordinator owner files, not in the view.
+
+### Cumulative Impact (Rounds 1–10)
+
+OpenCodianView.ts: 5314 → 3690 lines (**−1624 lines**, **30.6% reduction**)
+
+| Round | Actual Δ | Measured Before→After | Destinations |
+|-------|----------|----------------------|-------------|
+| Round 1 (view-17 to view-20) | −343 | 5314→4971 | 4 existing owners |
+| Round 2 (view-srp2-01 to view-srp2-04) | −534 | 4971→4437 | 4 owners (3 new, 1 extended) |
+| Round 3 (view-srp3-01 to view-srp3-04) | −229 | 4437→4208 | 6 owners (2 new, 4 extended) |
+| Round 4 (view-srp4-01 to view-srp4-02) | −125 | 4208→4083 | 1 new owner (ConversationNoticeCoordinator) |
+| Round 5 (view-srp5-01 to view-srp5-02) | −129 | 4083→3954 | 3 owners (0 new, 3 extended) |
+| Round 6 (view-srp6-01) | −54 | 3954→3900 | 1 extended owner (MessageFinalizationService) |
+| Round 7 (view-srp7-01 to view-srp7-02) | −17 | 3900→3883 | 2 extended owners |
+| Round 8 (view-srp8-01 to view-srp8-02) | −138 | 3883→3745 | 1 extended owner (MessageSendPreparationService) |
+| Round 9 (view-srp9-01 to view-srp9-02) | −54 | 3745→3691 | 2 extended owners (SlashCommandExecutionService, ConversationRenderService) |
+| Round 10 (view-srp10-01 to view-srp10-02) | −1 | 3691→3690 | 2 extended owners (ConversationLoadRecoveryCoordinator, ConversationTabRuntimeCoordinator) |
+| **Grand Total** | **−1624** | **5314→3690** | **22 distinct owners** |
