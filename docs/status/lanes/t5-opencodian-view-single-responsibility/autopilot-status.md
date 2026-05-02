@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 5
-- current_task: view-srp5-03
-- last_verified_source_commit: 09369d53 (factory spread elimination of bare debug function names)
+- round: 6
+- current_task: view-srp6-03
+- last_verified_source_commit: 28f3ea67 (refresh graphify after unavailable prompt routing)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
 - queue_state: completed
 - next_focus: none — queue complete
@@ -319,7 +319,8 @@ OpenCodianView.ts: 5314 → 3954 lines (**−1360 lines**, **25.6% reduction**)
 | Round 3 (view-srp3-01 to view-srp3-04) | −229 | 4437→4208 | 6 owners (2 new, 4 extended) |
 | Round 4 (view-srp4-01 to view-srp4-02) | −125 | 4208→4083 | 1 new owner (ConversationNoticeCoordinator) |
 | Round 5 (view-srp5-01 to view-srp5-02) | −129 | 4083→3954 | 3 owners (0 new, 3 extended) |
-| **Grand Total** | **−1360** | **5314→3954** | **15 distinct owners** |
+| Round 6 (view-srp6-01) | −54 | 3954→3900 | 1 extended owner (MessageFinalizationService) |
+| **Grand Total** | **−1414** | **5314→3900** | **15 distinct owners** |
 
 ### No Thin Helper Modules Introduced
 
@@ -328,6 +329,70 @@ All extractions went to either:
 2. **New modules with substantive domain ownership** — each owns a clear, non-trivial responsibility surface (ChatSurfaceAppearanceCoordinator, SendPipelineDebugSummaries, UserMessageContentRenderer, ConversationIdentityRuntime, ChatVisualDemoCoordinator, ConversationNoticeCoordinator)
 
 No adapter/factory/provider indirection layers were created. Each new module was created only because no existing owner covered the extracted domain.
+
+## Round 6 — Sixth SRP Batch (Server-Start Error Finalization)
+
+### view-srp6-01 — Move server-start assistant error finalization into MessageFinalizationService (DONE)
+- Moved `finalizeAssistantMessageWithError` from OpenCodianView private method to `MessageFinalizationService`
+- Added `getFriendlyServerStartErrorMessage()` as exported pure function: classifies server-start exceptions into user-friendly i18n messages (binary-missing, port-in-use, generic)
+- Added `getUnavailableServerMessage()` as exported pure function: maps `starting`/`offline`/`checking` to `chat.error.serverStarting` / `chat.error.serverOffline`
+- Added `finalizeAssistantMessageWithServerError()` wrapper: calls `finalizeAssistantMessageWithError` with `getFriendlyServerStartErrorMessage(error)`
+- Added `finalizeAssistantMessageWithServerUnavailableError()` wrapper: calls `finalizeAssistantMessageWithError` with `getUnavailableServerMessage(availability)`
+- Preserved optional `modelId` in error finalization to maintain notice context
+- Routed unavailable prompt copy through service wrapper instead of view inline
+- OpenCodianView now only calls the two wrapper methods; no direct access to `finalizeAssistantMessageWithError` or error classification functions
+- **Measured**: OpenCodianView.ts 3954→3900 lines (**−54 lines**, diff: +14/−68)
+- Destination: `src/features/chat/services/MessageFinalizationService.ts` (372 lines, +104 from 268)
+- 263 new test lines (error finalization flow, server-start classification, unavailable state mapping)
+
+### view-srp6-02 — Update render-finalization docs and graph artifacts (DONE)
+- Verified both in-scope module docs already correctly describe the finalization ownership transfer
+- OpenCodianView.md line 577: explicitly delegates finalization ownership to MessageFinalizationService
+- MessageFinalizationService.md: full "助手错误终结流" section describing all exported functions
+- Graphify already fresh (no new src changes requiring refresh)
+
+### view-srp6-03 — Finalize sixth SRP batch with measured docs and full verification (DONE)
+- Ran `npm run verify` — all gates pass:
+  - module-docs: pass (385 source modules, 385 mapped docs)
+  - graphify: pass (fresh for all source changes)
+  - devlog-order: pass
+  - lint: pass (0 errors, 1 pre-existing warning in test file)
+  - typecheck: clean
+  - tests: 1988 pass
+  - build: OK
+- Updated lane status doc with Round 6 results
+
+### Round 6 Net Impact
+
+OpenCodianView.ts: 3954 → 3900 lines (**−54 lines**)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp6-01 | −54 (3954→3900) | MessageFinalizationService (services/, 372 lines) |
+| **Round 6 Total** | **−54** | **1 extended owner** |
+
+### Why This Round Is Substantive (Not a Thin Helper Split)
+
+The server-start error finalization move is substantive because:
+
+1. **Error classification vocabulary**: `getFriendlyServerStartErrorMessage()` owns the complete server-start error classification with 3 distinct categories (binary-missing, port-in-use, generic) plus i18n mapping — not a simple pass-through
+2. **Unavailable state mapping**: `getUnavailableServerMessage()` maps server availability states to user-facing messages with domain-specific branching
+3. **Finalization orchestration**: `finalizeAssistantMessageWithError()` performs the complete error-to-message pipeline: render error block, persist to conversation, update sync fingerprint, scroll to bottom — this is a multi-step lifecycle, not a thin wrapper
+4. **No new helper module introduced**: All behavior moved to the existing `MessageFinalizationService`, extending its domain boundary rather than fragmenting into a new thin layer
+
+### Cumulative Impact (Rounds 1 + 2 + 3 + 4 + 5 + 6)
+
+OpenCodianView.ts: 5314 → 3900 lines (**−1414 lines**, **26.6% reduction**)
+
+| Round | Actual Δ | Measured Before→After | Destinations |
+|-------|----------|----------------------|-------------|
+| Round 1 (view-17 to view-20) | −343 | 5314→4971 | 4 existing owners |
+| Round 2 (view-srp2-01 to view-srp2-04) | −534 | 4971→4437 | 4 owners (3 new, 1 extended) |
+| Round 3 (view-srp3-01 to view-srp3-04) | −229 | 4437→4208 | 6 owners (2 new, 4 extended) |
+| Round 4 (view-srp4-01 to view-srp4-02) | −125 | 4208→4083 | 1 new owner (ConversationNoticeCoordinator) |
+| Round 5 (view-srp5-01 to view-srp5-02) | −129 | 4083→3954 | 3 owners (0 new, 3 extended) |
+| Round 6 (view-srp6-01) | −54 | 3954→3900 | 1 extended owner (MessageFinalizationService) |
+| **Grand Total** | **−1414** | **5314→3900** | **15 distinct owners** |
 
 ## Remaining Candidates (not extracted across all rounds)
 
