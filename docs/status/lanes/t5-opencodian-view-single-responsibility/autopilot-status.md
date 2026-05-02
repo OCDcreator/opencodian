@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 4
-- current_task: view-srp4-03
-- last_verified_source_commit: 5c4ca3e8 (latest source commit with code changes)
+- round: 5
+- current_task: view-srp5-03
+- last_verified_source_commit: 09369d53 (factory spread elimination of bare debug function names)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
 - queue_state: completed
 - next_focus: none — queue complete
@@ -255,9 +255,62 @@ ConversationNoticeCoordinator is not a thin adapter layer because it owns the co
 
 The coordinator has 165 lines of substantive logic and 25 tests. No method is a simple pass-through; each contains domain-specific branching, formatting, or classification logic.
 
-### Cumulative Impact (Rounds 1 + 2 + 3 + 4)
+## Round 5 — Fifth SRP Batch (Render Ownership)
 
-OpenCodianView.ts: 5314 → 4083 lines (**−1231 lines**, **23.2% reduction**)
+### view-srp5-01 — Move assistant render-support helpers into existing render owners (DONE)
+- Moved 4 render-support methods from OpenCodianView to existing render owners:
+  - `hasInterruptedLocalAssistantTail` → `ConversationRenderRuntime` (exported function alongside `getIncrementalRenderedMessageUpdate`)
+  - `createAssistantContainerElement` → `AssistantShellViewHostAdapter.createAssistantShellContainer()`
+  - `setStreamingAssistantMessageVisibility` → `AssistantShellViewHostAdapter` with `onVisibilityChanged` callback for debug logging
+  - `removeEmptyAssistantShells` → `AssistantShellViewHostAdapter` static method
+- OpenCodianView no longer owns any assistant-shell DOM construction or visibility toggling
+- **Measured**: OpenCodianView.ts 4083→4017 lines (**−66 lines**, diff: +65/−131)
+- Destinations: `ConversationRenderRuntime.ts` (444 lines), `AssistantShellViewHostAdapter.ts` (388 lines)
+- 13 new tests (6 for ConversationRenderRuntime, 7 for AssistantShellViewHostAdapter)
+
+### view-srp5-02 — Move assistant finalization debug ownership into existing render diagnostics (DONE)
+- Moved `ASSISTANT_DEBUG_STAGE_ALLOWLIST`, `shouldLogAssistantFinalizationDebug`, `logAssistantFinalizationDebug` from OpenCodianView private methods to exported pure functions in `trailingAssistantPatchDebug.ts`
+- Moved `stringifyLogPayload` and `getLogPreview` to `trailingAssistantPatchDebug.ts`
+- Eliminated all bare `getLogPreview`/`stringifyLogPayload` references from OpenCodianView via `createDebugLogCallbacks()` factory spread pattern — host adapters now receive debug callbacks through object spread instead of individual function pass-throughs
+- Added `previewLogText()` convenience helper for single-line call sites
+- **Measured**: OpenCodianView.ts 4017→3954 lines (**−63 lines**, diff: +2/−65)
+- Destination: `src/features/chat/services/trailingAssistantPatchDebug.ts` (523 lines)
+- 16 new tests (5 allowlist gate, 4 stringifyLogPayload, 5 getLogPreview, 2 edge-case)
+
+### view-srp5-03 — Finalize fifth SRP batch with docs and verification (DONE)
+- Ran `npm run verify` — all gates pass:
+  - module-docs: pass (385 source modules, 385 mapped docs)
+  - graphify: pass (fresh for all source changes)
+  - devlog-order: pass
+  - lint: pass (0 errors, 0 warnings)
+  - typecheck: clean
+  - tests: 1970 pass
+  - build: OK
+- Updated lane status doc with Round 5 results
+
+### Round 5 Net Impact
+
+OpenCodianView.ts: 4083 → 3954 lines (**−129 lines**)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp5-01 | −66 (4083→4017) | ConversationRenderRuntime (services/, 444 lines) + AssistantShellViewHostAdapter (runtime/, 388 lines) |
+| view-srp5-02 | −63 (4017→3954) | trailingAssistantPatchDebug (services/, 523 lines) |
+| **Round 5 Total** | **−129** | **3 owners (0 new, 3 extended)** |
+
+### Why This Round Is Substantive (Not a Thin Helper Split)
+
+The render ownership moves in Round 5 are substantive, not thin helper splits:
+
+1. **AssistantShellViewHostAdapter** gained complete assistant-shell DOM lifecycle ownership: container creation, shell rendering, visibility toggling with debug logging, and empty-shell cleanup. These were previously scattered across OpenCodianView private methods with intermixed view state access. The adapter now owns the full construction→visibility→cleanup lifecycle, with 71 lines of substantive logic added.
+
+2. **ConversationRenderRuntime** gained the interrupted-tail detection heuristic (`hasInterruptedLocalAssistantTail`) that determines whether a partial assistant turn should be preserved during incremental renders. This is domain-specific render logic, not a pass-through.
+
+3. **trailingAssistantPatchDebug** now owns the complete debug formatting vocabulary: stage allowlist, gate check, log emitter, payload serialization, text truncation, AND the factory function that wires these into host adapters. The `createDebugLogCallbacks()` factory eliminated 4 individual function pass-throughs from OpenCodianView's host adapters, replacing them with a single spread pattern. The module has 523 lines of substantive debug logic with 16 tests — no method is a simple delegation wrapper.
+
+### Cumulative Impact (Rounds 1 + 2 + 3 + 4 + 5)
+
+OpenCodianView.ts: 5314 → 3954 lines (**−1360 lines**, **25.6% reduction**)
 
 | Round | Actual Δ | Measured Before→After | Destinations |
 |-------|----------|----------------------|-------------|
@@ -265,12 +318,13 @@ OpenCodianView.ts: 5314 → 4083 lines (**−1231 lines**, **23.2% reduction**)
 | Round 2 (view-srp2-01 to view-srp2-04) | −534 | 4971→4437 | 4 owners (3 new, 1 extended) |
 | Round 3 (view-srp3-01 to view-srp3-04) | −229 | 4437→4208 | 6 owners (2 new, 4 extended) |
 | Round 4 (view-srp4-01 to view-srp4-02) | −125 | 4208→4083 | 1 new owner (ConversationNoticeCoordinator) |
-| **Grand Total** | **−1231** | **5314→4083** | **12 distinct owners** |
+| Round 5 (view-srp5-01 to view-srp5-02) | −129 | 4083→3954 | 3 owners (0 new, 3 extended) |
+| **Grand Total** | **−1360** | **5314→3954** | **15 distinct owners** |
 
 ### No Thin Helper Modules Introduced
 
 All extractions went to either:
-1. **Existing coordinators** extended with same-domain responsibilities (ActiveTabContextUsageCoordinator, BackgroundTaskTimelineService, ConversationRenderService, ChildSessionGraphCoordinator, ScrollManager, TabMessagesPaneCoordinator, ModelSelectionRuntime, ChatSelectionControlsCoordinator)
+1. **Existing coordinators** extended with same-domain responsibilities (ActiveTabContextUsageCoordinator, BackgroundTaskTimelineService, ConversationRenderService, ChildSessionGraphCoordinator, ScrollManager, TabMessagesPaneCoordinator, ModelSelectionRuntime, ChatSelectionControlsCoordinator, ConversationRenderRuntime, AssistantShellViewHostAdapter, trailingAssistantPatchDebug)
 2. **New modules with substantive domain ownership** — each owns a clear, non-trivial responsibility surface (ChatSurfaceAppearanceCoordinator, SendPipelineDebugSummaries, UserMessageContentRenderer, ConversationIdentityRuntime, ChatVisualDemoCoordinator, ConversationNoticeCoordinator)
 
 No adapter/factory/provider indirection layers were created. Each new module was created only because no existing owner covered the extracted domain.
