@@ -2840,6 +2840,8 @@ export class OpenCodianView extends ItemView {
     // Visual demo coordinator
     this.chatVisualDemoCoordinator = new ChatVisualDemoCoordinator({
       getMessagesShellEl: () => this.messagesShellEl,
+      showNotice: (message: string) => { new Notice(message); },
+      logWarn: (message: string, ...args: unknown[]) => { logger.warn(message, ...args); },
     });
 
     // Input area

@@ -27,8 +27,15 @@ import {
   type ChatVisualDemoCoordinatorHost,
 } from '../../../../../src/features/chat/services/ChatVisualDemoCoordinator';
 
+const mockShowNotice = jest.fn();
+const mockLogWarn = jest.fn();
+
 function createHost(shellEl: HTMLElement | null = null): ChatVisualDemoCoordinatorHost {
-  return { getMessagesShellEl: () => shellEl };
+  return {
+    getMessagesShellEl: () => shellEl,
+    showNotice: mockShowNotice,
+    logWarn: mockLogWarn,
+  };
 }
 
 describe('ChatVisualDemoCoordinator', () => {
@@ -60,6 +67,20 @@ describe('ChatVisualDemoCoordinator', () => {
       coordinator.toggleLiquidDiamondDemo();
       expect(mockDiamondShow).not.toHaveBeenCalled();
     });
+
+    it('calls host showNotice and logWarn on CPU show error', () => {
+      mockDiamondIsVisible.mockReturnValue(false);
+      mockDiamondShow.mockImplementationOnce(() => { throw new Error('test error'); });
+      const coordinator = new ChatVisualDemoCoordinator(createHost(shellEl));
+      coordinator.toggleLiquidDiamondDemo();
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        'Failed to initialize cpu liquid diamond demo',
+        expect.any(Error),
+      );
+      expect(mockShowNotice).toHaveBeenCalledWith(
+        'Diamond demo is not available in this environment.',
+      );
+    });
   });
 
   describe('toggleLiquidDiamondWebGlDemo', () => {
@@ -78,6 +99,20 @@ describe('ChatVisualDemoCoordinator', () => {
       coordinator.toggleLiquidDiamondWebGlDemo();
       expect(mockDiamondDestroy).toHaveBeenCalled();
     });
+
+    it('calls host showNotice with WebGL message on WebGL show error', () => {
+      mockDiamondIsVisible.mockReturnValue(false);
+      mockDiamondShow.mockImplementationOnce(() => { throw new Error('webgl error'); });
+      const coordinator = new ChatVisualDemoCoordinator(createHost(shellEl));
+      coordinator.toggleLiquidDiamondWebGlDemo();
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        'Failed to initialize webgl liquid diamond demo',
+        expect.any(Error),
+      );
+      expect(mockShowNotice).toHaveBeenCalledWith(
+        'WebGL diamond demo is not available in this environment. See developer console for details.',
+      );
+    });
   });
 
   describe('toggleGlassOctahedron', () => {
@@ -95,12 +130,19 @@ describe('ChatVisualDemoCoordinator', () => {
       expect(mockGlassDestroy).toHaveBeenCalled();
     });
 
-    it('destroys demo on show error', async () => {
+    it('destroys demo and delegates notice/log to host on show error', async () => {
       mockGlassIsVisible.mockReturnValue(false);
       mockGlassShow.mockRejectedValueOnce(new Error('test error'));
       const coordinator = new ChatVisualDemoCoordinator(createHost(shellEl));
       await coordinator.toggleGlassOctahedron();
       expect(mockGlassDestroy).toHaveBeenCalled();
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        'Failed to initialize glass octahedron demo',
+        expect.any(Error),
+      );
+      expect(mockShowNotice).toHaveBeenCalledWith(
+        'Glass octahedron is not available in this environment. See developer console for details.',
+      );
     });
 
     it('does nothing when host returns null', async () => {

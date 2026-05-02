@@ -1,13 +1,10 @@
-import { Notice } from 'obsidian';
-
-import { createLogger } from '../../../shared';
 import { GlassOctahedronDemoController } from '../glassOctahedronDemo';
 import { LiquidDiamondDemoController } from '../liquidDiamondDemo';
 
-const logger = createLogger('ChatVisualDemo');
-
 export interface ChatVisualDemoCoordinatorHost {
   getMessagesShellEl(): HTMLElement | null;
+  showNotice(message: string): void;
+  logWarn(message: string, ...args: unknown[]): void;
 }
 
 export class ChatVisualDemoCoordinator {
@@ -43,8 +40,8 @@ export class ChatVisualDemoCoordinator {
     try {
       await this.glassOctahedronDemoController.show();
     } catch (error) {
-      logger.warn('Failed to initialize glass octahedron demo', error);
-      new Notice(
+      this.host.logWarn('Failed to initialize glass octahedron demo', error);
+      this.host.showNotice(
         'Glass octahedron is not available in this environment. See developer console for details.',
       );
       this.destroyGlassOctahedronDemo();
@@ -108,8 +105,8 @@ export class ChatVisualDemoCoordinator {
     try {
       nextActiveController.show();
     } catch (error) {
-      logger.warn(`Failed to initialize ${backend} liquid diamond demo`, error);
-      new Notice(
+      this.host.logWarn(`Failed to initialize ${backend} liquid diamond demo`, error);
+      this.host.showNotice(
         backend === 'webgl'
           ? 'WebGL diamond demo is not available in this environment. See developer console for details.'
           : 'Diamond demo is not available in this environment.',

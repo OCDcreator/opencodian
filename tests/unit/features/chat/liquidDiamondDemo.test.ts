@@ -153,6 +153,8 @@ function mountViewChrome(view: DemoViewHarness): {
   view.inputTextarea = inputEl;
   (view as Record<string, unknown>).chatVisualDemoCoordinator = new ChatVisualDemoCoordinator({
     getMessagesShellEl: () => view.messagesShellEl,
+    showNotice: () => {},
+    logWarn: () => {},
   });
 
   return {
