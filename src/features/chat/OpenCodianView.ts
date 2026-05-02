@@ -265,8 +265,8 @@ import {
   type QuestionRuntimeViewHostFactoryHost,
 } from './services/QuestionRuntimeViewHostFactory';
 import {
+  assembleQuestionTodoBackgroundTaskRuntimeHost,
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
-  type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
   type TabConversationSyncFingerprintRuntimePort,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
@@ -1364,7 +1364,26 @@ export class OpenCodianView extends ItemView {
   private createBackgroundTaskRuntimeWiring(): OpenCodianViewBackgroundTaskRuntimeWiring {
     const questionTodoBackgroundTaskRuntime =
       createQuestionTodoBackgroundTaskRuntimeServiceBundle(
-        this.createQuestionTodoBackgroundTaskRuntimeServiceBundleHost(),
+        assembleQuestionTodoBackgroundTaskRuntimeHost({
+          getActiveTabId: () => this.getActiveTabId(),
+          getCurrentConversation: () => this.currentConversation,
+          setCurrentConversationRevertState: (revertState) => {
+            this.currentConversationRevertState = revertState;
+          },
+          getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
+          getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+          getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+          renderSessionTodoDock: (tabId) => {
+            this.renderSessionTodoDock(tabId);
+          },
+          getQuestionDockCoordinator: () => this.questionDockCoordinator,
+          getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
+          getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
+          getBackgroundTaskHost: () => this.backgroundTaskHost,
+          getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
+          getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
+          getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
+        }),
       );
     const activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),
@@ -1733,37 +1752,6 @@ export class OpenCodianView extends ItemView {
       reconcileBackgroundTaskLiveSignals: (tabId) => {
         this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
       },
-    };
-  }
-
-  private createQuestionTodoBackgroundTaskRuntimeServiceBundleHost():
-    QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
-    return {
-      getActiveTabId: () => this.getActiveTabId(),
-      getCurrentConversation: () => this.currentConversation,
-      setCurrentConversationRevertState: (revertState) => {
-        this.currentConversationRevertState = revertState;
-      },
-      getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
-      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
-      renderSessionTodoDock: (tabId) => {
-        this.renderSessionTodoDock(tabId);
-      },
-      getQuestionDockCoordinator: () => this.questionDockCoordinator,
-      getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
-      getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-      resetBackgroundTaskIndicator: (tabId) => {
-        this.backgroundTaskHost.resetBackgroundTaskIndicator(tabId);
-      },
-      syncBackgroundTaskStateFromConversation: (conversation, tabId?: TabId | null) => {
-        this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
-      getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
-      getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
-      getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
     };
   }
 

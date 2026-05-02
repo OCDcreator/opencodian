@@ -10,6 +10,7 @@ import {
   type BackgroundConversationPostSyncHandoffViewHostAdapterHost,
   createBackgroundConversationPostSyncHandoffViewHostAdapter,
 } from './BackgroundConversationPostSyncHandoffHostAdapter';
+import type { BackgroundTaskViewHost } from './BackgroundTaskTimelineService';
 import {
   createQuestionTodoBackgroundTaskActivationServices,
   createQuestionTodoBackgroundTaskActivationViewHostAdapter,
@@ -138,6 +139,34 @@ export interface QuestionTodoBackgroundTaskRuntimeViewHosts {
   questionTodoBackgroundTaskActivationViewHost:
     QuestionTodoBackgroundTaskActivationViewHost;
   backgroundTaskStreamTriggerViewHost: BackgroundTaskStreamTriggerCoordinatorHost;
+}
+
+export type QuestionTodoBackgroundTaskRuntimeSeam = Omit<
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
+  | 'resetBackgroundTaskIndicator'
+  | 'syncBackgroundTaskStateFromConversation'
+  | 'renderBackgroundTaskIndicatorIfNeeded'
+> & {
+  getBackgroundTaskHost(): Pick<
+    BackgroundTaskViewHost,
+    | 'resetBackgroundTaskIndicator'
+    | 'syncBackgroundTaskStateFromConversation'
+    | 'renderBackgroundTaskIndicatorIfNeeded'
+  >;
+};
+
+export function assembleQuestionTodoBackgroundTaskRuntimeHost(
+  seam: QuestionTodoBackgroundTaskRuntimeSeam,
+): QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
+  const { getBackgroundTaskHost, ...hostRest } = seam;
+  return {
+    ...hostRest,
+    resetBackgroundTaskIndicator: (tabId) => getBackgroundTaskHost().resetBackgroundTaskIndicator(tabId),
+    syncBackgroundTaskStateFromConversation: (conversation, tabId) =>
+      getBackgroundTaskHost().syncBackgroundTaskStateFromConversation(conversation, tabId),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+      getBackgroundTaskHost().renderBackgroundTaskIndicatorIfNeeded(tabId),
+  };
 }
 
 export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
