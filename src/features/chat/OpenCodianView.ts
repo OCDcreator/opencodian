@@ -303,9 +303,9 @@ import {
 } from './services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import {
-  getLogPreview,
+  createDebugLogCallbacks,
   logAssistantFinalizationDebug,
-  stringifyLogPayload,
+  previewLogText,
 } from './services/trailingAssistantPatchDebug';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -739,7 +739,7 @@ export class OpenCodianView extends ItemView {
   ): Promise<void> | void {
     if (submission.kind === 'shell') {
       logger.warn('Ignoring shell composer submission because the stable shell runtime is not enabled in this view', {
-        commandPreview: getLogPreview(submission.command, 120),
+        commandPreview: previewLogText(submission.command, 120),
       });
       return;
     }
@@ -815,8 +815,7 @@ export class OpenCodianView extends ItemView {
       },
       isDebugLoggingEnabled: () => this.plugin.settings.enableDebugLogging,
       resolveAssetUrl: (relativePath) => this.resolvePluginAssetUrl(relativePath),
-      getLogPreview: (text, maxLength) => getLogPreview(text, maxLength),
-      stringifyLogPayload: (payload) => stringifyLogPayload(payload),
+      ...createDebugLogCallbacks(),
     };
   }
 
@@ -2050,11 +2049,7 @@ export class OpenCodianView extends ItemView {
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
-      logAssistantFinalizationDebug: (label, payload) => {
-        logAssistantFinalizationDebug(label, payload);
-      },
-      stringifyLogPayload: (payload) => stringifyLogPayload(payload),
-      getLogPreview: (text, maxLength) => getLogPreview(text, maxLength),
+      ...createDebugLogCallbacks(),
     };
   }
 
@@ -2376,9 +2371,7 @@ export class OpenCodianView extends ItemView {
         this.conversationIdentityRuntime.getMessageVisualSignature(message),
       assistantShellRender,
       assistantTailRender,
-      logAssistantFinalizationDebug: (label, payload) => {
-        logAssistantFinalizationDebug(label, payload);
-      },
+      ...createDebugLogCallbacks(),
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
     };
   }
@@ -2631,13 +2624,9 @@ export class OpenCodianView extends ItemView {
     const debugPort: SendPipelineDebugPort = {
       summarizeContentBlocksForDebug: (blocks) =>
         summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
-      logAssistantFinalizationDebug: (label, payload) => {
-        logAssistantFinalizationDebug(label, payload);
-      },
-      getLogPreview: (text, maxLength) => getLogPreview(text, maxLength),
       summarizeCoreStreamChunkForDebug: (chunk) => summarizeCoreStreamChunkForDebug(chunk),
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
-      stringifyLogPayload: (payload) => stringifyLogPayload(payload),
+      ...createDebugLogCallbacks(),
     };
 
     return {

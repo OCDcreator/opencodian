@@ -499,3 +499,24 @@ function emitTrailingAssistantPatchDebugLogPlan(
 ): void {
   emitter.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
 }
+
+/**
+ * Factory that bundles all debug log formatting callbacks so callers can
+ * spread them into host adapter objects without importing individual names.
+ */
+export function createDebugLogCallbacks(): {
+  logAssistantFinalizationDebug: (label: string, payload: unknown) => void;
+  getLogPreview: (text: string, maxLength: number) => string;
+  stringifyLogPayload: (payload: unknown) => string;
+} {
+  return {
+    logAssistantFinalizationDebug,
+    getLogPreview,
+    stringifyLogPayload,
+  };
+}
+
+/** Convenience wrapper used by single-line call sites that just need a truncated preview. */
+export function previewLogText(text: string, maxLength: number = 120): string {
+  return getLogPreview(text, maxLength);
+}

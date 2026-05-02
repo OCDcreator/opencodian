@@ -157,7 +157,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 ### Send pipeline debug summary 边界
 
-send pipeline 调试摘要函数（`summarizeContentBlocksForDebug`、`summarizeChatMessageForDebug`、`summarizeCoreStreamChunkForDebug`、`summarizeRenderedStreamChunkForDebug`）现在由 `runtime/SendPipelineDebugSummaries.ts` 承接。assistant finalization debug 的 allowlist gate check（`shouldLogAssistantFinalizationDebug`）、统一 log emitter（`logAssistantFinalizationDebug`）、payload 序列化（`stringifyLogPayload`）和文本截断预览（`getLogPreview`）现在由 `services/trailingAssistantPatchDebug.ts` 承接。`OpenCodianView` 仅通过 import 调用这些纯函数，并在多个 host seam（`SendPipelineDebugPort`、`ConversationRenderHost`、`MessageFinalizationServiceHost`、`InputPanelAppearanceCoordinatorHost` 等）中直接传递函数引用；view 本身不再保留这些私有实现。
+send pipeline 调试摘要函数（`summarizeContentBlocksForDebug`、`summarizeChatMessageForDebug`、`summarizeCoreStreamChunkForDebug`、`summarizeRenderedStreamChunkForDebug`）现在由 `runtime/SendPipelineDebugSummaries.ts` 承接。assistant finalization debug 的 allowlist gate check、统一 log emitter、payload 序列化和文本截断预览现在由 `services/trailingAssistantPatchDebug.ts` 承接。`OpenCodianView` 通过 `createDebugLogCallbacks()` 工厂函数将 debug 回调 spread 到 `SendPipelineDebugPort`、`ConversationAuthoritativeSyncHost`、`InputPanelAppearanceCoordinatorHost` 等 host seam 中；单行预览使用 `previewLogText()`。view 本身不再保留这些私有实现，源码中也不包含这些函数的裸名。
 
 ### Header/status shell 抽离
 

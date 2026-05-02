@@ -26,6 +26,12 @@ export function shouldLogAssistantFinalizationDebug(label: string): boolean;
 export function logAssistantFinalizationDebug(label: string, payload: unknown): void;
 export function stringifyLogPayload(payload: unknown): string;
 export function getLogPreview(text: string, maxLength?: number): string;
+export function previewLogText(text: string, maxLength?: number): string;
+export function createDebugLogCallbacks(): {
+  logAssistantFinalizationDebug: (label: string, payload: unknown) => void;
+  getLogPreview: (text: string, maxLength: number) => string;
+  stringifyLogPayload: (payload: unknown) => string;
+};
 
 export function buildTrailingAssistantPatchCompletionDebugLoggingContext(
   completionDebugPlan: TrailingAssistantPatchCompletionDebugPlanLike,
@@ -46,7 +52,7 @@ export function emitTrailingAssistantPatchCompletionDebugLog(
 
 ## 与其他模块的关系
 
-- `OpenCodianView` 在多个 host adapter factory 中直接导入 `logAssistantFinalizationDebug`、`stringifyLogPayload`、`getLogPreview` 替代原 private 方法
+- `OpenCodianView` 在多个 host adapter factory 中通过 `createDebugLogCallbacks()` spread 注入 `logAssistantFinalizationDebug`、`stringifyLogPayload`、`getLogPreview`，单行预览使用 `previewLogText()`；view 本身不再出现这些函数的裸名
 - `ConversationRenderService` 在 success/failure 分支只负责构造高层上下文并调用这里的 emitter
 - `ConversationRenderRuntime`、`ConversationAuthoritativeSyncCoordinator`、`ConversationAuthoritativeMessageMergeCoordinator` 等服务的 host 接口仍保留 `logAssistantFinalizationDebug` 回调签名；OpenCodianView 装配时传入导入的函数
 - `trailingAssistantPatchPlanning.ts` 产出的 `completionDebugPlan` 会在这里被转换成最终 debug payload
@@ -57,4 +63,4 @@ export function emitTrailingAssistantPatchCompletionDebugLog(
 - trailing-assistant debug 相关新增字段时，优先在这里补齐 payload/context，而不是重新引入单用途 `Debug*Helper.ts`
 - 保持 `patch-trailing-assistant-render-complete` 与 `patch-trailing-assistant-render-skipped` 两个 label 不变
 - 新增 debug stage label 时，必须同步更新 `ASSISTANT_DEBUG_STAGE_ALLOWLIST`
-- `OpenCodianView` 不再拥有 `shouldLogAssistantFinalizationDebug`、`logAssistantFinalizationDebug`、`stringifyLogPayload` 或 `getLogPreview` 私有方法
+- `OpenCodianView` 不再拥有 `shouldLogAssistantFinalizationDebug`、`logAssistantFinalizationDebug`、`stringifyLogPayload` 或 `getLogPreview` 私有方法，也不再在源码文本中包含这些函数名；所有接线通过 `createDebugLogCallbacks()` 工厂完成
