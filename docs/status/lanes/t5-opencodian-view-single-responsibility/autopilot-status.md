@@ -67,13 +67,16 @@
 
 ## Net Impact
 
+OpenCodianView.ts: 5314 → 4971 lines (**−343 lines**)
+
 | Task | Lines Removed from OpenCodianView.ts | Destination |
 |------|--------------------------------------|-------------|
 | view-17 | ~120 | ChildSessionGraphCoordinator |
 | view-18 | ~55 | ActiveTabContextUsageCoordinator |
 | view-19 | ~30 | ConversationRenderService |
 | view-20 | ~45 | BackgroundTaskTimelineService |
-| **Total** | **~250** | **4 existing owners** |
+| **Per-task total** | **~250** | **4 existing owners** |
+| **Actual measured Δ** | **−343** | *(difference due to inline cleanup, import removal, dead-code elimination)* |
 
 ## Round 2 — Second SRP Batch
 
@@ -131,13 +134,13 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 
 ### Cumulative Impact (Rounds 1 + 2)
 
-OpenCodianView.ts: ~5314 → 4437 lines (**~877 lines removed**, **16.5% reduction**)
+OpenCodianView.ts: 5314 → 4437 lines (**−877 lines**, **16.5% reduction**)
 
-| Round | Lines Removed | Destinations |
-|-------|---------------|-------------|
-| Round 1 (view-17 to view-20) | ~250 | 4 existing owners |
-| Round 2 (view-srp2-01 to view-srp2-04) | ~534 | 4 owners (2 new, 2 extended) |
-| **Grand Total** | **~784** | **8 distinct owners** |
+| Round | Actual Δ | Per-task Estimates | Destinations |
+|-------|----------|--------------------|-------------|
+| Round 1 (view-17 to view-20) | −343 (5314→4971) | ~120+~55+~30+~45=~250 | 4 existing owners |
+| Round 2 (view-srp2-01 to view-srp2-04) | −534 (4971→4437) | ~120+~175+~155+~84=~534 | 4 owners (2 new, 2 extended) |
+| **Grand Total** | **−877** | *per-task sums undercount Round 1 by ~93 lines due to inline cleanup, import removal, and dead-code elimination not captured in per-slice estimates* | **8 distinct owners** |
 
 ### No Thin Helper Modules Introduced
 
