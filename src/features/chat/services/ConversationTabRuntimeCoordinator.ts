@@ -63,24 +63,33 @@ export interface ConversationTabRuntimeCoordinatorPorts {
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
 
-export interface ConversationTabRuntimeCoordinatorHostDependencies {
-  getMaxTabs(): number;
-  getTabManager(): TabManager | null;
-  setTabManager(tabManager: TabManager | null): void;
-  getTabBar(): TabBar | null;
-  setTabBar(tabBar: TabBar | null): void;
-  getTabBarMountEl(): HTMLElement | null;
-  setTabBarMountEl(element: HTMLElement | null): void;
+export interface TabBarMutableState {
+  tabManager: TabManager | null;
+  tabBar: TabBar | null;
+  tabBarMountEl: HTMLElement | null;
+}
+
+export interface TabRuntimeSettings {
+  maxTabs: number;
+  tabBarPosition: TabBarPosition;
+  belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
+}
+
+export interface TabRuntimePersistence {
+  setPersistedTabState(tabState: PersistedTabState): void;
+  saveImmediately(): void;
+  scheduleSave(): void;
+}
+
+export interface TabRuntimeElements {
   getChatContainerEl(): HTMLElement | null;
   getHeaderTabBarSlotEl(): HTMLElement | null;
   getBelowHeaderTabBarSlotEl(): HTMLElement | null;
   getOuterVerticalTabBarSlotEl(): HTMLElement | null;
   getInputTabBarSlotEl(): HTMLElement | null;
-  getTabBarPosition(): TabBarPosition;
-  getBelowHeaderTabBarLayout(): BelowHeaderTabBarLayout;
-  setPersistedTabState(tabState: PersistedTabState): void;
-  saveSettingsUiStateImmediately(): void;
-  scheduleSettingsUiStateSave(): void;
+}
+
+export interface TabRuntimeSession {
   getSessionIdForTab(tabId: TabId | null): string | null;
   getTabSessionStatus(
     tabId: TabId | null,
@@ -88,38 +97,97 @@ export interface ConversationTabRuntimeCoordinatorHostDependencies {
   ): SessionActivityStatus | null;
 }
 
+export interface ConversationTabRuntimeCoordinatorHostDependencies {
+  tabBarState: TabBarMutableState;
+  settings: TabRuntimeSettings;
+  persistence: TabRuntimePersistence;
+  elements: TabRuntimeElements;
+  session: TabRuntimeSession;
+}
+
 export function createConversationTabRuntimeCoordinatorHost(
   deps: ConversationTabRuntimeCoordinatorHostDependencies,
 ): ConversationTabRuntimeCoordinatorHost {
+  const { tabBarState, settings, persistence, elements, session } = deps;
   return {
-    getMaxTabs: () => deps.getMaxTabs(),
-    getTabManager: () => deps.getTabManager(),
-    setTabManager: (tabManager) => deps.setTabManager(tabManager),
-    getTabBar: () => deps.getTabBar(),
-    setTabBar: (tabBar) => deps.setTabBar(tabBar),
-    getTabBarMountEl: () => deps.getTabBarMountEl(),
-    setTabBarMountEl: (element) => deps.setTabBarMountEl(element),
-    getChatContainerEl: () => deps.getChatContainerEl(),
-    getHeaderTabBarSlotEl: () => deps.getHeaderTabBarSlotEl(),
-    getBelowHeaderTabBarSlotEl: () => deps.getBelowHeaderTabBarSlotEl(),
-    getOuterVerticalTabBarSlotEl: () => deps.getOuterVerticalTabBarSlotEl(),
-    getInputTabBarSlotEl: () => deps.getInputTabBarSlotEl(),
-    getTabBarPosition: () => deps.getTabBarPosition(),
-    getBelowHeaderTabBarLayout: () => deps.getBelowHeaderTabBarLayout(),
-    setPersistedTabState: (tabState) => deps.setPersistedTabState(tabState),
+    getMaxTabs: () => settings.maxTabs,
+    getTabManager: () => tabBarState.tabManager,
+    setTabManager: (tabManager) => {
+      tabBarState.tabManager = tabManager;
+    },
+    getTabBar: () => tabBarState.tabBar,
+    setTabBar: (tabBar) => {
+      tabBarState.tabBar = tabBar;
+    },
+    getTabBarMountEl: () => tabBarState.tabBarMountEl,
+    setTabBarMountEl: (element) => {
+      tabBarState.tabBarMountEl = element;
+    },
+    getChatContainerEl: () => elements.getChatContainerEl(),
+    getHeaderTabBarSlotEl: () => elements.getHeaderTabBarSlotEl(),
+    getBelowHeaderTabBarSlotEl: () => elements.getBelowHeaderTabBarSlotEl(),
+    getOuterVerticalTabBarSlotEl: () => elements.getOuterVerticalTabBarSlotEl(),
+    getInputTabBarSlotEl: () => elements.getInputTabBarSlotEl(),
+    getTabBarPosition: () => settings.tabBarPosition,
+    getBelowHeaderTabBarLayout: () => settings.belowHeaderTabBarLayout,
+    setPersistedTabState: (tabState) => persistence.setPersistedTabState(tabState),
     savePersistedTabState: (options = {}) => {
       if (options.flush) {
-        deps.saveSettingsUiStateImmediately();
+        persistence.saveImmediately();
         return;
       }
 
-      deps.scheduleSettingsUiStateSave();
+      persistence.scheduleSave();
     },
-    getSessionIdForTab: (tabId) => deps.getSessionIdForTab(tabId),
-    getTabSessionStatus: (tabId, sessionId) => deps.getTabSessionStatus(tabId, sessionId),
+    getSessionIdForTab: (tabId) => session.getSessionIdForTab(tabId),
+    getTabSessionStatus: (tabId, sessionId) => session.getTabSessionStatus(tabId, sessionId),
     getTabContextUsage: (tabId) =>
-      deps.getTabManager()?.getTabContextUsage(tabId) ?? null,
+      tabBarState.tabManager?.getTabContextUsage(tabId) ?? null,
   };
+}
+
+export interface ConversationTabRuntimeCoordinatorPortDependencies {
+  loadRecoveryCoordinator: {
+    activateTab(tabId: TabId): Promise<void>;
+    initializeFirstTab(): Promise<void>;
+    restorePersistedTabs(): TabId | null;
+  };
+  lifecycleRecoveryCoordinator: {
+    closeTabAndRecover(tabId: TabId): Promise<void>;
+  };
+  runtimeStateBridge: {
+    syncStreamLikeState(tabId: TabId | null): void;
+    syncActiveStreamLikeState(): void;
+    setNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
+  };
+}
+
+export interface ConversationTabRuntimeCoordinatorDependencies<
+  Runtime extends ConversationTabRuntimeState = ConversationTabRuntimeState,
+> extends ConversationTabRuntimeCoordinatorHostDependencies,
+    ConversationTabRuntimeCoordinatorPortDependencies {
+  paneCoordinator: TabMessagesPaneCoordinator<Runtime>;
+}
+
+export function createConversationTabRuntimeCoordinator<
+  Runtime extends ConversationTabRuntimeState = ConversationTabRuntimeState,
+>(deps: ConversationTabRuntimeCoordinatorDependencies<Runtime>): ConversationTabRuntimeCoordinator<Runtime> {
+  const host = createConversationTabRuntimeCoordinatorHost(deps);
+  return new ConversationTabRuntimeCoordinator(
+    host,
+    deps.paneCoordinator,
+    {
+      activateTab: (tabId) => deps.loadRecoveryCoordinator.activateTab(tabId),
+      closeTabAndRecover: (tabId) =>
+        deps.lifecycleRecoveryCoordinator.closeTabAndRecover(tabId),
+      initializeFirstTab: () => deps.loadRecoveryCoordinator.initializeFirstTab(),
+      restorePersistedTabs: () => deps.loadRecoveryCoordinator.restorePersistedTabs(),
+      syncTabStreamLikeState: (tabId) => deps.runtimeStateBridge.syncStreamLikeState(tabId),
+      syncActiveTabStreamLikeState: () => deps.runtimeStateBridge.syncActiveStreamLikeState(),
+      setTabNeedsAttention: (tabId, needsAttention) =>
+        deps.runtimeStateBridge.setNeedsAttention(tabId, needsAttention),
+    },
+  );
 }
 
 export class ConversationTabRuntimeCoordinator<

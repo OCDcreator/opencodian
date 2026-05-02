@@ -13,11 +13,42 @@
 - `ConversationLoadRecoveryCoordinator`：first-open load、persisted restore 与 fallback conversation 创建
 - `TabRuntimeStateBridge`：stream-like tab badge、background-task badge、attention 状态与 send-button writeback
 
-这样 `OpenCodianView` 只保留 DOM/settings/state host wiring，tab manager、tab bar、active pane、persist/restore 与 stream-like state 的编排不再散落在 view 方法里。host 组装已通过 `createConversationTabRuntimeCoordinatorHost(deps)` 工厂函数集中到此文件；工厂吸收了 `savePersistedTabState` 的 flush/schedule 分派逻辑和 `getTabContextUsage` 的 null-safe tabManager 派生，view 只传入 `saveSettingsUiStateImmediately` / `scheduleSettingsUiStateSave` 等低层级依赖。
+这样 `OpenCodianView` 只保留 DOM/settings/state host wiring，tab manager、tab bar、active pane、persist/restore 与 stream-like state 的编排不再散落在 view 方法里。host 组装已通过 `createConversationTabRuntimeCoordinatorHost(deps)` 工厂函数集中到此文件；工厂吸收了 `savePersistedTabState` 的 flush/schedule 分派逻辑和 `getTabContextUsage` 的 null-safe tabManager 派生。view 通过 `createConversationTabRuntimeCoordinator(deps)` 顶层工厂一次性获得完整协调器实例——host、ports 和 coordinator 构造全部由此文件负责。`ConversationTabRuntimeCoordinatorHostDependencies` 采用扁平依赖设计：`TabBarMutableState` 替代了原来的 6 个 get/set 回调，port 引用直接传入协调器而非由 view 内联组装。
 
 ## 公开接口
 
 ```typescript
+export interface TabBarMutableState {
+  tabManager: TabManager | null;
+  tabBar: TabBar | null;
+  tabBarMountEl: HTMLElement | null;
+}
+
+export interface TabRuntimeSettings {
+  maxTabs: number;
+  tabBarPosition: TabBarPosition;
+  belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
+}
+
+export interface TabRuntimePersistence {
+  setPersistedTabState(tabState: PersistedTabState): void;
+  saveImmediately(): void;
+  scheduleSave(): void;
+}
+
+export interface TabRuntimeElements {
+  getChatContainerEl(): HTMLElement | null;
+  getHeaderTabBarSlotEl(): HTMLElement | null;
+  getBelowHeaderTabBarSlotEl(): HTMLElement | null;
+  getOuterVerticalTabBarSlotEl(): HTMLElement | null;
+  getInputTabBarSlotEl(): HTMLElement | null;
+}
+
+export interface TabRuntimeSession {
+  getSessionIdForTab(tabId: TabId | null): string | null;
+  getTabSessionStatus(tabId: TabId | null, sessionId: string | null): SessionActivityStatus | null;
+}
+
 export interface ConversationTabRuntimeCoordinatorHost {
   getMaxTabs(): number;
   getTabManager(): TabManager | null;
@@ -41,13 +72,32 @@ export interface ConversationTabRuntimeCoordinatorHost {
 }
 
 export interface ConversationTabRuntimeCoordinatorHostDependencies {
-  /* same as Host except: saveSettingsUiStateImmediately + scheduleSettingsUiStateSave
-     replace savePersistedTabState; no getTabContextUsage (factory derives from getTabManager) */
+  tabBarState: TabBarMutableState;
+  settings: TabRuntimeSettings;
+  persistence: TabRuntimePersistence;
+  elements: TabRuntimeElements;
+  session: TabRuntimeSession;
 }
 
 export function createConversationTabRuntimeCoordinatorHost(
   deps: ConversationTabRuntimeCoordinatorHostDependencies,
 ): ConversationTabRuntimeCoordinatorHost;
+
+export interface ConversationTabRuntimeCoordinatorPortDependencies {
+  loadRecoveryCoordinator: { activateTab, initializeFirstTab, restorePersistedTabs };
+  lifecycleRecoveryCoordinator: { closeTabAndRecover };
+  runtimeStateBridge: { syncStreamLikeState, syncActiveStreamLikeState, setNeedsAttention };
+}
+
+export interface ConversationTabRuntimeCoordinatorDependencies<Runtime>
+  extends ConversationTabRuntimeCoordinatorHostDependencies,
+    ConversationTabRuntimeCoordinatorPortDependencies {
+  paneCoordinator: TabMessagesPaneCoordinator<Runtime>;
+}
+
+export function createConversationTabRuntimeCoordinator<Runtime>(
+  deps: ConversationTabRuntimeCoordinatorDependencies<Runtime>,
+): ConversationTabRuntimeCoordinator<Runtime>;
 
 export interface ConversationTabRuntimeCoordinatorPorts {
   activateTab(tabId: TabId): Promise<void>;
@@ -103,6 +153,8 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 仍定义完整 `TabRuntimeState` shape，并保留真实 DOM slots、settings、plugin save、session status 与 pane host wiring
+- `OpenCodianView` 通过 `createConversationTabRuntimeCoordinator(deps)` 一次性获得协调器实例，不再手动构造 `new ConversationTabRuntimeCoordinator(host, pane, ports)`
+- `TabBarMutableState` 是 view 与 coordinator 之间的共享可变状态桥接；view 的 `tabManager`、`tabBar`、`tabBarMountEl` 通过 getter/setter 适配器写入该对象
 - `ConversationTabRuntimeCoordinator` 只负责 tab runtime lifecycle 的编排，不接管 message render、send pipeline、opencode transport、question dock 或 todo runtime 语义
 - `ConversationLoadRecoveryCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationViewStateService` 继续拥有各自 conversation/recovery/load 细节；本模块只是把 tab-facing lifecycle 入口收束成单一 coordinator surface
 

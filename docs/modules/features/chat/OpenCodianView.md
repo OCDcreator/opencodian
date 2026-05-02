@@ -133,7 +133,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 消息区的 pane lifecycle 与 pane 级 scroll metrics 现在先由 `services/TabMessagesPaneCoordinator.ts` 承接，再由 `services/ConversationTabRuntimeCoordinator.ts` 对外提供 active pane / tab runtime facade；底部检测、scroll snapshot、重渲后恢复仍由 `services/ScrollManager.ts` 提供纯 helper。settled scroll 的 double-rAF 帧状态和取消逻辑由 `ScrollManager.SettledScrollScheduler` 拥有，`TabMessagesPaneCoordinator` 直接引用调度器实例。`OpenCodianView` 只保留：
 
 - `TabMessagesPaneCoordinator` 的 host wiring
-- `ConversationTabRuntimeCoordinator` 的 tab manager / tab bar / persistence host wiring
+- `ConversationTabRuntimeCoordinator` 的 tab bar mutable state 与 persistence host wiring（通过 `createConversationTabRuntimeCoordinator` 顶层工厂一次性构造协调器，view 不再手动组装 ports）
 - 是否应 auto-scroll 的业务判断
 - restore 后的高层 render / hydration / bridge 调度
 - `scrollToBottom` / `scheduleSettledScrollToBottom` / `clearScheduledScrollToBottom` 等薄兼容委托（内部委托给 `SettledScrollScheduler`）

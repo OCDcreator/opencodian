@@ -231,7 +231,8 @@ import {
 import {
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeState,
-  createConversationTabRuntimeCoordinatorHost,
+  createConversationTabRuntimeCoordinator,
+  type TabBarMutableState,
 } from './services/ConversationTabRuntimeCoordinator';
 import {
   type ConversationViewStateHost,
@@ -1646,54 +1647,35 @@ export class OpenCodianView extends ItemView {
           ),
       },
     );
-    const conversationTabRuntimeCoordinator = new ConversationTabRuntimeCoordinator(
-      createConversationTabRuntimeCoordinatorHost({
-        getMaxTabs: () => this.plugin.settings.maxTabs,
-        getTabManager: () => this.tabManager,
-        setTabManager: (tabManager) => {
-          this.tabManager = tabManager;
+    const conversationTabRuntimeCoordinator = createConversationTabRuntimeCoordinator({
+      tabBarState: this.createTabBarMutableState(),
+      settings: this.plugin.settings,
+      persistence: {
+        setPersistedTabState: (tabState) => {
+          this.plugin.settings.tabState = tabState;
         },
-        getTabBar: () => this.tabBar,
-        setTabBar: (tabBar) => {
-          this.tabBar = tabBar;
+        saveImmediately: () => {
+          void this.plugin.saveSettingsUiStateImmediately();
         },
-        getTabBarMountEl: () => this.tabBarMountEl,
-        setTabBarMountEl: (element) => {
-          this.tabBarMountEl = element;
-        },
+        scheduleSave: () => this.plugin.scheduleSettingsUiStateSave(),
+      },
+      elements: {
         getChatContainerEl: () => this.chatContainerEl,
         getHeaderTabBarSlotEl: () => this.headerTabBarSlotEl,
         getBelowHeaderTabBarSlotEl: () => this.belowHeaderTabBarSlotEl,
         getOuterVerticalTabBarSlotEl: () => this.outerVerticalTabBarSlotEl,
         getInputTabBarSlotEl: () => this.composerInputShellCoordinator.getTabBarSlotEl(),
-        getTabBarPosition: () => this.plugin.settings.tabBarPosition,
-        getBelowHeaderTabBarLayout: () => this.plugin.settings.belowHeaderTabBarLayout,
-        setPersistedTabState: (tabState) => {
-          this.plugin.settings.tabState = tabState;
-        },
-        saveSettingsUiStateImmediately: () => {
-          void this.plugin.saveSettingsUiStateImmediately();
-        },
-        scheduleSettingsUiStateSave: () => {
-          this.plugin.scheduleSettingsUiStateSave();
-        },
+      },
+      session: {
         getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
         getTabSessionStatus: (tabId, sessionId) =>
           this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
-      }),
-      this.tabMessagesPaneCoordinator,
-      {
-        activateTab: (tabId) => conversationLoadRecoveryCoordinator.activateTab(tabId),
-        closeTabAndRecover: (tabId) =>
-          conversationTabLifecycleRecoveryCoordinator.closeTabAndRecover(tabId),
-        initializeFirstTab: () => conversationLoadRecoveryCoordinator.initializeFirstTab(),
-        restorePersistedTabs: () => conversationLoadRecoveryCoordinator.restorePersistedTabs(),
-        syncTabStreamLikeState: (tabId) => tabRuntimeStateBridge.syncStreamLikeState(tabId),
-        syncActiveTabStreamLikeState: () => tabRuntimeStateBridge.syncActiveStreamLikeState(),
-        setTabNeedsAttention: (tabId, needsAttention) =>
-          tabRuntimeStateBridge.setNeedsAttention(tabId, needsAttention),
       },
-    );
+      paneCoordinator: this.tabMessagesPaneCoordinator,
+      loadRecoveryCoordinator: conversationLoadRecoveryCoordinator,
+      lifecycleRecoveryCoordinator: conversationTabLifecycleRecoveryCoordinator,
+      runtimeStateBridge: tabRuntimeStateBridge,
+    });
 
     return {
       conversationAuthoritativeSyncCoordinator,
@@ -2383,6 +2365,33 @@ export class OpenCodianView extends ItemView {
         new Notice(message);
       },
     };
+  }
+
+  private createTabBarMutableState(): TabBarMutableState {
+    const state: TabBarMutableState = {
+      tabManager: this.tabManager,
+      tabBar: this.tabBar,
+      tabBarMountEl: this.tabBarMountEl,
+    };
+    Object.defineProperty(state, 'tabManager', {
+      get: () => this.tabManager,
+      set: (v: TabManager | null) => { this.tabManager = v; },
+      enumerable: true,
+      configurable: false,
+    });
+    Object.defineProperty(state, 'tabBar', {
+      get: () => this.tabBar,
+      set: (v: TabBar | null) => { this.tabBar = v; },
+      enumerable: true,
+      configurable: false,
+    });
+    Object.defineProperty(state, 'tabBarMountEl', {
+      get: () => this.tabBarMountEl,
+      set: (v: HTMLElement | null) => { this.tabBarMountEl = v; },
+      enumerable: true,
+      configurable: false,
+    });
+    return state;
   }
 
   private createConversationTabLifecycleRecoveryHost(): ConversationTabLifecycleRecoveryHost {
