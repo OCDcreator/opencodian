@@ -28,6 +28,10 @@ export function shouldSyncAfterStream(
 
 export function getFriendlyServerStartErrorMessage(error: unknown): string;
 
+export function getUnavailableServerMessage(
+  availability: 'checking' | 'starting' | 'offline',
+): string;
+
 export interface FinalizeMessageOptions {
   conversation: Conversation;
   tabId: TabId | null;
@@ -47,6 +51,11 @@ export class MessageFinalizationService {
     messageEl: HTMLElement,
     contentEl: HTMLElement,
     error: unknown,
+  ): Promise<void>;
+  finalizeAssistantMessageWithServerUnavailableError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    availability: 'checking' | 'starting' | 'offline',
   ): Promise<void>;
 }
 ```
@@ -95,13 +104,22 @@ export class MessageFinalizationService {
 - 错误消息含 `"already in use"` → `chat.error.serverPortInUse`
 - 其他 → `chat.error.serverStartFailed` + 原始错误消息
 
+### getUnavailableServerMessage
+
+纯函数，不依赖 host。将 server 不可用状态分类为用户友好的 i18n 消息：
+
+- `starting` → `chat.error.serverStarting`
+- 其他（`offline`、`checking`）→ `chat.error.serverOffline`
+
 ### finalizeAssistantMessageWithError
 
-当 server-start prompt card 失败时（settings/skip 后仍不可用，或 start 抛异常），`OpenCodianView` 通过此方法完成助手错误终结：
+底层错误终结方法，由上面两个 wrapper 调用。
+
+当 server-start prompt card 失败时（settings/skip 后仍不可用，或 start 抛异常），`OpenCodianView` 通过 wrapper 方法完成助手错误终结：
 
 1. 通过 host 的 `renderStreamError()` 渲染错误块（委托 `AssistantShellViewHostAdapter`）
 2. 将错误消息作为 assistant message push 到 conversation 并 save
 3. 通过 host 的 `updateConversationSyncRuntime()` 更新 sync fingerprint
 4. 通过 host 的 `scrollToBottom()` 滚动到底部
 
-`OpenCodianView` 不再拥有 `finalizeAssistantMessageWithError` 或 `getFriendlyServerStartErrorMessage` 私有方法；全部委托到此服务。
+`OpenCodianView` 不再拥有 `finalizeAssistantMessageWithError`、`getFriendlyServerStartErrorMessage` 或 `getUnavailableServerMessage`；全部委托到此服务。`OpenCodianView` 仅通过 `finalizeAssistantMessageWithServerError` 和 `finalizeAssistantMessageWithServerUnavailableError` 两个 wrapper 方法调用，不直接调用 `finalizeAssistantMessageWithError`。

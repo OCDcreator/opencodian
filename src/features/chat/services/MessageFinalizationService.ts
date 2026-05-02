@@ -117,6 +117,16 @@ export function getFriendlyServerStartErrorMessage(error: unknown): string {
   return `${t('chat.error.serverStartFailed')}\n${rawMessage}`;
 }
 
+export type UnavailableServerAvailability = 'checking' | 'starting' | 'offline';
+
+export function getUnavailableServerMessage(availability: UnavailableServerAvailability): string {
+  if (availability === 'starting') {
+    return t('chat.error.serverStarting');
+  }
+
+  return t('chat.error.serverOffline');
+}
+
 export class MessageFinalizationService {
   constructor(private readonly host: MessageFinalizationHost) {}
 
@@ -341,6 +351,18 @@ export class MessageFinalizationService {
       messageEl,
       contentEl,
       getFriendlyServerStartErrorMessage(error),
+    );
+  }
+
+  async finalizeAssistantMessageWithServerUnavailableError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    availability: UnavailableServerAvailability,
+  ): Promise<void> {
+    await this.finalizeAssistantMessageWithError(
+      messageEl,
+      contentEl,
+      getUnavailableServerMessage(availability),
     );
   }
 }

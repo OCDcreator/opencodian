@@ -246,6 +246,7 @@ import {
   type InputPanelAppearanceCoordinatorHost,
 } from './services/InputPanelAppearanceCoordinator';
 import {
+  getUnavailableServerMessage,
   type MessageFinalizationHost,
   MessageFinalizationService,
 } from './services/MessageFinalizationService';
@@ -3201,7 +3202,7 @@ export class OpenCodianView extends ItemView {
     });
     cardEl.createDiv({
       cls: 'opencodian-server-action-desc',
-      text: this.getUnavailableServerMessage(availability),
+      text: getUnavailableServerMessage(availability),
     });
 
     const statusEl = cardEl.createDiv({
@@ -3244,10 +3245,10 @@ export class OpenCodianView extends ItemView {
         messageEl.remove();
         return true;
       }
-      await this.messageFinalizationService.finalizeAssistantMessageWithError(
+      await this.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(
         messageEl,
         contentEl,
-        this.getUnavailableServerMessage(latestAvailability)
+        latestAvailability
       );
       return false;
     }
@@ -3259,10 +3260,10 @@ export class OpenCodianView extends ItemView {
         messageEl.remove();
         return true;
       }
-      await this.messageFinalizationService.finalizeAssistantMessageWithError(
+      await this.messageFinalizationService.finalizeAssistantMessageWithServerUnavailableError(
         messageEl,
         contentEl,
-        this.getUnavailableServerMessage(latestAvailability)
+        latestAvailability
       );
       return false;
     }
@@ -3298,14 +3299,6 @@ export class OpenCodianView extends ItemView {
   private async refreshStatusSurfaces(): Promise<void> {
     await this.chatHeaderPresenter.refreshServerStatusBadge();
     this.plugin.settingsTab?.refreshServerStatusDisplay();
-  }
-
-  private getUnavailableServerMessage(availability: Exclude<ChatServerAvailability, 'running' | 'external'>): string {
-    if (availability === 'starting') {
-      return t('chat.error.serverStarting');
-    }
-
-    return t('chat.error.serverOffline');
   }
 
   /** Cancel streaming */
