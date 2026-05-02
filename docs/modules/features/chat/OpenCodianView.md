@@ -355,7 +355,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 
 - 把 streaming 内容组装成持久化的 assistant `ChatMessage`
 - 在正常完成时通过 `MessageFinalizationService` 先尝试把 canonical session graph 投影回最终消息；只有 canonical state 缺失时才回退服务端拉取，并按需 patch / rerender UI
-- 追加 turn diff notice
+- 通过 `ConversationNoticeCoordinator` 追加 turn diff notice
 - 刷新 session todos
 - 更新 context usage
 
@@ -530,6 +530,7 @@ background task notice 这条子链路现在的边界是：
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调
 - `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调；queued state 已不再挂在 view runtime 上
 - `PersistentAssistantNoticeService`：session todo / background task / diff / model-unavailable 共享的 persisted notice append、conversation save、sync fingerprint 写回，以及 visible/hidden tab 后续动作
+- `ConversationNoticeCoordinator`：conversation empty / stream error / turn diff / notice action 的编排入口
 
 ## 外观与控件
 
@@ -641,6 +642,7 @@ background task notice 这条子链路现在的边界是：
 | Composer input shell | `ComposerInputShellCoordinator` |
 | Slash command catalog 缓存 | `SlashCommandMenuCatalogCache` |
 | Notice 持久化 | `PersistentAssistantNoticeService` |
+| Conversation notice 编排 | `ConversationNoticeCoordinator` |
 | Trailing assistant patch | `trailingAssistantPatchPlanning` / `trailingAssistantPatchExecution` |
 
 ### 不可移除的关键行为

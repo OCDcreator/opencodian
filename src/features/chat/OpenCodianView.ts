@@ -22,7 +22,6 @@ import {
   type PromptContextItem,
   type QuestionRequest,
   type QuestionResolution,
-  type SessionDiffEntry,
   type SessionTodo,
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
@@ -50,9 +49,6 @@ import {
   AssistantNoticeCardRenderer,
   type AssistantNoticeCardRendererHost,
 } from './runtime/AssistantNoticeCardRenderer';
-import {
-  buildStreamErrorNotice,
-} from './runtime/AssistantNoticeRenderer';
 import {
   AssistantShellViewHostAdapter,
   type AssistantShellViewHostAdapterHost,
@@ -187,6 +183,10 @@ import {
   ConversationLoadRecoveryCoordinator,
   type ConversationLoadRecoveryHost,
 } from './services/ConversationLoadRecoveryCoordinator';
+import {
+  ConversationNoticeCoordinator,
+  type ConversationNoticeCoordinatorHost,
+} from './services/ConversationNoticeCoordinator';
 import {
   type ConversationAssistantShellRenderPort,
   type ConversationAssistantTailRenderPort,
@@ -369,6 +369,7 @@ interface OpenCodianViewSurfaceRuntimeWiring {
   composerContextViewFacade: ComposerContextViewFacade;
   tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
   persistentAssistantNoticeService: PersistentAssistantNoticeService;
+  conversationNoticeCoordinator: ConversationNoticeCoordinator;
   sessionTodoCoordinator: SessionTodoCoordinator;
   childSessionGraphCoordinator: ChildSessionGraphCoordinator;
   questionDockSlotCoordinator: QuestionDockSlotCoordinator;
@@ -482,6 +483,7 @@ export class OpenCodianView extends ItemView {
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private chatVisualDemoCoordinator: ChatVisualDemoCoordinator;
+  private conversationNoticeCoordinator: ConversationNoticeCoordinator;
   private currentConversation: Conversation | null = null;
   private currentConversationRevertState: ConversationRevertState | null = null;
   private markdownService: MarkdownRenderService | null = null;
@@ -1227,6 +1229,7 @@ export class OpenCodianView extends ItemView {
     this.tabConversationSyncFingerprintRuntimePort =
       surfaceRuntime.tabConversationSyncFingerprintRuntimePort;
     this.persistentAssistantNoticeService = surfaceRuntime.persistentAssistantNoticeService;
+    this.conversationNoticeCoordinator = surfaceRuntime.conversationNoticeCoordinator;
     this.sessionTodoCoordinator = surfaceRuntime.sessionTodoCoordinator;
     this.childSessionGraphCoordinator = surfaceRuntime.childSessionGraphCoordinator;
     this.questionDockSlotCoordinator = surfaceRuntime.questionDockSlotCoordinator;
@@ -1368,6 +1371,9 @@ export class OpenCodianView extends ItemView {
       tabConversationSyncFingerprintRuntimePort: this.createTabConversationSyncFingerprintRuntimePort(),
       persistentAssistantNoticeService: new PersistentAssistantNoticeService(
         this.createPersistentAssistantNoticeServiceHost(),
+      ),
+      conversationNoticeCoordinator: new ConversationNoticeCoordinator(
+        this.createConversationNoticeCoordinatorHost(),
       ),
       sessionTodoCoordinator: createSessionTodoCoordinator(this.createSessionTodoViewHost()),
       childSessionGraphCoordinator: new ChildSessionGraphCoordinator(
@@ -1703,6 +1709,30 @@ export class OpenCodianView extends ItemView {
         this.scheduleSettledScrollToBottomIfNeeded();
       },
       setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
+    };
+  }
+
+  private createConversationNoticeCoordinatorHost(): ConversationNoticeCoordinatorHost {
+    return {
+      getCurrentSessionModel: () => this.getCurrentSessionModel(),
+      formatModelId: (model) => this.chatSelectionControlsCoordinator.formatModelId(model),
+      isConversationRewound: () => Boolean(this.currentConversationRevertState?.messageID),
+      getActiveTabId: () => this.getActiveTabId(),
+      getSessionDiff: (sessionId, sourceMessageId) =>
+        this.plugin.openCodeService.getSessionDiff(sessionId, sourceMessageId),
+      getCachedSessionDiffEntries: (sessionId) =>
+        this.plugin.openCodeService.getCachedSessionDiffEntries(sessionId),
+      appendPersistentNotice: (options) =>
+        this.persistentAssistantNoticeService.appendMessage(options),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      handleRestoreRewindRequest: () => this.handleRestoreRewindRequest(),
+      openPluginSettingsPreservingScroll: () => {
+        this.openPluginSettingsPreservingScroll();
+        window.setTimeout(() => {
+          this.plugin.settingsTab?.scrollToModelSection();
+        }, 50);
+      },
     };
   }
 
@@ -2334,9 +2364,9 @@ export class OpenCodianView extends ItemView {
         this.resetTurnState();
       },
       shouldRenderEmptyConversationNotice: () =>
-        Boolean(this.currentConversationRevertState?.messageID),
+        this.conversationNoticeCoordinator.shouldRenderEmptyConversationNotice(),
       createEmptyConversationNoticeMessage: () =>
-        this.createEmptyConversationNoticeMessage(),
+        this.conversationNoticeCoordinator.createEmptyConversationNotice(),
       createUserMessageFrame: (message) =>
         this.createUserMessageRenderFrame(message),
       userMessageContentRenderer: this.userMessageContentRenderer,
@@ -2416,7 +2446,7 @@ export class OpenCodianView extends ItemView {
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
-        this.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
+        this.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
         this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
@@ -2640,7 +2670,7 @@ export class OpenCodianView extends ItemView {
   private createAssistantNoticeCardRendererHost(): AssistantNoticeCardRendererHost {
     return {
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
-      handleNoticeAction: (actionType) => this.handleNoticeAction(actionType),
+      handleNoticeAction: (actionType) => this.conversationNoticeCoordinator.routeNoticeAction(actionType),
       handleCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
     };
   }
@@ -3401,9 +3431,7 @@ export class OpenCodianView extends ItemView {
   private async appendAssistantErrorMessage(message: string): Promise<void> {
     const activeTabId = this.getActiveTabId();
     const activeRuntime = this.getTabRuntimeState(activeTabId);
-    const timestamp = Date.now();
-    const modelId = this.formatModelId(this.getCurrentSessionModel());
-    const noticeMessage = buildStreamErrorNotice(timestamp, message, modelId);
+    const noticeMessage = this.conversationNoticeCoordinator.createStreamErrorNotice(message);
     const { messageEl } = this.assistantShellViewHostAdapter.createAssistantMessageElement(activeTabId);
     await this.assistantShellViewHostAdapter.renderAssistantPlaceholderAsNotice({
       messageEl,
@@ -3621,25 +3649,6 @@ export class OpenCodianView extends ItemView {
 
   private async handleRewindRequest(message: ChatMessage): Promise<void> {
     await this.conversationLoadRecoveryCoordinator.handleRewindRequest(message);
-  }
-
-  private createEmptyConversationNoticeMessage(): ChatMessage {
-    const rewound = Boolean(this.currentConversationRevertState?.messageID);
-
-    return {
-      id: rewound ? 'opencodian-empty-rewind' : 'opencodian-empty-state',
-      role: 'assistant',
-      content: rewound
-        ? t('chat.rewind.empty.description')
-        : t('chat.empty.description'),
-      timestamp: Date.now(),
-      displayStyle: 'notice',
-      noticeTitle: rewound
-        ? t('chat.rewind.empty.title')
-        : t('chat.empty.title'),
-      noticeTone: rewound ? 'warning' : 'info',
-      noticeActions: rewound ? [{ type: 'restore_rewind' }] : undefined,
-    };
   }
 
   private getInputPlaceholder(): string {
@@ -3935,71 +3944,6 @@ export class OpenCodianView extends ItemView {
     return this.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model);
   }
 
-  private async appendTurnDiffNoticeIfNeeded(
-    conversation: Conversation,
-    editedFiles: string[],
-    tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<void> {
-    if (!conversation.openCodeSessionId || editedFiles.length === 0) {
-      return;
-    }
-
-    const latestUserMessage = [...conversation.messages]
-      .reverse()
-      .find((message) => message.role === 'user' && message.sourceMessageId);
-    if (!latestUserMessage?.sourceMessageId) {
-      return;
-    }
-
-    const diffEntries = await this.plugin.openCodeService.getSessionDiff(
-      conversation.openCodeSessionId,
-      latestUserMessage.sourceMessageId,
-    );
-    const cachedDiffEntries = this.plugin.openCodeService.getCachedSessionDiffEntries(conversation.openCodeSessionId);
-    const fallbackEntries: SessionDiffEntry[] = [...new Set(editedFiles)].map((file) => ({
-      file,
-      additions: 0,
-      deletions: 0,
-    }));
-    const entries = diffEntries.length > 0
-      ? diffEntries
-      : cachedDiffEntries.length > 0
-        ? cachedDiffEntries
-        : fallbackEntries;
-    if (entries.length === 0) {
-      return;
-    }
-
-    await this.persistentAssistantNoticeService.appendMessage({
-      title: t('chat.diffNotice.title'),
-      content: this.buildDiffNoticeMarkdown(entries),
-      tone: 'info',
-      conversation,
-      tabId,
-    });
-
-    if (tabId === this.getActiveTabId()) {
-      await this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
-    }
-  }
-
-  private buildDiffNoticeMarkdown(entries: SessionDiffEntry[]): string {
-    const lines = entries.map((entry) => {
-      const link = `[[${entry.file}]]`;
-      const stats = entry.additions > 0 || entry.deletions > 0
-        ? ` (+${entry.additions} / -${entry.deletions})`
-        : '';
-      const status = entry.status ? ` ${entry.status}` : '';
-      return `- ${link}${status}${stats}`;
-    });
-
-    return [
-      t('chat.diffNotice.description'),
-      '',
-      ...lines,
-    ].join('\n');
-  }
-
   private async appendModelUnavailableNoticeMessage(): Promise<void> {
     const { title, message } = this.getModelUnavailableNoticeContent();
     await this.persistentAssistantNoticeService.appendMessage({
@@ -4012,25 +3956,6 @@ export class OpenCodianView extends ItemView {
 
   private getModelUnavailableNoticeContent(): { title: string; message: string } {
     return this.chatSelectionControlsCoordinator.getModelUnavailableNoticeContent();
-  }
-
-  private async handleNoticeAction(
-    actionType: NonNullable<ChatMessage['noticeActions']>[number]['type'],
-  ): Promise<void> {
-    switch (actionType) {
-      case 'open_model_settings': {
-        this.openPluginSettingsPreservingScroll();
-        window.setTimeout(() => {
-          this.plugin.settingsTab?.scrollToModelSection();
-        }, 50);
-        return;
-      }
-      case 'restore_rewind':
-        await this.handleRestoreRewindRequest();
-        return;
-      default:
-        return;
-    }
   }
 
   /** Convert OpenCode stream chunk to streaming module format */
