@@ -243,7 +243,7 @@ import {
   type InputPanelAppearanceCoordinatorHost,
 } from './services/InputPanelAppearanceCoordinator';
 import {
-  type MessageFinalizationHost,
+  createMessageFinalizationHost,
   MessageFinalizationService,
 } from './services/MessageFinalizationService';
 import {
@@ -1722,7 +1722,42 @@ export class OpenCodianView extends ItemView {
       this.composerContextViewFacade.sendContext,
     );
     const messageFinalizationService = new MessageFinalizationService(
-      this.createMessageFinalizationHost(conversationRenderService),
+      createMessageFinalizationHost({
+        getCurrentConversation: () => this.currentConversation,
+        getActiveTabId: () => this.getActiveTabId(),
+        syncConversationMessagesFromCanonicalState: (conversation, tabId, reason) =>
+          this.syncConversationMessagesFromCanonicalState(conversation, tabId, reason),
+        syncConversationMessagesFromServer: (conversation, tabId, reason) =>
+          this.syncConversationMessagesFromServer(conversation, tabId, reason),
+        getConversationSyncFingerprint: (messages) =>
+          this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
+        applySyncedConversationUpdate: (previousMessages, nextMessages) =>
+          conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
+        renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+          this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
+          this.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
+        refreshTabSessionTodos: (tabId, sessionId, options) =>
+          this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
+        saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+        updateConversationSyncRuntime: (tabId, update) =>
+          this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, update),
+        clearPendingEditedFiles: (tabId) =>
+          this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId),
+        setTabNeedsAttention: (tabId, needsAttention) =>
+          this.setTabNeedsAttention(tabId, needsAttention),
+        syncActiveTabConversation: (conversation) =>
+          this.tabConversationStateBridge.syncActiveTabConversation(conversation),
+        syncActiveTabContextUsageIdentity: () =>
+          this.activeTabContextUsageCoordinator.syncIdentity(),
+        refreshActiveTabContextUsageFromServer: () =>
+          this.activeTabContextUsageCoordinator.refreshFromServer(),
+        renderStreamError: (options) =>
+          this.assistantShellViewHostAdapter.renderStreamError(options),
+        formatCurrentSessionModelId: () =>
+          this.formatModelId(this.getCurrentSessionModel()),
+        scrollToBottom: (options) => this.scrollToBottom(options),
+      }),
     );
     const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
       this.createAssistantNoticeCardRendererHost(),
@@ -2413,59 +2448,6 @@ export class OpenCodianView extends ItemView {
       showNotice: (message) => {
         new Notice(message);
       },
-    };
-  }
-
-  private createMessageFinalizationHost(
-    conversationRenderService: ConversationRenderService,
-  ): MessageFinalizationHost {
-    return {
-      getCurrentConversation: () => this.currentConversation,
-      getActiveTabId: () => this.getActiveTabId(),
-      syncConversationMessagesFromCanonicalState: (conversation, tabId, reason) =>
-        this.syncConversationMessagesFromCanonicalState(conversation, tabId, reason),
-      syncConversationMessagesFromServer: (conversation, tabId, reason) =>
-        this.syncConversationMessagesFromServer(conversation, tabId, reason),
-      getConversationSyncFingerprint: (messages) =>
-        this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
-      applySyncedConversationUpdate: (previousMessages, nextMessages) =>
-        conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
-      appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
-        this.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
-      refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
-      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
-      setConversationSyncInFlight: (tabId, value) => {
-        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
-          inFlight: value,
-        });
-      },
-      setLastConversationSyncFingerprint: (tabId, fingerprint) => {
-        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
-          fingerprint,
-        });
-      },
-      clearPendingEditedFiles: (tabId) => {
-        this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId);
-      },
-      setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
-      setActiveTabConversation: (conversation) => {
-        this.tabConversationStateBridge.syncActiveTabConversation(conversation);
-      },
-      syncActiveTabContextUsageIdentity: () => {
-        this.activeTabContextUsageCoordinator.syncIdentity();
-      },
-      refreshActiveTabContextUsageFromServer: () =>
-        this.activeTabContextUsageCoordinator.refreshFromServer(),
-      summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
-      renderStreamError: (options) =>
-        this.assistantShellViewHostAdapter.renderStreamError(options),
-      formatCurrentSessionModelId: () =>
-        this.formatModelId(this.getCurrentSessionModel()),
-      updateConversationSyncRuntime: (tabId, update) =>
-        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, update),
-      scrollToBottom: (options) => this.scrollToBottom(options),
     };
   }
 

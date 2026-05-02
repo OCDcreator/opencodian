@@ -22,6 +22,32 @@
 ## 公开接口
 
 ```typescript
+export interface MessageFinalizationHostDependencies {
+  getCurrentConversation(): Conversation | null;
+  getActiveTabId(): TabId | null;
+  syncConversationMessagesFromCanonicalState(...): Promise<MessageFinalizationSyncResult | null>;
+  syncConversationMessagesFromServer(...): Promise<MessageFinalizationSyncResult>;
+  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  applySyncedConversationUpdate(...): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  appendTurnDiffNoticeIfNeeded(...): Promise<void>;
+  refreshTabSessionTodos(...): Promise<SessionTodo[]>;
+  saveConversation(conversation: Conversation): Promise<void>;
+  updateConversationSyncRuntime(tabId, update: { inFlight?: boolean; fingerprint?: string | null }): void;
+  clearPendingEditedFiles(tabId: TabId | null): void;
+  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
+  syncActiveTabConversation(conversation: Conversation): void;
+  syncActiveTabContextUsageIdentity(): void;
+  refreshActiveTabContextUsageFromServer(): Promise<void>;
+  renderStreamError(options: AssistantErrorRenderOptions): void;
+  formatCurrentSessionModelId(): string | undefined;
+  scrollToBottom(options: { enableAutoScroll: boolean }): void;
+}
+
+export function createMessageFinalizationHost(
+  deps: MessageFinalizationHostDependencies,
+): MessageFinalizationHost;
+
 export function shouldSyncAfterStream(
   options: ShouldSyncAfterStreamOptions,
 ): boolean;
@@ -122,4 +148,16 @@ export class MessageFinalizationService {
 3. 通过 host 的 `updateConversationSyncRuntime()` 更新 sync fingerprint
 4. 通过 host 的 `scrollToBottom()` 滚动到底部
 
-`OpenCodianView` 不再拥有 `finalizeAssistantMessageWithError`、`getFriendlyServerStartErrorMessage` 或 `getUnavailableServerMessage`；全部委托到此服务。`OpenCodianView` 仅通过 `finalizeAssistantMessageWithServerError` 和 `finalizeAssistantMessageWithServerUnavailableError` 两个 wrapper 方法调用，不直接调用 `finalizeAssistantMessageWithError`。
+`OpenCodianView` 不再拥有 `createMessageFinalizationHost`、`finalizeAssistantMessageWithError`、`getFriendlyServerStartErrorMessage` 或 `getUnavailableServerMessage`；全部委托到此服务。`OpenCodianView` 仅通过 `createMessageFinalizationHost(deps)` 传入扁平依赖对象来构建 host，然后通过 `finalizeAssistantMessageWithServerError` 和 `finalizeAssistantMessageWithServerUnavailableError` 两个 wrapper 方法调用服务。
+
+### Host 组装工厂
+
+`createMessageFinalizationHost(deps)` 从扁平 `MessageFinalizationHostDependencies` 接口组装完整的 `MessageFinalizationHost`。关键映射：
+
+- `setConversationSyncInFlight(tabId, value)` → `deps.updateConversationSyncRuntime(tabId, { inFlight: value })`
+- `setLastConversationSyncFingerprint(tabId, fingerprint)` → `deps.updateConversationSyncRuntime(tabId, { fingerprint })`
+- `setActiveTabConversation(conversation)` → `deps.syncActiveTabConversation(conversation)`
+- `syncActiveTabContextUsageIdentity()` → `deps.syncActiveTabContextUsageIdentity()`
+- `summarizeChatMessageForDebug` → 直接使用从 `SendPipelineDebugSummaries` 导入的纯函数
+
+`OpenCodianView` 不再拥有 `createMessageFinalizationHost` 私有方法；组装逻辑完全在此服务文件中。

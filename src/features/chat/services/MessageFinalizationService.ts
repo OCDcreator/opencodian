@@ -4,6 +4,7 @@ import type {
   SessionTodo,
 } from '../../../core/types';
 import { t } from '../../../i18n';
+import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { TabId } from '../tabs';
 
 export interface ShouldSyncAfterStreamOptions {
@@ -100,6 +101,92 @@ export interface MessageFinalizationHost {
   formatCurrentSessionModelId(): string | undefined;
   updateConversationSyncRuntime(tabId: TabId | null, update: { fingerprint?: string | null }): void;
   scrollToBottom(options: { enableAutoScroll: boolean }): void;
+}
+
+export interface MessageFinalizationHostDependencies {
+  getCurrentConversation(): Conversation | null;
+  getActiveTabId(): TabId | null;
+  syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason: string,
+  ): Promise<MessageFinalizationSyncResult | null>;
+  syncConversationMessagesFromServer(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason: string,
+  ): Promise<MessageFinalizationSyncResult>;
+  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  applySyncedConversationUpdate(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  appendTurnDiffNoticeIfNeeded(
+    conversation: Conversation,
+    editedFiles: string[],
+    tabId?: TabId | null,
+  ): Promise<void>;
+  refreshTabSessionTodos(
+    tabId: TabId | null,
+    sessionId: string | undefined,
+    options: { suppressErrors?: boolean },
+  ): Promise<SessionTodo[]>;
+  saveConversation(conversation: Conversation): Promise<void>;
+  updateConversationSyncRuntime(tabId: TabId | null, update: { inFlight?: boolean; fingerprint?: string | null }): void;
+  clearPendingEditedFiles(tabId: TabId | null): void;
+  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
+  syncActiveTabConversation(conversation: Conversation): void;
+  syncActiveTabContextUsageIdentity(): void;
+  refreshActiveTabContextUsageFromServer(): Promise<void>;
+  renderStreamError(options: AssistantErrorRenderOptions): void;
+  formatCurrentSessionModelId(): string | undefined;
+  scrollToBottom(options: { enableAutoScroll: boolean }): void;
+}
+
+export function createMessageFinalizationHost(
+  deps: MessageFinalizationHostDependencies,
+): MessageFinalizationHost {
+  return {
+    getCurrentConversation: () => deps.getCurrentConversation(),
+    getActiveTabId: () => deps.getActiveTabId(),
+    syncConversationMessagesFromCanonicalState: (conversation, tabId, reason) =>
+      deps.syncConversationMessagesFromCanonicalState(conversation, tabId, reason),
+    syncConversationMessagesFromServer: (conversation, tabId, reason) =>
+      deps.syncConversationMessagesFromServer(conversation, tabId, reason),
+    getConversationSyncFingerprint: (messages) =>
+      deps.getConversationSyncFingerprint(messages),
+    applySyncedConversationUpdate: (previousMessages, nextMessages) =>
+      deps.applySyncedConversationUpdate(previousMessages, nextMessages),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+      deps.renderBackgroundTaskIndicatorIfNeeded(tabId),
+    appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
+      deps.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
+    refreshTabSessionTodos: (tabId, sessionId, options) =>
+      deps.refreshTabSessionTodos(tabId, sessionId, options),
+    saveConversation: (conversation) => deps.saveConversation(conversation),
+    setConversationSyncInFlight: (tabId, value) => {
+      deps.updateConversationSyncRuntime(tabId, { inFlight: value });
+    },
+    setLastConversationSyncFingerprint: (tabId, fingerprint) => {
+      deps.updateConversationSyncRuntime(tabId, { fingerprint });
+    },
+    clearPendingEditedFiles: (tabId) => deps.clearPendingEditedFiles(tabId),
+    setTabNeedsAttention: (tabId, needsAttention) =>
+      deps.setTabNeedsAttention(tabId, needsAttention),
+    setActiveTabConversation: (conversation) =>
+      deps.syncActiveTabConversation(conversation),
+    syncActiveTabContextUsageIdentity: () =>
+      deps.syncActiveTabContextUsageIdentity(),
+    refreshActiveTabContextUsageFromServer: () =>
+      deps.refreshActiveTabContextUsageFromServer(),
+    summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
+    renderStreamError: (options) => deps.renderStreamError(options),
+    formatCurrentSessionModelId: () => deps.formatCurrentSessionModelId(),
+    updateConversationSyncRuntime: (tabId, update) =>
+      deps.updateConversationSyncRuntime(tabId, update),
+    scrollToBottom: (options) => deps.scrollToBottom(options),
+  };
 }
 
 export function getFriendlyServerStartErrorMessage(error: unknown): string {
