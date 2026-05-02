@@ -43,6 +43,11 @@ export class MessageFinalizationService {
     contentEl: HTMLElement,
     errorMessage: string,
   ): Promise<void>;
+  finalizeAssistantMessageWithServerError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    error: unknown,
+  ): Promise<void>;
 }
 ```
 

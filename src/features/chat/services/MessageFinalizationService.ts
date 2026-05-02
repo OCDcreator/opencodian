@@ -331,4 +331,16 @@ export class MessageFinalizationService {
 
     this.host.scrollToBottom({ enableAutoScroll: true });
   }
+
+  async finalizeAssistantMessageWithServerError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    error: unknown,
+  ): Promise<void> {
+    await this.finalizeAssistantMessageWithError(
+      messageEl,
+      contentEl,
+      getFriendlyServerStartErrorMessage(error),
+    );
+  }
 }

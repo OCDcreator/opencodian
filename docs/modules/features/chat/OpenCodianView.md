@@ -574,7 +574,7 @@ background task notice 这条子链路现在的边界是：
 - `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
 - `AssistantShellViewHostAdapter` / `AssistantShellRenderer` / `AssistantNoticeRenderer` / `AssistantErrorRenderer` / `AssistantPlainTextFallbackRenderer` / `AssistantStructuredContentRenderer` / `StreamingInlineCardRenderer` / `PermissionInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
 - `MessageSendPreparationService`：`sendMessage()` 前半段的 send preflight、optimistic user message 落地，以及 stream-enter 状态编排
-- `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排，以及 server-start 助手错误终结流（`finalizeAssistantMessageWithError`、`getFriendlyServerStartErrorMessage`）
+- `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排，以及 server-start 助手错误终结流（`finalizeAssistantMessageWithError`、`finalizeAssistantMessageWithServerError`）；错误分类逻辑（`getFriendlyServerStartErrorMessage`）也由该服务内部持有，`OpenCodianView` 不再直接引用
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新

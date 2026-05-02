@@ -629,3 +629,50 @@ describe('MessageFinalizationService.finalizeAssistantMessageWithError', () => {
     expect(host.scrollToBottom).toHaveBeenCalled();
   });
 });
+
+describe('MessageFinalizationService.finalizeAssistantMessageWithServerError', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('classifies server error and delegates to finalizeAssistantMessageWithError', async () => {
+    const conversation = createConversation([]);
+    const host = createHost(conversation);
+    const service = new MessageFinalizationService(host);
+    const messageEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+
+    await service.finalizeAssistantMessageWithServerError(
+      messageEl,
+      contentEl,
+      new Error('opencode not found in PATH'),
+    );
+
+    expect(host.renderStreamError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageEl,
+        contentEl,
+        modelId: 'test-model',
+      }),
+    );
+    expect(host.renderStreamError.mock.calls[0][0].content).not.toBe('opencode not found in PATH');
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+    expect(host.scrollToBottom).toHaveBeenCalledWith({ enableAutoScroll: true });
+  });
+
+  it('classifies port-in-use errors through delegation', async () => {
+    const conversation = createConversation([]);
+    const host = createHost(conversation);
+    const service = new MessageFinalizationService(host);
+
+    await service.finalizeAssistantMessageWithServerError(
+      document.createElement('div'),
+      document.createElement('div'),
+      new Error('Port 4096 already in use'),
+    );
+
+    const renderedContent = host.renderStreamError.mock.calls[0][0].content;
+    expect(renderedContent).not.toContain('Port 4096 already in use');
+    expect(renderedContent.length).toBeGreaterThan(0);
+  });
+});

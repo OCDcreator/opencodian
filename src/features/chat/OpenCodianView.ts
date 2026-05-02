@@ -246,7 +246,6 @@ import {
   type InputPanelAppearanceCoordinatorHost,
 } from './services/InputPanelAppearanceCoordinator';
 import {
-  getFriendlyServerStartErrorMessage,
   type MessageFinalizationHost,
   MessageFinalizationService,
 } from './services/MessageFinalizationService';
@@ -3287,10 +3286,10 @@ export class OpenCodianView extends ItemView {
     } catch (error) {
       logger.error('Failed to start server from chat prompt:', error);
       await this.refreshStatusSurfaces();
-      await this.messageFinalizationService.finalizeAssistantMessageWithError(
+      await this.messageFinalizationService.finalizeAssistantMessageWithServerError(
         messageEl,
         contentEl,
-        getFriendlyServerStartErrorMessage(error)
+        error
       );
       return false;
     }
