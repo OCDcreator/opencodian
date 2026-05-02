@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 8
-- current_task: view-srp8-03
-- last_verified_source_commit: d961b9a6 (move host callback assembly into createMessageSendPreparationHost factory)
+- round: 9
+- current_task: view-srp9-03
+- last_verified_source_commit: 175c62f9 (move conversation render host assembly into ConversationRenderService owner)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
 - queue_state: completed
 - next_focus: none — queue complete
@@ -529,3 +529,73 @@ OpenCodianView.ts: 5314 → 3745 lines (**−1569 lines**, **29.5% reduction**)
 - remaining inline event handlers that reference `this.app` or `this.plugin` directly
 - conversation load/hydration bridge assembly (intertwined with tab lifecycle recovery)
 - tab state management delegation (central to view identity, unsafe to fragment)
+
+## Round 9 — Ninth SRP Batch (Host-Assembly Factory Pattern)
+
+### view-srp9-01 — Move slash command execution host assembly into SlashCommandExecutionService (DONE)
+- Added `SlashCommandExecutionHostDependencies` flat interface grouping raw view service references
+- Added `createSlashCommandExecutionHost()` factory: assembles all 18 host callbacks from deps object
+- Removed 52-line `createSlashCommandExecutionHost` private method from OpenCodianView
+- View now passes raw dependencies object (service refs + simple lambdas) instead of assembling host inline
+- **Measured**: OpenCodianView.ts 3745→3721 lines (**−24 lines**, diff: +32/−56)
+- Destination: `src/features/chat/services/SlashCommandExecutionService.ts` (361 lines, +18 lines)
+- 3 new tests for factory assembly
+
+### view-srp9-02 — Move conversation render host assembly into ConversationRenderService owner (DONE)
+- Added `ConversationRenderHostDependencies` flat interface grouping raw view service references
+- Added `createConversationRenderHost()` factory: assembles complete `ConversationRenderHost` including shell/tail render ports and debug callbacks
+- Removed `createConversationRenderHost`, `createConversationAssistantShellRenderPort`, `createConversationAssistantTailRenderPort` private methods from OpenCodianView (~90 lines)
+- View now passes flat dependency object with all callback wiring; factory assembles the 30+ host methods internally
+- **Measured**: OpenCodianView.ts 3721→3691 lines (**−30 lines**, diff: +66/−96)
+- Destination: `src/features/chat/services/ConversationRenderService.ts` (508 lines, +124 lines)
+- 1 comprehensive factory assembly test
+
+### view-srp9-03 — Finalize ninth SRP batch with measured docs and full verification (DONE)
+- Ran `npm run verify` — all gates pass:
+  - module-docs: pass (385 source modules, 385 mapped docs)
+  - graphify: pass (fresh)
+  - devlog-order: pass
+  - lint: pass (0 errors, 4 pre-existing warnings in files outside task scope)
+  - typecheck: clean
+  - tests: 2013 pass
+  - build: OK
+- Updated lane status doc with Round 9 results
+
+### Round 9 Net Impact
+
+OpenCodianView.ts: 3745 → 3691 lines (**−54 lines**)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp9-01 | −24 (3745→3721) | SlashCommandExecutionService (services/, 361 lines) |
+| view-srp9-02 | −30 (3721→3691) | ConversationRenderService (services/, 508 lines) |
+| **Round 9 Total** | **−54** | **2 extended owners** |
+
+### Why This Round Is Substantive (Not a Thin Helper Split)
+
+The host-assembly factory moves are substantive because:
+
+1. **SlashCommandExecutionService** now owns the complete slash command host assembly lifecycle: `createSlashCommandExecutionHost()` wires 18 callbacks through `SlashCommandExecutionHostDependencies`, including tab resolution, conversation query, message preparation delegation, stream error handling, question resolution, and server readiness. Previously this 52-line wiring block was a private method in OpenCodianView that directly accessed `this.*` for every callback.
+
+2. **ConversationRenderService** now owns the complete render host assembly lifecycle: `createConversationRenderHost()` wires 30+ callbacks through `ConversationRenderHostDependencies`, including the nested shell/tail render port creation, debug callback spreading, and all render orchestration callbacks. Previously this 90-line block was three private methods in OpenCodianView.
+
+3. **No new helper modules introduced**: Both destinations were existing owners extended with same-domain responsibilities. The factory pattern follows the established `createXxxHost(deps)` pattern used across the codebase.
+
+4. **`createConversationRenderHost` is not a thin adapter**: It internally creates `ConversationAssistantShellRenderPort` and `ConversationAssistantTailRenderPort` by mapping adapter methods to the narrower port interfaces, adds `clearMessagesContainer()` using `deps.getMessagesContainer()?.empty()`, spreads `createDebugLogCallbacks()`, and binds `summarizeChatMessageForDebug` — non-trivial assembly logic.
+
+### Cumulative Impact (Rounds 1–9)
+
+OpenCodianView.ts: 5314 → 3691 lines (**−1623 lines**, **30.5% reduction**)
+
+| Round | Actual Δ | Measured Before→After | Destinations |
+|-------|----------|----------------------|-------------|
+| Round 1 (view-17 to view-20) | −343 | 5314→4971 | 4 existing owners |
+| Round 2 (view-srp2-01 to view-srp2-04) | −534 | 4971→4437 | 4 owners (3 new, 1 extended) |
+| Round 3 (view-srp3-01 to view-srp3-04) | −229 | 4437→4208 | 6 owners (2 new, 4 extended) |
+| Round 4 (view-srp4-01 to view-srp4-02) | −125 | 4208→4083 | 1 new owner (ConversationNoticeCoordinator) |
+| Round 5 (view-srp5-01 to view-srp5-02) | −129 | 4083→3954 | 3 owners (0 new, 3 extended) |
+| Round 6 (view-srp6-01) | −54 | 3954→3900 | 1 extended owner (MessageFinalizationService) |
+| Round 7 (view-srp7-01 to view-srp7-02) | −17 | 3900→3883 | 2 extended owners |
+| Round 8 (view-srp8-01 to view-srp8-02) | −138 | 3883→3745 | 1 extended owner (MessageSendPreparationService) |
+| Round 9 (view-srp9-01 to view-srp9-02) | −54 | 3745→3691 | 2 extended owners (SlashCommandExecutionService, ConversationRenderService) |
+| **Grand Total** | **−1623** | **5314→3691** | **20 distinct owners** |
