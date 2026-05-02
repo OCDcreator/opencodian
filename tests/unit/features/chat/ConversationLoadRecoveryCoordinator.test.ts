@@ -378,11 +378,34 @@ describe('ConversationLoadRecoveryCoordinator forking', () => {
 });
 
 describe('createConversationLoadRecoveryHost factory', () => {
-  function createDeps(
-    overrides: Partial<MockedConversationLoadRecoveryHost> = {},
-  ): MockedConversationLoadRecoveryHost & ConversationLoadRecoveryHostDependencies {
+  const mockApp = {} as never;
+
+  function createFactoryDeps(
+    overrides: Partial<ConversationLoadRecoveryHostDependencies> = {},
+  ): ConversationLoadRecoveryHostDependencies {
     return {
-      ...createHost(createConversation('factory-test'), overrides),
+      isActiveTabStreaming: jest.fn(() => false),
+      getCurrentConversation: jest.fn(() => createConversation('factory-test')),
+      getTabManager: jest.fn(() => null),
+      getMaxTabs: jest.fn(() => 4),
+      getPersistedTabState: jest.fn().mockReturnValue({
+        tabs: [],
+        activeTabIndex: 0,
+      }),
+      setPersistedTabState: jest.fn(),
+      persistTabState: jest.fn(),
+      loadConversations: jest.fn().mockResolvedValue(undefined),
+      getConversations: jest.fn().mockReturnValue([]),
+      createConversation: jest.fn().mockResolvedValue(createConversation('created')),
+      app: mockApp,
+      revertSession: jest.fn().mockResolvedValue(true),
+      unrevertSession: jest.fn().mockResolvedValue(true),
+      forkSession: jest.fn().mockResolvedValue({ id: 'fork-session' }),
+      createConversationFromSession: jest.fn().mockResolvedValue(createConversation('forked')),
+      deleteConversation: jest.fn().mockResolvedValue(undefined),
+      syncActiveTabConversation: jest.fn(),
+      updateModelSelectorDisplay: jest.fn(),
+      ...overrides,
     };
   }
 
@@ -391,7 +414,7 @@ describe('createConversationLoadRecoveryHost factory', () => {
   });
 
   it('delegates isActiveTabStreaming to the provided dependency', () => {
-    const deps = createDeps({ isActiveTabStreaming: jest.fn(() => true) });
+    const deps = createFactoryDeps({ isActiveTabStreaming: jest.fn(() => true) });
     const host = createConversationLoadRecoveryHost(deps);
 
     expect(host.isActiveTabStreaming()).toBe(true);
@@ -400,7 +423,7 @@ describe('createConversationLoadRecoveryHost factory', () => {
 
   it('delegates getCurrentConversation to the provided dependency', () => {
     const conversation = createConversation('factory-conv');
-    const deps = createDeps({ getCurrentConversation: jest.fn(() => conversation) });
+    const deps = createFactoryDeps({ getCurrentConversation: jest.fn(() => conversation) });
     const host = createConversationLoadRecoveryHost(deps);
 
     expect(host.getCurrentConversation()).toBe(conversation);
@@ -409,7 +432,7 @@ describe('createConversationLoadRecoveryHost factory', () => {
 
   it('delegates revertSession with the correct arguments', async () => {
     const revertSession = jest.fn().mockResolvedValue(true);
-    const deps = createDeps({ revertSession });
+    const deps = createFactoryDeps({ revertSession });
     const host = createConversationLoadRecoveryHost(deps);
 
     const result = await host.revertSession('session-1', 'message-1');
@@ -420,7 +443,7 @@ describe('createConversationLoadRecoveryHost factory', () => {
   it('delegates createConversationFromSession with initial state', async () => {
     const forked = createConversation('forked-from-factory');
     const createFromSession = jest.fn().mockResolvedValue(forked);
-    const deps = createDeps({ createConversationFromSession: createFromSession });
+    const deps = createFactoryDeps({ createConversationFromSession: createFromSession });
     const host = createConversationLoadRecoveryHost(deps);
 
     const initial = { title: 'Test', messages: [] };
@@ -431,19 +454,21 @@ describe('createConversationLoadRecoveryHost factory', () => {
 
   it('delegates persistTabState with options', () => {
     const persistTabState = jest.fn();
-    const deps = createDeps({ persistTabState });
+    const deps = createFactoryDeps({ persistTabState });
     const host = createConversationLoadRecoveryHost(deps);
 
     host.persistTabState({ flush: true });
     expect(persistTabState).toHaveBeenCalledWith({ flush: true });
   });
 
-  it('delegates showNotice to the provided dependency', () => {
-    const showNotice = jest.fn();
-    const deps = createDeps({ showNotice });
+  it('resets persisted tab state by calling setPersistedTabState with default state', () => {
+    const setPersistedTabState = jest.fn();
+    const deps = createFactoryDeps({ setPersistedTabState });
     const host = createConversationLoadRecoveryHost(deps);
 
-    host.showNotice('test notice');
-    expect(showNotice).toHaveBeenCalledWith('test notice');
+    host.resetPersistedTabState();
+    expect(setPersistedTabState).toHaveBeenCalledTimes(1);
+    const calledWith = setPersistedTabState.mock.calls[0]![0];
+    expect(calledWith).toEqual({ tabs: [], activeTabIndex: 0 });
   });
 });

@@ -1,15 +1,18 @@
+import { Notice } from 'obsidian';
+
 import type {
   ChatMessage,
   Conversation,
   PersistedTabState,
 } from '../../../core/types';
+import { getDefaultPersistedTabState } from '../../../core/types';
 import { t } from '../../../i18n';
 import {
   createLogger,
   formatDurationMs,
   getPerformanceTimestampMs,
 } from '../../../shared';
-import type { ForkTarget } from '../../../shared/modals';
+import { chooseForkTarget, type ForkTarget } from '../../../shared/modals';
 import { cloneMessagesBeforeForkTarget } from '../forkMessages';
 import type {
   RestoredTabState,
@@ -66,6 +69,8 @@ export interface ConversationLoadRecoveryHost {
   showNotice(message: string): void;
 }
 
+import type { App } from 'obsidian';
+
 /** Flat dependency object passed from OpenCodianView to assemble a ConversationLoadRecoveryHost. */
 export interface ConversationLoadRecoveryHostDependencies {
   isActiveTabStreaming(): boolean;
@@ -73,13 +78,12 @@ export interface ConversationLoadRecoveryHostDependencies {
   getTabManager(): ConversationLoadRecoveryTabManager | null;
   getMaxTabs(): number;
   getPersistedTabState(): PersistedTabState;
-  resetPersistedTabState(): void;
+  setPersistedTabState(state: PersistedTabState): void;
   persistTabState(options?: { flush?: boolean }): void;
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
   createConversation(): Promise<Conversation>;
-  chooseForkTarget(): Promise<ForkTarget | null>;
-  confirmRewind(): boolean;
+  app: App;
   revertSession(sessionId: string, messageId: string): Promise<boolean>;
   unrevertSession(sessionId: string): Promise<boolean>;
   forkSession(sessionId: string, messageId: string): Promise<{ id: string }>;
@@ -90,7 +94,6 @@ export interface ConversationLoadRecoveryHostDependencies {
   deleteConversation(conversationId: string): Promise<void>;
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
-  showNotice(message: string): void;
 }
 
 export function createConversationLoadRecoveryHost(
@@ -102,13 +105,15 @@ export function createConversationLoadRecoveryHost(
     getTabManager: () => deps.getTabManager(),
     getMaxTabs: () => deps.getMaxTabs(),
     getPersistedTabState: () => deps.getPersistedTabState(),
-    resetPersistedTabState: () => deps.resetPersistedTabState(),
+    resetPersistedTabState: () => {
+      deps.setPersistedTabState(getDefaultPersistedTabState());
+    },
     persistTabState: (options) => deps.persistTabState(options),
     loadConversations: () => deps.loadConversations(),
     getConversations: () => deps.getConversations(),
     createConversation: () => deps.createConversation(),
-    chooseForkTarget: () => deps.chooseForkTarget(),
-    confirmRewind: () => deps.confirmRewind(),
+    chooseForkTarget: () => chooseForkTarget(deps.app),
+    confirmRewind: () => window.confirm(t('chat.rewind.confirm')),
     revertSession: (sessionId, messageId) => deps.revertSession(sessionId, messageId),
     unrevertSession: (sessionId) => deps.unrevertSession(sessionId),
     forkSession: (sessionId, messageId) => deps.forkSession(sessionId, messageId),
@@ -117,7 +122,9 @@ export function createConversationLoadRecoveryHost(
     deleteConversation: (conversationId) => deps.deleteConversation(conversationId),
     syncActiveTabConversation: (conversation) => deps.syncActiveTabConversation(conversation),
     updateModelSelectorDisplay: () => deps.updateModelSelectorDisplay(),
-    showNotice: (message) => deps.showNotice(message),
+    showNotice: (message) => {
+      new Notice(message);
+    },
   };
 }
 

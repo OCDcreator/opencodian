@@ -18,7 +18,6 @@ import {
 import {
   type ChatMessage,
   type Conversation,
-  getDefaultPersistedTabState,
   type PromptContextItem,
   type QuestionRequest,
   type QuestionResolution,
@@ -36,7 +35,6 @@ import {
   getVaultBasePath,
   isInternalStructuredOutputTool,
 } from '../../shared';
-import { chooseForkTarget } from '../../shared/modals';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import {
@@ -1603,8 +1601,8 @@ export class OpenCodianView extends ItemView {
         getTabManager: () => this.tabManager,
         getMaxTabs: () => this.plugin.settings.maxTabs,
         getPersistedTabState: () => this.plugin.settings.tabState,
-        resetPersistedTabState: () => {
-          this.plugin.settings.tabState = getDefaultPersistedTabState();
+        setPersistedTabState: (state) => {
+          this.plugin.settings.tabState = state;
         },
         persistTabState: (options) => {
           this.persistTabState(options);
@@ -1612,8 +1610,7 @@ export class OpenCodianView extends ItemView {
         loadConversations: () => this.plugin.loadConversations(),
         getConversations: () => this.plugin.getConversations(),
         createConversation: () => this.plugin.createConversation(),
-        chooseForkTarget: () => chooseForkTarget(this.app),
-        confirmRewind: () => window.confirm(t('chat.rewind.confirm')),
+        app: this.app,
         revertSession: (sessionId, messageId) =>
           this.plugin.openCodeService.revertSession(sessionId, messageId),
         unrevertSession: (sessionId) =>
@@ -1629,9 +1626,6 @@ export class OpenCodianView extends ItemView {
         },
         updateModelSelectorDisplay: () => {
           this.updateModelSelectorDisplay();
-        },
-        showNotice: (message) => {
-          new Notice(message);
         },
       }),
       {

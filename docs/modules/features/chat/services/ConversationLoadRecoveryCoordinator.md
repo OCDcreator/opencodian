@@ -41,7 +41,28 @@ export interface ConversationLoadRecoveryHost {
   showNotice(message: string): void;
 }
 
-export interface ConversationLoadRecoveryHostDependencies { /* same shape as Host */ }
+export interface ConversationLoadRecoveryHostDependencies {
+  isActiveTabStreaming(): boolean;
+  getCurrentConversation(): Conversation | null;
+  getTabManager(): ConversationLoadRecoveryTabManager | null;
+  getMaxTabs(): number;
+  getPersistedTabState(): PersistedTabState;
+  setPersistedTabState(state: PersistedTabState): void;
+  persistTabState(options?: { flush?: boolean }): void;
+  loadConversations(): Promise<void>;
+  getConversations(): Conversation[];
+  createConversation(): Promise<Conversation>;
+  app: App;  // factory absorbs chooseForkTarget(app)
+  revertSession(sessionId: string, messageId: string): Promise<boolean>;
+  unrevertSession(sessionId: string): Promise<boolean>;
+  forkSession(sessionId: string, messageId: string): Promise<{ id: string }>;
+  createConversationFromSession(...): Promise<Conversation>;
+  deleteConversation(conversationId: string): Promise<void>;
+  syncActiveTabConversation(conversation: Conversation): void;
+  updateModelSelectorDisplay(): void;
+  // factory absorbs: showNotice → new Notice(), confirmRewind → window.confirm(t(...)),
+  //                  chooseForkTarget → chooseForkTarget(app), resetPersistedTabState → getDefaultPersistedTabState()
+}
 
 export function createConversationLoadRecoveryHost(
   deps: ConversationLoadRecoveryHostDependencies,
@@ -87,7 +108,8 @@ export class ConversationLoadRecoveryCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 不再拥有 `createConversationLoadRecoveryHost` 私有方法；host 组装已通过 `createConversationLoadRecoveryHost(deps)` 工厂函数集中到此 coordinator 文件
-- `OpenCodianView` 现在只传入扁平依赖对象（`ConversationLoadRecoveryHostDependencies`），由工厂函数组装成 `ConversationLoadRecoveryHost`
+- 工厂函数吸收了四项组装逻辑：`showNotice`（直接 `new Notice`）、`confirmRewind`（直接 `window.confirm(t(...))`）、`chooseForkTarget`（直接调用 `chooseForkTarget(app)`）、`resetPersistedTabState`（使用 `getDefaultPersistedTabState()` + setter）
+- `OpenCodianView` 传入更低层级的扁平依赖对象（含 `app`、`setPersistedTabState` 等），不再传入 `chooseForkTarget` / `confirmRewind` / `showNotice` / `resetPersistedTabState` 回调
 - `ConversationLoadRecoveryCoordinator` 负责把 create/load/bootstrap/delete-recovery/fork/rewind 入口拼成一条可读的 lifecycle surface，并直接承接 first-open / persisted-restore 决策
 - `ConversationViewStateService`、`ConversationTabOpenCoordinator` 与 `ConversationTabLifecycleRecoveryCoordinator` 继续各自保有更细的 activation / open / delete 语义
 - 因此后续若继续推进相邻 residual，只需要沿这个 coordinator surface 往下收，而不必重新回到 `OpenCodianView` 里寻找分散入口
