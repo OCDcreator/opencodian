@@ -139,7 +139,7 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 - New runtime owns: `getConversationSyncFingerprint`, `getInterruptedSyncPreservationLogFingerprint`, `getMessageVisualSignature`, `getMessagesForRender`, `shouldRenderConversationMessage`, `isBackgroundTaskCompletionReminder`
 - Host interface provides: `getCanonicalConversationFingerprint` (canonical fallback), `getActiveTabId` (compaction injection), `getTabContextUsage` (compaction injection)
 - Removed `renderGroups` import block from OpenCodianView (moved to runtime)
-- OpenCodianView.ts reduced by ~120 lines (4437→4317)
+- **Measured**: OpenCodianView.ts 4437→4317 lines (**−120 lines**, diff: +41/−161)
 - Destination: `src/features/chat/services/ConversationIdentityRuntime.ts` (167 lines)
 - 26 tests across 2 files (fingerprint/signature + render/visibility)
 
@@ -149,7 +149,7 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 - Removed `scheduleSettledScrollToBottomIfNeeded` from `TabMessagesPaneCoordinatorHost`
 - OpenCodianView no longer owns `scrollToBottomFrameId`; delegates to `SettledScrollScheduler`
 - Removed dead `isNearBottom()` method from OpenCodianView
-- OpenCodianView.ts reduced by ~50 lines (4317→4267)
+- **Measured**: OpenCodianView.ts 4317→4300 lines (**−17 lines**, diff: +6/−23)
 - Destinations: `ScrollManager.ts` (173 lines), `TabMessagesPaneCoordinator.ts` (331 lines)
 - 4 new tests for `SettledScrollScheduler` + updated coordinator tests with mock scheduler
 
@@ -157,7 +157,7 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 - Moved `getSendMessageOptions`, `getReasoningOptionsForModel`, `appendModelUnavailableNoticeMessage`, `getModelUnavailableNoticeContent` to `ModelSelectionRuntime`/`ChatSelectionControlsCoordinator`
 - Added `getEffortLevel`/`getThinkingBudget` to `ModelSelectionRuntimeHost` so runtime uses `isAdaptiveThinkingModel` directly
 - Added `appendModelUnavailableNoticeMessage` to `ChatSelectionControlsCoordinatorHost` for notice delegation through host seam
-- OpenCodianView.ts reduced by ~59 lines (4267→4208)
+- OpenCodianView.ts reduced by ~50 lines (estimated; merged with view-srp3-04 into single commit 4300→4206)
 - Destinations: `ModelSelectionRuntime.ts` (307 lines), `ChatSelectionControlsCoordinator.ts` (447 lines)
 - 3 new tests for `getSendMessageOptions` covering empty, thinking budget, reasoning effort
 
@@ -166,9 +166,10 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 - Replaced 3 private demo controller fields in OpenCodianView with single coordinator
 - Public toggle methods now one-line delegates using `?.` for null safety
 - Coordinator initialized in `buildUI()` after `messagesShellEl` creation; Notice and log behavior delegated through host interface (`showNotice`, `logWarn`) — coordinator has zero obsidian/shared direct imports
-- OpenCodianView.ts reduced by ~100 lines
+- **Measured**: OpenCodianView.ts 4300→4208 lines (**−92 lines** after initial + fix; diff: +15/−107 across both commits)
 - Destination: `src/features/chat/services/ChatVisualDemoCoordinator.ts` (129 lines)
 - 14 coordinator tests with full mock isolation including host notice/log delegation verification
+- *Note: view-srp3-03 and view-srp3-04 were committed together (a097ec93 + 68371bc4) because the view-srp3-04 worktree was based on the pre-view-srp3-03 state; their combined measured Δ is −92 lines from 4300 to 4208*
 
 ### view-srp3-05 — Finalize third SRP batch with docs and verification (DONE)
 - Ran `npm run verify` — all gates pass:
@@ -186,24 +187,25 @@ OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
 
 OpenCodianView.ts: 4437 → 4208 lines (**−229 lines**)
 
-| Task | Lines Removed | Destination |
-|------|---------------|-------------|
-| view-srp3-01 | ~120 | ConversationIdentityRuntime (services/, 167 lines) |
-| view-srp3-02 | ~50 | ScrollManager (services/, 173 lines) + TabMessagesPaneCoordinator (extended) |
-| view-srp3-03 | ~59 | ModelSelectionRuntime (services/, 307 lines) + ChatSelectionControlsCoordinator (extended) |
-| view-srp3-04 | ~100 | ChatVisualDemoCoordinator (services/, 129 lines) |
-| **Round 3 Total** | **~229** | **6 owners (2 new, 4 extended)** |
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp3-01 | −120 (4437→4317) | ConversationIdentityRuntime (services/, 167 lines) |
+| view-srp3-02 | −17 (4317→4300) | ScrollManager (services/, 173 lines) + TabMessagesPaneCoordinator (extended) |
+| view-srp3-03 | ~−50 (est., merged with view-srp3-04) | ModelSelectionRuntime (services/, 307 lines) + ChatSelectionControlsCoordinator (extended) |
+| view-srp3-04 | ~−42 (est., merged with view-srp3-04) | ChatVisualDemoCoordinator (services/, 129 lines) |
+| **view-srp3-03 + view-srp3-04** | **−92 (4300→4208)** | **combined in single commit chain** |
+| **Round 3 Total** | **−229** | **6 owners (2 new, 4 extended)** |
 
 ### Cumulative Impact (Rounds 1 + 2 + 3)
 
 OpenCodianView.ts: 5314 → 4208 lines (**−1106 lines**, **20.8% reduction**)
 
-| Round | Actual Δ | Per-task Estimates | Destinations |
-|-------|----------|--------------------|-------------|
-| Round 1 (view-17 to view-20) | −343 (5314→4971) | ~120+~55+~30+~45=~250 | 4 existing owners |
-| Round 2 (view-srp2-01 to view-srp2-04) | −534 (4971→4437) | ~120+~175+~155+~84=~534 | 4 owners (3 new, 1 extended) |
-| Round 3 (view-srp3-01 to view-srp3-04) | −229 (4437→4208) | ~120+~50+~59+~100=~329 | 6 owners (2 new, 4 extended) |
-| **Grand Total** | **−1106** | *per-task sums undercount Round 1 by ~93 lines due to inline cleanup, import removal, and dead-code elimination* | **11 distinct owners** |
+| Round | Actual Δ | Measured Before→After | Destinations |
+|-------|----------|----------------------|-------------|
+| Round 1 (view-17 to view-20) | −343 | 5314→4971 | 4 existing owners |
+| Round 2 (view-srp2-01 to view-srp2-04) | −534 | 4971→4437 | 4 owners (3 new, 1 extended) |
+| Round 3 (view-srp3-01 to view-srp3-04) | −229 | 4437→4208 | 6 owners (2 new, 4 extended) |
+| **Grand Total** | **−1106** | **5314→4208** | **11 distinct owners** |
 
 ### No Thin Helper Modules Introduced
 
