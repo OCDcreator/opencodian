@@ -4,6 +4,11 @@ import {
   type TabActivationRuntimeBridgeHosts,
   type TabActivationRuntimeHostAdapterHost,
 } from '../runtime/TabActivationRuntimeHostAdapter';
+import { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
+import { TabConversationStateBridge } from '../runtime/TabConversationStateBridge';
+import { TabRuntimeStateBridge } from '../runtime/TabRuntimeStateBridge';
+import { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
+import { createTabActivationRuntimeViewHostFactoryHost, type TabActivationRuntimeHostProviderHost } from './TabActivationRuntimeHostProvider';
 
 export interface TabActivationConversationSyncRuntimePort {
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
@@ -161,4 +166,77 @@ export function createTabActivationRuntimeViewHosts(
       host.getViewWriteback().scheduleSettledScrollToBottom(tabId);
     },
   });
+}
+
+type AssemblyFocusContextPreviewPort = Pick<
+  import('../services/FocusContextPreviewCoordinator').FocusContextPreviewCoordinator,
+  'refreshActiveFocusContextPreview'
+>;
+
+type AssemblyQuestionTodoActivationPort = Pick<
+  import('../services/QuestionTodoActivationRefreshCoordinator').QuestionTodoActivationRefreshCoordinator,
+  'applyActivationPreflight' | 'applyConversationActivation' | 'applyEmptyActivation'
+>;
+
+type AssemblyBackgroundTaskActivationPort = Pick<
+  import('../services/BackgroundTaskActivationIndicatorCoordinator').BackgroundTaskActivationIndicatorCoordinator,
+  | 'prepareOpenConversation'
+  | 'syncOpenConversationState'
+  | 'renderLoadedConversationIndicator'
+  | 'renderOpenConversationIndicator'
+>;
+
+type AssemblyActiveTabContextUsagePort = Pick<
+  import('../services/ActiveTabContextUsageCoordinator').ActiveTabContextUsageCoordinator,
+  'syncIdentity' | 'refreshFromServer'
+>;
+
+export interface TabActivationRuntimeAssemblyDeps {
+  hostProviderHost: TabActivationRuntimeHostProviderHost;
+  focusPreviewRefresh: AssemblyFocusContextPreviewPort;
+  questionTodoActivationRefresh: AssemblyQuestionTodoActivationPort;
+  backgroundTaskActivationIndicator: AssemblyBackgroundTaskActivationPort;
+  activeTabContextUsage: AssemblyActiveTabContextUsagePort;
+}
+
+export interface TabActivationRuntimeAssembly {
+  tabConversationStateBridge: TabConversationStateBridge;
+  tabViewActivationBridge: TabViewActivationBridge;
+  tabConversationActivationBridge: TabConversationActivationBridge;
+  tabRuntimeStateBridge: TabRuntimeStateBridge;
+}
+
+export function createTabActivationRuntimeAssembly(
+  deps: TabActivationRuntimeAssemblyDeps,
+): TabActivationRuntimeAssembly {
+  const bridgeHosts = createTabActivationRuntimeViewHosts(
+    createTabActivationRuntimeViewHostFactoryHost(deps.hostProviderHost),
+  );
+  const tabConversationStateBridge = new TabConversationStateBridge(
+    bridgeHosts.tabConversationStateBridgeHost,
+  );
+  const tabViewActivationBridge = new TabViewActivationBridge({
+    host: bridgeHosts.tabActivationBridgeHosts.tabViewActivationBridgeHost,
+    focusContextPreviewCoordinator: deps.focusPreviewRefresh,
+    questionTodoActivationRefreshCoordinator: deps.questionTodoActivationRefresh,
+    backgroundTaskActivationIndicatorCoordinator: deps.backgroundTaskActivationIndicator,
+    activeTabContextUsageCoordinator: deps.activeTabContextUsage,
+  });
+  const tabConversationActivationBridge = new TabConversationActivationBridge({
+    host: bridgeHosts.tabActivationBridgeHosts.tabConversationActivationBridgeHost,
+    tabConversationStateBridge,
+    tabViewActivationBridge,
+    questionTodoActivationRefreshCoordinator: deps.questionTodoActivationRefresh,
+    backgroundTaskActivationIndicatorCoordinator: deps.backgroundTaskActivationIndicator,
+    activeTabContextUsageCoordinator: deps.activeTabContextUsage,
+  });
+  const tabRuntimeStateBridge = new TabRuntimeStateBridge(
+    bridgeHosts.tabRuntimeStateBridgeHost,
+  );
+  return {
+    tabConversationStateBridge,
+    tabViewActivationBridge,
+    tabConversationActivationBridge,
+    tabRuntimeStateBridge,
+  };
 }

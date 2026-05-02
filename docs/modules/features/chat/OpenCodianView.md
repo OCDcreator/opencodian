@@ -568,6 +568,7 @@ background task notice 这条子链路现在的边界是：
 - `TabConversationStateBridge`：active-tab conversation/session 写回、pending question reset 与 sync baseline 提交
 - `TabConversationActivationBridge`：当前活动 tab 的 empty-state activation / current-tab 新建会话打开路径 shell orchestration 与后续 UI refresh 编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回与 streaming / empty-tab activation outcome UI 刷新
+- `TabActivationRuntimeViewHostFactory`：tab activation bridge 全套实例化已通过 `createTabActivationRuntimeAssembly(deps)` 工厂集中到该模块；`OpenCodianView` 不再直接实例化 `TabConversationStateBridge`、`TabViewActivationBridge`、`TabConversationActivationBridge` 或 `TabRuntimeStateBridge`，改为从 assembly 结果中取出 bridge 实例
 - `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback，以及 per-tab stream lifecycle（begin/complete/apply-chunk）、indicator 刷新和详情弹窗打开
 - `ConversationTransitionBridge`：loaded-conversation 的 preflight cleanup、消息区 shell 与 hydration lifecycle bridge
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit
