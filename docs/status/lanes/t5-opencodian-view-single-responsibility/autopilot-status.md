@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 6
-- current_task: view-srp6-03
-- last_verified_source_commit: 28f3ea67 (refresh graphify after unavailable prompt routing)
+- round: 7
+- current_task: view-srp7-03
+- last_verified_source_commit: d1751731 (move question/todo/background host assembly into runtime bundle owner)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
 - queue_state: completed
 - next_focus: none — queue complete
@@ -380,9 +380,65 @@ The server-start error finalization move is substantive because:
 3. **Finalization orchestration**: `finalizeAssistantMessageWithError()` performs the complete error-to-message pipeline: render error block, persist to conversation, update sync fingerprint, scroll to bottom — this is a multi-step lifecycle, not a thin wrapper
 4. **No new helper module introduced**: All behavior moved to the existing `MessageFinalizationService`, extending its domain boundary rather than fragmenting into a new thin layer
 
-### Cumulative Impact (Rounds 1 + 2 + 3 + 4 + 5 + 6)
+### Cumulative Impact (Rounds 1–6)
 
-OpenCodianView.ts: 5314 → 3900 lines (**−1414 lines**, **26.6% reduction**)
+*See cumulative table below.*
+
+## Round 7 — Seventh SRP Batch (Question Runtime Assembly)
+
+### view-srp7-01 — Move question runtime bundle assembly into existing question owners (DONE)
+- Moved `createQuestionRuntimeViewHost`, `createQuestionPostResolutionRuntimeHostAdapter`, and `createQuestionRuntimeServices` from OpenCodianView private methods to `QuestionRuntimeViewHostFactory`
+- Factory now owns the complete question runtime bundle assembly: creates view host, post-resolution adapter, and runtime services in a single `createQuestionRuntimeBundle()` call
+- OpenCodianView no longer directly invokes any question runtime construction functions
+- **Measured**: OpenCodianView.ts 3900→3897 lines (**−3 lines**, diff: +14/−17 in OpenCodianView; primary reduction offset by one-line delegation call)
+- Destination: `src/features/chat/services/QuestionRuntimeViewHostFactory.ts` (extended, +37 lines)
+- 6 new tests for bundle assembly
+
+### view-srp7-02 — Move question/todo/background host assembly into existing runtime bundle owner (DONE)
+- Moved `createQuestionTodoBackgroundTaskRuntimeServiceBundleHost` from OpenCodianView private method to `QuestionTodoBackgroundTaskRuntimeServiceBundle`
+- Bundle now owns `assembleQuestionTodoBackgroundTaskRuntimeHost()` factory: creates seam with late-binding `getBackgroundTaskHost()` for background-task methods
+- Factory spreads non-background-task seam properties and wraps 3 background-task methods from `getBackgroundTaskHost()` sub-object
+- OpenCodianView no longer owns any question/todo/background host assembly logic
+- **Measured**: OpenCodianView.ts 3897→3883 lines (**−14 lines**, diff: +14/−28 in OpenCodianView)
+- Destination: `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts` (extended, +29 lines)
+- 6 new tests for factory assembly (total 7 in file including 1 pre-existing)
+
+### view-srp7-03 — Finalize seventh SRP batch with measured docs and full verification (DONE)
+- Ran `npm run verify` — all gates pass:
+  - module-docs: pass (385 source modules, 385 mapped docs)
+  - graphify: pass (fresh for all source changes)
+  - devlog-order: pass (148 dated sections in descending order)
+  - lint: pass (0 errors, 1 pre-existing warning in test file)
+  - typecheck: clean
+  - tests: 1999 pass
+  - build: OK
+- Updated lane status doc with Round 7 results
+
+### Round 7 Net Impact
+
+OpenCodianView.ts: 3900 → 3883 lines (**−17 lines**)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp7-01 | −3 (3900→3897) | QuestionRuntimeViewHostFactory (services/, extended +37 lines) |
+| view-srp7-02 | −14 (3897→3883) | QuestionTodoBackgroundTaskRuntimeServiceBundle (services/, extended +29 lines) |
+| **Round 7 Total** | **−17** | **2 extended owners** |
+
+### Why This Round Is Substantive (Not a Thin Helper Split)
+
+The question runtime assembly moves are substantive because:
+
+1. **QuestionRuntimeViewHostFactory** now owns the complete question runtime bundle lifecycle: view host creation, post-resolution adapter wiring, and runtime services assembly. The `createQuestionRuntimeBundle()` factory consolidates 3 previously scattered private method calls into a single coherent assembly point with proper dependency injection through the host seam.
+
+2. **QuestionTodoBackgroundTaskRuntimeServiceBundle** now owns the complete question/todo/background host assembly: the `assembleQuestionTodoBackgroundTaskRuntimeHost()` factory implements late-binding for background-task methods via `getBackgroundTaskHost()`, handling the timing constraint that `this.backgroundTaskHost` is assigned later in `createConversationRuntimeWiring()`. This is non-trivial closure design, not a simple pass-through.
+
+3. **No new helper modules introduced**: Both destinations were existing owners extended with same-domain responsibilities, consistent with the project's "prefer extending existing owners" constraint.
+
+4. **12 new tests** across 2 test files verify bundle assembly correctness including late-binding behavior.
+
+### Cumulative Impact (Rounds 1 + 2 + 3 + 4 + 5 + 6 + 7)
+
+OpenCodianView.ts: 5314 → 3883 lines (**−1431 lines**, **26.9% reduction**)
 
 | Round | Actual Δ | Measured Before→After | Destinations |
 |-------|----------|----------------------|-------------|
@@ -392,7 +448,8 @@ OpenCodianView.ts: 5314 → 3900 lines (**−1414 lines**, **26.6% reduction**)
 | Round 4 (view-srp4-01 to view-srp4-02) | −125 | 4208→4083 | 1 new owner (ConversationNoticeCoordinator) |
 | Round 5 (view-srp5-01 to view-srp5-02) | −129 | 4083→3954 | 3 owners (0 new, 3 extended) |
 | Round 6 (view-srp6-01) | −54 | 3954→3900 | 1 extended owner (MessageFinalizationService) |
-| **Grand Total** | **−1414** | **5314→3900** | **15 distinct owners** |
+| Round 7 (view-srp7-01 to view-srp7-02) | −17 | 3900→3883 | 2 extended owners (QuestionRuntimeViewHostFactory, QuestionTodoBackgroundTaskRuntimeServiceBundle) |
+| **Grand Total** | **−1431** | **5314→3883** | **17 distinct owners** |
 
 ## Remaining Candidates (not extracted across all rounds)
 
