@@ -62,12 +62,21 @@ export function logAssistantFinalizationDebug(label: string, payload: unknown): 
   logger.debug(`Assistant message finalization [${label}]: ${stringifyLogPayload(payload)}`);
 }
 
-function stringifyLogPayload(payload: unknown): string {
+export function stringifyLogPayload(payload: unknown): string {
   try {
     return JSON.stringify(payload);
   } catch {
     return '[unserializable]';
   }
+}
+
+export function getLogPreview(text: string, maxLength = 180): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength)}...`;
 }
 
 export type {

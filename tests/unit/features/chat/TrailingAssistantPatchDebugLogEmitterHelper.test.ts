@@ -2,8 +2,10 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   emitTrailingAssistantPatchCompletionDebugLog,
   emitTrailingAssistantPatchSkippedDebugLog,
+  getLogPreview,
   logAssistantFinalizationDebug,
   shouldLogAssistantFinalizationDebug,
+  stringifyLogPayload,
 } from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
 import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
@@ -135,5 +137,50 @@ describe('logAssistantFinalizationDebug', () => {
     expect(() => {
       logAssistantFinalizationDebug('stream-visibility-changed', circular);
     }).not.toThrow();
+  });
+});
+
+describe('getLogPreview', () => {
+  it('returns short text unchanged', () => {
+    expect(getLogPreview('hello world')).toBe('hello world');
+  });
+
+  it('truncates long text with ellipsis', () => {
+    const longText = 'a'.repeat(200);
+    const result = getLogPreview(longText, 50);
+    expect(result).toBe(`${'a'.repeat(50)}...`);
+    expect(result.length).toBe(53);
+  });
+
+  it('normalizes whitespace', () => {
+    expect(getLogPreview('  hello   world  ')).toBe('hello world');
+  });
+
+  it('respects custom maxLength', () => {
+    expect(getLogPreview('hello world', 5)).toBe('hello...');
+  });
+
+  it('returns empty string for whitespace-only input', () => {
+    expect(getLogPreview('   ')).toBe('');
+  });
+});
+
+describe('stringifyLogPayload', () => {
+  it('stringifies plain objects', () => {
+    expect(stringifyLogPayload({ a: 1 })).toBe('{"a":1}');
+  });
+
+  it('stringifies null', () => {
+    expect(stringifyLogPayload(null)).toBe('null');
+  });
+
+  it('stringifies strings', () => {
+    expect(stringifyLogPayload('test')).toBe('"test"');
+  });
+
+  it('handles circular references gracefully', () => {
+    const circular: Record<string, unknown> = { a: 1 };
+    circular.self = circular;
+    expect(stringifyLogPayload(circular)).toBe('[unserializable]');
   });
 });

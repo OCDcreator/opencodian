@@ -303,7 +303,9 @@ import {
 } from './services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import {
+  getLogPreview,
   logAssistantFinalizationDebug,
+  stringifyLogPayload,
 } from './services/trailingAssistantPatchDebug';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -737,7 +739,7 @@ export class OpenCodianView extends ItemView {
   ): Promise<void> | void {
     if (submission.kind === 'shell') {
       logger.warn('Ignoring shell composer submission because the stable shell runtime is not enabled in this view', {
-        commandPreview: this.getLogPreview(submission.command, 120),
+        commandPreview: getLogPreview(submission.command, 120),
       });
       return;
     }
@@ -813,8 +815,8 @@ export class OpenCodianView extends ItemView {
       },
       isDebugLoggingEnabled: () => this.plugin.settings.enableDebugLogging,
       resolveAssetUrl: (relativePath) => this.resolvePluginAssetUrl(relativePath),
-      getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
-      stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
+      getLogPreview: (text, maxLength) => getLogPreview(text, maxLength),
+      stringifyLogPayload: (payload) => stringifyLogPayload(payload),
     };
   }
 
@@ -2051,8 +2053,8 @@ export class OpenCodianView extends ItemView {
       logAssistantFinalizationDebug: (label, payload) => {
         logAssistantFinalizationDebug(label, payload);
       },
-      stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
-      getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
+      stringifyLogPayload: (payload) => stringifyLogPayload(payload),
+      getLogPreview: (text, maxLength) => getLogPreview(text, maxLength),
     };
   }
 
@@ -2632,10 +2634,10 @@ export class OpenCodianView extends ItemView {
       logAssistantFinalizationDebug: (label, payload) => {
         logAssistantFinalizationDebug(label, payload);
       },
-      getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
+      getLogPreview: (text, maxLength) => getLogPreview(text, maxLength),
       summarizeCoreStreamChunkForDebug: (chunk) => summarizeCoreStreamChunkForDebug(chunk),
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
-      stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
+      stringifyLogPayload: (payload) => stringifyLogPayload(payload),
     };
 
     return {
@@ -3471,23 +3473,6 @@ export class OpenCodianView extends ItemView {
         conversation.messages,
       ),
     });
-  }
-
-  private getLogPreview(text: string, maxLength = 180): string {
-    const normalized = text.replace(/\s+/g, ' ').trim();
-    if (normalized.length <= maxLength) {
-      return normalized;
-    }
-
-    return `${normalized.slice(0, maxLength)}...`;
-  }
-
-  private stringifyLogPayload(payload: unknown): string {
-    try {
-      return JSON.stringify(payload);
-    } catch {
-      return '[unserializable]';
-    }
   }
 
   private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {

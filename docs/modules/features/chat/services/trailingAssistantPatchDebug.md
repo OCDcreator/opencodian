@@ -12,6 +12,8 @@
 - 持有 `ASSISTANT_DEBUG_STAGE_ALLOWLIST`，定义所有允许输出的 debug stage label
 - 提供 `shouldLogAssistantFinalizationDebug()` gate check
 - 提供 `logAssistantFinalizationDebug()` 统一 log emitter（allowlist gate + payload stringify + logger.debug）
+- 提供 `stringifyLogPayload()` payload 序列化（JSON.stringify + fallback）
+- 提供 `getLogPreview()` 文本截断预览（whitespace normalization + ellipsis）
 - 构造 completion / skipped logging context
 - 生成 completion / skipped payload inputs 与 payload plan
 - 复用共享 coordinator 注入 `tabId` 并产出最终 `DebugLogPlan`
@@ -22,6 +24,8 @@
 ```typescript
 export function shouldLogAssistantFinalizationDebug(label: string): boolean;
 export function logAssistantFinalizationDebug(label: string, payload: unknown): void;
+export function stringifyLogPayload(payload: unknown): string;
+export function getLogPreview(text: string, maxLength?: number): string;
 
 export function buildTrailingAssistantPatchCompletionDebugLoggingContext(
   completionDebugPlan: TrailingAssistantPatchCompletionDebugPlanLike,
@@ -42,7 +46,7 @@ export function emitTrailingAssistantPatchCompletionDebugLog(
 
 ## 与其他模块的关系
 
-- `OpenCodianView` 在多个 host adapter factory 中直接导入 `logAssistantFinalizationDebug` 替代原 private 方法
+- `OpenCodianView` 在多个 host adapter factory 中直接导入 `logAssistantFinalizationDebug`、`stringifyLogPayload`、`getLogPreview` 替代原 private 方法
 - `ConversationRenderService` 在 success/failure 分支只负责构造高层上下文并调用这里的 emitter
 - `ConversationRenderRuntime`、`ConversationAuthoritativeSyncCoordinator`、`ConversationAuthoritativeMessageMergeCoordinator` 等服务的 host 接口仍保留 `logAssistantFinalizationDebug` 回调签名；OpenCodianView 装配时传入导入的函数
 - `trailingAssistantPatchPlanning.ts` 产出的 `completionDebugPlan` 会在这里被转换成最终 debug payload
@@ -53,4 +57,4 @@ export function emitTrailingAssistantPatchCompletionDebugLog(
 - trailing-assistant debug 相关新增字段时，优先在这里补齐 payload/context，而不是重新引入单用途 `Debug*Helper.ts`
 - 保持 `patch-trailing-assistant-render-complete` 与 `patch-trailing-assistant-render-skipped` 两个 label 不变
 - 新增 debug stage label 时，必须同步更新 `ASSISTANT_DEBUG_STAGE_ALLOWLIST`
-- `OpenCodianView` 不再拥有 `shouldLogAssistantFinalizationDebug` 或 `logAssistantFinalizationDebug` 私有方法
+- `OpenCodianView` 不再拥有 `shouldLogAssistantFinalizationDebug`、`logAssistantFinalizationDebug`、`stringifyLogPayload` 或 `getLogPreview` 私有方法
