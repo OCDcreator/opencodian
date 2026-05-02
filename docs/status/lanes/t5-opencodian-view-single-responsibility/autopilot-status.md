@@ -6,9 +6,9 @@
 
 ## Current State
 
-- round: 1
-- current_task: view-22
-- last_verified_source_commit: 645d1ec9
+- round: 2
+- current_task: view-srp2-05
+- last_verified_source_commit: e39ddb04
 - status_checkpoint_commit: rolling checkpoint; use git HEAD for the current doc-only checkpoint commit
 - queue_state: completed
 - next_focus: none — queue complete
@@ -75,7 +75,81 @@
 | view-20 | ~45 | BackgroundTaskTimelineService |
 | **Total** | **~250** | **4 existing owners** |
 
+## Round 2 — Second SRP Batch
+
+### view-srp2-01 — Extract ChatSurfaceAppearanceCoordinator (DONE)
+- Extracted surface color/appearance sync and scroll-mode appearance management to `ChatSurfaceAppearanceCoordinator`
+- New coordinator owns: `syncSurfaceColors()`, `applySurfaceScrollMode()`, color-to-CSS binding
+- Added scroll-mode color sync fix: pane coordinator now triggers appearance refresh when switching modes
+- OpenCodianView.ts reduced by ~120 lines
+- Destination: `src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts` (194 lines)
+
+### view-srp2-02 — Extract SendPipelineDebugSummaries (DONE)
+- Extracted send-pipeline debug summarizers to dedicated `SendPipelineDebugSummaries`
+- Coordinator owns: `summarizeDebugInfo()`, `summarizeToolPermissions()`, `summarizeActiveModels()`
+- OpenCodianView.ts reduced by ~175 lines
+- Destination: `src/features/chat/runtime/SendPipelineDebugSummaries.ts` (223 lines)
+
+### view-srp2-03 — Extract UserMessageContentRenderer (DONE)
+- Extracted user message body rendering to dedicated `UserMessageContentRenderer`
+- Renderer owns: `renderContentBody()`, vault-link resolution, image embedding, code-block handling
+- OpenCodianView.ts reduced by ~155 lines
+- Destination: `src/features/chat/runtime/UserMessageContentRenderer.ts` (184 lines)
+
+### view-srp2-04 — Move context usage stream operations to ActiveTabContextUsageCoordinator (DONE)
+- Moved `beginTabContextUsageStream`, `completeTabContextUsageStream`, `applyUsageChunkToTab`, `openContextUsageDetails`, `refreshContextUsageIndicator` to existing `ActiveTabContextUsageCoordinator`
+- Extended `ActiveTabContextUsageCoordinatorHost` with: `hasTab`, `getTabContextUsage`, `setTabContextUsage`, `getActiveTabId`, `openContextUsageDetailsModal`
+- Removed 8 private methods from OpenCodianView, cleaned unused imports
+- OpenCodianView.ts reduced by ~84 lines
+- Destination: `src/features/chat/services/ActiveTabContextUsageCoordinator.ts` (256 lines)
+- 10 new tests for stream lifecycle, modal opening, indicator refresh
+
+### view-srp2-05 — Finalize SRP batch with docs and verification (DONE)
+- Ran `npm run verify` — all gates pass:
+  - module-docs: pass
+  - graphify: pass
+  - devlog-order: pass
+  - lint: pass (0 errors, 0 warnings)
+  - typecheck: clean
+  - tests: 1882 pass
+  - build: OK
+- Updated lane status doc with second SRP batch results
+- Graphify already fresh (no source ownership changes in this task)
+- No thin helper modules introduced: all destinations are existing coordinators with meaningful domain ownership
+
+### Round 2 Net Impact
+
+OpenCodianView.ts: 4971 → 4437 lines (**−534 lines**)
+
+| Task | Lines Removed | Destination |
+|------|---------------|-------------|
+| view-srp2-01 | ~120 | ChatSurfaceAppearanceCoordinator (services/) |
+| view-srp2-02 | ~175 | SendPipelineDebugSummaries (runtime/) |
+| view-srp2-03 | ~155 | UserMessageContentRenderer (runtime/) |
+| view-srp2-04 | ~84 | ActiveTabContextUsageCoordinator (services/) |
+| **Round 2 Total** | **~534** | **4 owners (2 new, 2 extended)** |
+
+### Cumulative Impact (Rounds 1 + 2)
+
+OpenCodianView.ts: ~5314 → 4437 lines (**~877 lines removed**, **16.5% reduction**)
+
+| Round | Lines Removed | Destinations |
+|-------|---------------|-------------|
+| Round 1 (view-17 to view-20) | ~250 | 4 existing owners |
+| Round 2 (view-srp2-01 to view-srp2-04) | ~534 | 4 owners (2 new, 2 extended) |
+| **Grand Total** | **~784** | **8 distinct owners** |
+
+### No Thin Helper Modules Introduced
+
+All extractions went to either:
+1. **Existing coordinators** extended with same-domain responsibilities (ActiveTabContextUsageCoordinator, BackgroundTaskTimelineService, ConversationRenderService, ChildSessionGraphCoordinator)
+2. **New modules with substantive domain ownership** — each owns a clear, non-trivial responsibility surface (ChatSurfaceAppearanceCoordinator, SendPipelineDebugSummaries, UserMessageContentRenderer)
+
+No adapter/factory/provider indirection layers were created.
+
 ## Remaining Candidates (not extracted in this round)
 
 - debug or render-support behavior still owned directly by `OpenCodianView.ts`
 - question/todo activation host assembly (skipped as unsafe — adds bridge chain)
+- scroll anchoring and viewport math (complex, intertwined with tab switching)
+- remaining inline event handlers that reference `this.app` or `this.plugin` directly
