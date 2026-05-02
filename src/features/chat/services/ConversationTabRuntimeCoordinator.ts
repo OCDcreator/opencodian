@@ -63,6 +63,65 @@ export interface ConversationTabRuntimeCoordinatorPorts {
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
 
+export interface ConversationTabRuntimeCoordinatorHostDependencies {
+  getMaxTabs(): number;
+  getTabManager(): TabManager | null;
+  setTabManager(tabManager: TabManager | null): void;
+  getTabBar(): TabBar | null;
+  setTabBar(tabBar: TabBar | null): void;
+  getTabBarMountEl(): HTMLElement | null;
+  setTabBarMountEl(element: HTMLElement | null): void;
+  getChatContainerEl(): HTMLElement | null;
+  getHeaderTabBarSlotEl(): HTMLElement | null;
+  getBelowHeaderTabBarSlotEl(): HTMLElement | null;
+  getOuterVerticalTabBarSlotEl(): HTMLElement | null;
+  getInputTabBarSlotEl(): HTMLElement | null;
+  getTabBarPosition(): TabBarPosition;
+  getBelowHeaderTabBarLayout(): BelowHeaderTabBarLayout;
+  setPersistedTabState(tabState: PersistedTabState): void;
+  saveSettingsUiStateImmediately(): void;
+  scheduleSettingsUiStateSave(): void;
+  getSessionIdForTab(tabId: TabId | null): string | null;
+  getTabSessionStatus(
+    tabId: TabId | null,
+    sessionId: string | null,
+  ): SessionActivityStatus | null;
+}
+
+export function createConversationTabRuntimeCoordinatorHost(
+  deps: ConversationTabRuntimeCoordinatorHostDependencies,
+): ConversationTabRuntimeCoordinatorHost {
+  return {
+    getMaxTabs: () => deps.getMaxTabs(),
+    getTabManager: () => deps.getTabManager(),
+    setTabManager: (tabManager) => deps.setTabManager(tabManager),
+    getTabBar: () => deps.getTabBar(),
+    setTabBar: (tabBar) => deps.setTabBar(tabBar),
+    getTabBarMountEl: () => deps.getTabBarMountEl(),
+    setTabBarMountEl: (element) => deps.setTabBarMountEl(element),
+    getChatContainerEl: () => deps.getChatContainerEl(),
+    getHeaderTabBarSlotEl: () => deps.getHeaderTabBarSlotEl(),
+    getBelowHeaderTabBarSlotEl: () => deps.getBelowHeaderTabBarSlotEl(),
+    getOuterVerticalTabBarSlotEl: () => deps.getOuterVerticalTabBarSlotEl(),
+    getInputTabBarSlotEl: () => deps.getInputTabBarSlotEl(),
+    getTabBarPosition: () => deps.getTabBarPosition(),
+    getBelowHeaderTabBarLayout: () => deps.getBelowHeaderTabBarLayout(),
+    setPersistedTabState: (tabState) => deps.setPersistedTabState(tabState),
+    savePersistedTabState: (options = {}) => {
+      if (options.flush) {
+        deps.saveSettingsUiStateImmediately();
+        return;
+      }
+
+      deps.scheduleSettingsUiStateSave();
+    },
+    getSessionIdForTab: (tabId) => deps.getSessionIdForTab(tabId),
+    getTabSessionStatus: (tabId, sessionId) => deps.getTabSessionStatus(tabId, sessionId),
+    getTabContextUsage: (tabId) =>
+      deps.getTabManager()?.getTabContextUsage(tabId) ?? null,
+  };
+}
+
 export class ConversationTabRuntimeCoordinator<
   Runtime extends ConversationTabRuntimeState = ConversationTabRuntimeState,
 > {

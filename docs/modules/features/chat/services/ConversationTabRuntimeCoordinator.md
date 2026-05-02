@@ -13,7 +13,7 @@
 - `ConversationLoadRecoveryCoordinator`：first-open load、persisted restore 与 fallback conversation 创建
 - `TabRuntimeStateBridge`：stream-like tab badge、background-task badge、attention 状态与 send-button writeback
 
-这样 `OpenCodianView` 只保留 DOM/settings/state host wiring，tab manager、tab bar、active pane、persist/restore 与 stream-like state 的编排不再散落在 view 方法里。
+这样 `OpenCodianView` 只保留 DOM/settings/state host wiring，tab manager、tab bar、active pane、persist/restore 与 stream-like state 的编排不再散落在 view 方法里。host 组装已通过 `createConversationTabRuntimeCoordinatorHost(deps)` 工厂函数集中到此文件；工厂吸收了 `savePersistedTabState` 的 flush/schedule 分派逻辑和 `getTabContextUsage` 的 null-safe tabManager 派生，view 只传入 `saveSettingsUiStateImmediately` / `scheduleSettingsUiStateSave` 等低层级依赖。
 
 ## 公开接口
 
@@ -39,6 +39,15 @@ export interface ConversationTabRuntimeCoordinatorHost {
   getTabSessionStatus(tabId: TabId | null, sessionId: string | null): SessionActivityStatus | null;
   getTabContextUsage(tabId: TabId | null): TabContextState | null;
 }
+
+export interface ConversationTabRuntimeCoordinatorHostDependencies {
+  /* same as Host except: saveSettingsUiStateImmediately + scheduleSettingsUiStateSave
+     replace savePersistedTabState; no getTabContextUsage (factory derives from getTabManager) */
+}
+
+export function createConversationTabRuntimeCoordinatorHost(
+  deps: ConversationTabRuntimeCoordinatorHostDependencies,
+): ConversationTabRuntimeCoordinatorHost;
 
 export interface ConversationTabRuntimeCoordinatorPorts {
   activateTab(tabId: TabId): Promise<void>;

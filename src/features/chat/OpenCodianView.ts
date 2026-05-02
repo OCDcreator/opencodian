@@ -230,8 +230,8 @@ import {
 } from './services/ConversationTabOpenCoordinator';
 import {
   ConversationTabRuntimeCoordinator,
-  type ConversationTabRuntimeCoordinatorHost,
   type ConversationTabRuntimeState,
+  createConversationTabRuntimeCoordinatorHost,
 } from './services/ConversationTabRuntimeCoordinator';
 import {
   type ConversationViewStateHost,
@@ -1647,7 +1647,40 @@ export class OpenCodianView extends ItemView {
       },
     );
     const conversationTabRuntimeCoordinator = new ConversationTabRuntimeCoordinator(
-      this.createConversationTabRuntimeCoordinatorHost(),
+      createConversationTabRuntimeCoordinatorHost({
+        getMaxTabs: () => this.plugin.settings.maxTabs,
+        getTabManager: () => this.tabManager,
+        setTabManager: (tabManager) => {
+          this.tabManager = tabManager;
+        },
+        getTabBar: () => this.tabBar,
+        setTabBar: (tabBar) => {
+          this.tabBar = tabBar;
+        },
+        getTabBarMountEl: () => this.tabBarMountEl,
+        setTabBarMountEl: (element) => {
+          this.tabBarMountEl = element;
+        },
+        getChatContainerEl: () => this.chatContainerEl,
+        getHeaderTabBarSlotEl: () => this.headerTabBarSlotEl,
+        getBelowHeaderTabBarSlotEl: () => this.belowHeaderTabBarSlotEl,
+        getOuterVerticalTabBarSlotEl: () => this.outerVerticalTabBarSlotEl,
+        getInputTabBarSlotEl: () => this.composerInputShellCoordinator.getTabBarSlotEl(),
+        getTabBarPosition: () => this.plugin.settings.tabBarPosition,
+        getBelowHeaderTabBarLayout: () => this.plugin.settings.belowHeaderTabBarLayout,
+        setPersistedTabState: (tabState) => {
+          this.plugin.settings.tabState = tabState;
+        },
+        saveSettingsUiStateImmediately: () => {
+          void this.plugin.saveSettingsUiStateImmediately();
+        },
+        scheduleSettingsUiStateSave: () => {
+          this.plugin.scheduleSettingsUiStateSave();
+        },
+        getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+        getTabSessionStatus: (tabId, sessionId) =>
+          this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
+      }),
       this.tabMessagesPaneCoordinator,
       {
         activateTab: (tabId) => conversationLoadRecoveryCoordinator.activateTab(tabId),
@@ -2371,47 +2404,6 @@ export class OpenCodianView extends ItemView {
       showNotice: (message) => {
         new Notice(message);
       },
-    };
-  }
-
-  private createConversationTabRuntimeCoordinatorHost(): ConversationTabRuntimeCoordinatorHost {
-    return {
-      getMaxTabs: () => this.plugin.settings.maxTabs,
-      getTabManager: () => this.tabManager,
-      setTabManager: (tabManager) => {
-        this.tabManager = tabManager;
-      },
-      getTabBar: () => this.tabBar,
-      setTabBar: (tabBar) => {
-        this.tabBar = tabBar;
-      },
-      getTabBarMountEl: () => this.tabBarMountEl,
-      setTabBarMountEl: (element) => {
-        this.tabBarMountEl = element;
-      },
-      getChatContainerEl: () => this.chatContainerEl,
-      getHeaderTabBarSlotEl: () => this.headerTabBarSlotEl,
-      getBelowHeaderTabBarSlotEl: () => this.belowHeaderTabBarSlotEl,
-      getOuterVerticalTabBarSlotEl: () => this.outerVerticalTabBarSlotEl,
-      getInputTabBarSlotEl: () => this.composerInputShellCoordinator.getTabBarSlotEl(),
-      getTabBarPosition: () => this.plugin.settings.tabBarPosition,
-      getBelowHeaderTabBarLayout: () => this.plugin.settings.belowHeaderTabBarLayout,
-      setPersistedTabState: (tabState) => {
-        this.plugin.settings.tabState = tabState;
-      },
-      savePersistedTabState: (options = {}) => {
-        if (options.flush) {
-          void this.plugin.saveSettingsUiStateImmediately();
-          return;
-        }
-
-        this.plugin.scheduleSettingsUiStateSave();
-      },
-      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-      getTabSessionStatus: (tabId, sessionId) =>
-        this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
-      getTabContextUsage: (tabId) =>
-        this.tabManager?.getTabContextUsage(tabId) ?? null,
     };
   }
 

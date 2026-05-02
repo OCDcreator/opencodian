@@ -3,14 +3,16 @@ import type { PersistedTabState, TabContextState } from '../../../../src/core/ty
 import {
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeCoordinatorHost,
+  type ConversationTabRuntimeCoordinatorHostDependencies,
   type ConversationTabRuntimeCoordinatorPorts,
   type ConversationTabRuntimeState,
+  createConversationTabRuntimeCoordinatorHost,
 } from '../../../../src/features/chat/services/ConversationTabRuntimeCoordinator';
 import {
   type TabMessagesPaneCoordinator,
   type TabMessagesPaneState,
 } from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
-import type { TabBar, TabId, TabManager } from '../../../../src/features/chat/tabs';
+import { type TabBar, type TabId,TabManager } from '../../../../src/features/chat/tabs';
 
 interface TestRuntimeState extends ConversationTabRuntimeState {
   label?: string;
@@ -349,5 +351,99 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(runtime.pendingEditedFiles.size).toBe(0);
     expect(runtime.isHydratingConversation).toBe(false);
     expect(runtime.pendingLayoutMutations).toBe(0);
+  });
+});
+
+describe('createConversationTabRuntimeCoordinatorHost factory', () => {
+  function createFactoryDeps(
+    overrides: Partial<ConversationTabRuntimeCoordinatorHostDependencies> = {},
+  ): ConversationTabRuntimeCoordinatorHostDependencies {
+    return {
+      getMaxTabs: jest.fn(() => 4),
+      getTabManager: jest.fn(() => null),
+      setTabManager: jest.fn(),
+      getTabBar: jest.fn(() => null),
+      setTabBar: jest.fn(),
+      getTabBarMountEl: jest.fn(() => null),
+      setTabBarMountEl: jest.fn(),
+      getChatContainerEl: jest.fn(() => document.createElement('div')),
+      getHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
+      getBelowHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),
+      getOuterVerticalTabBarSlotEl: jest.fn(() => document.createElement('div')),
+      getInputTabBarSlotEl: jest.fn(() => document.createElement('div')),
+      getTabBarPosition: jest.fn(() => 'below-header'),
+      getBelowHeaderTabBarLayout: jest.fn(() => 'grid'),
+      setPersistedTabState: jest.fn(),
+      saveSettingsUiStateImmediately: jest.fn(),
+      scheduleSettingsUiStateSave: jest.fn(),
+      getSessionIdForTab: jest.fn(() => null),
+      getTabSessionStatus: jest.fn(() => null),
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('delegates getMaxTabs to the provided dependency', () => {
+    const deps = createFactoryDeps({ getMaxTabs: jest.fn(() => 6) });
+    const host = createConversationTabRuntimeCoordinatorHost(deps);
+
+    expect(host.getMaxTabs()).toBe(6);
+    expect(deps.getMaxTabs).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates getTabBarPosition to the provided dependency', () => {
+    const deps = createFactoryDeps({ getTabBarPosition: jest.fn(() => 'header') });
+    const host = createConversationTabRuntimeCoordinatorHost(deps);
+
+    expect(host.getTabBarPosition()).toBe('header');
+    expect(deps.getTabBarPosition).toHaveBeenCalledTimes(1);
+  });
+
+  it('assembles savePersistedTabState with flush option calling saveSettingsUiStateImmediately', () => {
+    const saveImmediately = jest.fn();
+    const scheduleSave = jest.fn();
+    const deps = createFactoryDeps({
+      saveSettingsUiStateImmediately: saveImmediately,
+      scheduleSettingsUiStateSave: scheduleSave,
+    });
+    const host = createConversationTabRuntimeCoordinatorHost(deps);
+
+    host.savePersistedTabState({ flush: true });
+    expect(saveImmediately).toHaveBeenCalledTimes(1);
+    expect(scheduleSave).not.toHaveBeenCalled();
+  });
+
+  it('assembles savePersistedTabState without flush calling scheduleSettingsUiStateSave', () => {
+    const saveImmediately = jest.fn();
+    const scheduleSave = jest.fn();
+    const deps = createFactoryDeps({
+      saveSettingsUiStateImmediately: saveImmediately,
+      scheduleSettingsUiStateSave: scheduleSave,
+    });
+    const host = createConversationTabRuntimeCoordinatorHost(deps);
+
+    host.savePersistedTabState();
+    expect(scheduleSave).toHaveBeenCalledTimes(1);
+    expect(saveImmediately).not.toHaveBeenCalled();
+  });
+
+  it('derives getTabContextUsage from getTabManager with null-safe access', () => {
+    const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+    const deps = createFactoryDeps({ getTabManager: jest.fn(() => tabManager) });
+    const host = createConversationTabRuntimeCoordinatorHost(deps);
+
+    const result = host.getTabContextUsage('nonexistent-tab');
+    expect(result).toBeNull();
+    expect(deps.getTabManager).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null from getTabContextUsage when getTabManager returns null', () => {
+    const deps = createFactoryDeps({ getTabManager: jest.fn(() => null) });
+    const host = createConversationTabRuntimeCoordinatorHost(deps);
+
+    expect(host.getTabContextUsage('any-tab')).toBeNull();
   });
 });
