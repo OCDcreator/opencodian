@@ -551,14 +551,15 @@ OpenCodianView.ts: 5314 → 3745 lines (**−1569 lines**, **29.5% reduction**)
 - 1 comprehensive factory assembly test
 
 ### view-srp9-03 — Finalize ninth SRP batch with measured docs and full verification (DONE)
-- Ran `npm run verify` — all gates pass:
+- Ran `npm run verify` — verification results:
   - module-docs: pass (385 source modules, 385 mapped docs)
   - graphify: pass (fresh)
   - devlog-order: pass
-  - lint: pass (0 errors, 4 pre-existing warnings in files outside task scope)
+  - lint: 0 errors; **4 pre-existing warnings** violate the zero-warning guardrail but are outside this queue's scope (MessageSendPreparationService.ts max-lines, MessageFinalizationService.test.ts max-lines, MessageSendPreparationService.test.ts max-lines, SlashCommandExecutionService.test.ts max-lines-per-function)
   - typecheck: clean
   - tests: 2013 pass
   - build: OK
+- Queue extraction tasks are complete; follow-up needed to clear the 4 pre-existing lint warnings
 - Updated lane status doc with Round 9 results
 
 ### Round 9 Net Impact
