@@ -67,6 +67,11 @@ function createHost(
     setActiveTabContextUsage: jest.fn(),
     renderContextUsageIndicator: jest.fn(),
     getSessionContextUsageSnapshot: jest.fn().mockResolvedValue(null),
+    hasTab: jest.fn().mockReturnValue(true),
+    getTabContextUsage: jest.fn().mockReturnValue(activeState),
+    setTabContextUsage: jest.fn(),
+    getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+    openContextUsageDetailsModal: jest.fn(),
     ...overrides,
   };
 }
@@ -76,23 +81,26 @@ function getCommittedState(host: MockedHost): TabContextState {
   return host.setActiveTabContextUsage.mock.calls[0][0];
 }
 
-describe('ActiveTabContextUsageCoordinator', () => {
-  beforeEach(() => {
-    setDebugLoggingEnabled(false);
-    setDebugModuleEnabled('contextUsage', true);
-    setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
-    resetLogEmissionThrottleState();
-    clearRecentLogs();
-  });
+function setupDebugLogging(): void {
+  setDebugLoggingEnabled(false);
+  setDebugModuleEnabled('contextUsage', true);
+  setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
+  resetLogEmissionThrottleState();
+  clearRecentLogs();
+}
 
-  afterEach(() => {
-    setDebugLoggingEnabled(false);
-    setDebugModuleEnabled('contextUsage', true);
-    setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
-    resetLogEmissionThrottleState();
-    clearRecentLogs();
-    jest.restoreAllMocks();
-  });
+function teardownDebugLogging(): void {
+  setDebugLoggingEnabled(false);
+  setDebugModuleEnabled('contextUsage', true);
+  setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
+  resetLogEmissionThrottleState();
+  clearRecentLogs();
+  jest.restoreAllMocks();
+}
+
+describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
+  beforeEach(setupDebugLogging);
+  afterEach(teardownDebugLogging);
 
   it('clears the indicator when no active tab is available', () => {
     const host = createHost({
@@ -244,5 +252,145 @@ describe('ActiveTabContextUsageCoordinator', () => {
       .filter((message) => message.includes('[ActiveTabContextUsageCoordinator] [context-usage] refreshFromServer committed'));
 
     expect(contextUsageLogs).toHaveLength(1);
+  });
+});
+
+describe('ActiveTabContextUsageCoordinator stream lifecycle', () => {
+  beforeEach(setupDebugLogging);
+  afterEach(teardownDebugLogging);
+
+  describe('beginTabContextUsageStream', () => {
+    it('begins stream for a valid tab', () => {
+      const host = createHost();
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.beginTabContextUsageStream('tab-1');
+
+      expect(host.setTabContextUsage).toHaveBeenCalledWith('tab-1', expect.any(Object));
+      const state = host.setTabContextUsage.mock.calls[0][1] as TabContextState;
+      expect(state.streamInputTokens).toBe(0);
+      expect(state.streamOutputTokens).toBe(0);
+    });
+
+    it('skips when tab does not exist', () => {
+      const host = createHost({ hasTab: jest.fn().mockReturnValue(false) });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.beginTabContextUsageStream('nonexistent');
+
+      expect(host.setTabContextUsage).not.toHaveBeenCalled();
+    });
+
+    it('refreshes indicator when stream begins on the active tab', () => {
+      const host = createHost({ getActiveTabId: jest.fn().mockReturnValue('tab-1') });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.beginTabContextUsageStream('tab-1');
+
+      expect(host.renderContextUsageIndicator).toHaveBeenCalled();
+    });
+
+    it('does not refresh indicator when stream begins on a background tab', () => {
+      const host = createHost({ getActiveTabId: jest.fn().mockReturnValue('tab-2') });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.beginTabContextUsageStream('tab-1');
+
+      expect(host.renderContextUsageIndicator).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completeTabContextUsageStream', () => {
+    it('completes stream for a valid tab', () => {
+      const host = createHost();
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.completeTabContextUsageStream('tab-1');
+
+      expect(host.setTabContextUsage).toHaveBeenCalledWith('tab-1', expect.any(Object));
+      const state = host.setTabContextUsage.mock.calls[0][1] as TabContextState;
+      expect(state.streamInputTokens).toBe(0);
+      expect(state.streamOutputTokens).toBe(0);
+    });
+
+    it('skips when tab does not exist', () => {
+      const host = createHost({ hasTab: jest.fn().mockReturnValue(false) });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.completeTabContextUsageStream('nonexistent');
+
+      expect(host.setTabContextUsage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyUsageChunkToTab', () => {
+    it('applies usage chunk for a valid tab', () => {
+      const host = createHost();
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+      const chunk = { type: 'usage' as const, inputTokens: 100, outputTokens: 50 };
+
+      coordinator.applyUsageChunkToTab('tab-1', chunk);
+
+      expect(host.setTabContextUsage).toHaveBeenCalledWith('tab-1', expect.any(Object));
+    });
+
+    it('skips when tab does not exist', () => {
+      const host = createHost({ hasTab: jest.fn().mockReturnValue(false) });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+      const chunk = { type: 'usage' as const, inputTokens: 100, outputTokens: 50 };
+
+      coordinator.applyUsageChunkToTab('nonexistent', chunk);
+
+      expect(host.setTabContextUsage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('openContextUsageDetails', () => {
+    it('delegates to the host modal method with current context state', () => {
+      const host = createHost();
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.openContextUsageDetails();
+
+      expect(host.openContextUsageDetailsModal).toHaveBeenCalledWith(
+        host.getActiveTabContextUsage(),
+      );
+    });
+
+    it('passes null when no context state is available', () => {
+      const host = createHost({
+        getActiveTabContextUsage: jest.fn().mockReturnValue(null),
+      });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.openContextUsageDetails();
+
+      expect(host.openContextUsageDetailsModal).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe('refreshContextUsageIndicator', () => {
+    it('renders the active tab context usage via the host', () => {
+      const state = createEmptyTabContextState();
+      const host = createHost({
+        getActiveTabContextUsage: jest.fn().mockReturnValue(state),
+      });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.refreshContextUsageIndicator();
+
+      expect(host.renderContextUsageIndicator).toHaveBeenCalledWith(state);
+    });
+
+    it('renders null when no context usage is available', () => {
+      const host = createHost({
+        getActiveTabContextUsage: jest.fn().mockReturnValue(null),
+      });
+      const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+      coordinator.refreshContextUsageIndicator();
+
+      expect(host.renderContextUsageIndicator).toHaveBeenCalledWith(null);
+    });
   });
 });

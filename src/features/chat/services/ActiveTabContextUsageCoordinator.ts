@@ -1,6 +1,7 @@
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import {
   createEmptyTabContextState,
+  type StreamChunk,
   type TabContextState,
 } from '../../../core/types';
 import {
@@ -9,6 +10,7 @@ import {
   getPerformanceTimestampMs,
   shouldEmitLogFingerprint,
 } from '../../../shared';
+import type { TabId } from '../tabs/types';
 import type {
   ModelSelectorKnownModelInfo,
   ModelSelectorSelection,
@@ -38,6 +40,11 @@ export interface ActiveTabContextUsageCoordinatorHost {
   setActiveTabContextUsage(contextUsage: TabContextState): void;
   renderContextUsageIndicator(state: TabContextState | null): void;
   getSessionContextUsageSnapshot(sessionId: string): Promise<ContextUsageSnapshot | null>;
+  hasTab(tabId: string): boolean;
+  getTabContextUsage(tabId: TabId | null): TabContextState | null;
+  setTabContextUsage(tabId: TabId | null, contextUsage: TabContextState): void;
+  getActiveTabId(): TabId | null;
+  openContextUsageDetailsModal(contextState: TabContextState | null): void;
 }
 
 export class ActiveTabContextUsageCoordinator {
@@ -146,6 +153,62 @@ export class ActiveTabContextUsageCoordinator {
   private commitState(contextUsage: TabContextState): void {
     this.host.setActiveTabContextUsage(contextUsage);
     this.host.renderContextUsageIndicator(contextUsage);
+  }
+
+  beginTabContextUsageStream(tabId: TabId | null): void {
+    if (!this.host.hasTab(tabId ?? '')) {
+      return;
+    }
+
+    const nextState = ContextUsageService.beginStream(
+      this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
+    );
+    this.host.setTabContextUsage(tabId, nextState);
+    if (tabId === this.host.getActiveTabId()) {
+      this.refreshContextUsageIndicator();
+    }
+  }
+
+  completeTabContextUsageStream(tabId: TabId | null): void {
+    if (!this.host.hasTab(tabId ?? '')) {
+      return;
+    }
+
+    const nextState = ContextUsageService.completeStream(
+      this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
+    );
+    this.host.setTabContextUsage(tabId, nextState);
+    if (tabId === this.host.getActiveTabId()) {
+      this.refreshContextUsageIndicator();
+    }
+  }
+
+  applyUsageChunkToTab(
+    tabId: TabId | null,
+    chunk: Extract<StreamChunk, { type: 'usage' }>,
+  ): void {
+    if (!this.host.hasTab(tabId ?? '')) {
+      return;
+    }
+
+    const nextState = ContextUsageService.applyUsageChunk(
+      this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
+      chunk,
+    );
+    this.host.setTabContextUsage(tabId, nextState);
+    if (tabId === this.host.getActiveTabId()) {
+      this.refreshContextUsageIndicator();
+    }
+  }
+
+  openContextUsageDetails(): void {
+    const contextState = this.host.getActiveTabContextUsage() ?? null;
+    this.host.openContextUsageDetailsModal(contextState);
+  }
+
+  refreshContextUsageIndicator(): void {
+    const state = this.host.getActiveTabContextUsage() ?? null;
+    this.host.renderContextUsageIndicator(state);
   }
 
   private logRefreshFromServerOutcome({

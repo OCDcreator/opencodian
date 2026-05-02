@@ -18,7 +18,6 @@ import {
 import {
   type ChatMessage,
   type Conversation,
-  createEmptyTabContextState,
   getDefaultPersistedTabState,
   type PromptContextItem,
   type QuestionRequest,
@@ -175,7 +174,6 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from './services/ComposerInputShellCoordinator';
-import { ContextUsageService } from './services/ContextUsageService';
 import {
   ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
@@ -306,7 +304,7 @@ import {
 } from './services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import type { TabBar, TabId, TabManager } from './tabs';
-import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
+import { ContextDetailModal } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import type {
@@ -601,7 +599,7 @@ export class OpenCodianView extends ItemView {
       resolveServerAvailability: () => this.getServerAvailability(),
       isLocalServerMode: () => this.plugin.settings.server.mode === 'local',
       refreshContextUsageIndicator: () => {
-        this.refreshContextUsageIndicator();
+        this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
       openServerSettings: () => {
         this.openPluginSettingsAtServerSection();
@@ -713,9 +711,9 @@ export class OpenCodianView extends ItemView {
       mountContextUsageIndicator: (container) => {
         this.contextRingContainerEl = container;
         this.contextRing = new ContextRing(container, () => {
-          this.openContextUsageDetails();
+          this.activeTabContextUsageCoordinator.openContextUsageDetails();
         });
-        this.refreshContextUsageIndicator();
+        this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
       mountEffortSelector: (container) => {
         this.effortContainerEl = container;
@@ -1863,6 +1861,36 @@ export class OpenCodianView extends ItemView {
       },
       getSessionContextUsageSnapshot: (sessionId) =>
         this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId),
+      hasTab: (tabId) => Boolean(this.tabManager?.getTab(tabId)),
+      getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
+      setTabContextUsage: (tabId, contextUsage) => {
+        this.tabManager?.setTabContextUsage(tabId, contextUsage);
+      },
+      getActiveTabId: () => this.getActiveTabId(),
+      openContextUsageDetailsModal: (contextState) => {
+        new ContextDetailModal(this.app, {
+          conversation: this.currentConversation,
+          contextState,
+          systemPrompt: this.plugin.settings.systemPrompt,
+          rawMessageLoader: async () => {
+            const sessionId = this.currentConversation?.openCodeSessionId;
+            if (!sessionId) {
+              return [];
+            }
+
+            const messages = await this.plugin.openCodeService.getSessionMessages(sessionId);
+            return messages.map(({ info, parts }) => ({
+              id: info.id,
+              role: info.role,
+              createdAt: info.time.created ?? null,
+              payload: JSON.stringify({
+                message: info,
+                parts,
+              }, null, 2),
+            }));
+          },
+        }).open();
+      },
     };
   }
 
@@ -2465,7 +2493,7 @@ export class OpenCodianView extends ItemView {
         this.syncTabStreamLikeState(tabId);
       },
       beginTabContextUsageStream: (tabId) => {
-        this.beginTabContextUsageStream(tabId);
+        this.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId);
       },
       clearPendingEditedFiles: (tabId) => {
         this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId);
@@ -2555,13 +2583,13 @@ export class OpenCodianView extends ItemView {
       syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
         this.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
       beginTabContextUsageStream: (tabId) => {
-        this.beginTabContextUsageStream(tabId);
+        this.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId);
       },
       completeTabContextUsageStream: (tabId) => {
-        this.completeTabContextUsageStream(tabId);
+        this.activeTabContextUsageCoordinator.completeTabContextUsageStream(tabId);
       },
       applyUsageChunkToTab: (tabId, chunk) => {
-        this.applyUsageChunkToTab(tabId, chunk);
+        this.activeTabContextUsageCoordinator.applyUsageChunkToTab(tabId, chunk);
       },
       showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
       showQuestionDialog: (request, tabId) =>
@@ -4346,100 +4374,6 @@ export class OpenCodianView extends ItemView {
     } catch (error) {
       logger.error('Failed to open subagent session from task tool:', error);
       new Notice('Failed to open subagent session');
-    }
-  }
-
-  private openContextUsageDetails(): void {
-    const contextState = this.tabManager?.getActiveTabContextUsage() ?? null;
-    new ContextDetailModal(this.app, {
-      conversation: this.currentConversation,
-      contextState,
-      systemPrompt: this.plugin.settings.systemPrompt,
-      rawMessageLoader: async (): Promise<ContextRawMessageItem[]> => {
-        const sessionId = this.currentConversation?.openCodeSessionId;
-        if (!sessionId) {
-          return [];
-        }
-
-        const messages = await this.plugin.openCodeService.getSessionMessages(sessionId);
-        return messages.map(({ info, parts }) => ({
-          id: info.id,
-          role: info.role,
-          createdAt: info.time.created ?? null,
-          payload: JSON.stringify({
-            message: info,
-            parts,
-          }, null, 2),
-        }));
-      },
-    }).open();
-  }
-
-  private refreshContextUsageIndicator(): void {
-    if (!this.contextRing) {
-      return;
-    }
-
-    this.contextRing.update(this.tabManager?.getActiveTabContextUsage() ?? null);
-  }
-
-  private beginActiveTabContextUsageStream(): void {
-    this.beginTabContextUsageStream(this.getActiveTabId());
-  }
-
-  private completeActiveTabContextUsageStream(): void {
-    this.completeTabContextUsageStream(this.getActiveTabId());
-  }
-
-  private applyUsageChunkToActiveTab(
-    chunk: Extract<import('../../core/types').StreamChunk, { type: 'usage' }>,
-  ): void {
-    this.applyUsageChunkToTab(this.getActiveTabId(), chunk);
-  }
-
-  private beginTabContextUsageStream(tabId: TabId | null): void {
-    if (!this.tabManager?.getTab(tabId ?? '')) {
-      return;
-    }
-
-    const nextState = ContextUsageService.beginStream(
-      this.tabManager.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
-    );
-    this.tabManager.setTabContextUsage(tabId, nextState);
-    if (tabId === this.getActiveTabId()) {
-      this.refreshContextUsageIndicator();
-    }
-  }
-
-  private completeTabContextUsageStream(tabId: TabId | null): void {
-    if (!this.tabManager?.getTab(tabId ?? '')) {
-      return;
-    }
-
-    const nextState = ContextUsageService.completeStream(
-      this.tabManager.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
-    );
-    this.tabManager.setTabContextUsage(tabId, nextState);
-    if (tabId === this.getActiveTabId()) {
-      this.refreshContextUsageIndicator();
-    }
-  }
-
-  private applyUsageChunkToTab(
-    tabId: TabId | null,
-    chunk: Extract<import('../../core/types').StreamChunk, { type: 'usage' }>,
-  ): void {
-    if (!this.tabManager?.getTab(tabId ?? '')) {
-      return;
-    }
-
-    const nextState = ContextUsageService.applyUsageChunk(
-      this.tabManager.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
-      chunk,
-    );
-    this.tabManager.setTabContextUsage(tabId, nextState);
-    if (tabId === this.getActiveTabId()) {
-      this.refreshContextUsageIndicator();
     }
   }
 

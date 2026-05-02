@@ -15,6 +15,8 @@
 
 它不负责 stream chunk 的 usage 累积、stream begin/complete 标记，或 context ring 详情弹窗；这些职责仍分别留给 `ContextUsageService`、`OpenCodianView` 的 per-tab stream writeback 和 `ContextDetailModal`。它只承接 activation/open 与相邻 sync 路径上的 active-tab identity/snapshot writeback。
 
+> **注意（更新）**：stream lifecycle 方法（`beginTabContextUsageStream`、`completeTabContextUsageStream`、`applyUsageChunkToTab`）、详情弹窗打开（`openContextUsageDetails`）和 indicator 刷新（`refreshContextUsageIndicator`）现已从 `OpenCodianView` 移入本 coordinator。Host 接口相应扩展了 per-tab 操作和 modal 委托端口。
+
 ## 公开接口
 
 ```typescript
@@ -28,11 +30,21 @@ export interface ActiveTabContextUsageCoordinatorHost {
   setActiveTabContextUsage(contextUsage: TabContextState): void;
   renderContextUsageIndicator(state: TabContextState | null): void;
   getSessionContextUsageSnapshot(sessionId: string): Promise<ActiveTabContextUsageSnapshot | null>;
+  hasTab(tabId: string): boolean;
+  getTabContextUsage(tabId: TabId | null): TabContextState | null;
+  setTabContextUsage(tabId: TabId | null, contextUsage: TabContextState): void;
+  getActiveTabId(): TabId | null;
+  openContextUsageDetailsModal(contextState: TabContextState | null): void;
 }
 
 export class ActiveTabContextUsageCoordinator {
   syncIdentity(): void;
   refreshFromServer(): Promise<void>;
+  beginTabContextUsageStream(tabId: TabId | null): void;
+  completeTabContextUsageStream(tabId: TabId | null): void;
+  applyUsageChunkToTab(tabId: TabId | null, chunk: Extract<StreamChunk, { type: 'usage' }>): void;
+  openContextUsageDetails(): void;
+  refreshContextUsageIndicator(): void;
 }
 ```
 
@@ -50,7 +62,9 @@ export class ActiveTabContextUsageCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 继续保留 model catalog / current conversation / tab manager / context ring 的真实所有权
-- `ContextUsageService` 继续保留纯 state 变换逻辑；streaming usage chunk 的 begin/apply/complete 仍留在 view 的 per-tab runtime 写回
+- `ContextUsageService` 继续保留纯 state 变换逻辑；streaming usage chunk 的 begin/apply/complete 现在由本 coordinator 通过 host 的 per-tab 端口编排
+- 详情弹窗通过 `host.openContextUsageDetailsModal()` 委托给 `OpenCodianView`，后者持有 `ContextDetailModal` 的完整构造上下文（conversation、systemPrompt、rawMessageLoader）
+- indicator 刷新由 `refreshContextUsageIndicator()` 统一处理：从 host 读取 active-tab state，通过 `renderContextUsageIndicator` 回写
 - `TabViewActivationBridge` 只保留 pane、layout、selector、send-button 与 loaded post-render 编排，不再直接持有 context usage identity/snapshot host
 - `TabViewActivationBridge` 的 loaded-conversation hydration tail 现在只同步 identity，精确 snapshot 改为后台刷新；coordinator 继续负责 stale guard 和回写安全性
 - `TabConversationActivationBridge` 只保留 current-tab open shell/outcome 编排，不再直接持有 context usage identity/snapshot host

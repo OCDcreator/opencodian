@@ -495,7 +495,7 @@ session todo 这条子链路现在的边界是：
 - `SessionTodoDockCoordinator`：session todo dock 的 slot 生命周期，以及 active/background tab 的 session→dock 渲染选择
 - `QuestionTodoActivationRefreshCoordinator`：activation/open 侧的 question dock render、session todo dock writeback 与 supplemental refresh 编排
 - `BackgroundTaskActivationIndicatorCoordinator`：activation/open 侧的 background-task indicator reset、conversation-derived runtime rebuild 与 render trigger 编排
-- `ActiveTabContextUsageCoordinator`：activation/open 侧的 active-tab context usage identity / snapshot writeback 编排
+- `ActiveTabContextUsageCoordinator`：activation/open 侧的 active-tab context usage identity / snapshot writeback 编排，以及 per-tab stream lifecycle、indicator 刷新和详情弹窗打开
 - `QuestionRuntimeViewHostFactory`：question runtime 相邻的 dock/API/attention late-bound host 派生
 - `QuestionTodoBackgroundTaskRefreshHostAdapter`：`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncCoordinator` 与 `BackgroundConversationPostSyncHandoffCoordinator` 共用的 refresh-side host factory 与 service bundle 装配
 - `QuestionRuntimeHostAdapter`：`QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionDockCoordinator`、post-resolution follow-up 与 `QuestionResolutionFlowCoordinator` 共用的 host factory 与 service bundle 装配
@@ -561,7 +561,7 @@ background task notice 这条子链路现在的边界是：
 - `TabConversationStateBridge`：active-tab conversation/session 写回、pending question reset 与 sync baseline 提交
 - `TabConversationActivationBridge`：当前活动 tab 的 empty-state activation / current-tab 新建会话打开路径 shell orchestration 与后续 UI refresh 编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回与 streaming / empty-tab activation outcome UI 刷新
-- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback
+- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback，以及 per-tab stream lifecycle（begin/complete/apply-chunk）、indicator 刷新和详情弹窗打开
 - `ConversationTransitionBridge`：loaded-conversation 的 preflight cleanup、消息区 shell 与 hydration lifecycle bridge
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit
 - `ConversationHydrationRenderBridge`：loaded-conversation hydration 的消息容器 scroll/class shell 与 pane metrics 回写
