@@ -174,8 +174,8 @@ import {
 } from './services/ConversationHydrationRuntimeViewHostFactory';
 import { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
 import {
+  assembleConversationLoadRecovery,
   ConversationLoadRecoveryCoordinator,
-  createConversationLoadRecoveryHost,
 } from './services/ConversationLoadRecoveryCoordinator';
 import {
   ConversationNoticeCoordinator,
@@ -214,22 +214,19 @@ import {
   ConversationSyncRuntimeCoordinator,
 } from './services/ConversationSyncRuntimeCoordinator';
 import {
-  ConversationTabLifecycleRecoveryCoordinator,
   type ConversationTabLifecycleRecoveryHost,
 } from './services/ConversationTabLifecycleRecoveryCoordinator';
 import {
-  ConversationTabOpenCoordinator,
   type ConversationTabOpenHost,
 } from './services/ConversationTabOpenCoordinator';
 import {
+  assembleConversationTabRuntime,
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeState,
-  createConversationTabRuntimeCoordinator,
   type TabBarMutableState,
 } from './services/ConversationTabRuntimeCoordinator';
 import {
   type ConversationViewStateHost,
-  ConversationViewStateService,
 } from './services/ConversationViewStateService';
 import {
   InputPanelAppearanceCoordinator,
@@ -1548,34 +1545,16 @@ export class OpenCodianView extends ItemView {
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
       conversationSyncRuntime.conversationLoadRuntimeBridgeHost,
     );
-    const conversationViewStateService = new ConversationViewStateService({
-      host: this.createConversationViewStateHost(),
+    const loadRecoveryAssembly = assembleConversationLoadRecovery({
+      viewStateHost: this.createConversationViewStateHost(),
       tabConversationActivationBridge,
       tabViewActivationBridge,
       conversationHydrationOutcomeBridge,
       conversationTransitionBridge,
       conversationLoadRuntimeBridge,
-    });
-    const conversationTabOpenCoordinator = new ConversationTabOpenCoordinator(
-      this.createConversationTabOpenHost(),
-      {
-        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
-        openConversationInCurrentTab: (conversation) => {
-          tabConversationActivationBridge.openConversation(conversation);
-        },
-      },
-    );
-    const conversationTabLifecycleRecoveryCoordinator =
-      new ConversationTabLifecycleRecoveryCoordinator(
-        this.createConversationTabLifecycleRecoveryHost(),
-        {
-          activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
-          createConversationInNewTab: () =>
-            conversationTabOpenCoordinator.createConversationInNewTab(),
-        },
-      );
-    const conversationLoadRecoveryCoordinator = new ConversationLoadRecoveryCoordinator(
-      createConversationLoadRecoveryHost({
+      tabOpenHost: this.createConversationTabOpenHost(),
+      lifecycleRecoveryHost: this.createConversationTabLifecycleRecoveryHost(),
+      loadRecoveryHostDeps: {
         isActiveTabStreaming: () => this.isActiveTabStreaming(),
         getCurrentConversation: () => this.currentConversation,
         getTabManager: () => this.tabManager,
@@ -1601,26 +1580,13 @@ export class OpenCodianView extends ItemView {
           this.tabConversationStateBridge.syncActiveTabConversation(conversation);
         },
         updateModelSelectorDisplay: () => { this.updateModelSelectorDisplay(); },
-      }),
-      {
-        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
-        createConversationInNewTab: () =>
-          conversationTabOpenCoordinator.createConversationInNewTab(),
-        createConversationInCurrentTab: () =>
-          conversationTabOpenCoordinator.createConversationInCurrentTab(),
-        loadConversation: (id, options) =>
-          conversationViewStateService.loadConversation(id, options),
-        deleteConversationsAndRecover: (conversationIds) =>
-          conversationTabLifecycleRecoveryCoordinator.deleteConversationsAndRecover(
-            conversationIds,
-          ),
-        deleteAllConversationsAndReset: (conversationIds) =>
-          conversationTabLifecycleRecoveryCoordinator.deleteAllConversationsAndReset(
-            conversationIds,
-          ),
       },
-    );
-    const conversationTabRuntimeCoordinator = createConversationTabRuntimeCoordinator({
+    });
+    const {
+      conversationLoadRecoveryCoordinator,
+      conversationTabLifecycleRecoveryCoordinator,
+    } = loadRecoveryAssembly;
+    const conversationTabRuntimeCoordinator = assembleConversationTabRuntime({
       tabBarState: this.createTabBarMutableState(),
       settings: this.plugin.settings,
       plugin: this.plugin,

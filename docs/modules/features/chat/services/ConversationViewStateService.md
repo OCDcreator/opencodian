@@ -27,6 +27,18 @@ export interface ConversationViewStateHost {
   // 省略若干 host 回调
 }
 
+export type TabConversationActivationPort = Pick<
+  TabConversationActivationBridge,
+  | 'applyEmptyTabActivation'
+  | 'applyLoadedConversationActivation'
+  | 'applyStreamingConversationActivation'
+>;
+
+export type TabViewActivationPort = Pick<
+  TabViewActivationBridge,
+  'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'
+>;
+
 export class ConversationViewStateService {
   activateTab(tabId: string): Promise<void>;
   loadConversation(id: string, options?: LoadConversationOptions): Promise<void>;

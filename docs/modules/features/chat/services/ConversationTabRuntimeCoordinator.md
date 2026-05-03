@@ -108,6 +108,8 @@ export function createConversationTabRuntimeCoordinator<Runtime>(
   deps: ConversationTabRuntimeCoordinatorDependencies<Runtime>,
 ): ConversationTabRuntimeCoordinator<Runtime>;
 
+export { createConversationTabRuntimeCoordinator as assembleConversationTabRuntime };
+
 export interface ConversationTabRuntimeCoordinatorPorts {
   activateTab(tabId: TabId): Promise<void>;
   closeTabAndRecover(tabId: TabId): Promise<void>;
@@ -163,6 +165,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 
 - `OpenCodianView` 仍定义完整 `TabRuntimeState` shape，并保留真实 DOM slots、settings、plugin save、session status 与 pane host wiring
 - `OpenCodianView` 通过 `createConversationTabRuntimeCoordinator(deps)` 一次性获得协调器实例，不再手动构造 `new ConversationTabRuntimeCoordinator(host, pane, ports)`
+- `assembleConversationTabRuntime(deps)` 作为同义导出，供 `OpenCodianView` 的 `createConversationRuntimeWiring` 使用，避免在视图内直接调用 `createConversationTabRuntimeCoordinator`
 - `TabBarMutableState` 是 view 与 coordinator 之间的共享可变状态桥接；view 的 `tabManager`、`tabBar`、`tabBarMountEl` 通过 getter/setter 适配器写入该对象
 - `ConversationTabRuntimeCoordinator` 只负责 tab runtime lifecycle 的编排，不接管 message render、send pipeline、opencode transport、question dock 或 todo runtime 语义
 - `ConversationLoadRecoveryCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationViewStateService` 继续拥有各自 conversation/recovery/load 细节；本模块只是把 tab-facing lifecycle 入口收束成单一 coordinator surface

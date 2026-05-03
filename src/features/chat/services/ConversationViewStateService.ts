@@ -26,14 +26,14 @@ export interface ConversationViewStateHost {
   getTabManager(): ConversationViewStateTabManager | null;
 }
 
-type TabConversationActivationPort = Pick<
+export type TabConversationActivationPort = Pick<
   TabConversationActivationBridge,
   | 'applyEmptyTabActivation'
   | 'applyLoadedConversationActivation'
   | 'applyStreamingConversationActivation'
 >;
 
-type TabViewActivationPort =
+export type TabViewActivationPort =
   Pick<
     TabViewActivationBridge,
     'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'

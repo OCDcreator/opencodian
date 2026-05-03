@@ -174,6 +174,8 @@ export function createConversationTabRuntimeCoordinator<
   });
 }
 
+export { createConversationTabRuntimeCoordinator as assembleConversationTabRuntime };
+
 export class ConversationTabRuntimeCoordinator<
   Runtime extends ConversationTabRuntimeState = ConversationTabRuntimeState,
 > {

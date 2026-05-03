@@ -14,13 +14,30 @@ import {
 } from '../../../shared';
 import { chooseForkTarget, type ForkTarget } from '../../../shared/modals';
 import { cloneMessagesBeforeForkTarget } from '../forkMessages';
+import type { ConversationHydrationOutcomePort } from '../runtime/ConversationHydrationOutcomeBridge';
+import type { ConversationLoadRuntimePort } from '../runtime/ConversationLoadRuntimeBridge';
+import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
+import type { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
 import type {
   RestoredTabState,
   TabData,
   TabId,
   TabModelOverride,
 } from '../tabs';
+import {
+  ConversationTabLifecycleRecoveryCoordinator,
+  type ConversationTabLifecycleRecoveryHost,
+} from './ConversationTabLifecycleRecoveryCoordinator';
+import {
+  ConversationTabOpenCoordinator,
+  type ConversationTabOpenHost,
+} from './ConversationTabOpenCoordinator';
 import type { LoadConversationOptions } from './ConversationViewStateService';
+import {
+  type ConversationViewStateHost,
+  ConversationViewStateService,
+  type TabViewActivationPort,
+} from './ConversationViewStateService';
 
 const logger = createLogger('ConversationLoadRecoveryCoordinator');
 
@@ -431,4 +448,84 @@ export class ConversationLoadRecoveryCoordinator {
     const baseTitle = sourceTitle?.trim() || t('chat.tab.new');
     return `Fork: ${baseTitle}`;
   }
+}
+
+export interface ConversationLoadRecoveryAssemblyDependencies {
+  viewStateHost: ConversationViewStateHost;
+  tabConversationActivationBridge: TabConversationActivationBridge;
+  tabViewActivationBridge: TabViewActivationPort;
+  conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
+  conversationTransitionBridge: ConversationTransitionPort;
+  conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
+  tabOpenHost: ConversationTabOpenHost;
+  lifecycleRecoveryHost: ConversationTabLifecycleRecoveryHost;
+  loadRecoveryHostDeps: ConversationLoadRecoveryHostDependencies;
+}
+
+export interface ConversationLoadRecoveryAssemblyResult {
+  conversationViewStateService: ConversationViewStateService;
+  conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
+  conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
+  conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
+}
+
+export function assembleConversationLoadRecovery(
+  deps: ConversationLoadRecoveryAssemblyDependencies,
+): ConversationLoadRecoveryAssemblyResult {
+  const conversationViewStateService = new ConversationViewStateService({
+    host: deps.viewStateHost,
+    tabConversationActivationBridge: deps.tabConversationActivationBridge,
+    tabViewActivationBridge: deps.tabViewActivationBridge,
+    conversationHydrationOutcomeBridge: deps.conversationHydrationOutcomeBridge,
+    conversationTransitionBridge: deps.conversationTransitionBridge,
+    conversationLoadRuntimeBridge: deps.conversationLoadRuntimeBridge,
+  });
+
+  const conversationTabOpenCoordinator = new ConversationTabOpenCoordinator(
+    deps.tabOpenHost,
+    {
+      activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
+      openConversationInCurrentTab: (conversation) => {
+        deps.tabConversationActivationBridge.openConversation(conversation);
+      },
+    },
+  );
+
+  const conversationTabLifecycleRecoveryCoordinator =
+    new ConversationTabLifecycleRecoveryCoordinator(
+      deps.lifecycleRecoveryHost,
+      {
+        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
+        createConversationInNewTab: () =>
+          conversationTabOpenCoordinator.createConversationInNewTab(),
+      },
+    );
+
+  const conversationLoadRecoveryCoordinator = new ConversationLoadRecoveryCoordinator(
+    createConversationLoadRecoveryHost(deps.loadRecoveryHostDeps),
+    {
+      activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
+      createConversationInNewTab: () =>
+        conversationTabOpenCoordinator.createConversationInNewTab(),
+      createConversationInCurrentTab: () =>
+        conversationTabOpenCoordinator.createConversationInCurrentTab(),
+      loadConversation: (id, options) =>
+        conversationViewStateService.loadConversation(id, options),
+      deleteConversationsAndRecover: (conversationIds) =>
+        conversationTabLifecycleRecoveryCoordinator.deleteConversationsAndRecover(
+          conversationIds,
+        ),
+      deleteAllConversationsAndReset: (conversationIds) =>
+        conversationTabLifecycleRecoveryCoordinator.deleteAllConversationsAndReset(
+          conversationIds,
+        ),
+    },
+  );
+
+  return {
+    conversationViewStateService,
+    conversationTabOpenCoordinator,
+    conversationTabLifecycleRecoveryCoordinator,
+    conversationLoadRecoveryCoordinator,
+  };
 }

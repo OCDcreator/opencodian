@@ -68,6 +68,29 @@ export function createConversationLoadRecoveryHost(
   deps: ConversationLoadRecoveryHostDependencies,
 ): ConversationLoadRecoveryHost;
 
+export interface ConversationLoadRecoveryAssemblyDependencies {
+  viewStateHost: ConversationViewStateHost;
+  tabConversationActivationBridge: TabConversationActivationBridge;
+  tabViewActivationBridge: TabViewActivationPort;
+  conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
+  conversationTransitionBridge: ConversationTransitionPort;
+  conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
+  tabOpenHost: ConversationTabOpenHost;
+  lifecycleRecoveryHost: ConversationTabLifecycleRecoveryHost;
+  loadRecoveryHostDeps: ConversationLoadRecoveryHostDependencies;
+}
+
+export interface ConversationLoadRecoveryAssemblyResult {
+  conversationViewStateService: ConversationViewStateService;
+  conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
+  conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
+  conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
+}
+
+export function assembleConversationLoadRecovery(
+  deps: ConversationLoadRecoveryAssemblyDependencies,
+): ConversationLoadRecoveryAssemblyResult;
+
 export interface ConversationLoadRecoveryPort {
   activateTab(tabId: TabId): Promise<void>;
   createConversationInNewTab(): Promise<void>;
@@ -112,4 +135,5 @@ export class ConversationLoadRecoveryCoordinator {
 - `OpenCodianView` 传入更低层级的扁平依赖对象（含 `app`、`setPersistedTabState` 等），不再传入 `chooseForkTarget` / `confirmRewind` / `showNotice` / `resetPersistedTabState` 回调
 - `ConversationLoadRecoveryCoordinator` 负责把 create/load/bootstrap/delete-recovery/fork/rewind 入口拼成一条可读的 lifecycle surface，并直接承接 first-open / persisted-restore 决策
 - `ConversationViewStateService`、`ConversationTabOpenCoordinator` 与 `ConversationTabLifecycleRecoveryCoordinator` 继续各自保有更细的 activation / open / delete 语义
+- `assembleConversationLoadRecovery(deps)` 顶层工厂进一步把 `ConversationViewStateService`、`ConversationTabOpenCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationLoadRecoveryCoordinator` 的组装收束到此文件；`OpenCodianView` 的 `createConversationRuntimeWiring` 不再直接 `new` 这四个服务，而是改为调用此工厂
 - 因此后续若继续推进相邻 residual，只需要沿这个 coordinator surface 往下收，而不必重新回到 `OpenCodianView` 里寻找分散入口
