@@ -5,9 +5,6 @@ import type {
 import {
   type ConversationLoadRuntimeBridgeHost,
 } from '../runtime/ConversationLoadRuntimeBridge';
-import {
-  createConversationSyncLoadRuntimeHosts,
-} from '../runtime/ConversationSyncLoadRuntimeHostAdapter';
 import type { TabData, TabId } from '../tabs';
 import {
   type ConversationSyncBackgroundPostSyncHandoffPort,
@@ -22,6 +19,9 @@ import {
   type ConversationSyncBridgeSyncResult,
   createConversationSyncBridgePorts,
 } from './ConversationSyncBridge';
+import {
+  createConversationSyncLoadRuntimeViewHosts,
+} from './ConversationSyncLoadRuntimeViewHostFactory';
 import {
   type ConversationSyncOrchestrationHost,
   ConversationSyncOrchestrationService,
@@ -186,41 +186,7 @@ export interface ConversationSyncRuntimeAssemblyDeps {
 export function assembleConversationSyncRuntime(
   deps: ConversationSyncRuntimeAssemblyDeps,
 ): ConversationSyncRuntimeAssembly {
-  const syncLoadHosts = createConversationSyncLoadRuntimeHosts({
-    getCurrentConversation: () => deps.viewHost.getCurrentConversation(),
-    getActiveTabId: () => deps.viewHost.getActiveTabId(),
-    getAllTabs: () => deps.viewHost.getAllTabs(),
-    getTab: (tabId) => deps.viewHost.getTab(tabId),
-    getTabRuntimeState: (tabId) => deps.viewHost.getTabRuntimeState(tabId),
-    loadConversations: () => deps.viewHost.loadConversations(),
-    getConversationById: (id) => deps.viewHost.getConversationById(id),
-    shouldSyncConversationFromServer: (conversation, options) => {
-      const shouldSyncInterrupted = !deps.viewHost.hasInterruptedLocalAssistantTail(conversation.messages)
-        && conversation.messages.some((message) =>
-          message.displayStyle !== 'notice'
-          && !message.sourceMessageId
-        );
-      return Boolean(
-        options.forceServerSync
-        || !conversation.messages
-        || conversation.messages.length === 0
-        || shouldSyncInterrupted,
-      );
-    },
-    getConversationSyncFingerprint: (messages) =>
-      deps.viewHost.getConversationSyncFingerprint(messages),
-    syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
-      deps.viewHost.syncConversationMessagesFromServer(conversation, tabId, reason, options),
-    syncConversationMessagesFromCanonicalState: (conversation, tabId, reason, options) =>
-      deps.viewHost.syncConversationMessagesFromCanonicalState(conversation, tabId, reason, options),
-    setCurrentConversationRevertState: (revertState) => {
-      deps.viewHost.setCurrentConversationRevertState(revertState);
-    },
-    applySyncedConversationUpdate: (previousMessages, nextMessages) =>
-      deps.viewHost.applySyncedConversationUpdate(previousMessages, nextMessages),
-    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-      deps.viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
-  });
+  const syncLoadHosts = createConversationSyncLoadRuntimeViewHosts(deps.viewHost);
 
   const services = createConversationSyncServices(
     syncLoadHosts.conversationSyncViewHost,

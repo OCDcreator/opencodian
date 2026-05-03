@@ -62,7 +62,7 @@ export function assembleConversationSyncRuntime(deps): ConversationSyncRuntimeAs
 ### full sync assembly
 
 - `assembleConversationSyncRuntime()` 合并了 sync load host 派生、sync services 创建、bridge ports 装配三步
-- 内部调用 `createConversationSyncLoadRuntimeHosts` 从 view host 派生 sync host 和 load bridge host
+- 内部委托 `createConversationSyncLoadRuntimeViewHosts`（来自 `ConversationSyncLoadRuntimeViewHostFactory`）从 view host 派生 sync host 和 load bridge host，避免重复映射
 - 内部调用 `createConversationSyncServices` 创建 runtime coordinator、orchestration service、bridge
 - 内部从已创建的 bridge 派生 bridge port host，消除了 OpenCodianView 需要先创建 bridge 再创建 ports 的循环依赖
 - 返回 `conversationLoadRuntimeBridgeHost` 供 `ConversationLoadRuntimeBridge` 使用
