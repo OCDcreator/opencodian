@@ -208,4 +208,56 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
     expect(noticeStateService.handleStoppedPendingLaunches).not.toHaveBeenCalled();
     expect(resetBackgroundTaskIndicator).toHaveBeenCalledWith('tab-1');
   });
+
+});
+
+describe('BackgroundTaskLiveSignalCoordinator constructor', () => {
+  it('accepts builder host directly and wraps it with createBackgroundTaskLiveSignalCoordinatorHost', () => {
+    const runtime: BackgroundTaskLiveSignalRuntime = {
+      isStreaming: false,
+      isHydratingConversation: false,
+      backgroundTaskStartedAt: Date.now() - 30_000,
+      backgroundTaskModeTag: null,
+      backgroundTaskLaunches: new Map(),
+      backgroundTaskWaitingForFollowUp: false,
+      backgroundTaskAwaitingAuthoritativeSync: true,
+      backgroundTaskLastAuthoritativeSyncAt: null,
+    };
+    const sessionTodoStateService = {
+      hasIncompleteTabSessionTodos: jest.fn().mockReturnValue(false),
+      reconcileStaleSessionTodoState: jest.fn(),
+    };
+    const timelineService = {
+      getPendingLaunches: jest.fn().mockReturnValue([]),
+    };
+    const noticeStateService = {
+      handleStoppedPendingLaunches: jest.fn().mockResolvedValue(undefined),
+    };
+    const getTabRuntimeState = jest.fn().mockReturnValue(runtime);
+    const getSessionIdForTab = jest.fn().mockReturnValue('session-1');
+    const getTabSessionStatus = jest.fn().mockReturnValue(null);
+    const syncTabStreamLikeState = jest.fn();
+    const resetBackgroundTaskIndicator = jest.fn();
+
+    const builderHost = {
+      getTabRuntimeState,
+      getSessionIdForTab,
+      getTabSessionStatus,
+      syncTabStreamLikeState,
+      resetBackgroundTaskIndicator,
+    };
+
+    const service = new BackgroundTaskLiveSignalCoordinator(
+      sessionTodoStateService,
+      timelineService,
+      noticeStateService,
+      builderHost,
+    );
+
+    service.hasIndicator('tab-1');
+    expect(getTabRuntimeState).toHaveBeenCalledWith('tab-1');
+
+    service.reconcileStateFromLiveSignals('tab-1');
+    expect(syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
+  });
 });

@@ -72,13 +72,16 @@ export function createBackgroundTaskLiveSignalCoordinatorHost(
 }
 
 export class BackgroundTaskLiveSignalCoordinator {
+  private readonly host: BackgroundTaskLiveSignalCoordinatorHost;
+
   constructor(
     private readonly sessionTodoStateService: BackgroundTaskLiveSignalTodoPort,
     private readonly timelineService: BackgroundTaskLiveSignalTimelinePort,
     private readonly noticeStateService: BackgroundTaskLiveSignalNoticePort,
-    private readonly host: BackgroundTaskLiveSignalCoordinatorHost,
-  ) {}
-
+    builderHost: BackgroundTaskLiveSignalCoordinatorHostBuilderHost,
+  ) {
+    this.host = createBackgroundTaskLiveSignalCoordinatorHost(builderHost);
+  }
   hasIndicator(tabId: TabId | null): boolean {
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime?.backgroundTaskStartedAt) {

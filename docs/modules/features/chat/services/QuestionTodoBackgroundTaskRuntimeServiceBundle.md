@@ -55,6 +55,10 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
   host: QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
 ): QuestionTodoBackgroundTaskRuntimeServiceBundle;
 
+export function createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam(
+  seam: QuestionTodoBackgroundTaskRuntimeSeam,
+): QuestionTodoBackgroundTaskRuntimeServiceBundle;
+
 export interface QuestionTodoBackgroundTaskRuntimeSeam
   extends Omit<
     QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
@@ -75,6 +79,7 @@ export function assembleQuestionTodoBackgroundTaskRuntimeHost(
 - `assembleQuestionTodoBackgroundTaskRuntimeHost()` 从 seam 接口组装完整 host，把 `getBackgroundTaskHost()` 的 3 个方法（reset、sync、render）展开为 host 扁平属性；其余 seam 属性直接透传。这保证了 late binding——每次调用 reset/sync/render 时都重新解析最新的 backgroundTaskHost
 - `createQuestionTodoBackgroundTaskRuntimeViewHosts()` 直接从扁平 runtime seam 组装 visible-state、refresh、background handoff、activation 共用的 host，并额外把 active-tab / session lookup + session todo bridge 收束成 `backgroundTaskStreamTriggerViewHost`
 - `createQuestionTodoBackgroundTaskRuntimeServiceBundle()` 复用这份 shared host，再创建 visible-state services、refresh services、activation services，保留原有依赖顺序，并把 stream-trigger host 一并回传
+- `createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam()` 是新的便捷工厂，它内部调用 `assembleQuestionTodoBackgroundTaskRuntimeHost(seam)` 再传给 `createQuestionTodoBackgroundTaskRuntimeServiceBundle()`，让调用方（如 `OpenCodianView`）只需构造 seam 对象即可完成整个 bundle 的组装
 - `VisibleConversationPostSyncStateCoordinator` 继续作为 bundle 内部依赖存在，而 activation/open 与 post-sync 共用的 supplemental refresh 则直接复用 bundle 内部的 `QuestionTodoStatusRefreshCoordinator`
 - 返回值只暴露 visible/background post-sync、activation 两侧真正需要的 coordinator，以及 stream-trigger runtime host，缩小 view 构造函数对中间 wiring 细节的感知面
 
@@ -82,7 +87,7 @@ export function assembleQuestionTodoBackgroundTaskRuntimeHost(
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 不再拥有 `createQuestionTodoBackgroundTaskRuntimeServiceBundleHost` 方法，改为构造 `QuestionTodoBackgroundTaskRuntimeSeam` 并传给本模块的 `createQuestionTodoBackgroundTaskRuntimeServiceBundleHost()` 工厂
+- `OpenCodianView` 不再内联组装 `assembleQuestionTodoBackgroundTaskRuntimeHost()`，改为构造 `QuestionTodoBackgroundTaskRuntimeSeam` 并传给本模块的 `createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam()` 工厂
 - seam 中 `getBackgroundTaskHost()` 返回 `this.backgroundTaskHost`，由工厂在每次调用时 late-resolve，保证 host 在 `createConversationRuntimeWiring()` 中赋值后才真正被消费
 - 主调用链从 `OpenCodianView -> RuntimeServiceBundle -> RuntimeHostProvider -> RuntimeViewHostFactory -> adapter/services` 缩短为 `OpenCodianView -> RuntimeServiceBundle -> adapter/services`
 - refresh、visible state、background handoff、activation 与 stream-trigger host assembly 的业务边界仍分别留在原有 adapter / coordinator 模块

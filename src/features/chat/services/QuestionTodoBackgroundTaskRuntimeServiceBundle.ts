@@ -269,3 +269,11 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
     backgroundTaskStreamTriggerViewHost: runtimeViewHosts.backgroundTaskStreamTriggerViewHost,
   };
 }
+
+export function createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam(
+  seam: QuestionTodoBackgroundTaskRuntimeSeam,
+): QuestionTodoBackgroundTaskRuntimeServiceBundle {
+  return createQuestionTodoBackgroundTaskRuntimeServiceBundle(
+    assembleQuestionTodoBackgroundTaskRuntimeHost(seam),
+  );
+}

@@ -10,6 +10,7 @@ import * as QuestionTodoBackgroundTaskRefreshHostAdapterModule from '../../../..
 import {
   assembleQuestionTodoBackgroundTaskRuntimeHost,
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
+  createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam,
   type QuestionTodoBackgroundTaskRuntimeSeam,
   type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
@@ -263,5 +264,83 @@ describe('assembleQuestionTodoBackgroundTaskRuntimeHost', () => {
     expect(bundle.backgroundTaskStreamTriggerViewHost.getActiveTabId()).toBe('tab-active');
     expect(bundle.backgroundTaskStreamTriggerViewHost.getSessionIdForTab('tab-active'))
       .toBe('session-active');
+  });
+});
+
+describe('createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('assembles the host from the seam and produces the same bundle as the two-step flow', () => {
+    const seam = createSeam();
+    const visibleConversationPostSyncStateServices =
+      createVisibleConversationPostSyncStateServices();
+    const questionTodoBackgroundTaskRefreshServices =
+      createQuestionTodoBackgroundTaskRefreshServices();
+    const questionTodoBackgroundTaskActivationServices =
+      createQuestionTodoBackgroundTaskActivationServices();
+    jest.spyOn(
+      VisibleConversationPostSyncStateHostAdapterModule,
+      'createVisibleConversationPostSyncStateServices',
+    ).mockReturnValue(visibleConversationPostSyncStateServices);
+    jest.spyOn(
+      QuestionTodoBackgroundTaskRefreshHostAdapterModule,
+      'createQuestionTodoBackgroundTaskRefreshServices',
+    ).mockReturnValue(questionTodoBackgroundTaskRefreshServices);
+    jest.spyOn(
+      QuestionTodoBackgroundTaskActivationHostAdapterModule,
+      'createQuestionTodoBackgroundTaskActivationServices',
+    ).mockReturnValue(questionTodoBackgroundTaskActivationServices);
+
+    const bundle = createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam(seam);
+
+    expect(bundle).toMatchObject({
+      visibleConversationPostSyncCoordinator:
+        questionTodoBackgroundTaskRefreshServices.visibleConversationPostSyncCoordinator,
+      backgroundConversationPostSyncHandoffCoordinator:
+        questionTodoBackgroundTaskRefreshServices.backgroundConversationPostSyncHandoffCoordinator,
+      questionTodoActivationRefreshCoordinator:
+        questionTodoBackgroundTaskActivationServices.questionTodoActivationRefreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator:
+        questionTodoBackgroundTaskActivationServices.backgroundTaskActivationIndicatorCoordinator,
+      backgroundTaskStreamTriggerViewHost: expect.any(Object),
+    });
+    expect(bundle.backgroundTaskStreamTriggerViewHost.getActiveTabId()).toBe('tab-active');
+    expect(bundle.backgroundTaskStreamTriggerViewHost.getSessionIdForTab('tab-active'))
+      .toBe('session-active');
+  });
+
+  it('delegates background task callbacks through the seam on each invocation', () => {
+    const seam = createSeam();
+    const visibleConversationPostSyncStateServices =
+      createVisibleConversationPostSyncStateServices();
+    const questionTodoBackgroundTaskRefreshServices =
+      createQuestionTodoBackgroundTaskRefreshServices();
+    const questionTodoBackgroundTaskActivationServices =
+      createQuestionTodoBackgroundTaskActivationServices();
+    jest.spyOn(
+      VisibleConversationPostSyncStateHostAdapterModule,
+      'createVisibleConversationPostSyncStateServices',
+    ).mockReturnValue(visibleConversationPostSyncStateServices);
+    jest.spyOn(
+      QuestionTodoBackgroundTaskRefreshHostAdapterModule,
+      'createQuestionTodoBackgroundTaskRefreshServices',
+    ).mockReturnValue(questionTodoBackgroundTaskRefreshServices);
+    jest.spyOn(
+      QuestionTodoBackgroundTaskActivationHostAdapterModule,
+      'createQuestionTodoBackgroundTaskActivationServices',
+    ).mockReturnValue(questionTodoBackgroundTaskActivationServices);
+
+    const bundle = createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam(seam);
+
+    bundle.backgroundTaskStreamTriggerViewHost.resetBackgroundTaskIndicator('tab-1');
+    expect(seam.getBackgroundTaskHost).toHaveBeenCalled();
+    expect(seam.getBackgroundTaskHost().resetBackgroundTaskIndicator)
+      .toHaveBeenCalledWith('tab-1');
   });
 });

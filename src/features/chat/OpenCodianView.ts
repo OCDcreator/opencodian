@@ -115,7 +115,6 @@ import {
 import {
   BackgroundTaskLiveSignalCoordinator,
   type BackgroundTaskLiveSignalCoordinatorHostBuilderHost,
-  createBackgroundTaskLiveSignalCoordinatorHost,
 } from './services/BackgroundTaskLiveSignalCoordinator';
 import {
   BackgroundTaskNoticeStateService,
@@ -252,8 +251,7 @@ import {
   type QuestionRuntimeViewHostFactoryHost,
 } from './services/QuestionRuntimeViewHostFactory';
 import {
-  assembleQuestionTodoBackgroundTaskRuntimeHost,
-  createQuestionTodoBackgroundTaskRuntimeServiceBundle,
+  createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam,
   type TabConversationSyncFingerprintRuntimePort,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
@@ -314,7 +312,7 @@ interface DeferredQuestionRequest {
 }
 
 type QuestionTodoBackgroundTaskRuntimeCoordinators = ReturnType<
-  typeof createQuestionTodoBackgroundTaskRuntimeServiceBundle
+  typeof createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam
 >;
 
 interface OpenCodianViewSurfaceRuntimeWiring {
@@ -1412,28 +1410,26 @@ export class OpenCodianView extends ItemView {
 
   private createBackgroundTaskRuntimeWiring(): OpenCodianViewBackgroundTaskRuntimeWiring {
     const questionTodoBackgroundTaskRuntime =
-      createQuestionTodoBackgroundTaskRuntimeServiceBundle(
-        assembleQuestionTodoBackgroundTaskRuntimeHost({
-          getActiveTabId: () => this.getActiveTabId(),
-          getCurrentConversation: () => this.currentConversation,
-          setCurrentConversationRevertState: (revertState) => {
-            this.currentConversationRevertState = revertState;
-          },
-          getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
-          getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-          getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-          renderSessionTodoDock: (tabId) => {
-            this.renderSessionTodoDock(tabId);
-          },
-          getQuestionDockCoordinator: () => this.questionDockCoordinator,
-          getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
-          getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-          getBackgroundTaskHost: () => this.backgroundTaskHost,
-          getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
-          getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
-          getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
-        }),
-      );
+      createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam({
+        getActiveTabId: () => this.getActiveTabId(),
+        getCurrentConversation: () => this.currentConversation,
+        setCurrentConversationRevertState: (revertState) => {
+          this.currentConversationRevertState = revertState;
+        },
+        getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
+        getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+        getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+        renderSessionTodoDock: (tabId) => {
+          this.renderSessionTodoDock(tabId);
+        },
+        getQuestionDockCoordinator: () => this.questionDockCoordinator,
+        getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
+        getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
+        getBackgroundTaskHost: () => this.backgroundTaskHost,
+        getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
+        getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
+        getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
+      });
     const activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),
     );
@@ -1447,9 +1443,7 @@ export class OpenCodianView extends ItemView {
       this.sessionTodoCoordinator,
       backgroundTaskTimelineService,
       backgroundTaskNoticeStateService,
-      createBackgroundTaskLiveSignalCoordinatorHost(
-        this.createBackgroundTaskLiveSignalCoordinatorHostBuilderHost(),
-      ),
+      this.createBackgroundTaskLiveSignalCoordinatorHostBuilderHost(),
     );
 
     return {
