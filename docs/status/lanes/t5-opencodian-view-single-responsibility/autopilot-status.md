@@ -6,14 +6,26 @@
 
 ## Current State
 
-- round: 12
-- current_task: view-srp12-04
-- last_verified_source_commit: 9a32fd5d (move conversation recovery and tab runtime assembly into existing owners)
+- round: 13
+- current_task: (none — stop boundary reached)
+- last_verified_source_commit: b119fc90 (move task-tool session opening into existing tab/session owners and preserve no-tab sync semantics)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
-- queue_state: complete — all Round 12 tasks verified; queue can terminate
+- queue_state: complete — Round 13 endpoint reached; do not start Round 14
 - next_focus: (none — batch complete)
-- blocker_category: none
+- blocker_category: none — queue-side integration conflict was resolved by preserving the verified task commits and landing them manually
 - continue_loop: false
+
+## Round 13 — Stop Boundary Reached
+
+### view-srp13-03 — Move task-tool session opening into existing tab/session owners (DONE)
+- Moved task-tool session opening flow out of `OpenCodianView.ts` and into `ConversationTabOpenCoordinator`
+- Preserved the no-tab path by keeping `syncActiveTabConversation(...)` semantics before `loadConversation(...)` instead of regressing to full activation/open behavior
+- Verified with source tests, blocking review, and full `npm run verify`
+
+### view-srp13-04 — Finalize Round 13 and stop at the maintainability endpoint (DONE)
+- Reached the planned stop boundary after Round 13 instead of creating a Round 14 queue
+- Stopped because the next candidate slices were trending toward host/callback wiring and over-fragmentation rather than clean domain ownership moves
+- Land this branch on `main`, then delete the dedicated worktree
 
 ## Completed Tasks
 
