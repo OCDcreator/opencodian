@@ -168,9 +168,9 @@ import {
   type ConversationHistoryActionsHost,
 } from './services/ConversationHistoryActionsCoordinator';
 import {
+  assembleConversationHydrationRuntime,
   type ConversationHydrationRuntimeBridges,
   type ConversationHydrationRuntimeViewHost,
-  createConversationHydrationRuntimeBridges,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
 import { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
 import {
@@ -1486,11 +1486,11 @@ export class OpenCodianView extends ItemView {
       conversationHydrationRenderBridge,
       conversationTransitionBridge,
       conversationHydrationOutcomeBridge,
-    } = createConversationHydrationRuntimeBridges(
-      this.createConversationHydrationRuntimeViewHost(conversationRenderService),
+    } = assembleConversationHydrationRuntime({
+      host: this.createHydrationRuntimeHostDeps(conversationRenderService),
       tabConversationStateBridge,
       tabViewActivationBridge,
-    );
+    });
     const tabConversationActivationBridge = tabActivationAssembly.tabConversationActivationBridge;
     const tabRuntimeStateBridge = tabActivationAssembly.tabRuntimeStateBridge;
     const conversationSyncRuntime = assembleConversationSyncRuntime({
@@ -2201,6 +2201,42 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createHydrationRuntimeHostDeps(
+    conversationRenderService: ConversationRenderService,
+  ): ConversationHydrationRuntimeViewHost {
+    return {
+      getMessagesContainer: () => this.messagesContainer,
+      getActiveTabId: () => this.getActiveTabId(),
+      getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
+      scrollToBottom: ({ tabId }) => { this.scrollToBottom({ tabId }); },
+      syncPaneScrollMetrics: (tabId, messagesEl) => {
+        this.syncPaneScrollMetrics(tabId, messagesEl);
+      },
+      requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+      syncBackgroundTaskStateFromConversation: (conversation) => {
+        this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
+      },
+      reapplyConversationSessionVisualState: (conversation) => {
+        this.conversationSessionSettingsCoordinator.applyConversationVisualState(conversation);
+      },
+      renderMessages: (messages) => conversationRenderService.renderMessages(messages),
+      getCurrentConversation: () => this.currentConversation,
+      cancelTitleGeneration: (conversationId) => {
+        this.titleGenerationService.cancelConversation(conversationId);
+      },
+      clearPendingTitleGenerationStatus: (conversationId) =>
+        this.updateConversationTitleState(conversationId, { titleGenerationStatus: undefined }),
+      resetBackgroundTaskIndicator: () => {
+        this.backgroundTaskHost.resetBackgroundTaskIndicator();
+      },
+      clearScheduledScrollToBottom: () => { this.clearScheduledScrollToBottom(); },
+      beginConversationHydration: (tabId) => { this.beginConversationHydration(tabId); },
+      clearMessagesContainer: () => { this.messagesContainer?.empty(); },
+      resetTurnState: () => { this.resetTurnState(); },
+      endConversationHydration: (tabId) => { this.endConversationHydration(tabId); },
+    };
+  }
+
   private createConversationSessionSignalRuntimeHost():
   ConversationSessionSignalRuntimeHost {
     return {
@@ -2234,56 +2270,6 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationHydrationRuntimeViewHost(
-    conversationRenderService: ConversationRenderService,
-  ):
-  ConversationHydrationRuntimeViewHost {
-    return {
-      getMessagesContainer: () => this.messagesContainer,
-      getActiveTabId: () => this.getActiveTabId(),
-      getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
-      scrollToBottom: ({ tabId }) => {
-        this.scrollToBottom({ tabId });
-      },
-      syncPaneScrollMetrics: (tabId, messagesEl) => {
-        this.syncPaneScrollMetrics(tabId, messagesEl);
-      },
-      requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
-      syncBackgroundTaskStateFromConversation: (conversation) => {
-        this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
-      },
-      reapplyConversationSessionVisualState: (conversation) => {
-        this.conversationSessionSettingsCoordinator.applyConversationVisualState(conversation);
-      },
-      renderMessages: (messages) => conversationRenderService.renderMessages(messages),
-      getCurrentConversation: () => this.currentConversation,
-      cancelTitleGeneration: (conversationId) => {
-        this.titleGenerationService.cancelConversation(conversationId);
-      },
-      clearPendingTitleGenerationStatus: (conversationId) =>
-        this.updateConversationTitleState(conversationId, {
-          titleGenerationStatus: undefined,
-        }),
-      resetBackgroundTaskIndicator: () => {
-        this.backgroundTaskHost.resetBackgroundTaskIndicator();
-      },
-      clearScheduledScrollToBottom: () => {
-        this.clearScheduledScrollToBottom();
-      },
-      beginConversationHydration: (tabId) => {
-        this.beginConversationHydration(tabId);
-      },
-      clearMessagesContainer: () => {
-        this.messagesContainer?.empty();
-      },
-      resetTurnState: () => {
-        this.resetTurnState();
-      },
-      endConversationHydration: (tabId) => {
-        this.endConversationHydration(tabId);
-      },
-    };
-  }
 
   private createConversationViewStateHost(): ConversationViewStateHost {
     return {

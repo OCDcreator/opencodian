@@ -4,6 +4,7 @@ import { ConversationTransitionBridge } from '../../../../src/features/chat/runt
 import { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
 import { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import {
+  assembleConversationHydrationRuntime,
   type ConversationHydrationRuntimeViewHost,
   createConversationHydrationRuntimeBridges,
   createConversationHydrationRuntimeViewHosts,
@@ -189,6 +190,26 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
       tabConversationStateBridge,
       tabViewActivationBridge,
     );
+
+    expect(bridges.conversationHydrationRenderBridge)
+      .toBeInstanceOf(ConversationHydrationRenderBridge);
+    expect(bridges.conversationTransitionBridge).toBeInstanceOf(ConversationTransitionBridge);
+    expect(bridges.conversationHydrationOutcomeBridge)
+      .toBeInstanceOf(ConversationHydrationOutcomeBridge);
+    expect(bridges.conversationTransitionBridge.captureLoadedConversationTransition(false))
+      .toMatchObject({ activeTabId: 'tab-active' });
+  });
+
+  it('assembles full hydration runtime from deps object', () => {
+    const fixture = createFixture();
+    const tabConversationStateBridge = {} as TabConversationStateBridge;
+    const tabViewActivationBridge = {} as TabViewActivationBridge;
+
+    const bridges = assembleConversationHydrationRuntime({
+      host: fixture.host,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+    });
 
     expect(bridges.conversationHydrationRenderBridge)
       .toBeInstanceOf(ConversationHydrationRenderBridge);

@@ -141,3 +141,19 @@ export function createConversationHydrationRuntimeBridges(
     conversationHydrationOutcomeBridge,
   };
 }
+
+export interface ConversationHydrationRuntimeAssemblyDeps {
+  host: ConversationHydrationRuntimeViewHost;
+  tabConversationStateBridge: TabConversationStateBridge;
+  tabViewActivationBridge: TabViewActivationBridge;
+}
+
+export function assembleConversationHydrationRuntime(
+  deps: ConversationHydrationRuntimeAssemblyDeps,
+): ConversationHydrationRuntimeBridges {
+  return createConversationHydrationRuntimeBridges(
+    deps.host,
+    deps.tabConversationStateBridge,
+    deps.tabViewActivationBridge,
+  );
+}

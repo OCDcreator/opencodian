@@ -525,7 +525,7 @@ background task notice 这条子链路现在的边界是：
 - `ConversationTabLifecycleRecoveryCoordinator`：tab close / conversation delete / delete-all reset 后的 pane cleanup、next-active activation 与 fallback-create recovery 决策
 - `ConversationTransitionBridge`：loaded-conversation 的切换前 cleanup、消息区清空、turn reset 与 hydration lifecycle shell
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit 编排
-- `ConversationHydrationRuntimeViewHostFactory`：从扁平 view seam 派生 hydration render / transition / outcome host，并打包创建三段 hydration bridge
+- `ConversationHydrationRuntimeViewHostFactory`：通过 `assembleConversationHydrationRuntime` 一次性完成 hydration bridge 装配，从扁平 view seam 派生 hydration render / transition / outcome host，并打包创建三段 hydration bridge；view 不再直接调用 `createConversationHydrationRuntimeBridges`
 - `TabRuntimeStateBridge`：tab stream-like / background-task badge、rewind-fork 按钮禁用态与 attention 标记的 runtime→UI 写回
 - `QuestionTodoBackgroundTaskRefreshHostAdapter`：question/todo/background-task post-sync 三段 host wiring 与 service bundle 装配
 - `QuestionTodoStatusRefreshCoordinator`：activation/open 与 post-sync 共享的 status + pending-question + todo 组合刷新顺序，以及 todo/status refresh runtime gate
@@ -573,7 +573,7 @@ background task notice 这条子链路现在的边界是：
 - `ConversationTransitionBridge`：loaded-conversation 的 preflight cleanup、消息区 shell 与 hydration lifecycle bridge
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit
 - `ConversationHydrationRenderBridge`：loaded-conversation hydration 的消息容器 scroll/class shell 与 pane metrics 回写
-- `ConversationHydrationRuntimeViewHostFactory`：hydration bridge host 派生与 bridge bundle 创建，避免 view 直接维护三段构造顺序
+- `ConversationHydrationRuntimeViewHostFactory`：通过 `assembleConversationHydrationRuntime` 拥有完整的 hydration bridge assembly 生命周期，view 不再直接调用底层 bridge 构造函数
 - `SendPipelineRuntime`：发送子系统总入口，负责真实 stream 调用、runtime 内部模块装配，以及向 `MessageFinalizationService` 交接
 - `StreamChunkRouter`：发送子系统内部的 stream loop / pending / timeout / chunk router
 - `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
