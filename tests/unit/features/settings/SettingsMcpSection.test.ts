@@ -57,7 +57,10 @@ describe('SettingsMcpSection', () => {
   });
 
   it('renders MCP management panel shells for toolbar, stats, and server cards', async () => {
-    const plugin = createPlugin({ servers: {}, updatedAt: null });
+    const plugin = createPlugin({
+      servers: { connected: { status: 'connected' } },
+      updatedAt: null,
+    });
     const section = new SettingsMcpSection({
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -72,6 +75,8 @@ describe('SettingsMcpSection', () => {
     expect(containerEl.querySelector('.opencodian-mcp-overview-toolbar')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-toolbar-add')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-server-list-shell')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-server-card-actions')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-server-action-grid')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-add-form-layout')).toBeNull();
   });
 
@@ -195,7 +200,7 @@ describe('SettingsMcpSection', () => {
 
     const refreshRecord = buttonRecords[0];
     expect(refreshRecord).toBeDefined();
-    expect(refreshRecord!.control.setCta).toHaveBeenCalled();
+    expect(refreshRecord!.control.setCta).not.toHaveBeenCalled();
 
     await refreshRecord!.onClick?.();
     expect(refreshRecord!.control.setDisabled).toHaveBeenCalledWith(true);

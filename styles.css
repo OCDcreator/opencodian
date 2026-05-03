@@ -9712,15 +9712,40 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-mcp-refresh-setting,
-.opencodian-mcp-toolbar-add {
+.opencodian-mcp-toolbar-add,
+.opencodian-mcp-toolbar-add-setting {
   margin: 0;
   padding: 0;
   border: none;
+  background: transparent;
+  box-shadow: none;
+  min-height: auto;
+}
+
+.opencodian-mcp-refresh-setting .setting-item-info,
+.opencodian-mcp-toolbar-add-setting .setting-item-info,
+.opencodian-mcp-server-row-actions .setting-item-info,
+.opencodian-mcp-server-card-actions .setting-item-info {
+  display: none;
 }
 
 .opencodian-mcp-refresh-setting .setting-item-control,
-.opencodian-mcp-toolbar-add .setting-item-control {
+.opencodian-mcp-toolbar-add .setting-item-control,
+.opencodian-mcp-toolbar-add-setting .setting-item-control {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
   justify-content: flex-end;
+}
+
+.opencodian-mcp-overview-toolbar-actions button {
+  background: transparent;
+  box-shadow: none;
+}
+
+.opencodian-mcp-overview-toolbar-actions button:hover,
+.opencodian-mcp-overview-toolbar-actions button:focus-visible {
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
 }
 
 .opencodian-mcp-overview {
@@ -9827,9 +9852,16 @@ body[data-opencodian-provider-icon-mode="color"] {
 .opencodian-mcp-server-row-actions,
 .opencodian-mcp-server-card-actions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
+}
+
+.opencodian-mcp-server-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .opencodian-mcp-server-row-actions .setting-item,
@@ -9837,10 +9869,16 @@ body[data-opencodian-provider-icon-mode="color"] {
   margin: 0;
   padding: 0;
   border: none;
+  background: transparent;
+  box-shadow: none;
+  min-height: auto;
 }
 
 .opencodian-mcp-server-row-actions .setting-item-control,
 .opencodian-mcp-server-card-actions .setting-item-control {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
   justify-content: flex-end;
 }
 
@@ -12212,6 +12250,10 @@ body[data-opencodian-provider-icon-mode="color"] {
 
   .opencodian-mcp-server-row-actions,
   .opencodian-mcp-server-card-actions {
+    align-items: flex-start;
+  }
+
+  .opencodian-mcp-server-action-grid {
     justify-content: flex-start;
   }
 

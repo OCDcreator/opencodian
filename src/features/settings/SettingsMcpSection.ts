@@ -198,7 +198,6 @@ export class SettingsMcpSection {
         this.refreshButton = button;
         button
           .setButtonText(t('settings.server.mcp.refresh'))
-          .setCta()
           .onClick(() => {
             void this.triggerRefresh();
           });
@@ -209,7 +208,6 @@ export class SettingsMcpSection {
         this.actionButtons.push({ button, stickyDisabled: false });
         button
           .setButtonText(t('settings.server.mcp.add.submit'))
-          .setCta()
           .onClick(() => {
             this.openAddModal();
           });
@@ -387,13 +385,17 @@ export class SettingsMcpSection {
       projectEntry,
       projectEntryEditable,
     } = context;
-    parent.createDiv({ cls: 'opencodian-mcp-runtime-switch-label', text: t('settings.server.mcp.runtimeSwitch.label') });
+    parent.createDiv({
+      cls: 'opencodian-mcp-runtime-switch-label',
+      text: t('settings.server.mcp.runtimeSwitch.label'),
+    });
+    const buttonGrid = parent.createDiv({ cls: 'opencodian-mcp-server-action-grid' });
     const addActionButton = (
       label: string,
       onClick: () => Promise<void>,
       options: { disabled?: boolean } = {},
     ) => {
-      new Setting(parent).addButton((button) => {
+      new Setting(buttonGrid).addButton((button) => {
         this.actionButtons.push({ button, stickyDisabled: options.disabled === true });
         button
           .setButtonText(label)
