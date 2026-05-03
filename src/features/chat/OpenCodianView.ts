@@ -22,7 +22,6 @@ import {
   type QuestionRequest,
   type QuestionResolution,
   type SessionTodo,
-  type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
 import type { EffortLevel, PermissionMode, ThinkingBudget } from '../../core/types/settings';
@@ -216,6 +215,7 @@ import {
   type ConversationTabLifecycleRecoveryHost,
 } from './services/ConversationTabLifecycleRecoveryCoordinator';
 import {
+  ConversationTabOpenCoordinator,
   type ConversationTabOpenHost,
 } from './services/ConversationTabOpenCoordinator';
 import {
@@ -508,6 +508,7 @@ export class OpenCodianView extends ItemView {
   private tabActivationConversationSyncRuntimePort!: TabActivationConversationSyncRuntimePort;
   private conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
   private conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
+  private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   private conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<TabRuntimeState>;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -591,7 +592,7 @@ export class OpenCodianView extends ItemView {
       },
       getMessagesContainerEl: () => this.messagesContainer,
       openTaskToolSession: (sessionId) => {
-        void this.openTaskToolSession(sessionId);
+        void this.conversationTabOpenCoordinator.openTaskToolSession(sessionId);
       },
     };
   }
@@ -1020,7 +1021,7 @@ export class OpenCodianView extends ItemView {
         },
       }, {
         onOpenToolSession: (sessionId, toolCall) => {
-          void this.openTaskToolSession(sessionId, toolCall);
+          void this.conversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall);
         },
       });
       paneState.runtime.streamController.setCallbacks({
@@ -1578,8 +1579,10 @@ export class OpenCodianView extends ItemView {
     });
     const {
       conversationLoadRecoveryCoordinator,
+      conversationTabOpenCoordinator,
       conversationTabLifecycleRecoveryCoordinator,
     } = loadRecoveryAssembly;
+    this.conversationTabOpenCoordinator = conversationTabOpenCoordinator;
     const conversationTabRuntimeCoordinator = assembleConversationTabRuntime({
       tabBarState: this.createTabBarMutableState(),
       settings: this.plugin.settings,
@@ -2243,6 +2246,10 @@ export class OpenCodianView extends ItemView {
       getMaxTabs: () => this.plugin.settings.maxTabs,
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       createConversation: () => this.plugin.createConversation(),
+      createConversationFromSession: (sessionId, initial) =>
+        this.plugin.createConversationFromSession(sessionId, initial),
+      deleteConversation: (conversationId) =>
+        this.plugin.deleteConversation(conversationId),
       showNotice: (message) => {
         new Notice(message);
       },
@@ -2430,7 +2437,8 @@ export class OpenCodianView extends ItemView {
         this.assistantNoticeCardRenderer.render(container, message),
       shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
       suppressActiveLayoutAutoScrollOnce: () => this.suppressActiveLayoutAutoScrollOnce(),
-      openTaskToolSession: (sessionId, toolCall) => this.openTaskToolSession(sessionId, toolCall),
+      openTaskToolSession: (sessionId, toolCall) =>
+        this.conversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall),
       getMarkdownService: () => this.markdownService,
     };
   }
@@ -3405,62 +3413,6 @@ export class OpenCodianView extends ItemView {
 
       default:
         return null;
-    }
-  }
-
-  private buildTaskToolSessionTitle(
-    sessionId: string,
-    toolCall?: Pick<ToolCallInfo, 'input'> | null,
-  ): string {
-    const description = typeof toolCall?.input?.description === 'string'
-      ? toolCall.input.description.trim()
-      : '';
-    const subagentType = typeof toolCall?.input?.subagent_type === 'string'
-      ? toolCall.input.subagent_type.trim()
-      : '';
-    return `Subagent: ${description || subagentType || sessionId}`;
-  }
-
-  private async openTaskToolSession(
-    sessionId: string,
-    toolCall?: Pick<ToolCallInfo, 'input'> | null,
-  ): Promise<void> {
-    const normalizedSessionId = sessionId.trim();
-    if (!normalizedSessionId) {
-      return;
-    }
-
-    const tabManager = this.tabManager;
-    if (tabManager && !tabManager.canCreateTab()) {
-      new Notice(t('chat.tab.maxReached', {
-        count: String(this.plugin.settings.maxTabs),
-      }));
-      return;
-    }
-
-    try {
-      const conversation = await this.plugin.createConversationFromSession(normalizedSessionId, {
-        title: this.buildTaskToolSessionTitle(normalizedSessionId, toolCall),
-      });
-
-      if (tabManager) {
-        const tab = tabManager.createTab(conversation);
-        if (tab) {
-          await this.activateTab(tab.id);
-          return;
-        }
-        await this.plugin.deleteConversation(conversation.id);
-        new Notice(t('chat.tab.maxReached', {
-          count: String(this.plugin.settings.maxTabs),
-        }));
-        return;
-      }
-
-      this.tabConversationStateBridge.syncActiveTabConversation(conversation);
-      await this.loadConversation(conversation.id, { forceServerSync: true });
-    } catch (error) {
-      logger.error('Failed to open subagent session from task tool:', error);
-      new Notice('Failed to open subagent session');
     }
   }
 

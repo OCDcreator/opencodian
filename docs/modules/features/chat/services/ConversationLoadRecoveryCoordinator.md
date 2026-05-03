@@ -136,4 +136,5 @@ export class ConversationLoadRecoveryCoordinator {
 - `ConversationLoadRecoveryCoordinator` 负责把 create/load/bootstrap/delete-recovery/fork/rewind 入口拼成一条可读的 lifecycle surface，并直接承接 first-open / persisted-restore 决策
 - `ConversationViewStateService`、`ConversationTabOpenCoordinator` 与 `ConversationTabLifecycleRecoveryCoordinator` 继续各自保有更细的 activation / open / delete 语义
 - `assembleConversationLoadRecovery(deps)` 顶层工厂进一步把 `ConversationViewStateService`、`ConversationTabOpenCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationLoadRecoveryCoordinator` 的组装收束到此文件；`OpenCodianView` 的 `createConversationRuntimeWiring` 不再直接 `new` 这四个服务，而是改为调用此工厂
+- `ConversationTabOpenCoordinator` 的 port 在装配时还会注入 `syncActiveTabConversation` 与 `loadConversation`，使其能够独立完成 `openTaskToolSession()` 的全链路（new-tab activate 或无 tabManager 时的 sync+load），无需回调到 `OpenCodianView`
 - 因此后续若继续推进相邻 residual，只需要沿这个 coordinator surface 往下收，而不必重新回到 `OpenCodianView` 里寻找分散入口

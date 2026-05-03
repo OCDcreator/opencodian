@@ -488,6 +488,11 @@ export function assembleConversationLoadRecovery(
       openConversationInCurrentTab: (conversation) => {
         deps.tabConversationActivationBridge.openConversation(conversation);
       },
+      syncActiveTabConversation: (conversation) => {
+        deps.tabConversationActivationBridge.openConversation(conversation);
+      },
+      loadConversation: (id, options) =>
+        conversationViewStateService.loadConversation(id, options),
     },
   );
 

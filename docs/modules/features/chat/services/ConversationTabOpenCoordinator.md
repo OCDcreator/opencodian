@@ -22,17 +22,26 @@ export interface ConversationTabOpenHost {
   getMaxTabs(): number;
   isActiveTabStreaming(): boolean;
   createConversation(): Promise<Conversation>;
+  createConversationFromSession(
+    sessionId: string,
+    initial?: Pick<Conversation, 'title'>,
+  ): Promise<Conversation>;
+  deleteConversation(conversationId: string): Promise<void>;
   showNotice(message: string): void;
 }
 
 export interface ConversationTabOpenPort {
   activateTab(tabId: TabId): Promise<void>;
   openConversationInCurrentTab(conversation: Conversation): void;
+  syncActiveTabConversation(conversation: Conversation): void;
+  loadConversation(id: string, options?: { forceServerSync?: boolean }): Promise<void>;
 }
 
 export class ConversationTabOpenCoordinator {
   createConversationInNewTab(): Promise<void>;
   createConversationInCurrentTab(): Promise<void>;
+  buildTaskToolSessionTitle(sessionId: string, toolCall?: Pick<ToolCallInfo, 'input'> | null): string;
+  openTaskToolSession(sessionId: string, toolCall?: Pick<ToolCallInfo, 'input'> | null): Promise<void>;
 }
 ```
 
@@ -43,6 +52,8 @@ export class ConversationTabOpenCoordinator {
 - `createConversationInCurrentTab()` 先检查前台 tab 是否仍在 streaming；忙碌时统一走 `chat.tab.newBlockedWhileStreaming`
 - current-tab 路径创建 conversation 后，继续复用 `TabConversationActivationBridge.openConversation()` 完成 active-pane shell reset 和 activation outcome
 - 两条入口共享同一套错误消息归一化与 success notice 决策
+- `buildTaskToolSessionTitle()` 从 tool call input 提取 description / subagent_type 生成子会话标题，优先 description，其次 subagent_type，最后回退 sessionId
+- `openTaskToolSession()` 承接 assistant shell 和 child session tree 的 "Open" 按钮入口：先检查 max-tabs，再通过 `createConversationFromSession()` 创建 conversation，有 tabManager 时走 new-tab + activate，无 tabManager 时回退到 `syncActiveTabConversation()` + `loadConversation()`；创建失败时统一显示 notice
 
 ## 与 `OpenCodianView` 的边界
 

@@ -1,3 +1,4 @@
+import type { ToolCallInfo } from '../../../core/types';
 import type { Conversation } from '../../../core/types';
 import { t } from '../../../i18n';
 import type { TabData, TabId } from '../tabs';
@@ -12,12 +13,19 @@ export interface ConversationTabOpenHost {
   getMaxTabs(): number;
   isActiveTabStreaming(): boolean;
   createConversation(): Promise<Conversation>;
+  createConversationFromSession(
+    sessionId: string,
+    initial?: Pick<Conversation, 'title'>,
+  ): Promise<Conversation>;
+  deleteConversation(conversationId: string): Promise<void>;
   showNotice(message: string): void;
 }
 
 export interface ConversationTabOpenPort {
   activateTab(tabId: TabId): Promise<void>;
   openConversationInCurrentTab(conversation: Conversation): void;
+  syncActiveTabConversation(conversation: Conversation): void;
+  loadConversation(id: string, options?: { forceServerSync?: boolean }): Promise<void>;
 }
 
 export class ConversationTabOpenCoordinator {
@@ -67,6 +75,61 @@ export class ConversationTabOpenCoordinator {
       this.host.showNotice(t('chat.tab.newCurrentCreated'));
     } catch (error) {
       this.host.showNotice(this.getErrorMessage(error));
+    }
+  }
+
+  buildTaskToolSessionTitle(
+    sessionId: string,
+    toolCall?: Pick<ToolCallInfo, 'input'> | null,
+  ): string {
+    const description = typeof toolCall?.input?.description === 'string'
+      ? toolCall.input.description.trim()
+      : '';
+    const subagentType = typeof toolCall?.input?.subagent_type === 'string'
+      ? toolCall.input.subagent_type.trim()
+      : '';
+    return `Subagent: ${description || subagentType || sessionId}`;
+  }
+
+  async openTaskToolSession(
+    sessionId: string,
+    toolCall?: Pick<ToolCallInfo, 'input'> | null,
+  ): Promise<void> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) {
+      return;
+    }
+
+    const tabManager = this.host.getTabManager();
+    if (tabManager && !tabManager.canCreateTab()) {
+      this.host.showNotice(t('chat.tab.maxReached', {
+        count: String(this.host.getMaxTabs()),
+      }));
+      return;
+    }
+
+    try {
+      const conversation = await this.host.createConversationFromSession(normalizedSessionId, {
+        title: this.buildTaskToolSessionTitle(normalizedSessionId, toolCall),
+      });
+
+      if (tabManager) {
+        const tab = tabManager.createTab(conversation);
+        if (tab) {
+          await this.port.activateTab(tab.id);
+          return;
+        }
+        await this.host.deleteConversation(conversation.id);
+        this.host.showNotice(t('chat.tab.maxReached', {
+          count: String(this.host.getMaxTabs()),
+        }));
+        return;
+      }
+
+      this.port.syncActiveTabConversation(conversation);
+      await this.port.loadConversation(conversation.id, { forceServerSync: true });
+    } catch {
+      this.host.showNotice('Failed to open subagent session');
     }
   }
 
