@@ -46,6 +46,27 @@ export function createTabActivationConversationSyncRuntimePort(
   };
 }
 
+export interface TabActivationConversationSyncRuntimePortAssemblyHost {
+  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  setActiveTabConversationSyncFingerprint(fingerprint: string): void;
+  startConversationSyncLoop(): void;
+  stopConversationSyncLoop(): void;
+}
+
+export function assembleTabActivationConversationSyncRuntimePort(
+  host: TabActivationConversationSyncRuntimePortAssemblyHost,
+): TabActivationConversationSyncRuntimePort {
+  return createTabActivationConversationSyncRuntimePort({
+    getConversationSyncFingerprint: (messages) =>
+      host.getConversationSyncFingerprint(messages),
+    setLastConversationSyncFingerprint: (fingerprint) => {
+      host.setActiveTabConversationSyncFingerprint(fingerprint);
+    },
+    startConversationSyncLoop: () => host.startConversationSyncLoop(),
+    stopConversationSyncLoop: () => host.stopConversationSyncLoop(),
+  });
+}
+
 type TabActivationRuntimeTabPort = Pick<
   TabActivationRuntimeHostAdapterHost,
   | 'getTabManager'

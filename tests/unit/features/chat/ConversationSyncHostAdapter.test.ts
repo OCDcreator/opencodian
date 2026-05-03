@@ -5,6 +5,8 @@ import {
 } from '../../../../src/core/types';
 import type { ConversationSyncBridgeSyncResult } from '../../../../src/features/chat/services/ConversationSyncBridge';
 import {
+  assembleConversationSyncRuntime,
+  type ConversationSyncRuntimeAssemblyViewHost,
   type ConversationSyncViewHost,
   createConversationSyncHosts,
 } from '../../../../src/features/chat/services/ConversationSyncHostAdapter';
@@ -227,5 +229,120 @@ describe('ConversationSyncHostAdapter', () => {
       currentConversation.messages,
     );
     expect(viewHost.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-active');
+  });
+});
+
+function createAssemblyViewHost(options?: {
+  activeTabId?: string | null;
+  currentConversation?: Conversation | null;
+  tabs?: TabData[];
+  runtimes?: Record<string, ConversationSyncSignalRuntime | null>;
+  conversations?: Record<string, Conversation | null>;
+  syncResult?: ConversationSyncBridgeSyncResult;
+}): Mocked<ConversationSyncRuntimeAssemblyViewHost> {
+  const base = createViewHost(options);
+  return {
+    ...base,
+    loadConversations: jest.fn().mockResolvedValue(undefined),
+    hasInterruptedLocalAssistantTail: jest.fn().mockReturnValue(false),
+    setCurrentConversationRevertState: jest.fn(),
+  };
+}
+
+describe('assembleConversationSyncRuntime', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('creates sync services, bridge ports, and load bridge host from one view host', () => {
+    const viewHost = createAssemblyViewHost();
+    const visiblePostSync = { handleVisibleConversationSyncComplete: jest.fn() };
+    const backgroundPostSync = { handleBackgroundConversationSyncHandoff: jest.fn() };
+
+    const result = assembleConversationSyncRuntime({
+      viewHost,
+      visiblePostSyncCoordinator: visiblePostSync,
+      backgroundPostSyncHandoffCoordinator: backgroundPostSync,
+    });
+
+    expect(result.runtimeCoordinator).toBeDefined();
+    expect(result.orchestrationService).toBeDefined();
+    expect(result.bridge).toBeDefined();
+    expect(result.bridgePorts).toBeDefined();
+    expect(result.conversationLoadRuntimeBridgeHost).toBeDefined();
+  });
+
+  it('bridge ports delegate to the internally created bridge', () => {
+    const viewHost = createAssemblyViewHost();
+    const visiblePostSync = { handleVisibleConversationSyncComplete: jest.fn() };
+    const backgroundPostSync = { handleBackgroundConversationSyncHandoff: jest.fn() };
+
+    const result = assembleConversationSyncRuntime({
+      viewHost,
+      visiblePostSyncCoordinator: visiblePostSync,
+      backgroundPostSyncHandoffCoordinator: backgroundPostSync,
+    });
+
+    const loopControl = result.bridgePorts.getLoopControl();
+    expect(loopControl.startConversationSyncLoop).toBeDefined();
+    expect(loopControl.stopConversationSyncLoop).toBeDefined();
+
+    const signalScheduler = result.bridgePorts.getSignalScheduler();
+    expect(signalScheduler.clearScheduledSignalConversationSync).toBeDefined();
+    expect(signalScheduler.scheduleConversationSyncFromSignal).toBeDefined();
+
+    const visibleFollowUp = result.bridgePorts.getVisibleSyncFollowUp();
+    expect(visibleFollowUp.startConversationSyncLoop).toBeDefined();
+    expect(visibleFollowUp.syncVisibleConversationInBackground).toBeDefined();
+  });
+
+  it('load bridge host delegates to view host methods', async () => {
+    const viewHost = createAssemblyViewHost();
+    const visiblePostSync = { handleVisibleConversationSyncComplete: jest.fn() };
+    const backgroundPostSync = { handleBackgroundConversationSyncHandoff: jest.fn() };
+
+    const result = assembleConversationSyncRuntime({
+      viewHost,
+      visiblePostSyncCoordinator: visiblePostSync,
+      backgroundPostSyncHandoffCoordinator: backgroundPostSync,
+    });
+
+    await result.conversationLoadRuntimeBridgeHost.loadConversations();
+    expect(viewHost.loadConversations).toHaveBeenCalled();
+
+    const conversation = createConversation('test');
+    const shouldSync = result.conversationLoadRuntimeBridgeHost.shouldSyncConversationFromServer(
+      { ...conversation, messages: [] },
+      { forceServerSync: false },
+    );
+    expect(shouldSync).toBe(true);
+  });
+
+  it('shouldSyncConversationFromServer uses hasInterruptedLocalAssistantTail', () => {
+    const viewHost = createAssemblyViewHost();
+    viewHost.hasInterruptedLocalAssistantTail = jest.fn().mockReturnValue(true);
+    const visiblePostSync = { handleVisibleConversationSyncComplete: jest.fn() };
+    const backgroundPostSync = { handleBackgroundConversationSyncHandoff: jest.fn() };
+
+    const result = assembleConversationSyncRuntime({
+      viewHost,
+      visiblePostSyncCoordinator: visiblePostSync,
+      backgroundPostSyncHandoffCoordinator: backgroundPostSync,
+    });
+
+    const conversation = createConversation('test', {
+      messages: [{
+        id: 'msg-1',
+        role: 'assistant',
+        content: 'hello',
+        timestamp: 1,
+      }],
+    });
+
+    const shouldSync = result.conversationLoadRuntimeBridgeHost.shouldSyncConversationFromServer(
+      conversation,
+      { forceServerSync: false },
+    );
+    expect(shouldSync).toBe(false);
   });
 });

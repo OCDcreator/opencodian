@@ -2,6 +2,12 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import {
+  type ConversationLoadRuntimeBridgeHost,
+} from '../runtime/ConversationLoadRuntimeBridge';
+import {
+  createConversationSyncLoadRuntimeHosts,
+} from '../runtime/ConversationSyncLoadRuntimeHostAdapter';
 import type { TabData, TabId } from '../tabs';
 import {
   type ConversationSyncBackgroundPostSyncHandoffPort,
@@ -11,7 +17,10 @@ import {
 import {
   ConversationSyncBridge,
   type ConversationSyncBridgeHost,
+  type ConversationSyncBridgePortBuilderHost,
+  type ConversationSyncBridgePorts,
   type ConversationSyncBridgeSyncResult,
+  createConversationSyncBridgePorts,
 } from './ConversationSyncBridge';
 import {
   type ConversationSyncOrchestrationHost,
@@ -151,5 +160,91 @@ export function createConversationSyncServices(
     runtimeCoordinator,
     orchestrationService,
     bridge,
+  };
+}
+
+export interface ConversationSyncRuntimeAssembly {
+  runtimeCoordinator: ConversationSyncRuntimeCoordinator;
+  orchestrationService: ConversationSyncOrchestrationService;
+  bridge: ConversationSyncBridge;
+  bridgePorts: ConversationSyncBridgePorts;
+  conversationLoadRuntimeBridgeHost: ConversationLoadRuntimeBridgeHost;
+}
+
+export interface ConversationSyncRuntimeAssemblyViewHost extends ConversationSyncViewHost {
+  loadConversations(): Promise<void>;
+  hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean;
+  setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
+}
+
+export interface ConversationSyncRuntimeAssemblyDeps {
+  viewHost: ConversationSyncRuntimeAssemblyViewHost;
+  visiblePostSyncCoordinator: VisibleConversationPostSyncPort;
+  backgroundPostSyncHandoffCoordinator: ConversationSyncBackgroundPostSyncHandoffPort;
+}
+
+export function assembleConversationSyncRuntime(
+  deps: ConversationSyncRuntimeAssemblyDeps,
+): ConversationSyncRuntimeAssembly {
+  const syncLoadHosts = createConversationSyncLoadRuntimeHosts({
+    getCurrentConversation: () => deps.viewHost.getCurrentConversation(),
+    getActiveTabId: () => deps.viewHost.getActiveTabId(),
+    getAllTabs: () => deps.viewHost.getAllTabs(),
+    getTab: (tabId) => deps.viewHost.getTab(tabId),
+    getTabRuntimeState: (tabId) => deps.viewHost.getTabRuntimeState(tabId),
+    loadConversations: () => deps.viewHost.loadConversations(),
+    getConversationById: (id) => deps.viewHost.getConversationById(id),
+    shouldSyncConversationFromServer: (conversation, options) => {
+      const shouldSyncInterrupted = !deps.viewHost.hasInterruptedLocalAssistantTail(conversation.messages)
+        && conversation.messages.some((message) =>
+          message.displayStyle !== 'notice'
+          && !message.sourceMessageId
+        );
+      return Boolean(
+        options.forceServerSync
+        || !conversation.messages
+        || conversation.messages.length === 0
+        || shouldSyncInterrupted,
+      );
+    },
+    getConversationSyncFingerprint: (messages) =>
+      deps.viewHost.getConversationSyncFingerprint(messages),
+    syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
+      deps.viewHost.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+    syncConversationMessagesFromCanonicalState: (conversation, tabId, reason, options) =>
+      deps.viewHost.syncConversationMessagesFromCanonicalState(conversation, tabId, reason, options),
+    setCurrentConversationRevertState: (revertState) => {
+      deps.viewHost.setCurrentConversationRevertState(revertState);
+    },
+    applySyncedConversationUpdate: (previousMessages, nextMessages) =>
+      deps.viewHost.applySyncedConversationUpdate(previousMessages, nextMessages),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+      deps.viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+  });
+
+  const services = createConversationSyncServices(
+    syncLoadHosts.conversationSyncViewHost,
+    deps.visiblePostSyncCoordinator,
+    deps.backgroundPostSyncHandoffCoordinator,
+  );
+
+  const bridgePortHost: ConversationSyncBridgePortBuilderHost = {
+    startConversationSyncLoop: () => services.bridge.startConversationSyncLoop(),
+    stopConversationSyncLoop: () => services.bridge.stopConversationSyncLoop(),
+    clearScheduledSignalConversationSync: (tabId) =>
+      services.bridge.clearScheduledSignalConversationSync(tabId),
+    scheduleConversationSyncFromSignal: (tabId, reason) =>
+      services.bridge.scheduleConversationSyncFromSignal(tabId, reason),
+    syncVisibleConversationInBackground: () =>
+      services.bridge.syncVisibleConversationInBackground(),
+  };
+  const bridgePorts = createConversationSyncBridgePorts(bridgePortHost);
+
+  return {
+    runtimeCoordinator: services.runtimeCoordinator,
+    orchestrationService: services.orchestrationService,
+    bridge: services.bridge,
+    bridgePorts,
+    conversationLoadRuntimeBridgeHost: syncLoadHosts.conversationLoadRuntimeBridgeHost,
   };
 }

@@ -234,7 +234,7 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 - `syncVisibleConversationInBackground()`：同步当前活动 tab
 - `syncBackgroundTaskTabsInBackground()`：同步非活动但仍有 background task 的 tab
 
-`OpenCodianView` 现在只提供一份 `ConversationSyncViewHost`；真正把这份 view-state / render bridge 适配成 runtime/orchestration/bridge 三组 host 的层，是 `ConversationSyncHostAdapter`。这样 sync service bundle 的 wiring 不再散落在 view 构造函数里。
+`OpenCodianView` 现在通过 `assembleConversationSyncRuntime` 一次性获得 sync services、bridge ports 和 load bridge host；`ConversationSyncHostAdapter` 内部完成 sync load host 派生、sync services 创建和 bridge ports 装配，sync service bundle 的 wiring 不再散落在 view 构造函数里。tab-activation 侧的 conversation sync runtime port 也通过 `assembleTabActivationConversationSyncRuntimePort` 一步创建。
 
 session sync event 与 session todo/status 的 live signal 入口都不再由 view 自己持有 `subscribeToSessionSyncEvents()` / `subscribeToSessionTodoUpdates()` / `subscribeToSessionStatusUpdates()` 及其 dispose 状态：`ConversationSessionSignalRuntime` 会统一接管三条 listener 的生命周期、session→tab 匹配与 active-tab fallback，再把 signal sync 调度交回 `ConversationSyncOrchestrationService`，把命中的 todo/status update 交回 `SessionTodoCoordinator`，并在每次 live update 后继续调用 `BackgroundTaskLiveSignalCoordinator`。
 

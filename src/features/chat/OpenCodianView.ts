@@ -199,16 +199,13 @@ import {
 } from './services/ConversationSessionSignalRuntime';
 import {
   ConversationSyncBridge,
-  type ConversationSyncBridgePortBuilderHost,
   type ConversationSyncBridgePorts,
-  createConversationSyncBridgePorts,
 } from './services/ConversationSyncBridge';
 import {
-  createConversationSyncServices,
+  assembleConversationSyncRuntime,
 } from './services/ConversationSyncHostAdapter';
 import {
   type ConversationSyncLoadRuntimeViewHost,
-  createConversationSyncLoadRuntimeViewHosts,
 } from './services/ConversationSyncLoadRuntimeViewHostFactory';
 import {
   ConversationSyncOrchestrationService,
@@ -279,10 +276,9 @@ import {
   type TabActivationRuntimeHostProviderHost,
 } from './services/TabActivationRuntimeHostProvider';
 import {
-  createTabActivationConversationSyncRuntimePort,
+  assembleTabActivationConversationSyncRuntimePort,
   createTabActivationRuntimeAssembly,
   type TabActivationConversationSyncRuntimePort,
-  type TabActivationConversationSyncRuntimePortHost,
 } from './services/TabActivationRuntimeViewHostFactory';
 import {
   TabMessagesPaneCoordinator,
@@ -1497,21 +1493,29 @@ export class OpenCodianView extends ItemView {
     );
     const tabConversationActivationBridge = tabActivationAssembly.tabConversationActivationBridge;
     const tabRuntimeStateBridge = tabActivationAssembly.tabRuntimeStateBridge;
-    const conversationSyncLoadRuntimeHosts = createConversationSyncLoadRuntimeViewHosts(
-      this.createConversationSyncLoadRuntimeViewHost(conversationRenderService),
-    );
-    const conversationSyncServices = createConversationSyncServices(
-      conversationSyncLoadRuntimeHosts.conversationSyncViewHost,
-      backgroundTaskRuntime.visibleConversationPostSyncCoordinator,
-      backgroundTaskRuntime.backgroundConversationPostSyncHandoffCoordinator,
-    );
-    const conversationSyncBridgePorts = createConversationSyncBridgePorts(
-      this.createConversationSyncBridgePortBuilderHost(),
-    );
+    const conversationSyncRuntime = assembleConversationSyncRuntime({
+      viewHost: this.createConversationSyncLoadRuntimeViewHost(conversationRenderService),
+      visiblePostSyncCoordinator: backgroundTaskRuntime.visibleConversationPostSyncCoordinator,
+      backgroundPostSyncHandoffCoordinator:
+        backgroundTaskRuntime.backgroundConversationPostSyncHandoffCoordinator,
+    });
     const tabActivationConversationSyncRuntimePort =
-      createTabActivationConversationSyncRuntimePort(
-        this.createTabActivationConversationSyncRuntimePortHost(),
-      );
+      assembleTabActivationConversationSyncRuntimePort({
+        getConversationSyncFingerprint: (messages) =>
+          this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
+        setActiveTabConversationSyncFingerprint: (fingerprint) => {
+          this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
+            this.getActiveTabId(),
+            { fingerprint },
+          );
+        },
+        startConversationSyncLoop: () => {
+          conversationSyncRuntime.bridgePorts.getLoopControl().startConversationSyncLoop();
+        },
+        stopConversationSyncLoop: () => {
+          conversationSyncRuntime.bridgePorts.getLoopControl().stopConversationSyncLoop();
+        },
+      });
     const conversationSessionSignalRuntime = new ConversationSessionSignalRuntime(
       this.createConversationSessionSignalRuntimeHost(),
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
@@ -1542,7 +1546,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
     );
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
-      conversationSyncLoadRuntimeHosts.conversationLoadRuntimeBridgeHost,
+      conversationSyncRuntime.conversationLoadRuntimeBridgeHost,
     );
     const conversationViewStateService = new ConversationViewStateService({
       host: this.createConversationViewStateHost(),
@@ -1636,10 +1640,10 @@ export class OpenCodianView extends ItemView {
       conversationHydrationOutcomeBridge,
       tabConversationActivationBridge,
       tabRuntimeStateBridge,
-      conversationSyncRuntimeCoordinator: conversationSyncServices.runtimeCoordinator,
-      conversationSyncOrchestrationService: conversationSyncServices.orchestrationService,
-      conversationSyncBridge: conversationSyncServices.bridge,
-      conversationSyncBridgePorts,
+      conversationSyncRuntimeCoordinator: conversationSyncRuntime.runtimeCoordinator,
+      conversationSyncOrchestrationService: conversationSyncRuntime.orchestrationService,
+      conversationSyncBridge: conversationSyncRuntime.bridge,
+      conversationSyncBridgePorts: conversationSyncRuntime.bridgePorts,
       tabActivationConversationSyncRuntimePort,
       conversationSessionSignalRuntime,
       backgroundTaskCompletionNoticeService,
@@ -2184,26 +2188,6 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncBridgePortBuilderHost():
-  ConversationSyncBridgePortBuilderHost {
-    return {
-      startConversationSyncLoop: () => {
-        this.conversationSyncBridge.startConversationSyncLoop();
-      },
-      stopConversationSyncLoop: () => {
-        this.conversationSyncBridge.stopConversationSyncLoop();
-      },
-      clearScheduledSignalConversationSync: (tabId) => {
-        this.conversationSyncBridge.clearScheduledSignalConversationSync(tabId);
-      },
-      scheduleConversationSyncFromSignal: (tabId, reason) => {
-        this.conversationSyncBridge.scheduleConversationSyncFromSignal(tabId, reason);
-      },
-      syncVisibleConversationInBackground: () =>
-        this.conversationSyncBridge.syncVisibleConversationInBackground(),
-    };
-  }
-
   private createTabConversationSyncFingerprintRuntimePort():
     TabConversationSyncFingerprintRuntimePort {
     return {
@@ -2213,26 +2197,6 @@ export class OpenCodianView extends ItemView {
         this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
           fingerprint,
         });
-      },
-    };
-  }
-
-  private createTabActivationConversationSyncRuntimePortHost():
-  TabActivationConversationSyncRuntimePortHost {
-    return {
-      getConversationSyncFingerprint: (messages) =>
-        this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
-      setLastConversationSyncFingerprint: (fingerprint) => {
-        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
-          this.getActiveTabId(),
-          { fingerprint },
-        );
-      },
-      startConversationSyncLoop: () => {
-        this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
-      },
-      stopConversationSyncLoop: () => {
-        this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
       },
     };
   }

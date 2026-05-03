@@ -11,6 +11,7 @@
 - 让 runtime/orchestration/bridge 三个服务共享同一套 view-state 读取与 render bridge，而不是继续由 `OpenCodianView` 分散维护三组 `createConversationSync*Host()`
 - 在不改变 sync 行为的前提下，把 sync service wiring 从主视图构造函数迁走
 - 在 service bundle 内把 visible/background 两个 post-sync router 与各自 dedicated coordinator 串联起来
+- 通过 `assembleConversationSyncRuntime` 将 sync load host 派生、sync services 创建、bridge ports 装配合并为一步调用
 
 它不拥有任何 sync 业务规则：真正的 runtime lock、loop orchestration、server sync callback 装配与 post-sync 收尾仍分别由现有三个 sync 服务负责。
 
@@ -33,6 +34,14 @@ export interface ConversationSyncViewHost {
 
 export function createConversationSyncHosts(...): ConversationSyncHosts;
 export function createConversationSyncServices(...): ConversationSyncServices;
+
+export interface ConversationSyncRuntimeAssemblyViewHost extends ConversationSyncViewHost {
+  loadConversations(): Promise<void>;
+  hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean;
+  setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
+}
+
+export function assembleConversationSyncRuntime(deps): ConversationSyncRuntimeAssembly;
 ```
 
 ## 关键行为
@@ -50,9 +59,16 @@ export function createConversationSyncServices(...): ConversationSyncServices;
 - `createConversationSyncServices()` 会把 `VisibleConversationPostSyncCoordinator` 接到 `ConversationSyncVisiblePostSyncRouter`，再把 `BackgroundConversationPostSyncHandoffCoordinator` 直接接到 `ConversationSyncBackgroundPostSyncRouter`
 - `ConversationSyncBridge` 继续复用同一个 runtime coordinator、orchestration service，并把 visible/background post-sync 分别委托给两个 router
 
+### full sync assembly
+
+- `assembleConversationSyncRuntime()` 合并了 sync load host 派生、sync services 创建、bridge ports 装配三步
+- 内部调用 `createConversationSyncLoadRuntimeHosts` 从 view host 派生 sync host 和 load bridge host
+- 内部调用 `createConversationSyncServices` 创建 runtime coordinator、orchestration service、bridge
+- 内部从已创建的 bridge 派生 bridge port host，消除了 OpenCodianView 需要先创建 bridge 再创建 ports 的循环依赖
+- 返回 `conversationLoadRuntimeBridgeHost` 供 `ConversationLoadRuntimeBridge` 使用
+
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在先经由 `ConversationSyncLoadRuntimeViewHostFactory` 提供共享的 sync/load seam，再由 `ConversationSyncLoadRuntimeHostAdapter` 派生 sync host 形状，不再直接持有分散的 sync host factory 闭包
-- `ConversationSyncHostAdapter` 只负责把 view-state / render callback 映射成 sync 服务能消费的 host 形状
+- `OpenCodianView` 通过 `assembleConversationSyncRuntime` 一次性获得 sync services、bridge ports 和 load bridge host，不再分别调用 sync load factory、sync services factory 和 bridge port factory
+- `ConversationSyncHostAdapter` 现在拥有完整的 sync runtime assembly lifecycle
 - `ConversationSyncRuntimeCoordinator`、`ConversationSyncOrchestrationService`、`ConversationSyncBridge` 的行为边界保持不变
-- 这次切片继续推进高优先级 sync/post-sync ownership 收窄：让 visible/background router 与各自 coordinator 的装配继续留在 host adapter，而不是回流到主 view
