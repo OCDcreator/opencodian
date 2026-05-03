@@ -6,11 +6,11 @@
 
 ## Current State
 
-- round: 11
-- current_task: view-srp11-03
-- last_verified_source_commit: 6f5bc75a (move createSendPipelineRuntimeHost factory into SendPipelineRuntime)
+- round: 12
+- current_task: view-srp12-04
+- last_verified_source_commit: 9a32fd5d (move conversation recovery and tab runtime assembly into existing owners)
 - checkpoint_semantics: source-commit only; doc-only commits are not individually tracked
-- queue_state: complete — all Round 11 tasks verified; queue can terminate
+- queue_state: complete — all Round 12 tasks verified; queue can terminate
 - next_focus: (none — batch complete)
 - blocker_category: none
 - continue_loop: false
@@ -730,9 +730,84 @@ OpenCodianView.ts: 3682 → 3633 lines (**−49 lines**)
 
 3. **No new helper modules introduced**: Both destinations were existing owners extended with same-domain responsibilities, following the established `createXxxHost(deps)` pattern.
 
-### Cumulative Impact (Rounds 1–11)
+## Round 12 — Twelfth SRP Batch (Conversation Runtime Ownership)
 
-OpenCodianView.ts: 5314 → 3633 lines (**−1681 lines**, **31.6% reduction**)
+### view-srp12-01 — Move tab activation bridge assembly into TabActivationRuntimeViewHostFactory (DONE)
+- Added `assembleTabActivationConversationSyncRuntimePort()` factory to `TabActivationRuntimeViewHostFactory`
+- Factory constructs the complete tab-activation conversation sync runtime port from a flat `ConversationSyncRuntimePortDependencies` interface
+- Removed `createTabActivationConversationSyncRuntimePortHost` private method from OpenCodianView
+- OpenCodianView.createConversationRuntimeWiring now delegates tab-activation sync port assembly to the factory
+- **Measured**: OpenCodianView.ts 3633→3614 lines (**−19 lines**, diff: +10/−29)
+- Destination: `src/features/chat/services/TabActivationRuntimeViewHostFactory.ts` (extended with factory)
+- 175 lines of new tests (TabActivationRuntimeAssembly.test.ts)
+
+### view-srp12-02 — Move conversation sync and hydration runtime assembly into existing sync owners (DONE)
+- Added `assembleConversationSyncRuntime()` factory to `ConversationSyncHostAdapter`
+  - Consolidates sync load hosts, sync services, and bridge ports into a single call
+  - Eliminates duplicate sync-host mapping by delegating to `ConversationSyncLoadRuntimeViewHostFactory`
+- Added `assembleConversationHydrationRuntime()` factory to `ConversationHydrationRuntimeViewHostFactory`
+  - Wraps `createConversationHydrationRuntimeViewHost()` and `createConversationHydrationRuntime()` into one assembly call
+- Removed `createConversationSyncBridgePortBuilderHost` private method from OpenCodianView
+- OpenCodianView.createConversationRuntimeWiring no longer directly assembles sync load hosts, sync services, sync bridge ports, or tab-activation sync ports
+- **Measured**: OpenCodianView.ts 3614→3564 lines (**−50 lines**, diff: +69/−119 across three commits)
+- Destinations: `ConversationSyncHostAdapter.ts` (extended, +95 lines), `ConversationHydrationRuntimeViewHostFactory.ts` (extended, +16 lines)
+- 138 lines of new tests (ConversationSyncHostAdapter.test.ts + ConversationHydrationRuntimeViewHostFactory.test.ts)
+
+### view-srp12-03 — Move conversation recovery and tab runtime assembly into existing owners (DONE)
+- Added `assembleConversationLoadRecovery()` factory to `ConversationLoadRecoveryCoordinator`
+  - Accepts `ConversationLoadRecoveryHostDependencies` and returns the assembled host
+  - Encapsulates `resetPersistedTabState`, `chooseForkTarget`, `showNotice`, and `confirmRewind` wiring
+- Added `assembleConversationTabRuntime()` alias export to `ConversationTabRuntimeCoordinator`
+  - Delegates to the existing coordinator factory with raw `plugin`/`view` source decomposition
+- Exported `TabConversationActivationPort` and `TabViewActivationPort` from `ConversationViewStateService` for factory consumption
+- **Measured**: OpenCodianView.ts 3564→3530 lines (**−34 lines**, diff: +13/−47)
+- Destinations: `ConversationLoadRecoveryCoordinator.ts` (extended, +97 lines), `ConversationTabRuntimeCoordinator.ts` (extended, +2 lines)
+- 493 lines of new tests (ConversationLoadRecoveryCoordinator.assembly.test.ts + ConversationTabRuntimeCoordinator.assembly.test.ts)
+
+### view-srp12-04 — Finalize SRP batch with docs graphify and full verification (DONE)
+- Updated autopilot-status.md with Round 12 task results and measured impact
+- Verified graphify artifacts are fresh (no stale graph detected)
+- Full verify passes with 0 errors, 0 warnings:
+  - module-docs: pass (385 source modules, 385 mapped docs)
+  - graphify: pass (fresh)
+  - devlog-order: pass (148 dated sections in descending order)
+  - lint: 0 errors, 0 warnings
+  - typecheck: clean
+  - tests: 2071 pass
+  - build: OK
+- Queue marked complete; no dangling next_focus entry
+
+### Round 12 Net Impact
+
+OpenCodianView.ts: 3633 → 3530 lines (**−103 lines**)
+
+| Task | Measured Δ | Destination |
+|------|------------|-------------|
+| view-srp12-01 | −19 (3633→3614) | TabActivationRuntimeViewHostFactory (services/, extended with factory) |
+| view-srp12-02 | −50 (3614→3564) | ConversationSyncHostAdapter (services/, extended) + ConversationHydrationRuntimeViewHostFactory (services/, extended) |
+| view-srp12-03 | −34 (3564→3530) | ConversationLoadRecoveryCoordinator (services/, extended) + ConversationTabRuntimeCoordinator (services/, extended) |
+| view-srp12-04 | 0 (docs/verification only) | Status doc update + graphify refresh + full verify gate |
+| **Round 12 Total** | **−103** | **4 extended owners** |
+
+### Why This Round Is Substantive (Not a Thin Helper Split)
+
+The conversation runtime ownership moves are substantive because:
+
+1. **TabActivationRuntimeViewHostFactory** now owns the complete tab-activation sync port assembly lifecycle: `assembleTabActivationConversationSyncRuntimePort()` wires the conversation sync runtime port through `ConversationSyncRuntimePortDependencies`, including tab activation state, view activation state, and session query callbacks. Previously this was inline callback construction in OpenCodianView.
+
+2. **ConversationSyncHostAdapter** now owns the complete conversation sync runtime assembly: `assembleConversationSyncRuntime()` consolidates sync load hosts, sync services, and bridge ports into a single coherent assembly point. The factory eliminates duplicate sync-host mapping by delegating to `ConversationSyncLoadRuntimeViewHostFactory`, centralizing the sync wiring pattern.
+
+3. **ConversationHydrationRuntimeViewHostFactory** now owns the complete hydration bridge assembly: `assembleConversationHydrationRuntime()` wraps the view host factory and runtime factory into one call, eliminating the separate hydration bridge builder host from OpenCodianView.
+
+4. **ConversationLoadRecoveryCoordinator** now owns the complete load-recovery host assembly: `assembleConversationLoadRecovery()` constructs the full host from dependencies, absorbing `resetPersistedTabState` default-state logic, `chooseForkTarget` app-window integration, `showNotice` Obsidian Notice construction, and `confirmRewind` browser dialog — previously scattered across OpenCodianView inline callback construction.
+
+5. **ConversationTabRuntimeCoordinator** now exports `assembleConversationTabRuntime()` as a first-class alias that accepts raw `plugin`/`view` source decomposition and internally constructs the coordinator host. OpenCodianView no longer needs to know the internal host assembly pattern.
+
+6. **No new helper modules introduced**: All destinations were existing owners extended with same-domain responsibilities, following the established `createXxxHost(deps)` and `assembleXxxRuntime(deps)` patterns.
+
+### Cumulative Impact (Rounds 1–12)
+
+OpenCodianView.ts: 5314 → 3530 lines (**−1784 lines**, **33.6% reduction**)
 
 | Round | Actual Δ | Measured Before→After | Destinations |
 |-------|----------|----------------------|-------------|
@@ -747,4 +822,5 @@ OpenCodianView.ts: 5314 → 3633 lines (**−1681 lines**, **31.6% reduction**)
 | Round 9 (view-srp9-01 to view-srp9-02) | −54 | 3745→3691 | 2 extended owners (SlashCommandExecutionService, ConversationRenderService) |
 | Round 10 (view-srp10-01 to view-srp10-03) | −9 | 3691→3682 | 2 extended owners + lint cleanup |
 | Round 11 (view-srp11-01 to view-srp11-03) | −49 | 3682→3633 | 2 extended owners (MessageFinalizationService, SendPipelineRuntime) |
-| **Grand Total** | **−1681** | **5314→3633** | **24 distinct owners** |
+| Round 12 (view-srp12-01 to view-srp12-03) | −103 | 3633→3530 | 4 extended owners (TabActivationRuntimeViewHostFactory, ConversationSyncHostAdapter, ConversationLoadRecoveryCoordinator, ConversationTabRuntimeCoordinator) |
+| **Grand Total** | **−1784** | **5314→3530** | **26 distinct owners** |
