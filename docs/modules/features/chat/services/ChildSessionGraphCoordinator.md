@@ -21,12 +21,17 @@ export interface ChildSessionGraphCoordinatorHost {
   getSessionChildren(sessionId: string): Promise<ChildSessionInfo[]>;
   onGraphUpdated(graph: ChildSessionGraph): void;
   getMessagesContainerEl(): HTMLElement | null;
-  openTaskToolSession(sessionId: string): void;
 }
+
+export type ChildSessionGraphOnOpenTaskToolSession = (sessionId: string) => void;
 
 export const SESSION_TREE_BASE_CSS: string;
 
 export class ChildSessionGraphCoordinator {
+  constructor(
+    host: ChildSessionGraphCoordinatorHost,
+    onOpenTaskToolSession?: ChildSessionGraphOnOpenTaskToolSession,
+  );
   getGraph(): ChildSessionGraph | null;
   refreshGraph(): Promise<ChildSessionGraph | null>;
   clearGraph(): void;
@@ -58,7 +63,7 @@ export class ChildSessionGraphCoordinator {
 普通 edge 行显示：
 - 状态色点（completed / active / error）
 - title / description
-- `Open` 按钮（点击触发 `host.openTaskToolSession()`）
+- `Open` 按钮（点击触发构造时传入的 `onOpenTaskToolSession()`）
 
 orphaned session 行显示：
 - 灰色未知色点

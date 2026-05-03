@@ -591,9 +591,6 @@ export class OpenCodianView extends ItemView {
         this.childSessionGraphCoordinator.render(graph);
       },
       getMessagesContainerEl: () => this.messagesContainer,
-      openTaskToolSession: (sessionId) => {
-        void this.conversationTabOpenCoordinator.openTaskToolSession(sessionId);
-      },
     };
   }
 
@@ -1020,9 +1017,9 @@ export class OpenCodianView extends ItemView {
           }
         },
       }, {
-        onOpenToolSession: (sessionId, toolCall) => {
-          void this.conversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall);
-        },
+        onOpenToolSession: this.conversationTabOpenCoordinator.openTaskToolSession.bind(
+          this.conversationTabOpenCoordinator,
+        ),
       });
       paneState.runtime.streamController.setCallbacks({
         onToolCallStart: (toolCall) => {
@@ -1401,10 +1398,15 @@ export class OpenCodianView extends ItemView {
       sessionTodoCoordinator: createSessionTodoCoordinator(this.createSessionTodoViewHost()),
       childSessionGraphCoordinator: new ChildSessionGraphCoordinator(
         this.createChildSessionGraphCoordinatorHost(),
+        (sessionId) => {
+          void this.conversationTabOpenCoordinator.openTaskToolSession(sessionId);
+        },
       ),
       questionDockSlotCoordinator,
       assistantShellViewHostAdapter: new AssistantShellViewHostAdapter(
         this.createAssistantShellViewHostAdapterHost(),
+        (sessionId, toolCall) =>
+          this.conversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall),
       ),
     };
   }
@@ -1542,6 +1544,7 @@ export class OpenCodianView extends ItemView {
     );
     const loadRecoveryAssembly = assembleConversationLoadRecovery({
       viewStateHost: this.createConversationViewStateHost(),
+      tabConversationStateBridge,
       tabConversationActivationBridge,
       tabViewActivationBridge,
       conversationHydrationOutcomeBridge,
@@ -2437,8 +2440,6 @@ export class OpenCodianView extends ItemView {
         this.assistantNoticeCardRenderer.render(container, message),
       shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
       suppressActiveLayoutAutoScrollOnce: () => this.suppressActiveLayoutAutoScrollOnce(),
-      openTaskToolSession: (sessionId, toolCall) =>
-        this.conversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall),
       getMarkdownService: () => this.markdownService,
     };
   }

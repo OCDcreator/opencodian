@@ -47,16 +47,23 @@ export interface AssistantShellViewHostAdapterHost extends AssistantShellRendere
   renderNoticeCard(container: HTMLElement, message: ChatMessage): Promise<void>;
   shouldRenderQuestionResolutionCards(): boolean;
   suppressActiveLayoutAutoScrollOnce(): void;
-  openTaskToolSession(sessionId: string, toolCall?: Pick<ToolCallInfo, 'input'> | null): Promise<void>;
   getMarkdownService(): MarkdownRenderService | null;
 }
+
+export type AssistantShellViewHostAdapterOnOpenTaskToolSession = (
+  sessionId: string,
+  toolCall?: Pick<ToolCallInfo, 'input'> | null,
+) => Promise<void>;
 
 export class AssistantShellViewHostAdapter {
   private readonly shellRenderer: AssistantShellRenderer;
   private readonly footerRenderer: AssistantFooterRenderer;
   private readonly errorRenderer: AssistantErrorRenderer;
 
-  constructor(private readonly host: AssistantShellViewHostAdapterHost) {
+  constructor(
+    private readonly host: AssistantShellViewHostAdapterHost,
+    private readonly onOpenTaskToolSession: AssistantShellViewHostAdapterOnOpenTaskToolSession = async () => {},
+  ) {
     this.shellRenderer = new AssistantShellRenderer(host);
     this.footerRenderer = new AssistantFooterRenderer(this.shellRenderer);
     this.errorRenderer = new AssistantErrorRenderer(this.footerRenderer);
@@ -277,7 +284,7 @@ export class AssistantShellViewHostAdapter {
           const toolRenderer = new ToolCallRenderer({
             onCollapsibleToggle: () => this.host.suppressActiveLayoutAutoScrollOnce(),
             onOpenToolSession: (sessionId, toolCall) => {
-              void this.host.openTaskToolSession(sessionId, toolCall);
+              void this.onOpenTaskToolSession(sessionId, toolCall);
             },
           });
           const toolCall: ToolCallInfo = {

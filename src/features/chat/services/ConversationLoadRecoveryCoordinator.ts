@@ -18,6 +18,7 @@ import type { ConversationHydrationOutcomePort } from '../runtime/ConversationHy
 import type { ConversationLoadRuntimePort } from '../runtime/ConversationLoadRuntimeBridge';
 import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
 import type { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
+import type { TabConversationStateBridge } from '../runtime/TabConversationStateBridge';
 import type {
   RestoredTabState,
   TabData,
@@ -452,6 +453,7 @@ export class ConversationLoadRecoveryCoordinator {
 
 export interface ConversationLoadRecoveryAssemblyDependencies {
   viewStateHost: ConversationViewStateHost;
+  tabConversationStateBridge: Pick<TabConversationStateBridge, 'syncActiveTabConversation'>;
   tabConversationActivationBridge: TabConversationActivationBridge;
   tabViewActivationBridge: TabViewActivationPort;
   conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
@@ -489,7 +491,7 @@ export function assembleConversationLoadRecovery(
         deps.tabConversationActivationBridge.openConversation(conversation);
       },
       syncActiveTabConversation: (conversation) => {
-        deps.tabConversationActivationBridge.openConversation(conversation);
+        deps.tabConversationStateBridge.syncActiveTabConversation(conversation);
       },
       loadConversation: (id, options) =>
         conversationViewStateService.loadConversation(id, options),

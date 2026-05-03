@@ -7,13 +7,15 @@ function createCoordinator(
   messagesContainer: HTMLElement,
   openTaskToolSession: (sessionId: string) => void = () => {},
 ): ChildSessionGraphCoordinator {
-  return new ChildSessionGraphCoordinator({
-    getCurrentConversation: () => null,
-    getSessionChildren: async () => [],
-    onGraphUpdated: () => {},
-    getMessagesContainerEl: () => messagesContainer,
+  return new ChildSessionGraphCoordinator(
+    {
+      getCurrentConversation: () => null,
+      getSessionChildren: async () => [],
+      onGraphUpdated: () => {},
+      getMessagesContainerEl: () => messagesContainer,
+    },
     openTaskToolSession,
-  });
+  );
 }
 
 function createGraph(): ChildSessionGraph {
@@ -74,13 +76,15 @@ describe('ChildSessionGraphCoordinator child-session tree rendering', () => {
     const container2 = document.body.createDiv();
     let currentContainer = container1;
 
-    const coordinator = new ChildSessionGraphCoordinator({
-      getCurrentConversation: () => null,
-      getSessionChildren: async () => [],
-      onGraphUpdated: () => {},
-      getMessagesContainerEl: () => currentContainer,
-      openTaskToolSession: () => {},
-    });
+    const coordinator = new ChildSessionGraphCoordinator(
+      {
+        getCurrentConversation: () => null,
+        getSessionChildren: async () => [],
+        onGraphUpdated: () => {},
+        getMessagesContainerEl: () => currentContainer,
+      },
+      () => {},
+    );
 
     coordinator.render(createGraph());
     expect(container1.querySelectorAll('.opencodian-session-tree')).toHaveLength(1);

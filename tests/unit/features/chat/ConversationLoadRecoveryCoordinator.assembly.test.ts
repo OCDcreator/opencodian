@@ -57,6 +57,9 @@ function createAssemblyDeps(
     viewStateHost: {
       getTabManager: jest.fn(() => null),
     },
+    tabConversationStateBridge: {
+      syncActiveTabConversation: jest.fn(),
+    } as never,
     tabConversationActivationBridge: {
       applyEmptyTabActivation: jest.fn(),
       applyLoadedConversationActivation: jest.fn(),
@@ -236,6 +239,24 @@ describe('assembleConversationLoadRecovery', () => {
     await result.conversationTabOpenCoordinator.createConversationInCurrentTab();
 
     expect(deps.tabConversationActivationBridge.openConversation).toHaveBeenCalled();
+  });
+
+  it('wires tabOpenCoordinator.syncActiveTabConversation to tabConversationStateBridge, not activation bridge', async () => {
+    const conversation = createConversation('sync-test');
+    const deps = createAssemblyDeps({
+      tabOpenHost: {
+        getTabManager: jest.fn(() => null),
+        getMaxTabs: jest.fn(() => 4),
+        createConversationFromSession: jest.fn().mockResolvedValue(conversation),
+        showNotice: jest.fn(),
+      } as never,
+    });
+    const result = assembleConversationLoadRecovery(deps);
+
+    await result.conversationTabOpenCoordinator.openTaskToolSession('session-1');
+
+    expect(deps.tabConversationStateBridge.syncActiveTabConversation).toHaveBeenCalledWith(conversation);
+    expect(deps.tabConversationActivationBridge.openConversation).not.toHaveBeenCalled();
   });
 
   it('wires tabOpenCoordinator.createConversationInNewTab through to loadRecoveryCoordinator', async () => {

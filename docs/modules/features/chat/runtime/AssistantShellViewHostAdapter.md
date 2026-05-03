@@ -24,7 +24,8 @@ body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodyS
 - `finalizePersistedFooter()` / `finalizeNoticeFooter()` / `finalizePseudoStreamFooter()`：让 persisted、notice 与 pseudo-stream assistant footer 变体都复用同一条 footer renderer seam
 - `renderStreamError()`：通过 `AssistantErrorRenderer` 统一渲染本地 stream-error block，并复用既有 error footer 收尾
 - `createSendPipelineShellPort()`：导出 `SendPipelineRuntime` 需要的 shell port，而不是让 view 自己重新拼一次 notice / footer wiring
-- `AssistantShellViewHostAdapterHost`：只暴露 shell/notice/footer 真正需要的 runtime state、scroll、visibility、copy-button 初始化、notice-card 渲染能力，以及 body rendering 所需的 `shouldRenderQuestionResolutionCards` / `suppressActiveLayoutAutoScrollOnce` / `openTaskToolSession` / `getMarkdownService` 回调
+- `AssistantShellViewHostAdapterHost`：只暴露 shell/notice/footer 真正需要的 runtime state、scroll、visibility、copy-button 初始化、notice-card 渲染能力，以及 body rendering 所需的 `shouldRenderQuestionResolutionCards` / `suppressActiveLayoutAutoScrollOnce` / `getMarkdownService` 回调
+- `AssistantShellViewHostAdapterOnOpenTaskToolSession`：工具会话打开回调类型；在 adapter 构造时传入，由 `ToolCallRenderer.onOpenToolSession` 消费，避免通过 host 接口传递
 
 ## 设计目的
 

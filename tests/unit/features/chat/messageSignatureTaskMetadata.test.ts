@@ -2,20 +2,22 @@ import type { ChatMessage } from '../../../../src/core/types';
 import { AssistantShellViewHostAdapter } from '../../../../src/features/chat/runtime/AssistantShellViewHostAdapter';
 
 function createAdapter(): AssistantShellViewHostAdapter {
-  return new AssistantShellViewHostAdapter({
-    getActiveTabId: () => 'tab-1',
-    getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
-    ensureTurnBody: () => document.createElement('div'),
-    shouldAutoScroll: () => true,
-    scheduleSettledScrollToBottomIfNeeded: jest.fn(),
-    setStreamingAssistantMessageVisibility: jest.fn(),
-    initializeAssistantCopyButton: jest.fn(),
-    renderNoticeCard: jest.fn(),
-    getMarkdownService: () => null,
-    shouldRenderQuestionResolutionCards: () => false,
-    suppressActiveLayoutAutoScrollOnce: jest.fn(),
-    openTaskToolSession: jest.fn(),
-  });
+  return new AssistantShellViewHostAdapter(
+    {
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
+      ensureTurnBody: () => document.createElement('div'),
+      shouldAutoScroll: () => true,
+      scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+      setStreamingAssistantMessageVisibility: jest.fn(),
+      initializeAssistantCopyButton: jest.fn(),
+      renderNoticeCard: jest.fn(),
+      getMarkdownService: () => null,
+      shouldRenderQuestionResolutionCards: () => false,
+      suppressActiveLayoutAutoScrollOnce: jest.fn(),
+    },
+    jest.fn(),
+  );
 }
 
 function createTaskMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {

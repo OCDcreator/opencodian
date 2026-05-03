@@ -29,21 +29,23 @@ describe('AssistantShellViewHostAdapter', () => {
     const shouldRenderQuestionResolutionCards = jest.fn(() => false);
     const suppressActiveLayoutAutoScrollOnce = jest.fn();
     const openTaskToolSession = jest.fn();
-    const adapter = new AssistantShellViewHostAdapter({
-      getActiveTabId: () => 'tab-1',
-      getTabRuntimeState: () => runtime,
-      ensureTurnBody: () => turnBody,
-      shouldAutoScroll: () => true,
-      scheduleSettledScrollToBottomIfNeeded: scrollSpy,
-      setStreamingAssistantMessageVisibility: (messageEl, visible) => {
-        messageEl.hidden = !visible;
+    const adapter = new AssistantShellViewHostAdapter(
+      {
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => runtime,
+        ensureTurnBody: () => turnBody,
+        shouldAutoScroll: () => true,
+        scheduleSettledScrollToBottomIfNeeded: scrollSpy,
+        setStreamingAssistantMessageVisibility: (messageEl, visible) => {
+          messageEl.hidden = !visible;
+        },
+        renderNoticeCard,
+        getMarkdownService,
+        shouldRenderQuestionResolutionCards,
+        suppressActiveLayoutAutoScrollOnce,
       },
-      renderNoticeCard,
-      getMarkdownService,
-      shouldRenderQuestionResolutionCards,
-      suppressActiveLayoutAutoScrollOnce,
       openTaskToolSession,
-    });
+    );
 
     return {
       adapter,
@@ -195,19 +197,21 @@ describe('AssistantShellViewHostAdapter', () => {
 describe('AssistantShellViewHostAdapter shell lifecycle', () => {
   function createAdapter() {
     const turnBody = document.createElement('div');
-    const adapter = new AssistantShellViewHostAdapter({
-      getActiveTabId: () => 'tab-1',
-      getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
-      ensureTurnBody: () => turnBody,
-      shouldAutoScroll: () => true,
-      scheduleSettledScrollToBottomIfNeeded: jest.fn(),
-      setStreamingAssistantMessageVisibility: jest.fn(),
-      renderNoticeCard: jest.fn(),
-      getMarkdownService: () => null,
-      shouldRenderQuestionResolutionCards: () => false,
-      suppressActiveLayoutAutoScrollOnce: jest.fn(),
-      openTaskToolSession: jest.fn(),
-    });
+    const adapter = new AssistantShellViewHostAdapter(
+      {
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
+        ensureTurnBody: () => turnBody,
+        shouldAutoScroll: () => true,
+        scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+        setStreamingAssistantMessageVisibility: jest.fn(),
+        renderNoticeCard: jest.fn(),
+        getMarkdownService: () => null,
+        shouldRenderQuestionResolutionCards: () => false,
+        suppressActiveLayoutAutoScrollOnce: jest.fn(),
+      },
+      jest.fn(),
+    );
     return { adapter, turnBody };
   }
 
@@ -221,19 +225,21 @@ describe('AssistantShellViewHostAdapter shell lifecycle', () => {
   });
 
   it('returns fallback when turn body is null', () => {
-    const adapter = new AssistantShellViewHostAdapter({
-      getActiveTabId: () => 'tab-1',
-      getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
-      ensureTurnBody: () => null,
-      shouldAutoScroll: () => false,
-      scheduleSettledScrollToBottomIfNeeded: jest.fn(),
-      setStreamingAssistantMessageVisibility: jest.fn(),
-      renderNoticeCard: jest.fn(),
-      getMarkdownService: () => null,
-      shouldRenderQuestionResolutionCards: () => false,
-      suppressActiveLayoutAutoScrollOnce: jest.fn(),
-      openTaskToolSession: jest.fn(),
-    });
+    const adapter = new AssistantShellViewHostAdapter(
+      {
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
+        ensureTurnBody: () => null,
+        shouldAutoScroll: () => false,
+        scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+        setStreamingAssistantMessageVisibility: jest.fn(),
+        renderNoticeCard: jest.fn(),
+        getMarkdownService: () => null,
+        shouldRenderQuestionResolutionCards: () => false,
+        suppressActiveLayoutAutoScrollOnce: jest.fn(),
+      },
+      jest.fn(),
+    );
 
     const result = adapter.createAssistantShellContainer('tab-1');
     expect(result.messageEl.isConnected).toBe(false);

@@ -8,8 +8,9 @@ export interface ChildSessionGraphCoordinatorHost {
   getSessionChildren(sessionId: string): Promise<ChildSessionInfo[]>;
   onGraphUpdated(graph: ChildSessionGraph): void;
   getMessagesContainerEl(): HTMLElement | null;
-  openTaskToolSession(sessionId: string): void;
 }
+
+export type ChildSessionGraphOnOpenTaskToolSession = (sessionId: string) => void;
 
 export const SESSION_TREE_BASE_CSS = `
 .opencodian-session-tree {
@@ -117,7 +118,10 @@ export class ChildSessionGraphCoordinator {
   private currentGraph: ChildSessionGraph | null = null;
   private childSessionTreeEl: HTMLElement | null = null;
 
-  constructor(private readonly host: ChildSessionGraphCoordinatorHost) {}
+  constructor(
+    private readonly host: ChildSessionGraphCoordinatorHost,
+    private readonly onOpenTaskToolSession: ChildSessionGraphOnOpenTaskToolSession = () => {},
+  ) {}
 
   getGraph(): ChildSessionGraph | null {
     return this.currentGraph;
@@ -217,7 +221,7 @@ export class ChildSessionGraphCoordinator {
         text: t('chat.childSessionTree.open'),
       });
       openBtn.addEventListener('click', () => {
-        this.host.openTaskToolSession(edge.childSessionId);
+        this.onOpenTaskToolSession(edge.childSessionId);
       });
     }
 
@@ -251,7 +255,7 @@ export class ChildSessionGraphCoordinator {
         text: t('chat.childSessionTree.open'),
       });
       openBtn.addEventListener('click', () => {
-        this.host.openTaskToolSession(orphaned.id);
+        this.onOpenTaskToolSession(orphaned.id);
       });
     }
 
