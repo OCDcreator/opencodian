@@ -19,14 +19,33 @@
 
 ### CI 门禁 (`.github/workflows/ci.yml`)
 
-仓库现在有一个最小质量门禁工作流，在 `push` 和 `pull_request` 上顺序执行：
+仓库现在有两个 CI 门禁 job，都会在 `push` 和 `pull_request` 上运行：
 
-1. `npm ci`
-2. `npm run lint`
-3. `npm run typecheck`
-4. `npm run test`
-5. `npm run build`
-6. `git diff --exit-code -- styles.css`
+1. `owner-guard`
+2. `verify`
+
+`owner-guard` job：
+
+1. `actions/checkout@v4` with `fetch-depth: 0`
+2. `npm ci`
+3. `npm run check:owner-guard`
+
+该 job 单独存在是为了尽早失败，并确保 owner guard 拿到足够的 git 历史来计算 PR diff range。
+
+`verify` job：
+
+1. `actions/checkout@v4` with `fetch-depth: 0`
+2. `npm ci`
+3. `npm run check:module-docs`
+4. `npm run check:graphify`
+5. `npm run check:devlog-order`
+6. `npm run lint`
+7. `npm run typecheck`
+8. `npm run test`
+9. `npm run build`
+10. `git diff --exit-code -- styles.css`
+
+由于 `npm run verify` 现已内嵌 `check:owner-guard`，`verify` job 也保留完整历史和统一的 owner-guard diff-range 环境变量，避免独立命令与聚合命令的范围判定不一致。
 
 最后一步的意义是：确保提交中的 `src/style/**` 改动已经同步刷新到根目录 `styles.css`，避免 CI 通过但仓库产物滞后。
 

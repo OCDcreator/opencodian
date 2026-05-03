@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证和模块文档硬约束。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs`。
+项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证、模块文档硬约束，以及新的 guarded thick-owner ownership gate。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs` 和 `tests/unit/infrastructure/owner-guard-lib.test.mjs`。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`
@@ -91,6 +91,39 @@ esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run docto
 
 非失败型辅助脚本，输出某个 diff 范围内必须更新的直接模块文档，以及新增 / 删除 / `index.ts` 变更时建议检查的父级 `index.md` 或 `docs/modules/README.md`。
 
+### owner-guard-lib.mjs — 厚 owner ownership gate 共享库
+
+纯逻辑 owner-guard 决策层。它负责：
+
+- guarded thick-owner 目标文件清单
+- 允许自动例外的路径判定，以及永不自动例外的 guard 脚本清单
+- Class A / Class B 变化分类
+- guarded file patch 的净新增 ownership 信号扫描
+- `maintainability-refactor` 模式下的净减少放行
+- 最终的 PASS / FAIL 结果格式化
+
+### check-owner-guard.mjs — 厚 owner ownership gate CLI
+
+repo-local owner guard 入口脚本。它读取 git diff 范围，构建 guarded-file patch assessment，调用 `owner-guard-lib.mjs` 得到结论，并以非零退出码阻断：
+
+- guarded thick-owner 文件上的 Class B 功能回灌
+- guarded thick-owner 文件上的净新增 runtime ownership
+
+支持：
+
+- `--range <git-range>` / `OWNER_GUARD_DIFF_RANGE`
+- `--mode normal|maintainability-refactor` / `OWNER_GUARD_MODE`
+
+默认范围：
+
+- 本地直接运行时默认比较 `HEAD`，确保未提交工作区改动也会被检查
+- repo-local `.githooks/pre-push` 显式设置 `OWNER_GUARD_DIFF_RANGE=origin/main...HEAD`
+- CI / PR 场景通过环境变量显式提供对比分支范围
+
+### install-hooks.mjs — repo-local hook 安装器
+
+将当前仓库的 `core.hooksPath` 指向 `.githooks`，让 repo-local `pre-push` 可以稳定调用 `npm run check:owner-guard`。
+
 ### run-jest.js — Jest 启动器
 
 Node.js 脚本形式的 Jest 启动包装器。
@@ -118,6 +151,9 @@ Node.js 脚本形式的 Jest 启动包装器。
 | `check-module-doc-coverage.mjs` | `npm run check:module-docs:coverage` | 模块文档覆盖 / orphan 检查 |
 | `check-module-doc-diff.mjs` | `npm run check:module-docs:diff` | 源码 diff 必须同步触碰映射文档 |
 | `list-module-doc-targets-from-diff.mjs` | `npm run list:module-docs` | 输出本次 diff 的文档同步目标 |
+| `owner-guard-lib.mjs` | — | 厚 owner ownership guard 的纯逻辑库 |
+| `check-owner-guard.mjs` | `npm run check:owner-guard` | 阻断 guarded thick-owner 功能回灌与净新增 ownership |
+| `install-hooks.mjs` | `npm run hooks:install` | 安装 repo-local `.githooks` |
 | `run-jest.js` | `npm run test` | Jest 启动 |
 | `sync-version.js` | — | 版本同步 |
 | `sync-lobehub-icons.mjs` | `npm run sync:lobehub-icons` | 从 `@lobehub/icons` 生成 provider icon manifest |
@@ -169,6 +205,18 @@ npm run check:module-docs
   → scripts/check-module-doc-diff.mjs --range HEAD
   → 验证源码 diff 已同步触碰映射文档
 
+npm run check:owner-guard
+  → scripts/check-owner-guard.mjs
+  → 读取 git diff 范围
+  → scripts/owner-guard-lib.mjs
+  → guarded thick-owner Class B / ownership 扩张时失败
+
+npm run hooks:install
+  → scripts/install-hooks.mjs
+  → git config core.hooksPath .githooks
+  → 激活 repo-local .githooks/pre-push
+  → pre-push 中显式导出 OWNER_GUARD_DIFF_RANGE=origin/main...HEAD
+
 npm run list:module-docs -- --range origin/main...HEAD
   → scripts/list-module-doc-targets-from-diff.mjs
   → 输出 Required module docs
@@ -182,6 +230,7 @@ npm run list:module-docs -- --range origin/main...HEAD
 - **devlog.md**: 被 check-devlog-order.mjs 验证
 - **graphify-out/**: 被 update-graphify-src.mjs 刷新，被 check-graphify-freshness.mjs 验证
 - **module-docs.config.json**: 被模块文档 guard 脚本读取，定义源码根、文档根、例外和特殊映射
+- **.githooks/pre-push**: 由 `install-hooks.mjs` 激活，调用 `npm run check:owner-guard`
 - **docs/modules/**: 被模块文档 coverage / diff gate 强制和 `src/` 保持同步
 
 ## 配置项
@@ -190,6 +239,7 @@ npm run list:module-docs -- --range origin/main...HEAD
 - graphify graph 固定为 `src/` 范围；不要把 `npm run graphify:update:src` 替换成 whole-repo `graphify update .`。
 - 模块文档 guard 通过 `module-docs.config.json` 配置；新增源码根、样式根、特殊入口或非源码文档例外时必须同步更新该文件。
 - `check-module-doc-diff.mjs` 支持 `--range <range>` 或 `MODULE_DOC_DIFF_RANGE`，本地 verify 默认使用 `HEAD`，分支审核建议使用 `origin/main...HEAD`。
+- `check-owner-guard.mjs` 支持 `--range <range>` / `OWNER_GUARD_DIFF_RANGE` 和 `--mode <mode>` / `OWNER_GUARD_MODE`；本地默认范围是 `HEAD`，`maintainability-refactor` 只用于明确的净减少 guarded ownership 的维护性整改。
 
 ## 注意事项
 
@@ -199,6 +249,7 @@ npm run list:module-docs -- --range origin/main...HEAD
 - `release.mjs` 使用 `npm install --package-lock-only` 更新 lockfile
 - `check-devlog-order.mjs` 在 CI/handoff 前应运行
 - `check:devlog-order` 已接入 `npm run verify`；新 devlog 条目必须插入到第一个日期标题之前
+- `check:owner-guard` 已接入 `npm run verify`，也会由 repo-local `.githooks/pre-push` 作为早期门禁执行；CI 是最终不可绕过的硬门禁
 - `check:graphify` 已接入 `npm run verify`；如果修改了 `src/`，通常需要先运行 `npm run graphify:update:src`
 - `check-module-docs` 已接入 `npm run verify`，源码模块新增、修改、删除时不能跳过对应文档
 - `sync-version.js` 应在 release 后自动运行

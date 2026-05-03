@@ -14,6 +14,7 @@
     "doctor:esbuild": "node scripts/doctor-esbuild.mjs",
     "doctor:esbuild:fix": "node scripts/doctor-esbuild.mjs --fix",
     "graphify:update:src": "node scripts/update-graphify-src.mjs",
+    "check:owner-guard": "node scripts/check-owner-guard.mjs",
     "check:graphify": "node scripts/check-graphify-freshness.mjs",
     "check:devlog-order": "node scripts/check-devlog-order.mjs",
     "check:module-docs:coverage": "node scripts/check-module-doc-coverage.mjs",
@@ -23,10 +24,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"{src,tests}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",
-    "verify": "npm run check:module-docs && npm run check:graphify && npm run check:devlog-order && npm run lint && npm run typecheck && npm test && npm run build",
+    "verify": "npm run check:owner-guard && npm run check:module-docs && npm run check:graphify && npm run check:devlog-order && npm run lint && npm run typecheck && npm test && npm run build",
     "test": "node scripts/run-jest.js",
     "test:watch": "node scripts/run-jest.js --watch",
     "test:coverage": "node scripts/run-jest.js --coverage",
+    "hooks:install": "node scripts/install-hooks.mjs",
     "version": "node scripts/sync-version.js && git add manifest.json"
   },
   "keywords": [

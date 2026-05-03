@@ -8,11 +8,37 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  owner-guard:
     runs-on: ubuntu-latest
+    env:
+      OWNER_GUARD_DIFF_RANGE: ${{ github.event_name == 'pull_request' && format('origin/{0}...HEAD', github.base_ref) || 'HEAD' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check owner guard
+        run: npm run check:owner-guard
+
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      OWNER_GUARD_DIFF_RANGE: ${{ github.event_name == 'pull_request' && format('origin/{0}...HEAD', github.base_ref) || 'HEAD' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
