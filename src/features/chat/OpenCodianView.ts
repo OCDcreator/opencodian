@@ -1213,6 +1213,10 @@ export class OpenCodianView extends ItemView {
       getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
     });
 
+    const userMessageContentRenderer = new UserMessageContentRenderer(
+      this.createUserMessageContentRendererHost(),
+    );
+    this.userMessageContentRenderer = userMessageContentRenderer;
     const conversationRenderService = new ConversationRenderService(
       createConversationRenderHost({
         getCurrentConversation: () => this.currentConversation,
@@ -1234,7 +1238,7 @@ export class OpenCodianView extends ItemView {
           this.conversationNoticeCoordinator.createEmptyConversationNotice(),
         createUserMessageFrame: (message) =>
           this.createUserMessageRenderFrame(message),
-        userMessageContentRenderer: this.userMessageContentRenderer,
+        userMessageContentRenderer,
         addUserMessageFooter: (messageEl, message, content) => {
           this.addUserMessageFooter(messageEl, message, content);
         },
@@ -1696,9 +1700,6 @@ export class OpenCodianView extends ItemView {
     const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
       this.createAssistantNoticeCardRendererHost(),
     );
-    const userMessageContentRenderer = new UserMessageContentRenderer(
-      this.createUserMessageContentRendererHost(),
-    );
     const userMessageFooterRenderer = new UserMessageFooterRenderer(
       this.createUserMessageFooterRendererHost(),
     );
@@ -1761,7 +1762,7 @@ export class OpenCodianView extends ItemView {
       messageSendPreparationService,
       messageFinalizationService,
       assistantNoticeCardRenderer,
-      userMessageContentRenderer,
+      userMessageContentRenderer: this.userMessageContentRenderer,
       userMessageFooterRenderer,
       streamingInlineCardRenderer,
       permissionInlineCardRenderer,

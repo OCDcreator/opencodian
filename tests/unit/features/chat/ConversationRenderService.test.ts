@@ -347,4 +347,41 @@ describe('createConversationRenderHost', () => {
     expect(deps.renderAssistantMessageBody).toHaveBeenCalledWith(assistantContentEl, assistantMessage);
     expect(deps.finalizePersistedFooter).toHaveBeenCalledWith(assistantMessageEl, assistantMessage);
   });
+
+  it('fails fast when the user message renderer is missing', () => {
+    const deps = {
+      getCurrentConversation: jest.fn().mockReturnValue(null),
+      getMessagesContainer: jest.fn().mockReturnValue(null),
+      getActiveTabId: jest.fn().mockReturnValue(null),
+      getTabRuntimeState: jest.fn().mockReturnValue(null),
+      clearScheduledScrollToBottom: jest.fn(),
+      beginConversationHydration: jest.fn(),
+      endConversationHydration: jest.fn(),
+      resetTurnState: jest.fn(),
+      shouldRenderEmptyConversationNotice: jest.fn().mockReturnValue(false),
+      createEmptyConversationNotice: jest.fn(),
+      createUserMessageFrame: jest.fn(),
+      userMessageContentRenderer: undefined,
+      addUserMessageFooter: jest.fn(),
+      renderMarkdownInto: jest.fn(),
+      renderBackgroundTaskIndicatorIfNeeded: jest.fn(),
+      syncBackgroundTaskStateFromConversation: jest.fn(),
+      shouldAutoScroll: jest.fn().mockReturnValue(false),
+      scrollToBottom: jest.fn(),
+      syncPaneScrollMetrics: jest.fn(),
+      scheduleComposerLayoutSync: jest.fn(),
+      getMessagesForRender: jest.fn().mockImplementation((messages) => messages),
+      getMessageVisualSignature: jest.fn().mockReturnValue('visual-signature'),
+      renderPersistedAssistantMessage: jest.fn(),
+      createAssistantMessageElements: jest.fn(),
+      finalizePseudoStreamFooter: jest.fn(),
+      clearStreamingMessageState: jest.fn(),
+      getAssistantBodySignature: jest.fn(),
+      renderAssistantMessageBody: jest.fn(),
+      finalizePersistedFooter: jest.fn(),
+    };
+
+    expect(() => createConversationRenderHost(deps as never))
+      .toThrow('createConversationRenderHost requires userMessageContentRenderer');
+  });
 });

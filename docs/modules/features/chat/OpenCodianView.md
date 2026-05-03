@@ -316,6 +316,8 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 - `createConversationRenderHost(deps)` 工厂函数（定义在 `ConversationRenderService.ts`）接收 `ConversationRenderHostDependencies` 扁平依赖，在工厂内部装配完整的 `ConversationRenderHost` 回调对象（包括 shell/tail render port 和 debug callbacks）；view 只提供原始 service 引用和简单 lambda，不再拥有 `createConversationRenderHost` / `createConversationAssistantShellRenderPort` / `createConversationAssistantTailRenderPort` 私有方法
 - `ConversationCanonicalRenderSource`：把 `OpenCodeService.getCanonicalSessionState()` 与 `hydrateOpenCodeMessage()` 作为独立 source 注入 render service，让 full rerender / synced update 优先走 canonical turn view-model，同时不扩大 DOM host
 
+其中 user message body renderer 不是 late-bound view 字段：`OpenCodianView` 会先创建 `UserMessageContentRenderer`，再把这个具体实例注入 `createConversationRenderHost()`，避免 render service 在首次发送或 authoritative rerender 时拿到未初始化的 renderer。
+
 收到服务端新消息后，`applySyncedConversationUpdate()` 会优先尝试：
 
 - patch 最后一条 assistant render

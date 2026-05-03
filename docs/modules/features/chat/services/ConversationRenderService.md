@@ -131,6 +131,8 @@ export class ConversationRenderService {
 }
 ```
 
+`createConversationRenderHost()` 现在会对 `deps.userMessageContentRenderer` 做 fail-fast 校验；`OpenCodianView` 必须先创建具体的 `UserMessageContentRenderer` 实例，再把它注入 render host，而不是依赖稍后才赋值的 view 字段。
+
 ## 关键行为
 
 ### 基础消息渲染

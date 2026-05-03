@@ -101,6 +101,11 @@ export interface ConversationRenderHostDependencies {
 export function createConversationRenderHost(
   deps: ConversationRenderHostDependencies,
 ): ConversationRenderHost {
+  const userMessageContentRenderer = deps.userMessageContentRenderer;
+  if (!userMessageContentRenderer) {
+    throw new Error('createConversationRenderHost requires userMessageContentRenderer');
+  }
+
   const assistantShellRender: ConversationAssistantShellRenderPort = {
     renderPersistedMessage: (message) =>
       deps.renderPersistedAssistantMessage({ message }),
@@ -150,7 +155,7 @@ export function createConversationRenderHost(
       deps.createEmptyConversationNotice(),
     createUserMessageFrame: (message) =>
       deps.createUserMessageFrame(message),
-    userMessageContentRenderer: deps.userMessageContentRenderer,
+    userMessageContentRenderer,
     addUserMessageFooter: (messageEl, message, content) => {
       deps.addUserMessageFooter(messageEl, message, content);
     },
