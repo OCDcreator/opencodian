@@ -352,7 +352,9 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
       expect(env.OPENCODE_PURE).toBe('true');
     });
   });
+}
 
+function registerBinaryResolutionTests(context: ServerManagerContext): void {
   describe('binary resolution', () => {
     if (process.platform === 'win32') {
       it('prefers npm global opencode.cmd over PATH opencode.exe', () => {
@@ -436,6 +438,30 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
         delete process.env.LOCALAPPDATA;
         delete process.env.USERPROFILE;
         delete process.env.PATH;
+        process.env.Path = pathBinDir;
+        delete process.env.path;
+
+        const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
+
+        expect(resolved).toBe(binaryPath);
+      } finally {
+        restorePlatform();
+      }
+    });
+
+    it('resolves Windows PATH fallback from process.env.Path when PATH is empty', () => {
+      const restorePlatform = mockProcessPlatform('win32');
+      const pathBinDir = path.join(context.testVaultPath, 'ExplorerEmptyPathBin');
+      const binaryPath = path.join(pathBinDir, 'opencode.cmd');
+
+      try {
+        fs.mkdirSync(pathBinDir, { recursive: true });
+        fs.writeFileSync(binaryPath, '@echo off', 'utf-8');
+
+        delete process.env.APPDATA;
+        delete process.env.LOCALAPPDATA;
+        delete process.env.USERPROFILE;
+        process.env.PATH = '';
         process.env.Path = pathBinDir;
         delete process.env.path;
 
@@ -533,4 +559,5 @@ describe('ServerManager lifecycle and environment', () => {
 
   registerStateAndHealthTests(context);
   registerEnvironmentAndBinaryTests(context);
+  registerBinaryResolutionTests(context);
 });

@@ -393,6 +393,29 @@ describe('OpenCodeServiceLifecycleCoordinator settings updates', () => {
     expect(harness.getCurrentBaseUrl()).toBe('http://127.0.0.1:5000');
   });
 
+  it('allows same-port managed host changes to restart in place', async () => {
+    const harness = createSettingsHarness({
+      serverManager: {
+        isRunning: jest.fn().mockReturnValue(true),
+        canBindLocalEndpoint: jest.fn().mockResolvedValue(false),
+      },
+      syncEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+      openCodeEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+    });
+    const nextSettings = cloneSettings(DEFAULT_SETTINGS);
+    nextSettings.server.local.host = '0.0.0.0';
+
+    await expect(harness.coordinator.updateSettings(nextSettings)).resolves.toBeUndefined();
+
+    expect(harness.serverManager.canBindLocalEndpoint).not.toHaveBeenCalled();
+    expect(harness.serverManager.restart).toHaveBeenCalledTimes(1);
+    expect(harness.getCurrentBaseUrl()).toBe('http://0.0.0.0:4196');
+  });
+
   it('rolls back settings and restores the previous managed server after a failed restart', async () => {
     const harness = createSettingsHarness({
       serverManager: {

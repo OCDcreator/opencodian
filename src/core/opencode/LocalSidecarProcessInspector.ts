@@ -16,21 +16,21 @@ const logger = createLogger('LocalProcessProbe');
 
 export class LocalSidecarProcessInspector {
   /** Return the PID currently listening on the given local port. */
-  async getListeningProcessId(port: number): Promise<number | null> {
+  async getListeningProcessId(port: number, host?: string): Promise<number | null> {
     const output = process.platform === 'win32'
       ? await this.captureCommandOutput(
         'powershell',
         [
           '-NoProfile',
           '-Command',
-          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $conn.OwningProcess }`,
+          this.buildWindowsListeningPidCommand(port, host),
         ],
       )
       : await this.captureCommandOutput(
         'sh',
         [
           '-lc',
-          `lsof -nP -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null | head -n 1`,
+          this.buildUnixListeningPidCommand(port, host),
         ],
       );
 
@@ -38,19 +38,19 @@ export class LocalSidecarProcessInspector {
       return null;
     }
 
-    const parsed = Number.parseInt(output.trim(), 10);
+    const parsed = this.parseListeningPidOutput(output, port, host);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
 
   /** Synchronous version of {@link getListeningProcessId}. */
-  getListeningProcessIdSync(port: number): number | null {
+  getListeningProcessIdSync(port: number, host?: string): number | null {
     const result = process.platform === 'win32'
       ? spawnSync(
         'powershell',
         [
           '-NoProfile',
           '-Command',
-          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $conn.OwningProcess }`,
+          this.buildWindowsListeningPidCommand(port, host),
         ],
         {
           encoding: 'utf-8',
@@ -61,7 +61,7 @@ export class LocalSidecarProcessInspector {
         'sh',
         [
           '-lc',
-          `lsof -nP -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null | head -n 1`,
+          this.buildUnixListeningPidCommand(port, host),
         ],
         {
           encoding: 'utf-8',
@@ -74,8 +74,116 @@ export class LocalSidecarProcessInspector {
     }
 
     const output = typeof result.stdout === 'string' ? result.stdout.trim() : '';
-    const parsed = Number.parseInt(output, 10);
+    const parsed = this.parseListeningPidOutput(output, port, host);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  private buildWindowsListeningPidCommand(port: number, host?: string): string {
+    if (!host?.trim()) {
+      return `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $conn.OwningProcess }`;
+    }
+
+    const hostLiteral = this.toPowerShellSingleQuotedString(host.trim());
+    return [
+      `$target = ${hostLiteral}`,
+      `$addresses = @($target)`,
+      `if ($target -eq 'localhost') { $addresses += @('127.0.0.1', '::1') }`,
+      `$wildcards = @('0.0.0.0', '::', '[::]')`,
+      `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Where-Object { ($addresses -contains $_.LocalAddress) -or ($wildcards -contains $_.LocalAddress) } | Select-Object -First 1`,
+      `if ($conn) { $conn.OwningProcess }`,
+    ].join('; ');
+  }
+
+  private buildUnixListeningPidCommand(port: number, host?: string): string {
+    if (!host?.trim()) {
+      return `lsof -nP -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null | head -n 1`;
+    }
+
+    return `lsof -nP -iTCP:${port} -sTCP:LISTEN -F pn 2>/dev/null`;
+  }
+
+  private parseListeningPidOutput(output: string, port: number, host?: string): number {
+    if (!host?.trim()) {
+      return Number.parseInt(output.trim(), 10);
+    }
+
+    if (process.platform === 'win32') {
+      return Number.parseInt(output.trim(), 10);
+    }
+
+    return this.parseHostAwareLsofPid(output, port, host.trim());
+  }
+
+  private parseHostAwareLsofPid(output: string, port: number, host: string): number {
+    let currentPid: number | null = null;
+    let wildcardPid: number | null = null;
+
+    for (const rawLine of output.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) {
+        continue;
+      }
+
+      if (line.startsWith('p')) {
+        const parsedPid = Number.parseInt(line.slice(1), 10);
+        currentPid = Number.isInteger(parsedPid) && parsedPid > 0 ? parsedPid : null;
+        continue;
+      }
+
+      if (!line.startsWith('n') || !currentPid) {
+        continue;
+      }
+
+      const address = this.extractLsofAddress(line.slice(1), port);
+      if (!address) {
+        continue;
+      }
+
+      if (this.isWildcardAddress(address)) {
+        wildcardPid ??= currentPid;
+        continue;
+      }
+
+      if (this.localAddressMatchesHost(address, host)) {
+        return currentPid;
+      }
+    }
+
+    return wildcardPid ?? Number.NaN;
+  }
+
+  private extractLsofAddress(endpoint: string, port: number): string | null {
+    const portSuffix = `:${port}`;
+    const suffixIndex = endpoint.lastIndexOf(portSuffix);
+    if (suffixIndex < 0) {
+      return null;
+    }
+
+    const addressSegment = endpoint
+      .slice(0, suffixIndex)
+      .trim()
+      .split(/\s+/)
+      .pop();
+    return addressSegment?.replace(/^\[(.*)\]$/, '$1') || null;
+  }
+
+  private localAddressMatchesHost(address: string, host: string): boolean {
+    const normalizedAddress = address.toLowerCase();
+    const normalizedHost = host.toLowerCase();
+    if (normalizedAddress === normalizedHost) {
+      return true;
+    }
+
+    return normalizedHost === 'localhost'
+      && (normalizedAddress === '127.0.0.1' || normalizedAddress === '::1');
+  }
+
+  private isWildcardAddress(address: string): boolean {
+    return address === '*' || address === '0.0.0.0' || address === '::';
+  }
+
+  private toPowerShellSingleQuotedString(value: string): string {
+    return `'${value.replace(/'/g, "''")}'`;
   }
 
   /** Return the command line for the process with the given PID. */
@@ -239,12 +347,12 @@ export class LocalProcessProbe {
     return this.inspector.isLocalPortAvailableSync(port);
   }
 
-  async getListeningProcessId(port: number): Promise<number | null> {
-    return this.inspector.getListeningProcessId(port);
+  async getListeningProcessId(port: number, host?: string): Promise<number | null> {
+    return this.inspector.getListeningProcessId(port, host);
   }
 
-  getListeningProcessIdSync(port: number): number | null {
-    return this.inspector.getListeningProcessIdSync(port);
+  getListeningProcessIdSync(port: number, host?: string): number | null {
+    return this.inspector.getListeningProcessIdSync(port, host);
   }
 
   async getProcessCommandLine(pid: number): Promise<string | null> {
@@ -258,8 +366,9 @@ export class LocalProcessProbe {
   async getCurrentPluginManagedListenerPid(
     port: number,
     isPluginManagedCommand: (commandLine: string | null) => boolean,
+    host?: string,
   ): Promise<number | null> {
-    const pid = await this.getListeningProcessId(port);
+    const pid = await this.getListeningProcessId(port, host);
     if (!pid) {
       return null;
     }
@@ -271,8 +380,9 @@ export class LocalProcessProbe {
   getCurrentPluginManagedListenerPidSync(
     port: number,
     isPluginManagedCommand: (commandLine: string | null) => boolean,
+    host?: string,
   ): number | null {
-    const pid = this.getListeningProcessIdSync(port);
+    const pid = this.getListeningProcessIdSync(port, host);
     if (!pid) {
       return null;
     }

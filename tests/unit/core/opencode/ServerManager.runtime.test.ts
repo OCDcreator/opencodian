@@ -405,6 +405,79 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
       });
     });
 
+    it('cleans up the spawned process when health never becomes ready', async () => {
+      const manager = context.setManager(new ServerManager({
+        ...context.defaultConfig,
+        timeout: 1,
+      }));
+      const pathBinDir = path.join(context.testVaultPath, 'PathBin');
+      const binaryPath = path.join(pathBinDir, 'opencode');
+      const spawnedProcess = {
+        pid: 13579,
+        on: jest.fn(),
+        once: jest.fn(),
+        removeListener: jest.fn(),
+        kill: jest.fn(),
+        stdout: { on: jest.fn(), removeListener: jest.fn() },
+        stderr: { on: jest.fn(), removeListener: jest.fn() },
+        killed: false,
+      };
+
+      fs.mkdirSync(pathBinDir, { recursive: true });
+      fs.writeFileSync(binaryPath, '#!/bin/sh', 'utf-8');
+      process.env.PATH = pathBinDir;
+
+      const { spawn: mockSpawn } = jest.requireMock('child_process') as { spawn: jest.Mock };
+      mockSpawn.mockReturnValueOnce(spawnedProcess);
+      jest.spyOn(getProcessProbe(manager), 'canBindLocalEndpoint').mockResolvedValue(true);
+      jest.spyOn(manager, 'checkHealth').mockResolvedValue(false);
+      jest.spyOn(getProcessProbe(manager), 'waitForPortAvailability').mockResolvedValue(true);
+
+      await expect(manager.start()).rejects.toThrow(/failed to start/i);
+
+      expect(spawnedProcess.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(manager.getManagedServerStateSnapshot()).toBeNull();
+    });
+
+    it('preserves the live listener state when a Windows launcher wrapper exits', async () => {
+      const manager = context.getManager();
+      const eventHandlers = new Map<string, (...args: unknown[]) => void>();
+      const spawnedProcess = {
+        pid: 1111,
+        on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+          eventHandlers.set(event, handler);
+        }),
+        once: jest.fn(),
+        removeListener: jest.fn(),
+        kill: jest.fn(),
+        stdout: { on: jest.fn(), removeListener: jest.fn() },
+        stderr: { on: jest.fn(), removeListener: jest.fn() },
+        killed: false,
+      };
+      const { spawn: mockSpawn } = jest.requireMock('child_process') as { spawn: jest.Mock };
+      const pathBinDir = path.join(context.testVaultPath, 'WrapperPathBin');
+      const binaryPath = path.join(pathBinDir, 'opencode');
+
+      fs.mkdirSync(pathBinDir, { recursive: true });
+      fs.writeFileSync(binaryPath, '#!/bin/sh', 'utf-8');
+      process.env.PATH = pathBinDir;
+      mockSpawn.mockReturnValueOnce(spawnedProcess);
+      jest.spyOn(getProcessProbe(manager), 'canBindLocalEndpoint').mockResolvedValue(true);
+      jest.spyOn(getProcessProbe(manager), 'getListeningProcessId').mockResolvedValue(2468);
+      jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
+      jest.spyOn(LocalProcessProbe.prototype, 'getCurrentPluginManagedListenerPidSync').mockReturnValue(2468);
+
+      await expect(manager.start()).resolves.toBeUndefined();
+      eventHandlers.get('exit')?.(0, null);
+
+      expect(manager.getManagedServerStateSnapshot()).toMatchObject({
+        pid: 2468,
+        launcherPid: 1111,
+        listenerPid: 2468,
+      });
+      expect(manager.getStatus()).toBe('running');
+    });
+
     it('formats launch failures from an immutable launch snapshot', () => {
       const manager = context.getManager();
       const activeLaunch = {

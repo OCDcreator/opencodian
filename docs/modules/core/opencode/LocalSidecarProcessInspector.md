@@ -34,12 +34,19 @@
 
 ### 端口到 PID 的映射
 
-`getListeningProcessId(port)` 和 `getListeningProcessIdSync(port)` 分别使用异步和同步方式查询监听指定端口的进程：
+`getListeningProcessId(port, host?)` 和 `getListeningProcessIdSync(port, host?)` 分别使用异步和同步方式查询监听指定端口的进程：
 
 - **非 Windows**: 通过 `lsof -nP -iTCP:${port} -sTCP:LISTEN -t` 获取 PID
 - **Windows**: 通过 `Get-NetTCPConnection -State Listen -LocalPort ${port}` 获取 `OwningProcess`
 
 返回值会经过 `Number.parseInt` 校验，只有正整数才会被返回。
+
+当调用方传入 host 时，查询会按当前 local address 过滤：
+
+- Windows: 在 PowerShell 中按 `LocalAddress` 过滤目标 host，并允许 `0.0.0.0` / `::` 这类 wildcard listener。
+- 非 Windows: 使用 `lsof -F pn` 输出解析 pid/address 对，优先返回 exact host 命中，其次接受 wildcard listener。
+
+这让调用方在 `127.0.0.1` / `localhost` / `0.0.0.0` 等同端口场景下可以减少端口 owner 误判；当前 `LocalSidecarLauncher` 用它确认 Windows/npm wrapper 退出后是否仍有当前 host/port 上的 plugin-managed listener。
 
 ### 命令行解析
 
@@ -86,7 +93,7 @@
 
 | 方法 | 说明 |
 |------|------|
-| `LocalSidecarProcessInspector.getListeningProcessId*` | 查询监听端口 PID（异步/同步） |
+| `LocalSidecarProcessInspector.getListeningProcessId*` | 查询监听端口 PID（异步/同步，可按 host 过滤） |
 | `LocalSidecarProcessInspector.getProcessCommandLine*` | 查询 PID 命令行（异步/同步） |
 | `LocalSidecarProcessInspector.isPidRunning*` | 查询 PID 存活（异步/同步） |
 | `LocalSidecarProcessInspector.isLocalPortAvailableSync` | 同步端口占用检查 |

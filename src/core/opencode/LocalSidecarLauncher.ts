@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { createLogger, getPerformanceTimestampMs } from '../../shared';
+import { LocalSidecarEndpointResolver } from './LocalSidecarEndpointResolver';
+import { LocalProcessProbe } from './LocalSidecarProcessInspector';
 import type { ManagedServerState, OpenCodeServerConfig } from './types';
 
 const logger = createLogger('LocalSidecarLauncher');
@@ -39,6 +41,7 @@ export interface LocalSidecarLaunchRuntimeOptions {
   timeout: number;
   checkHealth: (timeout: number) => Promise<boolean>;
   managedServerStateSnapshot: ManagedServerState | null;
+  onProcessSpawn?: (process: ChildProcess) => void;
   onProcessError?: (error: Error) => void;
   onProcessExit?: (code: number | null, signal: NodeJS.Signals | null) => void;
 }
@@ -54,9 +57,11 @@ export class LocalSidecarLauncher {
   private config: OpenCodeServerConfig;
   private workingDirectory: string | undefined;
   private activeLaunch: LocalServerLaunch | null = null;
+  private processProbe: LocalProcessProbe;
 
-  constructor(config: OpenCodeServerConfig) {
+  constructor(config: OpenCodeServerConfig, processProbe: LocalProcessProbe = new LocalProcessProbe()) {
     this.config = config;
+    this.processProbe = processProbe;
   }
 
   updateConfig(config: OpenCodeServerConfig): void {
@@ -68,18 +73,27 @@ export class LocalSidecarLauncher {
   }
 
   clearLaunchState(): void {
-    this.activeLaunch?.cleanup();
-    this.activeLaunch = null;
+    if (!this.activeLaunch) {
+      return;
+    }
+
+    this.detachLaunch(this.activeLaunch);
   }
 
   async launchRuntime(options: LocalSidecarLaunchRuntimeOptions): Promise<LocalSidecarLaunchRuntimeResult> {
     const launchStartedAt = getPerformanceTimestampMs();
-    const process = this.spawnServer(options);
+    const proc = this.spawnServer(options);
+    options.onProcessSpawn?.(proc);
     const spawnedAt = getPerformanceTimestampMs();
-    await this.waitForHealthy(options.timeout, options.checkHealth);
+    try {
+      await this.waitForHealthy(options.timeout, options.checkHealth);
+    } catch (error) {
+      await this.cleanupFailedLaunch(proc);
+      throw error;
+    }
     const healthyAt = getPerformanceTimestampMs();
     return {
-      process,
+      process: proc,
       launchStartedAt,
       spawnedAt,
       healthyAt,
@@ -95,7 +109,7 @@ export class LocalSidecarLauncher {
     logger.debug('Starting OpenCode server:');
     logger.debug(`  Binary: ${opencodePath}`);
     logger.debug(`  Working directory: ${this.workingDirectory || 'current directory'}`);
-    logger.debug(`  Config path: ${this.workingDirectory ? `${this.workingDirectory}/.opencode/opencode.json` : 'N/A'}`);
+    logger.debug(`  Config path: ${this.workingDirectory ? path.join(this.workingDirectory, '.opencode', 'opencode.json') : 'N/A'}`);
     logger.debug('  Spawn context:', {
       mode: this.config.mode,
       modelSourceMode: this.config.modelSourceMode,
@@ -166,6 +180,10 @@ export class LocalSidecarLauncher {
       launch.exited = true;
       launch.exitCode = code;
       launch.signal = signal;
+      if (this.shouldPreserveLiveListenerAfterLauncherExit()) {
+        this.detachLaunch(launch);
+        return;
+      }
       options.onProcessExit?.(code, signal);
     };
 
@@ -182,6 +200,60 @@ export class LocalSidecarLauncher {
     proc.on('exit', handleExit);
 
     this.activeLaunch = launch;
+  }
+
+  private detachLaunch(launch: LocalServerLaunch): void {
+    launch.cleanup();
+    if (this.activeLaunch === launch) {
+      this.activeLaunch = null;
+    }
+  }
+
+  private shouldPreserveLiveListenerAfterLauncherExit(): boolean {
+    if (this.config.mode !== 'local') {
+      return false;
+    }
+
+    const endpointResolver = new LocalSidecarEndpointResolver(this.config);
+    const listenerPid = this.processProbe.getCurrentPluginManagedListenerPidSync(
+      this.config.local.port,
+      (commandLine) => endpointResolver.looksLikePluginManagedSidecarCommand(commandLine),
+      this.config.local.host,
+    );
+    return Boolean(listenerPid);
+  }
+
+  private async cleanupFailedLaunch(proc: ChildProcess): Promise<void> {
+    this.clearLaunchState();
+    await this.terminateSpawnedProcess(proc);
+  }
+
+  private async terminateSpawnedProcess(proc: ChildProcess): Promise<void> {
+    if (!proc.pid || proc.killed) {
+      return;
+    }
+
+    if (process.platform === 'win32' && await this.terminateWindowsProcessTree(proc.pid)) {
+      return;
+    }
+
+    try {
+      proc.kill('SIGTERM');
+    } catch (error) {
+      logger.warn('Failed to terminate OpenCode process after startup failure:', error);
+    }
+  }
+
+  private terminateWindowsProcessTree(pid: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+
+      killer.once('error', () => resolve(false));
+      killer.once('exit', (code) => resolve(code === 0));
+    });
   }
 
   private createLaunchOutputHandler(
@@ -309,7 +381,9 @@ export class LocalSidecarLauncher {
   }
 
   private getPathEnvironmentValue(): string {
-    return process.env.PATH ?? process.env.Path ?? process.env.path ?? '';
+    return [process.env.PATH, process.env.Path, process.env.path]
+      .find((value) => typeof value === 'string' && value.trim().length > 0)
+      ?? '';
   }
 
   private getPathEnvironmentDelimiter(): string {

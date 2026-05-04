@@ -450,6 +450,7 @@ export class OpenCodeServiceLifecycleCoordinator {
 
   private async validateSettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): Promise<void> {
     if (!this.host.serverManager.isRunning() || plan.previousMode !== 'local' || plan.nextMode !== 'local' || !plan.serverConfigChanged) return;
+    if (plan.shouldRestartManagedServer && plan.previousSettings.server.local.port === plan.nextSettings.server.local.port) return;
     const endpointAvailable = await this.host.serverManager.canBindLocalEndpoint(plan.nextSettings.server.local.host, plan.nextSettings.server.local.port);
     if (!endpointAvailable) {
       throw new Error(`Cannot switch to ${plan.nextSettings.server.local.host}:${plan.nextSettings.server.local.port}. The target port is already in use.`);

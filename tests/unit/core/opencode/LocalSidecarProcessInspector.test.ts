@@ -57,6 +57,24 @@ describe('LocalSidecarProcessInspector', () => {
       );
     });
 
+    it('prefers the PID bound to the requested host on non-Windows', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      mockSpawnWithStdout('p12345\nn*:4196\np67890\nn127.0.0.1:4196\n');
+
+      const result = await inspector.getListeningProcessId(4196, '127.0.0.1');
+
+      expect(result).toBe(67890);
+    });
+
+    it('accepts wildcard listeners for the requested host on non-Windows', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      mockSpawnWithStdout('p12345\nn*:4196\n');
+
+      const result = await inspector.getListeningProcessId(4196, '127.0.0.1');
+
+      expect(result).toBe(12345);
+    });
+
     it('returns null when no process is listening', async () => {
       Object.defineProperty(process, 'platform', { value: 'darwin' });
       mockSpawnWithStdout('', 1);
@@ -78,6 +96,18 @@ describe('LocalSidecarProcessInspector', () => {
         expect.arrayContaining(['-NoProfile', '-Command']),
         expect.objectContaining({ stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }),
       );
+    });
+
+    it('filters Windows listener lookup by local address when a host is provided', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      mockSpawnWithStdout('6789\n');
+
+      const result = await inspector.getListeningProcessId(4196, '127.0.0.1');
+
+      expect(result).toBe(6789);
+      const command = mockSpawn.mock.calls[0][1][2] as string;
+      expect(command).toContain('LocalAddress');
+      expect(command).toContain('127.0.0.1');
     });
   });
 

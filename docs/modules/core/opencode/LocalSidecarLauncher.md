@@ -11,6 +11,9 @@
 - 本地 launch 输出 tail 跟踪（stdout/stderr）
 - 启动期进程异常/提前退出检测
 - ready 健康等待轮询与启动失败错误组装
+- ready timeout / 健康等待失败后的 spawned process 清理，避免半启动 sidecar 遗留
+- Windows/npm wrapper launcher 退出但当前 host/port 上仍有 plugin-managed listener 时，拦截 launcher exit，避免把仍在服务的 listener 误清成 orphan
+- spawn 成功后的 `onProcessSpawn` 回调，供需要启动期 pid 可见性的调用方使用
 - 启动环境变量清洗与注入
 
 `ServerManager` 仍然是生命周期/state owner：状态机变更、managed pid truth、adopt/restart/conflict 决策与 diagnostics 仍留在 `ServerManager`。
@@ -52,7 +55,7 @@
 - `getSpawnEnv()` 负责清理污染 `OPENCODE_*` 覆盖项，并按 `modelSourceMode` / `pluginIsolationMode` / auth 组装运行时环境。
 - `findOpenCodeBinary()` + `resolveExecutableCandidate()` 负责跨平台二进制候选解析。
 - Windows 仍优先解析 npm global shim（`%APPDATA%\npm\opencode.cmd`、`%LOCALAPPDATA%\npm\opencode.cmd`），随后显式探测 OpenCode Desktop 安装目录（`%LOCALAPPDATA%\OpenCode\opencode-cli.exe` / `opencode.exe`）和用户 wrapper（`%USERPROFILE%\bin\opencode.cmd`），最后才回退到 PATH。
-- Windows PATH fallback 会兼容 Electron/Explorer 继承环境中的 `PATH` / `Path` / `path` 大小写差异。
+- Windows PATH fallback 会兼容 Electron/Explorer 继承环境中的 `PATH` / `Path` / `path` 大小写差异，并选择第一个非空值，避免空 `PATH` 遮住可用的 `Path`。
 - Windows `.cmd` / `.bat` wrapper 会通过 `shell: true` 启动。
 
 ## 关键方法
