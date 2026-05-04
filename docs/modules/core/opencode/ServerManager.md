@@ -200,7 +200,7 @@ Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；
 
 `LocalSidecarLauncher` 中的 `findOpenCodeBinary()` 会按候选列表解析可执行文件，而不是只返回字面量命令名：
 
-- Windows：优先 `%APPDATA%\\npm\\opencode.cmd`，再尝试 `%LOCALAPPDATA%\\npm\\opencode.cmd`，最后才回退到 `PATH` 里的 `opencode.cmd` / `opencode`
+- Windows：优先 `%APPDATA%\\npm\\opencode.cmd` 与 `%LOCALAPPDATA%\\npm\\opencode.cmd`，再尝试 `%LOCALAPPDATA%\\OpenCode\\opencode-cli.exe` / `opencode.exe` 和 `%USERPROFILE%\\bin\\opencode.cmd`，最后才回退到 `PATH` / `Path` / `path` 里的 `opencode.cmd` / `opencode`
 - macOS / Linux：优先常见绝对路径，再回退到 `PATH`
 - 当系统里同时存在 npm 全局安装和其他渠道（例如 `winget`）的 `opencode` 时，这能让插件更稳定地命中 npm 版本，减少“终端 `opencode` 与插件本地 `4196` sidecar 不是同一套二进制”的偏差
 

@@ -74,6 +74,20 @@ const defaultConfig = {
   pluginIsolationMode: 'default' as const,
 };
 
+function mockProcessPlatform(platform: NodeJS.Platform): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', {
+    configurable: true,
+    value: platform,
+  });
+
+  return () => {
+    if (descriptor) {
+      Object.defineProperty(process, 'platform', descriptor);
+    }
+  };
+}
+
 type ServerManagerContext = {
   defaultConfig: typeof defaultConfig;
   getManager(): ServerManager;
@@ -361,6 +375,77 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
         expect(resolved).toBe(npmBinary);
       });
     }
+
+    it('resolves Windows OpenCode Desktop opencode-cli.exe when npm shims are absent', () => {
+      const restorePlatform = mockProcessPlatform('win32');
+      const localAppData = path.join(context.testVaultPath, 'LocalAppData');
+      const desktopBinary = path.join(localAppData, 'OpenCode', 'opencode-cli.exe');
+
+      try {
+        fs.mkdirSync(path.dirname(desktopBinary), { recursive: true });
+        fs.writeFileSync(desktopBinary, '', 'utf-8');
+
+        delete process.env.APPDATA;
+        process.env.LOCALAPPDATA = localAppData;
+        process.env.PATH = '';
+        delete process.env.Path;
+        delete process.env.path;
+
+        const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
+
+        expect(resolved).toBe(desktopBinary);
+      } finally {
+        restorePlatform();
+      }
+    });
+
+    it('resolves Windows user bin opencode.cmd when npm shims are absent', () => {
+      const restorePlatform = mockProcessPlatform('win32');
+      const userProfile = path.join(context.testVaultPath, 'UserProfile');
+      const userBinBinary = path.join(userProfile, 'bin', 'opencode.cmd');
+
+      try {
+        fs.mkdirSync(path.dirname(userBinBinary), { recursive: true });
+        fs.writeFileSync(userBinBinary, '@echo off', 'utf-8');
+
+        delete process.env.APPDATA;
+        delete process.env.LOCALAPPDATA;
+        process.env.USERPROFILE = userProfile;
+        process.env.PATH = '';
+        delete process.env.Path;
+        delete process.env.path;
+
+        const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
+
+        expect(resolved).toBe(userBinBinary);
+      } finally {
+        restorePlatform();
+      }
+    });
+
+    it('resolves Windows PATH fallback from process.env.Path when PATH is absent', () => {
+      const restorePlatform = mockProcessPlatform('win32');
+      const pathBinDir = path.join(context.testVaultPath, 'ExplorerPathBin');
+      const binaryPath = path.join(pathBinDir, 'opencode.cmd');
+
+      try {
+        fs.mkdirSync(pathBinDir, { recursive: true });
+        fs.writeFileSync(binaryPath, '@echo off', 'utf-8');
+
+        delete process.env.APPDATA;
+        delete process.env.LOCALAPPDATA;
+        delete process.env.USERPROFILE;
+        delete process.env.PATH;
+        process.env.Path = pathBinDir;
+        delete process.env.path;
+
+        const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
+
+        expect(resolved).toBe(binaryPath);
+      } finally {
+        restorePlatform();
+      }
+    });
 
     it('resolves the first matching binary from PATH', () => {
       const pathBinDir = path.join(context.testVaultPath, 'PathBin');

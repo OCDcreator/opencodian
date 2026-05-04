@@ -51,7 +51,9 @@
 
 - `getSpawnEnv()` 负责清理污染 `OPENCODE_*` 覆盖项，并按 `modelSourceMode` / `pluginIsolationMode` / auth 组装运行时环境。
 - `findOpenCodeBinary()` + `resolveExecutableCandidate()` 负责跨平台二进制候选解析。
-- Windows npm `opencode.cmd` 会通过 `shell: true` 启动。
+- Windows 仍优先解析 npm global shim（`%APPDATA%\npm\opencode.cmd`、`%LOCALAPPDATA%\npm\opencode.cmd`），随后显式探测 OpenCode Desktop 安装目录（`%LOCALAPPDATA%\OpenCode\opencode-cli.exe` / `opencode.exe`）和用户 wrapper（`%USERPROFILE%\bin\opencode.cmd`），最后才回退到 PATH。
+- Windows PATH fallback 会兼容 Electron/Explorer 继承环境中的 `PATH` / `Path` / `path` 大小写差异。
+- Windows `.cmd` / `.bat` wrapper 会通过 `shell: true` 启动。
 
 ## 关键方法
 

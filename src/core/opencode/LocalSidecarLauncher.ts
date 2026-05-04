@@ -218,6 +218,11 @@ export class LocalSidecarLauncher {
       }
       if (process.env.LOCALAPPDATA) {
         candidates.push(path.join(process.env.LOCALAPPDATA, 'npm', 'opencode.cmd'));
+        candidates.push(path.join(process.env.LOCALAPPDATA, 'OpenCode', 'opencode-cli.exe'));
+        candidates.push(path.join(process.env.LOCALAPPDATA, 'OpenCode', 'opencode.exe'));
+      }
+      if (process.env.USERPROFILE) {
+        candidates.push(path.join(process.env.USERPROFILE, 'bin', 'opencode.cmd'));
       }
       candidates.push(
         'opencode.cmd',
@@ -263,8 +268,8 @@ export class LocalSidecarLauncher {
       return fs.existsSync(candidate) ? candidate : null;
     }
 
-    const pathEntries = (process.env.PATH ?? '')
-      .split(path.delimiter)
+    const pathEntries = this.getPathEnvironmentValue()
+      .split(this.getPathEnvironmentDelimiter())
       .map((entry) => entry.trim())
       .filter(Boolean);
 
@@ -301,6 +306,14 @@ export class LocalSidecarLauncher {
     }
 
     return null;
+  }
+
+  private getPathEnvironmentValue(): string {
+    return process.env.PATH ?? process.env.Path ?? process.env.path ?? '';
+  }
+
+  private getPathEnvironmentDelimiter(): string {
+    return process.platform === 'win32' ? ';' : path.delimiter;
   }
 
   private shouldSpawnViaShell(opencodePath: string): boolean {
