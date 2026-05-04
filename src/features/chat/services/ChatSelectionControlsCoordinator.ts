@@ -282,6 +282,7 @@ export class ChatSelectionControlsCoordinator {
       return;
     }
 
+    this.permissionSelector.closeDropdown();
     this.isModelDropdownOpen = true;
     this.modelSelectorDropdown.style.display = 'block';
     this.modelSelectorTrigger.addClass('is-open');

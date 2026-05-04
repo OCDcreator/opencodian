@@ -1,5 +1,6 @@
 @import 'base/core.css';
 @import 'utils/markdown.css';
+@import 'components/agent-selector.css';
 @import 'components/model-selector.css';
 @import 'components/permission-mode-selector.css';
 @import 'components/history-dropdown.css';

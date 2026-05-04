@@ -98,8 +98,8 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `services/ConversationIdentityRuntime.ts` 的 host seam：conversation sync fingerprint、interrupted-sync preservation log fingerprint、message visual signature，以及 render-list shaping（消息可见性过滤、assistant merge、compaction divider 注入）
 - `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动
-- `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、toolbar slot mount，以及共享 composer catalog 加载入口
-- `SlashCommandMenuCatalogCache`：缓存 runtime commands + skills 与项目级 command/agent 配置合并后的 composer suggestion catalog；现在支持由插件入口在设置保存、server 恢复到 `running` 时主动失效
+- `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及共享 composer catalog 加载入口
+- `SlashCommandMenuCatalogCache`：缓存 runtime commands + skills 与项目级 command/agent 配置合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background 与 experimental demo / glass octahedron 相关 DOM 引用
@@ -204,6 +204,8 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 - effort selector display 刷新，以及共用的 Escape scope 注册
 
 因此 view 不再直接铺开 requested/current/resolved model selection、model catalog cache、switch-model notice / unavailable follow-up，或 model dropdown search/list/sticky-header cleanup、provider icon trigger 刷新、permission dropdown selected-state / open-close 状态机；这些 model-selection 与 selector UI lifecycle 已集中到 coordinator，而 send options、`ModelCatalogStateService` 语义与 provider icon fallback 顺序保持不变。
+
+主 Agent selector 则由 `ComposerInputShellCoordinator` 挂载的 `ChatAgentSelectionCoordinator` 承接，并复用 `SlashCommandMenuCatalogCache` 的 default-candidate sidecar。它不写回项目 `default_agent`，只在 composer submit 时作为 `SurfaceInvocationIntent.primaryAgent` 传入发送链路。
 
 ### Input appearance / glass ownership
 
@@ -333,7 +335,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 
 第七阶段后，`OpenCodianView.sendMessage()` 已经退化成 UI 事件到 `runtime/SendPipelineRuntime.ts` 的薄桥接。完整发送子系统现在按下面的边界协作：
 
-1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`；prompt submission 会把 `syntheticTextParts` 与显式 `invocationIntent` 一并透传，composer `@agent` 选中项也走这条 intent seam
+1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`；prompt submission 会把 `syntheticTextParts` 与显式 `invocationIntent` 一并透传，composer `@agent` 选中项和主 Agent selector 选择也走这条 intent seam
 2. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
 3. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
 4. `createMessageSendPreparationHost()` 工厂函数（定义在 `MessageSendPreparationService.ts`）接收 `MessageSendPreparationHostDependencies` 扁平依赖，在工厂内部装配完整的 `MessageSendPreparationHost` 回调对象；view 只提供原始 service 引用和简单 lambda，不再拥有 `createMessageSendPreparationSeam` 方法

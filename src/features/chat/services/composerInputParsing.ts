@@ -53,6 +53,22 @@ export function buildComposerInputSubmission(
   };
 }
 
+export function buildComposerInputSubmissionWithAgentIntents(
+  content: string,
+  mode: ComposerInputMode,
+  mentions: AgentMentionIntent[],
+  primaryAgent: string | null | undefined,
+): ComposerInputSubmission | null {
+  const trimStartOffset = content.length - content.trimStart().length;
+  return decoratePromptSubmissionWithPrimaryAgent(
+    decoratePromptSubmissionWithAgentMentions(
+      buildComposerInputSubmission(content, mode),
+      shiftAgentMentionSourceSpans(mentions, -trimStartOffset),
+    ),
+    primaryAgent,
+  );
+}
+
 export function isCommandComposerText(content: string): boolean {
   return parseCommandSubmission(content) !== null;
 }
@@ -74,6 +90,45 @@ export function decoratePromptSubmissionWithAgentMentions(
         ...getExistingMentions(submission),
         ...mentions,
       ],
+    },
+  };
+}
+
+export function shiftAgentMentionSourceSpans(
+  mentions: AgentMentionIntent[],
+  delta: number,
+): AgentMentionIntent[] {
+  if (delta === 0) {
+    return mentions;
+  }
+
+  return mentions.map((mention) => ({
+    ...mention,
+    source: mention.source
+      ? {
+        ...mention.source,
+        start: mention.source.start + delta,
+        end: mention.source.end + delta,
+      }
+      : undefined,
+  }));
+}
+
+export function decoratePromptSubmissionWithPrimaryAgent(
+  submission: ComposerInputSubmission | null,
+  primaryAgent: string | null | undefined,
+): ComposerInputSubmission | null {
+  const normalizedPrimaryAgent = primaryAgent?.trim();
+  if (!submission || submission.kind !== 'prompt' || !normalizedPrimaryAgent) {
+    return submission;
+  }
+
+  return {
+    ...submission,
+    invocationIntent: {
+      ...(submission.invocationIntent ?? {}),
+      kind: 'prompt',
+      primaryAgent: normalizedPrimaryAgent,
     },
   };
 }

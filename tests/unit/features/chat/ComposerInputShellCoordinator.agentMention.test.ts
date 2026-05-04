@@ -4,7 +4,10 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
-import { attachAgentMentionCandidatesToSlashCommandMenuItems } from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
+import {
+  attachAgentMentionCandidatesToSlashCommandMenuItems,
+  attachAgentSelectionCandidatesToSlashCommandMenuItems,
+} from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
 import { t } from '../../../../src/i18n';
 
 class ResizeObserverMock {
@@ -57,8 +60,8 @@ function slashItem(id: string, description: string): SlashCommandMenuItem {
   };
 }
 
-function createFixture() {
-  let slashCommandMenuItems: SlashCommandMenuItem[] = [];
+function createFixture(options: { slashCommandMenuItems?: SlashCommandMenuItem[] } = {}) {
+  let slashCommandMenuItems: SlashCommandMenuItem[] = options.slashCommandMenuItems ?? [];
   let agentMentionCandidates: AgentMentionCandidate[] = [];
 
   const host: jest.Mocked<ComposerInputShellCoordinatorHost> = {
@@ -228,6 +231,55 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
       content: 'please ask @reviewer to check this',
       invocationIntent: {
         kind: 'prompt',
+        mentions: [
+          {
+            agentId: 'reviewer',
+            source: {
+              value: '@reviewer',
+              start: 11,
+              end: 20,
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('submits the toolbar-selected primary agent alongside tracked mention intents', async () => {
+    const fixture = createFixture({
+      slashCommandMenuItems: attachAgentSelectionCandidatesToSlashCommandMenuItems([], [
+        { id: 'build', displayName: 'Build', description: 'Builds changes', mode: 'primary' },
+      ]),
+    });
+    fixture.setAgentMentionCandidates([
+      { id: 'reviewer', displayName: 'Reviewer', description: 'Reviews changes', mode: 'subagent' },
+    ]);
+    await flushAsync();
+
+    fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger')?.click();
+    await flushAsync();
+    fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]')?.click();
+
+    fixture.textarea.value = 'please ask @re';
+    fixture.textarea.setSelectionRange(14, 14);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushAsync();
+
+    fixture.textarea.value += 'to check this';
+    fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushAsync();
+
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith({
+      kind: 'prompt',
+      content: 'please ask @reviewer to check this',
+      invocationIntent: {
+        kind: 'prompt',
+        primaryAgent: 'build',
         mentions: [
           {
             agentId: 'reviewer',

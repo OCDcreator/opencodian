@@ -10,10 +10,12 @@
 ## 关键类名 / CSS 变量
 
 - 助手消息：`.opencodian-message--assistant`、`.opencodian-message-time-row`、`.opencodian-message-model-id`。
+- 用户消息 agent 高亮：`.opencodian-message-highlight-agent`。
 - 通知卡：`.opencodian-chat-notice-card*`、`.opencodian-chat-notice-action-btn`。
 - 交互按钮：`.opencodian-copy-btn-inline`、`.opencodian-user-action-btn*`。
 - 问题与 TODO：`.opencodian-question-dock*`、`.opencodian-session-todo-*`。
 - 输入区：`.opencodian-composer-*`、`.opencodian-slash-command-menu*`、`.opencodian-slash-command-menu-state*`、`.opencodian-input-toolbar`、`.opencodian-context-ring*`。
+- 输入工具栏现在为 Agent / permission / model selector 统一保留 flex slot，不在该文件内定义 Agent 下拉框本体样式；本体样式在 `components/agent-selector.css`。
 - 动画：`opencodian-spin`、`opencodian-todo-pulse`、若干玻璃态 hover 过渡。
 
 ## 关联 TS 组件

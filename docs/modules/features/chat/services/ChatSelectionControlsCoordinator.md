@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ChatSelectionControlsCoordinator` 承接聊天输入工具栏里 model selector 的 dropdown lifecycle、search/list 渲染、trigger 显示和 provider icon 刷新，并把模型目录缓存、requested/current/resolved selection 解析、active-tab override 写回与 unavailable follow-up ownership 委托给 `ModelSelectionRuntime`。permission selector 的 trigger、option list、open/close 与 mode writeback 现在进一步下沉到 `PermissionModeSelectorCoordinator`，避免本 coordinator 同时维护两套 dropdown DOM 状态机。
+`ChatSelectionControlsCoordinator` 承接聊天输入工具栏里 permission / model selector 的 UI lifecycle。model selector 的目录缓存、requested/current/resolved selection 解析、active-tab override 写回与 unavailable follow-up ownership 委托给 `ModelSelectionRuntime`；permission selector 的 trigger、option list、open/close 与 mode writeback 下沉到 `PermissionModeSelectorCoordinator`。
 
 它负责：
 
@@ -48,7 +48,7 @@ export class ChatSelectionControlsCoordinator {
 
 ## 关键行为
 
-- `build()` 一次性挂载 permission/model selector，并注册共享的 Escape close handler
+- `build()` 一次性挂载 permission / model selector，并注册共享的 Escape close handler
 - `reloadModelCatalog()` 触发 runtime data reload，重建 available provider/model cache，并同步 active-tab context-usage identity
 - `getCurrentSessionModel()` / `getCurrentSessionModelResolution()` 通过 `ModelSelectionRuntime` 完成 requested/current/resolved selection 推导，不再要求 view 直接维护 catalog 分支
 - `ensureSelectedModelAvailable()` / `getModelUnavailableNoticeContent()` 把 send 前 availability follow-up 与 notice copy 判定委托到 selection runtime

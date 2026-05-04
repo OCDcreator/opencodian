@@ -295,4 +295,5 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(fixture.getEscapeHandler()?.()).toBe(true);
     expect(permissionTrigger?.hasClass('is-open')).toBe(false);
   });
+
 });

@@ -4,26 +4,20 @@ import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCata
 import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import { type AgentMentionCandidate, AgentMentionComposerController } from './AgentMentionComposerController';
+import { ChatAgentSelectionCoordinator } from './ChatAgentSelectionCoordinator';
 import {
-  type AgentMentionCandidate,
-  AgentMentionComposerController,
-} from './AgentMentionComposerController';
-import {
-  buildComposerInputSubmission,
-  decoratePromptSubmissionWithAgentMentions,
+  buildComposerInputSubmissionWithAgentIntents,
   getSlashCommandMenuQuery,
   isCommandComposerText,
 } from './composerInputParsing';
-import type {
-  ComposerInputMode,
-  ComposerInputSubmission,
-} from './MessageSendPreparationService';
-import { loadAgentMentionCandidatesFromComposerCatalog } from './SlashCommandMenuCatalogCache';
-import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
+import type { ComposerInputMode, ComposerInputSubmission } from './MessageSendPreparationService';
 import {
-  renderSlashCommandMenu,
-  type SlashCommandMenuStatus,
-} from './slashCommandMenuRenderer';
+  loadAgentMentionCandidatesFromComposerCatalog,
+  loadAgentSelectionCandidatesFromComposerCatalog,
+} from './SlashCommandMenuCatalogCache';
+import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
+import { renderSlashCommandMenu, type SlashCommandMenuStatus } from './slashCommandMenuRenderer';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 
@@ -35,11 +29,7 @@ export interface ComposerInputShellCoordinatorHost {
   attachSessionTodo(container: HTMLElement): void;
   attachQuestionDock(container: HTMLElement): void;
   setContextRowElement(element: HTMLElement | null): void;
-  setTooltipLabel(
-    element: HTMLElement,
-    label: string,
-    position?: 'bottom' | 'top' | 'right',
-  ): void;
+  setTooltipLabel(element: HTMLElement, label: string, position?: 'bottom' | 'top' | 'right'): void;
   getInputPlaceholder(): string;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   addChosenFileContextToActiveTab(): Promise<void>;
@@ -76,6 +66,7 @@ export class ComposerInputShellCoordinator {
   private slashCommandMenuStatus: SlashCommandMenuStatus = 'idle';
   private slashCommandMenuQuery: string | null = null;
   private readonly agentMentionController: AgentMentionComposerController;
+  private readonly agentSelectionController: ChatAgentSelectionCoordinator;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {
     this.agentMentionController = new AgentMentionComposerController({
@@ -86,6 +77,18 @@ export class ComposerInputShellCoordinator {
       scheduleLayoutSync: () => this.scheduleLayoutSync(),
       onMentionInserted: () => this.syncTextareaHeight(),
       onLoadFailed: (error) => { logger.debug('Failed to load agent mention candidates:', error); },
+    });
+    this.agentSelectionController = new ChatAgentSelectionCoordinator({
+      loadAgentSelectionCandidates: () => loadAgentSelectionCandidatesFromComposerCatalog(
+        this.host,
+        this.slashCommandMenuCatalogItems,
+        (items) => { this.slashCommandMenuCatalogItems = items; },
+      ),
+      closePeerDropdowns: () => {
+        this.clearSlashCommandMenu();
+        this.agentMentionController.clear(this.slashCommandMenuEl);
+      },
+      restoreInputFocus: () => this.inputTextareaEl?.focus(),
     });
   }
 
@@ -165,6 +168,7 @@ export class ComposerInputShellCoordinator {
     this.updateSendButtonState();
 
     const toolbarEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
+    this.agentSelectionController.mount(toolbarEl.createDiv({ cls: 'opencodian-agent-selector' }));
     this.host.mountSelectionControls(toolbarEl);
     this.host.mountContextUsageIndicator(toolbarEl.createDiv({ cls: 'opencodian-context-usage-slot' }));
     this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
@@ -191,6 +195,7 @@ export class ComposerInputShellCoordinator {
 
     this.inputTextareaEl?.setAttribute('placeholder', this.host.getInputPlaceholder());
     this.updateSendButtonState();
+    this.agentSelectionController.applyLocaleTexts();
   }
 
   updateSendButtonState(): void {
@@ -251,6 +256,7 @@ export class ComposerInputShellCoordinator {
     this.slashCommandMenuStatus = 'idle';
     this.slashCommandMenuQuery = null;
     this.agentMentionController.reset();
+    this.agentSelectionController.destroy();
   }
 
   private initializeLayoutMetrics(): void {
@@ -292,21 +298,11 @@ export class ComposerInputShellCoordinator {
     }
 
     const rawContent = this.inputTextareaEl.value;
-    const trimStartOffset = rawContent.length - rawContent.trimStart().length;
-    const mentions = this.agentMentionController.resolveMentionIntents(rawContent)
-      .map((mention) => ({
-        ...mention,
-        source: mention.source
-          ? {
-            ...mention.source,
-            start: mention.source.start - trimStartOffset,
-            end: mention.source.end - trimStartOffset,
-          }
-          : undefined,
-      }));
-    const submission = decoratePromptSubmissionWithAgentMentions(
-      buildComposerInputSubmission(rawContent, this.host.getComposerInputMode()),
-      mentions,
+    const submission = buildComposerInputSubmissionWithAgentIntents(
+      rawContent,
+      this.host.getComposerInputMode(),
+      this.agentMentionController.resolveMentionIntents(rawContent),
+      this.agentSelectionController.getSelectedAgentId(),
     );
     if (!submission) {
       return;

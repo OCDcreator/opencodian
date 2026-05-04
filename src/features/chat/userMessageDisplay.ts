@@ -10,6 +10,17 @@ const HTML_BLOCK_REGEX = new RegExp(
 const MARKUP_TOKEN_REGEX =
   /<\?[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\/?[A-Za-z][\w:-]*(?:\s[^>\n]*)?>|<!--|<!\[CDATA\[|<\?[A-Za-z][\w:-]*/gi;
 
+export interface UserMessageTextHighlightSpan {
+  kind: 'agent';
+  value: string;
+  start: number;
+  end: number;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object');
+}
+
 function replaceOutsideMarkdownCode(
   markdown: string,
   replaceSegment: (segment: string) => string,
@@ -61,4 +72,104 @@ export function prepareUserMessageMarkdownForDisplay(markdown: string): string {
 
     return replaceOutsideMarkdownCode(withHtmlCodeBlocks, escapeHtmlTags);
   });
+}
+
+export function extractUserMessageAgentHighlightSpans(
+  visibleText: string,
+  parts: unknown,
+): UserMessageTextHighlightSpan[] {
+  if (!visibleText || !Array.isArray(parts)) {
+    return [];
+  }
+
+  const spans: UserMessageTextHighlightSpan[] = [];
+  for (const part of parts) {
+    if (!isRecord(part) || part.type !== 'agent' || !isRecord(part.source)) {
+      continue;
+    }
+
+    const { value, start, end } = part.source;
+    if (
+      typeof value !== 'string'
+      || typeof start !== 'number'
+      || typeof end !== 'number'
+      || !Number.isInteger(start)
+      || !Number.isInteger(end)
+      || start < 0
+      || end <= start
+      || end > visibleText.length
+      || visibleText.slice(start, end) !== value
+    ) {
+      continue;
+    }
+
+    spans.push({
+      kind: 'agent',
+      value,
+      start,
+      end,
+    });
+  }
+
+  let lastEnd = -1;
+  return spans
+    .sort((left, right) => left.start - right.start || left.end - right.end)
+    .filter((span) => {
+      if (span.start < lastEnd) {
+        return false;
+      }
+      lastEnd = span.end;
+      return true;
+    });
+}
+
+export function applyUserMessageTextHighlightSpans(
+  container: HTMLElement,
+  visibleText: string,
+  spans: readonly UserMessageTextHighlightSpan[],
+): boolean {
+  if (spans.length === 0 || container.textContent !== visibleText) {
+    return false;
+  }
+
+  const textNodes: Array<{ node: Text; start: number; end: number }> = [];
+  const ownerDocument = container.ownerDocument;
+  const showText = ownerDocument.defaultView?.NodeFilter?.SHOW_TEXT ?? 4;
+  const walker = ownerDocument.createTreeWalker(container, showText);
+  let offset = 0;
+  let currentNode = walker.nextNode();
+  while (currentNode) {
+    const textNode = currentNode as Text;
+    const start = offset;
+    const end = start + textNode.data.length;
+    textNodes.push({ node: textNode, start, end });
+    offset = end;
+    currentNode = walker.nextNode();
+  }
+
+  let didWrap = false;
+  for (const span of [...spans].reverse()) {
+    const entry = textNodes.find((candidate) =>
+      candidate.start <= span.start && candidate.end >= span.end);
+    if (!entry) {
+      continue;
+    }
+
+    const localStart = span.start - entry.start;
+    const localEnd = span.end - entry.start;
+    if (localStart < 0 || localEnd > entry.node.data.length || localEnd <= localStart) {
+      continue;
+    }
+
+    entry.node.splitText(localEnd);
+    const highlightedNode = entry.node.splitText(localStart);
+    const wrapper = ownerDocument.createElement('span');
+    wrapper.classList.add('opencodian-message-highlight-agent');
+    wrapper.dataset.highlight = 'agent';
+    highlightedNode.parentNode?.insertBefore(wrapper, highlightedNode);
+    wrapper.appendChild(highlightedNode);
+    didWrap = true;
+  }
+
+  return didWrap;
 }

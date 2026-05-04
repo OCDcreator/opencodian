@@ -19,6 +19,7 @@ src/style/
 │   ├── chat-user.css                     # 用户发送的聊天气泡及交互样式
 │   └── chat-assistant.css                # 助手回复的气泡、控制栏样式
 ├── components/                             # 通用复用组件的样式
+│   ├── agent-selector.css                # 聊天输入区主 Agent 下拉框样式
 │   ├── model-selector.css                # 模型选择器样式
 │   ├── permission-mode-selector.css      # 权限模式选择器样式
 │   ├── history-dropdown.css              # 历史记录下拉菜单样式

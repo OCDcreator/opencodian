@@ -7,6 +7,8 @@
 
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近几轮先后扩展了会话设置弹窗分组布局相关键、项目级 compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（会话标题、阅读与显示、提问交互、消息渲染）。
 
+本轮新增 `chat.agentSelector.*` 键，供聊天输入框下方的主 Agent 下拉框使用，包括 trigger、OpenCode 默认值选项、加载/空态/失败状态以及选中 tooltip。
+
 最近一轮还重写了 `settings.security.*` 相关文案：把原先容易让人误以为是上游原生“权限模式”的 wording，改成 **OpenCodian 权限模板 + 配置摘要** 语义，并补齐了 security section 的重启 tooltip / notice 键。
 
 2026-04-24 的这一轮还补了一组 `settings.commands.*` / `settings.quickNav.commandsDesc` 文案，把 Commands settings 的说法对齐到当前 slash runtime truth：仅项目配置的 command 只是“已写入项目配置、等待 runtime 暴露”的草稿，skill mode 只改变 `/skill` 与 `/skills <skill>` 的入口形态，而命令级 `Temperature` / `Top P` 则用“隐藏辅助代理”的大白话来解释背后的实现。
@@ -109,6 +111,7 @@ t('settings.server.started')
 - `settings.server.*` — 服务器设置（含帮助文本）
 - `settings.model.*` — 模型设置
 - `chat.context.*` — 上下文操作
+- `chat.agentSelector.*` — composer 主 Agent 下拉框
 - `chat.sessionSettings.*` — 会话级覆盖设置弹窗与保存结果提示（含 deferred backend apply notice）
 - `chat.childSessionTree.*` — child-session tree header / open action / partial-graph 文案
 - `chat.question.*` — 问题系统

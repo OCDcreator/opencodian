@@ -5,7 +5,7 @@
 
 ## 概述
 
-`AgentMentionCandidateService` 为 chat composer 的 `@agent` picker 提供候选目录。它复用 core agent surface 的 `AgentCatalogService`，把 runtime `app.agents()` 与项目 agent config 聚合后投影成 `AgentMentionCandidate[]`。
+`AgentMentionCandidateService` 为 chat composer 的 agent 入口提供候选目录。它复用 core agent surface 的 `AgentCatalogService`，把 runtime `app.agents()` 与项目 agent config 聚合后投影成两类 chat 候选：`@agent` mention picker 使用的 subagent 候选，以及输入工具栏主 Agent selector 使用的 default-eligible 候选。
 
 ## 公开接口
 
@@ -18,11 +18,17 @@ export interface AgentMentionCandidateServiceHost {
 
 export class AgentMentionCandidateService {
   load(): Promise<AgentMentionCandidate[]>;
+  loadDefaultCandidates(): Promise<AgentSelectionCandidate[]>;
   projectCandidates(input: {
     runtimeAgentsResult: unknown;
     projectAgents: OpencodeAgentConfigRecord;
     fileAgents?: readonly SurfaceAgentFile[];
   }): AgentMentionCandidate[];
+  defaultCandidates(input: {
+    runtimeAgentsResult: unknown;
+    projectAgents: OpencodeAgentConfigRecord;
+    fileAgents?: readonly SurfaceAgentFile[];
+  }): AgentSelectionCandidate[];
 }
 ```
 
@@ -32,7 +38,8 @@ export class AgentMentionCandidateService {
 - `AgentCatalogService.aggregate()` 仍是唯一合并 owner；本服务只做 chat picker 投影
 - `projectCandidates()` 让已有 catalog owner 在已经拿到 runtime/project snapshot 后复用同一投影逻辑，避免为了 `@agent` picker 重复 I/O 或把合并规则复制到 composer
 - 输出只保留 `subagentVisible` 的条目，即 `subagent` / `all` 且非 hidden
-- `all` agent 排在 `subagent` 前，随后按 agent id 稳定排序
+- `defaultCandidates()` 输出 `defaultEligible` 条目，即 `primary` / `all`、非 hidden、非 disabled，用于 composer 下方的主 Agent 下拉框
+- `all` agent 排在更窄的 mode 前，随后按 agent id 稳定排序
 - `loadFileAgents()` 是可选 seam；当前聊天入口先接 runtime + project config，后续若要把 Markdown file truth 也拉进 composer，可以通过这个 seam 扩展而不改 picker 协议
 
 ## 边界

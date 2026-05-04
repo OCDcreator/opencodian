@@ -114,6 +114,38 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
     expect(container.querySelector('.opencodian-message-text')).not.toBeNull();
   });
 
+  it('highlights native agent source spans in rendered user text', async () => {
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: 'Ask @reviewer to inspect this',
+      timestamp: 1,
+      parts: [
+        {
+          type: 'agent',
+          name: 'reviewer',
+          source: {
+            value: '@reviewer',
+            start: 4,
+            end: 13,
+          },
+        },
+      ],
+    };
+
+    await renderer.renderUserMessageContent(container, message);
+
+    const textEl = container.querySelector<HTMLElement>('.opencodian-message-text');
+    const highlight = textEl?.querySelector<HTMLElement>('.opencodian-message-highlight-agent');
+    expect(host.renderMarkdownInto).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      'Ask @reviewer to inspect this',
+    );
+    expect(textEl?.textContent).toBe('Ask @reviewer to inspect this');
+    expect(highlight?.textContent).toBe('@reviewer');
+    expect(highlight?.dataset.highlight).toBe('agent');
+  });
+
   it('prepares user markup as code blocks when setting is enabled', async () => {
     host.getRenderUserMarkupAsCodeBlocks.mockReturnValue(true);
     const message = {

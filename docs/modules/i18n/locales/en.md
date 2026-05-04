@@ -7,6 +7,8 @@
 
 OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近几轮先后扩展了会话设置弹窗分组布局相关键、project-scoped compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（conversation title、reading/display、question interaction、message rendering）。
 
+本轮新增 `chat.agentSelector.*` 键，供聊天输入框下方的主 Agent 下拉框使用，包括 trigger、OpenCode default 选项、loading/empty/load-failed 状态以及选中 tooltip。
+
 最近一轮还重写了 `settings.security.*` 的权限文案：把原先容易误导成“上游原生 mode”的 wording 调整为 **OpenCodian permission template + config summary** 语义，并补齐了 security section 的 restart tooltip / notice keys。
 
 2026-04-24 的本轮还补了一组 `settings.commands.*` / `settings.quickNav.commandsDesc` 文案，把 Commands settings 的心智模型对齐到当前 slash runtime truth：project-only command 只是“已写入项目配置、等待 runtime 暴露”的草稿，skill mode 只改变 `/skill` vs `/skills <skill>` 的入口形态，命令级 `Temperature` / `Top P` 则用 “hidden helper agent” 的 plain-language 语义解释。
@@ -65,6 +67,7 @@ export const enTranslations: Record<string, string> = {
 - 插件基础信息（`plugin.*`）
 - 设置页各分组（`settings.server.*`, `settings.model.*`, `settings.style.*` 等）
 - 会话与聊天交互（`chat.input.*`, `chat.context.*`, `chat.tab.*`, `chat.sessionSettings.*` 等）
+- composer 主 Agent selector（`chat.agentSelector.*`）
 - child-session tree UI（`chat.childSessionTree.*`）
 - 权限 / question / 调试提示
 - 主题与 Liquid Glass 参数说明（大量 `settings.style.input.liquidGlass.*` 键）

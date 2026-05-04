@@ -90,6 +90,14 @@
   font-size: calc(var(--opencodian-chat-font-size) + 2px);
 }
 
+.opencodian-message--user .opencodian-message-highlight-agent {
+  color: var(--text-warning);
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0 2px;
+  background: color-mix(in srgb, var(--text-warning) 12%, transparent);
+}
+
 .opencodian-message--user .opencodian-message-text > p {
   margin: 4px 0;
 }
@@ -1925,6 +1933,7 @@
   box-shadow: none;
 }
 
+.opencodian-input-toolbar .opencodian-agent-selector,
 .opencodian-input-toolbar .opencodian-permission-selector,
 .opencodian-input-toolbar .opencodian-model-selector {
   flex-shrink: 0;

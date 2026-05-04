@@ -1,7 +1,11 @@
 import type { ChatMessage, CompactionDividerMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { type CollapsibleState,setupCollapsible } from '../rendering/collapsible';
-import { prepareUserMessageMarkdownForDisplay } from '../userMessageDisplay';
+import {
+  applyUserMessageTextHighlightSpans,
+  extractUserMessageAgentHighlightSpans,
+  prepareUserMessageMarkdownForDisplay,
+} from '../userMessageDisplay';
 
 export interface UserMessageContentRendererHost {
   getRenderUserMarkupAsCodeBlocks(): boolean;
@@ -39,10 +43,18 @@ export class UserMessageContentRenderer {
     const visibleText = this.getVisibleUserMessageText(message);
     if (visibleText) {
       const textEl = container.createDiv({ cls: 'opencodian-message-text' });
-      const displayText = this.host.getRenderUserMarkupAsCodeBlocks()
+      const renderUserMarkupAsCodeBlocks = this.host.getRenderUserMarkupAsCodeBlocks();
+      const displayText = renderUserMarkupAsCodeBlocks
         ? prepareUserMessageMarkdownForDisplay(visibleText)
         : visibleText;
       await this.host.renderMarkdownInto(textEl, displayText);
+      if (!renderUserMarkupAsCodeBlocks) {
+        applyUserMessageTextHighlightSpans(
+          textEl,
+          visibleText,
+          extractUserMessageAgentHighlightSpans(visibleText, message.parts),
+        );
+      }
       const collapseToggleEl = container.createEl('button');
       const collapsibleState: CollapsibleState = {
         isExpanded: false,

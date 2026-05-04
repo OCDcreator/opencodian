@@ -1,4 +1,8 @@
-import { prepareUserMessageMarkdownForDisplay } from '../../../../src/features/chat/userMessageDisplay';
+import {
+  applyUserMessageTextHighlightSpans,
+  extractUserMessageAgentHighlightSpans,
+  prepareUserMessageMarkdownForDisplay,
+} from '../../../../src/features/chat/userMessageDisplay';
 
 describe('prepareUserMessageMarkdownForDisplay', () => {
   it('converts raw style blocks into css code fences', () => {
@@ -117,5 +121,100 @@ describe('prepareUserMessageMarkdownForDisplay', () => {
     expect(prepareUserMessageMarkdownForDisplay(markdown)).toBe(
       '残缺片段： &lt;!-- 和 &lt;?xml',
     );
+  });
+});
+
+describe('extractUserMessageAgentHighlightSpans', () => {
+  it('extracts valid native agent source spans from message parts', () => {
+    expect(extractUserMessageAgentHighlightSpans('Ask @reviewer to inspect this', [
+      {
+        type: 'agent',
+        name: 'reviewer',
+        source: {
+          value: '@reviewer',
+          start: 4,
+          end: 13,
+        },
+      },
+    ])).toEqual([
+      {
+        kind: 'agent',
+        value: '@reviewer',
+        start: 4,
+        end: 13,
+      },
+    ]);
+  });
+
+  it('ignores stale or overlapping agent spans', () => {
+    expect(extractUserMessageAgentHighlightSpans('Ask @reviewer now', [
+      {
+        type: 'agent',
+        source: {
+          value: '@planner',
+          start: 4,
+          end: 12,
+        },
+      },
+      {
+        type: 'agent',
+        source: {
+          value: '@reviewer',
+          start: 4,
+          end: 13,
+        },
+      },
+      {
+        type: 'agent',
+        source: {
+          value: '@viewer',
+          start: 8,
+          end: 15,
+        },
+      },
+    ])).toEqual([
+      {
+        kind: 'agent',
+        value: '@reviewer',
+        start: 4,
+        end: 13,
+      },
+    ]);
+  });
+});
+
+describe('applyUserMessageTextHighlightSpans', () => {
+  it('wraps agent spans in rendered text while preserving surrounding text nodes', () => {
+    const container = document.createElement('div');
+    container.textContent = 'Ask @reviewer now';
+
+    expect(applyUserMessageTextHighlightSpans(container, 'Ask @reviewer now', [
+      {
+        kind: 'agent',
+        value: '@reviewer',
+        start: 4,
+        end: 13,
+      },
+    ])).toBe(true);
+
+    const highlight = container.querySelector<HTMLElement>('.opencodian-message-highlight-agent');
+    expect(container.textContent).toBe('Ask @reviewer now');
+    expect(highlight?.textContent).toBe('@reviewer');
+    expect(highlight?.dataset.highlight).toBe('agent');
+  });
+
+  it('skips wrapping when rendered text no longer matches the source content', () => {
+    const container = document.createElement('div');
+    container.textContent = 'Ask reviewer now';
+
+    expect(applyUserMessageTextHighlightSpans(container, 'Ask @reviewer now', [
+      {
+        kind: 'agent',
+        value: '@reviewer',
+        start: 4,
+        end: 13,
+      },
+    ])).toBe(false);
+    expect(container.querySelector('.opencodian-message-highlight-agent')).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 import { attachOpenCodeAppAgents } from '../../../../src/core/opencode/OpenCodeAppCatalogSidecar';
 import {
   loadAgentMentionCandidatesFromSlashCommandMenuItems,
+  loadAgentSelectionCandidatesFromSlashCommandMenuItems,
   SlashCommandMenuCatalogCache,
   type SlashCommandMenuCatalogCacheHost,
 } from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
@@ -298,6 +299,20 @@ describe('SlashCommandMenuCatalogCache — skill provenance and agent sidecar', 
         description: 'Runtime reviewer',
         mode: 'subagent',
         hidden: false,
+      },
+    ]);
+    await expect(loadAgentSelectionCandidatesFromSlashCommandMenuItems(items)).resolves.toEqual([
+      {
+        id: 'planner',
+        displayName: 'planner',
+        description: 'Project planner',
+        mode: 'all',
+      },
+      {
+        id: 'primary',
+        displayName: 'primary',
+        description: 'Main agent',
+        mode: 'primary',
       },
     ]);
   });

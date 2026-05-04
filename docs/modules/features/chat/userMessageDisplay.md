@@ -5,12 +5,14 @@
 
 ## 概述
 
-这个模块只有一个职责：把用户消息里的 HTML 片段改写成“适合展示的 Markdown 文本”。它不是通用 sanitizer，而是专门服务于 `OpenCodianView.renderUserMessageContent()` 在 `renderUserMarkupAsCodeBlocks` 打开时的显示转换。
+这个模块负责用户消息的展示前处理：一部分把 HTML 片段改写成“适合展示的 Markdown 文本”，另一部分把 OpenCode native `agent` part 的 source span 投影成可包裹的文本高亮范围。它不是通用 sanitizer，也不负责最终 DOM 结构；这些 helper 专门服务于 `UserMessageContentRenderer`。
 
 ## 导出
 
 ```typescript
 prepareUserMessageMarkdownForDisplay(markdown: string): string
+extractUserMessageAgentHighlightSpans(visibleText: string, parts: unknown): UserMessageTextHighlightSpan[]
+applyUserMessageTextHighlightSpans(container: HTMLElement, visibleText: string, spans: readonly UserMessageTextHighlightSpan[]): boolean
 ```
 
 ## 转换顺序
@@ -56,9 +58,11 @@ prepareUserMessageMarkdownForDisplay(markdown: string): string
 ## 模块关系
 
 - 无上游依赖
-- 下游消费者：`OpenCodianView`
+- 下游消费者：`UserMessageContentRenderer`
 
 ## 注意事项
 
 - 实际启用开关是 `OpenCodianView` 读取的 `plugin.settings.renderUserMarkupAsCodeBlocks`，不是模块内部配置。
 - `buildCodeFence()` 会去掉被包裹内容首尾多余空行，再生成带语言标识的 fenced block。
+- agent span 提取只信任 `part.type === 'agent'` 且 `source.value/start/end` 与当前 visible text 完全匹配的范围；过期、越界、重叠范围会被忽略。
+- agent span DOM 包裹会先检查渲染容器的 `textContent` 是否仍等于原始 visible text，避免 markdown 输出改变文本后把高亮包到错误位置。

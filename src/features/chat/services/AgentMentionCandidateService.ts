@@ -7,6 +7,13 @@ import {
 import type { OpencodeAgentConfigRecord } from '../../../core/types';
 import type { AgentMentionCandidate } from './AgentMentionComposerController';
 
+export interface AgentSelectionCandidate {
+  id: string;
+  displayName: string;
+  description: string;
+  mode: 'primary' | 'all' | null;
+}
+
 export interface AgentMentionCandidateServiceHost {
   loadRuntimeAgents(): Promise<unknown>;
   loadProjectAgents(): Promise<OpencodeAgentConfigRecord>;
@@ -56,6 +63,20 @@ export class AgentMentionCandidateService {
     });
   }
 
+  async loadDefaultCandidates(): Promise<AgentSelectionCandidate[]> {
+    const [runtimeAgentsResult, projectAgents, fileAgents] = await Promise.all([
+      this.host.loadRuntimeAgents(),
+      this.host.loadProjectAgents(),
+      this.host.loadFileAgents?.() ?? Promise.resolve(undefined),
+    ]);
+
+    return this.defaultCandidates({
+      runtimeAgentsResult,
+      projectAgents,
+      fileAgents,
+    });
+  }
+
   projectCandidates(input: {
     runtimeAgentsResult: unknown;
     projectAgents: OpencodeAgentConfigRecord;
@@ -76,6 +97,28 @@ export class AgentMentionCandidateService {
         description: agent.description,
         mode: agent.mode,
         hidden: agent.hidden,
+      }));
+  }
+
+  defaultCandidates(input: {
+    runtimeAgentsResult: unknown;
+    projectAgents: OpencodeAgentConfigRecord;
+    fileAgents?: readonly SurfaceAgentFile[];
+  }): AgentSelectionCandidate[] {
+    const { runtimeAgentsResult, projectAgents, fileAgents } = input;
+
+    return this.catalogService.aggregate({
+      runtimeAgents: normalizeRuntimeAgents(runtimeAgentsResult),
+      configAgents: projectAgents,
+      ...(fileAgents ? { fileAgents } : {}),
+    })
+      .filter((agent) => agent.defaultEligible)
+      .sort(compareAgentCandidates)
+      .map((agent) => ({
+        id: agent.id,
+        displayName: agent.displayName,
+        description: agent.description,
+        mode: agent.mode === 'primary' || agent.mode === 'all' ? agent.mode : null,
       }));
   }
 }
