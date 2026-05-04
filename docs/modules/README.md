@@ -59,6 +59,7 @@ docs/modules/
 │   ├── opencode/
 │   │   ├── index.md
 │   │   ├── LocalSidecarEndpointResolver.md
+│   │   ├── OpenCodeAppCatalogSidecar.md
 │   │   ├── OpenCodeCatalogStateStore.md
 │   │   ├── OpenCodeContextPartSerializer.md
 │   │   ├── OpenCodeEventSubscriptionCoordinator.md
@@ -154,10 +155,13 @@ docs/modules/
 │   │   ├── rendering/
 │   │   │   └── collapsible.md
 │   │   ├── services/
+│   │   │   ├── AgentMentionCandidateService.md
+│   │   │   ├── AgentMentionComposerController.md
 │   │   │   ├── ChatHeaderPresenter.md
 │   │   │   ├── ChatVisualDemoCoordinator.md
 │   │   │   ├── ChatSelectionControlsCoordinator.md
 │   │   │   ├── ComposerInputShellCoordinator.md
+│   │   │   ├── composerInputParsing.md
 │   │   │   ├── SlashCommandMenuCatalogCache.md
 │   │   │   ├── slashCommandMenuRenderer.md
 │   │   │   ├── InputPanelAppearanceCoordinator.md

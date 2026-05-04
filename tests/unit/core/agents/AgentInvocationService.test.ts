@@ -90,4 +90,33 @@ describe('AgentInvocationService', () => {
       invocationParts: [],
     });
   });
+
+  it('removes selected mention source spans from request text without touching invalid spans', () => {
+    const resolved = service.resolveInvocationIntent({
+      kind: 'prompt',
+      mentions: [
+        {
+          agentId: 'reviewer',
+          source: {
+            value: '@reviewer',
+            start: 11,
+            end: 20,
+          },
+        },
+        {
+          agentId: 'explorer',
+          source: {
+            value: '@missing',
+            start: 0,
+            end: 8,
+          },
+        },
+      ],
+    });
+
+    expect(service.removeMentionFallbackText(
+      'please ask @reviewer to check this',
+      resolved,
+    )).toBe('please ask to check this');
+  });
 });

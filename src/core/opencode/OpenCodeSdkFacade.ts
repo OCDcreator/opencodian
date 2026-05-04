@@ -1,5 +1,6 @@
 import { createLogger } from '../../shared';
 import { createSdkClient, type CreateSdkClientOptions } from './createSdkClient';
+import { attachOpenCodeAppAgents } from './OpenCodeAppCatalogSidecar';
 import type { SdkOpencodeClient } from './sdkTypes';
 
 const logger = createLogger('OpenCodeService');
@@ -358,6 +359,31 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
     return current;
   }
 
+  private async invokeSdkFunction(
+    parentPath: string[],
+    functionPath: string[],
+    args: unknown[],
+  ): Promise<unknown> {
+    const parentObject = this.resolveValue(parentPath);
+    const rawValue = this.resolveValue(functionPath);
+    if (typeof rawValue !== 'function' || !parentObject || typeof parentObject !== 'object') {
+      throw new Error(`OpenCode SDK path ${functionPath.join('.')} is unavailable`);
+    }
+
+    return rawValue.apply(parentObject, args);
+  }
+
+  private attachAppSkillsSidecars(value: unknown): unknown {
+    const agentsPromise = this.invokeSdkFunction(['app'], ['app', 'agents'], [])
+      .then((result) => unwrapSdkResponse(result))
+      .catch((error) => {
+        logger.debug('Failed to load OpenCode app agents alongside app skills:', error);
+        return [];
+      });
+
+    return attachOpenCodeAppAgents(value, agentsPromise);
+  }
+
   private createObjectFacade<TValue>(path: string[]): TValue {
     const cacheKey = path.join('.');
     const cached = this.namespaceCache.get(cacheKey);
@@ -381,14 +407,11 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
         if (typeof rawValue === 'function') {
           const wrapped = async (...args: unknown[]) => {
             try {
-              const parentObject = this.resolveValue(path);
-              const nextRawValue = this.resolveValue(nextPath);
-              if (typeof nextRawValue !== 'function' || !parentObject || typeof parentObject !== 'object') {
-                throw new Error(`OpenCode SDK path ${nextPath.join('.')} is unavailable`);
-              }
-
-              const result = await nextRawValue.apply(parentObject, args);
-              return unwrapSdkResponse(result);
+              const result = await this.invokeSdkFunction(path, nextPath, args);
+              const unwrapped = unwrapSdkResponse(result);
+              return path.length === 1 && path[0] === 'app' && propertyKey === 'skills'
+                ? this.attachAppSkillsSidecars(unwrapped)
+                : unwrapped;
             } catch (error) {
               throw normalizeSdkError(error);
             }

@@ -1,4 +1,3 @@
-import { t } from '../../i18n';
 import {
   formatContextLabel,
   parseLineRangeFromFileUrl,
@@ -58,6 +57,21 @@ interface OpenCodeFilePart extends OpenCodeMessagePart {
       value?: string;
     };
   };
+}
+
+interface OpenCodeAgentPart extends OpenCodeMessagePart {
+  name?: string;
+  source?: {
+    value?: string;
+    start?: number;
+    end?: number;
+  };
+}
+
+interface OpenCodeAgentSourceSpan {
+  value: string;
+  start: number;
+  end: number;
 }
 
 export class OpenCodeMessageContextOmoAssembler {
@@ -123,12 +137,16 @@ export class OpenCodeMessageContextOmoAssembler {
       }
     }
 
-    const content = visibleTextParts.join('');
+    const textContent = visibleTextParts.join('');
     if (role !== 'user') {
-      return { content, contextAttachments, compactionDivider };
+      return { content: textContent, contextAttachments, compactionDivider };
     }
 
     contextAttachments.push(...this.collectFileContextAttachments(parts, vaultPath));
+    const content = this.restoreAgentMentionSourceText(
+      textContent,
+      this.collectAgentSourceSpans(parts),
+    );
 
     const inlineReadContext = this.extractInlineReadToolContext(content, vaultPath);
     return {
@@ -182,6 +200,106 @@ export class OpenCodeMessageContextOmoAssembler {
       }
       return attachments;
     }, []);
+  }
+
+  private collectAgentSourceSpans(parts: OpenCodeMessagePart[]): OpenCodeAgentSourceSpan[] {
+    return parts.reduce<OpenCodeAgentSourceSpan[]>((spans, part) => {
+      if (part.type !== 'agent') {
+        return spans;
+      }
+
+      const source = (part as OpenCodeAgentPart).source;
+      const value = typeof source?.value === 'string' ? source.value : '';
+      const start = source?.start;
+      const end = source?.end;
+      if (
+        !value
+        || typeof start !== 'number'
+        || typeof end !== 'number'
+        || !Number.isInteger(start)
+        || !Number.isInteger(end)
+        || start < 0
+        || end <= start
+      ) {
+        return spans;
+      }
+
+      spans.push({ value, start, end });
+      return spans;
+    }, []).sort((left, right) => left.start - right.start || left.end - right.end);
+  }
+
+  private restoreAgentMentionSourceText(
+    content: string,
+    spans: OpenCodeAgentSourceSpan[],
+  ): string {
+    return spans.reduce((restored, span) => {
+      const insertionIndex = Math.max(0, Math.min(span.start, restored.length));
+      if (restored.slice(insertionIndex, insertionIndex + span.value.length) === span.value) {
+        return restored;
+      }
+
+      const insertion = this.buildAgentMentionInsertion(restored, insertionIndex, span);
+      return `${restored.slice(0, insertionIndex)}${insertion}${restored.slice(insertionIndex)}`;
+    }, content);
+  }
+
+  private buildAgentMentionInsertion(
+    content: string,
+    insertionIndex: number,
+    span: OpenCodeAgentSourceSpan,
+  ): string {
+    let value = span.value;
+    if (this.shouldInsertSpaceBeforeAgentMention(content, insertionIndex, span.start)) {
+      value = ` ${value}`;
+    }
+    if (this.shouldInsertSpaceAfterAgentMention(content, insertionIndex)) {
+      value = `${value} `;
+    }
+    return value;
+  }
+
+  private shouldInsertSpaceBeforeAgentMention(
+    content: string,
+    insertionIndex: number,
+    sourceStart: number,
+  ): boolean {
+    if (insertionIndex === 0 || insertionIndex < content.length || sourceStart <= content.length) {
+      return false;
+    }
+
+    return !this.isInlineWhitespace(content[insertionIndex - 1]);
+  }
+
+  private shouldInsertSpaceAfterAgentMention(
+    content: string,
+    insertionIndex: number,
+  ): boolean {
+    const next = content[insertionIndex];
+    if (!next || this.isInlineWhitespace(next) || this.isTightPunctuationFollower(next)) {
+      return false;
+    }
+
+    const previous = content[insertionIndex - 1];
+    return insertionIndex === 0 || this.isInlineWhitespace(previous);
+  }
+
+  private isInlineWhitespace(value: string | undefined): boolean {
+    return value === ' ' || value === '\t';
+  }
+
+  private isTightPunctuationFollower(value: string): boolean {
+    return value === '.'
+      || value === ','
+      || value === '!'
+      || value === '?'
+      || value === ';'
+      || value === ':'
+      || value === ')'
+      || value === ']'
+      || value === '}'
+      || value === '"'
+      || value === "'";
   }
 
   private normalizeOmoContent(
@@ -285,22 +403,6 @@ export class OpenCodeMessageContextOmoAssembler {
 
   private isCompactionContinuePart(part: OpenCodeMessagePart): boolean {
     return part.metadata?.compaction_continue === true;
-  }
-
-  private buildCompactionNotice(part: OpenCodeMessagePart): string {
-    const lines = [
-      t('chat.compaction.title'),
-      '',
-      part.auto === true
-        ? t('chat.compaction.automatic')
-        : t('chat.compaction.manual'),
-    ];
-
-    if (part.overflow === true) {
-      lines.push(t('chat.compaction.overflow'));
-    }
-
-    return lines.join('\n');
   }
 
   private parseInlineReadToolInvocation(

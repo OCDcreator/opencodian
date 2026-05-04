@@ -4,11 +4,21 @@ import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCata
 import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import {
+  type AgentMentionCandidate,
+  AgentMentionComposerController,
+} from './AgentMentionComposerController';
+import {
+  buildComposerInputSubmission,
+  decoratePromptSubmissionWithAgentMentions,
+  getSlashCommandMenuQuery,
+  isCommandComposerText,
+} from './composerInputParsing';
 import type {
-  CommandComposerSubmission,
   ComposerInputMode,
   ComposerInputSubmission,
 } from './MessageSendPreparationService';
+import { loadAgentMentionCandidatesFromComposerCatalog } from './SlashCommandMenuCatalogCache';
 import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
 import {
   renderSlashCommandMenu,
@@ -18,6 +28,8 @@ import {
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 
 const logger = createLogger('ComposerInputShellCoordinator');
+
+export { buildComposerInputSubmission } from './composerInputParsing';
 
 export interface ComposerInputShellCoordinatorHost {
   attachSessionTodo(container: HTMLElement): void;
@@ -41,55 +53,9 @@ export interface ComposerInputShellCoordinatorHost {
   getComposerInputMode(): ComposerInputMode;
   submitMessage(submission: ComposerInputSubmission): void | Promise<void>;
   loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
+  loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
-}
-
-function parseCommandSubmission(content: string): CommandComposerSubmission | null {
-  const trimmedContent = content.trim();
-  if (!trimmedContent.startsWith('/') || trimmedContent.startsWith('//')) {
-    return null;
-  }
-
-  const commandBody = trimmedContent.slice(1);
-  if (!commandBody || /^\s/.test(commandBody)) {
-    return null;
-  }
-
-  const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
-  if (!commandMatch?.[1]) {
-    return null;
-  }
-
-  return {
-    kind: 'command',
-    rawContent: trimmedContent,
-    command: commandMatch[1],
-    arguments: commandMatch[2] ?? '',
-  };
-}
-
-export function buildComposerInputSubmission(
-  content: string,
-  mode: ComposerInputMode = 'prompt',
-): ComposerInputSubmission | null {
-  const trimmedContent = content.trim();
-  if (!trimmedContent) {
-    return null;
-  }
-
-  if (mode === 'shell') {
-    return {
-      kind: 'shell',
-      rawContent: trimmedContent,
-      command: trimmedContent,
-    };
-  }
-
-  return parseCommandSubmission(trimmedContent) ?? {
-    kind: 'prompt',
-    content: trimmedContent,
-  };
 }
 
 export class ComposerInputShellCoordinator {
@@ -109,8 +75,19 @@ export class ComposerInputShellCoordinator {
   private slashCommandMenuRunId = 0;
   private slashCommandMenuStatus: SlashCommandMenuStatus = 'idle';
   private slashCommandMenuQuery: string | null = null;
+  private readonly agentMentionController: AgentMentionComposerController;
 
-  constructor(private readonly host: ComposerInputShellCoordinatorHost) {}
+  constructor(private readonly host: ComposerInputShellCoordinatorHost) {
+    this.agentMentionController = new AgentMentionComposerController({
+      getComposerInputMode: () => this.host.getComposerInputMode(),
+      loadAgentMentionCandidates: () => loadAgentMentionCandidatesFromComposerCatalog(
+        this.host, this.slashCommandMenuCatalogItems, (items) => { this.slashCommandMenuCatalogItems = items; },
+      ),
+      scheduleLayoutSync: () => this.scheduleLayoutSync(),
+      onMentionInserted: () => this.syncTextareaHeight(),
+      onLoadFailed: (error) => { logger.debug('Failed to load agent mention candidates:', error); },
+    });
+  }
 
   build(container: HTMLElement): void {
     this.destroy();
@@ -135,9 +112,14 @@ export class ComposerInputShellCoordinator {
     });
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
-      void this.refreshSlashCommandMenu();
+      this.agentMentionController.syncContent(this.inputTextareaEl?.value ?? '');
+      void this.refreshComposerSuggestionMenu();
     });
     this.inputTextareaEl.addEventListener('keydown', (event) => {
+      if (this.tryHandleAgentMentionMenuKeydown(event)) {
+        return;
+      }
+
       if (this.tryHandleSlashCommandMenuKeydown(event)) {
         return;
       }
@@ -268,6 +250,7 @@ export class ComposerInputShellCoordinator {
     this.slashCommandMenuRunId += 1;
     this.slashCommandMenuStatus = 'idle';
     this.slashCommandMenuQuery = null;
+    this.agentMentionController.reset();
   }
 
   private initializeLayoutMetrics(): void {
@@ -308,9 +291,22 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    const submission = buildComposerInputSubmission(
-      this.inputTextareaEl.value,
-      this.host.getComposerInputMode(),
+    const rawContent = this.inputTextareaEl.value;
+    const trimStartOffset = rawContent.length - rawContent.trimStart().length;
+    const mentions = this.agentMentionController.resolveMentionIntents(rawContent)
+      .map((mention) => ({
+        ...mention,
+        source: mention.source
+          ? {
+            ...mention.source,
+            start: mention.source.start - trimStartOffset,
+            end: mention.source.end - trimStartOffset,
+          }
+          : undefined,
+      }));
+    const submission = decoratePromptSubmissionWithAgentMentions(
+      buildComposerInputSubmission(rawContent, this.host.getComposerInputMode()),
+      mentions,
     );
     if (!submission) {
       return;
@@ -318,7 +314,9 @@ export class ComposerInputShellCoordinator {
 
     void this.host.submitMessage(submission);
     this.inputTextareaEl.value = '';
+    this.agentMentionController.clearTrackedMentions();
     this.syncTextareaHeight();
+    this.agentMentionController.clear(this.slashCommandMenuEl);
   }
 
   private syncTextareaHeight(): void {
@@ -333,6 +331,44 @@ export class ComposerInputShellCoordinator {
       ? 'auto'
       : 'hidden';
     this.scheduleLayoutSync();
+  }
+
+  private async refreshComposerSuggestionMenu(): Promise<void> {
+    const textarea = this.inputTextareaEl;
+    if (!textarea) {
+      return;
+    }
+
+    const slashQuery = getSlashCommandMenuQuery(textarea);
+    if (slashQuery !== null) {
+      this.agentMentionController.clear(this.slashCommandMenuEl);
+      await this.refreshSlashCommandMenu();
+      return;
+    }
+
+    if (isCommandComposerText(textarea.value)) {
+      this.agentMentionController.clear(this.slashCommandMenuEl);
+      this.clearSlashCommandMenu();
+      return;
+    }
+
+    const agentQuery = this.agentMentionController.getQuery(textarea);
+    if (agentQuery) {
+      this.clearSlashCommandMenu();
+      await this.agentMentionController.refresh(agentQuery, this.slashCommandMenuEl);
+      return;
+    }
+
+    this.agentMentionController.clear(this.slashCommandMenuEl);
+    await this.refreshSlashCommandMenu();
+  }
+
+  private tryHandleAgentMentionMenuKeydown(event: KeyboardEvent): boolean {
+    return this.agentMentionController.tryHandleKeydown(
+      event,
+      this.inputTextareaEl,
+      this.slashCommandMenuEl,
+    );
   }
 
   private tryHandleSlashCommandMenuKeydown(event: KeyboardEvent): boolean {
@@ -427,7 +463,7 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    const query = this.getSlashCommandMenuQuery(textarea);
+    const query = getSlashCommandMenuQuery(textarea);
     if (query === null) {
       this.clearSlashCommandMenu();
       return;
@@ -473,54 +509,6 @@ export class ComposerInputShellCoordinator {
       this.slashCommandMenuStatus = 'loadFailed';
       this.renderSlashCommandMenu();
     }
-  }
-
-  private getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string | null {
-    const selectionStart = textarea.selectionStart ?? textarea.value.length;
-    const selectionEnd = textarea.selectionEnd ?? selectionStart;
-    if (selectionStart !== selectionEnd) {
-      return null;
-    }
-
-    const beforeCursor = textarea.value.slice(0, selectionStart);
-    if (/^\/skills(?:\s+\S*)?$/i.test(beforeCursor)) {
-      return beforeCursor.slice(1);
-    }
-
-    // Scan backward from cursor to find the trigger '/' character.
-    // The '/' is valid only at position 0 or when preceded by whitespace.
-    let slashIndex = -1;
-    for (let i = beforeCursor.length - 1; i >= 0; i--) {
-      const ch = beforeCursor[i];
-      if (ch === '/') {
-        slashIndex = i;
-        break;
-      }
-
-      if (/\s/.test(ch)) {
-        break;
-      }
-    }
-
-    if (slashIndex < 0) {
-      return null;
-    }
-
-    // Reject '//' (escaped slash or comment syntax).
-    if (slashIndex > 0 && beforeCursor[slashIndex - 1] === '/') {
-      return null;
-    }
-
-    const searchText = beforeCursor.slice(slashIndex + 1);
-
-    // If the search text (the portion after '/') contains whitespace,
-    // the user has moved past the command name into argument territory.
-    // `/skills <query>` is the one autocomplete-owned nested command form.
-    if (/\s/.test(searchText) && !/^skills(?:\s+\S*)?$/i.test(searchText)) {
-      return null;
-    }
-
-    return searchText;
   }
 
   private clearSlashCommandMenu(): void {
@@ -587,4 +575,5 @@ export class ComposerInputShellCoordinator {
   private getEmptySlashCommandMenuStatus(items: SlashCommandMenuItem[]): SlashCommandMenuStatus {
     return items.length === 0 ? 'emptyCatalog' : 'noMatches';
   }
+
 }

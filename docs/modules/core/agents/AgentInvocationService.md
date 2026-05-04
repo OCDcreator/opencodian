@@ -18,6 +18,7 @@
 ```ts
 export class AgentInvocationService {
   resolveInvocationIntent(intent: SurfaceInvocationIntent | undefined): ResolvedAgentInvocation;
+  removeMentionFallbackText(content: string, invocation: ResolvedAgentInvocation): string;
 }
 ```
 
@@ -26,6 +27,7 @@ export class AgentInvocationService {
 - 仅在 `kind` 为空或为 `'prompt'` 时产出结果
 - `primaryAgent` 会先 trim，再映射到 top-level `agent`
 - `mentions[]` 会映射成原生 `agent` request parts，并保留可选 source span
+- `removeMentionFallbackText()` 会从 transport text 中剔除 selected mention 的 source span，避免同一个 `@agent` 同时作为普通文本和 native `agent` part 发送；source span 不匹配当前内容时保持原文不变
 - `subtasks[]` 会映射成原生 `subtask` request parts，并保留可选 model / command
 - 空白或不完整的 mention/subtask 会被丢弃，避免生成无效 native parts
 

@@ -2,6 +2,7 @@ jest.mock('../../../../src/core/opencode/createSdkClient', () => ({
   createSdkClient: jest.fn(),
 }));
 
+import { getAttachedOpenCodeAppAgents } from '../../../../src/core/opencode/OpenCodeAppCatalogSidecar';
 import {
   describeSdkError,
   extractSdkErrorMessage,
@@ -12,7 +13,10 @@ import {
 describe('OpenCodeSdkFacade', () => {
   const createFacade = (clientOverrides: Record<string, unknown> = {}) => {
     const client = {
-      app: { agents: jest.fn().mockResolvedValue({ data: ['agent'] }) },
+      app: {
+        agents: jest.fn().mockResolvedValue({ data: ['agent'] }),
+        skills: jest.fn().mockResolvedValue({ data: [{ name: 'review', location: '/vault/.opencode/skills/review' }] }),
+      },
       auth: { set: jest.fn().mockResolvedValue(true) },
       command: { list: jest.fn().mockResolvedValue(['command']) },
       config: { get: jest.fn().mockResolvedValue({ data: { model: 'x' } }) },
@@ -75,6 +79,17 @@ describe('OpenCodeSdkFacade', () => {
     await expect(facade.global.event()).resolves.toEqual({
       stream: expect.any(Object),
     });
+  });
+
+  it('attaches app agents to app skills results for shared app catalog consumers', async () => {
+    const { client, facade } = createFacade();
+
+    const skills = await facade.app.skills();
+
+    expect(skills).toEqual([{ name: 'review', location: '/vault/.opencode/skills/review' }]);
+    expect(client.app.skills).toHaveBeenCalledTimes(1);
+    await expect(getAttachedOpenCodeAppAgents(skills)).resolves.toEqual(['agent']);
+    expect(client.app.agents).toHaveBeenCalledTimes(1);
   });
 
   it('normalizes non-Error failures', async () => {

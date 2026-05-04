@@ -43,6 +43,7 @@
 ### `openCodeMessageToChatMessage()`
 
 - 先通过邻近 owner `OpenCodeMessageContextOmoAssembler` 收束 visible text、context attachment 与 OMO metadata
+- hydrated user message 会消费 native `agent` part 的 source span 来恢复 `@agent` 可见文本，保持 optimistic bubble 与 canonical/server message 可见内容一致
 - 继续保留 assistant `summary` 标记，供 compaction report 在 render 层显示独立 badge/merge 语义
 - 先通过文件内的 tool/content seam 收束 renderable `tool` parts、pending `toolCalls`、历史 `tool_use` block 与 `contentBlocks` 装配
 - 为 assistant message 生成 `modelId`

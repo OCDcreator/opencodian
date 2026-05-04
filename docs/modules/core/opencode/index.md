@@ -13,7 +13,7 @@
 - SDK v2 rollout 常量与解析函数
 - 供调用方使用的服务层类型
 
-像 `createSdkClient.ts`、`sdkFetch.ts`、`sdkTypes.ts`、`omoCompat.ts` 这类实现细节并不会通过本文件转发。
+像 `OpenCodeAppCatalogSidecar.ts`、`createSdkClient.ts`、`sdkFetch.ts`、`sdkTypes.ts`、`omoCompat.ts` 这类实现细节并不会通过本文件转发。
 
 ## 导入关系
 

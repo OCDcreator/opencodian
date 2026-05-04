@@ -9,6 +9,7 @@
 
 - 从 hydrated OpenCode message parts 收束 renderable text 与 `contextAttachments`
 - 统一解析 Obsidian context tag、`file` part 与 inline Read tool 文本里的上下文引用
+- 对 user message 的原生 `agent` part 按 `source.value/start/end` 恢复 `@agent` 可见文本，避免发送侧去除 text fallback 后 hydration 丢失 mention
 - 把 OpenCode 原生 `compaction` part 归一化为结构化 `compactionDivider` 元数据（`auto`, `overflow`, `tailStartId`），并隐藏 `metadata.compaction_continue` synthetic follow-up
 - 对 attachment 路径、行号和 MIME 做跨平台归一化与去重
 - 识别 OMO user injection / system reminder metadata，并产出 mapper 继续组装 `ChatMessage` 所需的显示字段
@@ -42,9 +43,10 @@
 
 - `normalizeTextPart()` 处理普通文本、Obsidian context tag 与 synthetic inline Read 恢复
 - `normalizeTextPart()` 现在也会过滤 `metadata.compaction_continue === true` 的内部续跑 user text，避免 transcript 泄露“Continue...”提示
+- `collectAgentSourceSpans()` / `restoreAgentMentionSourceText()` 只在 user message 上运行，按原始 source span 把 native `agent` part 的 `@agent` 文本补回 hydrated visible content；如果 text part 已经包含该 mention，则不会重复插入
 - `parseFileContextAttachment()` 统一处理 `file` part 的 path/url/line-range/mime/textSnapshot
 - `extractInlineReadToolContext()` 从历史 Read tool 文本中恢复 file/selection attachment，并剥离用户可见文本
-- `collectRenderableTextState()` 现在把 user `compaction` part 投影成结构化 `compactionDivider` 元数据（`auto`, `overflow`, `tailStartId`），不再生成 plain-text marker；`buildCompactionNotice()` 保留为遗留参考但不再在主路径调用
+- `collectRenderableTextState()` 现在把 user `compaction` part 投影成结构化 `compactionDivider` 元数据（`auto`, `overflow`, `tailStartId`），不再生成 plain-text marker
 
 ### OMO 归一化
 

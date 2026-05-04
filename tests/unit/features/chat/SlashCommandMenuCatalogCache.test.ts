@@ -1,6 +1,8 @@
 import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 
+import { attachOpenCodeAppAgents } from '../../../../src/core/opencode/OpenCodeAppCatalogSidecar';
 import {
+  loadAgentMentionCandidatesFromSlashCommandMenuItems,
   SlashCommandMenuCatalogCache,
   type SlashCommandMenuCatalogCacheHost,
 } from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
@@ -171,7 +173,9 @@ describe('SlashCommandMenuCatalogCache', () => {
       expect.objectContaining({ id: 'frontend-design', source: 'skill' }),
     ]);
   });
+});
 
+describe('SlashCommandMenuCatalogCache — skill provenance and agent sidecar', () => {
   it('attaches provenance details to runtime skill entries from skill locations', async () => {
     const host = createHost({
       getVaultPath: jest.fn(() => 'C:/vault'),
@@ -259,6 +263,43 @@ describe('SlashCommandMenuCatalogCache', () => {
         source: 'command',
       }),
     ]));
+  });
+
+  it('carries runtime and project agent mention candidates on the shared catalog result', async () => {
+    const runtimeSkillsResult = attachOpenCodeAppAgents([], Promise.resolve([
+      { name: 'primary', mode: 'primary', description: 'Main agent' },
+      { name: 'reviewer', mode: 'subagent', description: 'Runtime reviewer' },
+      { name: 'hidden-reviewer', mode: 'subagent', hidden: true },
+    ]));
+    const host = createHost({
+      loadRuntimeSkills: jest.fn().mockResolvedValue(runtimeSkillsResult),
+      loadProjectAgents: jest.fn().mockResolvedValue({
+        planner: {
+          mode: 'all',
+          description: 'Project planner',
+        },
+      }),
+    });
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    const items = await cache.load();
+
+    await expect(loadAgentMentionCandidatesFromSlashCommandMenuItems(items)).resolves.toEqual([
+      {
+        id: 'planner',
+        displayName: 'planner',
+        description: 'Project planner',
+        mode: 'all',
+        hidden: false,
+      },
+      {
+        id: 'reviewer',
+        displayName: 'reviewer',
+        description: 'Runtime reviewer',
+        mode: 'subagent',
+        hidden: false,
+      },
+    ]);
   });
 });
 

@@ -6,12 +6,20 @@ import {
   mergeSlashCommandCatalog,
   type SlashCommandMenuItem,
 } from '../../../core/config/slashCommandCatalog';
+import { getAttachedOpenCodeAppAgents } from '../../../core/opencode/OpenCodeAppCatalogSidecar';
 import type {
   OpencodeAgentConfigRecord,
   OpencodeCommandConfigRecord,
 } from '../../../core/types';
+import { AgentMentionCandidateService } from './AgentMentionCandidateService';
+import type { AgentMentionCandidate } from './AgentMentionComposerController';
 
 const SLASH_COMMAND_MENU_CACHE_TTL_MS = 120_000;
+const AGENT_MENTION_CANDIDATES_PROMISE_KEY = Symbol('opencodian.agentMentionCandidatesPromise');
+
+type SlashCommandMenuItemsWithAgentMentions = SlashCommandMenuItem[] & {
+  [AGENT_MENTION_CANDIDATES_PROMISE_KEY]?: Promise<AgentMentionCandidate[]>;
+};
 
 export interface SlashCommandMenuCatalogCacheHost {
   getHiddenCommandIds(): string[];
@@ -34,6 +42,53 @@ interface SlashCommandMenuCatalogPendingLoad {
   key: string;
   promise: Promise<SlashCommandMenuItem[]>;
   token: symbol;
+}
+
+export function attachAgentMentionCandidatesToSlashCommandMenuItems(
+  items: SlashCommandMenuItem[],
+  candidates: Promise<AgentMentionCandidate[]> | readonly AgentMentionCandidate[],
+): SlashCommandMenuItem[] {
+  const candidatesPromise = Promise.resolve(candidates).then((resolved) =>
+    resolved.map((candidate) => ({ ...candidate })))
+    .catch(() => []);
+
+  Object.defineProperty(items, AGENT_MENTION_CANDIDATES_PROMISE_KEY, {
+    configurable: true,
+    enumerable: false,
+    value: candidatesPromise,
+  });
+
+  return items;
+}
+
+export function loadAgentMentionCandidatesFromSlashCommandMenuItems(
+  items: readonly SlashCommandMenuItem[] | null | undefined,
+): Promise<AgentMentionCandidate[]> {
+  const candidatesPromise = (items as SlashCommandMenuItemsWithAgentMentions | null | undefined)
+    ?.[AGENT_MENTION_CANDIDATES_PROMISE_KEY];
+
+  return candidatesPromise
+    ? candidatesPromise.then((candidates) => candidates.map((candidate) => ({ ...candidate })))
+    : Promise.resolve([]);
+}
+
+export interface SharedComposerCatalogLoaderHost {
+  loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
+  loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
+}
+
+export async function loadAgentMentionCandidatesFromComposerCatalog(
+  host: SharedComposerCatalogLoaderHost,
+  cachedItems: SlashCommandMenuItem[] | null,
+  setCachedItems: (items: SlashCommandMenuItem[]) => void,
+): Promise<AgentMentionCandidate[]> {
+  if (host.loadAgentMentionCandidates) {
+    return host.loadAgentMentionCandidates();
+  }
+
+  const items = cachedItems ?? await host.loadSlashCommandMenuItems();
+  setCachedItems(items);
+  return loadAgentMentionCandidatesFromSlashCommandMenuItems(items);
 }
 
 function normalizeRuntimeCommands(value: unknown): RuntimeCommand[] {
@@ -73,6 +128,10 @@ export class SlashCommandMenuCatalogCache {
   private cacheEntry: SlashCommandMenuCatalogCacheEntry | null = null;
   private generation = 0;
   private pendingLoad: SlashCommandMenuCatalogPendingLoad | null = null;
+  private readonly agentMentionCandidateService = new AgentMentionCandidateService({
+    loadRuntimeAgents: async () => [],
+    loadProjectAgents: async () => ({}),
+  });
 
   constructor(private readonly host: SlashCommandMenuCatalogCacheHost) {}
 
@@ -145,14 +204,21 @@ export class SlashCommandMenuCatalogCache {
         this.host.getVaultPath(),
       );
 
-      const items = buildVisibleSlashCommandMenuItems(
-        mergeSlashCommandCatalog({
-          runtimeCommands: normalizeRuntimeCommands(runtimeCommandsResult),
-          runtimeSkillSources,
-          projectCommands,
-          projectAgents,
-          hiddenCommandIds: new Set(this.host.getHiddenCommandIds()),
-        }),
+      const agentMentionCandidates = this.loadAgentMentionCandidates(
+        runtimeSkillsResult,
+        projectAgents,
+      ).catch(() => []);
+      const items = attachAgentMentionCandidatesToSlashCommandMenuItems(
+        buildVisibleSlashCommandMenuItems(
+          mergeSlashCommandCatalog({
+            runtimeCommands: normalizeRuntimeCommands(runtimeCommandsResult),
+            runtimeSkillSources,
+            projectCommands,
+            projectAgents,
+            hiddenCommandIds: new Set(this.host.getHiddenCommandIds()),
+          }),
+        ),
+        agentMentionCandidates,
       );
 
       if (generation === this.generation && this.pendingLoad?.token === token) {
@@ -176,5 +242,16 @@ export class SlashCommandMenuCatalogCache {
       token,
     };
     return promise;
+  }
+
+  private async loadAgentMentionCandidates(
+    runtimeSkillsResult: unknown,
+    projectAgents: OpencodeAgentConfigRecord,
+  ): Promise<AgentMentionCandidate[]> {
+    const runtimeAgentsResult = await (getAttachedOpenCodeAppAgents(runtimeSkillsResult) ?? Promise.resolve([]));
+    return this.agentMentionCandidateService.projectCandidates({
+      runtimeAgentsResult,
+      projectAgents,
+    });
   }
 }

@@ -57,6 +57,7 @@ export function createMessageSendPreparationHost(
 - 两类上下文按 target key 合并：持久路径先铺底，同 target 的一次性 draft context 覆盖旧条目
 - 基于合并后的 context items 向 `OpenCodeService` 请求稳定 `messageID + parts[]` send payload；如果上游额外提供 `syntheticTextParts`，这些插件注入文本会继续以结构化 synthetic parts 进入 payload，而不是改写 `userMessage.content`
 - 如果上游提供 `invocationIntent`，`AgentInvocationService` 会先把它解析成 top-level main `agent` 与 `agent` / `subtask` native parts；这些 invocation parts 会和普通 parts 一起进入稳定 payload，而不是被拼回纯文本
+- selected `@agent` 的 source span 会先从 transport text part 中剔除，避免同一 mention 同时以普通文本和 native `agent` part 发送；optimistic user bubble 仍保留用户实际输入的可见文本
 - 先把同一批稳定 `optimisticUserParts` seed 到 canonical session graph，再构造本地 optimistic user message；plugin synthetic parts 因此属于 canonical part truth，而不是靠 fallback `Conversation.messages.content` 重建
 - optimistic user message 继续使用合并后的 context items 构造 `contextAttachments`，但不把本地 UI bubble 直接当成最终真相
 - 保持既有顺序：

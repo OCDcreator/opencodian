@@ -278,7 +278,8 @@ export class MessageSendPreparationService {
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
     const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
-    const structuredSend = this.host.buildStructuredPromptSendPayload(options.content, {
+    const requestContent = this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
+    const structuredSend = this.host.buildStructuredPromptSendPayload(requestContent, {
       contextItems,
       ...(options.syntheticTextParts ? { syntheticTextParts: options.syntheticTextParts } : {}),
       ...(resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),

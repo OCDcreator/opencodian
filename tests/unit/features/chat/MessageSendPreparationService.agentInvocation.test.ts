@@ -177,4 +177,43 @@ describe('MessageSendPreparationService agent invocation', () => {
     });
     expect(result?.userMessage.content).toBe('Hello');
   });
+
+  it('removes selected @agent mentions from the transport text while preserving the user bubble text', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({
+      content: 'please ask @reviewer to check this',
+      invocationIntent: {
+        kind: 'prompt',
+        mentions: [
+          {
+            agentId: 'reviewer',
+            source: {
+              value: '@reviewer',
+              start: 11,
+              end: 20,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(host.buildStructuredPromptSendPayload).toHaveBeenCalledWith('please ask to check this', {
+      contextItems: [],
+      invocationParts: [
+        {
+          type: 'agent',
+          name: 'reviewer',
+          source: {
+            value: '@reviewer',
+            start: 11,
+            end: 20,
+          },
+        },
+      ],
+    });
+    expect(result?.userMessage.content).toBe('please ask @reviewer to check this');
+  });
 });

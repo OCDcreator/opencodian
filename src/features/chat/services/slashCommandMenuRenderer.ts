@@ -22,6 +22,21 @@ interface RenderSlashCommandMenuOptions {
   onSelectItem(index: number): void;
 }
 
+export interface AgentMentionMenuItem {
+  id: string;
+  displayName?: string;
+  description?: string;
+}
+
+interface RenderAgentMentionMenuOptions {
+  menuEl: HTMLElement;
+  items: AgentMentionMenuItem[];
+  selectedIndex: number;
+  status: SlashCommandMenuStatus;
+  onHoverItem(index: number): void;
+  onSelectItem(index: number): void;
+}
+
 export function renderSlashCommandMenu(options: RenderSlashCommandMenuOptions): void {
   const {
     menuEl,
@@ -79,6 +94,63 @@ export function renderSlashCommandMenu(options: RenderSlashCommandMenuOptions): 
   });
 }
 
+export function renderAgentMentionMenu(options: RenderAgentMentionMenuOptions): void {
+  const {
+    menuEl,
+    items,
+    selectedIndex,
+    status,
+    onHoverItem,
+    onSelectItem,
+  } = options;
+
+  menuEl.replaceChildren();
+
+  if (items.length === 0) {
+    const stateText = getSlashCommandMenuStateText(status);
+    if (!stateText) {
+      menuEl.addClass('is-hidden');
+      return;
+    }
+
+    menuEl.removeClass('is-hidden');
+    menuEl.createDiv({
+      cls: `opencodian-slash-command-menu-state opencodian-slash-command-menu-state--${status}`,
+      text: stateText,
+      attr: { role: 'status' },
+    });
+    return;
+  }
+
+  menuEl.removeClass('is-hidden');
+
+  items.forEach((item, index) => {
+    const itemEl = menuEl.createDiv({
+      cls: 'opencodian-slash-command-menu-item opencodian-agent-mention-menu-item',
+      attr: {
+        role: 'option',
+        'aria-selected': index === selectedIndex ? 'true' : 'false',
+      },
+    });
+
+    if (index === selectedIndex) {
+      itemEl.addClass('is-selected');
+    }
+
+    itemEl.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+    });
+    itemEl.addEventListener('mouseenter', () => {
+      onHoverItem(index);
+    });
+    itemEl.addEventListener('click', () => {
+      onSelectItem(index);
+    });
+
+    renderAgentMentionMenuItem(itemEl, item);
+  });
+}
+
 function renderSlashCommandMenuItem(itemEl: HTMLElement, item: SlashCommandMenuItem): void {
   const titleRowEl = itemEl.createDiv({
     cls: 'opencodian-slash-command-menu-title-row',
@@ -102,6 +174,31 @@ function renderSlashCommandMenuItem(itemEl: HTMLElement, item: SlashCommandMenuI
       cls: 'opencodian-slash-command-menu-source',
       text: skillSourceText,
       attr: { title: skillSourceText },
+    });
+  }
+
+  if (item.description) {
+    itemEl.createDiv({
+      cls: 'opencodian-slash-command-menu-description',
+      text: item.description,
+      attr: { title: item.description },
+    });
+  }
+}
+
+function renderAgentMentionMenuItem(itemEl: HTMLElement, item: AgentMentionMenuItem): void {
+  const titleRowEl = itemEl.createDiv({
+    cls: 'opencodian-slash-command-menu-title-row',
+  });
+  titleRowEl.createDiv({
+    cls: 'opencodian-slash-command-menu-title',
+    text: `@${item.id}`,
+  });
+
+  if (item.displayName && item.displayName !== item.id) {
+    titleRowEl.createDiv({
+      cls: 'opencodian-slash-command-menu-badge opencodian-slash-command-menu-badge--runtime',
+      text: item.displayName,
     });
   }
 
