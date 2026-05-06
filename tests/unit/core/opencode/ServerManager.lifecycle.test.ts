@@ -352,6 +352,30 @@ function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void 
       expect(env.OPENCODE_PURE).toBe('true');
     });
   });
+
+  describe('macOS GUI launch environment', () => {
+    it('adds common Node install locations to PATH for opencode npm wrappers', () => {
+      const restorePlatform = mockProcessPlatform('darwin');
+      const homeDir = path.join(context.testVaultPath, 'Home');
+
+      try {
+        process.env.HOME = homeDir;
+        process.env.PATH = '/usr/bin:/bin:/usr/sbin:/sbin';
+        delete process.env.Path;
+        delete process.env.path;
+
+        const env = context.getLauncherTestAccess().getSpawnEnv();
+
+        expect(env.PATH?.split(path.delimiter)).toEqual(expect.arrayContaining([
+          '/opt/homebrew/bin',
+          '/usr/local/bin',
+          path.join(homeDir, '.opencode', 'bin'),
+        ]));
+      } finally {
+        restorePlatform();
+      }
+    });
+  });
 }
 
 function registerBinaryResolutionTests(context: ServerManagerContext): void {

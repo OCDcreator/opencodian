@@ -406,6 +406,30 @@ export class LocalSidecarLauncher {
     return process.platform === 'win32' ? ';' : path.delimiter;
   }
 
+  private getMacOSGuiPathFallbacks(): string[] {
+    return [
+      process.env.HOME ? path.join(process.env.HOME, '.opencode', 'bin') : '',
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      '/opt/homebrew/sbin',
+      '/usr/local/sbin',
+    ].filter(Boolean);
+  }
+
+  private getAugmentedSpawnPathEnvironmentValue(): string {
+    const delimiter = this.getPathEnvironmentDelimiter();
+    const entries = this.getPathEnvironmentValue()
+      .split(delimiter)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (process.platform === 'darwin') {
+      entries.push(...this.getMacOSGuiPathFallbacks());
+    }
+
+    return [...new Set(entries)].join(delimiter);
+  }
+
   private shouldSpawnViaShell(opencodePath: string): boolean {
     return process.platform === 'win32' && /\.(cmd|bat)$/i.test(opencodePath);
   }
@@ -490,6 +514,10 @@ export class LocalSidecarLauncher {
 
   private getSpawnEnv(): NodeJS.ProcessEnv {
     const env = { ...process.env };
+    const spawnPath = this.getAugmentedSpawnPathEnvironmentValue();
+    if (spawnPath) {
+      env.PATH = spawnPath;
+    }
 
     for (const key of LOCAL_SERVER_SANITIZED_ENV_KEYS) {
       delete env[key];
