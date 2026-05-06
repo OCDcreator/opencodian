@@ -298,6 +298,7 @@ describe('SettingsServerSection', () => {
     ]);
     expect(toggleRecords.map((record) => record.name)).toEqual([t('settings.server.autoStart.name')]);
     expect(textRecords.map((record) => record.name)).toEqual([
+      t('settings.server.executablePath.name'),
       t('settings.server.host.name'),
       t('settings.server.port.name'),
     ]);
@@ -371,6 +372,31 @@ describe('SettingsServerSection', () => {
     await flushAsync();
 
     expect(plugin.settings.server.local.host).toBe('0.0.0.0');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits custom OpenCode executable path changes on native input events', async () => {
+    const plugin = createPlugin();
+    const section = new SettingsServerSection({
+      app: {} as App,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      notifyModelCatalogStatus: jest.fn(),
+      onServerStateChange: jest.fn(),
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attach(containerEl);
+
+    const executableRecord = textRecords.find(
+      (record) => record.name === t('settings.server.executablePath.name'),
+    );
+    executableRecord?.control.setValue('/Users/example/.opencode/bin/opencode');
+    executableRecord?.control.inputEl.dispatchEvent(new Event('change'));
+    await flushAsync();
+
+    expect(plugin.settings.server.local.executablePath).toBe('/Users/example/.opencode/bin/opencode');
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
   });
 });

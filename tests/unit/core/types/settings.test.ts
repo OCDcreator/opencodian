@@ -124,6 +124,7 @@ import {
       expect(DEFAULT_SETTINGS.server.local.host).toBe('127.0.0.1');
       expect(DEFAULT_SETTINGS.server.local.port).toBe(4196);
       expect(DEFAULT_SETTINGS.server.local.autoStart).toBe(true);
+      expect(DEFAULT_SETTINGS.server.local.executablePath).toBe('');
       expect(DEFAULT_SETTINGS.server.remote.baseUrl).toBe('http://127.0.0.1:4096');
       expect(DEFAULT_SETTINGS.server.auth.type).toBe('none');
       expect(DEFAULT_SETTINGS.enableBlocklist).toBe(true);

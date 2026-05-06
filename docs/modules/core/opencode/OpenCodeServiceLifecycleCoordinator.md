@@ -70,9 +70,9 @@
 `updateSettings(settings)` 现在由本 coordinator 直接拥有完整 reconfiguration lifecycle：
 
 1. 构造 update plan：深拷贝新 settings，记录旧 baseUrl / tool catalog scope / subscription wanted state
-2. 在本地运行中切换 host/port 时先执行 `canBindLocalEndpoint()` 预检；如果只是当前 managed server 的同端口 host 变更，则允许后续 restart 原地替换，避免被自己仍在监听的旧 sidecar 挡住
+2. 在本地运行中切换 host/port 时先执行 `canBindLocalEndpoint()` 预检；如果只是当前 managed server 的同端口 host 变更，或只改了本地 OpenCode 可执行文件路径，则允许后续 restart 原地替换，避免被自己仍在监听的旧 sidecar 挡住
 3. 写回 settings/baseUrl、更新 `ServerManager` config、按 scope 变化清理 tool schema cache，并暂停 subscriptions
-4. 根据 mode/config/auth/source-mode/isolation-mode 决策 stop 或 restart managed server
+4. 根据 mode/config/auth/source-mode/isolation-mode 决策 stop 或 restart managed server；本地 `executablePath` 变化属于 config change，会重启受管 sidecar
 5. 失败时回滚 settings/baseUrl/server config，必要时尽力 `start()` 原 managed server，最后恢复 subscriptions 并继续抛出原始错误
 
 ### Compaction config reload lifecycle

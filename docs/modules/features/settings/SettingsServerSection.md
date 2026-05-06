@@ -8,7 +8,7 @@
 `SettingsServerSection.ts` 是设置页 Server 分区的专属 owner。它从 `OpenCodianSettings` 主类中接管了这块 section 的完整 lifecycle，包括：
 
 - server mode 切换与 local/remote 子分支装配
-- host / port / remote URL / auth 输入写回
+- OpenCode executable path / host / port / remote URL / auth 输入写回
 - start / stop / test / refresh 按钮与状态文案刷新
 - 固定轮询驱动的 server status 同步
 - help modal 按钮与 unload cleanup
@@ -26,7 +26,7 @@
 ### 配置写回
 
 - mode 切换继续保留 local→remote 自动填充 base URL、local 下 bearer→none fallback 的旧语义
-- local host/port 仍沿用原来的原生 `change` / `blur` 事件提交与错误提示
+- local OpenCode executable path / host / port 仍沿用原生 `change` / `blur` 事件提交与错误提示；可执行文件路径留空表示继续使用自动探测
 - remote URL、basic auth、bearer token 仍直接写回 plugin settings，并在 mode/auth 切换后请求 settings 面板整体重建
 
 ### 状态与动作
@@ -59,7 +59,7 @@
 
 Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content to the appropriate secondary tab:
 
-- `connection` — renders mode + local/remote host/port settings
+- `connection` — renders mode + local executable path / host / port or remote URL settings
 - `auth` — renders auth type + credentials
 - `status` — renders status display with polling interval
 

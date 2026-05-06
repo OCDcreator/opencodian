@@ -283,6 +283,10 @@ export class LocalSidecarLauncher {
 
   private findOpenCodeBinary(): string | null {
     const candidates: string[] = [];
+    const configuredExecutablePath = this.config.local.executablePath?.trim();
+    if (configuredExecutablePath) {
+      candidates.push(this.expandHomeDirectory(configuredExecutablePath));
+    }
 
     if (process.platform === 'win32') {
       if (process.env.APPDATA) {
@@ -306,6 +310,7 @@ export class LocalSidecarLauncher {
         '/usr/local/bin/opencode',
         '/opt/homebrew/bin/opencode',
         '/usr/bin/opencode',
+        process.env.HOME ? path.join(process.env.HOME, '.opencode', 'bin', 'opencode') : '',
         process.env.HOME ? path.join(process.env.HOME, '.npm-global', 'bin', 'opencode') : '',
         process.env.HOME ? path.join(process.env.HOME, '.nvm', 'current', 'bin', 'opencode') : '',
         'opencode',
@@ -316,6 +321,7 @@ export class LocalSidecarLauncher {
         '/usr/local/bin/opencode',
         '/usr/bin/opencode',
         '/opt/bin/opencode',
+        process.env.HOME ? path.join(process.env.HOME, '.opencode', 'bin', 'opencode') : '',
         'opencode',
         'opencode-ai',
       );
@@ -329,6 +335,16 @@ export class LocalSidecarLauncher {
     }
 
     return null;
+  }
+
+  private expandHomeDirectory(candidate: string): string {
+    if (candidate === '~' && process.env.HOME) {
+      return process.env.HOME;
+    }
+    if ((candidate.startsWith('~/') || candidate.startsWith('~\\')) && process.env.HOME) {
+      return path.join(process.env.HOME, candidate.slice(2));
+    }
+    return candidate;
   }
 
   private resolveExecutableCandidate(candidate: string): string | null {

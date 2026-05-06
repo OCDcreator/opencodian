@@ -158,6 +158,9 @@ function normalizeServerSettingsOnLoad(savedSettings: LoadedSettingsSnapshot | n
           local: {
             ...defaultServer.local,
             ...(nestedServer.local ?? {}),
+            executablePath: typeof nestedServer.local?.executablePath === 'string'
+              ? nestedServer.local.executablePath.trim()
+              : defaultServer.local.executablePath,
           },
           remote: {
             ...defaultServer.remote,
@@ -186,6 +189,7 @@ function normalizeServerSettingsOnLoad(savedSettings: LoadedSettingsSnapshot | n
             host: legacyHost,
             port: legacyPort,
             autoStart: legacyAutoStart,
+            executablePath: defaultServer.local.executablePath,
           },
           remote: {
             baseUrl: `http://${legacyHost}:${legacyPort}`,

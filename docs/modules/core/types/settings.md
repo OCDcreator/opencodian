@@ -35,7 +35,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `ServerMode` | `'local' \| 'remote'` |
 | `ServerAuthType` | `'none' \| 'basic' \| 'bearer'` |
 | `ServerConfig` | 服务器配置（`mode`, `local`, `remote`, `auth`） |
-| `LocalServerConfig` | 本地服务器（`host`, `port`, `autoStart`） |
+| `LocalServerConfig` | 本地服务器（`host`, `port`, `autoStart`, `executablePath`） |
 | `RemoteServerConfig` | 远程服务器（`baseUrl`） |
 | `ServerAuthConfig` | 认证配置（`type`, `username`, `password`, `token`） |
 | `PermissionMode` | `'yolo' \| 'plan' \| 'normal'` |
@@ -118,6 +118,10 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 ## 关键方法
 
 ### 归一化函数
+
+### 本地 OpenCode 可执行文件路径
+
+`LocalServerConfig.executablePath` 是可选的本地 sidecar 启动覆盖项，默认空字符串。留空时 `LocalSidecarLauncher` 会继续使用平台内置候选路径和 `PATH`；填写后，该路径会优先于 macOS / Windows 默认候选。
 
 | 方法 | 说明 |
 |------|------|

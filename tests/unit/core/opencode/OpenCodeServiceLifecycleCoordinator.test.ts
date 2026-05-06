@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Existing shared lifecycle harness keeps related settings-update cases together. */
+
 import {
   type OpenCodeServiceLifecycleAssemblyHost,
   OpenCodeServiceLifecycleCoordinator,
@@ -414,6 +416,20 @@ describe('OpenCodeServiceLifecycleCoordinator settings updates', () => {
     expect(harness.serverManager.canBindLocalEndpoint).not.toHaveBeenCalled();
     expect(harness.serverManager.restart).toHaveBeenCalledTimes(1);
     expect(harness.getCurrentBaseUrl()).toBe('http://0.0.0.0:4196');
+  });
+
+  it('restarts the managed server when the local executable path changes', async () => {
+    const harness = createSettingsHarness({
+      serverManager: {
+        isRunning: jest.fn().mockReturnValue(true),
+      },
+    });
+    const nextSettings = cloneSettings(DEFAULT_SETTINGS);
+    nextSettings.server.local.executablePath = '/Users/example/.opencode/bin/opencode';
+
+    await harness.coordinator.updateSettings(nextSettings);
+
+    expect(harness.serverManager.restart).toHaveBeenCalledTimes(1);
   });
 
   it('rolls back settings and restores the previous managed server after a failed restart', async () => {

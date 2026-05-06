@@ -425,7 +425,8 @@ export class OpenCodeServiceLifecycleCoordinator {
 
   private hasLocalServerConfigChanged(previousSettings: OpenCodianSettings, nextSettings: OpenCodianSettings): boolean {
     return previousSettings.server.local.host !== nextSettings.server.local.host
-      || previousSettings.server.local.port !== nextSettings.server.local.port;
+      || previousSettings.server.local.port !== nextSettings.server.local.port
+      || previousSettings.server.local.executablePath !== nextSettings.server.local.executablePath;
   }
 
   private hasServerAuthChanged(previousSettings: OpenCodianSettings, nextSettings: OpenCodianSettings): boolean {

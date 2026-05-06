@@ -315,6 +315,7 @@ export interface LocalServerConfig {
   host: string;
   port: number;
   autoStart: boolean;
+  executablePath: string;
 }
 
 /** Remote server configuration */
@@ -1776,6 +1777,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
       host: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
       port: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
       autoStart: true,
+      executablePath: '',
     },
     remote: {
       baseUrl: `http://${OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST}:${OPENCODE_LEGACY_LOCAL_DEFAULT_PORT}`,

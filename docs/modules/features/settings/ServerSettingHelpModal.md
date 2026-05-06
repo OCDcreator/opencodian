@@ -15,7 +15,7 @@
 
 ```typescript
 type ServerHelpTopic =
-  | 'mode' | 'autoStart' | 'host' | 'port' | 'remoteUrl'
+  | 'mode' | 'autoStart' | 'executablePath' | 'host' | 'port' | 'remoteUrl'
   | 'auth' | 'username' | 'password' | 'token' | 'status';
 ```
 

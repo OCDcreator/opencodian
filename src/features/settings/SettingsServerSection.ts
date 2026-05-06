@@ -1,4 +1,4 @@
-import type { App, ButtonComponent } from 'obsidian';
+import type { App, ButtonComponent, TextComponent } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
 import { t } from '../../i18n';
@@ -172,6 +172,27 @@ export class SettingsServerSection {
       );
     this.addHelpButton(autoStartSetting, 'autoStart');
 
+    const executablePathSetting = new Setting(containerEl)
+      .setName(t('settings.server.executablePath.name'))
+      .setDesc(t('settings.server.executablePath.desc'))
+      .addText((text) => {
+        const commitExecutablePathChange = async () => {
+          const nextPath = text.inputEl.value.trim();
+          if (nextPath !== this.plugin.settings.server.local.executablePath) {
+            this.plugin.settings.server.local.executablePath = nextPath;
+            await this.plugin.saveSettings();
+          }
+          text.setValue(this.plugin.settings.server.local.executablePath);
+        };
+
+        const placeholder = process.platform === 'win32'
+          ? 'C:\\Users\\you\\AppData\\Roaming\\npm\\opencode.cmd'
+          : `${process.env.HOME ?? '/Users/you'}/.opencode/bin/opencode`;
+        text.setPlaceholder(placeholder).setValue(this.plugin.settings.server.local.executablePath);
+        this.bindCommitOnNativeTextEvents(text, commitExecutablePathChange);
+      });
+    this.addHelpButton(executablePathSetting, 'executablePath');
+
     const hostSetting = new Setting(containerEl)
       .setName(t('settings.server.host.name'))
       .setDesc(t('settings.server.host.desc'))
@@ -193,21 +214,8 @@ export class SettingsServerSection {
           }
         };
 
-        text
-          .setPlaceholder('127.0.0.1')
-          .setValue(this.plugin.settings.server.local.host);
-        text.inputEl.addEventListener('change', () => {
-          void commitHostChange();
-        });
-        text.inputEl.addEventListener('blur', () => {
-          void commitHostChange();
-        });
-        text.inputEl.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            text.inputEl.blur();
-          }
-        });
+        text.setPlaceholder('127.0.0.1').setValue(this.plugin.settings.server.local.host);
+        this.bindCommitOnNativeTextEvents(text, commitHostChange);
       });
     this.addHelpButton(hostSetting, 'host');
 
@@ -240,23 +248,21 @@ export class SettingsServerSection {
           }
         };
 
-        text
-          .setPlaceholder('4196')
-          .setValue(String(this.plugin.settings.server.local.port));
-        text.inputEl.addEventListener('change', () => {
-          void commitPortChange();
-        });
-        text.inputEl.addEventListener('blur', () => {
-          void commitPortChange();
-        });
-        text.inputEl.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            text.inputEl.blur();
-          }
-        });
+        text.setPlaceholder('4196').setValue(String(this.plugin.settings.server.local.port));
+        this.bindCommitOnNativeTextEvents(text, commitPortChange);
       });
     this.addHelpButton(portSetting, 'port');
+  }
+
+  private bindCommitOnNativeTextEvents(text: TextComponent, commit: () => Promise<void>): void {
+    text.inputEl.addEventListener('change', () => void commit());
+    text.inputEl.addEventListener('blur', () => void commit());
+    text.inputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        text.inputEl.blur();
+      }
+    });
   }
 
   private renderRemoteSettings(containerEl: HTMLElement): void {

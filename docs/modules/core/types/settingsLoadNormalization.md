@@ -41,7 +41,7 @@
 
 ### server / theme / input-panel 迁移
 
-- `normalizeServerSettingsOnLoad()` 兼容旧的扁平 `server.{host,port,autoStart}` 结构，并保留 legacy `4096` → local sidecar 默认端口迁移信号。
+- `normalizeServerSettingsOnLoad()` 兼容旧的扁平 `server.{host,port,autoStart}` 结构，并保留 legacy `4096` → local sidecar 默认端口迁移信号。嵌套 server 设置中的 `local.executablePath` 会被 trim；旧扁平结构统一回填为空字符串，表示继续自动探测。
 - `normalizeThemeAndChatAppearanceOnLoad()` 保持 preset-backed theme 与生效 `chatAppearance` 的恢复顺序，并保留背景图字段。
 - `normalizeInputPanelSettingsOnLoad()` 继续处理 glass/card/pill 默认层级 reset，以及 legacy `nikdelvin` 默认档案回填。
 

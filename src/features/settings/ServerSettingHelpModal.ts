@@ -5,6 +5,7 @@ import { t } from '../../i18n';
 export type ServerHelpTopic =
   | 'mode'
   | 'autoStart'
+  | 'executablePath'
   | 'host'
   | 'port'
   | 'remoteUrl'

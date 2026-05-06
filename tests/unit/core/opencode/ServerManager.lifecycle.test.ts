@@ -473,6 +473,53 @@ function registerBinaryResolutionTests(context: ServerManagerContext): void {
       }
     });
 
+    it('prefers the configured OpenCode executable path before platform defaults', () => {
+      const customBinDir = path.join(context.testVaultPath, 'CustomBin');
+      const pathBinDir = path.join(context.testVaultPath, 'PathBin');
+      const customBinary = path.join(customBinDir, process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
+      const pathBinary = path.join(pathBinDir, process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
+
+      fs.mkdirSync(customBinDir, { recursive: true });
+      fs.mkdirSync(pathBinDir, { recursive: true });
+      fs.writeFileSync(customBinary, process.platform === 'win32' ? '@echo off' : '#!/bin/sh', 'utf-8');
+      fs.writeFileSync(pathBinary, process.platform === 'win32' ? '@echo off' : '#!/bin/sh', 'utf-8');
+      process.env.PATH = pathBinDir;
+
+      context.setManager(new ServerManager({
+        ...context.defaultConfig,
+        local: {
+          ...context.defaultConfig.local,
+          executablePath: customBinary,
+        } as typeof context.defaultConfig.local & { executablePath: string },
+      }));
+
+      const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
+
+      expect(resolved).toBe(customBinary);
+    });
+
+    it('resolves the macOS official installer path when PATH is empty', () => {
+      const restorePlatform = mockProcessPlatform('darwin');
+      const homeDir = path.join(context.testVaultPath, 'Home');
+      const officialBinary = path.join(homeDir, '.opencode', 'bin', 'opencode');
+
+      try {
+        fs.mkdirSync(path.dirname(officialBinary), { recursive: true });
+        fs.writeFileSync(officialBinary, '#!/bin/sh', 'utf-8');
+
+        process.env.HOME = homeDir;
+        process.env.PATH = '';
+        delete process.env.Path;
+        delete process.env.path;
+
+        const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
+
+        expect(resolved).toBe(officialBinary);
+      } finally {
+        restorePlatform();
+      }
+    });
+
     it('resolves the first matching binary from PATH', () => {
       const pathBinDir = path.join(context.testVaultPath, 'PathBin');
       const binaryName = process.platform === 'win32' ? 'opencode.cmd' : 'opencode';
@@ -483,6 +530,7 @@ function registerBinaryResolutionTests(context: ServerManagerContext): void {
 
       delete process.env.APPDATA;
       delete process.env.LOCALAPPDATA;
+      process.env.HOME = path.join(context.testVaultPath, 'HomeWithoutOfficialInstall');
       process.env.PATH = pathBinDir;
 
       const resolved = context.getLauncherTestAccess().findOpenCodeBinary();
