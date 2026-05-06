@@ -15,6 +15,7 @@ export class ChatAgentSelectionCoordinator {
   private dropdownEl: HTMLElement | null = null;
   private candidates: AgentSelectionCandidate[] = [];
   private selectedAgentId: string | null = null;
+  private expandedDetailKeys = new Set<string>();
   private isDropdownOpen = false;
   private status: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
   private loadRunId = 0;
@@ -103,6 +104,11 @@ export class ChatAgentSelectionCoordinator {
     if (this.clickOutsideHandler) {
       document.removeEventListener('click', this.clickOutsideHandler, true);
     }
+
+    if (this.expandedDetailKeys.size > 0) {
+      this.expandedDetailKeys.clear();
+      this.renderList();
+    }
   }
 
   destroy(): void {
@@ -112,6 +118,7 @@ export class ChatAgentSelectionCoordinator {
     this.dropdownEl = null;
     this.candidates = [];
     this.status = 'idle';
+    this.expandedDetailKeys.clear();
     this.loadRunId += 1;
   }
 
@@ -190,6 +197,9 @@ export class ChatAgentSelectionCoordinator {
       cls: 'opencodian-agent-option',
       attr: { 'data-agent-id': input.agentId ?? '' },
     });
+    const detailKey = this.getOptionDetailKey(input.agentId);
+    const detailsOpen = this.expandedDetailKeys.has(detailKey);
+    optionEl.toggleClass('is-details-open', detailsOpen);
 
     const iconWrapper = optionEl.createSpan({ cls: 'opencodian-agent-option-icon' });
     setIcon(iconWrapper, input.agentId ? 'bot' : 'sparkles');
@@ -204,6 +214,26 @@ export class ChatAgentSelectionCoordinator {
       });
     }
     if (input.description) {
+      const detailToggleEl = labelRowEl.createEl('button', {
+        cls: 'opencodian-agent-option-detail-toggle',
+        text: detailsOpen ? t('chat.agentSelector.details.hide') : t('chat.agentSelector.details.show'),
+        attr: {
+          type: 'button',
+          'aria-expanded': String(detailsOpen),
+          'aria-label': detailsOpen
+            ? t('chat.agentSelector.details.hideFor', { name: input.displayName })
+            : t('chat.agentSelector.details.showFor', { name: input.displayName }),
+        },
+      });
+      const detailIconEl = detailToggleEl.createSpan({ cls: 'opencodian-agent-option-detail-chevron' });
+      setIcon(detailIconEl, detailsOpen ? 'chevron-up' : 'chevron-down');
+      detailToggleEl.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.toggleOptionDetails(input.agentId);
+      });
+    }
+    if (input.description && detailsOpen) {
       contentEl.createDiv({ cls: 'opencodian-agent-option-desc', text: input.description });
     }
 
@@ -220,6 +250,20 @@ export class ChatAgentSelectionCoordinator {
     return mode === 'all'
       ? t('settings.agents.catalog.mode.all')
       : t('settings.agents.catalog.mode.primary');
+  }
+
+  private getOptionDetailKey(agentId: string | null): string {
+    return agentId ?? '__opencode_default__';
+  }
+
+  private toggleOptionDetails(agentId: string | null): void {
+    const detailKey = this.getOptionDetailKey(agentId);
+    if (this.expandedDetailKeys.has(detailKey)) {
+      this.expandedDetailKeys.delete(detailKey);
+    } else {
+      this.expandedDetailKeys.add(detailKey);
+    }
+    this.renderList();
   }
 
   private getSelectedAgentCandidate(): AgentSelectionCandidate | null {

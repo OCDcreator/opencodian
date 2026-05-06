@@ -1942,7 +1942,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: flex;
   align-items: flex-start;
   width: 100%;
-  padding: 9px 12px;
+  padding: 7px 12px;
   gap: 10px;
   cursor: pointer;
   font-size: 13px;
@@ -1984,7 +1984,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .opencodian-agent-option-label-row {
@@ -2012,6 +2012,40 @@ body[data-opencodian-provider-icon-mode="color"] {
   font-size: 10px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.opencodian-agent-option-detail-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 18px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.opencodian-agent-option-detail-toggle:hover,
+.opencodian-agent-option-detail-toggle:focus-visible {
+  color: var(--text-normal);
+}
+
+.opencodian-agent-option-detail-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+}
+
+.opencodian-agent-option-detail-chevron svg {
+  width: 11px;
+  height: 11px;
 }
 
 .opencodian-agent-option-desc,

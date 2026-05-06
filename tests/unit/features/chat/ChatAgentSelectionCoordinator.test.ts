@@ -107,4 +107,55 @@ describe('ChatAgentSelectionCoordinator', () => {
     expect(fixture.coordinator.getSelectedAgentId()).toBeNull();
     expect(fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger')?.textContent).toBe('Agent');
   });
+
+  it('keeps agent descriptions collapsed unless the transient detail toggle is opened', async () => {
+    const fixture = createFixture();
+
+    fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger')?.click();
+    await settleAsyncWork();
+
+    let buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
+    expect(buildOption?.textContent).toContain('Build');
+    expect(buildOption?.textContent).not.toContain('Builds changes');
+    expect(buildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
+
+    buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-detail-toggle')?.click();
+    buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
+
+    expect(buildOption?.hasClass('is-details-open')).toBe(true);
+    expect(buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-desc')?.textContent).toBe('Builds changes');
+
+    fixture.coordinator.closeDropdown();
+    fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger')?.click();
+    buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
+
+    expect(buildOption?.hasClass('is-details-open')).toBe(false);
+    expect(buildOption?.textContent).not.toContain('Builds changes');
+    expect(buildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
+
+    buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-detail-toggle')?.click();
+    buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
+
+    expect(buildOption?.hasClass('is-details-open')).toBe(true);
+    expect(buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-desc')?.textContent).toBe('Builds changes');
+
+    buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-detail-toggle')?.click();
+    buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
+
+    expect(buildOption?.hasClass('is-details-open')).toBe(false);
+    expect(buildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
+
+    fixture.coordinator.destroy();
+    const nextContainer = document.createElement('div');
+    document.body.appendChild(nextContainer);
+    const nextCoordinator = new ChatAgentSelectionCoordinator(fixture.host);
+    nextCoordinator.mount(nextContainer);
+    nextContainer.querySelector<HTMLElement>('.opencodian-agent-trigger')?.click();
+    await settleAsyncWork();
+
+    const nextBuildOption = nextContainer.querySelector<HTMLElement>('[data-agent-id="build"]');
+    expect(nextBuildOption?.textContent).toContain('Build');
+    expect(nextBuildOption?.textContent).not.toContain('Builds changes');
+    expect(nextBuildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
+  });
 });

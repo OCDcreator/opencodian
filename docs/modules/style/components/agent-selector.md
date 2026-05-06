@@ -5,13 +5,14 @@
 
 ## 职责
 
-定义聊天输入工具栏里的主 Agent 下拉框样式。它覆盖 trigger icon/text/chevron、OpenCode default 选项、primary/all agent option、loading/empty/error 状态，以及选中态的黄色强调。
+定义聊天输入工具栏里的主 Agent 下拉框样式。它覆盖 trigger icon/text/chevron、OpenCode default 选项、primary/all agent option、详情展开按钮、loading/empty/error 状态，以及选中态的黄色强调。
 
 ## 关键类名
 
 - 容器与按钮：`.opencodian-agent-selector`、`.opencodian-agent-trigger*`
 - 下拉框：`.opencodian-agent-dropdown`
 - 选项：`.opencodian-agent-option*`
+- 详情切换：`.opencodian-agent-option-detail-toggle`、`.opencodian-agent-option-detail-chevron`
 - 状态行：`.opencodian-agent-dropdown-state`
 
 ## 关联 TS 组件

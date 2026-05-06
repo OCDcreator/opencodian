@@ -33,7 +33,7 @@ export class ChatAgentSelectionCoordinator {
 - `reloadCatalog()` 通过 host seam 拉取 `primary` / `all` agent 候选；如果当前选择不再存在，则回退为 OpenCode default
 - `openDropdown()` 会先调用 `closePeerDropdowns()`，确保 Agent / permission / model 下拉框不会同时打开
 - 选中任意 agent 或 OpenCode default 后会关闭 dropdown 并调用 `restoreInputFocus()`，让用户可以继续在 composer 中输入
-- 选项渲染保留 agent mode badge、description、checkmark 和 loading / empty / load-failed 状态行
+- 选项渲染保留 agent mode badge、checkmark 和 loading / empty / load-failed 状态行；description 默认折叠在临时"详情"切换下，关闭 dropdown 或销毁 coordinator 后不会持久化展开态
 - `destroy()` 释放 DOM refs 与 pending load run；当前 selected agent id 保留在 coordinator 实例中，直到下一次 catalog reload 判定不可用
 
 ## 边界
