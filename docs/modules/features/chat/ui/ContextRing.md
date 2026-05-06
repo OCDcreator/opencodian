@@ -5,7 +5,7 @@
 
 ## 概述
 
-SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以环形进度条 + 百分比标签 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现；当 session 正在做原生 compaction 时，ring 会切到 compacting 提示。
+SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以环形进度条 + 百分比标签 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现；当 session 正在做原生 compaction 时，ring 会切到 compacting 提示。视觉上它跟随输入工具栏统一高度，默认是轻量圆形按钮，`action-buttons-etched` 时切换成透明刻入状态。
 
 ## 导入关系
 上游: `TabContextState`（来自 `core/types`）、`i18n`、`ContextUsageService`（来自 `features/chat/services/ContextUsageService`）

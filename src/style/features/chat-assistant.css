@@ -1915,11 +1915,14 @@
 }
 
 .opencodian-input-toolbar {
+  --opencodian-input-toolbar-control-gap: 10px;
+  --opencodian-input-toolbar-control-height: 30px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 8px;
+  row-gap: 8px;
+  column-gap: var(--opencodian-input-toolbar-control-gap);
   align-self: stretch;
   position: relative;
   z-index: 4;
@@ -1936,6 +1939,7 @@
 .opencodian-input-toolbar .opencodian-agent-selector,
 .opencodian-input-toolbar .opencodian-permission-selector,
 .opencodian-input-toolbar .opencodian-model-selector {
+  min-height: var(--opencodian-input-toolbar-control-height);
   flex-shrink: 0;
 }
 
@@ -1951,28 +1955,59 @@
 .opencodian-context-usage-slot {
   display: flex;
   align-items: center;
+  min-height: var(--opencodian-input-toolbar-control-height);
+  padding-inline: 3px;
   flex-shrink: 0;
 }
 
 .opencodian-context-ring {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: var(--opencodian-input-toolbar-control-height, 30px);
+  height: var(--opencodian-input-toolbar-control-height, 30px);
   padding: 0;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
   border-radius: 999px;
-  background: transparent;
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in srgb, var(--background-primary) 74%, transparent) 0%,
+      color-mix(in srgb, var(--background-primary) 38%, transparent) 58%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--opencodian-composer-embedded-fill) 34%, var(--background-primary));
   color: var(--text-faint);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 32%, transparent) inset,
+    0 5px 12px color-mix(in srgb, var(--opencodian-glass-shadow) 54%, transparent);
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
 }
 
 .opencodian-context-ring:hover {
-  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 22%, transparent);
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in srgb, var(--background-primary) 82%, transparent) 0%,
+      color-mix(in srgb, var(--background-primary) 46%, transparent) 58%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--opencodian-composer-embedded-fill-strong) 38%, var(--background-primary));
+  border-color: color-mix(in srgb, currentColor 30%, var(--background-modifier-border));
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 36%, transparent) inset,
+    0 6px 14px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 48%, transparent);
+  filter: saturate(1.03);
 }
 
 .opencodian-context-ring-svg {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
+  margin: 2px;
   display: block;
   transform: rotate(-90deg);
 }
@@ -1980,7 +2015,8 @@
 .opencodian-context-ring-track,
 .opencodian-context-ring-progress {
   fill: none;
-  stroke-width: 3;
+  stroke-width: 2.35;
+  stroke-linecap: round;
 }
 
 .opencodian-context-ring-track {
@@ -1998,10 +2034,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  color: var(--text-normal);
+  color: color-mix(in srgb, currentColor 26%, var(--text-normal));
 }
 
 .opencodian-context-ring.is-success {
@@ -2019,5 +2055,56 @@
 .opencodian-context-ring.is-muted,
 .opencodian-context-ring.is-unavailable {
   color: var(--text-faint);
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-usage-slot {
+  padding-inline: 1px;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 78%, var(--text-muted));
+  filter: none;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring:hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  filter: brightness(1.04) saturate(1.02);
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-success {
+  color: color-mix(in srgb, var(--text-success) 72%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-warning {
+  color: color-mix(in srgb, var(--text-warning) 78%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-danger {
+  color: color-mix(in srgb, var(--text-error) 78%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-muted,
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-unavailable {
+  color: color-mix(in srgb, var(--text-faint) 86%, var(--text-muted));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-svg {
+  filter:
+    drop-shadow(0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 76%, transparent))
+    drop-shadow(0 -1px 0 color-mix(in srgb, var(--opencodian-glass-shadow-strong) 36%, transparent));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-track {
+  stroke: color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-label {
+  color: color-mix(in srgb, currentColor 34%, var(--text-normal));
 }
 

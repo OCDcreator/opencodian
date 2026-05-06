@@ -7,7 +7,7 @@
 
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近几轮先后扩展了会话设置弹窗分组布局相关键、项目级 compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（会话标题、阅读与显示、提问交互、消息渲染）。本轮新增 `settings.server.executablePath.*` 与 `settings.server.help.executablePath.*`，用于说明本地 OpenCode 可执行文件路径覆盖项。
 
-本轮新增 `chat.agentSelector.*` 键，供聊天输入框下方的主 Agent 下拉框使用，包括 trigger、OpenCode 默认值选项、description 详情切换、加载/空态/失败状态以及选中 tooltip。
+本轮新增 `chat.agentSelector.*` 键，供聊天输入框下方的主 Agent 下拉框使用，包括 trigger、轻量列表标题、OpenCode 默认值选项、default badge、description、加载/空态/失败状态以及选中 tooltip。
 
 最近一轮还重写了 `settings.security.*` 相关文案：把原先容易让人误以为是上游原生“权限模式”的 wording，改成 **OpenCodian 权限模板 + 配置摘要** 语义，并补齐了 security section 的重启 tooltip / notice 键。
 

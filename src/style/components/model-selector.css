@@ -5,18 +5,21 @@
 .opencodian-model-selector {
   flex-shrink: 0;
   position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Trigger Button - Ghost style like opencode */
 .opencodian-model-trigger {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
-  border-radius: 6px;
+  min-height: var(--opencodian-input-toolbar-control-height, 30px);
+  padding: 3px 5px;
+  border-radius: 8px;
   cursor: pointer;
   background: transparent;
-  border: none;
-  transition: color 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+  border: 1px solid transparent;
+  transition: color 0.15s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
   user-select: none;
   font-size: 13px;
   color: var(--text-normal);

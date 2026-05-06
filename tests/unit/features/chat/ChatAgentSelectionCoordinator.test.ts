@@ -79,6 +79,52 @@ describe('ChatAgentSelectionCoordinator', () => {
     expect(fixture.host.restoreInputFocus).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the dropdown as an accessible compact agent list without row detail toggles', async () => {
+    const fixture = createFixture();
+    const trigger = fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger');
+
+    expect(trigger?.getAttribute('role')).toBe('button');
+    expect(trigger?.getAttribute('aria-haspopup')).toBe('listbox');
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+
+    trigger?.click();
+    await settleAsyncWork();
+
+    const dropdown = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown');
+    const heading = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown-heading');
+    const defaultOption = fixture.container.querySelector<HTMLElement>('[data-agent-id=""]');
+    const buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(dropdown?.getAttribute('role')).toBe('listbox');
+    expect(heading?.textContent).toBe('Choose primary agent');
+    expect(heading?.getAttribute('role')).toBe('presentation');
+    expect(defaultOption?.getAttribute('role')).toBe('option');
+    expect(defaultOption?.hasClass('is-default')).toBe(true);
+    expect(defaultOption?.getAttribute('aria-selected')).toBe('true');
+    expect(defaultOption?.querySelector<HTMLElement>('.opencodian-agent-option-mode.is-default-mode')?.textContent).toBe(
+      'Project default',
+    );
+    expect(defaultOption?.querySelector<HTMLElement>('.opencodian-agent-option-desc')?.textContent).toBe(
+      'Let OpenCode choose the project default primary agent.',
+    );
+    expect(buildOption?.getAttribute('role')).toBe('option');
+    expect(buildOption?.getAttribute('aria-selected')).toBe('false');
+    expect(buildOption?.querySelector('.opencodian-agent-option-main')).not.toBeNull();
+    expect(buildOption?.querySelector('.opencodian-agent-option-meta')).not.toBeNull();
+    expect(buildOption?.querySelector('.opencodian-agent-option-detail-toggle')).toBeNull();
+    expect(buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-desc')?.textContent).toBe(
+      'Builds changes',
+    );
+
+    buildOption?.click();
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+    expect(fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]')?.getAttribute('aria-selected')).toBe(
+      'true',
+    );
+  });
+
   it('keeps the OpenCode default option selected when choosing the default row', async () => {
     const fixture = createFixture();
 
@@ -108,7 +154,7 @@ describe('ChatAgentSelectionCoordinator', () => {
     expect(fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger')?.textContent).toBe('Agent');
   });
 
-  it('keeps agent descriptions collapsed unless the transient detail toggle is opened', async () => {
+  it('keeps agent descriptions inline without transient expanded state', async () => {
     const fixture = createFixture();
 
     fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger')?.click();
@@ -116,13 +162,8 @@ describe('ChatAgentSelectionCoordinator', () => {
 
     let buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
     expect(buildOption?.textContent).toContain('Build');
-    expect(buildOption?.textContent).not.toContain('Builds changes');
-    expect(buildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
-
-    buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-detail-toggle')?.click();
-    buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
-
-    expect(buildOption?.hasClass('is-details-open')).toBe(true);
+    expect(buildOption?.textContent).toContain('Builds changes');
+    expect(buildOption?.querySelector('.opencodian-agent-option-detail-toggle')).toBeNull();
     expect(buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-desc')?.textContent).toBe('Builds changes');
 
     fixture.coordinator.closeDropdown();
@@ -130,20 +171,8 @@ describe('ChatAgentSelectionCoordinator', () => {
     buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
 
     expect(buildOption?.hasClass('is-details-open')).toBe(false);
-    expect(buildOption?.textContent).not.toContain('Builds changes');
-    expect(buildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
-
-    buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-detail-toggle')?.click();
-    buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
-
-    expect(buildOption?.hasClass('is-details-open')).toBe(true);
+    expect(buildOption?.textContent).toContain('Builds changes');
     expect(buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-desc')?.textContent).toBe('Builds changes');
-
-    buildOption?.querySelector<HTMLElement>('.opencodian-agent-option-detail-toggle')?.click();
-    buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
-
-    expect(buildOption?.hasClass('is-details-open')).toBe(false);
-    expect(buildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
 
     fixture.coordinator.destroy();
     const nextContainer = document.createElement('div');
@@ -155,7 +184,7 @@ describe('ChatAgentSelectionCoordinator', () => {
 
     const nextBuildOption = nextContainer.querySelector<HTMLElement>('[data-agent-id="build"]');
     expect(nextBuildOption?.textContent).toContain('Build');
-    expect(nextBuildOption?.textContent).not.toContain('Builds changes');
-    expect(nextBuildOption?.querySelector('.opencodian-agent-option-desc')).toBeNull();
+    expect(nextBuildOption?.textContent).toContain('Builds changes');
+    expect(nextBuildOption?.querySelector('.opencodian-agent-option-detail-toggle')).toBeNull();
   });
 });

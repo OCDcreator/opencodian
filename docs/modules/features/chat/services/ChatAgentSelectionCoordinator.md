@@ -29,11 +29,12 @@ export class ChatAgentSelectionCoordinator {
 
 ## 关键行为
 
-- `mount()` 创建 trigger、dropdown 和 OpenCode default 选项；首次打开下拉框时再异步加载 default-eligible agents
+- `mount()` 创建 trigger、dropdown、轻量列表标题和 OpenCode default 选项；首次打开下拉框时再异步加载 default-eligible agents
 - `reloadCatalog()` 通过 host seam 拉取 `primary` / `all` agent 候选；如果当前选择不再存在，则回退为 OpenCode default
 - `openDropdown()` 会先调用 `closePeerDropdowns()`，确保 Agent / permission / model 下拉框不会同时打开
 - 选中任意 agent 或 OpenCode default 后会关闭 dropdown 并调用 `restoreInputFocus()`，让用户可以继续在 composer 中输入
-- 选项渲染保留 agent mode badge、checkmark 和 loading / empty / load-failed 状态行；description 默认折叠在临时"详情"切换下，关闭 dropdown 或销毁 coordinator 后不会持久化展开态
+- trigger 暴露 `button` / `aria-expanded` / `aria-haspopup=listbox`，dropdown 和选项分别暴露 `listbox` / `option` 与 `aria-selected`，让样式重塑后仍保留明确的辅助技术语义
+- 选项渲染保留 default row、agent mode badge、checkmark、loading / empty / load-failed 状态行，以及用于紧凑布局的 main/meta 分区；OpenCode default 现在和 agent row 共用同一 option 视觉模型，description 固定作为低优先级二级文本展示，不再渲染临时详情按钮或展开态
 - `destroy()` 释放 DOM refs 与 pending load run；当前 selected agent id 保留在 coordinator 实例中，直到下一次 catalog reload 判定不可用
 
 ## 边界
