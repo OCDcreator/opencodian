@@ -28,8 +28,13 @@ coverage/
 # Obsidian
 data.json
 
-# Local settings
-.claude/settings.local.json
+# AI coding assistants
+.claude/
+.copilot/
+.gemini/
+.kimi/
+.opencode/
+.config/opencode/
 
 # Reference projects
 reference-projects/*
@@ -64,7 +69,6 @@ docs/*
 # Automation runtime
 automation/runtime/
 .codex/
-.opencode/
 
 # Local debug artifacts
 .obsidian-debug/
@@ -91,18 +95,3 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 dev-debug.log
-# Dependency directories
-# Environment variables
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-# OS specific
-
-# Task files
-# tasks.json
-# tasks/ 
