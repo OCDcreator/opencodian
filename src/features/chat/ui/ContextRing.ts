@@ -2,7 +2,7 @@ import type { TabContextState } from '../../../core/types';
 import { t } from '../../../i18n';
 import { ContextUsageService } from '../services/ContextUsageService';
 
-const RADIUS = 6;
+const RADIUS = 13.4;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export class ContextRing {
@@ -23,17 +23,17 @@ export class ContextRing {
 
     const svgEl = this.buttonEl.createSvg('svg', {
       cls: 'opencodian-context-ring-svg',
-      attr: { viewBox: '0 0 16 16', 'aria-hidden': 'true' },
+      attr: { viewBox: '0 0 36 36', 'aria-hidden': 'true' },
     });
 
     svgEl.createSvg('circle', {
       cls: 'opencodian-context-ring-track',
-      attr: { cx: '8', cy: '8', r: String(RADIUS) },
+      attr: { cx: '18', cy: '18', r: String(RADIUS) },
     });
 
     this.progressEl = svgEl.createSvg('circle', {
       cls: 'opencodian-context-ring-progress',
-      attr: { cx: '8', cy: '8', r: String(RADIUS) },
+      attr: { cx: '18', cy: '18', r: String(RADIUS) },
     });
     this.progressEl.style.strokeDasharray = String(CIRCUMFERENCE);
     this.progressEl.style.strokeDashoffset = String(CIRCUMFERENCE);

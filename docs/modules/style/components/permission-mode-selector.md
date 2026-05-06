@@ -5,7 +5,7 @@
 
 ## 职责
 
-定义聊天工具栏权限模式选择器（yolo / normal / plan）的触发器与下拉选项视觉，并提供模式语义色。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / model selector 保持同一横向节奏。
+定义聊天工具栏权限模式选择器（yolo / normal / plan）的触发器与下拉选项视觉，并提供模式语义色。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / model selector 保持同一横向节奏；默认态是透明底紧凑按钮，只用文字、图标和轻边界承载模式状态，`action-buttons-etched` 下切换为透明刻入态。
 
 ## 关键类名 / CSS 变量
 

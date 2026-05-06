@@ -9,29 +9,32 @@
   align-items: center;
 }
 
-/* Trigger Button - Ghost style like opencode */
+/* Trigger Button */
 .opencodian-model-trigger {
   display: flex;
   align-items: center;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
-  padding: 3px 5px;
+  padding: 3px 7px;
   border-radius: 8px;
   cursor: pointer;
-  background: transparent;
-  border: 1px solid transparent;
-  transition: color 0.15s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  background: color-mix(in srgb, var(--background-primary) 54%, transparent);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
+  transition: color 0.15s ease-out, opacity 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out;
   user-select: none;
   font-size: 13px;
   color: var(--text-normal);
 }
 
 .opencodian-model-trigger:hover {
-  background: transparent;
+  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted));
   color: var(--text-normal);
 }
 
 .opencodian-model-trigger.is-open {
   background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border));
 }
 
 .opencodian-model-trigger.is-unavailable {
@@ -41,6 +44,7 @@
 .opencodian-model-trigger.is-unconfigured {
   color: var(--text-error);
   background: color-mix(in srgb, var(--text-error) 10%, transparent);
+  border-color: color-mix(in srgb, var(--text-error) 26%, var(--background-modifier-border));
 }
 
 .opencodian-model-trigger.is-unconfigured:hover,
@@ -107,6 +111,41 @@
 
 .opencodian-model-trigger.is-open .opencodian-model-trigger-chevron {
   transform: rotate(180deg);
+}
+
+.opencodian-model-trigger:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 2px;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-model-trigger {
+  padding: 3px 5px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 78%, var(--text-muted));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-model-trigger:hover,
+.opencodian-composer-shell--action-buttons-etched .opencodian-model-trigger.is-open {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  filter: brightness(1.04) saturate(1.02);
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-model-trigger.is-unavailable {
+  color: color-mix(in srgb, var(--text-warning) 88%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-model-trigger.is-unconfigured {
+  color: color-mix(in srgb, var(--text-error) 88%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-model-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 58%, transparent);
+  outline-offset: 3px;
 }
 
 .opencodian-model-trigger-chevron svg {

@@ -9,18 +9,19 @@
   align-items: center;
 }
 
-/* Trigger Button - Ghost style */
+/* Trigger Button */
 .opencodian-permission-trigger {
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
-  padding: 3px 5px;
+  padding: 3px 7px;
   border-radius: 8px;
   cursor: pointer;
   background: transparent;
-  border: 1px solid transparent;
-  transition: color 0.15s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
+  box-shadow: none;
+  transition: color 0.15s ease-out, opacity 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out;
   user-select: none;
   font-size: 13px;
   color: var(--text-muted);
@@ -28,32 +29,39 @@
 
 .opencodian-permission-trigger:hover {
   background: transparent;
+  border-color: color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted));
   color: var(--text-normal);
 }
 
 /* Mode-specific colors */
 .opencodian-permission-trigger.mode-yolo {
   color: var(--background-modifier-success);
+  border-color: color-mix(in srgb, var(--background-modifier-success) 26%, var(--background-modifier-border));
 }
 
 .opencodian-permission-trigger.mode-yolo:hover {
   background: transparent;
+  border-color: color-mix(in srgb, var(--background-modifier-success) 36%, var(--background-modifier-border));
 }
 
 .opencodian-permission-trigger.mode-normal {
   color: var(--interactive-accent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
 }
 
 .opencodian-permission-trigger.mode-normal:hover {
   background: transparent;
+  border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border));
 }
 
 .opencodian-permission-trigger.mode-plan {
   color: var(--background-modifier-error);
+  border-color: color-mix(in srgb, var(--background-modifier-error) 24%, var(--background-modifier-border));
 }
 
 .opencodian-permission-trigger.mode-plan:hover {
   background: transparent;
+  border-color: color-mix(in srgb, var(--background-modifier-error) 34%, var(--background-modifier-border));
 }
 
 .opencodian-permission-trigger-icon {
@@ -87,6 +95,44 @@
 .opencodian-permission-trigger-chevron svg {
   width: 10px;
   height: 10px;
+}
+
+.opencodian-permission-trigger:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 2px;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-permission-trigger {
+  padding: 3px 5px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 78%, var(--text-muted));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-permission-trigger:hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  filter: brightness(1.04) saturate(1.02);
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-permission-trigger.mode-yolo {
+  color: color-mix(in srgb, var(--background-modifier-success) 88%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-permission-trigger.mode-normal {
+  color: color-mix(in srgb, var(--interactive-accent) 88%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-permission-trigger.mode-plan {
+  color: color-mix(in srgb, var(--background-modifier-error) 88%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-permission-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 58%, transparent);
+  outline-offset: 3px;
 }
 
 /* Permission Dropdown - styled like model dropdown */
