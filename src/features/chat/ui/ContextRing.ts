@@ -21,7 +21,9 @@ export class ContextRing {
       attr: { type: 'button', 'data-tooltip-position': 'top' },
     });
 
-    const svgEl = this.buttonEl.createSvg('svg', {
+    const meterEl = this.buttonEl.createSpan({ cls: 'opencodian-context-ring-meter' });
+
+    const svgEl = meterEl.createSvg('svg', {
       cls: 'opencodian-context-ring-svg',
       attr: { viewBox: '0 0 36 36', 'aria-hidden': 'true' },
     });
@@ -38,7 +40,7 @@ export class ContextRing {
     this.progressEl.style.strokeDasharray = String(CIRCUMFERENCE);
     this.progressEl.style.strokeDashoffset = String(CIRCUMFERENCE);
 
-    this.labelEl = this.buttonEl.createSpan({ cls: 'opencodian-context-ring-label' });
+    this.labelEl = meterEl.createSpan({ cls: 'opencodian-context-ring-label' });
     this.srLabelEl = this.buttonEl.createSpan({ cls: 'opencodian-visually-hidden' });
     this.srLabelEl.id = `opencodian-context-ring-label-${ContextRing.tooltipLabelId++}`;
     this.buttonEl.setAttribute('aria-labelledby', this.srLabelEl.id);

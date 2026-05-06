@@ -13,25 +13,32 @@
   display: flex;
   align-items: center;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
-  padding: 3px 5px;
-  border: 1px solid transparent;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
   border-radius: 8px;
   cursor: pointer;
   background: color-mix(in srgb, var(--background-primary) 54%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
   transition:
     background-color 0.15s ease-out,
     border-color 0.15s ease-out,
+    box-shadow 0.15s ease-out,
     color 0.15s ease-out;
   user-select: none;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-normal);
 }
 
-.opencodian-agent-trigger:hover,
-.opencodian-agent-trigger.is-open {
+.opencodian-agent-trigger:hover {
   color: var(--text-normal);
   background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, var(--background-primary));
   border-color: color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted));
+}
+
+.opencodian-agent-trigger.is-open {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border));
 }
 
 .opencodian-agent-trigger.is-selected {
@@ -41,7 +48,6 @@
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-agent-trigger {
-  min-height: 30px;
   padding: 3px 5px;
   background: transparent;
   border-color: transparent;
@@ -93,14 +99,19 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  opacity: 0.78;
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.opencodian-agent-trigger:hover .opencodian-agent-trigger-icon,
+.opencodian-agent-trigger.is-open .opencodian-agent-trigger-icon {
+  opacity: 1;
 }
 
 .opencodian-agent-trigger-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-agent-trigger-icon svg {
@@ -129,15 +140,15 @@
 }
 
 .opencodian-agent-trigger-chevron svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 .opencodian-agent-trigger-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .opencodian-agent-dropdown {

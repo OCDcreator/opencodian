@@ -5,7 +5,7 @@
 
 ## 职责
 
-定义聊天输入工具栏里的主 Agent 下拉框样式。它覆盖 trigger icon/text/chevron、轻量列表标题、OpenCode default 选项、primary/all agent option、marker/main/meta 紧凑行布局、固定二级描述、loading/empty/error 状态，以及选中态的黄色强调。Trigger 跟随输入工具栏统一高度/间距 token，并跟随输入区 `actionButtonStyle`：默认保持独立按钮，`etched` 时融入 composer 面板。
+定义聊天输入工具栏里的主 Agent 下拉框样式。它覆盖 trigger icon/text/chevron、轻量列表标题、OpenCode default 选项、primary/all agent option、marker/main/meta 紧凑行布局、固定二级描述、loading/empty/error 状态，以及选中态的黄色强调。Trigger 跟随输入工具栏统一高度/间距 token，并在默认态对齐 model selector trigger 的容器几何、边框、背景和 inset highlight；`etched` 时融入 composer 面板。
 
 ## 关键类名
 
@@ -21,6 +21,7 @@
 
 ## 修改注意点
 
+- trigger 容器应向 model selector 看齐，保持一致的默认边框、内边距、hover/open 反馈和图标尺寸。
 - 下拉框与 model / permission selector 保持同一 popover 视觉语言。
 - trigger 选中态使用 `var(--text-warning)`，对齐 OpenCode 对 agent reference 的黄色/橙色语义。
 - `.opencodian-composer-shell--action-buttons-etched` 下的 trigger 复用刻入玻璃按钮语法：透明底、无独立边框、轻量 hover/focus，仅用文字/图标颜色表达 agent 选择。

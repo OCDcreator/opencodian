@@ -12,7 +12,7 @@ type CreateElOptions = {
   attr?: Record<string, string>;
 };
 
-function applyCreateElOptions<T extends HTMLElement>(element: T, options?: CreateElOptions): T {
+function applyCreateElOptions<T extends Element>(element: T, options?: CreateElOptions): T {
   if (!options) {
     return element;
   }
@@ -60,6 +60,23 @@ if (!('createSpan' in HTMLElement.prototype)) {
       return (this as HTMLElement & {
         createEl: (tag: string, options?: CreateElOptions) => HTMLSpanElement;
       }).createEl('span', options);
+    },
+  });
+}
+
+function createSvgElement(this: Element, tag: string, options?: CreateElOptions) {
+  const element = applyCreateElOptions(
+    document.createElementNS('http://www.w3.org/2000/svg', tag),
+    options as CreateElOptions | undefined,
+  );
+  this.appendChild(element);
+  return element;
+}
+
+if (!('createSvg' in Element.prototype)) {
+  Object.defineProperty(Element.prototype, 'createSvg', {
+    value(tag: string, options?: CreateElOptions) {
+      return createSvgElement.call(this, tag, options);
     },
   });
 }

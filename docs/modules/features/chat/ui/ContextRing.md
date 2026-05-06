@@ -5,7 +5,7 @@
 
 ## 概述
 
-SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以环形进度条 + 中心百分比标签 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现；当 session 正在做原生 compaction 时，ring 会切到 compacting 提示。视觉上它是工具栏里的 compact donut gauge，默认透明底，`action-buttons-etched` 时继续保持刻入式透明状态。
+SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以环形进度条 + 中心百分比读数 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现；当 session 正在做原生 compaction 时，ring 会切到 compacting 提示。视觉上它是工具栏里的 compact donut gauge，默认透明底，`action-buttons-etched` 时继续保持刻入式透明状态，不额外渲染 LOW / MEDIUM / HIGH 等可见状态文字。中心读数由样式层套用 bundled Oxanium 数字字体，避免继承 Obsidian 默认字体。
 
 ## 导入关系
 上游: `TabContextState`（来自 `core/types`）、`i18n`、`ContextUsageService`（来自 `features/chat/services/ContextUsageService`）
@@ -19,7 +19,7 @@ SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的�
 
 ### 环形进度条渲染
 
-使用 SVG `<circle>` 元素，`RADIUS=13.4`，`CIRCUMFERENCE = 2πR`。进度通过 `strokeDashoffset` 控制，offset = `CIRCUMFERENCE * (1 - percentage/100)`。CSS 使用较厚的 track / progress stroke 承载仪表重量，中心读数保持中性，不再引入内层 plate 或靶心式阴影。
+使用 SVG `<circle>` 元素，`RADIUS=13.4`，`CIRCUMFERENCE = 2πR`。进度通过 `strokeDashoffset` 控制，offset = `CIRCUMFERENCE * (1 - percentage/100)`。CSS 使用较厚的 track / progress stroke 承载仪表重量，中心读数保持中性；状态只通过环形进度色表达，不通过旁路文字标签表达。
 
 ### 色调状态切换
 
@@ -36,8 +36,8 @@ SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的�
 
 | 方法 | 说明 |
 |------|------|
-| `constructor(parentEl, onClick)` | 创建按钮容器、SVG 轨道/进度圆、标签元素，绑定 click 事件 |
-| `update(state)` | 根据 `TabContextState` 刷新进度偏移、色调类、标签文本、tooltip、无障碍文本 |
+| `constructor(parentEl, onClick)` | 创建按钮容器、meter 容器、SVG 轨道/进度圆、中心读数元素，绑定 click 事件 |
+| `update(state)` | 根据 `TabContextState` 刷新进度偏移、色调类、中心读数、tooltip、无障碍文本 |
 | `destroy()` | 从 DOM 移除按钮元素 |
 
 ## 数据流
@@ -47,7 +47,7 @@ TabContextState → ContextUsageService.summarize() → ContextRing.update()
                                                         ↓
                                               SVG strokeDashoffset
                                               CSS tone class
-                                              label / tooltip text
+                                              center value / tooltip text
 ```
 
 ## 与其他模块的交互

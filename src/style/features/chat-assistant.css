@@ -1952,6 +1952,15 @@
   margin-left: auto;
 }
 
+@font-face {
+  font-family: "OpenCodian Oxanium Numerals";
+  src: url("assets/fonts/oxanium/Oxanium%5Bwght%5D.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+002D, U+0030-0039, U+2026;
+}
+
 .opencodian-context-usage-slot {
   display: flex;
   align-items: center;
@@ -1981,6 +1990,9 @@
   outline: none;
   overflow: visible;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
   line-height: normal;
   transition:
@@ -2000,6 +2012,14 @@
   filter: brightness(1.04) saturate(1.04);
 }
 
+.opencodian-context-ring-meter {
+  position: relative;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  display: block;
+}
+
 .opencodian-context-ring-svg {
   position: absolute;
   inset: 2px;
@@ -2012,12 +2032,12 @@
 .opencodian-context-ring-track,
 .opencodian-context-ring-progress {
   fill: none;
-  stroke-width: 4.4;
+  stroke-width: 5.2;
   stroke-linecap: round;
 }
 
 .opencodian-context-ring-track {
-  stroke: color-mix(in srgb, var(--text-faint) 34%, transparent);
+  stroke: color-mix(in srgb, var(--text-faint) 38%, transparent);
 }
 
 .opencodian-context-ring-progress {
@@ -2032,22 +2052,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-family: "OpenCodian Oxanium Numerals", "Oxanium", var(--font-monospace), var(--font-interface), sans-serif;
+  font-size: 10.5px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   line-height: 34px;
   color: color-mix(in srgb, var(--text-normal) 88%, var(--text-muted));
 }
 
 .opencodian-context-ring.is-success {
-  color: #52e6dc;
+  color: #56e0dc;
 }
 
 .opencodian-context-ring.is-warning {
-  color: #f2c94c;
+  color: #ffd45c;
 }
 
 .opencodian-context-ring.is-danger {
-  color: #ff6170;
+  color: #ff6578;
 }
 
 .opencodian-context-ring.is-muted,
@@ -2056,15 +2079,15 @@
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-success {
-  color: #52e6dc;
+  color: #56e0dc;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-warning {
-  color: #f2c94c;
+  color: #ffd45c;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-danger {
-  color: #ff6170;
+  color: #ff6578;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-muted,
@@ -2073,7 +2096,7 @@
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-track {
-  stroke: color-mix(in srgb, currentColor 28%, transparent);
+  stroke: color-mix(in srgb, var(--text-faint) 42%, transparent);
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-label {

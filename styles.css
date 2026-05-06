@@ -1840,25 +1840,32 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: flex;
   align-items: center;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
-  padding: 3px 5px;
-  border: 1px solid transparent;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
   border-radius: 8px;
   cursor: pointer;
   background: color-mix(in srgb, var(--background-primary) 54%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
   transition:
     background-color 0.15s ease-out,
     border-color 0.15s ease-out,
+    box-shadow 0.15s ease-out,
     color 0.15s ease-out;
   user-select: none;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-normal);
 }
 
-.opencodian-agent-trigger:hover,
-.opencodian-agent-trigger.is-open {
+.opencodian-agent-trigger:hover {
   color: var(--text-normal);
   background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, var(--background-primary));
   border-color: color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted));
+}
+
+.opencodian-agent-trigger.is-open {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border));
 }
 
 .opencodian-agent-trigger.is-selected {
@@ -1868,7 +1875,6 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-agent-trigger {
-  min-height: 30px;
   padding: 3px 5px;
   background: transparent;
   border-color: transparent;
@@ -1920,14 +1926,19 @@ body[data-opencodian-provider-icon-mode="color"] {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  opacity: 0.78;
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.opencodian-agent-trigger:hover .opencodian-agent-trigger-icon,
+.opencodian-agent-trigger.is-open .opencodian-agent-trigger-icon {
+  opacity: 1;
 }
 
 .opencodian-agent-trigger-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-agent-trigger-icon svg {
@@ -1956,15 +1967,15 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-agent-trigger-chevron svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 .opencodian-agent-trigger-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .opencodian-agent-dropdown {
@@ -7939,6 +7950,15 @@ body[data-opencodian-provider-icon-mode="color"] {
   margin-left: auto;
 }
 
+@font-face {
+  font-family: "OpenCodian Oxanium Numerals";
+  src: url("assets/fonts/oxanium/Oxanium%5Bwght%5D.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+002D, U+0030-0039, U+2026;
+}
+
 .opencodian-context-usage-slot {
   display: flex;
   align-items: center;
@@ -7968,6 +7988,9 @@ body[data-opencodian-provider-icon-mode="color"] {
   outline: none;
   overflow: visible;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
   line-height: normal;
   transition:
@@ -7987,6 +8010,14 @@ body[data-opencodian-provider-icon-mode="color"] {
   filter: brightness(1.04) saturate(1.04);
 }
 
+.opencodian-context-ring-meter {
+  position: relative;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  display: block;
+}
+
 .opencodian-context-ring-svg {
   position: absolute;
   inset: 2px;
@@ -7999,12 +8030,12 @@ body[data-opencodian-provider-icon-mode="color"] {
 .opencodian-context-ring-track,
 .opencodian-context-ring-progress {
   fill: none;
-  stroke-width: 4.4;
+  stroke-width: 5.2;
   stroke-linecap: round;
 }
 
 .opencodian-context-ring-track {
-  stroke: color-mix(in srgb, var(--text-faint) 34%, transparent);
+  stroke: color-mix(in srgb, var(--text-faint) 38%, transparent);
 }
 
 .opencodian-context-ring-progress {
@@ -8019,22 +8050,25 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-family: "OpenCodian Oxanium Numerals", "Oxanium", var(--font-monospace), var(--font-interface), sans-serif;
+  font-size: 10.5px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   line-height: 34px;
   color: color-mix(in srgb, var(--text-normal) 88%, var(--text-muted));
 }
 
 .opencodian-context-ring.is-success {
-  color: #52e6dc;
+  color: #56e0dc;
 }
 
 .opencodian-context-ring.is-warning {
-  color: #f2c94c;
+  color: #ffd45c;
 }
 
 .opencodian-context-ring.is-danger {
-  color: #ff6170;
+  color: #ff6578;
 }
 
 .opencodian-context-ring.is-muted,
@@ -8043,15 +8077,15 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-success {
-  color: #52e6dc;
+  color: #56e0dc;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-warning {
-  color: #f2c94c;
+  color: #ffd45c;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-danger {
-  color: #ff6170;
+  color: #ff6578;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring.is-muted,
@@ -8060,7 +8094,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-track {
-  stroke: color-mix(in srgb, currentColor 28%, transparent);
+  stroke: color-mix(in srgb, var(--text-faint) 42%, transparent);
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-label {
