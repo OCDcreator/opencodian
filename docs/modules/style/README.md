@@ -27,7 +27,8 @@ src/style/
 │   ├── inline-permission.css             # 内联的权限请求卡片样式
 │   ├── config-status.css                 # 配置状态提示样式
 │   ├── navigation-sidebar.css            # 侧边栏导航样式
-│   └── effort-selector.css               # “努力程度”调节器样式
+│   ├── effort-selector.css               # “努力程度”调节器样式
+│   └── settings-dropdown.css             # 设置界面跨平台自绘下拉样式
 ├── modals/                                 # 各种弹窗、设置项覆盖面板的样式
 │   ├── provider-icon-cache.css           # 图标缓存管理与内置图标选择弹窗样式
 │   ├── delete-confirm-dialog.css         # 删除确认弹窗样式

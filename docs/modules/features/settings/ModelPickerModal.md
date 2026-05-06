@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ModelPickerModal` 是设置侧复用的模型选择弹层。它把模型列表按 provider 分组展示，支持 provider 下拉筛选、名称/ID 搜索、键盘上下选择、回车确认，以及一个可选的“空值”入口。
+`ModelPickerModal` 是设置侧复用的模型选择弹层。它把模型列表按 provider 分组展示，支持 provider 下拉筛选、名称/ID 搜索、键盘上下选择、回车确认，以及一个可选的“空值”入口。provider 筛选的原生 select 会交给 `SettingsDropdownControl` 渲染成跨平台一致的设置下拉。
 
 当前主要被两处消费：
 
@@ -19,6 +19,7 @@
 - 支持一个顶部的空值选项，例如“未配置”或“跟随当前会话模型”
 - 选中后通过回调把 `ModelPickerOption | null` 交回调用方，再由调用方决定写回哪个设置字段
 - 搜索框带常驻清空按钮和本地最近搜索历史，历史候选层使用插件自绘浮层，避免原生 `datalist` 在 Obsidian 滚动容器里出现定位漂移
+- provider 筛选继续以 select 保存状态和触发 change，但视觉菜单由 `SettingsDropdownControl` 接管，避免 macOS / Windows 原生菜单差异
 
 ## 关键输入
 

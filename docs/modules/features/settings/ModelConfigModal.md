@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目级 provider / model 可视化配置弹窗。它把当前 vault 的 `.opencode/opencode.json` 模型子集读入一个更贴近 `CC Switch` 的平铺单列表单：顶部标题栏 + provider 预设 / 切换 + 当前 provider 编辑面板 + 底部配置 JSON 预览，并把 provider/model 开关分别写回项目配置与插件设置。自当前 maintainability round 起，modal 本体进一步收敛成 shell：快照 / JSON draft 状态语义下沉到 `modelConfigModalState.ts`，保存规划与序列化规则下沉到 `modelConfigSavePlan.ts`，provider 表单与模型列表渲染则分别下沉到 `ModelConfigProviderEditor.ts` 与 `ModelConfigModelListEditor.ts`。
+项目级 provider / model 可视化配置弹窗。它把当前 vault 的 `.opencode/opencode.json` 模型子集读入一个更贴近 `CC Switch` 的平铺单列表单：顶部标题栏 + provider 预设 / 切换 + 当前 provider 编辑面板 + 底部配置 JSON 预览，并把 provider/model 开关分别写回项目配置与插件设置。自当前 maintainability round 起，modal 本体进一步收敛成 shell：快照 / JSON draft 状态语义下沉到 `modelConfigModalState.ts`，保存规划与序列化规则下沉到 `modelConfigSavePlan.ts`，provider 表单与模型列表渲染则分别下沉到 `ModelConfigProviderEditor.ts` 与 `ModelConfigModelListEditor.ts`。modal 每次 render 后还会用 `SettingsDropdownControl` 接管编辑表单中的 select，保持设置界面下拉视觉一致。
 
 ## 导入关系
 
@@ -75,6 +75,7 @@ interface ModelConfigModalOpenOptions {
 - model 级开关最终写回插件设置 `disabledModelRefs`
 - 图标缓存管理从独立工具入口扩展到当前 provider 上下文入口
 - 配置 JSON 预览、原始 JSON 编辑器入口与“保存后重启本地服务”固定展示在底部预览区
+- provider 表单里的接口格式等 select 仍由 `ModelConfigProviderEditor` 创建，modal shell 统一负责在 render 后扫描并增强，避免 editor owner 持有弹层级生命周期。
 
 可视化编辑器仍然暴露“接口格式”而不是原始 `npm` 包名；保存时会把已知格式映射回 `provider.npm`。如果本地配置里存在未识别的自定义包名，会落到兼容性的“自定义适配器”选项，避免用户仅仅打开再保存就把原值覆盖掉。
 

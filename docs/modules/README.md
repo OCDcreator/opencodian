@@ -233,6 +233,7 @@ docs/modules/
 │       ├── ProviderBuiltinIconPickerModal.md
 │       ├── ProviderIconCacheModal.md
 │       ├── searchInputEnhancer.md
+│       ├── SettingsDropdownControl.md
 │       ├── ServerSettingHelpModal.md
 │       ├── SettingsCommandsSection.md
 │       ├── SettingsModelCatalogCoordinator.md

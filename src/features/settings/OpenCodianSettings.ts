@@ -13,6 +13,10 @@ import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
+import {
+  enhanceSettingsDropdowns,
+  type SettingsDropdownsEnhancerHandle,
+} from './SettingsDropdownControl';
 import { SettingsFormatterSection } from './SettingsFormatterSection';
 import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
@@ -57,6 +61,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private securitySection: SettingsSecuritySection | null = null;
   private formatterSection: SettingsFormatterSection | null = null;
   private userSection: SettingsUserSection | null = null;
+  private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -171,6 +176,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   display(): void {
     const { containerEl } = this;
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
     this.disposeSections();
 
     const mode = this.plugin.settings.settingsLayoutMode;
@@ -179,6 +186,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     } else {
       this.renderClassicDisplay(containerEl);
     }
+    this.dropdownsEnhancer = enhanceSettingsDropdowns(containerEl);
   }
 
   private disposeSections(): void {
@@ -443,6 +451,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   hide(): void {
     this.sectionCoordinator.hide();
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
     if (this.modelRefreshFrameId !== null) {
       window.cancelAnimationFrame(this.modelRefreshFrameId);
       this.modelRefreshFrameId = null;

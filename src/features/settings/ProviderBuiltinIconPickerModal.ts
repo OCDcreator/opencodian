@@ -6,6 +6,10 @@ import type OpenCodianPlugin from '../../main';
 import type { BuiltinIconLibraryId } from '../../utils/icons';
 import { ProviderIconService } from '../../utils/icons';
 import { enhanceSearchInput, type SearchInputEnhancerHandle } from './searchInputEnhancer';
+import {
+  enhanceSettingsDropdowns,
+  type SettingsDropdownsEnhancerHandle,
+} from './SettingsDropdownControl';
 
 const LOBEHUB_ICON_VARIANT_OPTIONS: LobehubIconVariant[] = [
   'auto',
@@ -33,6 +37,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
   private gridEl: HTMLElement | null = null;
   private previewEl: HTMLElement | null = null;
   private searchEnhancer: SearchInputEnhancerHandle | null = null;
+  private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
   private readonly colorModeButtons = new Map<ProviderIconColorMode, HTMLButtonElement>();
   private query = '';
   private libraryFilter: '' | BuiltinIconLibraryId = '';
@@ -153,6 +158,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
 
     this.gridEl = this.contentEl.createDiv({ cls: 'opencodian-builtin-icon-picker-grid' });
     this.renderGrid();
+    this.dropdownsEnhancer = enhanceSettingsDropdowns(this.contentEl);
 
     window.setTimeout(() => {
       this.searchInputEl?.focus();
@@ -160,6 +166,8 @@ export class ProviderBuiltinIconPickerModal extends Modal {
   }
 
   onClose(): void {
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
     this.searchEnhancer?.commitCurrentValue();
     this.searchEnhancer?.destroy();
     this.searchEnhancer = null;

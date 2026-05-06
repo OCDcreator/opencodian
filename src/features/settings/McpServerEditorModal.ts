@@ -5,6 +5,10 @@ import type { OpencodeMcpEntryConfig } from '../../core/types';
 import { t } from '../../i18n';
 import { redactMcpSensitiveText } from './McpServerStatusModal';
 import {
+  enhanceSettingsDropdowns,
+  type SettingsDropdownsEnhancerHandle,
+} from './SettingsDropdownControl';
+import {
   type AddFormState,
   buildMcpConfigFromFormState,
   createDefaultMcpFormState,
@@ -28,6 +32,7 @@ export interface McpServerEditorModalOptions {
 export class McpServerEditorModal extends Modal {
   private formState: AddFormState;
   private submitButton: HTMLButtonElement | null = null;
+  private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
   private isSaving = false;
 
   constructor(
@@ -51,7 +56,15 @@ export class McpServerEditorModal extends Modal {
     this.renderForm();
   }
 
+  onClose(): void {
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
+    this.contentEl.empty();
+  }
+
   private renderForm(): void {
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
     this.contentEl.empty();
     this.submitButton = null;
 
@@ -121,6 +134,7 @@ export class McpServerEditorModal extends Modal {
       void this.handleSave();
     });
     this.updateSubmitButton();
+    this.dropdownsEnhancer = enhanceSettingsDropdowns(this.contentEl);
   }
 
   private createFormGroup(parent: HTMLElement, title: string): HTMLElement {

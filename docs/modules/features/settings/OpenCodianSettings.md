@@ -29,7 +29,7 @@
 - 通过 `SettingsStyleBackgroundSection` 协调 style owner 下的聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
 
-最近还把一组稳定的 panel chrome 逻辑（标题品牌、通用 block 壳层、inline-code 格式化、help button、语言选择器）抽到 companion 模块 `SettingsPanelChrome.ts`，让主设置页 owner 更聚焦于 section 装配与跨 owner bridge。
+最近还把一组稳定的 panel chrome 逻辑（标题品牌、通用 block 壳层、inline-code 格式化、help button、语言选择器）抽到 companion 模块 `SettingsPanelChrome.ts`，让主设置页 owner 更聚焦于 section 装配与跨 owner bridge。设置页原生下拉的视觉接管由 `SettingsDropdownControl.ts` 扫描当前 settings container 完成，主 owner 只负责 display / hide 生命周期里的挂载与销毁。
 
 ## 主要分区
 
@@ -192,6 +192,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `SettingsPanelChrome`: 管理 panel title 品牌渲染、通用 block shell、inline-code 格式化、help button 和语言选择器这类稳定展示壳层
+- `SettingsDropdownControl`: 管理设置页 `<select>` / `DropdownComponent` 的跨平台自绘视觉层，底层保存逻辑仍走原 select change 事件
 - `SettingsTabbedRenderer`: 标签模式下的标签栏渲染与内容路由，从 `OpenCodianSettings` 中提取以控制代码行数；用户标签内容通过单一 `renderUserContent` seam 委托给 user section owner
 - `SettingsUserSection`: 用户 profile/prompt/tags 设置的经典 section shell 与 tabbed content routing owner，从 `OpenCodianSettings` 中提取
 - `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数

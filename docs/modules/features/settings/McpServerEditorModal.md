@@ -5,7 +5,7 @@
 
 ## 概述
 
-`McpServerEditorModal` 是 MCP server add/edit 的共用 modal。它使用 `SettingsMcpAddForm` 的纯 helper 维护表单状态和 payload 构建，并通过 `McpConfigService` 写入项目 `.opencode/opencode.json`。
+`McpServerEditorModal` 是 MCP server add/edit 的共用 modal。它使用 `SettingsMcpAddForm` 的纯 helper 维护表单状态和 payload 构建，并通过 `McpConfigService` 写入项目 `.opencode/opencode.json`。表单里的 type / OAuth 下拉在每次 render 后由 `SettingsDropdownControl` 接管视觉层。
 
 ## 核心逻辑
 
@@ -31,3 +31,4 @@
 
 - Editor modal 是唯一允许用户查看/编辑 secret value 的 MCP UI；status modal 和 cards 必须 redacted 或摘要化。
 - 只暴露 approved spec 中列出的 local/remote 字段，不做完整 JSON editor。
+- `renderForm()` 会重建 modal 内容，因此必须先销毁旧 dropdown enhancer，再对新内容调用 `enhanceSettingsDropdowns()`。

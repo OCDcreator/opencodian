@@ -3,6 +3,10 @@ import { App, Modal, setIcon } from 'obsidian';
 import { t } from '../../i18n';
 import { filterModelPickerGroups, type ModelPickerGroup, type ModelPickerOption } from './modelPicker';
 import { enhanceSearchInput, type SearchInputEnhancerHandle } from './searchInputEnhancer';
+import {
+  enhanceSettingsDropdowns,
+  type SettingsDropdownsEnhancerHandle,
+} from './SettingsDropdownControl';
 
 interface ModelPickerModalOptions {
   title: string;
@@ -21,6 +25,7 @@ export class ModelPickerModal extends Modal {
   private providerFilter = '';
   private query = '';
   private searchEnhancer: SearchInputEnhancerHandle | null = null;
+  private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
 
   constructor(app: App, options: ModelPickerModalOptions) {
     super(app);
@@ -112,6 +117,7 @@ export class ModelPickerModal extends Modal {
 
     this.listEl = this.contentEl.createDiv({ cls: 'opencodian-model-picker-list' });
     this.renderList();
+    this.dropdownsEnhancer = enhanceSettingsDropdowns(this.contentEl);
 
     window.setTimeout(() => {
       this.searchInputEl?.focus();
@@ -119,6 +125,8 @@ export class ModelPickerModal extends Modal {
   }
 
   onClose(): void {
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
     this.searchEnhancer?.commitCurrentValue();
     this.searchEnhancer?.destroy();
     this.searchEnhancer = null;

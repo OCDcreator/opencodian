@@ -45,6 +45,10 @@ import {
   PROVIDER_PRESETS,
   type ProviderPreset,
 } from './providerPresets';
+import {
+  enhanceSettingsDropdowns,
+  type SettingsDropdownsEnhancerHandle,
+} from './SettingsDropdownControl';
 
 const logger = createLogger('ModelConfigModal');
 
@@ -70,6 +74,7 @@ export class ModelConfigModal extends Modal {
   private providerChecks = new Map<string, ProviderCheckState>();
   private fetchedModelCandidates = new Map<string, FetchedProviderModelCandidate[]>();
   private readonly providerEditor: ModelConfigProviderEditor;
+  private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
 
   constructor(
     app: App,
@@ -182,11 +187,15 @@ export class ModelConfigModal extends Modal {
   }
 
   onClose(): void {
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
     this.contentEl.empty();
   }
 
   private render(): void {
     const { contentEl } = this;
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
     contentEl.empty();
 
     const service = this.plugin.modelConfigService;
@@ -252,6 +261,7 @@ export class ModelConfigModal extends Modal {
       saveButton.setText(t('settings.model.visualEditor.save'));
     }
     saveButton.addEventListener('click', () => void this.save());
+    this.dropdownsEnhancer = enhanceSettingsDropdowns(contentEl);
   }
 
   private renderPresetPicker(containerEl: HTMLElement): void {

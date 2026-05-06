@@ -9,6 +9,7 @@
 @import 'components/config-status.css';
 @import 'components/navigation-sidebar.css';
 @import 'components/effort-selector.css';
+@import 'components/settings-dropdown.css';
 @import 'features/chat-user.css';
 @import 'features/chat-assistant.css';
 @import 'modals/delete-confirm-dialog.css';
