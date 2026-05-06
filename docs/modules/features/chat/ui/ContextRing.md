@@ -5,7 +5,7 @@
 
 ## 概述
 
-SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以中心百分比读数 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现；默认 `classic` 样式使用环形进度条，`segmented` 样式使用同一 SVG 内的 44 个留有间隔的较长刻度线段模拟参考图里的刻度圆环。当 session 正在做原生 compaction 时，ring 会切到 compacting 提示。视觉上它是工具栏里的 compact donut gauge，默认透明底，`action-buttons-etched` 时继续保持刻入式透明状态，不额外渲染 LOW / MEDIUM / HIGH 等可见状态文字。中心读数由样式层套用 bundled Oxanium 数字字体，避免继承 Obsidian 默认字体。
+SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的上下文窗口使用率。通过 `ContextUsageService.summarize()` 获取用量摘要，以中心数字读数 + CSS 色调状态（success / warning / danger / muted / unavailable）呈现；默认 `classic` 样式使用环形进度条，`segmented` 样式使用同一 SVG 内的 24 个留有间隔的长刻度线段模拟参考图里的刻度圆环。当 session 正在做原生 compaction 时，ring 会切到 compacting 提示。视觉上它是工具栏里的 compact donut gauge，默认透明底，`action-buttons-etched` 时继续保持刻入式透明状态，不额外渲染 LOW / MEDIUM / HIGH 等可见状态文字。中心读数由样式层套用 bundled Oxanium 数字字体，避免继承 Obsidian 默认字体。
 
 ## 导入关系
 上游: `TabContextState`（来自 `core/types`）、`i18n`、`ContextUsageService`（来自 `features/chat/services/ContextUsageService`）
@@ -19,7 +19,7 @@ SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的�
 
 ### 环形进度条渲染
 
-`classic` 使用 SVG `<circle>` 元素，`RADIUS=13.4`，`CIRCUMFERENCE = 2πR`。进度通过 `strokeDashoffset` 控制，offset = `CIRCUMFERENCE * (1 - percentage/100)`。`segmented` 预生成 44 个 `<line>` 刻度，`update()` 根据百分比为前 N 个刻度添加 `is-active`，CSS 负责显示刻度轨道和状态色。两种样式都保持中心读数，不通过旁路文字标签表达状态。
+`classic` 使用 SVG `<circle>` 元素，`RADIUS=13.4`，`CIRCUMFERENCE = 2πR`。进度通过 `strokeDashoffset` 控制，offset = `CIRCUMFERENCE * (1 - percentage/100)`。`segmented` 预生成 24 个 `<line>` 刻度，`update()` 根据百分比为前 N 个刻度添加 `is-active`，CSS 负责显示刻度轨道和状态色。两种样式都保持中心读数，不通过旁路文字标签表达状态。
 
 ### 色调状态切换
 

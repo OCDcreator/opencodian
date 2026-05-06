@@ -4,9 +4,9 @@ import { ContextUsageService } from '../services/ContextUsageService';
 
 const RADIUS = 13.4;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-const SEGMENT_COUNT = 44;
-const SEGMENT_INNER_RADIUS = 11.7;
-const SEGMENT_OUTER_RADIUS = 15.0;
+const SEGMENT_COUNT = 24;
+const SEGMENT_INNER_RADIUS = 10.0;
+const SEGMENT_OUTER_RADIUS = 15.2;
 
 export class ContextRing {
   private static tooltipLabelId = 0;

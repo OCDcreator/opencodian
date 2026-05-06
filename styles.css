@@ -8280,12 +8280,6 @@ body[data-opencodian-provider-icon-mode="color"] {
   color: color-mix(in srgb, var(--text-normal) 88%, var(--text-muted));
 }
 
-.opencodian-container[data-opencodian-context-ring-style="segmented"] .opencodian-context-ring:not(.is-unavailable, .is-compacting) .opencodian-context-ring-label::after {
-  content: "%";
-  font-size: 0.78em;
-  margin-left: 1px;
-}
-
 .opencodian-context-ring.is-success {
   color: #56e0dc;
 }

@@ -49,8 +49,8 @@ describe('ContextRing', () => {
 
     ring.update(buildState(50));
 
-    expect(parentEl.querySelectorAll('.opencodian-context-ring-tick')).toHaveLength(44);
-    expect(parentEl.querySelectorAll('.opencodian-context-ring-tick.is-active')).toHaveLength(22);
+    expect(parentEl.querySelectorAll('.opencodian-context-ring-tick')).toHaveLength(24);
+    expect(parentEl.querySelectorAll('.opencodian-context-ring-tick.is-active')).toHaveLength(12);
 
     ring.destroy();
   });
