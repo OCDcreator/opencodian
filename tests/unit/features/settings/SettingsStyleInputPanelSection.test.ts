@@ -161,6 +161,35 @@ describe('SettingsStyleInputPanelSection', () => {
     expect(plugin.settings.inputPanelTheme).toBe('glass-refraction-card');
   });
 
+  it('adds the context ring style dropdown and applies segmented style changes', async () => {
+    const applyAndScheduleStyleUpdate = jest.fn();
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+      updateChatAppearance: jest.fn((mutator) => {
+        mutator(plugin.settings.chatAppearance);
+      }),
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+    } as unknown as ConstructorParameters<typeof SettingsStyleInputPanelSection>[0]['plugin'];
+    const inputPanelSection = createInputPanelSection(plugin, {
+      applyAndScheduleStyleUpdate,
+    });
+
+    inputPanelSection.attach(document.createElement('div'));
+
+    const contextRingDropdown = dropdownRecords.find((record) => record.name === '上下文圆环样式');
+    expect(contextRingDropdown).toBeDefined();
+    expect(contextRingDropdown?.control.addOption).toHaveBeenCalledWith('classic', '经典圆环');
+    expect(contextRingDropdown?.control.addOption).toHaveBeenCalledWith('segmented', '刻度圆环');
+
+    await contextRingDropdown?.control.onChange.mock.calls[0]?.[0]('segmented');
+
+    expect(plugin.settings.chatAppearance.input.contextRingStyle).toBe('segmented');
+    expect(applyAndScheduleStyleUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it('skips stale input rerenders after the owner is disposed', async () => {
     const saveDeferred = createDeferred<void>();
     const plugin = {

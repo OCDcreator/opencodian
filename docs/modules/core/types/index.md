@@ -61,6 +61,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `TabBarPosition` / `BelowHeaderTabBarLayout` | type | 标签栏配置 |
 | `ChatScrollMode` | type | 滚动模式 |
 | `InputPanelThemeId` / `LiquidGlassAdapterId` | type | 输入面板主题 |
+| `ContextRingStyleId` | type | 上下文圆环样式 |
 | `ChatAppearanceSettings` | type | 聊天外观设置 |
 | `ThemeSettings` / `ThemePresetId` / `ThemeStyleId` | type | 主题设置 |
 | `PersistedTabState` / `PersistedTabEntry` | type | 标签页持久化 |

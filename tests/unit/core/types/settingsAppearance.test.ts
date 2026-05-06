@@ -130,6 +130,7 @@ describe('chat appearance settings', () => {
     expect(normalized.input.backgroundOpacity).toBe(64);
     expect(normalized.input.blur).toBe(18);
     expect(normalized.input.actionButtonStyle).toBe('default');
+    expect(normalized.input.contextRingStyle).toBe('classic');
     expect(normalized.scrollbar.width).toBe(10);
     expect(normalized.scrollbar.thumbOpacity).toBe(80);
     expect(normalized.scrollbar.trackOpacity).toBe(22);
@@ -140,10 +141,12 @@ describe('chat appearance settings', () => {
     const normalized = normalizeChatAppearanceSettings({
       input: {
         actionButtonStyle: 'embedded' as never,
+        contextRingStyle: 'dashed' as never,
       },
     });
 
     expect(normalized.input.actionButtonStyle).toBe('default');
+    expect(normalized.input.contextRingStyle).toBe('classic');
   });
 
   it('normalizes assistant metadata appearance settings', () => {

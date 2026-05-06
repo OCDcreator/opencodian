@@ -29,6 +29,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 2026-04-26 navigation reorg added `settings.mcp.title`, `settings.mcp.tab.overview`, and `settings.quickNav.mcpDesc`, because MCP has been promoted to its own primary settings tab and classic quick-nav entry. `settings.server.tab.*` now only describes the remaining server secondary tabs (connection/auth/status).
 
+本轮新增 `settings.style.input.contextRing.*` 键，为输入区样式设置里的上下文圆环样式下拉框提供英文标签、描述和 `Classic ring` / `Segmented ring` 两个选项。
+
 源码约 2050 行。
 
 ## 导入关系

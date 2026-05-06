@@ -51,6 +51,19 @@ describe('ChatSurfaceAppearanceCoordinator', () => {
       expect(containerEl.style.getPropertyValue('--opencodian-messages-pad-top')).toBe('12px');
     });
 
+    it('applies the context ring style data attribute to the chat container', () => {
+      const settings = getDefaultChatAppearanceSettings();
+      settings.input.contextRingStyle = 'segmented';
+      const host = createHost({
+        getChatAppearanceSettings: jest.fn().mockReturnValue(settings),
+      });
+      const coordinator = new ChatSurfaceAppearanceCoordinator(host);
+
+      coordinator.syncAppearanceState();
+
+      expect(host.getChatContainerEl().dataset.opencodianContextRingStyle).toBe('segmented');
+    });
+
     it('applies theme preset class and CSS variables when preset is active', () => {
       const host = createHost({
         getActiveThemePresetId: jest.fn().mockReturnValue('dark'),

@@ -42,4 +42,16 @@ describe('ContextRing', () => {
 
     ring.destroy();
   });
+
+  it('marks segmented ticks active from the current percentage', () => {
+    const parentEl = document.createElement('div');
+    const ring = new ContextRing(parentEl, jest.fn());
+
+    ring.update(buildState(50));
+
+    expect(parentEl.querySelectorAll('.opencodian-context-ring-tick')).toHaveLength(44);
+    expect(parentEl.querySelectorAll('.opencodian-context-ring-tick.is-active')).toHaveLength(22);
+
+    ring.destroy();
+  });
 });

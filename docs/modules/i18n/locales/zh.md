@@ -29,6 +29,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 2026-04-26 的导航重组又新增了 `settings.mcp.title`、`settings.mcp.tab.overview` 和 `settings.quickNav.mcpDesc`，因为 MCP 已提升为独立一级设置页，并在 classic 布局的 quick-nav 中单独露出。`settings.server.tab.*` 现在只描述剩余的服务器二级标签（连接 / 认证 / 状态）。
 
+本轮新增 `settings.style.input.contextRing.*` 键，为输入区样式设置里的上下文圆环样式下拉框提供中文标签、描述和“经典圆环 / 刻度圆环”两个选项。
+
 源码约 2050 行。
 
 ## 导入关系

@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsStyleInputPanelSection` 是 `SettingsStyleSection` 下的 input-panel 子区块 owner。它负责 input theme family/variant dropdown、input radius 与 preset/glass-refraction 参数区、局部 rerender guard，以及 input-theme 保存后的 subsection 重建。
+`SettingsStyleInputPanelSection` 是 `SettingsStyleSection` 下的 input-panel 子区块 owner。它负责 input theme family/variant dropdown、操作按钮样式、上下文圆环样式、input radius 与 preset/glass-refraction 参数区、局部 rerender guard，以及 input-theme 保存后的 subsection 重建。
 
 这个 owner 的目标是把 input appearance lifecycle 从 style section 主 owner 里抽成一块相邻厚 seam，同时继续保留“只重绘 input subsection、不重建整页 settings”的行为。
 
@@ -26,6 +26,7 @@
 ### 参数区拆分
 
 - preset input 参数继续复用来自 `settingsStyleControls.ts` 的 `addNumericStyleControl()` seam，保持 baseline/reset 语义一致
+- `contextRingStyle` 作为 `chatAppearance.input` 的普通外观字段保存；切换时只调用 `plugin.updateChatAppearance()` + style apply/save，不触发 input subsection 重绘
 - glass refraction 参数与 SVG filter reset 仍在本 owner 内处理，因为它们与 theme-family 切换耦合
 - liquid glass 参数列表委托给 `SettingsStyleLiquidGlassInputControls`
 

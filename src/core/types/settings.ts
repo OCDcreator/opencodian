@@ -97,6 +97,9 @@ export type InputPanelThemeId =
 /** Composer action button style */
 export type InputPanelActionButtonStyleId = 'default' | 'etched';
 
+/** Context usage ring visual style */
+export type ContextRingStyleId = 'classic' | 'segmented';
+
 export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin' | 'shudingDiamond';
 export type InputPanelThemeFamily = 'preset' | 'glass-refraction' | 'liquid-glass';
 export type GlassRefractionInputPanelThemeId = Exclude<
@@ -285,6 +288,16 @@ export function normalizeInputPanelActionButtonStyleId(value: unknown): InputPan
       return value;
     default:
       return 'default';
+  }
+}
+
+export function normalizeContextRingStyleId(value: unknown): ContextRingStyleId {
+  switch (value) {
+    case 'segmented':
+    case 'classic':
+      return value;
+    default:
+      return 'classic';
   }
 }
 
@@ -689,6 +702,7 @@ export interface ChatAppearanceInputSettings {
   blur: number;
   shadowBlur: number;
   actionButtonStyle: InputPanelActionButtonStyleId;
+  contextRingStyle: ContextRingStyleId;
 }
 
 export type InputPanelGlassRefractionVariantId = 'glass' | 'card' | 'pill';
@@ -846,6 +860,7 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       blur: 18,
       shadowBlur: 28,
       actionButtonStyle: 'default',
+      contextRingStyle: 'classic',
     },
     scrollbar: {
       width: 8,
@@ -1483,6 +1498,7 @@ function normalizeChatAppearanceInputSettings(
     ...defaults,
     ...(input ?? {}),
     actionButtonStyle: normalizeInputPanelActionButtonStyleId(input?.actionButtonStyle),
+    contextRingStyle: normalizeContextRingStyleId(input?.contextRingStyle),
   };
 }
 

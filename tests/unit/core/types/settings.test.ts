@@ -18,6 +18,7 @@ import {
   normalizeBelowHeaderTabBarLayout,
   normalizeChatFontSizePx,
   normalizeCompactionReservedTokens,
+  normalizeContextRingStyleId,
   normalizeDisabledModelRefs,
   normalizeGlassRefractionInputPanelThemeId,
   normalizeInputPanelActionButtonStyleId,
@@ -484,6 +485,15 @@ import {
       expect(normalizeInputPanelActionButtonStyleId('etched')).toBe('etched');
       expect(normalizeInputPanelActionButtonStyleId('embedded')).toBe('default');
       expect(normalizeInputPanelActionButtonStyleId(undefined)).toBe('default');
+    });
+  });
+
+  describe('context ring style normalization', () => {
+    it('accepts supported styles and normalizes invalid values to default', () => {
+      expect(normalizeContextRingStyleId('classic')).toBe('classic');
+      expect(normalizeContextRingStyleId('segmented')).toBe('segmented');
+      expect(normalizeContextRingStyleId('dashed')).toBe('classic');
+      expect(normalizeContextRingStyleId(undefined)).toBe('classic');
     });
   });
 

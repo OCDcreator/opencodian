@@ -3,7 +3,7 @@ import {
   THEME_PRESET_CSS_VARIABLE_NAMES,
   THEME_STYLE_CONTAINER_CLASSES,
 } from '../../../core/theme';
-import type { ChatAppearanceSettings } from '../../../core/types';
+import { type ChatAppearanceSettings,normalizeContextRingStyleId } from '../../../core/types';
 import type { ThemePresetId } from '../../../core/types/settings';
 import {
   buildChatAppearanceCustomCss,
@@ -55,6 +55,9 @@ export class ChatSurfaceAppearanceCoordinator {
     for (const [cssVar, cssValue] of Object.entries(cssVariables)) {
       chatContainerEl.style.setProperty(cssVar, cssValue);
     }
+    chatContainerEl.dataset.opencodianContextRingStyle = normalizeContextRingStyleId(
+      this.host.getChatAppearanceSettings().input.contextRingStyle,
+    );
 
     this.host.applyConversationVisualState();
 

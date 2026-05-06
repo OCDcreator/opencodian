@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import {
+  type ContextRingStyleId,
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
   getInputPanelGlassRefractionVariantId,
@@ -151,6 +152,26 @@ export class SettingsStyleInputPanelSection {
           .onChange((value) => {
             this.plugin.updateChatAppearance((appearance) => {
               appearance.input.actionButtonStyle = value as InputPanelActionButtonStyleId;
+            });
+            this.applyAndScheduleStyleUpdate();
+          });
+      });
+
+    new Setting(inputGroupEl)
+      .setName(t('settings.style.input.contextRing.name'))
+      .setDesc(t('settings.style.input.contextRing.desc'))
+      .addDropdown((dropdown) => {
+        const syncFromSettings = () => {
+          dropdown.setValue(this.plugin.settings.chatAppearance.input.contextRingStyle);
+        };
+        this.registerStyleControlBinding('input', syncFromSettings);
+        dropdown
+          .addOption('classic', t('settings.style.input.contextRing.option.classic'))
+          .addOption('segmented', t('settings.style.input.contextRing.option.segmented'))
+          .setValue(this.plugin.settings.chatAppearance.input.contextRingStyle)
+          .onChange((value) => {
+            this.plugin.updateChatAppearance((appearance) => {
+              appearance.input.contextRingStyle = value as ContextRingStyleId;
             });
             this.applyAndScheduleStyleUpdate();
           });

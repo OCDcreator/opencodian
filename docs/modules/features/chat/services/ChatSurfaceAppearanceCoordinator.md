@@ -11,6 +11,7 @@
 - 聊天外观 CSS 变量注入
 - 主题背景图异步加载
 - 自定义 CSS `<style>` 元素生命周期
+- 上下文圆环样式的 chat-container data attribute
 - 滚动模式类切换
 - 粘性遮罩颜色同步（含 rAF/timeout 调度）
 
@@ -60,6 +61,7 @@ OpenCodianView.applyChatAppearanceSettings()
   → ChatSurfaceAppearanceCoordinator.syncAppearanceState()
     → 主题预设类/CSS 变量
     → 聊天外观 CSS 变量 (chatAppearance.ts)
+    → 上下文圆环样式 data attribute
     → 对话视觉状态 (ConversationSessionSettingsCoordinator)
     → 主题背景图异步加载
     → 自定义 CSS style 元素生命周期
@@ -69,6 +71,7 @@ OpenCodianView.applyChatAppearanceSettings()
 ## 注意事项
 
 - `SESSION_TREE_BASE_CSS` 始终包含在自定义 CSS 中，因此 style 元素通常不会为空
+- `data-opencodian-context-ring-style` 挂在 chat container 上，而不是 `OpenCodianView` 或全局 body 上；这样圆环样式仍属于 chat appearance owner 管辖
 - 主题背景图加载是异步的，使用 `themeBackgroundRequestId` 进行请求去重
 - 表面颜色同步使用双 rAF 模式确保布局已稳定，再辅以 timeout 兜底
 - 该协调器不直接操作 `tabMessagesPaneCoordinator` 的滚动模式；`OpenCodianView.applyChatScrollMode()` 先检查 pane coordinator，再回退到本协调器
