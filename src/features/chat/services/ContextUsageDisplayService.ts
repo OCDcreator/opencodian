@@ -52,7 +52,7 @@ export class ContextUsageDisplayService {
       ? 'warning'
       : percentage >= 85
         ? 'danger'
-        : percentage >= 60
+        : percentage >= 50
           ? 'warning'
           : 'success';
 

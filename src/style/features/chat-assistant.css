@@ -2087,18 +2087,23 @@
   color: color-mix(in srgb, var(--text-normal) 88%, var(--text-muted));
 }
 
+.opencodian-input-toolbar button.opencodian-context-ring.is-success,
 .opencodian-context-ring.is-success {
   color: #56e0dc;
 }
 
+.opencodian-input-toolbar button.opencodian-context-ring.is-warning,
 .opencodian-context-ring.is-warning {
   color: #ffd45c;
 }
 
+.opencodian-input-toolbar button.opencodian-context-ring.is-danger,
 .opencodian-context-ring.is-danger {
   color: #ff6578;
 }
 
+.opencodian-input-toolbar button.opencodian-context-ring.is-muted,
+.opencodian-input-toolbar button.opencodian-context-ring.is-unavailable,
 .opencodian-context-ring.is-muted,
 .opencodian-context-ring.is-unavailable {
   color: var(--text-faint);
