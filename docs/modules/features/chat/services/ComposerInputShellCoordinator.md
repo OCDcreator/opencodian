@@ -11,7 +11,7 @@
 
 - 创建 input tab bar slot、composer shell、context row、textarea、footer、toolbar slots，以及挂在 composer shell 上方的 slash menu overlay
 - 绑定 textarea Enter 提交、Shift+Enter 换行，以及 textarea 高度同步
-- 维护 `opencodian-input-highlight-backdrop`：一个位于 textarea 后方的镜像 div，将已追踪的 `@agent` 提及渲染为带样式的 `<span>`，textarea 文本设为透明（`color: transparent`），仅保留 caret 可见，实现输入框内的 @agent 富文本高亮而不影响原生复制行为
+- 维护 `opencodian-input-highlight-backdrop`：一个位于 textarea 后方的镜像 div，将已追踪的 `@agent` 提及和已知 slash item 渲染为带样式的 `<span>`，textarea 文本设为透明（`color: transparent`），仅保留 caret 可见，实现输入框内的富文本高亮而不影响原生复制行为
 - 在输入以 `/` 开头且光标仍停留在第一个 command token 内时，显示 slash autocomplete menu；`/skills <query>` 是允许继续显示 nested skill suggestions 的特殊前缀；加载中、无命令、无匹配或加载失败时保持可见状态提示，避免静默消失
 - 在 prompt mode 下把 `@agent` 查询交给 `AgentMentionComposerController`，选中后保留可见 `@name` 文本，并在 submit 时附加 `SurfaceInvocationIntent.mentions`
 - 在 toolbar slot 内挂载 `ChatAgentSelectionCoordinator`，提供 OpenCode default / primary agent 下拉框；提交 prompt 时把该 composer 级选择附加为 `SurfaceInvocationIntent.primaryAgent`，选中后把焦点还给 textarea
@@ -62,7 +62,7 @@ export class ComposerInputShellCoordinator {
 
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam；textarea 被 `opencodian-input-highlight-container` 包裹，内含 `opencodian-input-highlight-backdrop` 和 textarea 两个同级元素
 - `build()` 设置 textarea 的 scroll 事件监听器，同步 backdrop 的 scrollTop 以保持滚动一致
-- `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionIntents()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`/command` 段（行首或空白后均可匹配，支持多个 /command 共存）包裹在 `opencodian-input-highlight-command` span 内；`/skill` 和 `/skills` 会连带其后的 skill name 一起高亮，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内
+- `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionIntents()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内；slash 高亮则先依赖已加载的 `slashCommandMenuCatalogItems` 做精确判定，只把 catalog 中真实存在的 `/command`、direct `/skill`，以及 prefixed mode 下存在的 `/skills skill-name` 包裹为 `opencodian-input-highlight-command`。拼错的 `/using-superpowert` 这类未知 token 不会上色
 - `syncTextareaHeight()` 在调整 textarea 高度的同时同步 backdrop 高度
 - `buildComposerInputSubmission()` 继续从本模块 re-export，但实现已下沉到 `composerInputParsing.ts`；它会把当前 textarea 文本归一化成结构化 submission：普通文本 -> `prompt`、`/command ...` -> `command`、shell mode -> `shell`
 - slash menu 作为 `opencodian-composer-shell` 的 overlay 子节点挂载，用 CSS `bottom: calc(100% + 8px)` 显示在输入框上方，而不是插入 textarea/footer 的内部内容流
@@ -70,6 +70,7 @@ export class ComposerInputShellCoordinator {
 - `applyLocaleTexts()` 刷新 placeholder、add-context tooltip 和 send/stop tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
 - `refreshSlashCommandMenu()` 只在 slash trigger session 首次打开时向 host 拉取 merged visible menu items，后续同一次 `/...` 输入通过 `slashCommandMenuFilter.ts` 本地过滤，避免每次按键都重拉 runtime/project catalog
+- slash catalog 首次异步加载完成后，coordinator 会重新执行一次 backdrop 高亮同步，这样输入中的已知 slash item 能在 catalog 到位后立即着色，而未知 token 会自动退回普通文本
 - `refreshSlashCommandMenu()` 会把 `getSlashCommandSkillMode()` 传给过滤 helper；direct mode 直接展示 skill，prefixed mode 则顶层展示 `/skills` 并在 `/skills <query>` 下展示 nested skill suggestions
 - 若 runtime/project catalog 返回空、过滤后无结果或加载失败，`refreshSlashCommandMenu()` 会渲染非交互式状态行；失败细节只进入 debug log，避免普通输入 `/` 时刷警告
 - `tryHandleSlashCommandMenuKeydown()` 在 menu 打开时拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`

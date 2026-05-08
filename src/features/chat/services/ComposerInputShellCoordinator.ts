@@ -21,6 +21,7 @@ import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
 import { renderSlashCommandMenu, type SlashCommandMenuStatus } from './slashCommandMenuRenderer';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
+const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)/g;
 
 const logger = createLogger('ComposerInputShellCoordinator');
 
@@ -521,6 +522,7 @@ export class ComposerInputShellCoordinator {
       this.slashCommandMenuStatus = this.visibleSlashCommandMenuItems.length > 0
         ? 'idle'
         : this.getEmptySlashCommandMenuStatus(items);
+      this.syncHighlightBackdrop();
       this.renderSlashCommandMenu();
     } catch (error) {
       if (currentRunId !== this.slashCommandMenuRunId) {
@@ -532,17 +534,21 @@ export class ComposerInputShellCoordinator {
       this.visibleSlashCommandMenuItems = [];
       this.selectedSlashCommandMenuItemIndex = 0;
       this.slashCommandMenuStatus = 'loadFailed';
+      this.syncHighlightBackdrop();
       this.renderSlashCommandMenu();
     }
   }
 
-  private clearSlashCommandMenu(): void {
+  private clearSlashCommandMenu(options: { resetCatalog?: boolean } = {}): void {
     this.slashCommandMenuRunId += 1;
-    this.slashCommandMenuCatalogItems = null;
+    if (options.resetCatalog) {
+      this.slashCommandMenuCatalogItems = null;
+    }
     this.visibleSlashCommandMenuItems = [];
     this.selectedSlashCommandMenuItemIndex = 0;
     this.slashCommandMenuStatus = 'idle';
     this.slashCommandMenuQuery = null;
+    this.syncHighlightBackdrop();
     this.renderSlashCommandMenu();
   }
 
@@ -618,16 +624,10 @@ export class ComposerInputShellCoordinator {
     // Collect all highlight spans
     const spans: Array<{ start: number; end: number; cls: string; style: string }> = [];
 
-    // Slash command highlights — match all /command tokens, including mid-text.
-    // For /skill and /skills, also capture the following skill name.
-    const slashRegex = /(^|\s)(\/(?:skill|skills)(?:\s+\S+)?|\/\S+)/g;
-    let slashMatch: RegExpExecArray | null;
-    while ((slashMatch = slashRegex.exec(content)) !== null) {
-      const start = slashMatch.index + slashMatch[1].length;
-      const end = start + slashMatch[2].length;
+    for (const slashMatch of this.extractKnownSlashHighlightMatches(content)) {
       spans.push({
-        start,
-        end,
+        start: slashMatch.start,
+        end: slashMatch.end,
         cls: 'opencodian-input-highlight-command',
         style: 'color:#7b6ef6;background:rgba(123,110,246,0.22);border-radius:4px;box-shadow:0 0 0 1px rgba(123,110,246,0.4);',
       });
@@ -668,6 +668,53 @@ export class ComposerInputShellCoordinator {
 
     backdrop.innerHTML = html;
     backdrop.scrollTop = textarea.scrollTop;
+  }
+
+  private extractKnownSlashHighlightMatches(content: string): Array<{ start: number; end: number }> {
+    if (!content || !this.slashCommandMenuCatalogItems || this.slashCommandMenuCatalogItems.length === 0) {
+      return [];
+    }
+
+    const matches: Array<{ start: number; end: number }> = [];
+    let slashMatch: RegExpExecArray | null;
+    while ((slashMatch = INPUT_HIGHLIGHT_SLASH_REGEX.exec(content)) !== null) {
+      const token = slashMatch[2];
+      if (!token || !this.isKnownSlashHighlightToken(token)) {
+        continue;
+      }
+
+      const start = slashMatch.index + slashMatch[1].length;
+      const end = start + token.length;
+      matches.push({ start, end });
+    }
+
+    return matches;
+  }
+
+  private isKnownSlashHighlightToken(token: string): boolean {
+    if (!this.slashCommandMenuCatalogItems || !token.startsWith('/')) {
+      return false;
+    }
+
+    const skillMode = this.host.getSlashCommandSkillMode();
+    if (/^\/skills(?:\s|$)/i.test(token)) {
+      if (skillMode !== 'skills-command') {
+        return false;
+      }
+
+      const trimmed = token.trim();
+      if (trimmed === '/skills') {
+        return this.slashCommandMenuCatalogItems.some((item) => item.source === 'skill');
+      }
+
+      const skillName = trimmed.slice('/skills '.length).trim();
+      return skillName.length > 0
+        && this.slashCommandMenuCatalogItems.some((item) => item.source === 'skill' && item.id === skillName);
+    }
+
+    const commandId = token.slice(1);
+    return commandId.length > 0
+      && this.slashCommandMenuCatalogItems.some((item) => item.id === commandId);
   }
 
   private syncHighlightBackdropScroll(): void {

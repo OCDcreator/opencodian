@@ -84,6 +84,13 @@ function getRenderedMenuText(container: HTMLElement): Array<string | null> {
   );
 }
 
+function getRenderedHighlightText(container: HTMLElement): string[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>('.opencodian-input-highlight-command'),
+    (item) => item.textContent ?? '',
+  );
+}
+
 describe('ComposerInputShellCoordinator skill slash modes', () => {
   beforeEach(() => {
     setLocale('en');
@@ -120,6 +127,51 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
       expect.stringContaining('/build-mcp-server'),
     ]);
     expect(menuText[1]).toContain('skill');
+  });
+
+  it('only highlights direct slash skills that exist in the loaded catalog', async () => {
+    const fixture = createFixture();
+    fixture.setMenuItems([
+      slashItem('using-superpowers', 'Use the superpowers workflow', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/using-superpowers';
+    fixture.textarea.setSelectionRange('/using-superpowers'.length, '/using-superpowers'.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedHighlightText(fixture.container)).toEqual(['/using-superpowers']);
+
+    fixture.textarea.value = '/using-superpowert';
+    fixture.textarea.setSelectionRange('/using-superpowert'.length, '/using-superpowert'.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedHighlightText(fixture.container)).toEqual([]);
+  });
+
+  it('keeps highlighting a known direct skill after the cursor moves past the token', async () => {
+    const fixture = createFixture();
+    fixture.setMenuItems([
+      slashItem('writing-skills', 'Use the writing skills workflow', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/writing-skills';
+    fixture.textarea.setSelectionRange('/writing-skills'.length, '/writing-skills'.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedHighlightText(fixture.container)).toEqual(['/writing-skills']);
+
+    fixture.textarea.value = 'nihao /writing-skills weishenme hui';
+    fixture.textarea.setSelectionRange(
+      'nihao /writing-skills weishenme hui'.length,
+      'nihao /writing-skills weishenme hui'.length,
+    );
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedHighlightText(fixture.container)).toEqual(['/writing-skills']);
   });
 
   it('uses a /skills prefix entry and nested skill suggestions when skill mode is prefixed', async () => {
@@ -165,6 +217,28 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     nestedItem?.click();
 
     expect(fixture.textarea.value).toBe('/skills build-mcp-server ');
+  });
+
+  it('only highlights prefixed /skills entries when the nested skill exists', async () => {
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([
+      slashItem('using-superpowers', 'Use the superpowers workflow', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/skills using-superpowers';
+    fixture.textarea.setSelectionRange('/skills using-superpowers'.length, '/skills using-superpowers'.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedHighlightText(fixture.container)).toEqual(['/skills using-superpowers']);
+
+    fixture.textarea.value = '/skills using-superpowert';
+    fixture.textarea.setSelectionRange('/skills using-superpowert'.length, '/skills using-superpowert'.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedHighlightText(fixture.container)).toEqual([]);
   });
 
   it('renders localized skill provenance details in prefixed skill suggestions', async () => {

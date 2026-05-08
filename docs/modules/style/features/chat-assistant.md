@@ -10,12 +10,12 @@
 ## 关键类名 / CSS 变量
 
 - 助手消息：`.opencodian-message--assistant`、`.opencodian-message-time-row`、`.opencodian-message-model-id`。
-- 用户消息 agent 高亮：`.opencodian-message-highlight-agent`。
+- 用户消息高亮：`.opencodian-message-highlight-agent`（`@agent`）与 `.opencodian-message-highlight-command`（`/command`、`/skill`、`/skills skill`）。
 - 通知卡：`.opencodian-chat-notice-card*`、`.opencodian-chat-notice-action-btn`。
 - 交互按钮：`.opencodian-copy-btn-inline`、`.opencodian-user-action-btn*`。
 - 问题与 TODO：`.opencodian-question-dock*`、`.opencodian-session-todo-*`。
 - 输入区：`.opencodian-composer-*`、`.opencodian-slash-command-menu*`、`.opencodian-slash-command-menu-state*`、`.opencodian-input-toolbar`、`.opencodian-context-ring*`。
-- 输入 @agent 高亮：`.opencodian-input-highlight-container`（textarea 包裹层）、`.opencodian-input-highlight-backdrop`（镜像 backdrop）、`.opencodian-input-highlight-agent`（backdrop 内 @agent 高亮 span）。textarea 设为 `color: transparent; caret-color: var(--text-normal)`，backdrop 承担全部文本渲染。
+- 输入高亮：`.opencodian-input-highlight-container`（textarea 包裹层）、`.opencodian-input-highlight-backdrop`（镜像 backdrop）、`.opencodian-input-highlight-agent`（backdrop 内 `@agent` 高亮 span）、`.opencodian-input-highlight-command`（backdrop 内已知 slash command / skill 高亮 span）。textarea 设为 `color: transparent; caret-color: var(--text-normal)`，backdrop 承担全部文本渲染；未知 `/xxx` typo 不应被着色。
 - 输入工具栏现在为 Agent / permission / model / effort selector 统一保留 flex slot，并通过 `--opencodian-input-toolbar-control-gap` / `--opencodian-input-toolbar-control-height` 统一控制横向节奏与控件高度；context usage ring 也跟随该高度，并在 `action-buttons-etched` 下切换成刻入式透明状态。ring 内部通过 `.opencodian-context-ring-meter` 固定 34px 仪表盒，`classic` 样式显示原有连续环形进度，`segmented` 样式显示 24 个留有间隔的较长 SVG 刻度线段；状态只由环形进度色/刻度色和中心数字表达，不渲染额外 LOW / MEDIUM / HIGH 文本，也不再通过 CSS 伪元素追加 `%` 后缀。中心数字使用 bundled Oxanium 字体文件 `assets/fonts/oxanium/Oxanium[wght].ttf`，不依赖运行时外链。Agent 下拉框本体样式在 `components/agent-selector.css`。
 - 动画：`opencodian-spin`、`opencodian-todo-pulse`、若干玻璃态 hover 过渡。
 

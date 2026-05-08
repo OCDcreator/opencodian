@@ -11,11 +11,15 @@ const MARKUP_TOKEN_REGEX =
   /<\?[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\/?[A-Za-z][\w:-]*(?:\s[^>\n]*)?>|<!--|<!\[CDATA\[|<\?[A-Za-z][\w:-]*/gi;
 
 export interface UserMessageTextHighlightSpan {
-  kind: 'agent';
+  kind: 'agent' | 'command';
   value: string;
   start: number;
   end: number;
 }
+
+// Keep slash-token matching aligned with the composer backdrop so sent user
+// messages preserve the same visual command and skill cues after render.
+const USER_MESSAGE_SLASH_HIGHLIGHT_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)/g;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object');
@@ -74,7 +78,41 @@ export function prepareUserMessageMarkdownForDisplay(markdown: string): string {
   });
 }
 
-export function extractUserMessageAgentHighlightSpans(
+function extractUserMessageCommandHighlightSpans(
+  visibleText: string,
+  parts: unknown,
+): UserMessageTextHighlightSpan[] {
+  if (!visibleText) {
+    return [];
+  }
+
+  const expandedSkillNames = extractExpandedSkillNames(parts);
+  if (expandedSkillNames.size === 0) {
+    return [];
+  }
+
+  const spans: UserMessageTextHighlightSpan[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = USER_MESSAGE_SLASH_HIGHLIGHT_REGEX.exec(visibleText)) !== null) {
+    const value = match[2];
+    if (!value || value.startsWith('//') || !isExpandedSkillToken(value, expandedSkillNames)) {
+      continue;
+    }
+
+    const start = match.index + match[1].length;
+    const end = start + value.length;
+    spans.push({
+      kind: 'command',
+      value,
+      start,
+      end,
+    });
+  }
+
+  return spans;
+}
+
+function extractUserMessageAgentHighlightSpans(
   visibleText: string,
   parts: unknown,
 ): UserMessageTextHighlightSpan[] {
@@ -111,6 +149,17 @@ export function extractUserMessageAgentHighlightSpans(
     });
   }
 
+  return spans;
+}
+
+export function extractUserMessageTextHighlightSpans(
+  visibleText: string,
+  parts: unknown,
+): UserMessageTextHighlightSpan[] {
+  const spans = [
+    ...extractUserMessageCommandHighlightSpans(visibleText, parts),
+    ...extractUserMessageAgentHighlightSpans(visibleText, parts),
+  ];
   let lastEnd = -1;
   return spans
     .sort((left, right) => left.start - right.start || left.end - right.end)
@@ -164,12 +213,58 @@ export function applyUserMessageTextHighlightSpans(
     entry.node.splitText(localEnd);
     const highlightedNode = entry.node.splitText(localStart);
     const wrapper = ownerDocument.createElement('span');
-    wrapper.classList.add('opencodian-message-highlight-agent');
-    wrapper.dataset.highlight = 'agent';
+    wrapper.classList.add(getHighlightClassName(span.kind));
+    wrapper.dataset.highlight = span.kind;
     highlightedNode.parentNode?.insertBefore(wrapper, highlightedNode);
     wrapper.appendChild(highlightedNode);
     didWrap = true;
   }
 
   return didWrap;
+}
+
+function getHighlightClassName(kind: UserMessageTextHighlightSpan['kind']): string {
+  return kind === 'command'
+    ? 'opencodian-message-highlight-command'
+    : 'opencodian-message-highlight-agent';
+}
+
+function extractExpandedSkillNames(parts: unknown): ReadonlySet<string> {
+  if (!Array.isArray(parts)) {
+    return new Set();
+  }
+
+  const skillNames = new Set<string>();
+  for (const part of parts) {
+    if (!isRecord(part) || !isRecord(part.metadata)) {
+      continue;
+    }
+
+    const { kind, skillName } = part.metadata;
+    if (kind !== 'skill-expansion' || typeof skillName !== 'string') {
+      continue;
+    }
+
+    const trimmedSkillName = skillName.trim();
+    if (trimmedSkillName.length === 0) {
+      continue;
+    }
+
+    skillNames.add(trimmedSkillName);
+  }
+
+  return skillNames;
+}
+
+function isExpandedSkillToken(token: string, expandedSkillNames: ReadonlySet<string>): boolean {
+  if (!token.startsWith('/')) {
+    return false;
+  }
+
+  if (/^\/skills\s+/i.test(token)) {
+    const skillName = token.slice('/skills '.length).trim();
+    return skillName.length > 0 && expandedSkillNames.has(skillName);
+  }
+
+  return expandedSkillNames.has(token.slice(1));
 }

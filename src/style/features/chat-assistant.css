@@ -98,6 +98,15 @@
   background: color-mix(in srgb, var(--text-warning) 12%, transparent);
 }
 
+.opencodian-message--user .opencodian-message-highlight-command {
+  color: var(--text-accent);
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0 2px;
+  background: color-mix(in srgb, var(--text-accent) 16%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-accent) 22%, transparent);
+}
+
 .opencodian-message--user .opencodian-message-text > p {
   margin: 4px 0;
 }
@@ -2201,4 +2210,3 @@
 .opencodian-composer-shell--action-buttons-etched .opencodian-context-ring-label {
   color: color-mix(in srgb, var(--text-normal) 88%, var(--text-muted));
 }
-

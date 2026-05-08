@@ -3,7 +3,7 @@ import { t } from '../../../i18n';
 import { type CollapsibleState,setupCollapsible } from '../rendering/collapsible';
 import {
   applyUserMessageTextHighlightSpans,
-  extractUserMessageAgentHighlightSpans,
+  extractUserMessageTextHighlightSpans,
   prepareUserMessageMarkdownForDisplay,
 } from '../userMessageDisplay';
 
@@ -52,7 +52,7 @@ export class UserMessageContentRenderer {
         applyUserMessageTextHighlightSpans(
           textEl,
           visibleText,
-          extractUserMessageAgentHighlightSpans(visibleText, message.parts),
+          extractUserMessageTextHighlightSpans(visibleText, message.parts),
         );
       }
       const collapseToggleEl = container.createEl('button');

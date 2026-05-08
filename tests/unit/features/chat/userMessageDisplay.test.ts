@@ -1,6 +1,6 @@
 import {
   applyUserMessageTextHighlightSpans,
-  extractUserMessageAgentHighlightSpans,
+  extractUserMessageTextHighlightSpans,
   prepareUserMessageMarkdownForDisplay,
 } from '../../../../src/features/chat/userMessageDisplay';
 
@@ -124,9 +124,9 @@ describe('prepareUserMessageMarkdownForDisplay', () => {
   });
 });
 
-describe('extractUserMessageAgentHighlightSpans', () => {
+describe('extractUserMessageTextHighlightSpans', () => {
   it('extracts valid native agent source spans from message parts', () => {
-    expect(extractUserMessageAgentHighlightSpans('Ask @reviewer to inspect this', [
+    expect(extractUserMessageTextHighlightSpans('Ask @reviewer to inspect this', [
       {
         type: 'agent',
         name: 'reviewer',
@@ -147,7 +147,7 @@ describe('extractUserMessageAgentHighlightSpans', () => {
   });
 
   it('ignores stale or overlapping agent spans', () => {
-    expect(extractUserMessageAgentHighlightSpans('Ask @reviewer now', [
+    expect(extractUserMessageTextHighlightSpans('Ask @reviewer now', [
       {
         type: 'agent',
         source: {
@@ -181,6 +181,67 @@ describe('extractUserMessageAgentHighlightSpans', () => {
       },
     ]);
   });
+
+  it('extracts slash command and direct skill spans from visible text', () => {
+    expect(extractUserMessageTextHighlightSpans(
+      '你好 /writing-skills 为什么 /writing-skills',
+      [
+        {
+          type: 'text',
+          text: '<skill_content name="writing-skills">...</skill_content>',
+          synthetic: true,
+          metadata: {
+            kind: 'skill-expansion',
+            skillName: 'writing-skills',
+          },
+        },
+      ],
+    )).toEqual([
+      {
+        kind: 'command',
+        value: '/writing-skills',
+        start: 3,
+        end: 18,
+      },
+      {
+        kind: 'command',
+        value: '/writing-skills',
+        start: 23,
+        end: 38,
+      },
+    ]);
+  });
+
+  it('extracts prefixed skills-command spans including the skill name', () => {
+    expect(extractUserMessageTextHighlightSpans(
+      'Run /skills writing-skills now',
+      [
+        {
+          type: 'text',
+          text: '<skill_content name="writing-skills">...</skill_content>',
+          synthetic: true,
+          metadata: {
+            kind: 'skill-expansion',
+            skillName: 'writing-skills',
+          },
+        },
+      ],
+    )).toEqual([
+      {
+        kind: 'command',
+        value: '/skills writing-skills',
+        start: 4,
+        end: 26,
+      },
+    ]);
+  });
+
+  it('does not extract slash spans when the token is not a known expanded skill', () => {
+    expect(extractUserMessageTextHighlightSpans(
+      '你好 /not-a-skill 为什么',
+      [],
+    )).toEqual([]);
+  });
 });
 
 describe('applyUserMessageTextHighlightSpans', () => {
@@ -201,6 +262,37 @@ describe('applyUserMessageTextHighlightSpans', () => {
     expect(container.textContent).toBe('Ask @reviewer now');
     expect(highlight?.textContent).toBe('@reviewer');
     expect(highlight?.dataset.highlight).toBe('agent');
+  });
+
+  it('wraps slash command spans with command highlight styling', () => {
+    const container = document.createElement('div');
+    container.textContent = '你好 /writing-skills 为什么';
+
+    expect(applyUserMessageTextHighlightSpans(container, '你好 /writing-skills 为什么', [
+      {
+        kind: 'command',
+        value: '/writing-skills',
+        start: 3,
+        end: 18,
+      },
+    ])).toBe(true);
+
+    const highlight = container.querySelector<HTMLElement>('.opencodian-message-highlight-command');
+    expect(container.textContent).toBe('你好 /writing-skills 为什么');
+    expect(highlight?.textContent).toBe('/writing-skills');
+    expect(highlight?.dataset.highlight).toBe('command');
+  });
+
+  it('does not wrap slash command styling when no known skill span exists', () => {
+    const container = document.createElement('div');
+    container.textContent = '你好 /not-a-skill 为什么';
+
+    expect(applyUserMessageTextHighlightSpans(
+      container,
+      '你好 /not-a-skill 为什么',
+      extractUserMessageTextHighlightSpans('你好 /not-a-skill 为什么', []),
+    )).toBe(false);
+    expect(container.querySelector('.opencodian-message-highlight-command')).toBeNull();
   });
 
   it('skips wrapping when rendered text no longer matches the source content', () => {

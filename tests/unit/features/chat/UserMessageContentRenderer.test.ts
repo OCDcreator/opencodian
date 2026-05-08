@@ -146,6 +146,60 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
     expect(highlight?.dataset.highlight).toBe('agent');
   });
 
+  it('highlights inline slash skill tokens in rendered user text', async () => {
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: '你好 /writing-skills 为什么 /writing-skills',
+      timestamp: 1,
+      parts: [
+        {
+          type: 'text',
+          text: '<skill_content name="writing-skills">...</skill_content>',
+          synthetic: true,
+          metadata: {
+            kind: 'skill-expansion',
+            skillName: 'writing-skills',
+          },
+        },
+      ],
+    };
+
+    await renderer.renderUserMessageContent(container, message);
+
+    const textEl = container.querySelector<HTMLElement>('.opencodian-message-text');
+    const highlights = Array.from(
+      textEl?.querySelectorAll<HTMLElement>('.opencodian-message-highlight-command') ?? [],
+    );
+    expect(host.renderMarkdownInto).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      '你好 /writing-skills 为什么 /writing-skills',
+    );
+    expect(textEl?.textContent).toBe('你好 /writing-skills 为什么 /writing-skills');
+    expect(highlights).toHaveLength(2);
+    expect(highlights.map((element) => element.textContent)).toEqual([
+      '/writing-skills',
+      '/writing-skills',
+    ]);
+    expect(highlights.every((element) => element.dataset.highlight === 'command')).toBe(true);
+  });
+
+  it('does not highlight inline slash tokens that are not known skills', async () => {
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: '你好 /not-a-skill 为什么',
+      timestamp: 1,
+      parts: [],
+    };
+
+    await renderer.renderUserMessageContent(container, message);
+
+    const textEl = container.querySelector<HTMLElement>('.opencodian-message-text');
+    expect(textEl?.textContent).toBe('你好 /not-a-skill 为什么');
+    expect(textEl?.querySelector('.opencodian-message-highlight-command')).toBeNull();
+  });
+
   it('prepares user markup as code blocks when setting is enabled', async () => {
     host.getRenderUserMarkupAsCodeBlocks.mockReturnValue(true);
     const message = {
@@ -215,6 +269,23 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
     chip.click();
 
     expect(host.openContextAttachment).toHaveBeenCalledWith('docs/readme.md');
+  });
+});
+
+describe('UserMessageContentRenderer.renderUserMessageContent OMO handling', () => {
+  let container: HTMLDivElement;
+  let host: ReturnType<typeof createRenderer>['host'];
+  let renderer: UserMessageContentRenderer;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    const created = createRenderer();
+    host = created.host;
+    renderer = created.renderer;
+  });
+
+  afterEach(() => {
+    container.remove();
   });
 
   it('renders OMO user injection with badge, summary, and collapsible raw block', async () => {
