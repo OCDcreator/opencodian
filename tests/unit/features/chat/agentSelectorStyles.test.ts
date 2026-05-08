@@ -24,7 +24,7 @@ describe('agent selector toolbar styles', () => {
     );
 
     for (const declaration of [
-      'padding: 3px 7px;',
+      'padding: 4px 10px;',
       'border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);',
       'box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;',
       'color: var(--text-normal);',

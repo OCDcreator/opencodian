@@ -546,11 +546,11 @@ Nodes (0):
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `t()` connect `Community 0` to `Community 1`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 10`, `Community 11`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 22`, `Community 23`, `Community 24`, `Community 26`, `Community 27`, `Community 30`, `Community 32`, `Community 33`, `Community 37`, `Community 40`, `Community 42`?**
-  _High betweenness centrality (0.408) - this node is a cross-community bridge._
+  _High betweenness centrality (0.445) - this node is a cross-community bridge._
 - **Why does `OpenCodianView` connect `Community 3` to `Community 0`, `Community 1`, `Community 2`, `Community 4`, `Community 37`, `Community 6`, `Community 5`, `Community 10`, `Community 15`, `Community 16`, `Community 17`, `Community 22`, `Community 23`, `Community 24`?**
-  _High betweenness centrality (0.106) - this node is a cross-community bridge._
+  _High betweenness centrality (0.099) - this node is a cross-community bridge._
 - **Why does `OpenCodeService` connect `Community 12` to `Community 0`, `Community 33`, `Community 2`, `Community 4`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 19`, `Community 20`, `Community 21`, `Community 29`?**
-  _High betweenness centrality (0.064) - this node is a cross-community bridge._
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **Are the 439 inferred relationships involving `t()` (e.g. with `.getEmptyConversationTitle()` and `.generateDefaultTitle()`) actually correct?**
   _`t()` has 439 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**

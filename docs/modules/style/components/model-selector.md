@@ -16,6 +16,14 @@
 
 ## 近期行为
 
+- **Linear-inspired redesign**（当前）：模型选择器触发器、下拉面板、搜索框、Provider 标题栏与选项全部重新设计。
+  - 触发器：`padding: 4px 10px`、`font-weight: 500`；hover 时 `translateY(-1px)` + 柔和阴影抬升；`is-open` 态使用 accent 色边框 + 外发光。
+  - Chevron：`cubic-bezier(0.4, 0, 0.2, 1)` 平滑旋转 180°，hover/open 时颜色递进。
+  - 下拉面板：`border-radius: 16px`、三层阴影（含 1px 边框辉光）、`blur(40px) saturate(1.22)`；新增 `model-dropdown-close` 动画与 `.is-closing` 类。
+  - 搜索框：`border-radius: 12px`；`focus-within` 时 accent 色边框 + 微光背景；placeholder 更低透明度 + 字间距。
+  - Provider header：`15px`/`font-weight: 800`、左侧 `3px solid var(--interactive-accent)` 竖线标识；`blur(28px)` 更强 sticky 背景；`10px` 渐变过渡阴影。
+  - 选项：`padding: 6px 14px`、`font-weight: 450`；hover/highlighted 时左侧 accent 竖线 + `translateX(2px)`；selected 态使用 accent 背景 tint + `font-weight: 600`；checkmark 使用 `cubic-bezier(0.34, 1.56, 0.64, 1)` 弹性缩放出现。
+  - 微交互：选项按 provider group 交错入场（`model-option-stagger`），`translateX(-6px)` 滑入；下拉滚动条自定义细滚动条（`5px`、hover 加深）；全链路 `prefers-reduced-motion: reduce` 兜底。
 - classic 设置页 quick-nav 的 tooltip 现在不再依赖 `.opencodian-settings-quick-nav-btn` 的伪元素，而是用 `.opencodian-settings-quick-nav-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式。这样提示层可以真正越过 settings 滚动容器，不再受容器裁切影响。
 
 
