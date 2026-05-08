@@ -88,7 +88,7 @@ export class PermissionModeSelectorCoordinator {
     this.triggerEl?.removeClass('is-open');
 
     if (this.clickOutsideHandler) {
-      document.removeEventListener('click', this.clickOutsideHandler);
+      document.removeEventListener('click', this.clickOutsideHandler, true);
     }
   }
 
@@ -210,7 +210,7 @@ export class PermissionModeSelectorCoordinator {
     this.updateDropdownSelection();
 
     if (this.clickOutsideHandler) {
-      document.addEventListener('click', this.clickOutsideHandler);
+      document.addEventListener('click', this.clickOutsideHandler, true);
     }
   }
 

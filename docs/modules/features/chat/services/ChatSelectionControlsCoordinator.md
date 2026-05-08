@@ -54,6 +54,7 @@ export class ChatSelectionControlsCoordinator {
 - `ensureSelectedModelAvailable()` / `getModelUnavailableNoticeContent()` 把 send 前 availability follow-up 与 notice copy 判定委托到 selection runtime
 - `refreshModelOptions()` / `updateModelSelectorDisplay()` 把 list 渲染、trigger/icon 刷新与 unavailable/unconfigured state 收束到同一个 owner
 - `updatePermissionTriggerDisplay()` / `applyLocaleTexts()` 继续作为 view-facing 入口，但 permission mode 文案与 selected state 刷新会委托给 `PermissionModeSelectorCoordinator`
+- model dropdown 的 outside-click listener 使用 capture 阶段注册，确保点击其他 toolbar dropdown trigger 时当前 dropdown 能被正确关闭
 - `destroy()` 关闭 dropdown、移除 document click listener，并释放 sticky header cleanup
 
 ## 与 `OpenCodianView` 的边界

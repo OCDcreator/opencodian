@@ -299,7 +299,7 @@ export class ChatSelectionControlsCoordinator {
     }, 0);
 
     if (this.modelDropdownClickOutsideHandler) {
-      document.addEventListener('click', this.modelDropdownClickOutsideHandler);
+      document.addEventListener('click', this.modelDropdownClickOutsideHandler, true);
     }
   }
 
@@ -311,7 +311,7 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorTrigger?.removeClass('is-open');
 
     if (this.modelDropdownClickOutsideHandler) {
-      document.removeEventListener('click', this.modelDropdownClickOutsideHandler);
+      document.removeEventListener('click', this.modelDropdownClickOutsideHandler, true);
     }
   }
 

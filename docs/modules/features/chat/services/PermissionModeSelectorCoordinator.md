@@ -37,6 +37,7 @@ export class PermissionModeSelectorCoordinator {
 - trigger 文案继续映射为 `YOLO` / `ASK` / `PLAN`，并保留 `mode-*` class
 - option labels/descriptions 仍来自 `settings.security.permissionMode.*` locale keys，并保留原 fallback 文案
 - 选中 option 后先调用 `host.switchPermissionMode()`，再刷新 trigger/selected state 并关闭 dropdown
+- click-outside listener 使用 capture 阶段注册，与 agent selector 保持一致，确保点击其他 toolbar dropdown trigger 时当前 dropdown 能被正确关闭
 - click-outside listener 只在 dropdown open 时注册，close/destroy 时移除
 
 ## 与 `ChatSelectionControlsCoordinator` 的边界
