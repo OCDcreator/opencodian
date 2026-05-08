@@ -39,7 +39,15 @@ export class PermissionModeSelectorCoordinator {
   mount(containerEl: HTMLElement): void {
     this.destroy();
     this.containerEl = containerEl;
-    this.triggerEl = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
+    this.triggerEl = containerEl.createDiv({
+      cls: 'opencodian-permission-trigger',
+      attr: {
+        role: 'button',
+        tabindex: '0',
+        'aria-haspopup': 'listbox',
+        'aria-expanded': 'false',
+      },
+    });
 
     const iconEl = this.triggerEl.createSpan({ cls: 'opencodian-permission-trigger-icon' });
     setIcon(iconEl, 'shield');
@@ -83,9 +91,11 @@ export class PermissionModeSelectorCoordinator {
   closeDropdown(): void {
     this.isDropdownOpen = false;
     if (this.dropdownEl) {
+      this.dropdownEl.removeClass('is-open');
       this.dropdownEl.style.display = 'none';
     }
     this.triggerEl?.removeClass('is-open');
+    this.triggerEl?.setAttribute('aria-expanded', 'false');
 
     if (this.clickOutsideHandler) {
       document.removeEventListener('click', this.clickOutsideHandler, true);
@@ -206,7 +216,9 @@ export class PermissionModeSelectorCoordinator {
 
     this.isDropdownOpen = true;
     this.dropdownEl.style.display = 'block';
+    this.dropdownEl.addClass('is-open');
     this.triggerEl.addClass('is-open');
+    this.triggerEl.setAttribute('aria-expanded', 'true');
     this.updateDropdownSelection();
 
     if (this.clickOutsideHandler) {

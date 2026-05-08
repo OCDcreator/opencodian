@@ -118,6 +118,7 @@ export class ChatAgentSelectionCoordinator {
   closeDropdown(): void {
     this.isDropdownOpen = false;
     if (this.dropdownEl) {
+      this.dropdownEl.removeClass('is-open');
       this.dropdownEl.style.display = 'none';
       this.dropdownEl.setAttribute('aria-hidden', 'true');
     }
@@ -312,6 +313,7 @@ export class ChatAgentSelectionCoordinator {
     }
     this.isDropdownOpen = true;
     this.dropdownEl.style.display = 'block';
+    this.dropdownEl.addClass('is-open');
     this.dropdownEl.setAttribute('aria-hidden', 'false');
     this.triggerEl.addClass('is-open');
     this.triggerEl.setAttribute('aria-expanded', 'true');

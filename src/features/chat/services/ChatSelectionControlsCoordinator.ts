@@ -198,7 +198,15 @@ export class ChatSelectionControlsCoordinator {
 
   private mountModelSelector(containerEl: HTMLElement): void {
     this.modelSelectorContainer = containerEl;
-    this.modelSelectorTrigger = containerEl.createDiv({ cls: 'opencodian-model-trigger' });
+    this.modelSelectorTrigger = containerEl.createDiv({
+      cls: 'opencodian-model-trigger',
+      attr: {
+        role: 'button',
+        tabindex: '0',
+        'aria-haspopup': 'listbox',
+        'aria-expanded': 'false',
+      },
+    });
     const triggerContent = this.modelSelectorTrigger.createDiv({ cls: 'opencodian-model-trigger-content' });
 
     const iconWrapper = triggerContent.createSpan({ cls: 'opencodian-model-trigger-icon' });
@@ -285,7 +293,9 @@ export class ChatSelectionControlsCoordinator {
     this.permissionSelector.closeDropdown();
     this.isModelDropdownOpen = true;
     this.modelSelectorDropdown.style.display = 'block';
+    this.modelSelectorDropdown.addClass('is-open');
     this.modelSelectorTrigger.addClass('is-open');
+    this.modelSelectorTrigger.setAttribute('aria-expanded', 'true');
 
     this.modelFilterQuery = '';
     if (this.modelSelectorSearchInput) {
@@ -306,9 +316,11 @@ export class ChatSelectionControlsCoordinator {
   private closeModelDropdown(): void {
     this.isModelDropdownOpen = false;
     if (this.modelSelectorDropdown) {
+      this.modelSelectorDropdown.removeClass('is-open');
       this.modelSelectorDropdown.style.display = 'none';
     }
     this.modelSelectorTrigger?.removeClass('is-open');
+    this.modelSelectorTrigger?.setAttribute('aria-expanded', 'false');
 
     if (this.modelDropdownClickOutsideHandler) {
       document.removeEventListener('click', this.modelDropdownClickOutsideHandler, true);

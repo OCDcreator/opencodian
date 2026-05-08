@@ -55,6 +55,7 @@ export class ChatSelectionControlsCoordinator {
 - `refreshModelOptions()` / `updateModelSelectorDisplay()` 把 list 渲染、trigger/icon 刷新与 unavailable/unconfigured state 收束到同一个 owner
 - `updatePermissionTriggerDisplay()` / `applyLocaleTexts()` 继续作为 view-facing 入口，但 permission mode 文案与 selected state 刷新会委托给 `PermissionModeSelectorCoordinator`
 - model dropdown 的 outside-click listener 使用 capture 阶段注册，确保点击其他 toolbar dropdown trigger 时当前 dropdown 能被正确关闭
+- model selector trigger 现在携带 `role="button"`、`tabindex="0"`、`aria-haspopup="listbox"` 与 `aria-expanded`，dropdown 打开/关闭时同步更新这些属性并添加/移除 `is-open` 类以触发 CSS 动画
 - `destroy()` 关闭 dropdown、移除 document click listener，并释放 sticky header cleanup
 
 ## 与 `OpenCodianView` 的边界

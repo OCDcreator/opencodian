@@ -22,7 +22,8 @@
 ## 修改注意点
 
 - trigger 容器应向 model selector 看齐，保持一致的默认边框、内边距、hover/open 反馈和图标尺寸。当前 trigger padding 为 `4px 10px`，与 model selector 一致。
-- 下拉框与 model / permission selector 保持同一 popover 视觉语言。
+- 下拉框与 model / permission selector 保持同一 popover 视觉语言：`border-radius: 16px`、`blur(40px) saturate(1.22)`、统一分层阴影，并带有 `agent-dropdown-open` 入场动画。
+- 选项支持 `:focus-visible` 焦点轮廓，确保键盘导航可见。
 - trigger 选中态使用 `var(--text-warning)`，对齐 OpenCode 对 agent reference 的黄色/橙色语义。
 - `.opencodian-composer-shell--action-buttons-etched` 下的 trigger 复用刻入玻璃按钮语法：透明底、无独立边框、轻量 hover/focus，仅用文字/图标颜色表达 agent 选择。
 - default row 使用 `is-default` 与 muted marker / small default badge 轻微区分，但仍和 agent row 共用同一 option 几何；不要用彩色侧边条表达 default/selected 状态。

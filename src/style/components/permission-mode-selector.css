@@ -217,11 +217,6 @@
   animation: permission-dropdown-open 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.opencodian-permission-dropdown.is-closing {
-  animation: permission-dropdown-close 0.14s cubic-bezier(0.4, 0, 1, 1) forwards;
-  pointer-events: none;
-}
-
 @keyframes permission-dropdown-open {
   from {
     opacity: 0;
@@ -230,17 +225,6 @@
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
-  }
-}
-
-@keyframes permission-dropdown-close {
-  from {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.96) translateY(6px);
   }
 }
 
@@ -273,6 +257,12 @@
   background: color-mix(in srgb, var(--interactive-accent) 8%, var(--opencodian-highlight-strong));
   border-left-color: var(--interactive-accent);
   font-weight: 600;
+}
+
+.opencodian-permission-option:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+  border-left-color: var(--interactive-accent);
 }
 
 /* Mode-specific selected option states */

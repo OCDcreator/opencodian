@@ -23,4 +23,6 @@
 
 - 模式色语义与行为绑定（成功/默认/计划），不要把三种模式做成几乎同色。
 - 下拉体验与模型选择器需保持视觉一致（圆角、玻璃态、阴影等级）。
+- 下拉面板带有 `permission-dropdown-open` 入场动画，由 `.is-open` 类触发。
+- 选项支持 `:focus-visible` 焦点轮廓，确保键盘导航可见。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
