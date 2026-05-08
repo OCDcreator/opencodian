@@ -5862,6 +5862,21 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: none;
 }
 
+/*
+ * Portal mode: menu is portaled to document.body via JS to escape
+ * overflow:hidden clipping on ancestor card containers.
+ * z-index 2001 clears Obsidian's .modal-container at z-index 1000.
+ * box-sizing ensures inline width matches trigger dimensions exactly.
+ */
+.opencodian-settings-dropdown-menu.is-portal {
+  position: fixed;
+  top: auto;
+  left: auto;
+  right: auto;
+  z-index: 2001;
+  box-sizing: border-box;
+}
+
 .opencodian-settings-dropdown-option {
   box-sizing: border-box;
   display: flex;
