@@ -44,8 +44,12 @@ export function createSlashCommandExecutionHost(
 
 ### command 识别
 
-- 非 `/` 前缀输入直接返回 `false`
+- 非 `/` 前缀输入（不包含行中 `/command`）直接返回 `false`
 - `//` 与 `/ ` 这种非命令输入也直接放回普通消息路径
+- **行首 `/command`**：原有行为不变，`trimmedContent.startsWith('/')` 路径
+- **行中 `/command`**（空白后的 `/command`，例如 `"请帮我 /review src/app.ts"`）：`parseSlashCommandInput()` 使用全局正则匹配并取最后一个匹配项，提取 command 和 arguments；前导文字不是 arguments 的一部分，command 执行时只发送提取的 command 和 arguments
+- 行中匹配同时排除 `//`（例如 `"text //comment"` 不触发命令解析）
+- 若行中 `/command` 不被 runtime catalog 认可，`tryRunSlashCommand` 返回 `false`，`SendPipelineRuntime` 将完整原始文本作为普通 prompt 发送（不丢失用户输入）
 - runtime commands 统一使用 `sdk.command.list()` 判断
 - project config 只用于识别“这个 runtime command 是否同时存在 project override”，不会让 runtime 未注册的 command 提前执行
 - runtime catalog 会过滤掉 `source === 'mcp'` 的条目

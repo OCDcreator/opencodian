@@ -8,25 +8,64 @@ import type {
 
 function parseCommandSubmission(content: string): CommandComposerSubmission | null {
   const trimmedContent = content.trim();
-  if (!trimmedContent.startsWith('/') || trimmedContent.startsWith('//')) {
+  if (!trimmedContent || trimmedContent.startsWith('//')) {
     return null;
   }
 
-  const commandBody = trimmedContent.slice(1);
-  if (!commandBody || /^\s/.test(commandBody)) {
+  // Strategy 1: /command at start of text (backward compatible)
+  if (trimmedContent.startsWith('/')) {
+    const commandBody = trimmedContent.slice(1);
+    if (!commandBody || /^\s/.test(commandBody)) {
+      return null;
+    }
+
+    const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
+    if (!commandMatch?.[1]) {
+      return null;
+    }
+
+    return {
+      kind: 'command',
+      rawContent: trimmedContent,
+      command: commandMatch[1],
+      arguments: commandMatch[2] ?? '',
+    };
+  }
+
+  // Strategy 2: /command after whitespace (e.g. "some text /command args")
+  // Use global regex and take the LAST match to prefer the rightmost /command.
+  const midRegex = /\s\/(\S+)/g;
+  let lastMidMatch: RegExpExecArray | null = null;
+  let currentMatch: RegExpExecArray | null;
+  while ((currentMatch = midRegex.exec(trimmedContent)) !== null) {
+    lastMidMatch = currentMatch;
+  }
+
+  if (!lastMidMatch?.[1]) {
     return null;
   }
 
-  const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
-  if (!commandMatch?.[1]) {
+  // Reject // (e.g. "text //comment" should not be treated as a command)
+  const slashPosition = lastMidMatch.index + 1; // position of the '/' in full text
+  if (slashPosition > 0 && trimmedContent[slashPosition - 1] === '/') {
     return null;
   }
 
+  const precedingText = trimmedContent.slice(0, lastMidMatch.index).trim();
+  const commandName = lastMidMatch[1];
+  const afterCommand = trimmedContent.slice(lastMidMatch.index + lastMidMatch[0].length);
+  const argumentsText = afterCommand.trim();
+
+  // For mid-text commands, rawContent is the FULL original text so that if the
+  // slash command is not recognized, the send pipeline falls through to sending
+  // the complete text as a regular prompt (no data loss).
   return {
     kind: 'command',
     rawContent: trimmedContent,
-    command: commandMatch[1],
-    arguments: commandMatch[2] ?? '',
+    command: commandName,
+    arguments: argumentsText,
+    precedingText: precedingText || undefined,
+    originalContent: trimmedContent,
   };
 }
 
@@ -182,4 +221,42 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string 
   }
 
   return searchText;
+}
+
+/**
+ * Replace the /xxx slash token at the cursor position with `replacement`,
+ * preserving surrounding text. Returns the new value and cursor position.
+ */
+export function replaceSlashTokenAtCursor(
+  current: string,
+  cursorPos: number,
+  replacement: string,
+): { value: string; cursorPos: number } {
+  const beforeCursor = current.slice(0, cursorPos);
+  let slashIndex = -1;
+  for (let i = beforeCursor.length - 1; i >= 0; i--) {
+    const ch = beforeCursor[i];
+    if (ch === '/') {
+      slashIndex = i;
+      break;
+    }
+    if (/\s/.test(ch)) {
+      break;
+    }
+  }
+
+  if (slashIndex >= 0) {
+    let tokenEnd = slashIndex + 1;
+    while (tokenEnd < current.length && !/\s/.test(current[tokenEnd])) {
+      tokenEnd++;
+    }
+    const before = current.slice(0, slashIndex);
+    const after = current.slice(tokenEnd);
+    return {
+      value: before + replacement + after,
+      cursorPos: before.length + replacement.length,
+    };
+  }
+
+  return { value: replacement, cursorPos: replacement.length };
 }

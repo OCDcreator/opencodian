@@ -26,3 +26,4 @@ export function renderModelList(options: RenderModelListOptions): RenderModelLis
 - 每次重渲都会先执行 `previousStickyHeadersCleanup`
 - provider header 的 stuck 监听仍复用 `ui/modelSelectorStickyHeaders.ts`
 - 本模块只负责列表区；trigger、搜索框、dropdown 开关仍由 `OpenCodianView` 持有
+- provider header 现在包含 provider icon，通过 `ProviderIconService.createIconElement()` 同步获取 Lobehub CDN 图标，失败时静默跳过（header 仅显示文本）

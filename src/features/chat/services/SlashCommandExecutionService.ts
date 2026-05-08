@@ -85,32 +85,94 @@ export interface SlashCommandExecutionHostDependencies {
 interface ParsedSlashCommandInput {
   arguments: string;
   command: string;
+  agent?: string;
+}
+
+function extractAgentFromArguments(argumentsText: string): { cleanedArguments: string; agent?: string } {
+  // Find @agent tokens that are whole words (not part of an email or path).
+  // We look for @xxx where xxx is a non-empty sequence of non-whitespace chars.
+  const tokens = argumentsText.split(/\s+/);
+  const agentTokens: string[] = [];
+  const remainingTokens: string[] = [];
+
+  for (const token of tokens) {
+    if (token.startsWith('@') && token.length > 1) {
+      agentTokens.push(token.slice(1));
+    } else {
+      remainingTokens.push(token);
+    }
+  }
+
+  return {
+    cleanedArguments: remainingTokens.join(' '),
+    agent: agentTokens.length > 0 ? agentTokens[agentTokens.length - 1] : undefined,
+  };
 }
 
 function parseSlashCommandInput(content: string): ParsedSlashCommandInput | null {
   const trimmedContent = content.trim();
-  if (!trimmedContent.startsWith('/') || trimmedContent.startsWith('//')) {
+  if (!trimmedContent || trimmedContent.startsWith('//')) {
     return null;
   }
 
-  const commandBody = trimmedContent.slice(1);
-  if (!commandBody || /^\s/.test(commandBody)) {
+  // Strategy 1: /command at start of text
+  if (trimmedContent.startsWith('/')) {
+    const commandBody = trimmedContent.slice(1);
+    if (!commandBody || /^\s/.test(commandBody)) {
+      return null;
+    }
+
+    const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
+    if (!commandMatch) {
+      return null;
+    }
+
+    const command = commandMatch[1]?.trim() ?? '';
+    if (!command) {
+      return null;
+    }
+
+    const rawArguments = commandMatch[2] ?? '';
+    const { cleanedArguments, agent } = extractAgentFromArguments(rawArguments);
+    return {
+      command,
+      arguments: cleanedArguments,
+      agent,
+    };
+  }
+
+  // Strategy 2: /command after whitespace (mid-text, e.g. "some text /command args")
+  // Use global regex and take the LAST match to prefer the rightmost /command.
+  const midRegex = /\s\/(\S+)/g;
+  let lastMidMatch: RegExpExecArray | null = null;
+  let currentMatch: RegExpExecArray | null;
+  while ((currentMatch = midRegex.exec(trimmedContent)) !== null) {
+    lastMidMatch = currentMatch;
+  }
+
+  if (!lastMidMatch?.[1]) {
     return null;
   }
 
-  const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
-  if (!commandMatch) {
+  // Reject //
+  const slashPosition = lastMidMatch.index + 1;
+  if (slashPosition > 0 && trimmedContent[slashPosition - 1] === '/') {
     return null;
   }
 
-  const command = commandMatch[1]?.trim() ?? '';
-  if (!command) {
+  const commandName = lastMidMatch[1].trim();
+  if (!commandName) {
     return null;
   }
+
+  const afterCommand = trimmedContent.slice(lastMidMatch.index + lastMidMatch[0].length);
+  const rawArguments = afterCommand.trim();
+  const { cleanedArguments, agent } = extractAgentFromArguments(rawArguments);
 
   return {
-    command,
-    arguments: commandMatch[2] ?? '',
+    command: commandName,
+    arguments: cleanedArguments,
+    agent,
   };
 }
 
@@ -246,11 +308,15 @@ export class SlashCommandExecutionService {
 
       this.host.refreshActiveFocusContextPreview();
       this.host.startConversationSyncLoop();
-      await this.host.runSessionCommand(conversation.openCodeSessionId, {
+      const commandInput: SessionCommandInput = {
         command: executableCommand.command,
         arguments: executableCommand.arguments,
         placeholderContext: this.buildPlaceholderContext(conversation),
-      });
+      };
+      if (executableCommand.agent) {
+        commandInput.agent = executableCommand.agent;
+      }
+      await this.host.runSessionCommand(conversation.openCodeSessionId, commandInput);
       await this.host.syncVisibleConversationInBackground();
       return true;
     } catch (error) {

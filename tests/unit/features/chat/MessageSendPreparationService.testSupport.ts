@@ -102,6 +102,7 @@ export function createHost(
     appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
     buildStructuredPromptSendPayload: jest.fn().mockImplementation((content: string) =>
       createStructuredSendPayload({ requestParts: [{ id: 'part-1', type: 'text', text: content }] })),
+    loadSkills: jest.fn().mockResolvedValue([]),
     seedCanonicalUserMessage: jest.fn().mockImplementation(() => { callOrder.push('seedCanonicalUserMessage'); }),
     resetBackgroundTaskIndicator: jest.fn().mockImplementation(() => { callOrder.push('resetBackgroundTaskIndicator'); }),
     armBackgroundTaskIndicatorForUserMessage: jest.fn().mockImplementation(() => { callOrder.push('armBackgroundTaskIndicatorForUserMessage'); }),

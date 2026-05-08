@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
 
+import { ProviderIconService } from '../../../../utils/icons/ProviderIconService';
 import { bindModelSelectorStickyHeaders } from '../modelSelectorStickyHeaders';
 import { buildModelOptionValue } from './ModelSelectorInteractions';
 import type {
@@ -91,7 +92,18 @@ export function renderModelList({
     const header = groupEl.createDiv({
       cls: 'opencodian-model-provider-header',
     });
-    header.setText(provider.name);
+
+    const iconEl = ProviderIconService.createIconElement(provider.id, 14);
+    if (iconEl) {
+      iconEl.classList.add('opencodian-model-provider-header-icon');
+      iconEl.setAttribute('aria-hidden', 'true');
+      const img = iconEl.querySelector('img');
+      if (img) img.alt = '';
+      header.appendChild(iconEl);
+    }
+
+    const headerText = header.createSpan({ cls: 'opencodian-model-provider-header-text' });
+    headerText.setText(provider.name);
     headers.push(header);
 
     for (const model of provider.models) {

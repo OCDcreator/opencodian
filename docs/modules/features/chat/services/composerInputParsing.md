@@ -45,12 +45,15 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string 
 - 空白输入返回 `null`
 - shell mode 直接生成 `{ kind: 'shell', rawContent, command }`
 - prompt mode 下 `/command args` 会生成 structured command submission，`//` 不触发 command
+- **行首 `/command`**（backward compatible）：`/command args` 归类为 command submission，`rawContent` 为完整输入
+- **行中 `/command`**（`/command` 出现在空白之后）：例如 `some text /review src/app.ts` 也会归类为 command submission，`command = "review"`、`arguments = "src/app.ts"`、`precedingText = "some text"`、`originalContent = "some text /review src/app.ts"`。对于行中命令，`rawContent` 设为完整原始文本，这样当 `SlashCommandExecutionService` 不识别该命令时，发送管道会将完整内容作为普通 prompt 发送而不丢失文字
 - 普通文本生成 `{ kind: 'prompt', content }`
 - `buildComposerInputSubmissionWithAgentIntents()` 是 composer submit 边界的组合 helper：先归类 submission，再调整 mention source span，最后合并 mention 与 primary agent intent
 - `decoratePromptSubmissionWithAgentMentions()` 只处理 prompt submission，并把 selected `@agent` mention intent 合并进 `invocationIntent.mentions`
 - `shiftAgentMentionSourceSpans()` 用于把 textarea 原始坐标调整到 trim 后的 prompt content 坐标，避免 coordinator 内联 source span 改写
 - `decoratePromptSubmissionWithPrimaryAgent()` 只处理 prompt submission，并把 composer 主 Agent selector 的选择值写入 `invocationIntent.primaryAgent`
 - slash query 只在光标折叠、仍停留在 command token 内时返回；`/skills <query>` 是唯一允许继续跨空格补全的 nested form。`/` 前必须是空白或文本开头（`slashIndex > 0` 时检查前一字符是否为 `\s`），不会在 `path/to` 这种词中触发
+- `isCommandComposerText()` 调用 `parseCommandSubmission()` 判断输入是否包含可识别的 `/command`（行首或行中均可）
 
 ## 边界
 

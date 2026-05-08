@@ -9,6 +9,10 @@ import type {
   PromptRequestPart,
   PromptSyntheticTextPartInput,
 } from '../../../core/opencode/OpenCodePromptRequestBuilder';
+import {
+  SkillContentExpander,
+  type SkillRecord,
+} from '../../../core/opencode/SkillContentExpander';
 import type {
   ChatMessage,
   Conversation,
@@ -53,6 +57,10 @@ export interface CommandComposerSubmission {
   command: string;
   arguments: string;
   syntheticTextParts?: PromptSyntheticTextPartInput[];
+  /** Text preceding the /command when the slash command appears mid-input (e.g. "hello /review" → "hello"). */
+  precedingText?: string;
+  /** The full original input before mid-text command extraction. Used as fallback prompt when the command is not recognized. */
+  originalContent?: string;
 }
 
 export interface ShellComposerSubmission {
@@ -144,6 +152,7 @@ export interface MessageSendPreparationHost {
       invocationParts?: readonly InvocationPromptPart[];
     },
   ): BuiltPromptSendPayload;
+  loadSkills(): Promise<SkillRecord[]>;
   seedCanonicalUserMessage(input: {
     sessionID: string;
     messageID: string;
@@ -229,6 +238,7 @@ export interface MessageSendPreparationHostDependencies {
       parts: PromptRequestPart[];
       timestamp?: number;
     }): void;
+    sdk: { app: { skills(): Promise<unknown> } };
   };
   backgroundTaskHost: {
     resetBackgroundTaskIndicator(tabId: TabId | null): void;
@@ -250,11 +260,16 @@ export interface MessageSendPreparationHostDependencies {
 
 export class MessageSendPreparationService {
   private readonly agentInvocationService = new AgentInvocationService();
+  private readonly skillContentExpander: SkillContentExpander;
 
   constructor(
     private readonly host: MessageSendPreparationHost,
     private readonly composerSendContext: ComposerSendContextPort,
-  ) {}
+  ) {
+    this.skillContentExpander = new SkillContentExpander({
+      loadSkills: () => this.host.loadSkills(),
+    });
+  }
 
   async prepareMessageSend(
     options: PrepareMessageSendOptions,
@@ -279,9 +294,14 @@ export class MessageSendPreparationService {
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
     const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
     const requestContent = this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
+    const skillExpansion = await this.skillContentExpander.expand(requestContent);
+    const syntheticTextParts: PromptSyntheticTextPartInput[] = [
+      ...(options.syntheticTextParts ?? []),
+      ...skillExpansion.syntheticBlocks.map((text: string) => ({ text, ignored: false })),
+    ];
     const structuredSend = this.host.buildStructuredPromptSendPayload(requestContent, {
       contextItems,
-      ...(options.syntheticTextParts ? { syntheticTextParts: options.syntheticTextParts } : {}),
+      ...(syntheticTextParts.length > 0 ? { syntheticTextParts } : {}),
       ...(resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
     });
     const userMessage = buildOptimisticUserMessage(options.content, contextItems, Date.now(), { optimisticUserParts: structuredSend.optimisticUserParts });
@@ -478,6 +498,10 @@ export function createMessageSendPreparationHost(
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
     buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),
+    loadSkills: async () => {
+      const response = await openCodeService.sdk.app.skills();
+      return Array.isArray(response) ? response : [];
+    },
     seedCanonicalUserMessage: (input) => openCodeService.seedCanonicalUserMessage(input),
     resetBackgroundTaskIndicator: (tabId) => backgroundTaskHost.resetBackgroundTaskIndicator(tabId),
     armBackgroundTaskIndicatorForUserMessage: (message, tabId) => backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId),

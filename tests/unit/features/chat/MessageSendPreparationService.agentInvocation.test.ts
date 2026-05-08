@@ -78,6 +78,7 @@ function createHost(conversation: Conversation): MockedHost {
     ensureSelectedModelAvailable: jest.fn().mockResolvedValue(true),
     appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
     buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
+    loadSkills: jest.fn().mockResolvedValue([]),
     seedCanonicalUserMessage: jest.fn(),
     resetBackgroundTaskIndicator: jest.fn(),
     armBackgroundTaskIndicatorForUserMessage: jest.fn(),

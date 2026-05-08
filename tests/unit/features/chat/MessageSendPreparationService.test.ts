@@ -383,3 +383,54 @@ describe('MessageSendPreparationService synthetic part canonical seeding', () =>
     expect(result?.userMessage.content).not.toContain('Injected plugin prompt');
   });
 });
+
+describe('MessageSendPreparationService skill expansion', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('expands skill references into synthetic text parts while keeping user bubble original', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation, [], {
+      loadSkills: jest.fn().mockResolvedValue([
+        { name: 'analyze', description: 'Analyze content', location: '', content: 'Analyze the given content' },
+      ]),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({
+      content: '/analyze this file',
+    });
+
+    expect(host.loadSkills).toHaveBeenCalled();
+    expect(host.buildStructuredPromptSendPayload).toHaveBeenCalledWith(
+      '/analyze this file',
+      expect.objectContaining({
+        syntheticTextParts: expect.arrayContaining([
+          expect.objectContaining({
+            text: '<skill name="analyze" description="Analyze content">\nAnalyze the given content\n</skill>',
+          }),
+        ]),
+      }),
+    );
+    expect(result?.userMessage.content).toBe('/analyze this file');
+  });
+
+  it('ignores unknown slash tokens and does not add synthetic parts', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation, [], {
+      loadSkills: jest.fn().mockResolvedValue([]),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({
+      content: '/unknown this file',
+    });
+
+    expect(host.buildStructuredPromptSendPayload).toHaveBeenCalledWith(
+      '/unknown this file',
+      expect.not.objectContaining({ syntheticTextParts: expect.anything() }),
+    );
+    expect(result?.userMessage.content).toBe('/unknown this file');
+  });
+});

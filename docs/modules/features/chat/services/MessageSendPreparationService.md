@@ -21,6 +21,16 @@
 ## 公开接口
 
 ```typescript
+// Submission types used by the composer input pipeline:
+export interface CommandComposerSubmission {
+  kind: 'command';
+  rawContent: string;
+  command: string;
+  arguments: string;
+  syntheticTextParts?: PromptSyntheticTextPartInput[];
+  precedingText?: string; // text before /command when slash appears mid-input
+}
+
 export function buildOptimisticUserMessage(
   content: string,
   draftContextItems: PromptContextItem[],

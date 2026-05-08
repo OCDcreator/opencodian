@@ -177,6 +177,7 @@ describe('createMessageSendPreparationHost', () => {
       openCodeService: {
         buildStructuredPromptSendPayload: jest.fn().mockReturnValue(createStructuredSendPayload()),
         seedCanonicalUserMessage: jest.fn(),
+        sdk: { app: { skills: jest.fn().mockResolvedValue([]) } },
       },
       backgroundTaskHost: { resetBackgroundTaskIndicator: jest.fn(), armBackgroundTaskIndicatorForUserMessage: jest.fn() },
       conversationSyncBridgePorts: { getLoopControl: () => ({ startConversationSyncLoop: jest.fn() }) },

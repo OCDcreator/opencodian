@@ -62,7 +62,7 @@ export class ComposerInputShellCoordinator {
 
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam；textarea 被 `opencodian-input-highlight-container` 包裹，内含 `opencodian-input-highlight-backdrop` 和 textarea 两个同级元素
 - `build()` 设置 textarea 的 scroll 事件监听器，同步 backdrop 的 scrollTop 以保持滚动一致
-- `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionIntents()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内
+- `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionIntents()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`/command` 段（行首或空白后均可匹配）包裹在 `opencodian-input-highlight-command` span 内，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内
 - `syncTextareaHeight()` 在调整 textarea 高度的同时同步 backdrop 高度
 - `buildComposerInputSubmission()` 继续从本模块 re-export，但实现已下沉到 `composerInputParsing.ts`；它会把当前 textarea 文本归一化成结构化 submission：普通文本 -> `prompt`、`/command ...` -> `command`、shell mode -> `shell`
 - slash menu 作为 `opencodian-composer-shell` 的 overlay 子节点挂载，用 CSS `bottom: calc(100% + 8px)` 显示在输入框上方，而不是插入 textarea/footer 的内部内容流
@@ -73,12 +73,13 @@ export class ComposerInputShellCoordinator {
 - `refreshSlashCommandMenu()` 会把 `getSlashCommandSkillMode()` 传给过滤 helper；direct mode 直接展示 skill，prefixed mode 则顶层展示 `/skills` 并在 `/skills <query>` 下展示 nested skill suggestions
 - 若 runtime/project catalog 返回空、过滤后无结果或加载失败，`refreshSlashCommandMenu()` 会渲染非交互式状态行；失败细节只进入 debug log，避免普通输入 `/` 时刷警告
 - `tryHandleSlashCommandMenuKeydown()` 在 menu 打开时拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`
-- 选中 menu item 后，textarea 默认写成 `/<id> `；prefixed skill suggestion 会写成 `/skills <id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
+- 选中 menu item 后，使用局部替换：从光标位置反向扫描找到 `/xxx` 的起始位置，只替换该部分并保留前后的文字；若无法定位则 fallback 为整段替换。prefixed skill suggestion 会写成 `/skills <id> `，真正执行仍留给现有 send pipeline + `SlashCommandExecutionService`
 - prefixed mode 下如果先选中顶层 `/skills` 入口，coordinator 会立即保留菜单并切换到 nested skill 列表，而不是先关闭菜单再要求用户手动继续输入
 - skill menu 的状态行、badge、来源文案和 item DOM 已下沉到 `slashCommandMenuRenderer.ts`；coordinator 继续只保留当前 query、选中项和事件编排
 - `@agent` 的 query / filter / selection / source span 追踪已下沉到 `AgentMentionComposerController.ts`；coordinator 只负责把候选 catalog、textarea 和 overlay 元素接进去
 - `@agent` 候选优先使用可选 `loadAgentMentionCandidates()` host seam；稳定 view 路径则复用 `loadSlashCommandMenuItems()` 返回的 shared catalog sidecar，避免为了 agent picker 加厚 `OpenCodianView`
 - Enter 提交现在先在 coordinator 边界把文本归类成结构化 composer submission，再交给 host 决定 prompt / command / shell 的后续 runtime owner，避免 slash / shell 语义再次退化成“只剩原始字符串”
+- 若 command submission 包含 `precedingText`（即 `/command` 出现在行中），coordinator 在提交后仅清空命令部分，将 `precedingText` 保留在 textarea 中，供用户后续决定是否作为普通 prompt 发送
 - 如果 prompt submission 中有仍存在的 selected `@agent` mention，coordinator 会附加 `invocationIntent.mentions`；不会把 `@agent` 只当纯文本 fallback，也不会提升用户手写但未选中的 `@name`
 - 如果 `ChatAgentSelectionCoordinator` 当前有主 Agent 选择值，coordinator 会把它写入 `invocationIntent.primaryAgent`；`null` 继续表示跟随 OpenCode/project default
 - `scheduleLayoutSync()` / `clearScheduledLayoutSync()` 收束 composer stack height 的 RAF 节流

@@ -11,6 +11,7 @@ import {
   buildComposerInputSubmissionWithAgentIntents,
   getSlashCommandMenuQuery,
   isCommandComposerText,
+  replaceSlashTokenAtCursor,
 } from './composerInputParsing';
 import type { ComposerInputMode, ComposerInputSubmission } from './MessageSendPreparationService';
 import {
@@ -358,16 +359,23 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    if (isCommandComposerText(textarea.value)) {
-      this.agentMentionController.clear(this.slashCommandMenuEl);
+    // Check agent mention query before isCommandComposerText, so that typing
+    // @ after mid-text slash commands (e.g. "text /cmd @agent") still shows
+    // the agent autocomplete. When the input starts with /command, only block
+    // agent suggestions while the user is actively selecting a command name;
+    // once a command is chosen and arguments are being typed, @ should trigger
+    // agent mentions normally.
+    const agentQuery = this.agentMentionController.getQuery(textarea);
+    const isSelectingSlashCommand = getSlashCommandMenuQuery(textarea) !== null;
+    if (agentQuery && !isSelectingSlashCommand) {
       this.clearSlashCommandMenu();
+      await this.agentMentionController.refresh(agentQuery, this.slashCommandMenuEl);
       return;
     }
 
-    const agentQuery = this.agentMentionController.getQuery(textarea);
-    if (agentQuery) {
+    if (isCommandComposerText(textarea.value)) {
+      this.agentMentionController.clear(this.slashCommandMenuEl);
       this.clearSlashCommandMenu();
-      await this.agentMentionController.refresh(agentQuery, this.slashCommandMenuEl);
       return;
     }
 
@@ -456,10 +464,15 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    const nextValue = item.insertText ?? `/${item.id} `;
-    this.inputTextareaEl.value = nextValue;
-    this.inputTextareaEl.focus();
-    this.inputTextareaEl.setSelectionRange(nextValue.length, nextValue.length);
+    const textarea = this.inputTextareaEl;
+    const cursorPos = textarea.selectionStart ?? textarea.value.length;
+    const replacement = item.insertText ?? `/${item.id} `;
+    const { value: nextValue, cursorPos: nextCursorPos } =
+      replaceSlashTokenAtCursor(textarea.value, cursorPos, replacement);
+
+    textarea.value = nextValue;
+    textarea.focus();
+    textarea.setSelectionRange(nextCursorPos, nextCursorPos);
     this.syncTextareaHeight();
     this.syncHighlightBackdrop();
     if (item.source === 'skills-command') {
@@ -603,7 +616,7 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    // Slash command highlight (/command at start of content)
+    // Slash command highlight (only /command at start of content)
     const slashMatch = /^\/(\S+)/.exec(content);
     if (slashMatch) {
       const commandEnd = slashMatch[0].length;

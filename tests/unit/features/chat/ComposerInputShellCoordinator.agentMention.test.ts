@@ -332,8 +332,20 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
       },
     });
   });
+});
 
-  it('does not open agent suggestions inside slash command arguments', async () => {
+describe('ComposerInputShellCoordinator agent mentions in slash commands', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  it('opens agent suggestions inside slash command arguments', async () => {
     const fixture = createFixture();
     fixture.setAgentMentionCandidates([
       { id: 'reviewer', displayName: 'Reviewer', description: 'Reviews changes', mode: 'subagent' },
@@ -344,20 +356,49 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
     fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
     await flushAsync();
 
-    expect(fixture.host.loadAgentMentionCandidates).not.toHaveBeenCalled();
-    expect(
-      fixture.container.querySelector('.opencodian-slash-command-menu-item'),
-    ).toBeNull();
+    expect(fixture.host.loadAgentMentionCandidates).toHaveBeenCalled();
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    expect(menuItems.length).toBeGreaterThan(0);
+    expect(menuItems[0].textContent).toContain('@reviewer');
 
+    // Press Enter to select the agent mention
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushAsync();
+
+    // After selecting the mention, the text should be updated
+    expect(fixture.textarea.value).toBe('/review @reviewer ');
+
+    // Press Enter again to submit the command with the inserted mention text
     fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await flushAsync();
 
     expect(fixture.host.submitMessage).toHaveBeenCalledWith({
       kind: 'command',
-      rawContent: '/review @re',
+      rawContent: '/review @reviewer',
       command: 'review',
-      arguments: '@re',
+      arguments: '@reviewer',
     });
+  });
+
+  it('opens agent suggestions after command arguments with spaces', async () => {
+    const fixture = createFixture();
+    fixture.setAgentMentionCandidates([
+      { id: 'reviewer', displayName: 'Reviewer', description: 'Reviews changes', mode: 'subagent' },
+    ]);
+
+    fixture.textarea.value = '/skill nihao @re';
+    fixture.textarea.setSelectionRange(16, 16);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(fixture.host.loadAgentMentionCandidates).toHaveBeenCalled();
+    const menuItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    expect(menuItems.length).toBeGreaterThan(0);
+    expect(menuItems[0].textContent).toContain('@reviewer');
   });
 
   it('keeps slash autocomplete available while agent mentions are supported', async () => {
