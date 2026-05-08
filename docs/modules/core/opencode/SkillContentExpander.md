@@ -54,4 +54,7 @@ export class SkillContentExpander {
 - Skill 目录通过 `sdk.app.skills()` 获取，结果缓存 60 秒，避免每次发送消息都请求服务器
 - 采用 catalog-first 匹配：先加载完整目录，再用已知名称反向匹配文本中的 token
 - 支持含 `/` 的 skill 路径名称（如 `x-reader/video`），使用最长优先匹配避免短名称误匹配
+- 同时支持两种输入格式：
+  - **Direct mode**：`/skillName`（如 `/analyze this file`）
+  - **Skills-command mode**：`/skills skillName`（如 `/skills analyze this file`）
 - XML 输出格式为 `<skill_content name="...">`，不再使用旧的 `<skill name="..." description="...">` 格式

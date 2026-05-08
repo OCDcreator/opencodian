@@ -1,6 +1,5 @@
 import { setIcon } from 'obsidian';
 
-import type { AgentMentionIntent } from '../../../core/agents';
 import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
 import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
@@ -616,39 +615,49 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    // Slash command highlight (only /command at start of content)
-    const slashMatch = /^\/(\S+)/.exec(content);
-    if (slashMatch) {
-      const commandEnd = slashMatch[0].length;
-      const html = `<span class="opencodian-input-highlight-command" style="color:#7b6ef6;background:rgba(123,110,246,0.22);border-radius:4px;box-shadow:0 0 0 1px rgba(123,110,246,0.4);">${escapeHtmlContent(content.slice(0, commandEnd))}</span>`
-        + escapeHtmlContent(content.slice(commandEnd))
-        + (content.endsWith('\n') ? '\n' : '');
-      backdrop.innerHTML = html;
-      backdrop.scrollTop = textarea.scrollTop;
-      return;
+    // Collect all highlight spans
+    const spans: Array<{ start: number; end: number; cls: string; style: string }> = [];
+
+    // Slash command highlights — match all /command tokens, including mid-text.
+    // For /skill and /skills, also capture the following skill name.
+    const slashRegex = /(^|\s)(\/(?:skill|skills)(?:\s+\S+)?|\/\S+)/g;
+    let slashMatch: RegExpExecArray | null;
+    while ((slashMatch = slashRegex.exec(content)) !== null) {
+      const start = slashMatch.index + slashMatch[1].length;
+      const end = start + slashMatch[2].length;
+      spans.push({
+        start,
+        end,
+        cls: 'opencodian-input-highlight-command',
+        style: 'color:#7b6ef6;background:rgba(123,110,246,0.22);border-radius:4px;box-shadow:0 0 0 1px rgba(123,110,246,0.4);',
+      });
     }
 
     // Agent mention highlights
     const mentions = this.agentMentionController.resolveMentionIntents(content);
-    const sorted = [...mentions]
-      .filter(
-        (m): m is AgentMentionIntent & { source: NonNullable<AgentMentionIntent['source']> } =>
-          !!m.source,
-      )
-      .sort((a, b) => a.source.start - b.source.start);
+    for (const mention of mentions) {
+      if (mention.source) {
+        spans.push({
+          start: mention.source.start,
+          end: mention.source.end,
+          cls: 'opencodian-input-highlight-agent',
+          style: 'color:#e5a100;background:rgba(229,161,0,0.25);border-radius:4px;box-shadow:0 0 0 1px rgba(229,161,0,0.4);',
+        });
+      }
+    }
+
+    // Sort by position and render
+    spans.sort((a, b) => a.start - b.start);
 
     let html = '';
     let lastIndex = 0;
-
-    for (const mention of sorted) {
-      const { start, end } = mention.source;
-      if (start < lastIndex) {
+    for (const span of spans) {
+      if (span.start < lastIndex) {
         continue;
       }
-
-      html += escapeHtmlContent(content.slice(lastIndex, start));
-      html += `<span class="opencodian-input-highlight-agent" style="color:#e5a100;background:rgba(229,161,0,0.25);border-radius:4px;box-shadow:0 0 0 1px rgba(229,161,0,0.4);">${escapeHtmlContent(content.slice(start, end))}</span>`;
-      lastIndex = end;
+      html += escapeHtmlContent(content.slice(lastIndex, span.start));
+      html += `<span class="${span.cls}" style="${span.style}">${escapeHtmlContent(content.slice(span.start, span.end))}</span>`;
+      lastIndex = span.end;
     }
 
     html += escapeHtmlContent(content.slice(lastIndex));

@@ -66,8 +66,12 @@ export class SkillContentExpander {
 
   /**
    * Extract potential skill names from content by matching against the known
-   * skill catalog. Skills are matched longest-first to prevent shorter names
-   * from shadowing longer ones (e.g., `x-reader` vs `x-reader/video`).
+   * skill catalog. Supports both formats:
+   * - Direct: `/skillName` (e.g., `/analyze this file`)
+   * - Prefixed: `/skills skillName` (e.g., `/skills analyze this file`)
+   *
+   * Skills are matched longest-first to prevent shorter names from shadowing
+   * longer ones (e.g., `x-reader` vs `x-reader/video`).
    */
   extractSkillNames(content: string, skills: SkillRecord[]): string[] {
     // Sort skills by name length descending so longest names match first
@@ -77,6 +81,7 @@ export class SkillContentExpander {
     const names: string[] = [];
     const seen = new Set<string>();
 
+    // 1. Match /skillName tokens (direct mode)
     for (const skill of sortedSkills) {
       if (seen.has(skill.name)) {
         continue;
@@ -104,6 +109,34 @@ export class SkillContentExpander {
         seen.add(skill.name);
         names.push(skill.name);
         break; // Only take first non-overlapping match per skill
+      }
+    }
+
+    // 2. Match /skills skillName tokens (skills-command mode)
+    const prefixRegex = /\/skills\s+(\S+)/gi;
+    let prefixMatch: RegExpExecArray | null;
+    while ((prefixMatch = prefixRegex.exec(content)) !== null) {
+      const skillName = prefixMatch[1];
+      if (!skillName || seen.has(skillName)) {
+        continue;
+      }
+
+      const skill = sortedSkills.find((s) => s.name === skillName);
+      if (skill) {
+        const matchStart = prefixMatch.index + '/skills '.length;
+        const matchEnd = matchStart + skillName.length;
+
+        // Check for overlapping matches
+        const overlaps = matchedRanges.some(
+          (range) => matchStart < range.end && matchEnd > range.start,
+        );
+        if (overlaps) {
+          continue;
+        }
+
+        matchedRanges.push({ start: matchStart, end: matchEnd });
+        seen.add(skillName);
+        names.push(skillName);
       }
     }
 
