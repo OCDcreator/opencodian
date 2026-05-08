@@ -297,7 +297,11 @@ export class MessageSendPreparationService {
     const skillExpansion = await this.skillContentExpander.expand(requestContent);
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
       ...(options.syntheticTextParts ?? []),
-      ...skillExpansion.syntheticBlocks.map((text: string) => ({ text, ignored: false })),
+      ...skillExpansion.syntheticParts.map((part) => ({
+        text: part.text,
+        ignored: false,
+        metadata: { kind: 'skill-expansion', skillName: part.skillName },
+      })),
     ];
     const structuredSend = this.host.buildStructuredPromptSendPayload(requestContent, {
       contextItems,

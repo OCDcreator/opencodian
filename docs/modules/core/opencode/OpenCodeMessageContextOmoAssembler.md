@@ -43,6 +43,7 @@
 
 - `normalizeTextPart()` 处理普通文本、Obsidian context tag 与 synthetic inline Read 恢复
 - `normalizeTextPart()` 现在也会过滤 `metadata.compaction_continue === true` 的内部续跑 user text，避免 transcript 泄露“Continue...”提示
+- `normalizeTextPart()` 对 `metadata.kind === 'skill-expansion'` 的 synthetic part 直接返回 `{ attachments: [] }`（无 visibleText），使 skill 展开内容在用户消息渲染中隐藏——AI 可见但 UI 不显示
 - `collectAgentSourceSpans()` / `restoreAgentMentionSourceText()` 只在 user message 上运行，按原始 source span 把 native `agent` part 的 `@agent` 文本补回 hydrated visible content；如果 text part 已经包含该 mention，则不会重复插入
 - `parseFileContextAttachment()` 统一处理 `file` part 的 path/url/line-range/mime/textSnapshot
 - `extractInlineReadToolContext()` 从历史 Read tool 文本中恢复 file/selection attachment，并剥离用户可见文本

@@ -89,15 +89,16 @@ interface ParsedSlashCommandInput {
 }
 
 function extractAgentFromArguments(argumentsText: string): { cleanedArguments: string; agent?: string } {
-  // Find @agent tokens that are whole words (not part of an email or path).
-  // We look for @xxx where xxx is a non-empty sequence of non-whitespace chars.
   const tokens = argumentsText.split(/\s+/);
   const agentTokens: string[] = [];
   const remainingTokens: string[] = [];
 
   for (const token of tokens) {
-    if (token.startsWith('@') && token.length > 1) {
-      agentTokens.push(token.slice(1));
+    if (!token) continue;
+    // Match @agent with optional trailing punctuation, reject emails
+    const match = /^@([a-zA-Z0-9_-]+)[.,;:!?]*$/.exec(token);
+    if (match) {
+      agentTokens.push(match[1]);
     } else {
       remainingTokens.push(token);
     }
@@ -246,6 +247,18 @@ export class SlashCommandExecutionService {
   async tryRunSlashCommand(content: string): Promise<boolean> {
     const parsedCommand = parseSlashCommandInput(content);
     if (!parsedCommand) {
+      return false;
+    }
+
+    // Mid-text commands always fall through to prompt path
+    if (!content.trimStart().startsWith('/')) {
+      return false;
+    }
+
+    // Known skills fall through to prompt expansion (SkillContentExpander handles them)
+    const runtimeSkills = await this.host.getRuntimeSkills();
+    const runtimeSkillNames = collectRuntimeSkillNames(runtimeSkills);
+    if (runtimeSkillNames.has(parsedCommand.command)) {
       return false;
     }
 

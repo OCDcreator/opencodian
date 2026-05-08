@@ -179,6 +179,10 @@ export class OpenCodeMessageContextOmoAssembler {
       return { attachments: [contextAttachment] };
     }
 
+    if (part.metadata?.kind === 'skill-expansion') {
+      return { attachments: [] };
+    }
+
     if ((part as OpenCodeMessagePart & { synthetic?: boolean }).synthetic === true) {
       return this.extractInlineReadToolContext(part.text, vaultPath);
     }

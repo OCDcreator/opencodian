@@ -408,7 +408,8 @@ describe('MessageSendPreparationService skill expansion', () => {
       expect.objectContaining({
         syntheticTextParts: expect.arrayContaining([
           expect.objectContaining({
-            text: '<skill name="analyze" description="Analyze content">\nAnalyze the given content\n</skill>',
+            text: '<skill_content name="analyze">\nAnalyze the given content\n</skill_content>',
+            metadata: { kind: 'skill-expansion', skillName: 'analyze' },
           }),
         ]),
       }),

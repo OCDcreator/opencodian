@@ -47,9 +47,10 @@ export function createSlashCommandExecutionHost(
 - 非 `/` 前缀输入（不包含行中 `/command`）直接返回 `false`
 - `//` 与 `/ ` 这种非命令输入也直接放回普通消息路径
 - **行首 `/command`**：原有行为不变，`trimmedContent.startsWith('/')` 路径
-- **行中 `/command`**（空白后的 `/command`，例如 `"请帮我 /review src/app.ts"`）：`parseSlashCommandInput()` 使用全局正则匹配并取最后一个匹配项，提取 command 和 arguments；前导文字不是 arguments 的一部分，command 执行时只发送提取的 command 和 arguments
+- **行中 `/command`**（空白后的 `/command`，例如 `"请帮我 /review src/app.ts"`）：`parseSlashCommandInput()` 使用全局正则匹配并取最后一个匹配项，提取 command 和 arguments；**行中命令现在始终 fall through 到 prompt 路径**（返回 `false`），不会作为 slash command 执行——前导文字的存在意味着用户意图是普通消息而非命令
 - 行中匹配同时排除 `//`（例如 `"text //comment"` 不触发命令解析）
 - 若行中 `/command` 不被 runtime catalog 认可，`tryRunSlashCommand` 返回 `false`，`SendPipelineRuntime` 将完整原始文本作为普通 prompt 发送（不丢失用户输入）
+- **已知的 runtime skill 命令**（`source === 'skill'`）现在也会 fall through 到 prompt 展开路径，由 `SkillContentExpander` 处理，而不是直接作为 session command 执行；这确保 skill 内容通过 XML 展开而非命令调用
 - runtime commands 统一使用 `sdk.command.list()` 判断
 - project config 只用于识别“这个 runtime command 是否同时存在 project override”，不会让 runtime 未注册的 command 提前执行
 - runtime catalog 会过滤掉 `source === 'mcp'` 的条目
@@ -73,6 +74,11 @@ export function createSlashCommandExecutionHost(
   - `currentSelection = ''`
   - `currentNotePath` 回退到 note preview / `conversation.currentNote`
 - `externalContextPaths` 直接来自当前会话持久路径数组，真正的路径规范化仍交给 phase 14 已落地的 `runSessionCommand()` seam
+
+### agent 提取改进
+
+- `extractAgentFromArguments` 现在会剥离尾部标点符号（例如 `@reviewer,` → `reviewer`），避免用户在 agent mention 后加逗号时提取失败
+- 同时会拒绝 email 格式的 token（例如 `user@example.com`），避免误将 email 地址识别为 agent mention
 
 ## 与发送 runtime 的边界
 

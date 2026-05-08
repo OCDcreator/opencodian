@@ -13,10 +13,13 @@ export interface SkillContentExpanderHost {
   loadSkills(): Promise<SkillRecord[]>;
 }
 
+export interface SkillSyntheticPart {
+  text: string;
+  skillName: string;
+}
+
 export interface SkillExpansionResult {
-  /** Skill content blocks to inject as synthetic text parts. */
-  readonly syntheticBlocks: string[];
-  /** Names of skills that were found and expanded. */
+  readonly syntheticParts: SkillSyntheticPart[];
   readonly expandedSkillNames: string[];
 }
 
@@ -32,18 +35,19 @@ export class SkillContentExpander {
    *
    * Only `/name` tokens that match known skills in the catalog are expanded.
    * False positives like paths, URLs, and markdown links are ignored.
+   * Supports `/` in skill names (e.g., `x-reader/video`).
    */
   async expand(content: string): Promise<SkillExpansionResult> {
-    const skillNames = this.extractSkillNames(content);
+    const skills = await this.loadSkills();
+    const skillNames = this.extractSkillNames(content, skills);
     if (skillNames.length === 0) {
-      return { syntheticBlocks: [], expandedSkillNames: [] };
+      return { syntheticParts: [], expandedSkillNames: [] };
     }
 
-    const skills = await this.loadSkills();
     const knownNames = new Set(skills.map((s) => s.name));
     const skillMap = new Map(skills.map((s) => [s.name, s]));
 
-    const syntheticBlocks: string[] = [];
+    const syntheticParts: SkillSyntheticPart[] = [];
     const expandedSkillNames: string[] = [];
 
     for (const name of skillNames) {
@@ -52,34 +56,55 @@ export class SkillContentExpander {
       }
       const skill = skillMap.get(name);
       if (skill) {
-        syntheticBlocks.push(this.wrapSkillContent(skill));
+        syntheticParts.push(this.wrapSkillContent(skill));
         expandedSkillNames.push(name);
       }
     }
 
-    return { syntheticBlocks, expandedSkillNames };
+    return { syntheticParts, expandedSkillNames };
   }
 
-  private extractSkillNames(content: string): string[] {
+  /**
+   * Extract potential skill names from content by matching against the known
+   * skill catalog. Skills are matched longest-first to prevent shorter names
+   * from shadowing longer ones (e.g., `x-reader` vs `x-reader/video`).
+   */
+  extractSkillNames(content: string, skills: SkillRecord[]): string[] {
+    // Sort skills by name length descending so longest names match first
+    const sortedSkills = [...skills].sort((a, b) => b.name.length - a.name.length);
+
+    const matchedRanges: Array<{ start: number; end: number }> = [];
     const names: string[] = [];
     const seen = new Set<string>();
 
-    // Match /name at token boundaries.
-    // Reject: // (comments), paths with multiple /, URLs (://), markdown links [text](/url)
-    const regex = /(^|[\s(])(\/[^\s/]+)(?=[\s)]|$)/g;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(content)) !== null) {
-      const token = match[2]; // e.g. "/skill1"
-      const name = token.slice(1); // remove leading /
-      if (!name || seen.has(name)) {
+    for (const skill of sortedSkills) {
+      if (seen.has(skill.name)) {
         continue;
       }
-      // Reject URLs (://) and paths with multiple slashes
-      if (content.slice(match.index + match[1].length + token.length).startsWith('/')) {
-        continue;
+
+      // Build regex: match /<skillName> at a word boundary
+      // Escape the skill name for regex (handles / in names like x-reader/video)
+      const escapedName = skill.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`/${escapedName}\\b`, 'g');
+
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(content)) !== null) {
+        const matchStart = match.index;
+        const matchEnd = match.index + match[0].length;
+
+        // Check for overlapping matches
+        const overlaps = matchedRanges.some(
+          (range) => matchStart < range.end && matchEnd > range.start,
+        );
+        if (overlaps) {
+          continue;
+        }
+
+        matchedRanges.push({ start: matchStart, end: matchEnd });
+        seen.add(skill.name);
+        names.push(skill.name);
+        break; // Only take first non-overlapping match per skill
       }
-      seen.add(name);
-      names.push(name);
     }
 
     return names;
@@ -102,8 +127,11 @@ export class SkillContentExpander {
     }
   }
 
-  private wrapSkillContent(skill: SkillRecord): string {
-    return `<skill name="${this.escapeXml(skill.name)}" description="${this.escapeXml(skill.description)}">\n${skill.content}\n</skill>`;
+  private wrapSkillContent(skill: SkillRecord): SkillSyntheticPart {
+    return {
+      text: `<skill_content name="${this.escapeXml(skill.name)}">\n${skill.content}\n</skill_content>`,
+      skillName: skill.name,
+    };
   }
 
   private escapeXml(value: string): string {
