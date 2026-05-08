@@ -145,13 +145,13 @@ function normalizeRuntimeCommands(value: unknown): RuntimeCommand[] {
 
 function normalizeRuntimeSkills(
   value: unknown,
-): Array<{ name: string; location: string }> {
+): Array<{ name: string; description: string; location: string }> {
   if (!Array.isArray(value)) {
     return [];
   }
 
   return value
-    .filter((item): item is { name: string; location: string } =>
+    .filter((item): item is { name: string; description?: string; location: string } =>
       Boolean(
         item
         && typeof item === 'object'
@@ -160,8 +160,46 @@ function normalizeRuntimeSkills(
       ))
     .map((item) => ({
       name: item.name,
+      description: typeof item.description === 'string' ? item.description : '',
       location: item.location,
     }));
+}
+
+function mergeRuntimeCommandsWithMissingSkills(
+  runtimeCommands: RuntimeCommand[],
+  runtimeSkills: Array<{ name: string; description: string }>,
+): RuntimeCommand[] {
+  const commandNames = new Set(
+    runtimeCommands
+      .map((command) => command.name?.trim())
+      .filter((name): name is string => Boolean(name)),
+  );
+
+  if (runtimeSkills.every((skill) => commandNames.has(skill.name.trim()))) {
+    return runtimeCommands;
+  }
+
+  const syntheticSkillCommands = runtimeSkills.flatMap((skill) => {
+    const skillName = skill.name.trim();
+    if (!skillName || commandNames.has(skillName)) {
+      return [];
+    }
+
+    commandNames.add(skillName);
+    return [{
+      name: skillName,
+      template: '',
+      description: skill.description.trim(),
+      source: 'skill',
+      subtask: false,
+      agent: '',
+      model: '',
+    } as RuntimeCommand];
+  });
+
+  return syntheticSkillCommands.length > 0
+    ? runtimeCommands.concat(syntheticSkillCommands)
+    : runtimeCommands;
 }
 
 function buildHiddenCommandCacheKey(commandIds: string[]): string {
@@ -247,9 +285,14 @@ export class SlashCommandMenuCatalogCache {
         this.host.loadProjectCommands(),
         this.host.loadProjectAgents(),
       ]);
+      const runtimeSkills = normalizeRuntimeSkills(runtimeSkillsResult);
       const runtimeSkillSources = buildRuntimeSkillSourceMap(
-        normalizeRuntimeSkills(runtimeSkillsResult),
+        runtimeSkills,
         this.host.getVaultPath(),
+      );
+      const runtimeCommands = mergeRuntimeCommandsWithMissingSkills(
+        normalizeRuntimeCommands(runtimeCommandsResult),
+        runtimeSkills,
       );
 
       const runtimeAgentsResult = Promise.resolve(getAttachedOpenCodeAppAgents(runtimeSkillsResult) ?? [])
@@ -268,7 +311,7 @@ export class SlashCommandMenuCatalogCache {
         .catch(() => []);
       const items = buildVisibleSlashCommandMenuItems(
         mergeSlashCommandCatalog({
-          runtimeCommands: normalizeRuntimeCommands(runtimeCommandsResult),
+          runtimeCommands,
           runtimeSkillSources,
           projectCommands,
           projectAgents,

@@ -91,7 +91,7 @@ function getRenderedHighlightText(container: HTMLElement): string[] {
   );
 }
 
-describe('ComposerInputShellCoordinator skill slash modes', () => {
+function registerSkillSlashModeHooks(): void {
   beforeEach(() => {
     setLocale('en');
     (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver =
@@ -108,6 +108,10 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     jest.restoreAllMocks();
     delete (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
   });
+}
+
+describe('ComposerInputShellCoordinator skill slash modes', () => {
+  registerSkillSlashModeHooks();
 
   it('shows skill commands directly when the skill mode is direct', async () => {
     const fixture = createFixture();
@@ -218,6 +222,77 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
 
     expect(fixture.textarea.value).toBe('/skills build-mcp-server ');
   });
+
+  it('opens nested skill suggestions for a later /skills token after earlier prefixed content', async () => {
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([
+      slashItem('agent-browser', 'Use browser automation', 'skill'),
+      slashItem('frontend-design', 'Design a frontend', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/skills agent-browser weishenmehui /skills ';
+    fixture.textarea.setSelectionRange(
+      '/skills agent-browser weishenmehui /skills '.length,
+      '/skills agent-browser weishenmehui /skills '.length,
+    );
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/skills agent-browser'),
+      expect.stringContaining('/skills frontend-design'),
+    ]);
+  });
+
+  it('opens nested skill suggestions when prefixed /skills follows plain text', async () => {
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([
+      slashItem('agent-browser', 'Use browser automation', 'skill'),
+      slashItem('frontend-design', 'Design a frontend', 'skill'),
+    ]);
+
+    fixture.textarea.value = 'hello /skills ';
+    fixture.textarea.setSelectionRange(
+      'hello /skills '.length,
+      'hello /skills '.length,
+    );
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/skills agent-browser'),
+      expect.stringContaining('/skills frontend-design'),
+    ]);
+  });
+
+  it('treats an exact later /skills token as a nested skill query', async () => {
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([
+      slashItem('agent-browser', 'Use browser automation', 'skill'),
+      slashItem('frontend-design', 'Design a frontend', 'skill'),
+      slashItem('review', 'Review changes'),
+    ]);
+
+    fixture.textarea.value = 'hello /skills';
+    fixture.textarea.setSelectionRange(
+      'hello /skills'.length,
+      'hello /skills'.length,
+    );
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/skills agent-browser'),
+      expect.stringContaining('/skills frontend-design'),
+    ]);
+  });
+});
+
+describe('ComposerInputShellCoordinator skill slash presentation', () => {
+  registerSkillSlashModeHooks();
 
   it('only highlights prefixed /skills entries when the nested skill exists', async () => {
     const fixture = createFixture();

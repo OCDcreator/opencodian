@@ -174,6 +174,33 @@ describe('SlashCommandMenuCatalogCache', () => {
       expect.objectContaining({ id: 'frontend-design', source: 'skill' }),
     ]);
   });
+
+  it('surfaces runtime skills in the menu catalog even when command.list omits them', async () => {
+    const host = createHost({
+      loadRuntimeCommands: jest.fn().mockResolvedValue([
+        createRuntimeCommand({ name: 'review', source: 'command', description: 'Review code' }),
+      ]),
+      loadRuntimeSkills: jest.fn().mockResolvedValue([
+        {
+          name: 'frontend-design',
+          description: 'Design UI',
+          location: 'C:/vault/.claude/skills/frontend-design/SKILL.md',
+          content: '',
+        },
+      ]),
+    });
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    await expect(cache.load()).resolves.toEqual([
+      expect.objectContaining({ id: 'review', source: 'command' }),
+      expect.objectContaining({
+        id: 'frontend-design',
+        description: 'Design UI',
+        source: 'skill',
+        skillSource: { kind: 'project' },
+      }),
+    ]);
+  });
 });
 
 describe('SlashCommandMenuCatalogCache — skill provenance and agent sidecar', () => {

@@ -186,8 +186,12 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string 
   }
 
   const beforeCursor = textarea.value.slice(0, selectionStart);
-  if (/^\/skills(?:\s+\S*)?$/i.test(beforeCursor)) {
-    return beforeCursor.slice(1);
+  const prefixedSkillsMatch = /(?:^|\s)(\/skills(?:\s+\S*)?\s*)$/i.exec(beforeCursor);
+  if (prefixedSkillsMatch?.[1]) {
+    const prefixedSkillsQuery = prefixedSkillsMatch[1].slice(1);
+    return /^skills\s*$/i.test(prefixedSkillsQuery)
+      ? 'skills '
+      : prefixedSkillsQuery;
   }
 
   let slashIndex = -1;
