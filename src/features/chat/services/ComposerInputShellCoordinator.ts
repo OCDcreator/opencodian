@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
 
+import type { AgentMentionIntent } from '../../../core/agents';
 import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
 import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
@@ -56,6 +57,7 @@ export class ComposerInputShellCoordinator {
   private addContextBtnEl: HTMLButtonElement | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
+  private highlightBackdropEl: HTMLElement | null = null;
   private slashCommandMenuEl: HTMLElement | null = null;
   private layoutSyncFrameId: number | null = null;
   private inputContainerResizeObserver: ResizeObserver | null = null;
@@ -75,7 +77,7 @@ export class ComposerInputShellCoordinator {
         this.host, this.slashCommandMenuCatalogItems, (items) => { this.slashCommandMenuCatalogItems = items; },
       ),
       scheduleLayoutSync: () => this.scheduleLayoutSync(),
-      onMentionInserted: () => this.syncTextareaHeight(),
+      onMentionInserted: () => { this.syncTextareaHeight(); this.syncHighlightBackdrop(); },
       onLoadFailed: (error) => { logger.debug('Failed to load agent mention candidates:', error); },
     });
     this.agentSelectionController = new ChatAgentSelectionCoordinator({
@@ -109,14 +111,23 @@ export class ComposerInputShellCoordinator {
       composerContentEl.createDiv({ cls: 'opencodian-composer-context-row is-empty' }),
     );
 
-    this.inputTextareaEl = composerContentEl.createEl('textarea', {
+    const highlightContainerEl = composerContentEl.createDiv({ cls: 'opencodian-input-highlight-container' });
+    this.highlightBackdropEl = highlightContainerEl.createDiv({
+      cls: 'opencodian-input-highlight-backdrop',
+      attr: { 'aria-hidden': 'true' },
+    });
+    this.inputTextareaEl = highlightContainerEl.createEl('textarea', {
       cls: 'opencodian-input',
       attr: { placeholder: this.host.getInputPlaceholder(), rows: '1' },
     });
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
       this.agentMentionController.syncContent(this.inputTextareaEl?.value ?? '');
+      this.syncHighlightBackdrop();
       void this.refreshComposerSuggestionMenu();
+    });
+    this.inputTextareaEl.addEventListener('scroll', () => {
+      this.syncHighlightBackdropScroll();
     });
     this.inputTextareaEl.addEventListener('keydown', (event) => {
       if (this.tryHandleAgentMentionMenuKeydown(event)) {
@@ -248,6 +259,7 @@ export class ComposerInputShellCoordinator {
     this.addContextBtnEl = null;
     this.sendBtnEl = null;
     this.inputTextareaEl = null;
+    this.highlightBackdropEl = null;
     this.slashCommandMenuEl = null;
     this.slashCommandMenuCatalogItems = null;
     this.visibleSlashCommandMenuItems = [];
@@ -312,6 +324,7 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl.value = '';
     this.agentMentionController.clearTrackedMentions();
     this.syncTextareaHeight();
+    this.syncHighlightBackdrop();
     this.agentMentionController.clear(this.slashCommandMenuEl);
   }
 
@@ -326,6 +339,9 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl.style.overflowY = this.inputTextareaEl.scrollHeight > COMPOSER_TEXTAREA_MAX_HEIGHT
       ? 'auto'
       : 'hidden';
+    if (this.highlightBackdropEl) {
+      this.highlightBackdropEl.style.height = `${nextHeight}px`;
+    }
     this.scheduleLayoutSync();
   }
 
@@ -445,6 +461,7 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl.focus();
     this.inputTextareaEl.setSelectionRange(nextValue.length, nextValue.length);
     this.syncTextareaHeight();
+    this.syncHighlightBackdrop();
     if (item.source === 'skills-command') {
       void this.refreshSlashCommandMenu();
       return;
@@ -572,4 +589,77 @@ export class ComposerInputShellCoordinator {
     return items.length === 0 ? 'emptyCatalog' : 'noMatches';
   }
 
+  private syncHighlightBackdrop(): void {
+    const textarea = this.inputTextareaEl;
+    const backdrop = this.highlightBackdropEl;
+    if (!textarea || !backdrop) {
+      return;
+    }
+
+    const content = textarea.value;
+    if (!content) {
+      backdrop.empty();
+      backdrop.scrollTop = 0;
+      return;
+    }
+
+    // Slash command highlight (/command at start of content)
+    const slashMatch = /^\/(\S+)/.exec(content);
+    if (slashMatch) {
+      const commandEnd = slashMatch[0].length;
+      const html = `<span class="opencodian-input-highlight-command" style="color:#7b6ef6;background:rgba(123,110,246,0.22);border-radius:4px;box-shadow:0 0 0 1px rgba(123,110,246,0.4);">${escapeHtmlContent(content.slice(0, commandEnd))}</span>`
+        + escapeHtmlContent(content.slice(commandEnd))
+        + (content.endsWith('\n') ? '\n' : '');
+      backdrop.innerHTML = html;
+      backdrop.scrollTop = textarea.scrollTop;
+      return;
+    }
+
+    // Agent mention highlights
+    const mentions = this.agentMentionController.resolveMentionIntents(content);
+    const sorted = [...mentions]
+      .filter(
+        (m): m is AgentMentionIntent & { source: NonNullable<AgentMentionIntent['source']> } =>
+          !!m.source,
+      )
+      .sort((a, b) => a.source.start - b.source.start);
+
+    let html = '';
+    let lastIndex = 0;
+
+    for (const mention of sorted) {
+      const { start, end } = mention.source;
+      if (start < lastIndex) {
+        continue;
+      }
+
+      html += escapeHtmlContent(content.slice(lastIndex, start));
+      html += `<span class="opencodian-input-highlight-agent" style="color:#e5a100;background:rgba(229,161,0,0.25);border-radius:4px;box-shadow:0 0 0 1px rgba(229,161,0,0.4);">${escapeHtmlContent(content.slice(start, end))}</span>`;
+      lastIndex = end;
+    }
+
+    html += escapeHtmlContent(content.slice(lastIndex));
+
+    if (content.endsWith('\n')) {
+      html += '\n';
+    }
+
+    backdrop.innerHTML = html;
+    backdrop.scrollTop = textarea.scrollTop;
+  }
+
+  private syncHighlightBackdropScroll(): void {
+    const textarea = this.inputTextareaEl;
+    const backdrop = this.highlightBackdropEl;
+    if (!textarea || !backdrop) {
+      return;
+    }
+
+    backdrop.scrollTop = textarea.scrollTop;
+  }
+
+}
+
+function escapeHtmlContent(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

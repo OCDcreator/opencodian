@@ -23,7 +23,7 @@ export function renderAgentMentionMenu(options: RenderAgentMentionMenuOptions): 
 
 ## 行为
 
-- 空列表时根据 `status` 渲染 loading / empty / noMatches / loadFailed 状态行
+- 空列表时根据 `status` 渲染 loading / empty / noMatches / loadFailed 状态行；slash menu 使用 `slashCommand.menu.*` locale 键，agent mention menu 使用独立的 `agentMention.menu.*` locale 键（通过 `getAgentMentionMenuStateText()` 渲染）
 - 有命令时输出 title、source badge、skill provenance 文案和 description
 - 有 agent 候选时输出 `@id` 标题、可选 displayName badge 和 description
 - `mouseenter` 与 `click` 只通过回调把 index 交还给调用方，不直接持有 coordinator 状态

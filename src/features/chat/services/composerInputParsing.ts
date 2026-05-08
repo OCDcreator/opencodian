@@ -168,6 +168,10 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string 
     return null;
   }
 
+  if (slashIndex > 0 && !/\s/.test(beforeCursor[slashIndex - 1])) {
+    return null;
+  }
+
   if (slashIndex > 0 && beforeCursor[slashIndex - 1] === '/') {
     return null;
   }

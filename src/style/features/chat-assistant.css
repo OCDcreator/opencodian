@@ -771,7 +771,10 @@
   font-family: inherit;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--text-normal);
+  color: transparent;
+  caret-color: var(--text-normal);
+  position: relative;
+  z-index: 1;
   appearance: none;
   -webkit-appearance: none;
 }
@@ -787,6 +790,64 @@
 
 .opencodian-input::placeholder {
   color: var(--text-muted);
+}
+
+/* ── Input highlight backdrop (renders styled @agent mentions behind the textarea) ── */
+
+.opencodian-input-highlight-container {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+}
+
+.opencodian-input-highlight-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px 0 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  color: var(--text-normal);
+  z-index: 0;
+}
+
+.opencodian-input-wrapper .opencodian-input-highlight-backdrop {
+  padding: 10px 2px 8px;
+}
+
+.opencodian-input-highlight-agent {
+  color: var(--text-warning);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-warning) 40%, var(--background-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-warning) 50%, transparent);
+}
+
+.opencodian-input-highlight-command {
+  color: var(--text-accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-accent) 40%, var(--background-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-accent) 50%, transparent);
+}
+
+.opencodian-input-highlight-container .opencodian-input::selection {
+  background: color-mix(in srgb, var(--text-on-accent) 24%, transparent);
+}
+
+@media (forced-colors: active) {
+  .opencodian-input-highlight-container .opencodian-input {
+    color: CanvasText;
+  }
+
+  .opencodian-input-highlight-backdrop {
+    display: none;
+  }
 }
 
 .opencodian-send-btn,
@@ -1292,9 +1353,10 @@
   margin: 0;
   padding: 6px;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--opencodian-composer-embedded-border-strong) 68%, transparent);
-  background: color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 82%, transparent);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--opencodian-composer-lens-shadow) 24%, transparent);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--background-modifier-border) 40%, transparent),
+    0 2px 6px color-mix(in srgb, var(--background-modifier-border) 20%, transparent);
   max-height: min(320px, 45vh);
   overflow-x: hidden;
   overflow-y: auto;
@@ -1358,9 +1420,15 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.opencodian-slash-command-menu-item:hover,
+.opencodian-slash-command-menu-item:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+}
+
 .opencodian-slash-command-menu-item.is-selected {
-  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 34%, transparent);
+  background: var(--background-modifier-hover);
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+  border-radius: 6px;
 }
 
 .opencodian-slash-command-menu-item:focus-visible {

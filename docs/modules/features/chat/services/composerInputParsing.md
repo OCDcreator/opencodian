@@ -50,7 +50,7 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string 
 - `decoratePromptSubmissionWithAgentMentions()` 只处理 prompt submission，并把 selected `@agent` mention intent 合并进 `invocationIntent.mentions`
 - `shiftAgentMentionSourceSpans()` 用于把 textarea 原始坐标调整到 trim 后的 prompt content 坐标，避免 coordinator 内联 source span 改写
 - `decoratePromptSubmissionWithPrimaryAgent()` 只处理 prompt submission，并把 composer 主 Agent selector 的选择值写入 `invocationIntent.primaryAgent`
-- slash query 只在光标折叠、仍停留在 command token 内时返回；`/skills <query>` 是唯一允许继续跨空格补全的 nested form
+- slash query 只在光标折叠、仍停留在 command token 内时返回；`/skills <query>` 是唯一允许继续跨空格补全的 nested form。`/` 前必须是空白或文本开头（`slashIndex > 0` 时检查前一字符是否为 `\s`），不会在 `path/to` 这种词中触发
 
 ## 边界
 

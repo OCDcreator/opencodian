@@ -107,7 +107,7 @@ export function renderAgentMentionMenu(options: RenderAgentMentionMenuOptions): 
   menuEl.replaceChildren();
 
   if (items.length === 0) {
-    const stateText = getSlashCommandMenuStateText(status);
+    const stateText = getAgentMentionMenuStateText(status);
     if (!stateText) {
       menuEl.addClass('is-hidden');
       return;
@@ -217,6 +217,17 @@ function getSlashCommandMenuStateText(status: SlashCommandMenuStatus): string | 
     emptyCatalog: 'slashCommand.menu.empty',
     noMatches: 'slashCommand.menu.noMatches',
     loadFailed: 'slashCommand.menu.loadFailed',
+  };
+  const textKey = stateTextKeys[status];
+  return textKey ? t(textKey) : null;
+}
+
+function getAgentMentionMenuStateText(status: SlashCommandMenuStatus): string | null {
+  const stateTextKeys: Partial<Record<SlashCommandMenuStatus, Parameters<typeof t>[0]>> = {
+    loading: 'agentMention.menu.loading',
+    emptyCatalog: 'agentMention.menu.empty',
+    noMatches: 'agentMention.menu.noMatches',
+    loadFailed: 'agentMention.menu.loadFailed',
   };
   const textKey = stateTextKeys[status];
   return textKey ? t(textKey) : null;

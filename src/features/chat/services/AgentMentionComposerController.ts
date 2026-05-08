@@ -78,15 +78,16 @@ export class AgentMentionComposerController {
     }
 
     const beforeCursor = textarea.value.slice(0, selectionStart);
-    const match = /@(\S*)$/.exec(beforeCursor);
+    const match = /(^|[\s])@(\S*)$/.exec(beforeCursor);
     if (!match) {
       return null;
     }
 
-    const value = match[0];
+    const queryText = match[2] ?? '';
+    const mentionText = `@${queryText}`;
     return {
-      query: match[1] ?? '',
-      start: selectionStart - value.length,
+      query: queryText,
+      start: selectionStart - mentionText.length,
       end: selectionStart,
     };
   }

@@ -31,6 +31,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 本轮新增 `settings.style.input.contextRing.*` 键，为输入区样式设置里的上下文圆环样式下拉框提供中文标签、描述和“经典圆环 / 刻度圆环”两个选项。
 
+本轮还新增 `agentMention.menu.*` 系列键（`loading`、`empty`、`noMatches`、`loadFailed`），为 agent mention 自动补全菜单提供独立的状态文案，与 slash command 菜单的 `slashCommand.menu.*` 键分离。
+
 源码约 2050 行。
 
 ## 导入关系
@@ -118,6 +120,7 @@ t('settings.server.started')
 - `chat.childSessionTree.*` — child-session tree header / open action / partial-graph 文案
 - `chat.question.*` — 问题系统
 - `chat.omo.*` — OMO 相关
+- `agentMention.menu.*` — Agent mention 自动补全菜单状态文案（loading / empty / noMatches / loadFailed）
 
 ## 注意事项
 

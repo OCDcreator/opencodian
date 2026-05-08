@@ -33,7 +33,7 @@ export class AgentMentionComposerController {
 
 ## 行为
 
-- 只在 prompt mode 下识别 `@(\S*)$` 查询；shell mode 和选区非折叠时不接管输入
+- 只在 prompt mode 下识别 `(^|[\s])@(\S*)$` 查询（`@` 前必须是空白或行首，不会在 `hello@agent` 这种词中触发）；shell mode 和选区非折叠时不接管输入
 - 候选过滤对齐上游 OpenCode：只展示 `mode === 'subagent'` 或 `mode === 'all'`，并排除 `hidden`
 - 使用和 slash menu 相同的 overlay 容器、loading / empty / noMatches / loadFailed 状态和键盘选择语义
 - 选中候选后把当前 token 替换为可见 `@agent ` 文本，并记录 `{ agentId, value }`
