@@ -7315,7 +7315,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 0 !important;
   box-shadow: none !important;
   resize: none;
-  min-height: 44px;
+  min-height: 68px;
   max-height: 240px;
   font-family: inherit;
   font-size: 14px;
@@ -7338,7 +7338,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-input::placeholder {
-  color: var(--text-muted);
+  color: transparent;
 }
 
 /* ── Input highlight backdrop (renders styled @agent mentions behind the textarea) ── */
@@ -7346,7 +7346,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-input-highlight-container {
   position: relative;
   width: 100%;
-  min-height: 44px;
+  min-height: 68px;
 }
 
 .opencodian-input-highlight-backdrop {
@@ -7370,6 +7370,35 @@ img.opencodian-model-provider-header-icon {
 .opencodian-input-wrapper .opencodian-input-highlight-backdrop {
   padding: 12px 6px 10px;
   line-height: 1.65;
+}
+
+/* ── Custom placeholder overlay (replaces native textarea placeholder) ── */
+/* Uses -webkit-line-clamp:2 so the third line is never painted.           */
+
+.opencodian-input-placeholder {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+  padding: 12px 6px 10px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  z-index: 0;
+}
+
+.opencodian-input-placeholder-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.opencodian-input-placeholder.is-hidden {
+  display: none;
 }
 
 .opencodian-input-highlight-token {

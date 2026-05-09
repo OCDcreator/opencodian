@@ -1448,7 +1448,7 @@ export const enTranslations = {
   'settings.language.zh': '简体中文',
 
   // Chat UI
-  'chat.input.placeholder': 'Type a message to start chatting with AI…',
+  'chat.input.placeholder': 'Ask opencodian anything. Type @ to mention agents or files, type / for commands and skills',
   'chat.input.send': 'Send',
   'chat.input.sendMessage': 'Send message',
   'chat.input.stopStreaming': 'Stop streaming',

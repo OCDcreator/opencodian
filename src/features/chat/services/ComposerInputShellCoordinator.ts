@@ -67,6 +67,7 @@ export class ComposerInputShellCoordinator {
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
   private highlightBackdropEl: HTMLElement | null = null;
+  private placeholderOverlayEl: HTMLElement | null = null;
   private slashCommandMenuEl: HTMLElement | null = null;
   private layoutSyncFrameId: number | null = null;
   private inputContainerResizeObserver: ResizeObserver | null = null;
@@ -136,9 +137,15 @@ export class ComposerInputShellCoordinator {
       cls: 'opencodian-input-highlight-backdrop',
       attr: { 'aria-hidden': 'true' },
     });
+
+    // Custom placeholder overlay (-webkit-line-clamp:2; native placeholder cannot be clamped).
+    const placeholderText = this.host.getInputPlaceholder();
+    this.placeholderOverlayEl = highlightContainerEl.createDiv({ cls: 'opencodian-input-placeholder', attr: { 'aria-hidden': 'true' } });
+    this.placeholderOverlayEl.createSpan({ cls: 'opencodian-input-placeholder-text', text: placeholderText });
+
     this.inputTextareaEl = highlightContainerEl.createEl('textarea', {
       cls: 'opencodian-input',
-      attr: { placeholder: this.host.getInputPlaceholder(), rows: '1' },
+      attr: { rows: '1', 'aria-label': placeholderText },
     });
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
@@ -224,7 +231,10 @@ export class ComposerInputShellCoordinator {
       this.host.setTooltipLabel(this.addContextBtnEl, t('chat.context.addContext'), 'top');
     }
 
-    this.inputTextareaEl?.setAttribute('placeholder', this.host.getInputPlaceholder());
+    const placeholderText = this.host.getInputPlaceholder();
+    this.inputTextareaEl?.setAttribute('aria-label', placeholderText);
+    const textSpan = this.placeholderOverlayEl?.querySelector('.opencodian-input-placeholder-text');
+    if (textSpan) { textSpan.textContent = placeholderText; }
     this.updateSendButtonState();
     this.agentSelectionController.applyLocaleTexts();
   }
@@ -347,6 +357,12 @@ export class ComposerInputShellCoordinator {
   private syncTextareaHeight(): void {
     if (!this.inputTextareaEl) {
       return;
+    }
+
+    // Toggle custom placeholder overlay visibility
+    const isEmpty = !this.inputTextareaEl.value;
+    if (this.placeholderOverlayEl) {
+      this.placeholderOverlayEl.classList.toggle('is-hidden', !isEmpty);
     }
 
     this.inputTextareaEl.style.height = 'auto';
