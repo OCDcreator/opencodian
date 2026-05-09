@@ -1696,6 +1696,8 @@ export const zhTranslations = {
   'chat.sessionSettings.modal.chatFontSize': '聊天字体大小',
   'chat.sessionSettings.modal.chatFontSizeDesc': '覆盖此会话的消息正文字体大小。',
   'chat.sessionSettings.modal.defaultHint': '默认值：{value}',
+  'chat.sessionSettings.modal.decrease': '减小',
+  'chat.sessionSettings.modal.increase': '增大',
   'chat.sessionSettings.modal.cancel': '取消',
   'chat.sessionSettings.modal.save': '保存',
   'chat.sessionSettings.modal.globalDefaultsGroup': '全局设置',

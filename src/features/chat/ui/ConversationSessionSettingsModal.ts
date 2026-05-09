@@ -170,6 +170,9 @@ export class ConversationSessionSettingsModal extends Modal {
     defaultValue: string | number;
     placeholder: string;
     initialValue: number | null | undefined;
+    step?: number;
+    min?: number;
+    max?: number;
   }): HTMLInputElement {
     const controlEl = this.createFieldShell(containerEl, {
       name: options.name,
@@ -177,7 +180,11 @@ export class ConversationSessionSettingsModal extends Modal {
       defaultValue: String(options.defaultValue),
     });
 
-    const inputEl = controlEl.createEl('input', {
+    const stepperEl = controlEl.createDiv({
+      cls: 'opencodian-session-settings-stepper',
+    });
+
+    const inputEl = stepperEl.createEl('input', {
       cls: 'opencodian-session-settings-number-input',
       attr: {
         type: 'number',
@@ -189,6 +196,38 @@ export class ConversationSessionSettingsModal extends Modal {
     inputEl.value = typeof options.initialValue === 'number'
       ? String(options.initialValue)
       : '';
+
+    const step = options.step ?? 1;
+    const min = options.min;
+    const max = options.max;
+
+    const decBtn = stepperEl.createEl('button', {
+      cls: 'opencodian-session-settings-stepper-btn opencodian-session-settings-stepper-dec',
+      attr: { type: 'button', 'aria-label': t('chat.sessionSettings.modal.decrease') },
+    });
+    decBtn.setText('−');
+
+    const incBtn = stepperEl.createEl('button', {
+      cls: 'opencodian-session-settings-stepper-btn opencodian-session-settings-stepper-inc',
+      attr: { type: 'button', 'aria-label': t('chat.sessionSettings.modal.increase') },
+    });
+    incBtn.setText('+');
+
+    const clampValue = (v: number): number => {
+      if (min !== undefined && v < min) { return min; }
+      if (max !== undefined && v > max) { return max; }
+      return v;
+    };
+
+    const applyStep = (delta: number): void => {
+      const current = Number(inputEl.value) || Number(options.placeholder) || 0;
+      const next = clampValue(Math.round((current + delta) * 100) / 100);
+      inputEl.value = String(next);
+    };
+
+    decBtn.addEventListener('click', () => { applyStep(-step); });
+    incBtn.addEventListener('click', () => { applyStep(step); });
+
     return inputEl;
   }
 

@@ -1696,6 +1696,8 @@ export const enTranslations = {
   'chat.sessionSettings.modal.chatFontSize': 'Chat font size',
   'chat.sessionSettings.modal.chatFontSizeDesc': 'Override the message body font size for this conversation.',
   'chat.sessionSettings.modal.defaultHint': 'Default: {value}',
+  'chat.sessionSettings.modal.decrease': 'Decrease',
+  'chat.sessionSettings.modal.increase': 'Increase',
   'chat.sessionSettings.modal.cancel': 'Cancel',
   'chat.sessionSettings.modal.save': 'Save',
   'chat.sessionSettings.modal.globalDefaultsGroup': 'Global defaults',
