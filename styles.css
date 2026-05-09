@@ -7368,7 +7368,8 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-input-wrapper .opencodian-input-highlight-backdrop {
-  padding: 10px 2px 8px;
+  padding: 12px 6px 10px;
+  line-height: 1.65;
 }
 
 .opencodian-input-highlight-token {
@@ -7380,9 +7381,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   color: var(--text-warning);
   background: color-mix(in srgb, var(--text-warning) 40%, var(--background-primary));
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--text-warning) 40%, var(--background-primary)),
-    0 0 0 4px color-mix(in srgb, var(--text-warning) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-warning) 40%, var(--background-primary));
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -8540,7 +8539,8 @@ img.opencodian-model-provider-header-icon {
 .opencodian-input-wrapper .opencodian-input {
   width: 100%;
   min-width: 0;
-  padding: 10px 2px 8px;
+  padding: 12px 6px 10px;
+  line-height: 1.65;
   background: transparent !important;
   box-shadow: none !important;
 }
