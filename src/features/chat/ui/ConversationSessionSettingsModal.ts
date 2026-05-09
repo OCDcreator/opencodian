@@ -1,7 +1,12 @@
 import type { App } from 'obsidian';
 import { Modal } from 'obsidian';
 
-import type { ConversationSessionSettings } from '../../../core/types';
+import type {
+  ConversationSessionSettings,
+  QuestionCardPosition,
+  QuestionDisplayMode,
+  TitleMode,
+} from '../../../core/types';
 import {
   normalizeChatFontSizePx,
 } from '../../../core/types';
@@ -19,6 +24,16 @@ interface ConversationSessionSettingsModalOptions {
     overrides: ConversationSessionSettings | undefined,
   ): Promise<void> | void;
 }
+
+interface PluginSettingsSummary {
+  titleMode: TitleMode;
+  questionDisplayMode: QuestionDisplayMode;
+  questionCardPosition: QuestionCardPosition;
+  showAnsweredQuestionCards: boolean;
+  renderUserMarkupAsCodeBlocks: boolean;
+}
+
+const PLUGIN_ID = 'opencodian';
 
 export class ConversationSessionSettingsModal extends Modal {
   private chatFontSizeInputEl: HTMLInputElement | null = null;
@@ -57,6 +72,15 @@ export class ConversationSessionSettingsModal extends Modal {
       placeholder: String(this.options.defaults.chatFontSizePx),
       initialValue: this.options.initialOverrides?.chatFontSizePx,
     });
+
+    this.createSummaryDivider(bodyEl);
+
+    const globalSectionEl = this.createSection(bodyEl, {
+      section: 'global-defaults',
+      title: t('chat.sessionSettings.modal.globalDefaultsGroup'),
+      description: t('chat.sessionSettings.modal.globalDefaultsDesc'),
+    });
+    this.createSummaryRows(globalSectionEl);
 
     this.errorEl = bodyEl.createDiv({
       cls: 'opencodian-session-settings-error',
@@ -194,6 +218,137 @@ export class ConversationSessionSettingsModal extends Modal {
     });
     return fieldEl.createDiv({
       cls: 'opencodian-session-settings-field-control',
+    });
+  }
+
+  private createSummaryDivider(containerEl: HTMLElement): void {
+    containerEl.createDiv({
+      cls: 'opencodian-session-settings-summary-divider',
+    });
+  }
+
+  private readPluginSettingsSummary(): PluginSettingsSummary {
+    const plugin = (this.app as typeof this.app & {
+      plugins: {
+        plugins: Record<string, unknown>;
+      };
+    }).plugins?.plugins?.[PLUGIN_ID] as
+      | { settings: PluginSettingsSummary }
+      | undefined
+      | null;
+    const s = plugin?.settings;
+    return {
+      titleMode: s?.titleMode ?? 'default',
+      questionDisplayMode: s?.questionDisplayMode ?? 'all',
+      questionCardPosition: s?.questionCardPosition ?? 'inline',
+      showAnsweredQuestionCards: s?.showAnsweredQuestionCards ?? true,
+      renderUserMarkupAsCodeBlocks: s?.renderUserMarkupAsCodeBlocks ?? false,
+    };
+  }
+
+  private createSummaryRows(sectionEl: HTMLElement): void {
+    const summary = this.readPluginSettingsSummary();
+
+    const rows: Array<{
+      id: string;
+      label: string;
+      chips: Array<{ text: string }>;
+    }> = [
+      {
+        id: 'title',
+        label: t('chat.sessionSettings.modal.summary.titleGeneration'),
+        chips: [
+          {
+            text: summary.titleMode === 'ai'
+              ? t('settings.titleGeneration.mode.ai')
+              : t('settings.titleGeneration.mode.default'),
+          },
+        ],
+      },
+      {
+        id: 'compaction',
+        label: t('chat.sessionSettings.modal.summary.compaction'),
+        chips: [
+          { text: t('chat.sessionSettings.modal.summary.globalLevel') },
+        ],
+      },
+      {
+        id: 'questions',
+        label: t('chat.sessionSettings.modal.summary.questions'),
+        chips: [
+          {
+            text: summary.questionDisplayMode === 'all'
+              ? t('settings.conversation.questionDisplayMode.all')
+              : t('settings.conversation.questionDisplayMode.single'),
+          },
+          {
+            text: summary.questionCardPosition === 'inline'
+              ? t('settings.conversation.questionCardPosition.inline')
+              : t('settings.conversation.questionCardPosition.aboveInput'),
+          },
+          {
+            text: summary.showAnsweredQuestionCards
+              ? t('chat.sessionSettings.modal.summary.showAnswered')
+              : t('chat.sessionSettings.modal.summary.hideAnswered'),
+          },
+        ],
+      },
+      {
+        id: 'rendering',
+        label: t('chat.sessionSettings.modal.summary.rendering'),
+        chips: [
+          {
+            text: summary.renderUserMarkupAsCodeBlocks
+              ? t('chat.sessionSettings.modal.summary.on')
+              : t('chat.sessionSettings.modal.summary.off'),
+          },
+        ],
+      },
+    ];
+
+    const openSettingsLabel = t('chat.sessionSettings.modal.summary.openSettings');
+
+    for (const row of rows) {
+      this.createSummaryRow(sectionEl, row, openSettingsLabel);
+    }
+  }
+
+  private createSummaryRow(
+    containerEl: HTMLElement,
+    row: { id: string; label: string; chips: Array<{ text: string }> },
+    openSettingsLabel: string,
+  ): void {
+    const rowEl = containerEl.createDiv({
+      cls: 'opencodian-session-settings-summary-row',
+      attr: { 'data-summary': row.id },
+    });
+
+    rowEl.createDiv({
+      cls: 'opencodian-session-settings-summary-label',
+      text: row.label,
+    });
+
+    const chipsEl = rowEl.createDiv({
+      cls: 'opencodian-session-settings-summary-chips',
+    });
+    for (const chip of row.chips) {
+      chipsEl.createDiv({
+        cls: 'opencodian-session-settings-summary-chip',
+        text: chip.text,
+      });
+    }
+
+    const linkEl = rowEl.createEl('button', {
+      cls: 'opencodian-session-settings-summary-link',
+      text: openSettingsLabel,
+      attr: { type: 'button' },
+    });
+    linkEl.addEventListener('click', () => {
+      const appSetting = (this.app as typeof this.app & {
+        setting: { open: () => void; openTabById: (id: string) => void };
+      }).setting;
+      appSetting.open();
+      appSetting.openTabById('opencodian');
     });
   }
 

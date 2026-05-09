@@ -7,6 +7,8 @@
 
 OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近几轮先后扩展了会话设置弹窗分组布局相关键、project-scoped compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（conversation title、reading/display、question interaction、message rendering）。本轮新增 `settings.server.executablePath.*` 与 `settings.server.help.executablePath.*`，用于说明本地 OpenCode 可执行文件路径覆盖项。
 
+会话设置弹窗本轮还新增了 `chat.sessionSettings.modal.globalDefaultsGroup`、`globalDefaultsDesc` 和 `summary.*` 文案，用于 Display 分组下方的全局默认值摘要行与 “Open settings” 按钮。
+
 本轮新增 `chat.agentSelector.*` 键，供聊天输入框下方的主 Agent 下拉框使用，包括 trigger、轻量列表标题、OpenCode default 选项、default badge、description、loading/empty/load-failed 状态以及选中 tooltip。
 
 最近一轮还重写了 `settings.security.*` 的权限文案：把原先容易误导成“上游原生 mode”的 wording 调整为 **OpenCodian permission template + config summary** 语义，并补齐了 security section 的 restart tooltip / notice keys。
@@ -157,6 +159,23 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
 2. Locale keys for `autoCompactionEnabled` and `compactionReservedTokens` per-session overrides have been removed; new project-scoped compaction keys were added under `settings.conversation.compaction.*`.
 3. Manual `session.summarize()` remains a per-session action, not managed by compaction locale keys.
+
+## 2026-05-09 Session settings global defaults summary
+
+The per-conversation session settings modal now displays read-only global-default summary rows. Locale additions under `chat.sessionSettings.modal`:
+
+1. `globalDefaultsGroup`
+2. `globalDefaultsDesc`
+3. `summary.titleGeneration`
+4. `summary.compaction`
+5. `summary.projectLevel`
+6. `summary.questions`
+7. `summary.showAnswered`
+8. `summary.hideAnswered`
+9. `summary.rendering`
+10. `summary.on`
+11. `summary.off`
+12. `summary.openSettings`
 
 ## 2026-04-23 Conversation settings grouping
 

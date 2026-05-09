@@ -172,6 +172,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.server.title'));
   }
 
+  prepareScrollToConversationOnNextOpen(secondaryTab?: string): void {
+    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
+      this.getOrCreateTabbedRenderer().switchToPrimaryTab('conversation', secondaryTab ?? 'display');
+      return;
+    }
+
+    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.conversation.title'));
+  }
+
   // ─── Main display ──────────────────────────────────────────────────
 
   display(): void {

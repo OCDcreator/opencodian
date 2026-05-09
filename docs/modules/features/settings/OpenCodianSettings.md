@@ -143,7 +143,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 滚动恢复与 quick-nav 现在由 `SettingsSectionCoordinator` 持有；`OpenCodianSettings` 只保留“下一次打开前记录意图”的公开入口。当前恢复链路仍然包括：
 
 - `settingsPanelScrollTop` 持久化到插件设置
-- `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` 在下次打开前注册意图
+- `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` / `prepareScrollToConversationOnNextOpen()` 在下次打开前注册意图
 - `MutationObserver` + 多次延迟重试用于等待 DOM 稳定
 
 这是最近文档里最容易漏掉的行为之一，因为它已经不只是简单的“记住 scrollTop”。
@@ -172,6 +172,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
 | `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区（经典模式滚动，标签模式切标签） |
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
+| `prepareScrollToConversationOnNextOpen(secondaryTab?: string)` | 记录下次打开时跳转到 Conversation 设置分区；标签布局可同时指定二级标签，经典布局滚动到对应分区 |
 | `renderLanguageSetting()` | 渲染语言选择器（经典模式在 `General` 合并卡片内，标签模式在 `General > Language` 二级面板内） |
 | `renderLayoutModeSetting()` | 渲染设置界面模式切换控件（经典模式在 `General` 合并卡片内，标签模式在 `General > Basic`） |
 | `addServerSettings()` | 创建并挂载 `SettingsServerSection` owner，把 server section lifecycle 从主类中收口出去 |

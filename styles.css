@@ -9708,6 +9708,68 @@ img.opencodian-model-provider-header-icon {
   opacity: 0.62;
 }
 
+/* ─── Summary divider ──────────────────────────────────────── */
+.opencodian-session-settings-summary-divider {
+  height: 1px;
+  background: var(--background-modifier-border);
+  margin: 4px 0;
+}
+
+/* ─── Summary rows ─────────────────────────────────────────── */
+.opencodian-session-settings-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+}
+
+.opencodian-session-settings-summary-row + .opencodian-session-settings-summary-row {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-session-settings-summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  min-width: 72px;
+}
+
+.opencodian-session-settings-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.opencodian-session-settings-summary-chip {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+  border-radius: 6px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+.opencodian-session-settings-summary-link {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--interactive-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: background 150ms ease;
+}
+
+.opencodian-session-settings-summary-link:hover {
+  background: var(--background-modifier-hover);
+}
+
 @media (max-width: 640px) {
   .opencodian-conversation-compaction-help-modal {
     width: min(100vw - 24px, 920px);
@@ -9752,6 +9814,14 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-session-settings-choice-button[data-value="inherit"] {
     min-width: 0;
+  }
+
+  .opencodian-session-settings-summary-row {
+    flex-wrap: wrap;
+  }
+
+  .opencodian-session-settings-summary-label {
+    min-width: unset;
   }
 }
 
