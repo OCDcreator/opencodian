@@ -11,7 +11,7 @@ const MARKUP_TOKEN_REGEX =
   /<\?[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\/?[A-Za-z][\w:-]*(?:\s[^>\n]*)?>|<!--|<!\[CDATA\[|<\?[A-Za-z][\w:-]*/gi;
 
 export interface UserMessageTextHighlightSpan {
-  kind: 'agent' | 'command';
+  kind: 'agent' | 'command' | 'skill';
   value: string;
   start: number;
   end: number;
@@ -102,7 +102,7 @@ function extractUserMessageCommandHighlightSpans(
     const start = match.index + match[1].length;
     const end = start + value.length;
     spans.push({
-      kind: 'command',
+      kind: 'skill',
       value,
       start,
       end,
@@ -224,9 +224,16 @@ export function applyUserMessageTextHighlightSpans(
 }
 
 function getHighlightClassName(kind: UserMessageTextHighlightSpan['kind']): string {
-  return kind === 'command'
-    ? 'opencodian-message-highlight-command'
-    : 'opencodian-message-highlight-agent';
+  switch (kind) {
+    case 'command':
+      return 'opencodian-message-highlight-command';
+    case 'skill':
+      return 'opencodian-message-highlight-skill';
+    case 'agent':
+      return 'opencodian-message-highlight-agent';
+  }
+  const exhaustiveKind: never = kind;
+  return exhaustiveKind;
 }
 
 function extractExpandedSkillNames(parts: unknown): ReadonlySet<string> {

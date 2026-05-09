@@ -169,7 +169,7 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
 
     const textEl = container.querySelector<HTMLElement>('.opencodian-message-text');
     const highlights = Array.from(
-      textEl?.querySelectorAll<HTMLElement>('.opencodian-message-highlight-command') ?? [],
+      textEl?.querySelectorAll<HTMLElement>('.opencodian-message-highlight-skill') ?? [],
     );
     expect(host.renderMarkdownInto).toHaveBeenCalledWith(
       expect.any(HTMLElement),
@@ -181,7 +181,7 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
       '/writing-skills',
       '/writing-skills',
     ]);
-    expect(highlights.every((element) => element.dataset.highlight === 'command')).toBe(true);
+    expect(highlights.every((element) => element.dataset.highlight === 'skill')).toBe(true);
   });
 
   it('does not highlight inline slash tokens that are not known skills', async () => {

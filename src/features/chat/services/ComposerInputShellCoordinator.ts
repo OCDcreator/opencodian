@@ -23,6 +23,14 @@ const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)
 
 const logger = createLogger('ComposerInputShellCoordinator');
 
+type InputHighlightKind = 'agent' | 'command' | 'skill';
+
+interface InputHighlightSpan {
+  start: number;
+  end: number;
+  kind: InputHighlightKind;
+}
+
 export { buildComposerInputSubmission } from './composerInputParsing';
 
 export interface ComposerInputShellCoordinatorHost {
@@ -423,14 +431,13 @@ export class ComposerInputShellCoordinator {
     }
 
     // Collect all highlight spans
-    const spans: Array<{ start: number; end: number; cls: string; style: string }> = [];
+    const spans: InputHighlightSpan[] = [];
 
     for (const slashMatch of this.extractKnownSlashHighlightMatches(content)) {
       spans.push({
         start: slashMatch.start,
         end: slashMatch.end,
-        cls: 'opencodian-input-highlight-command',
-        style: 'color:#7b6ef6;background:rgba(123,110,246,0.22);border-radius:4px;box-shadow:0 0 0 1px rgba(123,110,246,0.4);',
+        kind: slashMatch.kind,
       });
     }
 
@@ -441,8 +448,7 @@ export class ComposerInputShellCoordinator {
         spans.push({
           start: mention.source.start,
           end: mention.source.end,
-          cls: 'opencodian-input-highlight-agent',
-          style: 'color:#e5a100;background:rgba(229,161,0,0.25);border-radius:4px;box-shadow:0 0 0 1px rgba(229,161,0,0.4);',
+          kind: 'agent',
         });
       }
     }
@@ -457,7 +463,7 @@ export class ComposerInputShellCoordinator {
         continue;
       }
       html += escapeHtmlContent(content.slice(lastIndex, span.start));
-      html += `<span class="${span.cls}" style="${span.style}">${escapeHtmlContent(content.slice(span.start, span.end))}</span>`;
+      html += `<span class="${this.getInputHighlightClassName(span.kind)}">${escapeHtmlContent(content.slice(span.start, span.end))}</span>`;
       lastIndex = span.end;
     }
 
@@ -471,51 +477,68 @@ export class ComposerInputShellCoordinator {
     backdrop.scrollTop = textarea.scrollTop;
   }
 
-  private extractKnownSlashHighlightMatches(content: string): Array<{ start: number; end: number }> {
+  private extractKnownSlashHighlightMatches(content: string): InputHighlightSpan[] {
     if (!content || !this.slashCommandMenuCatalogItems || this.slashCommandMenuCatalogItems.length === 0) {
       return [];
     }
 
-    const matches: Array<{ start: number; end: number }> = [];
+    const matches: InputHighlightSpan[] = [];
     let slashMatch: RegExpExecArray | null;
     while ((slashMatch = INPUT_HIGHLIGHT_SLASH_REGEX.exec(content)) !== null) {
       const token = slashMatch[2];
-      if (!token || !this.isKnownSlashHighlightToken(token)) {
+      const kind = token ? this.getKnownSlashHighlightKind(token) : null;
+      if (!kind) {
         continue;
       }
 
       const start = slashMatch.index + slashMatch[1].length;
       const end = start + token.length;
-      matches.push({ start, end });
+      matches.push({ start, end, kind });
     }
 
     return matches;
   }
 
-  private isKnownSlashHighlightToken(token: string): boolean {
+  private getKnownSlashHighlightKind(token: string): 'command' | 'skill' | null {
     if (!this.slashCommandMenuCatalogItems || !token.startsWith('/')) {
-      return false;
+      return null;
     }
 
     const skillMode = this.host.getSlashCommandSkillMode();
     if (/^\/skills(?:\s|$)/i.test(token)) {
       if (skillMode !== 'skills-command') {
-        return false;
+        return null;
       }
 
       const trimmed = token.trim();
       if (trimmed === '/skills') {
-        return this.slashCommandMenuCatalogItems.some((item) => item.source === 'skill');
+        return this.slashCommandMenuCatalogItems.some((item) => item.source === 'skill')
+          ? 'command'
+          : null;
       }
 
       const skillName = trimmed.slice('/skills '.length).trim();
       return skillName.length > 0
-        && this.slashCommandMenuCatalogItems.some((item) => item.source === 'skill' && item.id === skillName);
+        && this.slashCommandMenuCatalogItems.some((item) => item.source === 'skill' && item.id === skillName)
+        ? 'skill'
+        : null;
     }
 
     const commandId = token.slice(1);
-    return commandId.length > 0
-      && this.slashCommandMenuCatalogItems.some((item) => item.id === commandId);
+    if (commandId.length === 0) {
+      return null;
+    }
+
+    const catalogItem = this.slashCommandMenuCatalogItems.find((item) => item.id === commandId);
+    if (!catalogItem) {
+      return null;
+    }
+
+    return catalogItem.source === 'skill' ? 'skill' : 'command';
+  }
+
+  private getInputHighlightClassName(kind: InputHighlightKind): string {
+    return `opencodian-input-highlight-token opencodian-input-highlight-${kind}`;
   }
 
   private syncHighlightBackdropScroll(): void {

@@ -6630,12 +6630,21 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-message--user .opencodian-message-highlight-command {
-  color: var(--text-accent);
+  color: var(--color-blue, oklch(62% 0.14 255));
   font-weight: 700;
   border-radius: 4px;
   padding: 0 2px;
-  background: color-mix(in srgb, var(--text-accent) 16%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--color-blue, oklch(62% 0.14 255)) 16%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-blue, oklch(62% 0.14 255)) 22%, transparent);
+}
+
+.opencodian-message--user .opencodian-message-highlight-skill {
+  color: var(--text-success, var(--color-green));
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0 2px;
+  background: color-mix(in srgb, var(--text-success, var(--color-green)) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-success, var(--color-green)) 24%, transparent);
 }
 
 .opencodian-message--user .opencodian-message-text > p {
@@ -7362,18 +7371,27 @@ img.opencodian-model-provider-header-icon {
   padding: 10px 2px 8px;
 }
 
+.opencodian-input-highlight-token {
+  border-radius: 4px;
+  font-weight: 600;
+}
+
 .opencodian-input-highlight-agent {
   color: var(--text-warning);
-  border-radius: 4px;
   background: color-mix(in srgb, var(--text-warning) 40%, var(--background-primary));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-warning) 50%, transparent);
 }
 
 .opencodian-input-highlight-command {
-  color: var(--text-accent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--text-accent) 40%, var(--background-primary));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-accent) 50%, transparent);
+  color: var(--color-blue, oklch(62% 0.14 255));
+  background: color-mix(in srgb, var(--color-blue, oklch(62% 0.14 255)) 36%, var(--background-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-blue, oklch(62% 0.14 255)) 46%, transparent);
+}
+
+.opencodian-input-highlight-skill {
+  color: var(--text-success, var(--color-green));
+  background: color-mix(in srgb, var(--text-success, var(--color-green)) 34%, var(--background-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-success, var(--color-green)) 46%, transparent);
 }
 
 .opencodian-input-highlight-container .opencodian-input::selection {

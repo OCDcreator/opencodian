@@ -84,9 +84,12 @@ function getRenderedMenuText(container: HTMLElement): Array<string | null> {
   );
 }
 
-function getRenderedHighlightText(container: HTMLElement): string[] {
+function getRenderedHighlightText(
+  container: HTMLElement,
+  className = 'opencodian-input-highlight-skill',
+): string[] {
   return Array.from(
-    container.querySelectorAll<HTMLElement>('.opencodian-input-highlight-command'),
+    container.querySelectorAll<HTMLElement>(`.${className}`),
     (item) => item.textContent ?? '',
   );
 }
@@ -170,6 +173,22 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     await flushAsync();
 
     expect(getRenderedHighlightText(fixture.container)).toEqual([]);
+  });
+
+  it('uses separate input highlight classes for commands and skills', async () => {
+    const fixture = createFixture();
+    fixture.setMenuItems([
+      slashItem('review', 'Review changes'),
+      slashItem('writing-skills', 'Use the writing skills workflow', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/review and /writing-skills';
+    fixture.textarea.setSelectionRange('/review and /writing-skills'.length, '/review and /writing-skills'.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedHighlightText(fixture.container, 'opencodian-input-highlight-command')).toEqual(['/review']);
+    expect(getRenderedHighlightText(fixture.container, 'opencodian-input-highlight-skill')).toEqual(['/writing-skills']);
   });
 
   it('keeps highlighting a known direct skill after the cursor moves past the token', async () => {

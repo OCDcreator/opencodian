@@ -27,7 +27,7 @@
 - 把 user text、context chips、OMO injection、compaction divider 统一为一个渲染关注点
 - 让 markdown 渲染与文件打开等副作用继续留在 view host，renderer 只负责 DOM 结构
 - 保持 `.opencodian-message-text`、`.opencodian-user-context-list`、`.opencodian-omo-injection` 等选择器不变
-- 在 markdown 渲染完成后调用 `extractUserMessageTextHighlightSpans()`：既会读取 OpenCode native `agent` part 的 `source` span，把匹配的可见 `@agent` 文本包成 `.opencodian-message-highlight-agent`，也会读取 `message.parts` 中的 `skill-expansion` metadata，只把真实 expanded skill 对应的 `/skill` / `/skills skill` 包成 `.opencodian-message-highlight-command`
+- 在 markdown 渲染完成后调用 `extractUserMessageTextHighlightSpans()`：既会读取 OpenCode native `agent` part 的 `source` span，把匹配的可见 `@agent` 文本包成 `.opencodian-message-highlight-agent`，也会读取 `message.parts` 中的 `skill-expansion` metadata，只把真实 expanded skill 对应的 `/skill` / `/skills skill` 包成 `.opencodian-message-highlight-skill`
 
 ## 注意事项
 

@@ -64,6 +64,6 @@ applyUserMessageTextHighlightSpans(container: HTMLElement, visibleText: string, 
 
 - 实际启用开关是 `OpenCodianView` 读取的 `plugin.settings.renderUserMarkupAsCodeBlocks`，不是模块内部配置。
 - `buildCodeFence()` 会去掉被包裹内容首尾多余空行，再生成带语言标识的 fenced block。
-- slash 高亮不会盲目匹配任意 `/xxx`。它会先从 `message.parts` 里的 synthetic `text` parts 读取 `metadata.kind === 'skill-expansion'` 与 `metadata.skillName`，只把这些真实 expanded skill 对应的 `/skill` 或 `/skills skill-name` token 包成 command highlight；`//comment` 或不存在的 `/not-a-skill` 都不会着色。
+- slash 高亮不会盲目匹配任意 `/xxx`。它会先从 `message.parts` 里的 synthetic `text` parts 读取 `metadata.kind === 'skill-expansion'` 与 `metadata.skillName`，只把这些真实 expanded skill 对应的 `/skill` 或 `/skills skill-name` token 包成 skill highlight；`//comment` 或不存在的 `/not-a-skill` 都不会着色。
 - agent span 提取只信任 `part.type === 'agent'` 且 `source.value/start/end` 与当前 visible text 完全匹配的范围；过期、越界、重叠范围会被忽略，并与 slash spans 一起做统一去重。
 - span DOM 包裹会先检查渲染容器的 `textContent` 是否仍等于原始 visible text，避免 markdown 输出改变文本后把高亮包到错误位置。

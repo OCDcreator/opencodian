@@ -182,7 +182,7 @@ describe('extractUserMessageTextHighlightSpans', () => {
     ]);
   });
 
-  it('extracts slash command and direct skill spans from visible text', () => {
+  it('extracts direct skill spans from visible text', () => {
     expect(extractUserMessageTextHighlightSpans(
       '你好 /writing-skills 为什么 /writing-skills',
       [
@@ -198,13 +198,13 @@ describe('extractUserMessageTextHighlightSpans', () => {
       ],
     )).toEqual([
       {
-        kind: 'command',
+        kind: 'skill',
         value: '/writing-skills',
         start: 3,
         end: 18,
       },
       {
-        kind: 'command',
+        kind: 'skill',
         value: '/writing-skills',
         start: 23,
         end: 38,
@@ -228,7 +228,7 @@ describe('extractUserMessageTextHighlightSpans', () => {
       ],
     )).toEqual([
       {
-        kind: 'command',
+        kind: 'skill',
         value: '/skills writing-skills',
         start: 4,
         end: 26,
@@ -264,23 +264,23 @@ describe('applyUserMessageTextHighlightSpans', () => {
     expect(highlight?.dataset.highlight).toBe('agent');
   });
 
-  it('wraps slash command spans with command highlight styling', () => {
+  it('wraps slash skill spans with skill highlight styling', () => {
     const container = document.createElement('div');
     container.textContent = '你好 /writing-skills 为什么';
 
     expect(applyUserMessageTextHighlightSpans(container, '你好 /writing-skills 为什么', [
       {
-        kind: 'command',
+        kind: 'skill',
         value: '/writing-skills',
         start: 3,
         end: 18,
       },
     ])).toBe(true);
 
-    const highlight = container.querySelector<HTMLElement>('.opencodian-message-highlight-command');
+    const highlight = container.querySelector<HTMLElement>('.opencodian-message-highlight-skill');
     expect(container.textContent).toBe('你好 /writing-skills 为什么');
     expect(highlight?.textContent).toBe('/writing-skills');
-    expect(highlight?.dataset.highlight).toBe('command');
+    expect(highlight?.dataset.highlight).toBe('skill');
   });
 
   it('wraps multiple slash skill spans in one rendered user message', () => {
@@ -316,7 +316,7 @@ describe('applyUserMessageTextHighlightSpans', () => {
     )).toBe(true);
 
     const highlights = Array.from(
-      container.querySelectorAll<HTMLElement>('.opencodian-message-highlight-command'),
+      container.querySelectorAll<HTMLElement>('.opencodian-message-highlight-skill'),
       (element) => element.textContent,
     );
     expect(highlights).toEqual(['/writing-skills', '/agent-browser']);
@@ -331,7 +331,7 @@ describe('applyUserMessageTextHighlightSpans', () => {
       '你好 /not-a-skill 为什么',
       extractUserMessageTextHighlightSpans('你好 /not-a-skill 为什么', []),
     )).toBe(false);
-    expect(container.querySelector('.opencodian-message-highlight-command')).toBeNull();
+    expect(container.querySelector('.opencodian-message-highlight-skill')).toBeNull();
   });
 
   it('skips wrapping when rendered text no longer matches the source content', () => {
