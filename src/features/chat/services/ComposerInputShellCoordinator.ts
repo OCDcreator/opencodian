@@ -29,6 +29,8 @@ interface InputHighlightSpan {
   start: number;
   end: number;
   kind: InputHighlightKind;
+  agentId?: string;
+  value?: string;
 }
 
 export { buildComposerInputSubmission } from './composerInputParsing';
@@ -442,15 +444,15 @@ export class ComposerInputShellCoordinator {
     }
 
     // Agent mention highlights
-    const mentions = this.agentMentionController.resolveMentionIntents(content);
+    const mentions = this.agentMentionController.resolveMentionPillSpans(content);
     for (const mention of mentions) {
-      if (mention.source) {
-        spans.push({
-          start: mention.source.start,
-          end: mention.source.end,
-          kind: 'agent',
-        });
-      }
+      spans.push({
+        start: mention.start,
+        end: mention.end,
+        kind: 'agent',
+        agentId: mention.agentId,
+        value: mention.value,
+      });
     }
 
     // Sort by position and render
@@ -463,7 +465,7 @@ export class ComposerInputShellCoordinator {
         continue;
       }
       html += escapeHtmlContent(content.slice(lastIndex, span.start));
-      html += `<span class="${this.getInputHighlightClassName(span.kind)}">${escapeHtmlContent(content.slice(span.start, span.end))}</span>`;
+      html += `<span class="${this.getInputHighlightClassName(span.kind)}"${this.getInputHighlightAttributes(span)}>${escapeHtmlContent(content.slice(span.start, span.end))}</span>`;
       lastIndex = span.end;
     }
 
@@ -541,6 +543,19 @@ export class ComposerInputShellCoordinator {
     return `opencodian-input-highlight-token opencodian-input-highlight-${kind}`;
   }
 
+  private getInputHighlightAttributes(span: InputHighlightSpan): string {
+    if (span.kind !== 'agent' || !span.agentId || !span.value) {
+      return '';
+    }
+
+    return [
+      ' contenteditable="false"',
+      ' data-type="agent"',
+      ` data-name="${escapeHtmlAttribute(span.agentId)}"`,
+      ` data-value="${escapeHtmlAttribute(span.value)}"`,
+    ].join('');
+  }
+
   private syncHighlightBackdropScroll(): void {
     const textarea = this.inputTextareaEl;
     const backdrop = this.highlightBackdropEl;
@@ -555,4 +570,8 @@ export class ComposerInputShellCoordinator {
 
 function escapeHtmlContent(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeHtmlAttribute(text: string): string {
+  return escapeHtmlContent(text).replace(/"/g, '&quot;');
 }

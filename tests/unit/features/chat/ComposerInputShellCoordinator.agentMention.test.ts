@@ -245,6 +245,50 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
     });
   });
 
+  it('renders selected agent mentions as metadata-backed composer pills', async () => {
+    const fixture = createFixture();
+    fixture.setAgentMentionCandidates([
+      { id: 'reviewer', displayName: 'Reviewer', description: 'Reviews changes', mode: 'subagent' },
+    ]);
+
+    fixture.textarea.value = 'please ask @re';
+    fixture.textarea.setSelectionRange(14, 14);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushAsync();
+
+    const pill = fixture.container.querySelector<HTMLElement>('.opencodian-input-highlight-agent');
+    expect(pill?.textContent).toBe('@reviewer');
+    expect(pill?.dataset.type).toBe('agent');
+    expect(pill?.dataset.name).toBe('reviewer');
+    expect(pill?.dataset.value).toBe('@reviewer');
+  });
+
+  it('selects a whole selected agent pill before editing inside it', async () => {
+    const fixture = createFixture();
+    fixture.setAgentMentionCandidates([
+      { id: 'reviewer', displayName: 'Reviewer', description: 'Reviews changes', mode: 'subagent' },
+    ]);
+
+    fixture.textarea.value = 'please ask @re';
+    fixture.textarea.setSelectionRange(14, 14);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushAsync();
+
+    fixture.textarea.setSelectionRange(15, 15);
+    const event = new KeyboardEvent('keydown', { key: 'x', bubbles: true, cancelable: true });
+    fixture.textarea.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(fixture.textarea.selectionStart).toBe(11);
+    expect(fixture.textarea.selectionEnd).toBe(20);
+  });
+
   it('submits the toolbar-selected primary agent alongside tracked mention intents', async () => {
     const fixture = createFixture({
       slashCommandMenuItems: attachAgentSelectionCandidatesToSlashCommandMenuItems([], [

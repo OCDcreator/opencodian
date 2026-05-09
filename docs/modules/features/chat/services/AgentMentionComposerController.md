@@ -20,10 +20,18 @@ export interface AgentMentionCandidate {
   hidden?: boolean;
 }
 
+export interface AgentMentionPillSpan {
+  agentId: string;
+  value: string;
+  start: number;
+  end: number;
+}
+
 export class AgentMentionComposerController {
   getQuery(textarea: HTMLTextAreaElement): AgentMentionQuery | null;
   refresh(query: AgentMentionQuery, menuEl: HTMLElement | null): Promise<void>;
   tryHandleKeydown(event: KeyboardEvent, textarea: HTMLTextAreaElement | null, menuEl: HTMLElement | null): boolean;
+  resolveMentionPillSpans(content: string): AgentMentionPillSpan[];
   resolveMentionIntents(content: string): AgentMentionIntent[];
   clearTrackedMentions(): void;
   clear(menuEl: HTMLElement | null): void;
@@ -36,8 +44,9 @@ export class AgentMentionComposerController {
 - 只在 prompt mode 下识别 `(^|[\s])@(\S*)$` 查询（`@` 前必须是空白或行首，不会在 `hello@agent` 这种词中触发）；shell mode 和选区非折叠时不接管输入
 - 候选过滤对齐上游 OpenCode：只展示 `mode === 'subagent'` 或 `mode === 'all'`，并排除 `hidden`
 - 使用和 slash menu 相同的 overlay 容器、loading / empty / noMatches / loadFailed 状态和键盘选择语义
-- 选中候选后把当前 token 替换为可见 `@agent ` 文本，并记录 `{ agentId, value }`
-- submit 前只使用仍位于 tracked source span 的 selected mention，生成 `source: { value, start, end }`；后续输入会把 span 安全平移，覆盖 mention 本体的编辑会让该 intent 失效
+- 选中候选后把当前 token 替换为可见 `@agent ` 文本，并记录 `{ agentId, value, start, end }`；`ComposerInputShellCoordinator` 会把这些 span 渲染成带 `data-type="agent"` / `data-name` 的 pill
+- 对 tracked mention 执行原子编辑保护：光标位于 pill 内、Backspace/Delete 会修改 pill 边界字符，或选区只覆盖 pill 一部分时，先阻止本次编辑并选中整个 token；用户只能整体删除 selected mention，不能把 `@agent` 改坏后还保留结构化 intent
+- submit 前只使用仍位于 tracked source span 的 selected mention，生成 `source: { value, start, end }`；后续输入会把 span 安全平移，覆盖 mention 本体的外部编辑仍会让该 intent 失效
 - 用户手写但没有从候选选中的 `@name` 不会被静默提升为 agent intent
 
 ## 边界

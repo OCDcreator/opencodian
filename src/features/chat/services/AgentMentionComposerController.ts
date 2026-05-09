@@ -25,6 +25,13 @@ interface TrackedAgentMention {
   end: number;
 }
 
+export interface AgentMentionPillSpan {
+  agentId: string;
+  value: string;
+  start: number;
+  end: number;
+}
+
 export interface AgentMentionComposerControllerHost {
   getComposerInputMode(): 'prompt' | 'shell';
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
@@ -141,6 +148,10 @@ export class AgentMentionComposerController {
     textarea: HTMLTextAreaElement | null,
     menuEl: HTMLElement | null,
   ): boolean {
+    if (this.tryProtectTrackedMentionEdit(event, textarea)) {
+      return true;
+    }
+
     this.syncStateWithCurrentContext();
 
     if (this.visibleCandidates.length === 0) {
@@ -181,28 +192,33 @@ export class AgentMentionComposerController {
   }
 
   resolveMentionIntents(content: string): AgentMentionIntent[] {
-    const mentions: AgentMentionIntent[] = [];
+    return this.resolveMentionPillSpans(content).map((tracked) => ({
+      agentId: tracked.agentId,
+      source: {
+        value: tracked.value,
+        start: tracked.start,
+        end: tracked.end,
+      },
+    }));
+  }
 
-    for (const tracked of this.trackedMentions) {
+  resolveMentionPillSpans(content: string): AgentMentionPillSpan[] {
+    return this.trackedMentions.flatMap((tracked) => {
       const currentValue = content.slice(tracked.start, tracked.end);
       if (
         currentValue !== tracked.value
         || !isAgentMentionTokenBoundary(content, tracked.start, tracked.end)
       ) {
-        continue;
+        return [];
       }
 
-      mentions.push({
+      return [{
         agentId: tracked.agentId,
-        source: {
-          value: tracked.value,
-          start: tracked.start,
-          end: tracked.end,
-        },
-      });
-    }
-
-    return mentions;
+        value: tracked.value,
+        start: tracked.start,
+        end: tracked.end,
+      }];
+    });
   }
 
   syncContent(content: string): void {
@@ -272,6 +288,64 @@ export class AgentMentionComposerController {
     this.lastContent = nextValue;
     this.host.onMentionInserted();
     this.clear(menuEl);
+  }
+
+  private tryProtectTrackedMentionEdit(
+    event: KeyboardEvent,
+    textarea: HTMLTextAreaElement | null,
+  ): boolean {
+    if (!textarea || !isAtomicMentionEditKey(event)) {
+      return false;
+    }
+
+    const selectionStart = textarea.selectionStart ?? textarea.value.length;
+    const selectionEnd = textarea.selectionEnd ?? selectionStart;
+    const protectedMention = this.findProtectedMentionForSelection(
+      textarea.value,
+      selectionStart,
+      selectionEnd,
+      event.key,
+    );
+    if (!protectedMention) {
+      return false;
+    }
+
+    event.preventDefault();
+    textarea.focus();
+    textarea.setSelectionRange(protectedMention.start, protectedMention.end);
+    return true;
+  }
+
+  private findProtectedMentionForSelection(
+    content: string,
+    selectionStart: number,
+    selectionEnd: number,
+    key: string,
+  ): AgentMentionPillSpan | null {
+    for (const mention of this.resolveMentionPillSpans(content)) {
+      const selectedWholeMention = selectionStart <= mention.start && selectionEnd >= mention.end;
+      if (selectionStart === selectionEnd) {
+        const cursor = selectionStart;
+        const cursorInsideMention = cursor > mention.start && cursor < mention.end;
+        const backspaceWouldEditMention = key === 'Backspace' && cursor === mention.end;
+        const deleteWouldEditMention = key === 'Delete' && cursor === mention.start;
+        if (cursorInsideMention || backspaceWouldEditMention || deleteWouldEditMention) {
+          return mention;
+        }
+        continue;
+      }
+
+      const overlapsMention = selectionStart < mention.end && selectionEnd > mention.start;
+      if (!overlapsMention) {
+        continue;
+      }
+
+      if (!selectedWholeMention || isPrintableEditKey(key)) {
+        return mention;
+      }
+    }
+
+    return null;
   }
 
   private render(menuEl: HTMLElement | null): void {
@@ -441,4 +515,16 @@ function isAgentMentionTokenBoundary(content: string, start: number, end: number
   const before = start === 0 || /[\s([{"']/.test(content[start - 1] ?? '');
   const after = end === content.length || /[\s.,!?;:)\]}"']/.test(content[end] ?? '');
   return before && after;
+}
+
+function isAtomicMentionEditKey(event: KeyboardEvent): boolean {
+  if (event.metaKey || event.ctrlKey || event.altKey) {
+    return false;
+  }
+
+  return event.key === 'Backspace' || event.key === 'Delete' || isPrintableEditKey(event.key);
+}
+
+function isPrintableEditKey(key: string): boolean {
+  return key.length === 1;
 }

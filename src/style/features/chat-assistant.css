@@ -842,13 +842,18 @@
 
 .opencodian-input-highlight-token {
   border-radius: 4px;
-  font-weight: 600;
 }
 
 .opencodian-input-highlight-agent {
+  display: inline;
+  border-radius: 999px;
   color: var(--text-warning);
   background: color-mix(in srgb, var(--text-warning) 40%, var(--background-primary));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-warning) 50%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--text-warning) 40%, var(--background-primary)),
+    0 0 0 4px color-mix(in srgb, var(--text-warning) 50%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .opencodian-input-highlight-command {
