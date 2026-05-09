@@ -10,6 +10,7 @@
 ## 公开接口
 
 - `UserMessageFooterRenderer.render()`：在指定 user message bubble 下方组装 footer
+- `UserMessageFooterRenderer.refreshTooltips()`：按按钮上保存的 i18n key 刷新已渲染 footer tooltip 文案
 - `UserMessageFooterRendererHost.handleRewindRequest()`：由 view 提供 rewind 副作用入口
 - `UserMessageFooterRendererHost.handleForkRequest()`：由 view 提供 fork 副作用入口
 
@@ -22,4 +23,5 @@
 ## 注意事项
 
 - copy / rewind / fork 的视觉样式与 tooltip class 仍沿用既有 CSS class；如果更改类名，需要同步检查 `userMessageActions.ts` 和样式文件。
+- footer 按钮会把 tooltip 的 i18n key 保存在 DOM attribute 中，供语言切换后刷新已渲染消息使用。
 - renderer 只读取 `message.timestamp` 与 `message.sourceMessageId`；真正的 rewind / fork 可用性与副作用仍由 host 决定。

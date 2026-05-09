@@ -38,7 +38,7 @@
 ### Cross-view refresh
 
 - `refreshOpenCodianViews()` 通过 host 提供的 leaves 找到所有 `OpenCodianView` 实例。
-- `applyUi` 为 true 时先应用 provider icon color mode，再同步 locale、chat appearance、scroll mode 和 tab bar layout。
+- `applyUi` 为 true 时先应用 provider icon color mode，再同步 locale、已渲染 user footer tooltip、chat appearance、scroll mode 和 tab bar layout。
 - `reloadModels` 为 true 时触发每个打开视图的 `reloadModelCatalog()`。
 
 ### Slash command catalog invalidation

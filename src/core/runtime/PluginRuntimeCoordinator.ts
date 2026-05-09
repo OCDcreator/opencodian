@@ -1,6 +1,7 @@
 import type { WorkspaceLeaf } from 'obsidian';
 
 import { OpenCodianView } from '../../features/chat/OpenCodianView';
+import { UserMessageFooterRenderer } from '../../features/chat/runtime/UserMessageFooterRenderer';
 import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../../shared';
 import { OpenCodeService } from '../opencode';
 import type { OpenCodianSettings } from '../types';
@@ -51,6 +52,7 @@ export class PluginRuntimeCoordinator {
     for (const view of this.getOpenCodianViews()) {
       if (applyUi) {
         view.applyLocaleTexts();
+        UserMessageFooterRenderer.refreshTooltips(view.contentEl);
         view.applyChatAppearanceSettings();
         view.applyChatScrollMode();
         view.applyTabBarLayout();
@@ -175,4 +177,3 @@ export class PluginRuntimeCoordinator {
     );
   }
 }
-
