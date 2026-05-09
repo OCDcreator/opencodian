@@ -1527,6 +1527,7 @@ export const zhTranslations = {
   'agentMention.menu.noMatches': '没有匹配的代理',
   'agentMention.menu.loadFailed': '无法加载代理列表，请检查 OpenCode 服务状态。',
   'slashCommand.skillsCommand.description': '通过 `/skills <skill>` 浏览 OpenCode skills。',
+  'slashCommand.sourceBadge.command': 'command',
   'slashCommand.sourceBadge.runtime': '运行时',
   'slashCommand.sourceBadge.override': '覆盖',
   'slashCommand.sourceBadge.project': '项目',

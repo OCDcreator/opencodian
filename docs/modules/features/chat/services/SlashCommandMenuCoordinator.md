@@ -33,9 +33,9 @@ export class SlashCommandMenuCoordinator {
 
 ## 关键行为
 
-- `refresh()` 通过 `getSlashCommandMenuQuery()` 读取 textarea 光标前的 slash query；query 消失时关闭菜单
+- `refresh()` 通过 `getSlashCommandMenuQuery()` 读取 textarea 光标前的 slash query 与 `isMidText` 位置标记；query 消失时关闭菜单
 - 首次打开菜单时通过 host 拉取 shared catalog，后续同一 session 使用 `slashCommandMenuFilter.ts` 本地过滤
-- direct mode 展示 command + skill；`skills-command` mode 在顶层展示 `/skills`，在 `/skills <query>` 下展示 nested skill items
+- direct mode 在句首展示 command + skill；`skills-command` mode 在句首展示 command + `/skills` 顶层入口，并在 `/skills <query>` 下展示 nested skill items；句中 slash 会把 `isMidText` 传给 filter，使弹框只保留 skill candidates
 - `tryHandleKeydown()` 拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`，并保持 selected item scroll into view
 - `applySelectedItem()` 使用 `replaceSlashTokenAtCursor()` 做局部替换，保留 slash token 前后的正文；如果选中的是顶层 `/skills` 入口，会立即刷新为 nested skill 候选而不是关闭菜单
 - 载入失败只通过 `onMenuLoadFailed()` 交给 host 记录 debug log，UI 只展示 `loadFailed` 状态行

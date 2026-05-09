@@ -59,6 +59,7 @@ applyUserMessageTextHighlightSpans(container: HTMLElement, visibleText: string, 
 
 - 无上游依赖
 - 下游消费者：`UserMessageContentRenderer`
+- 这些 helper 是发送后用户气泡里的 inline invocation highlight 基础设施；它们与 HTML/markup code-block 预处理解耦，最终是否包裹 span 取决于渲染后 `textContent` 能否与原始 visible text 对齐
 
 ## 注意事项
 

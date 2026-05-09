@@ -9,6 +9,7 @@ interface FuzzyMatchResult {
 export interface SlashCommandMenuFilterOptions {
   skillMode: SlashCommandSkillMode;
   skillsCommandDescription: string;
+  isMidText?: boolean;
 }
 
 function fuzzyScore(text: string, query: string): number {
@@ -96,6 +97,20 @@ export function filterSlashCommandMenuItems(
   query: string,
   options?: SlashCommandMenuFilterOptions,
 ): SlashCommandMenuItem[] {
+  const isMidText = options?.isMidText === true;
+  const skillItems = items.filter((item) => item.source === 'skill');
+
+  if (isMidText) {
+    const filteredSkillItems = filterFuzzySlashCommandMenuItems(
+      skillItems,
+      isSkillsPrefixQuery(query) ? extractSkillsQuery(query) : query,
+    );
+
+    return options?.skillMode === 'skills-command'
+      ? filteredSkillItems.map(buildPrefixedSkillMenuItem)
+      : filteredSkillItems;
+  }
+
   if (options?.skillMode !== 'skills-command') {
     return filterFuzzySlashCommandMenuItems(items, query);
   }

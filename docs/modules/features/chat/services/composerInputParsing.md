@@ -37,7 +37,12 @@ export function decoratePromptSubmissionWithPrimaryAgent(
   primaryAgent: string | null | undefined,
 ): ComposerInputSubmission | null;
 
-export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string | null;
+export interface SlashCommandMenuQuery {
+  query: string;
+  isMidText: boolean;
+}
+
+export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): SlashCommandMenuQuery | null;
 
 export function replaceSlashTokenAtCursor(
   current: string,
@@ -58,7 +63,7 @@ export function replaceSlashTokenAtCursor(
 - `decoratePromptSubmissionWithAgentMentions()` 只处理 prompt submission，并把 selected `@agent` mention intent 合并进 `invocationIntent.mentions`
 - `shiftAgentMentionSourceSpans()` 用于把 textarea 原始坐标调整到 trim 后的 prompt content 坐标，避免 coordinator 内联 source span 改写
 - `decoratePromptSubmissionWithPrimaryAgent()` 只处理 prompt submission，并把 composer 主 Agent selector 的选择值写入 `invocationIntent.primaryAgent`
-- slash query 只在光标折叠、仍停留在 command token 内时返回；`/skills <query>` 是唯一允许继续跨空格补全的 nested form。当前实现会优先识别“最后一个以空白或文本开头为边界的 `/skills ...` 片段”，所以像 `/skills agent-browser why /skills ` 这种前文里再次输入的 `/skills` 也会继续弹出 nested skill 菜单，而不是只支持整段输入从 `/skills` 开始的场景。精确的 `/skills` 和 `/skills ` 现在都会被当成“空的 nested skill 查询”，直接展开 skill 候选，而不是退回成顶层 `/skills` 帮助项。普通 `/` token 仍要求 `/` 前必须是空白或文本开头（`slashIndex > 0` 时检查前一字符是否为 `\s`），不会在 `path/to` 这种词中触发
+- slash query 只在光标折叠、仍停留在 command token 内时返回；`/skills <query>` 是唯一允许继续跨空格补全的 nested form。当前实现会优先识别“最后一个以空白或文本开头为边界的 `/skills ...` 片段”，所以像 `/skills agent-browser why /skills ` 这种前文里再次输入的 `/skills` 也会继续弹出 nested skill 菜单，而不是只支持整段输入从 `/skills` 开始的场景。精确的 `/skills` 和 `/skills ` 现在都会被当成“空的 nested skill 查询”，直接展开 skill 候选，而不是退回成顶层 `/skills` 帮助项。返回值还会标注 `isMidText`，供菜单层把句中 slash 限定为 skill-only 候选；普通 `/` token 仍要求 `/` 前必须是空白或文本开头（`slashIndex > 0` 时检查前一字符是否为 `\s`），不会在 `path/to` 这种词中触发
 - `replaceSlashTokenAtCursor()` 做局部 token 替换并保留前后文本。普通 `/command` 只替换当前 token；`/skills <query>` 会把整个 prefixed skill 查询范围当成当前可替换片段，即使光标停在 `/skills ` 后的空白处，也能把中段文本里的 `hello /skills  world` 稳定替换为 `hello /skills skill-name  world`
 - `isCommandComposerText()` 调用 `parseCommandSubmission()` 判断输入是否包含可识别的 `/command`（行首或行中均可）
 

@@ -48,13 +48,7 @@ export class UserMessageContentRenderer {
         ? prepareUserMessageMarkdownForDisplay(visibleText)
         : visibleText;
       await this.host.renderMarkdownInto(textEl, displayText);
-      if (!renderUserMarkupAsCodeBlocks) {
-        applyUserMessageTextHighlightSpans(
-          textEl,
-          visibleText,
-          extractUserMessageTextHighlightSpans(visibleText, message.parts),
-        );
-      }
+      this.applyInlineInvocationHighlights(textEl, visibleText, message.parts);
       const collapseToggleEl = container.createEl('button');
       const collapsibleState: CollapsibleState = {
         isExpanded: false,
@@ -82,6 +76,18 @@ export class UserMessageContentRenderer {
     }
 
     return visibleText;
+  }
+
+  private applyInlineInvocationHighlights(
+    textEl: HTMLElement,
+    visibleText: string,
+    parts: ChatMessage['parts'],
+  ): void {
+    applyUserMessageTextHighlightSpans(
+      textEl,
+      visibleText,
+      extractUserMessageTextHighlightSpans(visibleText, parts),
+    );
   }
 
   private renderUserContextAttachments(

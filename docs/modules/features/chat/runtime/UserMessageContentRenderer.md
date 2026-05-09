@@ -27,12 +27,12 @@
 - 把 user text、context chips、OMO injection、compaction divider 统一为一个渲染关注点
 - 让 markdown 渲染与文件打开等副作用继续留在 view host，renderer 只负责 DOM 结构
 - 保持 `.opencodian-message-text`、`.opencodian-user-context-list`、`.opencodian-omo-injection` 等选择器不变
-- 在 markdown 渲染完成后调用 `extractUserMessageTextHighlightSpans()`：既会读取 OpenCode native `agent` part 的 `source` span，把匹配的可见 `@agent` 文本包成 `.opencodian-message-highlight-agent`，也会读取 `message.parts` 中的 `skill-expansion` metadata，只把真实 expanded skill 对应的 `/skill` / `/skills skill` 包成 `.opencodian-message-highlight-skill`
+- 在 markdown 渲染完成后通过独立的 inline invocation highlight 机制调用 `extractUserMessageTextHighlightSpans()`：既会读取 OpenCode native `agent` part 的 `source` span，把匹配的可见 `@agent` 文本包成 `.opencodian-message-highlight-agent`，也会读取 `message.parts` 中的 `skill-expansion` metadata，只把真实 expanded skill 对应的 `/skill` / `/skills skill` 包成 `.opencodian-message-highlight-skill`
 
 ## 注意事项
 
 - renderer 内部使用 `prepareUserMessageMarkdownForDisplay()` 处理 code block 包装，但只在 `getRenderUserMarkupAsCodeBlocks()` 返回 true 时生效
-- `@agent` 与 skill slash 高亮都只在渲染后的 textContent 与原始 visible text 完全一致时应用；如果 markdown/OMO 转换改变文本，renderer 会跳过 span 包裹以避免错位
+- `@agent` 与 skill slash 高亮不受 `renderUserMarkupAsCodeBlocks` 开关本身控制；它们只在渲染后的 textContent 与原始 visible text 完全一致时应用。如果 markdown/OMO 转换改变文本，renderer 会跳过 span 包裹以避免错位
 - collapsible 的 showMore/showLess label 通过 `t()` 从 i18n 获取
 - OMO injection 的 badge label（search/analyze/custom）和 headline 也走 i18n
 - compaction divider 的 live/auto/manual/overflow 文本同样走 i18n

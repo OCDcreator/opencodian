@@ -272,6 +272,64 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
   });
 });
 
+describe('UserMessageContentRenderer.renderUserMessageContent invocation highlights', () => {
+  let container: HTMLDivElement;
+  let host: ReturnType<typeof createRenderer>['host'];
+  let renderer: UserMessageContentRenderer;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    const created = createRenderer();
+    host = created.host;
+    renderer = created.renderer;
+  });
+
+  afterEach(() => {
+    container.remove();
+  });
+
+  it('keeps agent and skill highlights independent from markup code-block rendering', async () => {
+    host.getRenderUserMarkupAsCodeBlocks.mockReturnValue(true);
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: 'Ask @reviewer about /writing-skills',
+      timestamp: 1,
+      parts: [
+        {
+          type: 'agent',
+          name: 'reviewer',
+          source: {
+            value: '@reviewer',
+            start: 4,
+            end: 13,
+          },
+        },
+        {
+          type: 'text',
+          text: '<skill_content name="writing-skills">...</skill_content>',
+          synthetic: true,
+          metadata: {
+            kind: 'skill-expansion',
+            skillName: 'writing-skills',
+          },
+        },
+      ],
+    };
+
+    await renderer.renderUserMessageContent(container, message);
+
+    const textEl = container.querySelector<HTMLElement>('.opencodian-message-text');
+    expect(textEl?.textContent).toBe('Ask @reviewer about /writing-skills');
+    expect(textEl?.querySelector('.opencodian-message-highlight-agent')?.textContent).toBe(
+      '@reviewer',
+    );
+    expect(textEl?.querySelector('.opencodian-message-highlight-skill')?.textContent).toBe(
+      '/writing-skills',
+    );
+  });
+});
+
 describe('UserMessageContentRenderer.renderUserMessageContent OMO handling', () => {
   let container: HTMLDivElement;
   let host: ReturnType<typeof createRenderer>['host'];

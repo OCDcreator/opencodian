@@ -239,7 +239,7 @@ function buildSourceBadge(item: SlashCommandMenuItem): SlashCommandSourceBadge |
     : item.runtimeAvailable && item.hasProjectOverride
       ? { key: 'slashCommand.sourceBadge.override' as const, cls: 'opencodian-slash-command-menu-badge--override' }
       : item.runtimeAvailable
-        ? { key: 'slashCommand.sourceBadge.runtime' as const, cls: 'opencodian-slash-command-menu-badge--runtime' }
+        ? { key: 'slashCommand.sourceBadge.command' as const, cls: 'opencodian-slash-command-menu-badge--runtime' }
         : { key: 'slashCommand.sourceBadge.project' as const, cls: 'opencodian-slash-command-menu-badge--project' };
 
   return {

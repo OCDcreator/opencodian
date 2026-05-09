@@ -178,7 +178,16 @@ function getExistingMentions(
   return submission.invocationIntent?.mentions ?? [];
 }
 
-export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string | null {
+function isSlashCommandMidText(beforeCursor: string, slashIndex: number): boolean {
+  return beforeCursor.slice(0, slashIndex).trim().length > 0;
+}
+
+export interface SlashCommandMenuQuery {
+  query: string;
+  isMidText: boolean;
+}
+
+export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): SlashCommandMenuQuery | null {
   const selectionStart = textarea.selectionStart ?? textarea.value.length;
   const selectionEnd = textarea.selectionEnd ?? selectionStart;
   if (selectionStart !== selectionEnd) {
@@ -188,10 +197,14 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string 
   const beforeCursor = textarea.value.slice(0, selectionStart);
   const prefixedSkillsMatch = /(?:^|\s)(\/skills(?:\s+\S*)?\s*)$/i.exec(beforeCursor);
   if (prefixedSkillsMatch?.[1]) {
+    const slashIndex = prefixedSkillsMatch.index + prefixedSkillsMatch[0].indexOf('/');
     const prefixedSkillsQuery = prefixedSkillsMatch[1].slice(1);
-    return /^skills\s*$/i.test(prefixedSkillsQuery)
-      ? 'skills '
-      : prefixedSkillsQuery;
+    return {
+      query: /^skills\s*$/i.test(prefixedSkillsQuery)
+        ? 'skills '
+        : prefixedSkillsQuery,
+      isMidText: isSlashCommandMidText(beforeCursor, slashIndex),
+    };
   }
 
   let slashIndex = -1;
@@ -224,7 +237,10 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): string 
     return null;
   }
 
-  return searchText;
+  return {
+    query: searchText,
+    isMidText: isSlashCommandMidText(beforeCursor, slashIndex),
+  };
 }
 
 /**

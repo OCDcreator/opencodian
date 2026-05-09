@@ -4,6 +4,7 @@ import { t } from '../../../i18n';
 import {
   getSlashCommandMenuQuery,
   replaceSlashTokenAtCursor,
+  type SlashCommandMenuQuery,
 } from './composerInputParsing';
 import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
 import { renderSlashCommandMenu, type SlashCommandMenuStatus } from './slashCommandMenuRenderer';
@@ -26,7 +27,7 @@ export class SlashCommandMenuCoordinator {
   private selectedIndex = 0;
   private runId = 0;
   private status: SlashCommandMenuStatus = 'idle';
-  private query: string | null = null;
+  private query: SlashCommandMenuQuery | null = null;
 
   constructor(private readonly host: SlashCommandMenuCoordinatorHost) {}
 
@@ -237,11 +238,12 @@ export class SlashCommandMenuCoordinator {
 
   private filterItems(
     items: SlashCommandMenuItem[],
-    query: string,
+    query: SlashCommandMenuQuery,
   ): SlashCommandMenuItem[] {
-    return filterSlashCommandMenuItems(items, query, {
+    return filterSlashCommandMenuItems(items, query.query, {
       skillMode: this.host.getSkillMode(),
       skillsCommandDescription: t('slashCommand.skillsCommand.description'),
+      isMidText: query.isMidText,
     });
   }
 

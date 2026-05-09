@@ -136,11 +136,11 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     expect(menuText[1]).toContain('skill');
   });
 
-  it('opens slash autocomplete for a bare slash between surrounding spaces', async () => {
+  it('opens skill-only slash autocomplete for a bare slash between surrounding spaces', async () => {
     const fixture = createFixture();
     fixture.setMenuItems([
       slashItem('review', 'Review changes'),
-      slashItem('refactor', 'Refactor touched files'),
+      slashItem('refactor', 'Refactor touched files', 'skill'),
     ]);
 
     fixture.textarea.value = 'before / after';
@@ -149,7 +149,6 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     await flushAsync();
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
-      expect.stringContaining('/review'),
       expect.stringContaining('/refactor'),
     ]);
   });

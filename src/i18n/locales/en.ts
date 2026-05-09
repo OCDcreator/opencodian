@@ -1527,6 +1527,7 @@ export const enTranslations = {
   'agentMention.menu.noMatches': 'No matching agents',
   'agentMention.menu.loadFailed': 'Could not load agents. Check the OpenCode service status.',
   'slashCommand.skillsCommand.description': 'Browse OpenCode skills with `/skills <skill>`.',
+  'slashCommand.sourceBadge.command': 'command',
   'slashCommand.sourceBadge.runtime': 'runtime',
   'slashCommand.sourceBadge.override': 'override',
   'slashCommand.sourceBadge.project': 'project',

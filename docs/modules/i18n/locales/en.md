@@ -33,6 +33,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮还新增 `agentMention.menu.*` 系列键（`loading`、`empty`、`noMatches`、`loadFailed`），为 agent mention 自动补全菜单提供独立的状态文案，与 slash command 菜单的 `slashCommand.menu.*` 键分离。
 
+本轮还新增 `slashCommand.sourceBadge.command`，让 chat slash menu 中 runtime-backed 普通命令以 `command` badge 展示；旧的 `runtime` 文案保留给需要表达运行时来源的其他上下文。
+
 源码约 2050 行。
 
 ## 导入关系
