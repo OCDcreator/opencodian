@@ -36,6 +36,7 @@ export {
 export {
   buildContextAttachment,
   buildObsidianContextTag,
+  dedupeContextAttachments,
   formatContextLabel,
   formatLineRange,
   getContextPathExtension,
@@ -77,6 +78,7 @@ export { getVaultBasePath } from './vault';
 | `buildObsidianContextTag()` | 构建 `<obsidian_context>` XML 标签 |
 | `parseObsidianContextTag()` | 解析标签为 `MessageContextAttachment` |
 | `buildContextAttachment()` | `PromptContextItem` → `MessageContextAttachment` |
+| `dedupeContextAttachments()` | 按 kind/path/line-range 去重上下文附件 |
 | `resolveContextMimeFromPath()` | 路径 → MIME 类型 |
 | `resolveTextMimeFromPath()` | 路径 → 文本 MIME（非文本回退 `text/plain`） |
 | `isTextLikeMime()` | 检查是否为文本类 MIME |

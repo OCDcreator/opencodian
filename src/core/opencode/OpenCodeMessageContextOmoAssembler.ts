@@ -1,4 +1,5 @@
 import {
+  dedupeContextAttachments,
   formatContextLabel,
   parseLineRangeFromFileUrl,
   parseObsidianContextTag,
@@ -95,7 +96,7 @@ export class OpenCodeMessageContextOmoAssembler {
       renderableContent,
       content: normalizedContent.content,
       contextAttachments: contextAttachments.length > 0
-        ? this.dedupeContextAttachments(contextAttachments)
+        ? dedupeContextAttachments(contextAttachments)
         : [],
       displayStyle: normalizedContent.displayStyle,
       noticeTone: normalizedContent.noticeTone,
@@ -553,28 +554,4 @@ export class OpenCodeMessageContextOmoAssembler {
     return null;
   }
 
-  private dedupeContextAttachments(
-    attachments: MessageContextAttachment[],
-  ): MessageContextAttachment[] {
-    const seen = new Set<string>();
-    const deduped: MessageContextAttachment[] = [];
-
-    for (const attachment of attachments) {
-      const key = [
-        attachment.kind,
-        attachment.path,
-        attachment.lineRange?.startLine ?? '',
-        attachment.lineRange?.endLine ?? '',
-      ].join(':');
-
-      if (seen.has(key)) {
-        continue;
-      }
-
-      seen.add(key);
-      deduped.push(attachment);
-    }
-
-    return deduped;
-  }
 }

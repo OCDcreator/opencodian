@@ -10,15 +10,13 @@ import {
   buildComposerInputSubmissionWithAgentIntents,
   getSlashCommandMenuQuery,
   isCommandComposerText,
-  replaceSlashTokenAtCursor,
 } from './composerInputParsing';
 import type { ComposerInputMode, ComposerInputSubmission } from './MessageSendPreparationService';
 import {
   loadAgentMentionCandidatesFromComposerCatalog,
   loadAgentSelectionCandidatesFromComposerCatalog,
 } from './SlashCommandMenuCatalogCache';
-import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
-import { renderSlashCommandMenu, type SlashCommandMenuStatus } from './slashCommandMenuRenderer';
+import { SlashCommandMenuCoordinator } from './SlashCommandMenuCoordinator';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)/g;
@@ -63,13 +61,9 @@ export class ComposerInputShellCoordinator {
   private layoutSyncFrameId: number | null = null;
   private inputContainerResizeObserver: ResizeObserver | null = null;
   private slashCommandMenuCatalogItems: SlashCommandMenuItem[] | null = null;
-  private visibleSlashCommandMenuItems: SlashCommandMenuItem[] = [];
-  private selectedSlashCommandMenuItemIndex = 0;
-  private slashCommandMenuRunId = 0;
-  private slashCommandMenuStatus: SlashCommandMenuStatus = 'idle';
-  private slashCommandMenuQuery: string | null = null;
   private readonly agentMentionController: AgentMentionComposerController;
   private readonly agentSelectionController: ChatAgentSelectionCoordinator;
+  private readonly slashCommandMenuController: SlashCommandMenuCoordinator;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {
     this.agentMentionController = new AgentMentionComposerController({
@@ -92,6 +86,21 @@ export class ComposerInputShellCoordinator {
         this.agentMentionController.clear(this.slashCommandMenuEl);
       },
       restoreInputFocus: () => this.inputTextareaEl?.focus(),
+    });
+    this.slashCommandMenuController = new SlashCommandMenuCoordinator({
+      getTextarea: () => this.inputTextareaEl,
+      getMenuElement: () => this.slashCommandMenuEl,
+      getCatalogItems: () => this.slashCommandMenuCatalogItems,
+      setCatalogItems: (items) => { this.slashCommandMenuCatalogItems = items; },
+      loadItems: () => this.host.loadSlashCommandMenuItems(),
+      getSkillMode: () => this.host.getSlashCommandSkillMode(),
+      onMenuLoadFailed: (error) => { logger.debug('Failed to load slash command menu items:', error); },
+      onCatalogStateChanged: () => this.syncHighlightBackdrop(),
+      onMenuItemApplied: () => {
+        this.syncTextareaHeight();
+        this.syncHighlightBackdrop();
+      },
+      scheduleLayoutSync: () => this.scheduleLayoutSync(),
     });
   }
 
@@ -263,11 +272,7 @@ export class ComposerInputShellCoordinator {
     this.highlightBackdropEl = null;
     this.slashCommandMenuEl = null;
     this.slashCommandMenuCatalogItems = null;
-    this.visibleSlashCommandMenuItems = [];
-    this.selectedSlashCommandMenuItemIndex = 0;
-    this.slashCommandMenuRunId += 1;
-    this.slashCommandMenuStatus = 'idle';
-    this.slashCommandMenuQuery = null;
+    this.slashCommandMenuController.reset();
     this.agentMentionController.reset();
     this.agentSelectionController.destroy();
   }
@@ -392,219 +397,15 @@ export class ComposerInputShellCoordinator {
   }
 
   private tryHandleSlashCommandMenuKeydown(event: KeyboardEvent): boolean {
-    this.syncSlashCommandMenuStateWithCurrentContext();
-
-    if (this.visibleSlashCommandMenuItems.length === 0) {
-      if (event.key === 'Escape' && this.slashCommandMenuStatus !== 'idle') {
-        event.preventDefault();
-        this.clearSlashCommandMenu();
-        return true;
-      }
-
-      return false;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.moveSlashCommandMenuSelection(1);
-      return true;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.moveSlashCommandMenuSelection(-1);
-      return true;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      this.clearSlashCommandMenu();
-      return true;
-    }
-
-    if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
-      event.preventDefault();
-      this.applySelectedSlashCommandMenuItem();
-      return true;
-    }
-
-    return false;
-  }
-
-  private moveSlashCommandMenuSelection(delta: number): void {
-    if (this.visibleSlashCommandMenuItems.length === 0) {
-      return;
-    }
-
-    const itemCount = this.visibleSlashCommandMenuItems.length;
-    this.selectedSlashCommandMenuItemIndex =
-      (this.selectedSlashCommandMenuItemIndex + delta + itemCount) % itemCount;
-    this.renderSlashCommandMenu();
-    this.scrollSelectedItemIntoView();
-  }
-
-  private scrollSelectedItemIntoView(): void {
-    if (!this.slashCommandMenuEl) {
-      return;
-    }
-
-    const selectedEl = this.slashCommandMenuEl.querySelector<HTMLElement>(
-      '.opencodian-slash-command-menu-item.is-selected',
-    );
-    if (selectedEl && typeof selectedEl.scrollIntoView === 'function') {
-      selectedEl.scrollIntoView({ block: 'nearest' });
-    }
-  }
-
-  private applySelectedSlashCommandMenuItem(): void {
-    this.syncSlashCommandMenuStateWithCurrentContext();
-
-    const item = this.visibleSlashCommandMenuItems[this.selectedSlashCommandMenuItemIndex];
-    if (!item || !this.inputTextareaEl) {
-      return;
-    }
-
-    const textarea = this.inputTextareaEl;
-    const cursorPos = textarea.selectionStart ?? textarea.value.length;
-    const replacement = item.insertText ?? `/${item.id} `;
-    const { value: nextValue, cursorPos: nextCursorPos } =
-      replaceSlashTokenAtCursor(textarea.value, cursorPos, replacement);
-
-    textarea.value = nextValue;
-    textarea.focus();
-    textarea.setSelectionRange(nextCursorPos, nextCursorPos);
-    this.syncTextareaHeight();
-    this.syncHighlightBackdrop();
-    if (item.source === 'skills-command') {
-      void this.refreshSlashCommandMenu();
-      return;
-    }
-
-    this.clearSlashCommandMenu();
+    return this.slashCommandMenuController.tryHandleKeydown(event);
   }
 
   private async refreshSlashCommandMenu(): Promise<void> {
-    const textarea = this.inputTextareaEl;
-    if (!textarea) {
-      return;
-    }
-
-    const query = getSlashCommandMenuQuery(textarea);
-    if (query === null) {
-      this.clearSlashCommandMenu();
-      return;
-    }
-
-    this.slashCommandMenuQuery = query;
-
-    const currentRunId = ++this.slashCommandMenuRunId;
-    this.visibleSlashCommandMenuItems = [];
-    this.selectedSlashCommandMenuItemIndex = 0;
-    this.slashCommandMenuStatus = 'loading';
-    this.renderSlashCommandMenu();
-
-    try {
-      const items = this.slashCommandMenuCatalogItems ?? await this.host.loadSlashCommandMenuItems();
-      if (currentRunId !== this.slashCommandMenuRunId) {
-        return;
-      }
-
-      this.slashCommandMenuCatalogItems = items;
-      this.visibleSlashCommandMenuItems = filterSlashCommandMenuItems(
-        this.slashCommandMenuCatalogItems,
-        query,
-        {
-          skillMode: this.host.getSlashCommandSkillMode(),
-          skillsCommandDescription: t('slashCommand.skillsCommand.description'),
-        },
-      );
-      this.selectedSlashCommandMenuItemIndex = 0;
-      this.slashCommandMenuStatus = this.visibleSlashCommandMenuItems.length > 0
-        ? 'idle'
-        : this.getEmptySlashCommandMenuStatus(items);
-      this.syncHighlightBackdrop();
-      this.renderSlashCommandMenu();
-    } catch (error) {
-      if (currentRunId !== this.slashCommandMenuRunId) {
-        return;
-      }
-
-      logger.debug('Failed to load slash command menu items:', error);
-      this.slashCommandMenuCatalogItems = null;
-      this.visibleSlashCommandMenuItems = [];
-      this.selectedSlashCommandMenuItemIndex = 0;
-      this.slashCommandMenuStatus = 'loadFailed';
-      this.syncHighlightBackdrop();
-      this.renderSlashCommandMenu();
-    }
+    await this.slashCommandMenuController.refresh();
   }
 
   private clearSlashCommandMenu(options: { resetCatalog?: boolean } = {}): void {
-    this.slashCommandMenuRunId += 1;
-    if (options.resetCatalog) {
-      this.slashCommandMenuCatalogItems = null;
-    }
-    this.visibleSlashCommandMenuItems = [];
-    this.selectedSlashCommandMenuItemIndex = 0;
-    this.slashCommandMenuStatus = 'idle';
-    this.slashCommandMenuQuery = null;
-    this.syncHighlightBackdrop();
-    this.renderSlashCommandMenu();
-  }
-
-  private renderSlashCommandMenu(): void {
-    if (!this.slashCommandMenuEl) {
-      return;
-    }
-
-    this.syncSlashCommandMenuStateWithCurrentContext();
-
-    renderSlashCommandMenu({
-      menuEl: this.slashCommandMenuEl,
-      items: this.visibleSlashCommandMenuItems,
-      selectedIndex: this.selectedSlashCommandMenuItemIndex,
-      status: this.slashCommandMenuStatus,
-      onHoverItem: (index) => {
-        if (this.selectedSlashCommandMenuItemIndex === index) {
-          return;
-        }
-
-        this.selectedSlashCommandMenuItemIndex = index;
-        this.renderSlashCommandMenu();
-      },
-      onSelectItem: (index) => {
-        this.selectedSlashCommandMenuItemIndex = index;
-        this.applySelectedSlashCommandMenuItem();
-      },
-    });
-
-    this.scheduleLayoutSync();
-  }
-
-  private syncSlashCommandMenuStateWithCurrentContext(): void {
-    if (this.slashCommandMenuQuery === null || !this.slashCommandMenuCatalogItems) {
-      return;
-    }
-
-    this.visibleSlashCommandMenuItems = filterSlashCommandMenuItems(
-      this.slashCommandMenuCatalogItems,
-      this.slashCommandMenuQuery,
-      {
-        skillMode: this.host.getSlashCommandSkillMode(),
-        skillsCommandDescription: t('slashCommand.skillsCommand.description'),
-      },
-    );
-    this.selectedSlashCommandMenuItemIndex = Math.min(
-      this.selectedSlashCommandMenuItemIndex,
-      Math.max(0, this.visibleSlashCommandMenuItems.length - 1),
-    );
-    this.slashCommandMenuStatus = this.visibleSlashCommandMenuItems.length > 0
-      ? 'idle'
-      : this.getEmptySlashCommandMenuStatus(this.slashCommandMenuCatalogItems);
-  }
-
-  private getEmptySlashCommandMenuStatus(items: SlashCommandMenuItem[]): SlashCommandMenuStatus {
-    return items.length === 0 ? 'emptyCatalog' : 'noMatches';
+    this.slashCommandMenuController.clear(options);
   }
 
   private syncHighlightBackdrop(): void {

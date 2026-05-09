@@ -11,7 +11,7 @@
 - 统一解析 Obsidian context tag、`file` part 与 inline Read tool 文本里的上下文引用
 - 对 user message 的原生 `agent` part 按 `source.value/start/end` 恢复 `@agent` 可见文本，避免发送侧去除 text fallback 后 hydration 丢失 mention
 - 把 OpenCode 原生 `compaction` part 归一化为结构化 `compactionDivider` 元数据（`auto`, `overflow`, `tailStartId`），并隐藏 `metadata.compaction_continue` synthetic follow-up
-- 对 attachment 路径、行号和 MIME 做跨平台归一化与去重
+- 对 attachment 路径、行号和 MIME 做跨平台归一化，并把重复 attachment 去重委托给 shared `dedupeContextAttachments()`
 - 识别 OMO user injection / system reminder metadata，并产出 mapper 继续组装 `ChatMessage` 所需的显示字段
 
 它不负责 tool/content block 组装、question request 归一化或 session/runtime transport；这些仍留在 `OpenCodeMessageNormalizationMapper` 与 `OpenCodeService`。
@@ -37,7 +37,7 @@
 - 先收集 message parts 中可见文本与 context attachments
 - 对 user message 额外补充 `file` part 与 inline Read tool context
 - 在保持 pre-OMO `renderableContent` 的同时，生成 UI 使用的 `content` / `displayStyle` / `noticeTone` / `omo` / `compactionDivider`
-- 对重复 attachment 按 kind/path/line-range 去重
+- 对重复 attachment 按 kind/path/line-range 去重；去重 helper 位于 `shared/obsidianContext.ts`，方便发送侧和 hydration 侧复用同一判定规则
 
 ### Context attachment 收集
 
@@ -68,7 +68,7 @@ graph LR
 ## 与其他模块的交互
 
 - `OpenCodeMessageNormalizationMapper` 保留公开 hydration 入口，但把 context/OMO 装配委托给本 owner。
-- `shared/contextPath` 与 `shared` 中的 context helpers 提供路径、行号与 MIME 归一化能力。
+- `shared/contextPath` 与 `shared` 中的 context helpers 提供路径、行号、MIME 归一化与 attachment 去重能力。
 - `omoCompat` 提供 OMO metadata 识别；本模块只负责把结果映射到 `ChatMessage` 兼容字段。
 
 ## 注意事项

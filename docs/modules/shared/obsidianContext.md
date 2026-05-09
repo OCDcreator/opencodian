@@ -5,7 +5,7 @@
 
 ## 概述
 
-Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_context>` 标签的构建和解析、上下文附件对象与标签格式之间的转换、文件路径 MIME 类型解析和行范围格式化。用于在 AI 聊天消息中编码和还原编辑器上下文信息。
+Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_context>` 标签的构建和解析、上下文附件对象与标签格式之间的转换、附件去重、文件路径 MIME 类型解析和行范围格式化。用于在 AI 聊天消息中编码和还原编辑器上下文信息。
 
 ## 导入关系
 上游: `./contextPath`, `../core/types/chat` (MessageContextAttachment, PromptContextItem, PromptContextKind, PromptContextLineRange)
@@ -71,6 +71,7 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 | `buildObsidianContextTag(item)` | 构建 XML 标签字符串 |
 | `parseObsidianContextTag(text)` | 解析 XML 标签为附件对象 |
 | `buildContextAttachment(item)` | PromptContextItem → MessageContextAttachment |
+| `dedupeContextAttachments(attachments)` | 按 kind/path/line-range 去重上下文附件 |
 | `resolveContextMimeFromPath(path)` | 路径 → MIME 类型 |
 | `resolveTextMimeFromPath(path)` | 路径 → 文本 MIME（非文本回退 text/plain） |
 | `isTextLikeMime(mime)` | 检查是否为文本类 MIME |
@@ -114,6 +115,6 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 
 - HTML 属性编码/解码是双向对称的（`escapeHtmlAttribute` / `decodeHtmlAttribute`）
 - `textSnapshot` 在 `buildContextAttachment()` 中仅对 `selection` 类型保留
+- `dedupeContextAttachments()` 使用 `kind:path:startLine:endLine` 作为稳定 key；不会比较 `label`、`mime` 或 `textSnapshot`，以避免同一上下文来源因展示字段变化而重复
 - MIME 检测仅基于扩展名，不检查文件内容
 - `toFileContextUrl()` 的底层 file URL path 规范化由 `contextPath.ts` 负责；如果要调整 Windows/POSIX 路径兼容行为，应优先扩展该模块
-

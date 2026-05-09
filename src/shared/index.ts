@@ -22,6 +22,7 @@ export {
 export {
   buildContextAttachment,
   buildObsidianContextTag,
+  dedupeContextAttachments,
   formatContextLabel,
   formatLineRange,
   getContextPathExtension,

@@ -229,6 +229,31 @@ export function buildContextAttachment(item: PromptContextItem): MessageContextA
   };
 }
 
+export function dedupeContextAttachments(
+  attachments: MessageContextAttachment[],
+): MessageContextAttachment[] {
+  const seen = new Set<string>();
+  const deduped: MessageContextAttachment[] = [];
+
+  for (const attachment of attachments) {
+    const key = [
+      attachment.kind,
+      attachment.path,
+      attachment.lineRange?.startLine ?? '',
+      attachment.lineRange?.endLine ?? '',
+    ].join(':');
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(attachment);
+  }
+
+  return deduped;
+}
+
 export function parseLineRangeFromFileUrl(url: string): PromptContextLineRange | null {
   try {
     const parsed = new URL(url);
