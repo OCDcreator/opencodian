@@ -35,6 +35,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮还新增 `slashCommand.sourceBadge.command`，让 chat slash menu 中 runtime-backed 普通命令以 `command` badge 展示；旧的 `runtime` 文案保留给需要表达运行时来源的其他上下文。
 
+本轮新增 `slashCommand.menu.hint`，用于在 slash command 一级补全框顶部提示用户“斜杠命令仅在输入框开头输入时生效”。
+
 源码约 2050 行。
 
 ## 导入关系

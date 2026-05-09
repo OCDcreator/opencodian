@@ -203,6 +203,7 @@ export class SlashCommandMenuCoordinator {
       items: this.visibleItems,
       selectedIndex: this.selectedIndex,
       status: this.status,
+      isMidText: this.query?.isMidText,
       onHoverItem: (index) => {
         if (this.selectedIndex === index) {
           return;

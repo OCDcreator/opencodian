@@ -1522,6 +1522,7 @@ export const zhTranslations = {
   'slashCommand.menu.empty': '当前没有可用的斜杠命令',
   'slashCommand.menu.noMatches': '没有匹配的斜杠命令',
   'slashCommand.menu.loadFailed': '无法加载斜杠命令，请检查 OpenCode 服务状态。',
+  'slashCommand.menu.hint': '斜杠命令仅在输入框开头输入时生效',
   'agentMention.menu.loading': '正在加载代理列表…',
   'agentMention.menu.empty': '当前没有可用的代理',
   'agentMention.menu.noMatches': '没有匹配的代理',

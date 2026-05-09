@@ -18,6 +18,7 @@ interface RenderSlashCommandMenuOptions {
   items: SlashCommandMenuItem[];
   selectedIndex: number;
   status: SlashCommandMenuStatus;
+  isMidText?: boolean;
   onHoverItem(index: number): void;
   onSelectItem(index: number): void;
 }
@@ -43,6 +44,7 @@ export function renderSlashCommandMenu(options: RenderSlashCommandMenuOptions): 
     items,
     selectedIndex,
     status,
+    isMidText,
     onHoverItem,
     onSelectItem,
   } = options;
@@ -66,6 +68,14 @@ export function renderSlashCommandMenu(options: RenderSlashCommandMenuOptions): 
   }
 
   menuEl.removeClass('is-hidden');
+
+  if (!isMidText) {
+    menuEl.createDiv({
+      cls: 'opencodian-slash-command-menu-hint',
+      text: t('slashCommand.menu.hint'),
+      attr: { 'aria-hidden': 'true' },
+    });
+  }
 
   items.forEach((item, index) => {
     const itemEl = menuEl.createDiv({

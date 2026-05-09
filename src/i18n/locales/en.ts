@@ -1522,6 +1522,7 @@ export const enTranslations = {
   'slashCommand.menu.empty': 'No slash commands available',
   'slashCommand.menu.noMatches': 'No matching slash commands',
   'slashCommand.menu.loadFailed': 'Could not load slash commands. Check the OpenCode service status.',
+  'slashCommand.menu.hint': 'Slash commands only work at the start of the input',
   'agentMention.menu.loading': 'Loading agents…',
   'agentMention.menu.empty': 'No agents available',
   'agentMention.menu.noMatches': 'No matching agents',

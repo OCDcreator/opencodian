@@ -1398,6 +1398,15 @@
   display: none;
 }
 
+.opencodian-slash-command-menu-hint {
+  padding: 6px 10px 2px;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
+}
+
 .opencodian-slash-command-menu-state {
   padding: 10px 12px;
   color: var(--text-muted);
