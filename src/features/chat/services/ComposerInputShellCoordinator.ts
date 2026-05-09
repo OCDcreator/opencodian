@@ -145,7 +145,7 @@ export class ComposerInputShellCoordinator {
 
     this.inputTextareaEl = highlightContainerEl.createEl('textarea', {
       cls: 'opencodian-input',
-      attr: { rows: '1', 'aria-label': placeholderText },
+      attr: { rows: '1' },
     });
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
@@ -232,7 +232,8 @@ export class ComposerInputShellCoordinator {
     }
 
     const placeholderText = this.host.getInputPlaceholder();
-    this.inputTextareaEl?.setAttribute('aria-label', placeholderText);
+    // aria-label removed — the custom placeholder overlay already provides the visual cue,
+    // and aria-label on the textarea caused an unwanted native tooltip on hover in Obsidian.
     const textSpan = this.placeholderOverlayEl?.querySelector('.opencodian-input-placeholder-text');
     if (textSpan) { textSpan.textContent = placeholderText; }
     this.updateSendButtonState();

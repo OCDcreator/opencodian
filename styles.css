@@ -7380,6 +7380,7 @@ img.opencodian-model-provider-header-icon {
   inset: 0;
   pointer-events: none;
   color: var(--text-muted);
+  opacity: 0.55;
   font-family: inherit;
   font-size: 14px;
   line-height: 1.65;
