@@ -133,6 +133,24 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     expect(menuText[1]).toContain('skill');
   });
 
+  it('opens slash autocomplete for a bare slash between surrounding spaces', async () => {
+    const fixture = createFixture();
+    fixture.setMenuItems([
+      slashItem('review', 'Review changes'),
+      slashItem('refactor', 'Refactor touched files'),
+    ]);
+
+    fixture.textarea.value = 'before / after';
+    fixture.textarea.setSelectionRange('before /'.length, 'before /'.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/review'),
+      expect.stringContaining('/refactor'),
+    ]);
+  });
+
   it('only highlights direct slash skills that exist in the loaded catalog', async () => {
     const fixture = createFixture();
     fixture.setMenuItems([
@@ -265,6 +283,31 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
       expect.stringContaining('/skills agent-browser'),
       expect.stringContaining('/skills frontend-design'),
     ]);
+  });
+
+  it('preserves surrounding text when selecting a nested skill from a mid-text /skills prefix', async () => {
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([
+      slashItem('agent-browser', 'Use browser automation', 'skill'),
+      slashItem('frontend-design', 'Design a frontend', 'skill'),
+    ]);
+
+    fixture.textarea.value = 'hello /skills  world';
+    fixture.textarea.setSelectionRange('hello /skills '.length, 'hello /skills '.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    const nestedItems = Array.from(
+      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
+    );
+    expect(nestedItems).toHaveLength(2);
+
+    nestedItems[1]?.click();
+    await flushAsync();
+
+    expect(fixture.textarea.value).toBe('hello /skills frontend-design  world');
+    expect(fixture.textarea.selectionStart).toBe('hello /skills frontend-design '.length);
   });
 
   it('treats an exact later /skills token as a nested skill query', async () => {

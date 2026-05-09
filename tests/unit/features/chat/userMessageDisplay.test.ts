@@ -283,6 +283,45 @@ describe('applyUserMessageTextHighlightSpans', () => {
     expect(highlight?.dataset.highlight).toBe('command');
   });
 
+  it('wraps multiple slash skill spans in one rendered user message', () => {
+    const container = document.createElement('div');
+    container.textContent = '先 /writing-skills 再 /agent-browser';
+
+    expect(applyUserMessageTextHighlightSpans(
+      container,
+      '先 /writing-skills 再 /agent-browser',
+      extractUserMessageTextHighlightSpans(
+        '先 /writing-skills 再 /agent-browser',
+        [
+          {
+            type: 'text',
+            text: '<skill_content name="writing-skills">...</skill_content>',
+            synthetic: true,
+            metadata: {
+              kind: 'skill-expansion',
+              skillName: 'writing-skills',
+            },
+          },
+          {
+            type: 'text',
+            text: '<skill_content name="agent-browser">...</skill_content>',
+            synthetic: true,
+            metadata: {
+              kind: 'skill-expansion',
+              skillName: 'agent-browser',
+            },
+          },
+        ],
+      ),
+    )).toBe(true);
+
+    const highlights = Array.from(
+      container.querySelectorAll<HTMLElement>('.opencodian-message-highlight-command'),
+      (element) => element.textContent,
+    );
+    expect(highlights).toEqual(['/writing-skills', '/agent-browser']);
+  });
+
   it('does not wrap slash command styling when no known skill span exists', () => {
     const container = document.createElement('div');
     container.textContent = '你好 /not-a-skill 为什么';

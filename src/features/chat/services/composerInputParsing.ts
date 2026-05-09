@@ -237,6 +237,22 @@ export function replaceSlashTokenAtCursor(
   replacement: string,
 ): { value: string; cursorPos: number } {
   const beforeCursor = current.slice(0, cursorPos);
+  const prefixedSkillsMatch = /(?:^|\s)(\/skills(?:\s+\S*)?\s*)$/i.exec(beforeCursor);
+  if (prefixedSkillsMatch?.[1]) {
+    const start = prefixedSkillsMatch.index + prefixedSkillsMatch[0].indexOf('/');
+    let end = cursorPos;
+    while (end < current.length && !/\s/.test(current[end])) {
+      end++;
+    }
+
+    const before = current.slice(0, start);
+    const after = current.slice(end);
+    return {
+      value: before + replacement + after,
+      cursorPos: before.length + replacement.length,
+    };
+  }
+
   let slashIndex = -1;
   for (let i = beforeCursor.length - 1; i >= 0; i--) {
     const ch = beforeCursor[i];
