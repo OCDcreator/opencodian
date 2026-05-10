@@ -290,7 +290,7 @@ describe('ConversationAuthoritativeSyncCoordinator timeout notice server sync me
     ]);
   });
 
-  it('drops a timeout interrupted notice once authoritative sync includes the awaited assistant reply', async () => {
+  it('preserves a timeout interrupted notice alongside the awaited assistant reply from authoritative sync', async () => {
     const host = createHost({
       getSessionMessages: jest.fn().mockResolvedValue([
         {
@@ -358,6 +358,10 @@ describe('ConversationAuthoritativeSyncCoordinator timeout notice server sync me
 
     expect(result.messages).toEqual([
       expect.objectContaining({ sourceMessageId: 'msg-user-latest' }),
+      expect.objectContaining({
+        id: 'assistant-interrupted-2001',
+        displayStyle: 'notice',
+      }),
       expect.objectContaining({
         sourceMessageId: 'msg-assistant-latest',
         content: '终于回来了',

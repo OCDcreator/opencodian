@@ -46,7 +46,7 @@ export function shouldBypassCanonicalSyncForInterruptedNotice(
 
 export function shouldPreserveInterruptedNoticeOnSync(
   existingMessages: ChatMessage[],
-  syncedMessages: ChatMessage[],
+  _syncedMessages: ChatMessage[],
   message: ChatMessage,
 ): boolean {
   if (!isInterruptedNoticeMessage(message)) {
@@ -58,18 +58,5 @@ export function shouldPreserveInterruptedNoticeOnSync(
     return false;
   }
 
-  const latestUser = findLatestUserBeforeTimestamp(existingMessages, latestInterruptedNotice.timestamp);
-  if (!latestUser) {
-    return false;
-  }
-
-  const latestUserSourceId = latestUser.sourceMessageId ?? latestUser.id;
-  const syncedUserIndex = syncedMessages.findIndex((candidate) =>
-    (candidate.sourceMessageId ?? candidate.id) === latestUserSourceId
-  );
-  if (syncedUserIndex < 0) {
-    return true;
-  }
-
-  return !syncedMessages.slice(syncedUserIndex + 1).some((candidate) => candidate.role === 'assistant');
+  return message.id === latestInterruptedNotice.id;
 }
