@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript, Jest, Obsidian plugin runtime, OpenCode SDK v2 / legacy fallback, OpenCodian chat render services.
 
+**Status note:** This is a historical implementation plan. As of 2026-05-10, commits `68c413ee` and `4e9eaa7c` landed the focused canonical-convergence slice, so the Phase 1-5 checkboxes below are backfilled to match the current implementation status rather than representing new open work.
+
 ---
 
 ## Scope Rules
@@ -48,25 +50,27 @@
 
 **Problem solved:** `Conversation.messages` still participates in render fallback and local render grouping when canonical state exists.
 
+**Current status:** Completed in the landed canonical-convergence slice.
+
 **Files:**
 - Modify: `src/features/chat/services/ConversationRenderService.ts`
 - Modify: `src/features/chat/services/ConversationTurnViewModelBuilder.ts`
 - Modify or add tests near existing chat service tests for canonical render projection.
 
-- [ ] **Step 1: Add tests for canonical render input**
+- [x] **Step 1: Add tests for canonical render input**
   - Cover a session state with one user message, one assistant message, and multiple parts.
   - Cover tool-first assistant parts with no initial text part.
   - Expected result: render input is built from canonical message/part state and does not require `Conversation.messages`.
 
-- [ ] **Step 2: Make fallback explicit and narrow**
+- [x] **Step 2: Make fallback explicit and narrow**
   - Keep fallback only when `getCanonicalSessionState(sessionId)` returns `null` or canonical state is empty before first authoritative load.
   - Add a debug log or test-visible branch label if helpful, but do not add a new state store.
 
-- [ ] **Step 3: Preserve UI-specific compatibility in projection**
+- [x] **Step 3: Preserve UI-specific compatibility in projection**
   - Confirm footer model metadata, context attachments, question resolution, OMO task markers, and visible tool cards still survive through canonical projection or documented compatibility projection.
   - Any field that cannot be canonical should be clearly marked as client-only decoration, not truth.
 
-- [ ] **Step 4: Run focused render tests**
+- [x] **Step 4: Run focused render tests**
   - Run the smallest test command that covers the changed render service.
   - If no adjacent tests exist, add focused Jest coverage rather than broad snapshots.
 
@@ -78,30 +82,32 @@
 
 **Problem solved:** `ConversationAuthoritativeReloadCoordinator` currently hydrates to `ChatMessage[]`, merges with `conversation.messages`, and writes that as runtime truth.
 
+**Current status:** Completed in the landed canonical-convergence slice.
+
 **Files:**
 - Modify: `src/features/chat/services/ConversationAuthoritativeReloadCoordinator.ts`
 - Modify: `src/features/chat/services/ConversationAuthoritativeMessageMergeCoordinator.ts`
 - Modify: `src/features/chat/services/ConversationSyncBridge.ts`
 - Modify or add tests for server snapshot sync and canonical-state sync.
 
-- [ ] **Step 1: Add tests for server snapshot to canonical projection**
+- [x] **Step 1: Add tests for server snapshot to canonical projection**
   - Start with existing `conversation.messages` containing stale assistant content.
   - Provide canonical/server messages with updated assistant parts.
   - Expected result: canonical-derived render/cache output wins; stale `Conversation.messages` content does not override it.
 
-- [ ] **Step 2: Split client-only decorations from truth fields**
+- [x] **Step 2: Split client-only decorations from truth fields**
   - Preserve only explicit client decorations, such as context attachment display metadata or resolved question UI state.
   - Do not preserve assistant body, tool call output, structured payload, stream state, or source message content from `conversation.messages` when canonical state exists.
 
-- [ ] **Step 3: Rewrite sync merge around canonical snapshot**
+- [x] **Step 3: Rewrite sync merge around canonical snapshot**
   - Treat server snapshot and canonical snapshot as inputs to `OpenCodeSessionStateStore`.
   - Derive render/cache `ChatMessage[]` after canonical update.
   - Keep `Conversation.messages` save as compatibility/cache writeback after projection.
 
-- [ ] **Step 4: Keep server fallback only for canonical cache miss**
+- [x] **Step 4: Keep server fallback only for canonical cache miss**
   - In `ConversationSyncBridge`, use server sync when canonical state is unavailable, not as an ordinary second truth path.
 
-- [ ] **Step 5: Run focused sync tests**
+- [x] **Step 5: Run focused sync tests**
   - Validate live sync event and explicit reload produce identical canonical-derived render input.
 
 **Exit criteria:**
@@ -112,24 +118,26 @@
 
 **Problem solved:** `session.diff` currently schedules conversation sync instead of behaving like reference OpenCode's separate diff state.
 
+**Current status:** Completed in the landed canonical-convergence slice.
+
 **Files:**
 - Modify: `src/features/chat/services/ConversationSessionSignalRuntime.ts`
 - Modify: `src/features/chat/services/ConversationSyncBridge.ts`
 - Modify or add a small diff-state holder if an existing owner is not available.
 - Modify tests around sync signal routing.
 
-- [ ] **Step 1: Add tests for `session.diff` routing**
+- [x] **Step 1: Add tests for `session.diff` routing**
   - Emit a `session.diff` update for the active session.
   - Expected result: diff state / turn-diff notice path updates, but message authoritative sync is not scheduled.
 
-- [ ] **Step 2: Route diff to diff-specific state**
+- [x] **Step 2: Route diff to diff-specific state**
   - Store or hand off diff payload separately from message/part canonical state.
   - Do not call `syncConversationMessagesFromServer()` solely because a diff event arrived.
 
-- [ ] **Step 3: Preserve existing turn-diff notices**
+- [x] **Step 3: Preserve existing turn-diff notices**
   - Ensure `appendTurnDiffNoticeIfNeeded()` or its successor still has the diff data it needs.
 
-- [ ] **Step 4: Run focused signal tests**
+- [x] **Step 4: Run focused signal tests**
   - Validate `message.updated` still triggers canonical message projection.
   - Validate `session.diff` does not trigger message reload.
 
@@ -141,30 +149,32 @@
 
 **Problem solved:** `MessageFinalizationService` still post-syncs, compares `Conversation.messages` fingerprints, and applies render repair.
 
+**Current status:** Completed in the landed canonical-convergence slice.
+
 **Files:**
 - Modify: `src/features/chat/services/MessageFinalizationService.ts`
 - Modify: `src/features/chat/runtime/LocalStreamMessagePersistence.ts`
 - Modify: `src/features/chat/runtime/StreamChunkRouter.ts`
 - Modify tests for finalization and live/reload parity.
 
-- [ ] **Step 1: Add canonical drift tests**
+- [x] **Step 1: Add canonical drift tests**
   - Build a stream result with assistant text and tool parts.
   - Build the equivalent canonical snapshot.
   - Expected result: finalization compares canonical-derived fingerprints, not raw `Conversation.messages`.
 
-- [ ] **Step 2: Replace visual fingerprint repair with canonical convergence check**
+- [x] **Step 2: Replace visual fingerprint repair with canonical convergence check**
   - Compute fingerprints from canonical render input or canonical message/part state.
   - If drift exists, project canonical state to render/cache; do not preserve local assistant body as truth.
 
-- [ ] **Step 3: Narrow local assistant append behavior**
+- [x] **Step 3: Narrow local assistant append behavior**
   - Make `LocalStreamMessagePersistence` append compatibility/cache output only after canonical stream state exists.
   - Keep interrupted/error notices only where they are intentionally client-only and documented.
 
-- [ ] **Step 4: Remove or gate post-sync render repair**
+- [x] **Step 4: Remove or gate post-sync render repair**
   - Keep server sync only when the stream transport did not deliver enough canonical events.
   - Otherwise finalization should mark completion, save cache output, refresh todos/context, and stop.
 
-- [ ] **Step 5: Run finalization tests**
+- [x] **Step 5: Run finalization tests**
   - Cover normal text response, tool-first assistant response, interrupted response, and structured output response.
 
 **Exit criteria:**
@@ -175,6 +185,8 @@
 
 **Problem solved:** Plugin synthetic parts, command, shell, question, and notice paths can still bypass unified session logic.
 
+**Current status:** Completed for the current slice: synthetic parts, command/shell routing, and client-only notice boundaries are covered. This does not make unrelated opencode-desktop-only patterns required for OpenCodian.
+
 **Files:**
 - Modify: `src/core/opencode/OpenCodeSessionControlOrchestrator.ts`
 - Modify: `src/features/chat/services/MessageSendPreparationService.ts`
@@ -182,19 +194,19 @@
 - Modify: `src/features/chat/OpenCodianView.ts`
 - Add or update tests for synthetic parts and command/shell routing.
 
-- [ ] **Step 1: Add plugin synthetic part reload test**
+- [x] **Step 1: Add plugin synthetic part reload test**
   - Send a prompt with synthetic text parts.
   - Reload from canonical/server messages.
   - Expected result: synthetic parts survive through canonical state without depending on fallback `Conversation.messages.content`.
 
-- [ ] **Step 2: Audit command path for canonical reuse**
+- [x] **Step 2: Audit command path for canonical reuse**
   - Ensure slash command execution eventually produces canonical message/part state through the same projection path as normal prompt sends.
 
-- [ ] **Step 3: Decide shell scope before implementation**
+- [x] **Step 3: Decide shell scope before implementation**
   - If shell remains disabled, document it as intentionally unsupported in stable OpenCodian.
   - If shell is enabled, route it through `session.shell` and canonical projection instead of a local-only path.
 
-- [ ] **Step 4: Validate question/notice client-only boundaries**
+- [x] **Step 4: Validate question/notice client-only boundaries**
   - Ensure question cards and notices are clearly client decorations or canonical-backed messages.
 
 **Exit criteria:**
@@ -232,9 +244,22 @@ As of 2026-05-10, the focused canonical-convergence slice has landed in code:
 - Phase 4 finalization without local repair: implemented
 - Phase 5 extension-path parity proof: implemented for synthetic parts, command/shell routing, and client-only notice boundaries
 
-Still intentionally out of scope for this slice:
+Do not repeat the same canonical convergence as a new task unless there is a concrete regression or drift reproduction. The next automation queue after this documentation status alignment is:
 
+- active stream duplicate Notice
+- `TabSessionPhase` read-only derived view
+- background-task metadata persistence
 - follow-up queue
 - sync-event batching
+
+Conditional write lock remains a conditional stability measure only: evaluate it after a specific cache writeback interleaving is reproduced.
+
+Still intentionally out of scope for this slice:
+
+- active stream duplicate Notice
+- `TabSessionPhase` read-only derived view
 - background-task metadata persistence
-- full `TabSessionPhase`
+- follow-up queue
+- sync-event batching
+- full writable `TabSessionPhase` state machine
+- conditional write lock without a concrete interleaving reproduction

@@ -9,6 +9,8 @@
 > **评估方法**：本地源码审计 + 既有会话对齐审计复核 + 后续外部 Council 审查门
 > **对比项目**：OpenCode — [https://github.com/opencode-ai/opencode](https://github.com/opencode-ai/opencode)
 >
+> **状态注记**：本文是历史审计基线，不是当前未完成路线图。后续提交 `68c413ee`（canonical cache writeback）和 `4e9eaa7c`（finalization local cache boundary）已经部分 supersede 本报告中的 canonical convergence 差距描述。
+>
 > 本报告涉及的 opencode-desktop 源码路径应在后续外部审查中重新确认。当前修订重点是让 OpenCodian 本地现状、证据边界和后续实施优先级准确可审查。
 
 ---
@@ -155,7 +157,9 @@ Server SSE → GlobalSDK.event
 
 更准确的风险是：`Conversation.messages` 仍参与 send、authoritative reload、sync merge、finalization fingerprint、error notice persistence 和 storage cache writeback。也就是说，OpenCodian 已经有 canonical 优先路径，但 reload / finalization / persistence 仍保留本地补偿路径。JS 单线程避免了真正的数据竞争，但 async interleaving 仍可能让 live stream、reload、post-sync 三条路径产出不同的 `ChatMessage[]` cache。
 
-**评估结论**：当前最大的架构风险不是"完全没有 canonical truth"，而是 canonical graph 与 `Conversation.messages` cache/compat 输出之间的职责边界仍不够硬。优先修复方向应是让 render / reload / finalization 的输入收敛到 canonical projection，再决定是否需要额外的串行写入保护。
+**评估结论（历史基线）**：当时最大的架构风险不是"完全没有 canonical truth"，而是 canonical graph 与 `Conversation.messages` cache/compat 输出之间的职责边界仍不够硬。当时的优先修复方向是让 render / reload / sync / finalization 的输入收敛到 canonical projection，再决定是否需要额外的串行写入保护。
+
+**当前状态（2026-05-10 后续实现）**：`68c413ee` 和 `4e9eaa7c` 已完成本轮 canonical render / reload / sync / finalization / local cache boundary 收敛切片。后续 agent 不应重复实现同一 canonical convergence；只能在新的复现证据证明仍有漂移时做窄修。
 
 ### 3.3 事件流与同步
 
@@ -246,6 +250,8 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 
 #### 建议 1：先做 canonical render / reload / finalization 收敛切片
 
+**当前状态**：已由 `68c413ee` 与 `4e9eaa7c` 落地当前切片；本小节保留为历史计划说明。不要把以下内容当作新的待实现任务重复执行。
+
 - **问题**：当前 render 已 canonical 优先，但 reload、sync merge、finalization 和 persistence 仍通过 `Conversation.messages` 补偿层判断与修复。
 - **方案**：让 `ConversationRenderService`、`ConversationAuthoritativeReloadCoordinator` 和 `MessageFinalizationService` 使用同一套 canonical-derived render input。`Conversation.messages` 在 canonical 存在时只作为 compatibility/cache writeback，不再覆盖 assistant body、tool output、structured payload 等 truth 字段。
 - **影响**：高 — 直接降低 live stream、reload、post-sync 之间的漂移风险。
@@ -271,6 +277,7 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 
 - **问题**：多个 async 路径仍会写入 `Conversation.messages` cache。
 - **方案**：不要先用 Promise chain 固化双重事实源。只有当 canonical 收敛切片后仍存在 cache writeback interleaving 时，再为剩余 cache 写入引入 per-conversation write lock。
+- **当前状态**：canonical 收敛后仍没有把 conditional write lock 列为默认待办；只有在出现具体 interleaving 复现、且能证明 canonical/cache writeback 仍会互相覆盖时才评估。
 - **影响**：中。
 - **工作量**：中。
 - **风险**：中 — 需要避免死锁和延迟渲染。
@@ -313,11 +320,13 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 
 #### 建议 7：双重真相收敛
 
+**当前状态**：当前 canonical convergence 切片已经完成 render / reload / sync / finalization / local cache boundary 的收敛；Tier 3 不再代表同一工作的立即待办。它只保留为长期架构简化方向，前提是后续发现新的 runtime truth 边界问题。
+
 - **问题**：`OpenCodeSessionStateStore`（规范）和 `Conversation.messages`（显示/持久化）承载同一份消息的不同表示，增加理解和维护成本
 - **方案**（多迭代渐进式）：
-  - **Phase 1**：渲染层优先从 `OpenCodeSessionStateStore` 读取（**已基本具备**，`ConversationRenderService` 已 canonical 优先），`Conversation.messages` 仅作为 fallback
-  - **Phase 2**：消除 merge fallback，规范状态成为唯一渲染输入
-  - **Phase 3**：`Conversation.messages` 退化为纯持久化载体，运行时不再直接读取
+  - **Phase 1**：渲染层优先从 `OpenCodeSessionStateStore` 读取（已完成当前切片），`Conversation.messages` 仅作为 fallback/cache 输出
+  - **Phase 2**：消除 merge fallback，规范状态成为唯一渲染输入（已完成当前切片范围内的 render/reload/sync/finalization 边界）
+  - **Phase 3**：`Conversation.messages` 退化为纯持久化载体，运行时不再直接读取（长期方向；当前切片已把 local cache writeback 边界收窄）
 - **影响**：高 — 架构简化
 - **工作量**：高 — 需要多迭代逐步迁移
 - **风险**：中 — 需要在每个阶段充分验证
@@ -371,27 +380,27 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 ## 7. 实施优先级总结
 
 ```text
-Tier 1（立即行动）
-  ├── #1 canonical render/reload/finalization 收敛  ← 数据一致性基石
-  ├── #2 TabSessionPhase 只读派生视图               ← 维护性基石
-  ├── #3 条件性串行写入保护                         ← 收敛后再决定
-  └── #4 后台任务元数据持久化                       ← 重载恢复增强
+Tier 1（当前状态）
+  ├── #1 canonical render/reload/sync/finalization/local cache boundary 收敛  ← 已完成当前切片
+  ├── #2 TabSessionPhase 只读派生视图                                      ← 仍在剩余队列
+  ├── #3 条件性串行写入保护                                                ← 仅在具体 interleaving 复现时评估
+  └── #4 后台任务元数据持久化                                              ← 仍在剩余队列
 
-Tier 2（下一步）
-  ├── #5 跟进提示队列                               ← UX 高价值改进
-  └── #6 同步事件批处理                             ← 性能优化
+Tier 2（剩余队列）
+  ├── #5 跟进提示队列                                                      ← UX 高价值改进
+  ├── #6 同步事件批处理                                                    ← 性能优化
+  └── active stream duplicate Notice                                       ← 从静默覆盖改为用户提示
 
 Tier 3（长期方向）
-  └── #7 双重真相收敛                               ← 架构简化，建立在 Tier 1 上
+  └── #7 双重真相收敛                                                      ← 已由当前切片覆盖核心边界；只在新证据下继续
 ```
 
-**建议实施路径**：
+**更新后的实施路径**：
 
-1. 先做 #1 canonical 收敛切片，这是后续所有工作的基础
-2. #2 可与 #1 并行，只读派生不影响现有行为
-3. #3 和 #4 在 #1 验证后再决定是否需要
-4. #5 和 #6 可在 Tier 1 完成后并行
-5. #7 在 Tier 1 收敛稳定后再启动
+1. 不要重复做 #1 canonical convergence；它已经由后续提交覆盖当前切片范围。
+2. 下一批自动化队列按小切片推进：active stream duplicate Notice、`TabSessionPhase` 只读派生、background-task metadata persistence、follow-up queue、sync-event batching。
+3. conditional write lock 不是默认队列项；只有在有具体 async interleaving 复现时才评估。
+4. 继续保留“不照搬 opencode-desktop”的边界；分层存储、LRU 预取、父子会话 worktree 隔离等不适用项不应被改写成待实现任务。
 
 ### UI / layout / style guard
 
@@ -407,11 +416,11 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
 
 | 议题 | 本地判断 | 说明 |
 |------|---------|------|
-| canonical render/reload/finalization 收敛应作为 #1 优先级 | 作者判断 | render 已 canonical 优先，但 reload/finalization/persistence 仍有补偿路径 |
-| TabSessionPhase 只读派生视图 | 作者判断 | 状态分散问题已确认，只读派生可降低行为回归风险 |
-| 条件性串行写入保护 | 待定 | 应在 canonical 收敛后根据残留 interleaving 再决定 |
-| 后台任务元数据持久化 | 待定 | 依赖 canonical 收敛完成后评估 |
-| 双重真相收敛时机 | 待定 | 应建立在 Tier 1 收敛之上，不宜提前 |
+| canonical render/reload/finalization 收敛应作为 #1 优先级 | 已完成当前切片 | `68c413ee` 与 `4e9eaa7c` 已覆盖 render/reload/sync/finalization/local cache boundary；不要重复实现同一 convergence |
+| TabSessionPhase 只读派生视图 | 剩余队列 | 状态分散问题仍适合用只读派生降低维护成本；不要让它成为新的可写状态源 |
+| 条件性串行写入保护 | 条件评估 | 只有出现具体 cache writeback interleaving 复现时才评估，不作为默认后续任务 |
+| 后台任务元数据持久化 | 剩余队列 | canonical 收敛完成后可作为独立重载恢复增强切片 |
+| 双重真相收敛时机 | 当前核心边界已收敛 | Tier 3 只保留长期架构简化语境，不应驱动重复 canonical convergence |
 | 分层存储不应照搬 | 作者判断 | Obsidian 单库场景无需求 |
 | 流单例可接受 | 作者判断 | 仅需改善用户提示 |
 | 会话 GC 不迫切 | 作者判断 | 侧边栏对话规模有限 |
@@ -468,7 +477,9 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
 
 当前仍故意保留为后续独立切片的事项：
 
+- active stream duplicate Notice
+- `TabSessionPhase` 只读派生视图
+- background-task metadata persistence
 - follow-up queue
 - sync-event batching
-- background-task metadata persistence
-- full `TabSessionPhase`
+- conditional write lock：仅在有具体 async interleaving 复现时评估
