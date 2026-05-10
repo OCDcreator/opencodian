@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This owner intentionally keeps SDK sync subscription, batching, normalization, and recovery state together. */
 import { createLogger } from '../../shared';
 import type { SessionDiffEntry, SessionTodo } from '../types';
 import type {
@@ -7,6 +8,7 @@ import type {
 
 const logger = createLogger('OpenCodeSyncEventRuntimeCoordinator');
 const TRANSIENT_CONNECTIVITY_RECOVERY_POLL_MS = 3_000;
+const SESSION_SYNC_EVENT_BATCH_WINDOW_MS = 16;
 
 export type SessionActivityStatus =
   | {
@@ -243,8 +245,12 @@ export class OpenCodeSyncEventRuntimeCoordinator {
   private readonly sessionTodoListeners = new Set<SessionTodoListener>();
   private readonly sessionStatusListeners = new Set<SessionStatusListener>();
   private readonly sessionSyncEventListeners = new Set<SessionSyncEventListener>();
+  private readonly pendingSessionSyncEventUpdates: SessionSyncEventUpdate[] = [];
   private subscriptionAbortController: AbortController | null = null;
   private subscriptionPromise: Promise<void> | null = null;
+  private sessionSyncEventBatchPromise: Promise<void> | null = null;
+  private sessionSyncEventBatchPromiseSignal: AbortSignal | null = null;
+  private sessionSyncEventBatchSignal: AbortSignal | null = null;
   private wanted = false;
 
   constructor(private readonly host: OpenCodeSyncEventRuntimeCoordinatorHost) {}
@@ -334,33 +340,41 @@ export class OpenCodeSyncEventRuntimeCoordinator {
   }
 
   private async runLoop(abortController: AbortController): Promise<void> {
-    while (!abortController.signal.aborted && this.hasListeners()) {
-      try {
-        const stream = await this.host.subscribeToSyncEvents(abortController.signal);
+    this.sessionSyncEventBatchSignal = abortController.signal;
 
-        for await (const event of stream) {
+    try {
+      while (!abortController.signal.aborted && this.hasListeners()) {
+        try {
+          const stream = await this.host.subscribeToSyncEvents(abortController.signal);
+
+          for await (const event of stream) {
+            if (abortController.signal.aborted) {
+              break;
+            }
+            this.handleSyncEvent(event);
+          }
+        } catch (error) {
           if (abortController.signal.aborted) {
             break;
           }
-          this.handleSyncEvent(event);
+          const isTransientConnectivity = this.host.isTransientConnectivityError(error);
+          this.host.logSyncEventStreamFailure(error);
+          if (isTransientConnectivity) {
+            await this.waitForTransientConnectivityRecovery(abortController.signal);
+            continue;
+          }
         }
-      } catch (error) {
+
         if (abortController.signal.aborted) {
           break;
         }
-        const isTransientConnectivity = this.host.isTransientConnectivityError(error);
-        this.host.logSyncEventStreamFailure(error);
-        if (isTransientConnectivity) {
-          await this.waitForTransientConnectivityRecovery(abortController.signal);
-          continue;
-        }
-      }
 
-      if (abortController.signal.aborted) {
-        break;
+        await this.host.delay(1000, abortController.signal).catch(() => {});
       }
-
-      await this.host.delay(1000, abortController.signal).catch(() => {});
+    } finally {
+      this.sessionSyncEventBatchSignal = null;
+      this.sessionSyncEventBatchPromise = null;
+      this.pendingSessionSyncEventUpdates.length = 0;
     }
   }
 
@@ -395,7 +409,7 @@ export class OpenCodeSyncEventRuntimeCoordinator {
     if (value.type !== 'session.status') {
       const update = this.createSessionSyncEventUpdate(value, sessionId);
       if (update) {
-        this.emitSessionSyncEventUpdate(update);
+        this.queueSessionSyncEventUpdate(update);
       }
       return;
     }
@@ -406,6 +420,134 @@ export class OpenCodeSyncEventRuntimeCoordinator {
     }
 
     this.emitSessionStatusUpdate({ sessionId, status });
+  }
+
+  private queueSessionSyncEventUpdate(update: SessionSyncEventUpdate): void {
+    this.pendingSessionSyncEventUpdates.push(update);
+    this.ensureSessionSyncEventBatch();
+  }
+
+  private ensureSessionSyncEventBatch(): void {
+    if (this.sessionSyncEventBatchPromise || !this.sessionSyncEventBatchSignal) {
+      return;
+    }
+
+    const signal = this.sessionSyncEventBatchSignal;
+    this.sessionSyncEventBatchPromise = this.flushSessionSyncEventBatch(signal).finally(() => {
+      if (this.sessionSyncEventBatchSignal === signal) {
+        this.sessionSyncEventBatchPromise = null;
+        if (this.pendingSessionSyncEventUpdates.length > 0 && !signal.aborted) {
+          this.ensureSessionSyncEventBatch();
+        }
+      }
+    });
+  }
+
+  private async flushSessionSyncEventBatch(signal: AbortSignal): Promise<void> {
+    await this.host.delay(SESSION_SYNC_EVENT_BATCH_WINDOW_MS, signal).catch(() => {});
+    if (signal.aborted) {
+      return;
+    }
+
+    const batch = this.pendingSessionSyncEventUpdates.splice(0);
+    const updates = this.coalesceSessionSyncEventUpdates(batch);
+    for (const update of updates) {
+      this.emitSessionSyncEventUpdate(update);
+    }
+  }
+
+  private coalesceSessionSyncEventUpdates(
+    updates: SessionSyncEventUpdate[],
+  ): SessionSyncEventUpdate[] {
+    const coalesced: SessionSyncEventUpdate[] = [];
+    let segment: SessionSyncEventUpdate[] = [];
+
+    for (const update of updates) {
+      if (this.isSessionSyncEventCoalescingBarrier(update)) {
+        coalesced.push(...this.coalesceSessionSyncEventSegment(segment), update);
+        segment = [];
+        continue;
+      }
+      segment.push(update);
+    }
+
+    coalesced.push(...this.coalesceSessionSyncEventSegment(segment));
+    return coalesced;
+  }
+
+  private coalesceSessionSyncEventSegment(
+    updates: SessionSyncEventUpdate[],
+  ): SessionSyncEventUpdate[] {
+    const seenMessageUpdated = new Set<string>();
+    const seenPartUpdated = new Set<string>();
+    const seenSessionDiff = new Set<string>();
+    const updatedPartKeys = new Set<string>();
+
+    for (const update of updates) {
+      if (update.type === 'message.part.updated') {
+        updatedPartKeys.add(this.getPartKey(update.sessionId, update.part.id));
+      }
+    }
+
+    const coalesced: SessionSyncEventUpdate[] = [];
+    for (let index = updates.length - 1; index >= 0; index -= 1) {
+      const update = updates[index];
+
+      switch (update.type) {
+        case 'message.updated': {
+          const key = this.getMessageKey(update.sessionId, update.info.id);
+          if (seenMessageUpdated.has(key)) {
+            continue;
+          }
+          seenMessageUpdated.add(key);
+          coalesced.push(update);
+          continue;
+        }
+        case 'message.part.updated': {
+          const key = this.getPartKey(update.sessionId, update.part.id);
+          if (seenPartUpdated.has(key)) {
+            continue;
+          }
+          seenPartUpdated.add(key);
+          coalesced.push(update);
+          continue;
+        }
+        case 'message.part.delta': {
+          const key = this.getPartKey(update.sessionId, update.partId);
+          if (updatedPartKeys.has(key)) {
+            continue;
+          }
+          coalesced.push(update);
+          continue;
+        }
+        case 'session.diff': {
+          if (seenSessionDiff.has(update.sessionId)) {
+            continue;
+          }
+          seenSessionDiff.add(update.sessionId);
+          coalesced.push(update);
+          continue;
+        }
+        default:
+          coalesced.push(update);
+      }
+    }
+
+    return coalesced.reverse();
+  }
+
+  private isSessionSyncEventCoalescingBarrier(update: SessionSyncEventUpdate): boolean {
+    return update.type === 'message.removed'
+      || update.type === 'message.part.removed'
+      || update.type === 'session.compacted';
+  }
+
+  private getMessageKey(sessionId: string, messageId: string): string {
+    return `${sessionId}::${messageId}`;
+  }
+
+  private getPartKey(sessionId: string, partId: string): string {
+    return `${sessionId}::${partId}`;
   }
 
   private createSessionSyncEventUpdate(

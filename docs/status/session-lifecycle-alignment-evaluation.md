@@ -382,14 +382,14 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 ```text
 Tier 1（当前状态）
   ├── #1 canonical render/reload/sync/finalization/local cache boundary 收敛  ← 已完成当前切片
-  ├── #2 TabSessionPhase 只读派生视图                                      ← 仍在剩余队列
+  ├── #2 TabSessionPhase 只读派生视图                                      ← 已完成
   ├── #3 条件性串行写入保护                                                ← 仅在具体 interleaving 复现时评估
-  └── #4 后台任务元数据持久化                                              ← 仍在剩余队列
+  └── #4 后台任务元数据持久化                                              ← 已完成
 
-Tier 2（剩余队列）
-  ├── #5 跟进提示队列                                                      ← UX 高价值改进
-  ├── #6 同步事件批处理                                                    ← 性能优化
-  └── active stream duplicate Notice                                       ← 从静默覆盖改为用户提示
+Tier 2（当前状态）
+  ├── #5 跟进提示队列                                                      ← 已完成
+  ├── #6 同步事件批处理                                                    ← 已完成
+  └── active stream duplicate gating                                       ← 已完成；同 session streaming 现在会进入 busy gating
 
 Tier 3（长期方向）
   └── #7 双重真相收敛                                                      ← 已由当前切片覆盖核心边界；只在新证据下继续
@@ -398,9 +398,10 @@ Tier 3（长期方向）
 **更新后的实施路径**：
 
 1. 不要重复做 #1 canonical convergence；它已经由后续提交覆盖当前切片范围。
-2. 下一批自动化队列按小切片推进：active stream duplicate Notice、`TabSessionPhase` 只读派生、background-task metadata persistence、follow-up queue、sync-event batching。
+2. 本轮小切片队列已完成：active stream duplicate busy gating、`TabSessionPhase` 只读派生、background-task metadata persistence、follow-up queue、sync-event batching。
 3. conditional write lock 不是默认队列项；只有在有具体 async interleaving 复现时才评估。
-4. 继续保留“不照搬 opencode-desktop”的边界；分层存储、LRU 预取、父子会话 worktree 隔离等不适用项不应被改写成待实现任务。
+4. 完整可写 `TabSessionPhase` state machine 仍不在当前范围内；现有 phase 只是只读派生视图。
+5. 继续保留“不照搬 opencode-desktop”的边界；分层存储、LRU 预取、父子会话 worktree 隔离等不适用项不应被改写成待实现任务。
 
 ### UI / layout / style guard
 
@@ -417,9 +418,11 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
 | 议题 | 本地判断 | 说明 |
 |------|---------|------|
 | canonical render/reload/finalization 收敛应作为 #1 优先级 | 已完成当前切片 | `68c413ee` 与 `4e9eaa7c` 已覆盖 render/reload/sync/finalization/local cache boundary；不要重复实现同一 convergence |
-| TabSessionPhase 只读派生视图 | 剩余队列 | 状态分散问题仍适合用只读派生降低维护成本；不要让它成为新的可写状态源 |
+| TabSessionPhase 只读派生视图 | 已完成 | 状态分散问题已用只读派生降低维护成本；不要把它升级成新的可写状态源 |
 | 条件性串行写入保护 | 条件评估 | 只有出现具体 cache writeback interleaving 复现时才评估，不作为默认后续任务 |
-| 后台任务元数据持久化 | 剩余队列 | canonical 收敛完成后可作为独立重载恢复增强切片 |
+| 后台任务元数据持久化 | 已完成 | 已作为独立重载恢复增强切片落地，保留为 lightweight metadata 而非新 truth source |
+| 跟进提示队列 | 已完成 | 已作为 per-tab one-slot send-intent queue 落地，不持久化消息 truth |
+| 同步事件批处理 | 已完成 | sync-event message / part / diff / compacted 路径已有 16ms 批处理与保守合并 |
 | 双重真相收敛时机 | 当前核心边界已收敛 | Tier 3 只保留长期架构简化语境，不应驱动重复 canonical convergence |
 | 分层存储不应照搬 | 作者判断 | Obsidian 单库场景无需求 |
 | 流单例可接受 | 作者判断 | 仅需改善用户提示 |
@@ -475,11 +478,11 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
 - `session.diff` 不再驱动 message authoritative reload
 - local stream normal-completion 的本地 cache writeback 延后给 canonical finalization
 
-当前仍故意保留为后续独立切片的事项：
+本轮后续独立切片的当前状态：
 
-- active stream duplicate Notice
-- `TabSessionPhase` 只读派生视图
-- background-task metadata persistence
-- follow-up queue
-- sync-event batching
-- conditional write lock：仅在有具体 async interleaving 复现时评估
+- active stream duplicate busy gating：已完成；同 session 另一标签页 streaming 会进入 foreground busy 判断
+- `TabSessionPhase` 只读派生视图：已完成；仍不是新的可写 truth source
+- background-task metadata persistence：已完成；仅持久化 lifecycle metadata
+- follow-up queue：已完成；仅保存一条 per-tab send intent
+- sync-event batching：已完成；message / part / diff / compacted sync events 经 16ms 批窗口合并后 apply / emit
+- conditional write lock：仍仅在有具体 async interleaving 复现时评估

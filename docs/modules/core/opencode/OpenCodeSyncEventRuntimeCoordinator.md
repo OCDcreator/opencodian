@@ -55,7 +55,19 @@ SDK stream 事件会按现有语义路由：
 - `session.diff` → 带可选 `diff` entries 的 `SessionSyncEventUpdate`
 - `session.compacted` → 只携带 `sessionId` 的 compaction-complete signal，供上层走即时收尾 refresh
 
-session id 仍按 `properties.sessionID`、`properties.info.sessionID`、`properties.part.sessionID` 的顺序解析；缺少 session id 的事件会被忽略。`session.diff` 的 `properties.diff` 会在这里先归一化成 `SessionDiffEntry[]`（缺失或形状异常时退为空数组）。对 message / part 事件，coordinator 现在会先调用 host 的 canonical apply seam，再把同一份 `SessionSyncEventUpdate` 广播给 listener。
+session id 仍按 `properties.sessionID`、`properties.info.sessionID`、`properties.part.sessionID` 的顺序解析；缺少 session id 的事件会被忽略。`session.diff` 的 `properties.diff` 会在这里先归一化成 `SessionDiffEntry[]`（缺失或形状异常时退为空数组）。对 message / part / diff / compacted 事件，coordinator 会进入 16ms sync-event batching window；flush 时先调用 host 的 canonical apply seam，再把同一份 `SessionSyncEventUpdate` 广播给 listener。
+
+### Sync-event batching
+
+`todo.updated` 与 `session.status` 仍即时广播。其他 `SessionSyncEventUpdate` 会在一个短批窗口内合并后再 apply / emit，以减少高频 part 更新导致的重复 canonical projection 与 render scheduling。
+
+当前合并规则保持保守：
+
+- 同一窗口内相同 `sessionId + message id` 的 `message.updated` 只保留最后一条。
+- 同一窗口内相同 `sessionId + part id` 的 `message.part.updated` 只保留最后一条。
+- 同一窗口内如果某个 part 已有 `message.part.updated`，同 part 的 `message.part.delta` 会被丢弃，因为 updated snapshot 已覆盖 delta。
+- 同一窗口内相同 session 的 `session.diff` 只保留最后一条。
+- `message.removed`、`message.part.removed` 和 `session.compacted` 保持事件顺序，并作为 coalescing barrier；前后两段不会互相去重。
 
 ### Transient connectivity recovery
 

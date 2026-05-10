@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- Sync-event batching tests keep raw event fixtures inline so coalescing expectations stay readable. */
 import {
   OpenCodeSyncEventRuntimeCoordinator,
   type OpenCodeSyncEventRuntimeCoordinatorHost,
@@ -45,7 +46,8 @@ function createHost(
 }
 
 describe('OpenCodeSyncEventRuntimeCoordinator', () => {
-  it('routes todo, status, and message sync events through registered listeners', async () => {
+  it('routes todo and status updates immediately while batching sync events for 16ms', async () => {
+    let releaseBatch: (() => void) | null = null;
     const host = createHost({
       subscribeToSyncEvents: jest.fn((signal) =>
         Promise.resolve(createSignalBoundStream(signal, [
@@ -76,10 +78,15 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
             },
           },
           {
-            type: 'message.removed',
+            type: 'message.updated',
             properties: {
               sessionID: 'session-1',
-              messageID: 'msg-old',
+              info: {
+                id: 'msg-1',
+                sessionID: 'session-1',
+                role: 'assistant',
+                time: { created: 2 },
+              },
             },
           },
           {
@@ -106,11 +113,16 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
             },
           },
           {
-            type: 'message.part.removed',
+            type: 'message.part.updated',
             properties: {
               sessionID: 'session-1',
-              messageID: 'msg-1',
-              partID: 'part-1',
+              part: {
+                id: 'part-1',
+                sessionID: 'session-1',
+                type: 'tool',
+                messageID: 'msg-1',
+              },
+              time: 43,
             },
           },
           {
@@ -119,12 +131,33 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
               sessionID: 'session-1',
               diff: [
                 {
-                  file: 'notes.md',
+                  file: 'notes-a.md',
                   additions: 2,
                   deletions: 1,
                   status: 'modified',
                 },
               ],
+            },
+          },
+          {
+            type: 'session.diff',
+            properties: {
+              sessionID: 'session-1',
+              diff: [
+                {
+                  file: 'notes-b.md',
+                  additions: 3,
+                  deletions: 0,
+                  status: 'modified',
+                },
+              ],
+            },
+          },
+          {
+            type: 'message.removed',
+            properties: {
+              sessionID: 'session-1',
+              messageID: 'msg-old',
             },
           },
           {
@@ -134,6 +167,15 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
             },
           },
         ]))),
+      delay: jest.fn((ms) => {
+        if (ms === 16) {
+          return new Promise<void>((resolve) => {
+            releaseBatch = resolve;
+          });
+        }
+
+        return Promise.resolve();
+      }),
     });
     const coordinator = new OpenCodeSyncEventRuntimeCoordinator(host);
     const todoUpdates: Array<{ sessionId: string; todos: SessionTodo[] }> = [];
@@ -151,11 +193,7 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
     });
 
     await flushAsync();
-    disposeTodo();
-    disposeStatus();
-    disposeSync();
 
-    expect(host.subscribeToSyncEvents).toHaveBeenCalledTimes(1);
     expect(todoUpdates).toEqual([
       {
         sessionId: 'session-1',
@@ -168,6 +206,200 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
         status: { type: 'busy' },
       },
     ]);
+    expect(syncUpdates).toEqual([]);
+    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(0);
+    expect(host.delay).toHaveBeenCalledWith(16, expect.any(AbortSignal));
+
+    releaseBatch?.();
+    await flushAsync();
+
+    expect(syncUpdates).toEqual([
+      {
+        sessionId: 'session-1',
+        type: 'message.updated',
+        info: {
+          id: 'msg-1',
+          sessionID: 'session-1',
+          role: 'assistant',
+          time: { created: 2 },
+        },
+      },
+      {
+        sessionId: 'session-1',
+        type: 'message.part.updated',
+        part: {
+          id: 'part-1',
+          sessionID: 'session-1',
+          type: 'tool',
+          messageID: 'msg-1',
+        },
+        time: 43,
+      },
+      {
+        sessionId: 'session-1',
+        type: 'session.diff',
+        diff: [
+          {
+            file: 'notes-b.md',
+            additions: 3,
+            deletions: 0,
+            status: 'modified',
+          },
+        ],
+      },
+      {
+        sessionId: 'session-1',
+        type: 'message.removed',
+        messageId: 'msg-old',
+      },
+      {
+        sessionId: 'session-1',
+        type: 'session.compacted',
+      },
+    ]);
+    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(5);
+    expect(host.applySessionSyncEvent).toHaveBeenNthCalledWith(1, syncUpdates[0]);
+
+    disposeTodo();
+    disposeStatus();
+    disposeSync();
+  });
+
+  it('keeps part deltas when no updated snapshot for that part exists in the batch', async () => {
+    let releaseBatch: (() => void) | null = null;
+    const host = createHost({
+      subscribeToSyncEvents: jest.fn((signal) =>
+        Promise.resolve(createSignalBoundStream(signal, [
+          {
+            type: 'message.part.delta',
+            properties: {
+              sessionID: 'session-1',
+              messageID: 'msg-1',
+              partID: 'part-1',
+              field: 'text',
+              delta: 'hello',
+            },
+          },
+          {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'session-1',
+              part: {
+                id: 'part-2',
+                sessionID: 'session-1',
+                type: 'text',
+                messageID: 'msg-1',
+              },
+              time: 7,
+            },
+          },
+        ]))),
+      delay: jest.fn((ms) => {
+        if (ms === 16) {
+          return new Promise<void>((resolve) => {
+            releaseBatch = resolve;
+          });
+        }
+
+        return Promise.resolve();
+      }),
+    });
+    const coordinator = new OpenCodeSyncEventRuntimeCoordinator(host);
+    const syncUpdates: SessionSyncEventUpdate[] = [];
+
+    const dispose = coordinator.subscribeToSessionSyncEvents((update) => {
+      syncUpdates.push(update);
+    });
+
+    await flushAsync();
+    expect(syncUpdates).toEqual([]);
+
+    releaseBatch?.();
+    await flushAsync();
+
+    expect(syncUpdates).toEqual([
+      {
+        sessionId: 'session-1',
+        type: 'message.part.delta',
+        messageId: 'msg-1',
+        partId: 'part-1',
+        field: 'text',
+        delta: 'hello',
+      },
+      {
+        sessionId: 'session-1',
+        type: 'message.part.updated',
+        part: {
+          id: 'part-2',
+          sessionID: 'session-1',
+          type: 'text',
+          messageID: 'msg-1',
+        },
+        time: 7,
+      },
+    ]);
+    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(2);
+
+    dispose();
+  });
+
+  it('does not coalesce message updates across removal or compaction barriers', async () => {
+    let releaseBatch: (() => void) | null = null;
+    const host = createHost({
+      subscribeToSyncEvents: jest.fn((signal) =>
+        Promise.resolve(createSignalBoundStream(signal, [
+          {
+            type: 'message.updated',
+            properties: {
+              sessionID: 'session-1',
+              info: {
+                id: 'msg-1',
+                sessionID: 'session-1',
+                role: 'assistant',
+                time: { created: 1 },
+              },
+            },
+          },
+          {
+            type: 'session.compacted',
+            properties: {
+              sessionID: 'session-1',
+            },
+          },
+          {
+            type: 'message.updated',
+            properties: {
+              sessionID: 'session-1',
+              info: {
+                id: 'msg-1',
+                sessionID: 'session-1',
+                role: 'assistant',
+                time: { created: 2 },
+              },
+            },
+          },
+        ]))),
+      delay: jest.fn((ms) => {
+        if (ms === 16) {
+          return new Promise<void>((resolve) => {
+            releaseBatch = resolve;
+          });
+        }
+
+        return Promise.resolve();
+      }),
+    });
+    const coordinator = new OpenCodeSyncEventRuntimeCoordinator(host);
+    const syncUpdates: SessionSyncEventUpdate[] = [];
+
+    const dispose = coordinator.subscribeToSessionSyncEvents((update) => {
+      syncUpdates.push(update);
+    });
+
+    await flushAsync();
+    releaseBatch?.();
+    await flushAsync();
+
     expect(syncUpdates).toEqual([
       {
         sessionId: 'session-1',
@@ -181,53 +413,21 @@ describe('OpenCodeSyncEventRuntimeCoordinator', () => {
       },
       {
         sessionId: 'session-1',
-        type: 'message.removed',
-        messageId: 'msg-old',
-      },
-      {
-        sessionId: 'session-1',
-        type: 'message.part.updated',
-        part: {
-          id: 'part-1',
-          sessionID: 'session-1',
-          type: 'tool',
-          messageID: 'msg-1',
-        },
-        time: 42,
-      },
-      {
-        sessionId: 'session-1',
-        type: 'message.part.delta',
-        messageId: 'msg-1',
-        partId: 'part-1',
-        field: 'text',
-        delta: 'hi',
-      },
-      {
-        sessionId: 'session-1',
-        type: 'message.part.removed',
-        messageId: 'msg-1',
-        partId: 'part-1',
-      },
-      {
-        sessionId: 'session-1',
-        type: 'session.diff',
-        diff: [
-          {
-            file: 'notes.md',
-            additions: 2,
-            deletions: 1,
-            status: 'modified',
-          },
-        ],
-      },
-      {
-        sessionId: 'session-1',
         type: 'session.compacted',
       },
+      {
+        sessionId: 'session-1',
+        type: 'message.updated',
+        info: {
+          id: 'msg-1',
+          sessionID: 'session-1',
+          role: 'assistant',
+          time: { created: 2 },
+        },
+      },
     ]);
-    expect(host.applySessionSyncEvent).toHaveBeenCalledTimes(7);
-    expect(host.applySessionSyncEvent).toHaveBeenNthCalledWith(1, syncUpdates[0]);
+
+    dispose();
   });
 });
 

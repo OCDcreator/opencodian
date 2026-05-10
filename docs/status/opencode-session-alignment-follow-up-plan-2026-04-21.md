@@ -244,22 +244,17 @@ As of 2026-05-10, the focused canonical-convergence slice has landed in code:
 - Phase 4 finalization without local repair: implemented
 - Phase 5 extension-path parity proof: implemented for synthetic parts, command/shell routing, and client-only notice boundaries
 
-Do not repeat the same canonical convergence as a new task unless there is a concrete regression or drift reproduction. The next automation queue after this documentation status alignment is:
+Do not repeat the same canonical convergence as a new task unless there is a concrete regression or drift reproduction. The post-canonical automation queue has now landed as focused slices:
 
-- active stream duplicate Notice
-- `TabSessionPhase` read-only derived view
-- background-task metadata persistence
-- follow-up queue
-- sync-event batching
+- active stream duplicate busy gating: implemented
+- `TabSessionPhase` read-only derived view: implemented
+- background-task metadata persistence: implemented
+- follow-up queue: implemented as a one-slot per-tab send-intent queue
+- sync-event batching: implemented with a 16ms conservative merge window
 
 Conditional write lock remains a conditional stability measure only: evaluate it after a specific cache writeback interleaving is reproduced.
 
-Still intentionally out of scope for this slice:
+Still intentionally out of scope:
 
-- active stream duplicate Notice
-- `TabSessionPhase` read-only derived view
-- background-task metadata persistence
-- follow-up queue
-- sync-event batching
 - full writable `TabSessionPhase` state machine
 - conditional write lock without a concrete interleaving reproduction

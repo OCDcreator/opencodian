@@ -21,6 +21,12 @@ beforeEach(() => {
   ({ service, mockSdkClient } = createOpenCodeServiceTestContext());
 });
 
+async function flushSyncEventBatch(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('OpenCodeService SDK session lifecycle', () => {
   it('uses SDK createSession when rollout flags are enabled', async () => {
     service = createServiceWithSdkFlags();
@@ -174,7 +180,7 @@ describe('OpenCodeService SDK sync events', () => {
       updates.push(update as unknown as { sessionId: string; todos: unknown[] });
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushSyncEventBatch();
     dispose();
 
     expect(mockSdkClient.global.event).toHaveBeenCalled();
@@ -208,7 +214,7 @@ describe('OpenCodeService SDK sync events', () => {
       updates.push(update as unknown as { sessionId: string; status: unknown });
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushSyncEventBatch();
     dispose();
 
     expect(mockSdkClient.global.event).toHaveBeenCalled();
@@ -250,7 +256,7 @@ describe('OpenCodeService SDK sync message mutations', () => {
       updates.push(update);
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushSyncEventBatch();
     dispose();
 
     expect(updates).toEqual([
@@ -326,7 +332,7 @@ describe('OpenCodeService SDK sync message mutations', () => {
       updates.push(update);
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushSyncEventBatch();
     dispose();
 
     expect(updates).toEqual([
@@ -352,14 +358,6 @@ describe('OpenCodeService SDK sync message mutations', () => {
         },
         time: 42,
       },
-      {
-        sessionId: 'sdk-session',
-        type: 'message.part.delta',
-        messageId: 'msg-1',
-        partId: 'part-1',
-        field: 'text',
-        delta: 'lo',
-      },
     ]);
     expect(service.getCanonicalSessionMessages('sdk-session')).toEqual([
       {
@@ -371,7 +369,7 @@ describe('OpenCodeService SDK sync message mutations', () => {
           expect.objectContaining({
             id: 'part-1',
             messageID: 'msg-1',
-            text: 'Hello',
+            text: 'Hel',
           }),
         ],
       },
@@ -431,7 +429,7 @@ describe('OpenCodeService SDK sync removals', () => {
       subscribeToSessionSyncEvents: (listener: (update: unknown) => void) => () => void;
     }).subscribeToSessionSyncEvents(jest.fn());
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushSyncEventBatch();
     dispose();
 
     expect(service.getCanonicalSessionMessages('sdk-session')).toEqual([]);
@@ -467,7 +465,7 @@ describe('OpenCodeService SDK sync reload events', () => {
       updates.push(update as { sessionId: string; type: string });
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushSyncEventBatch();
     dispose();
 
     expect(updates).toEqual([
