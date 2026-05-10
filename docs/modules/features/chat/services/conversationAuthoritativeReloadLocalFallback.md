@@ -32,7 +32,7 @@ export function shouldPreserveInterruptedNoticeOnSync(
 
 - 只处理本地 `assistant-interrupted-*` warning notice；普通 error notice、anchored notice 或普通 interrupted assistant 仍沿用原有 merge 规则。
 - `shouldBypassCanonicalSyncForInterruptedNotice()` 会找到 timeout notice 前的最新 user turn，并检查 canonical assistant 的 `parentID` 是否已经挂回这个 user；没有就说明 canonical 仍是 stale snapshot，应回退到 server。
-- `shouldPreserveInterruptedNoticeOnSync()` 会检查 authoritative synced messages 是否已经在该最新 user turn 后面补出 assistant；若还没有，就继续保留 warning notice，直到真正 assistant 到达。
+- `shouldPreserveInterruptedNoticeOnSync()` 无条件保留最新的 `assistant-interrupted-*` warning notice，不受服务端 assistant 消息存在与否的影响。只有最新的 interrupted notice 会被保留；旧 turn 中的 notice 仍按正常 merge 规则丢弃。
 
 ## 与相邻模块的边界
 
