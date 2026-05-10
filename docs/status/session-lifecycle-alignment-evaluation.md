@@ -2,7 +2,8 @@
 
 > **评估日期**：2026-05-10
 > **当前仓库**：`/Users/dht/.codex/worktrees/session-lifecycle-report-baseline/opencodian`
-> **当前基线**：commit `aaa470c6` (branch `codex/session-lifecycle-report-baseline`)；工作区干净；报告修订不改变 runtime 源码
+> **源码基线**：commit `aaa470c6` (branch `codex/session-lifecycle-report-baseline`)；工作区干净；报告修订不改变 runtime 源码
+> **报告修订**：commit `5d8ca1fa` 起连续修订，审计追踪见 git log
 > **对比基准**：opencode-desktop（OpenCode 官方 Electron 前端，SolidJS）
 > **评估对象**：OpenCodian Obsidian 插件当前会话生命周期实现
 > **评估方法**：本地源码审计 + 既有会话对齐审计复核 + 后续外部 Council 审查门
@@ -193,8 +194,8 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 
 | 维度 | opencode-desktop | OpenCodian | 评估 |
 |------|-----------------|------------|------|
-| **子会话模型** | 独立会话 + `parentID` 链接 + 可选 worktree 隔离 | 同会话内消息序列中的工具调用段 | — **架构不同，各有合理理由** |
-| **后台状态跟踪** | 服务端原生支持（子会话是独立会话） | 客户端专用协调器群（8个专用组件） | — **OpenCodian 的方案更重但更细粒度** |
+| **子会话模型** | 独立会话 + `parentID` 链接 + 可选 worktree 隔离 | 同会话内消息序列中的工具调用段 | ⚪ **架构不同，各有合理理由** |
+| **后台状态跟踪** | 服务端原生支持（子会话是独立会话） | 客户端专用协调器群（8个专用组件） | ⚪ **OpenCodian 的方案更重但更细粒度** |
 | **持久化** | 服务端持久化子会话 | 仅从 `Conversation.messages` 重建 | ⚠️ **脆弱** |
 | **崩溃恢复** | 子会话独立于父会话生存 | 重建依赖消息完整性 | ⚠️ **可能不准确** |
 
@@ -217,12 +218,12 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 **状态分散详细分析**：
 
 当前一个标签页的"忙碌"状态分散在至少 4 个独立标志中：
-- `TabRuntimeState.isStreaming` — 流式传输中
-- `TabRuntimeState.isConversationSyncInFlight` — 同步进行中
-- `TabRuntimeState.sessionStatus` — 服务端报告的状态
-- `StreamController.state.isStreaming` — StreamController 内部状态
+- `TabRuntimeState.isStreaming` — 流式传输中（`TabRuntimeState` 字段）
+- `TabRuntimeState.isConversationSyncInFlight` — 同步进行中（`TabRuntimeState` 字段）
+- `TabRuntimeState.sessionStatus` — 服务端报告的状态（`TabRuntimeState` 字段）
+- `StreamController.state.isStreaming` — StreamController 内部状态（**不是** `TabRuntimeState` 字段）
 
-这些标志之间没有形式化的转换约束。不一致的组合（如 `isStreaming=true` 但 `sessionStatus= idle`）可能导致 UI 显示异常。
+其中前三者是 `TabRuntimeState` 上的字段，第四个是 `StreamController` 的内部状态。尽管归属不同，`StreamController.state.isStreaming` 仍参与忙碌状态判断，因此维护性风险成立：一个标签页的"忙不忙"需要跨两个不同对象的属性组合判定，且缺少形式化的转换约束。不一致的组合（如 `isStreaming=true` 但 `sessionStatus=idle`）可能导致 UI 显示异常。
 
 **评估结论**：引入形式化的 `TabSessionPhase` 枚举是高优先级维护性改进。不是新加一个协调器，而是将现有分散的布尔值统一为一个派生枚举。
 
@@ -454,4 +455,4 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
    - ✅ 对齐良好：模式等效或 OpenCodian 方案更适合当前场景
    - ⚠️ 可优化：存在改进空间但不影响核心功能
    - ❌ 需改进：存在数据完整性风险或显著维护性问题
-   - ⚪ 不适用：因场景差异不需对齐
+   - ⚪ 不适用：因场景差异不需对齐，含架构不同但各有合理理由的情况
