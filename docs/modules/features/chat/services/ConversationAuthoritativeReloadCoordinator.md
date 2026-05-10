@@ -10,7 +10,7 @@
 - server message 拉取、hydrate 与 revert-state 查询
 - authoritative merge 前后的 sync begin/fetch/finish debug payload 组装
 - canonical-derived render input 的 compatibility/cache writeback、受限的本地 metadata 保留，以及 foreground render fingerprint / cache fingerprint 的分离判定
-- authoritative message apply、save、background-task authoritative-sync 标记与 active conversation context-usage refresh
+- authoritative message apply、serialized compatibility/cache writeback、background-task authoritative-sync 标记与 active conversation context-usage refresh
 
 它不负责 optimistic user bubble hydration，也不直接决定 client-only field / rich assistant block / modelId 的合并规则；这些职责分别留在 `ConversationAuthoritativeSyncCoordinator` 与 `ConversationAuthoritativeMessageMergeCoordinator`。
 
@@ -31,6 +31,7 @@ export class ConversationAuthoritativeReloadCoordinator {
 - merge 之后仍然按 timestamp 排序，并继续复用 per-tab `lastConversationSyncFingerprint` 判断本轮是否真的发生 foreground render authoritative 变化；同时单独比较当前 `Conversation.messages` cache fingerprint，确保 canonical projection 已经是最新输入时仍会写回 stale compatibility cache。
 - 只有在 authoritative snapshot 为空时，才继续保留本地 interrupted assistant 作为恢复兜底；如果本轮发送在服务端接受 user message 之前就失败并生成了无 `sourceMessageId` 的本地 error notice，也会保留这一整组本地失败 turn，避免后续 background sync 把用户气泡和错误卡片清空；额外地，若本地只剩 timeout warning notice、而 authoritative snapshot 仍停在“最新 user 已落盘但 assistant 还没回来”的状态，也会继续保留这张 notice，直到 server 真的补回 assistant 为止。
 - preserved interrupted assistants 的日志 fingerprint 仍写回 tab runtime，避免 background/signal sync 重复刷同一条 preservation 日志。
+- compatibility/cache writeback 通过 host 注入的 conversation write ticket + commit 执行；ticket 过期时跳过本轮 apply，避免 finalization / latest-user hydration / background sync 的异步写入互相覆盖。
 - compatibility/cache writeback 变化发生时会更新 `conversation.updatedAt` 并保存；`changed` 仍只表达 foreground render fingerprint 是否变化，避免 finalization / post-sync 把 cache dirty 当成 render drift。
 - 失败兜底仍返回当前 conversation messages 与 active conversation revert-state，不改变现有 auth-sync 完成门槛。
 

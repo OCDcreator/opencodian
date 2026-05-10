@@ -23,9 +23,9 @@ import {
   createInitialTabSessionLifecycleState,
   deriveTabSessionPhase,
   isForegroundBusyTabSessionPhase,
-  transitionTabSessionLifecycle,
   type TabSessionLifecycleState,
   type TabSessionPhase,
+  transitionTabSessionLifecycle,
   type WritableTabSessionPhase,
 } from './TabSessionPhase';
 export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState {

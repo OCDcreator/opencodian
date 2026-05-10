@@ -95,6 +95,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - 一个面向 settings shell 的公开 bridge：`reapplyCurrentConversationSessionSettings()` 会直接复用上述 coordinator，让 settings/conversation 里的 global session default 修改可以立刻落回当前聊天运行时
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
+- `ConversationWriteSerializationService`：为 send preparation、local stream persistence、message finalization 与 authoritative reload/hydration 提供 per-conversation write ticket + commit boundary；`OpenCodianView.commitConversationWrite()` 是当前统一保存入口
 - `services/ConversationIdentityRuntime.ts` 的 host seam：conversation sync fingerprint、interrupted-sync preservation log fingerprint、message visual signature，以及 render-list shaping（消息可见性过滤、assistant merge、compaction divider 注入）
 - `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动

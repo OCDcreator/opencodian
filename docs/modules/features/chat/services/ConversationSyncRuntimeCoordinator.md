@@ -2,14 +2,16 @@
 
 > **源码**: `src/features/chat/services/ConversationSyncRuntimeCoordinator.ts`
 > **状态**: [REVIEW]
+> **最近更新**: Sync lock now advances writable tab lifecycle
 
 ## 概述
 
-`ConversationSyncRuntimeCoordinator` 把 `OpenCodianView` 里对话同步入口共用的 runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab sync fingerprint baseline 判定独立出来，专门负责：
+`ConversationSyncRuntimeCoordinator` 把 `OpenCodianView` 里对话同步入口共用的 runtime guard、`isConversationSyncInFlight` 兼容 flag 生命周期、`TabSessionLifecycleState` sync transition，以及 per-tab sync fingerprint baseline 判定独立出来，专门负责：
 
 - 为 visible active-conversation sync 统一检查 active tab、session 可用性，以及 tab runtime 是否仍可发起同步
 - 为 signal sync / background-tab sync 统一检查目标 tab runtime，并产出 `previousFingerprint`
 - 用同一处 lock/unlock 包裹同步回调，避免这些入口各自手写 `isConversationSyncInFlight = true/false`
+- 在进入/退出 sync lock 时推进 `TabSessionLifecycleState`：进入 `syncing`，退出回到 `idle`
 
 它不负责具体的服务端拉取、question/todo/background-task post-sync orchestration，也不负责 tab 枚举、conversation 查询或 signal/background polling dispatch；这些职责现在分别由 `ConversationSyncBridge`、`ConversationSyncOrchestrationService`、`ConversationSyncVisiblePostSyncRouter` 与 `ConversationSyncBackgroundPostSyncRouter` 承接。它依赖的 host 也改由 `ConversationSyncHostAdapter` 统一装配，而不是继续留在 `OpenCodianView` 内部分散创建。
 
@@ -20,6 +22,7 @@ export interface ConversationSyncRuntimeCoordinatorHost {
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): ConversationSyncRuntime | null;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
 }
 
 export class ConversationSyncRuntimeCoordinator {
@@ -35,6 +38,9 @@ export class ConversationSyncRuntimeCoordinator {
 - `runVisibleConversationSync()` 只接受当前 active tab 对应的 conversation
 - 当 active tab 缺失、runtime 正在 streaming / 已有 sync 在飞，或 conversation 没有 `openCodeSessionId` 时，会直接跳过
 - 真正的 sync 回调结束后，无论成功还是抛错，coordinator 都会负责清理 in-flight flag
+- sync lock enter 会调用 `transitionTabSessionLifecycle(tabId, 'syncing', 'conversation-sync-lock')`
+- sync lock release 会调用 `transitionTabSessionLifecycle(tabId, 'idle', 'conversation-sync-lock-release')`
+- `syncing` 现在是 foreground-busy phase，因为 authoritative sync 可能写入 `Conversation.messages` compatibility/cache，必须阻止 foreground send 与其他 lifecycle writes 交错
 
 ### hidden tab sync 入口
 
@@ -47,6 +53,6 @@ export class ConversationSyncRuntimeCoordinator {
 - `OpenCodianView` 仍负责暴露 render host；`ConversationSyncBridge` 负责把 runtime coordinator、server sync 和 post-sync 回调装配起来
 - `ConversationSyncHostAdapter` 负责把 `OpenCodianView` 的单一 sync host 适配成 runtime coordinator 所需的 host 形状
 - `ConversationSyncOrchestrationService` 负责 signal/background polling sync 的 tab/conversation 选择、conversation 加载与 dispatch
-- `ConversationSyncRuntimeCoordinator` 只负责“这个 tab 现在能不能进 sync、进入后怎么持有 runtime lock、基线 fingerprint 怎么取”
+- `ConversationSyncRuntimeCoordinator` 只负责“这个 tab 现在能不能进 sync、进入后怎么持有 runtime lock、如何推进 tab lifecycle、基线 fingerprint 怎么取”
 - `ConversationSyncVisiblePostSyncRouter` 与 `ConversationSyncBackgroundPostSyncRouter` 继续负责 sync 完成后的 visible/background post-sync 路由
 - 这条边界继续服务 master plan 的 P1 `OpenCodianView` sync orchestration lane：sync 入口的 runtime guard / baseline / lock 生命周期归 coordinator，tab / conversation dispatch 归 orchestration service，具体拉取和 UI bridge 才回到 view

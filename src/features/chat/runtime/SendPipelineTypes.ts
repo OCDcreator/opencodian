@@ -6,11 +6,11 @@ import type {
   QuestionResolution,
   StreamChunk as CoreStreamChunk,
 } from '../../../core/types';
-import type { ConversationWriteTicket } from '../services/ConversationWriteSerializationService';
 import type {
   ContentBlock as StreamingContentBlock,
   StreamChunk as StreamingChunk,
 } from '../../../utils/streaming';
+import type { ConversationWriteTicket } from '../services/ConversationWriteSerializationService';
 import type { FinalizeMessageOptions } from '../services/MessageFinalizationService';
 import type {
   PreparedMessageSend,

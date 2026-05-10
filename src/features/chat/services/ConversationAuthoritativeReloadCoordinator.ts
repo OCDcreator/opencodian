@@ -113,13 +113,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       );
       const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
 
-      const writeApplied = await this.applyConversationServerSyncMessages(
-        conversation,
-        ticket,
-        syncMerge.merged,
-        syncMerge.cacheWritebackChanged,
-        'authoritative-server-sync',
-      );
+      const writeApplied = await this.applyConversationServerSyncMessages(conversation, ticket, syncMerge, 'authoritative-server-sync');
       if (!writeApplied) {
         return this.buildSkippedConversationServerSyncResult(conversation);
       }
@@ -189,13 +183,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       snapshot.convertedServerMessages,
     );
     const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
-    const writeApplied = await this.applyConversationServerSyncMessages(
-      conversation,
-      ticket,
-      syncMerge.merged,
-      syncMerge.cacheWritebackChanged,
-      'authoritative-canonical-sync',
-    );
+    const writeApplied = await this.applyConversationServerSyncMessages(conversation, ticket, syncMerge, 'authoritative-canonical-sync');
     if (!writeApplied) {
       return this.buildSkippedConversationServerSyncResult(conversation);
     }
@@ -500,28 +488,24 @@ export class ConversationAuthoritativeReloadCoordinator {
   private async applyConversationServerSyncMessages(
     conversation: Conversation,
     ticket: ReturnType<ConversationAuthoritativeReloadHost['createConversationWriteTicket']>,
-    merged: ChatMessage[],
-    changed: boolean,
+    syncMerge: ConversationServerSyncMergeResult,
     reason: string,
   ): Promise<boolean> {
     return this.host.commitConversationWrite(conversation, ticket, reason, () => {
-      conversation.messages = merged;
-      if (changed) {
+      conversation.messages = syncMerge.merged;
+      if (syncMerge.cacheWritebackChanged) {
         conversation.updatedAt = Date.now();
       }
     });
   }
 
-  private buildSkippedConversationServerSyncResult(
-    conversation: Conversation,
-  ): ConversationAuthoritativeSyncResult {
+  private buildSkippedConversationServerSyncResult(conversation: Conversation): ConversationAuthoritativeSyncResult {
+    const isCurrentConversation = this.host.getCurrentConversationId() === conversation.id;
     return {
       messages: conversation.messages,
       changed: false,
       fingerprint: this.host.getConversationSyncFingerprint(conversation.messages),
-      revertState: this.host.getCurrentConversationId() === conversation.id
-        ? this.host.getCurrentConversationRevertState()
-        : null,
+      revertState: isCurrentConversation ? this.host.getCurrentConversationRevertState() : null,
     };
   }
 

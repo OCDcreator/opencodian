@@ -31,11 +31,11 @@ import {
   ConversationSyncRuntimeCoordinator,
   type ConversationSyncRuntimeCoordinatorHost,
 } from './ConversationSyncRuntimeCoordinator';
-import type { WritableTabSessionPhase } from './TabSessionPhase';
 import {
   ConversationSyncVisiblePostSyncRouter,
   type ConversationSyncVisiblePostSyncRouterHost,
 } from './ConversationSyncVisiblePostSyncRouter';
+import type { WritableTabSessionPhase } from './TabSessionPhase';
 import type { VisibleConversationPostSyncCoordinator } from './VisibleConversationPostSyncCoordinator';
 
 export interface ConversationSyncViewHost {

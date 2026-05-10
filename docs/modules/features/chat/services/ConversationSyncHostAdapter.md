@@ -9,6 +9,7 @@
 
 - 从单一 `ConversationSyncViewHost` 暴露 `ConversationSyncRuntimeCoordinator`、`ConversationSyncOrchestrationService`、`ConversationSyncBridge` 需要的 host 回调
 - 让 runtime/orchestration/bridge 三个服务共享同一套 view-state 读取与 render bridge，而不是继续由 `OpenCodianView` 分散维护三组 `createConversationSync*Host()`
+- 把 tab lifecycle transition port 传给 runtime coordinator，让 sync lock 进入/退出能同步推进 `TabSessionLifecycleState`
 - 在不改变 sync 行为的前提下，把 sync service wiring 从主视图构造函数迁走
 - 在 service bundle 内把 visible/background 两个 post-sync router 与各自 dedicated coordinator 串联起来
 - 通过 `assembleConversationSyncRuntime` 将 sync load host 派生、sync services 创建、bridge ports 装配合并为一步调用
@@ -26,6 +27,7 @@ export interface ConversationSyncViewHost {
   getTabRuntimeState(tabId: TabId | null): ConversationSyncSignalRuntime | null;
   getConversationById(id: string): Promise<Conversation | null>;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  transitionTabSessionLifecycle(...): boolean;
   syncConversationMessagesFromServer(...): Promise<ConversationSyncBridgeSyncResult>;
   syncConversationMessagesFromCanonicalState(...): Promise<ConversationSyncBridgeSyncResult | null>;
   applySyncedConversationUpdate(...): Promise<void>;

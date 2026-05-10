@@ -215,6 +215,12 @@ describe('MessageSendPreparationService optimistic preparation', () => {
       'send-preflight-aborted',
     );
   });
+});
+
+describe('MessageSendPreparationService context preparation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('resolves persistent conversation context paths and merges them with draft context', async () => {
     const conversation = createConversation();

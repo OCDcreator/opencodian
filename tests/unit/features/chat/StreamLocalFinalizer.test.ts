@@ -43,6 +43,7 @@ describe('StreamLocalFinalizer', () => {
       finalizeBackgroundTaskIndicatorAfterPrimaryStream: jest.fn().mockResolvedValue(undefined),
       removeEmptyAssistantShells: jest.fn(),
       syncTabStreamLikeState: jest.fn(),
+      transitionTabSessionLifecycle: jest.fn().mockReturnValue(true),
       refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
       completeTabContextUsageStream: jest.fn(),
       summarizeContentBlocksForDebug: jest.fn().mockReturnValue({ blockCount: 0 }),
@@ -81,6 +82,11 @@ describe('StreamLocalFinalizer', () => {
 
     expect(finalizeStreamingShell).toHaveBeenCalled();
     expect(host.finalizeBackgroundTaskIndicatorAfterPrimaryStream).toHaveBeenCalledWith('tab-1');
+    expect(host.transitionTabSessionLifecycle).toHaveBeenCalledWith(
+      'tab-1',
+      'finalizing',
+      'stream-local-finalizer',
+    );
     expect(
       (finalizeStreamingShell as jest.Mock).mock.invocationCallOrder[0],
     ).toBeLessThan(host.finalizeBackgroundTaskIndicatorAfterPrimaryStream.mock.invocationCallOrder[0]);

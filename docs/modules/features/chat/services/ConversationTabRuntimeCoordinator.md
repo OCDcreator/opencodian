@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/services/ConversationTabRuntimeCoordinator.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Per-tab follow-up send queue
+> **最近更新**: Writable tab session lifecycle owner
 
 ## 概述
 
@@ -160,9 +160,10 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 - `applyTabBarLayout()` 继续保留 header / below-header grid / below-header vertical / input slot 的原有 CSS class 与 render 顺序
 - `persistTabState()` 只持久化 conversation id、title、model override 与 active index，并继续区分 scheduled save 与 `flush` immediate save
 - `handleTabSwitch()` 先让 `TabManager` 切换 active tab，再转交 activation port；`handleTabClose()` 只转交 close/recovery port
-- `TabSessionPhase.ts` 提供 `deriveTabSessionPhase()` 只读派生 helper；`ConversationTabRuntimeCoordinator` 不写入新的 phase truth source，也不删除 `isStreaming`、`isConversationSyncInFlight` 或 session status 等既有字段。
-- `getTabSessionPhase()` 按固定优先级派生当前 tab 的 phase：本 tab streaming > 同 session 其他 tab streaming > conversation sync in flight > context compaction > server retry > server busy > idle。同 session 其他 tab streaming 复用 `streaming` phase，保持与发送入口的 busy 语义兼容。
-- `isTabForegroundBusy()` 现在消费 derived phase：`streaming`、`compacting`、`server-busy`、`server-retrying` 仍阻塞 foreground send；`syncing` 只表达 authoritative conversation sync 正在进行，不改变既有 foreground busy 语义。
+- `TabSessionLifecycleState.ts` 提供 writable lifecycle reducer；`ConversationTabRuntimeCoordinator` 是 tab lifecycle transition owner，并在迁移期继续回写 `isStreaming`、`isConversationSyncInFlight` 等兼容字段。
+- `getTabSessionPhase()` 按固定优先级派生当前 tab 的 phase：writable lifecycle foreground-busy phase > 同 session 其他 tab streaming > context compaction > server retry > server busy > idle/error/cancelled。同 session 其他 tab streaming 复用 `streaming` phase，保持与发送入口的 busy 语义兼容。
+- `isTabForegroundBusy()` 现在消费 lifecycle-derived phase：`preparing`、`streaming`、`finalizing`、`syncing`、`compacting`、`server-busy`、`server-retrying` 都会阻塞 foreground send，防止 finalization / authoritative sync 写入窗口内再次发送。
+- `transitionTabSessionLifecycle()` 是发送准备、stream start、local finalization、conversation sync lock、cancel/error recovery 等路径的统一写入入口；重复 phase/reason transition 不会制造新的 sequence。
 - `queueFollowUpSend()` / `consumeQueuedFollowUpSend()` 在 tab runtime 上保存一个最小 send-intent：可见 prompt 内容、synthetic text parts、invocation intent 与目标 tab pin。队列只接受本 tab 正在 streaming 的 follow-up，因此 server-busy、retry 或同 session 其他 tab streaming 仍保持既有 blocked notice 语义；每个 tab 最多保留一个 queued follow-up。缺失 tab runtime 时不会创建队列或伪造消息。
 - `suppressNextLayoutAutoScroll()` 是给 view/render 层的细粒度入口：当 tool / thinking 这类用户主动展开将要引发一次 pane layout 变化时，先把下一次 layout-driven auto-scroll 标记为应跳过
 - pane state、runtime state、active pane、pane cleanup 与 scroll metrics 都继续委托给 `TabMessagesPaneCoordinator`，不在本 coordinator 内复制 pane DOM map

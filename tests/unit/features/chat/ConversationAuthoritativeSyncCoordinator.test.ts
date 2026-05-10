@@ -310,6 +310,12 @@ describe('ConversationAuthoritativeSyncCoordinator', () => {
     expect(result.messages).toEqual([syncedUserMessage]);
     expect(runtime.lastInterruptedSyncPreservationLogFingerprint).toBeNull();
   });
+});
+
+describe('ConversationAuthoritativeSyncCoordinator serialized hydration writes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('skips hydrated optimistic user side effects when the serialized commit is stale', async () => {
     const optimisticMessage: ChatMessage = {

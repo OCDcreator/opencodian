@@ -2,10 +2,10 @@ import {
   createInitialTabSessionLifecycleState,
   deriveTabSessionPhaseFromLifecycle,
   isForegroundBusyTabSessionPhase,
-  transitionTabSessionLifecycle,
   type TabSessionLifecycleSignals,
   type TabSessionLifecycleState,
   type TabSessionPhase,
+  transitionTabSessionLifecycle,
   type WritableTabSessionPhase,
 } from './TabSessionLifecycleState';
 

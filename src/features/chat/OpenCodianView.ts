@@ -210,10 +210,6 @@ import {
   ConversationSyncRuntimeCoordinator,
 } from './services/ConversationSyncRuntimeCoordinator';
 import {
-  ConversationWriteSerializationService,
-  type ConversationWriteTicket,
-} from './services/ConversationWriteSerializationService';
-import {
   type ConversationTabLifecycleRecoveryHost,
 } from './services/ConversationTabLifecycleRecoveryCoordinator';
 import {
@@ -227,11 +223,12 @@ import {
   type TabBarMutableState,
 } from './services/ConversationTabRuntimeCoordinator';
 import {
-  createInitialTabSessionLifecycleState,
-} from './services/TabSessionPhase';
-import {
   type ConversationViewStateHost,
 } from './services/ConversationViewStateService';
+import {
+  ConversationWriteSerializationService,
+  type ConversationWriteTicket,
+} from './services/ConversationWriteSerializationService';
 import {
   InputPanelAppearanceCoordinator,
   type InputPanelAppearanceCoordinatorHost,
@@ -285,6 +282,9 @@ import {
   type TabMessagesPaneCoordinatorHost,
   type TabMessagesPaneState,
 } from './services/TabMessagesPaneCoordinator';
+import {
+  createInitialTabSessionLifecycleState,
+} from './services/TabSessionPhase';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import {
   createDebugLogCallbacks,
