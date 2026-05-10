@@ -104,7 +104,8 @@ export class MessageFinalizationService {
 - finalization 会先尝试 `syncConversationMessagesFromCanonicalState()`，直接把 canonical `session/message/part` 图投影回 `Conversation.messages`
 - 只有 canonical state 当前不可用时，才回退 `syncConversationMessagesFromServer()`
 - runtime baseline fingerprint 继续以 canonical-derived message snapshot 为准，因此隐藏的 `parts` / synthetic metadata 漂移也会在 final sync 后持久化下来
-- sync 完成后，如果当前仍是同一个 foreground conversation/tab，且 canonical fingerprint 发生变化，就统一走 `ConversationRenderService.applySyncedConversationUpdate()`，让 render 层自己决定是 append、tail patch 还是 full rerender
+- sync 完成后，如果当前仍是同一个 foreground conversation/tab，且 authoritative sync 返回的 `changed` 标志为真，就统一走 `ConversationRenderService.applySyncedConversationUpdate()`，让 render 层自己决定是 append、tail patch 还是 full rerender
+- finalization 不再用 stale visual `Conversation.messages` fingerprint 自行判定漂移；本地 cache fingerprint 只保留为诊断日志，实际 render drift 以 canonical/server projection 的 sync result 为准
 - 不再把本地 `Conversation.messages` assistant body repair 当作 truth；本地流式消息只作为 live/cache 输出，最终收敛由 canonical projection 决定
 - 不重新实现 append / patch / full rerender 细节，而是复用已有 `ConversationRenderService` 边界
 

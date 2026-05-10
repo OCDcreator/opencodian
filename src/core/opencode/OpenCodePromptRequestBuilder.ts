@@ -1,8 +1,6 @@
-import { createLogger } from '../../shared';
 import type { SdkOutputFormat } from './sdkTypes';
 import type { LocalOutputFormat, QueryOptions } from './types';
 
-const logger = createLogger('OpenCodePromptRequestBuilder');
 const OPEN_CODE_ID_RANDOM_LENGTH = 14;
 const OPEN_CODE_ID_RANDOM_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const OPEN_CODE_ID_TIMESTAMP_MULTIPLIER = 0x1000;

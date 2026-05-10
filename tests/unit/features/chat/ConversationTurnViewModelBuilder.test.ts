@@ -354,6 +354,52 @@ describe('ConversationTurnViewModelBuilder canonical render input', () => {
     });
   });
 
+  it('keeps tool-only assistant parts as renderable canonical input without a blank text block', () => {
+    const toolPart = createPart({
+      id: 'part-tool',
+      messageID: 'assistant-1',
+      type: 'tool',
+      tool: 'read',
+      callID: 'call-read-1',
+      state: { status: 'completed', output: 'done' },
+    });
+    const state = createState(
+      [
+        createMessage({ id: 'user-1', role: 'user', time: { created: 1 } }),
+        createMessage({ id: 'assistant-1', role: 'assistant', time: { created: 2 } }),
+      ],
+      [
+        createPart({ id: 'part-user', messageID: 'user-1', type: 'text', text: 'Inspect files' }),
+        toolPart,
+      ],
+    );
+    const builder = new ConversationTurnViewModelBuilder();
+
+    const renderInput = builder.buildCanonicalRenderInput(state, hydrateCanonicalChatMessage);
+    const assistantMessage = renderInput.messages[1];
+
+    expect(renderInput.messages).toHaveLength(2);
+    expect(assistantMessage).toMatchObject({
+      id: 'assistant-1',
+      sourceMessageId: 'assistant-1',
+      content: '',
+      contentBlocks: [
+        expect.objectContaining({
+          type: 'tool_use',
+          toolId: 'call-read-1',
+          toolName: 'read',
+        }),
+      ],
+    });
+    expect(assistantMessage?.contentBlocks).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'text', text: '' }),
+      ]),
+    );
+  });
+});
+
+describe('ConversationTurnViewModelBuilder canonical render input fingerprints', () => {
   it('builds identical canonical render input fingerprints for live and reload interrupted assistant responses', () => {
     const liveState = createState(
       [

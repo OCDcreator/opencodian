@@ -675,6 +675,7 @@ export class OpenCodianView extends ItemView {
           getVariants: () => {
             const current = this.getCurrentSessionModel();
             if (!current) return [];
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const modelRef = `${current.provider}/${current.model}`;
             return this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
           },

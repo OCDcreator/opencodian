@@ -60,6 +60,7 @@ export class ConversationTurnViewModelBuilder {
 
 - `buildTurns()` 先按 canonical message 列表建立 user turn，再在第二遍把 assistant message 挂回对应 turn；这样即使 canonical message 顺序暂时漂移，只要 assistant 仍带着 `parentID`，它也会回到原始 user turn 下
 - assistant message 会保留原始 `info` 和 `parts`，因此 tool-first、reasoning-first、text-late delta 后的结构都不会被压平成纯文本
+- tool-only assistant message 仍作为带 `contentBlocks` 的可渲染 canonical input 输出，不会为了兼容空正文而补一个空白 text block
 - assistant `error` 会被归一成 `{ name?, message }`；错误名或消息中包含 abort / cancel / interrupt 语义时，turn 会标记为 `interrupted`
 - part-level `status` 或 `state.status` 出现 abort / cancel / interrupt 语义时，同样会把 turn 标记为 `interrupted`
 - `buildCanonicalRenderInput()` 会按原始 canonical message 扫描顺序输出 render input：遇到 user message 时整段展开该 turn，已被 turn 吃掉的 assistant 不再重复输出；assistant-only / orphan message 仍会保留可见输入

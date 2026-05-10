@@ -248,6 +248,50 @@ describe('MessageFinalizationService canonical-first foreground finalization', (
     });
     expect(conversation.messages[0]?.structured).toBeUndefined();
   });
+
+  it('uses the sync result drift flag instead of stale visual cache fingerprints', async () => {
+    const previousMessages = [
+      createMessage({
+        id: 'assistant-local',
+        content: 'stale local body',
+        timestamp: 10,
+        sourceMessageId: 'assistant-1',
+      }),
+    ];
+    const canonicalMessages = [
+      createMessage({
+        id: 'assistant-1',
+        content: 'Canonical body',
+        timestamp: 20,
+        sourceMessageId: 'assistant-1',
+      }),
+    ];
+    const conversation = createConversation(previousMessages);
+    const host = createHost(conversation, { syncConversationMessagesFromServer: jest.fn() });
+    host.syncConversationMessagesFromCanonicalState = jest.fn().mockImplementation(async (
+      targetConversation: Conversation,
+    ) => {
+      targetConversation.messages = canonicalMessages;
+      return {
+        messages: canonicalMessages,
+        changed: false,
+        fingerprint: OpenCodeService.getCanonicalConversationFingerprint(canonicalMessages),
+      };
+    });
+    const service = new MessageFinalizationService(host);
+
+    await service.finalizeAfterStream({
+      conversation,
+      tabId: 'tab-1',
+      shouldSyncFromServer: true,
+      editedFiles: [],
+      logStage: jest.fn(),
+    });
+
+    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
+    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
+  });
 });
 
 describe('MessageFinalizationService background and recovery paths', () => {

@@ -315,11 +315,11 @@ export class MessageFinalizationService {
     logStage: FinalizeMessageOptions['logStage'],
   ): Promise<MessageFinalizationSyncAfterStreamState> {
     const previousMessagesBeforeSync = [...conversation.messages];
-    const previousCanonicalFingerprint = this.host.getConversationSyncFingerprint(
+    const previousCacheFingerprint = this.host.getConversationSyncFingerprint(
       conversation.messages,
     );
     logStage('server-sync-requested', {
-      previousCanonicalFingerprint,
+      previousCacheFingerprint,
       localTailAssistant: this.host.summarizeChatMessageForDebug(
         this.findLatestAssistantMessage(conversation.messages),
       ),
@@ -346,7 +346,7 @@ export class MessageFinalizationService {
         syncSource: 'canonical',
         isForegroundConversation,
         needsForegroundRenderSync: isForegroundConversation
-          && previousCanonicalFingerprint !== canonicalSyncResult.fingerprint,
+          && canonicalSyncResult.changed,
       };
     }
 
@@ -370,7 +370,7 @@ export class MessageFinalizationService {
       syncSource: 'server',
       isForegroundConversation,
       needsForegroundRenderSync: isForegroundConversation
-        && previousCanonicalFingerprint !== syncResult.fingerprint,
+        && syncResult.changed,
     };
   }
 

@@ -562,6 +562,8 @@ background task notice 这条子链路现在的边界是：
 - 会优先解析当前 tab 请求的模型；若它已被开关链路过滤，则自动回退到同 provider 默认模型 / 当前 effective catalog 的其他可用模型
 - 当 effective catalog 为空时，trigger 会回退到默认机器人图标，并保留空 catalog 对应的 tooltip 文案
 
+effort selector 的 variant 列表继续直接按当前 provider/model 查询 `findKnownModelInfo()`；当前局部 `modelRef` 仅保留为既有兼容占位并用行内 lint 注释限制影响，不作为额外 runtime truth。
+
 ## 直接协作模块
 
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage

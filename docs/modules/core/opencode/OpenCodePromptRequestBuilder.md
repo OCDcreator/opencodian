@@ -13,7 +13,6 @@ builder 不负责 transport 分流，也不负责 context/image request part 序
 
 ```text
 上游:
-- `../../shared`
 - `./sdkTypes`
 - `./types`
 
@@ -111,3 +110,4 @@ graph TD
 - 不要把它重新拆成 `AllowedToolsHelper`、`OutputFormatHelper` 之类更薄文件；R22 的目标是把 prompt option assembly 收口到一个较厚 owner。
 - SDK 路径对 `thinkingBudget` 的“只记录 debug log、不入 payload”行为是刻意保留的兼容边界。
 - legacy `/message` 与 `/prompt_async` 对 `model.options` 的差异也是兼容语义，不要在没有专门迁移计划时擅自统一。
+- builder 当前不持有独立 logger；如果未来需要 diagnostics，应先确认是否属于 prompt assembly owner，而不是为了局部调试重新引入未使用的 shared import。
