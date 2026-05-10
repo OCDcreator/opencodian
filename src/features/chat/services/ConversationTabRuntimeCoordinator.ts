@@ -17,6 +17,7 @@ import {
   type TabMessagesPaneRuntimeState,
   type TabMessagesPaneState,
 } from './TabMessagesPaneCoordinator';
+import { deriveTabSessionPhase, isForegroundBusyTabSessionPhase, type TabSessionPhase } from './TabSessionPhase';
 
 export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
@@ -378,18 +379,18 @@ export class ConversationTabRuntimeCoordinator<
     return bodyEl;
   }
 
-  isActiveTabStreaming(): boolean {
-    return Boolean(this.getActiveRuntimeState()?.isStreaming);
-  }
-  isTabForegroundBusy(tabId: TabId | null = this.getActiveTabId()): boolean {
+  isActiveTabStreaming(): boolean { return Boolean(this.getActiveRuntimeState()?.isStreaming); }
+  getTabSessionPhase(tabId: TabId | null = this.getActiveTabId()): TabSessionPhase {
     const runtime = this.getRuntimeState(tabId);
-    if (!runtime) return false;
-    if (runtime.isStreaming || this.isSameSessionStreamingInAnotherTab(tabId)) return true;
-    const contextUsage = this.host.getTabContextUsage(tabId);
-    if (typeof contextUsage?.compactingAt === 'number') return true;
+    if (!runtime) return 'idle';
+    const sameSessionStreaming = this.isSameSessionStreamingInAnotherTab(tabId);
+    if (runtime.isStreaming || sameSessionStreaming) return deriveTabSessionPhase({ isStreaming: runtime.isStreaming, isSameSessionStreamingInAnotherTab: sameSessionStreaming });
+    if (runtime.isConversationSyncInFlight) return deriveTabSessionPhase({ isConversationSyncInFlight: true });
+    if (typeof this.host.getTabContextUsage(tabId)?.compactingAt === 'number') return deriveTabSessionPhase({ isContextCompacting: true });
     const status = this.host.getTabSessionStatus(tabId, this.host.getSessionIdForTab(tabId));
-    return status?.type === 'busy' || status?.type === 'retry';
+    return deriveTabSessionPhase({ sessionStatus: status });
   }
+  isTabForegroundBusy(tabId: TabId | null = this.getActiveTabId()): boolean { return isForegroundBusyTabSessionPhase(this.getTabSessionPhase(tabId)); }
 
   private isSameSessionStreamingInAnotherTab(tabId: TabId | null): boolean {
     const targetSessionId = this.host.getSessionIdForTab(tabId);
