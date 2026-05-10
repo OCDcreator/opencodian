@@ -107,6 +107,7 @@ function createFixture(options: {
     getBelowHeaderTabBarLayout: jest.fn(() => options.belowHeaderTabBarLayout ?? 'grid'),
     setPersistedTabState: jest.fn((s) => { persistedTabState = s; }),
     savePersistedTabState: jest.fn(),
+    trimConversationFullMessageCache: jest.fn(),
     getSessionIdForTab: jest.fn((tabId) => (tabId ? `${tabId}-session` : null)),
     getTabSessionStatus: jest.fn(() => options.sessionStatus ?? null),
     getTabContextUsage: jest.fn(() => options.tabContextUsage ?? null),
@@ -168,6 +169,7 @@ describe('ConversationTabRuntimeCoordinator', () => {
       activeTabIndex: 0,
     });
     expect(fixture.host.savePersistedTabState).toHaveBeenCalledWith({});
+    expect(fixture.host.trimConversationFullMessageCache).toHaveBeenCalled();
     expect(tabBarMountEl?.querySelector('.opencodian-tab-bar-item')).not.toBeNull();
   });
 
@@ -386,6 +388,7 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
         },
         saveSettingsUiStateImmediately: jest.fn(),
         scheduleSettingsUiStateSave: jest.fn(),
+        trimConversationFullMessageCache: jest.fn(),
         ...overrides.plugin,
       },
       view: {
@@ -479,7 +482,7 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
     const tabBarState: TabBarMutableState = { tabManager: null, tabBar: null, tabBarMountEl: null };
     const hostSource: ConversationTabRuntimeCoordinatorHostSource = {
       tabBarState, settings,
-      plugin: { settings: { ...settings, tabState: { activeTabId: null, tabs: [] } }, saveSettingsUiStateImmediately: jest.fn(), scheduleSettingsUiStateSave: jest.fn() },
+      plugin: { settings: { ...settings, tabState: { activeTabId: null, tabs: [] } }, saveSettingsUiStateImmediately: jest.fn(), scheduleSettingsUiStateSave: jest.fn(), trimConversationFullMessageCache: jest.fn() },
       view: {
         getChatContainerEl: jest.fn(() => document.createElement('div')),
         getHeaderTabBarSlotEl: jest.fn(() => document.createElement('div')),

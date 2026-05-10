@@ -463,6 +463,8 @@ export class OpenCodianView extends ItemView {
   private tabBarMountEl: HTMLElement | null = null;
   private tabBar: TabBar | null = null;
   private tabManager: TabManager | null = null;
+  private readonly conversationCachePinProvider = (): Iterable<string> =>
+    this.getPinnedConversationIdsForFullMessageCache();
   private tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
   private chatHeaderPresenter: ChatHeaderPresenter;
   private conversationHistoryActionsCoordinator: ConversationHistoryActionsCoordinator;
@@ -2579,6 +2581,7 @@ export class OpenCodianView extends ItemView {
       this.conversationSessionSignalRuntime.start();
     });
     await measureStep('initializeFirstTab', () => this.initializeFirstTab());
+    this.plugin.registerConversationCachePinProvider(this.conversationCachePinProvider);
 
     logger.info(
       `[view-open] completed in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} | ${stepSummaries.join(', ')}`,
@@ -2587,6 +2590,7 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    this.plugin.unregisterConversationCachePinProvider(this.conversationCachePinProvider);
     this.persistTabState({ flush: true });
     this.clearSlashCommandMenuPreload();
     this.chatHeaderPresenter.destroy();
@@ -2630,6 +2634,19 @@ export class OpenCodianView extends ItemView {
     // Cleanup markdown service
     this.messageComponent.unload();
     this.markdownService = null;
+  }
+
+  private getPinnedConversationIdsForFullMessageCache(): ReadonlySet<string> {
+    const conversationIds = new Set<string>();
+    if (this.currentConversation?.id) {
+      conversationIds.add(this.currentConversation.id);
+    }
+    for (const tab of this.tabManager?.getAllTabs() ?? []) {
+      if (tab.conversationId) {
+        conversationIds.add(tab.conversationId);
+      }
+    }
+    return conversationIds;
   }
 
   /** Build the UI structure */

@@ -93,6 +93,7 @@ function createAssemblyDeps(): ConversationTabRuntimeCoordinatorDependencies<Tes
       settings: { ...settings, tabState: { activeTabId: null, tabs: [] } as PersistedTabState },
       saveSettingsUiStateImmediately: jest.fn(),
       scheduleSettingsUiStateSave: jest.fn(),
+      trimConversationFullMessageCache: jest.fn(),
     } as unknown as TabRuntimePluginSource,
     view: {
       getChatContainerEl: jest.fn(() => document.createElement('div')),

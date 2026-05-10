@@ -56,6 +56,7 @@ export interface ConversationTabRuntimeCoordinatorHost {
   getBelowHeaderTabBarLayout(): BelowHeaderTabBarLayout;
   setPersistedTabState(tabState: PersistedTabState): void;
   savePersistedTabState(options?: { flush?: boolean }): void;
+  trimConversationFullMessageCache(): void;
   getSessionIdForTab(tabId: TabId | null): string | null;
   getTabSessionStatus(
     tabId: TabId | null,
@@ -83,6 +84,7 @@ export interface TabRuntimePluginSource {
   settings: TabRuntimeSettings & { tabState: PersistedTabState };
   saveSettingsUiStateImmediately(): Promise<void>;
   scheduleSettingsUiStateSave(): void;
+  trimConversationFullMessageCache(): void;
 }
 
 export interface TabRuntimeViewSource {
@@ -136,6 +138,7 @@ export function createConversationTabRuntimeCoordinatorHost(
       }
       plugin.scheduleSettingsUiStateSave();
     },
+    trimConversationFullMessageCache: () => { plugin.trimConversationFullMessageCache(); },
     getSessionIdForTab: (tabId) => view.getSessionIdForTab(tabId),
     getTabSessionStatus: (tabId, sessionId) =>
       view.getTabSessionStatus(tabId, sessionId),
@@ -565,6 +568,7 @@ export class ConversationTabRuntimeCoordinator<
       onChanged: () => {
         this.renderTabBar();
         this.persistTabState();
+        this.host.trimConversationFullMessageCache();
       },
     });
   }
