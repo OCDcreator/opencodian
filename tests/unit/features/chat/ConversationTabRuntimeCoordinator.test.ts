@@ -219,6 +219,23 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(fixture.coordinator.isTabForegroundBusy('tab-idle')).toBe(false);
   });
 
+  it('treats another streaming tab for the same session as foreground busy', () => {
+    const fixture = createFixture({ sessionStatus: null });
+    fixture.coordinator.initializeTabSystem();
+    const tabManager = fixture.getTabManager();
+    const firstTab = tabManager?.createTab({ id: 'conversation-1', title: 'Shared' });
+    const secondTab = tabManager?.createTab({ id: 'conversation-1', title: 'Shared' });
+    expect(firstTab).not.toBeNull();
+    expect(secondTab).not.toBeNull();
+    fixture.pane.runtimeByTab.set(firstTab!.id, createRuntimeState({ isStreaming: true }));
+    fixture.pane.runtimeByTab.set(secondTab!.id, createRuntimeState({ isStreaming: false }));
+    jest.mocked(fixture.host.getSessionIdForTab).mockImplementation((tabId) => (
+      tabId === firstTab!.id || tabId === secondTab!.id ? 'session-shared' : null
+    ));
+
+    expect(fixture.coordinator.isTabForegroundBusy(secondTab!.id)).toBe(true);
+  });
+
   it('considers a retry-status tab busy even when the tab itself is not streaming', () => {
     const fixture = createFixture({
       sessionStatus: {

@@ -48,7 +48,7 @@
 ### Active stream registry
 
 - `createActiveStreamContext(sessionId)` 会为每个 session 分配独立 context。
-- 如果同一 session 已有旧流，coordinator 会先中断旧 context，再注册新 context。
+- 如果同一 session 已有旧流，coordinator 会先中断旧 context，再注册新 context；单 session 仍只保留一个 active stream context。
 - `releaseActiveStreamContext()` 只在传入 context 仍是当前注册实例时才删除它，避免旧流 finally 把同 session 的新流误清掉。
 
 ### SDK / legacy transport seam

@@ -383,18 +383,19 @@ export class ConversationTabRuntimeCoordinator<
   }
   isTabForegroundBusy(tabId: TabId | null = this.getActiveTabId()): boolean {
     const runtime = this.getRuntimeState(tabId);
-    if (!runtime) {
-      return false;
-    }
-    if (runtime.isStreaming) {
-      return true;
-    }
+    if (!runtime) return false;
+    if (runtime.isStreaming || this.isSameSessionStreamingInAnotherTab(tabId)) return true;
     const contextUsage = this.host.getTabContextUsage(tabId);
-    if (typeof contextUsage?.compactingAt === 'number') {
-      return true;
-    }
+    if (typeof contextUsage?.compactingAt === 'number') return true;
     const status = this.host.getTabSessionStatus(tabId, this.host.getSessionIdForTab(tabId));
     return status?.type === 'busy' || status?.type === 'retry';
+  }
+
+  private isSameSessionStreamingInAnotherTab(tabId: TabId | null): boolean {
+    const targetSessionId = this.host.getSessionIdForTab(tabId);
+    return Boolean(tabId && targetSessionId && this.host.getTabManager()?.getAllTabs().some((tab) => tab.id !== tabId
+      && this.getRuntimeState(tab.id)?.isStreaming
+      && this.host.getSessionIdForTab(tab.id) === targetSessionId));
   }
 
   syncTabStreamLikeState(tabId: TabId | null): void {

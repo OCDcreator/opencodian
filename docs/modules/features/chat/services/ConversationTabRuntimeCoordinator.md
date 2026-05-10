@@ -157,7 +157,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 - `applyTabBarLayout()` 继续保留 header / below-header grid / below-header vertical / input slot 的原有 CSS class 与 render 顺序
 - `persistTabState()` 只持久化 conversation id、title、model override 与 active index，并继续区分 scheduled save 与 `flush` immediate save
 - `handleTabSwitch()` 先让 `TabManager` 切换 active tab，再转交 activation port；`handleTabClose()` 只转交 close/recovery port
-- `isTabForegroundBusy()` 先检查 `getTabContextUsage(tabId).compactingAt`——若为 number（正在进行 compaction），直接返回 busy；否则回落到原有 gating：runtime streaming 优先，其次按 session todo/status 的 `busy` / `retry` 判定 foreground busy
+- `isTabForegroundBusy()` 先检查当前 tab runtime streaming；若同一 OpenCode session 的另一 tab 正在 streaming，也视为 busy，从发送入口复用既有 processing-blocked Notice，避免同 session active stream 被新流静默覆盖；随后检查 `getTabContextUsage(tabId).compactingAt`，最后按 session todo/status 的 `busy` / `retry` 判定 foreground busy。
 - `suppressNextLayoutAutoScroll()` 是给 view/render 层的细粒度入口：当 tool / thinking 这类用户主动展开将要引发一次 pane layout 变化时，先把下一次 layout-driven auto-scroll 标记为应跳过
 - pane state、runtime state、active pane、pane cleanup 与 scroll metrics 都继续委托给 `TabMessagesPaneCoordinator`，不在本 coordinator 内复制 pane DOM map
 
