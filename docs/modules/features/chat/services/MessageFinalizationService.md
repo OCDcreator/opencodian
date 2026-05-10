@@ -118,7 +118,7 @@ export class MessageFinalizationService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `SendPipelineRuntime` 仍保留 stream loop、本地 shell finalization、本地 assistant/notice message 构建，以及第一次 `saveConversation()`
+- `SendPipelineRuntime` 仍保留 stream loop、本地 shell finalization、本地 assistant/notice message 构建；正常 completed assistant 的 cache writeback 可延后到本服务的 canonical convergence，client-only notice / interrupted / questionResolution 边界才需要第一次本地 `saveConversation()`
 - `MessageFinalizationService` 只负责"stream 结束后是否做 canonical convergence、必要时如何回退服务端 sync、sync 后如何 patch/rerender、最后如何做 todo/save/attention 收尾"
 - `ConversationRenderService` 继续负责消息区 full rerender、append-only sync 和 tail patch，本服务只决定何时调用它
 

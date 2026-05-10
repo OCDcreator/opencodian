@@ -221,3 +221,20 @@ Start with **Phase 1 + the smallest part of Phase 2**:
 3. Add tests proving live canonical state and reload canonical state produce identical render input for a normal assistant response and a tool-first assistant response.
 
 This slice directly attacks the highest-risk non-equivalence: local `ChatMessage[]` truth competing with canonical `session/message/part` truth.
+
+## Current Implementation Status
+
+As of 2026-05-10, the focused canonical-convergence slice has landed in code:
+
+- Phase 1 canonical render projection: implemented
+- Phase 2 authoritative reload / sync projection: implemented
+- Phase 3 `session.diff` routing: implemented
+- Phase 4 finalization without local repair: implemented
+- Phase 5 extension-path parity proof: implemented for synthetic parts, command/shell routing, and client-only notice boundaries
+
+Still intentionally out of scope for this slice:
+
+- follow-up queue
+- sync-event batching
+- background-task metadata persistence
+- full `TabSessionPhase`

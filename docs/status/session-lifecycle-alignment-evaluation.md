@@ -456,3 +456,19 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
    - ⚠️ 可优化：存在改进空间但不影响核心功能
    - ❌ 需改进：存在数据完整性风险或显著维护性问题
    - ⚪ 不适用：因场景差异不需对齐，含架构不同但各有合理理由的情况
+
+## 当前实现注记
+
+这份评估报告记录的是 2026-05-10 时点的对齐差距基线。随后实现已把本轮聚焦的 canonical 收敛切片落到代码里，具体包括：
+
+- canonical render / authoritative reload / sync projection / finalization drift 的边界收敛
+- `Conversation.messages` 在 canonical 存在时退化为 compatibility/cache writeback
+- `session.diff` 不再驱动 message authoritative reload
+- local stream normal-completion 的本地 cache writeback 延后给 canonical finalization
+
+当前仍故意保留为后续独立切片的事项：
+
+- follow-up queue
+- sync-event batching
+- background-task metadata persistence
+- full `TabSessionPhase`

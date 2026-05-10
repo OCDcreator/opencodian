@@ -310,7 +310,7 @@ describe('SendPipelineRuntime', () => {
     expect(finalizationPort.finalizeAfterStream).not.toHaveBeenCalled();
   });
 
-  it('persists the local assistant message before handing off post-stream finalization', async () => {
+  it('defers completed assistant persistence to canonical post-stream finalization', async () => {
     const callOrder: string[] = [];
     const preparedSend = createPreparedSend();
     const runtimeState = createTabRuntime();
@@ -352,27 +352,16 @@ describe('SendPipelineRuntime', () => {
       outputTokens: 34,
       sessionId: 'session-1',
     });
-    expect(preparedSend.conversation.messages).toHaveLength(2);
-    expect(preparedSend.conversation.messages[1]).toEqual(expect.objectContaining({
-      id: 'assistant-1',
-      role: 'assistant',
-      content: 'Hi there',
-      timestamp: 42,
-      modelId: 'openai/gpt-5.4',
-      sourceMessageId: 'assistant-1',
-      contentBlocks: [
-        { type: 'text', text: 'Hi there' },
-      ],
-    }));
+    expect(preparedSend.conversation.messages).toHaveLength(1);
     expect(host.addTimestampWithCopyButton).toHaveBeenCalledTimes(1);
-    expect(host.saveConversation).toHaveBeenCalledWith(preparedSend.conversation);
+    expect(host.saveConversation).not.toHaveBeenCalled();
     expect(finalizationPort.finalizeAfterStream).toHaveBeenCalledWith(expect.objectContaining({
       conversation: preparedSend.conversation,
       tabId: 'tab-1',
       shouldSyncFromServer: true,
       editedFiles: ['notes.md'],
     }));
-    expect(callOrder.indexOf('saveConversation')).toBeLessThan(callOrder.indexOf('finalizeAfterStream'));
+    expect(callOrder).not.toContain('saveConversation');
   });
 
   it('sends the merged prepared context items instead of only draft items', async () => {

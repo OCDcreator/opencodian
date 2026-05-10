@@ -55,13 +55,14 @@ export class StreamLocalFinalizer {
 ### shell finalization
 
 - 有 content blocks：追加 timestamp / copy button，并在 interrupted 时显示 interrupted badge
+- 正常 completed assistant 的本地 cache writeback 现在可延后给 canonical finalization，只有 interrupted / error / questionResolution 等 client-only 边界会先落本地
 - 只有 error：把占位 assistant shell 渲染成 error notice card
 - interrupted 且无内容：把占位 shell 渲染成 interrupted notice
 - 既无内容又无 notice：移除空 shell
 
 ### local message persistence
 
-- 有 stream content blocks 时构造 assistant `ChatMessage`
+- 有 stream content blocks 时按本地/客户端边界决定是否构造 assistant `ChatMessage`
 - error / interrupted 分支构造 notice message
 - 只要有本地 message / notice，就更新 `updatedAt`、`lastResponseAt` 并执行第一次本地 save
 

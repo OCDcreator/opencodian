@@ -373,6 +373,7 @@ describe('ConversationAuthoritativeSyncCoordinator canonical projection', () => 
     expect(host.saveConversation).toHaveBeenCalledTimes(1);
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
   });
+
 });
 
 describe('ConversationAuthoritativeSyncCoordinator canonical tool projection', () => {

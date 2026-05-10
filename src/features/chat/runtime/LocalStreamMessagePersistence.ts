@@ -25,7 +25,21 @@ export async function persistLocalStreamOutcome(options: {
     logAssistantFinalizationStage,
   } = options;
 
+  let persistedLocalMessage = false;
+
   if (outcome.hasStreamContentBlocks && outcome.streamContentBlocks) {
+    const shouldPersistAssistantMessage = shouldPersistLocalAssistantMessage(
+      outcome,
+      runtime,
+    );
+    if (!shouldPersistAssistantMessage) {
+      logAssistantFinalizationStage('local-assistant-cache-deferred', {
+        finalizedAssistantMessageId: outcome.finalizedAssistantMessageId ?? null,
+        reason: 'canonical-sync-pending',
+      });
+      return;
+    }
+
     const assistantMessage: ChatMessage = {
       id: outcome.finalizedAssistantMessageId ?? `assistant-${outcome.finalizedTimestamp}`,
       role: 'assistant',
@@ -47,6 +61,7 @@ export async function persistLocalStreamOutcome(options: {
 
     writeShellDataset(runtime.streamingMessageEl, assistantMessage);
     preparedSend.conversation.messages.push(assistantMessage);
+    persistedLocalMessage = true;
     logAssistantFinalizationStage('local-assistant-message-appended', {
       conversationMessageCount: preparedSend.conversation.messages.length,
       message: host.summarizeChatMessageForDebug(assistantMessage),
@@ -59,6 +74,7 @@ export async function persistLocalStreamOutcome(options: {
       logAssistantFinalizationStage,
       stage: 'local-error-notice-appended',
     });
+    persistedLocalMessage = true;
   } else if (outcome.interruptedNoticeMessage) {
     logInterruptedNoticePersistence(host, preparedSend, outcome.interruptedNoticeMessage);
     appendNoticeMessage({
@@ -68,9 +84,10 @@ export async function persistLocalStreamOutcome(options: {
       logAssistantFinalizationStage,
       stage: 'local-interrupted-notice-appended',
     });
+    persistedLocalMessage = true;
   }
 
-  if (!outcome.hasStreamContentBlocks && !outcome.streamErrorNoticeMessage && !outcome.interruptedNoticeMessage) {
+  if (!persistedLocalMessage) {
     return;
   }
 
@@ -82,6 +99,20 @@ export async function persistLocalStreamOutcome(options: {
     lastResponseAt: preparedSend.conversation.lastResponseAt ?? null,
     messageCount: preparedSend.conversation.messages.length,
   });
+}
+
+function shouldPersistLocalAssistantMessage(
+  outcome: LocalStreamOutcome,
+  runtime: SendPipelineTabRuntime,
+): boolean {
+  if (!outcome.shouldSyncFromServer) {
+    return true;
+  }
+
+  return Boolean(
+    outcome.shouldPersistInterruptedState
+      || runtime.pendingQuestionResolution,
+  );
 }
 
 function appendNoticeMessage(options: {
