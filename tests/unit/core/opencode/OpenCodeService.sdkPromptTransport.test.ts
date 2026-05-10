@@ -61,7 +61,7 @@ describe('OpenCodeService SDK prompt requests', () => {
         },
       },
       allowedTools: ['read', 'grep'],
-      reasoningEffort: 'high',
+      variant: 'high',
     });
 
     expect(response?.content).toBe('Generated title');
@@ -279,7 +279,7 @@ describe('OpenCodeService SDK promptAsync transport', () => {
         },
       },
       allowedTools: ['read'],
-      reasoningEffort: 'medium',
+      variant: 'medium',
     })) {
       chunks.push(chunk);
     }

@@ -180,8 +180,7 @@ describe('OpenCodePromptRequestBuilder transport payloads', () => {
       agent: ' title ',
       noReply: false,
       allowedTools: ['read', 'grep'],
-      reasoningEffort: 'high',
-      thinkingBudget: 128,
+      variant: 'high',
       format: {
         type: 'json_schema',
         schema: {
@@ -233,8 +232,7 @@ describe('OpenCodePromptRequestBuilder transport payloads', () => {
       provider: 'anthropic',
       model: 'claude-3-7-sonnet',
       allowedTools: ['read'],
-      reasoningEffort: 'medium',
-      thinkingBudget: 0,
+      variant: 'medium',
       format: { type: 'text' },
     });
 
@@ -252,44 +250,29 @@ describe('OpenCodePromptRequestBuilder transport payloads', () => {
     });
   });
 
-  it('maps reasoning effort and thinking budget into legacy stream model options', () => {
+  it('maps variant into legacy stream request body', () => {
     const { builder } = createBuilder();
 
-    const enabledThinking = builder.buildLegacyStreamRequestBody(parts, {
-      reasoningEffort: 'low',
-      thinkingBudget: 256,
+    const withVariant = builder.buildLegacyStreamRequestBody(parts, {
+      variant: 'low',
     }, 'msg_enabled');
-    const disabledThinking = builder.buildLegacyStreamRequestBody(parts, {
-      thinkingBudget: 0,
-    }, 'msg_disabled');
+    const withoutVariant = builder.buildLegacyStreamRequestBody(parts, {}, 'msg_disabled');
 
-    expect(enabledThinking).toEqual({
+    expect(withVariant).toEqual({
       messageID: 'msg_enabled',
       parts,
       model: {
         providerID: 'openai',
         modelID: 'gpt-5',
-        options: {
-          reasoningEffort: 'low',
-          thinking: {
-            type: 'enabled',
-            budgetTokens: 256,
-          },
-        },
       },
       variant: 'low',
     });
-    expect(disabledThinking).toEqual({
+    expect(withoutVariant).toEqual({
       messageID: 'msg_disabled',
       parts,
       model: {
         providerID: 'openai',
         modelID: 'gpt-5',
-        options: {
-          thinking: {
-            type: 'disabled',
-          },
-        },
       },
     });
   });
