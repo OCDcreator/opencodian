@@ -19,8 +19,17 @@ import {
   type TabMessagesPaneRuntimeState,
   type TabMessagesPaneState,
 } from './TabMessagesPaneCoordinator';
-import { deriveTabSessionPhase, isForegroundBusyTabSessionPhase, type TabSessionPhase } from './TabSessionPhase';
+import {
+  createInitialTabSessionLifecycleState,
+  deriveTabSessionPhase,
+  isForegroundBusyTabSessionPhase,
+  transitionTabSessionLifecycle,
+  type TabSessionLifecycleState,
+  type TabSessionPhase,
+  type WritableTabSessionPhase,
+} from './TabSessionPhase';
 export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState {
+  tabSessionLifecycle: TabSessionLifecycleState;
   currentTurnBodyEl: HTMLElement | null;
   isConversationSyncInFlight: boolean;
   lastConversationSyncFingerprint: string | null;
@@ -336,7 +345,29 @@ export class ConversationTabRuntimeCoordinator<
     const runtime = this.getRuntimeState(tabId);
     if (runtime) {
       runtime.isStreaming = isStreaming;
+      runtime.tabSessionLifecycle = transitionTabSessionLifecycle(
+        runtime.tabSessionLifecycle ?? createInitialTabSessionLifecycleState(),
+        isStreaming ? 'streaming' : 'idle',
+        isStreaming ? 'set-streaming' : 'clear-streaming',
+      );
     }
+  }
+  transitionTabSessionLifecycle(
+    tabId: TabId | null,
+    phase: WritableTabSessionPhase,
+    reason: string,
+  ): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return false;
+    }
+
+    runtime.tabSessionLifecycle = transitionTabSessionLifecycle(
+      runtime.tabSessionLifecycle ?? createInitialTabSessionLifecycleState(),
+      phase,
+      reason,
+    );
+    return true;
   }
   clearPendingEditedFiles(tabId: TabId | null): void {
     this.getRuntimeState(tabId)?.pendingEditedFiles.clear();
@@ -364,7 +395,14 @@ export class ConversationTabRuntimeCoordinator<
   ): void {
     const runtime = this.getRuntimeState(tabId);
     if (!runtime) return;
-    if (update.inFlight !== undefined) runtime.isConversationSyncInFlight = update.inFlight;
+    if (update.inFlight !== undefined) {
+      runtime.isConversationSyncInFlight = update.inFlight;
+      runtime.tabSessionLifecycle = transitionTabSessionLifecycle(
+        runtime.tabSessionLifecycle ?? createInitialTabSessionLifecycleState(),
+        update.inFlight ? 'syncing' : 'idle',
+        update.inFlight ? 'conversation-sync-in-flight' : 'conversation-sync-complete',
+      );
+    }
     if ('fingerprint' in update) runtime.lastConversationSyncFingerprint = update.fingerprint ?? null;
   }
   registerTurnBodyAnchor(tabId: TabId | null, anchorKey: string, bodyEl: HTMLElement): void {
@@ -409,11 +447,25 @@ export class ConversationTabRuntimeCoordinator<
     const runtime = this.getRuntimeState(tabId);
     if (!runtime) return 'idle';
     const sameSessionStreaming = this.isSameSessionStreamingInAnotherTab(tabId);
-    if (runtime.isStreaming || sameSessionStreaming) return deriveTabSessionPhase({ isStreaming: runtime.isStreaming, isSameSessionStreamingInAnotherTab: sameSessionStreaming });
-    if (runtime.isConversationSyncInFlight) return deriveTabSessionPhase({ isConversationSyncInFlight: true });
-    if (typeof this.host.getTabContextUsage(tabId)?.compactingAt === 'number') return deriveTabSessionPhase({ isContextCompacting: true });
     const status = this.host.getTabSessionStatus(tabId, this.host.getSessionIdForTab(tabId));
-    return deriveTabSessionPhase({ sessionStatus: status });
+    const lifecycle = runtime.tabSessionLifecycle ?? createInitialTabSessionLifecycleState();
+    const shouldUseLegacyBusySignal = lifecycle.sequence === 0
+      && lifecycle.phase === 'idle'
+      && (runtime.isStreaming || runtime.isConversationSyncInFlight);
+    const effectiveLifecycle = shouldUseLegacyBusySignal
+      ? {
+        ...lifecycle,
+        phase: runtime.isStreaming ? 'streaming' : 'syncing',
+      } satisfies TabSessionLifecycleState
+      : lifecycle;
+    return deriveTabSessionPhase({
+      lifecycle: effectiveLifecycle,
+      isStreaming: runtime.isStreaming,
+      isConversationSyncInFlight: runtime.isConversationSyncInFlight,
+      isSameSessionStreamingInAnotherTab: sameSessionStreaming,
+      isContextCompacting: typeof this.host.getTabContextUsage(tabId)?.compactingAt === 'number',
+      sessionStatus: status,
+    });
   }
   isTabForegroundBusy(tabId: TabId | null = this.getActiveTabId()): boolean { return isForegroundBusyTabSessionPhase(this.getTabSessionPhase(tabId)); }
 

@@ -13,6 +13,11 @@ export class StreamLocalFinalizer {
   async finalize(): Promise<StreamLocalFinalizerResult> {
     const outcome = this.buildOutcome();
     this.logFinalizationEntry(outcome);
+    this.options.host.transitionTabSessionLifecycle(
+      this.options.preparedSend.tabId,
+      'finalizing',
+      'stream-local-finalizer',
+    );
     this.markSyncInFlight(outcome);
 
     this.options.routedStream.resetStreamingState();
@@ -59,6 +64,11 @@ export class StreamLocalFinalizer {
     }
 
     this.options.runtime.isConversationSyncInFlight = true;
+    this.options.host.transitionTabSessionLifecycle(
+      this.options.preparedSend.tabId,
+      'syncing',
+      'stream-finalization-sync',
+    );
   }
 
   private async finalizeStreamingShell(outcome: LocalStreamOutcome): Promise<void> {

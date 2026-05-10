@@ -3,17 +3,23 @@ import type {
   Conversation,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type {
+  TabSessionLifecycleState,
+  WritableTabSessionPhase,
+} from './TabSessionPhase';
 
 export interface ConversationSyncRuntime {
   isStreaming: boolean;
   isConversationSyncInFlight: boolean;
   lastConversationSyncFingerprint: string | null;
+  tabSessionLifecycle: TabSessionLifecycleState;
 }
 
 export interface ConversationSyncRuntimeCoordinatorHost {
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): ConversationSyncRuntime | null;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
 }
 
 export interface VisibleConversationSyncContext {
@@ -82,6 +88,7 @@ export class ConversationSyncRuntimeCoordinator {
     }
 
     runtime.isConversationSyncInFlight = true;
+    this.host.transitionTabSessionLifecycle(tabId, 'syncing', 'conversation-sync-lock');
     try {
       await callback({
         tabId,
@@ -91,6 +98,7 @@ export class ConversationSyncRuntimeCoordinator {
       return true;
     } finally {
       runtime.isConversationSyncInFlight = false;
+      this.host.transitionTabSessionLifecycle(tabId, 'idle', 'conversation-sync-lock-release');
     }
   }
 }

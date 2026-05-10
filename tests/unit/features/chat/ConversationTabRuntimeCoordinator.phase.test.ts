@@ -185,6 +185,27 @@ describe('ConversationTabRuntimeCoordinator tab session phase', () => {
     expect(fixture.coordinator.getTabSessionPhase('tab-idle')).toBe('idle');
     expect(fixture.coordinator.isTabForegroundBusy('tab-idle')).toBe(false);
   });
+
+  it('moves through preparing, streaming, finalizing, syncing, and idle using coordinator transitions', () => {
+    const fixture = createFixture({ sessionStatus: null });
+    fixture.pane.runtimeByTab.set('tab-life', createRuntimeState());
+
+    fixture.coordinator.transitionTabSessionLifecycle('tab-life', 'preparing', 'send-preflight');
+    expect(fixture.coordinator.getTabSessionPhase('tab-life')).toBe('preparing');
+    expect(fixture.coordinator.isTabForegroundBusy('tab-life')).toBe(true);
+
+    fixture.coordinator.setStreaming('tab-life', true);
+    expect(fixture.coordinator.getTabSessionPhase('tab-life')).toBe('streaming');
+
+    fixture.coordinator.transitionTabSessionLifecycle('tab-life', 'finalizing', 'stream-finally');
+    expect(fixture.coordinator.getTabSessionPhase('tab-life')).toBe('finalizing');
+
+    fixture.coordinator.updateConversationSyncRuntime('tab-life', { inFlight: true });
+    expect(fixture.coordinator.getTabSessionPhase('tab-life')).toBe('syncing');
+
+    fixture.coordinator.updateConversationSyncRuntime('tab-life', { inFlight: false });
+    expect(fixture.coordinator.getTabSessionPhase('tab-life')).toBe('idle');
+  });
 });
 
 describe('deriveTabSessionPhase', () => {

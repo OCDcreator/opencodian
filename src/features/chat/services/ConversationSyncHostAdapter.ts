@@ -31,6 +31,7 @@ import {
   ConversationSyncRuntimeCoordinator,
   type ConversationSyncRuntimeCoordinatorHost,
 } from './ConversationSyncRuntimeCoordinator';
+import type { WritableTabSessionPhase } from './TabSessionPhase';
 import {
   ConversationSyncVisiblePostSyncRouter,
   type ConversationSyncVisiblePostSyncRouterHost,
@@ -64,6 +65,10 @@ export interface ConversationSyncViewHost {
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
 }
 
+interface ConversationSyncLifecycleHost extends ConversationSyncViewHost {
+  transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
+}
+
 export interface ConversationSyncHosts {
   runtimeCoordinatorHost: ConversationSyncRuntimeCoordinatorHost;
   orchestrationHost: ConversationSyncOrchestrationHost;
@@ -84,7 +89,7 @@ type VisibleConversationPostSyncPort = Pick<
 >;
 
 export function createConversationSyncHosts(
-  viewHost: ConversationSyncViewHost,
+  viewHost: ConversationSyncLifecycleHost,
 ): ConversationSyncHosts {
   return {
     runtimeCoordinatorHost: {
@@ -92,6 +97,8 @@ export function createConversationSyncHosts(
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       getConversationSyncFingerprint: (messages: ChatMessage[]) =>
         viewHost.getConversationSyncFingerprint(messages),
+      transitionTabSessionLifecycle: (tabId, phase, reason) =>
+        viewHost.transitionTabSessionLifecycle(tabId, phase, reason),
     },
     orchestrationHost: {
       getCurrentConversation: () => viewHost.getCurrentConversation(),
@@ -131,7 +138,7 @@ export function createConversationSyncHosts(
 }
 
 export function createConversationSyncServices(
-  viewHost: ConversationSyncViewHost,
+  viewHost: ConversationSyncLifecycleHost,
   visiblePostSyncCoordinator: VisibleConversationPostSyncPort,
   backgroundPostSyncHandoffCoordinator: ConversationSyncBackgroundPostSyncHandoffPort,
 ): ConversationSyncServices {
@@ -175,6 +182,7 @@ export interface ConversationSyncRuntimeAssemblyViewHost extends ConversationSyn
   loadConversations(): Promise<void>;
   hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean;
   setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
+  transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
 }
 
 export interface ConversationSyncRuntimeAssemblyDeps {
@@ -189,7 +197,11 @@ export function assembleConversationSyncRuntime(
   const syncLoadHosts = createConversationSyncLoadRuntimeViewHosts(deps.viewHost);
 
   const services = createConversationSyncServices(
-    syncLoadHosts.conversationSyncViewHost,
+    {
+      ...syncLoadHosts.conversationSyncViewHost,
+      transitionTabSessionLifecycle: (tabId, phase, reason) =>
+        deps.viewHost.transitionTabSessionLifecycle(tabId, phase, reason),
+    },
     deps.visiblePostSyncCoordinator,
     deps.backgroundPostSyncHandoffCoordinator,
   );

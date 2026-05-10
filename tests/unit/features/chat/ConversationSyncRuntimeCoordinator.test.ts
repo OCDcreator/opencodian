@@ -6,6 +6,9 @@ import {
   type ConversationSyncRuntime,
   ConversationSyncRuntimeCoordinator,
 } from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
+import {
+  createInitialTabSessionLifecycleState,
+} from '../../../../src/features/chat/services/TabSessionPhase';
 
 describe('ConversationSyncRuntimeCoordinator', () => {
   function createConversation(overrides?: Partial<Conversation>): Conversation {
@@ -38,22 +41,26 @@ describe('ConversationSyncRuntimeCoordinator', () => {
         isStreaming: false,
         isConversationSyncInFlight: false,
         lastConversationSyncFingerprint: null,
+        tabSessionLifecycle: createInitialTabSessionLifecycleState(),
         ...options?.runtime,
       };
     const getConversationSyncFingerprint = jest.fn().mockReturnValue(
       options?.fingerprint ?? 'derived-fingerprint',
     );
+    const transitionTabSessionLifecycle = jest.fn().mockReturnValue(true);
 
     const service = new ConversationSyncRuntimeCoordinator({
       getActiveTabId: jest.fn().mockReturnValue(options?.activeTabId ?? 'tab-1'),
       getTabRuntimeState: jest.fn().mockImplementation(() => runtime),
       getConversationSyncFingerprint,
+      transitionTabSessionLifecycle,
     });
 
     return {
       service,
       runtime,
       getConversationSyncFingerprint,
+      transitionTabSessionLifecycle,
     };
   }
 
@@ -68,7 +75,7 @@ describe('ConversationSyncRuntimeCoordinator', () => {
   });
 
   it('sets and clears the in-flight flag around visible sync work', async () => {
-    const { service, runtime } = createService();
+    const { service, runtime, transitionTabSessionLifecycle } = createService();
     const seenStates: boolean[] = [];
 
     const ran = await service.runVisibleConversationSync(
@@ -81,6 +88,8 @@ describe('ConversationSyncRuntimeCoordinator', () => {
     expect(ran).toBe(true);
     expect(seenStates).toEqual([true]);
     expect(runtime?.isConversationSyncInFlight).toBe(false);
+    expect(transitionTabSessionLifecycle).toHaveBeenNthCalledWith(1, 'tab-1', 'syncing', 'conversation-sync-lock');
+    expect(transitionTabSessionLifecycle).toHaveBeenNthCalledWith(2, 'tab-1', 'idle', 'conversation-sync-lock-release');
   });
 
   it('derives the previous fingerprint from runtime state before tab sync', async () => {

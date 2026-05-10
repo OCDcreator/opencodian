@@ -56,6 +56,7 @@ export interface SendPipelineHostDependencies {
   finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId: import('../tabs').TabId | null): Promise<void>;
   removeEmptyAssistantShells(): void;
   syncTabStreamLikeState(tabId: import('../tabs').TabId | null): void;
+  transitionTabSessionLifecycle: SendPipelineHost['transitionTabSessionLifecycle'];
   refreshServerStatusBadge(): Promise<void>;
   sendStreamMessage: SendPipelineHost['sendStreamMessage'];
   detachStream(sessionId: string | undefined): void;
@@ -90,6 +91,8 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
       deps.finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId),
     removeEmptyAssistantShells: () => deps.removeEmptyAssistantShells(),
     syncTabStreamLikeState: (tabId) => deps.syncTabStreamLikeState(tabId),
+    transitionTabSessionLifecycle: (tabId, phase, reason) =>
+      deps.transitionTabSessionLifecycle(tabId, phase, reason),
     refreshServerStatusBadge: () => deps.refreshServerStatusBadge(),
   };
   const transportPort: SendPipelineTransportPort = {

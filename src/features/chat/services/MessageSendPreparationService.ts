@@ -25,6 +25,7 @@ import { getPromptContextTargetKey } from '../composerContext';
 import type { SendPipelineStreamElements } from '../runtime/SendPipelineTypes';
 import type { TabId } from '../tabs';
 import type { ComposerSendContextPort } from './ComposerContextViewFacade';
+import type { WritableTabSessionPhase } from './TabSessionPhase';
 
 const logger = createLogger('MessageSendPreparationService');
 
@@ -166,6 +167,7 @@ export interface MessageSendPreparationHost {
   startConversationSyncLoop(): void;
   saveConversation(conversation: Conversation): Promise<void>;
   setAutoScrollEnabled(tabId: TabId | null, enabled: boolean): void;
+  transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   renderMessage(message: ChatMessage): Promise<unknown>;
   scrollToBottom(options: { tabId: TabId | null; enableAutoScroll?: boolean }): void;
   applyFallbackConversationTitle(conversationId: string, firstMessage: string): Promise<void>;
@@ -190,6 +192,7 @@ export interface MessageSendPreparationHostDependencies {
   isTabForegroundBusy: (tabId: TabId) => boolean;
   conversationTabRuntimeCoordinator: {
     setAutoScrollEnabled(tabId: TabId | null, enabled: boolean): void;
+    transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
     setStreaming(tabId: TabId | null, value: boolean): void;
     clearPendingEditedFiles(tabId: TabId | null): void;
     queueFollowUpSend(tabId: TabId | null, request: PrepareMessageSendOptions): boolean;
@@ -290,17 +293,25 @@ export class MessageSendPreparationService {
       if (!this.queueFollowUpSend(tabId, options)) this.host.notifyForegroundBusy();
       return null;
     }
+    this.host.transitionTabSessionLifecycle(tabId, 'preparing', 'send-preflight');
     const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.refreshStatusSurfaces();
     if (availability !== 'running' && availability !== 'external') {
-      if (!(await this.ensureServerReadyForChat(availability))) return null;
+      if (!(await this.ensureServerReadyForChat(availability))) {
+        this.resetPreparingLifecycle(tabId);
+        return null;
+      }
     }
     if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
     const modelOptions = this.host.getSendMessageOptions();
     const activeModelId = this.host.formatModelId(modelOptions);
     const modelAvailable = await this.host.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model);
-    if (!modelAvailable) { await this.host.appendModelUnavailableNoticeMessage(); return null; }
+    if (!modelAvailable) {
+      await this.host.appendModelUnavailableNoticeMessage();
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
     const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
@@ -346,6 +357,7 @@ export class MessageSendPreparationService {
   }
 
   enterStreamingState(tabId: TabId | null): void {
+    this.host.transitionTabSessionLifecycle(tabId, 'streaming', 'send-stream-start');
     this.host.setStreaming(tabId, true);
     this.host.syncTabStreamLikeState(tabId);
     this.host.beginTabContextUsageStream(tabId);
@@ -362,6 +374,10 @@ export class MessageSendPreparationService {
 
   private isTargetTabActive(targetTabId: TabId | undefined): boolean {
     return !targetTabId || this.host.getActiveTabId() === targetTabId;
+  }
+
+  private resetPreparingLifecycle(tabId: TabId | null): void {
+    this.host.transitionTabSessionLifecycle(tabId, 'idle', 'send-preflight-aborted');
   }
 
   private queueFollowUpSend(tabId: TabId, options: PrepareMessageSendOptions): boolean {
@@ -542,6 +558,8 @@ export function createMessageSendPreparationHost(
     startConversationSyncLoop: () => conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
     saveConversation: (conversation) => deps.saveConversation(conversation),
     setAutoScrollEnabled: (tabId, enabled) => tabRuntime.setAutoScrollEnabled(tabId, enabled),
+    transitionTabSessionLifecycle: (tabId, phase, reason) =>
+      tabRuntime.transitionTabSessionLifecycle(tabId, phase, reason),
     renderMessage: (message) => conversationRenderService.renderMessage(message),
     scrollToBottom: (options) => deps.scrollToBottom(options),
     applyFallbackConversationTitle: (conversationId, firstMessage) => deps.applyFallbackConversationTitle(conversationId, firstMessage),

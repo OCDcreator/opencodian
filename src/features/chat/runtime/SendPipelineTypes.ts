@@ -16,6 +16,7 @@ import type {
   PrepareMessageSendOptions,
   SendMessageModelOptions,
 } from '../services/MessageSendPreparationService';
+import type { WritableTabSessionPhase } from '../services/TabSessionPhase';
 import type { TabId } from '../tabs';
 
 export interface SendPipelineTabRuntime {
@@ -68,6 +69,7 @@ export interface SendPipelineViewPort {
   finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId: TabId | null): Promise<void>;
   removeEmptyAssistantShells(): void;
   syncTabStreamLikeState(tabId: TabId | null): void;
+  transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   refreshServerStatusBadge(): Promise<void>;
 }
 
@@ -190,6 +192,7 @@ export type StreamLocalFinalizerHost =
     | 'finalizeBackgroundTaskIndicatorAfterPrimaryStream'
     | 'removeEmptyAssistantShells'
     | 'syncTabStreamLikeState'
+    | 'transitionTabSessionLifecycle'
     | 'refreshServerStatusBadge'
   >
   & Pick<SendPipelineTransportPort, 'completeTabContextUsageStream'>

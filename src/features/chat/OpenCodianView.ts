@@ -201,10 +201,8 @@ import {
 } from './services/ConversationSyncBridge';
 import {
   assembleConversationSyncRuntime,
+  type ConversationSyncRuntimeAssemblyViewHost,
 } from './services/ConversationSyncHostAdapter';
-import {
-  type ConversationSyncLoadRuntimeViewHost,
-} from './services/ConversationSyncLoadRuntimeViewHostFactory';
 import {
   ConversationSyncOrchestrationService,
 } from './services/ConversationSyncOrchestrationService';
@@ -224,6 +222,9 @@ import {
   type ConversationTabRuntimeState,
   type TabBarMutableState,
 } from './services/ConversationTabRuntimeCoordinator';
+import {
+  createInitialTabSessionLifecycleState,
+} from './services/TabSessionPhase';
 import {
   type ConversationViewStateHost,
 } from './services/ConversationViewStateService';
@@ -893,6 +894,7 @@ export class OpenCodianView extends ItemView {
   private createTabRuntimeState(): TabRuntimeState {
     return {
       isStreaming: false,
+      tabSessionLifecycle: createInitialTabSessionLifecycleState(),
       streamController: null,
       streamingMessageEl: null,
       streamingContentEl: null,
@@ -2079,7 +2081,7 @@ export class OpenCodianView extends ItemView {
   private createConversationSyncLoadRuntimeViewHost(
     conversationRenderService: ConversationRenderService,
   ):
-  ConversationSyncLoadRuntimeViewHost {
+  ConversationSyncRuntimeAssemblyViewHost {
     return {
       loadConversations: () => this.plugin.loadConversations(),
       getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
@@ -2102,6 +2104,8 @@ export class OpenCodianView extends ItemView {
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
       hasInterruptedLocalAssistantTail: (messages) => hasInterruptedLocalAssistantTail(messages),
+      transitionTabSessionLifecycle: (tabId, phase, reason) =>
+        this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
     };
   }
 
@@ -2366,6 +2370,8 @@ export class OpenCodianView extends ItemView {
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
       },
+      transitionTabSessionLifecycle: (tabId, phase, reason) =>
+        this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
       sendStreamMessage: (content, options) => this.plugin.openCodeService.sendMessage(content, options),
       detachStream: (sessionId) => {
