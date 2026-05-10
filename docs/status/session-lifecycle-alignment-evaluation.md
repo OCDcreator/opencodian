@@ -1,8 +1,8 @@
 # OpenCodian 会话生命周期管理：对齐评估与优化增强报告
 
 > **评估日期**：2026-05-10
-> **当前仓库**：`/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian`
-> **当前基线**：本地 `main` 当前检出状态，含未提交报告草稿；报告修订不改变 runtime 源码
+> **当前仓库**：`/Users/dht/.codex/worktrees/session-lifecycle-report-baseline/opencodian`
+> **当前基线**：commit `aaa470c6` (branch `codex/session-lifecycle-report-baseline`)；工作区干净；报告修订不改变 runtime 源码
 > **对比基准**：opencode-desktop（OpenCode 官方 Electron 前端，SolidJS）
 > **评估对象**：OpenCodian Obsidian 插件当前会话生命周期实现
 > **评估方法**：本地源码审计 + 既有会话对齐审计复核 + 后续外部 Council 审查门
@@ -284,7 +284,7 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 
 ### 4.2 Tier 2 — 中优先级（用户体验 + 性能）
 
-#### 建议 4：跟进提示队列
+#### 建议 5：跟进提示队列
 
 - **问题**：会话忙碌时发送新消息被直接阻断，用户需要等待当前流完成
 - **方案**：在 `TabRuntimeState` 增加 `queuedPrompt: string | null`。忙碌时入队而非阻断，流完成或会话空闲时自动出队发送。每标签页仅排队一条，不设无限队列。
@@ -296,7 +296,7 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
   - `SendPipelineRuntime.ts`（入队逻辑）
   - `OpenCodeStreamingFinalizationCoordinator.ts`（出队触发）
 
-#### 建议 5：同步事件批处理窗口
+#### 建议 6：同步事件批处理窗口
 
 - **问题**：每个同步事件独立处理，高频场景下产生不必要的状态更新
 - **方案**：在 `OpenCodeSyncEventRuntimeCoordinator.emitSessionSyncEventUpdate()` 中引入 16ms 批处理窗口。同类型事件在窗口内合并（`message.part.delta` 在已有 `message.part.updated` 时跳过）。
@@ -310,17 +310,17 @@ opencode-desktop 在 16ms 帧窗口内合并事件，`message.part.delta` 在已
 
 ### 4.3 Tier 3 — 长期方向（架构收敛）
 
-#### 建议 6：双重真相收敛
+#### 建议 7：双重真相收敛
 
 - **问题**：`OpenCodeSessionStateStore`（规范）和 `Conversation.messages`（显示/持久化）承载同一份消息的不同表示，增加理解和维护成本
 - **方案**（多迭代渐进式）：
-  - **Phase 1**：渲染层优先从 `OpenCodeSessionStateStore` 读取，`Conversation.messages` 仅作为 fallback
+  - **Phase 1**：渲染层优先从 `OpenCodeSessionStateStore` 读取（**已基本具备**，`ConversationRenderService` 已 canonical 优先），`Conversation.messages` 仅作为 fallback
   - **Phase 2**：消除 merge fallback，规范状态成为唯一渲染输入
   - **Phase 3**：`Conversation.messages` 退化为纯持久化载体，运行时不再直接读取
 - **影响**：高 — 架构简化
 - **工作量**：高 — 需要多迭代逐步迁移
 - **风险**：中 — 需要在每个阶段充分验证
-- **前置条件**：建议 1（串行变更机制）和 建议 2（状态机）应先落地
+- **前置条件**：建议 1（canonical 收敛）和 建议 2（状态机）应先落地
 
 ---
 
@@ -404,16 +404,16 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
 
 以下内容不是已完成的 Council 结论，而是提交给 `opencode` Council 审查的重点问题：
 
-| 议题 | 初步判断 | 说明 |
+| 议题 | 本地判断 | 说明 |
 |------|---------|------|
-| canonical render/reload/finalization 收敛应作为 #1 优先级 | 初步共识 | render 已 canonical 优先，但 reload/finalization/persistence 仍有补偿路径 |
-| TabSessionPhase 只读派生视图 | 初步共识 | 状态分散问题已确认，只读派生可降低行为回归风险 |
+| canonical render/reload/finalization 收敛应作为 #1 优先级 | 作者判断 | render 已 canonical 优先，但 reload/finalization/persistence 仍有补偿路径 |
+| TabSessionPhase 只读派生视图 | 作者判断 | 状态分散问题已确认，只读派生可降低行为回归风险 |
 | 条件性串行写入保护 | 待定 | 应在 canonical 收敛后根据残留 interleaving 再决定 |
 | 后台任务元数据持久化 | 待定 | 依赖 canonical 收敛完成后评估 |
 | 双重真相收敛时机 | 待定 | 应建立在 Tier 1 收敛之上，不宜提前 |
-| 分层存储不应照搬 | 初步共识 | Obsidian 单库场景无需求 |
-| 流单例可接受 | 初步共识 | 仅需改善用户提示 |
-| 会话 GC 不迫切 | 初步共识 | 侧边栏对话规模有限 |
+| 分层存储不应照搬 | 作者判断 | Obsidian 单库场景无需求 |
+| 流单例可接受 | 作者判断 | 仅需改善用户提示 |
+| 会话 GC 不迫切 | 作者判断 | 侧边栏对话规模有限 |
 
 ---
 
