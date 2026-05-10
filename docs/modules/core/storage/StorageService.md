@@ -100,6 +100,8 @@ class StorageService {
 
 `backgroundTaskMetadata` 只作为会话级 background-task lifecycle 恢复缓存随完整 session JSON 保存和读取；它不进入 conversation list sidecar，也不承载 assistant 正文、工具输出、结构化 payload 或 `contentBlocks` 真值。
 
+保存完整 conversation 前，`StorageService` 会对已有 `sessions/{id}.json` 做一个窄范围 stale-overwrite guard：如果待保存对象的 message 列表为空或只是磁盘中完整 message 列表的前缀，则保存新的 metadata 字段但保留磁盘中的完整 messages。这个保护只防止旧 full-message 快照覆盖新消息，不做任意历史分叉合并；如果 message id 序列已经分叉，会记录诊断并按调用方传入对象保存。
+
 完整消息的磁盘真值仍是 `sessions/{id}.json`。内存层现在可以通过 `ConversationFullMessageCache` 把未 pin 的 `Conversation.messages` 裁剪为空数组；下一次打开该 conversation 时会再走 `loadFullConversation(id)` 从磁盘恢复完整消息。
 
 读取分成两条路径：

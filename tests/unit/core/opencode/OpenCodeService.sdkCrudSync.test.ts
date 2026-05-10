@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 async function flushSyncEventBatch(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await new Promise((resolve) => setTimeout(resolve, 100));
   await Promise.resolve();
   await Promise.resolve();
 }

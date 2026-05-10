@@ -5,9 +5,11 @@ import type {
 import {
   type ConversationSyncRuntime,
   ConversationSyncRuntimeCoordinator,
+  type ConversationSyncRuntimeCoordinatorOptions,
 } from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
 import {
   createInitialTabSessionLifecycleState,
+  transitionTabSessionLifecycle,
 } from '../../../../src/features/chat/services/TabSessionPhase';
 
 describe('ConversationSyncRuntimeCoordinator', () => {
@@ -34,6 +36,7 @@ describe('ConversationSyncRuntimeCoordinator', () => {
     activeTabId?: string | null;
     runtime?: Partial<ConversationSyncRuntime> | null;
     fingerprint?: string;
+    coordinatorOptions?: ConversationSyncRuntimeCoordinatorOptions;
   }) {
     const runtime: ConversationSyncRuntime | null = options?.runtime === null
       ? null
@@ -47,20 +50,32 @@ describe('ConversationSyncRuntimeCoordinator', () => {
     const getConversationSyncFingerprint = jest.fn().mockReturnValue(
       options?.fingerprint ?? 'derived-fingerprint',
     );
-    const transitionTabSessionLifecycle = jest.fn().mockReturnValue(true);
-
-    const service = new ConversationSyncRuntimeCoordinator({
-      getActiveTabId: jest.fn().mockReturnValue(options?.activeTabId ?? 'tab-1'),
-      getTabRuntimeState: jest.fn().mockImplementation(() => runtime),
-      getConversationSyncFingerprint,
-      transitionTabSessionLifecycle,
+    const transitionLifecycle = jest.fn().mockImplementation((_tabId, phase, reason) => {
+      if (runtime) {
+        runtime.tabSessionLifecycle = transitionTabSessionLifecycle(
+          runtime.tabSessionLifecycle,
+          phase,
+          reason,
+        );
+      }
+      return true;
     });
+
+    const service = new ConversationSyncRuntimeCoordinator(
+      {
+        getActiveTabId: jest.fn().mockReturnValue(options?.activeTabId ?? 'tab-1'),
+        getTabRuntimeState: jest.fn().mockImplementation(() => runtime),
+        getConversationSyncFingerprint,
+        transitionTabSessionLifecycle: transitionLifecycle,
+      },
+      options?.coordinatorOptions,
+    );
 
     return {
       service,
       runtime,
       getConversationSyncFingerprint,
-      transitionTabSessionLifecycle,
+      transitionTabSessionLifecycle: transitionLifecycle,
     };
   }
 
@@ -153,5 +168,73 @@ describe('ConversationSyncRuntimeCoordinator', () => {
     )).rejects.toThrow('sync failed');
 
     expect(runtime?.isConversationSyncInFlight).toBe(false);
+  });
+
+  it('reports a stuck syncing lock without clearing it automatically', async () => {
+    jest.useFakeTimers();
+    try {
+      const onSyncTimeout = jest.fn();
+      const { service, runtime } = createService({
+        coordinatorOptions: {
+          syncTimeoutMs: 25,
+          onSyncTimeout,
+          now: () => Date.now(),
+          setTimeout: (callback, delay) => setTimeout(callback, delay),
+          clearTimeout: (handle) => clearTimeout(handle),
+        },
+      });
+      const conversation = createConversation();
+      let releaseSync: (() => void) | null = null;
+
+      const sync = service.runVisibleConversationSync(
+        conversation,
+        () => new Promise<void>((resolve) => {
+          releaseSync = resolve;
+        }),
+      );
+      await Promise.resolve();
+
+      expect(runtime?.isConversationSyncInFlight).toBe(true);
+      await jest.advanceTimersByTimeAsync(25);
+
+      expect(onSyncTimeout).toHaveBeenCalledWith(expect.objectContaining({
+        tabId: 'tab-1',
+        conversationId: conversation.id,
+        openCodeSessionId: conversation.openCodeSessionId,
+        phase: 'syncing',
+        reason: 'conversation-sync-lock',
+        isStreaming: false,
+      }));
+      expect(runtime?.isConversationSyncInFlight).toBe(true);
+
+      releaseSync?.();
+      await sync;
+      expect(runtime?.isConversationSyncInFlight).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('clears the syncing timeout timer after a fast sync completes', async () => {
+    jest.useFakeTimers();
+    try {
+      const onSyncTimeout = jest.fn();
+      const { service } = createService({
+        coordinatorOptions: {
+          syncTimeoutMs: 25,
+          onSyncTimeout,
+          now: () => Date.now(),
+          setTimeout: (callback, delay) => setTimeout(callback, delay),
+          clearTimeout: (handle) => clearTimeout(handle),
+        },
+      });
+
+      await service.runVisibleConversationSync(createConversation(), async () => undefined);
+      await jest.advanceTimersByTimeAsync(25);
+
+      expect(onSyncTimeout).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

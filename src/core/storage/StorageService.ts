@@ -41,6 +41,8 @@ interface RuntimeState {
   managedServer: ManagedServerState | null;
 }
 
+type StoredConversationRecord = Conversation & { messageCount?: number };
+
 export type PersistedUiSettingsKey =
   | 'tabState'
   | 'settingsPanelScrollTop'
@@ -182,22 +184,26 @@ export class StorageService {
   /** Save conversation with all messages */
   async saveConversation(conversation: Conversation): Promise<void> {
     const conversationPath = this.getConversationPath(conversation.id);
+    const persistedConversation = await this.resolveConversationForPersistence(
+      conversation,
+      conversationPath,
+    );
     
     // Save full conversation data including messages
     const data = {
-      id: conversation.id,
-      title: conversation.title,
-      createdAt: conversation.createdAt,
-      updatedAt: conversation.updatedAt,
-      lastResponseAt: conversation.lastResponseAt,
-      titleGenerationStatus: conversation.titleGenerationStatus,
-      messageCount: conversation.messages.length,
-      openCodeSessionId: conversation.openCodeSessionId,
-      currentNote: conversation.currentNote,
-      externalContextPaths: conversation.externalContextPaths,
-      sessionSettings: normalizeConversationSessionSettings(conversation.sessionSettings),
-      backgroundTaskMetadata: conversation.backgroundTaskMetadata,
-      messages: conversation.messages,  // Save full messages with contentBlocks
+      id: persistedConversation.id,
+      title: persistedConversation.title,
+      createdAt: persistedConversation.createdAt,
+      updatedAt: persistedConversation.updatedAt,
+      lastResponseAt: persistedConversation.lastResponseAt,
+      titleGenerationStatus: persistedConversation.titleGenerationStatus,
+      messageCount: persistedConversation.messages.length,
+      openCodeSessionId: persistedConversation.openCodeSessionId,
+      currentNote: persistedConversation.currentNote,
+      externalContextPaths: persistedConversation.externalContextPaths,
+      sessionSettings: normalizeConversationSessionSettings(persistedConversation.sessionSettings),
+      backgroundTaskMetadata: persistedConversation.backgroundTaskMetadata,
+      messages: persistedConversation.messages,  // Save full messages with contentBlocks
     };
 
     await this.app.vault.adapter.write(
@@ -212,7 +218,7 @@ export class StorageService {
         updatedAt: conversation.updatedAt,
         lastResponseAt: conversation.lastResponseAt,
         titleGenerationStatus: conversation.titleGenerationStatus,
-        messageCount: conversation.messages.length,
+        messageCount: persistedConversation.messages.length,
         openCodeSessionId: conversation.openCodeSessionId,
       },
       'saveConversation',
@@ -379,6 +385,78 @@ export class StorageService {
     if (!exists) {
       await this.app.vault.adapter.mkdir(normalizePath(dir));
     }
+  }
+
+  private async resolveConversationForPersistence(
+    conversation: Conversation,
+    conversationPath: string,
+  ): Promise<Conversation> {
+    const storedConversation = await this.readStoredConversationForMerge(conversationPath);
+    if (!storedConversation) {
+      return conversation;
+    }
+
+    return this.mergeStoredMessagesIfIncomingLooksStale(conversation, storedConversation);
+  }
+
+  private async readStoredConversationForMerge(
+    conversationPath: string,
+  ): Promise<StoredConversationRecord | null> {
+    const normalizedPath = normalizePath(conversationPath);
+    try {
+      if (!(await this.app.vault.adapter.exists(normalizedPath))) {
+        return null;
+      }
+
+      const content = await this.app.vault.adapter.read(normalizedPath);
+      const parsed = JSON.parse(content) as Partial<StoredConversationRecord>;
+      if (!parsed || typeof parsed.id !== 'string' || !Array.isArray(parsed.messages)) {
+        return null;
+      }
+
+      return parsed as StoredConversationRecord;
+    } catch (error) {
+      logger.warn('Skipped stored conversation merge guard after read failure', {
+        conversationPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  private mergeStoredMessagesIfIncomingLooksStale(
+    incoming: Conversation,
+    stored: StoredConversationRecord,
+  ): Conversation {
+    if (
+      stored.id !== incoming.id
+      || stored.messages.length === 0
+      || incoming.messages.length >= stored.messages.length
+    ) {
+      return incoming;
+    }
+
+    const incomingIsStoredPrefix = incoming.messages.every((message, index) =>
+      typeof message.id === 'string'
+        && stored.messages[index]?.id === message.id);
+    if (!incomingIsStoredPrefix) {
+      logger.warn('Detected divergent conversation histories during saveConversation', {
+        conversationId: incoming.id,
+        incomingMessageCount: incoming.messages.length,
+        storedMessageCount: stored.messages.length,
+      });
+      return incoming;
+    }
+
+    logger.warn('Preserved stored full messages from stale conversation overwrite', {
+      conversationId: incoming.id,
+      incomingMessageCount: incoming.messages.length,
+      storedMessageCount: stored.messages.length,
+    });
+    return {
+      ...incoming,
+      messages: stored.messages,
+    };
   }
 
   private enqueueSettingsWrite(task: () => Promise<void>): Promise<void> {

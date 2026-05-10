@@ -233,6 +233,75 @@ describe('StorageService conversation persistence - saveConversation', () => {
   });
 });
 
+describe('StorageService conversation persistence - stale message guard', () => {
+  it('preserves stored full messages when an incoming conversation has stale prefix messages', async () => {
+      mockAdapter.exists.mockImplementation(async (path: string) =>
+        path === '.opencodian/sessions/conv-stale.json');
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        id: 'conv-stale',
+        title: 'Old title',
+        createdAt: 100,
+        updatedAt: 200,
+        openCodeSessionId: 'session-stale',
+        messages: [
+          { id: 'user-1', role: 'user', content: 'one', timestamp: 100 },
+          { id: 'assistant-1', role: 'assistant', content: 'two', timestamp: 150 },
+        ],
+      }));
+
+      await storage.saveConversation({
+        id: 'conv-stale',
+        title: 'New title',
+        createdAt: 100,
+        updatedAt: 300,
+        openCodeSessionId: 'session-stale',
+        messages: [
+          { id: 'user-1', role: 'user', content: 'one', timestamp: 100 },
+        ],
+      } as never);
+
+      const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      expect(savedData.title).toBe('New title');
+      expect(savedData.updatedAt).toBe(300);
+      expect(savedData.messages.map((message: { id: string }) => message.id)).toEqual([
+        'user-1',
+        'assistant-1',
+      ]);
+      expect(savedData.messageCount).toBe(2);
+  });
+
+  it('does not merge stored messages when incoming and stored histories diverge', async () => {
+      mockAdapter.exists.mockImplementation(async (path: string) =>
+        path === '.opencodian/sessions/conv-diverged.json');
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        id: 'conv-diverged',
+        title: 'Stored',
+        createdAt: 100,
+        updatedAt: 200,
+        openCodeSessionId: 'session-diverged',
+        messages: [
+          { id: 'user-stored', role: 'user', content: 'stored', timestamp: 100 },
+        ],
+      }));
+
+      await storage.saveConversation({
+        id: 'conv-diverged',
+        title: 'Incoming',
+        createdAt: 100,
+        updatedAt: 300,
+        openCodeSessionId: 'session-diverged',
+        messages: [
+          { id: 'user-incoming', role: 'user', content: 'incoming', timestamp: 100 },
+        ],
+      } as never);
+
+      const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      expect(savedData.messages.map((message: { id: string }) => message.id)).toEqual([
+        'user-incoming',
+      ]);
+  });
+});
+
 describe('StorageService conversation persistence - loadConversation', () => {
   it('should load conversation metadata', async () => {
       const mockData = JSON.stringify({
