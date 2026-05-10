@@ -69,7 +69,8 @@ export interface SendPipelineHostDependencies {
   convertToStreamingChunk: SendPipelineHost['convertToStreamingChunk'];
   getFriendlyStreamErrorMessage(rawMessage: string): string;
   createSendPipelineShellPort(): import('./SendPipelineTypes').SendPipelineShellPort;
-  saveConversation: SendPipelineHost['saveConversation'];
+  createConversationWriteTicket: SendPipelineHost['createConversationWriteTicket'];
+  commitConversationWrite: SendPipelineHost['commitConversationWrite'];
   summarizeContentBlocksForDebug(blocks: SendPipelineDebugContentBlock[] | undefined): Record<string, unknown> | null;
   summarizeCoreStreamChunkForDebug: SendPipelineHost['summarizeCoreStreamChunkForDebug'];
   summarizeChatMessageForDebug: SendPipelineHost['summarizeChatMessageForDebug'];
@@ -110,7 +111,10 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
   };
   const shellPort: SendPipelineShellPort = deps.createSendPipelineShellPort();
   const persistencePort: SendPipelinePersistencePort = {
-    saveConversation: (conversation) => deps.saveConversation(conversation),
+    createConversationWriteTicket: (conversationId) =>
+      deps.createConversationWriteTicket(conversationId),
+    commitConversationWrite: (conversation, ticket, reason, write) =>
+      deps.commitConversationWrite(conversation, ticket, reason, write),
   };
   const debugPort: SendPipelineDebugPort = {
     summarizeContentBlocksForDebug: (blocks) =>

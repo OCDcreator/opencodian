@@ -147,11 +147,20 @@ describe('createMessageSendPreparationHost', () => {
       getCurrentConversation: jest.fn().mockReturnValue(createConversation()),
       createNewConversation: jest.fn().mockResolvedValue(null),
       saveConversation: jest.fn().mockResolvedValue(undefined),
+      createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+        conversationId,
+        version: 0,
+      })),
+      commitConversationWrite: jest.fn().mockImplementation(async (_conversation, _ticket, _reason, write) => {
+        await write();
+        return true;
+      }),
       getActiveTabId: jest.fn().mockReturnValue('tab-1'),
       ensureTabRuntimeState: jest.fn().mockReturnValue({}),
       isTabForegroundBusy: jest.fn().mockReturnValue(false),
       conversationTabRuntimeCoordinator: {
         setAutoScrollEnabled: jest.fn(),
+        transitionTabSessionLifecycle: jest.fn().mockReturnValue(true),
         setStreaming: jest.fn(),
         clearPendingEditedFiles: jest.fn(),
         queueFollowUpSend: jest.fn().mockReturnValue(false),

@@ -47,7 +47,7 @@ export function createHost(
   conversation: Conversation,
   overrides: Partial<MockedMessageFinalizationHost> = {},
 ): MockedMessageFinalizationHost {
-  return {
+  const host: MockedMessageFinalizationHost = {
     getCurrentConversation: jest.fn().mockReturnValue(conversation),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
     syncConversationMessagesFromCanonicalState: jest.fn().mockResolvedValue(null),
@@ -64,6 +64,20 @@ export function createHost(
     appendTurnDiffNoticeIfNeeded: jest.fn().mockResolvedValue(undefined),
     refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
     saveConversation: jest.fn().mockResolvedValue(undefined),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (
+      targetConversation: Conversation,
+      _ticket,
+      _reason,
+      write,
+    ) => {
+      await write();
+      await host.saveConversation(targetConversation);
+      return true;
+    }),
     setConversationSyncInFlight: jest.fn(),
     setLastConversationSyncFingerprint: jest.fn(),
     clearPendingEditedFiles: jest.fn(),
@@ -85,4 +99,5 @@ export function createHost(
     scrollToBottom: jest.fn(),
     ...overrides,
   };
+  return host;
 }

@@ -51,14 +51,29 @@ function createRuntime(overrides: Partial<SendPipelineTabRuntime> = {}): SendPip
 }
 
 function createHost(): jest.Mocked<LocalStreamPersistenceHost> {
-  return {
+  const host: jest.Mocked<LocalStreamPersistenceHost> = {
     saveConversation: jest.fn().mockResolvedValue(undefined),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (
+      conversation: Conversation,
+      _ticket,
+      _reason,
+      write,
+    ) => {
+      await write();
+      await host.saveConversation(conversation);
+      return true;
+    }),
     summarizeChatMessageForDebug: jest.fn().mockImplementation((message: ChatMessage | null | undefined) => (
       message ? { id: message.id, role: message.role } : null
     )),
     stringifyLogPayload: jest.fn().mockImplementation((payload: unknown) => JSON.stringify(payload)),
     getLogPreview: jest.fn().mockImplementation((text: string) => text),
   };
+  return host;
 }
 
 function createOutcome(overrides: Partial<LocalStreamOutcome> = {}): LocalStreamOutcome {
@@ -137,6 +152,37 @@ describe('persistLocalStreamOutcome canonical cache boundary', () => {
       sourceMessageId: 'assistant-1',
     });
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('skips local finalization side effects when the serialized commit is stale', async () => {
+    const conversation = createConversation();
+    const host = createHost();
+    host.commitConversationWrite.mockResolvedValue(false);
+    const logStage = jest.fn();
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime(),
+      outcome: createOutcome({
+        shouldSyncFromServer: false,
+        shouldPersistInterruptedState: true,
+        streamedTextContent: 'Partial',
+        streamContentBlocks: [{ type: 'text', content: 'Partial' }],
+      }),
+      logAssistantFinalizationStage: logStage,
+    });
+
+    expect(conversation.messages).toHaveLength(0);
+    expect(host.saveConversation).not.toHaveBeenCalled();
+    expect(logStage).toHaveBeenCalledWith('local-stream-finalization-write-skipped', {
+      conversationId: conversation.id,
+      messageCount: 0,
+    });
+    expect(logStage).not.toHaveBeenCalledWith(
+      'conversation-saved-after-local-finalization',
+      expect.anything(),
+    );
   });
 
   it('persists question resolution decoration so authoritative merge can preserve it', async () => {

@@ -7,6 +7,7 @@ import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import { ConversationAuthoritativeMessageMergeCoordinator } from './ConversationAuthoritativeMessageMergeCoordinator';
 import { ConversationAuthoritativeReloadCoordinator } from './ConversationAuthoritativeReloadCoordinator';
+import type { ConversationWriteTicket } from './ConversationWriteSerializationService';
 
 const logger = createLogger('OpenCodianView');
 
@@ -26,6 +27,7 @@ interface HydratedUserMessageMismatchContext {
 
 interface HydratedOptimisticUserMessageUpdate {
   conversation: Conversation;
+  ticket: ConversationWriteTicket;
   optimisticIndex: number;
   optimisticMessage: ChatMessage;
   mergedHydratedMessage: ChatMessage;
@@ -71,7 +73,13 @@ export interface ConversationAuthoritativeSyncHost {
     conversation: Conversation,
     messages: ChatMessage[],
   ): string;
-  saveConversation(conversation: Conversation): Promise<void>;
+  createConversationWriteTicket(conversationId: string): ConversationWriteTicket;
+  commitConversationWrite(
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ): Promise<boolean>;
   logOmoBackgroundTaskDiagnostics(
     conversation: Conversation,
     previousMessages: ChatMessage[],
@@ -139,6 +147,7 @@ export class ConversationAuthoritativeSyncCoordinator {
     }
 
     try {
+      const ticket = this.host.createConversationWriteTicket(conversation.id);
       const hydration = await this.getLatestServerUserMessageHydration(sessionId);
       if (!hydration) {
         return;
@@ -184,6 +193,7 @@ export class ConversationAuthoritativeSyncCoordinator {
 
       await this.applyHydratedOptimisticUserMessage({
         conversation,
+        ticket,
         optimisticIndex,
         optimisticMessage,
         mergedHydratedMessage,
@@ -341,12 +351,24 @@ export class ConversationAuthoritativeSyncCoordinator {
   ): Promise<void> {
     const {
       conversation,
+      ticket,
       optimisticIndex,
       optimisticMessage,
       mergedHydratedMessage,
       tabId,
     } = update;
-    conversation.messages.splice(optimisticIndex, 1, mergedHydratedMessage);
+    const writeApplied = await this.host.commitConversationWrite(
+      conversation,
+      ticket,
+      'latest-user-hydration',
+      () => {
+        conversation.messages.splice(optimisticIndex, 1, mergedHydratedMessage);
+      },
+    );
+    if (!writeApplied) {
+      return;
+    }
+
     this.host.armBackgroundTaskIndicatorForUserMessage(mergedHydratedMessage, tabId);
     this.host.updateHydratedUserMessageRuntimeAnchors(
       conversation,
@@ -354,7 +376,6 @@ export class ConversationAuthoritativeSyncCoordinator {
       mergedHydratedMessage,
       tabId,
     );
-    await this.host.saveConversation(conversation);
 
     if (
       this.host.getCurrentConversationId() !== conversation.id

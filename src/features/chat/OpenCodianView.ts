@@ -210,6 +210,10 @@ import {
   ConversationSyncRuntimeCoordinator,
 } from './services/ConversationSyncRuntimeCoordinator';
 import {
+  ConversationWriteSerializationService,
+  type ConversationWriteTicket,
+} from './services/ConversationWriteSerializationService';
+import {
   type ConversationTabLifecycleRecoveryHost,
 } from './services/ConversationTabLifecycleRecoveryCoordinator';
 import {
@@ -480,6 +484,7 @@ export class OpenCodianView extends ItemView {
   private contextRingContainerEl: HTMLElement | null = null;
 
   private readonly scrollScheduler = new SettledScrollScheduler();
+  private readonly conversationWriteSerializationService = new ConversationWriteSerializationService();
   private chatSurfaceAppearanceCoordinator: ChatSurfaceAppearanceCoordinator;
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
@@ -609,6 +614,29 @@ export class OpenCodianView extends ItemView {
         new Notice(message);
       },
     };
+  }
+
+  private createConversationWriteTicket(conversationId: string): ConversationWriteTicket {
+    return this.conversationWriteSerializationService.createTicket(conversationId);
+  }
+
+  private async commitConversationWrite(
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ): Promise<boolean> {
+    const result = await this.conversationWriteSerializationService.commit({
+      conversation,
+      ticket,
+      reason,
+      write: async () => {
+        await write();
+        await this.plugin.saveConversation(conversation);
+      },
+    });
+
+    return result.applied;
   }
 
   private createConversationHistoryActionsHost(
@@ -1649,7 +1677,10 @@ export class OpenCodianView extends ItemView {
           await this.createNewConversation();
           return this.currentConversation;
         },
-        saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+        createConversationWriteTicket: (conversationId) =>
+          this.createConversationWriteTicket(conversationId),
+        commitConversationWrite: (conversation, ticket, reason, write) =>
+          this.commitConversationWrite(conversation, ticket, reason, write),
         getActiveTabId: () => this.getActiveTabId(),
         ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
         isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
@@ -1698,7 +1729,10 @@ export class OpenCodianView extends ItemView {
         backgroundTaskHost: this.backgroundTaskHost,
         conversationNoticeCoordinator: this.conversationNoticeCoordinator,
         sessionTodoCoordinator: this.sessionTodoCoordinator,
-        saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+        createConversationWriteTicket: (conversationId) =>
+          this.createConversationWriteTicket(conversationId),
+        commitConversationWrite: (conversation, ticket, reason, write) =>
+          this.commitConversationWrite(conversation, ticket, reason, write),
         conversationTabRuntimeCoordinator: this.conversationTabRuntimeCoordinator,
         setTabNeedsAttention: (tabId, needsAttention) =>
           this.setTabNeedsAttention(tabId, needsAttention),
@@ -2134,7 +2168,10 @@ export class OpenCodianView extends ItemView {
           conversation,
           messages,
         ),
-      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      createConversationWriteTicket: (conversationId) =>
+        this.createConversationWriteTicket(conversationId),
+      commitConversationWrite: (conversation, ticket, reason, write) =>
+        this.commitConversationWrite(conversation, ticket, reason, write),
       logOmoBackgroundTaskDiagnostics: (conversation, previousMessages, nextMessages) => {
         this.backgroundTaskHost.logOmoBackgroundTaskDiagnostics(
           conversation, previousMessages, nextMessages,
@@ -2396,7 +2433,10 @@ export class OpenCodianView extends ItemView {
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
       getFriendlyStreamErrorMessage: (rawMessage) => this.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage),
       createSendPipelineShellPort: () => this.assistantShellViewHostAdapter.createSendPipelineShellPort(),
-      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      createConversationWriteTicket: (conversationId) =>
+        this.createConversationWriteTicket(conversationId),
+      commitConversationWrite: (conversation, ticket, reason, write) =>
+        this.commitConversationWrite(conversation, ticket, reason, write),
       summarizeContentBlocksForDebug: (blocks) =>
         summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
       summarizeCoreStreamChunkForDebug: (chunk) => summarizeCoreStreamChunkForDebug(chunk),

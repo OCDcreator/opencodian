@@ -149,7 +149,7 @@ function createHost(
   runtime.streamingMessageEl = messageEl;
   runtime.streamingContentEl = contentEl;
 
-  return {
+  const host: MockedSendPipelineHost = {
     getTabRuntimeState: jest.fn().mockReturnValue(runtime),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
     shouldAutoScroll: jest.fn().mockReturnValue(true),
@@ -179,11 +179,22 @@ function createHost(
     finalizeBackgroundTaskIndicatorAfterPrimaryStream: jest.fn().mockResolvedValue(undefined),
     removeEmptyAssistantShells: jest.fn(),
     syncTabStreamLikeState: jest.fn(),
+    transitionTabSessionLifecycle: jest.fn().mockReturnValue(true),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
     saveConversation: jest.fn().mockResolvedValue(undefined),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (conversation, _ticket, _reason, write) => {
+      await write();
+      await host.saveConversation(conversation);
+      return true;
+    }),
     summarizeChatMessageForDebug: jest.fn().mockReturnValue(null),
     stringifyLogPayload: jest.fn().mockImplementation((payload: unknown) => JSON.stringify(payload)),
   };
+  return host;
 }
 
 describe('SendPipelineRuntime agent invocation', () => {

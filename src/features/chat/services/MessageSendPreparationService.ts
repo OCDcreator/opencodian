@@ -25,6 +25,7 @@ import { getPromptContextTargetKey } from '../composerContext';
 import type { SendPipelineStreamElements } from '../runtime/SendPipelineTypes';
 import type { TabId } from '../tabs';
 import type { ComposerSendContextPort } from './ComposerContextViewFacade';
+import type { ConversationWriteTicket } from './ConversationWriteSerializationService';
 import type { WritableTabSessionPhase } from './TabSessionPhase';
 
 const logger = createLogger('MessageSendPreparationService');
@@ -165,7 +166,13 @@ export interface MessageSendPreparationHost {
   resetBackgroundTaskIndicator(tabId: TabId | null): void;
   armBackgroundTaskIndicatorForUserMessage(message: ChatMessage, tabId: TabId | null): void;
   startConversationSyncLoop(): void;
-  saveConversation(conversation: Conversation): Promise<void>;
+  createConversationWriteTicket(conversationId: string): ConversationWriteTicket;
+  commitConversationWrite(
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ): Promise<boolean>;
   setAutoScrollEnabled(tabId: TabId | null, enabled: boolean): void;
   transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   renderMessage(message: ChatMessage): Promise<unknown>;
@@ -186,7 +193,13 @@ export interface MessageSendPreparationHost {
 export interface MessageSendPreparationHostDependencies {
   getCurrentConversation: () => Conversation | null;
   createNewConversation: () => Promise<Conversation | null>;
-  saveConversation: (conversation: Conversation) => Promise<void>;
+  createConversationWriteTicket: (conversationId: string) => ConversationWriteTicket;
+  commitConversationWrite: (
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ) => Promise<boolean>;
   getActiveTabId: () => TabId | null;
   ensureTabRuntimeState: (tabId: TabId) => unknown;
   isTabForegroundBusy: (tabId: TabId) => boolean;
@@ -331,16 +344,28 @@ export class MessageSendPreparationService {
       ...(resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
     });
     const userMessage = buildOptimisticUserMessage(options.content, contextItems, Date.now(), { optimisticUserParts: structuredSend.optimisticUserParts });
+    const writeTicket = this.host.createConversationWriteTicket(conversation.id);
+    const writeApplied = await this.host.commitConversationWrite(
+      conversation,
+      writeTicket,
+      'optimistic-user-message',
+      () => {
+        conversation.messages.push(userMessage);
+        conversation.updatedAt = userMessage.timestamp;
+      },
+    );
+    if (!writeApplied) {
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
+
     this.host.seedCanonicalUserMessage({
       sessionID: conversation.openCodeSessionId, messageID: structuredSend.messageID,
       parts: structuredSend.optimisticUserParts, timestamp: userMessage.timestamp,
     });
     this.host.resetBackgroundTaskIndicator(tabId);
     this.host.armBackgroundTaskIndicatorForUserMessage(userMessage, tabId);
-    conversation.messages.push(userMessage);
-    conversation.updatedAt = userMessage.timestamp;
     this.host.startConversationSyncLoop();
-    await this.host.saveConversation(conversation);
     this.host.setAutoScrollEnabled(tabId, true);
     await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
@@ -556,7 +581,10 @@ export function createMessageSendPreparationHost(
     resetBackgroundTaskIndicator: (tabId) => backgroundTaskHost.resetBackgroundTaskIndicator(tabId),
     armBackgroundTaskIndicatorForUserMessage: (message, tabId) => backgroundTaskHost.armBackgroundTaskIndicatorForUserMessage(message, tabId),
     startConversationSyncLoop: () => conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
-    saveConversation: (conversation) => deps.saveConversation(conversation),
+    createConversationWriteTicket: (conversationId) =>
+      deps.createConversationWriteTicket(conversationId),
+    commitConversationWrite: (conversation, ticket, reason, write) =>
+      deps.commitConversationWrite(conversation, ticket, reason, write),
     setAutoScrollEnabled: (tabId, enabled) => tabRuntime.setAutoScrollEnabled(tabId, enabled),
     transitionTabSessionLifecycle: (tabId, phase, reason) =>
       tabRuntime.transitionTabSessionLifecycle(tabId, phase, reason),

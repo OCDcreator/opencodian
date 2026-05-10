@@ -77,7 +77,7 @@ export function createHost(
   callOrder: string[] = [],
   overrides: Partial<MockedMessageSendPreparationHost> = {},
 ): MockedMessageSendPreparationHost {
-  return {
+  const host: MockedMessageSendPreparationHost = {
     ensureConversationReady: jest.fn().mockResolvedValue(conversation),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
     ensureTabRuntime: jest.fn().mockReturnValue(true),
@@ -110,7 +110,25 @@ export function createHost(
     armBackgroundTaskIndicatorForUserMessage: jest.fn().mockImplementation(() => { callOrder.push('armBackgroundTaskIndicatorForUserMessage'); }),
     startConversationSyncLoop: jest.fn().mockImplementation(() => { callOrder.push('startConversationSyncLoop'); }),
     saveConversation: jest.fn().mockImplementation(async () => { callOrder.push('saveConversation'); }),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (
+      targetConversation: Conversation,
+      _ticket,
+      _reason,
+      write,
+    ) => {
+      await write();
+      await host.saveConversation(targetConversation);
+      return true;
+    }),
     setAutoScrollEnabled: jest.fn().mockImplementation(() => { callOrder.push('setAutoScrollEnabled'); }),
+    transitionTabSessionLifecycle: jest.fn().mockImplementation((_tabId, phase) => {
+      callOrder.push(`transitionTabSessionLifecycle:${phase}`);
+      return true;
+    }),
     renderMessage: jest.fn().mockImplementation(async () => { callOrder.push('renderMessage'); }),
     scrollToBottom: jest.fn().mockImplementation(() => { callOrder.push('scrollToBottom'); }),
     applyFallbackConversationTitle: jest.fn().mockImplementation(async () => { callOrder.push('applyFallbackConversationTitle'); }),
@@ -122,4 +140,5 @@ export function createHost(
     clearPendingEditedFiles: jest.fn().mockImplementation(() => { callOrder.push('clearPendingEditedFiles'); }),
     ...overrides,
   };
+  return host;
 }

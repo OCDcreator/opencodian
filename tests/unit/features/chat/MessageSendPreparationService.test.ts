@@ -172,19 +172,48 @@ describe('MessageSendPreparationService optimistic preparation', () => {
     expect(conversation.messages[0]).toBe(result?.userMessage);
     expect(conversation.updatedAt).toBe(result?.userMessage.timestamp);
     expect(callOrder).toEqual([
+      'transitionTabSessionLifecycle:preparing',
       'refreshSettingsTabStatus',
       'ensureSelectedModelAvailable',
+      'saveConversation',
       'seedCanonicalUserMessage',
       'resetBackgroundTaskIndicator',
       'armBackgroundTaskIndicatorForUserMessage',
       'startConversationSyncLoop',
-      'saveConversation',
       'setAutoScrollEnabled',
       'renderMessage',
       'scrollToBottom',
       'applyFallbackConversationTitle',
       'startAiConversationTitleGeneration',
     ]);
+  });
+
+  it('aborts optimistic user write side effects when the serialized commit is skipped', async () => {
+    const callOrder: string[] = [];
+    const conversation = createConversation();
+    const host = createHost(conversation, callOrder, {
+      commitConversationWrite: jest.fn().mockResolvedValue(false),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext(callOrder));
+
+    const result = await service.prepareMessageSend({ content: 'Hello' });
+
+    expect(result).toBeNull();
+    expect(conversation.messages).toHaveLength(0);
+    expect(host.createConversationWriteTicket).toHaveBeenCalledWith(conversation.id);
+    expect(host.commitConversationWrite).toHaveBeenCalledWith(
+      conversation,
+      expect.objectContaining({ conversationId: conversation.id }),
+      'optimistic-user-message',
+      expect.any(Function),
+    );
+    expect(host.seedCanonicalUserMessage).not.toHaveBeenCalled();
+    expect(host.renderMessage).not.toHaveBeenCalled();
+    expect(host.transitionTabSessionLifecycle).toHaveBeenCalledWith(
+      'tab-1',
+      'idle',
+      'send-preflight-aborted',
+    );
   });
 
   it('resolves persistent conversation context paths and merges them with draft context', async () => {
@@ -319,6 +348,7 @@ describe('MessageSendPreparationService optimistic preparation', () => {
     service.completePreparedStreamStart('tab-1');
 
     expect(callOrder).toEqual([
+      'transitionTabSessionLifecycle:streaming',
       'setStreaming',
       'syncTabStreamLikeState',
       'beginTabContextUsageStream',

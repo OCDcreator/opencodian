@@ -62,7 +62,8 @@ type ConversationAuthoritativeReloadHost = Pick<
   | 'logOmoBackgroundTaskDiagnostics'
   | 'markBackgroundTaskAuthoritativeSync'
   | 'refreshContextUsageAfterActiveConversationSync'
-  | 'saveConversation'
+  | 'createConversationWriteTicket'
+  | 'commitConversationWrite'
   | 'shouldRenderConversationMessage'
   | 'stringifyLogPayload'
   | 'summarizeChatMessageForDebug'
@@ -100,6 +101,7 @@ export class ConversationAuthoritativeReloadCoordinator {
   ): Promise<ConversationAuthoritativeSyncResult> {
     const verbose = !options?.suppressVerboseLogs;
     try {
+      const ticket = this.host.createConversationWriteTicket(conversation.id);
       const syncContext = { conversation, tabId, reason, verbose };
       this.logConversationServerSyncBegin(syncContext);
       const snapshot = await this.getConversationServerSyncSnapshot(conversation);
@@ -111,11 +113,16 @@ export class ConversationAuthoritativeReloadCoordinator {
       );
       const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
 
-      await this.applyConversationServerSyncMessages(
+      const writeApplied = await this.applyConversationServerSyncMessages(
         conversation,
+        ticket,
         syncMerge.merged,
         syncMerge.cacheWritebackChanged,
+        'authoritative-server-sync',
       );
+      if (!writeApplied) {
+        return this.buildSkippedConversationServerSyncResult(conversation);
+      }
 
       this.host.markBackgroundTaskAuthoritativeSync(tabId, reason);
 
@@ -165,6 +172,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     }
 
     const verbose = !options?.suppressVerboseLogs;
+    const ticket = this.host.createConversationWriteTicket(conversation.id);
     const syncContext = { conversation, tabId, reason, verbose };
     const snapshot: ConversationServerSyncSnapshot = {
       serverMessages: canonicalMessages,
@@ -181,11 +189,16 @@ export class ConversationAuthoritativeReloadCoordinator {
       snapshot.convertedServerMessages,
     );
     const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
-    await this.applyConversationServerSyncMessages(
+    const writeApplied = await this.applyConversationServerSyncMessages(
       conversation,
+      ticket,
       syncMerge.merged,
       syncMerge.cacheWritebackChanged,
+      'authoritative-canonical-sync',
     );
+    if (!writeApplied) {
+      return this.buildSkippedConversationServerSyncResult(conversation);
+    }
 
     this.host.markBackgroundTaskAuthoritativeSync(tabId, reason);
     await this.host.refreshContextUsageAfterActiveConversationSync(conversation, tabId);
@@ -486,16 +499,30 @@ export class ConversationAuthoritativeReloadCoordinator {
 
   private async applyConversationServerSyncMessages(
     conversation: Conversation,
+    ticket: ReturnType<ConversationAuthoritativeReloadHost['createConversationWriteTicket']>,
     merged: ChatMessage[],
     changed: boolean,
-  ): Promise<void> {
-    conversation.messages = merged;
-    if (!changed) {
-      return;
-    }
+    reason: string,
+  ): Promise<boolean> {
+    return this.host.commitConversationWrite(conversation, ticket, reason, () => {
+      conversation.messages = merged;
+      if (changed) {
+        conversation.updatedAt = Date.now();
+      }
+    });
+  }
 
-    conversation.updatedAt = Date.now();
-    await this.host.saveConversation(conversation);
+  private buildSkippedConversationServerSyncResult(
+    conversation: Conversation,
+  ): ConversationAuthoritativeSyncResult {
+    return {
+      messages: conversation.messages,
+      changed: false,
+      fingerprint: this.host.getConversationSyncFingerprint(conversation.messages),
+      revertState: this.host.getCurrentConversationId() === conversation.id
+        ? this.host.getCurrentConversationRevertState()
+        : null,
+    };
   }
 
   private logConversationServerSyncComplete(

@@ -25,7 +25,7 @@ export async function persistLocalStreamOutcome(options: {
     logAssistantFinalizationStage,
   } = options;
 
-  let persistedLocalMessage = false;
+  let persistLocalMessage: (() => void) | null = null;
 
   if (outcome.hasStreamContentBlocks && outcome.streamContentBlocks) {
     const shouldPersistAssistantMessage = shouldPersistLocalAssistantMessage(
@@ -59,41 +59,60 @@ export async function persistLocalStreamOutcome(options: {
       logInterruptedAssistantPersistence(host, preparedSend, assistantMessage);
     }
 
-    writeShellDataset(runtime.streamingMessageEl, assistantMessage);
-    preparedSend.conversation.messages.push(assistantMessage);
-    persistedLocalMessage = true;
-    logAssistantFinalizationStage('local-assistant-message-appended', {
-      conversationMessageCount: preparedSend.conversation.messages.length,
-      message: host.summarizeChatMessageForDebug(assistantMessage),
-    });
+    persistLocalMessage = () => {
+      writeShellDataset(runtime.streamingMessageEl, assistantMessage);
+      preparedSend.conversation.messages.push(assistantMessage);
+      logAssistantFinalizationStage('local-assistant-message-appended', {
+        conversationMessageCount: preparedSend.conversation.messages.length,
+        message: host.summarizeChatMessageForDebug(assistantMessage),
+      });
+    };
   } else if (outcome.streamErrorNoticeMessage) {
-    appendNoticeMessage({
-      conversation: preparedSend.conversation,
-      host,
-      message: outcome.streamErrorNoticeMessage,
-      logAssistantFinalizationStage,
-      stage: 'local-error-notice-appended',
-    });
-    persistedLocalMessage = true;
+    persistLocalMessage = () => {
+      appendNoticeMessage({
+        conversation: preparedSend.conversation,
+        host,
+        message: outcome.streamErrorNoticeMessage as ChatMessage,
+        logAssistantFinalizationStage,
+        stage: 'local-error-notice-appended',
+      });
+    };
   } else if (outcome.interruptedNoticeMessage) {
     logInterruptedNoticePersistence(host, preparedSend, outcome.interruptedNoticeMessage);
-    appendNoticeMessage({
-      conversation: preparedSend.conversation,
-      host,
-      message: outcome.interruptedNoticeMessage,
-      logAssistantFinalizationStage,
-      stage: 'local-interrupted-notice-appended',
-    });
-    persistedLocalMessage = true;
+    persistLocalMessage = () => {
+      appendNoticeMessage({
+        conversation: preparedSend.conversation,
+        host,
+        message: outcome.interruptedNoticeMessage as ChatMessage,
+        logAssistantFinalizationStage,
+        stage: 'local-interrupted-notice-appended',
+      });
+    };
   }
 
-  if (!persistedLocalMessage) {
+  if (!persistLocalMessage) {
     return;
   }
 
-  preparedSend.conversation.updatedAt = outcome.finalizedTimestamp;
-  preparedSend.conversation.lastResponseAt = outcome.finalizedTimestamp;
-  await host.saveConversation(preparedSend.conversation);
+  const writeTicket = host.createConversationWriteTicket(preparedSend.conversation.id);
+  const writeApplied = await host.commitConversationWrite(
+    preparedSend.conversation,
+    writeTicket,
+    'local-stream-finalization',
+    () => {
+      persistLocalMessage?.();
+      preparedSend.conversation.updatedAt = outcome.finalizedTimestamp;
+      preparedSend.conversation.lastResponseAt = outcome.finalizedTimestamp;
+    },
+  );
+  if (!writeApplied) {
+    logAssistantFinalizationStage('local-stream-finalization-write-skipped', {
+      conversationId: preparedSend.conversation.id,
+      messageCount: preparedSend.conversation.messages.length,
+    });
+    return;
+  }
+
   logAssistantFinalizationStage('conversation-saved-after-local-finalization', {
     updatedAt: preparedSend.conversation.updatedAt,
     lastResponseAt: preparedSend.conversation.lastResponseAt ?? null,

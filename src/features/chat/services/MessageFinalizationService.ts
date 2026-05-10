@@ -6,6 +6,7 @@ import type {
 import { t } from '../../../i18n';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { TabId } from '../tabs';
+import type { ConversationWriteTicket } from './ConversationWriteSerializationService';
 
 export interface ShouldSyncAfterStreamOptions {
   streamCompleted: boolean;
@@ -88,7 +89,13 @@ export interface MessageFinalizationHost {
     sessionId: string | undefined,
     options: { suppressErrors?: boolean },
   ): Promise<SessionTodo[]>;
-  saveConversation(conversation: Conversation): Promise<void>;
+  createConversationWriteTicket(conversationId: string): ConversationWriteTicket;
+  commitConversationWrite(
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ): Promise<boolean>;
   setConversationSyncInFlight(tabId: TabId | null, value: boolean): void;
   setLastConversationSyncFingerprint(tabId: TabId | null, fingerprint: string): void;
   clearPendingEditedFiles(tabId: TabId | null): void;
@@ -142,7 +149,13 @@ export interface MessageFinalizationHostDependencies {
       options: { suppressErrors?: boolean },
     ): Promise<SessionTodo[]>;
   };
-  saveConversation: (conversation: Conversation) => Promise<void>;
+  createConversationWriteTicket: (conversationId: string) => ConversationWriteTicket;
+  commitConversationWrite: (
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ) => Promise<boolean>;
   conversationTabRuntimeCoordinator: {
     updateConversationSyncRuntime(
       tabId: TabId | null,
@@ -187,7 +200,10 @@ export function createMessageFinalizationHost(
       deps.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
     refreshTabSessionTodos: (tabId, sessionId, options) =>
       deps.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
-    saveConversation: (conversation) => deps.saveConversation(conversation),
+    createConversationWriteTicket: (conversationId) =>
+      deps.createConversationWriteTicket(conversationId),
+    commitConversationWrite: (conversation, ticket, reason, write) =>
+      deps.commitConversationWrite(conversation, ticket, reason, write),
     setConversationSyncInFlight: (tabId, value) => {
       tabRuntime.updateConversationSyncRuntime(tabId, { inFlight: value });
     },
@@ -271,12 +287,25 @@ export class MessageFinalizationService {
       await this.host.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
       logStage('session-todos-refreshed');
 
-      conversation.updatedAt = Date.now();
-      await this.host.saveConversation(conversation);
-      logStage('conversation-final-save-complete', {
-        updatedAt: conversation.updatedAt,
-        messageCount: conversation.messages.length,
-      });
+      const finalWriteTicket = this.host.createConversationWriteTicket(conversation.id);
+      const finalWriteApplied = await this.host.commitConversationWrite(
+        conversation,
+        finalWriteTicket,
+        'finalize-after-stream-updated-at',
+        () => {
+          conversation.updatedAt = Date.now();
+        },
+      );
+      if (finalWriteApplied) {
+        logStage('conversation-final-save-complete', {
+          updatedAt: conversation.updatedAt,
+          messageCount: conversation.messages.length,
+        });
+      } else {
+        logStage('conversation-final-save-skipped', {
+          messageCount: conversation.messages.length,
+        });
+      }
 
       this.host.clearPendingEditedFiles(tabId);
 
@@ -435,21 +464,30 @@ export class MessageFinalizationService {
 
     const conversation = this.host.getCurrentConversation();
     if (conversation) {
-      conversation.messages.push({
-        id: `assistant-${timestamp}`,
-        role: 'assistant',
-        content: errorMessage,
-        timestamp,
-        modelId,
-      });
-      conversation.updatedAt = Date.now();
-      await this.host.saveConversation(conversation);
-      this.host.updateConversationSyncRuntime(
-        this.host.getActiveTabId(),
-        {
-          fingerprint: this.host.getConversationSyncFingerprint(conversation.messages),
+      const writeTicket = this.host.createConversationWriteTicket(conversation.id);
+      const writeApplied = await this.host.commitConversationWrite(
+        conversation,
+        writeTicket,
+        'assistant-error-message',
+        () => {
+          conversation.messages.push({
+            id: `assistant-${timestamp}`,
+            role: 'assistant',
+            content: errorMessage,
+            timestamp,
+            modelId,
+          });
+          conversation.updatedAt = Date.now();
         },
       );
+      if (writeApplied) {
+        this.host.updateConversationSyncRuntime(
+          this.host.getActiveTabId(),
+          {
+            fingerprint: this.host.getConversationSyncFingerprint(conversation.messages),
+          },
+        );
+      }
     }
 
     this.host.scrollToBottom({ enableAutoScroll: true });

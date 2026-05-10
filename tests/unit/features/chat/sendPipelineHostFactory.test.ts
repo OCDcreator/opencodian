@@ -71,7 +71,14 @@ function createFullDeps(overrides: Partial<SendPipelineHostDependencies> = {}): 
     convertToStreamingChunk: jest.fn().mockReturnValue(null),
     getFriendlyStreamErrorMessage: jest.fn().mockImplementation((m: string) => `Friendly: ${m}`),
     createSendPipelineShellPort: jest.fn().mockReturnValue(shellPort),
-    saveConversation: jest.fn().mockResolvedValue(undefined),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (_conversation, _ticket, _reason, write) => {
+      await write();
+      return true;
+    }),
     summarizeContentBlocksForDebug: jest.fn().mockReturnValue(null),
     summarizeCoreStreamChunkForDebug: jest.fn().mockReturnValue({}),
     summarizeChatMessageForDebug: jest.fn().mockReturnValue(null),
@@ -89,7 +96,8 @@ describe('createSendPipelineRuntimeHost', () => {
 
     expect(typeof host.sendStreamMessage).toBe('function');
     expect(typeof host.createAssistantMessageElement).toBe('function');
-    expect(typeof host.saveConversation).toBe('function');
+    expect(typeof host.createConversationWriteTicket).toBe('function');
+    expect(typeof host.commitConversationWrite).toBe('function');
     expect(typeof host.summarizeContentBlocksForDebug).toBe('function');
 
     host.getTabRuntimeState('tab-1');
@@ -139,8 +147,8 @@ describe('createSendPipelineRuntimeHost', () => {
     expect(host.createAssistantMessageElement).toBe(shellPort.createAssistantMessageElement);
     expect(host.revealStreamingAssistantMessageElement).toBe(shellPort.revealStreamingAssistantMessageElement);
 
-    host.saveConversation(conversation);
-    expect(deps.saveConversation).toHaveBeenCalledWith(conversation);
+    host.createConversationWriteTicket('conversation-1');
+    expect(deps.createConversationWriteTicket).toHaveBeenCalledWith('conversation-1');
 
     host.summarizeContentBlocksForDebug([]);
     expect(deps.summarizeContentBlocksForDebug).toHaveBeenCalled();

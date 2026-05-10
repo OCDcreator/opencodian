@@ -49,7 +49,7 @@ type MockedComposerSendContextPort = {
 };
 
 function createHost(conversation: Conversation): MockedHost {
-  return {
+  const host: MockedHost = {
     ensureConversationReady: jest.fn().mockResolvedValue(conversation),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
     ensureTabRuntime: jest.fn().mockReturnValue(true),
@@ -84,7 +84,22 @@ function createHost(conversation: Conversation): MockedHost {
     armBackgroundTaskIndicatorForUserMessage: jest.fn(),
     startConversationSyncLoop: jest.fn(),
     saveConversation: jest.fn().mockResolvedValue(undefined),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (
+      targetConversation: Conversation,
+      _ticket,
+      _reason,
+      write,
+    ) => {
+      await write();
+      await host.saveConversation(targetConversation);
+      return true;
+    }),
     setAutoScrollEnabled: jest.fn(),
+    transitionTabSessionLifecycle: jest.fn().mockReturnValue(true),
     renderMessage: jest.fn().mockResolvedValue(undefined),
     scrollToBottom: jest.fn(),
     applyFallbackConversationTitle: jest.fn().mockResolvedValue(undefined),
@@ -95,6 +110,7 @@ function createHost(conversation: Conversation): MockedHost {
     beginTabContextUsageStream: jest.fn(),
     clearPendingEditedFiles: jest.fn(),
   };
+  return host;
 }
 
 function createComposerSendContext(): MockedComposerSendContextPort {

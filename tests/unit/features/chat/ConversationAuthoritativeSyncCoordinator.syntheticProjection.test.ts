@@ -37,7 +37,7 @@ function createConversation(
 function createHost(
   overrides?: Partial<Mocked<ConversationAuthoritativeSyncHost>>,
 ): Mocked<ConversationAuthoritativeSyncHost> {
-  return {
+  const host: Mocked<ConversationAuthoritativeSyncHost> = {
     getVaultBasePath: jest.fn().mockReturnValue(undefined),
     getTabRuntimeState: jest.fn().mockReturnValue(null),
     getCurrentConversationId: jest.fn().mockReturnValue(null),
@@ -51,6 +51,20 @@ function createHost(
     getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint'),
     getInterruptedSyncPreservationLogFingerprint: jest.fn().mockReturnValue('interrupted-fingerprint'),
     saveConversation: jest.fn().mockResolvedValue(undefined),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (
+      conversation: Conversation,
+      _ticket,
+      _reason,
+      write,
+    ) => {
+      await write();
+      await host.saveConversation(conversation);
+      return true;
+    }),
     logOmoBackgroundTaskDiagnostics: jest.fn(),
     markBackgroundTaskAuthoritativeSync: jest.fn(),
     refreshContextUsageAfterActiveConversationSync: jest.fn().mockResolvedValue(undefined),
@@ -72,6 +86,7 @@ function createHost(
     getLogPreview: jest.fn().mockImplementation((text: string) => text),
     ...overrides,
   };
+  return host;
 }
 
 describe('ConversationAuthoritativeSyncCoordinator synthetic projection', () => {

@@ -43,7 +43,7 @@ function createRuntime(
 function createHost(
   overrides?: Partial<Mocked<ConversationAuthoritativeSyncHost>>,
 ): Mocked<ConversationAuthoritativeSyncHost> {
-  return {
+  const host: Mocked<ConversationAuthoritativeSyncHost> = {
     getVaultBasePath: jest.fn().mockReturnValue(undefined),
     getTabRuntimeState: jest.fn().mockReturnValue(null),
     getCurrentConversationId: jest.fn().mockReturnValue(null),
@@ -72,6 +72,20 @@ function createHost(
         }),
     ),
     saveConversation: jest.fn().mockResolvedValue(undefined),
+    createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
+      conversationId,
+      version: 0,
+    })),
+    commitConversationWrite: jest.fn().mockImplementation(async (
+      conversation: Conversation,
+      _ticket,
+      _reason,
+      write,
+    ) => {
+      await write();
+      await host.saveConversation(conversation);
+      return true;
+    }),
     logOmoBackgroundTaskDiagnostics: jest.fn(),
     markBackgroundTaskAuthoritativeSync: jest.fn(),
     refreshContextUsageAfterActiveConversationSync: jest.fn().mockResolvedValue(undefined),
@@ -93,6 +107,7 @@ function createHost(
     getLogPreview: jest.fn().mockImplementation((text: string) => text),
     ...overrides,
   };
+  return host;
 }
 
 describe('ConversationAuthoritativeSyncCoordinator', () => {
@@ -294,5 +309,66 @@ describe('ConversationAuthoritativeSyncCoordinator', () => {
 
     expect(result.messages).toEqual([syncedUserMessage]);
     expect(runtime.lastInterruptedSyncPreservationLogFingerprint).toBeNull();
+  });
+
+  it('skips hydrated optimistic user side effects when the serialized commit is stale', async () => {
+    const optimisticMessage: ChatMessage = {
+      id: 'optimistic-user',
+      role: 'user',
+      content: 'Server question',
+      timestamp: 1,
+    };
+    const syncedUserMessage: ChatMessage = {
+      id: 'server-user',
+      role: 'user',
+      content: 'Server question',
+      timestamp: 2,
+      sourceMessageId: 'server-user',
+    };
+    const host = createHost({
+      getCurrentConversationId: jest.fn().mockReturnValue('sync-hydrate'),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'server-user',
+            role: 'user',
+            sessionID: 'session-sync-hydrate',
+            time: { created: 2 },
+          },
+          parts: [
+            {
+              id: 'part-server-user',
+              sessionID: 'session-sync-hydrate',
+              messageID: 'server-user',
+              type: 'text',
+              text: 'Server question',
+            },
+          ],
+        },
+      ]),
+      hydrateOpenCodeMessage: jest.fn().mockReturnValue(syncedUserMessage),
+      commitConversationWrite: jest.fn().mockResolvedValue(false),
+    });
+    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
+    const conversation = createConversation('sync-hydrate', {
+      messages: [optimisticMessage],
+    });
+
+    await coordinator.syncLatestUserMessageFromServer(
+      conversation,
+      optimisticMessage.id,
+      'tab-1',
+    );
+
+    expect(conversation.messages).toEqual([optimisticMessage]);
+    expect(host.commitConversationWrite).toHaveBeenCalledWith(
+      conversation,
+      expect.objectContaining({ conversationId: conversation.id }),
+      'latest-user-hydration',
+      expect.any(Function),
+    );
+    expect(host.armBackgroundTaskIndicatorForUserMessage).not.toHaveBeenCalled();
+    expect(host.rerenderSingleUserMessage).not.toHaveBeenCalled();
   });
 });

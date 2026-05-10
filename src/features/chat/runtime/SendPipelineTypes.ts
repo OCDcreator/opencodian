@@ -6,6 +6,7 @@ import type {
   QuestionResolution,
   StreamChunk as CoreStreamChunk,
 } from '../../../core/types';
+import type { ConversationWriteTicket } from '../services/ConversationWriteSerializationService';
 import type {
   ContentBlock as StreamingContentBlock,
   StreamChunk as StreamingChunk,
@@ -126,7 +127,13 @@ export interface SendPipelineShellPort {
 }
 
 export interface SendPipelinePersistencePort {
-  saveConversation(conversation: Conversation): Promise<void>;
+  createConversationWriteTicket(conversationId: string): ConversationWriteTicket;
+  commitConversationWrite(
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ): Promise<boolean>;
 }
 
 export interface SendPipelineDebugPort {
