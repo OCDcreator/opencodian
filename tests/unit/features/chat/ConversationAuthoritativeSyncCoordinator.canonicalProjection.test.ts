@@ -286,6 +286,93 @@ describe('ConversationAuthoritativeSyncCoordinator canonical projection', () => 
     });
     expect(result?.messages[1]?.structured).toBeUndefined();
   });
+
+  it('saves canonical cache writeback even when foreground render fingerprint is unchanged', async () => {
+    const canonicalMessages: CanonicalSessionMessage[] = [
+      {
+        info: {
+          id: 'user-1',
+          role: 'user',
+          sessionID: 'session-sync-cache-writeback',
+          time: { created: 10 },
+        },
+        parts: [
+          {
+            id: 'part-user-1',
+            sessionID: 'session-sync-cache-writeback',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'Question',
+          },
+        ],
+      },
+      {
+        info: {
+          id: 'assistant-1',
+          role: 'assistant',
+          sessionID: 'session-sync-cache-writeback',
+          time: { created: 20 },
+        },
+        parts: [
+          {
+            id: 'part-assistant-1',
+            sessionID: 'session-sync-cache-writeback',
+            messageID: 'assistant-1',
+            type: 'text',
+            text: 'Canonical cache answer',
+          },
+        ],
+      },
+    ];
+    const conversation = createConversation('sync-cache-writeback', {
+      messages: [
+        {
+          id: 'assistant-local',
+          role: 'assistant',
+          content: 'stale cache answer',
+          timestamp: 1,
+          sourceMessageId: 'assistant-1',
+          structured: { stale: true },
+          contentBlocks: [
+            { type: 'text', text: 'stale cache answer' },
+          ],
+        } as ChatMessage,
+      ],
+    });
+    const expectedMessages = buildCanonicalRenderMessages(
+      conversation.openCodeSessionId,
+      canonicalMessages,
+    );
+    const host = createHost({
+      getTabRuntimeState: jest.fn().mockReturnValue({
+        lastConversationSyncFingerprint: JSON.stringify(expectedMessages.map((message) => ({
+          id: message.id,
+          sourceMessageId: message.sourceMessageId ?? null,
+          streamState: message.streamState ?? null,
+          displayStyle: message.displayStyle ?? null,
+          content: message.content,
+          timestamp: message.timestamp,
+        }))),
+        lastInterruptedSyncPreservationLogFingerprint: null,
+      }),
+      getCanonicalSessionMessages: jest.fn().mockReturnValue(canonicalMessages),
+      hydrateOpenCodeMessage: jest.fn((info, parts) =>
+        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
+    });
+    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
+
+    const result = await coordinator.syncConversationMessagesFromCanonicalState(
+      conversation,
+      'tab-1',
+      'sync-event:message.updated',
+    );
+
+    expect(result?.changed).toBe(false);
+    expect(result?.messages).toEqual(expectedMessages);
+    expect(conversation.messages).toEqual(expectedMessages);
+    expect(host.saveConversation).toHaveBeenCalledTimes(1);
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
 });
 
 describe('ConversationAuthoritativeSyncCoordinator canonical tool projection', () => {

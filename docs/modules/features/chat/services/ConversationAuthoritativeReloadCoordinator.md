@@ -9,7 +9,7 @@
 
 - server message 拉取、hydrate 与 revert-state 查询
 - authoritative merge 前后的 sync begin/fetch/finish debug payload 组装
-- canonical-derived render input 的落盘替换、受限的本地 metadata 保留，以及 fingerprint 计算与去重日志
+- canonical-derived render input 的 compatibility/cache writeback、受限的本地 metadata 保留，以及 foreground render fingerprint / cache fingerprint 的分离判定
 - authoritative message apply、save、background-task authoritative-sync 标记与 active conversation context-usage refresh
 
 它不负责 optimistic user bubble hydration，也不直接决定 client-only field / rich assistant block / modelId 的合并规则；这些职责分别留在 `ConversationAuthoritativeSyncCoordinator` 与 `ConversationAuthoritativeMessageMergeCoordinator`。
@@ -28,10 +28,10 @@ export class ConversationAuthoritativeReloadCoordinator {
 - `syncConversationMessagesFromServer()` 会先读取 server messages，再统一执行 hydrate、renderable filter、OMO background-task diagnostics 与 authoritative merge。
 - `syncConversationMessagesFromCanonicalState()` 会把 `OpenCodeService` 的 canonical graph 先重组回 `OpenCodeCanonicalSessionState`，再通过 `ConversationTurnViewModelBuilder.buildCanonicalRenderInput()` 生成稳定的 canonical render `ChatMessage[]`，最后复用同一套 renderable filter / merge / fingerprint / save 路径；拿不到 graph 时返回 `null`，由上层 bridge 做 gap recovery。如果当前本地会话刚经历了 `assistant-interrupted-*` timeout notice，而 canonical graph 里还没有挂到该最新 user turn 下的 assistant，本方法也会主动返回 `null`，强制上层回退到 server truth，避免 stale canonical 把延迟到达的 provider 回复永久挡在外面。
 - `syncConversationMessagesFromServer()` 现在也会先把 raw `[{ info, parts[] }]` snapshot 投影到同一份 canonical render input，再进入 authoritative merge，避免 render path 与 reload path 各自维护一套 message hydrate 顺序。
-- merge 之后仍然按 timestamp 排序，并继续复用 per-tab `lastConversationSyncFingerprint` 判断本轮是否真的发生 authoritative 变化。
+- merge 之后仍然按 timestamp 排序，并继续复用 per-tab `lastConversationSyncFingerprint` 判断本轮是否真的发生 foreground render authoritative 变化；同时单独比较当前 `Conversation.messages` cache fingerprint，确保 canonical projection 已经是最新输入时仍会写回 stale compatibility cache。
 - 只有在 authoritative snapshot 为空时，才继续保留本地 interrupted assistant 作为恢复兜底；如果本轮发送在服务端接受 user message 之前就失败并生成了无 `sourceMessageId` 的本地 error notice，也会保留这一整组本地失败 turn，避免后续 background sync 把用户气泡和错误卡片清空；额外地，若本地只剩 timeout warning notice、而 authoritative snapshot 仍停在“最新 user 已落盘但 assistant 还没回来”的状态，也会继续保留这张 notice，直到 server 真的补回 assistant 为止。
 - preserved interrupted assistants 的日志 fingerprint 仍写回 tab runtime，避免 background/signal sync 重复刷同一条 preservation 日志。
-- authoritative 变化发生时才会更新 `conversation.updatedAt` 并保存；无变化时仍会保留当前 message 集合与 fingerprint。
+- compatibility/cache writeback 变化发生时会更新 `conversation.updatedAt` 并保存；`changed` 仍只表达 foreground render fingerprint 是否变化，避免 finalization / post-sync 把 cache dirty 当成 render drift。
 - 失败兜底仍返回当前 conversation messages 与 active conversation revert-state，不改变现有 auth-sync 完成门槛。
 
 ## 与相邻模块的边界

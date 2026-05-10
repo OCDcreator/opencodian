@@ -36,6 +36,7 @@ interface ConversationServerSyncMergeResult {
   preservedClientOnlyMessages: ChatMessage[];
   fingerprint: string;
   changed: boolean;
+  cacheWritebackChanged: boolean;
 }
 
 interface ConversationServerSyncContext {
@@ -113,7 +114,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       await this.applyConversationServerSyncMessages(
         conversation,
         syncMerge.merged,
-        syncMerge.changed,
+        syncMerge.cacheWritebackChanged,
       );
 
       this.host.markBackgroundTaskAuthoritativeSync(tabId, reason);
@@ -183,7 +184,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     await this.applyConversationServerSyncMessages(
       conversation,
       syncMerge.merged,
-      syncMerge.changed,
+      syncMerge.cacheWritebackChanged,
     );
 
     this.host.markBackgroundTaskAuthoritativeSync(tabId, reason);
@@ -334,14 +335,16 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.logConversationServerSyncMerged(context, merged, preservedClientOnlyMessages);
 
     const fingerprint = this.host.getConversationSyncFingerprint(merged);
+    const previousCacheFingerprint = this.host.getConversationSyncFingerprint(conversation.messages);
     const previousFingerprint = this.host.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
-      ?? this.host.getConversationSyncFingerprint(conversation.messages);
+      ?? previousCacheFingerprint;
 
     return {
       merged,
       preservedClientOnlyMessages,
       fingerprint,
       changed: fingerprint !== previousFingerprint,
+      cacheWritebackChanged: fingerprint !== previousCacheFingerprint,
     };
   }
 
@@ -515,6 +518,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       revertApplied: Boolean(snapshot.revertState),
       revertMessageId: snapshot.revertState?.messageID ?? null,
       changed: syncMerge.changed,
+      cacheWritebackChanged: syncMerge.cacheWritebackChanged,
     });
   }
 
@@ -534,6 +538,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       sessionId: conversation.openCodeSessionId,
       tabId,
       changed: syncMerge.changed,
+      cacheWritebackChanged: syncMerge.cacheWritebackChanged,
       fingerprint: syncMerge.fingerprint,
       revertApplied: Boolean(snapshot.revertState),
       revertMessageId: snapshot.revertState?.messageID ?? null,
