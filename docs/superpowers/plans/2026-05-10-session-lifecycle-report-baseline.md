@@ -37,7 +37,7 @@
 ## Global Constraints
 
 - Do not modify runtime TypeScript, CSS, generated assets, `reference-projects/`, or test code in this slice.
-- Do not stage unrelated local changes or the six existing local commits ahead of `origin/main`.
+- Do not stage unrelated local changes or disturb the existing local commits ahead of `origin/main`.
 - Keep `docs/status/session-lifecycle-alignment-evaluation.md` as the only implementation target.
 - Do not claim Council review has happened unless the current workflow actually ran it.
 - If any task unexpectedly requires UI, layout, style, theme, visual component, or user-facing copy changes outside this report, stop and invoke `impeccable` before editing:
@@ -299,22 +299,22 @@ rg -n "2025-05-10|源码级全量审计 \\+ 多模型|所有 Council 成员|一�
 
 Expected: No output.
 
-- [ ] **Step 2: Inspect the final report diff**
+- [ ] **Step 2: Inspect the final report diff while the report is untracked**
 
 Run:
 
 ```bash
-git diff -- docs/status/session-lifecycle-alignment-evaluation.md
+git diff --no-index -- /dev/null docs/status/session-lifecycle-alignment-evaluation.md || true
 ```
 
-Expected: Diff only changes `docs/status/session-lifecycle-alignment-evaluation.md` and matches this plan's report-baseline scope.
+Expected: Diff output shows the full report as an added file and its content matches this plan's report-baseline scope. The `|| true` is intentional because `git diff --no-index` exits with `1` when differences exist.
 
-- [ ] **Step 3: Verify no runtime files changed**
+- [ ] **Step 3: Verify no unrelated files changed, including untracked files**
 
 Run:
 
 ```bash
-git diff --name-only | rg -v '^docs/status/session-lifecycle-alignment-evaluation\\.md$'
+git status --short | rg -v '^\?\? docs/status/session-lifecycle-alignment-evaluation\.md$'
 ```
 
 Expected: No output.
