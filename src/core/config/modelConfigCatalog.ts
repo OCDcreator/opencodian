@@ -13,6 +13,7 @@ export interface ModelCatalogModel {
   id: string;
   name: string;
   contextWindow?: number;
+  variants?: string[];
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
@@ -42,6 +43,7 @@ export interface ModelCatalogRuntimeResult {
       id: string;
       name: string;
       contextWindow?: number;
+      variants?: string[];
     }>;
   }>;
   defaults: Record<string, string>;
@@ -109,6 +111,7 @@ export function catalogFromRuntimeResult(result: ModelCatalogRuntimeResult): Mod
         id: model.id,
         name: model.name || model.id,
         contextWindow: model.contextWindow,
+        variants: model.variants,
         source: 'server',
         existsInLocal: false,
         existsInServer: true,

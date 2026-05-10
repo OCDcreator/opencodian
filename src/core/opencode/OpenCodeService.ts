@@ -1280,14 +1280,14 @@ export class OpenCodeService {
   /** Get available models - Handles both string array and object formats */
   async getAvailableModels(
     options: { includeDirectory?: boolean; debugReason?: string | null } = {},
-  ): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>; defaults: Record<string, string> }> {
+  ): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number; variants?: string[] }> }>; defaults: Record<string, string> }> {
     return this.catalogQueries.getAvailableModels(options);
   }
 
   async getProviderDirectory(
     options: { includeDirectory?: boolean; debugReason?: string | null } = {},
   ): Promise<{
-    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
+    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number; variants?: string[] }> }>;
     defaults: Record<string, string>;
     connected: string[];
   }> {

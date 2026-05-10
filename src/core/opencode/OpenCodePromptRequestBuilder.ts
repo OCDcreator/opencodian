@@ -170,12 +170,6 @@ export class OpenCodePromptRequestBuilder {
     options: PromptRequestOptions,
     messageID?: string,
   ): SdkPromptParameters {
-    if (options.thinkingBudget !== undefined) {
-      logger.debug('thinkingBudget is not currently mapped to the SDK v2 prompt payload and is being omitted', {
-        thinkingBudget: options.thinkingBudget,
-      });
-    }
-
     const parameters: SdkPromptParameters = {
       sessionID: sessionId,
       ...(messageID ? { messageID } : {}),
@@ -215,14 +209,10 @@ export class OpenCodePromptRequestBuilder {
     options: PromptRequestOptions,
     messageID?: string,
   ): LegacyPromptRequestBody {
-    const modelOptions = this.buildLegacyStreamModelOptions(options);
     const requestBody: LegacyPromptRequestBody = {
       ...(messageID ? { messageID } : {}),
       parts,
-      model: {
-        ...this.resolveModelSelection(options),
-        ...(modelOptions ? { options: modelOptions } : {}),
-      },
+      model: this.resolveModelSelection(options),
     };
 
     const sharedOptions = this.buildSharedPromptOptions(options);
@@ -240,27 +230,6 @@ export class OpenCodePromptRequestBuilder {
       providerID: options.provider ?? defaults.providerID,
       modelID: options.model ?? defaults.modelID,
     };
-  }
-
-  private buildLegacyStreamModelOptions(options: QueryOptions): Record<string, unknown> | undefined {
-    const modelOptions: Record<string, unknown> = {};
-
-    if (options.reasoningEffort) {
-      modelOptions.reasoningEffort = options.reasoningEffort;
-    }
-
-    if (options.thinkingBudget !== undefined) {
-      modelOptions.thinking = options.thinkingBudget > 0
-        ? {
-            type: 'enabled',
-            budgetTokens: options.thinkingBudget,
-          }
-        : {
-            type: 'disabled',
-          };
-    }
-
-    return Object.keys(modelOptions).length > 0 ? modelOptions : undefined;
   }
 
   private applyCommonSharedOptions(target: SharedPromptTarget, sharedOptions: PromptSharedOptions): void {
@@ -352,7 +321,8 @@ export class OpenCodePromptRequestBuilder {
   }
 
   private resolveVariant(options: QueryOptions): string | undefined {
-    return options.reasoningEffort;
+    const variant = options.variant;
+    return variant ? variant : undefined;
   }
 
   private withStablePartId(part: PromptRequestPart): PromptRequestPart {

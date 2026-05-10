@@ -7,6 +7,7 @@ export interface ModelSelectorModel {
   id: string;
   name: string;
   contextWindow?: number;
+  variants?: string[];
 }
 
 export interface ModelSelectorProvider {
@@ -19,6 +20,7 @@ export interface ModelSelectorKnownModelInfo {
   providerName?: string;
   modelName?: string;
   contextWindow?: number;
+  variants?: string[];
 }
 
 export interface ModelSelectorAvailableModelInfo extends ModelSelectorSelection, ModelSelectorKnownModelInfo {

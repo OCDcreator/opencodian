@@ -146,6 +146,7 @@ export class ModelSelectionRuntime {
       providerName: baseProvider.name,
       modelName: baseModel.name,
       contextWindow: baseModel.contextWindow,
+      variants: baseModel.variants,
     };
   }
 
@@ -241,6 +242,7 @@ export class ModelSelectionRuntime {
         id: model.id,
         name: model.name,
         contextWindow: model.contextWindow,
+        variants: model.variants,
       }));
 
       for (const model of providerModels) {
@@ -251,6 +253,7 @@ export class ModelSelectionRuntime {
           providerName: provider.name,
           modelName: model.name,
           contextWindow: model.contextWindow,
+          variants: model.variants,
         });
       }
 

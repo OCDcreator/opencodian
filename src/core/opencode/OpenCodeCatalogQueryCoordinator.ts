@@ -18,6 +18,7 @@ type OpenCodeCatalogModelEntry = {
   id: string;
   name: string;
   contextWindow?: number;
+  variants?: string[];
 };
 
 type OpenCodeCatalogProviderEntry = {
@@ -490,11 +491,16 @@ export class OpenCodeCatalogQueryCoordinator {
           }));
         } else if (provider.models && typeof provider.models === 'object') {
           models = Object.entries(
-            provider.models as Record<string, { name?: string; limit?: { context?: number } }>,
+            provider.models as Record<string, {
+              name?: string;
+              limit?: { context?: number };
+              variants?: Record<string, unknown>;
+            }>,
           ).map(([id, info]) => ({
             id,
             name: info.name ?? id,
             contextWindow: typeof info.limit?.context === 'number' ? info.limit.context : undefined,
+            variants: info.variants ? Object.keys(info.variants) : undefined,
           }));
         }
 

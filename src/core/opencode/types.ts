@@ -4,13 +4,11 @@
 
 import type { ImageAttachment, PromptContextItem, StreamChunk } from '../types';
 import type {
-  EffortLevel,
   LocalServerConfig,
   ModelSourceMode,
   PluginIsolationMode,
   ServerAuthConfig,
   ServerMode,
-  ThinkingBudget,
 } from '../types/settings';
 import type { Message, Part, SessionMessage } from './OpenCodeSessionLifecycleCoordinator';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
@@ -78,8 +76,7 @@ export interface QueryOptions {
   contextItems?: PromptContextItem[];
   allowedTools?: string[];
   externalContextPaths?: string[];
-  reasoningEffort?: EffortLevel;
-  thinkingBudget?: ThinkingBudget;
+  variant?: string;
 }
 
 /** Server configuration */

@@ -18,7 +18,6 @@ import type {
   Conversation,
   PromptContextItem,
 } from '../../../core/types';
-import type { EffortLevel, ThinkingBudget } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import { buildContextAttachment, createLogger } from '../../../shared';
 import { getPromptContextTargetKey } from '../composerContext';
@@ -38,8 +37,7 @@ export type SendPreparationServerAvailability =
 export interface SendMessageModelOptions {
   provider?: string;
   model?: string;
-  reasoningEffort?: EffortLevel;
-  thinkingBudget?: ThinkingBudget;
+  variant?: string;
 }
 
 export type ComposerInputMode = 'prompt' | 'shell';

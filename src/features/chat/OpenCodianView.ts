@@ -24,7 +24,7 @@ import {
   type SessionTodo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
-import type { EffortLevel, PermissionMode, ThinkingBudget } from '../../core/types/settings';
+import type { PermissionMode } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import {
@@ -472,8 +472,8 @@ export class OpenCodianView extends ItemView {
 
   // Effort selector
   private effortSelector: EffortSelector | null = null;
-  private currentEffortLevel: EffortLevel;
-  private currentThinkingBudget: ThinkingBudget;
+  private currentVariant: string | undefined;
+  private readonly variantStore: Record<string, string | undefined> = {};
   private effortContainerEl: HTMLElement | null = null;
   private contextRing: ContextRing | null = null;
   private contextRingContainerEl: HTMLElement | null = null;
@@ -672,18 +672,20 @@ export class OpenCodianView extends ItemView {
       mountEffortSelector: (container) => {
         this.effortContainerEl = container;
         this.effortSelector = new EffortSelector(container, {
-          onEffortLevelChange: async (effort: EffortLevel) => {
-            this.currentEffortLevel = effort;
-            this.plugin.settings.effortLevel = effort;
-            await this.plugin.saveSettings();
+          getVariants: () => {
+            const current = this.getCurrentSessionModel();
+            if (!current) return [];
+            const modelRef = `${current.provider}/${current.model}`;
+            return this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
           },
-          onThinkingBudgetChange: async (budget: ThinkingBudget) => {
-            this.currentThinkingBudget = budget;
-            this.plugin.settings.thinkingBudget = budget;
-            await this.plugin.saveSettings();
+          getVariant: () => this.currentVariant,
+          onVariantChange: async (variant: string | undefined) => {
+            this.currentVariant = variant;
+            const current = this.getCurrentSessionModel();
+            if (current) {
+              this.variantStore[`${current.provider}/${current.model}`] = variant;
+            }
           },
-          getEffortLevel: () => this.currentEffortLevel,
-          getThinkingBudget: () => this.currentThinkingBudget,
           getCurrentModel: () => {
             const current = this.getCurrentSessionModel();
             return current ? `${current.provider}/${current.model}` : '';
@@ -871,6 +873,15 @@ export class OpenCodianView extends ItemView {
           this.plugin.settings.providerIconLibrary,
         ),
       updateEffortSelectorDisplay: () => {
+        const current = this.getCurrentSessionModel();
+        if (current) {
+          const modelRef = `${current.provider}/${current.model}`;
+          const saved = this.variantStore[modelRef];
+          const available = this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
+          this.currentVariant = saved && available.includes(saved) ? saved : undefined;
+        } else {
+          this.currentVariant = undefined;
+        }
         this.effortSelector?.updateDisplay();
       },
       getPermissionMode: () => this.plugin.settings.permissionMode,
@@ -1155,8 +1166,7 @@ export class OpenCodianView extends ItemView {
     super(leaf);
     this.plugin = plugin;
     this.messageComponent = new Component();
-    this.currentEffortLevel = this.plugin.settings.effortLevel;
-    this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
+    this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
       loadProjectAgents: async () => this.plugin.opencodeConfigManager?.getAgentConfig() ?? {},
@@ -3304,37 +3314,16 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Get model options for sendMessage */
-  private getSendMessageOptions(): { provider?: string; model?: string } {
+  private getSendMessageOptions(): { provider?: string; model?: string; variant?: string } {
     const current = this.getCurrentSessionModel();
     if (!current) {
       return {};
     }
 
-    const modelRef = `${current.provider}/${current.model}`;
-    const reasoningOptions = this.getReasoningOptionsForModel(modelRef);
-
     return {
       provider: current.provider,
       model: current.model,
-      ...reasoningOptions,
-    };
-  }
-
-  private getReasoningOptionsForModel(
-    modelRef: string,
-  ): { reasoningEffort?: EffortLevel; thinkingBudget?: ThinkingBudget } {
-    if (!modelRef) {
-      return {};
-    }
-
-    if (this.effortSelector && this.effortSelector.isEffortModel(modelRef)) {
-      return {
-        reasoningEffort: this.currentEffortLevel,
-      };
-    }
-
-    return {
-      thinkingBudget: this.currentThinkingBudget,
+      variant: this.currentVariant,
     };
   }
 
