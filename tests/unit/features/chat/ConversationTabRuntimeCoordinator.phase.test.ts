@@ -10,11 +10,16 @@ import {
   type TabMessagesPaneCoordinator,
   type TabMessagesPaneState,
 } from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
-import { deriveTabSessionPhase } from '../../../../src/features/chat/services/TabSessionPhase';
+import {
+  createInitialTabSessionLifecycleState,
+  deriveTabSessionPhase,
+  type TabSessionLifecycleState,
+} from '../../../../src/features/chat/services/TabSessionPhase';
 import { type TabBar, type TabId, TabManager } from '../../../../src/features/chat/tabs';
 
 interface TestRuntimeState extends ConversationTabRuntimeState {
   label?: string;
+  tabSessionLifecycle: TabSessionLifecycleState;
 }
 
 function createRuntimeState(overrides: Partial<TestRuntimeState> = {}): TestRuntimeState {
@@ -25,6 +30,7 @@ function createRuntimeState(overrides: Partial<TestRuntimeState> = {}): TestRunt
     isHydratingConversation: false,
     pendingLayoutMutations: 0,
     isStreaming: false,
+    tabSessionLifecycle: createInitialTabSessionLifecycleState(),
     isConversationSyncInFlight: false,
     lastConversationSyncFingerprint: null,
     currentTurnBodyEl: null,
@@ -140,12 +146,12 @@ describe('ConversationTabRuntimeCoordinator tab session phase', () => {
     expect(fixture.coordinator.isTabForegroundBusy(secondTab.id)).toBe(true);
   });
 
-  it('derives syncing phase without changing foreground busy semantics', () => {
+  it('derives syncing phase and treats it as foreground busy', () => {
     const fixture = createFixture({ sessionStatus: null });
     fixture.pane.runtimeByTab.set('tab-syncing', createRuntimeState({ isConversationSyncInFlight: true }));
 
     expect(fixture.coordinator.getTabSessionPhase('tab-syncing')).toBe('syncing');
-    expect(fixture.coordinator.isTabForegroundBusy('tab-syncing')).toBe(false);
+    expect(fixture.coordinator.isTabForegroundBusy('tab-syncing')).toBe(true);
   });
 
   it('derives compacting phase and treats it as foreground busy', () => {
