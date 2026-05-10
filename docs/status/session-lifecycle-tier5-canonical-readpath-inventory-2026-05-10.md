@@ -366,6 +366,8 @@ These files have the highest density of `projection-needed` reads and are the be
 
 ### Completed Migrations
 
+**Migrated slice** (tier5-b-first-safe-slice): 2 pure read projection paths in `ConversationRenderService` now consume canonical state first.
+
 - **`ConversationRenderService.ts`** — 2 projection-needed reads migrated (tier5-b-first-safe-slice). R-1: lazy fallback in `resolveConversationRenderMessages`. R-2: diagnostic logging now uses resolved canonical messages. `conversation.messages` is no longer accessed when canonical state is available.
 
 ---
