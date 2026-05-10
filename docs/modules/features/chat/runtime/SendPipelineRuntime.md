@@ -13,6 +13,7 @@
 - 把 stream loop / chunk router 交给 `StreamChunkRouter`
 - 把本地 shell finalization / local assistant-notice persistence 交给 `StreamLocalFinalizer`
 - 把 post-stream finalization 继续交给 `MessageFinalizationService`
+- post-stream finalization 完成后，取出同一 tab 的一个 queued follow-up send-intent；若完成的 tab 仍是 active tab，则带着 `targetTabId` 通过 `sendMessage()` 正常路径提交，不直接构造消息或绕过 preparation。若用户已经切到别的 tab，则丢弃这条一次性 queued intent，避免留下 orphan queue 或误发到新的 active conversation。
 
 它不是一个“小 helper”，而是发送子系统的总入口；`OpenCodianView` 现在只保留 host 装配与桥接。
 
@@ -65,6 +66,7 @@ export class SendPipelineRuntime {
 - transport 层现在还会直接复用 `PreparedMessageSend.messageID` 与 `requestParts`，避免 send preparation 和真正 transport 再各自生成一批不同的 part id
 - 如果 preparation 阶段解析出了显式 main agent，transport 层还会把它透传给 `openCodeService.sendMessage()` 的 top-level `agent`
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
+- 当 `prepareMessageSend()` 因 busy tab 返回 `null` 时，queue 行为由 preparation service / tab runtime seam 处理；runtime 不创建队列，也不在 busy 时开第二条 stream
 
 ### chunk router
 
@@ -96,6 +98,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
   - 本地 assistant message / error notice / interrupted notice 的构建与追加
   - 第一次本地 `saveConversation()`
 - 最后再把 `shouldSyncFromServer`、`editedFiles` 和调试 logger 一并交给 `MessageFinalizationService`
+- post-stream finalization 完成后，runtime 会消费同一 tab 的一个 queued follow-up；目标 tab 仍 active 时，该 follow-up 再次进入 slash/preparation/transport 的完整 send path，因此不会成为第三个消息真相来源。目标 tab 已不再 active 时，runtime 清掉这条一次性 intent，避免 orphan queue；preparation 层还会再次校验 `targetTabId`，防止 await 间隙中的 tab switch 把 intent 发错 conversation。
 
 其中：
 
@@ -121,5 +124,6 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 
 - 不能破坏多 tab 并发 streaming 与 tab runtime 隔离语义
 - 不能改变 optimistic user message 先落地再开流的时序
+- 不能把 queued follow-up 扩展成全局或无上限队列；它只是一条 per-tab send-intent
 - 不能改变 pending indicator / idle timeout / interrupted notice 的优先级
 - 不能把 `MessageSendPreparationService` 或 `MessageFinalizationService` 的职责重新回灌进 runtime host

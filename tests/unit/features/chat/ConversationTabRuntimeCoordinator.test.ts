@@ -352,6 +352,7 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(runtime.isHydratingConversation).toBe(false);
     expect(runtime.pendingLayoutMutations).toBe(0);
   });
+
 });
 
 describe('createConversationTabRuntimeCoordinatorHost factory', () => {

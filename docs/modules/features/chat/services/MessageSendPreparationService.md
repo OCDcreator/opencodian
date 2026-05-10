@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/services/MessageSendPreparationService.ts`
 > **状态**: [REVIEW]
-> **最近更新**: lint compaction (max-lines 500 gate)
+> **最近更新**: Busy-tab follow-up enqueue
 
 ## 概述
 
@@ -43,6 +43,7 @@ export class MessageSendPreparationService {
   createServerReadinessDelegate(): { ensureServerReadyForChat: (availability: ...) => Promise<boolean> };
   enterStreamingState(tabId: TabId | null): void;
   completePreparedStreamStart(tabId: TabId | null): void;
+  consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null;
 }
 
 export interface MessageSendPreparationHostDependencies { /* flat view deps */ }
@@ -58,7 +59,9 @@ export function createMessageSendPreparationHost(
 
 - 若当前没有 conversation，会先通过 host 触发“按现有 UI 规则新建会话”的路径
 - 如果 active tab 不存在、runtime 无法建立，直接中止
-- 如果前台 tab 已经处于 streaming / busy / retry，调用 host 统一走现有 blocked notice
+- 如果前台 tab 已经处于 busy，会先尝试把当前 prompt send-intent 存为该 tab 的一个 queued follow-up；入队只在本 tab 正在 streaming 且具备明确 post-stream 出队触发时成功。server-busy、retry、同 session 其他 tab streaming、或该 tab 已有 queued follow-up 时，保持既有 blocked notice 语义。
+- queued follow-up 会携带 `targetTabId`，重新进入 preparation 时必须仍指向 active tab；如果用户已经切到别的 tab，preparation 会中止，避免把 queued intent 发进错误 conversation。
+- busy enqueue 只发生在 conversation、active tab 与 tab runtime 均存在之后；缺失 canonical/session 上下文时直接中止，不创建 queued prompt。
 
 ### optimistic bootstrap 时序
 
@@ -95,6 +98,7 @@ export function createMessageSendPreparationHost(
 - `completePreparedStreamStart()` 只负责：
   - 清空 pending edited files
   - 通过 composer send-context 端口清空一次性的 draft context items（持久路径仍保留在 conversation 上）
+- `consumeQueuedFollowUpSend()` 只把 tab runtime 上的一次性 follow-up send-intent 交回 send pipeline；真正的 optimistic append、canonical seed 与 transport 仍复用下一次 `prepareMessageSend()` 的正常路径。
 
 这让发送子系统可以把“真正的 stream 调用”下沉到 `SendPipelineRuntime`，同时把 preparation 阶段的状态时序单独测住。
 

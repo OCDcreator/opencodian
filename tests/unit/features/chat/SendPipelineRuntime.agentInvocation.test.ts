@@ -129,6 +129,7 @@ function createPreparationPort(
     prepareMessageSend: jest.fn().mockResolvedValue(preparedSend),
     enterStreamingState: jest.fn(),
     completePreparedStreamStart: jest.fn(),
+    consumeQueuedFollowUpSend: jest.fn().mockReturnValue(null),
   };
 }
 

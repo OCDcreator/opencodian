@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Send preparation keeps preflight, optimistic bootstrap, and one-slot follow-up enqueue in one runtime owner. */
 import type {
   ResolvedAgentInvocation,
   SurfaceInvocationIntent,
@@ -76,6 +77,7 @@ export interface PrepareMessageSendOptions {
   content: string;
   syntheticTextParts?: PromptSyntheticTextPartInput[];
   invocationIntent?: SurfaceInvocationIntent;
+  targetTabId?: TabId;
 }
 
 export interface PreparedMessageSend {
@@ -117,6 +119,8 @@ export interface MessageSendPreparationHost {
   getActiveTabId(): TabId | null;
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
+  queueFollowUpSend(tabId: TabId | null, request: PrepareMessageSendOptions): boolean;
+  consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null;
   notifyForegroundBusy(): void;
   getServerAvailability(): Promise<SendPreparationServerAvailability>;
   refreshServerStatusBadge(): Promise<void>;
@@ -188,6 +192,8 @@ export interface MessageSendPreparationHostDependencies {
     setAutoScrollEnabled(tabId: TabId | null, enabled: boolean): void;
     setStreaming(tabId: TabId | null, value: boolean): void;
     clearPendingEditedFiles(tabId: TabId | null): void;
+    queueFollowUpSend(tabId: TabId | null, request: PrepareMessageSendOptions): boolean;
+    consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null;
   };
   getServerAvailability: () => Promise<SendPreparationServerAvailability>;
   chatHeaderPresenter: { refreshServerStatusBadge(): Promise<void> };
@@ -269,14 +275,21 @@ export class MessageSendPreparationService {
     });
   }
 
+  // eslint-disable-next-line complexity -- Send preflight deliberately keeps readiness, model, canonical seed, and follow-up enqueue ordering together.
   async prepareMessageSend(
     options: PrepareMessageSendOptions,
   ): Promise<PreparedMessageSend | null> {
+    const tabId = options.targetTabId ?? this.host.getActiveTabId();
+    if (!tabId || !this.isTargetTabActive(options.targetTabId)) {
+      return null;
+    }
     const conversation = await this.host.ensureConversationReady();
     if (!conversation) return null;
-    const tabId = this.host.getActiveTabId();
-    if (!tabId || !this.host.ensureTabRuntime(tabId)) return null;
-    if (this.host.isTabForegroundBusy(tabId)) { this.host.notifyForegroundBusy(); return null; }
+    if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) return null;
+    if (this.host.isTabForegroundBusy(tabId)) {
+      if (!this.queueFollowUpSend(tabId, options)) this.host.notifyForegroundBusy();
+      return null;
+    }
     const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.refreshStatusSurfaces();
@@ -341,6 +354,23 @@ export class MessageSendPreparationService {
   completePreparedStreamStart(tabId: TabId | null): void {
     this.host.clearPendingEditedFiles(tabId);
     this.composerSendContext.clearDraftContextItems(tabId);
+  }
+
+  consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null {
+    return this.host.consumeQueuedFollowUpSend(tabId);
+  }
+
+  private isTargetTabActive(targetTabId: TabId | undefined): boolean {
+    return !targetTabId || this.host.getActiveTabId() === targetTabId;
+  }
+
+  private queueFollowUpSend(tabId: TabId, options: PrepareMessageSendOptions): boolean {
+    return this.host.queueFollowUpSend(tabId, {
+      content: options.content,
+      ...(options.syntheticTextParts ? { syntheticTextParts: [...options.syntheticTextParts] } : {}),
+      ...(options.invocationIntent ? { invocationIntent: options.invocationIntent } : {}),
+      targetTabId: tabId,
+    });
   }
 
   private isFirstUserMessage(conversation: Conversation): boolean {
@@ -482,6 +512,8 @@ export function createMessageSendPreparationHost(
     getActiveTabId: () => deps.getActiveTabId(),
     ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
     isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),
+    queueFollowUpSend: (tabId, request) => tabRuntime.queueFollowUpSend(tabId, request),
+    consumeQueuedFollowUpSend: (tabId) => tabRuntime.consumeQueuedFollowUpSend(tabId),
     notifyForegroundBusy: () => deps.notifyForegroundBusy(),
     getServerAvailability: () => deps.getServerAvailability(),
     refreshServerStatusBadge: () => chatHeaderPresenter.refreshServerStatusBadge(),

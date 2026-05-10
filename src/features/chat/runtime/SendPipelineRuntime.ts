@@ -177,6 +177,16 @@ export class SendPipelineRuntime {
       editedFiles: [...execution.runtime.pendingEditedFiles],
       logStage: localFinalization.logAssistantFinalizationStage,
     });
+    await this.sendQueuedFollowUp(preparedSend.tabId);
+  }
+
+  private async sendQueuedFollowUp(tabId: PreparedMessageSend['tabId']): Promise<void> {
+    const queuedSend = this.messageSendPreparationService.consumeQueuedFollowUpSend(tabId);
+    if (!queuedSend || this.host.getActiveTabId() !== tabId) {
+      return;
+    }
+
+    await this.sendMessage({ ...queuedSend, targetTabId: tabId });
   }
 
   private createStreamingExecution(

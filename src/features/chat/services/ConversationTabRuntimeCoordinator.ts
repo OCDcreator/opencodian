@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This owner intentionally keeps tab lifecycle, derived phase, and one-slot follow-up queue state together. */
 import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   BelowHeaderTabBarLayout,
@@ -12,13 +13,13 @@ import {
   type TabId,
   TabManager,
 } from '../tabs';
+import type { PrepareMessageSendOptions } from './MessageSendPreparationService';
 import {
   type TabMessagesPaneCoordinator,
   type TabMessagesPaneRuntimeState,
   type TabMessagesPaneState,
 } from './TabMessagesPaneCoordinator';
 import { deriveTabSessionPhase, isForegroundBusyTabSessionPhase, type TabSessionPhase } from './TabSessionPhase';
-
 export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
   isConversationSyncInFlight: boolean;
@@ -27,8 +28,8 @@ export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState
   backgroundTaskInlineEls: Map<string, HTMLElement>;
   turnBodyByAnchorKey: Map<string, HTMLElement>;
   pendingEditedFiles: Set<string>;
+  queuedFollowUpSend?: PrepareMessageSendOptions | null;
 }
-
 export interface ConversationTabRuntimeCoordinatorHost {
   getMaxTabs(): number;
   getTabManager(): TabManager | null;
@@ -53,7 +54,6 @@ export interface ConversationTabRuntimeCoordinatorHost {
   ): SessionActivityStatus | null;
   getTabContextUsage(tabId: TabId | null): TabContextState | null;
 }
-
 export interface ConversationTabRuntimeCoordinatorPorts {
   activateTab(tabId: TabId): Promise<void>;
   closeTabAndRecover(tabId: TabId): Promise<void>;
@@ -70,7 +70,6 @@ export interface ConversationTabRuntimeCoordinatorHostSource {
   plugin: TabRuntimePluginSource;
   view: TabRuntimeViewSource;
 }
-
 export interface TabRuntimePluginSource {
   settings: TabRuntimeSettings & { tabState: PersistedTabState };
   saveSettingsUiStateImmediately(): Promise<void>;
@@ -101,7 +100,6 @@ export interface TabRuntimeSettings {
   tabBarPosition: TabBarPosition;
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
 }
-
 export function createConversationTabRuntimeCoordinatorHost(
   source: ConversationTabRuntimeCoordinatorHostSource,
 ): ConversationTabRuntimeCoordinatorHost {
@@ -303,35 +301,62 @@ export class ConversationTabRuntimeCoordinator<
   }
   beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): boolean {
     const runtime = this.getRuntimeState(tabId);
-    if (!runtime) return false;
+    if (!runtime) {
+      return false;
+    }
     runtime.isHydratingConversation = true;
     runtime.pendingLayoutMutations = 0;
     return true;
   }
   recordHydrationLayoutMutation(tabId: TabId | null = this.getActiveTabId()): boolean {
     const runtime = this.getRuntimeState(tabId);
-    if (!runtime?.isHydratingConversation) return false;
+    if (!runtime?.isHydratingConversation) {
+      return false;
+    }
     runtime.pendingLayoutMutations += 1;
     return true;
   }
   endConversationHydration(tabId: TabId | null = this.getActiveTabId()): boolean {
     const runtime = this.getRuntimeState(tabId);
-    if (!runtime) return false;
+    if (!runtime) {
+      return false;
+    }
     runtime.isHydratingConversation = false;
     const had = runtime.pendingLayoutMutations > 0;
     runtime.pendingLayoutMutations = 0;
     return had;
   }
   setAutoScrollEnabled(tabId: TabId | null, enabled: boolean): void {
-    const r = this.getRuntimeState(tabId);
-    if (r) r.autoScrollEnabled = enabled;
+    const runtime = this.getRuntimeState(tabId);
+    if (runtime) {
+      runtime.autoScrollEnabled = enabled;
+    }
   }
   setStreaming(tabId: TabId | null, isStreaming: boolean): void {
-    const r = this.getRuntimeState(tabId);
-    if (r) r.isStreaming = isStreaming;
+    const runtime = this.getRuntimeState(tabId);
+    if (runtime) {
+      runtime.isStreaming = isStreaming;
+    }
   }
   clearPendingEditedFiles(tabId: TabId | null): void {
     this.getRuntimeState(tabId)?.pendingEditedFiles.clear();
+  }
+  queueFollowUpSend(tabId: TabId | null, request: PrepareMessageSendOptions): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime?.isStreaming || runtime.queuedFollowUpSend) {
+      return false;
+    }
+    runtime.queuedFollowUpSend = { ...request, ...(request.syntheticTextParts ? { syntheticTextParts: [...request.syntheticTextParts] } : {}) };
+    return true;
+  }
+  consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime?.queuedFollowUpSend) {
+      return null;
+    }
+    const queued = runtime.queuedFollowUpSend;
+    runtime.queuedFollowUpSend = null;
+    return queued;
   }
   updateConversationSyncRuntime(
     tabId: TabId | null,

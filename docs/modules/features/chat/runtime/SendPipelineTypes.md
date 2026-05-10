@@ -11,7 +11,7 @@
 
 - `SendPipelineTabRuntime`：发送链路真正需要读写的 tab 级 streaming 状态切片
 - `SendPipelineStreamController` / `SendPipelineStreamElements`：stream shell 与流式渲染控制器边界
-- `SendPipelinePreparationPort` / `SendPipelineFinalizationPort`：对 `MessageSendPreparationService` 与 `MessageFinalizationService` 的窄接口
+- `SendPipelinePreparationPort` / `SendPipelineFinalizationPort`：对 `MessageSendPreparationService` 与 `MessageFinalizationService` 的窄接口。preparation port 还暴露 `consumeQueuedFollowUpSend()`，供 stream finalization 后按 tab 取回一条 queued send-intent 并重新走正常 send path
 - `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port；其中 transport port 现在显式接收 preparation 阶段生成的稳定 `messageID` / `requestParts`，并支持可选 top-level `agent`，shell port 只保留 streaming shell 创建、reveal、notice placeholder 渲染与 timestamp 收尾，并由 `AssistantShellRenderer.ts` 统一实现 shell adapter
 - `SendPipelineHost`：由上述 port 组合出来的完整宿主契约，方便 view 侧一次性装配
 - `SendPipelineHostDependencies`（定义在 `SendPipelineRuntime.ts`）：扁平依赖接口，让 `OpenCodianView` 只需提供原始回调而不负责 port 分组；`createSendPipelineRuntimeHost()` 工厂函数消费此接口并组合成 `SendPipelineHost`
@@ -25,6 +25,7 @@
 - 让 `SendPipelineRuntime` 只装配依赖，不再内联庞大的匿名对象类型
 - 让 `StreamChunkRouter`、`StreamLocalFinalizer` 与更小的 helper 模块共享同一套状态形状
 - 让 send preparation 生成的 stable `messageID + parts[]` 以及可选显式 main `agent` 能通过类型层明确传到 transport，而不是再次退回匿名字段
+- 让 busy-tab follow-up 只通过 preparation port 暴露为一次性 send-intent，避免把 queued prompt 误建成 message truth source
 - 让发送链路里的每个子模块只声明自己真正需要的 host port，避免 `SendPipelineHost` 继续膨胀成新的隐形大接口
 - 让单测可以只 mock 必需能力，而不是构造整个 `OpenCodianView`
 

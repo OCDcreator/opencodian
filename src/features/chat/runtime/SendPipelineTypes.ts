@@ -52,6 +52,7 @@ export interface SendPipelinePreparationPort {
   prepareMessageSend(options: PrepareMessageSendOptions): Promise<PreparedMessageSend | null>;
   enterStreamingState(tabId: TabId | null): void;
   completePreparedStreamStart(tabId: TabId | null): void;
+  consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null;
 }
 
 export interface SendPipelineFinalizationPort {
