@@ -740,7 +740,11 @@ export class OpenCodeService {
 
   /** Delete a session */
   async deleteSession(sessionId: string): Promise<void> {
-    return this.sessionLifecycle.deleteSession(sessionId);
+    try {
+      await this.sessionLifecycle.deleteSession(sessionId);
+    } finally {
+      this.sessionStateStore.deleteSession(sessionId);
+    }
   }
 
   /** Update a session title */

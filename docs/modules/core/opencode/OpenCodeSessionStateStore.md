@@ -12,6 +12,7 @@
 - `message.part.delta` 风格的字符串字段增量合并
 - stream mutation 的 message/part upsert、part merge、delta fallback part 补建
 - `session.diff` sync event 的 diff entries 缓存
+- session 级 eviction，用于删除会话或长期运行缓存收缩时释放 canonical graph
 - 对外提供稳定、克隆后的 canonical state 读取视图
 
 它不负责 SDK/legacy transport，也不负责 turn 渲染；当前只承接 session graph 状态本身。
@@ -72,6 +73,10 @@
 | `setSessionDiffEntries()` | 缓存 `session.diff` sync event 的 diff entries |
 | `getSessionDiffEntries()` | 读取某个 session 的克隆后 diff entries |
 | `removeSessionDiffEntries()` | 删除某个 session 的 diff entries |
+| `deleteSession()` | 删除单个 session 的 canonical graph 与 diff entries，返回是否命中已存在 session |
+| `deleteSessions()` | 按传入顺序批量删除 session，并返回实际删除的 session id |
+| `getSessionIds()` | 按 store 插入顺序返回当前持有的 session id |
+| `getSessionCount()` | 返回当前持有的 canonical session 数量 |
 | `getSessionState()` | 读取某个 session 的克隆后 canonical state |
 
 ## 数据流
@@ -98,3 +103,4 @@ graph TD
 - 这是 canonical truth layer，不要把 UI 级 `ChatMessage.content` 拼接状态写回这里。
 - message 顺序必须保留 authoritative snapshot / 增量 mutation 的原始会话顺序，不能再把 `id` 当成时间代理；本地 user message 已经可能使用随机 UUID 风格 `msg_*`，而 assistant message 仍可能来自单调 id 空间，按 `id` 排序会把旧 assistant 错挂到后续 user turn 后面。
 - part 目前仍按 `id` 稳定排序；若未来 part 也引入独立显式顺序字段，应该在这里统一调整。
+- `deleteSession()` 只清理本地 canonical graph；服务端删除仍由 OpenCodeSessionLifecycleCoordinator / OpenCodeService.deleteSession() 发起。

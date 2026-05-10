@@ -287,6 +287,30 @@ export class OpenCodeSessionStateStore {
     this.diffEntriesBySessionId.delete(sessionID);
   }
 
+  deleteSession(sessionID: string): boolean {
+    const deleted = this.sessions.delete(sessionID);
+    this.diffEntriesBySessionId.delete(sessionID);
+    return deleted;
+  }
+
+  deleteSessions(sessionIDs: Iterable<string>): string[] {
+    const deletedSessionIds: string[] = [];
+    for (const sessionID of sessionIDs) {
+      if (this.deleteSession(sessionID)) {
+        deletedSessionIds.push(sessionID);
+      }
+    }
+    return deletedSessionIds;
+  }
+
+  getSessionIds(): string[] {
+    return [...this.sessions.keys()];
+  }
+
+  getSessionCount(): number {
+    return this.sessions.size;
+  }
+
   getSessionState(sessionID: string): OpenCodeCanonicalSessionState | null {
     const state = this.sessions.get(sessionID);
     return state ? cloneState(state) : null;
