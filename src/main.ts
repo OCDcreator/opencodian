@@ -9,6 +9,7 @@ import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianS
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
 import { PluginRuntimeCoordinator } from './core/runtime/PluginRuntimeCoordinator';
 import { StorageService } from './core/storage';
+import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
 import type {
   ChatAppearanceSettings,
   Conversation,
@@ -54,6 +55,7 @@ const OPENCODIAN_APP_ICON_SVG = `
 `;
 
 type LoadedManagedServerState = Awaited<ReturnType<StorageService['loadManagedServerState']>>;
+type ConversationCachePinProvider = () => Iterable<string>;
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
 
@@ -69,6 +71,9 @@ export default class OpenCodianPlugin extends Plugin {
   private conversations: Conversation[] = [];
   private conversationsLoaded = false;
   private conversationsLoadPromise: Promise<void> | null = null;
+  private readonly conversationFullMessageCache = new ConversationFullMessageCache({ maxFullConversations: 12 });
+  private readonly conversationCachePinProviders = new Set<ConversationCachePinProvider>();
+  private conversationFullMessageCacheClock = 0;
   private runtimeCoordinator = new PluginRuntimeCoordinator({
     getSettings: () => this.settings ?? null,
     getOpenCodeService: () => this.openCodeService ?? null,
@@ -652,6 +657,7 @@ export default class OpenCodianPlugin extends Plugin {
     };
 
     this.conversations.unshift(conversation);
+    this.touchConversationFullMessageCache(conversation.id);
     await this.storage.saveConversation(conversation);
 
     return conversation;
@@ -676,19 +682,43 @@ export default class OpenCodianPlugin extends Plugin {
     };
 
     this.conversations.unshift(conversation);
+    this.touchConversationFullMessageCache(conversation.id);
+    if (conversation.messages.length > 0) {
+      this.trimConversationFullMessageCache();
+    }
     await this.storage.saveConversation(conversation);
     return conversation;
   }
 
   async saveConversation(conversation: Conversation): Promise<void> {
     const index = this.conversations.findIndex((item) => item.id === conversation.id);
-    if (index === -1) {
-      this.conversations.unshift(conversation);
-    } else {
-      this.conversations[index] = conversation;
+    let nextConversation = conversation;
+
+    if (
+      index !== -1
+      && conversation.messages.length === 0
+      && (this.conversationFullMessageCache.isEvicted(conversation.id)
+        || this.conversations[index].messages.length === 0)
+    ) {
+      const fullConversation = await this.storage.loadFullConversation(conversation.id);
+      if (fullConversation && fullConversation.messages.length > 0) {
+        nextConversation = {
+          ...conversation,
+          messages: fullConversation.messages,
+        };
+      }
     }
 
-    await this.storage.saveConversation(conversation);
+    if (index === -1) {
+      this.conversations.unshift(nextConversation);
+    } else {
+      this.conversations[index] = nextConversation;
+    }
+
+    this.touchConversationFullMessageCache(nextConversation.id);
+    this.trimConversationFullMessageCache();
+
+    await this.storage.saveConversation(nextConversation);
   }
 
   /** Get all conversations */
@@ -717,6 +747,8 @@ export default class OpenCodianPlugin extends Plugin {
       if (index !== -1) {
         this.conversations[index] = fullConversation;
       }
+      this.touchConversationFullMessageCache(fullConversation.id);
+      this.trimConversationFullMessageCache();
       return fullConversation;
     }
 
@@ -730,6 +762,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     const conversation = this.conversations[index];
     this.conversations.splice(index, 1);
+    this.conversationFullMessageCache.forget(id);
 
     // Delete from OpenCode
     try {
@@ -740,6 +773,49 @@ export default class OpenCodianPlugin extends Plugin {
 
     // Delete from storage
     await this.storage.deleteConversation(id);
+  }
+
+  private touchConversationFullMessageCache(id: string): void {
+    this.conversationFullMessageCacheClock = Math.max(Date.now(), this.conversationFullMessageCacheClock + 1);
+    this.conversationFullMessageCache.touch(id, this.conversationFullMessageCacheClock);
+  }
+
+  registerConversationCachePinProvider(provider: ConversationCachePinProvider): void {
+    this.conversationCachePinProviders.add(provider);
+    this.trimConversationFullMessageCache();
+  }
+
+  unregisterConversationCachePinProvider(provider: ConversationCachePinProvider): void {
+    this.conversationCachePinProviders.delete(provider);
+    this.trimConversationFullMessageCache();
+  }
+
+  trimConversationFullMessageCache(): void {
+    const snapshot = this.conversationFullMessageCache.trim(
+      this.conversations,
+      this.getConversationCachePinnedIds(),
+    );
+    if (snapshot.evictedConversationIds.length > 0) {
+      logger.debug('Trimmed full conversation messages from memory cache', {
+        evictedConversationIds: snapshot.evictedConversationIds,
+        pinnedConversationIds: snapshot.pinnedConversationIds,
+        fullConversationIds: snapshot.fullConversationIds,
+      });
+    }
+  }
+
+  private getConversationCachePinnedIds(): ReadonlySet<string> {
+    const pinnedIds = new Set<string>();
+
+    for (const provider of this.conversationCachePinProviders) {
+      for (const id of provider()) {
+        if (typeof id === 'string' && id.length > 0) {
+          pinnedIds.add(id);
+        }
+      }
+    }
+
+    return pinnedIds;
   }
 
   /** Get placeholder title for a new, empty conversation */

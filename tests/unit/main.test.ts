@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import type { StorageService } from '../../src/core/storage';
 import type { Conversation } from '../../src/core/types';
 import { OpenCodianView } from '../../src/features/chat/OpenCodianView';
@@ -8,6 +9,18 @@ jest.mock('@opencode-ai/sdk/v2/client', () => ({
 }), { virtual: true });
 
 (globalThis as { BUILD_ID?: string }).BUILD_ID = 'test-build';
+
+function createConversation(id: string, overrides: Partial<Conversation> = {}): Conversation {
+  return {
+    id,
+    title: `Conversation ${id}`,
+    createdAt: Number(id.replace(/\D/g, '')) || 1,
+    updatedAt: Number(id.replace(/\D/g, '')) || 1,
+    openCodeSessionId: `session-${id}`,
+    messages: [{ id: `message-${id}`, role: 'user', content: `message ${id}`, timestamp: 1 }],
+    ...overrides,
+  };
+}
 
 describe('OpenCodianPlugin.getConversationById', () => {
   it('returns the in-memory conversation when preferCache is enabled', async () => {
@@ -100,6 +113,248 @@ describe('OpenCodianPlugin.getConversationById', () => {
         openCodeSessionId: 'session-1',
       }),
     ]);
+  });
+
+});
+
+describe('OpenCodianPlugin conversation full-message cache', () => {
+  it('trims unpinned full-message conversations after loading over the cache limit', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation'>;
+    };
+    const storedConversations = new Map<string, Conversation>();
+
+    plugin.conversations = Array.from({ length: 13 }, (_, index) => {
+      const id = `conv-${index + 1}`;
+      const conversation = createConversation(id);
+      storedConversations.set(id, conversation);
+      return { ...conversation, messages: [] };
+    });
+    plugin.storage = {
+      loadFullConversation: jest.fn(async (id: string) => storedConversations.get(id)),
+    } as Pick<StorageService, 'loadFullConversation'>;
+
+    for (const conversation of plugin.conversations) {
+      await plugin.getConversationById(conversation.id);
+    }
+
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')?.messages).toHaveLength(0);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-2')?.messages).toHaveLength(1);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-13')?.messages).toHaveLength(1);
+  });
+
+  it('does not trim pinned full-message conversations', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation'>;
+    };
+    const storedConversations = new Map<string, Conversation>();
+    const pinAllProvider = () => plugin.conversations.map((conversation) => conversation.id);
+
+    plugin.conversations = Array.from({ length: 13 }, (_, index) => {
+      const id = `conv-${index + 1}`;
+      const conversation = createConversation(id);
+      storedConversations.set(id, conversation);
+      return { ...conversation, messages: [] };
+    });
+    plugin.storage = {
+      loadFullConversation: jest.fn(async (id: string) => storedConversations.get(id)),
+    } as Pick<StorageService, 'loadFullConversation'>;
+    plugin.registerConversationCachePinProvider(pinAllProvider);
+
+    for (const conversation of plugin.conversations) {
+      await plugin.getConversationById(conversation.id);
+    }
+
+    expect(plugin.conversations.every((conversation) => conversation.messages.length === 1)).toBe(true);
+
+    plugin.unregisterConversationCachePinProvider(pinAllProvider);
+
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')?.messages).toHaveLength(0);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-13')?.messages).toHaveLength(1);
+  });
+
+  it('trims immediately when a pin provider is registered', () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+    };
+
+    plugin.conversations = Array.from({ length: 13 }, (_, index) => createConversation(`conv-${index + 1}`));
+
+    plugin.registerConversationCachePinProvider(() => ['conv-1']);
+
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')?.messages).toHaveLength(1);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-2')?.messages).toHaveLength(0);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-13')?.messages).toHaveLength(1);
+  });
+
+  it('aggregates pinned conversations from multiple views and supports unregister', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation'>;
+    };
+    const storedConversations = new Map<string, Conversation>();
+    const providerA = () => ['conv-1', '', null as unknown as string];
+    const providerB = () => ['conv-2'];
+
+    plugin.conversations = Array.from({ length: 14 }, (_, index) => {
+      const id = `conv-${index + 1}`;
+      const conversation = createConversation(id);
+      storedConversations.set(id, conversation);
+      return { ...conversation, messages: [] };
+    });
+    plugin.storage = {
+      loadFullConversation: jest.fn(async (id: string) => storedConversations.get(id)),
+    } as Pick<StorageService, 'loadFullConversation'>;
+    plugin.registerConversationCachePinProvider(providerA);
+    plugin.registerConversationCachePinProvider(providerB);
+
+    for (const conversation of plugin.conversations) {
+      await plugin.getConversationById(conversation.id);
+    }
+
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')?.messages).toHaveLength(1);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-2')?.messages).toHaveLength(1);
+
+    plugin.unregisterConversationCachePinProvider(providerA);
+    await plugin.getConversationById('conv-3');
+
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')?.messages).toHaveLength(0);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-2')?.messages).toHaveLength(1);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-3')?.messages).toHaveLength(1);
+  });
+
+  it('rehydrates an evicted conversation when requested again', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation'>;
+    };
+    const storedConversations = new Map<string, Conversation>();
+
+    plugin.conversations = Array.from({ length: 13 }, (_, index) => {
+      const id = `conv-${index + 1}`;
+      const conversation = createConversation(id);
+      storedConversations.set(id, conversation);
+      return { ...conversation, messages: [] };
+    });
+    plugin.storage = {
+      loadFullConversation: jest.fn(async (id: string) => storedConversations.get(id)),
+    } as Pick<StorageService, 'loadFullConversation'>;
+
+    for (const conversation of plugin.conversations) {
+      await plugin.getConversationById(conversation.id);
+    }
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')?.messages).toHaveLength(0);
+
+    const result = await plugin.getConversationById('conv-1');
+
+    expect(result?.messages).toHaveLength(1);
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')?.messages).toHaveLength(1);
+    expect(plugin.storage.loadFullConversation).toHaveBeenCalledWith('conv-1');
+  });
+});
+
+describe('OpenCodianPlugin conversation save full-message guard', () => {
+  it('reloads full messages before saving an evicted metadata-only conversation', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation' | 'saveConversation'>;
+    };
+    const storedConversations = new Map<string, Conversation>();
+
+    plugin.conversations = Array.from({ length: 13 }, (_, index) => {
+      const id = `conv-${index + 1}`;
+      const conversation = createConversation(id);
+      storedConversations.set(id, conversation);
+      return { ...conversation, messages: [] };
+    });
+    plugin.storage = {
+      loadFullConversation: jest.fn(async (id: string) => storedConversations.get(id)),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    } as Pick<StorageService, 'loadFullConversation' | 'saveConversation'>;
+
+    for (const conversation of plugin.conversations) {
+      await plugin.getConversationById(conversation.id);
+    }
+
+    await plugin.saveConversation({
+      ...createConversation('conv-1', {
+        messages: [],
+        title: 'Metadata title',
+        updatedAt: 99,
+        lastResponseAt: 100,
+        titleGenerationStatus: 'success',
+        currentNote: 'note.md',
+        externalContextPaths: ['context.md'],
+        sessionSettings: { model: 'anthropic/claude-sonnet-4-5' },
+        backgroundTaskMetadata: {
+          activeAnchor: {
+            startedAt: 1,
+            anchorKey: 'anchor',
+            modeTag: 'mode',
+            waitingForFollowUp: false,
+            updatedAt: 2,
+          },
+        },
+      }),
+    });
+
+    const savedConversation = (plugin.storage.saveConversation as jest.Mock).mock.calls[0][0] as Conversation;
+    expect(savedConversation.messages).toHaveLength(1);
+    expect(savedConversation).toEqual(expect.objectContaining({
+      title: 'Metadata title',
+      updatedAt: 99,
+      lastResponseAt: 100,
+      titleGenerationStatus: 'success',
+      currentNote: 'note.md',
+      externalContextPaths: ['context.md'],
+      sessionSettings: { model: 'anthropic/claude-sonnet-4-5' },
+      backgroundTaskMetadata: {
+        activeAnchor: {
+          startedAt: 1,
+          anchorKey: 'anchor',
+          modeTag: 'mode',
+          waitingForFollowUp: false,
+          updatedAt: 2,
+        },
+      },
+    }));
+    expect(plugin.conversations.find((conversation) => conversation.id === 'conv-1')).toEqual(savedConversation);
+  });
+
+  it('reloads full messages before saving a startup metadata-only conversation', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation' | 'saveConversation'>;
+    };
+    const fullConversation = createConversation('conv-1', {
+      title: 'Stored title',
+      messages: [
+        { id: 'message-1', role: 'user', content: 'preserve me', timestamp: 1 },
+      ],
+    });
+    const metadataOnly = {
+      ...fullConversation,
+      title: 'Updated title',
+      updatedAt: 42,
+      messages: [],
+    };
+
+    plugin.conversations = [metadataOnly];
+    plugin.storage = {
+      loadFullConversation: jest.fn().mockResolvedValue(fullConversation),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    } as Pick<StorageService, 'loadFullConversation' | 'saveConversation'>;
+
+    await plugin.saveConversation(metadataOnly);
+
+    expect(plugin.storage.loadFullConversation).toHaveBeenCalledWith('conv-1');
+    expect(plugin.storage.saveConversation).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Updated title',
+      updatedAt: 42,
+      messages: fullConversation.messages,
+    }));
   });
 });
 
