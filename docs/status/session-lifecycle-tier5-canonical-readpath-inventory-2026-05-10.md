@@ -1,6 +1,6 @@
 # Tier 5 Canonical Read-Path Inventory: Conversation.messages Runtime Accesses
 
-> **Date**: 2026-05-10 (revision 3, 2026-05-11)
+> **Date**: 2026-05-10 (revision 3, 2026-05-11; migration revision 4, 2026-05-11)
 > **Scope**: `src/features/chat/`, `src/core/opencode/`, `src/core/storage/`, `src/utils/streaming/`
 > **Purpose**: Source-grounded audit of every runtime path that directly reads `conversation.messages` (including aliased forms: `targetConversation.messages`, `preparedSend.conversation.messages`, `options.conversation.messages`, `loadedConversation.messages`, `currentConversation.messages`, `this.conversation?.messages`), classified for canonical-only complexity reduction.
 > **Constraint**: This lane does NOT change runtime code.
@@ -19,6 +19,7 @@
 | Classification | Meaning |
 |---|---|
 | **canonical-now** | Already delegates to `OpenCodeSessionStateStore` canonical state, or IS the canonical store itself. No migration needed. |
+| **migrated** | Previously projection-needed; now reads from canonical projection first, falling back to `conversation.messages` only when canonical is unavailable. Migration complete. |
 | **projection-needed** | Currently reads `conversation.messages` directly but could be refactored to consume a projected/canonical view inside its existing owner. |
 | **persistence/fallback-only** | Must remain reading `conversation.messages` because it is in the persistence, serialization, fallback, or write-path layer. |
 
@@ -37,8 +38,9 @@
 
 | Classification | READ | WRITE | Total |
 |---|---|---|---|
+| migrated | 2 | 0 | 2 |
 | canonical-now | 0 | 0 | 0 |
-| projection-needed | 20 | 0 | 20 |
+| projection-needed | 18 | 0 | 18 |
 | persistence/fallback-only | 33 | 9 | 42 |
 | **Total** | **53** | **9** | **62** |
 
@@ -77,21 +79,26 @@ None — all fingerprint paths read `conversation.messages` directly.
 
 Paths that read messages for rendering, display, or reload projection in the chat UI.
 
-### 2.1 canonical-now
-
-None — all render/reload paths read `conversation.messages` directly.
-
-### 2.2 projection-needed
+### 2.1 migrated
 
 | # | File | Line(s) | Function | Access | Detail |
 |---|---|---|---|---|---|
-| R-1 | `src/features/chat/services/ConversationRenderService.ts` | 383 | `resolveConversationRenderMessages` | READ | Default parameter `fallbackMessages: ChatMessage[] = conversation.messages`. Key fallback: uses `conversation.messages` when canonical state is empty. Could project canonical messages as fallback. |
-| R-2 | `src/features/chat/services/ConversationRenderService.ts` | 239, 241 | `rerenderConversationMessages` | READ | Diagnostic logging — `conversation.messages.length` and reverse-find tail assistant. Could accept projected count/tail. |
+| R-1 | `src/features/chat/services/ConversationRenderService.ts` | 383 | `resolveConversationRenderMessages` | READ | **Migrated** (tier5-b-first-safe-slice). Default parameter changed from eager `= conversation.messages` to lazy `fallbackMessages?: ChatMessage[]` with `?? conversation.messages` fallback. When canonical state is available, `conversation.messages` is never accessed. |
+| R-2 | `src/features/chat/services/ConversationRenderService.ts` | 239, 241 | `rerenderConversationMessages` | READ | **Migrated** (tier5-b-first-safe-slice). Diagnostic logging now uses pre-resolved canonical messages (`resolvedMessages.length` and `resolvedMessages` tail search) instead of raw `conversation.messages`. |
+
+### 2.2 canonical-now
+
+None — all render/reload paths read `conversation.messages` directly (except migrated R-1/R-2).
+
+### 2.3 projection-needed
+
+| # | File | Line(s) | Function | Access | Detail |
+|---|---|---|---|---|---|
 | R-3 | `src/features/chat/ui/ContextDetailModal.ts` | 49, 67–69 | `onOpen` | READ | 4 reads via `this.conversation?.messages`: total count, user count, assistant count, message iteration. Could accept projected stats from canonical. |
 | R-4 | `src/features/chat/services/ConversationSyncLoadRuntimeViewHostFactory.ts` | 47–48, 54–55 | `shouldSyncConversationFromServer` | READ | 4 reads: `conversation.messages` for interrupted tail check, some() scan, null guard, empty-length check. Could use projected metadata. |
 | R-5 | `src/features/chat/services/ConversationSyncOrchestrationService.ts` | 211 | `shouldStartConversationSyncLoop` | READ | Checks `currentConversation.messages.length > 0` for sync loop start. Could use projected length. |
 
-### 2.3 persistence/fallback-only
+### 2.4 persistence/fallback-only
 
 | # | File | Line(s) | Function | Access | Detail |
 |---|---|---|---|---|---|
@@ -108,7 +115,7 @@ None — all render/reload paths read `conversation.messages` directly.
 | R-16 | `src/features/chat/services/ConversationSyncVisiblePostSyncRouter.ts` | 52 | `routeVisibleSyncComplete` | READ | Passes `options.syncContext.conversation.messages` to `applySyncedConversationUpdate` — post-sync render apply. |
 | R-17 | `src/features/chat/runtime/ConversationLoadRuntimeBridge.ts` | 70 | `loadConversationMessages` | READ | Returns `conversation.messages` when sync skipped. Must remain — load fallback path. |
 
-**Section 2 total**: 0 canonical-now, 5 projection-needed, 12 persistence/fallback-only (including 1 WRITE) = **17 access points** across **8 files**.
+**Section 2 total**: 2 migrated, 0 canonical-now, 3 projection-needed, 12 persistence/fallback-only (including 1 WRITE) = **17 access points** across **8 files**.
 
 ---
 
@@ -312,17 +319,17 @@ The following files read from **canonical session state** (`state.messages` / `s
 
 Only files with **direct** `conversation.messages` access (or alias):
 
-| File | projection-needed | persistence/fallback-only | Total |
-|---|---|---|---|
-| `ConversationAuthoritativeReloadCoordinator.ts` | 0 | 12 (incl. 1 WRITE) | 12 |
-| `StorageService.ts` | 0 | 8 (incl. 1 WRITE) | 8 |
-| `MessageFinalizationService.ts` | 2 | 4 (incl. 1 WRITE) | 6 |
-| `LocalStreamMessagePersistence.ts` | 0 | 6 (incl. 2 WRITEs) | 6 |
-| `BackgroundTaskTimelineService.ts` | 3 | 0 | 3 |
-| `PersistentAssistantNoticeService.ts` | 2 | 1 (incl. 1 WRITE) | 3 |
-| `ConversationSyncBridge.ts` | 0 | 3 | 3 |
-| `ConversationRenderService.ts` | 2 | 0 | 2 |
-| `ConversationAuthoritativeSyncCoordinator.ts` | 1 | 1 (incl. 1 WRITE) | 2 |
+| File | migrated | projection-needed | persistence/fallback-only | Total |
+|---|---|---|---|---|
+| `ConversationAuthoritativeReloadCoordinator.ts` | 0 | 0 | 12 (incl. 1 WRITE) | 12 |
+| `StorageService.ts` | 0 | 0 | 8 (incl. 1 WRITE) | 8 |
+| `MessageFinalizationService.ts` | 0 | 2 | 4 (incl. 1 WRITE) | 6 |
+| `LocalStreamMessagePersistence.ts` | 0 | 0 | 6 (incl. 2 WRITEs) | 6 |
+| `BackgroundTaskTimelineService.ts` | 0 | 3 | 0 | 3 |
+| `PersistentAssistantNoticeService.ts` | 0 | 2 | 1 (incl. 1 WRITE) | 3 |
+| `ConversationSyncBridge.ts` | 0 | 0 | 3 | 3 |
+| `ConversationRenderService.ts` | 2 | 0 | 0 | 2 |
+| `ConversationAuthoritativeSyncCoordinator.ts` | 0 | 1 | 1 (incl. 1 WRITE) | 2 |
 | `MessageSendPreparationService.ts` | 1 | 1 (incl. 1 WRITE) | 2 |
 | `ConversationLoadRecoveryCoordinator.ts` | 0 | 2 | 2 |
 | `ConversationLoadRuntimeBridge.ts` | 0 | 1 | 1 |
@@ -339,7 +346,7 @@ Only files with **direct** `conversation.messages` access (or alias):
 | `ChildSessionGraphCoordinator.ts` | 1 | 0 | 1 |
 | `ConversationMetadataCache.ts` | 0 | 1 | 1 |
 | `ConversationFullMessageCache.ts` | 0 | 2 (incl. 1 WRITE) | 2 |
-| **Total** | **20** | **42** | **62** |
+| **Total** | **2** | **18** | **42** | **62** |
 
 ---
 
@@ -351,13 +358,15 @@ These files have the highest density of `projection-needed` reads and are the be
 
 2. **`MessageFinalizationService.ts`** — 2 projection-needed reads. Diagnostic logging and tail-finding can be reduced by consuming projected counts/tail data from canonical state while leaving persistence and writeback paths intact.
 
-3. **`ConversationRenderService.ts`** — 2 projection-needed reads. The fallback path at line 383 (`resolveConversationRenderMessages`) defaults to `conversation.messages` when canonical state is empty. This is a small, testable candidate for preferring canonical projection while preserving cold-start fallback.
+3. **`PersistentAssistantNoticeService.ts`** — 2 projection-needed reads. Duplicate check and predictive fingerprint could use projected data while keeping the actual notice append as a serialized persistence write.
 
-4. **`PersistentAssistantNoticeService.ts`** — 2 projection-needed reads. Duplicate check and predictive fingerprint could use projected data while keeping the actual notice append as a serialized persistence write.
+4. **`ConversationSyncLoadRuntimeViewHostFactory.ts`** — 1 projection-needed read entry. `shouldSyncConversationFromServer()` has a concentrated decision point that could use projected metadata (`hasMessages`, `hasInterruptedTail`, `hasUnanchoredMessages`) instead of iterating the raw array.
 
-5. **`ConversationSyncLoadRuntimeViewHostFactory.ts`** — 1 projection-needed read entry. `shouldSyncConversationFromServer()` has a concentrated decision point that could use projected metadata (`hasMessages`, `hasInterruptedTail`, `hasUnanchoredMessages`) instead of iterating the raw array.
+5. **`ConversationAuthoritativeReloadCoordinator.ts`** — has 0 projection-needed reads but the highest total access count (12), all persistence/fallback-only due to the sync-merge-write cycle. Understanding this file is critical, but it is not a first migration target.
 
-6. **`ConversationAuthoritativeReloadCoordinator.ts`** — has 0 projection-needed reads but the highest total access count (12), all persistence/fallback-only due to the sync-merge-write cycle. Understanding this file is critical, but it is not a first migration target.
+### Completed Migrations
+
+- **`ConversationRenderService.ts`** — 2 projection-needed reads migrated (tier5-b-first-safe-slice). R-1: lazy fallback in `resolveConversationRenderMessages`. R-2: diagnostic logging now uses resolved canonical messages. `conversation.messages` is no longer accessed when canonical state is available.
 
 ---
 
@@ -367,7 +376,7 @@ These files have the highest density of `projection-needed` reads and are the be
 
 2. **Write serialization is mature**: All 9 WRITE operations flow through `commitConversationWrite()` callbacks or are in deserialization/cache initialization paths (`data.messages = []`, metadata-only cache eviction). No migration needed for writes.
 
-3. **Canonical render is already the primary path**: `ConversationTurnViewModelBuilder` reads `sessionState.messages` (canonical), and `ConversationRenderService.resolveConversationRenderMessages` prefers canonical with `conversation.messages` as fallback. The fallback path is the main gap.
+3. **Canonical render is now canonical-first (2 paths migrated)**: `ConversationTurnViewModelBuilder` reads `sessionState.messages` (canonical), and `ConversationRenderService.resolveConversationRenderMessages` now uses lazy fallback — it never reads `conversation.messages` when canonical state is available. The `rerenderConversationMessages` diagnostic log also uses the resolved canonical messages instead of raw `conversation.messages`.
 
 4. **Snapshot-before-sync pattern**: `ConversationSyncBridge` (3x) and `MessageFinalizationService` (1x) take `[...conversation.messages]` snapshots before sync. These must remain as persistence/fallback because they compare local state before and after sync.
 

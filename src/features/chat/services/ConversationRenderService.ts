@@ -233,12 +233,14 @@ export class ConversationRenderService {
       return;
     }
 
+    const resolvedMessages = this.resolveConversationRenderMessages(conversation);
+
     this.host.logAssistantFinalizationDebug('rerender-conversation-messages-start', {
       conversationId: conversation.id,
       sessionId: conversation.openCodeSessionId,
-      messageCount: conversation.messages.length,
+      messageCount: resolvedMessages.length,
       tailAssistant: this.host.summarizeChatMessageForDebug(
-        [...conversation.messages].reverse().find((message) => message.role === 'assistant'),
+        [...resolvedMessages].reverse().find((message) => message.role === 'assistant'),
       ),
     });
 
@@ -259,7 +261,7 @@ export class ConversationRenderService {
     this.host.resetTurnState();
 
     try {
-      await this.renderMessages(this.resolveConversationRenderMessages(conversation));
+      await this.renderMessages(resolvedMessages);
       await this.host.renderBackgroundTaskIndicatorIfNeeded();
       restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
         runtime: this.host.getScrollRuntimeForTab(activeTabId),
@@ -380,10 +382,10 @@ export class ConversationRenderService {
 
   private resolveConversationRenderMessages(
     conversation: Conversation,
-    fallbackMessages: ChatMessage[] = conversation.messages,
+    fallbackMessages?: ChatMessage[],
   ): ChatMessage[] {
     const canonicalMessages = this.buildCanonicalRenderMessages(conversation.openCodeSessionId);
-    return canonicalMessages.length > 0 ? canonicalMessages : fallbackMessages;
+    return canonicalMessages.length > 0 ? canonicalMessages : (fallbackMessages ?? conversation.messages);
   }
 
   private buildCanonicalRenderMessages(sessionId: string): ChatMessage[] {

@@ -153,6 +153,7 @@ export class ConversationRenderService {
 - 只在当前活动 conversation 仍匹配、且消息容器存在时执行
 - 如果当前 session 已有 canonical state，会直接调用 `ConversationTurnViewModelBuilder.buildCanonicalRenderInput()` 生成稳定的 canonical render `ChatMessage[]`
 - canonical state 一旦可用，就直接成为 full rerender 与 synced update 的唯一 render 输入；`conversation.messages` 只在 canonical 缺失时才作为临时 fallback
+- **Tier 5 canonical read-path migration**: `resolveConversationRenderMessages` 现在使用 lazy fallback（`fallbackMessages?: ChatMessage[]` + `?? conversation.messages`），当 canonical state 可用时完全不读取 `conversation.messages`；`rerenderConversationMessages` 的诊断日志也使用已解析的 canonical 消息而非原始 `conversation.messages`
 - 进入 hydration 前先抓取 scroll snapshot，并复用 `ScrollManager` 恢复 bottom / distance / anchor 语义
 - 重渲后继续刷新 background-task indicator、pane metrics 和 composer layout
 
