@@ -79,6 +79,8 @@ interface TabRuntimeState {
 
 这就是多标签并发不共享一个全局 streaming 状态的实现基础。
 
+聊天视图在 `onOpen()` 注册 conversation full-message cache pin provider，并在 `onClose()` 清除它。第一版 pin 策略保守地保留所有打开 tab 对应 conversation 的完整 messages，因此 active、restored、streaming、syncing、finalizing 与 background-task tab 都不会被内存 LRU 裁剪；历史列表中未打开的旧 conversation 可以只保留 metadata，按需再从 storage hydrate。
+
 其中 question 相关的 `pendingQuestionRequests`、draft answers、active group/index 与 waiter map 现在虽然仍存放在 `TabRuntimeState`，但读写和 refresh/render 编排已经统一收束到 `services/QuestionDockCoordinator.ts`，不再由 `OpenCodianView` 直接维护这整条链路。
 
 background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTasks`、active anchor / waiting-for-follow-up 等字段同样仍存放在 `TabRuntimeState`，但它们的 timeline 推导、conversation→runtime 重建、indicator reset runtime 清理、OMO diagnostics 去重状态，以及 inline copy 组装现在已经集中到 `services/BackgroundTaskTimelineService.ts`。

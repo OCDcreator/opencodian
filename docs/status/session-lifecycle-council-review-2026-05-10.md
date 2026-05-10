@@ -5,20 +5,23 @@
 > **审查对象**：OpenCodian vs opencode-desktop 会话生命周期成熟度分析
 > **参与模型**：gpt-5.5（alpha，两轮深度审查）+ kimi-for-coding（delta，一轮深度审查）
 > **共识置信度**：majority（2/4 模型响应，立场高度一致）
+> **修正注记**：第二轮 Council 发现文档存在时序性偏差——`TabSessionLifecycleState` 与 `ConversationWriteSerializationService` 已实现但文档正文未充分反映
 > **关联文档**：`docs/status/session-lifecycle-alignment-evaluation.md`
 
 ---
 
-## 0. Tier 1 实施计划
+## 0. 实施计划
 
 本审查的 Tier 1 收敛已落到实施计划：`docs/superpowers/plans/2026-05-10-session-lifecycle-tier1-convergence.md`。
+
+Tier 2 扩展性收敛计划：`docs/superpowers/plans/2026-05-10-session-lifecycle-tier2-cache-eviction.md`。
 
 Tier 1 只覆盖两个高优先级、低扩散面的风险收束：
 
 - writable per-tab lifecycle state machine：以 `TabSessionLifecycleState` 统一 `preparing → streaming → finalizing → syncing` 等前台忙碌阶段。
 - per-conversation write serialization：以 monotonic ticket 与 per-conversation queue 串行化 `Conversation.messages` compatibility/cache 写入。
 
-LRU/full-message cache、`OpenCodeSessionStateStore` canonical eviction、以及更彻底的 canonical-only runtime 读取仍是独立后续计划，不在本 Tier 1 范围内。
+LRU/full-message cache 与 `OpenCodeSessionStateStore` canonical eviction 已进入 Tier 2 计划；更彻底的 canonical-only runtime 读取仍是独立后续方向。
 
 ## 1. 审查背景
 
@@ -58,6 +61,22 @@ opencode-desktop 是 OpenCode 官方的桌面端前端（SolidJS + Electron）�
 - **两轮 Council 调用**，prompt 涵盖 5 个核心问题
 - **深度源码审查**：alpha 引用 15+ 处源码行号，delta 审查 10+ 核心文件
 - **独立回答后综合**：每个模型先独立回答，再综合出共识结论
+
+### 1.4 第二轮 Council 修正（重要）
+
+第二轮 Council 审查发现文档存在**重大事实错误**和**时序性偏差**：
+
+| 发现 | 说明 | 影响 |
+|------|------|------|
+| **重大事实错误** | 文档声称"`TabSessionPhase` 不将 `syncing` 算 foreground busy"，但源码 `TabSessionLifecycleState.ts:90-97` 明确包含 `syncing` | 导致 Q2 评分偏低 0.3-0.5 分 |
+| **时序性偏差** | 文档将 writable per-tab lifecycle state machine 和 per-conversation write serialization 列为"待实现"，但源码显示两者**已实现** | Tier 1 改进路线需要调整 |
+
+**已验证的源码**：
+- `src/features/chat/services/TabSessionLifecycleState.ts` — 可写状态机（`idle → preparing → streaming → finalizing → syncing → cancelled/error`）
+- `src/features/chat/services/ConversationWriteSerializationService.ts` — per-conversation queue + monotonic version ticket
+- `tests/unit/features/chat/ConversationTabRuntimeCoordinator.phase.test.ts:149` — "derives syncing phase and treats it as foreground busy"
+
+**修正后评分**：7.5-8/10 → **8.0-8.5/10**
 
 ---
 
@@ -205,7 +224,7 @@ JS 单线程避免了真正的数据竞争，但在以下场景下 async interle
 
 | 场景 | 机制 | 影响 |
 |------|------|------|
-| **finalization sync 窗口** | `isConversationSyncInFlight=true` 后仍在 sync/save；`TabSessionPhase` 不将 `syncing` 算 foreground busy，用户可再次发送 | 新发送与 `conversation.messages = merged` 交错 |
+| **finalization sync 窗口** | `isConversationSyncInFlight=true` 后仍在 sync/save；`syncing` 虽算 foreground busy，但 busy gating 与 sync commit 之间仍可能存在竞争窗口 | 新发送与 `conversation.messages = merged` 交错 |
 | **cancel 时序** | tab `isStreaming` 先置 false → `streamController.cancelStream()` 后执行；极短窗口派生状态与 controller 内部状态不一致 | UI 短暂显示错误状态 |
 | **stream done 后延迟** | `StreamController` 自身 `state.isStreaming=false` 先于 tab runtime reset；需等 router/finalizer 回调 | busy gating、content finalization 时序难以证明 |
 
@@ -288,12 +307,14 @@ metadata index + pinned full conversations + LRU full-message cache
 
 **共识评分：7.5-8/10**（opencode-desktop = 10）
 
+**修正后评分：8.0-8.5/10**（见下方"第二轮 Council 修正"）
+
 #### 扣分明细（alpha R2 精细拆分）
 
 | 扣分项 | 分值 | 说明 |
 |--------|------|------|
 | `Conversation.messages` 仍是可写副真相 | -0.9 | 持久化/display 写入点未完全收归 canonical |
-| busy/phase 状态分散，缺可验证状态机 | -0.7 | `syncing` 不参与 foreground busy，转换无互斥保护 |
+| busy/phase 状态分散，部分已收敛 | -0.5 | `TabSessionLifecycleState` 已统一写入，但仍有直接字段赋值绕过状态机（如 `StreamLocalFinalizer` 直接写 `isConversationSyncInFlight`）|
 | conversation save 缺 serialization/version guard | -0.5 | per-conversation 写入无序 |
 | 长期运行缓存增长边界不完整 | -0.4 | full conversation + canonical sessions 均无 eviction |
 | background task 嵌入同一消息序列 | -0.4 | 语义证明比 desktop 子会话隔离更难 |
@@ -316,18 +337,18 @@ metadata index + pinned full conversations + LRU full-message cache
 | 维度 | 原始分析 | Council 修正 |
 |------|---------|-------------|
 | 双重真相收敛 | "已基本收敛" | **"核心路径 canonical-first，残余中等风险"** |
-| 状态分散 | "已通过 TabSessionPhase 缓解" | **"只读派生不够，写入仍分散，需状态机"** |
+| 状态分散 | "已通过 TabSessionPhase 缓解" | **"TabSessionLifecycleState 已统一写入，但仍有绕过"** |
 | 遗漏差距 | "未遗漏重大差距" | **"3+1 项被低估"** |
 | LRU 排除 | "不应照搬，完全排除" | **"应裁剪采用，不完全排除"** |
-| 整体成熟度 | "基本成熟" (~8.5-9/10) | **"功能成熟、架构收敛中" (7.5-8/10)** |
+| 整体成熟度 | "基本成熟" (~8.5-9/10) | **"功能成熟、架构收敛中" (8.0-8.5/10)** |
 
 ### 修正后结论
 
-> **OpenCodian 会话生命周期核心能力已成熟实现（多标签并发、canonical 状态管理、发送管线、后台任务），但架构一致性边界尚未完全收敛。当前处于"功能成熟、架构收敛中"状态，评分 7.5-8/10。**
+> **OpenCodian 会话生命周期核心能力已成熟实现（多标签并发、canonical 状态管理、发送管线、后台任务、可写状态机、写入序列化），架构一致性边界已大幅收敛。当前处于"功能成熟、架构收敛中"状态，评分 8.0-8.5/10。**
 >
 > 与 opencode-desktop 的主要差距不是功能缺失，而是：
 > 1. 一致性强边界（双重真相残余写入路径）
-> 2. 状态机形式化（4+ 布尔值 → 可验证状态机）
+> 2. 状态机完整性（仍有直接字段赋值绕过 `TabSessionLifecycleState`）
 > 3. 长期扩展性策略（全量加载无上限 + 无 eviction）
 
 ---
@@ -336,27 +357,23 @@ metadata index + pinned full conversations + LRU full-message cache
 
 ### Tier 1 — 高优先级（一致性 + 维护性）
 
-#### 改进 1：Per-tab writable lifecycle state machine
+#### 改进 1：统一写入入口，消除绕过状态机的直接字段赋值
 
-- **问题**：4+ 布尔值写入分散在两个对象上，busy gating 不可靠
-- **方案**：定义 `TabSessionPhase` 可写状态机，明确转换表
-- **转换表草案**：
-  ```text
-  idle → preparing → streaming → finalizing → syncing → idle
-                          ↓           ↓           ↓
-                     cancelled    error      cancelled
-  ```
-- **影响**：高 — 消除不一致组合，所有 busy gating 只问单一状态源
+- **现状**：`TabSessionLifecycleState` 已实现（`idle → preparing → streaming → finalizing → syncing → cancelled/error`），`isForegroundBusyTabSessionPhase()` 已包含 `syncing`
+- **问题**：仍有代码直接修改字段（如 `StreamLocalFinalizer` 直接写 `isConversationSyncInFlight`），绕过状态机
+- **方案**：将所有前台忙碌状态变更统一到 `transitionTabSessionLifecycle()`，消除直接字段赋值
+- **影响**：高 — 消除状态机与实际字段之间的漂移
 - **工作量**：中
-- **风险**：中 — 需要覆盖所有现有状态转换路径
+- **风险**：低-中 — 需要覆盖所有现有状态转换路径
 
-#### 改进 2：Per-conversation write serialization + monotonic version
+#### 改进 2：验证 per-conversation write serialization 的 head-of-line blocking 保护
 
-- **问题**：async interleaving 可能导致 `ChatMessage[]` cache 短暂不一致
-- **方案**：为 `Conversation.messages` 写入引入 per-conversation write lock 或 monotonic version guard
-- **影响**：中-高 — 防止 finalization sync + user hydration + bg task polling 交错时的 cache drift
-- **工作量**：中
-- **风险**：中 — 需避免死锁和延迟渲染
+- **现状**：`ConversationWriteSerializationService` 已实现（per-conversation queue + monotonic version ticket）
+- **问题**：若 `saveConversation()` 变慢，后续写入（含 sync event 的 authoritative merge）会被阻塞，当前无超时保护
+- **方案**：为 write serialization queue 添加超时/降级策略
+- **影响**：中 — 防止极端情况下的 head-of-line blocking
+- **工作量**：低
+- **风险**：低
 
 ### Tier 2 — 中优先级（扩展性）
 
@@ -395,30 +412,30 @@ metadata index + pinned full conversations + LRU full-message cache
 
 ### Alpha（gpt-5.5）— 两轮深度审查
 
-**评分：7.6/10**，置信度高。
+**评分：8.0/10**（修正后），置信度高。
 
-定位为"canonical 优先 + local cache/display 边界基本清晰，但未完全成熟"。
+定位为"canonical 优先 + local cache/display 边界基本清晰，核心架构已收敛"。
 
 **关键发现**：
-- sync event 错过事件后无强制重放保证
+- `TabSessionLifecycleState` 与 `ConversationWriteSerializationService` 已实现，但文档存在时序性偏差
+- 仍有代码直接操作字段绕过状态机
 - canonical sessions map 无 eviction API
-- 3 个具体失败场景（finalization sync 窗口、cancel 时序、stream done 后延迟）
-- `syncing` 不参与 foreground busy 是最具体的状态机缺陷
+- 3 个具体场景（finalization sync 窗口、cancel 时序、stream done 后延迟）但 `syncing` 已算 foreground busy
 
-**优先改进**：monotonic version/write token → writable state machine → LRU eviction
+**优先改进**：统一写入入口（消除绕过）→ write serialization 超时保护 → canonical sessions eviction
 
 ### Delta（kimi-for-coding）— 一轮深度审查
 
-**评分：7.5-8/10**，置信度高。
+**评分：8.0-8.5/10**（修正后），置信度高。
 
-定位为"功能成熟、架构收敛中，非终点状态"。
+定位为"核心能力已成熟，架构收敛中，非终点状态"。
 
 **关键发现**：
-- `isStreaming=true` + `sessionStatus=idle` 的具体用户可重入场景
-- 跨对象耦合比报告描述更深
-- 对"温和乐观偏倚"的定性最明确
+- `TabSessionLifecycleState` 与 `ConversationWriteSerializationService` 已实现，文档正文未充分反映
+- 仍有直接字段赋值绕过状态机（`StreamLocalFinalizer` 等）
+- head-of-line blocking 风险：write serialization queue 无超时保护
 
-**优先改进**：条件性串行写入保护 → 可验证状态机 → 长期 LRU 策略
+**优先改进**：统一写入入口（消除绕过）→ write serialization 超时保护 → 长期 LRU 策略
 
 ---
 

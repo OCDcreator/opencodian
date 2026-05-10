@@ -62,7 +62,7 @@ esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run docto
 
 ### update-graphify-src.mjs — src-scoped graphify 刷新
 
-运行当前平台可用的 Python graphify 入口，对 `src/` 做增量 code graph 更新；Windows 使用 `py -m graphify update src`。刷新完成后，把 `src/graphify-out/GRAPH_REPORT.md` 和 `src/graphify-out/graph.json` 同步回根目录 `graphify-out/`，再删除临时的 `src/graphify-out/`。
+运行当前平台可用的 Python graphify 入口，对 `src/` 做增量 code graph 更新；Windows 使用 `py -m graphify update src`。脚本会先清理旧的临时 `src/graphify-out/`，刷新完成后把 `src/graphify-out/GRAPH_REPORT.md` 和 `src/graphify-out/graph.json` 同步回根目录 `graphify-out/`，再删除临时输出。如果 graphify 在必需的 report/json 写出后仅因 HTML viz 规模上限返回非 0，脚本会继续同步这两个提交用 artifact。
 
 ### check-graphify-freshness.mjs — graphify 新鲜度检查
 

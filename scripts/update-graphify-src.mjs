@@ -1,6 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, 'src');
@@ -65,17 +65,37 @@ function removeScopedOutput() {
   }
 }
 
+function emitProcessOutput(result) {
+  if (result.stdout) {
+    process.stdout.write(result.stdout);
+  }
+  if (result.stderr) {
+    process.stderr.write(result.stderr);
+  }
+}
+
+function isHtmlVizLimitFailure(result) {
+  return `${result.stdout ?? ''}\n${result.stderr ?? ''}`.includes('too large for HTML viz');
+}
+
 const { command, args } = resolveGraphifyCommand();
+removeScopedOutput();
 const update = spawnSync(command, args, {
   cwd: repoRoot,
-  stdio: 'inherit',
+  encoding: 'utf8',
 });
+emitProcessOutput(update);
 
 if (update.status !== 0) {
-  process.exit(update.status ?? 1);
+  const hasRequiredArtifacts = existsSync(join(scopedOutputDir, 'GRAPH_REPORT.md'))
+    && existsSync(join(scopedOutputDir, 'graph.json'));
+  if (!hasRequiredArtifacts || !isHtmlVizLimitFailure(update)) {
+    process.exit(update.status ?? 1);
+  }
+  process.stderr.write('graphify exited non-zero after writing required report/json artifacts; continuing without HTML viz.\n');
 }
 
 syncCommittedArtifacts();
 removeScopedOutput();
 
-console.log('Synced src-scoped graphify artifacts back to graphify-out/ and cleaned src/graphify-out/.');
+process.stdout.write('Synced src-scoped graphify artifacts back to graphify-out/ and cleaned src/graphify-out/.\n');

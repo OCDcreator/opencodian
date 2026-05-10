@@ -100,6 +100,8 @@ class StorageService {
 
 `backgroundTaskMetadata` 只作为会话级 background-task lifecycle 恢复缓存随完整 session JSON 保存和读取；它不进入 conversation list sidecar，也不承载 assistant 正文、工具输出、结构化 payload 或 `contentBlocks` 真值。
 
+完整消息的磁盘真值仍是 `sessions/{id}.json`。内存层现在可以通过 `ConversationFullMessageCache` 把未 pin 的 `Conversation.messages` 裁剪为空数组；下一次打开该 conversation 时会再走 `loadFullConversation(id)` 从磁盘恢复完整消息。
+
 读取分成两条路径：
 
 - `loadFullConversation(id)` 返回完整 `Conversation`
@@ -150,6 +152,8 @@ class StorageService {
 - `largestFallbackSessions`
 
 `deleteConversation()` 会尝试删除单个文件；文件不存在时静默忽略。
+
+删除 conversation 时，插件层还会同步调用 `ConversationFullMessageCache.forget(id)` 与 `OpenCodeService.deleteSession()`；后者会在服务端删除尝试结束后清理本地 canonical session graph。
 
 ### 设置与运行时状态
 
