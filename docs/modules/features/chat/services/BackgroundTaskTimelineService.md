@@ -67,6 +67,9 @@ export function createBackgroundTaskViewHost(
 - `syncStateFromConversation()` 复用同一份 runtime reset，只是不提前清空 inline panel；conversation reload / authoritative sync 的 runtime rebuild 因此与主动 reset 保持一致。
 - `syncStateFromConversation()` 只会从存在真实 pending `task` launch 的 segment 重建 live runtime；历史会话里的纯 `search-mode` user injection 不会重新 armed 成“后台任务准备中”。
 - hydration 期间如果 conversation 里仍存在 active segment，会重新 arm authoritative-sync gate，避免过早把仍在运行的 background task 降级为 stale。
+- `syncStateFromConversation()` 会把 message-derived active segment 的轻量生命周期缓存写回 `conversation.backgroundTaskMetadata.activeAnchor`（`startedAt` / `anchorKey` / `modeTag` / `waitingForFollowUp` / `updatedAt`）。该 metadata 只用于 reload/hydration 恢复 active anchor，不保存 task launch、completion、tool output、structured payload 或 `contentBlocks`。
+- 当 message timeline 显示没有 active segment、segment 已 all-complete，或 segment 被 suppression 规则压制时，message-derived state 始终优先，并会清理 stale `backgroundTaskMetadata`，避免 metadata 把已结束任务重新撑活。
+- hydration/recovery 中如果 message timeline 还无法重建 active segment，且没有 message-derived 终止/抑制证据，service 可以从有效 `backgroundTaskMetadata.activeAnchor` 恢复 runtime 的 `startedAt`、`anchorKey`、`modeTag` 与 `waitingForFollowUp`，并重新 arm authoritative-sync gate；它不会伪造 `backgroundTaskLaunches` 或 `backgroundTaskCompletedTasks`。
 
 ### timeline facade
 

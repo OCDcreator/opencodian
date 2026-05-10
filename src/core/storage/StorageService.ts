@@ -196,6 +196,7 @@ export class StorageService {
       currentNote: conversation.currentNote,
       externalContextPaths: conversation.externalContextPaths,
       sessionSettings: normalizeConversationSessionSettings(conversation.sessionSettings),
+      backgroundTaskMetadata: conversation.backgroundTaskMetadata,
       messages: conversation.messages,  // Save full messages with contentBlocks
     };
 

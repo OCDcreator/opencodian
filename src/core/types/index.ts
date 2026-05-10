@@ -1,11 +1,13 @@
 // Chat types
 export {
+  type BackgroundTaskActiveAnchorMetadata,
   type ChatMessage,
   type CompactionDividerMeta,
   type ContentBlock,
   type ContextBreakdownKey,
   type ContextBreakdownSegment,
   type Conversation,
+  type ConversationBackgroundTaskMetadata,
   type ConversationMeta,
   type ConversationSessionSettings,
   createEmptyTabContextState,

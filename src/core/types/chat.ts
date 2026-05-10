@@ -342,6 +342,18 @@ export interface ConversationMeta {
   openCodeSessionId?: string;
 }
 
+export interface BackgroundTaskActiveAnchorMetadata {
+  startedAt: number;
+  anchorKey: string;
+  modeTag: string | null;
+  waitingForFollowUp: boolean;
+  updatedAt: number;
+}
+
+export interface ConversationBackgroundTaskMetadata {
+  activeAnchor?: BackgroundTaskActiveAnchorMetadata;
+}
+
 /** Conversation */
 export interface Conversation {
   id: string;
@@ -355,4 +367,5 @@ export interface Conversation {
   currentNote?: string;
   externalContextPaths?: string[];
   sessionSettings?: ConversationSessionSettings;
+  backgroundTaskMetadata?: ConversationBackgroundTaskMetadata;
 }

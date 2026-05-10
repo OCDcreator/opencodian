@@ -41,6 +41,8 @@
 | `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
 | `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
 | `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
+| `ConversationBackgroundTaskMetadata` | 会话级 background-task lifecycle 缓存（当前只包含可选 `activeAnchor`，用于 hydration/recovery 恢复 active anchor 生命周期，不承载消息正文、工具输出、结构化 payload 或 `contentBlocks` 真值） |
+| `BackgroundTaskActiveAnchorMetadata` | active background-task anchor 的轻量字段（`startedAt`, `anchorKey`, `modeTag`, `waitingForFollowUp`, `updatedAt`） |
 | `ConversationMeta` | 会话元数据（不含消息体） |
 | `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据） |
 
@@ -101,6 +103,7 @@
 - 助手消息可携带 `summary?: true`，当前用于把 OpenCode 原生 compaction report 保持成独立 assistant transcript 节点
 - `displayStyle: 'notice'` 表示系统通知消息，使用不同的渲染模板
 - `streamState: 'interrupted'` 标记被取消的流
+- `Conversation.backgroundTaskMetadata` 是 lifecycle recovery/cache state。canonical session/message/part projection 仍然是 assistant body、tool output、structured payload 与 `contentBlocks` 的真值来源，metadata 不得覆盖这些字段。
 
 ### 内容块类型
 `ContentBlock.type` 支持五种：

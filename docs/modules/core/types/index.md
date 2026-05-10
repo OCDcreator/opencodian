@@ -23,7 +23,9 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `ChatMessage` | type | 聊天消息结构 |
 | `CompactionDividerMeta` | type | 结构化 compaction 分界元数据 |
 | `ContentBlock` | type | 内容块（text/thinking/tool_use/tool_result/subagent） |
+| `BackgroundTaskActiveAnchorMetadata` | type | background-task active anchor 的轻量 lifecycle 缓存字段 |
 | `Conversation` | type | 完整会话（含消息数组） |
+| `ConversationBackgroundTaskMetadata` | type | 会话级 background-task lifecycle 恢复缓存；不承载消息内容真值 |
 | `ConversationMeta` | type | 会话元数据 |
 | `StreamChunk` | type | 流式事件联合类型（13 种事件） |
 | `TabContextState` | type | 标签页上下文状态 |

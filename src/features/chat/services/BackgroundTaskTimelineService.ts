@@ -1,4 +1,4 @@
-import type { ChatMessage, Conversation } from '../../../core/types';
+import type { BackgroundTaskActiveAnchorMetadata, ChatMessage, Conversation } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
@@ -128,12 +128,13 @@ export class BackgroundTaskTimelineService {
       return;
     }
 
-    if (!conversation || conversation.messages.length === 0) {
+    if (!conversation) {
       this.host.syncTabStreamLikeState(tabId);
       return;
     }
 
-    const latestActiveSegment = [...this.collectSegments(conversation.messages, tabId)]
+    const segments = this.collectSegments(conversation.messages, tabId);
+    const latestActiveSegment = [...segments]
       .reverse()
       .find((segment) =>
         !this.host.isSuppressedBackgroundTaskSegment(segment, tabId, conversation)
@@ -142,6 +143,16 @@ export class BackgroundTaskTimelineService {
       ) ?? null;
 
     if (!latestActiveSegment) {
+      if (
+        runtime.isHydratingConversation
+        && !this.hasMessageDerivedTerminalLifecycleState(segments, tabId, conversation)
+        && this.restoreRuntimeStateFromMetadata(conversation.backgroundTaskMetadata?.activeAnchor, runtime)
+      ) {
+        this.host.armAuthoritativeSyncGate(tabId);
+        this.host.syncTabStreamLikeState(tabId);
+        return;
+      }
+      delete conversation.backgroundTaskMetadata;
       this.host.syncTabStreamLikeState(tabId);
       return;
     }
@@ -159,6 +170,7 @@ export class BackgroundTaskTimelineService {
     for (const completion of latestActiveSegment.completed) {
       runtime.backgroundTaskCompletedTasks.set(completion.taskId, completion);
     }
+    this.writeConversationMetadata(conversation, latestActiveSegment);
     this.host.syncTabStreamLikeState(tabId);
   }
 
@@ -332,6 +344,73 @@ export class BackgroundTaskTimelineService {
     this.host.clearAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     return runtime;
+  }
+
+  private restoreRuntimeStateFromMetadata(
+    metadata: BackgroundTaskActiveAnchorMetadata | undefined,
+    runtime: BackgroundTaskTimelineRuntime,
+  ): boolean {
+    if (!this.isValidActiveAnchorMetadata(metadata)) {
+      return false;
+    }
+
+    runtime.backgroundTaskStartedAt = metadata.startedAt;
+    runtime.backgroundTaskActiveAnchorKey = metadata.anchorKey;
+    runtime.backgroundTaskModeTag = metadata.modeTag;
+    runtime.backgroundTaskWaitingForFollowUp = metadata.waitingForFollowUp && !runtime.isStreaming;
+    return true;
+  }
+
+  private isValidActiveAnchorMetadata(
+    metadata: BackgroundTaskActiveAnchorMetadata | undefined,
+  ): metadata is BackgroundTaskActiveAnchorMetadata {
+    return !!metadata
+      && Number.isFinite(metadata.startedAt)
+      && metadata.startedAt > 0
+      && typeof metadata.anchorKey === 'string'
+      && metadata.anchorKey.length > 0
+      && (metadata.modeTag === null || typeof metadata.modeTag === 'string')
+      && typeof metadata.waitingForFollowUp === 'boolean'
+      && Number.isFinite(metadata.updatedAt);
+  }
+
+  private hasMessageDerivedTerminalLifecycleState(
+    segments: BackgroundTaskSegment[],
+    tabId: TabId | null,
+    conversation: Conversation,
+  ): boolean {
+    return segments.some((segment) =>
+      this.host.isSuppressedBackgroundTaskSegment(segment, tabId, conversation)
+      || segment.sawAllTasksComplete
+      || segment.launches.length > 0
+      || segment.completed.length > 0,
+    );
+  }
+
+  private writeConversationMetadata(
+    conversation: Conversation,
+    segment: BackgroundTaskSegment,
+  ): void {
+    conversation.backgroundTaskMetadata = {
+      activeAnchor: {
+        startedAt: segment.anchorTimestamp,
+        anchorKey: segment.anchorKey,
+        modeTag: segment.modeTag,
+        waitingForFollowUp: segment.waitingForFollowUp,
+        updatedAt: this.getSegmentUpdatedAt(conversation, segment),
+      },
+    };
+  }
+
+  private getSegmentUpdatedAt(
+    conversation: Conversation,
+    segment: BackgroundTaskSegment,
+  ): number {
+    const messageTimestamps = conversation.messages
+      .filter((message) => message.timestamp >= segment.anchorTimestamp)
+      .map((message) => message.timestamp);
+
+    return Math.max(segment.anchorTimestamp, ...messageTimestamps);
   }
 
   private getLogPreview(text: string, maxLength = 180): string {

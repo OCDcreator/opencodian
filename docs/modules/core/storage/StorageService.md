@@ -93,9 +93,12 @@ class StorageService {
 - `currentNote`
 - `externalContextPaths`
 - `sessionSettings`
+- `backgroundTaskMetadata`
 - `messages`
 
 也就是说，保存时不是只存摘要，而是把完整消息数组一起落盘；同时还会额外写一份轻量 sidecar metadata，里面只保留历史列表需要的字段（`title/updatedAt/messageCount/openCodeSessionId` 等）。
+
+`backgroundTaskMetadata` 只作为会话级 background-task lifecycle 恢复缓存随完整 session JSON 保存和读取；它不进入 conversation list sidecar，也不承载 assistant 正文、工具输出、结构化 payload 或 `contentBlocks` 真值。
 
 读取分成两条路径：
 

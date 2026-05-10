@@ -190,6 +190,47 @@ describe('StorageService conversation persistence - saveConversation', () => {
       const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
       expect(savedData.externalContextPaths).toEqual(['notes/alpha.md', 'notes/beta.md']);
   });
+
+  it('persists conversation background task lifecycle metadata', async () => {
+      const conversation = {
+        id: 'conv-bg-meta',
+        title: 'Background metadata conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        openCodeSessionId: 'session-bg-meta',
+        backgroundTaskMetadata: {
+          activeAnchor: {
+            startedAt: 1234567900,
+            anchorKey: 'msg-user-1',
+            modeTag: 'search-mode',
+            waitingForFollowUp: true,
+            updatedAt: 1234567999,
+          },
+        },
+        messages: [],
+      };
+
+      await storage.saveConversation(conversation as unknown as {
+        id: string;
+        title: string;
+        createdAt: number;
+        updatedAt: number;
+        openCodeSessionId: string;
+        backgroundTaskMetadata: unknown;
+        messages: unknown[];
+      });
+
+      const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      expect(savedData.backgroundTaskMetadata).toEqual({
+        activeAnchor: {
+          startedAt: 1234567900,
+          anchorKey: 'msg-user-1',
+          modeTag: 'search-mode',
+          waitingForFollowUp: true,
+          updatedAt: 1234567999,
+        },
+      });
+  });
 });
 
 describe('StorageService conversation persistence - loadConversation', () => {
@@ -304,6 +345,38 @@ describe('StorageService conversation persistence - loadFullConversation', () =>
       const result = await storage.loadFullConversation('conv-paths');
 
       expect(result?.externalContextPaths).toEqual(['notes/alpha.md', 'notes/beta.md']);
+  });
+
+  it('restores persisted background task lifecycle metadata after reload', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        id: 'conv-bg-meta',
+        title: 'Background metadata conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        openCodeSessionId: 'session-bg-meta',
+        backgroundTaskMetadata: {
+          activeAnchor: {
+            startedAt: 1234567900,
+            anchorKey: 'msg-user-1',
+            modeTag: 'search-mode',
+            waitingForFollowUp: true,
+            updatedAt: 1234567999,
+          },
+        },
+        messages: [],
+      }));
+
+      const result = await storage.loadFullConversation('conv-bg-meta');
+
+      expect(result?.backgroundTaskMetadata).toEqual({
+        activeAnchor: {
+          startedAt: 1234567900,
+          anchorKey: 'msg-user-1',
+          modeTag: 'search-mode',
+          waitingForFollowUp: true,
+          updatedAt: 1234567999,
+        },
+      });
   });
 });
 

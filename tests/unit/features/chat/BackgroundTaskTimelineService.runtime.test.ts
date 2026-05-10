@@ -153,6 +153,250 @@ describe('BackgroundTaskTimelineService runtime state synchronization', () => {
     expect(runtime.backgroundTaskStaleNoticeFingerprint).toBeNull();
     expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
   });
+});
+
+describe('BackgroundTaskTimelineService background task metadata writeback and recovery', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('writes active message-derived lifecycle metadata onto the conversation', () => {
+    const runtime = createRuntime({ isHydratingConversation: true });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'search docs',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+        omo: {
+          kind: 'user-injection',
+          modeTag: 'search-mode',
+          injectedPrompt: 'search docs',
+          originalText: 'search docs',
+          rawText: 'search docs',
+          headline: 'search docs',
+        },
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Search docs', taskId: 'bg_1' },
+          toolResult: 'started bg_1',
+          toolStatus: 'completed',
+        }],
+      },
+    ]);
+
+    service.syncStateFromConversation(conversation, 'tab-1');
+
+    expect(conversation.backgroundTaskMetadata).toEqual({
+      activeAnchor: {
+        startedAt: 1,
+        anchorKey: 'msg-user-1',
+        modeTag: 'search-mode',
+        waitingForFollowUp: true,
+        updatedAt: 2,
+      },
+    });
+  });
+
+  it('clears stale lifecycle metadata when messages do not reconstruct an active segment outside hydration', () => {
+    const runtime = createRuntime();
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([{
+      id: 'assistant-1',
+      role: 'assistant',
+      content: 'hello',
+      timestamp: 2,
+    }]);
+    conversation.backgroundTaskMetadata = {
+      activeAnchor: {
+        startedAt: 1,
+        anchorKey: 'msg-user-1',
+        modeTag: 'search-mode',
+        waitingForFollowUp: true,
+        updatedAt: 1,
+      },
+    };
+
+    service.syncStateFromConversation(conversation, 'tab-1');
+
+    expect(conversation.backgroundTaskMetadata).toBeUndefined();
+    expect(runtime.backgroundTaskStartedAt).toBeNull();
+    expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
+  });
+
+  it('restores lifecycle metadata during hydration without fabricating launches or completions', () => {
+    const runtime = createRuntime({ isHydratingConversation: true });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([]);
+    conversation.backgroundTaskMetadata = {
+      activeAnchor: {
+        startedAt: 10,
+        anchorKey: 'msg-user-1',
+        modeTag: 'search-mode',
+        waitingForFollowUp: true,
+        updatedAt: 15,
+      },
+    };
+
+    service.syncStateFromConversation(conversation, 'tab-1');
+
+    expect(runtime.backgroundTaskStartedAt).toBe(10);
+    expect(runtime.backgroundTaskActiveAnchorKey).toBe('msg-user-1');
+    expect(runtime.backgroundTaskModeTag).toBe('search-mode');
+    expect(runtime.backgroundTaskWaitingForFollowUp).toBe(true);
+    expect(runtime.backgroundTaskLaunches.size).toBe(0);
+    expect(runtime.backgroundTaskCompletedTasks.size).toBe(0);
+    expect(host.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
+    expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
+  });
+});
+
+describe('BackgroundTaskTimelineService background task metadata precedence', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('lets message-derived all-complete state clear stale lifecycle metadata during hydration', () => {
+    const runtime = createRuntime({ isHydratingConversation: true });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'search docs',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+        omo: {
+          kind: 'user-injection',
+          modeTag: 'search-mode',
+          injectedPrompt: 'search docs',
+          originalText: 'search docs',
+          rawText: 'search docs',
+          headline: 'search docs',
+        },
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Search docs', taskId: 'bg_1' },
+          toolResult: 'started bg_1',
+          toolStatus: 'completed',
+        }],
+      },
+      {
+        id: 'assistant-reminder-1',
+        role: 'assistant',
+        content: 'all background tasks complete',
+        timestamp: 3,
+        displayStyle: 'notice',
+        noticeTone: 'info',
+        omo: {
+          kind: 'system-reminder',
+          reminderType: 'all-background-tasks-complete',
+          reminderText: 'all background tasks complete',
+          rawText: 'all background tasks complete',
+          headline: 'all background tasks complete',
+          isInternalInitiator: false,
+          tasks: [],
+        },
+      },
+    ]);
+    conversation.backgroundTaskMetadata = {
+      activeAnchor: {
+        startedAt: 1,
+        anchorKey: 'msg-user-1',
+        modeTag: 'search-mode',
+        waitingForFollowUp: true,
+        updatedAt: 2,
+      },
+    };
+
+    service.syncStateFromConversation(conversation, 'tab-1');
+
+    expect(conversation.backgroundTaskMetadata).toBeUndefined();
+    expect(runtime.backgroundTaskStartedAt).toBeNull();
+    expect(runtime.backgroundTaskLaunches.size).toBe(0);
+    expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
+  });
+
+  it('lets message-derived suppression clear stale lifecycle metadata during hydration', () => {
+    const runtime = createRuntime({ isHydratingConversation: true });
+    const host = createHost(runtime);
+    host.isSuppressedBackgroundTaskSegment.mockReturnValue(true);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'search docs',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+        omo: {
+          kind: 'user-injection',
+          modeTag: 'search-mode',
+          injectedPrompt: 'search docs',
+          originalText: 'search docs',
+          rawText: 'search docs',
+          headline: 'search docs',
+        },
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Search docs', taskId: 'bg_1' },
+          toolResult: 'started bg_1',
+          toolStatus: 'completed',
+        }],
+      },
+    ]);
+    conversation.backgroundTaskMetadata = {
+      activeAnchor: {
+        startedAt: 1,
+        anchorKey: 'msg-user-1',
+        modeTag: 'search-mode',
+        waitingForFollowUp: true,
+        updatedAt: 2,
+      },
+    };
+
+    service.syncStateFromConversation(conversation, 'tab-1');
+
+    expect(conversation.backgroundTaskMetadata).toBeUndefined();
+    expect(runtime.backgroundTaskStartedAt).toBeNull();
+    expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
+  });
+});
+
+describe('BackgroundTaskTimelineService indicator runtime controls', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('does not rehydrate launchless search-mode anchors from persisted history', () => {
     const runtime = createRuntime({
