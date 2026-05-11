@@ -61,6 +61,7 @@
 - 对 `message.part.updated` 记录 part type/message id，并产出 assistant message + part upsert mutations
 - 对 `message.part.delta` 复用 part type/message id，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`，同时产出 part delta mutation；reasoning delta 会更新 dedupe 游标，避免后续 `part.updated` 重复渲染，空白 delta 只保留 canonical mutation 不触发 UI thinking 块
 - 对 `permission.asked`、`file.edited`、`question.asked` 做结构化 chunk 映射；其中 permission chunk 会复用同一套请求归一化，保留 `always` 与可选 `tool` 引用，避免流式路径和 polling 路径的权限语义漂移
+- `question.asked` 仍是 AskQuestion 主路径；同时，`question` tool-part 如果明确处于 `state.status === 'waiting'` 且 `state.metadata` / `state.metadata.request` / `state.metadata.question` / part 本身能通过 host 的 `normalizeQuestionRequest()`，会补发 `question_request` chunk，作为事件丢失或 alternate stream shape 的保守回退
 - 对 `session.error` / `session.idle` 返回 stop 信号，同时保留错误与 debug 信息
 
 ### `parseSSEEvents()`
@@ -74,7 +75,7 @@
 
 ### `transformEventToChunks()` / `transformPartToChunks()`
 
-这是较薄的通用映射 helper，负责把已有 event / part payload 映射成 `text`、`thinking`、`tool_use`、`tool_result`、`usage` chunk。它们不参与 session guard、tool-use dedupe 或 stream stop 判断；这些留给 `handleStreamingEvent()`。
+这是较薄的通用映射 helper，负责把已有 event / part payload 映射成 `text`、`thinking`、`tool_use`、`tool_result`、`usage` chunk。`transformPartToChunks()` 也保留 waiting `question` tool-part 的 `question_request` 回退映射，方便 helper 调用方不漏掉结构化问题。它们不参与 session guard、tool-use dedupe 或 stream stop 判断；这些留给 `handleStreamingEvent()`。
 
 ## 数据流
 
@@ -99,5 +100,6 @@ graph LR
 - 不要让 `message.part.delta` 只走 loose text chunk；如果能解析出 `partID + messageID`，必须同时输出 canonical part mutation。
 - `transformPartToChunks()` 目前仍保持原有"只直接处理 `reasoning` part，不单独处理 `thinking` part"的兼容语义。
 - `toolMetadata` 是 UI-safe 白名单字段，不要把 OpenCode `part.state.metadata` 整对象直接塞进 `StreamChunk`。
+- waiting `question` tool-part fallback 只能通过 `normalizeQuestionRequest()` 接受显式 question request payload；不要扩展成任意 tool metadata sniffing，否则容易把普通工具结果误判为用户问题。
 - `task` 的 result visibility 同样属于流式 contract；如果以后新增 part-to-chunk helper，必须同时保留 `toolMetadata.sessionId` 与 hidden-result 标记。
 - MCP 工具名观察必须在分类之前执行（`observeRuntimeToolNames` → `resolveToolPartClassification`），确保首次出现的 MCP 工具在第一个 `tool_use` chunk 里就拿到正确的 `mcp` kind，而不是先 `custom` 后 `mcp` 的漂移。这个观察-分类顺序在 `handleToolPartUpdated` 和 `appendToolPartChunks` 两条路径都保持一致。

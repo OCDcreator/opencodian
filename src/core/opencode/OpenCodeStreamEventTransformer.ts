@@ -505,6 +505,8 @@ export class OpenCodeStreamEventTransformer {
       return;
     }
 
+    this.appendWaitingQuestionRequestChunk(toolPart, chunks);
+
     const {
       toolId,
       toolName,
@@ -625,6 +627,8 @@ export class OpenCodeStreamEventTransformer {
       return;
     }
 
+    this.appendWaitingQuestionRequestChunk(part, chunks);
+
     const {
       toolId,
       toolName,
@@ -669,6 +673,48 @@ export class OpenCodeStreamEventTransformer {
         isError: toolStatus === 'error',
       });
     }
+  }
+
+  private appendWaitingQuestionRequestChunk(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    const request = this.resolveWaitingQuestionRequest(part);
+    if (!request) {
+      return;
+    }
+
+    chunks.push({
+      type: 'question_request',
+      request,
+    });
+  }
+
+  private resolveWaitingQuestionRequest(part: OpenCodeStreamPart): ChatQuestionRequest | null {
+    if (
+      part.type !== 'tool'
+      || part.tool !== 'question'
+      || part.state?.status !== 'waiting'
+    ) {
+      return null;
+    }
+
+    const metadata = part.state.metadata;
+    const candidates: unknown[] = [
+      metadata,
+      metadata?.request,
+      metadata?.question,
+      part,
+    ];
+
+    for (const candidate of candidates) {
+      const request = this.host.normalizeQuestionRequest(candidate);
+      if (request) {
+        return request;
+      }
+    }
+
+    return null;
   }
 
   private handleMessagePartDelta({
