@@ -61,6 +61,12 @@ interface QuestionDockCallbacks {
 - `single`: 一次显示一个问题，footer 按钮文本为 "下一步"/"提交"
 - `all`: 显示当前 group 的所有问题，已回答的问题标记 `is-answered`
 
+### 键盘交互
+
+Dock 的键盘处理是组件本地行为，不安装全局 `document` / `window` listener。焦点在选项 input 上时，`ArrowDown` / `ArrowRight` 聚焦下一个选项，`ArrowUp` / `ArrowLeft` 聚焦上一个选项，`Home` / `End` 跳到首尾选项，`Space` 切换或选择当前选项，`Enter` 复用 single 模式的下一步 / 提交流程，`Escape` 走拒绝回调。
+
+选项仍使用原生 radio / checkbox input 作为焦点目标，保持浏览器与辅助技术语义。`single` 模式下，非最后一题的单选选项在完成答案后会自动调用 `onSelectQuestion(index + 1)` 前进；最后一题不会因单次选项选择自动提交，仍需 `Enter` 或提交按钮。`all` 模式下，选项上的 `Enter` 只选择并更新当前题答案，不直接提交整组问题。自定义文本输入保留原生文字编辑行为；`Enter` / 方向键不参与选项导航快捷键，`Escape` 仍会拒绝当前 dock 请求。
+
 ## 关键方法
 
 | 方法 | 说明 |
@@ -70,6 +76,8 @@ interface QuestionDockCallbacks {
 | `renderHeader(viewModel, displayMode, callbacks)` | 标题、进度、关闭按钮 |
 | `renderTabs(viewModel, callbacks)` | 分组标签页 |
 | `renderBody(viewModel, displayMode, callbacks)` | 问题卡片列表 |
+| `handleQuestionKeydown(...)` | 处理 dock 内选项焦点、选择、下一步/提交与拒绝快捷键 |
+| `handleSubmitOrNext(...)` | 复用 footer 与键盘 Enter 的 single 模式下一步/提交逻辑 |
 | `renderFooter(viewModel, displayMode, sectionElements, callbacks)` | 提交/下一步 + 拒绝按钮 |
 | `collectAnswerFromSection(container, question)` | 从 DOM 读取当前答案 |
 | `destroy()` | 移除根元素 |

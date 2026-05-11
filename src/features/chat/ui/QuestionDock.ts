@@ -163,6 +163,17 @@ export class QuestionDock {
         sectionEl.toggleClass('is-answered', visibleQuestion.answered);
       }
       sectionElements.set(visibleQuestion.index, sectionEl);
+      sectionEl.addEventListener('keydown', (event) => {
+        this.handleQuestionKeydown({
+          event,
+          question: visibleQuestion.question,
+          questionIndex: visibleQuestion.index,
+          sectionEl,
+          displayMode,
+          viewModel,
+          callbacks,
+        });
+      });
 
       sectionEl.createDiv({
         cls: 'opencodian-question-inline-header-text',
@@ -233,6 +244,128 @@ export class QuestionDock {
     return sectionElements;
   }
 
+  private handleQuestionKeydown(options: {
+    event: KeyboardEvent;
+    question: QuestionRequest['questions'][number];
+    questionIndex: number;
+    sectionEl: HTMLElement;
+    displayMode: QuestionDisplayMode;
+    viewModel: QuestionDockViewModel;
+    callbacks: QuestionDockCallbacks;
+  }): void {
+    const {
+      event,
+      question,
+      questionIndex,
+      sectionEl,
+      displayMode,
+      viewModel,
+      callbacks,
+    } = options;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      callbacks.onReject();
+      return;
+    }
+
+    if (
+      event.target instanceof HTMLInputElement
+      && event.target.classList.contains('opencodian-question-inline-custom')
+    ) {
+      return;
+    }
+
+    const optionInputs = this.getOptionInputs(sectionEl);
+    const focusedIndex = optionInputs.findIndex((input) => input === event.target);
+    if (focusedIndex < 0) {
+      return;
+    }
+
+    if (this.handleOptionFocusKey(event, optionInputs, focusedIndex)) {
+      return;
+    }
+
+    if (event.key !== ' ' && event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+    this.toggleOptionInput(optionInputs[focusedIndex], question);
+    const answer = this.collectAnswerFromSection(sectionEl, question);
+    const shouldDeferAnswerChangeToSubmit = event.key === 'Enter' && !question.multiple && displayMode === 'single';
+    if (!shouldDeferAnswerChangeToSubmit) {
+      callbacks.onAnswerChange(questionIndex, answer);
+    }
+
+    if (
+      displayMode === 'single'
+      && !question.multiple
+      && isQuestionAnswerComplete(question, answer)
+      && event.key === ' '
+      && questionIndex < viewModel.totalCount - 1
+    ) {
+      callbacks.onSelectQuestion(questionIndex + 1);
+      return;
+    }
+
+    if (event.key === 'Enter' && !question.multiple && displayMode === 'single') {
+      this.handleSubmitOrNext(viewModel, displayMode, new Map([[questionIndex, sectionEl]]), callbacks);
+    }
+  }
+
+  private handleOptionFocusKey(
+    event: KeyboardEvent,
+    optionInputs: readonly HTMLInputElement[],
+    focusedIndex: number,
+  ): boolean {
+    const focusTargetByKey: Record<string, number | undefined> = {
+      ArrowDown: focusedIndex + 1,
+      ArrowRight: focusedIndex + 1,
+      ArrowUp: focusedIndex - 1,
+      ArrowLeft: focusedIndex - 1,
+      Home: 0,
+      End: optionInputs.length - 1,
+    };
+    const nextIndex = focusTargetByKey[event.key];
+    if (nextIndex === undefined) {
+      return false;
+    }
+
+    event.preventDefault();
+    this.focusOptionInput(optionInputs, nextIndex);
+    return true;
+  }
+
+  private getOptionInputs(sectionEl: HTMLElement): HTMLInputElement[] {
+    return [...sectionEl.querySelectorAll<HTMLInputElement>('input[type="checkbox"], input[type="radio"]')];
+  }
+
+  private focusOptionInput(optionInputs: readonly HTMLInputElement[], nextIndex: number): void {
+    if (optionInputs.length === 0) {
+      return;
+    }
+
+    const boundedIndex = Math.max(0, Math.min(nextIndex, optionInputs.length - 1));
+    optionInputs[boundedIndex]?.focus();
+  }
+
+  private toggleOptionInput(
+    inputEl: HTMLInputElement | undefined,
+    question: QuestionRequest['questions'][number],
+  ): void {
+    if (!inputEl) {
+      return;
+    }
+
+    if (question.multiple) {
+      inputEl.checked = !inputEl.checked;
+      return;
+    }
+
+    inputEl.checked = true;
+  }
+
   private renderFooter(
     viewModel: QuestionDockViewModel,
     displayMode: QuestionDisplayMode,
@@ -249,28 +382,7 @@ export class QuestionDock {
       attr: { type: 'button' },
     });
     submitBtn.addEventListener('click', () => {
-      if (displayMode === 'single') {
-        const current = viewModel.visibleQuestions[0];
-        if (!current) {
-          return;
-        }
-
-        const sectionEl = sectionElements.get(current.index);
-        const answer = sectionEl
-          ? this.collectAnswerFromSection(sectionEl, current.question)
-          : current.answer;
-        if (!isQuestionAnswerComplete(current.question, answer)) {
-          return;
-        }
-
-        callbacks.onAnswerChange(current.index, answer);
-        if (current.index < viewModel.totalCount - 1) {
-          callbacks.onSelectQuestion(current.index + 1);
-          return;
-        }
-      }
-
-      callbacks.onSubmit();
+      this.handleSubmitOrNext(viewModel, displayMode, sectionElements, callbacks);
     });
 
     const rejectBtn = footerEl.createEl('button', {
@@ -281,6 +393,36 @@ export class QuestionDock {
     rejectBtn.addEventListener('click', () => {
       callbacks.onReject();
     });
+  }
+
+  private handleSubmitOrNext(
+    viewModel: QuestionDockViewModel,
+    displayMode: QuestionDisplayMode,
+    sectionElements: ReadonlyMap<number, HTMLElement>,
+    callbacks: QuestionDockCallbacks,
+  ): void {
+    if (displayMode === 'single') {
+      const current = viewModel.visibleQuestions[0];
+      if (!current) {
+        return;
+      }
+
+      const sectionEl = sectionElements.get(current.index);
+      const answer = sectionEl
+        ? this.collectAnswerFromSection(sectionEl, current.question)
+        : current.answer;
+      if (!isQuestionAnswerComplete(current.question, answer)) {
+        return;
+      }
+
+      callbacks.onAnswerChange(current.index, answer);
+      if (current.index < viewModel.totalCount - 1) {
+        callbacks.onSelectQuestion(current.index + 1);
+        return;
+      }
+    }
+
+    callbacks.onSubmit();
   }
 
   private collectAnswerFromSection(
