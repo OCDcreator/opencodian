@@ -33,13 +33,13 @@ The assembly fallback that resolves OMO completion reminders should prefer a seg
 
 ### Indicator Arming
 
-`BackgroundTaskTimelineService.armIndicatorForUserMessage()` should arm runtime state for every user message that can become a task anchor. For ordinary user messages, `backgroundTaskModeTag` should be `null`; for OMO user-injection messages, it should preserve the original mode tag. The authoritative sync gate, stale notice fingerprints, and suppressed fingerprints should be reset exactly as they are today.
+`BackgroundTaskTimelineService.armIndicatorForUserMessage()` should preserve an active anchor for every user message that can become a task anchor. For ordinary user messages, `backgroundTaskModeTag` should be `null`; for OMO user-injection messages, it should preserve the original mode tag. The authoritative sync gate, stale notice fingerprints, and suppressed fingerprints should be reset exactly as they are today.
 
-Launchless placeholder behavior remains valid only while runtime still tracks the anchor. The inline panel should continue to render pending segments and preparing segments that match active runtime state, without requiring search-mode.
+Ordinary armed anchors should stay visually quiet until a downstream native `task` launch exists. Launchless preparing placeholders remain compatibility behavior for OMO-mode anchors only, and still require runtime to track the active anchor. This avoids showing a background-task preparing panel for every normal chat send while still giving native task launches a stable user anchor as soon as they arrive.
 
 ### Live Signals
 
-`BackgroundTaskLiveSignalCoordinator` should decide whether an indicator still exists from runtime activity, pending launches, streaming state, grace period, or an active anchor. Empty launch placeholders after the grace period should be reset for any mode, not only `search-mode`.
+`BackgroundTaskLiveSignalCoordinator` should decide whether an indicator still exists from runtime activity, pending launches, streaming state, grace period, or an OMO-mode launchless placeholder. Empty launch placeholders after the grace period should be reset for any mode, not only `search-mode`.
 
 The existing grace-period and authoritative-sync protections remain unchanged. Hydration must still avoid premature stale notices until authoritative message sync has run.
 
@@ -59,8 +59,8 @@ Add or update focused Jest tests before implementation:
 
 - Timeline assembly: a normal user message followed by a native `task` block creates a segment with `modeTag: null`, launch metadata from `toolMetadata.sessionId`, and reload-safe pending/completed state.
 - Diagnostics: the same normal user anchor returns diagnostics instead of `null`.
-- Indicator arming: a normal user message arms runtime with `backgroundTaskModeTag: null` and calls the authoritative sync gate.
-- Inline preparing state: a launchless ordinary user anchor renders only when runtime still tracks that anchor.
+- Indicator arming: a normal user message stores runtime anchor metadata with `backgroundTaskModeTag: null` and calls the authoritative sync gate.
+- Inline task state: an ordinary user anchor renders once a downstream native task launch exists, while a launchless ordinary user anchor stays hidden.
 - Live signal cleanup: an empty launch placeholder after the grace period resets for `modeTag: null`.
 
 Then run the targeted test files for the touched behavior, followed by the repository source guards:
@@ -83,6 +83,7 @@ Implementation should follow the user's requested controller workflow:
 ## Success Criteria
 
 - No lifecycle-critical branch in `BackgroundTaskTimelineAssemblyService`, `BackgroundTaskTimelineService`, or `BackgroundTaskLiveSignalCoordinator` requires `modeTag === 'search-mode'` to support native OpenCode `task` activity.
+- Ordinary chat sends do not show a launchless background-task preparing panel unless a native `task` launch appears.
 - Search-mode remains allowed as metadata and historical OMO fallback context.
 - Native task reload behavior is covered by tests for ordinary user anchors.
 - The module docs and graphify artifacts pass their guards.

@@ -17,13 +17,13 @@
 - Modify: `tests/unit/features/chat/BackgroundTaskTimelineService.runtime.test.ts`
   - Update indicator arming expectations for ordinary user messages.
 - Modify: `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`
-  - Add inline preparing coverage for ordinary user anchors.
+  - Add inline coverage for ordinary user anchors with native task launches and hidden launchless ordinary anchors.
 - Modify: `tests/unit/features/chat/BackgroundTaskLiveSignalCoordinator.test.ts`
   - Add live-signal cleanup coverage for mode-null placeholders.
 - Modify: `src/features/chat/services/BackgroundTaskTimelineAssemblyService.ts`
   - Remove search-mode-only anchor and activity fallback from native task assembly and diagnostics.
 - Modify: `src/features/chat/services/BackgroundTaskTimelineService.ts`
-  - Arm indicators for all user anchors and make preparing inline segments mode-agnostic.
+  - Preserve active anchors for all user messages while keeping launchless ordinary anchors visually quiet.
 - Modify: `src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts`
   - Make empty launch placeholder visibility and cleanup mode-agnostic.
 - Modify: `docs/modules/features/chat/services/BackgroundTaskTimelineAssemblyService.md`
@@ -174,12 +174,12 @@ Replace the existing test named `ignores non-search-mode messages when arming in
   });
 ```
 
-- [ ] **Step 3: Add ordinary-user inline preparing coverage**
+- [ ] **Step 3: Add ordinary-user inline task coverage and launchless quiet coverage**
 
-Append this test to the existing `BackgroundTaskTimelineService inline rendering` describe block in `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`:
+Append these tests to the existing `BackgroundTaskTimelineService inline rendering` describe block in `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`:
 
 ```typescript
-  it('keeps active preparing ordinary user anchors without search-mode metadata', () => {
+  it('renders ordinary user anchors once a native task launch exists', () => {
     const host = createHost(createRuntime({
       backgroundTaskStartedAt: 3,
       backgroundTaskActiveAnchorKey: 'msg-user-2',
@@ -194,6 +194,20 @@ Append this test to the existing `BackgroundTaskTimelineService inline rendering
         timestamp: 3,
         sourceMessageId: 'msg-user-2',
       },
+      {
+        id: 'assistant-2',
+        role: 'assistant',
+        content: '',
+        timestamp: 4,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-2',
+          toolName: 'task',
+          toolInput: { description: 'Audit routes' },
+          toolMetadata: { sessionId: 'child-session-2' },
+          toolStatus: 'running',
+        }],
+      },
     ]);
 
     const segments = service.collectInlineSegments(conversation, 'tab-1');
@@ -202,9 +216,35 @@ Append this test to the existing `BackgroundTaskTimelineService inline rendering
     expect(segments[0]).toEqual(expect.objectContaining({
       anchorKey: 'msg-user-2',
       modeTag: null,
-      launches: [],
-      pending: [],
+      launches: [expect.objectContaining({
+        launchId: 'call-2',
+        taskId: 'child-session-2',
+      })],
+      pending: [expect.objectContaining({
+        launchId: 'call-2',
+        taskId: 'child-session-2',
+      })],
     }));
+  });
+
+  it('keeps launchless ordinary user anchors hidden while they wait for native task activity', () => {
+    const host = createHost(createRuntime({
+      backgroundTaskStartedAt: 3,
+      backgroundTaskActiveAnchorKey: 'msg-user-2',
+      backgroundTaskModeTag: null,
+    }));
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-2',
+        role: 'user',
+        content: 'normal chat',
+        timestamp: 3,
+        sourceMessageId: 'msg-user-2',
+      },
+    ]);
+
+    expect(service.collectInlineSegments(conversation, 'tab-1')).toEqual([]);
   });
 ```
 
@@ -226,7 +266,7 @@ Run:
 npm test -- tests/unit/features/chat/BackgroundTaskTimelineService.runtime.test.ts tests/unit/features/chat/BackgroundTaskTimelineService.nativeTask.test.ts tests/unit/features/chat/BackgroundTaskTimelineService.test.ts tests/unit/features/chat/BackgroundTaskLiveSignalCoordinator.test.ts
 ```
 
-Expected: FAIL before implementation. Expected failing assertions include diagnostics returning `null`, normal user arming leaving `backgroundTaskStartedAt` null, ordinary preparing anchors not rendering, and mode-null empty placeholders not resetting.
+Expected: FAIL before implementation. Expected failing assertions include diagnostics returning `null`, normal user arming leaving `backgroundTaskStartedAt` null, ordinary native task anchors not rendering, and mode-null empty placeholders not resetting.
 
 ## Task 2: Remove Timeline And Indicator Search-Mode Gates
 
@@ -351,7 +391,7 @@ Keep the existing assignments that follow:
     runtime.backgroundTaskSuppressedFingerprint = null;
 ```
 
-- [ ] **Step 6: Make launchless preparing renderability mode-agnostic**
+- [ ] **Step 6: Render native task launches for ordinary anchors while keeping launchless ordinary anchors quiet**
 
 Replace `shouldRenderInlineSegment()` with:
 
@@ -365,11 +405,11 @@ Replace `shouldRenderInlineSegment()` with:
       return true;
     }
 
-    return segment.launches.length === 0;
+    return segment.modeTag !== null && segment.launches.length === 0;
   }
 ```
 
-Replace the opening guard in `shouldRenderPreparingInlineSegment()`:
+Replace the opening guard in `shouldRenderPreparingInlineSegment()` so launched segments are allowed without checking mode:
 
 ```typescript
     if (segment.launches.length > 0) {
@@ -377,7 +417,7 @@ Replace the opening guard in `shouldRenderPreparingInlineSegment()`:
     }
 ```
 
-Keep the runtime active-anchor match check unchanged.
+Keep the runtime active-anchor match check unchanged for launchless OMO-mode placeholders.
 
 - [ ] **Step 7: Run timeline-focused tests**
 
@@ -395,7 +435,7 @@ Expected: PASS for these three files after Task 2.
 - Modify: `src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts`
 - Verify: `tests/unit/features/chat/BackgroundTaskLiveSignalCoordinator.test.ts`
 
-- [ ] **Step 1: Make launchless indicator visibility mode-agnostic**
+- [ ] **Step 1: Remove the search-mode literal from launchless indicator visibility**
 
 In `hasIndicator()`, replace:
 
@@ -408,7 +448,7 @@ In `hasIndicator()`, replace:
 with:
 
 ```typescript
-    return runtime.isStreaming || gracePeriodActive;
+    return runtime.backgroundTaskModeTag !== null && (runtime.isStreaming || gracePeriodActive);
 ```
 
 - [ ] **Step 2: Reset empty placeholders regardless of mode**
@@ -500,7 +540,7 @@ Change the inline copy bullet:
 to:
 
 ```markdown
-- `shouldRenderInlineSegment()` 继续负责 all-complete / pending launch 的基础判定；零 launch 的 preparing 占位现在对所有 mode 都要求 runtime 仍在跟踪该 active anchor，避免旧会话 reload 后把已失活的用户消息误显示成“后台任务准备中”。
+- `shouldRenderInlineSegment()` 继续负责 all-complete / pending launch 的基础判定；普通 user anchor 只有在 native task launch 出现后才渲染 inline panel，零 launch 的 OMO-mode preparing 占位仍要求 runtime 跟踪该 active anchor，避免普通聊天消息误显示成“后台任务准备中”。
 ```
 
 - [ ] **Step 3: Update `BackgroundTaskLiveSignalCoordinator.md`**
@@ -514,7 +554,7 @@ Change the `hasIndicator()` bullet:
 to:
 
 ```markdown
-- `hasIndicator()` 现在集中复用 `backgroundTaskStartedAt`、pending launch、session status / todos、streaming state 与 grace period，统一回答 tab badge / stream finalize 是否还应把该 tab 视为 background-task running；empty placeholder 不再要求 `search-mode`
+- `hasIndicator()` 现在集中复用 `backgroundTaskStartedAt`、pending launch、session status / todos、streaming state 与 grace period，统一回答 tab badge / stream finalize 是否还应把该 tab 视为 background-task running；empty placeholder 不再硬编码 `search-mode`
 ```
 
 - [ ] **Step 4: Append the P1-P3 implementation note to the Council report**
@@ -532,8 +572,8 @@ Append this section to `docs/status/task-subagent-lifecycle-alignment-evaluation
 完成项：
 
 - `BackgroundTaskTimelineAssemblyService`：native `task` block 的 segment anchoring 与 diagnostics 不再要求 OMO `search-mode` anchor；`modeTag` 只保留为 metadata / historical fallback context。
-- `BackgroundTaskTimelineService`：indicator arming 支持普通 user message，普通 native task anchor 的 runtime `modeTag` 为 `null`；launchless preparing segment 对所有 mode 使用同一 active-anchor 校验。
-- `BackgroundTaskLiveSignalCoordinator`：empty placeholder 的 grace-period visibility 与 stale cleanup 不再要求 `search-mode`。
+- `BackgroundTaskTimelineService`：indicator arming 支持普通 user message，普通 native task anchor 的 runtime `modeTag` 为 `null`；普通 anchor 只有在 native task launch 出现后才渲染 inline panel，launchless OMO-mode preparing segment 继续使用 active-anchor 校验。
+- `BackgroundTaskLiveSignalCoordinator`：empty placeholder 的 grace-period visibility 不再硬编码 `search-mode`，stale cleanup 对所有 mode 统一 reset。
 
 保留项：
 
