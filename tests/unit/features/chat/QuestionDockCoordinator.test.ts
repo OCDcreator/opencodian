@@ -231,6 +231,41 @@ describe('QuestionDockCoordinator resolution flow', () => {
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', false);
   });
 
+  it('resolves pending dock waiters when pending question state is cleared', async () => {
+    const request = createQuestionRequest();
+    const {
+      coordinator,
+      host,
+      runtimeByTab,
+    } = createCoordinator();
+
+    const resolutionPromise = coordinator.waitForDockResolutionIfEnabled(
+      request,
+      'tab-active',
+    );
+    await Promise.resolve();
+
+    const runtime = runtimeByTab.get('tab-active');
+    expect(runtime).toBeDefined();
+    expect(runtime?.pendingQuestionRequests).toEqual([request]);
+    expect(runtime?.questionDraftAnswers.has(request.id)).toBe(true);
+    expect(runtime?.questionActiveGroupKeys.has(request.id)).toBe(true);
+    expect(runtime?.questionActiveIndexes.has(request.id)).toBe(true);
+    expect(runtime?.questionRequestWaiters.has(request.id)).toBe(true);
+
+    coordinator.clearPendingQuestionsForTab('tab-active');
+
+    await expect(resolutionPromise).resolves.toBe(true);
+    expect(runtime?.pendingQuestionRequests).toEqual([]);
+    expect(runtime?.questionDraftAnswers.size).toBe(0);
+    expect(runtime?.questionActiveGroupKeys.size).toBe(0);
+    expect(runtime?.questionActiveIndexes.size).toBe(0);
+    expect(runtime?.questionRequestWaiters.size).toBe(0);
+    expect(host.replyToQuestion).not.toHaveBeenCalled();
+    expect(host.rejectQuestion).not.toHaveBeenCalled();
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', false);
+  });
+
   it('applies background resolution cleanup through the shared pending writeback path', async () => {
     const request = createQuestionRequest({
       id: 'request-background',

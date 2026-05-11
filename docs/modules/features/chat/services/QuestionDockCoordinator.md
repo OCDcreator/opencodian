@@ -38,6 +38,7 @@ export class QuestionDockCoordinator {
 ## 关键行为
 
 - `refreshPendingQuestionsForTab()` 现在通过同一条 pending runtime seam 完成服务端 pending question 拉取、session 过滤、resolved-id suppression、waiter-owned request 保活、draft answer / active selection 同步，以及 stale dock state pruning，再统一分流到 active/background tab writeback
+- `clearPendingQuestionsForTab()` 在丢弃 pending request / draft answer / active selection runtime state 前，会先 resolve 当前 tab 的所有 dock waiters，确保正在 `waitForDockResolutionIfEnabled()` 中等待上方 dock 的调用方不会因为清理路径永久挂起；该清理路径只释放本地等待，不会主动调用 OpenCode `reply` / `reject` API。
 - `waitForDockResolutionIfEnabled()` 负责创建 waiter、入队 pending request，并复用同一个 pending presentation sync + writeback 路径初始化 draft answer 与 active selection runtime
 - `applyResolutionAction()` 是 dock 与 inline fallback 共用的 resolve 入口；它只补充可选 pending-request removal 上下文，真正的 resolved-id 标记、resolved state apply 与 status/sync follow-up 已下沉到共享 execution facade
 - `render()` 仍只消费 `QuestionDockRenderStateFacade` 的 `active` / `empty` / `skip` 结果，并把 callback payload 委托给 `QuestionDockRenderAdapter`

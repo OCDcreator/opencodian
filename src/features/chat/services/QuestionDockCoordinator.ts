@@ -264,12 +264,12 @@ export class QuestionDockCoordinator {
   }
 
   private clearPendingQuestionState(runtime: QuestionDockRuntimeState): void {
+    this.resolveAllQuestionWaiters(runtime);
     runtime.pendingQuestionRequests = [];
     runtime.resolvedQuestionRequestIds.clear();
     runtime.questionDraftAnswers.clear();
     runtime.questionActiveGroupKeys.clear();
     runtime.questionActiveIndexes.clear();
-    runtime.questionRequestWaiters.clear();
   }
 
   private mergePendingQuestionRequests(
@@ -371,6 +371,14 @@ export class QuestionDockCoordinator {
       waiter.resolve();
       runtime.questionRequestWaiters.delete(requestId);
     }
+  }
+
+  private resolveAllQuestionWaiters(runtime: QuestionDockRuntimeState): void {
+    for (const waiter of runtime.questionRequestWaiters.values()) {
+      waiter.resolve();
+    }
+
+    runtime.questionRequestWaiters.clear();
   }
 
   private syncPendingQuestionPresentationState(
