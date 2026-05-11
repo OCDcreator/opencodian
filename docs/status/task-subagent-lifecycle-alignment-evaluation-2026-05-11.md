@@ -807,3 +807,125 @@ P1-P7:  9/10   ██████████████████░░  (OM
 
 - OMO `system-reminder` fallback 和 `bg_` historical id fallback 仍保留，等待 P4 compat adapter slice 再围栏化。
 - 服务合并仍不在本轮范围内，等待 P5。
+
+---
+
+# 第三轮评估（2026-05-11 最终）：P1-P3 完成后对齐评分
+
+> **评估性质**：多 LLM 共识终审（Council，5 councillors）
+> **评估对象**：search-mode 门控移除后的 task/subagent 生命周期处理
+> **关键 commit**：`8f2e84eb feat: remove task lifecycle search-mode gates`
+> **对比基线**：同日第二轮评估 5.5/10
+
+## 更新对齐评分：6.8/10（原始 3/10 → 5.5/10 → **6.8/10**）
+
+| Councillor | 评分 | 定性 |
+|---|---|---|
+| alpha (gpt-5.5) | 7.2/10 | "Lifecycle finally recognizable, ceiling is architecture not path" |
+| beta (glm-5.1) | 6.5/10 | "Streaming unified, reload path partially bifurcated" |
+| gamma (deepseek-v4) | 6.5/10 | "Bifurcation resolved, service surface enormous" |
+| delta (kimi-for-coding) | 7.0/10 | "Solid, production-ready, but not yet elegant" |
+| epsilon (mimo-v2.5-pro) | 7.0/10 | "Live path desktop-aligned, OMO replay is redundant" |
+
+**共识：6.5–7.0。** 范围紧凑。系统已从"OMO 依赖 + SDK 附加"跨越到"SDK 原生 + OMO 遗留降级"。剩余差距是架构重量，不是生命周期正确性。
+
+---
+
+## 各维度评分（Council 平均）
+
+| 维度 | 第二轮 | 第三轮 | Δ | 评估 |
+|------|--------|--------|---|------|
+| **流式完成检测** | 9/10 | **9/10** | — | SDK 原生，零模式门控 |
+| **会话 ID 提取** | 8/10 | **8/10** | — | `metadata.sessionId` 主路径 |
+| **ToolPart 生命周期** | 8/10 | **8.5/10** | +0.5 | `toolName === 'task'` 唯一触发，`toolStatus` 驱动完成 |
+| **历史回放/锚定** | 3/10 | **6/10** | +3 | Indicator arming 模式无关，lazy segment 创建工作正常 |
+| **search-mode 门控消除** | 4/10 | **8.5/10** | +4.5 | 8 → 1 残留（在 OMO 降级路径内部） |
+| **服务架构** | 3/10 | **4/10** | +1 | 19 文件（非 11），过度抽象 |
+| **模块文档** | 3/10 | **7/10** | +4 | 大部分服务已有文档 |
+
+---
+
+## 结构性分叉是否已解决？
+
+**是的——原始分叉在功能上已消除。**
+
+所有 councillors 追踪了 reload 路径并确认：
+
+| 检查点 | 状态 |
+|--------|------|
+| `armIndicatorForUserMessage` 对任何 `message.role === 'user'` 触发 | ✅ |
+| `captureUserSegmentAnchor` 为任何用户消息设置 `latestTaskAnchorMessage` | ✅ |
+| `collectTaskLaunchBlock` lazily 为任何 anchor 创建 segment | ✅ |
+| `collectDiagnostics` 处理所有 anchor 的 task blocks | ✅ |
+| `shouldRenderInlineSegment` 使用 `modeTag !== null` | ✅ |
+| `hasIndicator` 和 `reconcileStateFromLiveSignals` 模式无关 | ✅ |
+
+**微小不对称（beta 标记）**：OMO anchors 获得即时 segment 创建，native anchors 获得 lazy segment 创建。这是时序差异，不是正确性差异。
+
+**Epsilon 的深层关注**：`collectCompletionReminderSegments` OMO 路径可能已是冗余代码——`addNativeTaskCompletionToSegment` 已经从 `tool_use` blocks 的 `toolStatus === 'completed'` 提取完成信息。
+
+---
+
+## Desktop 开发者会怎么看？
+
+综合所有 councillors 的观点：
+
+> Live path 终于干净了。`toolStatus` 驱动完成，`metadata.sessionId` 驱动身份，`toolName === 'task'` 是唯一触发。很好。
+>
+> 你的 inline progress panels、stale task warnings、per-tab isolation 是我们确实没有的实用功能。那些值得额外复杂度。
+>
+> 但你用 19 个文件做了我们用单个 `ToolPart` renderer 做到的事。你的 `ActivationIndicatorCoordinator` 是 31 行纯委托。你有 5 个后台会话同步服务可以合并为 2 个。你的 `bg_` regex 爬过 `JSON.stringify()` 寻找可能永远不会出现的模式。你的 OMO `collectCompletionReminderSegments` 路径和你自己的 `addNativeTaskCompletionToSegment` 可能互为冗余。
+>
+> 你的代码能工作，但不够简洁。
+
+---
+
+## 残留风险评估
+
+| 风险 | 严重度 | 说明 |
+|------|--------|------|
+| `getLatestSearchModeSegment` 降级 | 🟢 低 | 三层嵌套在 OMO 门控路径内，native task 不可达 |
+| 6 处 OMO assembly 引用 | 🟡 中 | Native 用户的死代码，但增加维护负担 |
+| `bg_` regex 降级 | 🟢 低 | `metadata.sessionId` 之后检查，对 native 调用静默 |
+| **Reload 中途任务** | 🟡 中 | SDK 原生路径能否仅从持久化消息恢复子会话状态？需要显式测试 |
+
+---
+
+## 达到 8+/10 的建议
+
+### P1：移除 `getLatestSearchModeSegment` 降级 → +0.3
+- 替换为 `getLatestSegmentWithActivity`（已存在）或重命名接受任何 modeTag
+- **2 行变更**，消除最后一个 search-mode 硬编码
+
+### P2：从 `extractBackgroundTaskId` 移除 `bg_` regex → +0.2
+- 对 native task 完全信任 `metadata.sessionId`
+- **10 行简化**，消除身份歧义
+
+### P3：内联 `ActivationIndicatorCoordinator`（31 行）→ +0.2
+- 纯委托反模式，违反 AGENTS.md 规则
+
+### P4：合并 `NoticeStateService` + `CompletionNoticeService` → +0.3
+- 两者管理后台任务持久化通知，共享 host 接口
+
+### P5：审计 OMO `collectCompletionReminderSegments` 冗余 → +0.5
+- 如果 `addNativeTaskCompletionToSegment` 已从 `toolStatus` blocks 提取完成，整条 OMO 路径可能是死代码
+- 添加 SDK 原生 task conversation reload 的显式测试
+
+### P6：收缩后台会话同步（5 → 2 文件）→ +0.5
+- 合并 SignalSyncStateCoordinator（23 行）、AttentionCoordinator（52 行）、PostSyncHandoffCoordinator（82 行）
+
+**P1–P4 合计**：~4 小时，评分 → ~7.8/10
+**P1–P6 合计**：~8 小时，评分 → ~8.5/10
+
+---
+
+## 对齐轨迹（全部三轮）
+
+```text
+Round 1:  3/10   ██████░░░░░░░░░░░░░░  100% OMO，11 search-mode gates
+Round 2:  5.5/10 ███████████░░░░░░░░░  流式 SDK 原生，结构模型未变
+Round 3:  6.8/10 ██████████████░░░░░░  结构性分叉消除，服务架构成为天花板
+Target:   8+/10  ████████████████░░░░  服务整合 + OMO 围栏
+```
+
+**天花板不再是生命周期正确性。天花板是服务架构和遗留代码表面。** 19 文件的 background-task 家族提供了 desktop 没有的真实 UX 价值（inline panels、stale warnings、per-tab isolation、persisted notices），但为此付出了过度抽象的代价。通往 8+ 的路径是机械性整合——无行为变更，仅减少文件和清理边界。
