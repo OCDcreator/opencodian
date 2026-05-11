@@ -305,6 +305,25 @@ describe('QuestionInlineCardRenderer keyboard interaction', () => {
     await expectPromisePending(responsePromise);
   });
 
+  it('auto-renders the next sequential single-select question after Enter selects a non-final answer', async () => {
+    const { cardEl, responsePromise, runtime } = await renderInlineQuestion({
+      request: createSingleSelectRequest(),
+      displayMode: 'single',
+    });
+    const inputs = optionInputs(cardEl);
+
+    inputs[1].focus();
+    const event = keydown(inputs[1], 'Enter');
+    await flushInlineRender();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(inputs[1].checked).toBe(true);
+    expect(runtime.questionInlineCardEl).toBe(cardEl);
+    expect(cardEl.querySelector('.opencodian-question-inline-progress')?.textContent).toContain('2');
+    expect(cardEl.querySelector('.opencodian-question-inline-header-text')?.textContent).toBe('Platform');
+    await expectPromisePending(responsePromise);
+  });
+
   it('submits the final sequential single-select question with Enter', async () => {
     const { cardEl, responsePromise } = await renderInlineQuestion({
       request: createSingleSelectRequest(),

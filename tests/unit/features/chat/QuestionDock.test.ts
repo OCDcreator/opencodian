@@ -157,6 +157,23 @@ describe('QuestionDock keyboard interaction', () => {
     expect(callbacks.onSubmit).not.toHaveBeenCalled();
   });
 
+  it('selects a focused radio with Enter and auto-advances single-mode non-final questions', () => {
+    const { callbacks, rootEl } = renderDock();
+    if (!rootEl) {
+      throw new Error('Expected dock root');
+    }
+    const inputs = optionInputs(rootEl);
+
+    inputs[1].focus();
+    const event = keydown(inputs[1], 'Enter');
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(inputs[1].checked).toBe(true);
+    expect(callbacks.onAnswerChange).toHaveBeenCalledWith(0, ['Python']);
+    expect(callbacks.onSelectQuestion).toHaveBeenCalledWith(1);
+    expect(callbacks.onSubmit).not.toHaveBeenCalled();
+  });
+
   it('submits with Enter on a final answered single-select question', () => {
     const request = createQuestionRequest();
     const { callbacks, rootEl } = renderDock({

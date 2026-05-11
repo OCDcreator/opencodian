@@ -10,9 +10,9 @@
 
 ## 0. 执行摘要
 
-**当前对齐评分：9.0/10**。
+**Council 终审评分：8.8/10**。
 
-OpenCodian 的 AskQuestion 机制现在已完成本轮要求的“完全体”对齐：核心流程、状态释放、Dock 键盘交互、Inline 键盘交互、协议事件主路径、pending question polling，以及保守 tool-part fallback 都已落地。剩余差异是平台适配或当前上游未公开的历史 PR 背景，不再列为必须对齐的问题。
+OpenCodian 的 AskQuestion 机制已经通过 Council 终审：5 位 councillors 一致 `APPROVED`，剩余缺陷为 0。核心流程、状态释放、Dock 键盘交互、Inline 键盘交互、协议事件主路径、pending question polling，以及保守 tool-part fallback 都已落地。剩余差异是平台适配或可延后的产品打磨，不再列为必须对齐的问题。
 
 | 对齐点 | 当前状态 | 证据 |
 |--------|----------|------|
@@ -24,6 +24,14 @@ OpenCodian 的 AskQuestion 机制现在已完成本轮要求的“完全体”�
 | Inline 键盘交互 | 已对齐 | option-local keydown、custom input native editing、Escape reject |
 | tool-part fallback | 已对齐 | waiting `question` tool-part 可通过 `normalizeQuestionRequest()` 补发 `question_request` |
 | 当前 OpenCode API 校准 | 已校准 | 本地参考公开 `GET /question`、`POST /question/{id}/reply`、`POST /question/{id}/reject`，未公开 `POST /question/ask` |
+
+Council 终审分类：
+
+| 分类 | 数量 | 结论 |
+|------|------|------|
+| 缺陷 | 0 | 无需阻塞修复 |
+| 平台适配 | 4 | 可接受 |
+| 小优化 | 5 | 可延后 |
 
 ---
 
@@ -133,20 +141,20 @@ question.reply / question.reject
 
 ## 4. 逐维度终态评分
 
-| 维度 | 当前评分 | 状态 |
+| 维度 | Council 终审状态 | 状态 |
 |------|----------|------|
-| 任务触发机制 | 9.0 | `question.asked` + polling + waiting `question` tool fallback |
-| 状态管理 | 9.0 | waiter cleanup 已修复，per-tab state 边界保持 |
-| 用户交互流程 | 9.0 | Dock / Inline 均支持键盘选择与单选非终题 auto-advance |
-| API/SDK 集成 | 9.0 | SDK-first + HTTP fallback；当前上游公开面已覆盖 |
-| 键盘导航 | 9.0 | Dock 与 Inline 均已实现核心键位 |
-| 问题类型支持 | 8.5 | 当前上游仍是 option-based prompt；confirm 可用 yes/no 单选表达 |
-| 事件/元数据处理 | 9.0 | `question.asked` 主路径 + 保守 waiting fallback |
-| 平台特定 UX | 9.0 | Inline/Dock 是 Obsidian 侧边栏下的合理适配 |
-| 错误处理与边界 | 8.5 | reply/reject error Notice 保持；网络重试仍是优化项 |
-| 后台任务集成 | 9.0 | tab activation / post-sync refresh 覆盖 pending questions |
+| 任务触发机制 | 已通过 | `question.asked` + polling + waiting `question` tool fallback |
+| 状态管理 | 已通过 | waiter cleanup 已修复，per-tab state 边界保持 |
+| 用户交互流程 | 已通过 | Dock / Inline 均支持键盘选择与单选非终题 auto-advance |
+| API/SDK 集成 | 已通过 | SDK-first + HTTP fallback；当前上游公开面已覆盖 |
+| 键盘导航 | 已通过 | Dock 与 Inline 均已实现核心键位 |
+| 问题类型支持 | 已通过 | 当前上游仍是 option-based prompt；confirm 可用 yes/no 单选表达 |
+| 事件/元数据处理 | 已通过 | `question.asked` 主路径 + 保守 waiting fallback |
+| 平台特定 UX | 已通过 | Inline/Dock 是 Obsidian 侧边栏下的合理适配 |
+| 错误处理与边界 | 已通过 | reply/reject error Notice 保持；网络重试仍是优化项 |
+| 后台任务集成 | 已通过 | tab activation / post-sync refresh 覆盖 pending questions |
 
-综合评分：**9.0/10**。
+综合评分：**8.8/10**。这是 Council 终审评分，而不是内部自评；5 位 councillors 一致通过，缺陷项为 0。
 
 ---
 
@@ -163,6 +171,8 @@ question.reply / question.reject
 | Markdown answer formatting | 当前 server API 接收 `string[][]`；Markdown 是潜在优化，不影响闭环 |
 | `x-opencode-client` 头 | 客户端标识优化项，不影响 AskQuestion 可用性 |
 | 回复/拒绝重试 | 网络韧性优化项，不是当前对齐缺口 |
+| waiter 超时 | 防御性资源管理优化项；当前已修复确认的 clear-state waiter 释放 bug |
+| Dock 面板折叠 | 产品打磨项，不影响 AskQuestion 机制闭环 |
 
 ---
 
