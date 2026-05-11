@@ -113,6 +113,18 @@ export class QuestionInlineCardRenderer {
 
     const buttons = this.renderButtons(questionCard, t('chat.question.submit'));
     const action = await new Promise<QuestionInlineCardAction>((resolve) => {
+      request.questions.forEach((question, index) => {
+        this.attachQuestionKeyboardHandlers({
+          question,
+          inputState: inputStates[index],
+          onReject: () => resolve({ type: 'reject' }),
+          onOptionActivated: () => {
+            // Grouped cards only collect through the submit button so every
+            // question can be validated together.
+          },
+        });
+      });
+
       buttons.submitBtn.addEventListener('click', () => {
         buttons.submitBtn.blur();
         const answers = request.questions.map((question, index) =>
@@ -200,6 +212,26 @@ export class QuestionInlineCardRenderer {
     );
 
     const action = await new Promise<SingleQuestionAction>((resolve) => {
+      this.attachQuestionKeyboardHandlers({
+        question,
+        inputState,
+        onReject: () => resolve({ type: 'reject' }),
+        onOptionActivated: (key) => {
+          if (question.multiple) {
+            return;
+          }
+
+          const answer = this.collectAnswerFromInputState(question, inputState);
+          if (answer.length === 0) {
+            return;
+          }
+
+          if (key === 'Enter' || index < total - 1) {
+            resolve({ type: 'reply', answer });
+          }
+        },
+      });
+
       buttons.submitBtn.addEventListener('click', () => {
         buttons.submitBtn.blur();
         const answer = this.collectAnswerFromInputState(question, inputState);
@@ -306,6 +338,105 @@ export class QuestionInlineCardRenderer {
     }
 
     return inputState;
+  }
+
+  private attachQuestionKeyboardHandlers(options: {
+    question: QuestionRequest['questions'][number];
+    inputState: QuestionInputState;
+    onReject: () => void;
+    onOptionActivated: (key: 'Enter' | ' ') => void;
+  }): void {
+    const {
+      question,
+      inputState,
+      onReject,
+      onOptionActivated,
+    } = options;
+
+    for (const inputEl of inputState.optionInputs) {
+      inputEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          onReject();
+          return;
+        }
+
+        if (this.moveOptionFocus(inputState, inputEl, event.key)) {
+          event.preventDefault();
+          return;
+        }
+
+        if (!this.isOptionActivationKey(event.key)) {
+          return;
+        }
+
+        event.preventDefault();
+        this.toggleOptionInput(question, inputState, inputEl);
+        onOptionActivated(event.key === 'Enter' ? 'Enter' : ' ');
+      });
+    }
+
+    inputState.customInput?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      event.preventDefault();
+      onReject();
+    });
+  }
+
+  private moveOptionFocus(
+    inputState: QuestionInputState,
+    currentInput: HTMLInputElement,
+    key: string,
+  ): boolean {
+    const inputs = inputState.optionInputs;
+    if (inputs.length === 0) {
+      return false;
+    }
+
+    const currentIndex = inputs.indexOf(currentInput);
+    if (currentIndex === -1) {
+      return false;
+    }
+
+    let nextIndex: number | null = null;
+    if (key === 'ArrowDown' || key === 'ArrowRight') {
+      nextIndex = Math.min(currentIndex + 1, inputs.length - 1);
+    } else if (key === 'ArrowUp' || key === 'ArrowLeft') {
+      nextIndex = Math.max(currentIndex - 1, 0);
+    } else if (key === 'Home') {
+      nextIndex = 0;
+    } else if (key === 'End') {
+      nextIndex = inputs.length - 1;
+    }
+
+    if (nextIndex === null) {
+      return false;
+    }
+
+    inputs[nextIndex]?.focus();
+    return true;
+  }
+
+  private isOptionActivationKey(key: string): boolean {
+    return key === 'Enter' || key === ' ' || key === 'Spacebar';
+  }
+
+  private toggleOptionInput(
+    question: QuestionRequest['questions'][number],
+    inputState: QuestionInputState,
+    inputEl: HTMLInputElement,
+  ): void {
+    if (question.multiple) {
+      inputEl.checked = !inputEl.checked;
+      return;
+    }
+
+    for (const optionInput of inputState.optionInputs) {
+      optionInput.checked = optionInput === inputEl;
+    }
   }
 
   private renderButtons(
