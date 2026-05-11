@@ -943,3 +943,160 @@ Target:   8+/10  ████████████████░░░░  �
 - P6：删除 `BackgroundConversationSignalSyncStateCoordinator` 和 `BackgroundConversationAttentionCoordinator`，把 background post-sync mark 与 attention handoff 收束进 `BackgroundConversationPostSyncHandoffCoordinator`。
 
 本轮属于纯 service / docs / graphify 切片，未触碰需要部署的 Test Vault runtime 路径；因此不需要 Test Vault deploy。
+
+---
+
+# 第四轮最终评估（2026-05-11）：P1-P6 完成后对齐评分
+
+> **评估性质**：多 LLM 共识终审（Council，5 councillors）
+> **评估对象**：P1-P6 服务整合完成后的 task/subagent 生命周期处理
+> **关键 commit**：`68694c99 refactor: consolidate task lifecycle services`
+> **对比基线**：第三轮评估 6.8/10
+
+## 最终对齐评分：7.2/10（3/10 → 5.5/10 → 6.8/10 → **7.2/10**）
+
+| Councillor | 评分 | 关键洞察 |
+|---|---|---|
+| alpha (gpt-5.5) | 7.4/10 | "Lifecycle correct, ceiling is architecture not path" |
+| beta (glm-5.1) | 7.2/10 | "Streaming unified, 1.5pts = design choice, 1.0 = OMO compat, 0.3 = cleanup" |
+| gamma (deepseek-v4) | 7.0/10 | "Real progress, remaining gap is design choice not alignment failure" |
+| delta (kimi-for-coding) | 7.0/10 | "Alignment debt fixed, remaining is consolidation polish" |
+| epsilon (mimo-v2.5-pro) | 7.5/10 | "SDK signal alignment done, gap is intentional UX enrichment" |
+
+**共识：7.0–7.5。** 系统已从"对齐债务"跨越到"设计选择差距"。
+
+---
+
+## 各维度评分（Council 平均）
+
+| 维度 | Round 2 | Round 3 | Round 4（最终） | 状态 |
+|------|---------|---------|----------------|------|
+| **流式完成检测** | 9/10 | 9/10 | **9/10** | ✅ 稳定 — 完全 SDK 原生 |
+| **会话 ID 提取** | 8/10 | 8/10 | **9/10** | ✅ `bg_` regex 已移除，`metadata.sessionId` 唯一原生路径 |
+| **ToolPart 生命周期** | 8/10 | 8.5/10 | **8.5/10** | ✅ `toolStatus` 生命周期与 desktop 匹配 |
+| **历史回放/锚定** | 3/10 | 6/10 | **6.5/10** | ⚠️ OMO 已围栏，SDK 原生工作正常，但 AssemblyService 双路径仍存在 |
+| **search-mode 消除** | 4/10 | 8.5/10 | **10/10** | ✅ 零引用。完成。 |
+| **服务架构** | 3/10 | 4/10 | **5.5/10** | ⚠️ 19→14 文件，真实改善。4 个薄壳残留。 |
+| **模块文档** | 3/10 | 7/10 | **8/10** | ✅ 所有文件已有文档 |
+
+---
+
+## 评分分解
+
+beta 的框架最精确：
+
+> 剩余 2.8 分分布为：
+> - **~1.5**  deliberate UX 范围（inline panels、grace periods、persistence、cross-tab — 是功能，不是 bug）
+> - **~1.0**  OMO 兼容层，移除会破坏历史会话
+> - **~0.3**  次要清理机会（未使用参数、命名清晰度）
+
+所有 councillors 同意此分解是诚实的。
+
+---
+
+## 14 文件 / 2545 行仍然太多吗？
+
+**Council 共识：略高，但由范围证明。desktop 对比是错误的。**
+
+Desktop 有 0 个文件因为它没有：
+- 带 per-task 状态的 inline progress panels
+- 带去重的延迟持久化完成通知
+- 带 15 秒 grace period 的 stale task 警告
+- hydration 的跨会话元数据持久化
+- per-tab 后台任务隔离
+- 权威同步 gates
+- Post-sync handoff 协调
+
+**gamma 的诚实清单：**
+
+| 类别 | 数量 | 结论 |
+|---|---|---|
+| 核心任务生命周期 | 4 | **合理** — assembly、orchestration、launch extraction、live signals |
+| 丰富 UI | 3 | **合理** — inline panel、indicator、notice state |
+| Post-sync 基础设施 | 3 | **过度抽象** — coordinator + adapter + executor 可为 1-2 文件 |
+| Facade/薄壳 | 1 | **应合并** — 66 行 CompletionNoticeService 包裹 NoticeStateService |
+
+**Delta 的目标**："9 文件、~2100 行对 OpenCodian 的功能集是真正合理的数字。"
+
+**但：** 按 AGENTS.md 规则，现在合并这些会是反向的"仅为减少行数而拆分文件"——组织性调整，不是所有权改善。文件存在，每个有连贯所有权，整合曲线已到收益递减点。
+
+---
+
+## 残留 OMO 引用：永久保留还是移除？
+
+**Council 共识：永久兼容层。保留。**
+
+| OMO 路径 | 目的 | 可移除？ |
+|----------|------|---------|
+| `collectOmoCompletionReminderSegments` | 历史会话回放 | 否 — 会破坏旧会话 |
+| `addCompletedTasksFromMessage` | 历史任务完成提取 | 否 — 是 pre-SDK 消息的唯一来源 |
+| `isOmoModeAnchorMessage` | OMO 模式标记 segment anchoring | 低优先级 — 可稍后简化 |
+| `backgroundTaskModeTag` runtime 字段 | OMO "preparing" 状态渲染 | 建议重命名为 `omoCompatModeTag` |
+
+所有 councillors 确认：移除这些会破坏历史会话渲染。fast-fail 围栏意味着原生会话成本 ~ 为零。**作为永久兼容层可接受。**
+
+---
+
+## Desktop 开发者会怎么说
+
+综合五位 councillors：
+
+> *"原生路径干净 — `toolStatus`、`metadata.sessionId`、零模式门控。这就是我们预期的。OMO 降级已正确围栏。我们理解你为什么需要 inline panels 和 completion notices 作为你的 UX。*
+>
+> *服务数量是你的插件问题，不是 desktop 问题。我们会标记 4 个薄 coordinator 壳和 3 跳调用链，但它们是组织选择，不是 bug。热路径正确。发布它。"*
+
+---
+
+## 对齐轨迹（全部四轮）
+
+```text
+Round 1:  3/10   ██████░░░░░░░░░░░░░░  100% OMO，11 search-mode gates
+Round 2:  5.5/10 ███████████░░░░░░░░░  流式 SDK 原生，结构模型未变
+Round 3:  6.8/10 ██████████████░░░░░░  结构性分叉消除
+Round 4:  7.2/10 ███████████████░░░░░  整合完成，设计选择天花板
+```
+
+---
+
+## 停止条件
+
+**是的。task/subagent 对齐工作已完成到足够停止的程度。**
+
+所有 councillors 独立达到此结论：
+
+- ✅ SDK 信号对齐：**完成** — `toolCall.status`、`metadata.sessionId`、`toolName === 'task'` 均匹配 desktop
+- ✅ search-mode 门控：**已消除** — 零引用
+- ✅ `bg_` regex：**已移除** — 零引用
+- ✅ OMO 降级：**已正确围栏** — 不在原生会话热路径中
+- ✅ 结构性分叉：**已解决** — 无按模式分离的代码路径
+- ✅ 服务整合：**已到收益递减点** — 进一步合并是组织性调整，非对齐改善
+- ✅ 模块文档：**当前** — 所有文件已有文档
+
+**剩余差距（7.2 → 10）分布为：**
+- 1.5 分 = deliberate UX 丰富性（inline panels、grace periods、persistence、per-tab isolation）
+- 1.0 分 = 无法移除的 OMO 向后兼容
+- 0.3 分 = 次要命名/参数清理
+
+**这些都不是对齐失败。它们是设计选择。**
+
+**最终评分：7.2/10。** 这是提供比 desktop 参考更丰富的 task UX、同时保持正确 SDK 信号对齐的 Obsidian 插件的自然天花板。
+
+---
+
+## 结论
+
+本次 task/subagent 生命周期对齐工作经历了四轮递进优化：
+
+1. **Round 1（原始状态）**：100% OMO 依赖，11 search-mode 硬编码，无 SDK-native 路径。评分 **3/10**。
+2. **Round 2（数据层修复）**：commit `0874c0c3` 引入 SDK-native ToolPart 状态 + `metadata.sessionId`，但结构模型未变。评分 **5.5/10**。
+3. **Round 3（结构分叉消除）**：commit `8f2e84eb` 移除 search-mode 门控，indicator/anchoring/diagnostics 模式无关。评分 **6.8/10**。
+4. **Round 4（服务整合）**：commit `68694c99` 完成 P1-P6 整合，移除 5 个文件，消除 `bg_` regex，围栏 OMO 路径。评分 **7.2/10**。
+
+从 **3/10 到 7.2/10**，实现了：
+- **OMO 依赖从 100% 降至仅历史兼容降级**
+- **search-mode 硬编码从 11 处降至 0 处**
+- **`bg_` 正则从主路径降至已移除**
+- **服务文件从 19 个降至 14 个**
+- **SDK 原生信号成为唯一生命周期权威**
+
+剩余差距不是 bug，而是设计选择。工作已完成。
