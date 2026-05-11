@@ -1499,6 +1499,8 @@ export const enTranslations = {
   'chat.question.submit': 'Submit answer',
   'chat.question.reject': 'Reject',
   'chat.question.close': 'Close',
+  'chat.question.collapse': 'Collapse question panel',
+  'chat.question.expand': 'Expand question panel',
   'chat.question.answerRequired': 'Please answer every question before submitting.',
   'chat.question.notice.answeredTitle': 'Question answered',
   'chat.question.notice.answeredBody': 'Submitted answers for the pending question request:',

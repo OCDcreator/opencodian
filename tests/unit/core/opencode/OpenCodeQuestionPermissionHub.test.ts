@@ -65,6 +65,10 @@ function createHost(
   } as MockHost;
 }
 
+function createStatusError(message: string, status: number): Error & { status: number } {
+  return Object.assign(new Error(message), { status });
+}
+
 describe('OpenCodeQuestionPermissionHub question negotiation', () => {
   it('normalizes question requests and routes SDK question responders', async () => {
     const questionSdk = createQuestionSdk({
@@ -176,6 +180,58 @@ describe('OpenCodeQuestionPermissionHub question negotiation', () => {
       'SDK question.list failed, falling back to legacy HTTP',
       expect.any(Error),
     );
+  });
+
+  it('retries transient reply failures before reporting success', async () => {
+    const host = createHost(createQuestionSdk(), createPermissionSdk(), {
+      shouldUseSdkQuestions: jest.fn(() => false),
+      postLegacy: jest.fn()
+        .mockRejectedValueOnce(createStatusError('temporary gateway failure', 502))
+        .mockResolvedValueOnce(undefined),
+    });
+    const hub = new OpenCodeQuestionPermissionHub(host);
+
+    await expect(hub.replyToQuestion('question-1', [['Fast']])).resolves.toBeUndefined();
+
+    expect(host.postLegacy).toHaveBeenCalledTimes(2);
+    expect(host.postLegacy).toHaveBeenNthCalledWith(1, '/question/question-1/reply', {
+      answers: [['Fast']],
+    });
+    expect(host.postLegacy).toHaveBeenNthCalledWith(2, '/question/question-1/reply', {
+      answers: [['Fast']],
+    });
+  });
+
+  it('retries transient reject failures before reporting success', async () => {
+    const host = createHost(createQuestionSdk(), createPermissionSdk(), {
+      shouldUseSdkQuestions: jest.fn(() => false),
+      postLegacy: jest.fn()
+        .mockRejectedValueOnce(createStatusError('service unavailable', 503))
+        .mockResolvedValueOnce(undefined),
+    });
+    const hub = new OpenCodeQuestionPermissionHub(host);
+
+    await expect(hub.rejectQuestion('question-1')).resolves.toBeUndefined();
+
+    expect(host.postLegacy).toHaveBeenCalledTimes(2);
+    expect(host.postLegacy).toHaveBeenNthCalledWith(1, '/question/question-1/reject', {});
+    expect(host.postLegacy).toHaveBeenNthCalledWith(2, '/question/question-1/reject', {});
+  });
+
+  it('throws the final transient reply failure after retry attempts are exhausted', async () => {
+    const finalError = createStatusError('still unavailable', 503);
+    const host = createHost(createQuestionSdk(), createPermissionSdk(), {
+      shouldUseSdkQuestions: jest.fn(() => false),
+      postLegacy: jest.fn()
+        .mockRejectedValueOnce(createStatusError('temporary failure 1', 503))
+        .mockRejectedValueOnce(createStatusError('temporary failure 2', 503))
+        .mockRejectedValueOnce(finalError),
+    });
+    const hub = new OpenCodeQuestionPermissionHub(host);
+
+    await expect(hub.replyToQuestion('question-1', [['Fast']])).rejects.toBe(finalError);
+
+    expect(host.postLegacy).toHaveBeenCalledTimes(3);
   });
 
 });

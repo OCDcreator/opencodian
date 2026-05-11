@@ -35,7 +35,7 @@
 hub 现在统一承接：
 
 - `getPendingQuestions()`：先按 `sdkQuestions` 尝试 SDK `question.list()`，失败后回退 legacy `/question`，并统一通过 mapper 归一化 question request。
-- `replyToQuestion()` / `rejectQuestion()`：保持现有 SDK→legacy fallback 语义，不在 `OpenCodeService` 主类里重复铺开 transport 分支。
+- `replyToQuestion()` / `rejectQuestion()`：保持现有 SDK→legacy fallback 语义，不在 `OpenCodeService` 主类里重复铺开 transport 分支。question mutation 会对保守识别的 transient request failure 做最多 2 次额外尝试；如果仍失败，最终错误会原样抛给上层 Notice / error path。
 
 这样 question request 的 list/reply/reject 共享一套 host seam、warning 日志与 normalization 入口，不再散落在主服务中。
 
@@ -55,6 +55,7 @@ hub 当前还负责两类轻量过滤：
 
 - question list 会统一兼容 array 与 `{ data }` 两种返回形状，再借助 host mapper 过滤掉无效 request。
 - permission list 会统一兼容 `Array` / `{ data }` 返回形状，过滤掉缺少 `id` / `sessionID` / `permission` 的无效项，并标准化 `patterns`、`always`、`metadata` 与可选 `tool` 引用。
+- question reply/reject retry 只覆盖请求层面的短暂失败，例如常见 network code、HTTP 408/409/425/429/5xx、timeout/abort/network error 名称或消息。确定性的 validation/auth/schema 错误不重试。
 
 它刻意不处理 session lifecycle、session control/message operations、broad query gateway、streaming runtime 或 settings/model catalog 逻辑。
 
@@ -79,4 +80,5 @@ graph TD
 
 - 不要再把 question 和 permission 拆成两个薄 façade；roadmap 明确要求它们共享一个较厚 owner。
 - `getPendingPermissions()` / `respondToPermission()` 继续跟随 `sdkCrud`，而 question list/reply/reject 继续跟随 `sdkQuestions`；不要把两组 rollout flag 混成一套。
+- retry 只属于 question reply/reject mutation resiliency，不要扩大到 `question.list()`、permission responder 或 waiter timeout。
 - `respondToSessionPermission()` 目前仍是 SDK-only responder；如果未来需要 legacy fallback，应该在这个 hub 内集中补，而不是把逻辑重新散回 `OpenCodeService`。

@@ -1765,6 +1765,7 @@
   border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 72%, transparent);
 }
 
+.opencodian-question-dock-collapse-toggle,
 .opencodian-question-dock-close {
   margin-left: 4px;
   width: 30px;
@@ -1780,6 +1781,15 @@
   padding: 0;
 }
 
+.opencodian-question-dock-collapse-toggle {
+  margin-left: 0;
+}
+
+.opencodian-question-dock.is-collapsed {
+  gap: 0;
+}
+
+.opencodian-question-dock-collapse-toggle:hover,
 .opencodian-question-dock-close:hover {
   color: var(--text-normal);
   border-color: color-mix(in srgb, var(--interactive-accent) 26%, var(--opencodian-glass-border));

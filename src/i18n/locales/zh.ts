@@ -1499,6 +1499,8 @@ export const zhTranslations = {
   'chat.question.submit': '提交回答',
   'chat.question.reject': '拒绝',
   'chat.question.close': '关闭',
+  'chat.question.collapse': '收起问题面板',
+  'chat.question.expand': '展开问题面板',
   'chat.question.answerRequired': '请先回答所有问题再提交。',
   'chat.question.notice.answeredTitle': '已回答问题',
   'chat.question.notice.answeredBody': '已提交以下问题回答：',

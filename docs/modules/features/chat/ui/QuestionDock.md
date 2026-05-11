@@ -37,10 +37,12 @@ interface QuestionDockCallbacks {
 ### 渲染流程
 
 `render(state, callbacks)` 每次调用清空 DOM 并重建：
-1. **Header**: 图标 + 标题 + 进度信息（single 模式显示步骤，all 模式显示完成计数）+ 关闭按钮
+1. **Header**: 图标 + 标题 + 进度信息（single 模式显示步骤，all 模式显示完成计数）+ 折叠/展开按钮 + 关闭按钮
 2. **Tabs**: 当 group 数 > 1 时显示分组标签页，每个标签显示 `answeredCount/totalCount`
 3. **Body**: 根据 `viewModel.visibleQuestions` 渲染问题卡片
 4. **Footer**: 提交 + 拒绝按钮
+
+Dock 折叠是组件本地状态，按当前 `QuestionRequest.id` 记忆。同一个 pending request 被用户折叠后，后续 render 保持折叠；新的 request id 默认展开，避免新问题被静默隐藏。折叠状态只隐藏 tabs/body/footer，header、进度、已答数量、展开按钮和关闭按钮仍保留，不清空上层维护的 draft answer。
 
 ### 问题卡片
 
@@ -73,7 +75,8 @@ Dock 的键盘处理是组件本地行为，不安装全局 `document` / `window
 |------|------|
 | `constructor(parentEl)` | 创建 `is-hidden` 根容器 |
 | `render(state, callbacks)` | 清空重建完整 dock UI |
-| `renderHeader(viewModel, displayMode, callbacks)` | 标题、进度、关闭按钮 |
+| `renderHeader(options)` | 标题、进度、折叠/展开按钮、关闭按钮 |
+| `toggleCollapsed(requestId)` | 切换当前 request 的组件本地折叠状态，并用最近一次 render state 重绘 |
 | `renderTabs(viewModel, callbacks)` | 分组标签页 |
 | `renderBody(viewModel, displayMode, callbacks)` | 问题卡片列表 |
 | `handleQuestionKeydown(...)` | 处理 dock 内选项焦点、选择、下一步/提交与拒绝快捷键 |
@@ -111,6 +114,7 @@ render() → Header + Tabs + Body + Footer
 - 每次 `render()` 完全重建 DOM，无增量更新
 - `collectAnswerFromSection()` 直接操作 DOM，与 render 紧耦合
 - `is-hidden` CSS 类控制可见性，非 display:none
+- `is-collapsed` 只表示 above-input Dock shell 的本地折叠状态，不影响 `QuestionDockCoordinator` 的 pending question、draft answer、reply 或 reject flow
 
 ## 补充说明
 

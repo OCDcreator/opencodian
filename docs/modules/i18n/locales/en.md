@@ -39,7 +39,7 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮新增 `slashCommand.menu.hint`，用于在 slash command 一级补全框顶部提示用户“斜杠命令仅在输入框开头输入时生效”。
 
-2026-05-11 还新增 `chat.tab.backToParent`，用于子会话 tab 激活时的 “Back to parent” 面包屑按钮文案。
+2026-05-11 还新增 `chat.tab.backToParent`，用于子会话 tab 激活时的 “Back to parent” 面包屑按钮文案。同日 AskQuestion Dock polish 新增 `chat.question.collapse` 与 `chat.question.expand`，作为 above-input QuestionDock 折叠/展开图标按钮的 aria label。
 
 源码约 2050 行。
 

@@ -6,6 +6,7 @@ import type {
 } from '../types';
 
 const logger = createLogger('OpenCodeQuestionPermissionHub');
+const QUESTION_MUTATION_MAX_RETRIES = 2;
 
 export interface OpenCodeQuestionSdk {
   list(): Promise<unknown>;
@@ -114,6 +115,83 @@ export function normalizePermissionResponse(response: unknown): PermissionReques
   }, []);
 }
 
+function readErrorStringProperty(error: unknown, key: string): string | undefined {
+  if (!error || typeof error !== 'object' || !(key in error)) {
+    return undefined;
+  }
+
+  const value = (error as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readErrorNumberProperty(error: unknown, key: string): number | undefined {
+  if (!error || typeof error !== 'object' || !(key in error)) {
+    return undefined;
+  }
+
+  const value = (error as Record<string, unknown>)[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function isTransientQuestionMutationError(error: unknown): boolean {
+  const status = readErrorNumberProperty(error, 'status')
+    ?? readErrorNumberProperty(error, 'statusCode')
+    ?? readErrorNumberProperty(error, 'code');
+  if (
+    status === 408
+    || status === 409
+    || status === 425
+    || status === 429
+    || (typeof status === 'number' && status >= 500 && status < 600)
+  ) {
+    return true;
+  }
+
+  const code = readErrorStringProperty(error, 'code')?.toUpperCase();
+  if (code && [
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'EHOSTUNREACH',
+    'ENETDOWN',
+    'ENETRESET',
+    'ENETUNREACH',
+    'ETIMEDOUT',
+  ].includes(code)) {
+    return true;
+  }
+
+  const name = readErrorStringProperty(error, 'name')?.toLowerCase();
+  if (name === 'aborterror' || name === 'timeouterror' || name === 'networkerror') {
+    return true;
+  }
+
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return [
+    'network error',
+    'socket hang up',
+    'timeout',
+    'timed out',
+    'temporarily unavailable',
+    'temporary failure',
+  ].some((pattern) => message.includes(pattern));
+}
+
+async function runQuestionMutationWithRetry(operation: () => Promise<unknown>): Promise<void> {
+  let attempt = 0;
+
+  for (;;) {
+    try {
+      await operation();
+      return;
+    } catch (error) {
+      if (attempt >= QUESTION_MUTATION_MAX_RETRIES || !isTransientQuestionMutationError(error)) {
+        throw error;
+      }
+      attempt += 1;
+    }
+  }
+}
+
 export class OpenCodeQuestionPermissionHub {
   constructor(private readonly host: OpenCodeQuestionPermissionHubHost) {}
 
@@ -139,32 +217,32 @@ export class OpenCodeQuestionPermissionHub {
   async replyToQuestion(requestID: string, answers: string[][]): Promise<void> {
     if (this.host.shouldUseSdkQuestions()) {
       try {
-        await this.host.getSdkQuestion().reply({
+        await runQuestionMutationWithRetry(() => this.host.getSdkQuestion().reply({
           requestID,
           answers,
-        });
+        }));
         return;
       } catch (error) {
         this.host.logServiceWarning('question.reply', 'SDK question.reply failed, falling back to legacy HTTP', error);
       }
     }
 
-    await this.host.postLegacy(`/question/${requestID}/reply`, { answers });
+    await runQuestionMutationWithRetry(() => this.host.postLegacy(`/question/${requestID}/reply`, { answers }));
   }
 
   async rejectQuestion(requestID: string): Promise<void> {
     if (this.host.shouldUseSdkQuestions()) {
       try {
-        await this.host.getSdkQuestion().reject({
+        await runQuestionMutationWithRetry(() => this.host.getSdkQuestion().reject({
           requestID,
-        });
+        }));
         return;
       } catch (error) {
         this.host.logServiceWarning('question.reject', 'SDK question.reject failed, falling back to legacy HTTP', error);
       }
     }
 
-    await this.host.postLegacy(`/question/${requestID}/reject`, {});
+    await runQuestionMutationWithRetry(() => this.host.postLegacy(`/question/${requestID}/reject`, {}));
   }
 
   async respondToSessionPermission(

@@ -94,6 +94,14 @@ function customInput(rootEl: HTMLElement): HTMLInputElement {
   return input;
 }
 
+function collapseToggle(rootEl: HTMLElement): HTMLButtonElement {
+  const button = rootEl.querySelector<HTMLButtonElement>('.opencodian-question-dock-collapse-toggle');
+  if (!button) {
+    throw new Error('Expected collapse toggle');
+  }
+  return button;
+}
+
 function keydown(target: HTMLElement, key: string): KeyboardEvent {
   const event = new KeyboardEvent('keydown', {
     bubbles: true,
@@ -294,5 +302,80 @@ describe('QuestionDock keyboard interaction', () => {
     expect(callbacks.onAnswerChange).toHaveBeenLastCalledWith(0, ['Dock', 'Inline']);
     expect(callbacks.onSelectQuestion).not.toHaveBeenCalled();
     expect(callbacks.onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuestionDock collapse interaction', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+    jest.clearAllMocks();
+    setLocale('en');
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('collapses the above-input dock while keeping the pending-question header visible', () => {
+    const { rootEl } = renderDock();
+    if (!rootEl) {
+      throw new Error('Expected dock root');
+    }
+
+    collapseToggle(rootEl).click();
+
+    expect(rootEl.classList.contains('is-collapsed')).toBe(true);
+    expect(collapseToggle(rootEl).getAttribute('aria-expanded')).toBe('false');
+    expect(rootEl.querySelector('.opencodian-question-dock-title')?.textContent).toBe('Question from OpenCode');
+    expect(rootEl.querySelector('.opencodian-question-dock-progress')?.textContent).toBe('Question 1 of 2');
+    expect(rootEl.querySelector('.opencodian-question-dock-summary')?.textContent).toBe('0 of 2 answered');
+    expect(rootEl.querySelector('.opencodian-question-dock-body')).toBeNull();
+    expect(rootEl.querySelector('.opencodian-question-dock-footer')).toBeNull();
+  });
+
+  it('expands the dock without clearing draft answers', () => {
+    const { rootEl } = renderDock({
+      answers: [['Python'], []],
+    });
+    if (!rootEl) {
+      throw new Error('Expected dock root');
+    }
+
+    collapseToggle(rootEl).click();
+    collapseToggle(rootEl).click();
+
+    expect(rootEl.classList.contains('is-collapsed')).toBe(false);
+    expect(collapseToggle(rootEl).getAttribute('aria-expanded')).toBe('true');
+    expect(rootEl.querySelector('.opencodian-question-dock-body')).not.toBeNull();
+    expect(rootEl.querySelector('.opencodian-question-dock-footer')).not.toBeNull();
+    const inputs = optionInputs(rootEl);
+    expect(inputs.find((input) => input.value === 'Python')?.checked).toBe(true);
+  });
+
+  it('defaults a new pending request to expanded after the previous request was collapsed', () => {
+    const { callbacks, dock, rootEl, request } = renderDock();
+    if (!rootEl) {
+      throw new Error('Expected dock root');
+    }
+
+    collapseToggle(rootEl).click();
+    expect(rootEl.classList.contains('is-collapsed')).toBe(true);
+
+    const nextRequest = createQuestionRequest({ id: 'request-2' });
+    dock.render(
+      {
+        request: nextRequest,
+        answers: nextRequest.questions.map(() => []),
+        displayMode: 'single',
+        activeQuestionIndex: 0,
+      },
+      callbacks,
+    );
+
+    expect(request.id).toBe('request-1');
+    expect(rootEl.classList.contains('is-collapsed')).toBe(false);
+    expect(collapseToggle(rootEl).getAttribute('aria-expanded')).toBe('true');
+    expect(rootEl.querySelector('.opencodian-question-dock-body')).not.toBeNull();
+    expect(rootEl.querySelector('.opencodian-question-dock-footer')).not.toBeNull();
   });
 });

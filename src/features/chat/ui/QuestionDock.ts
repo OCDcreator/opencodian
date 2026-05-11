@@ -25,8 +25,20 @@ export interface QuestionDockCallbacks {
   onClose: () => void;
 }
 
+interface QuestionDockHeaderOptions {
+  viewModel: QuestionDockViewModel;
+  displayMode: QuestionDisplayMode;
+  requestId: string;
+  isCollapsed: boolean;
+  callbacks: QuestionDockCallbacks;
+}
+
 export class QuestionDock {
   private readonly rootEl: HTMLElement;
+  private readonly collapsedRequestIds = new Set<string>();
+  private currentRequestId: string | null = null;
+  private lastRenderState: QuestionDockRenderState | null = null;
+  private lastCallbacks: QuestionDockCallbacks | null = null;
 
   constructor(parentEl: HTMLElement) {
     this.rootEl = parentEl.createDiv({
@@ -38,14 +50,22 @@ export class QuestionDock {
   }
 
   render(state: QuestionDockRenderState, callbacks: QuestionDockCallbacks): void {
+    this.lastRenderState = state;
+    this.lastCallbacks = callbacks;
     this.rootEl.empty();
 
     if (!state.request || state.request.questions.length === 0) {
       this.rootEl.addClass('is-hidden');
+      this.rootEl.removeClass('is-collapsed');
+      this.currentRequestId = null;
       return;
     }
 
     this.rootEl.removeClass('is-hidden');
+    if (state.request.id !== this.currentRequestId) {
+      this.currentRequestId = state.request.id;
+      this.collapsedRequestIds.delete(state.request.id);
+    }
 
     const viewModel = buildQuestionDockViewModel(
       state.request,
@@ -59,10 +79,24 @@ export class QuestionDock {
 
     if (viewModel.visibleQuestions.length === 0) {
       this.rootEl.addClass('is-hidden');
+      this.rootEl.removeClass('is-collapsed');
       return;
     }
 
-    this.renderHeader(viewModel, state.displayMode, callbacks);
+    const isCollapsed = this.collapsedRequestIds.has(state.request.id);
+    this.rootEl.toggleClass('is-collapsed', isCollapsed);
+
+    this.renderHeader({
+      viewModel,
+      displayMode: state.displayMode,
+      requestId: state.request.id,
+      isCollapsed,
+      callbacks,
+    });
+    if (isCollapsed) {
+      return;
+    }
+
     this.renderTabs(viewModel, callbacks);
     const sectionElements = this.renderBody(viewModel, state.displayMode, callbacks);
     this.renderFooter(viewModel, state.displayMode, sectionElements, callbacks);
@@ -72,11 +106,14 @@ export class QuestionDock {
     this.rootEl.remove();
   }
 
-  private renderHeader(
-    viewModel: QuestionDockViewModel,
-    displayMode: QuestionDisplayMode,
-    callbacks: QuestionDockCallbacks,
-  ): void {
+  private renderHeader(options: QuestionDockHeaderOptions): void {
+    const {
+      viewModel,
+      displayMode,
+      requestId,
+      isCollapsed,
+      callbacks,
+    } = options;
     const headerEl = this.rootEl.createDiv({ cls: 'opencodian-question-dock-header' });
 
     const titleWrapEl = headerEl.createDiv({ cls: 'opencodian-question-dock-title-wrap' });
@@ -105,6 +142,19 @@ export class QuestionDock {
       }),
     });
 
+    const collapseBtn = headerEl.createEl('button', {
+      cls: 'opencodian-question-dock-collapse-toggle',
+      attr: {
+        type: 'button',
+        'aria-expanded': isCollapsed ? 'false' : 'true',
+        'aria-label': isCollapsed ? t('chat.question.expand') : t('chat.question.collapse'),
+      },
+    });
+    setIcon(collapseBtn, isCollapsed ? 'chevron-down' : 'chevron-up');
+    collapseBtn.addEventListener('click', () => {
+      this.toggleCollapsed(requestId);
+    });
+
     const closeBtn = headerEl.createEl('button', {
       cls: 'opencodian-question-dock-close',
       attr: {
@@ -116,6 +166,18 @@ export class QuestionDock {
     closeBtn.addEventListener('click', () => {
       callbacks.onClose();
     });
+  }
+
+  private toggleCollapsed(requestId: string): void {
+    if (this.collapsedRequestIds.has(requestId)) {
+      this.collapsedRequestIds.delete(requestId);
+    } else {
+      this.collapsedRequestIds.add(requestId);
+    }
+
+    if (this.lastRenderState && this.lastCallbacks) {
+      this.render(this.lastRenderState, this.lastCallbacks);
+    }
   }
 
   private renderTabs(viewModel: QuestionDockViewModel, callbacks: QuestionDockCallbacks): void {
