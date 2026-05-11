@@ -103,9 +103,7 @@ export class BackgroundTaskLiveSignalCoordinator {
         || gracePeriodActive;
     }
 
-    return runtime.backgroundTaskModeTag === 'search-mode' && (
-      runtime.isStreaming || gracePeriodActive
-    );
+    return runtime.backgroundTaskModeTag !== null && (runtime.isStreaming || gracePeriodActive);
   }
 
   armAuthoritativeSyncGate(tabId: TabId | null): void {
@@ -183,9 +181,7 @@ export class BackgroundTaskLiveSignalCoordinator {
     }
 
     if (runtime.backgroundTaskLaunches.size === 0) {
-      if (runtime.backgroundTaskModeTag === 'search-mode') {
-        this.host.resetBackgroundTaskIndicator(tabId);
-      }
+      this.host.resetBackgroundTaskIndicator(tabId);
       return;
     }
 

@@ -50,7 +50,7 @@ export class BackgroundTaskLiveSignalCoordinator {
 
 ### indicator running predicate
 
-- `hasIndicator()` 现在集中复用 `backgroundTaskStartedAt`、pending launch、session status / todos 与 search-mode runtime，统一回答 tab badge / stream finalize 是否还应把该 tab 视为 background-task running
+- `hasIndicator()` 现在集中复用 `backgroundTaskStartedAt`、pending launch、session status / todos、streaming state 与 grace period，统一回答 tab badge / stream finalize 是否还应把该 tab 视为 background-task running；empty placeholder 不再硬编码 `search-mode`
 - grace period 计时不再由 `OpenCodianView` 额外保留一个私有 helper，而是作为 live-signal coordinator 的内部运行时规则，与后续 stale downgrade 判定共用同一份 started-at 语义
 
 ### live-signal reconciliation

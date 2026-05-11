@@ -351,3 +351,82 @@ describe('BackgroundTaskTimelineService timeline assembly with runtime state', (
     expect(segments).toEqual([]);
   });
 });
+
+describe('BackgroundTaskTimelineService native inline rendering', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('renders ordinary user anchors once a native task launch exists', () => {
+    const host = createHost(createRuntime());
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'delegate this',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Audit routes' },
+          toolMetadata: { sessionId: 'child-session-1' },
+          toolStatus: 'running',
+        }],
+      },
+    ]);
+
+    const segments = service.collectInlineSegments(conversation, 'tab-1');
+
+    expect(segments).toEqual([expect.objectContaining({
+      anchorKey: 'msg-user-1',
+      modeTag: null,
+      launches: [expect.objectContaining({
+        launchId: 'call-1',
+        taskId: 'child-session-1',
+        description: 'Audit routes',
+      })],
+      pending: [expect.objectContaining({
+        launchId: 'call-1',
+        taskId: 'child-session-1',
+      })],
+      waitingForFollowUp: true,
+    })]);
+  });
+
+  it('keeps launchless ordinary user anchors hidden while they wait for native task activity', () => {
+    const host = createHost(createRuntime());
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'delegate this',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'working',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'text',
+          text: 'working',
+        }],
+      },
+    ]);
+
+    const segments = service.collectInlineSegments(conversation, 'tab-1');
+
+    expect(segments).toEqual([]);
+  });
+});

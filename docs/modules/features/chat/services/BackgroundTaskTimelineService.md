@@ -10,7 +10,7 @@
 当前职责集中在：
 
 - indicator reset、active anchor、launch/completion、waiting-for-follow-up 与 stale fingerprint 的 runtime 清理
-- search-mode user injection 到 active runtime indicator 的 arm 入口，以及 native task tool lifecycle 的 runtime rebuild/facade 入口
+- any user message 到 active runtime indicator 的 arm 入口，以及 native task tool lifecycle 的 runtime rebuild/facade 入口；OMO mode tag 只作为 metadata 保留
 - conversation→runtime rebuild 时的 authoritative-sync gate 与 stream-like state 回写
 - inline segment renderability、suppression 过滤、inline copy / task markdown 组装
 - 向调用方保留 `collectSegments()`、`collectDiagnostics()`、`upsertLaunch()`、`upsertCompletionFromToolCall()` 与 `getPendingLaunches()` 的兼容 facade
@@ -82,7 +82,7 @@ export function createBackgroundTaskViewHost(
 
 ### inline copy
 
-- `shouldRenderInlineSegment()` 继续负责 all-complete / pending launch 的基础判定；零 launch 的 `search-mode` preparing 占位现在还要求 runtime 仍在跟踪该 active anchor，避免旧会话 reload 后把已失活的搜索模式误显示成“后台任务准备中”。
+- `shouldRenderInlineSegment()` 继续负责 all-complete / pending launch 的基础判定；普通 user anchor 只有在 native task launch 出现后才渲染 inline panel，零 launch 的 OMO-mode preparing 占位仍要求 runtime 跟踪该 active anchor，避免普通聊天消息误显示成“后台任务准备中”。
 - `getInlineCopy()` 和 `buildTasksMarkdown()` 仍留在 facade 内，保证 inline panel 与 completion queue 使用同一份可读文案。
 
 ## 与相邻模块的边界

@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../src/core/types';
+import type { ChatMessage, Conversation } from '../../../../src/core/types';
 import {
   type BackgroundTaskTimelineRuntime,
   BackgroundTaskTimelineService,
@@ -42,6 +42,17 @@ function createHost(
     clearAuthoritativeSyncGate: jest.fn(),
     syncTabStreamLikeState: jest.fn(),
     isSuppressedBackgroundTaskSegment: jest.fn().mockReturnValue(false),
+  };
+}
+
+function createConversation(messages: ChatMessage[]): Conversation {
+  return {
+    id: 'conversation-1',
+    title: 'Conversation',
+    createdAt: 1,
+    updatedAt: 2,
+    openCodeSessionId: 'session-1',
+    messages,
   };
 }
 
@@ -184,5 +195,69 @@ describe('BackgroundTaskTimelineService native OpenCode task lifecycle', () => {
       taskId: 'child-session-1',
       description: 'Native audit',
     });
+  });
+
+  it('collects diagnostics for native task blocks after a normal user anchor', () => {
+    const host = createHost(null);
+    const service = new BackgroundTaskTimelineService(host);
+
+    const diagnostics = service.collectDiagnostics(createNativeTaskMessages('completed'));
+
+    expect(diagnostics).toEqual(expect.objectContaining({
+      anchorKey: 'msg-user-1',
+      completed: [expect.objectContaining({
+        taskId: 'child-session-1',
+        description: 'Audit routes',
+      })],
+      pending: [],
+      sawAllTasksComplete: false,
+    }));
+  });
+
+  it('rehydrates active native task segments after a normal user anchor', () => {
+    const runtime = createRuntime({ isHydratingConversation: true });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation([
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'delegate this',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Audit routes' },
+          toolMetadata: { sessionId: 'child-session-1' },
+          toolStatus: 'running',
+        }],
+      },
+    ]);
+
+    service.syncStateFromConversation(conversation, 'tab-1');
+
+    expect(runtime.backgroundTaskStartedAt).toBe(1);
+    expect(runtime.backgroundTaskActiveAnchorKey).toBe('msg-user-1');
+    expect(runtime.backgroundTaskModeTag).toBeNull();
+    expect(runtime.backgroundTaskLaunches.get('call-1')).toEqual(expect.objectContaining({
+      launchId: 'call-1',
+      taskId: 'child-session-1',
+      description: 'Audit routes',
+    }));
+    expect(runtime.backgroundTaskWaitingForFollowUp).toBe(true);
+    expect(host.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
+    expect(conversation.backgroundTaskMetadata?.activeAnchor).toEqual(expect.objectContaining({
+      anchorKey: 'msg-user-1',
+      modeTag: null,
+      waitingForFollowUp: true,
+    }));
   });
 });

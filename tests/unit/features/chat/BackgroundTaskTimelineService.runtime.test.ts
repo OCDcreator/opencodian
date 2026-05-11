@@ -479,7 +479,7 @@ describe('BackgroundTaskTimelineService indicator runtime controls', () => {
     expect(runtime.backgroundTaskSuppressedFingerprint).toBeNull();
   });
 
-  it('ignores non-search-mode messages when arming indicator', () => {
+  it('arms indicator for normal user messages with a null mode tag', () => {
     const runtime = createRuntime();
     const host = createHost(runtime);
     const service = new BackgroundTaskTimelineService(host);
@@ -493,8 +493,14 @@ describe('BackgroundTaskTimelineService indicator runtime controls', () => {
 
     service.armIndicatorForUserMessage(message, 'tab-1');
 
-    expect(runtime.backgroundTaskStartedAt).toBeNull();
-    expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
+    expect(runtime.backgroundTaskStartedAt).toBe(42);
+    expect(runtime.backgroundTaskActiveAnchorKey).toBe('msg-user-1');
+    expect(runtime.backgroundTaskModeTag).toBeNull();
+    expect(runtime.backgroundTaskWaitingForFollowUp).toBe(false);
+    expect(host.getMessageAnchorKey).toHaveBeenCalledWith(message);
+    expect(host.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
+    expect(runtime.backgroundTaskStaleNoticeFingerprint).toBeNull();
+    expect(runtime.backgroundTaskSuppressedFingerprint).toBeNull();
   });
 
   it('clears inline panel then syncs stream state when resetting indicator', () => {

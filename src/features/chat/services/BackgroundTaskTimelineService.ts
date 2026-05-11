@@ -77,13 +77,15 @@ export class BackgroundTaskTimelineService {
       return;
     }
 
-    if (message.omo?.kind !== 'user-injection' || message.omo.modeTag !== 'search-mode') {
+    if (message.role !== 'user') {
       return;
     }
 
     runtime.backgroundTaskStartedAt = message.timestamp;
     runtime.backgroundTaskActiveAnchorKey = this.host.getMessageAnchorKey(message);
-    runtime.backgroundTaskModeTag = message.omo.modeTag;
+    runtime.backgroundTaskModeTag = message.omo?.kind === 'user-injection'
+      ? message.omo.modeTag
+      : null;
     runtime.backgroundTaskWaitingForFollowUp = false;
     this.host.armAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
@@ -207,14 +209,14 @@ export class BackgroundTaskTimelineService {
       return true;
     }
 
-    return segment.modeTag === 'search-mode' && segment.launches.length === 0;
+    return segment.modeTag !== null && segment.launches.length === 0;
   }
 
   private shouldRenderPreparingInlineSegment(
     segment: BackgroundTaskSegment,
     tabId: TabId | null,
   ): boolean {
-    if (segment.modeTag !== 'search-mode' || segment.launches.length > 0) {
+    if (segment.launches.length > 0) {
       return true;
     }
 

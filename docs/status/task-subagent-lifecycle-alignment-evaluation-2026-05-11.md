@@ -636,11 +636,174 @@ message.part.updated 事件
 
 ## 附录 C：术语对照
 
-| 术语 | opencode-desktop | OpenCodian |
-|------|-----------------|-----------|
-| 任务工具 | `task` tool | `task` tool（仅 search-mode） |
-| 子代理 | 子会话（`parentID`） | 子代理（`@subagent` mention） |
-| 任务完成 | `ToolPart.state.status: completed` | OMO `system-reminder: background-task-completed` |
-| 后台任务 | 不区分（就是 task tool） | 独立概念（search-mode + OMO 门控） |
-| 子会话链接 | `metadata.sessionId` | `bg_[a-z0-9]+` regex |
-| 模式 | 不区分 | `search-mode`（11 处硬编码） |
+| 术语 | opencode-desktop | OpenCodian（原始） | OpenCodian（优化后） |
+|------|-----------------|-------------------|---------------------|
+| 任务工具 | `task` tool | `task` tool（仅 search-mode） | `task` tool（所有模式） |
+| 子代理 | 子会话（`parentID`） | 子代理（`@subagent` mention） | 子代理 + 子会话（`metadata.sessionId`） |
+| 任务完成 | `ToolPart.state.status: completed` | OMO `system-reminder` 唯一路径 | SDK `ToolCallInfo.status` 主路径 + OMO 降级 |
+| 后台任务 | 不区分（就是 task tool） | 独立概念（search-mode + OMO 门控） | 渐进对齐（流式 SDK，历史 OMO 降级） |
+| 子会话链接 | `metadata.sessionId` | `bg_[a-z0-9]+` regex | `metadata.sessionId` 主路径 + regex 降级 |
+| 模式 | 不区分 | `search-mode`（11 处硬编码） | `search-mode`（8 处残留，流式路径已移除） |
+
+---
+
+# 更新评估（2026-05-11 下午）：优化后对齐评分
+
+> **评估性质**：多 LLM 共识重评估（Council，4 councillors）
+> **评估对象**：4 个关键 commit 优化后的 task/subagent 生命周期处理
+> **对比基线**：同日早先评估 3/10
+
+## 更新对齐评分：5.5/10（原始 3/10 → +2.5）
+
+| Councillor | 评分 | 定性 |
+|---|---|---|
+| alpha (gpt-5.5) | 6.5/10 | "流式 SDK 原生，时间线仍为 legacy-hybrid" |
+| beta (glm-5.1) | 5.5/10 | "+2.5 已赚得，未整合，indicator 仍受门控" |
+| gamma (deepseek-v4) | 6/10 | "流式路径已转化，半迁移状态" |
+| delta (kimi-for-coding) | 5/10 | "数据层已改善，结构模型未变" |
+
+---
+
+## 各维度评分（Council 平均）
+
+| 维度 | 原始 | 优化后 | 目标 | 关键变化 |
+|------|------|--------|------|---------|
+| **流式完成检测** | 1/10 | **9/10** | 9/10 | `ToolCallInfo.status` + `toolMetadata.sessionId`；零 OMO |
+| **会话 ID 提取** | 2/10 | **8/10** | 9/10 | `metadata.sessionId` 为主；`bg_` regex 仍为降级 |
+| **ToolPart 状态用于生命周期** | 1/10 | **8/10** | 9/10 | `resolveToolExecutionStatus` 读 `state.status`；contentBlock `toolStatus` 已使用 |
+| **历史回放/锚定** | 1/10 | **3/10** | 8/10 | **仍 OMO 门控**：segment anchoring、diagnostics、indicator arming |
+| **search-mode 门控消除** | 1/10 | **4/10** | 9/10 | 11 → 8 处残留硬编码（AssemblyService 4、LiveSignal 2、TimelineService 2） |
+| **服务架构** | 3/10 | **3/10** | 7/10 | **未整合。** 仍 11+ 服务，~2400 行 |
+| **模块文档覆盖** | — | **3/10** | 8/10 | 5 个关键服务缺文档 |
+
+---
+
+## 已修复 vs 未修复
+
+### ✅ 已修复（流式/渲染路径已干净）
+
+| 成就 | 证据 |
+|------|------|
+| `isBackgroundTaskTool` 模式无关 | 返回 `toolName === 'task'` — 零模式检查 |
+| 原生 task 卡片渲染 | `ToolCallRenderer` 使用 `toolMetadata.sessionId` + status |
+| SDK 原生流式完成检测 | `upsertCompletionFromToolCall` 通过 `ToolCallInfo.status` |
+| `metadata.sessionId` 提取 | 4 文件：NormalizationMapper、StreamEventTransformer、StreamingRuntimeCoordinator、ChildSessionGraphService |
+| 同步事件批量处理 | 16ms 合并，去重，barrier flush |
+| 跨会话持久化 | `BackgroundTaskActiveAnchorMetadata` 存活 reload |
+| 原生路径测试覆盖 | 188 行 SDK 原生完成测试 |
+
+### ❌ 未修复（结构模型未变）
+
+| 残留问题 | 影响 |
+|----------|------|
+| **Indicator arming 受 search-mode 门控** | `armIndicatorForUserMessage` line 80：非 search 任务永远无法触发 inline panel |
+| **Segment anchoring 仅 OMO** | `captureUserSegmentAnchor` 只为 `search-mode` anchors 创建 segments |
+| **Diagnostics 仅 OMO** | `collectDiagnostics` 无 search-mode anchor 时跳过 |
+| **8 处 search-mode 硬编码残留** | AssemblyService 4 处、TimelineService 2 处、LiveSignalCoordinator 2 处 |
+| **双完成路径** | SDK 原生 + OMO 写入同一 map；潜在 taskId 分歧 |
+| **11 服务未变** | 无合并、无移除、无整合 |
+| **`bg_` regex 持续存在** | `extractBackgroundTaskId` line 117 中的降级 |
+| **5 个服务缺模块文档** | AssemblyService、TimelineService、LiveSignalCoordinator、CompletionNoticeService、NoticeStateService |
+
+---
+
+## 关键发现：结构性分叉
+
+所有四个 councillors 独立识别出同一架构不一致：
+
+> `StreamTriggerCoordinator` 的 `isBackgroundTaskTool` 对所有 task 返回 true（无模式检查）。但 indicator、assembly 和 diagnostics 基础设施仅完整支持 search-mode 任务。非 search-mode 任务进入 trigger 但**无法激活 indicator panel** 或 **reload 后持久化到 segments**。
+
+这意味着：
+
+| 场景 | search-mode task | 非 search-mode task |
+|------|-----------------|-------------------|
+| **活跃流式** | ✅ inline panel + tool card + completion | ✅ tool card + completion（无 panel） |
+| **Reload 后** | ✅ 时间线 + panel 恢复 | ❌ 丢失 panel 状态 |
+| **Indicator** | ✅ 正常 arm | ❌ 永远不 arm |
+| **Diagnostics** | ✅ 正常扫描 | ❌ 跳过 |
+
+**Delta 的精炼诊断**："commits 在旧模型旁添加了并行 SDK 原生路径，但没有替换结构性门控。"
+
+---
+
+## 丰富 UI 的复杂度是否值得？
+
+**Council 共识：部分值得。**
+
+| 功能 | 价值 | 结论 |
+|------|------|------|
+| Inline 进度面板 | 高 — 窄 Obsidian 侧边栏必需 | **保留** |
+| 延迟完成通知 | 高 — 防止异步任务闪烁 | **保留** |
+| Stale 警告 + grace period | 高 — 防止虚假失败印象 | **保留** |
+| 跨会话持久化 | 高 — Obsidian reload 模式需要 | **保留** |
+| Per-tab 隔离 | 高 — 并发聊天 tab 需要独立状态 | **保留** |
+| OMO 诊断日志 | 低 — 仅调试用，OMO 特定 | **随 OMO 移除** |
+| 11 服务架构 | 过度 — desktop 用 0 服务做到 | **整合至 ~7** |
+
+**Gamma 的框架**："复杂度中 40% 是合理的增值（多 tab、持久化、丰富 inline UI），60% 是遗留 OMO 债务。"
+
+**Delta 的基准**："干净设计需要 5 个服务而非 11 个：timeline/segment、live signal coordinator、indicator renderer、completion notice service、stream trigger coordinator。"
+
+---
+
+## 达到 8/10+ 的建议
+
+### P1：从 indicator arming 移除 search-mode 门控 → 7/10
+- `BackgroundTaskTimelineService.armIndicatorForUserMessage`：为任何有下游 task 工具活动的用户消息 arm
+- ~20 行，消除 2-3 处 search-mode 引用
+
+### P2：使 segment anchoring 模式无关 → 7.5/10
+- `AssemblyService.captureUserSegmentAnchor`：为所有有下游 task 活动的用户消息创建 segments
+- `collectDiagnostics`：扫描所有 task blocks，不仅限 search-mode anchors
+- `getLatestSegmentWithActivity`：移除 search-mode 过滤
+- ~30 行，消除 4 处 search-mode 引用
+
+### P3：从 LiveSignalCoordinator 移除 search-mode 守卫 → 7.5/10
+- 将 `modeTag === 'search-mode'` 替换为 `launches.size > 0` 或 pending 检查
+- ~10 行，消除 2 处 search-mode 引用
+
+### P4：将 OMO 降级整合进单一 compat adapter → 8/10
+- 将 `addCompletedTasksFromMessage`、`collectCompletionReminderSegments`、`bg_` regex 移入一个 `OmoBackgroundTaskCompatAdapter`
+- OMO 引用从 ~12 处降至 1 处
+- 从 AssemblyService + LaunchService 移除 ~40 行
+
+### P5：合并薄服务 → 8/10
+- AssemblyService + LaunchService → 一个 assembly owner
+- CompletionNoticeService + NoticeStateService → 一个 notice owner
+- 服务数：11 → ~7
+
+### P6：补充缺失模块文档 → 8/10
+- 5 个服务违反 maintainability R3
+
+---
+
+## 对齐轨迹
+
+```text
+原始:    3/10   ████████░░░░░░░░░░░░  (100% OMO，11 search-mode gates)
+当前:    5.5/10 ███████████░░░░░░░░░  (流式 SDK 原生，结构模型未变)
+P1-P3:  7.5/10 ███████████████░░░░░  (search-mode 门控消除)
+P1-P5:  8/10   ████████████████░░░░  (OMO 围栏化，服务整合)
+P1-P7:  9/10   ██████████████████░░  (OMO 弃用后移除)
+```
+
+**仅 P1–P3**（移除 search-mode 结构性门控）即可将评分带到 **~7.5/10** — 这是单一最高杠杆变更。约 60 行跨 3 文件，消除 live（对所有 task 工作）与 reload（仅 search-mode）之间的核心分叉。
+
+**底线**：四个 commit 修复了数据层。结构模型 — indicator 如何 arm、segments 如何 anchor、diagnostics 如何扫描 — 仍然像 OMO 是唯一选择一样运作。修复那个是下一个明确的步骤。
+
+---
+
+## P1-P3 实施记录（2026-05-11）
+
+本轮按 `docs/superpowers/specs/2026-05-11-task-subagent-search-mode-gate-removal-design.md` 和 `docs/superpowers/plans/2026-05-11-task-subagent-search-mode-gate-removal.md` 执行，仅处理 Council 标出的 P1-P3 search-mode 结构性门控。
+
+完成项：
+
+- `BackgroundTaskTimelineAssemblyService`：native `task` block 的 segment anchoring 与 diagnostics 不再要求 OMO `search-mode` anchor；`modeTag` 只保留为 metadata / historical fallback context。
+- `BackgroundTaskTimelineService`：indicator arming 支持普通 user message，普通 native task anchor 的 runtime `modeTag` 为 `null`；普通 anchor 只有在 native task launch 出现后才渲染 inline panel，launchless OMO-mode preparing segment 继续使用 active-anchor 校验。
+- `BackgroundTaskLiveSignalCoordinator`：empty placeholder 的 grace-period visibility 不再硬编码 `search-mode`，stale cleanup 对所有 mode 统一 reset。
+
+保留项：
+
+- OMO `system-reminder` fallback 和 `bg_` historical id fallback 仍保留，等待 P4 compat adapter slice 再围栏化。
+- 服务合并仍不在本轮范围内，等待 P5。

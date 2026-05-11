@@ -195,10 +195,10 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
     expect(resetBackgroundTaskIndicator).toHaveBeenCalledWith('tab-1');
   });
 
-  it('clears empty search-mode placeholders after the grace period', () => {
+  it('clears empty task placeholders after the grace period regardless of mode', () => {
     const { service, noticeStateService, resetBackgroundTaskIndicator } = createService({
       runtime: {
-        backgroundTaskModeTag: 'search-mode',
+        backgroundTaskModeTag: null,
       },
       status: { type: 'idle' },
     });

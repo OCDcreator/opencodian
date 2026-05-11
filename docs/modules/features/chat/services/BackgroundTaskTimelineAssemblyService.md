@@ -41,7 +41,7 @@ export class BackgroundTaskTimelineAssemblyService {
 - Task tool tracking no longer requires `search-mode`; `modeTag` is preserved as segment metadata rather than used as the functional gate.
 - all-complete reminder 会清空 pending 并关闭 waiting-for-follow-up；普通 completion reminder 只按 task id / description matching 清掉对应 launch。
 - runtime merge 不保存或修改 conversation，只把当前 tab 仍活跃但尚未持久化的 launch/completion 并入 segment 视图。
-- `collectDiagnostics()` 仍只扫描最后一个 search-mode user anchor 之后的 task/reminder activity，继续保持 OMO diagnostics 的语义边界。
+- `collectDiagnostics()` scans the latest user anchor that has downstream task/reminder activity, so native OpenCode task blocks and historical OMO reminders use the same anchor model.
 
 ## 与相邻模块的边界
 
