@@ -1,4 +1,5 @@
 import type { ToolCallInfo } from '../../../core/types';
+import type { BackgroundTaskCompletionInfo } from '../services/BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
 import type {
   BackgroundTaskLaunchInfo,
@@ -12,12 +13,16 @@ type BackgroundTaskStreamLiveSignalPort = Pick<
   BackgroundTaskLiveSignalCoordinator,
   'armAuthoritativeSyncGate' | 'hasIndicator'
 >;
-type BackgroundTaskTriggerTimelinePort = Pick<BackgroundTaskTimelineService, 'upsertLaunch'>;
+type BackgroundTaskTriggerTimelinePort = Pick<
+  BackgroundTaskTimelineService,
+  'upsertLaunch' | 'upsertCompletionFromToolCall'
+>;
 
 export interface BackgroundTaskStreamTriggerRuntime {
   backgroundTaskStartedAt: number | null;
   backgroundTaskModeTag: string | null;
   backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
+  backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
   backgroundTaskWaitingForFollowUp: boolean;
   backgroundTaskStaleNoticeFingerprint: string | null;
 }
@@ -68,6 +73,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
       {
         id: toolCall.id,
         input: toolCall.input ?? {},
+        toolMetadata: toolCall.toolMetadata,
       },
       runtime.backgroundTaskLaunches,
     );
@@ -101,10 +107,22 @@ export class BackgroundTaskStreamTriggerCoordinator {
       {
         id: toolCall.id,
         input: toolCall.input ?? {},
+        toolMetadata: toolCall.toolMetadata,
         result: toolCall.result,
       },
       runtime.backgroundTaskLaunches,
     );
+    if (toolCall.status === 'completed' || toolCall.status === 'error') {
+      this.timelineService.upsertCompletionFromToolCall(
+        {
+          id: toolCall.id,
+          input: toolCall.input ?? {},
+          toolMetadata: toolCall.toolMetadata,
+          result: toolCall.result,
+        },
+        runtime.backgroundTaskCompletedTasks,
+      );
+    }
     this.liveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     await this.indicatorCoordinator.renderIfNeeded(tabId);
@@ -129,9 +147,9 @@ export class BackgroundTaskStreamTriggerCoordinator {
 
   private isBackgroundTaskTool(
     toolName: string,
-    runtime: Pick<BackgroundTaskStreamTriggerRuntime, 'backgroundTaskModeTag'>,
+    _runtime: Pick<BackgroundTaskStreamTriggerRuntime, 'backgroundTaskModeTag'>,
   ): boolean {
-    return toolName === 'task' && runtime.backgroundTaskModeTag === 'search-mode';
+    return toolName === 'task';
   }
 
   private isTodoTool(toolName: string): boolean {

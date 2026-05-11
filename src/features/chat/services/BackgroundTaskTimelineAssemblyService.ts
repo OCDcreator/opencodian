@@ -50,6 +50,13 @@ export interface BackgroundTaskTimelineAssemblyHost {
 }
 
 type ChatContentBlock = NonNullable<ChatMessage['contentBlocks']>[number];
+type BackgroundTaskToolUseBlock = ChatContentBlock & {
+  type: 'tool_use';
+  toolId: string; toolInput?: Record<string, unknown>;
+  toolMetadata?: Record<string, unknown>;
+  toolResult?: string;
+  toolStatus?: string;
+};
 
 interface BackgroundTaskSegmentCollectionState {
   segments: BackgroundTaskSegment[];
@@ -70,11 +77,21 @@ export class BackgroundTaskTimelineAssemblyService {
     toolCall: {
       id: string;
       input: Record<string, unknown>;
+      toolMetadata?: Record<string, unknown>;
       result?: string;
     },
     target: Map<string, BackgroundTaskLaunchInfo>,
   ): void {
     BackgroundTaskTimelineLaunchService.upsertLaunch(toolCall, target);
+  }
+
+  getCompletedTaskFromToolCall(toolCall: {
+    id: string;
+    input: Record<string, unknown>;
+    toolMetadata?: Record<string, unknown>;
+    result?: string;
+  }): BackgroundTaskCompletionInfo | null {
+    return BackgroundTaskTimelineLaunchService.getCompletedTaskFromToolCall(toolCall);
   }
 
   collectSegments(
@@ -131,6 +148,7 @@ export class BackgroundTaskTimelineAssemblyService {
         this.upsertLaunch({
           id: block.toolId,
           input: block.toolInput ?? {},
+          toolMetadata: block.toolMetadata,
           result: block.toolResult,
         }, launches);
       }
@@ -205,7 +223,7 @@ export class BackgroundTaskTimelineAssemblyService {
       return;
     }
 
-    if (!state.latestUserMessage || !this.isSearchModeAnchorMessage(state.latestUserMessage)) {
+    if (!state.latestUserMessage) {
       return;
     }
 
@@ -214,11 +232,14 @@ export class BackgroundTaskTimelineAssemblyService {
       return;
     }
 
+    const taskBlock = block as BackgroundTaskToolUseBlock;
     this.upsertSegmentLaunch(segment, {
-      id: block.toolId,
-      input: block.toolInput ?? {},
-      result: block.toolResult,
+      id: taskBlock.toolId,
+      input: taskBlock.toolInput ?? {},
+      toolMetadata: taskBlock.toolMetadata,
+      result: taskBlock.toolResult,
     });
+    this.addNativeTaskCompletionToSegment(segment, taskBlock);
   }
 
   private collectCompletionReminderSegments(
@@ -445,12 +466,32 @@ export class BackgroundTaskTimelineAssemblyService {
     toolCall: {
       id: string;
       input: Record<string, unknown>;
+      toolMetadata?: Record<string, unknown>;
       result?: string;
     },
   ): void {
     const launches = new Map(segment.launches.map((launch) => [launch.launchId, launch] as const));
     this.upsertLaunch(toolCall, launches);
     segment.launches = Array.from(launches.values());
+  }
+
+  private addNativeTaskCompletionToSegment(
+    segment: BackgroundTaskSegment,
+    block: BackgroundTaskToolUseBlock,
+  ): void {
+    if (block.toolStatus !== 'completed' && block.toolStatus !== 'error') {
+      return;
+    }
+
+    const completion = BackgroundTaskTimelineLaunchService.getCompletedTaskFromToolCall({
+      id: block.toolId,
+      input: block.toolInput ?? {},
+      toolMetadata: block.toolMetadata,
+      result: block.toolResult,
+    });
+    if (completion) {
+      this.addCompletionToSegment(segment, completion);
+    }
   }
 
   private mergeSegmentLaunches(

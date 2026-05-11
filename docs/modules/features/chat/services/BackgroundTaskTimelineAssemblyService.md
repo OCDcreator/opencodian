@@ -9,8 +9,8 @@
 
 它负责：
 
-- 按 search-mode user anchor 聚合 `toolName === 'task'` launch block
-- 将 `background-task-completed` 与 `all-background-tasks-complete` system reminder 应用到匹配 segment
+- 按最近 user anchor 聚合带有 lifecycle state 的 native `toolName === 'task'` launch block
+- 将 native task terminal state 与 `background-task-completed` / `all-background-tasks-complete` OMO system reminder 应用到匹配 segment
 - 当 reminder 缺少明确 task→launch 匹配时，回退到最近仍有 task activity 的 segment
 - 合并当前 tab runtime 中尚未持久化的 launch/completion 状态
 - finalize pending / waiting-for-follow-up 状态，并按 anchor timestamp 排序
@@ -26,6 +26,7 @@ export interface BackgroundTaskTimelineAssemblyHost {
 
 export class BackgroundTaskTimelineAssemblyService {
   upsertLaunch(...): void;
+  getCompletedTaskFromToolCall(...): BackgroundTaskCompletionInfo | null;
   collectSegments(...): BackgroundTaskSegment[];
   collectDiagnostics(...): BackgroundTaskDiagnostics | null;
   getPendingLaunches(...): BackgroundTaskLaunchInfo[];
@@ -35,11 +36,12 @@ export class BackgroundTaskTimelineAssemblyService {
 ## 关键行为
 
 - `collectSegments()` 先按 conversation order 收集 user anchors、tool launches 与 completion reminders，再合并 active runtime state，最后统一 resolve pending state。
-- 只有 search-mode user anchor 之后的 `task` tool block 才会被视为 OMO background-task launch；普通 OpenCode 原生 task/subagent 卡片不会再被 timeline 误吸进 background-task segment。
-- completion reminder 的 fallback 也只允许落到已有 search-mode segment / search-mode anchor；如果当前对话只有普通 user turn，则 orphan reminder 会被丢弃而不会创建 `modeTag: null` 的 background-task segment。
+- Native `task` tool blocks after any user anchor can create a background-task segment when they carry task lifecycle state; OMO search-mode anchors still provide historical grouping and reminder fallback.
+- Native OpenCode task metadata（`toolMetadata.sessionId`）优先作为 child-session/task identity；OMO `system-reminder` tasks 继续作为历史或 OMO-enhanced conversation 的 fallback completion source。
+- Task tool tracking no longer requires `search-mode`; `modeTag` is preserved as segment metadata rather than used as the functional gate.
 - all-complete reminder 会清空 pending 并关闭 waiting-for-follow-up；普通 completion reminder 只按 task id / description matching 清掉对应 launch。
 - runtime merge 不保存或修改 conversation，只把当前 tab 仍活跃但尚未持久化的 launch/completion 并入 segment 视图。
-- `collectDiagnostics()` 只扫描最后一个 search-mode user anchor 之后的 task/reminder activity，继续保持 OMO diagnostics 的语义边界。
+- `collectDiagnostics()` 仍只扫描最后一个 search-mode user anchor 之后的 task/reminder activity，继续保持 OMO diagnostics 的语义边界。
 
 ## 与相邻模块的边界
 

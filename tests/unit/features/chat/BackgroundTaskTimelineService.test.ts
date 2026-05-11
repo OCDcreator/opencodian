@@ -61,36 +61,6 @@ describe('BackgroundTaskTimelineService timeline assembly from persisted message
     jest.clearAllMocks();
   });
 
-  it('ignores plain OpenCode task blocks when no search-mode anchor armed the background-task timeline', () => {
-    const host = createHost(null);
-    const service = new BackgroundTaskTimelineService(host);
-    const messages: ChatMessage[] = [
-      {
-        id: 'user-local-1',
-        role: 'user',
-        content: 'delegate this',
-        timestamp: 1,
-        sourceMessageId: 'msg-user-1',
-      },
-      {
-        id: 'assistant-1',
-        role: 'assistant',
-        content: '',
-        timestamp: 2,
-        contentBlocks: [{
-          type: 'tool_use',
-          toolId: 'call-1',
-          toolName: 'task',
-          toolInput: { description: 'Audit routes', taskId: 'child_1' },
-          toolResult: 'started child_1',
-          toolStatus: 'completed',
-        }],
-      },
-    ];
-
-    expect(service.collectSegments(messages, 'tab-1')).toEqual([]);
-  });
-
   it('collects launches, completions, and pending tasks into a single segment', () => {
     const host = createHost(null);
     const service = new BackgroundTaskTimelineService(host);
@@ -381,5 +351,3 @@ describe('BackgroundTaskTimelineService timeline assembly with runtime state', (
     expect(segments).toEqual([]);
   });
 });
-
-

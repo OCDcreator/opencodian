@@ -2,6 +2,7 @@ import type { BackgroundTaskActiveAnchorMetadata, ChatMessage, Conversation } fr
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
+import type { BackgroundTaskCompletionInfo } from './BackgroundTaskCompletionNoticeService';
 import {
   type BackgroundTaskDiagnostics,
   type BackgroundTaskLaunchInfo,
@@ -93,12 +94,29 @@ export class BackgroundTaskTimelineService {
     toolCall: {
       id: string;
       input: Record<string, unknown>;
+      toolMetadata?: Record<string, unknown>;
       result?: string;
     },
     target: Map<string, BackgroundTaskLaunchInfo> =
       this.host.getTabRuntimeState(this.host.getActiveTabId())?.backgroundTaskLaunches ?? new Map(),
   ): void {
     this.assemblyService.upsertLaunch(toolCall, target);
+  }
+
+  upsertCompletionFromToolCall(
+    toolCall: {
+      id: string;
+      input: Record<string, unknown>;
+      toolMetadata?: Record<string, unknown>;
+      result?: string;
+    },
+    target: Map<string, BackgroundTaskCompletionInfo>,
+  ): void {
+    const completion = this.assemblyService.getCompletedTaskFromToolCall(toolCall);
+    if (!completion) {
+      return;
+    }
+    target.set(completion.taskId, completion);
   }
 
   collectSegments(

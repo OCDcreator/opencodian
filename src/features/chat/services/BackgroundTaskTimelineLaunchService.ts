@@ -10,6 +10,7 @@ export class BackgroundTaskTimelineLaunchService {
     toolCall: {
       id: string;
       input: Record<string, unknown>;
+      toolMetadata?: Record<string, unknown>;
       result?: string;
     },
     target: Map<string, BackgroundTaskLaunchInfo>,
@@ -20,6 +21,7 @@ export class BackgroundTaskTimelineLaunchService {
       toolCall.result ?? existing?.description,
     );
     const taskId = this.extractBackgroundTaskId(
+      toolCall.toolMetadata,
       toolCall.input,
       toolCall.result,
       existing?.taskId,
@@ -30,6 +32,28 @@ export class BackgroundTaskTimelineLaunchService {
       taskId,
       description,
     });
+  }
+
+  static getCompletedTaskFromToolCall(toolCall: {
+    id: string;
+    input: Record<string, unknown>;
+    toolMetadata?: Record<string, unknown>;
+    result?: string;
+  }): BackgroundTaskCompletionInfo | null {
+    const taskId = this.extractNativeTaskSessionId(toolCall.toolMetadata);
+    if (!taskId) {
+      return null;
+    }
+
+    const description = this.getBackgroundTaskDescription(
+      toolCall.input,
+      toolCall.result,
+    );
+
+    return {
+      taskId,
+      description,
+    };
   }
 
   static addCompletedTasksFromMessage(
@@ -102,6 +126,11 @@ export class BackgroundTaskTimelineLaunchService {
       }
 
       if (source && typeof source === 'object') {
+        const sessionId = (source as Record<string, unknown>).sessionId;
+        if (typeof sessionId === 'string' && sessionId.trim().length > 0) {
+          return sessionId.trim();
+        }
+
         const nested = [
           (source as Record<string, unknown>).task_id,
           (source as Record<string, unknown>).taskId,
@@ -124,6 +153,15 @@ export class BackgroundTaskTimelineLaunchService {
     }
 
     return null;
+  }
+
+  private static extractNativeTaskSessionId(
+    metadata: Record<string, unknown> | undefined,
+  ): string | null {
+    const sessionId = metadata?.sessionId;
+    return typeof sessionId === 'string' && sessionId.trim().length > 0
+      ? sessionId.trim()
+      : null;
   }
 
   private static isLaunchMatchedByCompletion(

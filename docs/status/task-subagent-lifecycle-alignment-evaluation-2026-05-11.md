@@ -1,0 +1,646 @@
+# Task/Subagent 生命周期对齐评估：OpenCodian vs opencode-desktop
+
+> **评估日期**：2026-05-11
+> **评估性质**：多 LLM 共识评估（Council，4 councillors）
+> **评估对象**：OpenCodian 与 opencode-desktop 在 task/subagent/background task 生命周期处理上的架构对齐
+> **参与模型**：council 多模型共识
+> **关联文档**：`docs/status/session-lifecycle-council-review-2026-05-10.md`、`docs/status/session-lifecycle-alignment-evaluation.md`
+> **对比项目**：OpenCode — [https://github.com/opencode-ai/opencode](https://github.com/opencode-ai/opencode)
+
+---
+
+## 0. 执行摘要
+
+### 核心结论
+
+**当前对齐评分：3/10**（ councillors 评分范围 2–4）
+
+OpenCodian 的后台任务子系统完全构建在 OMO（第三方适配层）之上，而 opencode-desktop 证明了通过 SDK 原生的 `ToolPart.state.status` 即可正确处理全部 task/subagent 生命周期，无需任何 OMO 依赖。
+
+**这不是功能缺失问题，而是架构方向问题。** OpenCodian 已经拥有所有需要的基础设施——`message.part.updated` 事件、`metadata.sessionId` 提取、`ChildSessionGraphService`——但后台任务生命周期管理没有接线到这些原生信号上。
+
+**预期可达到的对齐评分：8/10**（3–4 个聚焦迭代后）
+
+---
+
+## 1. 评估背景
+
+### 1.1 三个前端消费同一个后端
+
+```text
+                    ┌──────────────────────────────┐
+                    │     OpenCode Server (Go)      │
+                    │  HTTP / SSE / SDK v2          │
+                    │                               │
+                    │  核心能力:                      │
+                    │  · ToolPart 状态生命周期         │
+                    │  · message.part.updated 事件   │
+                    │  · session.children() API      │
+                    │  · metadata.sessionId 注入      │
+                    └──────────┬───────────────────┘
+                               │
+             ┌─────────────────┼──────────────────┐
+             │                 │                  │
+       ┌─────┴──────┐  ┌──────┴──────┐  ┌───────┴───────┐
+       │ TUI (终端)  │  │ Desktop     │  │ OpenCodian    │
+       │ CLI/PTY    │  │ SolidJS     │  │ Obsidian 插件  │
+       └────────────┘  └─────────────┘  └───────────────┘
+                           │                    │
+                           │                    │
+                     SDK ToolPart 状态      OMO system-reminder
+                     (原生协议)             (第三方 XML 文本注入)
+```
+
+### 1.2 评估发起原因
+
+用户提出关键质疑：**OMO 只是第三方开发的 OpenCode 适配插件，OpenCodian 作为前端插件不应将核心功能（任务完成检测）硬绑在一个可选的外部组件上。**
+
+经调查发现：
+
+1. opencode-desktop **完全不用 OMO**，仅靠 SDK ToolPart 状态驱动
+2. OpenCodian 的后台任务完成检测 **100% 依赖 OMO**
+3. OpenCodian 已经有了所有 SDK 原生基础设施，但 **没有接线**
+
+### 1.3 评估范围
+
+| 维度 | 覆盖范围 |
+|------|---------|
+| 后端协议 | OpenCode Server 的 task 工具实现、ToolPart 状态机、事件总线 |
+| opencode-desktop | `packages/ui/`（SolidJS 组件）、`packages/desktop/`（Electron 壳） |
+| OpenCodian | `src/features/chat/` 下 13 个 BackgroundTask 相关文件、`src/core/opencode/` 同步基础设施 |
+| 排除 | TUI 渲染、非 task 工具的 tool call 处理 |
+
+---
+
+## 2. 后端协议分析
+
+### 2.1 OpenCode Server 如何实现 Task 工具
+
+**源文件**：`packages/opencode/src/tool/task.ts`
+
+当 LLM 调用 `task` 工具时，后端执行以下步骤：
+
+```text
+步骤 1: 创建子会话
+  sessions.create({
+    parentID: ctx.sessionID,          // ← 父子关系
+    title: description + " (@agent subagent)",
+  })
+
+步骤 2: 将子会话 ID 写入工具元数据
+  ctx.metadata({
+    title: params.description,
+    metadata: {
+      sessionId: nextSession.id,      // ← 关键信号
+      model,
+    },
+  })
+
+步骤 3: 在子会话上运行完整 LLM 循环
+  ops.prompt({ sessionID: nextSession.id, ... })
+
+步骤 4: 子会话完成 → ToolPart.state.status = "completed"
+  父会话发布 message.part.updated 事件
+```
+
+**关键设计**：`metadata.sessionId` 是后端协议的一部分，不是 OMO 发明的。任何前端都可以直接读取。
+
+### 2.2 ToolPart 状态机
+
+**源文件**：`packages/sdk/js/src/v2/gen/types.gen.ts`
+
+```typescript
+type ToolState =
+  | { status: "pending";   input: Record<string, unknown>; raw: string }
+  | { status: "running";   input: Record<string, unknown>; title?: string;
+      metadata?: Record<string, unknown>; time: { start: number } }
+  | { status: "completed"; input: Record<string, unknown>; output: string;
+      title: string; metadata: Record<string, unknown>; time: { start, end } }
+  | { status: "error";     input: Record<string, unknown>; error: string;
+      metadata?: Record<string, unknown>; time: { start, end } }
+```
+
+**task 工具的完整生命周期**：
+
+```text
+pending → running → completed/error
+              │
+              └─ metadata.sessionId 在 running 状态注入
+```
+
+### 2.3 事件系统
+
+后端通过全局事件总线推送的、与 task/subagent 相关的事件：
+
+| 事件 | 来源 | 数据 | 与 task 的关系 |
+|------|------|------|---------------|
+| `message.part.updated` | `Session.updatePart()` | `{ sessionID, part: ToolPart, time }` | **task 完成的原生信号**：`part.tool === 'task'` 且 `status === 'completed'` |
+| `session.status` | `SessionStatus.set()` | `{ sessionID, status: { type: "idle"\|"busy"\|"retry" } }` | 子会话独立发送状态事件 |
+| `session.created` | `Session.create()` | `{ sessionID, info }` | 子会话创建时触发 |
+| `message.updated` | `Session.updateMessage()` | `{ sessionID, info }` | 间接反映进度 |
+
+**注意**：没有专门的 `subagent.completed` 事件。完成是隐含在 ToolPart 状态转换中的。
+
+### 2.4 子会话发现 API
+
+| API | 用途 |
+|-----|------|
+| `GET /session/{sessionID}/children` | 返回所有 `parent_id == parentID` 的子会话 |
+| `GET /session/status` | 一次调用返回所有已知会话的 `{ idle\|busy\|retry }` 状态 |
+| `GET /session/{sessionID}/messages` | 获取子会话的消息列表 |
+
+---
+
+## 3. opencode-desktop 方案分析
+
+### 3.1 核心方法：零 OMO，完全 SDK 原生
+
+opencode-desktop 处理 task/subagent 的方式极其简洁：
+
+```text
+ToolPart.state.status 变化 → message.part.updated 事件 → UI 自动响应
+```
+
+**没有**：
+- 没有单独的后台任务追踪层
+- 没有 OMO system-reminder 解析
+- 没有 search-mode 门控
+- 没有独立的完成检测服务
+- 没有 inline panel、timeline、completion notice
+
+### 3.2 Task 工具注册
+
+**源文件**：`packages/ui/src/components/message-part.tsx`
+
+```typescript
+ToolRegistry.register({
+  name: "task",
+  render(props) {
+    // 1. 从 metadata.sessionId 直接读取子会话 ID
+    const childSessionId = createMemo(() => {
+      const value = props.metadata.sessionId      // 直接从 ToolPart state
+      if (typeof value === "string" && value) return value
+      // 2. 降级：通过 parentID 匹配搜索
+      return taskSession(props.input, location.pathname,
+                         data.store.session, data.store.agent)
+    })
+
+    const running = createMemo(() =>
+      props.status === "pending" || props.status === "running")
+
+    // running 时显示 spinner，completed 时显示可点击链接
+  }
+})
+```
+
+### 3.3 子会话查找降级路径
+
+**源文件**：`packages/ui/src/components/message-part.tsx`（`taskSession()` 函数）
+
+```typescript
+function taskSession(input, path, sessions, agents) {
+  const parentID = currentSession(path)        // 当前会话 ID
+  const description = input.description
+  const agent = taskAgent(input.subagent_type, agents).name
+
+  return (sessions ?? [])
+    .filter(s => s.parentID === parentID && !s.time?.archived)
+    .filter(s => description ? s.title.startsWith(description) : true)
+    .filter(s => agent ? s.title.includes(`@${agent}`) : true)
+    .sort((a, b) => (b.time.created ?? 0) - (a.time.created ?? 0))[0]?.id
+}
+```
+
+双层策略：
+1. **主路径**：`metadata.sessionId`（后端在创建子会话时直接注入）
+2. **降级路径**：通过 `parentID` + description + agent 匹配搜索
+
+### 3.4 数据模型
+
+```typescript
+type Data = {
+  session: Session[]                              // 所有会话（含子会话）
+  session_status: { [sessionID: string]: SessionStatus }  // 会话级状态
+  message: { [sessionID: string]: Message[] }     // 每会话消息
+  part: { [messageID: string]: Part[] }           // 每消息 Part
+}
+```
+
+没有专门的 subagent/background task 状态。ToolPart 的 `state.status` 就是生命周期。
+
+### 3.5 工具状态渲染
+
+| 状态 | 渲染行为 |
+|------|---------|
+| `pending` | Text shimmer 动画，阻止折叠 |
+| `running` | 同 pending + spinner |
+| `completed` | 显示标题/副标题，可折叠展开详情，可点击打开子会话 |
+| `error` | 显示 ToolErrorCard，可点击打开子会话查看错误 |
+
+### 3.6 会话级状态（独立于工具级）
+
+`session_status` 提供 `idle/busy/retry` 信号：
+- `busy` → 显示 "thinking" 指示器
+- `retry` → 显示 SessionRetry 卡片（速率限制重试）
+- 这是**会话级**信号，不区分具体工具
+
+---
+
+## 4. OpenCodian 当前方案分析
+
+### 4.1 核心方法：OMO 驱动的并行追踪层
+
+```text
+OMO system-reminder XML 解析 → BackgroundTask 服务群 → inline panel + completion notice
+```
+
+### 4.2 服务架构（13 个文件，~3000 行）
+
+```text
+流式触发
+├── BackgroundTaskStreamTriggerCoordinator    (工具调用 start/end 钩子)
+│
+时间线管理
+├── BackgroundTaskTimelineService             (时间线组装/管理)
+├── BackgroundTaskTimelineAssemblyService     (消息遍历，识别 anchor)
+├── BackgroundTaskTimelineLaunchService       (launch 提取/匹配)
+│
+信号协调
+├── BackgroundTaskLiveSignalCoordinator       (15s grace period + session liveness)
+│
+UI 渲染
+├── BackgroundTaskIndicatorCoordinator        (渲染编排)
+├── BackgroundTaskInlinePanelRenderer         (inline DOM 面板)
+│
+通知管理
+├── BackgroundTaskCompletionNoticeService     (延迟持久化完成通知)
+├── BackgroundTaskNoticeStateService          (stale-task 警告去重)
+│
+Tab 运行时状态
+└── ConversationTabRuntimeCoordinator
+    (14+ background-task-specific 字段 per tab)
+```
+
+### 4.3 OMO 依赖点分析
+
+| 能力 | 是否依赖 OMO | 具体依赖 |
+|------|-------------|---------|
+| 检测 task 工具调用启动 | ❌ | 直接从流式 content block 读取 `toolName === 'task'` |
+| 提取任务描述 | ❌ | 从工具 input 的 `description/prompt/title` 读取 |
+| **检测任务完成** | ✅ **唯一路径** | `message.omo.kind === 'system-reminder'` 且 `reminderType === 'background-task-completed'` |
+| **锚点/模式识别** | ✅ | `message.omo.kind === 'user-injection'` + `[search-mode]` 头部 |
+| **"全部完成"信号** | ✅ | `omo.reminderType === 'all-background-tasks-complete'` |
+| **子会话 ID** | ⚠️ | `bg_[a-z0-9]+` 正则匹配（而非 `metadata.sessionId`）|
+| stale 警告 | ❌ | session idle + grace period 超时 |
+
+### 4.4 search-mode 门控
+
+**11 处硬编码** `=== 'search-mode'` 检查分布在 5 个文件中：
+
+| 文件 | 门控位置 | 作用 |
+|------|---------|------|
+| `BackgroundTaskStreamTriggerCoordinator.ts` | `isBackgroundTaskTool()` | 决定 task 工具是否进入后台任务 lane |
+| `BackgroundTaskTimelineService.ts` | `armIndicatorForUserMessage()` | 非 search-mode 直接 early return |
+| `BackgroundTaskTimelineService.ts` | `shouldRenderInlineSegment()` | 空 segment 在 search-mode 不渲染 |
+| `BackgroundTaskTimelineService.ts` | `shouldRenderPreparingInlineSegment()` | 非 search-mode 跳过 preparing |
+| `BackgroundTaskTimelineAssemblyService.ts` | `isSearchModeAnchorMessage()` | 识别锚点消息 |
+| `BackgroundTaskTimelineAssemblyService.ts` | `collectDiagnostics()` | 诊断收集 |
+| `BackgroundTaskTimelineAssemblyService.ts` | `getLatestSegmentWithActivity()` | 获取活跃 segment |
+| `BackgroundTaskTimelineAssemblyService.ts` | `getLatestSearchModeSegment()` | 获取最新 search-mode segment |
+| `BackgroundTaskLiveSignalCoordinator.ts` | `hasIndicator()` | 降级路径中检查 mode |
+| `BackgroundTaskLiveSignalCoordinator.ts` | `reconcileStateFromLiveSignals()` | 调和时重置 indicator |
+
+**没有抽象层、没有配置、没有枚举扩展点。** 如需支持其他模式（如 `analyze-mode`），必须修改全部 11 处。
+
+### 4.5 完成检测的单一路径
+
+**`BackgroundTaskTimelineLaunchService.addCompletedTasksFromMessage()`**：
+
+```typescript
+static addCompletedTasksFromMessage(message, target): void {
+    // ← 不是 OMO system-reminder 直接退出
+    if (message.omo?.kind !== 'system-reminder' || !message.omo.tasks
+        || message.omo.tasks.length === 0) {
+      return;
+    }
+    // ... 解析 message.omo.tasks
+}
+```
+
+OMO 解析链路：
+
+```text
+原始消息文本 → 检测 <system-reminder> XML 标签
+             → 检测 <!-- OMO_INTERNALIATOR --> 标记
+             → classifyReminderType():
+                 匹配 '[ALL BACKGROUND TASKS COMPLETE]' → 'all-background-tasks-complete'
+                 匹配 '[BACKGROUND TASK COMPLETED]'     → 'background-task-completed'
+                 其他                                    → 'generic'
+             → 提取 task ID: ID: `bg_[a-z0-9]+` 或 markdown list
+```
+
+---
+
+## 5. 差异矩阵
+
+### 5.1 架构对比
+
+| 维度 | opencode-desktop | OpenCodian | 评估 |
+|------|-----------------|-----------|------|
+| **完成检测机制** | `ToolPart.state.status` SDK 协议 | OMO `<system-reminder>` XML 解析 | OpenCodian 脱离了后端协议契约 |
+| **子会话链接** | `metadata.sessionId` + parentID 搜索 | `bg_[a-z0-9]+` 正则 | OpenCodian 未使用后端注入的 sessionId |
+| **模式限制** | 无（所有模式统一处理） | search-mode only（11 处硬编码） | OpenCodian 大量 task 工具调用被忽略 |
+| **服务数量** | 0（Part 状态即是生命周期） | 11 个专用服务 | OpenCodian 复杂度远超需要 |
+| **代码行数** | ~200 行（tool registry + render） | ~3000 行（13 个文件） | 15 倍差距 |
+| **OMO 依赖** | 零 | 100%（完成检测、锚点、模式） | 核心风险 |
+
+### 5.2 功能对比
+
+| 功能 | opencode-desktop | OpenCodian（有 OMO） | OpenCodian（无 OMO） |
+|------|-----------------|---------------------|---------------------|
+| Task 运行指示 | ✅ 工具卡片 spinner | ✅ Inline panel | ❌ 死路径 |
+| Task 完成通知 | ✅ 状态变更 | ✅ 持久化 notice 卡片 | ❌ 死路径 |
+| 子会话链接 | ✅ `metadata.sessionId` | ✅ `bg_*` regex | ⚠️ 图谱部分可用 |
+| 子会话消息查看 | ✅ 可导航 | ✅ 可导航 | ✅ 可导航 |
+| 多模式支持 | ✅ 所有模式 | ❌ 仅 search-mode | ❌ 仅 search-mode |
+| Stale 任务警告 | ❌ | ✅ | ⚠️ 仅 session idle 超时 |
+| 进度时间线 | ❌ | ✅ | ❌ |
+| Task 计数汇总 | ✅ `tool-count-summary` | ✅ Inline panel | ❌ |
+
+### 5.3 数据源对比
+
+| 数据源 | opencode-desktop 使用 | OpenCodian 使用 | 差异 |
+|--------|---------------------|----------------|------|
+| `ToolPart.state.status` | ✅ 主路径 | ❌ 未用于生命周期 | **关键差距** |
+| `ToolPart.metadata.sessionId` | ✅ 主路径 | ❌ 未用于后台任务 | **关键差距** |
+| `message.part.updated` 事件 | ✅ 驱动 Part store | ✅ 收到但未用于完成检测 | 信号已在手，未接线 |
+| `session.children()` API | ❌ 不需要 | ✅ 用于图谱可视化 | 各取所需 |
+| `session.status` 事件 | ✅ 会话级 | ✅ 会话级 | 一致 |
+| OMO system-reminder | ❌ 不使用 | ✅ **唯一完成检测路径** | 核心分歧 |
+
+---
+
+## 6. 风险评估
+
+### 6.1 当前架构风险（保持 OMO 依赖）
+
+| 风险 | 严重度 | 说明 |
+|------|--------|------|
+| **OMO 格式变更** | 🔴 高 | `<system-reminder>` 标签格式、`bg_*` ID 模式、`[BACKGROUND TASK COMPLETED]` 文本匹配都是无契约的约定，任何变更都会导致静默失败 |
+| **功能死路径** | 🔴 高 | 未安装 OMO 的用户完全无法使用后台任务追踪，覆盖 search-mode 以外的所有 task 工具调用 |
+| **维护负担** | 🟡 中 | 13 个文件、~3000 行代码维护一个并行追踪层，而后端已经提供了所需信息 |
+| **模式锁定** | 🟡 中 | 11 处硬编码 `search-mode` 检查无法支持新模式（如 `analyze-mode`） |
+| **重复真相** | 🟡 中 | `bg_[a-z0-9]+` 正则匹配 task ID vs `metadata.sessionId`，两套 ID 体系并存 |
+
+### 6.2 迁移风险（向 SDK 原生过渡）
+
+| 风险 | 严重度 | 缓解策略 |
+|------|--------|---------|
+| **双信号冲突** | 🟡 中 | 声明 SDK 为权威，OMO 降级为可选装饰，设置去重逻辑 |
+| **历史对话兼容** | 🟡 中 | 旧对话无 ToolPart metadata，graceful fallback 到现有渲染 |
+| **UI 回归** | 🟡 中 | 分阶段启用：先叠加 SDK 信号（P0），再替换 OMO（P2），最后移除门控（P1） |
+| **事件时序** | 🟡 低 | `message.part.updated` 与 OMO system-reminder 可能有时序差异，以 Part 状态为准 |
+| **丰富 UI 降级** | 🟢 低 | Inline panel、completion notice 等丰富 UI 保留，仅改变数据驱动源 |
+
+### 6.3 风险对比结论
+
+**保持 OMO 依赖的长期风险 > 迁移到 SDK 原生的短期风险。** 迁移是增量式的（additive first），且 OpenCodian 已有全部基础设施。
+
+---
+
+## 7. 修复建议
+
+### 7.1 分阶段路线图
+
+#### P0 — 增量：添加 SDK 原生任务完成检测
+
+**目标**：在现有 OMO 路径旁边添加 SDK 路径，作为补充信号。
+
+**变更**：
+- 在 `OpenCodeSyncEventRuntimeCoordinator` 或 `BackgroundTaskStreamTriggerCoordinator` 中，监听 `message.part.updated` 事件
+- 过滤条件：`part.tool === 'task'` 且 `part.state.status === 'completed'` 或 `'error'`
+- 从 `part.state.metadata.sessionId` 提取子会话 ID
+- 将完成状态写入现有 `backgroundTaskCompletedTasks` Map
+
+**影响文件**：`OpenCodeService.ts`（sync handler）、`BackgroundTaskStreamTriggerCoordinator.ts`
+
+**风险**：低 — 纯增量，OMO 路径不受影响。
+
+#### P1 — 激活：移除 search-mode 门控
+
+**目标**：让所有模式的 task 工具都触发后台任务追踪。
+
+**变更**：
+- `isBackgroundTaskTool()` 从 `toolName === 'task' && modeTag === 'search-mode'` 改为 `toolName === 'task'`
+- 审查 11 处 `=== 'search-mode'` 硬编码，逐个评估是否可以移除或改为配置
+- 模式信息（`modeTag`）保留为 UI 标签，不作为功能门控
+
+**影响文件**：`BackgroundTaskStreamTriggerCoordinator.ts`、`BackgroundTaskTimelineService.ts`、`BackgroundTaskTimelineAssemblyService.ts`、`BackgroundTaskLiveSignalCoordinator.ts`
+
+**风险**：中 — 所有模式的 task 都会进入追踪 lane，需要视觉 QA。
+
+#### P2 — 替换：用 ToolPart 状态替代 OMO 完成检测
+
+**目标**：SDK ToolPart 状态成为唯一的生命周期权威。
+
+**变更**：
+- `BackgroundTaskTimelineAssemblyService` 使用 `contentBlocks[].toolStatus === 'completed'` 替代 `message.omo.reminderType`
+- `BackgroundTaskTimelineLaunchService` 使用 `metadata.sessionId` 替代 `bg_[a-z0-9]+` 正则
+- 添加去重逻辑：SDK 信号和 OMO 信号同时到达时，以 SDK 为准
+
+**影响文件**：`BackgroundTaskTimelineAssemblyService.ts`、`BackgroundTaskTimelineLaunchService.ts`
+
+**风险**：中 — 需要验证双信号场景下的去重正确性。
+
+#### P3 — 精简：整合后台任务服务
+
+**目标**：在 P0–P2 稳定后，评估 11 个服务中哪些可以合并或移除。
+
+**可能方向**：
+- `BackgroundTaskStreamTriggerCoordinator` + `BackgroundTaskLiveSignalCoordinator` → 合并为单一 coordinator
+- `BackgroundTaskTimelineAssemblyService` + `BackgroundTaskTimelineLaunchService` → 合并到 `BackgroundTaskTimelineService`
+- 保留有独立价值的服务（如 `BackgroundTaskCompletionNoticeService` 的延迟持久化通知）
+
+**风险**：仅在其他路径稳定后执行。
+
+### 7.2 优先级排序理由
+
+```
+P0（增量 SDK 接线）→ 最安全、最直接、验证假设
+  ↓
+P1（移除模式门控）→ 扩大覆盖范围、验证 SDK 信号可靠性
+  ↓
+P2（替代 OMO）→ 确立 SDK 为权威、OMO 降级为可选
+  ↓
+P3（精简服务）→ 减少维护负担、收敛架构
+```
+
+每一步都是上一步验证通过后才执行。
+
+### 7.3 不应做的事
+
+| 不要 | 原因 |
+|------|------|
+| 不要一次性重写全部 13 个文件 | 风险太高，增量更安全 |
+| 不要移除 OMO 解析代码 | 保持为可选降级路径，直到 SDK 路径在生产中验证稳定 |
+| 不要将 desktop 的简单 tool card 强行套入 OpenCodian | OpenCodian 的丰富 UI（inline panel、notice）有价值，只需改变驱动源 |
+| 不要保留双权威系统超过一个迭代窗口 | 双信号增加调试复杂度，尽快收敛到单一权威 |
+
+---
+
+## 8. 已有基础设施清单
+
+以下是 OpenCodian 中**已经存在但未用于后台任务生命周期**的 SDK 原生基础设施：
+
+| 基础设施 | 位置 | 当前用途 | 缺失的接线 |
+|----------|------|---------|-----------|
+| `message.part.updated` 事件 | `OpenCodeSyncEventRuntimeCoordinator.ts:578` | 触发消息重同步 | 未过滤 `tool === 'task'` 的状态变更 |
+| `metadata.sessionId` 提取 | `OpenCodeStreamEventTransformer.ts:177` | 提取后传给 ToolCallRenderer | 未传给 BackgroundTask 服务 |
+| ToolPart 状态解析 | `resolveToolExecutionStatus()` in `toolExecution.ts` | 渲染工具状态 | 未用于完成检测 |
+| 子会话图谱 | `ChildSessionGraphService.ts:192` | 可视化会话树 | 未用于完成检测 |
+| `session.children()` API | `OpenCodeSessionControlOrchestrator.getSessionChildren()` | 图谱查询 | 未用于轮询子会话状态 |
+| Task 工具渲染 | `ToolCallRenderer.ts` + `getTaskSummary()` | 非 search-mode 的 task 卡片渲染 | 未与后台任务生命周期集成 |
+
+**关键洞察**：不是缺少基础设施，而是缺少接线。
+
+---
+
+## 9. Council 共识详情
+
+### 9.1 Councillor 立场分布
+
+所有 councillors 独立收敛到同一诊断：
+
+| 维度 | 一致性 | 说明 |
+|------|--------|------|
+| OMO 依赖是否合理 | 全员一致：不合理 | 前端不应依赖第三方适配层的文本格式 |
+| 迁移是否可行 | 全员一致：可行 | 基础设施已全部就位 |
+| 迁移路径 | 全员一致：增量式 | P0 → P1 → P2 → P3 的渐进路线 |
+| 丰富 UI 保留 | 全员一致：保留 | inline panel、completion notice 有价值 |
+| 模式门控移除 | 全员一致：移除 | 11 处硬编码 `search-mode` 应改为配置或移除 |
+
+### 9.2 分歧点
+
+| 点 | Alpha | Beta | Gamma | Delta |
+|----|-------|------|-------|-------|
+| P1 是否应在 P0 之后立即执行 | 先验证 SDK 信号稳定 | 可以并行 | 可以并行 | 先验证 |
+
+这是唯一的分歧：timing，不是方向。
+
+---
+
+## 10. 结论
+
+### 10.1 当前状态总结
+
+OpenCodian 的后台任务子系统是一套**架构过拟合于 OMO 的并行追踪层**。它在 OMO 存在时提供了丰富的 UI 体验（inline panel、时间线、完成通知、stale 警告），但这些体验应该由后端原生协议（ToolPart 状态 + SDK 事件）驱动，而不是由第三方插件的 XML 文本注入驱动。
+
+### 10.2 核心修复原则
+
+> **让后端协议成为唯一的生命周期权威。**
+> OMO 是可选的装饰增强，不是必需的数据源。
+
+### 10.3 预期成果
+
+| 阶段 | 完成后对齐评分 | 说明 |
+|------|--------------|------|
+| 当前 | 3/10 | OMO 依赖、search-mode 门控、~3000 行并行追踪 |
+| P0 完成后 | 4–5/10 | SDK 信号作为补充，验证可靠性 |
+| P1 完成后 | 5–6/10 | 所有模式覆盖，功能范围对齐 |
+| P2 完成后 | 7–8/10 | SDK 为权威，OMO 降级为可选 |
+| P3 完成后 | 8/10 | 服务精简、维护负担降低 |
+
+### 10.4 一句话总结
+
+> 修复的第一步不是新增代码，而是将已有的 SDK 信号接线到已有的后台任务服务。
+> `ToolPart.state.status` 已经知道 task 何时完成——OpenCodian 只需要开始监听。
+
+---
+
+## 附录 A：源文件索引
+
+### opencode-desktop 相关文件
+
+| 文件 | 用途 |
+|------|------|
+| `packages/ui/src/components/message-part.tsx` | ToolPart 渲染分发 + `ToolRegistry` + `taskSession()` |
+| `packages/ui/src/components/basic-tool.tsx` | 通用工具卡片（spinner → collapsible） |
+| `packages/ui/src/components/tool-error-card.tsx` | 工具错误卡片 |
+| `packages/ui/src/components/tool-count-summary.tsx` | 工具计数汇总 |
+| `packages/ui/src/components/tool-status-title.tsx` | 工具状态标题 |
+| `packages/ui/src/components/session-turn.tsx` | 会话轮次渲染 |
+| `packages/ui/src/components/session-review.tsx` | 会话审查 |
+| `packages/ui/src/context/data.tsx` | 数据 store（session/message/part） |
+
+### OpenCode Server 相关文件
+
+| 文件 | 用途 |
+|------|------|
+| `packages/opencode/src/tool/task.ts` | Task 工具实现（创建子会话、注入 metadata） |
+| `packages/opencode/src/session/session.ts` | 会话模型（parentID、children()） |
+| `packages/opencode/src/session/status.ts` | 会话状态事件发布 |
+| `packages/opencode/src/session/run-state.ts` | Runner 状态管理（idle/busy） |
+| `packages/opencode/src/pubsub/events.go` | 事件总线 |
+| `packages/opencode/src/cli/cmd/run/subagent-data.ts` | CLI 子代理数据追踪（参考实现） |
+
+### OpenCodian 相关文件
+
+| 文件 | 用途 |
+|------|------|
+| `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts` | 流式工具调用触发 |
+| `src/features/chat/services/BackgroundTaskTimelineService.ts` | 时间线管理 |
+| `src/features/chat/services/BackgroundTaskTimelineAssemblyService.ts` | 时间线组装（OMO 完成） |
+| `src/features/chat/services/BackgroundTaskTimelineLaunchService.ts` | Launch 提取/匹配 |
+| `src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts` | 实时信号协调 |
+| `src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts` | 渲染编排 |
+| `src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts` | Inline panel 渲染 |
+| `src/features/chat/services/BackgroundTaskCompletionNoticeService.ts` | 完成通知 |
+| `src/features/chat/services/BackgroundTaskNoticeStateService.ts` | Stale 警告 |
+| `src/core/opencode/OpenCodeSyncEventRuntimeCoordinator.ts` | SDK 同步事件分发 |
+| `src/core/opencode/OpenCodeStreamEventTransformer.ts` | 流事件转换（已提取 metadata） |
+| `src/core/agents/ChildSessionGraphService.ts` | 子会话图谱（已使用 metadata.sessionId） |
+| `src/utils/streaming/ToolCallRenderer.ts` | 工具调用渲染（非 search-mode 路径） |
+
+## 附录 B：OMO System-Reminder 解析链路
+
+```text
+原始消息文本
+  │
+  ├── 检测 <system-reminder>...</system-reminder> XML 标签
+  │
+  ├── 检测 <!-- OMO_INTERNALIATOR --> 标记
+  │
+  ├── classifyReminderType():
+  │     匹配 '[ALL BACKGROUND TASKS COMPLETE]' → 'all-background-tasks-complete'
+  │     匹配 '[BACKGROUND TASK COMPLETED]'     → 'background-task-completed'
+  │     其他                                    → 'generic'
+  │
+  └── 提取 task 信息:
+        单任务: ID: `bg_[a-z0-9]+`
+        批量:   - `id`: description
+```
+
+**与之对比的 SDK 原生路径**：
+
+```text
+message.part.updated 事件
+  │
+  ├── part.tool === 'task'
+  │
+  ├── part.state.status === 'completed' | 'error'
+  │
+  └── part.state.metadata.sessionId → 子会话 ID
+```
+
+后者是后端协议契约，前者是文本约定。
+
+## 附录 C：术语对照
+
+| 术语 | opencode-desktop | OpenCodian |
+|------|-----------------|-----------|
+| 任务工具 | `task` tool | `task` tool（仅 search-mode） |
+| 子代理 | 子会话（`parentID`） | 子代理（`@subagent` mention） |
+| 任务完成 | `ToolPart.state.status: completed` | OMO `system-reminder: background-task-completed` |
+| 后台任务 | 不区分（就是 task tool） | 独立概念（search-mode + OMO 门控） |
+| 子会话链接 | `metadata.sessionId` | `bg_[a-z0-9]+` regex |
+| 模式 | 不区分 | `search-mode`（11 处硬编码） |
