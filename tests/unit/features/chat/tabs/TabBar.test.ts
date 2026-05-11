@@ -1,5 +1,6 @@
 import type { TabBarItem, TabBarLayoutMode } from '../../../../../src/features/chat/tabs';
 import { TabBar } from '../../../../../src/features/chat/tabs';
+import { t } from '../../../../../src/i18n';
 
 function createItems(count: number, activeIndex = 0): TabBarItem[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -14,11 +15,16 @@ function createItems(count: number, activeIndex = 0): TabBarItem[] {
   }));
 }
 
-function renderTabBar(items: TabBarItem[], layout: TabBarLayoutMode): HTMLElement {
+function renderTabBar(
+  items: TabBarItem[],
+  layout: TabBarLayoutMode,
+  callbacks?: Partial<ConstructorParameters<typeof TabBar>[1]>,
+): HTMLElement {
   const containerEl = document.createElement('div');
   const tabBar = new TabBar(containerEl, {
     onTabClick: jest.fn(),
     onTabClose: jest.fn(),
+    ...callbacks,
   });
 
   tabBar.render(items, layout);
@@ -88,5 +94,23 @@ describe('TabBar', () => {
     expect(tabEl?.classList.contains('has-background-task')).toBe(true);
     expect(stateEl).not.toBeNull();
     expect(dots).toHaveLength(3);
+  });
+
+  it('renders a back-to-parent breadcrumb for the active child tab', () => {
+    const items = createItems(2, 1);
+    items[0].title = 'Parent session';
+    items[1].title = 'Child session';
+    items[1].parentTabId = items[0].id;
+    const onTabClick = jest.fn();
+
+    const containerEl = renderTabBar(items, 'input', { onTabClick });
+    const breadcrumbEl = containerEl.querySelector<HTMLButtonElement>('.opencodian-tab-bar-parent-breadcrumb');
+
+    expect(breadcrumbEl).not.toBeNull();
+    expect(breadcrumbEl?.textContent).toContain(t('chat.tab.backToParent', { title: 'Parent session' }));
+
+    breadcrumbEl?.click();
+
+    expect(onTabClick).toHaveBeenCalledWith(items[0].id);
   });
 });

@@ -5,7 +5,7 @@
 
 ## 概述
 
-标签栏 UI 组件。渲染标签按钮列表，处理标签切换和关闭交互，管理溢出菜单（overflow menu）用于超出显示限制的标签。支持四种布局模式（header / input / below-header-grid / below-header-vertical），每种模式有不同的最大可见标签数。提供 tooltip、状态指示器（streaming/backgroundTask/needsAttention）和辅助功能支持。
+标签栏 UI 组件。渲染标签按钮列表，处理标签切换、父会话返回和关闭交互，管理溢出菜单（overflow menu）用于超出显示限制的标签。支持四种布局模式（header / input / below-header-grid / below-header-vertical），每种模式有不同的最大可见标签数。提供 tooltip、状态指示器（streaming/backgroundTask/needsAttention）和辅助功能支持。
 
 ## 导入关系
 
@@ -36,6 +36,9 @@ interface TabBarCallbacks {
 ### 标签按钮
 每个标签按钮显示序号徽章、标题文本和状态指示器。支持 CSS class 标记（`is-active`, `is-streaming`, `has-background-task`, `needs-attention`）。左键点击切换标签，右键点击关闭标签。
 
+### 父会话返回
+当激活标签的 `parentTabId` 指向当前 tab 列表中的父标签时，`render()` 会在标签按钮前渲染 `opencodian-tab-bar-parent-breadcrumb`。点击面包屑复用 `onTabClick(parentTabId)` 切回父 tab，不内联渲染子会话内容。
+
 ### 溢出菜单
 超出可见限制的标签显示为 `+N` 按钮。点击后在 `document.body` 上创建浮动菜单，支持 Escape 和外部点击关闭。菜单位置根据锚点和视口空间自动计算（上方/下方）。
 
@@ -60,7 +63,7 @@ interface TabBarCallbacks {
 TabManager.getTabBarItems()
   → TabBarItem[]
   → TabBar.render(items, layout)
-    → 可见标签按钮 + 溢出按钮
+    → 可选父会话面包屑 + 可见标签按钮 + 溢出按钮
     → 用户点击 → callbacks.onTabClick(tabId)
     → 用户右键 → callbacks.onTabClose(tabId)
 ```
@@ -79,6 +82,7 @@ TabManager.getTabBarItems()
 ## 注意事项
 
 - `render()` 每次调用都完全重建 DOM，非增量更新
+- 父会话面包屑只在 active child 的 `parentTabId` 能匹配当前 tab 列表时显示；父 tab 已关闭时不显示
 - 溢出菜单挂载在 `document.body` 上，不在容器内部
 - `tooltipLabelId` 为静态计数器，组件销毁后不清零（不影响功能）
 - `below-header-vertical` 布局不显示 tooltip（空间不足）

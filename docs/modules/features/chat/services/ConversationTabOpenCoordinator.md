@@ -53,7 +53,7 @@ export class ConversationTabOpenCoordinator {
 - current-tab 路径创建 conversation 后，继续复用 `TabConversationActivationBridge.openConversation()` 完成 active-pane shell reset 和 activation outcome
 - 两条入口共享同一套错误消息归一化与 success notice 决策
 - `buildTaskToolSessionTitle()` 从 tool call input 提取 description / subagent_type 生成子会话标题，优先 description，其次 subagent_type，最后回退 sessionId
-- `openTaskToolSession()` 承接 assistant shell 和 child session tree 的 "Open" 按钮入口：先检查 max-tabs，再通过 `createConversationFromSession()` 创建 conversation，有 tabManager 时走 new-tab + activate，无 tabManager 时回退到 `syncActiveTabConversation()` + `loadConversation()`；创建失败时统一显示 notice
+- `openTaskToolSession()` 承接 assistant shell 和 child session tree 的 "Open" 按钮入口：先检查 max-tabs，再通过 `createConversationFromSession()` 创建 conversation，有 tabManager 时用当前 active tab 作为 `parentTabId` 创建 child tab 并 activate，无 tabManager 时回退到 `syncActiveTabConversation()` + `loadConversation()`；创建失败时统一显示 notice
 
 ## 与 `OpenCodianView` 的边界
 

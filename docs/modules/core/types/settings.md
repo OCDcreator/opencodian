@@ -101,7 +101,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | 类型 | 说明 |
 |------|------|
 | `PersistedTabState` | `{ tabs: PersistedTabEntry[], activeTabIndex }` |
-| `PersistedTabEntry` | `{ conversationId, title, modelOverride }` |
+| `PersistedTabEntry` | `{ id?, parentTabId?, conversationId, title, modelOverride }` |
 | `PersistedTabModelOverride` | `{ provider, model }` |
 
 ### Provider 图标

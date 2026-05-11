@@ -5,13 +5,13 @@
 
 ## 概述
 
-单个标签的数据模型类。封装标签 ID、关联对话 ID、标题、激活状态、流式传输状态、背景任务标记、注意力标记、模型覆盖和上下文用量。所有状态变更通过 setter 方法，`getData()` 返回一级深拷贝防止外部直接修改内部状态。
+单个标签的数据模型类。封装标签 ID、可选父标签 ID、关联对话 ID、标题、激活状态、流式传输状态、背景任务标记、注意力标记、模型覆盖和上下文用量。所有状态变更通过 setter 方法，`getData()` 返回一级深拷贝防止外部直接修改内部状态。
 
 ## 导入关系
 
 **上游**:
 - `../../../core/types` — `TabContextState`, `createEmptyTabContextState`
-- `./types` — `TabData`, `TabId`, `TabModelOverride`, `TabConversationLike`, `generateTabId`
+- `./types` — `TabCreateOptions`, `TabData`, `TabId`, `TabModelOverride`, `TabConversationLike`, `generateTabId`
 
 **下游**: `TabManager` — 内部管理 `Tab[]` 数组。
 
@@ -22,7 +22,7 @@
 ## 核心逻辑
 
 ### 构造
-构造函数接收默认标题和可选的对话引用，生成唯一 `TabId`（通过 `generateTabId()`），初始化所有状态字段为默认值。
+构造函数接收默认标题、可选的对话引用和 `TabCreateOptions`，生成唯一 `TabId`（通过 `generateTabId()`），初始化所有状态字段为默认值。子会话 tab 可通过 `parentTabId` 记录打开它的父 tab。
 
 ### 数据获取
 `getData()` 返回 `TabData` 的浅拷贝，其中 `modelOverride` 和 `contextUsage` 进行一级拷贝，确保调用方修改不影响内部状态。
@@ -43,6 +43,7 @@
 | `setStreaming(streaming)` | 设置流式传输状态 |
 | `setBackgroundTaskRunning(hasBackgroundTask)` | 设置背景任务标记 |
 | `setNeedsAttention(needsAttention)` | 设置注意力标记 |
+| `setParentTabId(parentTabId)` | 设置或清除父标签 ID，用于恢复持久化的 child-tab 面包屑 |
 | `setConversation(conversation, fallbackTitle)` | 设置关联对话（ID 变化时重置上下文用量） |
 | `setTitle(title)` | 设置标题 |
 | `setModelOverride(modelOverride)` | 设置模型覆盖（一级拷贝） |
@@ -72,6 +73,7 @@ TabManager 操作
 - `getData()` 的一级拷贝意味着嵌套对象（如 `contextUsage` 内的 `preciseTokens`）仍可能被外部修改
 - `setConversation()` 在对话 ID 不变时不重置上下文用量，仅更新标题
 - `generateTabId()` 格式为 `tab-{timestamp}-{random}`
+- `parentTabId` 创建时可由 `TabCreateOptions` 设置；持久化恢复时也可由 `setParentTabId()` 在旧 ID 映射完成后写入，不随 `setConversation()` 改写
 
 ## 补充说明
 

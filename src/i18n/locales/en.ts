@@ -1511,6 +1511,7 @@ export const enTranslations = {
   'chat.tab.newTooltip': 'Create a new tab and chat there',
   'chat.tab.newCurrentTooltip': 'Start a new conversation in the current tab',
   'chat.tab.close': 'Close tab',
+  'chat.tab.backToParent': 'Back to: {title}',
   'chat.tab.more': '+{count}',
   'chat.tab.moreMenu': 'Show {count} more tabs',
   'chat.tab.created': 'New tab created',

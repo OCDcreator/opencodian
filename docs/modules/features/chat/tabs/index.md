@@ -31,7 +31,7 @@ export type { CloseTabResult, CloseTabsResult, RestoredTabState, TabBarItem, Tab
 
 ### 类型与实现同入口暴露
 
-`TabManagerOptions`、`TabData`、`TabModelOverride` 等高频类型与类导出放在一起，方便主视图一次性导入。
+`TabManagerOptions`、`TabData`、`TabCreateOptions`、`TabModelOverride` 等高频类型与类导出放在一起，方便主视图一次性导入。
 
 ## 关键方法
 

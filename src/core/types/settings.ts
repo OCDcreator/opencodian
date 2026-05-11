@@ -1591,6 +1591,8 @@ export interface PersistedTabModelOverride {
 }
 
 export interface PersistedTabEntry {
+  id?: string;
+  parentTabId?: string;
   conversationId: string | null;
   title: string;
   modelOverride: PersistedTabModelOverride | null;
@@ -1618,6 +1620,12 @@ export function normalizePersistedTabState(state?: Partial<PersistedTabState> | 
         const conversationId = typeof entry.conversationId === 'string'
           ? entry.conversationId
           : null;
+        const id = typeof entry.id === 'string' && entry.id.trim()
+          ? entry.id
+          : undefined;
+        const parentTabId = typeof entry.parentTabId === 'string' && entry.parentTabId.trim()
+          ? entry.parentTabId
+          : undefined;
         const title = typeof entry.title === 'string' && entry.title.trim()
           ? entry.title
           : '';
@@ -1633,6 +1641,8 @@ export function normalizePersistedTabState(state?: Partial<PersistedTabState> | 
             : null;
 
         return [{
+          id,
+          parentTabId,
           conversationId,
           title,
           modelOverride,

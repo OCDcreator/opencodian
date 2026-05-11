@@ -26,6 +26,7 @@ interface TabModelOverride {
 
 interface TabData {
   id: TabId;
+  parentTabId?: TabId;
   conversationId: string | null;
   title: string;
   isActive: boolean;
@@ -38,6 +39,7 @@ interface TabData {
 
 interface TabBarItem {
   id: TabId;
+  parentTabId?: TabId;
   index: number;
   title: string;
   isActive: boolean;
@@ -50,9 +52,15 @@ interface TabBarItem {
 type TabBarLayoutMode = 'header' | 'input' | 'below-header-grid' | 'below-header-vertical';
 
 interface RestoredTabState {
+  id?: TabId;
+  parentTabId?: TabId;
   conversationId: string | null;
   title: string;
   modelOverride: TabModelOverride | null;
+}
+
+interface TabCreateOptions {
+  parentTabId?: TabId | null;
 }
 
 interface TabManagerOptions {
@@ -84,10 +92,11 @@ interface CloseTabsResult {
 |------|------|
 | `TabId` | 标签唯一标识符 |
 | `TabModelOverride` | 标签级别的模型覆盖（provider + model） |
-| `TabData` | 标签完整数据（ID、对话引用、标题、状态标记、模型覆盖、上下文用量） |
-| `TabBarItem` | 面向标签栏 UI 的精简数据（含序号和 canClose） |
+| `TabData` | 标签完整数据（ID、可选父标签 ID、对话引用、标题、状态标记、模型覆盖、上下文用量） |
+| `TabBarItem` | 面向标签栏 UI 的精简数据（含可选父标签 ID、序号和 canClose） |
 | `TabBarLayoutMode` | 标签栏布局模式（4 种） |
-| `RestoredTabState` | 持久化/恢复时的标签状态快照 |
+| `RestoredTabState` | 持久化/恢复时的标签状态快照，包含旧 tab id 与旧 parent id 以便恢复父子关系 |
+| `TabCreateOptions` | 创建标签时的运行时选项，目前用于记录子会话返回父标签的 `parentTabId` |
 | `TabManagerOptions` | TabManager 构造选项（动态最大标签数 + 变更回调） |
 | `TabConversationLike` | 对话的最小公共类型（只需 id + title） |
 | `CloseTabResult` | 单标签关闭结果 |
@@ -118,10 +127,11 @@ interface CloseTabsResult {
 ## 注意事项
 
 - `TabConversationLike` 使用 `Pick<Conversation, 'id' | 'title'>` 避免完整 Conversation 依赖
-- `RestoredTabState` 不包含运行时状态（streaming/attention 等），仅持久化必要的对话引用和标题
+- `RestoredTabState` 不包含运行时状态（streaming/attention 等），但会持久化 tab `id` 和 `parentTabId`，供重启恢复时重建子会话返回路径
 - `TabBarLayoutMode` 的 `below-header-grid` 和 `below-header-vertical` 在 TabBar 中使用相同的最大可见数（5）
 
 ## 补充说明
 
 - `TabContextState` 定义在 `src/core/types/chat.ts`，包含 `sessionTitle`、`provider`、`model`、`preciseTokens`、`totalCost`、`createdAt`、`updatedAt` 等字段，由 `createEmptyTabContextState()` 创建初始值
-- `RestoredTabState` 序列化格式：`{ conversationId: string | null, title: string, modelOverride: { provider: string, model: string } | null }`，以 JSON 数组形式存储在 StorageService 的 tab state 中
+- `RestoredTabState` 序列化格式：`{ id?: string, parentTabId?: string, conversationId: string | null, title: string, modelOverride: { provider: string, model: string } | null }`，以 JSON 数组形式存储在 StorageService 的 tab state 中
+- `parentTabId` 是当前 tab 图里的导航引用，用于子会话 tab 的 “Back to parent” 面包屑；恢复时 tab ID 会重建，`TabManager.restoreTabs()` 会把旧 id 映射到新 id 后再写回 child tab。

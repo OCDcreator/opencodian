@@ -103,4 +103,34 @@ describe('TabManager', () => {
 
     expect(manager.getTabContextUsage(first.id)?.estimatedInputTokens).toBe(42);
   });
+
+  it('remaps restored parent tab ids to the regenerated tab ids', () => {
+    const manager = createManager();
+    const conversations = new Map([
+      ['conv-parent', { id: 'conv-parent', title: 'Parent chat' }],
+      ['conv-child', { id: 'conv-child', title: 'Child chat' }],
+    ]);
+
+    const restored = manager.restoreTabs([
+      {
+        id: 'old-parent-tab',
+        conversationId: 'conv-parent',
+        title: 'Parent chat',
+        modelOverride: null,
+      },
+      {
+        id: 'old-child-tab',
+        parentTabId: 'old-parent-tab',
+        conversationId: 'conv-child',
+        title: 'Child chat',
+        modelOverride: null,
+      },
+    ], 1, conversations);
+
+    const tabs = manager.getAllTabs();
+    expect(restored?.conversationId).toBe('conv-child');
+    expect(tabs[1]?.parentTabId).toBe(tabs[0]?.id);
+    expect(tabs[1]?.parentTabId).not.toBe('old-parent-tab');
+    expect(manager.getTabBarItems()[1]?.parentTabId).toBe(tabs[0]?.id);
+  });
 });

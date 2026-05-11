@@ -161,6 +161,7 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(fixture.getPersistedTabState()).toEqual({
       tabs: [
         {
+          id: tab?.id,
           conversationId: 'conv-1',
           title: 'Conversation 1',
           modelOverride: null,

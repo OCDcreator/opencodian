@@ -158,7 +158,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 
 - `initializeTabSystem()` 一次性创建 `TabBar`、`TabManager` 与 tab bar mount，并把 `TabManager.onChanged` 统一接到 `renderTabBar()` + `persistTabState()`
 - `applyTabBarLayout()` 继续保留 header / below-header grid / below-header vertical / input slot 的原有 CSS class 与 render 顺序
-- `persistTabState()` 只持久化 conversation id、title、model override 与 active index，并继续区分 scheduled save 与 `flush` immediate save
+- `persistTabState()` 持久化 tab id、parent tab id、conversation id、title、model override 与 active index，并继续区分 scheduled save 与 `flush` immediate save
 - `handleTabSwitch()` 先让 `TabManager` 切换 active tab，再转交 activation port；`handleTabClose()` 只转交 close/recovery port
 - `TabSessionLifecycleState.ts` 提供 writable lifecycle reducer；`ConversationTabRuntimeCoordinator` 是 tab lifecycle transition owner，并在迁移期继续回写 `isStreaming`、`isConversationSyncInFlight` 等兼容字段。
 - `getTabSessionPhase()` 按固定优先级派生当前 tab 的 phase：writable lifecycle foreground-busy phase > 同 session 其他 tab streaming > context compaction > server retry > server busy > idle/error/cancelled。同 session 其他 tab streaming 复用 `streaming` phase，保持与发送入口的 busy 语义兼容。

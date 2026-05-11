@@ -5,7 +5,11 @@ import type { TabData, TabId } from '../tabs';
 
 interface ConversationTabOpenTabManager {
   canCreateTab(): boolean;
-  createTab(conversation?: Pick<Conversation, 'id' | 'title'> | null): TabData | null;
+  createTab(
+    conversation?: Pick<Conversation, 'id' | 'title'> | null,
+    options?: { parentTabId?: TabId | null },
+  ): TabData | null;
+  getActiveTab(): TabData | null;
 }
 
 export interface ConversationTabOpenHost {
@@ -114,7 +118,8 @@ export class ConversationTabOpenCoordinator {
       });
 
       if (tabManager) {
-        const tab = tabManager.createTab(conversation);
+        const parentTab = tabManager.getActiveTab();
+        const tab = tabManager.createTab(conversation, { parentTabId: parentTab?.id ?? null });
         if (tab) {
           await this.port.activateTab(tab.id);
           return;

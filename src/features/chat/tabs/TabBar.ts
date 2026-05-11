@@ -30,6 +30,7 @@ export class TabBar {
     this.containerEl.setAttribute('data-layout', layout);
 
     const { visibleItems, overflowItems } = this.partitionItems(items, layout);
+    this.renderParentBreadcrumb(items, layout);
 
     for (const item of visibleItems) {
       this.renderTabItem(item, layout);
@@ -87,6 +88,46 @@ export class TabBar {
       default:
         return INPUT_MAX_VISIBLE_TABS;
     }
+  }
+
+  private renderParentBreadcrumb(items: TabBarItem[], layout: TabBarLayoutMode): void {
+    const activeItem = items.find((item) => item.isActive);
+    const parentItem = activeItem?.parentTabId
+      ? items.find((item) => item.id === activeItem.parentTabId)
+      : null;
+    if (!parentItem) {
+      return;
+    }
+
+    const label = t('chat.tab.backToParent', { title: parentItem.title });
+    const useTooltip = layout !== 'below-header-vertical';
+    const breadcrumbEl = this.containerEl.createEl('button', {
+      cls: useTooltip
+        ? 'opencodian-tab-bar-parent-breadcrumb opencodian-tooltip-trigger'
+        : 'opencodian-tab-bar-parent-breadcrumb',
+      attr: useTooltip
+        ? {
+            type: 'button',
+            'data-tooltip': label,
+          }
+        : {
+            type: 'button',
+          },
+    });
+    this.attachTooltipLabel(breadcrumbEl, label);
+
+    const iconEl = breadcrumbEl.createSpan({ cls: 'opencodian-tab-bar-parent-breadcrumb-icon' });
+    iconEl.setAttribute('aria-hidden', 'true');
+    setIcon(iconEl, 'arrow-left');
+    breadcrumbEl.createSpan({
+      cls: 'opencodian-tab-bar-parent-breadcrumb-title',
+      text: label,
+    });
+
+    breadcrumbEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      this.callbacks.onTabClick(parentItem.id);
+    });
   }
 
   private renderTabItem(item: TabBarItem, layout: TabBarLayoutMode): void {

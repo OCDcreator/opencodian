@@ -7,6 +7,7 @@ export type {
   RestoredTabState,
   TabBarItem,
   TabBarLayoutMode,
+  TabCreateOptions,
   TabData,
   TabId,
   TabManagerOptions,

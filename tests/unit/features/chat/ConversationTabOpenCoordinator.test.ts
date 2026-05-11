@@ -182,6 +182,7 @@ describe('ConversationTabOpenCoordinator', () => {
   describe('openTaskToolSession', () => {
     it('creates conversation from session, opens tab, and activates it', async () => {
       const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+      const parentTab = tabManager.createTab(createConversation('parent'))!;
       const conversation = createConversation('from-session');
       const host = createHost({
         getTabManager: jest.fn().mockReturnValue(tabManager),
@@ -198,9 +199,10 @@ describe('ConversationTabOpenCoordinator', () => {
         title: 'Subagent: Test task',
       });
       const tabs = tabManager.getAllTabs();
-      expect(tabs).toHaveLength(1);
-      expect(tabs[0]?.conversationId).toBe(conversation.id);
-      expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
+      expect(tabs).toHaveLength(2);
+      expect(tabs[1]?.conversationId).toBe(conversation.id);
+      expect(tabs[1]?.parentTabId).toBe(parentTab.id);
+      expect(port.activateTab).toHaveBeenCalledWith(tabs[1]!.id);
     });
 
     it('shows max-tabs notice without creating conversation when tab limit is reached', async () => {

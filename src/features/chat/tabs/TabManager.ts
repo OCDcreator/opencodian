@@ -6,6 +6,7 @@ import type {
   RestoredTabState,
   TabBarItem,
   TabConversationLike,
+  TabCreateOptions,
   TabData,
   TabId,
   TabManagerOptions,
@@ -25,12 +26,12 @@ export class TabManager {
     return this.tabs.length < this.options.getMaxTabs();
   }
 
-  createTab(conversation?: TabConversationLike | null): TabData | null {
+  createTab(conversation?: TabConversationLike | null, options?: TabCreateOptions): TabData | null {
     if (!this.canCreateTab()) {
       return null;
     }
 
-    const tab = new Tab(this.defaultTitle, conversation);
+    const tab = new Tab(this.defaultTitle, conversation, options);
     this.tabs.push(tab);
     this.switchToTab(tab.getId());
     this.notifyChanged();
@@ -133,6 +134,8 @@ export class TabManager {
     const maxTabs = this.options.getMaxTabs();
     const limitedItems = items.slice(0, Math.max(1, maxTabs));
     let restoredActiveIndex: number | null = null;
+    const restoredIdMap = new Map<TabId, TabId>();
+    const pendingParentLinks: Array<{ tab: Tab; parentTabId: TabId }> = [];
 
     for (const [index, item] of limitedItems.entries()) {
       if (item.conversationId && !conversations.has(item.conversationId)) {
@@ -147,10 +150,20 @@ export class TabManager {
       tab.setTitle(conversation?.title || item.title || this.defaultTitle);
       tab.setModelOverride(item.modelOverride ?? null);
       this.tabs.push(tab);
+      if (item.id) {
+        restoredIdMap.set(item.id, tab.getId());
+      }
+      if (item.parentTabId) {
+        pendingParentLinks.push({ tab, parentTabId: item.parentTabId });
+      }
 
       if (index === activeTabIndex) {
         restoredActiveIndex = this.tabs.length - 1;
       }
+    }
+
+    for (const link of pendingParentLinks) {
+      link.tab.setParentTabId(restoredIdMap.get(link.parentTabId) ?? null);
     }
 
     if (this.tabs.length === 0) {
@@ -174,6 +187,7 @@ export class TabManager {
       const data = tab.getData();
       return {
         id: data.id,
+        parentTabId: data.parentTabId,
         index: index + 1,
         title: data.title,
         isActive: data.isActive,

@@ -246,6 +246,8 @@ export class ConversationTabRuntimeCoordinator<
     const activeTabIndex = Math.max(0, tabs.findIndex((tab) => tab.id === activeTabId));
     this.host.setPersistedTabState({
       tabs: tabs.map((tab) => ({
+        id: tab.id,
+        ...(tab.parentTabId ? { parentTabId: tab.parentTabId } : {}),
         conversationId: tab.conversationId,
         title: tab.title,
         modelOverride: tab.modelOverride,

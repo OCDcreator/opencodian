@@ -583,6 +583,52 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: none;
 }
 
+.opencodian-tab-bar-parent-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 1 auto;
+  max-width: min(220px, 48%);
+  min-width: 0;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, var(--opencodian-glass-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-secondary) 78%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.opencodian-tab-bar-parent-breadcrumb:hover,
+.opencodian-tab-bar-parent-breadcrumb:focus-visible {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--opencodian-glass-border-strong));
+  background: color-mix(in srgb, var(--background-modifier-hover) 78%, transparent);
+}
+
+.opencodian-tab-bar-parent-breadcrumb-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.opencodian-tab-bar-parent-breadcrumb-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.opencodian-tab-bar-parent-breadcrumb-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .opencodian-tab-bar-slot--outer-vertical.is-active-slot .opencodian-tab-bar {
   flex-direction: column;
   align-items: flex-start;
@@ -980,6 +1026,12 @@ body[data-opencodian-provider-icon-mode="color"] {
   border-radius: 6px;
   overflow: visible;
   box-shadow: 0 2px 8px var(--opencodian-glass-shadow);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-parent-breadcrumb {
+  max-width: 160px;
+  border-radius: 6px;
+  padding: 5px 7px;
 }
 
 .opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item:hover,

@@ -1100,3 +1100,119 @@ Round 4:  7.2/10 ███████████████░░░░░  �
 - **SDK 原生信号成为唯一生命周期权威**
 
 剩余差距不是 bug，而是设计选择。工作已完成。
+
+---
+
+# Council 补充决议：子会话查看体验对齐（2026-05-11）
+
+> **触发原因**：用户指出 opencode-desktop 可以查看子会话内容，质疑 OpenCodian 是否对齐该功能。
+> **评估性质**：多 LLM 共识讨论（Council，5 councillors）
+> **核心问题**：OpenCodian 是否真的能查看子会话内容？当前 tab 切换模式是否足够？
+
+## 调查发现
+
+### OpenCodian **已有**子会话查看能力
+
+| 功能 | 实现 | 证据 |
+|------|------|------|
+| 打开子会话 | ✅ "Open subagent session" 按钮 → 新 tab | `ToolCallRenderer.ts:160` |
+| 子会话消息历史 | ✅ 完整加载，same pipeline | `ConversationTabOpenCoordinator.ts:94` → SDK `session.messages()` |
+| 子会话树状图 | ✅ Collapsible tree below messages | `ChildSessionGraphCoordinator.ts` |
+| 子会话状态标记 | ✅ completed/active/error/unknown | `ChildSessionGraphCoordinator.ts:210` |
+
+**结论：OpenCodian 可以查看子会话内容，但 UX 路径是 "新 tab" 而非 desktop 的 "in-app 导航"。**
+
+### opencode-desktop 的实际做法
+
+**关键发现：desktop 也** **不** **inline 渲染子会话内容。**
+
+Desktop 的 task 工具使用 `hideDetails`，渲染为：
+- Compact card (~50px)：agent 名称 + 描述 + 状态
+- 点击后 **navigate to child session page**（URL 变化）
+- **零 inline 子会话内容**
+
+Desktop 模型："indicator + deep link" — 看到子代理被 spawn，点击访问它。
+
+### OpenCodian vs Desktop 的真实差异
+
+| 维度 | Desktop | OpenCodian | 差异 |
+|------|---------|-----------|------|
+| 子会话内容查看 | 导航到子会话页面 | 打开新 tab | **等价** |
+| 返回父会话 | 浏览器 back / 会话列表 | **手动找 tab** | **OpenCodian 较差** |
+| Inline 内容 | **无**（`hideDetails`） | 无 | **相同** |
+| 视觉占用 | Compact card | Tool card + "Open" 按钮 | **OpenCodian 略大** |
+
+**真实差距不是"能不能看"，而是"看完怎么回来"。**
+
+---
+
+## Council 共识：Option C — 改进 Tab 模型 + "Back to Parent" 面包屑
+
+**5/5 councillors 一致同意。**
+
+### 为什么选 C
+
+| 选项 | 评估 |
+|------|------|
+| A Inline 内容 | ❌ 拒绝 — sidebar 嵌套完整会话 = scroll hell，实现风险高 |
+| B Compact summary | ⚠️ 后续增强 — 现有 `ToolCallRenderer` 已提供足够信息 |
+| **C Tab + breadcrumb** | ✅ **选定** — 低复杂度，高影响，Obsidian 原生 |
+| D 什么都不做 | ❌ 拒绝 — 上下文丢失是真实的日常摩擦 |
+
+### 核心判断
+
+> **问题不是"看不到内容"（OpenCodian 已经可以），而是"切换 tab 后丢失上下文，没有快速返回路径"。**
+
+Desktop 用 in-app 导航（URL 变化），用户可用浏览器 back 返回。OpenCodian 用 tab 切换，但没有等价机制。
+
+### 最小可行改进（MVP）
+
+1. **`TabData` 添加 `parentTabId?: string`** — tab 创建时记录父 tab
+2. **`ConversationTabOpenCoordinator.openTaskToolSession()` 传递当前 active tab ID** 作为 `parentTabId`
+3. **`TabBar` 渲染 "← Back to: [parent title]"** 当 active tab 有 `parentTabId`
+4. **点击面包屑 → `tabManager.switchToTab(parentTabId)`**
+
+**修改文件：5-6 个，不新增模块，纯增量。**
+
+### 理想状态（后续迭代）
+
+- MVP 面包屑
+- + 可选：task 卡片上显示一行完成摘要（tool 计数、文件变更）— Option B 的轻量版本
+- + 可选：child tab 标题加 `↳` 前缀以视觉区分
+
+### 优先级：P1（改进项）
+
+不是 bug（内容可访问，无数据丢失），但 subagent 工作流是核心 agent 用法，"打开 tab → 丢失上下文 → 手动扫描 tab bar 找父会话" 是日常 UX 摩擦。实现成本低，用户价值明确。
+
+---
+
+## 子会话查看维度单独评分
+
+| 维度 | Desktop | OpenCodian（当前） | OpenCodian（+MVP） |
+|------|---------|-------------------|-------------------|
+| 查看子会话内容 | ✅ 导航到子页面 | ✅ 新 tab | ✅ 新 tab（不变） |
+| 返回父会话 | ✅ 浏览器 back | ❌ 手动找 tab | ✅ 面包屑一键返回 |
+| Inline 内容展示 | ❌ 无（`hideDetails`） | ❌ 无 | ❌ 无（不需要） |
+| 视觉紧凑度 | ✅ Compact card | ⚠️ Tool card + button | ⚠️ 同上 |
+| 上下文保留 | ✅ In-app 导航 | ❌ Tab 切换 | ✅ 面包屑弥补 |
+
+**当前子会话查看评分：6/10**（能看，但返回路径差）
+**+MVP 后评分：8/10**（能看 + 能回来，和 desktop 等价）
+
+---
+
+## 对齐轨迹更新（含子会话查看）
+
+```text
+Round 1:  3/10   ██████░░░░░░░░░░░░░░  100% OMO，无 SDK-native
+Round 2:  5.5/10 ███████████░░░░░░░░░  流式 SDK 原生
+Round 3:  6.8/10 ██████████████░░░░░░  结构分叉消除
+Round 4:  7.2/10 ███████████████░░░░░  服务整合完成
+Round 5:  7.2/10 ███████████████░░░░░  + 子会话查看澄清：能看，但返回差
++MVP:     8/10   ████████████████░░░░  + 面包屑后，子会话查看对齐
+```
+
+**修正后的整体评估：**
+- **协议层对齐**：7.2/10（已完成）
+- **子会话查看体验**：6/10 → 8/10（MVP 后）
+- **最终目标**：整体 8/10 需要完成生命周期协议 + 子会话面包屑

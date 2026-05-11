@@ -1,13 +1,14 @@
 import { createEmptyTabContextState, type TabContextState } from '../../../core/types';
-import type { TabConversationLike, TabData, TabId, TabModelOverride } from './types';
+import type { TabConversationLike, TabCreateOptions, TabData, TabId, TabModelOverride } from './types';
 import { generateTabId } from './types';
 
 export class Tab {
   private data: TabData;
 
-  constructor(title: string, conversation?: TabConversationLike | null) {
+  constructor(title: string, conversation?: TabConversationLike | null, options?: TabCreateOptions) {
     this.data = {
       id: generateTabId(),
+      parentTabId: options?.parentTabId ?? undefined,
       conversationId: conversation?.id ?? null,
       title: conversation?.title || title,
       isActive: false,
@@ -45,6 +46,10 @@ export class Tab {
 
   setNeedsAttention(needsAttention: boolean): void {
     this.data.needsAttention = needsAttention;
+  }
+
+  setParentTabId(parentTabId: TabId | null): void {
+    this.data.parentTabId = parentTabId ?? undefined;
   }
 
   setConversation(conversation: TabConversationLike | null, fallbackTitle: string): void {

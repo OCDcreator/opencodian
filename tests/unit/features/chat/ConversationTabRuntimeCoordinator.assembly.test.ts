@@ -227,6 +227,37 @@ describe('assembleConversationTabRuntime', () => {
     expect(deps.plugin.saveSettingsUiStateImmediately).not.toHaveBeenCalled();
   });
 
+  it('persists parent tab ids for child-session breadcrumbs', () => {
+    const deps = createAssemblyDeps();
+    const coordinator = assembleConversationTabRuntime(deps);
+
+    coordinator.initializeTabSystem();
+    const tabManager = deps.tabBarState.tabManager!;
+    const parent = tabManager.createTab({ id: 'conv-parent', title: 'Parent tab' })!;
+    tabManager.createTab(
+      { id: 'conv-child', title: 'Child tab' },
+      { parentTabId: parent.id },
+    );
+
+    coordinator.persistTabState();
+
+    expect(deps.plugin.settings.tabState.tabs).toEqual([
+      {
+        id: parent.id,
+        conversationId: 'conv-parent',
+        title: 'Parent tab',
+        modelOverride: null,
+      },
+      {
+        id: expect.any(String),
+        parentTabId: parent.id,
+        conversationId: 'conv-child',
+        title: 'Child tab',
+        modelOverride: null,
+      },
+    ]);
+  });
+
   it('flushes tab state through plugin saveImmediately when flush is true', () => {
     const deps = createAssemblyDeps();
     const coordinator = assembleConversationTabRuntime(deps);

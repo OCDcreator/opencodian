@@ -1511,6 +1511,7 @@ export const zhTranslations = {
   'chat.tab.newTooltip': '新建标签并在新标签中对话',
   'chat.tab.newCurrentTooltip': '在当前标签新建对话',
   'chat.tab.close': '关闭标签',
+  'chat.tab.backToParent': '返回父会话：{title}',
   'chat.tab.more': '+{count}',
   'chat.tab.moreMenu': '显示另外 {count} 个标签',
   'chat.tab.created': '已创建新标签',
