@@ -29,7 +29,7 @@ export class BackgroundTaskIndicatorCoordinator {
 
 - `renderIfNeeded()` 先确认目标 tab runtime 仍存在，再直接调用 `BackgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals()`、`BackgroundTaskInlinePanelRenderer.render()`，然后复用统一的 completion/writeback helper
 - `flushCompletionNoticesAndSyncStreamLikeState()` 把 completion notice queue/flush 与 `TabRuntimeStateBridge.syncStreamLikeState()` 折叠成一条 dedicated post-sync / render writeback 能力
-- `queueAndFlushCompletionNotices()` 复用 `BackgroundTaskTimelineService.collectSegments()` 收集 completion events，再把 queue/flush 顺序集中交给 `BackgroundTaskCompletionNoticeService`
+- `queueAndFlushCompletionNotices()` 复用 `BackgroundTaskTimelineService.collectSegments()` 收集 completion events，再把 queue/flush 顺序集中交给 `BackgroundTaskNoticeStateService`
 - 当 conversation 不可用时，completion notice refresh 会 no-op；inline panel render 仍可在 `renderIfNeeded()` 中收到 `null` conversation 并清理 stale panel
 - streaming tool-call start/end 与 primary-stream finalize 触发不再由本 coordinator 负责，而是交给 `BackgroundTaskStreamTriggerCoordinator`，本模块只保留 render/notice/sync 顺序
 
@@ -37,7 +37,7 @@ export class BackgroundTaskIndicatorCoordinator {
 
 - `OpenCodianView` 只保留 active tab / current conversation / runtime presence 这类更薄的 host bridge 与 `renderBackgroundTaskIndicatorIfNeeded()` 入口，不再转发 foreground live-signal reconcile 或 stream-like sync callback
 - `BackgroundTaskInlinePanelRenderer` 继续只负责 mounted inline panel 的 DOM 生命周期
-- `BackgroundTaskCompletionNoticeService` 继续只负责 queued notice state、content/fingerprint 与 persisted append/dedupe
+- `BackgroundTaskNoticeStateService` 负责 stopped/stale notice state，并持有 completion notice queued state、content/fingerprint 与 persisted append/dedupe
 - `BackgroundTaskLiveSignalCoordinator` 负责 foreground live-signal reconcile 决策，供本 coordinator 直接复用
 - `TabRuntimeStateBridge` 负责 foreground render 结束后的 tab badge / send-button / rewind-fork 状态写回
 - `BackgroundTaskStreamTriggerCoordinator` 负责把 stream-side tool-call / finalize 触发折叠成对本 coordinator 的 `renderIfNeeded()` 调用

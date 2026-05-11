@@ -10,8 +10,8 @@
 它负责：
 
 - 按最近 user anchor 聚合带有 lifecycle state 的 native `toolName === 'task'` launch block
-- 将 native task terminal state 与 `background-task-completed` / `all-background-tasks-complete` OMO system reminder 应用到匹配 segment
-- 当 reminder 缺少明确 task→launch 匹配时，回退到最近仍有 task activity 的 segment
+- 将 native task terminal state 与 `background-task-completed` / `all-background-tasks-complete` OMO `system-reminder` compatibility replay 应用到匹配 segment
+- 当 reminder 缺少明确 task→launch 匹配时，回退到最近仍有 task activity 的 segment；没有 activity segment 时只使用最近 user anchor，不再靠 search-mode-only segment 撑起完成回放
 - 合并当前 tab runtime 中尚未持久化的 launch/completion 状态
 - finalize pending / waiting-for-follow-up 状态，并按 anchor timestamp 排序
 - 为 OMO background-task diagnostics 输出 anchor、pending、completed 与 all-complete 快照
@@ -37,8 +37,9 @@ export class BackgroundTaskTimelineAssemblyService {
 
 - `collectSegments()` 先按 conversation order 收集 user anchors、tool launches 与 completion reminders，再合并 active runtime state，最后统一 resolve pending state。
 - Native `task` tool blocks after any user anchor can create a background-task segment when they carry task lifecycle state; OMO search-mode anchors still provide historical grouping and reminder fallback.
-- Native OpenCode task metadata（`toolMetadata.sessionId`）优先作为 child-session/task identity；OMO `system-reminder` tasks 继续作为历史或 OMO-enhanced conversation 的 fallback completion source。
+- Native OpenCode task metadata（`toolMetadata.sessionId`）优先作为 child-session/task identity；OMO `system-reminder` tasks 继续作为历史或 OMO-enhanced conversation 的 fenced compatibility completion source。
 - Task tool tracking no longer requires `search-mode`; `modeTag` is preserved as segment metadata rather than used as the functional gate.
+- Completion event / task info 类型由 `BackgroundTaskNoticeStateService` 暴露，timeline assembly 只生成事件数据，不负责 persisted completion notice queue/flush。
 - all-complete reminder 会清空 pending 并关闭 waiting-for-follow-up；普通 completion reminder 只按 task id / description matching 清掉对应 launch。
 - runtime merge 不保存或修改 conversation，只把当前 tab 仍活跃但尚未持久化的 launch/completion 并入 segment 视图。
 - `collectDiagnostics()` scans the latest user anchor that has downstream task/reminder activity, so native OpenCode task blocks and historical OMO reminders use the same anchor model.

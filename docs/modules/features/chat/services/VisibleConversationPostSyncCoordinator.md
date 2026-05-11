@@ -11,7 +11,7 @@
 - 再委托 `VisibleConversationPostSyncStateCoordinator` 完成 current-conversation match、revert-state/fingerprint 写回与 render outcome 判定
 - 让 visible path 和 hidden/background handoff path 形成对称 seam，避免单一 post-sync coordinator 同时拥有两侧编排细节
 
-它不负责 signal/background-tab 的 source-specific handoff，也不负责 authoritative mark、attention、background-task rebuild 或 completion notice flush；这些仍分别留给 `BackgroundConversationPostSyncHandoffCoordinator`、`BackgroundConversationSignalSyncStateCoordinator`、`BackgroundConversationAttentionCoordinator`、`BackgroundConversationPostSyncRefreshExecutor` 与相关 coordinator。
+它不负责 signal/background-tab 的 source-specific handoff，也不负责 authoritative mark、attention、background-task rebuild 或 completion notice flush；这些仍分别留给 `BackgroundConversationPostSyncHandoffCoordinator`、`BackgroundConversationPostSyncRefreshExecutor` 与相关 coordinator。
 
 ## 公开接口
 

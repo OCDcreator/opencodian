@@ -47,7 +47,7 @@ export interface QuestionTodoBackgroundTaskRuntimeServiceBundle {
   visibleConversationPostSyncCoordinator: VisibleConversationPostSyncCoordinator;
   backgroundConversationPostSyncHandoffCoordinator: BackgroundConversationPostSyncHandoffCoordinator;
   questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshCoordinator;
-  backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorCoordinator;
+  backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort;
   backgroundTaskStreamTriggerViewHost: BackgroundTaskStreamTriggerCoordinatorHost;
 }
 

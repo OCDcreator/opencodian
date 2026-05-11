@@ -23,5 +23,5 @@
 
 - 这个模块只负责 inline panel DOM 生命周期，不负责 timeline 推导、suppression、completion notice queue 或 stale 判定
 - copy 文案继续来自 `BackgroundTaskTimelineService.getInlineCopy()`；不要在 renderer 内重新拼装 background-task 文案
-- authoritative-sync gate、stopped/stale notice、completion notice queue/flush，仍分别由 `BackgroundTaskLiveSignalCoordinator`、`BackgroundTaskNoticeStateService` 与 `BackgroundTaskIndicatorCoordinator` / `BackgroundTaskCompletionNoticeService` 负责
+- authoritative-sync gate、stopped/stale notice、completion notice queue/flush，仍分别由 `BackgroundTaskLiveSignalCoordinator`、`BackgroundTaskNoticeStateService` 与 `BackgroundTaskIndicatorCoordinator` 负责
 - `OpenCodianView` 仍保留 background-task service bundle 的 host wiring；`renderBackgroundTaskIndicatorIfNeeded()` 的 render/queue/flush 顺序现在由 `BackgroundTaskIndicatorCoordinator` 承接

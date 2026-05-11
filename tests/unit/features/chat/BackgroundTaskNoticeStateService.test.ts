@@ -22,6 +22,7 @@ describe('BackgroundTaskNoticeStateService', () => {
     appendPersistentAssistantNoticeMessage: jest.Mock;
   } {
     const runtime: BackgroundTaskNoticeStateRuntime = {
+      isStreaming: false,
       backgroundTaskStaleNoticeFingerprint: null,
       backgroundTaskSuppressedFingerprint: null,
     };

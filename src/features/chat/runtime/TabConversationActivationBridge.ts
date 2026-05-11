@@ -1,7 +1,7 @@
 import type { Conversation } from '../../../core/types';
 import type { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
-import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../services/QuestionTodoBackgroundTaskActivationHostAdapter';
 import type { TabId } from '../tabs';
 import type { TabConversationStateBridge } from './TabConversationStateBridge';
 import type { TabViewActivationBridge } from './TabViewActivationBridge';
@@ -22,7 +22,7 @@ type ActiveTabContextUsagePort = Pick<
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
-  BackgroundTaskActivationIndicatorCoordinator,
+  BackgroundTaskActivationIndicatorSourcePort,
   | 'prepareOpenConversation'
   | 'syncOpenConversationState'
   | 'renderOpenConversationIndicator'

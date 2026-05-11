@@ -3,20 +3,13 @@ import type { BackgroundTaskIndicatorCoordinator } from '../runtime/BackgroundTa
 import type { TabRuntimeStateBridge } from '../runtime/TabRuntimeStateBridge';
 import type { TabId } from '../tabs';
 import {
-  BackgroundConversationAttentionCoordinator,
-  type BackgroundConversationAttentionCoordinatorHost,
-} from './BackgroundConversationAttentionCoordinator';
-import {
   BackgroundConversationPostSyncHandoffCoordinator,
+  type BackgroundConversationPostSyncHandoffCoordinatorHost,
 } from './BackgroundConversationPostSyncHandoffCoordinator';
 import {
   BackgroundConversationPostSyncRefreshExecutor,
   type BackgroundTaskPostSyncRefreshPort,
 } from './BackgroundConversationPostSyncRefreshExecutor';
-import {
-  BackgroundConversationSignalSyncStateCoordinator,
-  type BackgroundConversationSignalSyncStateCoordinatorHost,
-} from './BackgroundConversationSignalSyncStateCoordinator';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import type { PostSyncQuestionTodoRefreshPlanBuilder } from './PostSyncQuestionTodoRefreshPlanBuilder';
 import type { QuestionTodoStatusRefreshCoordinator } from './QuestionTodoStatusRefreshCoordinator';
@@ -59,8 +52,7 @@ export interface BackgroundConversationPostSyncHandoffViewHostAdapterDependencie
 
 export interface BackgroundConversationPostSyncHandoffViewHost
   extends BackgroundTaskPostSyncRefreshPort,
-    BackgroundConversationAttentionCoordinatorHost,
-    BackgroundConversationSignalSyncStateCoordinatorHost {}
+    BackgroundConversationPostSyncHandoffCoordinatorHost {}
 
 export interface BackgroundConversationPostSyncHandoffServices {
   backgroundConversationPostSyncHandoffCoordinator:
@@ -104,17 +96,12 @@ export function createBackgroundConversationPostSyncHandoffServices(
       questionTodoStatusRefreshCoordinator,
       viewHost,
     );
-  const backgroundConversationAttentionCoordinator =
-    new BackgroundConversationAttentionCoordinator(viewHost);
-  const backgroundConversationSignalSyncStateCoordinator =
-    new BackgroundConversationSignalSyncStateCoordinator(viewHost);
 
   return {
     backgroundConversationPostSyncHandoffCoordinator:
       new BackgroundConversationPostSyncHandoffCoordinator(
         backgroundConversationPostSyncRefreshExecutor,
-        backgroundConversationSignalSyncStateCoordinator,
-        backgroundConversationAttentionCoordinator,
+        viewHost,
       ),
   };
 }

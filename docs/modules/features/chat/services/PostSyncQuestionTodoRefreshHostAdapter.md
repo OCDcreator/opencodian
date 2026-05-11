@@ -11,7 +11,7 @@
 - 统一实例化 `QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshPlanBuilder` 与 `PostSyncQuestionTodoRefreshFacade`
 - 让 `QuestionTodoBackgroundTaskRefreshHostAdapter` 不再继续持有 visible question/todo post-sync refresh 的 pass-through host 装配
 
-它不拥有 activation-side dock writeback、background-task writeback、visible sync state commit、authoritative mark 或 tab attention 判定；这些职责仍分别留在 `QuestionTodoActivationRefreshCoordinator`、`BackgroundConversationPostSyncRefreshExecutor`、`VisibleConversationPostSyncCoordinator`、`BackgroundConversationSignalSyncStateCoordinator` 与 `BackgroundConversationAttentionCoordinator`。activation/open 与 post-sync 共用的 supplemental refresh 已统一回落到 `QuestionTodoStatusRefreshCoordinator`。
+它不拥有 activation-side dock writeback、background-task writeback、visible sync state commit、authoritative mark 或 tab attention 判定；这些职责仍分别留在 `QuestionTodoActivationRefreshCoordinator`、`BackgroundConversationPostSyncRefreshExecutor`、`VisibleConversationPostSyncCoordinator` 与 `BackgroundConversationPostSyncHandoffCoordinator`。activation/open 与 post-sync 共用的 supplemental refresh 已统一回落到 `QuestionTodoStatusRefreshCoordinator`。
 
 ## 公开接口
 

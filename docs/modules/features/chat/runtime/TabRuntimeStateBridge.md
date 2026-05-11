@@ -7,7 +7,7 @@
 
 `TabRuntimeStateBridge` 把 `OpenCodianView` 里剩余的 tab stream-like badge / background-task badge / 用户消息 rewind-fork 按钮禁用态同步，和 attention 标记写回，收束成一个 dedicated runtime bridge。
 
-它不推导 session status、background-task live predicate 或 question/todo attention 规则；这些判断仍分别留在 `BackgroundTaskLiveSignalCoordinator`、`BackgroundConversationAttentionCoordinator`、`QuestionDockCoordinator` 与发送/收尾链路。本模块只负责把已经算好的 runtime state 写回 `TabManager` 与消息区 DOM。
+它不推导 session status、background-task live predicate 或 question/todo attention 规则；这些判断仍分别留在 `BackgroundTaskLiveSignalCoordinator`、`BackgroundConversationPostSyncHandoffCoordinator`、`QuestionDockCoordinator` 与发送/收尾链路。本模块只负责把已经算好的 runtime state 写回 `TabManager` 与消息区 DOM。
 
 ## 公开接口
 

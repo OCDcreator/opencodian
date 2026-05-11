@@ -1,23 +1,17 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
-import type { BackgroundConversationAttentionCoordinator } from './BackgroundConversationAttentionCoordinator';
 import type { BackgroundConversationPostSyncRefreshExecutor } from './BackgroundConversationPostSyncRefreshExecutor';
-import type { BackgroundConversationSignalSyncStateCoordinator } from './BackgroundConversationSignalSyncStateCoordinator';
 
 type BackgroundConversationPostSyncRefreshPort = Pick<
   BackgroundConversationPostSyncRefreshExecutor,
   | 'refreshBackgroundTabConversation'
   | 'refreshSignalSyncedBackgroundConversation'
 >;
-type BackgroundConversationAttentionPort = Pick<
-  BackgroundConversationAttentionCoordinator,
-  | 'commitBackgroundTabSyncAttention'
-  | 'commitSignalSyncAttention'
->;
-type BackgroundConversationSignalSyncStatePort = Pick<
-  BackgroundConversationSignalSyncStateCoordinator,
-  'commitSignalSyncState'
->;
+
+export interface BackgroundConversationPostSyncHandoffCoordinatorHost {
+  markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
+  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
+}
 
 export interface BackgroundTaskPostSyncResult {
   changed: boolean;
@@ -43,27 +37,24 @@ export class BackgroundConversationPostSyncHandoffCoordinator {
   constructor(
     private readonly backgroundConversationPostSyncRefresh:
       BackgroundConversationPostSyncRefreshPort,
-    private readonly backgroundConversationSignalSyncState:
-      BackgroundConversationSignalSyncStatePort,
-    private readonly backgroundConversationAttention: BackgroundConversationAttentionPort,
+    private readonly host: BackgroundConversationPostSyncHandoffCoordinatorHost,
   ) {}
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {
-    this.backgroundConversationSignalSyncState.commitSignalSyncState({
-      tabId: options.tabId,
-      reason: options.reason,
-    });
+    this.host.markBackgroundTaskAuthoritativeSync(
+      options.tabId,
+      `sync-event:${options.reason}`,
+    );
     await this.backgroundConversationPostSyncRefresh.refreshSignalSyncedBackgroundConversation({
       tabId: options.tabId,
       conversation: options.conversation,
       tabHasBackgroundTask: options.tabHasBackgroundTask,
     });
-    this.backgroundConversationAttention.commitSignalSyncAttention({
-      tabId: options.tabId,
-      activeTabId: options.activeTabId,
-      previousFingerprint: options.previousFingerprint,
-      syncResult: options.syncResult,
-    });
+    if (!this.didConversationChange(options.syncResult, options.previousFingerprint)) {
+      return;
+    }
+
+    this.host.setTabNeedsAttention(options.tabId, options.tabId !== options.activeTabId);
   }
 
   async handleBackgroundTabSyncComplete(
@@ -73,10 +64,17 @@ export class BackgroundConversationPostSyncHandoffCoordinator {
       tabId: options.tabId,
       conversation: options.conversation,
     });
-    this.backgroundConversationAttention.commitBackgroundTabSyncAttention({
-      tabId: options.tabId,
-      previousFingerprint: options.previousFingerprint,
-      syncResult: options.syncResult,
-    });
+    if (!this.didConversationChange(options.syncResult, options.previousFingerprint)) {
+      return;
+    }
+
+    this.host.setTabNeedsAttention(options.tabId, true);
+  }
+
+  private didConversationChange(
+    syncResult: BackgroundTaskPostSyncResult,
+    previousFingerprint: string,
+  ): boolean {
+    return syncResult.changed || syncResult.fingerprint !== previousFingerprint;
   }
 }

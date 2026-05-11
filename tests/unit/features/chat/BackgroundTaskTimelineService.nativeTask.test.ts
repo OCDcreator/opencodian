@@ -147,7 +147,7 @@ describe('BackgroundTaskTimelineService native OpenCode task lifecycle', () => {
     });
   });
 
-  it('keeps historical bg input and result ids for launches without native metadata', () => {
+  it('keeps structured legacy task ids for launches without native metadata', () => {
     const runtime = createRuntime();
     const host = createHost(runtime);
     const service = new BackgroundTaskTimelineService(host);
@@ -157,20 +157,89 @@ describe('BackgroundTaskTimelineService native OpenCode task lifecycle', () => {
       input: { description: 'Search docs', taskId: 'bg_input' },
       result: 'started without result id',
     }, runtime.backgroundTaskLaunches);
-    service.upsertLaunch({
-      id: 'call-result',
-      input: { description: 'Draft summary' },
-      result: 'started bg_result',
-    }, runtime.backgroundTaskLaunches);
 
     expect(runtime.backgroundTaskLaunches.get('call-input')).toEqual(expect.objectContaining({
       taskId: 'bg_input',
       description: 'Search docs',
     }));
+  });
+
+  it('does not scrape bg ids from unstructured tool results without native metadata', () => {
+    const runtime = createRuntime();
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+
+    service.upsertLaunch({
+      id: 'call-result',
+      input: { description: 'Draft summary' },
+      result: 'started bg_legacy',
+    }, runtime.backgroundTaskLaunches);
+
     expect(runtime.backgroundTaskLaunches.get('call-result')).toEqual(expect.objectContaining({
-      taskId: 'bg_result',
+      taskId: null,
       description: 'Draft summary',
     }));
+  });
+
+  it('collects native task identity from tool metadata and ignores bg ids in result text', () => {
+    const host = createHost(null);
+    const service = new BackgroundTaskTimelineService(host);
+    const messages: ChatMessage[] = [
+      {
+        id: 'u1',
+        role: 'user',
+        content: 'delegate',
+        timestamp: 1,
+        sourceMessageId: 'u1',
+      },
+      {
+        id: 'a1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Audit routes' },
+          toolMetadata: { sessionId: 'child-session-1' },
+          toolResult: 'contains bg_legacy but metadata wins',
+          toolStatus: 'running',
+        }],
+      },
+    ];
+
+    expect(service.collectSegments(messages, 'tab-1')[0].launches[0].taskId).toBe('child-session-1');
+  });
+
+  it('does not treat bg-like result text as task identity for no-metadata task blocks', () => {
+    const host = createHost(null);
+    const service = new BackgroundTaskTimelineService(host);
+    const messages: ChatMessage[] = [
+      {
+        id: 'u1',
+        role: 'user',
+        content: 'delegate',
+        timestamp: 1,
+        sourceMessageId: 'u1',
+      },
+      {
+        id: 'a1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Audit routes' },
+          toolResult: 'contains bg_legacy without metadata',
+          toolStatus: 'running',
+        }],
+      },
+    ];
+
+    expect(service.collectSegments(messages, 'tab-1')[0].launches[0].taskId).toBeNull();
   });
 
   it('records native completions only when tool metadata contains a sessionId', () => {
@@ -195,6 +264,12 @@ describe('BackgroundTaskTimelineService native OpenCode task lifecycle', () => {
       taskId: 'child-session-1',
       description: 'Native audit',
     });
+  });
+});
+
+describe('BackgroundTaskTimelineService native OpenCode task reload and diagnostics', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   it('collects diagnostics for native task blocks after a normal user anchor', () => {
@@ -259,5 +334,22 @@ describe('BackgroundTaskTimelineService native OpenCode task lifecycle', () => {
       modeTag: null,
       waitingForFollowUp: true,
     }));
+  });
+
+  it('keeps completed native task state after reload from a normal user anchor', () => {
+    const host = createHost(null);
+    const service = new BackgroundTaskTimelineService(host);
+    const conversation = createConversation(createNativeTaskMessages('completed'));
+
+    const [segment] = service.collectSegments(conversation.messages, 'tab-1');
+
+    expect(segment.completed).toEqual([
+      expect.objectContaining({
+        taskId: 'child-session-1',
+        description: 'Audit routes',
+      }),
+    ]);
+    expect(segment.pending).toEqual([]);
+    expect(segment.waitingForFollowUp).toBe(false);
   });
 });

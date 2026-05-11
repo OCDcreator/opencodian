@@ -7,7 +7,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 import type { ChatMessage } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import { BackgroundTaskIndicatorCoordinator } from '../../../../src/features/chat/runtime/BackgroundTaskIndicatorCoordinator';
-import { BackgroundTaskCompletionNoticeService } from '../../../../src/features/chat/services/BackgroundTaskCompletionNoticeService';
+import { BackgroundTaskNoticeStateService } from '../../../../src/features/chat/services/BackgroundTaskNoticeStateService';
 import {
   BackgroundTaskTimelineService,
   type OmoBackgroundTaskLogState,
@@ -191,8 +191,12 @@ describe('OpenCodianView background task timeline', () => {
       isSuppressedBackgroundTaskSegment: jest.fn().mockReturnValue(false),
     });
     const appendSpy = jest.fn().mockResolvedValue(undefined);
-    const completionNoticeService = new BackgroundTaskCompletionNoticeService({
+    const completionNoticeService = new BackgroundTaskNoticeStateService({
       getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      getSessionIdForTab: jest.fn().mockReturnValue('session-1'),
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      hasMatchingPersistentAssistantNoticeMessage: jest.fn().mockReturnValue(false),
       appendPersistentAssistantNoticeMessage: appendSpy,
     });
     const coordinator = new BackgroundTaskIndicatorCoordinator({

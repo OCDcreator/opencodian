@@ -92,4 +92,4 @@ export function createBackgroundTaskViewHost(
 - `BackgroundTaskTimelineLaunchService`：负责 task launch upsert、native `toolMetadata.sessionId` / historical `bg_*` id 抽取、description fallback、completion matching 与 pending 过滤。
 - `BackgroundTaskInlinePanelRenderer`：负责真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用。
 - `BackgroundTaskIndicatorCoordinator`：负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序。
-- `BackgroundTaskLiveSignalCoordinator`、`BackgroundTaskNoticeStateService` 与 `BackgroundTaskCompletionNoticeService` 继续分别负责 live-signal stale follow-up、stale notice state 与 completion notice queue state。
+- `BackgroundTaskLiveSignalCoordinator` 负责 live-signal stale follow-up；`BackgroundTaskNoticeStateService` 负责 stopped/stale notice state 与 completion notice queue state。

@@ -2,7 +2,7 @@ import type { BackgroundTaskActiveAnchorMetadata, ChatMessage, Conversation } fr
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
-import type { BackgroundTaskCompletionInfo } from './BackgroundTaskCompletionNoticeService';
+import type { BackgroundTaskCompletionInfo } from './BackgroundTaskNoticeStateService';
 import {
   type BackgroundTaskDiagnostics,
   type BackgroundTaskLaunchInfo,

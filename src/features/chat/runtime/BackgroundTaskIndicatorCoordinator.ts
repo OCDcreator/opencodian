@@ -1,6 +1,6 @@
 import type { Conversation } from '../../../core/types';
-import type { BackgroundTaskCompletionNoticeService } from '../services/BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
+import type { BackgroundTaskNoticeStateService } from '../services/BackgroundTaskNoticeStateService';
 import type { BackgroundTaskTimelineService } from '../services/BackgroundTaskTimelineService';
 import type { TabId } from '../tabs';
 import type { BackgroundTaskInlinePanelRenderer } from './BackgroundTaskInlinePanelRenderer';
@@ -14,7 +14,7 @@ type BackgroundTaskIndicatorLiveSignalPort = Pick<
 >;
 type BackgroundTaskIndicatorTabRuntimePort = Pick<TabRuntimeStateBridge, 'syncStreamLikeState'>;
 type BackgroundTaskIndicatorCompletionNoticePort = Pick<
-  BackgroundTaskCompletionNoticeService,
+  BackgroundTaskNoticeStateService,
   'queueNotices' | 'flushQueuedNotices'
 >;
 

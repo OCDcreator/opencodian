@@ -6,8 +6,8 @@ import {
 import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
 import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
-import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
 
 type TabConversationStatePort = Pick<
   TabConversationStateBridge,
@@ -25,7 +25,7 @@ type ActiveTabContextUsagePort = Pick<
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
-  BackgroundTaskActivationIndicatorCoordinator,
+  BackgroundTaskActivationIndicatorSourcePort,
   | 'prepareOpenConversation'
   | 'syncOpenConversationState'
   | 'renderOpenConversationIndicator'

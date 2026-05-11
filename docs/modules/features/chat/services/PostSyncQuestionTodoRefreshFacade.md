@@ -11,7 +11,7 @@
 - 保持 visible source 的窄 refresh 入口，不再同时承接 signal/background-tab 的 source routing
 - 把 background-only 的 execution seam 让给 `BackgroundConversationPostSyncRefreshExecutor`，避免 visible/background 继续共享一个 facade surface
 
-它不负责 authoritative mark、background attention、visible sync 的 state-commit 判定，也不自己决定 todo/status runtime gate；这些职责仍分别留在 `BackgroundConversationSignalSyncStateCoordinator`、`BackgroundConversationAttentionCoordinator`、`VisibleConversationPostSyncCoordinator` 与 `QuestionTodoStatusRefreshCoordinator`。visible session-id 配对仍由 `PostSyncQuestionTodoRefreshPlanBuilder` 持有；signal/background-tab source 到 force-refresh policy 的映射与执行则下沉到 `BackgroundConversationPostSyncRefreshExecutor`。它的 host 装配现在通常由 `PostSyncQuestionTodoRefreshHostAdapter` 统一提供。
+它不负责 authoritative mark、background attention、visible sync 的 state-commit 判定，也不自己决定 todo/status runtime gate；这些职责仍分别留在 `BackgroundConversationPostSyncHandoffCoordinator`、`VisibleConversationPostSyncCoordinator` 与 `QuestionTodoStatusRefreshCoordinator`。visible session-id 配对仍由 `PostSyncQuestionTodoRefreshPlanBuilder` 持有；signal/background-tab source 到 force-refresh policy 的映射与执行则下沉到 `BackgroundConversationPostSyncRefreshExecutor`。它的 host 装配现在通常由 `PostSyncQuestionTodoRefreshHostAdapter` 统一提供。
 
 ## 公开接口
 
@@ -33,6 +33,6 @@ export class PostSyncQuestionTodoRefreshFacade {
 - `QuestionTodoStatusRefreshCoordinator` 继续拥有 pending-question + todo/status 的组合刷新顺序与 runtime gate
 - `VisibleConversationPostSyncCoordinator` 继续把 visible refresh 与 visible state-commit 串成一个窄 seam，避免 facade 直接感知 apply/indicator outcome
 - `VisibleConversationPostSyncCoordinator` 继续拥有 visible refresh + state-commit 组合，`BackgroundConversationPostSyncHandoffCoordinator` 则直接拥有 hidden/background source handoff 与 signal authoritative mark 交接点
-- `BackgroundConversationAttentionCoordinator` 负责 signal/background-tab sync 的 fingerprint/attention outcome，避免 visible facade 再耦合 background tab state policy
+- `BackgroundConversationPostSyncHandoffCoordinator` 负责 signal/background-tab sync 的 authoritative mark、fingerprint/attention outcome 与 background refresh handoff，避免 visible facade 再耦合 background tab state policy
 - signal/background-tab 的 todo/status 强制刷新策略仍由 `PostSyncQuestionTodoRefreshPlanBuilder` 持有，只是执行入口不再和 visible source 共享同一个 facade
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` lane：让 visible refresh host 装配进一步收束到独立 adapter，同时继续把 session/policy 选择留在 builder、runtime gate 留在 coordinator

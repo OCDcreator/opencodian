@@ -200,7 +200,7 @@ type AssemblyQuestionTodoActivationPort = Pick<
 >;
 
 type AssemblyBackgroundTaskActivationPort = Pick<
-  import('../services/BackgroundTaskActivationIndicatorCoordinator').BackgroundTaskActivationIndicatorCoordinator,
+  import('../services/QuestionTodoBackgroundTaskActivationHostAdapter').BackgroundTaskActivationIndicatorPort,
   | 'prepareOpenConversation'
   | 'syncOpenConversationState'
   | 'renderLoadedConversationIndicator'

@@ -11,12 +11,12 @@ import {
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
-import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from '../../../../src/features/chat/services/ConversationViewStateService';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 function createConversation(id: string, title = `Chat ${id}`) {
@@ -76,7 +76,7 @@ function createActivationBridge() {
     applyEmptyActivation: jest.fn(),
   };
   const backgroundTaskCoordinator: jest.Mocked<Pick<
-    BackgroundTaskActivationIndicatorCoordinator,
+    BackgroundTaskActivationIndicatorPort,
     'renderLoadedConversationIndicator'
   >> = {
     renderLoadedConversationIndicator: jest.fn().mockResolvedValue(undefined),

@@ -3,9 +3,9 @@ import {
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
-import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { FocusContextPreviewCoordinator } from '../../../../src/features/chat/services/FocusContextPreviewCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
 
 type ActiveTabContextUsagePort = Pick<
   ActiveTabContextUsageCoordinator,
@@ -18,7 +18,7 @@ type FocusContextPreviewPort = Pick<
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
-  BackgroundTaskActivationIndicatorCoordinator,
+  BackgroundTaskActivationIndicatorSourcePort,
   'renderLoadedConversationIndicator'
 >;
 

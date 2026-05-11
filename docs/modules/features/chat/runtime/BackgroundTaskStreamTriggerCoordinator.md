@@ -38,6 +38,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
 - `OpenCodianView` 现在只保留 stream controller callback / send pipeline host 的 wiring，不再直接持有 background-task tool-call start/end/finalize 的 runtime orchestration，也不再自己组装 stream-trigger host 或实现 `applyStreamingTodoSnapshotFromTool()`
 - `BackgroundTaskIndicatorCoordinator` 继续负责 live-signal reconcile 之后的 inline render、completion notice queue/flush 与 stream-like sync 顺序
 - `BackgroundTaskTimelineService` 继续负责 launch upsert、native metadata completion snapshot 与 timeline segment 推导，本 coordinator 只在 streaming trigger 入口复用它
+- Completion snapshot 类型与 queued notice state 同属 `BackgroundTaskNoticeStateService` 的 notice contract；本 coordinator 只把 runtime completion map 传给 timeline service，不直接写 persisted notice。
 - `BackgroundTaskLiveSignalCoordinator` 继续负责 authoritative-sync gate 与 indicator running 判定，本 coordinator 只在 stream trigger / finalize 入口复用它
 - `QuestionTodoBackgroundTaskRuntimeServiceBundle` 负责把 active-tab / session lookup、session todo snapshot/refresh、tab runtime lookup 与 reset indicator writeback 装配成 shared `BackgroundTaskStreamTriggerCoordinatorHost`
 - `SessionTodoCoordinator` 继续负责 todowrite snapshot 写回、默认 session 解析与 todo refresh，本 coordinator 只是透过 bundle 提供的 host 复用这些 port

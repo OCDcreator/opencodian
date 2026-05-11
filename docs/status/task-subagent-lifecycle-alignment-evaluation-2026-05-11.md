@@ -929,3 +929,17 @@ Target:   8+/10  ████████████████░░░░  �
 ```
 
 **天花板不再是生命周期正确性。天花板是服务架构和遗留代码表面。** 19 文件的 background-task 家族提供了 desktop 没有的真实 UX 价值（inline panels、stale warnings、per-tab isolation、persisted notices），但为此付出了过度抽象的代价。通往 8+ 的路径是机械性整合——无行为变更，仅减少文件和清理边界。
+
+---
+
+## P1-P6 服务整合实现记录（2026-05-11）
+
+本轮按 P1-P6 完成 task/subagent 生命周期服务整合，目标是降低后台任务服务重量，同时保留 SDK 原生 task 行为、inline panels、stale warnings、per-tab isolation 和 persisted notices。
+
+- P1/P2：移除最终 search-mode fallback，并停止从任意字符串或 `JSON.stringify()` 结果中抓取 `bg_` 标识；后台任务身份继续以结构化 `metadata.sessionId` / structured id 字段为准。
+- P3：删除 `BackgroundTaskActivationIndicatorCoordinator`，将纯委托的 activation indicator 调用内联到现有 activation host / bridge 所有者中。
+- P4：把完成通知队列与 stopped/stale notice 状态合并到 `BackgroundTaskNoticeStateService`，由一个 notice owner 管理持久化通知；`BackgroundTaskCompletionNoticeService` 仅保留为 completion-only compatibility facade，避免本轮 Class B 服务整合触碰 `OpenCodianView` thick owner。
+- P5：将 OMO completion reminder replay 围栏化，只对显式 system-reminder 兼容路径生效；SDK 原生 completed task reload 继续由 `toolStatus` / `toolMetadata.sessionId` 驱动。
+- P6：删除 `BackgroundConversationSignalSyncStateCoordinator` 和 `BackgroundConversationAttentionCoordinator`，把 background post-sync mark 与 attention handoff 收束进 `BackgroundConversationPostSyncHandoffCoordinator`。
+
+本轮属于纯 service / docs / graphify 切片，未触碰需要部署的 Test Vault runtime 路径；因此不需要 Test Vault deploy。

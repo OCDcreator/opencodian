@@ -1,25 +1,23 @@
 import type { Conversation } from '../../../../src/core/types';
-import type { BackgroundConversationAttentionCoordinator } from '../../../../src/features/chat/services/BackgroundConversationAttentionCoordinator';
 import {
   BackgroundConversationPostSyncHandoffCoordinator,
+  type BackgroundConversationPostSyncHandoffCoordinatorHost,
 } from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator';
 import type { BackgroundConversationPostSyncRefreshExecutor } from '../../../../src/features/chat/services/BackgroundConversationPostSyncRefreshExecutor';
-import type { BackgroundConversationSignalSyncStateCoordinator } from '../../../../src/features/chat/services/BackgroundConversationSignalSyncStateCoordinator';
 
 type BackgroundConversationRefreshPort = Pick<
   BackgroundConversationPostSyncRefreshExecutor,
   | 'refreshBackgroundTabConversation'
   | 'refreshSignalSyncedBackgroundConversation'
 >;
-type BackgroundConversationAttentionPort = Pick<
-  BackgroundConversationAttentionCoordinator,
-  | 'commitBackgroundTabSyncAttention'
-  | 'commitSignalSyncAttention'
->;
-type BackgroundConversationSignalSyncStatePort = Pick<
-  BackgroundConversationSignalSyncStateCoordinator,
-  'commitSignalSyncState'
->;
+type MockedHandoffHost = {
+  [Key in keyof BackgroundConversationPostSyncHandoffCoordinatorHost]:
+    BackgroundConversationPostSyncHandoffCoordinatorHost[Key] extends (
+      ...args: infer Args
+    ) => infer Result
+      ? jest.Mock<Result, Args>
+      : BackgroundConversationPostSyncHandoffCoordinatorHost[Key];
+};
 
 function createConversation(): Conversation {
   return {
@@ -39,17 +37,10 @@ function createBackgroundRefreshExecutor(): jest.Mocked<BackgroundConversationRe
   };
 }
 
-function createBackgroundAttentionCoordinator(): jest.Mocked<BackgroundConversationAttentionPort> {
+function createHandoffHost(): MockedHandoffHost {
   return {
-    commitSignalSyncAttention: jest.fn(),
-    commitBackgroundTabSyncAttention: jest.fn(),
-  };
-}
-
-function createBackgroundSignalSyncStateCoordinator():
-  jest.Mocked<BackgroundConversationSignalSyncStatePort> {
-  return {
-    commitSignalSyncState: jest.fn(),
+    markBackgroundTaskAuthoritativeSync: jest.fn(),
+    setTabNeedsAttention: jest.fn(),
   };
 }
 
@@ -60,13 +51,23 @@ describe('BackgroundConversationPostSyncHandoffCoordinator', () => {
 
   it('orchestrates signal-sync handoff through signal state, refresh, and attention seams', async () => {
     const conversation = createConversation();
+    const callOrder: string[] = [];
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
-    const backgroundSignalSyncStateCoordinator = createBackgroundSignalSyncStateCoordinator();
-    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
+    const host = createHandoffHost();
+    host.markBackgroundTaskAuthoritativeSync.mockImplementation(() => {
+      callOrder.push('markBackgroundTaskAuthoritativeSync');
+    });
+    backgroundRefreshExecutor.refreshSignalSyncedBackgroundConversation.mockImplementation(
+      async () => {
+        callOrder.push('refreshSignalSyncedBackgroundConversation');
+      },
+    );
+    host.setTabNeedsAttention.mockImplementation(() => {
+      callOrder.push('setTabNeedsAttention');
+    });
     const coordinator = new BackgroundConversationPostSyncHandoffCoordinator(
       backgroundRefreshExecutor,
-      backgroundSignalSyncStateCoordinator,
-      backgroundAttentionCoordinator,
+      host,
     );
 
     await coordinator.handleSignalSyncComplete({
@@ -79,42 +80,37 @@ describe('BackgroundConversationPostSyncHandoffCoordinator', () => {
       syncResult: { changed: true, fingerprint: 'new' },
     });
 
-    expect(backgroundSignalSyncStateCoordinator.commitSignalSyncState).toHaveBeenCalledWith({
-      tabId: 'tab-bg',
-      reason: 'message.updated',
-    });
+    expect(host.markBackgroundTaskAuthoritativeSync).toHaveBeenCalledWith(
+      'tab-bg',
+      'sync-event:message.updated',
+    );
     expect(backgroundRefreshExecutor.refreshSignalSyncedBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       conversation,
       tabHasBackgroundTask: false,
     });
-    expect(backgroundAttentionCoordinator.commitSignalSyncAttention).toHaveBeenCalledWith({
-      tabId: 'tab-bg',
-      activeTabId: 'tab-active',
-      previousFingerprint: 'old',
-      syncResult: { changed: true, fingerprint: 'new' },
-    });
-    expect(
-      backgroundSignalSyncStateCoordinator.commitSignalSyncState.mock.invocationCallOrder[0],
-    ).toBeLessThan(
-      backgroundRefreshExecutor.refreshSignalSyncedBackgroundConversation.mock.invocationCallOrder[0],
-    );
-    expect(
-      backgroundRefreshExecutor.refreshSignalSyncedBackgroundConversation.mock.invocationCallOrder[0],
-    ).toBeLessThan(
-      backgroundAttentionCoordinator.commitSignalSyncAttention.mock.invocationCallOrder[0],
-    );
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
+    expect(callOrder).toEqual([
+      'markBackgroundTaskAuthoritativeSync',
+      'refreshSignalSyncedBackgroundConversation',
+      'setTabNeedsAttention',
+    ]);
   });
 
   it('routes background-tab sync through background refresh before attention writeback', async () => {
     const conversation = createConversation();
+    const callOrder: string[] = [];
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
-    const backgroundSignalSyncStateCoordinator = createBackgroundSignalSyncStateCoordinator();
-    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
+    const host = createHandoffHost();
+    backgroundRefreshExecutor.refreshBackgroundTabConversation.mockImplementation(async () => {
+      callOrder.push('refreshBackgroundTabConversation');
+    });
+    host.setTabNeedsAttention.mockImplementation(() => {
+      callOrder.push('setTabNeedsAttention');
+    });
     const coordinator = new BackgroundConversationPostSyncHandoffCoordinator(
       backgroundRefreshExecutor,
-      backgroundSignalSyncStateCoordinator,
-      backgroundAttentionCoordinator,
+      host,
     );
 
     await coordinator.handleBackgroundTabSyncComplete({
@@ -128,16 +124,74 @@ describe('BackgroundConversationPostSyncHandoffCoordinator', () => {
       tabId: 'tab-bg',
       conversation,
     });
-    expect(backgroundAttentionCoordinator.commitBackgroundTabSyncAttention).toHaveBeenCalledWith({
-      tabId: 'tab-bg',
+    expect(host.markBackgroundTaskAuthoritativeSync).not.toHaveBeenCalled();
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
+    expect(callOrder).toEqual([
+      'refreshBackgroundTabConversation',
+      'setTabNeedsAttention',
+    ]);
+  });
+
+  it('clears attention for active signal-synced tabs when only the fingerprint changed', async () => {
+    const conversation = createConversation();
+    const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
+    const host = createHandoffHost();
+    const coordinator = new BackgroundConversationPostSyncHandoffCoordinator(
+      backgroundRefreshExecutor,
+      host,
+    );
+
+    await coordinator.handleSignalSyncComplete({
+      tabId: 'tab-active',
+      conversation,
+      reason: 'message.updated',
+      activeTabId: 'tab-active',
+      tabHasBackgroundTask: false,
       previousFingerprint: 'old',
       syncResult: { changed: false, fingerprint: 'new' },
     });
-    expect(backgroundSignalSyncStateCoordinator.commitSignalSyncState).not.toHaveBeenCalled();
-    expect(
-      backgroundRefreshExecutor.refreshBackgroundTabConversation.mock.invocationCallOrder[0],
-    ).toBeLessThan(
-      backgroundAttentionCoordinator.commitBackgroundTabSyncAttention.mock.invocationCallOrder[0],
+
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', false);
+  });
+
+  it('skips attention writes when a signal sync did not change', async () => {
+    const conversation = createConversation();
+    const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
+    const host = createHandoffHost();
+    const coordinator = new BackgroundConversationPostSyncHandoffCoordinator(
+      backgroundRefreshExecutor,
+      host,
     );
+
+    await coordinator.handleSignalSyncComplete({
+      tabId: 'tab-bg',
+      conversation,
+      reason: 'message.updated',
+      activeTabId: 'tab-active',
+      tabHasBackgroundTask: false,
+      previousFingerprint: 'same',
+      syncResult: { changed: false, fingerprint: 'same' },
+    });
+
+    expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
+  });
+
+  it('skips attention writes when a background-tab sync did not change', async () => {
+    const conversation = createConversation();
+    const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
+    const host = createHandoffHost();
+    const coordinator = new BackgroundConversationPostSyncHandoffCoordinator(
+      backgroundRefreshExecutor,
+      host,
+    );
+
+    await coordinator.handleBackgroundTabSyncComplete({
+      tabId: 'tab-bg',
+      conversation,
+      previousFingerprint: 'same',
+      syncResult: { changed: false, fingerprint: 'same' },
+    });
+
+    expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
   });
 });

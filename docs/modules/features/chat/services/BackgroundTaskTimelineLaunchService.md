@@ -9,7 +9,7 @@
 
 它负责：
 
-- 从 native OpenCode task metadata（优先 `toolMetadata.sessionId`）以及 historical input / result / existing launch 中提取 child-session/task identity
+- 从 native OpenCode task metadata（优先 `toolMetadata.sessionId`）以及 structured input / existing launch 中提取 child-session/task identity
 - 按 description、prompt、title、summary、query、command 与 result fallback 推导可读 description
 - 从 native completed task tool call 或 OMO `system-reminder` tasks 中提取 completed task snapshot
 - 根据 task id 优先、description 次之的规则匹配 completion 与 launch
@@ -29,7 +29,7 @@ export class BackgroundTaskTimelineLaunchService {
 ## 关键行为
 
 - `upsertLaunch()` 保留已有 description 作为 result fallback，并把无法解析到 child-session/task identity 的 launch 标成 `taskId: null`。
-- Native OpenCode task metadata（`toolMetadata.sessionId`）优先作为 child-session/task identity；历史 `bg_*` id 仍作为兼容路径保留。
+- Native OpenCode task metadata（`toolMetadata.sessionId`）优先作为 child-session/task identity；structured `task_id` / `taskId` / `id` 仍可作为兼容输入，但任意 result string / JSON string 里的 `bg_*` 不再被抓取成 task id。
 - `getCompletedTaskFromToolCall()` 只从 native task metadata 生成 completion snapshot，避免把缺少 child session id 的普通结果误判为完成事件。
 - `addCompletedTasksFromMessage()` 继续只消费 OMO `system-reminder` 的 tasks，作为历史或 OMO-enhanced conversation 的 fallback completion source；没有 id 和 description 的 task 会被忽略。
 - `filterPendingLaunches()` 先用 task id 精确匹配 completion，再回退到 description 的大小写无关匹配，保持历史 pending 语义不变。

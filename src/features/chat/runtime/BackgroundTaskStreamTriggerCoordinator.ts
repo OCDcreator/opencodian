@@ -1,6 +1,6 @@
 import type { ToolCallInfo } from '../../../core/types';
-import type { BackgroundTaskCompletionInfo } from '../services/BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
+import type { BackgroundTaskCompletionInfo } from '../services/BackgroundTaskNoticeStateService';
 import type {
   BackgroundTaskLaunchInfo,
   BackgroundTaskTimelineService,

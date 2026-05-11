@@ -13,6 +13,7 @@
 2. **Conversation sync port assembly** (`assembleTabActivationConversationSyncRuntimePort`): 从更简洁的 host 接口一步创建 sync runtime port，内部调用 `createTabActivationConversationSyncRuntimePort`。Host 使用 `setActiveTabConversationSyncFingerprint` 命名替代 `setLastConversationSyncFingerprint`，语义更清晰。
 3. **View host assembly** (`createTabActivationRuntimeViewHosts`): 从 grouped view ports 组合成 `TabActivationRuntimeHostAdapterHost`，交给 adapter 派生 activation / conversation-state / runtime-state bridge hosts。
 4. **Bridge assembly** (`createTabActivationRuntimeAssembly`): 从 flat deps 直接创建 `TabConversationStateBridge`、`TabViewActivationBridge`、`TabConversationActivationBridge`、`TabRuntimeStateBridge` 四个 bridge 实例。OpenCodianView 不再直接实例化这些 bridge。
+   其中 `backgroundTaskActivationIndicator` 现在消费 `QuestionTodoBackgroundTaskActivationHostAdapter` 导出的 `BackgroundTaskActivationIndicatorPort` 结构类型，而不是已移除的独立 indicator coordinator class。
 
 ## 公开接口
 
@@ -56,4 +57,5 @@ export function assembleTabActivationConversationSyncRuntimePort(
 - grouped port 提供由 `TabActivationRuntimeHostProvider` 承担
 - 本模块负责把 grouped view ports 组合成共享 activation runtime seam，并进一步组装为 bridge 实例
 - `TabActivationRuntimeHostAdapter` 继续负责从共享 seam 派生 `TabActivationBridgeHosts`、`TabConversationStateBridgeHost` 与 `TabRuntimeStateBridgeHost`
+- `backgroundTaskActivationIndicator` 继续作为 bridge assembly 的 flat dependency 传入；其 reset / sync / render 委托逻辑已由 activation host adapter 内联提供
 - 这条边界推进 master plan 的 P1 activation / sync / runtime bridge ownership，避免 view 继续直接维护完整 adapter host shape

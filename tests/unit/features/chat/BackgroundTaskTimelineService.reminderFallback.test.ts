@@ -46,7 +46,7 @@ function createHost(
 }
 
 describe('BackgroundTaskTimelineService reminder fallback', () => {
-  it('does not create fallback completion segments for non-search user turns', () => {
+  it('attaches unmatched completion reminders to the latest tracked task anchor', () => {
     const host = createHost(null);
     const service = new BackgroundTaskTimelineService(host);
     const messages: ChatMessage[] = [
@@ -93,16 +93,16 @@ describe('BackgroundTaskTimelineService reminder fallback', () => {
     ];
 
     const segments = service.collectSegments(messages, 'tab-1');
+    const reminderSegment = segments.find((segment) => segment.anchorKey === 'msg-user-plain');
 
-    expect(segments).toHaveLength(1);
-    expect(segments[0]).toEqual(expect.objectContaining({
-      anchorKey: 'msg-user-search',
-      modeTag: 'search-mode',
+    expect(reminderSegment).toEqual(expect.objectContaining({
+      anchorKey: 'msg-user-plain',
+      modeTag: null,
       completionEvents: [expect.objectContaining({ reminderMessageId: 'msg-reminder-1' })],
     }));
   });
 
-  it('drops orphan completion reminders when no search-mode anchor exists', () => {
+  it('creates a latest-anchor reminder segment when no activity segment exists', () => {
     const host = createHost(null);
     const service = new BackgroundTaskTimelineService(host);
     const messages: ChatMessage[] = [
@@ -133,6 +133,72 @@ describe('BackgroundTaskTimelineService reminder fallback', () => {
       },
     ];
 
-    expect(service.collectSegments(messages, 'tab-1')).toEqual([]);
+    expect(service.collectSegments(messages, 'tab-1')).toEqual([
+      expect.objectContaining({
+        anchorKey: 'msg-user-plain',
+        modeTag: null,
+        completionEvents: [expect.objectContaining({ reminderMessageId: 'msg-reminder-1' })],
+      }),
+    ]);
+  });
+
+  it('prefers the latest activity segment over the latest tracked task anchor', () => {
+    const host = createHost(null);
+    const service = new BackgroundTaskTimelineService(host);
+    const messages: ChatMessage[] = [
+      {
+        id: 'user-task',
+        role: 'user',
+        content: 'delegate this',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-task',
+      },
+      {
+        id: 'assistant-task',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Search docs' },
+          toolStatus: 'running',
+        }],
+      },
+      {
+        id: 'user-plain',
+        role: 'user',
+        content: 'plain follow-up',
+        timestamp: 3,
+        sourceMessageId: 'msg-user-plain',
+      },
+      {
+        id: 'assistant-reminder-1',
+        role: 'assistant',
+        content: 'bg_missing complete',
+        timestamp: 4,
+        sourceMessageId: 'msg-reminder-1',
+        displayStyle: 'notice',
+        noticeTone: 'info',
+        omo: {
+          kind: 'system-reminder',
+          reminderType: 'background-task-completed',
+          reminderText: 'bg_missing complete',
+          rawText: 'bg_missing complete',
+          headline: 'bg_missing complete',
+          isInternalInitiator: false,
+          tasks: [{ id: 'bg_missing', description: 'Search docs' }],
+        },
+      },
+    ];
+
+    const segments = service.collectSegments(messages, 'tab-1');
+
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toEqual(expect.objectContaining({
+      anchorKey: 'msg-user-task',
+      completionEvents: [expect.objectContaining({ reminderMessageId: 'msg-reminder-1' })],
+    }));
   });
 });

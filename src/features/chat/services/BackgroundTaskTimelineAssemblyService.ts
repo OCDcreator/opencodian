@@ -4,7 +4,7 @@ import type { TabId } from '../tabs';
 import type {
   BackgroundTaskCompletionEvent,
   BackgroundTaskCompletionInfo,
-} from './BackgroundTaskCompletionNoticeService';
+} from './BackgroundTaskNoticeStateService';
 import {
   type BackgroundTaskLaunchInfo,
   BackgroundTaskTimelineLaunchService,
@@ -199,7 +199,7 @@ export class BackgroundTaskTimelineAssemblyService {
       this.collectTaskLaunchBlock(state, block);
     }
 
-    this.collectCompletionReminderSegments(state, message);
+    this.collectOmoCompletionReminderSegments(state, message);
   }
 
   private captureUserSegmentAnchor(
@@ -246,15 +246,15 @@ export class BackgroundTaskTimelineAssemblyService {
     this.addNativeTaskCompletionToSegment(segment, taskBlock);
   }
 
-  private collectCompletionReminderSegments(
+  private collectOmoCompletionReminderSegments(
     state: BackgroundTaskSegmentCollectionState,
     message: ChatMessage,
   ): void {
-    if (!this.isBackgroundTaskCompletionReminder(message)) {
+    if (message.omo?.kind !== 'system-reminder') {
       return;
     }
 
-    if (message.omo?.kind !== 'system-reminder') {
+    if (!this.isOmoBackgroundTaskCompletionReminder(message)) {
       return;
     }
 
@@ -289,7 +289,7 @@ export class BackgroundTaskTimelineAssemblyService {
     }
 
     const fallback = this.getLatestSegmentWithActivity(state.segments)
-      ?? this.getLatestSearchModeSegment(state);
+      ?? this.getOrCreateSegment(state, state.latestTaskAnchorMessage);
     return fallback ? [fallback] : [];
   }
 
@@ -544,18 +544,6 @@ export class BackgroundTaskTimelineAssemblyService {
     return null;
   }
 
-  private getLatestSearchModeSegment(
-    state: BackgroundTaskSegmentCollectionState,
-  ): BackgroundTaskSegment | null {
-    for (let index = state.segments.length - 1; index >= 0; index -= 1) {
-      if (state.segments[index].modeTag === 'search-mode') {
-        return state.segments[index];
-      }
-    }
-
-    return null;
-  }
-
   private segmentHasTaskActivity(segment: BackgroundTaskSegment): boolean {
     return segment.pending.length > 0 || segment.launches.length > 0;
   }
@@ -570,7 +558,7 @@ export class BackgroundTaskTimelineAssemblyService {
     return -1;
   }
 
-  private isBackgroundTaskCompletionReminder(message: ChatMessage): boolean {
+  private isOmoBackgroundTaskCompletionReminder(message: ChatMessage): boolean {
     return message.omo?.kind === 'system-reminder'
       && (
         message.omo.reminderType === 'background-task-completed'

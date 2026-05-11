@@ -1,16 +1,16 @@
 import {
-  type BackgroundTaskCompletionNoticeRuntime,
   type BackgroundTaskCompletionNoticeSegment,
-  BackgroundTaskCompletionNoticeService,
-} from '../../../../src/features/chat/services/BackgroundTaskCompletionNoticeService';
+  type BackgroundTaskNoticeStateRuntime,
+  BackgroundTaskNoticeStateService,
+} from '../../../../src/features/chat/services/BackgroundTaskNoticeStateService';
 import { t } from '../../../../src/i18n';
 
 function createService(options?: {
   conversationMessages?: Array<Record<string, unknown>>;
   isStreaming?: boolean;
 }): {
-  service: BackgroundTaskCompletionNoticeService;
-  runtime: BackgroundTaskCompletionNoticeRuntime;
+  service: BackgroundTaskNoticeStateService;
+  runtime: BackgroundTaskNoticeStateRuntime;
   conversation: {
     id: string;
     openCodeSessionId: string;
@@ -18,8 +18,10 @@ function createService(options?: {
   };
   appendPersistentAssistantNoticeMessage: jest.Mock;
 } {
-  const runtime: BackgroundTaskCompletionNoticeRuntime = {
+  const runtime: BackgroundTaskNoticeStateRuntime = {
     isStreaming: options?.isStreaming ?? false,
+    backgroundTaskStaleNoticeFingerprint: null,
+    backgroundTaskSuppressedFingerprint: null,
   };
   const conversation = {
     id: 'conversation-1',
@@ -30,11 +32,15 @@ function createService(options?: {
 
   const host = {
     getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+    getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+    getSessionIdForTab: jest.fn().mockReturnValue('session-1'),
+    getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    hasMatchingPersistentAssistantNoticeMessage: jest.fn().mockReturnValue(false),
     appendPersistentAssistantNoticeMessage,
   };
 
   return {
-    service: new BackgroundTaskCompletionNoticeService(host),
+    service: new BackgroundTaskNoticeStateService(host),
     runtime,
     conversation,
     appendPersistentAssistantNoticeMessage,

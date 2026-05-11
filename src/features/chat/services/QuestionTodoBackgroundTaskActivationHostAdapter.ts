@@ -1,9 +1,5 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
-import {
-  BackgroundTaskActivationIndicatorCoordinator,
-  type BackgroundTaskActivationIndicatorCoordinatorHost,
-} from './BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
 import {
   QuestionTodoActivationRefreshCoordinator,
@@ -43,6 +39,13 @@ export interface QuestionTodoBackgroundTaskActivationViewHost {
   renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
 }
 
+export interface BackgroundTaskActivationIndicatorPort {
+  prepareOpenConversation(conversation: Conversation): void;
+  syncOpenConversationState(conversation: Conversation, tabId: TabId | null): void;
+  renderOpenConversationIndicator(tabId: TabId | null): void;
+  renderLoadedConversationIndicator(tabId: TabId | null): Promise<void>;
+}
+
 export function createQuestionTodoBackgroundTaskActivationViewHostAdapter(
   dependencies: QuestionTodoBackgroundTaskActivationViewHostAdapterDependencies,
 ): QuestionTodoBackgroundTaskActivationViewHost {
@@ -70,12 +73,12 @@ export function createQuestionTodoBackgroundTaskActivationViewHostAdapter(
 
 export interface QuestionTodoBackgroundTaskActivationHosts {
   questionTodoActivationRefreshCoordinatorHost: QuestionTodoActivationRefreshCoordinatorHost;
-  backgroundTaskActivationIndicatorCoordinatorHost: BackgroundTaskActivationIndicatorCoordinatorHost;
+  backgroundTaskActivationIndicator: BackgroundTaskActivationIndicatorPort;
 }
 
 export interface QuestionTodoBackgroundTaskActivationServices {
   questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshCoordinator;
-  backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorCoordinator;
+  backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort;
 }
 
 export function createQuestionTodoBackgroundTaskActivationHosts(
@@ -93,18 +96,22 @@ export function createQuestionTodoBackgroundTaskActivationHosts(
         viewHost.renderSessionTodoDock(tabId);
       },
     },
-    backgroundTaskActivationIndicatorCoordinatorHost: {
-      getCurrentConversationId: () => viewHost.getCurrentConversation()?.id ?? null,
-      resetBackgroundTaskIndicator: () => {
-        viewHost.resetBackgroundTaskIndicator();
+    backgroundTaskActivationIndicator: {
+      prepareOpenConversation: (conversation: Conversation) => {
+        if (viewHost.getCurrentConversation()?.id !== conversation.id) {
+          viewHost.resetBackgroundTaskIndicator();
+        }
       },
-      syncBackgroundTaskStateFromConversation: (
+      syncOpenConversationState: (
         conversation: Conversation,
         tabId: TabId | null,
       ) => {
         viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId);
       },
-      renderBackgroundTaskIndicatorIfNeeded: (tabId: TabId | null) =>
+      renderOpenConversationIndicator: (tabId: TabId | null) => {
+        void viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+      },
+      renderLoadedConversationIndicator: (tabId: TabId | null) =>
         viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
     },
   };
@@ -119,13 +126,9 @@ export function createQuestionTodoBackgroundTaskActivationServices(
     hosts.questionTodoActivationRefreshCoordinatorHost,
     questionTodoStatusRefreshCoordinator,
   );
-  const backgroundTaskActivationIndicatorCoordinator =
-    new BackgroundTaskActivationIndicatorCoordinator(
-      hosts.backgroundTaskActivationIndicatorCoordinatorHost,
-    );
 
   return {
     questionTodoActivationRefreshCoordinator,
-    backgroundTaskActivationIndicatorCoordinator,
+    backgroundTaskActivationIndicatorCoordinator: hosts.backgroundTaskActivationIndicator,
   };
 }

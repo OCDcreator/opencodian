@@ -12,7 +12,7 @@
 - 在当前可见会话里先渲染 notice，再写入 conversation、更新 sync fingerprint，并触发 hydration/scroll 后续动作
 - 在隐藏 tab 会话里只做持久化与 fingerprint 写回，再标记 tab attention
 
-它不决定 notice 何时出现，也不生成 session todo / background task 的 fingerprint 与文案；这些规则仍分别由 `SessionTodoStateService`、`BackgroundTaskNoticeStateService` 与 `BackgroundTaskCompletionNoticeService` 持有。
+它不决定 notice 何时出现，也不生成 session todo / background task 的 fingerprint 与文案；这些规则仍分别由 `SessionTodoStateService` 与 `BackgroundTaskNoticeStateService` 持有。
 
 ## 公开接口
 
@@ -48,6 +48,6 @@ export class PersistentAssistantNoticeService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `SessionTodoStateService`、`BackgroundTaskNoticeStateService`、`BackgroundTaskCompletionNoticeService` 仍负责各自 notice 的状态机、文案和 dedupe 时机
+- `SessionTodoStateService` 与 `BackgroundTaskNoticeStateService` 仍负责各自 notice 的状态机、文案和 dedupe 时机
 - `OpenCodianView` 只提供 assistant-message render/save/tab-runtime host bridge，并把 fingerprint 计算与 tab writeback seam 作为 `TabConversationSyncFingerprintRuntimePort` 直接交给本服务；该 port 类型与 question/todo/background-task runtime bundle 共用，避免保留额外 pass-through provider
 - 这让 P2 `question / todo / background task` lane 继续把 session todo 与 background task 共用的 persisted-notice ownership 从主 view 迁到 dedicated service

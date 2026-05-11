@@ -121,21 +121,15 @@ describe('QuestionTodoBackgroundTaskActivationHostAdapter', () => {
     const nextConversation = createConversation('conversation-next');
     const hosts = createQuestionTodoBackgroundTaskActivationHosts(viewHost);
 
-    expect(hosts.backgroundTaskActivationIndicatorCoordinatorHost.getCurrentConversationId()).toBe(
-      'conversation-active',
-    );
-
     hosts.questionTodoActivationRefreshCoordinatorHost.renderQuestionDock();
     hosts.questionTodoActivationRefreshCoordinatorHost.updateSessionTodoDockForTab('tab-1');
     hosts.questionTodoActivationRefreshCoordinatorHost.renderSessionTodoDock('tab-1');
-    hosts.backgroundTaskActivationIndicatorCoordinatorHost.resetBackgroundTaskIndicator();
-    hosts.backgroundTaskActivationIndicatorCoordinatorHost.syncBackgroundTaskStateFromConversation(
+    hosts.backgroundTaskActivationIndicator.prepareOpenConversation(nextConversation);
+    hosts.backgroundTaskActivationIndicator.syncOpenConversationState(
       nextConversation,
       'tab-1',
     );
-    await hosts.backgroundTaskActivationIndicatorCoordinatorHost.renderBackgroundTaskIndicatorIfNeeded(
-      'tab-1',
-    );
+    hosts.backgroundTaskActivationIndicator.renderOpenConversationIndicator('tab-1');
 
     expect(viewHost.renderQuestionDock).toHaveBeenCalledTimes(1);
     expect(viewHost.updateSessionTodoDockForTab).toHaveBeenCalledWith('tab-1');
@@ -146,6 +140,16 @@ describe('QuestionTodoBackgroundTaskActivationHostAdapter', () => {
       'tab-1',
     );
     expect(viewHost.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('keeps the activation indicator when preparing the current conversation', () => {
+    const currentConversation = createConversation('conversation-active');
+    const viewHost = createViewHost(currentConversation);
+    const hosts = createQuestionTodoBackgroundTaskActivationHosts(viewHost);
+
+    hosts.backgroundTaskActivationIndicator.prepareOpenConversation(currentConversation);
+
+    expect(viewHost.resetBackgroundTaskIndicator).not.toHaveBeenCalled();
   });
 
   it('wires activation coordinators through the shared activation bundle', async () => {

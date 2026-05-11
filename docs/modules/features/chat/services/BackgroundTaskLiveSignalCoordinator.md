@@ -12,7 +12,7 @@
 - 在 session todo/status live signal 到来时，根据 hydration、authoritative-sync、grace period 与 pending launch 状态决定是否继续保留 indicator
 - 当后台任务已经明显 stale 时，协调 stopped notice 追加请求与 indicator reset 的触发时机
 
-它不负责 inline panel DOM 渲染或 post-sync completion notice 编排；这些能力现在由 `BackgroundTaskInlinePanelRenderer`、`BackgroundTaskIndicatorCoordinator`、`BackgroundConversationPostSyncHandoffCoordinator` 和 `BackgroundTaskCompletionNoticeService` 分别承接。它会直接组合 `SessionTodoStateService`、`BackgroundTaskTimelineService` 与 `BackgroundTaskNoticeStateService` 来完成 stale follow-up，而不是再通过 `OpenCodianView` 转发这组 callback。`OpenCodianView` 与本模块之间的 host assembly 现在直接由本模块的构造函数承接——`BackgroundTaskLiveSignalCoordinator` 的构造函数接受 `BackgroundTaskLiveSignalCoordinatorHostBuilderHost`，并在内部调用 `createBackgroundTaskLiveSignalCoordinatorHost()` 完成 host 包装。
+它不负责 inline panel DOM 渲染或 post-sync completion notice 编排；这些能力现在由 `BackgroundTaskInlinePanelRenderer`、`BackgroundTaskIndicatorCoordinator`、`BackgroundConversationPostSyncHandoffCoordinator` 和 `BackgroundTaskNoticeStateService` 分别承接。它会直接组合 `SessionTodoStateService`、`BackgroundTaskTimelineService` 与 `BackgroundTaskNoticeStateService` 来完成 stale follow-up，而不是再通过 `OpenCodianView` 转发这组 callback。`OpenCodianView` 与本模块之间的 host assembly 现在直接由本模块的构造函数承接——`BackgroundTaskLiveSignalCoordinator` 的构造函数接受 `BackgroundTaskLiveSignalCoordinatorHostBuilderHost`，并在内部调用 `createBackgroundTaskLiveSignalCoordinatorHost()` 完成 host 包装。
 
 ## 公开接口
 

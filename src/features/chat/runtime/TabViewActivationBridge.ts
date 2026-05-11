@@ -4,9 +4,9 @@ import {
   getPerformanceTimestampMs,
 } from '../../../shared';
 import type { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
-import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
 import type { FocusContextPreviewCoordinator } from '../services/FocusContextPreviewCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../services/QuestionTodoBackgroundTaskActivationHostAdapter';
 import type { TabId } from '../tabs';
 
 const logger = createLogger('TabViewActivationBridge');
@@ -22,7 +22,7 @@ type FocusContextPreviewRefreshPort = Pick<
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
-  BackgroundTaskActivationIndicatorCoordinator,
+  BackgroundTaskActivationIndicatorSourcePort,
   'renderLoadedConversationIndicator'
 >;
 

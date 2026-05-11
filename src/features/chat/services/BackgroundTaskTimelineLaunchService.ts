@@ -1,7 +1,7 @@
 import type { ChatMessage } from '../../../core/types';
 import { t } from '../../../i18n';
-import type { BackgroundTaskCompletionInfo } from './BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskLiveSignalLaunchInfo } from './BackgroundTaskLiveSignalCoordinator';
+import type { BackgroundTaskCompletionInfo } from './BackgroundTaskNoticeStateService';
 
 export type BackgroundTaskLaunchInfo = BackgroundTaskLiveSignalLaunchInfo;
 
@@ -114,14 +114,8 @@ export class BackgroundTaskTimelineLaunchService {
   }
 
   private static extractBackgroundTaskId(...sources: unknown[]): string | null {
-    const pattern = /\b(bg_[a-z0-9]+)\b/i;
-
     for (const source of sources) {
       if (typeof source === 'string') {
-        const match = source.match(pattern);
-        if (match?.[1]) {
-          return match[1];
-        }
         continue;
       }
 
@@ -136,18 +130,10 @@ export class BackgroundTaskTimelineLaunchService {
           (source as Record<string, unknown>).taskId,
           (source as Record<string, unknown>).id,
         ];
-        const directMatch = this.extractBackgroundTaskId(...nested);
-        if (directMatch) {
-          return directMatch;
-        }
-
-        try {
-          const match = JSON.stringify(source).match(pattern);
-          if (match?.[1]) {
-            return match[1];
+        for (const value of nested) {
+          if (typeof value === 'string' && value.trim().length > 0) {
+            return value.trim();
           }
-        } catch {
-          continue;
         }
       }
     }
