@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { Notice } from 'obsidian';
 
 jest.mock('obsidian', () => ({
@@ -349,5 +352,67 @@ describe('SettingsMcpSection subscriptions and status', () => {
     await flushAsync();
 
     expect(containerEl.querySelectorAll('.opencodian-mcp-server-card-helper.is-error')).toHaveLength(0);
+  });
+});
+
+describe('SettingsMcpSection CSS contract', () => {
+  it('keeps MCP management surfaces aligned with the shared settings hierarchy contract', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    const findRule = (selector: string, required: string): string => (
+      Array.from(css.matchAll(new RegExp(`${selector}\\s*\\{[^}]*\\}`, 'g')))
+        .map((match) => match[0])
+        .find((rule) => rule.includes(required)) ?? ''
+    );
+
+    const toolbarRule = findRule('\\.opencodian-mcp-overview-toolbar', 'background:');
+    const overviewCardRule = findRule('\\.opencodian-mcp-overview-card', 'background:');
+    const serverCardRule = findRule(
+      '\\.opencodian-mcp-server-row,\\s*\\.opencodian-mcp-server-card',
+      'background:',
+    );
+    const actionSettingRule = findRule(
+      '\\.opencodian-mcp-server-row-actions \\.setting-item,\\s*\\.opencodian-mcp-server-card-actions \\.setting-item',
+      'box-shadow:',
+    );
+    const helperRule = findRule(
+      '\\.opencodian-mcp-server-row-error,\\s*\\.opencodian-mcp-server-card-helper',
+      'background:',
+    );
+    const emptyRule = findRule('\\.opencodian-mcp-empty', 'background:');
+    const detailsRule = findRule(
+      '\\.opencodian-mcp-details-summary,\\s*\\.opencodian-mcp-details-section,\\s*\\.opencodian-mcp-details-technical',
+      'background:',
+    );
+    const formGroupRule = findRule('\\.opencodian-mcp-form-group', 'background:');
+    const mcpCss = css.slice(
+      css.indexOf('.opencodian-mcp-overview-shell'),
+      css.indexOf('.opencodian-plugin-summary-list'),
+    );
+    const mcpCssWithoutBadges = mcpCss.replace(
+      /\.opencodian-mcp-badge[\s\S]*?\.opencodian-mcp-transport-badge/,
+      '',
+    );
+
+    expect(toolbarRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(toolbarRule).toContain('var(--opencodian-settings-radius-inline');
+    expect(overviewCardRule).toContain('var(--opencodian-settings-object-bg');
+    expect(overviewCardRule).toContain('var(--opencodian-settings-radius-row');
+    expect(overviewCardRule).toContain('box-shadow: none');
+    expect(serverCardRule).toContain('var(--opencodian-settings-object-bg');
+    expect(serverCardRule).toContain('var(--opencodian-settings-radius-row');
+    expect(serverCardRule).toContain('box-shadow: none');
+    expect(actionSettingRule).toContain('background: transparent');
+    expect(helperRule).toContain('var(--opencodian-settings-row-bg');
+    expect(emptyRule).toContain('var(--opencodian-settings-row-bg');
+    expect(detailsRule).toContain('var(--opencodian-settings-object-bg');
+    expect(formGroupRule).toContain('var(--opencodian-settings-object-bg');
+    expect(mcpCssWithoutBadges).not.toContain('linear-gradient');
+    expect(mcpCssWithoutBadges).not.toContain('backdrop-filter');
+    expect(mcpCssWithoutBadges).not.toContain('transform: translateY');
+    expect(mcpCssWithoutBadges).not.toMatch(/border-left:\s*[2-9]px/);
   });
 });

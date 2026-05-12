@@ -11372,10 +11372,11 @@ img.opencodian-model-provider-header-icon {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--background-primary) 72%, var(--background-secondary));
+  padding: 10px 12px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: var(--opencodian-settings-inline-bg);
+  box-shadow: none;
 }
 
 .opencodian-mcp-overview-toolbar-copy {
@@ -11444,10 +11445,11 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-mcp-overview-card {
-  padding: 14px 14px 12px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--background-primary) 78%, var(--background-secondary));
+  padding: 12px;
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
 }
 
 .opencodian-mcp-overview-card-value {
@@ -11492,9 +11494,10 @@ img.opencodian-model-provider-header-icon {
 .opencodian-mcp-server-row,
 .opencodian-mcp-server-card {
   padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--background-primary) 78%, var(--background-secondary));
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
 }
 
 .opencodian-mcp-server-row-name,
@@ -11568,8 +11571,10 @@ img.opencodian-model-provider-header-icon {
 .opencodian-mcp-server-row-error,
 .opencodian-mcp-server-card-helper {
   margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
+  padding: 9px 10px;
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: var(--opencodian-settings-row-bg);
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.55;
@@ -11581,14 +11586,15 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-mcp-empty {
-  padding: 18px 14px;
-  border: 1px dashed color-mix(in srgb, var(--background-modifier-border-hover) 88%, transparent);
-  border-radius: 14px;
+  padding: 16px 14px;
+  border: 1px dashed var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.55;
   text-align: center;
-  background: color-mix(in srgb, var(--background-primary) 68%, var(--background-secondary));
+  background: var(--opencodian-settings-row-bg);
+  box-shadow: none;
 }
 
 .opencodian-mcp-badge {
@@ -11647,9 +11653,10 @@ img.opencodian-model-provider-header-icon {
 .opencodian-mcp-details-technical {
   margin-bottom: 14px;
   padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--background-primary) 76%, var(--background-secondary));
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
 }
 
 .opencodian-mcp-details-summary {
@@ -11681,15 +11688,16 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-mcp-form-group {
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--background-primary) 76%, var(--background-secondary));
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
   overflow: hidden;
 }
 
 .opencodian-mcp-form-group-title {
   padding: 14px 16px 12px;
-  background: color-mix(in srgb, var(--background-secondary) 76%, var(--background-primary));
+  background: var(--opencodian-settings-row-bg);
   color: var(--text-normal);
   font-size: 13px;
   font-weight: 700;

@@ -69,3 +69,14 @@
 - status badge 保留语义色，因为 provider / model availability 是决策关键状态。
 
 Guardrail: 不要在 `.opencodian-model-toggle-provider` / `.opencodian-model-toggle-model` 上重新引入 `linear-gradient`、`backdrop-filter`、hover `translateY` 或 black-tinted card shadow。
+
+## 2026-05-12 MCP/server density slice
+
+MCP management 现在遵守共享 settings hierarchy token：
+
+- management toolbar 使用 inline tokens，不再自成一张本地 toolbar 卡片。
+- overview metrics、server cards、details panels 和 editor form groups 使用 object tokens。
+- helper / error / empty rows 使用 row tokens。
+- MCP status badges 保留语义色，因为 runtime connection、auth、failure 和 disabled 状态会影响用户决策。
+
+Guardrail: 不要在 `.opencodian-mcp-*` 管理区重新引入 MCP-only card family，也不要使用渐变、decorative blur、hover lift、side-stripe border 或 shadowed nested cards。
