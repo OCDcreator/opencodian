@@ -6369,6 +6369,107 @@ img.opencodian-model-provider-header-icon {
 }
 
 
+/* components/settings-layout-contract.css */
+.opencodian-settings {
+  --opencodian-settings-section-bg:
+    color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
+  --opencodian-settings-section-border:
+    color-mix(in srgb, var(--background-modifier-border) 92%, transparent);
+  --opencodian-settings-row-bg:
+    color-mix(in srgb, var(--background-primary) 86%, var(--background-secondary));
+  --opencodian-settings-row-border:
+    color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
+  --opencodian-settings-object-bg:
+    color-mix(in srgb, var(--background-primary) 78%, var(--background-secondary));
+  --opencodian-settings-object-border:
+    color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
+  --opencodian-settings-inline-bg:
+    color-mix(in srgb, var(--background-secondary-alt, var(--background-secondary)) 72%, transparent);
+  --opencodian-settings-inline-border:
+    color-mix(in srgb, var(--background-modifier-border) 64%, transparent);
+  --opencodian-settings-radius-section: 12px;
+  --opencodian-settings-radius-row: 10px;
+  --opencodian-settings-radius-inline: 6px;
+  --opencodian-settings-space-xs: 4px;
+  --opencodian-settings-space-sm: 6px;
+  --opencodian-settings-space-md: 8px;
+  --opencodian-settings-space-lg: 12px;
+  --opencodian-settings-space-xl: 16px;
+  --opencodian-settings-space-2xl: 24px;
+}
+
+.opencodian-settings .opencodian-settings-content-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg);
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-settings-content-shell[data-primary-tab] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-settings-section,
+.opencodian-settings .opencodian-settings-block.opencodian-settings-section {
+  border: 1px solid var(--opencodian-settings-section-border);
+  border-radius: var(--opencodian-settings-radius-section);
+  background: var(--opencodian-settings-section-bg);
+}
+
+.opencodian-settings .opencodian-settings-section > .opencodian-settings-block-body,
+.opencodian-settings .opencodian-settings-section .opencodian-settings-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
+}
+
+.opencodian-settings .opencodian-settings-section .setting-item {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-row-bg);
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-settings-section .setting-item + .setting-item {
+  margin-top: 0;
+}
+
+.opencodian-settings .opencodian-settings-section .setting-item-info {
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-settings-section .setting-item-name {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-settings-section .setting-item-description {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.opencodian-settings .opencodian-settings-section .setting-item-control {
+  gap: var(--opencodian-settings-space-md);
+}
+
+@media (max-width: 720px) {
+  .opencodian-settings .opencodian-settings-section .setting-item {
+    align-items: stretch;
+  }
+
+  .opencodian-settings .opencodian-settings-section .setting-item-control {
+    justify-content: flex-start;
+  }
+}
+
+
 /* features/chat-user.css */
 /* ============================================================
    User Message - Push-Up Sticky Header

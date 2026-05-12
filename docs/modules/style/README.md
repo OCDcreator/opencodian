@@ -28,7 +28,8 @@ src/style/
 │   ├── config-status.css                 # 配置状态提示样式
 │   ├── navigation-sidebar.css            # 侧边栏导航样式
 │   ├── effort-selector.css               # “努力程度”调节器样式
-│   └── settings-dropdown.css             # 设置界面跨平台自绘下拉样式
+│   ├── settings-dropdown.css             # 设置界面跨平台自绘下拉样式
+│   └── settings-layout-contract.css      # 设置界面布局契约与共享 surface token
 ├── modals/                                 # 各种弹窗、设置项覆盖面板的样式
 │   ├── provider-icon-cache.css           # 图标缓存管理与内置图标选择弹窗样式
 │   ├── delete-confirm-dialog.css         # 删除确认弹窗样式
@@ -59,6 +60,7 @@ CSS 依赖加载顺序以确保后加载的样式能正确覆盖前方的样式�
 - **添加新样式**: 当您开发新的视图或组件时，请不要在现有文件里无脑追加。新建一个独立的 `.css` 文件存放到合适的子目录（如 `src/style/components/new-button.css`），并在 `src/style/index.css` 中添加 `@import 'components/new-button.css';`。
 - **命名规范**: 遵循已有的 `opencodian-` 前缀以防止与 Obsidian 或其他插件的 CSS 类冲突（例如 `.opencodian-icon-cache-modal`）。
 - **同步构建**: 修改了 `src/style/` 下的任何代码后，开发期仍需执行 `node scripts/build-css.mjs` 或 `npm run build:css` 以刷新根目录的 `styles.css`；生产构建 `npm run build` 会自动完成这一步。
+- **设置布局契约**: 设置界面的共享 surface、spacing、row-card、object-card 与 inline group token 归 `components/settings-layout-contract.css` 管理；不要在单个 section CSS 中重复发明普通设置卡片的背景、边框、圆角或间距。
 
 ## 注意事项
 
