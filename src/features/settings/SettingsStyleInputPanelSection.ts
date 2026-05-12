@@ -26,7 +26,6 @@ import {
   FONT_CATEGORY_ORDER,
   InputFontLoader,
   UNIFIED_FONT_OPTIONS,
-  type FontCategory,
 } from './InputFontRegistry';
 import type {
   NumericControlConfig,

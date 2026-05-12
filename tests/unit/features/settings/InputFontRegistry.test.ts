@@ -1,9 +1,9 @@
 import {
-  InputFontLoader,
-  UNIFIED_FONT_OPTIONS,
   findFontOptionById,
+  InputFontLoader,
   resolveComposerFontFamily,
   resolveFontCssFamily,
+  UNIFIED_FONT_OPTIONS,
 } from '../../../../src/features/settings/InputFontRegistry';
 
 describe('InputFontRegistry', () => {

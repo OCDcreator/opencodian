@@ -28,6 +28,9 @@ function createRendererState(options?: {
   const renderLanguageSetting = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'language-marker', text: 'language-setting' });
   });
+  const renderSettingsInEditorAreaSetting = jest.fn((containerEl: HTMLElement) => {
+    containerEl.createDiv({ cls: 'settings-editor-area-marker', text: 'settings-editor-area-setting' });
+  });
   const renderUserContent = jest.fn((containerEl: HTMLElement, secondaryTabId: string) => {
     containerEl.createDiv({ cls: 'user-marker', text: secondaryTabId });
   });
@@ -61,6 +64,7 @@ function createRendererState(options?: {
     renderUserContent,
     renderLayoutModeSetting,
     renderLanguageSetting,
+    renderSettingsInEditorAreaSetting,
   });
 
   return {
@@ -69,6 +73,7 @@ function createRendererState(options?: {
     requestDisplayRefresh,
     renderLayoutModeSetting,
     renderLanguageSetting,
+    renderSettingsInEditorAreaSetting,
     renderUserContent,
   };
 }
@@ -84,7 +89,8 @@ describe('SettingsTabbedRenderer', () => {
   });
 
   it('renders the general primary tab as one merged panel without secondary tabs', () => {
-    const { renderer, renderLayoutModeSetting, renderLanguageSetting } = createRendererState();
+    const { renderer, renderLayoutModeSetting, renderLanguageSetting, renderSettingsInEditorAreaSetting } =
+      createRendererState();
     const containerEl = document.createElement('div');
 
     renderer.renderDisplay(containerEl);
@@ -101,9 +107,13 @@ describe('SettingsTabbedRenderer', () => {
     ).toEqual([]);
     expect(renderLayoutModeSetting).toHaveBeenCalledTimes(1);
     expect(renderLanguageSetting).toHaveBeenCalledTimes(1);
+    expect(renderSettingsInEditorAreaSetting).toHaveBeenCalledTimes(1);
     expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
     expect(containerEl.querySelector('.layout-mode-marker')?.textContent).toBe('layout-mode-setting');
     expect(containerEl.querySelector('.language-marker')?.textContent).toBe('language-setting');
+    expect(containerEl.querySelector('.settings-editor-area-marker')?.textContent).toBe(
+      'settings-editor-area-setting',
+    );
     expect(containerEl.querySelectorAll('.opencodian-settings-block')).toHaveLength(1);
     expect(containerEl.querySelector('.opencodian-settings-general-merged-block')).not.toBeNull();
   });
