@@ -17,6 +17,19 @@
 - `.opencodian-settings-section .setting-item`：普通设置项的轻量 row-card 样式，和 object-card 等更重实体 surface 区分。
 - `.opencodian-theme-style-card` / `.opencodian-style-input-lock-note` / `.opencodian-debug-help-item`：在本轮只映射到 object token weight，不把样式设置、debug help 等复杂区域完整迁移成统一 object-card。
 
+## Mode-Aware Hierarchy Taxonomy
+
+设置界面的视觉层级必须先判断当前 layout mode，再选择 token weight。Tabbed mode 和 classic mode 都是一等公民，但它们获得层级的方式不同：tabbed mode 已经有 primary / secondary tabs 帮用户拆分上下文，classic mode 则会把多个子区域连续铺在同一滚动流里，因此需要更明确的轻量父子层级。
+
+- **Navigation shell**：quick nav、primary tabs、secondary tabs。使用 nav / inline tokens，只表达导航、active、hover、focus 状态，不承担内容卡片视觉。
+- **Primary section**：`.opencodian-settings-section`。使用 section tokens，是 classic 与 tabbed 共享的最强内容 surface。
+- **Classic child panel**：classic section 内部的子区域，当一个大 section 包含多个独立子块时使用。使用 object tokens，无 shadow、无 gradient、无 decorative blur。Tabbed mode 默认不使用 classic child panel，因为 secondary tabs 已经承担分层。
+- **Object surface**：provider、server、formatter、editor group、plugin source item 等有实体含义的对象。使用 object tokens。
+- **Row surface**：ordinary setting rows、catalog rows、helper rows、tables、nested editable rows。使用 row tokens。
+- **Inline surface**：paths、compact key/value rows、toolbars、filters、button bars。使用 inline tokens 或透明背景。
+
+Rule: never apply one hierarchy rule globally across both layout modes. In classic mode, visible grouping may be needed for scanability. In tabbed mode, extra panels can become nested-card noise.
+
 ## Visible Unification Slice
 
 本轮可见统一只处理 settings layout 的第一层观感：

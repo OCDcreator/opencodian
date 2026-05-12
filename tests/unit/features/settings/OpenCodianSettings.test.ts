@@ -712,6 +712,33 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(legacyCss).not.toMatch(/\.opencodian-settings-tab-panel\s*\{[^}]*box-shadow:/);
     expect(legacyCss).not.toMatch(/\.opencodian-style-section\s*\{[^}]*border-left:\s*[2-9]px/);
   });
+
+  it('documents mode-aware settings hierarchy rules after the regression audit', () => {
+    const contractDoc = readFileSync(
+      join(process.cwd(), 'docs/modules/style/components/settings-layout-contract.md'),
+      'utf8',
+    );
+    const modalDoc = readFileSync(
+      join(process.cwd(), 'docs/modules/style/modals/config-editor-modal.md'),
+      'utf8',
+    );
+    const modalCss = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    expect(contractDoc).toContain('Mode-Aware Hierarchy Taxonomy');
+    expect(contractDoc).toContain('classic child panel');
+    expect(contractDoc).toContain('tabbed mode');
+    expect(contractDoc).toContain('classic mode');
+    expect(contractDoc).toContain('row tokens');
+    expect(contractDoc).toContain('inline tokens');
+    expect(modalDoc).toContain('classic hierarchy repair');
+    expect(modalCss).toMatch(/data-settings-layout-mode="classic"[\s\S]*\.opencodian-plugin-block/);
+    expect(modalCss).toMatch(
+      /\.opencodian-settings-catalog-scroll > \.setting-item\s*\{[\s\S]*var\(--opencodian-settings-row-bg/,
+    );
+  });
 });
 
 describe('OpenCodianSettingTab title styling', () => {
