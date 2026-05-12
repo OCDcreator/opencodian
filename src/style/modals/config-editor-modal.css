@@ -1770,7 +1770,7 @@
 
 .opencodian-settings[data-settings-layout-mode="classic"] .opencodian-plugin-block {
   margin: var(--opencodian-settings-space-lg) 0 var(--opencodian-settings-space-xl);
-  padding: 12px;
+  padding: 14px;
   border: 1px solid var(--opencodian-settings-object-border);
   border-radius: var(--opencodian-settings-radius-row);
   background: var(--opencodian-settings-object-bg);
@@ -1779,10 +1779,19 @@
 
 .opencodian-settings[data-settings-layout-mode="classic"] .opencodian-plugin-block > .opencodian-settings-subsection-heading {
   padding: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-normal);
 }
 
 .opencodian-settings[data-settings-layout-mode="classic"] .opencodian-plugin-block-body {
-  padding-top: var(--opencodian-settings-space-md);
+  margin-top: var(--opencodian-settings-space-lg);
+  padding-top: var(--opencodian-settings-space-lg);
+  border-top: 1px solid color-mix(in srgb, var(--opencodian-settings-object-border) 78%, transparent);
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-settings-catalog-scroll > .setting-item + .setting-item {
+  margin-top: var(--opencodian-settings-space-md);
 }
 
 .opencodian-settings-catalog-scroll,

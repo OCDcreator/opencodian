@@ -462,6 +462,18 @@ describe('Settings plugin/catalog CSS contract', () => {
       '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-plugin-block',
       'background:',
     );
+    const classicHeadingRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-plugin-block > \\.opencodian-settings-subsection-heading',
+      'font-size:',
+    );
+    const classicBodyRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-plugin-block-body',
+      'border-top:',
+    );
+    const classicCatalogSiblingRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-catalog-scroll > \\.setting-item \\+ \\.setting-item',
+      'margin-top:',
+    );
     const agentGroupRule = findRule('\\.opencodian-agent-editor-group', 'background:');
     const summaryRule = findRule('\\.opencodian-plugin-summary-row', 'background:');
     const sourcePathRule = findRule('\\.opencodian-plugin-source-path', 'background:');
@@ -481,6 +493,11 @@ describe('Settings plugin/catalog CSS contract', () => {
     expect(classicBlockRule).toContain('var(--opencodian-settings-object-border');
     expect(classicBlockRule).toContain('var(--opencodian-settings-radius-row');
     expect(classicBlockRule).toContain('box-shadow: none');
+    expect(classicHeadingRule).toContain('font-size: 13px');
+    expect(classicHeadingRule).toContain('line-height: 1.35');
+    expect(classicBodyRule).toContain('var(--opencodian-settings-object-border');
+    expect(classicBodyRule).toContain('var(--opencodian-settings-space-lg');
+    expect(classicCatalogSiblingRule).toContain('var(--opencodian-settings-space-md');
     expect(bodyRule).toContain('var(--opencodian-settings-space-md');
     expect(catalogRowRule).toContain('var(--opencodian-settings-row-bg');
     expect(catalogRowRule).toContain('box-shadow: none');

@@ -110,3 +110,14 @@ Guardrail: 不要在 `.opencodian-plugin-block*`、`.opencodian-settings-catalog
 - tabbed mode 继续保持 `.opencodian-plugin-block` 无框，因为二级 tab 已经承担分层。
 - classic mode 下 `.opencodian-plugin-block` 使用 object tokens 作为轻量 section panel，帮助用户扫描多个子块。
 - catalog rows 仍使用 row tokens，避免回到旧的大卡片套小卡片。
+
+### 2026-05-13 classic catalog readability pass
+
+第七轮只增强 classic mode 下 catalog-like 子块的扫读层级，不改变 tabbed mode：
+
+- classic `.opencodian-plugin-block` padding 增至 14px，保留 object token 背景、边框、半径和 `box-shadow: none`。
+- classic 子块 heading 固定为 13px / 1.35 line-height，避免标题和父 section 标题抢层级。
+- classic `.opencodian-plugin-block-body` 增加 object-border token 的 1px top divider，并使用 `--opencodian-settings-space-lg` 作为标题区与内容区间距。
+- classic catalog rows 之间使用 `--opencodian-settings-space-md`，让大量 Agents / Commands / Plugin rows 不再挤成一团。
+
+Guardrail: 这次增强只允许 classic mode 获得更明确的 child panel rhythm。Tabbed mode 的 `.opencodian-plugin-block` 必须继续透明、无框、无 shadow。
