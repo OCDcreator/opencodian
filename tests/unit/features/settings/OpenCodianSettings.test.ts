@@ -597,6 +597,41 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(generalBlocks[0]?.querySelector('.language-setting')).not.toBeNull();
   });
 
+  it('keeps ordinary setting rows scoped under marked classic settings sections', () => {
+    const { tab } = createSettingsTab('classic');
+    const appendSettingRow = (containerEl: HTMLElement) => {
+      containerEl.createDiv({ cls: 'setting-item', text: 'setting row' });
+    };
+
+    Object.assign(tab as unknown as Record<string, unknown>, {
+      addServerSettings: jest.fn(),
+      addMcpSettings: jest.fn(),
+      addModelSettings: jest.fn(),
+      addConversationSettings: jest.fn(),
+      addAgentsSettings: jest.fn(),
+      addCommandsSettings: jest.fn(),
+      addFormatterSettings: jest.fn(),
+      addPluginSettings: jest.fn(),
+      addSecuritySettings: jest.fn(),
+      addUISettings: jest.fn(),
+      addStyleSettings: jest.fn(),
+      addDebugSettings: jest.fn(),
+      addUserSettings: jest.fn(),
+      renderLayoutModeSetting: jest.fn(appendSettingRow),
+      renderLanguageSetting: jest.fn(appendSettingRow),
+      renderSettingsInEditorAreaSetting: jest.fn(appendSettingRow),
+    });
+
+    tab.display();
+
+    const sectionEl = tab.containerEl.querySelector<HTMLElement>('.opencodian-settings-section');
+    expect(sectionEl).not.toBeNull();
+    expect(sectionEl?.querySelectorAll('.setting-item').length).toBeGreaterThan(0);
+    expect(
+      tab.containerEl.querySelector('.opencodian-settings-content-shell .opencodian-settings-tab-panel'),
+    ).toBeNull();
+  });
+
   it('places MCP between Commands and Formatter in classic quick-nav order', () => {
     const { tab } = createSettingsTab('classic');
     const appendHeading = (title: string) => (containerEl: HTMLElement) => {
