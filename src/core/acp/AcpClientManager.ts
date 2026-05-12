@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess,spawn } from 'node:child_process';
+
 import { createLogger } from '../../shared';
 import type { AcpAgentConfig, AcpConnectionState } from './types';
 
