@@ -34,7 +34,7 @@ export class SlashCommandMenuCoordinator {
 ## 关键行为
 
 - `refresh()` 通过 `getSlashCommandMenuQuery()` 读取 textarea 光标前的 slash query 与 `isMidText` 位置标记；query 消失时关闭菜单
-- 首次打开菜单时通过 host 拉取 shared catalog，后续同一 session 使用 `slashCommandMenuFilter.ts` 本地过滤
+- 每次刷新 slash query 时都通过 host 拉取 shared catalog，再使用 `slashCommandMenuFilter.ts` 本地过滤；host 背后仍是 `SlashCommandMenuCatalogCache`，所以重复输入通常命中 view 层缓存，但 settings 隐藏命令 / 切换 skill 模式触发的 cache invalidation 不会被 composer 层旧数组挡住
 - direct mode 在句首展示 command + skill；`skills-command` mode 在句首展示 command + `/skills` 顶层入口，并在 `/skills <query>` 下展示 nested skill items；句中 slash 会把 `isMidText` 传给 filter，使弹框只保留 skill candidates，同时 suppress hint 文案（避免与 mid-text skill 用法产生误导）
 - `tryHandleKeydown()` 拦截 `ArrowUp` / `ArrowDown` / `Enter` / `Tab` / `Escape`，并保持 selected item scroll into view
 - `applySelectedItem()` 使用 `replaceSlashTokenAtCursor()` 做局部替换，保留 slash token 前后的正文；如果选中的是顶层 `/skills` 入口，会立即刷新为 nested skill 候选而不是关闭菜单
@@ -45,4 +45,4 @@ export class SlashCommandMenuCoordinator {
 - 不创建 composer DOM，也不直接拥有 textarea / menu element；DOM refs 由 `ComposerInputShellCoordinator` 提供
 - 不处理 `@agent` query；agent mention 状态仍由 `AgentMentionComposerController` 拥有
 - 不执行 slash command；真正执行仍属于 send pipeline 和 `SlashCommandExecutionService`
-- 不持久化 catalog；catalog cache 仍由 `SlashCommandMenuCatalogCache` 和 view host seam 提供
+- 不持久化 catalog；composer 层只保存最近一次成功加载的 items 供高亮使用，刷新时仍以 view host seam 返回的 `SlashCommandMenuCatalogCache` 结果为准

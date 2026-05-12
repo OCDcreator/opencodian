@@ -20,7 +20,7 @@ interface TextAreaRecord { control: MockTextAreaControl; name: string; onChange?
 interface ButtonRecord { control: MockButtonControl; label?: string; name: string; onClick?: () => void | Promise<void>; }
 interface SettingDescriptionRecord { desc: string; name: string; }
 
-type AgentsSectionPlugin = Pick<OpenCodianPlugin, 'app' | 'openCodeService' | 'opencodeConfigManager'>;
+type AgentsSectionPlugin = Pick<OpenCodianPlugin, 'app' | 'openCodeService' | 'opencodeConfigManager' | 'saveSettings'>;
 
 interface MockVaultAdapter {
   exists: jest.MockedFunction<(path: string) => Promise<boolean>>;
@@ -204,6 +204,7 @@ function createPlugin(options: {
       upsertAgentConfig: jest.fn().mockResolvedValue(undefined),
       removeAgentConfig: jest.fn().mockResolvedValue(undefined),
     },
+    saveSettings: jest.fn().mockResolvedValue(undefined),
   } as unknown as AgentsSectionPlugin;
 }
 
@@ -477,6 +478,30 @@ describe('SettingsAgentsSection catalog shell', () => {
     await flushAsync();
 
     expect(restoredPlugin.opencodeConfigManager?.removeAgentConfig).toHaveBeenCalledWith('plan');
+  });
+
+  it('invalidates chat agent autocomplete after subagent visibility changes through the settings runtime', async () => {
+    const plugin = createPlugin({
+      runtimeAgents: [
+        createRuntimeAgent({
+          name: 'plan',
+          mode: 'subagent',
+        }),
+      ],
+    });
+
+    createSection(plugin);
+    await flushAsync();
+
+    await findToggle('plan')?.onChange?.(false);
+    await flushAsync();
+
+    expect(plugin.saveSettings).toHaveBeenCalledWith({
+      syncService: false,
+      reloadModels: false,
+      syncConfig: false,
+      applyUi: false,
+    });
   });
 
   it('wraps the catalog list in an internal scroll container', async () => {

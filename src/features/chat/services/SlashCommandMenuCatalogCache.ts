@@ -120,7 +120,7 @@ export async function loadAgentMentionCandidatesFromComposerCatalog(
     return host.loadAgentMentionCandidates();
   }
 
-  const items = cachedItems ?? await host.loadSlashCommandMenuItems();
+  const items = await host.loadSlashCommandMenuItems();
   setCachedItems(items);
   return loadAgentMentionCandidatesFromSlashCommandMenuItems(items);
 }
@@ -134,7 +134,7 @@ export async function loadAgentSelectionCandidatesFromComposerCatalog(
     return host.loadAgentSelectionCandidates();
   }
 
-  const items = cachedItems ?? await host.loadSlashCommandMenuItems();
+  const items = await host.loadSlashCommandMenuItems();
   setCachedItems(items);
   return loadAgentSelectionCandidatesFromSlashCommandMenuItems(items);
 }

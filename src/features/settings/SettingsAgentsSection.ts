@@ -400,6 +400,7 @@ export class SettingsAgentsSection {
             .setValue(!agent.hidden)
             .onChange(async (value) => {
               await this.updateAgentVisibility(agent.id, !value, projectAgents);
+              await this.invalidateAgentAutocompleteCatalog();
               await this.refreshCatalog({
                 catalogBodyEl,
                 configManager,
@@ -552,6 +553,7 @@ export class SettingsAgentsSection {
         return;
       }
       await originalUpsert(agentId, patch);
+      await this.invalidateAgentAutocompleteCatalog();
     };
     guarded.removeAgentConfig = async (agentId: string) => {
       const guardResult = this.getSystemAgentGuard().checkWriteAllowed(agentId);
@@ -560,8 +562,18 @@ export class SettingsAgentsSection {
         return;
       }
       await originalRemove(agentId);
+      await this.invalidateAgentAutocompleteCatalog();
     };
     return guarded;
+  }
+
+  private async invalidateAgentAutocompleteCatalog(): Promise<void> {
+    await this.plugin.saveSettings({
+      syncService: false,
+      reloadModels: false,
+      syncConfig: false,
+      applyUi: false,
+    });
   }
 
   private getMarkdownWorkspaceService(): MarkdownAgentWorkspaceService {

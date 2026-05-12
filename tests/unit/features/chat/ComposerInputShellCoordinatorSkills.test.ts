@@ -136,6 +136,34 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     expect(menuText[1]).toContain('skill');
   });
 
+  it('reloads direct slash candidates after the shared catalog is invalidated', async () => {
+    const fixture = createFixture();
+    fixture.setMenuItems([
+      slashItem('review', 'Review changes'),
+      slashItem('build-mcp-server', 'Build an MCP server', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/';
+    fixture.textarea.setSelectionRange(1, 1);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/review'),
+      expect.stringContaining('/build-mcp-server'),
+    ]);
+
+    fixture.setMenuItems([
+      slashItem('commit', 'Create commit'),
+    ]);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/commit'),
+    ]);
+  });
+
   it('opens skill-only slash autocomplete for a bare slash between surrounding spaces', async () => {
     const fixture = createFixture();
     fixture.setMenuItems([
@@ -213,6 +241,10 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
 
     expect(getRenderedHighlightText(fixture.container)).toEqual(['/writing-skills']);
   });
+});
+
+describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
+  registerSkillSlashModeHooks();
 
   it('uses a /skills prefix entry and nested skill suggestions when skill mode is prefixed', async () => {
     const fixture = createFixture();
@@ -257,6 +289,35 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     nestedItem?.click();
 
     expect(fixture.textarea.value).toBe('/skills build-mcp-server ');
+  });
+
+  it('reloads prefixed /skills candidates after the shared catalog is invalidated', async () => {
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([
+      slashItem('agent-browser', 'Use browser automation', 'skill'),
+      slashItem('frontend-design', 'Design a frontend', 'skill'),
+    ]);
+
+    fixture.textarea.value = '/skills ';
+    fixture.textarea.setSelectionRange('/skills '.length, '/skills '.length);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/skills agent-browser'),
+      expect.stringContaining('/skills frontend-design'),
+    ]);
+
+    fixture.setMenuItems([
+      slashItem('writing-skills', 'Use writing skills', 'skill'),
+    ]);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+
+    expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/skills writing-skills'),
+    ]);
   });
 
   it('opens nested skill suggestions for a later /skills token after earlier prefixed content', async () => {

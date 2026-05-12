@@ -99,7 +99,7 @@ export class SlashCommandMenuCoordinator {
     this.render();
 
     try {
-      const items = this.host.getCatalogItems() ?? await this.host.loadItems();
+      const items = await this.host.loadItems();
       if (currentRunId !== this.runId) {
         return;
       }

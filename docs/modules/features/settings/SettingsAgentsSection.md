@@ -73,6 +73,9 @@ owner 会并行读取：
 - 用户关闭可见性时会写入 `agent.<id>.hidden = true`
 - 用户重新开启可见性时，如果 project override 只剩 `hidden` 字段，则删除该 agent override
 - 用户重新开启可见性时，如果 project override 还有其他字段，则删除 `hidden` 后通过 `upsertAgentConfig()` 保留其余配置
+- 可见性写回成功后会通过 `plugin.saveSettings({ syncService: false, reloadModels: false, syncConfig: false, applyUi: false })` 复用既有 settings runtime 的 slash / `@agent` catalog 失效路径，让聊天输入框共享 catalog 立即丢弃旧的 `@` 候选，而不是等待 slash catalog 的 TTL 过期
+
+项目 agent 编辑器的 `upsertAgentConfig()` / `removeAgentConfig()` 也会走同一失效路径，因为 `mode`、`hidden`、`description` 等字段都会影响聊天输入框里的 agent mention 候选。
 
 这条路径只对 `mode: 'subagent'` 且未 `disable` 的条目开放，因为 OpenCode 的 `hidden` 语义主要用于子代理 `@` 菜单可见性。
 
@@ -117,6 +120,7 @@ owner 现在在同一分区内提供一个 project agent editor：
 | `dispose()` | 递增 refresh run id，防止旧异步加载结果回写已重建的设置页 |
 | `renderMarkdownWorkspaceBlock()` | 渲染 Markdown file workspace rows 以及 create/edit/delete actions |
 | `createGuardedConfigManager()` | 用 expert-mode gate 包装 `upsertAgentConfig()` / `removeAgentConfig()` |
+| `invalidateAgentAutocompleteCatalog()` | 在 agent 可见性或 project override 写入后复用 settings runtime 通知聊天视图刷新共享 slash / `@agent` catalog |
 
 ## 与其他模块的交互
 
@@ -126,6 +130,7 @@ owner 现在在同一分区内提供一个 project agent editor：
 - `MarkdownAgentWorkspaceService`: 负责 Markdown file scan / create / update / delete
 - `SystemAgentGuardService`: 提供 system-agent risk kind 与 expert-mode write guard
 - `OpencodeConfigManager`: 读取 / 写回 project `agent`、legacy `mode` import、`default_agent`
+- `OpenCodianPlugin`: 提供 `saveSettings()`，本 owner 以关闭 service/model/config/UI 同步的方式复用 settings runtime 的候选缓存失效广播
 - `SettingsProjectAgentEditor.ts`: 负责 project agent 核心字段表单、保存 / 删除 action 与 notice
 - `projectAgentEditorConfig.ts`: 为 project agent editor 提供字段归一化与 delete-aware patch helper
 - `core/types/opencodeConfig.ts`: 提供 `OpencodeAgentConfig` / `OpencodeAgentMode` 类型

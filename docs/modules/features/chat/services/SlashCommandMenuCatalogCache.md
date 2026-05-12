@@ -14,7 +14,7 @@ project-only command 仍会参与 merge 以提供 override/source 信息，但�
 - `load()` 返回当前 hidden-command key 下的缓存结果；缓存仍新鲜时不再触发 runtime 请求。
 - 缓存 TTL 目前是 `120s`；如果没有主动失效，超时前重复打开 `/` 会继续复用同一份 merged catalog。
 - 如果后台预热仍在进行，用户触发的 `load()` 会复用同一个 pending promise，不会再发第二次 `sdk.command.list()`。
-- `load()` 返回的 slash item array 会携带不可枚举的 agent-candidate promise；`ComposerInputShellCoordinator` 在 `@agent` 查询时通过 `loadAgentMentionCandidatesFromSlashCommandMenuItems()` 读取 subagent 候选，在主 Agent 下拉框打开时通过 `loadAgentSelectionCandidatesFromSlashCommandMenuItems()` 读取 default-eligible 候选，而不是要求 `OpenCodianView` 新增单独 runtime agent seam。
+- `load()` 返回的 slash item array 会携带不可枚举的 agent-candidate promise；`ComposerInputShellCoordinator` 在 `@agent` 查询时会重新调用 host `loadSlashCommandMenuItems()` 并通过 `loadAgentMentionCandidatesFromSlashCommandMenuItems()` 读取 subagent 候选，在主 Agent 下拉框打开时也会重新读取 shared catalog sidecar。这样 composer 自己的上次 items 不会绕过 view 层 cache invalidation，同时仍不要求 `OpenCodianView` 新增单独 runtime agent seam。
 - hidden command 列表会进入 cache key；设置里隐藏/显示命令后，下一次加载会重新合并 catalog。
 - `runtimeAvailable: false` 的 project-only command 不会进入最终 menu items；它们只保留在 settings/catalog 层。
 - runtime `source === 'skill'` 会进入缓存；后续由 `slashCommandMenuFilter.ts` 按 `slashCommandSkillMode` 决定直显或 `/skills` 前缀。
@@ -36,6 +36,6 @@ project-only command 仍会参与 merge 以提供 override/source 信息，但�
 
 ## 注意事项
 
-- 不要在输入每个字符时绕过 cache 直接调用 `sdk.command.list()`；这会重新引入首次 slash menu 长时间 loading。
+- 不要在输入每个字符时绕过 view 层 cache 直接调用 `sdk.command.list()`；composer 可以重新请求 host catalog，但 host 必须继续走本 cache，让 hidden command key、TTL、pending promise 和 warm preload 语义保持集中。
 - 不要把 `@agent` 候选回退成纯文本解析；composer 只使用 selected mention 形成 `SurfaceInvocationIntent.mentions`，主 Agent 下拉框只形成 `SurfaceInvocationIntent.primaryAgent`。
 - 如果后续 project command editor 需要即时刷新 chat menu，可调用 view 侧的 cache invalidation seam，而不是复制 catalog 合并逻辑。
