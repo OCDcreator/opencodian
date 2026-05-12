@@ -1810,6 +1810,7 @@
   padding: 14px 16px 16px;
 }
 
+.opencodian-settings-catalog-scroll,
 .opencodian-agent-catalog-scroll {
   max-height: min(460px, 52vh);
   overflow-y: auto;

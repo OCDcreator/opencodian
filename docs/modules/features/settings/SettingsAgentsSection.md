@@ -81,9 +81,10 @@ owner 会并行读取：
 
 ### agent catalog shell height
 
-- agent 目录 block body 现在额外挂 `opencodian-agent-catalog-scroll`
+- agent 目录 block body 现在额外挂 `opencodian-settings-catalog-scroll` / `opencodian-agent-catalog-scroll`
 - 目录区使用最大高度 + 内部滚动，避免大量代理把整个 settings 页拉得过长
-- 这一层只负责 catalog 可滚动外壳，不改变 runtime/project agent merge 语义
+- catalog 局部刷新会先捕获目录 body 的 `scrollTop`，重建 DOM 后在下一帧恢复，避免用户切换 subagent 可见性时目录子页跳回顶部
+- 这一层只负责 catalog 可滚动外壳和滚动位置稳定，不改变 runtime/project agent merge 语义
 
 ### 项目 agent 核心字段编辑器 / disable / task allowlist 写回
 

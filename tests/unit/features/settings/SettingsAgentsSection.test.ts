@@ -350,6 +350,10 @@ beforeEach(() => {
     callback(record.control);
     return this;
   });
+  jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
 });
 
 afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
@@ -519,6 +523,27 @@ describe('SettingsAgentsSection catalog shell', () => {
 
     const scrollEl = containerEl.querySelector('.opencodian-agent-catalog-scroll');
     expect(scrollEl).not.toBeNull();
+  });
+
+  it('keeps the agent catalog scroll position when visibility toggles refresh the list', async () => {
+    const plugin = createPlugin({
+      runtimeAgents: [
+        createRuntimeAgent({ name: 'plan', mode: 'subagent' }),
+        createRuntimeAgent({ name: 'review', mode: 'subagent' }),
+      ],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    const catalogScrollEl = containerEl.querySelector<HTMLElement>('.opencodian-agent-catalog-scroll');
+    expect(catalogScrollEl).not.toBeNull();
+    catalogScrollEl!.scrollTop = 220;
+
+    await findToggle('plan')?.onChange?.(false);
+    await flushAsync();
+
+    expect(catalogScrollEl?.scrollTop).toBe(220);
   });
 
   it('shows system-agent and markdown source labels in the catalog', async () => {

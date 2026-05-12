@@ -171,7 +171,9 @@ export class SettingsCommandsSection {
       cls: 'opencodian-plugin-block-desc',
       text: t('settings.commands.editor.desc'),
     });
-    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
+    return blockEl.createDiv({
+      cls: 'opencodian-plugin-block-body opencodian-settings-catalog-scroll opencodian-command-catalog-scroll',
+    });
   }
 
   private createCatalogBlock(containerEl: HTMLElement): HTMLElement {
@@ -264,40 +266,64 @@ export class SettingsCommandsSection {
       skillMode: this.getSkillMode(),
     });
 
-    catalogBodyEl.replaceChildren();
+    this.renderWithPreservedScroll(catalogBodyEl, () => {
+      catalogBodyEl.replaceChildren();
 
-    if (mergedCommands.length === 0) {
-      catalogBodyEl.createDiv({ text: t('settings.commands.catalog.empty') });
-      return;
-    }
+      if (mergedCommands.length === 0) {
+        catalogBodyEl.createDiv({ text: t('settings.commands.catalog.empty') });
+        return;
+      }
 
-    for (const command of mergedCommands) {
-      const setting = new Setting(catalogBodyEl)
-        .setName(this.buildCommandSettingName(command))
-        .setDesc(this.buildCommandDescription(command));
+      for (const command of mergedCommands) {
+        const setting = new Setting(catalogBodyEl)
+          .setName(this.buildCommandSettingName(command))
+          .setDesc(this.buildCommandDescription(command));
 
-      setting.addToggle((toggle) => {
-        toggle
-          .setValue(!command.hidden)
-          .onChange(async (value) => {
-            await this.updateCommandVisibility(command.id, value);
-            await this.refreshCatalog({
-              catalogBodyEl,
-              configManager,
-              currentRunId,
-              editorBodyEl,
+        setting.addToggle((toggle) => {
+          toggle
+            .setValue(!command.hidden)
+            .onChange(async (value) => {
+              await this.updateCommandVisibility(command.id, value);
+              await this.refreshCatalog({
+                catalogBodyEl,
+                configManager,
+                currentRunId,
+                editorBodyEl,
+              });
             });
-          });
-      });
-    }
+        });
+      }
+    });
   }
 
   private renderCatalogLoadFailure(catalogBodyEl: HTMLElement, error: unknown): void {
-    catalogBodyEl.replaceChildren();
-    const message = error instanceof Error ? error.message : String(error);
-    new Setting(catalogBodyEl)
-      .setName(t('settings.commands.loadFailed.name'))
-      .setDesc(t('settings.commands.loadFailed.desc', { message }));
+    this.renderWithPreservedScroll(catalogBodyEl, () => {
+      catalogBodyEl.replaceChildren();
+      const message = error instanceof Error ? error.message : String(error);
+      new Setting(catalogBodyEl)
+        .setName(t('settings.commands.loadFailed.name'))
+        .setDesc(t('settings.commands.loadFailed.desc', { message }));
+    });
+  }
+
+  private renderWithPreservedScroll(containerEl: HTMLElement, render: () => void): void {
+    const previousScrollTop = containerEl.scrollTop;
+    render();
+    this.restoreScrollTopAfterRender(containerEl, previousScrollTop);
+  }
+
+  private restoreScrollTopAfterRender(containerEl: HTMLElement, scrollTop: number): void {
+    if (scrollTop <= 0) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (!containerEl.isConnected) {
+        return;
+      }
+
+      containerEl.scrollTop = scrollTop;
+    });
   }
 
   private buildCommandDescription(command: SlashCommandCatalogEntry): string {

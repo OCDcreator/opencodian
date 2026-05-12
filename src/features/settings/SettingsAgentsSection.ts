@@ -195,7 +195,9 @@ export class SettingsAgentsSection {
       cls: 'opencodian-plugin-block-desc',
       text: t('settings.agents.catalog.desc'),
     });
-    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body opencodian-agent-catalog-scroll' });
+    return blockEl.createDiv({
+      cls: 'opencodian-plugin-block-body opencodian-settings-catalog-scroll opencodian-agent-catalog-scroll',
+    });
   }
 
   private createProjectAgentEditorBlock(containerEl: HTMLElement): HTMLElement {
@@ -382,45 +384,69 @@ export class SettingsAgentsSection {
       workspaceBodyEl,
     } = context;
 
-    catalogBodyEl.replaceChildren();
+    this.renderWithPreservedScroll(catalogBodyEl, () => {
+      catalogBodyEl.replaceChildren();
 
-    if (mergedAgents.length === 0) {
-      catalogBodyEl.createDiv({ text: t('settings.agents.catalog.empty') });
-      return;
-    }
-
-    for (const agent of mergedAgents) {
-      const setting = new Setting(catalogBodyEl)
-        .setName(agent.id)
-        .setDesc(this.buildAgentDescription(agent));
-
-      if (agent.mode === 'subagent' && !agent.disabled) {
-        setting.addToggle((toggle) => {
-          toggle
-            .setValue(!agent.hidden)
-            .onChange(async (value) => {
-              await this.updateAgentVisibility(agent.id, !value, projectAgents);
-              await this.invalidateAgentAutocompleteCatalog();
-              await this.refreshCatalog({
-                catalogBodyEl,
-                configManager,
-                currentRunId,
-                defaultAgentDropdown,
-                editorBodyEl,
-                workspaceBodyEl,
-              });
-            });
-        });
+      if (mergedAgents.length === 0) {
+        catalogBodyEl.createDiv({ text: t('settings.agents.catalog.empty') });
+        return;
       }
-    }
+
+      for (const agent of mergedAgents) {
+        const setting = new Setting(catalogBodyEl)
+          .setName(agent.id)
+          .setDesc(this.buildAgentDescription(agent));
+
+        if (agent.mode === 'subagent' && !agent.disabled) {
+          setting.addToggle((toggle) => {
+            toggle
+              .setValue(!agent.hidden)
+              .onChange(async (value) => {
+                await this.updateAgentVisibility(agent.id, !value, projectAgents);
+                await this.invalidateAgentAutocompleteCatalog();
+                await this.refreshCatalog({
+                  catalogBodyEl,
+                  configManager,
+                  currentRunId,
+                  defaultAgentDropdown,
+                  editorBodyEl,
+                  workspaceBodyEl,
+                });
+              });
+          });
+        }
+      }
+    });
   }
 
   private renderCatalogLoadFailure(catalogBodyEl: HTMLElement, error: unknown): void {
-    catalogBodyEl.replaceChildren();
-    const message = error instanceof Error ? error.message : String(error);
-    new Setting(catalogBodyEl)
-      .setName(t('settings.agents.loadFailed.name'))
-      .setDesc(t('settings.agents.loadFailed.desc', { message }));
+    this.renderWithPreservedScroll(catalogBodyEl, () => {
+      catalogBodyEl.replaceChildren();
+      const message = error instanceof Error ? error.message : String(error);
+      new Setting(catalogBodyEl)
+        .setName(t('settings.agents.loadFailed.name'))
+        .setDesc(t('settings.agents.loadFailed.desc', { message }));
+    });
+  }
+
+  private renderWithPreservedScroll(containerEl: HTMLElement, render: () => void): void {
+    const previousScrollTop = containerEl.scrollTop;
+    render();
+    this.restoreScrollTopAfterRender(containerEl, previousScrollTop);
+  }
+
+  private restoreScrollTopAfterRender(containerEl: HTMLElement, scrollTop: number): void {
+    if (scrollTop <= 0) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (!containerEl.isConnected) {
+        return;
+      }
+
+      containerEl.scrollTop = scrollTop;
+    });
   }
 
   private buildAgentDescription(agent: SurfaceAgent): string {

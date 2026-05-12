@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 import { Setting } from 'obsidian';
 
@@ -342,6 +343,10 @@ beforeEach(() => {
     callback(record.control);
     return this;
   });
+  jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
 });
 
 afterEach(() => {
@@ -418,6 +423,27 @@ describe('SettingsCommandsSection catalog shell', () => {
     await flushAsync();
 
     expect(plugin.settings.hiddenSlashCommands).toEqual(['init']);
+  });
+
+  it('keeps the command catalog scroll position when visibility toggles refresh the list', async () => {
+    const plugin = createPlugin({
+      runtimeCommands: [
+        createRuntimeCommand({ name: 'init' }),
+        createRuntimeCommand({ name: 'review' }),
+      ],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    const catalogScrollEl = containerEl.querySelector<HTMLElement>('.opencodian-command-catalog-scroll');
+    expect(catalogScrollEl).not.toBeNull();
+    catalogScrollEl!.scrollTop = 180;
+
+    await findToggle('/init')?.onChange?.(false);
+    await flushAsync();
+
+    expect(catalogScrollEl?.scrollTop).toBe(180);
   });
 
   it('persists the slash command skill invocation mode from the commands settings', async () => {
