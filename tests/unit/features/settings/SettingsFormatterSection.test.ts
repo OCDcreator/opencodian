@@ -769,6 +769,22 @@ describe('SettingsFormatterSection CSS contract', () => {
       '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-builtin-row \\+ \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-custom-row \\+ \\.opencodian-formatter-custom-row',
       'margin-top:',
     );
+    const classicFormatterRowRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-custom-row',
+      'margin-left:',
+    );
+    const classicFormatterFirstRowRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-builtin-row:first-of-type,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-custom-row:first-of-type',
+      'margin-top:',
+    );
+    const classicFormatterSettingRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-builtin-row > \\.setting-item,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-custom-row > \\.setting-item',
+      'grid-template-columns:',
+    );
+    const classicFormatterControlRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-builtin-row > \\.setting-item \\.setting-item-control,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-custom-row > \\.setting-item \\.setting-item-control',
+      'width:',
+    );
     const formatterCss = css.slice(
       css.indexOf('.opencodian-formatter-summary-cards'),
       css.indexOf('.opencodian-plugin-summary-list'),
@@ -788,6 +804,10 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(classicSummaryGridRule).toContain('var(--opencodian-settings-object-border');
     expect(classicSummaryGridRule).toContain('var(--opencodian-settings-space-lg');
     expect(classicBuiltinSiblingRule).toContain('var(--opencodian-settings-space-md');
+    expect(classicFormatterRowRule).toContain('var(--opencodian-settings-space-lg');
+    expect(classicFormatterFirstRowRule).toContain('var(--opencodian-settings-space-lg');
+    expect(classicFormatterSettingRule).toContain('minmax(180px, 260px)');
+    expect(classicFormatterControlRule).toContain('260px');
     expect(formatterCss).not.toContain('linear-gradient');
     expect(formatterCss).not.toContain('backdrop-filter');
     expect(formatterCss).not.toContain('transform: translateY');

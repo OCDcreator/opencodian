@@ -11916,6 +11916,44 @@ img.opencodian-model-provider-header-icon {
   margin-top: var(--opencodian-settings-space-md);
 }
 
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-settings-block > .opencodian-formatter-builtin-row,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-settings-block > .opencodian-formatter-custom-row {
+  margin-right: var(--opencodian-settings-space-lg);
+  margin-left: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-settings-block > .opencodian-formatter-builtin-row:first-of-type,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-settings-block > .opencodian-formatter-custom-row:first-of-type {
+  margin-top: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-settings-block > .opencodian-formatter-builtin-row:last-of-type,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-settings-block > .opencodian-formatter-custom-row:last-of-type {
+  margin-bottom: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-builtin-row > .setting-item,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-custom-row > .setting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+  gap: var(--opencodian-settings-space-lg);
+  align-items: center;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-builtin-row > .setting-item .setting-item-control,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-custom-row > .setting-item .setting-item-control {
+  width: 260px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-builtin-row > .setting-item .setting-item-control select,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-builtin-row > .setting-item .opencodian-settings-dropdown-trigger,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-custom-row > .setting-item .setting-item-control select,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-custom-row > .setting-item .opencodian-settings-dropdown-trigger {
+  width: 100%;
+}
+
 .opencodian-formatter-builtin-row > .setting-item,
 .opencodian-formatter-custom-row > .setting-item {
   margin: 0;

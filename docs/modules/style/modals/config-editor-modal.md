@@ -131,5 +131,6 @@ Guardrail: 这次增强只允许 classic mode 获得更明确的 child panel rhy
 - classic `.opencodian-mcp-overview-shell` 使用 `--opencodian-settings-space-lg` 加强 overview 内部 rhythm；server list shell 增加 object-border token 的 top divider。
 - classic `.opencodian-mcp-server-list` 使用 `--opencodian-settings-space-md`，让 server cards 在平铺流里更容易分辨。
 - classic `.opencodian-formatter-summary-cards` 增加 top divider 与 `--opencodian-settings-space-lg` spacing；builtin / custom formatter rows 使用 `--opencodian-settings-space-md`。
+- classic `.opencodian-settings-block` 直接包含的 formatter builtin / custom rows 会获得左右 inset、首尾 spacing，并把内部 `Setting` 约束为 `1fr + 180-260px` 两列，避免“内置格式化器”标题下的行贴边、贴顶或右侧下拉过宽。
 
 Guardrail: MCP、Formatter、Model availability 的 classic 精修只能增加局部节奏和分隔，不应恢复 section 内的大卡片套大卡片、decorative blur、gradient、hover lift 或 heavy shadow。
