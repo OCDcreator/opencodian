@@ -1,4 +1,5 @@
-import { createLogger, isBuiltinToolName } from '../../shared';
+import { createLogger } from '../../shared';
+import { isBuiltinToolName } from '../../shared/toolIdentity';
 import type {
   McpServerSnapshot,
   McpServerStatus,
@@ -45,6 +46,19 @@ export class OpenCodeCatalogStateStore {
 
   hasCatalogUpdateListeners(): boolean {
     return this.catalogUpdateListeners.size > 0;
+  }
+
+  classifyToolIds(toolIds: string[]): { builtin: string[]; custom: string[] } {
+    const builtin: string[] = [];
+    const custom: string[] = [];
+    for (const id of toolIds) {
+      if (isBuiltinToolName(id)) {
+        builtin.push(id);
+      } else {
+        custom.push(id);
+      }
+    }
+    return { builtin, custom };
   }
 
   observeRuntimeToolNames(toolNames: Iterable<string>): boolean {

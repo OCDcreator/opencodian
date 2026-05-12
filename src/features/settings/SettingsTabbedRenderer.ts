@@ -10,6 +10,7 @@ import { setIcon, Setting } from 'obsidian';
 
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
@@ -26,6 +27,7 @@ import { SettingsModelSection } from './SettingsModelSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
+import { SettingsSkillSection } from './SettingsSkillSection';
 import { SettingsStyleSection } from './SettingsStyleSection';
 import { SettingsUiSection } from './SettingsUiSection';
 
@@ -216,6 +218,12 @@ export class SettingsTabbedRenderer {
       case 'user':
         this.renderUserContent(containerEl, secondaryTabId);
         break;
+      case 'skills':
+        this.renderSkillsContent(containerEl, secondaryTabId);
+        break;
+      case 'acp':
+        this.renderAcpContent(containerEl, secondaryTabId);
+        break;
     }
   }
 
@@ -383,5 +391,21 @@ export class SettingsTabbedRenderer {
 
   private renderUserContent(containerEl: HTMLElement, secondaryTabId: string): void {
     this.deps.renderUserContent(containerEl, secondaryTabId);
+  }
+
+  private renderSkillsContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const skillSection = new SettingsSkillSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    });
+    skillSection.attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private renderAcpContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const acpSection = new SettingsAcpSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    });
+    acpSection.attachTabbed(containerEl, secondaryTabId);
   }
 }

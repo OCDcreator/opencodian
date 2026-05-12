@@ -14,6 +14,7 @@ store 不负责 SDK 事件订阅本身；它只通过 host seam 告诉 `OpenCode
 ```text
 上游:
 - `../../shared`
+- `../../shared/toolIdentity`
 - `./types`
 
 下游:
@@ -45,6 +46,7 @@ listener 释放后也会再次触发 `syncOpenCodeEventSubscriptions()`，这样
 
 ### Tool catalog state
 
+- `classifyToolIds()` 复用 `shared/toolIdentity` 的 builtin 判定，把 tool ids 分成 builtin/custom 两组
 - `observeRuntimeToolNames()` 只记录非 builtin 的外部工具名，并返回“集合是否变化”
 - `updateRegistryToolIds()` 负责规范化 tool ids、更新时间并广播 snapshot
 - `updateToolSchemaCache()` 负责按 model scope 写入 schema cache、更新时间并广播 snapshot
@@ -62,6 +64,7 @@ listener 释放后也会再次触发 `syncOpenCodeEventSubscriptions()`，这样
 |-------------|------|
 | `subscribeToCatalogUpdates()` | 注册 capability snapshot listener，并同步 open-code event runtime wanted state |
 | `hasCatalogUpdateListeners()` | 给 `OpenCodeEventSubscriptionCoordinator` 判断是否还需要保留 SDK event streams |
+| `classifyToolIds()` | 按共享 tool identity 规则把 tool ids 分成 builtin/custom |
 | `observeRuntimeToolNames()` | 记录外部工具名并返回是否发生集合变化 |
 | `updateRegistryToolIds()` | 更新 registry tool ids 并广播 tool catalog snapshot |
 | `updateToolSchemaCache()` | 更新 model 级 tool schema cache 并广播 |
