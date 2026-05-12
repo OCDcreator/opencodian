@@ -371,4 +371,7 @@ export interface Conversation {
   externalContextPaths?: string[];
   sessionSettings?: ConversationSessionSettings;
   backgroundTaskMetadata?: ConversationBackgroundTaskMetadata;
+  transport?: 'opencode' | 'acp';
+  acpSessionId?: string;
+  acpAgentId?: string;
 }

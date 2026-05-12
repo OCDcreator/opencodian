@@ -183,6 +183,34 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'tags', labelKey: 'settings.user.tab.tags' },
     ],
   },
+  {
+    id: 'skills',
+    labelKey: 'settings.skills.title',
+    icon: 'brain',
+    defaultSecondaryTabId: 'catalog',
+    secondaryTabs: [
+      { id: 'catalog', labelKey: 'settings.skills.tab.catalog' },
+    ],
+  },
+  {
+    id: 'tools',
+    labelKey: 'settings.tools.title',
+    icon: 'wrench',
+    defaultSecondaryTabId: 'builtin',
+    secondaryTabs: [
+      { id: 'builtin', labelKey: 'settings.tools.tab.builtin' },
+      { id: 'custom', labelKey: 'settings.tools.tab.custom' },
+    ],
+  },
+  {
+    id: 'acp',
+    labelKey: 'settings.acp.title',
+    icon: 'radio-tower',
+    defaultSecondaryTabId: 'agents',
+    secondaryTabs: [
+      { id: 'agents', labelKey: 'settings.acp.tab.agents' },
+    ],
+  },
 ];
 
 const PRIMARY_TAB_MAP = new Map<string, SettingsPrimaryTabDefinition>();

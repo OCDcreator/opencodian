@@ -1671,6 +1671,16 @@ export function normalizePersistedTabState(state?: Partial<PersistedTabState> | 
   };
 }
 
+export interface AcpAgentConfig {
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  enabled: boolean;
+  cwd?: string;
+}
+
 /** Main settings interface */
 export interface OpenCodianSettings {
   // User preferences
@@ -1750,6 +1760,15 @@ export interface OpenCodianSettings {
 
   // OpenCode skill slash command invocation mode
   slashCommandSkillMode: SlashCommandSkillMode;
+
+  // Skill management (UI preferences only)
+  skillCatalogCacheTtl: number;
+
+  // Tool catalog (UI preferences only)
+  toolCatalogCacheTtl: number;
+
+  // ACP client (agent configs)
+  acpAgents: AcpAgentConfig[];
 }
 
 export type SettingsLayoutMode = 'classic' | 'tabbed';
@@ -1898,6 +1917,9 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   hiddenSlashCommands: [],
   slashCommandSkillMode: 'direct',
+  skillCatalogCacheTtl: 30000,
+  toolCatalogCacheTtl: 30000,
+  acpAgents: [],
 };
 
 export function normalizeQuestionCardSettings(
