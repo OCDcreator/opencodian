@@ -20,12 +20,12 @@ describe('AcpTransportOwner chunk translation', () => {
   it('translates tool_use chunk', () => {
     const chunk = translateAcpToolCall('bash', 'call-1', { command: 'ls' });
 
-    expect(chunk.type).toBe('tool_use');
-    if (chunk.type === 'tool_use') {
-      expect(chunk.id).toBe('call-1');
-      expect(chunk.name).toBe('bash');
-      expect(chunk.input).toEqual({ command: 'ls' });
-    }
+    expect(chunk).toEqual({
+      type: 'tool_use',
+      id: 'call-1',
+      name: 'bash',
+      input: { command: 'ls' },
+    });
   });
 
   it('translates tool_result chunk', () => {

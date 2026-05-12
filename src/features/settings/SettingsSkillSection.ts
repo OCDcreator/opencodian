@@ -4,11 +4,11 @@
 
 import { Notice, requestUrl, Setting } from 'obsidian';
 
-import type { SkillInfo, SkillSourceGroups } from '../chat/services/SkillCatalogService';
 import { getServerBaseUrl } from '../../core/types/settings';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import type { SkillInfo, SkillSourceGroups } from '../chat/services/SkillCatalogService';
 
 const logger = createLogger('SettingsSkillSection');
 

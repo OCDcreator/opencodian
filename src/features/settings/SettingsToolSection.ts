@@ -1,6 +1,7 @@
 import { Setting } from 'obsidian';
-import type { OpenCodianPlugin } from '../../main';
+
 import { t } from '../../i18n';
+import type { OpenCodianPlugin } from '../../main';
 import { getToolIdentity, isBuiltinToolName } from '../../shared/toolIdentity';
 
 type ToolPermissionAction = 'allow' | 'deny' | 'ask';
@@ -43,6 +44,7 @@ export class SettingsToolSection {
     const currentPermissions = await this.readCurrentPermissions();
 
     for (const [groupLabelKey, toolNames] of Object.entries(TOOL_GROUPS)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.containerEl.createEl('h3', { text: t(groupLabelKey as any) });
 
       for (const toolName of toolNames) {
