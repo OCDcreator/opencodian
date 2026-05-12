@@ -2715,10 +2715,10 @@ img.opencodian-model-provider-header-icon {
 }
 
 /* Settings in editor-area leaf */
-.workspace-leaf-content.opencodian-settings[data-type="opencodian-settings-view"] {
+.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings {
   padding: 12px 48px 32px !important;
 }
-.workspace-leaf-content.opencodian-settings.opencodian-settings--tabbed[data-type="opencodian-settings-view"] .opencodian-settings-panel-title {
+.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings.opencodian-settings--tabbed .opencodian-settings-panel-title {
   margin-left: 0 !important;
 }
 

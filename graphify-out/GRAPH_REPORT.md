@@ -1,7 +1,7 @@
 # Graph Report - /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/src  (2026-05-12)
 
 ## Corpus Check
-- 381 files · ~327,616 words
+- 381 files · ~327,621 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -298,7 +298,7 @@ Nodes (1): ContextFileCatalogEventBridge
 
 ### Community 44 - "Community 44"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
 ### Community 45 - "Community 45"
 Cohesion: 1.0
@@ -536,11 +536,11 @@ Nodes (0):
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 12`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 21`, `Community 22`, `Community 23`, `Community 24`, `Community 25`, `Community 28`, `Community 29`, `Community 30`, `Community 32`, `Community 33`, `Community 36`, `Community 39`, `Community 41`?**
-  _High betweenness centrality (0.344) - this node is a cross-community bridge._
+  _High betweenness centrality (0.365) - this node is a cross-community bridge._
 - **Why does `OpenCodianView` connect `Community 1` to `Community 0`, `Community 5`, `Community 6`, `Community 7`, `Community 10`, `Community 12`, `Community 13`, `Community 14`, `Community 16`, `Community 17`, `Community 18`, `Community 21`, `Community 23`, `Community 30`?**
-  _High betweenness centrality (0.076) - this node is a cross-community bridge._
+  _High betweenness centrality (0.077) - this node is a cross-community bridge._
 - **Why does `OpenCodeService` connect `Community 8` to `Community 0`, `Community 4`, `Community 6`, `Community 7`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 17`, `Community 22`, `Community 25`?**
-  _High betweenness centrality (0.063) - this node is a cross-community bridge._
+  _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **Are the 450 inferred relationships involving `t()` (e.g. with `.getEmptyConversationTitle()` and `.generateDefaultTitle()`) actually correct?**
   _`t()` has 450 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**

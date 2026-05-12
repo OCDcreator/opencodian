@@ -44,6 +44,7 @@ import { SettingsUserSection } from './SettingsUserSection';
 
 export class OpenCodianSettingsView extends ItemView {
   private readonly plugin: OpenCodianPlugin;
+  private readonly settingsRootEl: HTMLElement;
   private refreshModelsCallback?: () => void;
   private refreshTitleModelsCallback?: () => void;
   private refreshModelCatalogStatusCallback?: () => void;
@@ -70,11 +71,12 @@ export class OpenCodianSettingsView extends ItemView {
   constructor(leaf: import('obsidian').WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
     this.plugin = plugin;
+    this.settingsRootEl = this.contentEl;
 
     // Scroll coordinator that does NOT persist scroll position
     // (avoids collision with the standard settings tab's scroll state)
     this.sectionCoordinator = new SettingsSectionCoordinator({
-      containerEl: this.containerEl,
+      containerEl: this.settingsRootEl,
       getSavedScrollTop: () => 0,
       setSavedScrollTop: () => {},
       scheduleScrollStateSave: () => {},
@@ -129,7 +131,7 @@ export class OpenCodianSettingsView extends ItemView {
 
   /** Full re-render — mirrors OpenCodianSettingTab.display() */
   private renderSettings(): void {
-    const { containerEl } = this;
+    const containerEl = this.settingsRootEl;
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
     this.disposeSections();
