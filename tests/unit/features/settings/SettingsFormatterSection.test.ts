@@ -1,4 +1,7 @@
 /* eslint-disable max-lines */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { Setting } from 'obsidian';
 
 import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
@@ -728,5 +731,56 @@ describe('SettingsFormatterSection runtime failure does not block config editing
     const headings = containerEl.querySelectorAll('.opencodian-settings-subsection-heading');
     const headingTexts = Array.from(headings).map((h) => h.textContent);
     expect(headingTexts).toContain(t('settings.formatter.config.advanced.title'));
+  });
+});
+
+describe('SettingsFormatterSection CSS contract', () => {
+  it('keeps formatter settings surfaces aligned with the shared settings hierarchy contract', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    const findRule = (selector: string, required: string): string => (
+      Array.from(css.matchAll(new RegExp(`${selector}\\s*\\{[^}]*\\}`, 'g')))
+        .map((match) => match[0])
+        .find((rule) => rule.includes(required)) ?? ''
+    );
+
+    const summaryCardRule = findRule('\\.opencodian-formatter-summary-card', 'background:');
+    const runtimeListRule = findRule('\\.opencodian-formatter-runtime-list', 'background:');
+    const tableRule = findRule('\\.opencodian-formatter-table', 'background:');
+    const builtinRowRule = findRule(
+      '\\.opencodian-formatter-builtin-row,\\s*\\.opencodian-formatter-custom-row',
+      'background:',
+    );
+    const fieldsRule = findRule(
+      '\\.opencodian-formatter-override-fields,\\s*\\.opencodian-formatter-custom-fields',
+      'background:',
+    );
+    const envRowRule = findRule('\\.opencodian-formatter-env-row', 'background:');
+    const jsonEditorRule = findRule('\\.opencodian-formatter-json-editor', 'background:');
+    const buttonBarRule = findRule('\\.opencodian-formatter-json-buttons', 'background:');
+    const formatterCss = css.slice(
+      css.indexOf('.opencodian-formatter-summary-cards'),
+      css.indexOf('.opencodian-plugin-summary-list'),
+    );
+
+    expect(summaryCardRule).toContain('var(--opencodian-settings-object-bg');
+    expect(summaryCardRule).toContain('var(--opencodian-settings-radius-row');
+    expect(summaryCardRule).toContain('box-shadow: none');
+    expect(runtimeListRule).toContain('var(--opencodian-settings-object-bg');
+    expect(tableRule).toContain('var(--opencodian-settings-row-bg');
+    expect(builtinRowRule).toContain('var(--opencodian-settings-object-bg');
+    expect(builtinRowRule).toContain('box-shadow: none');
+    expect(fieldsRule).toContain('var(--opencodian-settings-row-bg');
+    expect(envRowRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(jsonEditorRule).toContain('var(--opencodian-settings-row-bg');
+    expect(buttonBarRule).toContain('background: transparent');
+    expect(formatterCss).not.toContain('linear-gradient');
+    expect(formatterCss).not.toContain('backdrop-filter');
+    expect(formatterCss).not.toContain('transform: translateY');
+    expect(formatterCss).not.toMatch(/border-left:\s*[2-9]px/);
+    expect(formatterCss).not.toMatch(/opencodian-settings-radius-(md|lg)/);
   });
 });

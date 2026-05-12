@@ -80,3 +80,14 @@ MCP management 现在遵守共享 settings hierarchy token：
 - MCP status badges 保留语义色，因为 runtime connection、auth、failure 和 disabled 状态会影响用户决策。
 
 Guardrail: 不要在 `.opencodian-mcp-*` 管理区重新引入 MCP-only card family，也不要使用渐变、decorative blur、hover lift、side-stripe border 或 shadowed nested cards。
+
+## 2026-05-12 Formatter density slice
+
+Formatter settings 现在使用共享 settings hierarchy token：
+
+- summary cards、runtime list、builtin rows 和 custom rows 使用 object tokens。
+- runtime table、override fields、custom fields 和 JSON editor 使用 row tokens。
+- environment key/value rows 使用 inline tokens。
+- enabled / disabled formatter badges 保留语义状态色。
+
+Guardrail: 不要引入 formatter-only card hierarchy、渐变、decorative blur、hover lift、side-stripe border 或未定义的 settings radius token。
