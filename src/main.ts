@@ -25,13 +25,11 @@ import {
   normalizeLobehubIconVariant,
   normalizeProviderIconColorMode,
   VIEW_TYPE_OPENCODIAN,
-  VIEW_TYPE_OPENCODIAN_SETTINGS,
 } from './core/types';
 import { prepareLoadedSettingsBootstrapState } from './core/types/settingsLoadNormalization';
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
-import { OpenCodianSettingsView } from './features/settings/OpenCodianSettingsView';
-import { registerSettingsView } from './features/settings/SettingsViewRegistrar';
+import { broadcastModelsLoadedToSettingsViews, broadcastServerStatusToSettingsViews, registerSettingsView } from './features/settings/SettingsViewRegistrar';
 import { setLocale, t } from './i18n';
 import {
   createLogger,
@@ -84,7 +82,12 @@ export default class OpenCodianPlugin extends Plugin {
     applyProviderIconColorMode: () => this.applyProviderIconColorMode(),
     startConfiguredLocalServerIfNeeded: () => this.startConfiguredLocalServerIfNeeded(),
     logServerStatusSnapshot: (source?: string) => this.logServerStatusSnapshot(source),
-    onModelsLoaded: () => this.refreshAllSettingsSurfaces(),
+    onModelsLoaded: () => {
+      this.settingsTab?.onModelsLoaded();
+      this.settingsTab?.refreshServerStatusDisplay();
+      broadcastModelsLoadedToSettingsViews(this);
+      broadcastServerStatusToSettingsViews(this);
+    },
   });
   private settingsPersistenceWritable = true;
   private settingsPersistenceWarningShown = false;
@@ -355,20 +358,6 @@ export default class OpenCodianPlugin extends Plugin {
     return leaf?.view instanceof OpenCodianView
       ? leaf.view
       : null;
-  }
-
-  /** Broadcast model-loaded and server-status refresh to all settings surfaces */
-  private refreshAllSettingsSurfaces(): void {
-    this.settingsTab?.onModelsLoaded();
-    this.settingsTab?.refreshServerStatusDisplay();
-
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN_SETTINGS)) {
-      const view = leaf.view;
-      if (view instanceof OpenCodianSettingsView) {
-        view.onModelsLoaded();
-        view.refreshServerStatusDisplay();
-      }
-    }
   }
 
   async reapplyConversationSessionDefaults(): Promise<void> {
@@ -872,12 +861,7 @@ export default class OpenCodianPlugin extends Plugin {
   private handleOpenCodeServerStatusChange(status: string): void {
     logger.debug(`Server status changed: ${status}`);
     this.settingsTab?.refreshServerStatusDisplay();
-    for (const leaf of this.app?.workspace?.getLeavesOfType(VIEW_TYPE_OPENCODIAN_SETTINGS) ?? []) {
-      const view = leaf.view;
-      if (view instanceof OpenCodianSettingsView) {
-        view.refreshServerStatusDisplay();
-      }
-    }
+    broadcastServerStatusToSettingsViews(this);
     if (status === 'running') {
       this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
     }

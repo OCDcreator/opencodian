@@ -448,6 +448,14 @@ img.opencodian-model-provider-header-icon {
   padding-top: 0 !important;
 }
 
+/* Settings in editor-area leaf */
+.workspace-leaf-content.opencodian-settings[data-type="opencodian-settings-view"] {
+  padding: 12px 48px 32px !important;
+}
+.workspace-leaf-content.opencodian-settings.opencodian-settings--tabbed[data-type="opencodian-settings-view"] .opencodian-settings-panel-title {
+  margin-left: 0 !important;
+}
+
 .opencodian-settings {
   --opencodian-settings-scrollbar-size: 8px;
   --opencodian-settings-scrollbar-radius: 999px;

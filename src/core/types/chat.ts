@@ -7,6 +7,9 @@ import { normalizeChatFontSizePx } from './settings';
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
 
+/** Settings view type constant */
+export const VIEW_TYPE_OPENCODIAN_SETTINGS = 'opencodian-settings-view';
+
 /** Image media types */
 export type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 

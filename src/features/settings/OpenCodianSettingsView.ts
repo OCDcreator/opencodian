@@ -1,11 +1,15 @@
 /**
- * OpenCodian Settings Tab
+ * OpenCodian Settings View (Editor Area)
  *
- * Settings UI for configuring the OpenCodian plugin.
- * Supports two layout modes: classic flat and tabbed primary/secondary tabs.
+ * Renders the full plugin settings UI inside an editor-area Leaf,
+ * allowing split-screen settings viewing alongside the chat view.
+ *
+ * Reuses all existing section classes from OpenCodianSettingTab —
+ * no rendering logic is duplicated.
  */
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import type { App } from 'obsidian';
+import { ItemView, Setting } from 'obsidian';
 
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -34,12 +38,12 @@ import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
 import { SettingsStyleSection } from './SettingsStyleSection';
-import { SettingsTabbedRenderer } from './SettingsTabbedRenderer';
+import { SettingsTabbedRenderer, type TabRendererDependencies } from './SettingsTabbedRenderer';
 import { SettingsUiSection } from './SettingsUiSection';
 import { SettingsUserSection } from './SettingsUserSection';
 
-export class OpenCodianSettingTab extends PluginSettingTab {
-  plugin: OpenCodianPlugin;
+export class OpenCodianSettingsView extends ItemView {
+  private readonly plugin: OpenCodianPlugin;
   private refreshModelsCallback?: () => void;
   private refreshTitleModelsCallback?: () => void;
   private refreshModelCatalogStatusCallback?: () => void;
@@ -63,58 +67,48 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private userSection: SettingsUserSection | null = null;
   private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
 
-  constructor(app: App, plugin: OpenCodianPlugin) {
-    super(app, plugin);
+  constructor(leaf: import('obsidian').WorkspaceLeaf, plugin: OpenCodianPlugin) {
+    super(leaf);
     this.plugin = plugin;
+
+    // Scroll coordinator that does NOT persist scroll position
+    // (avoids collision with the standard settings tab's scroll state)
     this.sectionCoordinator = new SettingsSectionCoordinator({
       containerEl: this.containerEl,
-      getSavedScrollTop: () => this.plugin.settings.settingsPanelScrollTop,
-      setSavedScrollTop: (scrollTop) => {
-        this.plugin.settings.settingsPanelScrollTop = scrollTop;
-      },
-      scheduleScrollStateSave: () => this.plugin.scheduleSettingsUiStateSave(),
+      getSavedScrollTop: () => 0,
+      setSavedScrollTop: () => {},
+      scheduleScrollStateSave: () => {},
     });
   }
 
-  private getOrCreateTabbedRenderer(): SettingsTabbedRenderer {
-    if (!this.tabbedRenderer) {
-      this.tabbedRenderer = new SettingsTabbedRenderer({
-        app: this.app,
-        plugin: this.plugin,
-        createHeading: (containerEl, title, tooltip) => this.createSectionHeading(containerEl, title, tooltip),
-        createSettingsBlock: (containerEl, options) => createSettingsBlock(containerEl, options, applyInlineCodeText),
-        setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
-        applyInlineCodeText,
-        setSettingNameWithFormatting: (setting, text) => setSettingNameWithFormatting(setting, text, applyInlineCodeText),
-        addSettingHelpButton,
-        notifyModelCatalogStatus: () => { this.refreshModelCatalogStatusCallback?.(); },
-        setModelCatalogStatusCallback: (cb) => { this.refreshModelCatalogStatusCallback = cb; },
-        setServerSection: (section) => { this.serverSection = section; },
-        setMcpSection: (section) => { this.mcpSection = section; },
-        setModelSection: (section) => { this.modelSection = section; },
-        setSecuritySection: (section) => { this.securitySection = section; },
-        getRefreshModelsCallback: () => this.refreshModelsCallback,
-        getRefreshTitleModelsCallback: () => this.refreshTitleModelsCallback,
-        setRefreshModelsCallback: (cb) => { this.refreshModelsCallback = cb; },
-        setRefreshTitleModelsCallback: (cb) => { this.refreshTitleModelsCallback = cb; },
-        getServerState: () => ({ healthy: this.lastKnownServerHealthy, status: this.lastKnownServerStatus }),
-        setServerState: ({ healthy, status }) => {
-          this.lastKnownServerHealthy = healthy;
-          this.lastKnownServerStatus = status;
-        },
-        requestDisplayRefresh: () => { this.display(); },
-        renderUserContent: (el, secondaryTabId) => {
-          this.createUserSection().attachTabbed(el, secondaryTabId);
-        },
-        renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
-        renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
-        renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
-      });
-    }
-    return this.tabbedRenderer;
+  getViewType(): string {
+    return 'opencodian-settings-view';
   }
 
-  /** Called when models are auto-loaded - refreshes the model dropdowns */
+  getDisplayText(): string {
+    return t('settings.ui.settingsInEditorArea.tabTitle');
+  }
+
+  getIcon(): string {
+    return 'settings';
+  }
+
+  async onOpen(): Promise<void> {
+    this.renderSettings();
+  }
+
+  async onClose(): Promise<void> {
+    this.disposeSections();
+    this.dropdownsEnhancer?.destroy();
+    this.dropdownsEnhancer = null;
+    this.sectionCoordinator.hide();
+    if (this.modelRefreshFrameId !== null) {
+      window.cancelAnimationFrame(this.modelRefreshFrameId);
+      this.modelRefreshFrameId = null;
+    }
+  }
+
+  /** Called from main.ts when models are auto-loaded */
   onModelsLoaded(): void {
     if (this.modelRefreshFrameId !== null) {
       window.cancelAnimationFrame(this.modelRefreshFrameId);
@@ -127,78 +121,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
   }
 
+  /** Called from main.ts when server status changes */
   refreshServerStatusDisplay(): void {
     void this.serverSection?.refreshStatus();
     this.refreshModelCatalogStatusCallback?.();
   }
 
-  renderLanguageSetting(containerEl: HTMLElement): void {
-    renderLanguageSetting(containerEl, this.plugin, () => { this.display(); });
-  }
-
-  private renderSettingsInEditorAreaSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.ui.settingsInEditorArea.name'))
-      .setDesc(t('settings.ui.settingsInEditorArea.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.settingsInEditorArea)
-          .onChange(async (value) => {
-            this.plugin.settings.settingsInEditorArea = value;
-            await this.plugin.saveSettings();
-          })
-      );
-  }
-
-  // ─── Navigation ────────────────────────────────────────────────────
-
-  scrollToServerSection(): void {
-    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
-      this.getOrCreateTabbedRenderer().switchToPrimaryTab('server', 'connection');
-      return;
-    }
-
-    this.sectionCoordinator.scrollToSectionByTitle(t('settings.server.title'));
-  }
-
-  scrollToModelSection(): void {
-    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
-      this.getOrCreateTabbedRenderer().switchToPrimaryTab('model', 'common');
-      return;
-    }
-
-    this.sectionCoordinator.scrollToSectionByTitle(t('settings.model.title'));
-  }
-
-  prepareRestoreScrollOnNextOpen(scrollTop = this.plugin.settings.settingsPanelScrollTop): void {
-    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
-      return;
-    }
-
-    this.sectionCoordinator.prepareRestoreScrollOnNextOpen(scrollTop);
-  }
-
-  prepareScrollToServerOnNextOpen(): void {
-    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
-      this.getOrCreateTabbedRenderer().switchToPrimaryTab('server', 'connection');
-      return;
-    }
-
-    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.server.title'));
-  }
-
-  prepareScrollToConversationOnNextOpen(secondaryTab?: string): void {
-    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
-      this.getOrCreateTabbedRenderer().switchToPrimaryTab('conversation', secondaryTab ?? 'display');
-      return;
-    }
-
-    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.conversation.title'));
-  }
-
-  // ─── Main display ──────────────────────────────────────────────────
-
-  display(): void {
+  /** Full re-render — mirrors OpenCodianSettingTab.display() */
+  private renderSettings(): void {
     const { containerEl } = this;
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
@@ -211,27 +141,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.renderClassicDisplay(containerEl);
     }
     this.dropdownsEnhancer = enhanceSettingsDropdowns(containerEl);
-  }
-
-  private disposeSections(): void {
-    this.conversationSection?.dispose();
-    this.agentsSection?.dispose();
-    this.commandsSection?.dispose();
-    this.modelSection?.dispose();
-    this.pluginSection?.dispose();
-    this.styleSection?.dispose();
-    this.uiSection?.dispose();
-    this.debugSection?.dispose();
-    this.serverSection?.dispose();
-    this.mcpSection?.dispose();
-    this.securitySection?.dispose();
-    this.formatterSection?.dispose();
-    this.userSection = null;
-    this.serverSection = null;
-    this.mcpSection = null;
-    this.securitySection = null;
-    this.formatterSection = null;
-    this.refreshModelCatalogStatusCallback = undefined;
   }
 
   // ─── Classic layout ────────────────────────────────────────────────
@@ -278,12 +187,56 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private renderPanelTitle(containerEl: HTMLElement): void {
-    renderSettingsPanelTitle(containerEl, this.app, this.plugin);
+    renderSettingsPanelTitle(containerEl, this.app as App, this.plugin);
+  }
+
+  // ─── Tabbed renderer ───────────────────────────────────────────────
+
+  private getOrCreateTabbedRenderer(): SettingsTabbedRenderer {
+    if (!this.tabbedRenderer) {
+      this.tabbedRenderer = new SettingsTabbedRenderer(this.buildTabRendererDeps());
+    }
+    return this.tabbedRenderer;
+  }
+
+  private buildTabRendererDeps(): TabRendererDependencies {
+    return {
+      app: this.app as App,
+      plugin: this.plugin,
+      createHeading: (containerEl, title, tooltip) => this.createSectionHeading(containerEl, title, tooltip),
+      createSettingsBlock: (containerEl, options) => createSettingsBlock(containerEl, options, applyInlineCodeText),
+      setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
+      applyInlineCodeText,
+      setSettingNameWithFormatting: (setting, text) => setSettingNameWithFormatting(setting, text, applyInlineCodeText),
+      addSettingHelpButton,
+      notifyModelCatalogStatus: () => { this.refreshModelCatalogStatusCallback?.(); },
+      setModelCatalogStatusCallback: (cb) => { this.refreshModelCatalogStatusCallback = cb; },
+      setServerSection: (section) => { this.serverSection = section; },
+      setMcpSection: (section) => { this.mcpSection = section; },
+      setModelSection: (section) => { this.modelSection = section; },
+      setSecuritySection: (section) => { this.securitySection = section; },
+      getRefreshModelsCallback: () => this.refreshModelsCallback,
+      getRefreshTitleModelsCallback: () => this.refreshTitleModelsCallback,
+      setRefreshModelsCallback: (cb) => { this.refreshModelsCallback = cb; },
+      setRefreshTitleModelsCallback: (cb) => { this.refreshTitleModelsCallback = cb; },
+      getServerState: () => ({ healthy: this.lastKnownServerHealthy, status: this.lastKnownServerStatus }),
+      setServerState: ({ healthy, status }) => {
+        this.lastKnownServerHealthy = healthy;
+        this.lastKnownServerStatus = status;
+      },
+      requestDisplayRefresh: () => { this.renderSettings(); },
+      renderUserContent: (el, secondaryTabId) => {
+        this.createUserSection().attachTabbed(el, secondaryTabId);
+      },
+      renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
+      renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
+      renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
+    };
   }
 
   // ─── Layout mode control ───────────────────────────────────────────
 
-  renderLayoutModeSetting(containerEl: HTMLElement): void {
+  private renderLayoutModeSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.layoutMode.name'))
       .setDesc(t('settings.layoutMode.desc'))
@@ -295,9 +248,27 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.settingsLayoutMode = value as 'classic' | 'tabbed';
             await this.plugin.saveSettings();
-            this.display();
+            this.renderSettings();
           });
       });
+  }
+
+  private renderLanguageSetting(containerEl: HTMLElement): void {
+    renderLanguageSetting(containerEl, this.plugin, () => { this.renderSettings(); });
+  }
+
+  private renderSettingsInEditorAreaSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.ui.settingsInEditorArea.name'))
+      .setDesc(t('settings.ui.settingsInEditorArea.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.settingsInEditorArea)
+          .onChange(async (value) => {
+            this.plugin.settings.settingsInEditorArea = value;
+            await this.plugin.saveSettings();
+          })
+      );
   }
 
   // ─── Classic section rendering ─────────────────────────────────────
@@ -317,10 +288,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
   }
 
-  private addServerSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addServerSettings(containerEl: HTMLElement): void {
     let serverSection: SettingsServerSection | null = null;
     serverSection = new SettingsServerSection({
-      app: this.app,
+      app: this.app as App,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
       notifyModelCatalogStatus: () => {
@@ -337,25 +308,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.lastKnownServerStatus = status;
       },
       requestDisplayRefresh: () => {
-        this.display();
+        this.renderSettings();
       },
     });
     this.serverSection = serverSection;
-    return serverSection.attach(containerEl);
+    serverSection.attach(containerEl);
   }
 
   private addMcpSettings(containerEl: HTMLElement): void {
     this.mcpSection = new SettingsMcpSection({
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-      requestDisplayRefresh: () => { this.display(); },
+      requestDisplayRefresh: () => { this.renderSettings(); },
     });
     this.mcpSection.attach(containerEl);
   }
 
-  private addModelSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addModelSettings(containerEl: HTMLElement): void {
     this.modelSection ??= new SettingsModelSection({
-      app: this.app,
+      app: this.app as App,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
       createSettingsBlock: (hostEl, options) => createSettingsBlock(hostEl, options, applyInlineCodeText),
@@ -379,12 +350,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.lastKnownServerStatus = status;
       },
     });
-    return this.modelSection.attach(containerEl);
+    this.modelSection.attach(containerEl);
   }
 
-  private addConversationSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addConversationSettings(containerEl: HTMLElement): void {
     this.conversationSection ??= new SettingsConversationSection({
-      app: this.app,
+      app: this.app as App,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
       createSettingsBlock: (hostEl, options) => createSettingsBlock(hostEl, options, applyInlineCodeText),
@@ -393,109 +364,107 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.refreshTitleModelsCallback = callback;
       },
     });
-    return this.conversationSection.attach(containerEl);
+    this.conversationSection.attach(containerEl);
   }
 
-  private addAgentsSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addAgentsSettings(containerEl: HTMLElement): void {
     this.agentsSection ??= new SettingsAgentsSection({
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
     });
-    return this.agentsSection.attach(containerEl);
+    this.agentsSection.attach(containerEl);
   }
 
-  private addCommandsSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addCommandsSettings(containerEl: HTMLElement): void {
     this.commandsSection ??= new SettingsCommandsSection({
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
     });
-    return this.commandsSection.attach(containerEl);
+    this.commandsSection.attach(containerEl);
   }
 
-  private addPluginSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addPluginSettings(containerEl: HTMLElement): void {
     this.pluginSection ??= new SettingsPluginSection({
-      app: this.app,
+      app: this.app as App,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
       applyInlineCodeText,
       setSettingNameWithFormatting: (setting, text) => setSettingNameWithFormatting(setting, text, applyInlineCodeText),
       setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
     });
-    return this.pluginSection.attach(containerEl);
+    this.pluginSection.attach(containerEl);
   }
 
-  private addSecuritySettings(containerEl: HTMLElement): HTMLHeadingElement {
-    return new SettingsSecuritySection({
-      app: this.app,
+  private addSecuritySettings(containerEl: HTMLElement): void {
+    this.securitySection ??= new SettingsSecuritySection({
+      app: this.app as App,
       plugin: this.plugin,
-      createSectionHeading: this.createSectionHeading.bind(this),
-    }).attach(containerEl);
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    this.securitySection.attach(containerEl);
   }
 
-  private addFormatterSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addFormatterSettings(containerEl: HTMLElement): void {
     this.formatterSection ??= new SettingsFormatterSection({
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-      requestDisplayRefresh: () => { this.display(); },
+      requestDisplayRefresh: () => { this.renderSettings(); },
     });
-    return this.formatterSection.attach(containerEl);
+    this.formatterSection.attach(containerEl);
   }
 
-  private addUISettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addUISettings(containerEl: HTMLElement): void {
     this.uiSection ??= new SettingsUiSection({
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
     });
-    return this.uiSection.attach(containerEl);
+    this.uiSection.attach(containerEl);
   }
 
-  private addStyleSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addStyleSettings(containerEl: HTMLElement): void {
     this.styleSection ??= new SettingsStyleSection({
-      app: this.app,
+      app: this.app as App,
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
       setSettingDescWithFormatting: (setting, text) => setSettingDescWithFormatting(setting, text, applyInlineCodeText),
       addSettingHelpButton,
     });
-    return this.styleSection.attach(containerEl);
+    this.styleSection.attach(containerEl);
   }
 
-  private addDebugSettings(containerEl: HTMLElement): HTMLHeadingElement {
+  private addDebugSettings(containerEl: HTMLElement): void {
     this.debugSection ??= new SettingsDebugSection({
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
     });
-    return this.debugSection.attach(containerEl);
+    this.debugSection.attach(containerEl);
   }
 
-  private addUserSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    return this.createUserSection().attach(containerEl);
+  private addUserSettings(containerEl: HTMLElement): void {
+    this.createUserSection().attach(containerEl);
   }
 
   // ─── Shared helpers ────────────────────────────────────────────────
 
-  hide(): void {
-    this.sectionCoordinator.hide();
-    this.dropdownsEnhancer?.destroy();
-    this.dropdownsEnhancer = null;
-    if (this.modelRefreshFrameId !== null) {
-      window.cancelAnimationFrame(this.modelRefreshFrameId);
-      this.modelRefreshFrameId = null;
-    }
+  private disposeSections(): void {
     this.conversationSection?.dispose();
     this.agentsSection?.dispose();
     this.commandsSection?.dispose();
-    this.styleSection?.dispose();
     this.modelSection?.dispose();
     this.pluginSection?.dispose();
+    this.styleSection?.dispose();
     this.uiSection?.dispose();
     this.debugSection?.dispose();
+    this.serverSection?.dispose();
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.formatterSection?.dispose();
-    this.refreshModelsCallback = undefined;
-    this.refreshTitleModelsCallback = undefined;
-    super.hide();
+    this.userSection = null;
+    this.serverSection = null;
+    this.mcpSection = null;
+    this.securitySection = null;
+    this.formatterSection = null;
+    this.refreshModelCatalogStatusCallback = undefined;
   }
 
   private createSectionHeading(

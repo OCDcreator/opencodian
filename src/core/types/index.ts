@@ -33,6 +33,7 @@ export {
   type TabContextState,
   type UsageInfo,
   VIEW_TYPE_OPENCODIAN,
+  VIEW_TYPE_OPENCODIAN_SETTINGS,
 } from './chat';
 
 // Model types
