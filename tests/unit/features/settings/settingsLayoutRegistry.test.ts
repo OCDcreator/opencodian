@@ -42,6 +42,9 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'style',
       'debug',
       'user',
+      'skills',
+      'tools',
+      'acp',
     ]);
   });
 
