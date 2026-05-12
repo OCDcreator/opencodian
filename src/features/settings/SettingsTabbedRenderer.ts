@@ -129,15 +129,15 @@ export class SettingsTabbedRenderer {
       }
     }
 
-    // Content panel
-    const contentEl = this.shouldUsePanelShell(activePrimaryId)
-      ? containerEl.createDiv({ cls: 'opencodian-settings-tab-panel' })
-      : containerEl.createDiv();
+    // Content shell
+    const contentEl = containerEl.createDiv({
+      cls: 'opencodian-settings-content-shell',
+      attr: {
+        'data-primary-tab': activePrimaryId,
+        'data-secondary-tab': activeSecondaryId,
+      },
+    });
     this.renderContent(contentEl, activePrimaryId, activeSecondaryId);
-  }
-
-  private shouldUsePanelShell(primaryTabId: string): boolean {
-    return primaryTabId !== 'general' && primaryTabId !== 'style' && primaryTabId !== 'plugins' && primaryTabId !== 'model' && primaryTabId !== 'formatter';
   }
 
   switchToPrimaryTab(primaryTabId: string, secondaryTabId?: string): void {

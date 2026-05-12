@@ -1,10 +1,19 @@
 import type { App } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { SettingsAgentsSection } from '../../../../src/features/settings/SettingsAgentsSection';
+import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
+import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
+import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
+import { SettingsMcpSection } from '../../../../src/features/settings/SettingsMcpSection';
 import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
+import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
+import { SettingsSecuritySection } from '../../../../src/features/settings/SettingsSecuritySection';
+import { SettingsServerSection } from '../../../../src/features/settings/SettingsServerSection';
 import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
 import { SettingsTabbedRenderer } from '../../../../src/features/settings/SettingsTabbedRenderer';
+import { SettingsUiSection } from '../../../../src/features/settings/SettingsUiSection';
 import { setLocale } from '../../../../src/i18n';
 
 function createRendererState(options?: {
@@ -87,6 +96,19 @@ function createRendererState(options?: {
   };
 }
 
+function expectSingleContentShell(
+  containerEl: HTMLElement,
+  primaryTabId: string,
+  secondaryTabId: string,
+): HTMLElement {
+  const shellEls = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-content-shell');
+  expect(shellEls).toHaveLength(1);
+  expect(shellEls[0]?.dataset.primaryTab).toBe(primaryTabId);
+  expect(shellEls[0]?.dataset.secondaryTab).toBe(secondaryTabId);
+  expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
+  return shellEls[0]!;
+}
+
 describe('SettingsTabbedRenderer', () => {
   beforeEach(() => {
     setLocale('en');
@@ -117,13 +139,13 @@ describe('SettingsTabbedRenderer', () => {
     expect(renderLayoutModeSetting).toHaveBeenCalledTimes(1);
     expect(renderLanguageSetting).toHaveBeenCalledTimes(1);
     expect(renderSettingsInEditorAreaSetting).toHaveBeenCalledTimes(1);
-    expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
+    const shellEl = expectSingleContentShell(containerEl, 'general', 'basic');
     expect(containerEl.querySelector('.layout-mode-marker')?.textContent).toBe('layout-mode-setting');
     expect(containerEl.querySelector('.language-marker')?.textContent).toBe('language-setting');
     expect(containerEl.querySelector('.settings-editor-area-marker')?.textContent).toBe(
       'settings-editor-area-setting',
     );
-    expect(containerEl.querySelectorAll('.opencodian-settings-block')).toHaveLength(1);
+    expect(shellEl.querySelectorAll('.opencodian-settings-block')).toHaveLength(1);
     const generalBlockEl = containerEl.querySelector<HTMLElement>('.opencodian-settings-general-merged-block');
     expect(generalBlockEl).not.toBeNull();
     expect(generalBlockEl?.classList.contains('opencodian-settings-section')).toBe(true);
@@ -163,6 +185,74 @@ describe('SettingsTabbedRenderer', () => {
     expect(requestDisplayRefresh).not.toHaveBeenCalled();
   });
 
+  it('renders every primary tab inside one structural content shell', () => {
+    const secondaryByPrimary = {
+      general: 'basic',
+      server: 'connection',
+      model: 'common',
+      conversation: 'title',
+      agents: 'default',
+      commands: 'mode',
+      mcp: 'overview',
+      formatter: 'overview',
+      plugins: 'overview',
+      security: 'config',
+      ui: 'general',
+      style: 'presets',
+      debug: 'general',
+      user: 'profile',
+    };
+
+    jest.spyOn(SettingsServerSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'server-tab-marker' });
+    });
+    jest.spyOn(SettingsModelSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'model-tab-marker' });
+    });
+    jest.spyOn(SettingsConversationSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'conversation-tab-marker' });
+    });
+    jest.spyOn(SettingsAgentsSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'agents-tab-marker' });
+    });
+    jest.spyOn(SettingsCommandsSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'commands-tab-marker' });
+    });
+    jest.spyOn(SettingsMcpSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'mcp-tab-marker' });
+    });
+    jest.spyOn(SettingsFormatterSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'formatter-tab-marker' });
+    });
+    jest.spyOn(SettingsPluginSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'plugin-tab-marker' });
+    });
+    jest.spyOn(SettingsSecuritySection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'security-tab-marker' });
+    });
+    jest.spyOn(SettingsUiSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'ui-tab-marker' });
+    });
+    jest.spyOn(SettingsStyleSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'style-tab-marker' });
+    });
+    jest.spyOn(SettingsDebugSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'debug-tab-marker' });
+    });
+
+    for (const [primaryTabId, secondaryTabId] of Object.entries(secondaryByPrimary)) {
+      const { renderer } = createRendererState({
+        primaryTabId,
+        secondaryTabs: secondaryByPrimary,
+      });
+      const containerEl = document.createElement('div');
+
+      renderer.renderDisplay(containerEl);
+
+      expectSingleContentShell(containerEl, primaryTabId, secondaryTabId);
+    }
+  });
+
   it('does not wrap style tabs with the extra tab-panel shell', () => {
     jest.spyOn(SettingsStyleSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
       containerEl.createDiv({ cls: 'style-tab-marker', text: 'style-tab-rendered' });
@@ -175,7 +265,8 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
+    const shellEl = expectSingleContentShell(containerEl, 'style', 'presets');
+    expect(shellEl.querySelector('.style-tab-marker')?.textContent).toBe('style-tab-rendered');
     expect(containerEl.querySelector('.style-tab-marker')?.textContent).toBe('style-tab-rendered');
   });
 
@@ -194,7 +285,8 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
+    const shellEl = expectSingleContentShell(containerEl, 'plugins', 'overview');
+    expect(shellEl.querySelector('.plugin-tab-marker')?.textContent).toBe('plugin-tab-rendered');
     expect(containerEl.querySelector('.plugin-tab-marker')?.textContent).toBe('plugin-tab-rendered');
   });
 
@@ -210,7 +302,8 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
+    const shellEl = expectSingleContentShell(containerEl, 'model', 'common');
+    expect(shellEl.querySelector('.model-tab-marker')?.textContent).toBe('model-tab-rendered');
     expect(containerEl.querySelector('.model-tab-marker')?.textContent).toBe('model-tab-rendered');
   });
 
@@ -226,7 +319,8 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    expect(containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
+    const shellEl = expectSingleContentShell(containerEl, 'formatter', 'overview');
+    expect(shellEl.querySelector('.formatter-tab-marker')?.textContent).toBe('formatter-tab-rendered');
     expect(containerEl.querySelector('.formatter-tab-marker')?.textContent).toBe('formatter-tab-rendered');
     expect(
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
