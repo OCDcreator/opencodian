@@ -687,6 +687,18 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(tab.containerEl.querySelector('.opencodian-settings-quick-nav')).toBeNull();
     expect(tab.containerEl.querySelector('.tabbed-render-marker')?.textContent).toBe('tabbed-rendered');
   });
+});
+
+describe('OpenCodianSettingTab title styling', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
 
   it('renders a branded settings title using the shared OpenCodian title logic', () => {
     const { tab } = createSettingsTab('classic');

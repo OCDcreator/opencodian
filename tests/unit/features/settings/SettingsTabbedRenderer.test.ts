@@ -202,6 +202,7 @@ describe('SettingsTabbedRenderer', () => {
       debug: 'general',
       user: 'profile',
     };
+    let renderedShellCount = 0;
 
     jest.spyOn(SettingsServerSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
       containerEl.createDiv({ cls: 'server-tab-marker' });
@@ -250,7 +251,21 @@ describe('SettingsTabbedRenderer', () => {
       renderer.renderDisplay(containerEl);
 
       expectSingleContentShell(containerEl, primaryTabId, secondaryTabId);
+      renderedShellCount += containerEl.querySelectorAll('.opencodian-settings-content-shell').length;
     }
+
+    expect(renderedShellCount).toBe(Object.keys(secondaryByPrimary).length);
+  });
+});
+
+describe('SettingsTabbedRenderer tab content routing', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('does not wrap style tabs with the extra tab-panel shell', () => {
