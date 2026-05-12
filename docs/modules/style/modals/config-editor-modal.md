@@ -58,3 +58,14 @@
 - `.opencodian-session-settings-summary-chips` / `.opencodian-session-settings-summary-chip`：右侧只读状态 chip 列表。
 - `.opencodian-session-settings-summary-link`：跳转主设置页的 “Open settings” 按钮。
 - 窄屏响应式规则会把摘要行改成单列，并让 chip 与按钮自然折行。
+
+## 2026-05-12 Model availability density slice
+
+模型可用性 / provider 管理区现在映射到共享 settings hierarchy token：
+
+- search / filter controls 使用 inline tokens，不再像独立 glass toolbar。
+- catalog summary card 与 provider row 使用 object tokens，不使用渐变、blur、hover lift 或装饰性阴影。
+- 展开的 model row 使用 row tokens，避免 provider object row 内再出现另一套完整卡片家族。
+- status badge 保留语义色，因为 provider / model availability 是决策关键状态。
+
+Guardrail: 不要在 `.opencodian-model-toggle-provider` / `.opencodian-model-toggle-model` 上重新引入 `linear-gradient`、`backdrop-filter`、hover `translateY` 或 black-tinted card shadow。

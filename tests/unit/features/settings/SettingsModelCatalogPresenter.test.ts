@@ -278,3 +278,34 @@ describe('SettingsModelCatalogPresenter', () => {
     rafSpy.mockRestore();
   });
 });
+
+describe('SettingsModelCatalogPresenter CSS contract', () => {
+  it('keeps model availability rows aligned with the shared settings hierarchy contract', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    const findRule = (selector: string, required: string): string => (
+      Array.from(css.matchAll(new RegExp(`${selector}\\s*\\{[^}]*\\}`, 'g')))
+        .map((match) => match[0])
+        .find((rule) => rule.includes(required)) ?? ''
+    );
+    const providerRule = findRule('\\.opencodian-model-toggle-provider', 'background:');
+    const providerHoverRule = findRule('\\.opencodian-model-toggle-provider:hover', 'background:');
+    const modelRule = findRule('\\.opencodian-model-toggle-model', 'background:');
+    const searchRule = findRule('\\.opencodian-model-availability-search-container', 'background:');
+    const summaryCardRule = findRule('\\.opencodian-model-catalog-summary-card', 'background:');
+
+    expect(providerRule).toContain('var(--opencodian-settings-object-bg');
+    expect(providerRule).toContain('box-shadow: none');
+    expect(providerRule).not.toContain('linear-gradient');
+    expect(providerRule).not.toContain('backdrop-filter');
+    expect(providerHoverRule).not.toContain('transform: translateY');
+    expect(modelRule).toContain('var(--opencodian-settings-row-bg');
+    expect(modelRule).toContain('box-shadow: none');
+    expect(modelRule).not.toContain('backdrop-filter');
+    expect(searchRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(summaryCardRule).toContain('var(--opencodian-settings-object-bg');
+  });
+});
