@@ -2970,13 +2970,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings-tab-panel {
-  padding: 18px 18px 8px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
-  background: color-mix(in srgb, var(--background-secondary) 78%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 62%, transparent),
-    0 12px 28px color-mix(in srgb, var(--text-normal) 6%, transparent);
+  display: contents;
 }
 
 .opencodian-settings code,
@@ -3334,10 +3328,9 @@ img.opencodian-model-provider-header-icon {
   position: relative;
   margin: 24px 0 16px;
   padding: 16px;
-  border-radius: var(--radius-m, 8px);
-  border: 1px solid var(--background-modifier-border);
-  border-left: 3px solid var(--background-modifier-border-hover);
-  background: var(--background-secondary);
+  border-radius: var(--opencodian-settings-radius-section, var(--radius-m, 8px));
+  border: 1px solid var(--opencodian-settings-section-border, var(--background-modifier-border));
+  background: var(--opencodian-settings-section-bg, var(--background-secondary));
 }
 
 .opencodian-style-section .opencodian-style-group {
@@ -6387,6 +6380,16 @@ img.opencodian-model-provider-header-icon {
     color-mix(in srgb, var(--background-secondary-alt, var(--background-secondary)) 72%, transparent);
   --opencodian-settings-inline-border:
     color-mix(in srgb, var(--background-modifier-border) 64%, transparent);
+  --opencodian-settings-nav-bg:
+    color-mix(in srgb, var(--background-secondary) 54%, transparent);
+  --opencodian-settings-nav-border:
+    color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  --opencodian-settings-nav-active-bg:
+    color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+  --opencodian-settings-nav-active-border:
+    color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border-hover));
+  --opencodian-settings-focus-ring:
+    color-mix(in srgb, var(--interactive-accent) 60%, transparent);
   --opencodian-settings-radius-section: 12px;
   --opencodian-settings-radius-row: 10px;
   --opencodian-settings-radius-inline: 6px;
@@ -6411,11 +6414,96 @@ img.opencodian-model-provider-header-icon {
   box-shadow: none;
 }
 
+.opencodian-settings .opencodian-settings-quick-nav {
+  gap: var(--opencodian-settings-space-sm);
+  margin: 0 0 var(--opencodian-settings-space-lg);
+  padding: 10px 12px;
+  border: 1px solid var(--opencodian-settings-nav-border);
+  border-radius: var(--opencodian-settings-radius-section);
+  background: var(--opencodian-settings-nav-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.opencodian-settings .opencodian-settings-quick-nav-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.opencodian-settings .opencodian-settings-quick-nav-chips {
+  gap: var(--opencodian-settings-space-sm);
+}
+
+.opencodian-settings .opencodian-settings-quick-nav-btn {
+  min-height: 28px;
+  padding: 5px 9px;
+  border-color: var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.opencodian-settings .opencodian-settings-quick-nav-btn:hover {
+  background: var(--opencodian-settings-inline-bg);
+  border-color: var(--opencodian-settings-nav-active-border);
+  box-shadow: none;
+  transform: none;
+}
+
+.opencodian-settings .opencodian-settings-quick-nav-btn:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 2px;
+}
+
+.opencodian-settings .opencodian-settings-tabs-primary,
+.opencodian-settings .opencodian-settings-tabs-secondary {
+  gap: var(--opencodian-settings-space-sm);
+  margin: 0 0 var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings .opencodian-settings-tab-primary,
+.opencodian-settings .opencodian-settings-tab-secondary {
+  min-height: 30px;
+  padding: 6px 10px;
+  border-color: var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.opencodian-settings .opencodian-settings-tab-primary:hover,
+.opencodian-settings .opencodian-settings-tab-secondary:hover {
+  background: var(--opencodian-settings-inline-bg);
+  transform: none;
+}
+
+.opencodian-settings .opencodian-settings-tab-primary.opencodian-settings-tab-active,
+.opencodian-settings .opencodian-settings-tab-secondary.opencodian-settings-tab-active {
+  border-color: var(--opencodian-settings-nav-active-border);
+  background: var(--opencodian-settings-nav-active-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+}
+
+.opencodian-settings .opencodian-settings-tab-primary:focus-visible,
+.opencodian-settings .opencodian-settings-tab-secondary:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 2px;
+}
+
 .opencodian-settings .opencodian-settings-section,
 .opencodian-settings .opencodian-settings-block.opencodian-settings-section {
+  overflow: hidden;
   border: 1px solid var(--opencodian-settings-section-border);
   border-radius: var(--opencodian-settings-radius-section);
   background: var(--opencodian-settings-section-bg);
+  box-shadow: none;
 }
 
 .opencodian-settings .opencodian-settings-section > .opencodian-settings-block-body,
@@ -6457,6 +6545,34 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-settings .opencodian-settings-section .setting-item-control {
   gap: var(--opencodian-settings-space-md);
+}
+
+.opencodian-settings .opencodian-settings-block-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-settings .opencodian-settings-section-heading {
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.opencodian-settings .opencodian-theme-style-card,
+.opencodian-settings .opencodian-style-input-lock-note,
+.opencodian-settings .opencodian-debug-help-item {
+  border-color: var(--opencodian-settings-object-border);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-theme-style-card:hover {
+  border-color: var(--opencodian-settings-nav-active-border);
+  background: color-mix(in srgb, var(--interactive-accent) 6%, var(--opencodian-settings-object-bg));
+  box-shadow: none;
 }
 
 @media (max-width: 720px) {

@@ -704,13 +704,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings-tab-panel {
-  padding: 18px 18px 8px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
-  background: color-mix(in srgb, var(--background-secondary) 78%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 62%, transparent),
-    0 12px 28px color-mix(in srgb, var(--text-normal) 6%, transparent);
+  display: contents;
 }
 
 .opencodian-settings code,
@@ -1068,10 +1062,9 @@ img.opencodian-model-provider-header-icon {
   position: relative;
   margin: 24px 0 16px;
   padding: 16px;
-  border-radius: var(--radius-m, 8px);
-  border: 1px solid var(--background-modifier-border);
-  border-left: 3px solid var(--background-modifier-border-hover);
-  background: var(--background-secondary);
+  border-radius: var(--opencodian-settings-radius-section, var(--radius-m, 8px));
+  border: 1px solid var(--opencodian-settings-section-border, var(--background-modifier-border));
+  background: var(--opencodian-settings-section-bg, var(--background-secondary));
 }
 
 .opencodian-style-section .opencodian-style-group {

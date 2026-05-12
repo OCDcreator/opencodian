@@ -28,6 +28,10 @@
   - 全链路 `prefers-reduced-motion: reduce` 兜底。
 - classic 设置页 quick-nav 的 tooltip 现在不再依赖 `.opencodian-settings-quick-nav-btn` 的伪元素，而是用 `.opencodian-settings-quick-nav-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式。这样提示层可以真正越过 settings 滚动容器，不再受容器裁切影响。
 - editor-area 设置页样式现在只匹配 `.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings`。这和 `OpenCodianSettingsView` 渲染到 `ItemView.contentEl` 的结构保持一致，避免 classic/平铺模式下 Obsidian `Setting` 行只剩分隔线、名称和控件被异常层级样式吞掉。
+- settings layout visible unification 后，此文件保留 settings 旧类名的兼容样式，但不再承担共享层级合同：
+  - `.opencodian-settings-tab-panel` 只保留 `display: contents`，避免重 tab panel 再包一层 section card。
+  - `.opencodian-style-section` 去掉粗 `border-left` 侧边条，改用 `--opencodian-settings-section-*` token fallback，使样式设置 section 不再像另一个局部设计系统。
+  - quick-nav、tabs、section、ordinary setting row 的可见层级现在由 `settings-layout-contract.css` 统一覆盖。
 
 
 ## 关联 TS 组件

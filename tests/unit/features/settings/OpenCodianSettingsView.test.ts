@@ -84,7 +84,7 @@ describe('OpenCodianSettingsView', () => {
   it('renders editor-area tabbed settings inside the ItemView content element', async () => {
     const { view } = createSettingsView('tabbed');
     const renderDisplay = jest.fn((containerEl: HTMLElement) => {
-      containerEl.createDiv({ cls: 'tabbed-render-marker', text: 'tabbed-rendered' });
+      containerEl.createDiv({ cls: 'opencodian-settings-content-shell tabbed-render-marker', text: 'tabbed-rendered' });
     });
 
     Object.assign(view as unknown as Record<string, unknown>, {
@@ -101,6 +101,8 @@ describe('OpenCodianSettingsView', () => {
     expect(view.contentEl.classList.contains('opencodian-settings--tabbed')).toBe(true);
     expect(view.contentEl.dataset.settingsLayoutMode).toBe('tabbed');
     expect(view.contentEl.dataset.settingsSurface).toBe('page');
+    expect(view.contentEl.querySelector('.opencodian-settings-content-shell')).not.toBeNull();
+    expect(view.contentEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
     expect(renderDisplay).toHaveBeenCalledTimes(1);
   });
 });

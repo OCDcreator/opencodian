@@ -669,7 +669,7 @@ describe('OpenCodianSettingTab layout shell', () => {
   it('does not render quick-nav in tabbed layout mode', () => {
     const { tab } = createSettingsTab('tabbed');
     const renderDisplay = jest.fn((containerEl: HTMLElement) => {
-      containerEl.createDiv({ cls: 'tabbed-render-marker', text: 'tabbed-rendered' });
+      containerEl.createDiv({ cls: 'opencodian-settings-content-shell tabbed-render-marker', text: 'tabbed-rendered' });
     });
 
     Object.assign(tab as unknown as Record<string, unknown>, {
@@ -684,8 +684,33 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(renderDisplay).toHaveBeenCalledTimes(1);
     expect(tab.containerEl.dataset.settingsLayoutMode).toBe('tabbed');
     expect(tab.containerEl.dataset.settingsSurface).toBe('page');
+    expect(tab.containerEl.classList.contains('opencodian-settings--tabbed')).toBe(true);
     expect(tab.containerEl.querySelector('.opencodian-settings-quick-nav')).toBeNull();
+    expect(tab.containerEl.querySelector('.opencodian-settings-content-shell')).not.toBeNull();
+    expect(tab.containerEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
     expect(tab.containerEl.querySelector('.tabbed-render-marker')?.textContent).toBe('tabbed-rendered');
+  });
+
+  it('keeps the visible settings hierarchy token-scoped and avoids heavy legacy tab panels', () => {
+    const contractCss = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-layout-contract.css'),
+      'utf8',
+    );
+    const legacyCss = readFileSync(
+      join(process.cwd(), 'src/style/components/model-selector.css'),
+      'utf8',
+    );
+
+    expect(contractCss).toContain('--opencodian-settings-nav-bg');
+    expect(contractCss).toContain('--opencodian-settings-section-bg');
+    expect(contractCss).toContain('--opencodian-settings-row-bg');
+    expect(contractCss).toContain('--opencodian-settings-object-bg');
+    expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-quick-nav/);
+    expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-tab-primary/);
+    expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-section\s+\.setting-item/);
+
+    expect(legacyCss).not.toMatch(/\.opencodian-settings-tab-panel\s*\{[^}]*box-shadow:/);
+    expect(legacyCss).not.toMatch(/\.opencodian-style-section\s*\{[^}]*border-left:\s*[2-9]px/);
   });
 });
 
@@ -742,6 +767,10 @@ describe('OpenCodianSettingTab title styling', () => {
       join(process.cwd(), 'src/style/components/model-selector.css'),
       'utf8',
     );
+    const contractCss = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-layout-contract.css'),
+      'utf8',
+    );
 
     expect(css).toMatch(
       /\.opencodian-settings h2\s*\{[\s\S]*margin-left:\s*0;[\s\S]*margin-bottom:\s*12px;[\s\S]*padding-bottom:\s*0;[\s\S]*border-bottom:\s*none;/,
@@ -758,8 +787,8 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(css).toMatch(
       /\.opencodian-settings\.opencodian-settings--tabbed\s+\.opencodian-settings-panel-title\s*\{[\s\S]*margin-left:\s*-20px;/,
     );
-    expect(css).toMatch(
-      /\.opencodian-settings-quick-nav\s*\{[\s\S]*padding:\s*24px\s+20px\s+14px;/,
+    expect(contractCss).toMatch(
+      /\.opencodian-settings\s+\.opencodian-settings-quick-nav\s*\{[\s\S]*padding:\s*10px\s+12px;/,
     );
     expect(css).toMatch(
       /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2200;/,
