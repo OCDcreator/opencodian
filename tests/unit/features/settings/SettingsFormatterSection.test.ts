@@ -765,24 +765,24 @@ describe('SettingsFormatterSection CSS contract', () => {
       '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-summary-cards',
       'border-top:',
     );
-    const classicBuiltinSiblingRule = findRule(
-      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-builtin-row \\+ \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-custom-row \\+ \\.opencodian-formatter-custom-row',
+    const formatterSiblingRule = findRule(
+      '\\.opencodian-formatter-builtin-row \\+ \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-formatter-custom-row \\+ \\.opencodian-formatter-custom-row',
       'margin-top:',
     );
-    const classicFormatterRowRule = findRule(
-      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-custom-row',
+    const formatterRowRule = findRule(
+      '\\.opencodian-settings-block > \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings-block > \\.opencodian-formatter-custom-row',
       'margin-left:',
     );
-    const classicFormatterFirstRowRule = findRule(
-      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-builtin-row:first-of-type,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-settings-block > \\.opencodian-formatter-custom-row:first-of-type',
+    const formatterFirstRowRule = findRule(
+      '\\.opencodian-settings-block > \\.opencodian-formatter-builtin-row:first-of-type,\\s*\\.opencodian-settings-block > \\.opencodian-formatter-custom-row:first-of-type',
       'margin-top:',
     );
-    const classicFormatterSettingRule = findRule(
-      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-builtin-row > \\.setting-item,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-custom-row > \\.setting-item',
+    const formatterSettingRule = findRule(
+      '\\.opencodian-formatter-builtin-row > \\.setting-item,\\s*\\.opencodian-formatter-custom-row > \\.setting-item',
       'grid-template-columns:',
     );
-    const classicFormatterControlRule = findRule(
-      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-builtin-row > \\.setting-item \\.setting-item-control,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-custom-row > \\.setting-item \\.setting-item-control',
+    const formatterControlRule = findRule(
+      '\\.opencodian-formatter-builtin-row > \\.setting-item \\.setting-item-control,\\s*\\.opencodian-formatter-custom-row > \\.setting-item \\.setting-item-control',
       'width:',
     );
     const formatterCss = css.slice(
@@ -803,11 +803,12 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(buttonBarRule).toContain('background: transparent');
     expect(classicSummaryGridRule).toContain('var(--opencodian-settings-object-border');
     expect(classicSummaryGridRule).toContain('var(--opencodian-settings-space-lg');
-    expect(classicBuiltinSiblingRule).toContain('var(--opencodian-settings-space-md');
-    expect(classicFormatterRowRule).toContain('var(--opencodian-settings-space-lg');
-    expect(classicFormatterFirstRowRule).toContain('var(--opencodian-settings-space-lg');
-    expect(classicFormatterSettingRule).toContain('minmax(180px, 260px)');
-    expect(classicFormatterControlRule).toContain('260px');
+    expect(formatterSiblingRule).toContain('var(--opencodian-settings-space-md');
+    expect(formatterRowRule).toContain('var(--opencodian-settings-space-lg');
+    expect(formatterFirstRowRule).toContain('var(--opencodian-settings-space-lg');
+    expect(formatterSettingRule).toContain('minmax(180px, 260px)');
+    expect(formatterSettingRule).toContain('background: transparent');
+    expect(formatterControlRule).toContain('260px');
     expect(formatterCss).not.toContain('linear-gradient');
     expect(formatterCss).not.toContain('backdrop-filter');
     expect(formatterCss).not.toContain('transform: translateY');

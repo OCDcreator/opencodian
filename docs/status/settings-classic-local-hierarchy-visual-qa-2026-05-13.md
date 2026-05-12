@@ -16,12 +16,13 @@
 
 ## Screenshot Follow-up: Formatter Config
 
-用户截图复查后确认 Formatter config 仍有局部问题：classic / tiled mode 中，父级“配置”block、`内置格式化器`标题、以及 formatter row 的边框和间距过紧；第一行几乎贴住标题，右侧下拉控件也显得过宽、过重。
+用户截图复查后确认 Formatter config 仍有局部问题：classic / tiled mode 和 tabbed mode 中，父级“配置”block、`内置格式化器`标题、以及 formatter row 的边框和间距过紧；第一行几乎贴住标题，右侧下拉控件也显得过宽、过重。
 
-追加修正保持功能不变，只调整 classic mode 的局部排版：
+追加修正保持功能不变，把 formatter config 的局部排版统一到 classic 和 tabbed 两种模式：
 
 - `.opencodian-settings-block` 直接包含的 builtin/custom formatter rows 增加左右 inset。
 - 第一行和最后一行增加首尾 spacing，让标题、子行和父 block 边界分开。
+- builtin/custom formatter rows 之间使用 shared row spacing，不再让边框连成一片。
 - formatter row 内部 `Setting` 改为 `minmax(0, 1fr) minmax(180px, 260px)` 两列。
 - 控件列固定为 260px 上限，避免 dropdown 在宽设置面板里抢走过多视觉重量。
 
@@ -31,6 +32,7 @@
 - Classic MCP 能区分 overview controls、metric cards 和 server list。
 - Classic Formatter 能区分 summary cards、runtime/list rows、builtin/custom rows。
 - Classic Formatter config 中“内置格式化器”标题、builtin/custom rows 和右侧下拉控件之间有清晰但不过度卡片化的层级。
+- Tabbed Formatter config 中“内置格式化器”标题、builtin/custom rows 和右侧下拉控件之间有清晰但不过度卡片化的层级。
 - Tabbed mode 不出现新的 nested-card noise。
 - 不引入功能、schema、locale、默认值或运行时行为变化。
 
@@ -48,8 +50,8 @@ Commands:
 Deployment:
 
 - Test Vault plugin artifacts copied sequentially from `dist/`.
-- BUILD_ID in `dist/main.js`: `codex-settings-ui-layout-foundation.202605130115`.
-- BUILD_ID in Test Vault `main.js`: `codex-settings-ui-layout-foundation.202605130115`.
+- BUILD_ID in `dist/main.js`: `codex-settings-ui-layout-foundation.202605130133`.
+- BUILD_ID in Test Vault `main.js`: `codex-settings-ui-layout-foundation.202605130133`.
 - `obsidian plugin:reload id=opencodian vault=testvault`: reloaded successfully.
 
 Autodebug:
@@ -68,7 +70,7 @@ Representative DOM checks:
 | Tabbed MCP | `ok: true`, `mode: tabbed`, `primary: mcp`, `secondary: overview`, server cards `6`, no tab panel |
 | Tabbed formatter | `ok: true`, `mode: tabbed`, `primary: formatter`, `secondary: overview`, summary cards `2`, no tab panel |
 | Classic formatter config follow-up | `ok: true`, `mode: classic`, builtin rows `26`, first row margin `12px`, row grid `450px 260px`, control width `260px`, no tab panel |
-| Tabbed formatter config regression | `ok: true`, `mode: tabbed`, `primary: formatter`, `secondary: config`, builtin rows `26` |
+| Tabbed formatter config regression | `ok: true`, `mode: tabbed`, `primary: formatter`, `secondary: config`, builtin rows `26`, first row margin `12px`, row grid `450px 260px`, control width `260px` |
 
 Evidence paths:
 
@@ -85,3 +87,4 @@ Evidence paths:
 - `.obsidian-debug/settings-formatter-config-readability/tabbed-formatter-config-result.json`
 - `.obsidian-debug/settings-formatter-config-readability/classic-formatter-config.png`
 - `.obsidian-debug/settings-formatter-config-readability/tabbed-formatter-config.png`
+- `.obsidian-debug/settings-formatter-config-readability/tabbed-formatter-config-after-row-fix.png`
