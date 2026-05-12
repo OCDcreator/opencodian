@@ -15,6 +15,7 @@
 - `.opencodian-tab-bar*`、`.opencodian-tab-bar-parent-breadcrumb*`、`.opencodian-tab-overflow-menu*`：多会话标签栏、子会话返回父 tab 面包屑与溢出菜单样式。
 - `.opencodian-theme-background-*`：主题背景图层、遮罩、叠加高光。
 - 关键变量组：`--opencodian-glass-*`、`--opencodian-composer-*`、`--opencodian-status-*`、`--opencodian-shadow-*`。
+- 输入区字体默认值由 `--opencodian-composer-font-family` 提供，并可被聊天外观设置生成的容器变量覆盖。
 
 ## 关联 TS 组件
 

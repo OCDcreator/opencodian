@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Input panel style controls intentionally keep theme, radius, font, and variant settings co-located for shared refresh lifecycle. */
 import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
@@ -16,9 +17,17 @@ import {
   normalizeGlassRefractionInputPanelThemeId,
   normalizeLiquidGlassInputPanelThemeId,
 } from '../../core/types';
-import { t } from '../../i18n';
+import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getAllGlassAdapters } from '../../utils/glass';
+import {
+  CUSTOM_FONT_ID,
+  FONT_CATEGORY_LABELS,
+  FONT_CATEGORY_ORDER,
+  InputFontLoader,
+  UNIFIED_FONT_OPTIONS,
+  type FontCategory,
+} from './InputFontRegistry';
 import type {
   NumericControlConfig,
   NumericStyleControlConfig,
@@ -61,6 +70,7 @@ export class SettingsStyleInputPanelSection {
   private readonly liquidGlassControls: SettingsStyleLiquidGlassInputControls;
   private hostEl: HTMLElement | null = null;
   private renderSessionId = 0;
+  private fontLoader = new InputFontLoader();
 
   constructor(options: SettingsStyleInputPanelSectionOptions) {
     this.app = options.app;
@@ -226,6 +236,9 @@ export class SettingsStyleInputPanelSection {
       },
     });
 
+    // ── Font controls (shown for all input panel themes) ──
+    this.addFontControls(inputControlsEl);
+
     if (isPresetInputPanelTheme) {
       this.addPresetInputControls(inputControlsEl);
       return;
@@ -261,6 +274,148 @@ export class SettingsStyleInputPanelSection {
     }
 
     this.refresh();
+  }
+
+  private addFontControls(container: HTMLElement): void {
+    // ── English font dropdown ──
+    new Setting(container)
+      .setName(t('settings.style.input.enFont.name'))
+      .setDesc(t('settings.style.input.enFont.desc'))
+      .then((setting) => {
+        this.buildFontDropdown(setting, container, 'en');
+      });
+
+    // ── Chinese font dropdown ──
+    new Setting(container)
+      .setName(t('settings.style.input.cnFont.name'))
+      .setDesc(t('settings.style.input.cnFont.desc'))
+      .then((setting) => {
+        this.buildFontDropdown(setting, container, 'cn');
+      });
+  }
+
+  private static readonly CATEGORY_SEPARATOR_PREFIX = '__cat__';
+
+  private buildFontDropdown(
+    setting: Setting,
+    container: HTMLElement,
+    kind: 'en' | 'cn',
+  ): void {
+    const options = UNIFIED_FONT_OPTIONS;
+    const currentValue = kind === 'en'
+      ? this.plugin.settings.chatAppearance.input.enFontFamily
+      : this.plugin.settings.chatAppearance.input.cnFontFamily;
+
+    // Determine current selection: match a known id, or mark as custom
+    const isCustomValue = !!currentValue && !options.some(o => o.id === currentValue);
+    const dropdownValue = isCustomValue ? CUSTOM_FONT_ID : (currentValue || 'inherit');
+
+    let customInputEl: HTMLInputElement | null = null;
+
+    setting.addDropdown((dd) => {
+      // Build categorized options with separator headers
+      const selectEl = dd.selectEl;
+      selectEl.empty();
+
+      for (const category of FONT_CATEGORY_ORDER) {
+        const categoryFonts = options.filter(o => o.category === category);
+        if (categoryFonts.length === 0) continue;
+
+        // Category header (disabled separator)
+        const headerValue = `${SettingsStyleInputPanelSection.CATEGORY_SEPARATOR_PREFIX}${category}`;
+        const headerEl = document.createElement('option');
+        headerEl.value = headerValue;
+        headerEl.textContent = t(FONT_CATEGORY_LABELS[category] as TranslationKey);
+        headerEl.disabled = true;
+        selectEl.appendChild(headerEl);
+
+        // Font options in this category
+        for (const font of categoryFonts) {
+          const optionEl = document.createElement('option');
+          optionEl.value = font.id;
+          optionEl.textContent = font.displayName;
+          selectEl.appendChild(optionEl);
+        }
+      }
+
+      // Custom option at the end
+      const customOption = document.createElement('option');
+      customOption.value = CUSTOM_FONT_ID;
+      customOption.textContent = t('settings.style.input.font.custom');
+      selectEl.appendChild(customOption);
+
+      selectEl.value = dropdownValue;
+
+      dd.onChange((value) => {
+        // Ignore separator selections
+        if (value.startsWith(SettingsStyleInputPanelSection.CATEGORY_SEPARATOR_PREFIX)) return;
+
+        if (value === CUSTOM_FONT_ID) {
+          // Show custom input
+          if (!customInputEl) {
+            customInputEl = this.createCustomFontInput(setting, kind, isCustomValue ? currentValue : '');
+          }
+          customInputEl?.focus();
+        } else {
+          // Hide custom input
+          if (customInputEl) {
+            customInputEl.remove();
+            customInputEl = null;
+          }
+          this.applyFontSelection(kind, value);
+        }
+      });
+    });
+
+    // If current value is custom, show the input immediately
+    if (isCustomValue) {
+      customInputEl = this.createCustomFontInput(setting, kind, currentValue);
+    }
+  }
+
+  private createCustomFontInput(
+    setting: Setting,
+    kind: 'en' | 'cn',
+    initialValue: string,
+  ): HTMLInputElement {
+    const inputEl = document.createElement('input');
+    inputEl.type = 'text';
+    inputEl.placeholder = "'My Font', sans-serif";
+    inputEl.value = initialValue;
+    inputEl.style.cssText =
+      'width: 100%; margin-top: 6px; padding: 4px 8px; border-radius: 6px;' +
+      ' border: 1px solid var(--background-modifier-border);' +
+      ' background: var(--background-primary); color: var(--text-normal); font-size: 12px;';
+
+    inputEl.addEventListener('input', () => {
+      const val = inputEl.value.trim();
+      if (kind === 'en') {
+        this.plugin.settings.chatAppearance.input.enFontFamily = val;
+      } else {
+        this.plugin.settings.chatAppearance.input.cnFontFamily = val;
+      }
+      this.applyAndScheduleStyleUpdate();
+    });
+
+    // Append below the setting control area
+    const controlEl = setting.settingEl.querySelector('.setting-item-control');
+    if (controlEl?.parentElement) {
+      controlEl.parentElement.appendChild(inputEl);
+    }
+
+    return inputEl;
+  }
+
+  private applyFontSelection(kind: 'en' | 'cn', fontId: string): void {
+    const input = this.plugin.settings.chatAppearance.input;
+    if (kind === 'en') {
+      input.enFontFamily = fontId;
+      this.fontLoader.ensureLoaded(fontId);
+    } else {
+      input.cnFontFamily = fontId;
+      this.fontLoader.ensureLoaded(fontId);
+    }
+    this.applyAndScheduleStyleUpdate();
   }
 
   private addPresetInputControls(containerEl: HTMLElement): void {

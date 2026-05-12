@@ -4,6 +4,9 @@ import type {
   InputPanelGlassRefractionSettings,
 } from '../../core/types';
 import { isValidChatAppearanceCustomCssDeclarations } from '../../core/types';
+import { InputFontLoader, resolveComposerFontFamily } from '../settings/InputFontRegistry';
+
+const fontLoader = new InputFontLoader();
 
 export function getChatAppearanceBackgroundSizeValue(
   fitMode: ChatAppearanceBackgroundFitMode,
@@ -24,6 +27,9 @@ export function getChatAppearanceBackgroundSizeValue(
 export function getChatAppearanceCssVariables(
   appearance: ChatAppearanceSettings,
 ): Record<string, string> {
+  // Ensure selected fonts are loaded from CDN before CSS variables reference them.
+  fontLoader.ensureBothLoaded(appearance.input.enFontFamily, appearance.input.cnFontFamily);
+
   const backgroundScale = 1 + (appearance.background.depth / 100);
   const backgroundBleed = Math.max(
     28,
@@ -82,6 +88,10 @@ export function getChatAppearanceCssVariables(
     '--opencodian-input-bg-opacity': `${appearance.input.backgroundOpacity}%`,
     '--opencodian-input-blur': `${appearance.input.blur}px`,
     '--opencodian-input-shadow-blur': `${appearance.input.shadowBlur}px`,
+    '--opencodian-composer-font-family': resolveComposerFontFamily(
+      appearance.input.enFontFamily,
+      appearance.input.cnFontFamily,
+    ),
     '--opencodian-scrollbar-width': `${appearance.scrollbar.width}px`,
     '--opencodian-scrollbar-radius': `${appearance.scrollbar.radius}px`,
     '--opencodian-scrollbar-track-opacity': `${appearance.scrollbar.trackOpacity}%`,

@@ -548,6 +548,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 0.02em;
 }
 
 .opencodian-message-time-status {
@@ -1028,6 +1030,7 @@
   gap: 8px;
   background: transparent;
   pointer-events: none;
+  font-family: var(--opencodian-composer-font-family, inherit);
 }
 
 .opencodian-input-area > * {

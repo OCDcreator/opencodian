@@ -189,20 +189,30 @@ interface MenuRenderContext {
 function renderMenuOptions(menuEl: HTMLElement, ctx: MenuRenderContext): void {
   menuEl.replaceChildren();
   ctx.options.forEach((option, index) => {
+    const isCategoryHeader = option.disabled && option.value.startsWith('__cat__');
+    const cls = [
+      'opencodian-settings-dropdown-option',
+      option.disabled && !isCategoryHeader ? ' is-disabled' : '',
+      isCategoryHeader ? ' is-category-header' : '',
+      index === ctx.highlightedIndex ? ' is-highlighted' : '',
+    ].join('');
     const optionEl = menuEl.createEl('button', {
-      cls: `opencodian-settings-dropdown-option${option.disabled ? ' is-disabled' : ''}${index === ctx.highlightedIndex ? ' is-highlighted' : ''}`,
-      text: option.label,
+      cls,
       attr: {
         type: 'button',
-        role: 'option',
+        role: isCategoryHeader ? 'presentation' : 'option',
         'aria-selected': String(index === ctx.selectedIndex),
         'data-value': option.value,
       },
     });
+    // Wrap label in a span so text-overflow: ellipsis works correctly
+    optionEl.createSpan({ cls: 'opencodian-settings-dropdown-option-label', text: option.label });
     optionEl.disabled = option.disabled;
-    const checkEl = optionEl.createSpan({ cls: 'opencodian-settings-dropdown-option-check' });
-    if (index === ctx.selectedIndex) {
-      setIcon(checkEl, 'check');
+    if (!isCategoryHeader) {
+      const checkEl = optionEl.createSpan({ cls: 'opencodian-settings-dropdown-option-check' });
+      if (index === ctx.selectedIndex) {
+        setIcon(checkEl, 'check');
+      }
     }
     optionEl.addEventListener('click', () => {
       ctx.onSelect(index);

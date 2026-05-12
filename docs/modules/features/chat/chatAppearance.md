@@ -31,6 +31,8 @@ buildChatAppearanceCustomCss(declarations): string
 
 `getChatAppearanceCssVariables()` 读取 `ChatAppearanceSettings`，生成消息区、背景、用户气泡、助手气泡、输入区、滚动条相关的 `--opencodian-*` 变量。
 
+输入区字体现在会通过 `resolveComposerFontFamily()` 合并英文字体 / 中文字体设置，写入 `--opencodian-composer-font-family`，并由 `InputFontLoader` singleton 按需加载 CDN 字体。
+
 其中有几组变量是运行时计算值，不是直接照抄设置：
 
 - `backgroundScale = 1 + depth / 100`

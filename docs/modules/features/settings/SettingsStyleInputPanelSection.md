@@ -26,6 +26,7 @@
 ### 参数区拆分
 
 - preset input 参数继续复用来自 `settingsStyleControls.ts` 的 `addNumericStyleControl()` seam，保持 baseline/reset 语义一致
+- 输入区字体设置在本 owner 中提供 English / Chinese font 两个 dropdown，并写回 `chatAppearance.input.enFontFamily` / `cnFontFamily`
 - `contextRingStyle` 作为 `chatAppearance.input` 的普通外观字段保存；切换时只调用 `plugin.updateChatAppearance()` + style apply/save，不触发 input subsection 重绘
 - glass refraction 参数与 SVG filter reset 仍在本 owner 内处理，因为它们与 theme-family 切换耦合
 - liquid glass 参数列表委托给 `SettingsStyleLiquidGlassInputControls`

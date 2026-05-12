@@ -81,7 +81,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `ChatAppearanceBackgroundSettings` | 背景图（`imagePath`, `fitMode`, `opacity`, `blur`, `depth`, `dim`, `edgeFade`, `saturation`, `brightness`, `focusX`, `focusY`） |
 | `ChatAppearanceUserSettings` | 用户消息气泡，现含时间样式（`timeFontSize`, `timeFontWeight`, `timeColor`） |
 | `ChatAppearanceAssistantSettings` | 助手消息气泡，现含 meta/time/modelId 样式（字号、字重、颜色） |
-| `ChatAppearanceInputSettings` | 输入面板（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`, `actionButtonStyle`, `contextRingStyle`） |
+| `ChatAppearanceInputSettings` | 输入面板（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`, `actionButtonStyle`, `contextRingStyle`, `enFontFamily`, `cnFontFamily`） |
 | `ChatAppearanceScrollbarSettings` | 滚动条（`width`, `radius`, `trackOpacity`, `thumbOpacity`, `thumbHoverOpacity`, `edgePadding`, `shadowOpacity`） |
 | `ChatAppearanceAdvancedSettings` | 高级（`customCssDeclarations`） |
 
@@ -135,6 +135,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `normalizeInputPanelThemeId(value)` | 归一化输入面板主题（含废弃 ID 迁移） |
 | `normalizeInputPanelActionButtonStyleId(value)` | 归一化按钮样式 |
 | `normalizeContextRingStyleId(value)` | 归一化上下文圆环样式 |
+| `normalizeFontFamilyValue(value)` | 归一化输入区英文字体 / 中文字体选择，未知或空值回退默认字体 |
 | `normalizeChatAppearanceBackgroundFitMode(value)` | 归一化背景填充模式 |
 | `normalizePluginIsolationMode(value)` | 归一化插件隔离模式 |
 | `normalizeDisabledModelRefs(value)` | 清洗 `provider/model` 列表，去重并剔除非法引用 |

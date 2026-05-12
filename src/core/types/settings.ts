@@ -703,6 +703,8 @@ export interface ChatAppearanceInputSettings {
   shadowBlur: number;
   actionButtonStyle: InputPanelActionButtonStyleId;
   contextRingStyle: ContextRingStyleId;
+  enFontFamily: string;
+  cnFontFamily: string;
 }
 
 export type InputPanelGlassRefractionVariantId = 'glass' | 'card' | 'pill';
@@ -861,6 +863,8 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       shadowBlur: 28,
       actionButtonStyle: 'default',
       contextRingStyle: 'classic',
+      enFontFamily: '',
+      cnFontFamily: '',
     },
     scrollbar: {
       width: 8,
@@ -1490,6 +1494,13 @@ function normalizeChatAppearanceAssistantSettings(
   };
 }
 
+function normalizeFontFamilyValue(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (trimmed.length > 200) return trimmed.slice(0, 200);
+  return trimmed;
+}
+
 function normalizeChatAppearanceInputSettings(
   input: Partial<ChatAppearanceInputSettings> | null | undefined,
   defaults: ChatAppearanceInputSettings,
@@ -1499,6 +1510,8 @@ function normalizeChatAppearanceInputSettings(
     ...(input ?? {}),
     actionButtonStyle: normalizeInputPanelActionButtonStyleId(input?.actionButtonStyle),
     contextRingStyle: normalizeContextRingStyleId(input?.contextRingStyle),
+    enFontFamily: normalizeFontFamilyValue(input?.enFontFamily),
+    cnFontFamily: normalizeFontFamilyValue(input?.cnFontFamily),
   };
 }
 
@@ -1720,6 +1733,7 @@ export interface OpenCodianSettings {
   debugRefreshIntervalMs: number;
   debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
+  settingsInEditorArea: boolean;
   tabState: PersistedTabState;
   theme: ThemeSettings;
 
@@ -1872,6 +1886,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   debugRefreshIntervalMs: normalizeDebugRefreshIntervalMs(undefined),
   debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,
+  settingsInEditorArea: true,
   tabState: getDefaultPersistedTabState(),
   theme: getDefaultThemeSettings(),
 
