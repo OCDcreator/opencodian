@@ -438,3 +438,53 @@ describe('SettingsPluginSection', () => {
     expect(noticeSpy).not.toHaveBeenCalledWith(t('settings.plugins.omo.openFailed'));
   });
 });
+
+describe('Settings plugin/catalog CSS contract', () => {
+  it('keeps agents, commands, and plugin rows aligned with the shared settings hierarchy contract', () => {
+    const css = fs.readFileSync(
+      path.join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    const findRule = (selector: string, required: string): string => (
+      Array.from(css.matchAll(new RegExp(`${selector}\\s*\\{[^}]*\\}`, 'g')))
+        .map((match) => match[0])
+        .find((rule) => rule.includes(required)) ?? ''
+    );
+
+    const blockRule = findRule('\\.opencodian-plugin-block', 'background:');
+    const bodyRule = findRule('\\.opencodian-plugin-block-body', 'padding:');
+    const catalogRowRule = findRule(
+      '\\.opencodian-settings-catalog-scroll > \\.setting-item',
+      'background:',
+    );
+    const agentGroupRule = findRule('\\.opencodian-agent-editor-group', 'background:');
+    const summaryRule = findRule('\\.opencodian-plugin-summary-row', 'background:');
+    const sourcePathRule = findRule('\\.opencodian-plugin-source-path', 'background:');
+    const sourceItemRule = findRule(
+      '\\.opencodian-plugin-source-item,\\s*\\.opencodian-plugin-source-empty',
+      'background:',
+    );
+    const pluginCatalogCss = css.slice(
+      css.indexOf('.opencodian-plugin-block'),
+      css.indexOf('.opencodian-mcp-overview-shell'),
+    );
+
+    expect(blockRule).toContain('background: transparent');
+    expect(blockRule).toContain('border: 0');
+    expect(blockRule).toContain('box-shadow: none');
+    expect(bodyRule).toContain('var(--opencodian-settings-space-md');
+    expect(catalogRowRule).toContain('var(--opencodian-settings-row-bg');
+    expect(catalogRowRule).toContain('box-shadow: none');
+    expect(agentGroupRule).toContain('var(--opencodian-settings-object-bg');
+    expect(agentGroupRule).toContain('box-shadow: none');
+    expect(summaryRule).toContain('var(--opencodian-settings-row-bg');
+    expect(sourcePathRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(sourceItemRule).toContain('var(--opencodian-settings-object-bg');
+    expect(pluginCatalogCss).not.toContain('linear-gradient');
+    expect(pluginCatalogCss).not.toContain('backdrop-filter');
+    expect(pluginCatalogCss).not.toContain('transform: translateY');
+    expect(pluginCatalogCss).not.toMatch(/border-left:\s*[2-9]px/);
+    expect(pluginCatalogCss).not.toMatch(/opencodian-settings-radius-(md|lg)/);
+  });
+});
