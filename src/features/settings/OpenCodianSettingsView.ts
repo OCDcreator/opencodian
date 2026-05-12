@@ -283,8 +283,14 @@ export class OpenCodianSettingsView extends ItemView {
     );
 
     const blockBodyEl = containerEl
-      .createDiv({ cls: 'opencodian-settings-block' })
-      .createDiv({ cls: 'opencodian-settings-block-body' });
+      .createDiv({
+        cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-general-merged-block',
+        attr: { 'data-settings-surface': 'section' },
+      })
+      .createDiv({
+        cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+        attr: { 'data-settings-surface': 'section-body' },
+      });
     this.renderLayoutModeSetting(blockBodyEl);
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);

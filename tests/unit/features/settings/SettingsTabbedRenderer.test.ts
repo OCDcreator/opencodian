@@ -40,9 +40,18 @@ function createRendererState(options?: {
     plugin: plugin as never,
     createHeading: (containerEl, title) => containerEl.createEl('h3', { text: title }),
     createSettingsBlock: (containerEl, options) => {
-      const hostEl = containerEl.createDiv({ cls: 'settings-block' });
-      hostEl.createEl('h4', { text: options.title });
-      return hostEl;
+      const hostEl = containerEl.createDiv({
+        cls: 'opencodian-settings-block opencodian-settings-section',
+        attr: { 'data-settings-surface': 'section' },
+      });
+      hostEl.createEl('h4', {
+        text: options.title,
+        cls: 'opencodian-settings-subsection-heading opencodian-settings-section-heading',
+      });
+      return hostEl.createDiv({
+        cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+        attr: { 'data-settings-surface': 'section-body' },
+      });
     },
     setSettingDescWithFormatting: () => undefined,
     applyInlineCodeText: () => undefined,
@@ -115,7 +124,11 @@ describe('SettingsTabbedRenderer', () => {
       'settings-editor-area-setting',
     );
     expect(containerEl.querySelectorAll('.opencodian-settings-block')).toHaveLength(1);
-    expect(containerEl.querySelector('.opencodian-settings-general-merged-block')).not.toBeNull();
+    const generalBlockEl = containerEl.querySelector<HTMLElement>('.opencodian-settings-general-merged-block');
+    expect(generalBlockEl).not.toBeNull();
+    expect(generalBlockEl?.classList.contains('opencodian-settings-section')).toBe(true);
+    expect(generalBlockEl?.dataset.settingsSurface).toBe('section');
+    expect(generalBlockEl?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
   });
 
   it('shows MCP as a top-level tab between Commands and Formatter', () => {
@@ -265,16 +278,33 @@ describe('SettingsModelSection tabbed block visibility', () => {
   it('hides the whole inactive model blocks instead of leaving empty block shells', () => {
     const createSectionHeading = jest.fn((containerEl: HTMLElement, title: string) => containerEl.createEl('h3', { text: title }));
     const createSettingsBlock = jest.fn((containerEl: HTMLElement, options: { title: string; description: string; collapsible?: boolean }) => {
-      const hostEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+      const hostEl = containerEl.createDiv({
+        cls: 'opencodian-settings-block opencodian-settings-section',
+        attr: { 'data-settings-surface': 'section' },
+      });
       if (!options.collapsible) {
-        hostEl.createEl('h4', { text: options.title });
+        hostEl.createEl('h4', {
+          text: options.title,
+          cls: 'opencodian-settings-subsection-heading opencodian-settings-section-heading',
+        });
         hostEl.createDiv({ cls: 'opencodian-settings-block-desc', text: options.description });
-        return hostEl.createDiv({ cls: 'opencodian-settings-block-body' });
+        return hostEl.createDiv({
+          cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+          attr: { 'data-settings-surface': 'section-body' },
+        });
       }
 
       const detailsEl = hostEl.createEl('details', { cls: 'opencodian-settings-block-details' });
-      detailsEl.createEl('summary', { cls: 'opencodian-settings-block-summary', text: options.title });
-      return detailsEl.createDiv({ cls: 'opencodian-settings-block-body' });
+      detailsEl
+        .createEl('summary', { cls: 'opencodian-settings-block-summary' })
+        .createDiv({
+          cls: 'opencodian-settings-subsection-heading opencodian-settings-section-heading',
+          text: options.title,
+        });
+      return detailsEl.createDiv({
+        cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+        attr: { 'data-settings-surface': 'section-body' },
+      });
     });
     const plugin = {
       settings: {

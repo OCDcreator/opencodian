@@ -223,8 +223,14 @@ export class SettingsTabbedRenderer {
 
   private renderGeneralContent(containerEl: HTMLElement, _secondaryTabId: string): void {
     const blockBodyEl = containerEl
-      .createDiv({ cls: 'opencodian-settings-block opencodian-settings-general-merged-block' })
-      .createDiv({ cls: 'opencodian-settings-block-body' });
+      .createDiv({
+        cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-general-merged-block',
+        attr: { 'data-settings-surface': 'section' },
+      })
+      .createDiv({
+        cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+        attr: { 'data-settings-surface': 'section-body' },
+      });
     this.deps.renderLayoutModeSetting(blockBodyEl);
     this.deps.renderLanguageSetting(blockBodyEl);
     this.deps.renderSettingsInEditorAreaSetting(blockBodyEl);

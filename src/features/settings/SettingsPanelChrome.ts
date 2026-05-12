@@ -54,15 +54,21 @@ export function createSettingsBlock(
     onToggle,
   } = options;
 
-  const hostEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+  const hostEl = containerEl.createDiv({
+    cls: 'opencodian-settings-block opencodian-settings-section',
+    attr: { 'data-settings-surface': 'section' },
+  });
   if (!collapsible) {
     hostEl.createEl('h4', {
       text: title,
-      cls: 'opencodian-settings-subsection-heading',
+      cls: 'opencodian-settings-subsection-heading opencodian-settings-section-heading',
     });
     const descEl = hostEl.createDiv({ cls: 'opencodian-settings-block-desc' });
     applyInlineCodeTextToTarget(descEl, description);
-    return hostEl.createDiv({ cls: 'opencodian-settings-block-body' });
+    return hostEl.createDiv({
+      cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+      attr: { 'data-settings-surface': 'section-body' },
+    });
   }
 
   const detailsEl = hostEl.createEl('details', { cls: 'opencodian-settings-block-details' });
@@ -73,13 +79,16 @@ export function createSettingsBlock(
 
   const summaryEl = detailsEl.createEl('summary', { cls: 'opencodian-settings-block-summary' });
   summaryEl.createDiv({
-    cls: 'opencodian-settings-subsection-heading',
+    cls: 'opencodian-settings-subsection-heading opencodian-settings-section-heading',
     text: title,
   });
   const descEl = summaryEl.createDiv({ cls: 'opencodian-settings-block-desc' });
   applyInlineCodeTextToTarget(descEl, description);
 
-  return detailsEl.createDiv({ cls: 'opencodian-settings-block-body' });
+  return detailsEl.createDiv({
+    cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+    attr: { 'data-settings-surface': 'section-body' },
+  });
 }
 
 export function setSettingDescWithFormatting(
