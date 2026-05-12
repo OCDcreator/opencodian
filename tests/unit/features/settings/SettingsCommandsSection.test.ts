@@ -438,6 +438,9 @@ describe('SettingsCommandsSection catalog shell', () => {
 
     const catalogScrollEl = containerEl.querySelector<HTMLElement>('.opencodian-command-catalog-scroll');
     expect(catalogScrollEl).not.toBeNull();
+    expect(
+      catalogScrollEl?.closest('.opencodian-plugin-block')?.querySelector('.opencodian-settings-subsection-heading')?.textContent,
+    ).toBe(t('settings.commands.catalog.title'));
     catalogScrollEl!.scrollTop = 180;
 
     await findToggle('/init')?.onChange?.(false);

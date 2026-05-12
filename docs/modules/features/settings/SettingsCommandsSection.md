@@ -53,6 +53,7 @@ project command editor 负责 `.opencode/opencode.json` 的 `command` 字段，�
 - 关闭 toggle = 把该 command ID 加入 `hiddenSlashCommands`
 - 写回时会去重、裁剪空白并按字母序排序，避免重复 ID 长期累积
 - catalog 可见性写回会刷新本地目录，但会保留 `opencodian-command-catalog-scroll` 的内部滚动位置，避免长命令列表在开关后跳回顶部
+- `opencodian-command-catalog-scroll` 必须挂在实际 catalog block body 上，而不是 project command editor block；`renderWithPreservedScroll()` 只围绕 catalog body 重绘列表
 
 因此这条路径只表达“当前 Obsidian profile 下的 slash menu 可见性”，不改变 OpenCode runtime 自身的 command config。
 

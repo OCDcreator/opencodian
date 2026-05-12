@@ -171,9 +171,7 @@ export class SettingsCommandsSection {
       cls: 'opencodian-plugin-block-desc',
       text: t('settings.commands.editor.desc'),
     });
-    return blockEl.createDiv({
-      cls: 'opencodian-plugin-block-body opencodian-settings-catalog-scroll opencodian-command-catalog-scroll',
-    });
+    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
   }
 
   private createCatalogBlock(containerEl: HTMLElement): HTMLElement {
@@ -186,7 +184,9 @@ export class SettingsCommandsSection {
       cls: 'opencodian-plugin-block-desc',
       text: t('settings.commands.catalog.desc'),
     });
-    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
+    return blockEl.createDiv({
+      cls: 'opencodian-plugin-block-body opencodian-settings-catalog-scroll opencodian-command-catalog-scroll',
+    });
   }
 
   private async refreshCatalog(options: {
