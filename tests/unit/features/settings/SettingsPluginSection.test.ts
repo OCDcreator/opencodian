@@ -458,6 +458,10 @@ describe('Settings plugin/catalog CSS contract', () => {
       '\\.opencodian-settings-catalog-scroll > \\.setting-item',
       'background:',
     );
+    const classicBlockRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-plugin-block',
+      'background:',
+    );
     const agentGroupRule = findRule('\\.opencodian-agent-editor-group', 'background:');
     const summaryRule = findRule('\\.opencodian-plugin-summary-row', 'background:');
     const sourcePathRule = findRule('\\.opencodian-plugin-source-path', 'background:');
@@ -473,6 +477,10 @@ describe('Settings plugin/catalog CSS contract', () => {
     expect(blockRule).toContain('background: transparent');
     expect(blockRule).toContain('border: 0');
     expect(blockRule).toContain('box-shadow: none');
+    expect(classicBlockRule).toContain('var(--opencodian-settings-object-bg');
+    expect(classicBlockRule).toContain('var(--opencodian-settings-object-border');
+    expect(classicBlockRule).toContain('var(--opencodian-settings-radius-row');
+    expect(classicBlockRule).toContain('box-shadow: none');
     expect(bodyRule).toContain('var(--opencodian-settings-space-md');
     expect(catalogRowRule).toContain('var(--opencodian-settings-row-bg');
     expect(catalogRowRule).toContain('box-shadow: none');

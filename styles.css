@@ -11286,6 +11286,23 @@ img.opencodian-model-provider-header-icon {
   padding: var(--opencodian-settings-space-md) 0 0;
 }
 
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-plugin-block {
+  margin: var(--opencodian-settings-space-lg) 0 var(--opencodian-settings-space-xl);
+  padding: 12px;
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-plugin-block > .opencodian-settings-subsection-heading {
+  padding: 0;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-plugin-block-body {
+  padding-top: var(--opencodian-settings-space-md);
+}
+
 .opencodian-settings-catalog-scroll,
 .opencodian-agent-catalog-scroll {
   max-height: min(460px, 52vh);

@@ -102,3 +102,11 @@ Agents、Commands 和 Plugin settings 现在共享同一组 plugin/catalog densi
 - plugin source paths 使用 inline tokens。
 
 Guardrail: 不要在 `.opencodian-plugin-block*`、`.opencodian-settings-catalog-scroll`、`.opencodian-agent-editor-*` 或 `.opencodian-plugin-source-*` 重新引入大卡片套小卡片、渐变、decorative blur、hover lift、side-stripe border 或未定义的 settings radius token。
+
+### 2026-05-12 classic hierarchy repair
+
+第五轮的平铺模式反馈表明：Agents、Commands 和 Plugin catalog 的子选项很多，完全扁平会让 classic mode 失去二级层级。现在规则调整为：
+
+- tabbed mode 继续保持 `.opencodian-plugin-block` 无框，因为二级 tab 已经承担分层。
+- classic mode 下 `.opencodian-plugin-block` 使用 object tokens 作为轻量 section panel，帮助用户扫描多个子块。
+- catalog rows 仍使用 row tokens，避免回到旧的大卡片套小卡片。
