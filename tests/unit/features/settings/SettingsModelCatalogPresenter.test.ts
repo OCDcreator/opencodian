@@ -296,6 +296,18 @@ describe('SettingsModelCatalogPresenter CSS contract', () => {
     const modelRule = findRule('\\.opencodian-model-toggle-model', 'background:');
     const searchRule = findRule('\\.opencodian-model-availability-search-container', 'background:');
     const summaryCardRule = findRule('\\.opencodian-model-catalog-summary-card', 'background:');
+    const classicBlockRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-model-toggle-block',
+      'background:',
+    );
+    const classicDescRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-model-toggle-desc',
+      'border-bottom:',
+    );
+    const classicProviderSiblingRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-model-toggle-provider \\+ \\.opencodian-model-toggle-provider',
+      'margin-top:',
+    );
 
     expect(providerRule).toContain('var(--opencodian-settings-object-bg');
     expect(providerRule).toContain('box-shadow: none');
@@ -307,5 +319,11 @@ describe('SettingsModelCatalogPresenter CSS contract', () => {
     expect(modelRule).not.toContain('backdrop-filter');
     expect(searchRule).toContain('var(--opencodian-settings-inline-bg');
     expect(summaryCardRule).toContain('var(--opencodian-settings-object-bg');
+    expect(classicBlockRule).toContain('var(--opencodian-settings-object-bg');
+    expect(classicBlockRule).toContain('box-shadow: none');
+    expect(classicBlockRule).not.toContain('linear-gradient');
+    expect(classicBlockRule).toContain('backdrop-filter: none');
+    expect(classicDescRule).toContain('var(--opencodian-settings-object-border');
+    expect(classicProviderSiblingRule).toContain('var(--opencodian-settings-space-md');
   });
 });

@@ -761,6 +761,14 @@ describe('SettingsFormatterSection CSS contract', () => {
     const envRowRule = findRule('\\.opencodian-formatter-env-row', 'background:');
     const jsonEditorRule = findRule('\\.opencodian-formatter-json-editor', 'background:');
     const buttonBarRule = findRule('\\.opencodian-formatter-json-buttons', 'background:');
+    const classicSummaryGridRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-summary-cards',
+      'border-top:',
+    );
+    const classicBuiltinSiblingRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-builtin-row \\+ \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-custom-row \\+ \\.opencodian-formatter-custom-row',
+      'margin-top:',
+    );
     const formatterCss = css.slice(
       css.indexOf('.opencodian-formatter-summary-cards'),
       css.indexOf('.opencodian-plugin-summary-list'),
@@ -777,6 +785,9 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(envRowRule).toContain('var(--opencodian-settings-inline-bg');
     expect(jsonEditorRule).toContain('var(--opencodian-settings-row-bg');
     expect(buttonBarRule).toContain('background: transparent');
+    expect(classicSummaryGridRule).toContain('var(--opencodian-settings-object-border');
+    expect(classicSummaryGridRule).toContain('var(--opencodian-settings-space-lg');
+    expect(classicBuiltinSiblingRule).toContain('var(--opencodian-settings-space-md');
     expect(formatterCss).not.toContain('linear-gradient');
     expect(formatterCss).not.toContain('backdrop-filter');
     expect(formatterCss).not.toContain('transform: translateY');

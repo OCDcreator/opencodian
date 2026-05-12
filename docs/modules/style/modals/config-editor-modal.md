@@ -121,3 +121,15 @@ Guardrail: 不要在 `.opencodian-plugin-block*`、`.opencodian-settings-catalog
 - classic catalog rows 之间使用 `--opencodian-settings-space-md`，让大量 Agents / Commands / Plugin rows 不再挤成一团。
 
 Guardrail: 这次增强只允许 classic mode 获得更明确的 child panel rhythm。Tabbed mode 的 `.opencodian-plugin-block` 必须继续透明、无框、无 shadow。
+
+### 2026-05-13 classic local hierarchy pass
+
+第八轮只增强 classic mode 下 MCP、Formatter、Model availability 的局部层级，不改变功能和 tabbed mode：
+
+- classic `.opencodian-model-toggle-block` 覆盖旧的 gradient / blur / heavy shadow，改用 object tokens、14px padding、row radius，并显式 `box-shadow: none` 与 `backdrop-filter: none`。
+- classic `.opencodian-model-toggle-desc` 使用 object-border token 的分隔线，provider rows 之间使用 `--opencodian-settings-space-md`。
+- classic `.opencodian-mcp-overview-shell` 使用 `--opencodian-settings-space-lg` 加强 overview 内部 rhythm；server list shell 增加 object-border token 的 top divider。
+- classic `.opencodian-mcp-server-list` 使用 `--opencodian-settings-space-md`，让 server cards 在平铺流里更容易分辨。
+- classic `.opencodian-formatter-summary-cards` 增加 top divider 与 `--opencodian-settings-space-lg` spacing；builtin / custom formatter rows 使用 `--opencodian-settings-space-md`。
+
+Guardrail: MCP、Formatter、Model availability 的 classic 精修只能增加局部节奏和分隔，不应恢复 section 内的大卡片套大卡片、decorative blur、gradient、hover lift 或 heavy shadow。

@@ -10656,6 +10656,16 @@ img.opencodian-model-provider-header-icon {
     0 14px 34px color-mix(in srgb, black 12%, transparent);
 }
 
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-model-toggle-block {
+  padding: 14px;
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .opencodian-model-toggle-catalogs {
   margin-bottom: 8px;
 }
@@ -10726,6 +10736,12 @@ img.opencodian-model-provider-header-icon {
   border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 52%, transparent);
 }
 
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-model-toggle-desc {
+  margin-bottom: var(--opencodian-settings-space-lg);
+  padding-bottom: var(--opencodian-settings-space-lg);
+  border-bottom: 1px solid color-mix(in srgb, var(--opencodian-settings-object-border) 78%, transparent);
+}
+
 .opencodian-model-toggle-empty {
   margin-top: 14px;
   padding: 18px 16px;
@@ -10770,6 +10786,10 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-model-toggle-provider + .opencodian-model-toggle-provider {
   margin-top: 10px;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-model-toggle-provider + .opencodian-model-toggle-provider {
+  margin-top: var(--opencodian-settings-space-md);
 }
 
 .opencodian-model-toggle-provider:first-of-type {
@@ -11428,6 +11448,16 @@ img.opencodian-model-provider-header-icon {
   gap: 12px;
 }
 
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-mcp-overview-shell {
+  gap: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-mcp-server-list-shell {
+  margin-top: var(--opencodian-settings-space-lg);
+  padding-top: var(--opencodian-settings-space-lg);
+  border-top: 1px solid color-mix(in srgb, var(--opencodian-settings-object-border) 78%, transparent);
+}
+
 .opencodian-mcp-overview-toolbar {
   display: flex;
   align-items: center;
@@ -11532,6 +11562,10 @@ img.opencodian-model-provider-header-icon {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-mcp-server-list {
+  gap: var(--opencodian-settings-space-md);
 }
 
 .opencodian-mcp-server-header,
@@ -11785,6 +11819,12 @@ img.opencodian-model-provider-header-icon {
   gap: var(--opencodian-settings-space-md);
 }
 
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-summary-cards {
+  margin-top: var(--opencodian-settings-space-lg);
+  padding-top: var(--opencodian-settings-space-lg);
+  border-top: 1px solid color-mix(in srgb, var(--opencodian-settings-object-border) 78%, transparent);
+}
+
 .opencodian-formatter-summary-card {
   padding: 10px 12px;
   border: 1px solid var(--opencodian-settings-object-border);
@@ -11869,6 +11909,11 @@ img.opencodian-model-provider-header-icon {
   border-radius: var(--opencodian-settings-radius-row);
   background: var(--opencodian-settings-object-bg);
   box-shadow: none;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-builtin-row + .opencodian-formatter-builtin-row,
+.opencodian-settings[data-settings-layout-mode="classic"] .opencodian-formatter-custom-row + .opencodian-formatter-custom-row {
+  margin-top: var(--opencodian-settings-space-md);
 }
 
 .opencodian-formatter-builtin-row > .setting-item,

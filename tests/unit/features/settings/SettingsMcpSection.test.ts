@@ -388,6 +388,18 @@ describe('SettingsMcpSection CSS contract', () => {
       'background:',
     );
     const formGroupRule = findRule('\\.opencodian-mcp-form-group', 'background:');
+    const classicOverviewShellRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-mcp-overview-shell',
+      'gap:',
+    );
+    const classicServerListShellRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-mcp-server-list-shell',
+      'border-top:',
+    );
+    const classicServerListRule = findRule(
+      '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-mcp-server-list',
+      'gap:',
+    );
     const mcpCss = css.slice(
       css.indexOf('.opencodian-mcp-overview-shell'),
       css.indexOf('.opencodian-plugin-summary-list'),
@@ -410,6 +422,9 @@ describe('SettingsMcpSection CSS contract', () => {
     expect(emptyRule).toContain('var(--opencodian-settings-row-bg');
     expect(detailsRule).toContain('var(--opencodian-settings-object-bg');
     expect(formGroupRule).toContain('var(--opencodian-settings-object-bg');
+    expect(classicOverviewShellRule).toContain('var(--opencodian-settings-space-lg');
+    expect(classicServerListShellRule).toContain('var(--opencodian-settings-object-border');
+    expect(classicServerListRule).toContain('var(--opencodian-settings-space-md');
     expect(mcpCssWithoutBadges).not.toContain('linear-gradient');
     expect(mcpCssWithoutBadges).not.toContain('backdrop-filter');
     expect(mcpCssWithoutBadges).not.toContain('transform: translateY');
