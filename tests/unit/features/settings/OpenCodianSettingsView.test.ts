@@ -73,9 +73,34 @@ describe('OpenCodianSettingsView', () => {
     expect(view.containerEl.classList.contains('opencodian-settings')).toBe(false);
     expect(view.contentEl.classList.contains('opencodian-settings')).toBe(true);
     expect(view.contentEl.classList.contains('opencodian-settings--classic')).toBe(true);
+    expect(view.contentEl.dataset.settingsLayoutMode).toBe('classic');
+    expect(view.contentEl.dataset.settingsSurface).toBe('page');
     expect(view.contentEl.querySelector('.opencodian-settings-quick-nav')).not.toBeNull();
     expect(Array.from(view.containerEl.children).some((child) =>
       child.classList.contains('opencodian-settings-quick-nav'),
     )).toBe(false);
+  });
+
+  it('renders editor-area tabbed settings inside the ItemView content element', async () => {
+    const { view } = createSettingsView('tabbed');
+    const renderDisplay = jest.fn((containerEl: HTMLElement) => {
+      containerEl.createDiv({ cls: 'tabbed-render-marker', text: 'tabbed-rendered' });
+    });
+
+    Object.assign(view as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderDisplay,
+        switchToPrimaryTab: jest.fn(),
+      }),
+    });
+
+    await view.onOpen();
+
+    expect(view.containerEl.classList.contains('opencodian-settings')).toBe(false);
+    expect(view.contentEl.classList.contains('opencodian-settings')).toBe(true);
+    expect(view.contentEl.classList.contains('opencodian-settings--tabbed')).toBe(true);
+    expect(view.contentEl.dataset.settingsLayoutMode).toBe('tabbed');
+    expect(view.contentEl.dataset.settingsSurface).toBe('page');
+    expect(renderDisplay).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,6 +9,10 @@
 
 这个模块复用现有 settings section owner，不复制具体设置项渲染逻辑。它的职责是把 `OpenCodianSettingTab` 的 classic / tabbed 装配路径搬到 editor-area view 生命周期里，并隔离滚动状态，避免和标准设置页互相覆盖。
 
+## Settings Layout Contract
+
+编辑区设置视图会在 `contentEl` 上镜像标准 settings tab 的根布局契约标记：`data-settings-surface="page"` 和 `data-settings-layout-mode="classic|tabbed"`。CSS 与测试应通过这些 marker 识别 editor-area settings page surface 与当前布局模式，避免只依赖视觉 class 推断。
+
 ## 导入关系
 
 ```text

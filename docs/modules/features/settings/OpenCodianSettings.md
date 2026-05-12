@@ -14,6 +14,10 @@
 
 布局模式通过 `settingsLayoutMode` settings 字段持久化，新用户默认 `'tabbed'`，老用户升级默认 `'classic'`。标签模式的标签结构定义在 `settingsLayoutRegistry.ts`，渲染委托给 `SettingsTabbedRenderer`。
 
+## Settings Layout Contract
+
+标准 settings tab 的根设置容器会暴露稳定布局契约标记：`data-settings-surface="page"` 和 `data-settings-layout-mode="classic|tabbed"`。CSS 与测试应优先使用这些 data marker 做页面 surface / layout mode 的契约检查，而不是只从 `.opencodian-settings--classic` 或 `.opencodian-settings--tabbed` 等视觉 class 推断当前模式。
+
 当前文件的重点不只是“渲染设置项”，还包括：
 
 - 模型 / 样式 / server / security owner 的装配与跨 section 桥接

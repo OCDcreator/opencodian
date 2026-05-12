@@ -242,6 +242,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
     containerEl.classList.remove('opencodian-settings--tabbed');
     containerEl.classList.add('opencodian-settings--classic');
+    containerEl.dataset.settingsSurface = 'page';
+    containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
     this.addServerSettings(containerEl);
@@ -271,6 +273,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
     containerEl.classList.remove('opencodian-settings--classic');
     containerEl.classList.add('opencodian-settings--tabbed');
+    containerEl.dataset.settingsSurface = 'page';
+    containerEl.dataset.settingsLayoutMode = 'tabbed';
 
     this.getOrCreateTabbedRenderer().renderDisplay(containerEl);
 

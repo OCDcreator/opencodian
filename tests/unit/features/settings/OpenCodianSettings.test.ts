@@ -570,6 +570,8 @@ describe('OpenCodianSettingTab layout shell', () => {
 
     tab.display();
 
+    expect(tab.containerEl.dataset.settingsLayoutMode).toBe('classic');
+    expect(tab.containerEl.dataset.settingsSurface).toBe('page');
     expect(
       Array.from(tab.containerEl.querySelectorAll<HTMLHeadingElement>('.opencodian-settings-section-heading')).map(
         (element) => element.textContent?.trim(),
@@ -645,6 +647,8 @@ describe('OpenCodianSettingTab layout shell', () => {
     tab.display();
 
     expect(renderDisplay).toHaveBeenCalledTimes(1);
+    expect(tab.containerEl.dataset.settingsLayoutMode).toBe('tabbed');
+    expect(tab.containerEl.dataset.settingsSurface).toBe('page');
     expect(tab.containerEl.querySelector('.opencodian-settings-quick-nav')).toBeNull();
     expect(tab.containerEl.querySelector('.tabbed-render-marker')?.textContent).toBe('tabbed-rendered');
   });
