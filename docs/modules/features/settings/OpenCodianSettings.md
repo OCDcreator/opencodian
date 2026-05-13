@@ -29,6 +29,7 @@
 - 通过 `SettingsServerSection` 协调 server section 的 mode/auth/status lifecycle
 - 通过 `SettingsModelSection` 协调 model section 的 source mode / refresh / workspace / icon cache lifecycle
 - 通过 `SettingsSecuritySection` 协调 security section 的 config-status/permission/restart/blocklist lifecycle
+- 通过 `SettingsToolSection` 协调 Tools section 的 built-in permission、项目 `.opencode/tools` 自定义工具文件、全局 tools 只读目录和运行时 custom tool catalog 权限 lifecycle
 - 通过 `SettingsDebugSection` 协调 debug logging、log path picker、diagnostic action 与 console help lifecycle
 - 通过 `SettingsStyleBackgroundSection` 协调 style owner 下的聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
@@ -95,6 +96,9 @@
 - **Security**
   - config file status / permission mode / restart action 现已委托给 `SettingsSecuritySection`
   - blocklist、external access、export path 与平台 blocked commands 的 section 组装同样收口到专属 owner
+- **Tools**
+  - `SettingsToolSection` 继续管理 built-in tool permission 分组，并新增自定义工具文件管理：可在 `.opencode/tools/` 创建默认 TS 工具模板、编辑/删除项目工具文件、只读展示 `~/.config/opencode/tools` 全局工具，并保留运行时 catalog custom tool 的真实 tool id 权限控制
+  - 自定义工具的启用 / 询问 / 拒绝仍写入项目 `.opencode/opencode.json` 的 `permission.<toolName>`；文件管理不直接执行或加载工具
 - **Debug**
   - `SettingsDebugSection` 现在接管 `enableDebugLogging`、`inlineSerializedDebugLogArgs`、log path picker、diagnostic copy/generate action 与 console help block
   - `OpenCodianSettings` 不再直接铺开 debug section 的路径/导出/帮助说明 UI 细节，只保留 owner 装配
@@ -217,6 +221,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsSecuritySection`: 管理 security section 的 config status、permission mode 写回、restart action 与 blocklist/export-path 输入；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsStyleSection`: 管理 style section 的 theme preset、binding sync、background/input 子 owner 装配与 custom CSS；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsFormatterSection`: 管理 formatter section 的 runtime status 展示、project config 模式切换（default/disabled/custom）与 formatter 子树读写；`OpenCodianSettings` 只保留 owner 装配与 display refresh bridge
+- `SettingsToolSection`: 管理 Tools section 的内置工具权限、自定义工具文件 authoring、全局工具只读展示和运行时 custom tool 权限列表；`OpenCodianSettings` 只负责 classic / tabbed 两种布局下的 owner 装配
 - `SettingsStyleInputPanelSection`: 管理 input panel theme family/variant、glass-refraction 参数与 input subsection rerender；`SettingsStyleSection` 只向它提供通用 style-control seam
 - `ModelCatalogStateService`: 提供 settings/model 分区使用的 catalog state API，并集中 provider/model availability 的 core 写回操作
 - `SettingsModelCatalogPresenter`: 管理 provider/model accordion、search、bulk toggle、catalog summary 卡片与 provider probe presentation；`SettingsModelSection` 只向它提供 settings writeback 与 icon/inline-code host seam

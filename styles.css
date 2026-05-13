@@ -7114,6 +7114,23 @@ img.opencodian-model-provider-header-icon {
   background: var(--opencodian-settings-object-bg);
 }
 
+.opencodian-settings .opencodian-tool-control-panel {
+  margin-bottom: var(--opencodian-settings-space-md);
+}
+
+.opencodian-settings .opencodian-tool-default-cluster {
+  margin: 0;
+}
+
+.opencodian-settings .opencodian-tool-control-panel:not(.opencodian-tool-control-panel--with-toolbar) .opencodian-tool-default-cluster {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.opencodian-settings .opencodian-tool-default-action {
+  min-width: 150px;
+}
+
 .opencodian-settings .opencodian-tool-group-panel + .opencodian-tool-group-panel {
   margin-top: var(--opencodian-settings-space-md);
 }
@@ -7152,8 +7169,81 @@ img.opencodian-model-provider-header-icon {
   border-color: color-mix(in srgb, var(--text-error) 30%, var(--opencodian-settings-row-border));
 }
 
+.opencodian-settings .opencodian-tool-permission-row[data-tool-permission-source='override'] .setting-item {
+  background: color-mix(in srgb, var(--background-primary) 78%, var(--interactive-accent) 8%);
+}
+
 .opencodian-settings .opencodian-tool-permission-row .setting-item-description {
   font-family: var(--font-monospace);
+}
+
+.opencodian-settings .opencodian-tool-file-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--opencodian-settings-space-md);
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+}
+
+.opencodian-settings .opencodian-tool-file-card-content {
+  display: grid;
+  gap: var(--opencodian-settings-space-xs);
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-tool-file-title-row,
+.opencodian-settings .opencodian-tool-row-actions {
+  display: flex;
+  gap: var(--opencodian-settings-space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.opencodian-settings .opencodian-tool-source-chip {
+  padding: 2px 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.opencodian-settings .opencodian-tool-file-path,
+.opencodian-settings .opencodian-tool-file-hint {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-settings .opencodian-tool-file-path {
+  font-family: var(--font-monospace);
+}
+
+.opencodian-settings .opencodian-tool-row-action.setting-item {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.opencodian-settings .opencodian-tool-row-action .setting-item-info {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .opencodian-settings .opencodian-tool-file-card {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-settings .opencodian-tool-row-actions {
+    justify-content: flex-start;
+  }
 }
 
 /* ─── ACP agent cards ────────────────────────────────────────────────── */

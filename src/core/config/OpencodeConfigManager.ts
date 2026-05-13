@@ -348,6 +348,11 @@ export class OpencodeConfigManager {
 
   async clearToolPermission(tool: string): Promise<void> {
     const config = await this.read();
+    if (tool === '*' && typeof config.permission === 'string') {
+      delete config.permission;
+      await this.write(config);
+      return;
+    }
     if (!config.permission || typeof config.permission !== 'object') {
       return;
     }

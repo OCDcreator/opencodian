@@ -67,8 +67,13 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 
 ## Tool Permission Styles
 
+- `.opencodian-tool-control-panel` / `.opencodian-tool-default-*`：Tools 页签顶部控制卡。它有意复用 `.opencodian-skill-control-panel`、`.opencodian-skill-permission-cluster`、`.opencodian-skill-permission-*` 和 `.opencodian-skill-toolbar` 的结构与样式 vocabulary，让工具权限配置和技能权限配置看起来属于同一套设置表单。
+- `.opencodian-tool-authoring-actions`：自定义工具文件 authoring 工具条，承载 New tool、Refresh 和 Docs 等紧凑动作。它位于同一张 Tools 控制卡的权限 cluster 下方，而不是另起一张更重的面板。
 - `.opencodian-tool-group-panel`：工具权限的分组面板，承载组标题、描述和权限行。
-- `.opencodian-tool-permission-row`：单个工具权限行，带 `data-tool-permission` 标记供 ask / deny 状态做低调语义边框。
+- `.opencodian-tool-permission-row`：单个工具权限行，带 `data-tool-permission` 标记供 ask / deny 状态做低调语义边框；`data-tool-permission-source="override"` 会用更明确的 tonal background 提示该工具已覆盖默认权限。
+- `.opencodian-tool-file-card` / `.opencodian-tool-file-*`：自定义工具定义文件行，宽屏为“名称/来源/路径/说明 + 操作区”两列，窄屏退为单列。
+- `.opencodian-tool-source-chip`：项目 / 全局工具来源 chip，使用低调边框和 background-secondary，不用重色块。
+- `.opencodian-tool-row-actions` / `.opencodian-tool-row-action`：工具文件行中的 permission dropdown、Open、Delete 等操作区，保持 compact 表单节奏。
 - `.opencodian-settings-inline-empty`：Skills / Tools / ACP 共享的空态与加载态 surface。
 
 ## ACP Agent Card Styles

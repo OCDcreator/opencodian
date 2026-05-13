@@ -16,7 +16,7 @@
 
 ## 一级/二级标签结构
 
-当前涵盖 14 个一级标签：
+当前涵盖 17 个一级标签：
 
 | 一级标签 | 二级标签 |
 |---------|---------|
@@ -34,6 +34,9 @@
 | `style` | `presets`, `background`, `layout`, `user`, `assistant`, `input`, `scrollbar`, `advanced` |
 | `debug` | `general`, `modules`, `logs`, `actions` |
 | `user` | `profile`, `prompt`, `tags` |
+| `skills` | `catalog` |
+| `tools` | `builtin`, `custom` |
+| `acp` | `agents` |
 
 ## 查找与回退函数
 

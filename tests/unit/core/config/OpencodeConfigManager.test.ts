@@ -161,6 +161,14 @@ describe('OpencodeConfigManager permissions', () => {
       expect(permission['*']).toBe('allow');
       expect(permission.edit).toBe('deny');
     });
+
+    it('should clear shorthand global permission when clearing the default wildcard', async () => {
+      await manager.setYoloMode();
+      await manager.clearToolPermission('*');
+
+      const config = await manager.read();
+      expect(config.permission).toBeUndefined();
+    });
   });
 
   describe('remove', () => {
