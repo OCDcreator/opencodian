@@ -15,15 +15,16 @@
 
 ### 内置工具
 
-- `renderBuiltinTools()` 按文件、搜索、执行、网络、智能、元工具和计划工具分组渲染。
+- `renderBuiltinTools()` 按文件、搜索、执行、网络、智能、元工具和计划工具分组渲染，每组使用 `opencodian-tool-group-panel` 和说明文案呈现。
 - 每个工具先通过 `isBuiltinToolName()` 校验，再用 `getToolIdentity()` 获取标准名称和显示名称。
 - 当前权限来自具体 tool id，缺省时回退到通配符 `*`，再回退到 `allow`。
+- 每个权限行外层带 `opencodian-tool-permission-row` 和 `data-tool-permission`，用于 CSS 区分 allow / ask / deny 状态，不改变权限保存语义。
 
 ### 自定义工具
 
 - `renderCustomTools()` 从 `openCodeCatalogStateStore` 读取 registry tool ids。
 - `classifyToolIds()` 将工具分成 builtin/custom，只渲染 custom 列表。
-- 自定义工具按名称排序，并通过 registry context 解析显示名。
+- 自定义工具按名称排序，并通过 registry context 解析显示名。自定义工具列表也复用 group panel 结构，空状态使用共享的 `opencodian-settings-inline-empty` 样式。
 
 ### 权限保存
 

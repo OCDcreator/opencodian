@@ -43,6 +43,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 2026-05-11 还新增 `chat.tab.backToParent`，用于子会话 tab 激活时的 “Back to parent” 面包屑按钮文案。同日 AskQuestion Dock polish 新增 `chat.question.collapse` 与 `chat.question.expand`，作为 above-input QuestionDock 折叠/展开图标按钮的 aria label。
 
+2026-05-13 新增 `settings.skills.loading` / `settings.skills.count`、`settings.tools.group.*.desc`、`settings.tools.custom.desc`、`settings.acp.customAgent`、`settings.acp.preset.desc` 和 `settings.acp.command.empty`，服务 Skills / Tools / ACP Agents 设置页的分组化布局、空态和命令摘要。
+
 源码约 2050 行。
 
 ## 导入关系

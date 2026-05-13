@@ -12,15 +12,43 @@ interface ToolCatalogStoreLike {
   getToolCatalogSnapshot(): { registryToolIds: string[] };
 }
 
-const TOOL_GROUPS: Record<string, string[]> = {
-  'settings.tools.group.fileOps': ['read', 'write', 'edit', 'multiedit', 'apply_patch', 'patch'],
-  'settings.tools.group.search': ['glob', 'grep', 'list', 'codesearch'],
-  'settings.tools.group.execution': ['bash', 'task'],
-  'settings.tools.group.network': ['web_fetch', 'web_search'],
-  'settings.tools.group.intelligence': ['lsp'],
-  'settings.tools.group.meta': ['skill', 'todowrite', 'todoread', 'question'],
-  'settings.tools.group.plan': ['plan_enter', 'plan_exit'],
-};
+const TOOL_GROUPS: Array<{ labelKey: string; descKey: string; toolNames: string[] }> = [
+  {
+    labelKey: 'settings.tools.group.fileOps',
+    descKey: 'settings.tools.group.fileOps.desc',
+    toolNames: ['read', 'write', 'edit', 'multiedit', 'apply_patch', 'patch'],
+  },
+  {
+    labelKey: 'settings.tools.group.search',
+    descKey: 'settings.tools.group.search.desc',
+    toolNames: ['glob', 'grep', 'list', 'codesearch'],
+  },
+  {
+    labelKey: 'settings.tools.group.execution',
+    descKey: 'settings.tools.group.execution.desc',
+    toolNames: ['bash', 'task'],
+  },
+  {
+    labelKey: 'settings.tools.group.network',
+    descKey: 'settings.tools.group.network.desc',
+    toolNames: ['web_fetch', 'web_search'],
+  },
+  {
+    labelKey: 'settings.tools.group.intelligence',
+    descKey: 'settings.tools.group.intelligence.desc',
+    toolNames: ['lsp'],
+  },
+  {
+    labelKey: 'settings.tools.group.meta',
+    descKey: 'settings.tools.group.meta.desc',
+    toolNames: ['skill', 'todowrite', 'todoread', 'question'],
+  },
+  {
+    labelKey: 'settings.tools.group.plan',
+    descKey: 'settings.tools.group.plan.desc',
+    toolNames: ['plan_enter', 'plan_exit'],
+  },
+];
 
 export class SettingsToolSection {
   constructor(
@@ -43,18 +71,23 @@ export class SettingsToolSection {
   private async renderBuiltinTools(): Promise<void> {
     const currentPermissions = await this.readCurrentPermissions();
 
-    for (const [groupLabelKey, toolNames] of Object.entries(TOOL_GROUPS)) {
+    for (const group of TOOL_GROUPS) {
+      const groupEl = this.containerEl.createDiv({ cls: 'opencodian-tool-group-panel' });
+      const headerEl = groupEl.createDiv({ cls: 'opencodian-tool-group-header' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.containerEl.createEl('h3', { text: t(groupLabelKey as any) });
+      headerEl.createEl('h3', { text: t(group.labelKey as any) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      headerEl.createDiv({ cls: 'opencodian-tool-group-desc', text: t(group.descKey as any) });
+      const rowsEl = groupEl.createDiv({ cls: 'opencodian-tool-group-rows' });
 
-      for (const toolName of toolNames) {
+      for (const toolName of group.toolNames) {
         if (!isBuiltinToolName(toolName)) {
           continue;
         }
 
         const identity = getToolIdentity(toolName);
         const currentPermission = this.getPermissionForTool(currentPermissions, identity.normalizedName);
-        this.renderToolRow(identity.normalizedName, identity.displayName, currentPermission);
+        this.renderToolRow(rowsEl, identity.normalizedName, identity.displayName, currentPermission);
       }
     }
   }
@@ -62,29 +95,46 @@ export class SettingsToolSection {
   private async renderCustomTools(): Promise<void> {
     const catalogStore = this.getCatalogStore();
     if (!catalogStore) {
-      this.containerEl.createEl('p', { text: t('settings.tools.empty') });
+      this.renderEmptyState();
       return;
     }
 
     const allToolIds = catalogStore.getToolCatalogSnapshot().registryToolIds;
     const { custom } = catalogStore.classifyToolIds(allToolIds);
     if (custom.length === 0) {
-      this.containerEl.createEl('p', { text: t('settings.tools.empty') });
+      this.renderEmptyState();
       return;
     }
 
     const currentPermissions = await this.readCurrentPermissions();
     const identityContext = { registryTools: allToolIds };
+    const panelEl = this.containerEl.createDiv({ cls: 'opencodian-tool-group-panel opencodian-tool-custom-panel' });
+    const headerEl = panelEl.createDiv({ cls: 'opencodian-tool-group-header' });
+    headerEl.createEl('h3', { text: t('settings.tools.tab.custom') });
+    headerEl.createDiv({
+      cls: 'opencodian-tool-group-desc',
+      text: t('settings.tools.custom.desc').replace('{count}', String(custom.length)),
+    });
+    const rowsEl = panelEl.createDiv({ cls: 'opencodian-tool-group-rows' });
 
     for (const toolId of custom.sort((left, right) => left.localeCompare(right))) {
       const identity = getToolIdentity(toolId, identityContext);
       const currentPermission = this.getPermissionForTool(currentPermissions, toolId);
-      this.renderToolRow(toolId, identity.displayName, currentPermission);
+      this.renderToolRow(rowsEl, toolId, identity.displayName, currentPermission);
     }
   }
 
-  private renderToolRow(toolId: string, displayName: string, currentPermission: string): void {
-    new Setting(this.containerEl)
+  private renderToolRow(containerEl: HTMLElement, toolId: string, displayName: string, currentPermission: string): void {
+    const permission = this.normalizePermissionAction(currentPermission);
+    const rowEl = containerEl.createDiv({
+      cls: 'opencodian-tool-permission-row',
+      attr: {
+        'data-tool-id': toolId,
+        'data-tool-permission': permission,
+      },
+    });
+
+    new Setting(rowEl)
       .setName(displayName)
       .setDesc(toolId)
       .addDropdown((dropdown) => {
@@ -92,11 +142,18 @@ export class SettingsToolSection {
           .addOption('allow', t('settings.tools.permission.allow'))
           .addOption('ask', t('settings.tools.permission.ask'))
           .addOption('deny', t('settings.tools.permission.deny'))
-          .setValue(this.normalizePermissionAction(currentPermission))
+          .setValue(permission)
           .onChange(async (value) => {
             await this.setToolPermission(toolId, this.normalizePermissionAction(value));
           });
       });
+  }
+
+  private renderEmptyState(): void {
+    this.containerEl.createDiv({
+      cls: 'opencodian-settings-inline-empty opencodian-tool-empty',
+      text: t('settings.tools.empty'),
+    });
   }
 
   private async setToolPermission(toolId: string, action: ToolPermissionAction): Promise<void> {

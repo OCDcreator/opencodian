@@ -19,6 +19,10 @@
 
 技能按 `location` 归类为 project / global / builtin / claude / agents。归类规则与 `SkillCatalogService` 保持一致，方便后续改回共享 service seam。
 
+### 工具栏与来源分组
+
+顶部控制现在集中在 `opencodian-skill-toolbar` 中：权限 dropdown 与刷新按钮并列，避免与技能卡片混在一起。技能列表会先显示 `opencodian-skill-loading`，加载完成后按来源渲染 `opencodian-skill-source-section`，每个来源 header 显示来源名和数量。
+
 ### 内容渲染
 
 技能内容卡片将 SKILL.md 文本按行解析为轻量 HTML 结构（标题 → `<strong>`，列表项 → 带缩进 div，普通段落 → `<p>`），而不是原始 `<pre>` 块。超过 500 字符的内容会被截断并显示省略号。卡片使用 `opencodian-skill-card` CSS 类，布局由 `settings-layout-contract.css` 统一管理。

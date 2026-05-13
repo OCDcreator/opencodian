@@ -17,6 +17,13 @@ interface SettingsAcpSectionOptions {
   ) => HTMLHeadingElement;
 }
 
+interface AcpStackedFieldOptions {
+  label: string;
+  value: string;
+  onChange: (value: string) => Promise<void>;
+  placeholder?: string;
+}
+
 const ACP_PRESETS: Array<Omit<AcpAgentConfig, 'id'>> = [
   { name: 'OpenCode', command: 'opencode', args: ['acp'], env: {}, enabled: true },
   { name: 'Codex', command: 'codex', args: ['acp'], env: {}, enabled: true },
@@ -55,19 +62,25 @@ export class SettingsAcpSection {
       return;
     }
 
+    const scrollContainer = this.resolveScrollContainer(this.bodyEl);
+    const previousScrollTop = scrollContainer?.scrollTop ?? 0;
     this.bodyEl.empty();
     this.renderAddButtons(this.bodyEl);
     this.renderAgentList(this.bodyEl);
+    this.restoreScrollTopAfterRender(scrollContainer, previousScrollTop);
   }
 
   private renderAddButtons(containerEl: HTMLElement): void {
-    const presetBarEl = containerEl.createDiv({ cls: 'opencodian-acp-preset-bar' });
+    const presetBarEl = containerEl.createDiv({ cls: 'opencodian-acp-preset-rail' });
+    const introEl = presetBarEl.createDiv({ cls: 'opencodian-acp-preset-intro' });
+    introEl.createEl('strong', { text: t('settings.acp.addAgent') });
+    introEl.createDiv({ text: t('settings.acp.preset.desc'), cls: 'opencodian-acp-preset-desc' });
 
     new Setting(presetBarEl)
-      .setName(t('settings.acp.addAgent'))
+      .setClass('opencodian-acp-preset-action')
       .addButton((button) => {
         button
-          .setButtonText('+')
+          .setButtonText(t('settings.acp.customAgent'))
           .onClick(() => {
             void this.addAgent({
               id: this.createAgentId(),
@@ -82,9 +95,10 @@ export class SettingsAcpSection {
 
     for (const preset of ACP_PRESETS) {
       new Setting(presetBarEl)
+        .setClass('opencodian-acp-preset-action')
         .addButton((button) => {
           button
-            .setButtonText(`+ ${preset.name}`)
+            .setButtonText(preset.name)
             .onClick(() => {
               void this.addAgent({ id: this.createAgentId(), ...preset });
             });
@@ -95,22 +109,28 @@ export class SettingsAcpSection {
   private renderAgentList(containerEl: HTMLElement): void {
     const agents = this.plugin.settings.acpAgents;
     if (agents.length === 0) {
-      containerEl.createEl('p', { text: t('settings.acp.empty') });
+      containerEl.createDiv({ cls: 'opencodian-settings-inline-empty opencodian-acp-empty', text: t('settings.acp.empty') });
       return;
     }
 
+    const listEl = containerEl.createDiv({ cls: 'opencodian-acp-agent-list' });
     for (const agent of agents) {
-      this.renderAgentCard(containerEl, agent);
+      this.renderAgentCard(listEl, agent);
     }
   }
 
   private renderAgentCard(containerEl: HTMLElement, agent: AcpAgentConfig): void {
     const cardEl = containerEl.createDiv({ cls: 'opencodian-acp-agent-card' });
+    const headerEl = cardEl.createDiv({ cls: 'opencodian-acp-agent-card-header' });
+    const identityEl = headerEl.createDiv({ cls: 'opencodian-acp-agent-identity' });
+    identityEl.createEl('strong', { text: agent.name || t('settings.acp.agentName') });
+    identityEl.createDiv({
+      cls: 'opencodian-acp-agent-command-summary',
+      text: this.formatAgentCommand(agent),
+    });
 
-    // Header row: name, description, toggle, remove
-    new Setting(cardEl)
-      .setName(agent.name || t('settings.acp.agentName'))
-      .setDesc(`${agent.command} ${agent.args.join(' ')}`.trim())
+    new Setting(headerEl)
+      .setClass('opencodian-acp-agent-actions')
       .addToggle((toggle) => {
         toggle.setValue(agent.enabled).onChange(async (value) => {
           agent.enabled = value;
@@ -132,45 +152,64 @@ export class SettingsAcpSection {
     // Stacked form fields: label above input, full width
     const fieldsEl = cardEl.createDiv({ cls: 'opencodian-acp-agent-fields' });
 
-    this.renderStackedField(fieldsEl, t('settings.acp.agentName'), agent.name, async (value) => {
-      agent.name = value;
-      await this.saveSettings();
+    this.renderStackedField(fieldsEl, {
+      label: t('settings.acp.agentName'),
+      value: agent.name,
+      onChange: async (value) => {
+        agent.name = value;
+        await this.saveSettings();
+      },
     });
 
-    this.renderStackedField(fieldsEl, t('settings.acp.agentCommand'), agent.command, async (value) => {
-      agent.command = value;
-      await this.saveSettings();
+    this.renderStackedField(fieldsEl, {
+      label: t('settings.acp.agentCommand'),
+      value: agent.command,
+      onChange: async (value) => {
+        agent.command = value;
+        await this.saveSettings();
+      },
     });
 
-    this.renderStackedField(fieldsEl, t('settings.acp.agentArgs'), agent.args.join(' '), async (value) => {
-      agent.args = value.split(/\s+/).filter(Boolean);
-      await this.saveSettings();
+    this.renderStackedField(fieldsEl, {
+      label: t('settings.acp.agentArgs'),
+      value: agent.args.join(' '),
+      onChange: async (value) => {
+        agent.args = value.split(/\s+/).filter(Boolean);
+        await this.saveSettings();
+      },
     });
 
-    this.renderStackedField(fieldsEl, t('settings.acp.agentCwd'), agent.cwd ?? '', async (value) => {
-      agent.cwd = value.trim() || undefined;
-      await this.saveSettings();
-    }, '(default)');
+    this.renderStackedField(fieldsEl, {
+      label: t('settings.acp.agentCwd'),
+      value: agent.cwd ?? '',
+      onChange: async (value) => {
+        agent.cwd = value.trim() || undefined;
+        await this.saveSettings();
+      },
+      placeholder: '(default)',
+    });
   }
 
   private renderStackedField(
     containerEl: HTMLElement,
-    label: string,
-    value: string,
-    onChange: (value: string) => Promise<void>,
-    placeholder?: string,
+    options: AcpStackedFieldOptions,
   ): void {
     const fieldEl = containerEl.createDiv({ cls: 'opencodian-acp-stacked-field' });
-    fieldEl.createEl('label', { text: label, cls: 'opencodian-acp-field-label' });
+    const inputId = `opencodian-acp-field-${this.createFieldId(options.label)}`;
+    fieldEl.createEl('label', {
+      text: options.label,
+      cls: 'opencodian-acp-field-label',
+      attr: { for: inputId },
+    });
     const input = fieldEl.createEl('input', {
       cls: 'opencodian-acp-field-input',
-      attr: { type: 'text', value },
+      attr: { id: inputId, type: 'text', value: options.value },
     }) as HTMLInputElement;
-    if (placeholder) {
-      input.placeholder = placeholder;
+    if (options.placeholder) {
+      input.placeholder = options.placeholder;
     }
     input.addEventListener('change', () => {
-      void onChange(input.value);
+      void options.onChange(input.value);
     });
   }
 
@@ -188,5 +227,47 @@ export class SettingsAcpSection {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `acp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  private resolveScrollContainer(anchorEl: HTMLElement): HTMLElement | null {
+    let currentEl: HTMLElement | null = anchorEl;
+    while (currentEl) {
+      if (
+        currentEl.classList.contains('vertical-tab-content')
+        || currentEl.classList.contains('modal-content')
+        || currentEl.scrollHeight > currentEl.clientHeight
+      ) {
+        return currentEl;
+      }
+      currentEl = currentEl.parentElement;
+    }
+
+    return null;
+  }
+
+  private restoreScrollTopAfterRender(scrollContainer: HTMLElement | null, scrollTop: number): void {
+    if (!scrollContainer || scrollTop <= 0) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (!scrollContainer.isConnected) {
+        return;
+      }
+
+      scrollContainer.scrollTop = scrollTop;
+    });
+  }
+
+  private createFieldId(label: string): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}-${label}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  private formatAgentCommand(agent: AcpAgentConfig): string {
+    const command = `${agent.command} ${agent.args.join(' ')}`.trim();
+    return command || t('settings.acp.command.empty');
   }
 }

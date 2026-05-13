@@ -52,9 +52,14 @@ export class SettingsSkillSection {
   private render(containerEl: HTMLElement): void {
     const blockEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     this.bodyEl = blockEl.createDiv({ cls: 'opencodian-settings-block-body' });
-    this.renderPermissionControl(this.bodyEl);
-    this.renderRefreshButton(this.bodyEl);
+    this.renderToolbar(this.bodyEl);
     void this.renderSkillList(this.bodyEl);
+  }
+
+  private renderToolbar(containerEl: HTMLElement): void {
+    const toolbarEl = containerEl.createDiv({ cls: 'opencodian-skill-toolbar' });
+    this.renderPermissionControl(toolbarEl);
+    this.renderRefreshButton(toolbarEl);
   }
 
   private renderPermissionControl(containerEl: HTMLElement): void {
@@ -92,8 +97,7 @@ export class SettingsSkillSection {
             }
 
             this.bodyEl.empty();
-            this.renderPermissionControl(this.bodyEl);
-            this.renderRefreshButton(this.bodyEl);
+            this.renderToolbar(this.bodyEl);
             void this.renderSkillList(this.bodyEl, true);
           });
       });
@@ -101,13 +105,18 @@ export class SettingsSkillSection {
 
   private async renderSkillList(containerEl: HTMLElement, forceRefresh = false): Promise<void> {
     const listEl = containerEl.createDiv({ cls: 'opencodian-skill-list' });
+    listEl.createDiv({
+      cls: 'opencodian-settings-inline-empty opencodian-skill-loading',
+      text: t('settings.skills.loading'),
+    });
 
     try {
       const skills = await this.fetchSkills(forceRefresh);
+      listEl.empty();
       const groups = this.groupBySource(skills);
       const allEmpty = Object.values(groups).every((group) => group.length === 0);
       if (allEmpty) {
-        listEl.createEl('p', { text: t('settings.skills.empty') });
+        listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty') });
         return;
       }
 
@@ -117,14 +126,24 @@ export class SettingsSkillSection {
           continue;
         }
 
-        listEl.createEl('h3', { text: t(SOURCE_LABEL_KEYS[source]) });
+        const sectionEl = listEl.createDiv({
+          cls: 'opencodian-skill-source-section',
+          attr: { 'data-skill-source': source },
+        });
+        const headerEl = sectionEl.createDiv({ cls: 'opencodian-skill-source-header' });
+        headerEl.createEl('h3', { text: t(SOURCE_LABEL_KEYS[source]) });
+        headerEl.createSpan({
+          cls: 'opencodian-skill-count',
+          text: t('settings.skills.count').replace('{count}', String(sourceSkills.length)),
+        });
         for (const skill of sourceSkills) {
-          this.renderSkillCard(listEl, skill);
+          this.renderSkillCard(sectionEl, skill);
         }
       }
     } catch (error) {
+      listEl.empty();
       logger.error('Failed to render skills:', error);
-      listEl.createEl('p', { text: t('settings.skills.empty') });
+      listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty') });
       if (forceRefresh) {
         new Notice(t('settings.skills.empty'));
       }
@@ -134,9 +153,10 @@ export class SettingsSkillSection {
   private renderSkillCard(containerEl: HTMLElement, skill: SkillInfo): void {
     const cardEl = containerEl.createDiv({ cls: 'opencodian-skill-card' });
     const headerEl = cardEl.createDiv({ cls: 'opencodian-skill-card-header' });
-    headerEl.createEl('strong', { text: skill.name });
+    const titleEl = headerEl.createDiv({ cls: 'opencodian-skill-title-row' });
+    titleEl.createEl('strong', { text: skill.name });
     if (skill.description) {
-      headerEl.createSpan({ text: ` — ${skill.description}` });
+      headerEl.createDiv({ text: skill.description, cls: 'opencodian-skill-description' });
     }
     cardEl.createEl('small', { text: skill.location, cls: 'opencodian-skill-source' });
 

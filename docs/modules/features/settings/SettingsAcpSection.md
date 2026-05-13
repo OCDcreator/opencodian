@@ -11,10 +11,11 @@
 
 ### Agent CRUD
 
-- `+` 按钮创建空白 agent 配置。
-- 预设按钮（OpenCode、Codex、Claude Code）创建对应 command / args 的 agent 配置，排列在同一行 preset bar 内。
+- `Custom agent` 按钮创建空白 agent 配置。
+- 预设按钮（OpenCode、Codex、Claude Code）创建对应 command / args 的 agent 配置，排列在 `opencodian-acp-preset-rail` 内，并带有简短说明。
 - 每张 agent card 支持 enabled toggle、name、command、args、cwd 编辑和 remove 操作。
-- Agent card 使用 `opencodian-acp-agent-card` CSS 类，输入框宽度限制为 300px，布局由 `settings-layout-contract.css` 统一管理。
+- Agent card 使用 `opencodian-acp-agent-card` CSS 类，顶部 `opencodian-acp-agent-card-header` 展示名称、命令摘要、启用开关和移除动作，字段区继续用 label-above-input 的 stacked form 布局。
+- 新增、预设新增和移除 agent 都会局部重建 ACP body。`rerender()` 会在重建前捕获外层设置滚动容器，并在下一帧恢复 `scrollTop`，避免点击 preset 按钮后设置页向上跳。
 
 ### 保存路径
 

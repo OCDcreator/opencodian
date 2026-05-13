@@ -52,15 +52,25 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 
 ## Skill Card Styles
 
-- `.opencodian-skill-list`：纵向 flex 容器，承载技能卡片列表。
+- `.opencodian-skill-toolbar`：权限 dropdown 与刷新按钮的顶部工具栏，使用 grid 在宽屏并排、窄屏堆叠。
+- `.opencodian-skill-list`：纵向 flex 容器，承载来源分组后的技能卡片列表。
+- `.opencodian-skill-source-section` / `.opencodian-skill-source-header`：每个技能来源的分组容器与标题行，显示来源名和计数。
 - `.opencodian-skill-card`：使用 object token weight 的技能卡片，包含 header（名称 + 描述）、source 路径和 content 区域。
 - `.opencodian-skill-content`：最大高度 260px 的可滚动内容区，将 SKILL.md 解析为轻量 HTML（strong / p / div.li）。
 
+## Tool Permission Styles
+
+- `.opencodian-tool-group-panel`：工具权限的分组面板，承载组标题、描述和权限行。
+- `.opencodian-tool-permission-row`：单个工具权限行，带 `data-tool-permission` 标记供 ask / deny 状态做低调语义边框。
+- `.opencodian-settings-inline-empty`：Skills / Tools / ACP 共享的空态与加载态 surface。
+
 ## ACP Agent Card Styles
 
-- `.opencodian-acp-agent-card`：使用 object token weight 的 agent 配置卡片，内部 setting-item 无边框。
-- `.opencodian-acp-agent-card .setting-item-control`：输入框最大宽度 320px，防止撑满整个设置面板。
-- `.opencodian-acp-preset-bar`：flex-wrap 行内按钮组，承载新建和预设按钮。
+- `.opencodian-acp-preset-rail`：新建和预设按钮的顶部 rail，左侧展示说明，右侧展示 custom / preset actions。
+- `.opencodian-acp-agent-list`：agent card 的纵向列表容器。
+- `.opencodian-acp-agent-card`：使用 object token weight 的 agent 配置卡片。
+- `.opencodian-acp-agent-card-header`：卡片头部，展示 agent 名称、命令摘要、enabled toggle 与 remove 动作。
+- `.opencodian-acp-agent-fields`：两列 stacked field grid，窄屏退化为单列。
 
 ## Tab Bar Scrolling
 
