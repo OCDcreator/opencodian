@@ -90,6 +90,12 @@ describe('SkillCatalogService', () => {
       { name: 'c', description: '', location: '.claude/skills/c/SKILL.md', content: '' },
       { name: 'd', description: '', location: '.agents/skills/d/SKILL.md', content: '' },
       { name: 'e', description: '', location: 'builtin', content: '' },
+      {
+        name: 'f',
+        description: '',
+        location: '/Users/me/.cache/opencode/packages/superpowers/node_modules/superpowers/skills/f/SKILL.md',
+        content: '',
+      },
     ];
     const host = createHost({
       fetchSkills: jest.fn().mockResolvedValue(skills),
@@ -103,6 +109,7 @@ describe('SkillCatalogService', () => {
     expect(groups.claude).toEqual([skills[2]]);
     expect(groups.agents).toEqual([skills[3]]);
     expect(groups.builtin).toEqual([skills[4]]);
+    expect(groups.plugin).toEqual([skills[5]]);
   });
 
   it('forces refresh when refresh() is called', async () => {

@@ -3,8 +3,9 @@
  * Skill settings section for OpenCode skill discovery and permission control.
  */
 
-import { MarkdownRenderer, Modal, normalizePath, Notice, requestUrl, Setting } from 'obsidian';
+import { MarkdownRenderer, Modal, normalizePath, Notice, requestUrl, setIcon, Setting } from 'obsidian';
 
+import type { PermissionAction, PermissionConfig } from '../../core/types';
 import { getServerBaseUrl } from '../../core/types/settings';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -12,6 +13,7 @@ import { createLogger } from '../../shared';
 import type { SkillInfo, SkillSourceGroups } from '../chat/services/SkillCatalogService';
 
 const logger = createLogger('SettingsSkillSection');
+const OPENCODE_SKILLS_DOC_URL = 'https://opencode.ai/docs/zh-cn/skills/';
 const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const SKILL_NAME_MAX_LENGTH = 64;
 const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
@@ -28,10 +30,13 @@ const ALLOWED_SKILL_FRONTMATTER_KEYS = new Set([
 const SOURCE_LABEL_KEYS: Record<keyof SkillSourceGroups, TranslationKey> = {
   project: 'settings.skills.source.project',
   global: 'settings.skills.source.global',
+  plugin: 'settings.skills.source.plugin',
   builtin: 'settings.skills.source.builtin',
   claude: 'settings.skills.source.claude',
   agents: 'settings.skills.source.agents',
 };
+
+type SkillPermissionSelection = 'inherit' | PermissionAction;
 
 interface SettingsSkillSectionOptions {
   plugin: OpenCodianPlugin;
@@ -63,41 +68,131 @@ export class SettingsSkillSection {
   }
 
   private render(containerEl: HTMLElement): void {
-    const blockEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
-    this.bodyEl = blockEl.createDiv({ cls: 'opencodian-settings-block-body' });
+    this.bodyEl = containerEl.createDiv({ cls: 'opencodian-skill-settings-shell' });
     this.renderToolbar(this.bodyEl);
     void this.renderSkillList(this.bodyEl);
   }
 
   private renderToolbar(containerEl: HTMLElement): void {
-    const toolbarEl = containerEl.createDiv({ cls: 'opencodian-skill-toolbar' });
-    this.renderPermissionControl(toolbarEl);
+    const panelEl = containerEl.createDiv({
+      cls: 'opencodian-skill-control-panel opencodian-settings-section',
+      attr: { 'data-settings-surface': 'section' },
+    });
+    this.renderPermissionControl(panelEl);
+    const toolbarEl = panelEl.createDiv({ cls: 'opencodian-skill-toolbar' });
     this.renderCreateSkillControl(toolbarEl);
     this.renderRefreshButton(toolbarEl);
   }
 
   private renderPermissionControl(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.skills.permission.label'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('allow', t('settings.skills.permission.allow'))
-          .addOption('ask', t('settings.skills.permission.ask'))
-          .addOption('deny', t('settings.skills.permission.deny'))
-          .setValue('allow')
-          .onChange(async (value) => {
-            const configManager = this.plugin.opencodeConfigManager;
-            if (!configManager) {
-              return;
-            }
+    const clusterEl = containerEl.createDiv({ cls: 'opencodian-skill-permission-cluster' });
+    const copyEl = clusterEl.createDiv({ cls: 'opencodian-skill-permission-copy' });
+    copyEl.createDiv({
+      cls: 'opencodian-skill-permission-title',
+      text: t('settings.skills.permission.label'),
+    });
+    copyEl.createDiv({
+      cls: 'opencodian-skill-permission-summary',
+      text: t('settings.skills.permission.desc'),
+    });
+    const globalStatusEl = copyEl.createDiv({
+      cls: 'opencodian-skill-permission-global-status',
+      text: t('settings.skills.permission.globalStatus.loading'),
+    });
+    void this.getCurrentGlobalPermission().then((permission) => {
+      globalStatusEl.setText(
+        t('settings.skills.permission.globalStatus.value').replace(
+          '{permission}',
+          this.formatPermissionSelection(permission),
+        ),
+      );
+    });
 
-            await configManager.setToolPermission('skill', value as 'allow' | 'deny' | 'ask');
-          });
+    const actionEl = clusterEl.createDiv({ cls: 'opencodian-skill-permission-actions' });
+    const dropdownEl = actionEl.createEl('select', {
+      cls: 'dropdown opencodian-skill-permission-select',
+      attr: { 'aria-label': t('settings.skills.permission.label') },
+    });
+    this.addPermissionOption(dropdownEl, 'inherit', t('settings.skills.permission.inheritGlobal'));
+    this.addPermissionOption(dropdownEl, 'allow', t('settings.skills.permission.allow'));
+    this.addPermissionOption(dropdownEl, 'ask', t('settings.skills.permission.ask'));
+    this.addPermissionOption(dropdownEl, 'deny', t('settings.skills.permission.deny'));
+    dropdownEl.value = 'inherit';
+    dropdownEl.addEventListener('change', () => {
+      void this.updateSkillDefaultPermission(dropdownEl.value as SkillPermissionSelection);
+    });
+    void this.getCurrentSkillPermission().then((permission) => {
+      dropdownEl.value = permission;
+    });
 
-        void this.getCurrentSkillPermission().then((permission) => {
-          dropdown.setValue(permission);
-        });
-      });
+    const helpButtonEl = actionEl.createEl('button', {
+      cls: 'clickable-icon opencodian-skill-permission-help-button',
+      attr: {
+        'aria-label': t('settings.skills.permission.help.tooltip'),
+        title: t('settings.skills.permission.help.tooltip'),
+        type: 'button',
+      },
+    });
+    setIcon(helpButtonEl, 'help-circle');
+    helpButtonEl.addEventListener('click', () => {
+      new SkillPermissionHelpModal(this.plugin.app).open();
+    });
+  }
+
+  private addPermissionOption(selectEl: HTMLSelectElement, value: SkillPermissionSelection, label: string): void {
+    const optionEl = selectEl.createEl('option', { text: label });
+    optionEl.value = value;
+  }
+
+  private async getCurrentGlobalPermission(): Promise<SkillPermissionSelection> {
+    try {
+      const configManager = this.plugin.opencodeConfigManager;
+      if (!configManager) {
+        return 'inherit';
+      }
+
+      const permission = (await configManager.read()).permission;
+      if (permission === 'allow' || permission === 'deny' || permission === 'ask') {
+        return permission;
+      }
+      if (permission && typeof permission === 'object') {
+        const defaultPermission = (permission as PermissionConfig)['*'];
+        if (defaultPermission === 'allow' || defaultPermission === 'deny' || defaultPermission === 'ask') {
+          return defaultPermission;
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to read global permission:', error);
+    }
+
+    return 'inherit';
+  }
+
+  private formatPermissionSelection(permission: SkillPermissionSelection): string {
+    if (permission === 'allow') {
+      return t('settings.skills.permission.allow');
+    }
+    if (permission === 'ask') {
+      return t('settings.skills.permission.ask');
+    }
+    if (permission === 'deny') {
+      return t('settings.skills.permission.deny');
+    }
+    return t('settings.skills.permission.globalStatus.unset');
+  }
+
+  private async updateSkillDefaultPermission(value: SkillPermissionSelection): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      return;
+    }
+
+    if (value === 'inherit') {
+      await configManager.clearToolPermission('skill');
+    } else {
+      await configManager.setToolPermission('skill', value);
+    }
+    await this.restartLocalServiceAfterPermissionWrite();
   }
 
   private renderCreateSkillControl(containerEl: HTMLElement): void {
@@ -205,6 +300,41 @@ export class SettingsSkillSection {
             this.openSkillModal(skill, { mode: this.resolveVaultRelativeSkillPath(skill.location) ? 'edit' : 'view' });
           });
       });
+    this.renderSkillDeleteButton(actionsEl, skill);
+  }
+
+  private renderSkillDeleteButton(containerEl: HTMLElement, skill: SkillInfo): void {
+    if (!this.resolveProjectSkillPath(skill.location)) {
+      return;
+    }
+
+    const buttonEl = containerEl.createEl('button', {
+      cls: 'mod-warning opencodian-skill-row-action opencodian-skill-row-delete-action',
+      text: t('settings.skills.delete'),
+      attr: { type: 'button' },
+    });
+    buttonEl.addEventListener('click', () => {
+      void this.deleteProjectSkill(skill);
+    });
+  }
+
+  private async deleteProjectSkill(skill: SkillInfo): Promise<void> {
+    const path = this.resolveProjectSkillPath(skill.location);
+    if (!path) {
+      new Notice(t('settings.skills.notice.readOnly'));
+      return;
+    }
+    if (!window.confirm(t('settings.skills.delete.confirm', { name: skill.name }))) {
+      return;
+    }
+    await this.plugin.app.vault.adapter.remove(path);
+    new Notice(t('settings.skills.notice.deleted', { path }));
+    if (!this.bodyEl) {
+      return;
+    }
+    this.bodyEl.empty();
+    this.renderToolbar(this.bodyEl);
+    await this.renderSkillList(this.bodyEl, true);
   }
 
   private renderSkillPermissionDropdown(containerEl: HTMLElement, skillName: string): void {
@@ -213,16 +343,22 @@ export class SettingsSkillSection {
       .setName(t('settings.skills.itemPermission.label'))
       .addDropdown((dropdown) => {
         dropdown
+          .addOption('inherit', t('settings.skills.itemPermission.inherit'))
           .addOption('allow', t('settings.skills.permission.allow'))
           .addOption('ask', t('settings.skills.permission.ask'))
           .addOption('deny', t('settings.skills.permission.deny'))
-          .setValue('ask')
+          .setValue('inherit')
           .onChange(async (value) => {
             const configManager = this.plugin.opencodeConfigManager;
             if (!configManager) {
               return;
             }
-            await configManager.setSkillPermissionPattern(skillName, value as 'allow' | 'ask' | 'deny');
+            if (value === 'inherit') {
+              await configManager.clearSkillPermissionPattern(skillName);
+            } else {
+              await configManager.setSkillPermissionPattern(skillName, value as PermissionAction);
+            }
+            await this.restartLocalServiceAfterPermissionWrite();
           });
 
         void this.getCurrentSkillPatternPermission(skillName).then((permission) => {
@@ -231,60 +367,78 @@ export class SettingsSkillSection {
       });
   }
 
-  private async getCurrentSkillPermission(): Promise<'allow' | 'deny' | 'ask'> {
+  private async getCurrentSkillPermission(): Promise<SkillPermissionSelection> {
     try {
       const configManager = this.plugin.opencodeConfigManager;
       if (!configManager) {
-        return 'allow';
+        return 'inherit';
       }
 
       const config = await configManager.read();
       const permission = config.permission;
-      if (permission === 'allow' || permission === 'deny' || permission === 'ask') {
-        return permission;
-      }
-
       if (permission && typeof permission === 'object') {
-        const skillPermission = (permission as Record<string, unknown>).skill;
+        const skillPermission = (permission as PermissionConfig).skill;
         if (skillPermission === 'allow' || skillPermission === 'deny' || skillPermission === 'ask') {
           return skillPermission;
+        }
+        if (skillPermission && typeof skillPermission === 'object') {
+          const defaultSkillPermission = (skillPermission as Record<string, unknown>)['*'];
+          if (
+            defaultSkillPermission === 'allow'
+            || defaultSkillPermission === 'deny'
+            || defaultSkillPermission === 'ask'
+          ) {
+            return defaultSkillPermission;
+          }
         }
       }
     } catch (error) {
       logger.warn('Failed to read skill permission:', error);
     }
 
-    return 'allow';
+    return 'inherit';
   }
 
-  private async getCurrentSkillPatternPermission(skillName: string): Promise<'allow' | 'deny' | 'ask'> {
+  private async getCurrentSkillPatternPermission(skillName: string): Promise<SkillPermissionSelection> {
     try {
       const configManager = this.plugin.opencodeConfigManager;
       if (!configManager) {
-        return 'ask';
+        return 'inherit';
       }
       const permission = (await configManager.read()).permission;
       if (permission && typeof permission === 'object') {
-        const skillPermission = (permission as Record<string, unknown>).skill;
+        const skillPermission = (permission as PermissionConfig).skill;
         if (skillPermission && typeof skillPermission === 'object') {
           const exactPermission = (skillPermission as Record<string, unknown>)[skillName];
           if (exactPermission === 'allow' || exactPermission === 'deny' || exactPermission === 'ask') {
             return exactPermission;
           }
-          const defaultPermission = (skillPermission as Record<string, unknown>)['*'];
-          if (defaultPermission === 'allow' || defaultPermission === 'deny' || defaultPermission === 'ask') {
-            return defaultPermission;
-          }
-        }
-        if (skillPermission === 'allow' || skillPermission === 'deny' || skillPermission === 'ask') {
-          return skillPermission;
         }
       }
     } catch (error) {
       logger.warn('Failed to read skill pattern permission:', error);
     }
 
-    return 'ask';
+    return 'inherit';
+  }
+
+  private async restartLocalServiceAfterPermissionWrite(): Promise<void> {
+    if (this.plugin.settings.server.mode !== 'local') {
+      new Notice(t('settings.server.remoteManageUnavailable'));
+      return;
+    }
+
+    try {
+      const isRunning = await this.plugin.openCodeService.checkHealth();
+      if (isRunning) {
+        await this.plugin.openCodeService.stop();
+      }
+      await this.plugin.openCodeService.start();
+      new Notice(t('settings.skills.permission.restartSuccess'));
+    } catch (error) {
+      logger.error('Failed to restart OpenCode after skill permission change:', error);
+      new Notice(t('settings.skills.permission.restartFailed'));
+    }
   }
 
   private async fetchSkills(_forceRefresh: boolean): Promise<SkillInfo[]> {
@@ -326,6 +480,7 @@ export class SettingsSkillSection {
     const groups: SkillSourceGroups = {
       project: [],
       global: [],
+      plugin: [],
       builtin: [],
       claude: [],
       agents: [],
@@ -339,19 +494,26 @@ export class SettingsSkillSection {
   }
 
   private classifySource(location: string): keyof SkillSourceGroups {
+    const normalizedLocation = location.replace(/\\/gu, '/');
+
     if (location === 'builtin') {
       return 'builtin';
     }
 
-    if (location.includes('.config/opencode/skills')) {
+    if (normalizedLocation.includes('/.cache/opencode/packages/')
+      || normalizedLocation.includes('/.cache/opencode/node_modules/')) {
+      return 'plugin';
+    }
+
+    if (normalizedLocation.includes('.config/opencode/skills')) {
       return 'global';
     }
 
-    if (location.includes('.claude/skills')) {
+    if (normalizedLocation.includes('.claude/skills')) {
       return 'claude';
     }
 
-    if (location.includes('.agents/skills')) {
+    if (normalizedLocation.includes('.agents/skills')) {
       return 'agents';
     }
 
@@ -401,7 +563,7 @@ export class SettingsSkillSection {
 
   private resolveVaultRelativeSkillPath(location: string): string | null {
     const normalizedLocation = normalizePath(location);
-    const adapter = this.plugin.app.vault.adapter as { basePath?: string };
+    const adapter = (this.plugin.app?.vault?.adapter ?? {}) as { basePath?: string };
     const basePath = typeof adapter.basePath === 'string' ? normalizePath(adapter.basePath) : '';
     const relativePath = basePath && normalizedLocation.startsWith(`${basePath}/`)
       ? normalizedLocation.slice(basePath.length + 1)
@@ -416,6 +578,14 @@ export class SettingsSkillSection {
     }
     return null;
   }
+
+  private resolveProjectSkillPath(location: string): string | null {
+    const path = this.resolveVaultRelativeSkillPath(location);
+    if (path?.startsWith('.opencode/skills/')) {
+      return path;
+    }
+    return null;
+  }
 }
 
 interface SkillDetailModalOptions {
@@ -423,6 +593,72 @@ interface SkillDetailModalOptions {
   plugin: OpenCodianPlugin;
   skill: SkillInfo;
   onSaved: () => Promise<void>;
+}
+
+class SkillPermissionHelpModal extends Modal {
+  onOpen(): void {
+    this.titleEl.setText(t('settings.skills.permission.help.title'));
+    this.modalEl.addClass('opencodian-skill-permission-help-modal');
+    this.contentEl.empty();
+
+    const shellEl = this.contentEl.createDiv({ cls: 'opencodian-skill-permission-help' });
+    shellEl.createDiv({
+      cls: 'opencodian-skill-permission-help-intro',
+      text: t('settings.skills.permission.help.intro'),
+    });
+
+    const listEl = shellEl.createDiv({ cls: 'opencodian-skill-permission-help-list' });
+    this.renderPermissionCard(listEl, 'allow');
+    this.renderPermissionCard(listEl, 'ask');
+    this.renderPermissionCard(listEl, 'deny');
+
+    const patternEl = shellEl.createDiv({ cls: 'opencodian-skill-permission-help-pattern' });
+    patternEl.createDiv({
+      cls: 'opencodian-skill-permission-help-pattern-title',
+      text: t('settings.skills.permission.help.pattern.title'),
+    });
+    patternEl.createDiv({
+      cls: 'opencodian-skill-permission-help-pattern-body',
+      text: t('settings.skills.permission.help.pattern.body'),
+    });
+    patternEl.createDiv({
+      cls: 'opencodian-skill-permission-help-pattern-body',
+      text: t('settings.skills.itemPermission.desc'),
+    });
+
+    const docLinkEl = shellEl.createEl('a', {
+      cls: 'opencodian-skill-permission-help-link',
+      text: t('settings.skills.permission.help.docs'),
+      attr: {
+        href: OPENCODE_SKILLS_DOC_URL,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      },
+    });
+    docLinkEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.modalEl.removeClass('opencodian-skill-permission-help-modal');
+  }
+
+  private renderPermissionCard(containerEl: HTMLElement, permission: 'allow' | 'ask' | 'deny'): void {
+    const cardEl = containerEl.createDiv({
+      cls: 'opencodian-skill-permission-help-card',
+      attr: { 'data-skill-permission': permission },
+    });
+    cardEl.createDiv({
+      cls: 'opencodian-skill-permission-help-card-title',
+      text: t(`settings.skills.permission.help.${permission}.title` as TranslationKey),
+    });
+    cardEl.createDiv({
+      cls: 'opencodian-skill-permission-help-card-body',
+      text: t(`settings.skills.permission.help.${permission}.body` as TranslationKey),
+    });
+  }
 }
 
 class SkillDetailModal extends Modal {

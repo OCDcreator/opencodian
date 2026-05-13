@@ -12,6 +12,7 @@ export interface SkillInfo {
 export interface SkillSourceGroups {
   project: SkillInfo[];
   global: SkillInfo[];
+  plugin: SkillInfo[];
   builtin: SkillInfo[];
   claude: SkillInfo[];
   agents: SkillInfo[];
@@ -66,6 +67,7 @@ export class SkillCatalogService {
     const groups: SkillSourceGroups = {
       project: [],
       global: [],
+      plugin: [],
       builtin: [],
       claude: [],
       agents: [],
@@ -80,19 +82,26 @@ export class SkillCatalogService {
   }
 
   private classifySource(location: string): keyof SkillSourceGroups {
+    const normalizedLocation = location.replace(/\\/gu, '/');
+
     if (location === 'builtin') {
       return 'builtin';
     }
 
-    if (location.includes('.config/opencode/skills')) {
+    if (normalizedLocation.includes('/.cache/opencode/packages/')
+      || normalizedLocation.includes('/.cache/opencode/node_modules/')) {
+      return 'plugin';
+    }
+
+    if (normalizedLocation.includes('.config/opencode/skills')) {
       return 'global';
     }
 
-    if (location.includes('.claude/skills')) {
+    if (normalizedLocation.includes('.claude/skills')) {
       return 'claude';
     }
 
-    if (location.includes('.agents/skills')) {
+    if (normalizedLocation.includes('.agents/skills')) {
       return 'agents';
     }
 

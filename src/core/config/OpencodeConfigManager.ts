@@ -334,7 +334,36 @@ export class OpencodeConfigManager {
       config.permission = {};
     }
     const permission = config.permission as PermissionConfig;
+    if (tool === 'skill' && permission.skill && typeof permission.skill === 'object') {
+      permission.skill = {
+        ...this.cloneConfigObject(permission.skill),
+        '*': action,
+      };
+      await this.write(config);
+      return;
+    }
     permission[tool as keyof PermissionConfig] = action;
+    await this.write(config);
+  }
+
+  async clearToolPermission(tool: string): Promise<void> {
+    const config = await this.read();
+    if (!config.permission || typeof config.permission !== 'object') {
+      return;
+    }
+    const permission = config.permission as PermissionConfig;
+    if (tool === 'skill' && permission.skill && typeof permission.skill === 'object') {
+      const nextSkillPermission = this.cloneConfigObject(permission.skill) as Record<string, PermissionAction>;
+      delete nextSkillPermission['*'];
+      if (Object.keys(nextSkillPermission).length > 0) {
+        permission.skill = nextSkillPermission;
+      } else {
+        delete permission.skill;
+      }
+      await this.write(config);
+      return;
+    }
+    delete permission[tool as keyof PermissionConfig];
     await this.write(config);
   }
 
@@ -364,6 +393,41 @@ export class OpencodeConfigManager {
     }
     nextSkillPermission[normalizedPattern] = action;
     permission.skill = nextSkillPermission;
+    await this.write(config);
+  }
+
+  async clearSkillPermissionPattern(pattern: string): Promise<void> {
+    const normalizedPattern = pattern.trim();
+    if (!normalizedPattern) {
+      throw new Error('OpenCode skill permission pattern is required');
+    }
+
+    const config = await this.read();
+    if (!config.permission || typeof config.permission !== 'object') {
+      return;
+    }
+
+    const permission = config.permission as PermissionConfig;
+    const currentSkillPermission = permission.skill;
+    if (!currentSkillPermission || typeof currentSkillPermission !== 'object') {
+      return;
+    }
+
+    const nextSkillPermission = this.cloneConfigObject(currentSkillPermission) as Record<string, PermissionAction>;
+    delete nextSkillPermission[normalizedPattern];
+    const remainingPatterns = Object.keys(nextSkillPermission);
+    if (remainingPatterns.length === 0) {
+      delete permission.skill;
+    } else if (remainingPatterns.length === 1 && nextSkillPermission['*']) {
+      const defaultSkillPermission = nextSkillPermission['*'];
+      if (defaultSkillPermission === permission['*']) {
+        delete permission.skill;
+      } else {
+        permission.skill = defaultSkillPermission;
+      }
+    } else {
+      permission.skill = nextSkillPermission;
+    }
     await this.write(config);
   }
 

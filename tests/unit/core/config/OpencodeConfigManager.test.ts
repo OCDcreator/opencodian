@@ -557,6 +557,28 @@ describe('OpencodeConfigManager session agent command helpers', () => {
 });
 
 describe('OpencodeConfigManager skill permissions', () => {
+  it('preserves per-skill overrides when changing the skill default permission', async () => {
+    await manager.write({
+      permission: {
+        '*': 'allow',
+        skill: {
+          '*': 'ask',
+          reviewer: 'deny',
+        },
+      },
+    });
+
+    await manager.setToolPermission('skill', 'allow');
+
+    expect((await manager.read()).permission).toEqual({
+      '*': 'allow',
+      skill: {
+        '*': 'allow',
+        reviewer: 'deny',
+      },
+    });
+  });
+
   it('writes per-skill permission patterns while preserving shorthand defaults', async () => {
     await manager.write({ permission: 'ask' });
 
@@ -566,6 +588,46 @@ describe('OpencodeConfigManager skill permissions', () => {
       '*': 'ask',
       skill: {
         '*': 'ask',
+        reviewer: 'deny',
+      },
+    });
+  });
+
+  it('clears only the selected skill override and keeps the skill default', async () => {
+    await manager.write({
+      permission: {
+        '*': 'allow',
+        skill: {
+          '*': 'ask',
+          reviewer: 'deny',
+        },
+      },
+    });
+
+    await manager.clearSkillPermissionPattern('reviewer');
+
+    expect((await manager.read()).permission).toEqual({
+      '*': 'allow',
+      skill: 'ask',
+    });
+  });
+
+  it('clears the skill default while preserving per-skill overrides', async () => {
+    await manager.write({
+      permission: {
+        '*': 'allow',
+        skill: {
+          '*': 'ask',
+          reviewer: 'deny',
+        },
+      },
+    });
+
+    await manager.clearToolPermission('skill');
+
+    expect((await manager.read()).permission).toEqual({
+      '*': 'allow',
+      skill: {
         reviewer: 'deny',
       },
     });

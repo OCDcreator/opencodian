@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SkillCatalogService` 是聊天侧技能目录的缓存与分组 owner。它通过宿主注入的 `fetchSkills()` 获取技能列表，按 TTL 缓存结果，合并并发加载请求，并按 location 将技能归类为 project、global、builtin、claude 或 agents 来源。
+`SkillCatalogService` 是聊天侧技能目录的缓存与分组 owner。它通过宿主注入的 `fetchSkills()` 获取技能列表，按 TTL 缓存结果，合并并发加载请求，并按 location 将技能归类为 project、global、plugin、builtin、claude 或 agents 来源。
 
 ## 关键导出
 
@@ -25,8 +25,8 @@
 ### 查询和分组
 
 - `getByName()` 基于 `getAll()` 查找指定 skill name。
-- `groupBySource()` 将技能按来源分成 project、global、builtin、claude、agents 五组。
-- `classifySource()` 根据 location 字符串识别 builtin、OpenCode global skills、Claude skills、agents skills，其余默认为 project。
+- `groupBySource()` 将技能按来源分成 project、global、plugin、builtin、claude、agents 六组。
+- `classifySource()` 根据 location 字符串识别 builtin、OpenCode global skills、OpenCode plugin package cache skills、Claude skills、agents skills，其余默认为 project。
 
 ### 错误兜底
 

@@ -50,11 +50,13 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 - navigation shell 的 hover / focus 只能改变背景、边框或 outline，不应使用会造成布局错觉的 translate 或重 shadow。
 - 修改后运行 `npm run build:css` 刷新根目录 `styles.css`。
 
-## Skill Card Styles
+## Skill Catalog Styles
 
-- `.opencodian-skill-toolbar`：全局权限 dropdown、新建技能和刷新按钮的顶部工具栏，使用 grid 在宽屏并排、窄屏堆叠。
-- `.opencodian-skill-list`：纵向 flex 容器，承载来源分组后的技能卡片列表。
-- `.opencodian-skill-source-section` / `.opencodian-skill-source-header`：每个技能来源的分组容器与标题行，显示来源名和计数。
+- `.opencodian-skill-settings-shell`：Skills 标签页的布局 shell，只负责控制面板与来源列表之间的垂直 rhythm，不再把整个技能页包成一个大 settings block。
+- `.opencodian-skill-control-panel` / `.opencodian-skill-toolbar`：全局权限 dropdown、新建技能和刷新按钮的独立控制栏，外层使用 section token，内部 setting items 会被压平为透明工具条内容，避免把三个控制渲染成三张并排卡片。
+- `.opencodian-skill-permission-help-modal` / `.opencodian-skill-permission-help*`：默认技能权限的解释弹窗，使用三列卡片说明 allow / ask / deny，窄屏退为单列，并在底部提供官方文档链接。
+- `.opencodian-skill-list`：纵向 flex 容器，承载来源分组后的技能列表。
+- `.opencodian-skill-source-section` / `.opencodian-skill-source-header`：每个技能来源的独立分区与标题行，显示来源名和计数，让用户按来源扫描，而不是先穿过一个大卡片。
 - `.opencodian-skill-card`：紧凑技能行，宽屏为“名称/描述/路径 + 操作区”两列，避免在列表中展开完整 SKILL.md。
 - `.opencodian-skill-source-chip`：技能来源的低调 monospace chip。
 - `.opencodian-skill-row-actions` / `.opencodian-skill-row-action`：承载单技能 permission dropdown 与打开按钮，保持 setting row 的信息区隐藏。

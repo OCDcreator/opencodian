@@ -112,9 +112,11 @@ getCommandScopedAgentId(commandId: string): string
 
 这点很重要：`plan` 只是 OpenCodian 的 shorthand，不是上游 OpenCode 的原生权限模式；上游仍是 rule-based `permission + pattern + action` 语义。
 
-`setToolPermission()` 允许增量改某一个工具权限；如果原始 `permission` 是字符串，会先转成对象形态 `{ '*': 原值 }`。
+`setToolPermission()` 允许增量改某一个工具权限；如果原始 `permission` 是字符串，会先转成对象形态 `{ '*': 原值 }`。当目标是 `skill` 且已有 `permission.skill` 对象时，它只更新 `permission.skill['*']`，保留单技能 pattern 覆盖。
 
 `setSkillPermissionPattern()` 专门写 `permission.skill.<pattern>`，用于 Skills 设置页给单个 skill name 或 pattern 配置 allow / ask / deny。它会把字符串简写提升为 `{ '*': 原值 }`，并保留已有 `permission.skill` 默认规则。
+
+`clearToolPermission('skill')` 会清除技能默认权限；如果 `permission.skill` 里还有单技能 pattern 覆盖，则只移除 `'*'` 默认项并保留这些覆盖。`clearSkillPermissionPattern(pattern)` 会删除单个技能覆盖；如果剩下的 `permission.skill['*']` 与全局 `permission['*']` 相同，则会删除 `permission.skill` 回到继承全局。
 
 `setAgentSkillPermission()` 写 `agent.<id>.permission.skill`，用于按代理覆盖全局技能权限；传入 `undefined` 会移除该代理的 skill 权限覆盖。`setAgentSkillToolEnabled()` 写 `agent.<id>.tools.skill`，用于让特定代理完全禁用或启用 skill tool；传入 `undefined` 会回到继承状态。
 
