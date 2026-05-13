@@ -603,7 +603,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings-tabs-primary {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin: 0 0 12px;
 }
 

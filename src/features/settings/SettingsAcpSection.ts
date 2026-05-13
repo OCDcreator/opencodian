@@ -61,11 +61,13 @@ export class SettingsAcpSection {
   }
 
   private renderAddButtons(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const presetBarEl = containerEl.createDiv({ cls: 'opencodian-acp-preset-bar' });
+
+    new Setting(presetBarEl)
       .setName(t('settings.acp.addAgent'))
       .addButton((button) => {
         button
-          .setButtonText(t('settings.acp.addAgent'))
+          .setButtonText('+')
           .onClick(() => {
             void this.addAgent({
               id: this.createAgentId(),
@@ -79,8 +81,7 @@ export class SettingsAcpSection {
       });
 
     for (const preset of ACP_PRESETS) {
-      new Setting(containerEl)
-        .setName(`${t('settings.acp.addAgent')}: ${preset.name}`)
+      new Setting(presetBarEl)
         .addButton((button) => {
           button
             .setButtonText(`+ ${preset.name}`)
@@ -106,6 +107,7 @@ export class SettingsAcpSection {
   private renderAgentCard(containerEl: HTMLElement, agent: AcpAgentConfig): void {
     const cardEl = containerEl.createDiv({ cls: 'opencodian-acp-agent-card' });
 
+    // Header row: name, description, toggle, remove
     new Setting(cardEl)
       .setName(agent.name || t('settings.acp.agentName'))
       .setDesc(`${agent.command} ${agent.args.join(' ')}`.trim())
@@ -127,44 +129,49 @@ export class SettingsAcpSection {
           });
       });
 
-    new Setting(cardEl)
-      .setName(t('settings.acp.agentName'))
-      .addText((text) => {
-        text.setValue(agent.name).onChange(async (value) => {
-          agent.name = value;
-          await this.saveSettings();
-        });
-      });
+    // Stacked form fields: label above input, full width
+    const fieldsEl = cardEl.createDiv({ cls: 'opencodian-acp-agent-fields' });
 
-    new Setting(cardEl)
-      .setName(t('settings.acp.agentCommand'))
-      .addText((text) => {
-        text.setValue(agent.command).onChange(async (value) => {
-          agent.command = value;
-          await this.saveSettings();
-        });
-      });
+    this.renderStackedField(fieldsEl, t('settings.acp.agentName'), agent.name, async (value) => {
+      agent.name = value;
+      await this.saveSettings();
+    });
 
-    new Setting(cardEl)
-      .setName(t('settings.acp.agentArgs'))
-      .addText((text) => {
-        text.setValue(agent.args.join(' ')).onChange(async (value) => {
-          agent.args = value.split(/\s+/).filter(Boolean);
-          await this.saveSettings();
-        });
-      });
+    this.renderStackedField(fieldsEl, t('settings.acp.agentCommand'), agent.command, async (value) => {
+      agent.command = value;
+      await this.saveSettings();
+    });
 
-    new Setting(cardEl)
-      .setName(t('settings.acp.agentCwd'))
-      .addText((text) => {
-        text
-          .setValue(agent.cwd ?? '')
-          .setPlaceholder('(default)')
-          .onChange(async (value) => {
-            agent.cwd = value.trim() || undefined;
-            await this.saveSettings();
-          });
-      });
+    this.renderStackedField(fieldsEl, t('settings.acp.agentArgs'), agent.args.join(' '), async (value) => {
+      agent.args = value.split(/\s+/).filter(Boolean);
+      await this.saveSettings();
+    });
+
+    this.renderStackedField(fieldsEl, t('settings.acp.agentCwd'), agent.cwd ?? '', async (value) => {
+      agent.cwd = value.trim() || undefined;
+      await this.saveSettings();
+    }, '(default)');
+  }
+
+  private renderStackedField(
+    containerEl: HTMLElement,
+    label: string,
+    value: string,
+    onChange: (value: string) => Promise<void>,
+    placeholder?: string,
+  ): void {
+    const fieldEl = containerEl.createDiv({ cls: 'opencodian-acp-stacked-field' });
+    fieldEl.createEl('label', { text: label, cls: 'opencodian-acp-field-label' });
+    const input = fieldEl.createEl('input', {
+      cls: 'opencodian-acp-field-input',
+      attr: { type: 'text', value },
+    }) as HTMLInputElement;
+    if (placeholder) {
+      input.placeholder = placeholder;
+    }
+    input.addEventListener('change', () => {
+      void onChange(input.value);
+    });
   }
 
   private async addAgent(agent: AcpAgentConfig): Promise<void> {

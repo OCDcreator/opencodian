@@ -32,6 +32,7 @@
   - `.opencodian-settings-tab-panel` 只保留 `display: contents`，避免重 tab panel 再包一层 section card。
   - `.opencodian-style-section` 去掉粗 `border-left` 侧边条，改用 `--opencodian-settings-section-*` token fallback，使样式设置 section 不再像另一个局部设计系统。
   - quick-nav、tabs、section、ordinary setting row 的可见层级现在由 `settings-layout-contract.css` 统一覆盖。
+- `.opencodian-settings-tabs-primary` 现在使用 `flex-wrap: nowrap` + `overflow-x: auto` 实现水平滚动（而非换行），配合 `::after` 右侧渐变遮罩提示可滚动。当标签数量超过可视宽度时，用户可横向滚动查看更多标签。
 
 
 ## 关联 TS 组件

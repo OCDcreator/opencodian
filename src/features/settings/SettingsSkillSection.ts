@@ -143,9 +143,20 @@ export class SettingsSkillSection {
     const contentEl = cardEl.createDiv({ cls: 'opencodian-skill-content' });
     if (skill.content) {
       const preview = skill.content.length > 500
-        ? `${skill.content.slice(0, 500)}...`
+        ? `${skill.content.slice(0, 500)}…`
         : skill.content;
-      contentEl.createEl('pre', { text: preview });
+      // Render markdown-like content as styled paragraphs instead of raw <pre>
+      const lines = preview.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('#')) {
+          contentEl.createEl('strong', { text: trimmed.replace(/^#+\s*/, '') });
+        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          contentEl.createEl('div', { text: trimmed, cls: 'opencodian-skill-content-li' });
+        } else if (trimmed.length > 0) {
+          contentEl.createEl('p', { text: trimmed });
+        }
+      }
     } else {
       contentEl.createEl('p', { text: t('settings.skills.content.unavailable') });
     }

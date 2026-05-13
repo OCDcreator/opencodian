@@ -53,6 +53,9 @@
 - Style
 - Debug
 - User
+- Skills
+- Tools (Built-in + Custom)
+- ACP Agents
 
 其中最近变化较大的几块是：
 

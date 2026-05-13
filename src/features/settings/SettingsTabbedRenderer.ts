@@ -29,6 +29,7 @@ import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
 import { SettingsSkillSection } from './SettingsSkillSection';
 import { SettingsStyleSection } from './SettingsStyleSection';
+import { SettingsToolSection } from './SettingsToolSection';
 import { SettingsUiSection } from './SettingsUiSection';
 
 interface SettingHelpButtonConfig {
@@ -221,6 +222,9 @@ export class SettingsTabbedRenderer {
       case 'skills':
         this.renderSkillsContent(containerEl, secondaryTabId);
         break;
+      case 'tools':
+        this.renderToolsContent(containerEl, secondaryTabId);
+        break;
       case 'acp':
         this.renderAcpContent(containerEl, secondaryTabId);
         break;
@@ -399,6 +403,12 @@ export class SettingsTabbedRenderer {
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     });
     skillSection.attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private renderToolsContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const mode = secondaryTabId === 'custom' ? 'custom' : 'builtin';
+    const section = new SettingsToolSection(containerEl, this.deps.plugin, mode);
+    void section.render();
   }
 
   private renderAcpContent(containerEl: HTMLElement, secondaryTabId: string): void {

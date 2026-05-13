@@ -60,4 +60,5 @@ interface ToolIdentity {
 
 - `mcp` 当前使用注册后的 LobeHub MCP 图标 `opencodian-tool-mcp`，并已按 Obsidian 自定义图标的 100×100 坐标系做缩放适配；`custom` 继续使用 `layers`。
 - `task` 的显示名现在刻意保持为 `Subagent Task`，避免把 OpenCode 原生 subagent/task 卡片误称成 OMO background task。
+- `apply_patch` 与 `patch` 的显示名已区分：`Apply Patch` vs `Create Patch`，避免在工具权限 UI 中出现同名歧义。
 - `StructuredOutput` / `structured_output` 仍会被归一到同一规范名，保证内部过滤逻辑不回归。

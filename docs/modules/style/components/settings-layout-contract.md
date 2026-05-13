@@ -49,3 +49,19 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 - 新的视觉迁移应优先复用这些 token，再按 section 的真实职责增加更具体的 object-card、summary、toolbar 或 state 样式。
 - navigation shell 的 hover / focus 只能改变背景、边框或 outline，不应使用会造成布局错觉的 translate 或重 shadow。
 - 修改后运行 `npm run build:css` 刷新根目录 `styles.css`。
+
+## Skill Card Styles
+
+- `.opencodian-skill-list`：纵向 flex 容器，承载技能卡片列表。
+- `.opencodian-skill-card`：使用 object token weight 的技能卡片，包含 header（名称 + 描述）、source 路径和 content 区域。
+- `.opencodian-skill-content`：最大高度 260px 的可滚动内容区，将 SKILL.md 解析为轻量 HTML（strong / p / div.li）。
+
+## ACP Agent Card Styles
+
+- `.opencodian-acp-agent-card`：使用 object token weight 的 agent 配置卡片，内部 setting-item 无边框。
+- `.opencodian-acp-agent-card .setting-item-control`：输入框最大宽度 320px，防止撑满整个设置面板。
+- `.opencodian-acp-preset-bar`：flex-wrap 行内按钮组，承载新建和预设按钮。
+
+## Tab Bar Scrolling
+
+当一级标签数量超过可视宽度时，`.opencodian-settings-tabs-primary` 启用水平滚动（`overflow-x: auto`），隐藏滚动条高度为 4px，保持标签栏不换行（`flex-wrap: nowrap`）。

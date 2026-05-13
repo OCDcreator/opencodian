@@ -564,6 +564,9 @@ describe('OpenCodianSettingTab layout shell', () => {
       addStyleSettings: jest.fn(),
       addDebugSettings: jest.fn(),
       addUserSettings: jest.fn(),
+      addSkillsSettings: jest.fn(),
+      addToolsSettings: jest.fn(),
+      addAcpSettings: jest.fn(),
       renderLayoutModeSetting: appendMarker('layout-mode-setting'),
       renderLanguageSetting: appendMarker('language-setting'),
     });

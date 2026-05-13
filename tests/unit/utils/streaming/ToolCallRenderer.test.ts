@@ -89,7 +89,7 @@ describe('ToolCallRenderer', () => {
   it.each([
     ['read', { filePath: 'docs/architecture/README.md', offset: 5, limit: 10 }, 'Read', 'README.md · 5-14'],
     ['multiedit', { filePath: 'src/main.ts', edits: [{}, {}] }, 'MultiEdit', 'main.ts · 2 edits'],
-    ['apply_patch', { patchText: '*** Begin Patch\n*** Update File: src/main.ts\n@@\n-x\n+y\n*** End Patch' }, 'Patch', 'main.ts'],
+    ['apply_patch', { patchText: '*** Begin Patch\n*** Update File: src/main.ts\n@@\n-x\n+y\n*** End Patch' }, 'Apply Patch', 'main.ts'],
     ['list', { path: 'src/features/chat' }, 'List', 'chat'],
     ['glob', { pattern: '**/*.ts', path: 'src' }, 'Glob', '**/*.ts · src'],
     ['grep', { pattern: 'TODO', include: '*.ts' }, 'Grep', 'TODO · *.ts'],
