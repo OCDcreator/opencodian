@@ -451,8 +451,9 @@ class SkillDetailModal extends Modal {
     this.contentEl.empty();
     this.modalEl.addClass('opencodian-skill-detail-modal');
 
-    this.validationEl = this.contentEl.createDiv({ cls: 'opencodian-skill-validation' });
-    const layoutEl = this.contentEl.createDiv({ cls: 'opencodian-skill-detail-layout' });
+    const shellEl = this.contentEl.createDiv({ cls: 'opencodian-skill-detail-shell' });
+    this.validationEl = shellEl.createDiv({ cls: 'opencodian-skill-validation' });
+    const layoutEl = shellEl.createDiv({ cls: 'opencodian-skill-detail-layout' });
     const editorEl = layoutEl.createDiv({ cls: 'opencodian-skill-detail-editor' });
     const previewPanelEl = layoutEl.createDiv({ cls: 'opencodian-skill-detail-preview' });
 
@@ -476,34 +477,18 @@ class SkillDetailModal extends Modal {
 
     const actionsEl = this.contentEl.createDiv({ cls: 'opencodian-skill-detail-actions' });
     if (this.mode !== 'view') {
-      new Setting(actionsEl)
-        .addButton((button) => {
-          button
-            .setButtonText(t('settings.skills.modal.save'))
-            .setCta()
-            .onClick(async () => {
-              await this.save();
-            });
-        });
+      this.createFooterButton(actionsEl, t('settings.skills.modal.save'), async () => {
+        await this.save();
+      }, { cta: true });
     }
     if (this.mode === 'edit' && this.resolveVaultRelativeSkillPath(this.skill.location)) {
-      new Setting(actionsEl)
-        .addButton((button) => {
-          button
-            .setButtonText(t('settings.skills.delete'))
-            .onClick(async () => {
-              await this.delete();
-            });
-        });
-    }
-    new Setting(actionsEl)
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.skills.modal.close'))
-          .onClick(() => {
-            this.close();
-          });
+      this.createFooterButton(actionsEl, t('settings.skills.delete'), async () => {
+        await this.delete();
       });
+    }
+    this.createFooterButton(actionsEl, t('settings.skills.modal.close'), () => {
+      this.close();
+    });
   }
 
   private getTitle(): string {
@@ -616,6 +601,24 @@ class SkillDetailModal extends Modal {
     }
     const segments = normalizePath(path).split('/');
     return segments[segments.length - 2];
+  }
+
+  private createFooterButton(
+    containerEl: HTMLElement,
+    text: string,
+    onClick: () => void | Promise<void>,
+    options: { cta?: boolean } = {},
+  ): HTMLButtonElement {
+    const buttonEl = containerEl.createEl('button', { text });
+    buttonEl.type = 'button';
+    buttonEl.addClass('opencodian-skill-detail-action-button');
+    if (options.cta) {
+      buttonEl.addClass('mod-cta');
+    }
+    buttonEl.addEventListener('click', () => {
+      void onClick();
+    });
+    return buttonEl;
   }
 
   private normalizeSkillContent(skill: SkillInfo): string {

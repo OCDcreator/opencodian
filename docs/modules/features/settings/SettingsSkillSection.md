@@ -25,7 +25,7 @@
 
 ### 内容渲染
 
-技能列表项现在是紧凑行，只显示技能名、描述、来源路径和操作，不在卡片里塞完整 `SKILL.md`。路径被收在内容列并截断，避免长路径挤压描述；描述保持两行以内，供快速扫描。点击 `Open` 会打开 `SkillDetailModal`：顶部是全宽格式校验条，下方是等高双栏工作区，左侧为 Markdown 源文本编辑区，右侧使用 Obsidian `MarkdownRenderer.renderMarkdown()` 渲染完整预览；长 frontmatter、代码块和正文都会软换行，避免横向滚动遮住内容。弹窗宽度作用在 Obsidian 外层 modal 上，保证宽屏双栏真正居中可见，而不是让内容从默认窄 modal 中向右溢出。若服务器只返回正文而非完整 frontmatter 文件，弹窗会用目录元数据补齐 `name` / `description` frontmatter，避免把只读技能误判为缺少 frontmatter。外部/global/plugin 技能在这里只读；当前 vault 内 `.opencode/skills/`、`.claude/skills/`、`.agents/skills/` 下的技能允许保存或删除。
+技能列表项现在是紧凑行，只显示技能名、描述、来源路径和操作，不在卡片里塞完整 `SKILL.md`。路径被收在内容列并截断，避免长路径挤压描述；描述保持两行以内，供快速扫描。点击 `Open` 会打开 `SkillDetailModal`：顶部是全宽格式校验条，中间是会吃掉 modal 剩余高度的双栏工作区，左侧为 Markdown 源文本编辑区，右侧使用 Obsidian `MarkdownRenderer.renderMarkdown()` 渲染完整预览；源码与预览面板本身各自滚动，因此底部操作区不会再被长内容或较矮窗口挤出 modal 可视区。弹窗宽度作用在 Obsidian 外层 modal 上，保证宽屏双栏真正居中可见，而不是让内容从默认窄 modal 中向右溢出。若服务器只返回正文而非完整 frontmatter 文件，弹窗会用目录元数据补齐 `name` / `description` frontmatter，避免把只读技能误判为缺少 frontmatter。外部/global/plugin 技能在这里只读；当前 vault 内 `.opencode/skills/`、`.claude/skills/`、`.agents/skills/` 下的技能允许保存或删除。
 
 ### 技能文件与格式校验
 

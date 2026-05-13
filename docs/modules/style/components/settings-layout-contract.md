@@ -58,7 +58,9 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 - `.opencodian-skill-card`：紧凑技能行，宽屏为“名称/描述/路径 + 操作区”两列，避免在列表中展开完整 SKILL.md。
 - `.opencodian-skill-source-chip`：技能来源的低调 monospace chip。
 - `.opencodian-skill-row-actions` / `.opencodian-skill-row-action`：承载单技能 permission dropdown 与打开按钮，保持 setting row 的信息区隐藏。
-- `.opencodian-skill-detail-modal` / `.opencodian-skill-detail-layout`：技能详情编辑器的宽屏双栏布局，宽度设在 Obsidian 外层 modal 上以保持居中可见；左侧源码 textarea，右侧 Markdown 渲染预览，源码与预览代码块都软换行。
+- `.opencodian-skill-detail-modal` / `.opencodian-skill-detail-shell` / `.opencodian-skill-detail-layout`：技能详情编辑器的宽屏双栏布局，宽度进一步收在约 `1120px` 内，避免超宽窗口下显得过扁；双栏采用更明显的编辑器比例 `1.22fr / 0.78fr`，让源码区更主、预览区更辅。`modal-content` 本身是 `overflow: hidden` 的纵向 flex，shell 吃掉剩余高度，双栏区在中段独立滚动。
+- `.opencodian-skill-editor-textarea` / `.opencodian-skill-preview-content`：源码与预览面板改为 `flex: 1` 的内部滚动区域，不再依赖固定大高度把 footer 挤到 modal 视窗外。
+- `.opencodian-skill-detail-actions` / `.opencodian-skill-detail-action-button`：技能详情底部操作区，使用独立 footer 和直接按钮元素承载 `Save / Delete / Close`，保证较矮窗口下右下角操作仍留在 modal 内。
 - `.opencodian-skill-validation*`：保存前格式校验状态，使用低调边框颜色表示 valid / invalid。
 
 ## Tool Permission Styles

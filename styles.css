@@ -6769,36 +6769,51 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-skill-detail-modal {
-  width: min(1520px, calc(100vw - 48px));
-  max-width: min(1520px, calc(100vw - 48px));
+  width: min(1120px, calc(100vw - 96px));
+  max-width: min(1120px, calc(100vw - 96px));
 }
 
 .opencodian-skill-detail-modal .modal-content {
   width: 100%;
   max-width: 100%;
-  max-height: 88vh;
+  max-height: min(90vh, 1040px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.opencodian-skill-detail-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
 }
 
 .opencodian-skill-detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.22fr) minmax(300px, 0.78fr);
+  gap: 20px;
+  flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .opencodian-skill-detail-editor,
 .opencodian-skill-detail-preview {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .opencodian-skill-editor-textarea {
   box-sizing: border-box;
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  height: min(64vh, 720px);
-  min-height: 560px;
+  height: auto;
+  min-height: 420px;
   overflow: auto;
   resize: none;
   font-family: var(--font-monospace);
@@ -6846,9 +6861,10 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-skill-preview-content {
   box-sizing: border-box;
+  flex: 1 1 auto;
   min-width: 0;
-  height: min(64vh, 720px);
-  min-height: 560px;
+  height: auto;
+  min-height: 420px;
   overflow: auto;
   padding: 16px 18px;
   border: 1px solid var(--background-modifier-border);
@@ -6891,8 +6907,18 @@ img.opencodian-model-provider-header-icon {
 .opencodian-skill-detail-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.opencodian-skill-detail-action-button {
+  flex: 0 0 auto;
+  min-width: 72px;
+  white-space: nowrap;
 }
 
 /* ─── Tool permission groups ─────────────────────────────────────────── */
@@ -7122,8 +7148,7 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-skill-editor-textarea,
   .opencodian-skill-preview-content {
-    height: 38vh;
-    min-height: 320px;
+    min-height: 260px;
   }
 }
 
