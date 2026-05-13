@@ -128,6 +128,30 @@ describe('SettingsDropdownControl portal behavior', () => {
     expect(menuEl?.style.left).toBeTruthy();
   });
 
+  it('widens narrow menus enough to show compact permission labels', () => {
+    const selectEl = document.createElement('select');
+    for (const label of ['允许', '询问', '拒绝']) {
+      const optionEl = document.createElement('option');
+      optionEl.value = label;
+      optionEl.textContent = label;
+      selectEl.appendChild(optionEl);
+    }
+    document.body.appendChild(selectEl);
+    enhanceSettingsSelect(selectEl);
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger')!;
+    jest.spyOn(triggerEl, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({
+      x: 20,
+      y: 20,
+      width: 72,
+      height: 32,
+    }));
+
+    triggerEl.click();
+
+    const menuEl = document.body.querySelector<HTMLElement>('.opencodian-settings-dropdown-menu')!;
+    expect(parseInt(menuEl.style.width, 10)).toBeGreaterThanOrEqual(128);
+  });
+
   it('resets inline styles on close', () => {
     const selectEl = createSelect();
     enhanceSettingsSelect(selectEl);

@@ -53,6 +53,9 @@ class OpencodeConfigManager {
   setNormalMode(): Promise<void>;
   setPlanMode(): Promise<void>;
   setToolPermission(tool: string, action: PermissionAction): Promise<void>;
+  setSkillPermissionPattern(pattern: string, action: PermissionAction): Promise<void>;
+  setAgentSkillPermission(agentId: string, action: PermissionAction | undefined): Promise<void>;
+  setAgentSkillToolEnabled(agentId: string, enabled: boolean | undefined): Promise<void>;
   getConfigDir(): string;
   getPluginDir(): string;
   getConfigPath(): string;
@@ -110,6 +113,10 @@ getCommandScopedAgentId(commandId: string): string
 这点很重要：`plan` 只是 OpenCodian 的 shorthand，不是上游 OpenCode 的原生权限模式；上游仍是 rule-based `permission + pattern + action` 语义。
 
 `setToolPermission()` 允许增量改某一个工具权限；如果原始 `permission` 是字符串，会先转成对象形态 `{ '*': 原值 }`。
+
+`setSkillPermissionPattern()` 专门写 `permission.skill.<pattern>`，用于 Skills 设置页给单个 skill name 或 pattern 配置 allow / ask / deny。它会把字符串简写提升为 `{ '*': 原值 }`，并保留已有 `permission.skill` 默认规则。
+
+`setAgentSkillPermission()` 写 `agent.<id>.permission.skill`，用于按代理覆盖全局技能权限；传入 `undefined` 会移除该代理的 skill 权限覆盖。`setAgentSkillToolEnabled()` 写 `agent.<id>.tools.skill`，用于让特定代理完全禁用或启用 skill tool；传入 `undefined` 会回到继承状态。
 
 ### 插件配置读写
 

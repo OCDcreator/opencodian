@@ -92,6 +92,12 @@ export class MarkdownView {
   };
 }
 
+export const MarkdownRenderer = {
+  renderMarkdown: jest.fn(async (markdown: string, el: HTMLElement) => {
+    el.textContent = markdown;
+  }),
+};
+
 export class TFolder {
   vault = {};
   path = '';

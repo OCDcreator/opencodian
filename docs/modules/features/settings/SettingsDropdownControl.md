@@ -45,6 +45,7 @@
 - 下方空间不足时自动翻转到上方（`bottom` 定位 + `.is-flipped` class）
 - 上下都不足时选空间较大侧，限制 `maxHeight`
 - 水平方向限制在视窗内（`VIEWPORT_MARGIN` 边距）
+- 菜单宽度取 trigger 宽度、最小菜单宽度和选项文本估算宽度的较大值，再限制在视窗内，避免窄设置行把 “允许 / 询问 / 拒绝” 或较长选项截成省略号
 - 极端小视窗下空间低于 `MIN_MENU_HEIGHT` 时自动关闭
 
 滚动和 resize 时通过 capture-phase `document scroll` + `window resize` 监听器（RAF 节流）重新定位；trigger 滚出视窗时自动关闭。
@@ -56,6 +57,8 @@
 | `MENU_GAP` | 5px | trigger 与菜单间距 |
 | `VIEWPORT_MARGIN` | 8px | 视窗边距 |
 | `MIN_MENU_HEIGHT` | 40px | 最小可用菜单高度，不足则关闭 |
+| `MIN_MENU_WIDTH` | 128px | 菜单最小可读宽度 |
+| `MAX_MENU_WIDTH` | 520px | 菜单按文本扩宽时的上限 |
 
 ### 动态刷新
 

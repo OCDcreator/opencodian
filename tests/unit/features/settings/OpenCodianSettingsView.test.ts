@@ -66,6 +66,9 @@ describe('OpenCodianSettingsView', () => {
       addStyleSettings: appendHeading('Style'),
       addDebugSettings: appendHeading('Debug'),
       addUserSettings: appendHeading('User'),
+      addSkillsSettings: appendHeading('Skills'),
+      addToolsSettings: appendHeading('Tools'),
+      addAcpSettings: appendHeading('ACP'),
     });
 
     await view.onOpen();
@@ -76,6 +79,27 @@ describe('OpenCodianSettingsView', () => {
     expect(view.contentEl.dataset.settingsLayoutMode).toBe('classic');
     expect(view.contentEl.dataset.settingsSurface).toBe('page');
     expect(view.contentEl.querySelector('.opencodian-settings-quick-nav')).not.toBeNull();
+    expect(Array.from(view.contentEl.querySelectorAll('.opencodian-settings-section-heading')).map((heading) =>
+      heading.textContent,
+    )).toEqual([
+      'General',
+      'Server',
+      'Model',
+      'Conversation',
+      'Agents',
+      'Commands',
+      'MCP',
+      'Formatter',
+      'Plugins',
+      'Security',
+      'UI',
+      'Style',
+      'Debug',
+      'User',
+      'Skills',
+      'Tools',
+      'ACP',
+    ]);
     expect(Array.from(view.containerEl.children).some((child) =>
       child.classList.contains('opencodian-settings-quick-nav'),
     )).toBe(false);

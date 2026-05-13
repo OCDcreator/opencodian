@@ -126,7 +126,7 @@ repo-local owner guard 入口脚本。它读取 git diff 范围，构建 guarded
 
 ### run-jest.js — Jest 启动器
 
-Node.js 脚本形式的 Jest 启动包装器。
+Node.js 脚本形式的 Jest 启动包装器。它会为 Jest 子进程设置 repo-local `.tmp/jest-node-localstorage.json` 作为 Node webstorage 文件，避免 Node 环境 teardown 读取 `global.localStorage` 时输出 `--localstorage-file` warning。
 
 ### sync-version.js — 版本同步
 

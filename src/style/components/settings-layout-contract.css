@@ -233,7 +233,7 @@
 /* ─── Skill cards ────────────────────────────────────────────────────── */
 .opencodian-settings .opencodian-skill-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, auto) auto;
   gap: var(--opencodian-settings-space-md);
   align-items: stretch;
 }
@@ -280,7 +280,11 @@
 }
 
 .opencodian-settings .opencodian-skill-card {
-  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
+  gap: var(--opencodian-settings-space-md);
+  align-items: center;
+  padding: 10px 12px;
   border: 1px solid var(--opencodian-settings-object-border);
   border-radius: var(--opencodian-settings-radius-row);
   background: var(--opencodian-settings-object-bg);
@@ -294,21 +298,32 @@
   background: color-mix(in srgb, var(--interactive-accent) 5%, var(--opencodian-settings-object-bg));
 }
 
+.opencodian-settings .opencodian-skill-card-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-xs);
+}
+
 .opencodian-settings .opencodian-skill-card-header {
   display: flex;
   flex-direction: column;
   gap: var(--opencodian-settings-space-xs);
-  margin-bottom: var(--opencodian-settings-space-sm);
+  min-width: 0;
 }
 
 .opencodian-settings .opencodian-skill-title-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--opencodian-settings-space-md);
+  justify-content: start;
+  gap: var(--opencodian-settings-space-sm);
 }
 
 .opencodian-settings .opencodian-skill-card-header strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-normal);
@@ -318,11 +333,15 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
+  max-width: 72ch;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .opencodian-settings .opencodian-skill-source {
   display: block;
-  margin-bottom: var(--opencodian-settings-space-sm);
   color: var(--text-faint);
   font-size: 11px;
   font-family: var(--font-monospace);
@@ -331,34 +350,160 @@
   text-overflow: ellipsis;
 }
 
-.opencodian-settings .opencodian-skill-content {
-  max-height: 260px;
-  overflow-y: auto;
-  padding: var(--opencodian-settings-space-sm);
+.opencodian-settings .opencodian-skill-source-chip {
+  padding: 1px 5px;
+  border: 1px solid var(--opencodian-settings-object-border);
   border-radius: var(--opencodian-settings-radius-inline);
   background: color-mix(in srgb, var(--background-primary) 50%, transparent);
-}
-
-.opencodian-settings .opencodian-skill-content p {
-  margin: var(--opencodian-settings-space-xs) 0;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 10px;
+  font-family: var(--font-monospace);
 }
 
-.opencodian-settings .opencodian-skill-content strong {
-  display: block;
-  margin-top: var(--opencodian-settings-space-sm);
+.opencodian-settings .opencodian-skill-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--opencodian-settings-space-xs);
+  min-width: 150px;
+}
+
+.opencodian-settings .opencodian-skill-row-action.setting-item {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.opencodian-settings .opencodian-skill-row-action .setting-item-info {
+  display: none;
+}
+
+.opencodian-skill-detail-modal {
+  width: min(1520px, calc(100vw - 48px));
+  max-width: min(1520px, calc(100vw - 48px));
+}
+
+.opencodian-skill-detail-modal .modal-content {
+  width: 100%;
+  max-width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.opencodian-skill-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.opencodian-skill-detail-editor,
+.opencodian-skill-detail-preview {
+  min-width: 0;
+}
+
+.opencodian-skill-editor-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: min(64vh, 720px);
+  min-height: 560px;
+  overflow: auto;
+  resize: none;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.opencodian-skill-validation {
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.opencodian-skill-validation.is-valid {
+  border-color: color-mix(in srgb, var(--color-green) 35%, var(--background-modifier-border));
+}
+
+.opencodian-skill-validation.is-invalid {
+  border-color: color-mix(in srgb, var(--color-red) 35%, var(--background-modifier-border));
+}
+
+.opencodian-skill-validation-title {
   color: var(--text-normal);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.opencodian-settings .opencodian-skill-content-li {
-  padding-left: var(--opencodian-settings-space-lg);
+.opencodian-skill-validation-message {
+  margin-top: 2px;
   color: var(--text-muted);
+  font-size: 11px;
+}
+
+.opencodian-skill-preview-label {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.opencodian-skill-preview-content {
+  box-sizing: border-box;
+  min-width: 0;
+  height: min(64vh, 720px);
+  min-height: 560px;
+  overflow: auto;
+  padding: 16px 18px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.opencodian-skill-preview-content h1 {
+  margin: 0 0 14px;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.opencodian-skill-preview-content h2 {
+  margin: 22px 0 10px;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.opencodian-skill-preview-content p,
+.opencodian-skill-preview-content li {
+  max-width: 72ch;
+}
+
+.opencodian-skill-preview-content pre {
+  padding: 10px 12px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-skill-preview-content code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-skill-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 /* ─── Tool permission groups ─────────────────────────────────────────── */
@@ -561,7 +706,34 @@
     grid-template-columns: 1fr;
   }
 
+  .opencodian-settings .opencodian-skill-card,
+  .opencodian-skill-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-settings .opencodian-skill-row-actions {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
   .opencodian-settings .opencodian-acp-agent-fields {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1240px) {
+  .opencodian-skill-detail-modal {
+    width: min(820px, calc(100vw - 32px));
+    max-width: min(820px, calc(100vw - 32px));
+  }
+
+  .opencodian-skill-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-skill-editor-textarea,
+  .opencodian-skill-preview-content {
+    height: 38vh;
+    min-height: 320px;
   }
 }

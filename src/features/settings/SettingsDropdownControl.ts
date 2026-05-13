@@ -6,6 +6,10 @@ const MENU_GAP = 5;
 const VIEWPORT_MARGIN = 8;
 /** Minimum usable menu height; close if less space is available. */
 const MIN_MENU_HEIGHT = 40;
+/** Small menus still need enough width for labels plus the selected checkmark. */
+const MIN_MENU_WIDTH = 128;
+/** Prevent long option labels from making the menu feel detached from the settings row. */
+const MAX_MENU_WIDTH = 520;
 
 /** Portal positioning result returned by {@link computePortalPosition}. */
 interface PortalPosition {
@@ -19,23 +23,33 @@ interface PortalPosition {
   insufficientSpace: boolean;
 }
 
+interface PortalPositionInput {
+  desiredMenuWidth: number;
+  menuScrollHeight: number;
+  triggerRect: DOMRect;
+  viewportHeight: number;
+  viewportWidth: number;
+}
+
 /**
  * Pure computation for portal menu positioning.
  * Returns style values and placement decision without touching the DOM.
  */
-function computePortalPosition(
-  triggerRect: DOMRect,
-  menuScrollHeight: number,
-  viewportHeight: number,
-  viewportWidth: number,
-): PortalPosition {
-  const clampedWidth = Math.max(1, Math.min(triggerRect.width, viewportWidth - VIEWPORT_MARGIN * 2));
+function computePortalPosition(input: PortalPositionInput): PortalPosition {
+  const viewportMaxWidth = Math.max(1, input.viewportWidth - VIEWPORT_MARGIN * 2);
+  const clampedWidth = Math.max(
+    1,
+    Math.min(
+      Math.max(input.triggerRect.width, input.desiredMenuWidth),
+      viewportMaxWidth,
+    ),
+  );
 
-  const cssMaxHeight = Math.min(280, Math.max(0, viewportHeight - 96));
-  const naturalHeight = Math.min(menuScrollHeight, cssMaxHeight);
+  const cssMaxHeight = Math.min(280, Math.max(0, input.viewportHeight - 96));
+  const naturalHeight = Math.min(input.menuScrollHeight, cssMaxHeight);
 
-  const spaceBelow = viewportHeight - triggerRect.bottom - VIEWPORT_MARGIN;
-  const spaceAbove = triggerRect.top - VIEWPORT_MARGIN;
+  const spaceBelow = input.viewportHeight - input.triggerRect.bottom - VIEWPORT_MARGIN;
+  const spaceAbove = input.triggerRect.top - VIEWPORT_MARGIN;
 
   let placement: 'below' | 'above';
   if (spaceBelow >= naturalHeight) {
@@ -63,12 +77,12 @@ function computePortalPosition(
 
   const clampedHeight = Math.max(MIN_MENU_HEIGHT, Math.min(naturalHeight, usableHeight));
 
-  const top = placement === 'below' ? `${triggerRect.bottom + MENU_GAP}px` : '';
-  const bottom = placement === 'above' ? `${viewportHeight - triggerRect.top + MENU_GAP}px` : '';
+  const top = placement === 'below' ? `${input.triggerRect.bottom + MENU_GAP}px` : '';
+  const bottom = placement === 'above' ? `${input.viewportHeight - input.triggerRect.top + MENU_GAP}px` : '';
 
-  let left = triggerRect.left;
-  if (left + clampedWidth > viewportWidth - VIEWPORT_MARGIN) {
-    left = Math.max(VIEWPORT_MARGIN, viewportWidth - VIEWPORT_MARGIN - clampedWidth);
+  let left = input.triggerRect.left;
+  if (left + clampedWidth > input.viewportWidth - VIEWPORT_MARGIN) {
+    left = Math.max(VIEWPORT_MARGIN, input.viewportWidth - VIEWPORT_MARGIN - clampedWidth);
   }
   if (left < VIEWPORT_MARGIN) {
     left = VIEWPORT_MARGIN;
@@ -83,6 +97,16 @@ function computePortalPosition(
     maxHeight: `${clampedHeight}px`,
     insufficientSpace: false,
   };
+}
+
+function estimateMenuWidth(options: SettingsDropdownOption[]): number {
+  const longestLabelUnits = options.reduce((max, option) => {
+    const units = Array.from(option.label).reduce((total, char) =>
+      total + (/[\u3000-\u9fff\uff00-\uffef]/u.test(char) ? 2 : 1), 0);
+    return Math.max(max, units);
+  }, 0);
+  const estimatedLabelWidth = longestLabelUnits * 7;
+  return Math.max(MIN_MENU_WIDTH, Math.min(MAX_MENU_WIDTH, estimatedLabelWidth + 54));
 }
 
 let nextDropdownId = 0;
@@ -393,12 +417,13 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
   };
 
   const positionMenu = (): boolean => {
-    const pos = computePortalPosition(
-      triggerEl.getBoundingClientRect(),
-      menuEl.scrollHeight,
-      window.innerHeight,
-      window.innerWidth,
-    );
+    const pos = computePortalPosition({
+      desiredMenuWidth: estimateMenuWidth(options),
+      menuScrollHeight: menuEl.scrollHeight,
+      triggerRect: triggerEl.getBoundingClientRect(),
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+    });
     menuEl.style.width = pos.width;
     if (pos.insufficientSpace) {
       close();

@@ -52,11 +52,14 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 
 ## Skill Card Styles
 
-- `.opencodian-skill-toolbar`：权限 dropdown 与刷新按钮的顶部工具栏，使用 grid 在宽屏并排、窄屏堆叠。
+- `.opencodian-skill-toolbar`：全局权限 dropdown、新建技能和刷新按钮的顶部工具栏，使用 grid 在宽屏并排、窄屏堆叠。
 - `.opencodian-skill-list`：纵向 flex 容器，承载来源分组后的技能卡片列表。
 - `.opencodian-skill-source-section` / `.opencodian-skill-source-header`：每个技能来源的分组容器与标题行，显示来源名和计数。
-- `.opencodian-skill-card`：使用 object token weight 的技能卡片，包含 header（名称 + 描述）、source 路径和 content 区域。
-- `.opencodian-skill-content`：最大高度 260px 的可滚动内容区，将 SKILL.md 解析为轻量 HTML（strong / p / div.li）。
+- `.opencodian-skill-card`：紧凑技能行，宽屏为“名称/描述/路径 + 操作区”两列，避免在列表中展开完整 SKILL.md。
+- `.opencodian-skill-source-chip`：技能来源的低调 monospace chip。
+- `.opencodian-skill-row-actions` / `.opencodian-skill-row-action`：承载单技能 permission dropdown 与打开按钮，保持 setting row 的信息区隐藏。
+- `.opencodian-skill-detail-modal` / `.opencodian-skill-detail-layout`：技能详情编辑器的宽屏双栏布局，宽度设在 Obsidian 外层 modal 上以保持居中可见；左侧源码 textarea，右侧 Markdown 渲染预览，源码与预览代码块都软换行。
+- `.opencodian-skill-validation*`：保存前格式校验状态，使用低调边框颜色表示 valid / invalid。
 
 ## Tool Permission Styles
 

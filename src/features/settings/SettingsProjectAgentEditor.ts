@@ -12,14 +12,18 @@ import { createLogger } from '../../shared';
 import {
   buildProjectAgentOptionsPatch,
   buildProjectAgentPermissionPatch,
+  buildProjectAgentToolsPatch,
   cloneOptions,
   clonePermission,
+  cloneTools,
   normalizeProjectAgentEditorMode,
   optionalTrimmedText,
   parseOptionalNumber,
   stringifyConfigNumber,
   stringifyConfigText,
   stringifyOptions,
+  stringifySkillPermission,
+  stringifySkillToolMode,
   stringifyTaskAllowlist,
 } from './projectAgentEditorConfig';
 
@@ -37,11 +41,16 @@ interface ProjectAgentEditorState {
   optionsJson: string;
   permission: OpencodeAgentConfig['permission'];
   prompt: string;
+  skillPermission: 'inherit' | 'allow' | 'ask' | 'deny';
+  skillPermissionDirty: boolean;
+  skillToolMode: 'inherit' | 'enabled' | 'disabled';
+  skillToolModeDirty: boolean;
   steps: string;
   taskAllowlist: string;
   taskAllowlistDirty: boolean;
   temperature: string;
   topP: string;
+  tools: OpencodeAgentConfig['tools'];
 }
 
 interface TextLikeControl {
@@ -104,6 +113,8 @@ export class SettingsProjectAgentEditor {
     let stepsControl: TextLikeControl | null = null;
     let colorControl: TextLikeControl | null = null;
     let taskAllowlistControl: TextLikeControl | null = null;
+    let skillPermissionDropdown: { setValue(value: string): unknown } | null = null;
+    let skillToolDropdown: { setValue(value: string): unknown } | null = null;
     let optionsControl: TextLikeControl | null = null;
     let deleteButton: DisableableControl | null = null;
 
@@ -127,6 +138,8 @@ export class SettingsProjectAgentEditor {
       stepsControl?.setValue(state.steps);
       colorControl?.setValue(state.color);
       taskAllowlistControl?.setValue(state.taskAllowlist);
+      skillPermissionDropdown?.setValue(state.skillPermission);
+      skillToolDropdown?.setValue(state.skillToolMode);
       optionsControl?.setValue(state.optionsJson);
       syncDeleteButton();
     };
@@ -310,6 +323,14 @@ export class SettingsProjectAgentEditor {
     this.renderTaskAllowlistSetting(advancedBodyEl, state, (control) => {
       taskAllowlistControl = control;
     });
+    this.renderSkillControls(advancedBodyEl, state, {
+      setSkillPermissionDropdown: (control) => {
+        skillPermissionDropdown = control;
+      },
+      setSkillToolDropdown: (control) => {
+        skillToolDropdown = control;
+      },
+    });
     this.renderOptionsSetting(advancedBodyEl, state, (control) => {
       optionsControl = control;
     });
@@ -347,11 +368,16 @@ export class SettingsProjectAgentEditor {
       optionsJson: stringifyOptions(agent?.options),
       permission: clonePermission(agent?.permission),
       prompt: stringifyConfigText(agent?.prompt),
+      skillPermission: stringifySkillPermission(agent?.permission),
+      skillPermissionDirty: false,
+      skillToolMode: stringifySkillToolMode(agent?.tools),
+      skillToolModeDirty: false,
       steps: stringifyConfigNumber(agent?.steps),
       taskAllowlist: stringifyTaskAllowlist(agent?.permission),
       taskAllowlistDirty: false,
       temperature: stringifyConfigNumber(agent?.temperature),
       topP: stringifyConfigNumber(agent?.top_p),
+      tools: cloneTools(agent?.tools),
     };
   }
 
@@ -502,6 +528,7 @@ export class SettingsProjectAgentEditor {
       color: optionalTrimmedText(state.color),
       disable: state.disabled ? true : undefined,
       ...buildProjectAgentPermissionPatch(state),
+      ...buildProjectAgentToolsPatch(state),
       ...buildProjectAgentOptionsPatch(state, {
         invalidJsonMessage: (message) => t('settings.agents.editor.notice.invalidJson', {
           field: t('settings.agents.editor.options.name'),
@@ -530,6 +557,50 @@ export class SettingsProjectAgentEditor {
           .onChange((value) => {
             state.taskAllowlist = value;
             state.taskAllowlistDirty = true;
+          });
+      });
+  }
+
+  private renderSkillControls(
+    containerEl: HTMLElement,
+    state: ProjectAgentEditorState,
+    setControls: {
+      setSkillPermissionDropdown: (control: { setValue(value: string): unknown }) => void;
+      setSkillToolDropdown: (control: { setValue(value: string): unknown }) => void;
+    },
+  ): void {
+    new Setting(containerEl)
+      .setName(t('settings.agents.editor.skillTool.name'))
+      .setDesc(t('settings.agents.editor.skillTool.desc'))
+      .addDropdown((dropdown) => {
+        setControls.setSkillToolDropdown(dropdown);
+        dropdown
+          .addOption('inherit', t('settings.agents.editor.skillTool.inherit'))
+          .addOption('enabled', t('settings.agents.editor.skillTool.enabled'))
+          .addOption('disabled', t('settings.agents.editor.skillTool.disabled'))
+          .setValue(state.skillToolMode)
+          .onChange((value) => {
+            state.skillToolMode = value === 'enabled' || value === 'disabled' ? value : 'inherit';
+            state.skillToolModeDirty = true;
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.agents.editor.skillPermission.name'))
+      .setDesc(t('settings.agents.editor.skillPermission.desc'))
+      .addDropdown((dropdown) => {
+        setControls.setSkillPermissionDropdown(dropdown);
+        dropdown
+          .addOption('inherit', t('settings.agents.editor.skillPermission.inherit'))
+          .addOption('allow', t('settings.skills.permission.allow'))
+          .addOption('ask', t('settings.skills.permission.ask'))
+          .addOption('deny', t('settings.skills.permission.deny'))
+          .setValue(state.skillPermission)
+          .onChange((value) => {
+            state.skillPermission = value === 'allow' || value === 'ask' || value === 'deny'
+              ? value
+              : 'inherit';
+            state.skillPermissionDirty = true;
           });
       });
   }

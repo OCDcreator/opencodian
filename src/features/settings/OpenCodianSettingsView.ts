@@ -13,6 +13,7 @@ import { ItemView, Setting } from 'obsidian';
 
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
@@ -37,8 +38,10 @@ import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
+import { SettingsSkillSection } from './SettingsSkillSection';
 import { SettingsStyleSection } from './SettingsStyleSection';
 import { SettingsTabbedRenderer, type TabRendererDependencies } from './SettingsTabbedRenderer';
+import { SettingsToolSection } from './SettingsToolSection';
 import { SettingsUiSection } from './SettingsUiSection';
 import { SettingsUserSection } from './SettingsUserSection';
 
@@ -170,6 +173,9 @@ export class OpenCodianSettingsView extends ItemView {
     this.addStyleSettings(containerEl);
     this.addDebugSettings(containerEl);
     this.addUserSettings(containerEl);
+    this.addSkillsSettings(containerEl);
+    this.addToolsSettings(containerEl);
+    this.addAcpSettings(containerEl);
 
     this.sectionCoordinator.finishDisplay();
   }
@@ -454,6 +460,41 @@ export class OpenCodianSettingsView extends ItemView {
 
   private addUserSettings(containerEl: HTMLElement): void {
     this.createUserSection().attach(containerEl);
+  }
+
+  private addSkillsSettings(containerEl: HTMLElement): void {
+    new SettingsSkillSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    }).attach(containerEl);
+  }
+
+  private addToolsSettings(containerEl: HTMLElement): void {
+    this.createSectionHeading(containerEl, t('settings.tools.title'));
+
+    const blockEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-settings-section',
+      attr: { 'data-settings-surface': 'section' },
+    });
+    const bodyEl = blockEl.createDiv({
+      cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+      attr: { 'data-settings-surface': 'section-body' },
+    });
+
+    bodyEl.createEl('h3', { text: t('settings.tools.tab.builtin') });
+    const builtinSection = new SettingsToolSection(bodyEl, this.plugin, 'builtin');
+    void builtinSection.render();
+
+    bodyEl.createEl('h3', { text: t('settings.tools.tab.custom') });
+    const customSection = new SettingsToolSection(bodyEl, this.plugin, 'custom');
+    void customSection.render();
+  }
+
+  private addAcpSettings(containerEl: HTMLElement): void {
+    new SettingsAcpSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    }).attach(containerEl);
   }
 
   // ─── Shared helpers ────────────────────────────────────────────────

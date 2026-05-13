@@ -12,7 +12,7 @@
 - `基础信息`：project agent 选择、新建 ID、mode、disable、description
 - `行为定义`：prompt
 - `模型与采样`：model、temperature、top_p、steps
-- `高级配置`：color、`permission.task` allowlist、`options`
+- `高级配置`：color、`permission.task` allowlist、技能工具/权限覆盖、`options`
 
 其中 `高级配置` 默认折叠，避免长文本 area 把整个设置面撑得过长。
 
@@ -28,6 +28,8 @@
 - `steps`
 - `color`
 - `permission.task` allowlist
+- `tools.skill`
+- `permission.skill`
 - `options`
 
 commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 editor，继续留在相邻 command config/runtime owners。
@@ -56,6 +58,8 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 - `permission.task` allowlist 用多行 textarea 表达；每行一个子代理 ID 或 glob pattern，保存时会写成 `{'*': 'deny', <pattern>: 'allow'}` 形式的显式 allowlist
 - 读取已有 agent 时，只从 `permission.task` object 中提取值为 `allow` 的条目回填到 textarea；未改动该字段时不会覆盖原有 `permission` 配置
 - 如果原始 `permission` 是字符串简写（如 `ask`），首次编辑 allowlist 时会先提升为 object，再附加 `task` 规则
+- `tools.skill` 用 inherit / enabled / disabled dropdown 表达；disabled 会写入 `agent.<id>.tools.skill=false`，让该代理完全禁用技能功能
+- `permission.skill` 用 inherit / allow / ask / deny dropdown 表达；非 inherit 会写入 `agent.<id>.permission.skill`，用于按代理覆盖全局技能权限
 - `options` 用 raw JSON textarea 表达；留空会清理 `agent.<id>.options`，非空时必须是 JSON object
 - 读取已有 `options` 时会格式化成缩进 JSON 回填；保存时会按当前 textarea 内容构造“替换型 patch”，让已删除的嵌套键也能从项目 override 中真正移除
 - 未触碰的未知字段由 `OpencodeConfigManager.upsertAgentConfig()` 的 merge 行为保留
@@ -71,7 +75,7 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 
 ## 与其他模块的交互
 
-- `projectAgentEditorConfig.ts`: 提供表单归一化、`permission.task` allowlist patch 与 `options` JSON 替换型 patch helper
+- `projectAgentEditorConfig.ts`: 提供表单归一化、`permission.task` allowlist patch、`permission.skill`/`tools.skill` patch 与 `options` JSON 替换型 patch helper
 - `SettingsAgentsSection`: 提供 editor 挂载点、当前 project agent map 与刷新回调
 - `OpencodeConfigManager`: 执行 project `agent.<id>` 的 upsert/remove
 - `i18n/locales/*`: 提供 editor 字段、按钮与错误提示文案

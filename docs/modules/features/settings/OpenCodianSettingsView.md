@@ -38,7 +38,7 @@ export class OpenCodianSettingsView extends ItemView
 
 `renderSettings()` 根据 `settingsLayoutMode` 分发到 classic 或 tabbed 布局：
 
-- classic 模式按 General、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User 顺序挂载 section
+- classic 模式按 General、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User、Skills、Tools、ACP 顺序挂载 section
 - tabbed 模式通过 `SettingsTabbedRenderer` 路由一级 / 二级标签内容
 - General 面板额外承载设置布局模式、语言，以及“在编辑区打开设置”的开关
 
@@ -93,6 +93,6 @@ main.ts callback
 ## 注意事项
 
 - 该模块是 editor-area settings shell，不应新增 provider/model/server 等业务逻辑；优先扩展对应 section owner。
-- 修改 classic / tabbed 的分区顺序时，需要同时检查标准 settings tab、`SettingsTabbedRenderer`、locale 文案和模块文档是否仍一致。
+- 修改 classic / tabbed 的分区顺序时，需要同时检查标准 settings tab、editor-area settings view、`SettingsTabbedRenderer`、locale 文案和模块文档是否仍一致。
 - 该 view 刻意不持久化自己的滚动位置，避免和标准设置页滚动恢复状态冲突。
 - editor-area 专用样式应定位 `.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings`，不要把 `.opencodian-settings` 直接挂到 leaf 外壳上，否则 Obsidian `Setting` 行会落在异常层级。

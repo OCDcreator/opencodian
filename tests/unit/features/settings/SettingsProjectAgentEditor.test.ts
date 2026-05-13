@@ -325,6 +325,35 @@ describe('SettingsProjectAgentEditor layout and creation', () => {
     });
   });
 
+  it('writes agent skill tool and permission overrides', async () => {
+    const { configManager } = renderEditor();
+
+    await findText(t('settings.agents.editor.id.name'))?.onChange?.('researcher');
+    await findDropdown(t('settings.agents.editor.skillTool.name'))?.onChange?.('disabled');
+    await findDropdown(t('settings.agents.editor.skillPermission.name'))?.onChange?.('deny');
+
+    await findButton(t('settings.agents.editor.actions.save'))?.onClick?.();
+    await flushAsync();
+
+    expect(configManager.upsertAgentConfig).toHaveBeenCalledWith('researcher', {
+      mode: 'primary',
+      description: undefined,
+      prompt: undefined,
+      model: undefined,
+      temperature: undefined,
+      top_p: undefined,
+      steps: undefined,
+      color: undefined,
+      disable: undefined,
+      permission: {
+        skill: 'deny',
+      },
+      tools: {
+        skill: false,
+      },
+    });
+  });
+
   it('writes project agent options from a JSON object field', async () => {
     const { configManager } = renderEditor();
 

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import * as fs from 'fs';
 import { Notice } from 'obsidian';
 import * as path from 'path';
@@ -334,6 +335,98 @@ export class OpencodeConfigManager {
     }
     const permission = config.permission as PermissionConfig;
     permission[tool as keyof PermissionConfig] = action;
+    await this.write(config);
+  }
+
+  async setSkillPermissionPattern(pattern: string, action: PermissionAction): Promise<void> {
+    const normalizedPattern = pattern.trim();
+    if (!normalizedPattern) {
+      throw new Error('OpenCode skill permission pattern is required');
+    }
+
+    const config = await this.read();
+    if (typeof config.permission === 'string') {
+      config.permission = { '*': config.permission };
+    }
+    if (!config.permission || typeof config.permission !== 'object') {
+      config.permission = {};
+    }
+
+    const permission = config.permission as PermissionConfig;
+    const currentSkillPermission = permission.skill;
+    const nextSkillPermission: Record<string, PermissionAction> = typeof currentSkillPermission === 'string'
+      ? { '*': currentSkillPermission }
+      : currentSkillPermission && typeof currentSkillPermission === 'object'
+        ? this.cloneConfigObject(currentSkillPermission)
+        : {};
+    if (!nextSkillPermission['*'] && permission['*']) {
+      nextSkillPermission['*'] = permission['*'];
+    }
+    nextSkillPermission[normalizedPattern] = action;
+    permission.skill = nextSkillPermission;
+    await this.write(config);
+  }
+
+  async setAgentSkillPermission(
+    agentId: string,
+    action: PermissionAction | undefined,
+  ): Promise<void> {
+    const config = await this.read();
+    const normalizedAgentId = this.normalizeConfigEntryId('agent', agentId);
+    const nativeAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.agent);
+    const legacyAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.mode);
+    const existingAgent = nativeAgents[normalizedAgentId] ?? legacyAgents[normalizedAgentId] ?? {};
+    const nextAgent = this.cloneConfigObject(existingAgent);
+
+    if (action === undefined) {
+      if (typeof nextAgent.permission === 'string') {
+        delete nextAgent.permission;
+      } else if (nextAgent.permission && typeof nextAgent.permission === 'object') {
+        delete (nextAgent.permission as PermissionConfig).skill;
+        if (Object.keys(nextAgent.permission).length === 0) {
+          delete nextAgent.permission;
+        }
+      }
+    } else if (typeof nextAgent.permission === 'string') {
+      nextAgent.permission = { '*': nextAgent.permission, skill: action };
+    } else {
+      nextAgent.permission = {
+        ...(nextAgent.permission && typeof nextAgent.permission === 'object' ? nextAgent.permission : {}),
+        skill: action,
+      };
+    }
+
+    nativeAgents[normalizedAgentId] = nextAgent;
+    config.agent = nativeAgents;
+    await this.write(config);
+  }
+
+  async setAgentSkillToolEnabled(
+    agentId: string,
+    enabled: boolean | undefined,
+  ): Promise<void> {
+    const config = await this.read();
+    const normalizedAgentId = this.normalizeConfigEntryId('agent', agentId);
+    const nativeAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.agent);
+    const legacyAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.mode);
+    const existingAgent = nativeAgents[normalizedAgentId] ?? legacyAgents[normalizedAgentId] ?? {};
+    const nextAgent = this.cloneConfigObject(existingAgent);
+    const nextTools = this.cloneConfigObject(nextAgent.tools ?? {});
+
+    if (enabled === undefined) {
+      delete nextTools.skill;
+    } else {
+      nextTools.skill = enabled;
+    }
+
+    if (Object.keys(nextTools).length > 0) {
+      nextAgent.tools = nextTools;
+    } else {
+      delete nextAgent.tools;
+    }
+
+    nativeAgents[normalizedAgentId] = nextAgent;
+    config.agent = nativeAgents;
     await this.write(config);
   }
 

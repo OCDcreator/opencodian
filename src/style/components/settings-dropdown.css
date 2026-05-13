@@ -160,9 +160,9 @@
 .opencodian-settings-dropdown-option-label {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .opencodian-settings-dropdown-option:hover,

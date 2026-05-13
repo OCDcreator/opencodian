@@ -5,7 +5,7 @@
 
 ## 概述
 
-`projectAgentEditorConfig.ts` 是 `SettingsProjectAgentEditor` 的纯配置归一化 helper。它承接 project agent 表单里的值转换、JSON 解析、`permission.task` allowlist patch 和 `options` 替换型 patch，避免 editor owner 因字段语义继续膨胀。
+`projectAgentEditorConfig.ts` 是 `SettingsProjectAgentEditor` 的纯配置归一化 helper。它承接 project agent 表单里的值转换、JSON 解析、`permission.task` allowlist patch、`permission.skill` / `tools.skill` 覆盖 patch 和 `options` 替换型 patch，避免 editor owner 因字段语义继续膨胀。
 
 ## 核心逻辑
 
@@ -23,6 +23,13 @@
 - allowlist 非空时写成 `{ '*': 'deny', <pattern>: 'allow' }`
 - 清空 allowlist 时只清理 `permission.task`；如果原 permission 还有其他 key，会保留这些 key
 - 如果原 permission 是字符串简写，会提升成 object 并把原简写放到 `'*'`
+
+### skill 覆盖
+
+- `stringifySkillPermission()` 从 `permission.skill` 读取 allow / ask / deny，其他形态回填为 inherit
+- `stringifySkillToolMode()` 从 `tools.skill` 读取 enabled / disabled，缺失时回填为 inherit
+- `buildProjectAgentPermissionPatch()` 现在同时支持 task allowlist 与 skill permission 两种 dirty bit；skill inherit 会写 `skill: undefined`，用于抵消 agent config 的递归 merge
+- `buildProjectAgentToolsPatch()` 专门构造 `tools.skill` patch；inherit 会移除该 key，disabled 会写入 `false`
 
 ### options JSON
 

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 /**
  * Tests for OpencodeConfigManager
  */
@@ -553,6 +554,55 @@ describe('OpencodeConfigManager session agent command helpers', () => {
     });
   });
 
+});
+
+describe('OpencodeConfigManager skill permissions', () => {
+  it('writes per-skill permission patterns while preserving shorthand defaults', async () => {
+    await manager.write({ permission: 'ask' });
+
+    await manager.setSkillPermissionPattern('reviewer', 'deny');
+
+    expect((await manager.read()).permission).toEqual({
+      '*': 'ask',
+      skill: {
+        '*': 'ask',
+        reviewer: 'deny',
+      },
+    });
+  });
+
+  it('writes agent skill permission and tool availability without dropping unrelated fields', async () => {
+    await manager.write({
+      agent: {
+        researcher: {
+          mode: 'primary',
+          description: 'Reads sources',
+          permission: {
+            bash: 'ask',
+          },
+          tools: {
+            webfetch: true,
+          },
+        },
+      },
+    });
+
+    await manager.setAgentSkillPermission('researcher', 'deny');
+    await manager.setAgentSkillToolEnabled('researcher', false);
+
+    expect((await manager.read()).agent?.researcher).toEqual({
+      mode: 'primary',
+      description: 'Reads sources',
+      permission: {
+        bash: 'ask',
+        skill: 'deny',
+      },
+      tools: {
+        webfetch: true,
+        skill: false,
+      },
+    });
+  });
 });
 
 describe('OpencodeConfigManager paths', () => {

@@ -8,8 +8,16 @@ import type {
 
 export interface ProjectAgentPermissionPatchState {
   permission: OpencodeAgentConfig['permission'];
+  skillPermission: 'inherit' | PermissionAction;
+  skillPermissionDirty: boolean;
   taskAllowlist: string;
   taskAllowlistDirty: boolean;
+}
+
+export interface ProjectAgentToolsPatchState {
+  skillToolMode: 'inherit' | 'enabled' | 'disabled';
+  skillToolModeDirty: boolean;
+  tools: OpencodeAgentConfig['tools'];
 }
 
 export interface ProjectAgentOptionsPatchState {
@@ -74,6 +82,29 @@ export function stringifyTaskAllowlist(permission: OpencodeAgentConfig['permissi
     .join('\n');
 }
 
+export function stringifySkillPermission(
+  permission: OpencodeAgentConfig['permission'],
+): 'inherit' | PermissionAction {
+  if (!isRecord(permission)) {
+    return 'inherit';
+  }
+
+  const skillPermission = permission.skill;
+  return skillPermission === 'allow' || skillPermission === 'ask' || skillPermission === 'deny'
+    ? skillPermission
+    : 'inherit';
+}
+
+export function stringifySkillToolMode(
+  tools: OpencodeAgentConfig['tools'],
+): 'inherit' | 'enabled' | 'disabled' {
+  if (!isRecord(tools) || typeof tools.skill !== 'boolean') {
+    return 'inherit';
+  }
+
+  return tools.skill ? 'enabled' : 'disabled';
+}
+
 export function buildTaskAllowlistPermission(
   value: string,
 ): Record<string, PermissionAction> | undefined {
@@ -98,52 +129,56 @@ export function hasPermissionKeysOtherThanTask(permission: Record<string, unknow
 export function buildProjectAgentPermissionPatch(
   state: ProjectAgentPermissionPatchState,
 ): Pick<OpencodeAgentConfig, 'permission'> | Record<string, never> {
-  if (!state.taskAllowlistDirty) {
+  if (!state.taskAllowlistDirty && !state.skillPermissionDirty) {
     return {};
   }
 
   const taskPermission = buildTaskAllowlistPermission(state.taskAllowlist);
   const basePermission = state.permission;
-
+  const permission: PermissionConfig = {};
   if (typeof basePermission === 'string') {
-    if (!taskPermission) {
-      return {};
+    permission['*'] = basePermission;
+  }
+
+  if (state.taskAllowlistDirty) {
+    if (taskPermission) {
+      permission.task = taskPermission;
+    } else {
+      permission.task = undefined;
     }
-    const permission: PermissionConfig = {
-      '*': basePermission,
-      task: taskPermission,
-    };
-    return {
-      permission,
-    };
   }
 
-  if (!isRecord(basePermission)) {
-    if (!taskPermission) {
-      return {};
+  if (state.skillPermissionDirty) {
+    if (state.skillPermission === 'inherit') {
+      permission.skill = undefined;
+    } else {
+      permission.skill = state.skillPermission;
     }
-    const permission: PermissionConfig = {
-      task: taskPermission,
-    };
-    return {
-      permission,
-    };
   }
 
-  if (!taskPermission) {
-    const permissionPatch = hasPermissionKeysOtherThanTask(basePermission)
-      ? ({ task: undefined } as PermissionConfig)
-      : undefined;
-    return {
-      permission: permissionPatch,
-    };
-  }
-
-  const permission: PermissionConfig = {
-    task: taskPermission,
-  };
   return {
-    permission,
+    permission: Object.keys(permission).length > 0 ? permission : undefined,
+  };
+}
+
+export function buildProjectAgentToolsPatch(
+  state: ProjectAgentToolsPatchState,
+): Pick<OpencodeAgentConfig, 'tools'> | Record<string, never> {
+  if (!state.skillToolModeDirty) {
+    return {};
+  }
+
+  const tools = isRecord(state.tools)
+    ? cloneJsonValue(state.tools) as Record<string, boolean>
+    : {};
+  if (state.skillToolMode === 'inherit') {
+    delete tools.skill;
+  } else {
+    tools.skill = state.skillToolMode === 'enabled';
+  }
+
+  return {
+    tools: Object.keys(tools).length > 0 ? tools : undefined,
   };
 }
 
@@ -242,6 +277,16 @@ export function cloneOptions(
   }
 
   return cloneJsonValue(options);
+}
+
+export function cloneTools(
+  tools: OpencodeAgentConfig['tools'],
+): OpencodeAgentConfig['tools'] {
+  if (!isRecord(tools)) {
+    return undefined;
+  }
+
+  return cloneJsonValue(tools) as Record<string, boolean>;
 }
 
 export function stringifyOptions(options: OpencodeAgentConfig['options']): string {

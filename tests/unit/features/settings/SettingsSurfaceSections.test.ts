@@ -20,6 +20,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
     opencodeConfigManager: {
       read: jest.fn().mockResolvedValue({ permission: {} }),
       setToolPermission: jest.fn().mockResolvedValue(undefined),
+      setSkillPermissionPattern: jest.fn().mockResolvedValue(undefined),
     },
     openCodeCatalogStateStore: {
       getToolCatalogSnapshot: jest.fn(() => ({ registryToolIds: ['custom.exec'] })),
