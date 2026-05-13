@@ -6533,8 +6533,12 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings .opencodian-settings-section .setting-item-name {
   color: var(--text-normal);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-settings-section .setting-item-name + .setting-item-description {
+  margin-top: 3px;
 }
 
 .opencodian-settings .opencodian-settings-section .setting-item-description {
@@ -6569,6 +6573,23 @@ img.opencodian-model-provider-header-icon {
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.opencodian-settings[data-settings-layout-mode="classic"] > .opencodian-settings-section-heading:not(.opencodian-settings-subsection-heading) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 36px;
+  margin: 28px 0 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--opencodian-settings-section-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: color-mix(in srgb, var(--background-secondary) 78%, var(--background-primary));
+  color: var(--text-normal);
+  text-align: center;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background-modifier-hover) 34%, transparent);
 }
 
 .opencodian-settings .opencodian-theme-style-card,
