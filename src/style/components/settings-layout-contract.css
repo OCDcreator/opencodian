@@ -113,6 +113,10 @@
   transform: none;
 }
 
+.opencodian-settings .opencodian-settings-tab-secondary {
+  border-radius: 999px;
+}
+
 .opencodian-settings .opencodian-settings-tab-primary:hover,
 .opencodian-settings .opencodian-settings-tab-secondary:hover {
   background: var(--opencodian-settings-inline-bg);
