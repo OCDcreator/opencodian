@@ -12,7 +12,7 @@
 - 模型选择器：`.opencodian-model-selector`、`.opencodian-model-trigger*`、`.opencodian-model-dropdown*`、`.opencodian-model-option*`。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / permission selector 保持同一横向节奏；默认态是紧凑按钮，`action-buttons-etched` 下切换为透明刻入态。
 - 选择态：`.is-open`、`.is-unavailable`、`.is-unconfigured`、`.is-highlighted`、`.is-selected`。
 - 设置页通用：`.opencodian-settings*`、`.opencodian-settings-quick-nav*`、`.opencodian-settings-tabs-*`、`.opencodian-settings-tab-*`、`.opencodian-tooltip-trigger`。
-- 编辑区设置页：`.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings` 是 editor-area 专用根选择器；padding 和 tabbed 标题修正都应落在 `.view-content` 上，避免把设置 UI 挂到 Obsidian leaf 外壳。
+- 编辑区设置页：`.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings` 是 editor-area 专用根选择器；padding、classic quick-nav 顶部贴合、tabbed 标题修正都应落在 `.view-content` 上，避免把设置 UI 挂到 Obsidian leaf 外壳。
 - 样式面板通用：`.opencodian-style-*`、`.opencodian-theme-*`、滚动条规则（含 `.opencodian-history-scroll` 皮肤）。
 
 ## 近期行为
@@ -27,7 +27,7 @@
   - 动画简化：选项入场仅为 `opacity` 淡入，移除了按 provider group 交错延迟和 `translateX(-6px)` 滑入。
   - 全链路 `prefers-reduced-motion: reduce` 兜底。
 - classic 设置页 quick-nav 的 tooltip 现在不再依赖 `.opencodian-settings-quick-nav-btn` 的伪元素，而是用 `.opencodian-settings-quick-nav-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式。这样提示层可以真正越过 settings 滚动容器，不再受容器裁切影响。
-- editor-area 设置页样式现在只匹配 `.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings`。这和 `OpenCodianSettingsView` 渲染到 `ItemView.contentEl` 的结构保持一致，避免 classic/平铺模式下 Obsidian `Setting` 行只剩分隔线、名称和控件被异常层级样式吞掉。
+- editor-area 设置页样式现在只匹配 `.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings`。这和 `OpenCodianSettingsView` 渲染到 `ItemView.contentEl` 的结构保持一致，避免 classic/平铺模式下 Obsidian `Setting` 行只剩分隔线、名称和控件被异常层级样式吞掉。classic 模式会把 `.view-content` 顶部 padding 清零，让 quick-nav 像标准设置页一样贴住顶部；tabbed 模式继续保留自己的标题间距修正。
 - settings layout visible unification 后，此文件保留 settings 旧类名的兼容样式，但不再承担共享层级合同：
   - `.opencodian-settings-tab-panel` 只保留 `display: contents`，避免重 tab panel 再包一层 section card。
   - `.opencodian-style-section` 去掉粗 `border-left` 侧边条，改用 `--opencodian-settings-section-*` token fallback，使样式设置 section 不再像另一个局部设计系统。

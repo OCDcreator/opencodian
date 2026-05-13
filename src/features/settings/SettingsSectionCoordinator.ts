@@ -31,6 +31,7 @@ interface SettingsSectionCoordinatorOptions {
   getSavedScrollTop: () => number;
   setSavedScrollTop: (scrollTop: number) => void;
   scheduleScrollStateSave: () => void;
+  getScrollContainer?: () => HTMLElement | null;
 }
 
 interface BeginDisplayOptions {
@@ -43,6 +44,7 @@ export class SettingsSectionCoordinator {
   private readonly getSavedScrollTop: () => number;
   private readonly setSavedScrollTop: (scrollTop: number) => void;
   private readonly scheduleScrollStateSave: () => void;
+  private readonly getExplicitScrollContainer?: () => HTMLElement | null;
   private sections: SettingsQuickNavSection[] = [];
   private quickNavEl: HTMLElement | null = null;
   private settingsScrollHandler?: () => void;
@@ -71,6 +73,7 @@ export class SettingsSectionCoordinator {
     this.getSavedScrollTop = options.getSavedScrollTop;
     this.setSavedScrollTop = options.setSavedScrollTop;
     this.scheduleScrollStateSave = options.scheduleScrollStateSave;
+    this.getExplicitScrollContainer = options.getScrollContainer;
   }
 
   scrollToSectionByTitle(sectionTitle: string): void {
@@ -658,6 +661,16 @@ export class SettingsSectionCoordinator {
   }
 
   private getSettingsScrollContainer(): HTMLElement {
+    const explicitScrollContainer = this.getExplicitScrollContainer?.();
+    if (
+      explicitScrollContainer
+      && explicitScrollContainer.isConnected
+      && explicitScrollContainer.contains(this.containerEl)
+    ) {
+      this.settingsScrollContainerEl = explicitScrollContainer;
+      return explicitScrollContainer;
+    }
+
     if (
       this.settingsScrollContainerEl
       && this.settingsScrollContainerEl.isConnected

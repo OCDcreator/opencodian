@@ -2718,6 +2718,9 @@ img.opencodian-model-provider-header-icon {
 .workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings {
   padding: 12px 48px 32px !important;
 }
+.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings.opencodian-settings--classic {
+  padding-top: 0 !important;
+}
 .workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings.opencodian-settings--tabbed .opencodian-settings-panel-title {
   margin-left: 0 !important;
 }

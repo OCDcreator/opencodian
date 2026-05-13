@@ -817,6 +817,9 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(css).toMatch(
       /\.opencodian-settings\.opencodian-settings--tabbed\s+\.opencodian-settings-panel-title\s*\{[\s\S]*margin-left:\s*-20px;/,
     );
+    expect(css).toMatch(
+      /\.workspace-leaf-content\[data-type="opencodian-settings-view"\]\s*>\s*\.view-content\.opencodian-settings\.opencodian-settings--classic\s*\{[\s\S]*padding-top:\s*0\s*!important;/,
+    );
     expect(contractCss).toMatch(
       /\.opencodian-settings\s+\.opencodian-settings-quick-nav\s*\{[\s\S]*padding:\s*10px\s+12px;/,
     );

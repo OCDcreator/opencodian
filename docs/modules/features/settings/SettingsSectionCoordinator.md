@@ -12,6 +12,7 @@
 - 在 `beginDisplay()` / `finishDisplay()` 之间管理 settings panel 的顶层重建流程
 - 通过 `createSectionHeading()` 记录 section heading，并在完成渲染后按需生成 quick-nav
 - 在 quick-nav 点击跳转或外部 `scrollToSectionByTitle()` 导航时，根据真实滚动容器与当前 sticky quick-nav 可见高度计算目标 `scrollTop`，避免按钮换行后标题被滚过头
+- 支持调用方显式提供 settings 滚动容器；标准设置页仍自动发现 Obsidian 的 vertical-tab 容器，editor-area settings view 则锁定自己的 `contentEl`
 - 在 classic quick-nav 上管理 body-level tooltip overlay，让提示可以越过 settings 滚动容器而不被裁切
 - 维护 `prepareRestoreScrollOnNextOpen()` / `prepareScrollToSectionOnNextOpen()` 的打开意图
 - 在 post-render 阶段绑定 scroll persistence，并用 `MutationObserver` + retry timers 恢复滚动位置
@@ -32,6 +33,7 @@
 ## 与其他模块的交互
 
 - `OpenCodianSettings.ts`: 负责调用 `beginDisplay()` / `createSectionHeading()` / `finishDisplay()`，以及暴露 scroll intent 的公开方法
+- `OpenCodianSettingsView.ts`: 复用 classic quick-nav，但通过显式 scroll container 让跳转只滚动 `ItemView.contentEl`，避免平铺模式下误滚外层 leaf
 - `shared/logger.ts`: 继续沿用 `OpenCodianSettings` logger 前缀记录 scroll restore 成功日志，保持现有诊断输出不变
 
 ## 注意事项

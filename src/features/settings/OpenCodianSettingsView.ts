@@ -83,6 +83,7 @@ export class OpenCodianSettingsView extends ItemView {
       getSavedScrollTop: () => 0,
       setSavedScrollTop: () => {},
       scheduleScrollStateSave: () => {},
+      getScrollContainer: () => this.settingsRootEl,
     });
   }
 
