@@ -1,6 +1,7 @@
 import { App, Modal, setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
+import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { filterModelPickerGroups, type ModelPickerGroup, type ModelPickerOption } from './modelPicker';
 import { enhanceSearchInput, type SearchInputEnhancerHandle } from './searchInputEnhancer';
 import {
@@ -36,7 +37,8 @@ export class ModelPickerModal extends Modal {
     this.contentEl.empty();
     this.modalEl.addClass('opencodian-model-picker-modal');
 
-    this.contentEl.createEl('h2', { text: this.options.title });
+    this.contentEl.createEl('h2', { cls: 'opencodian-model-picker-title', text: this.options.title });
+
     this.contentEl.createEl('p', {
       cls: 'opencodian-model-picker-modal-desc',
       text: this.options.description,
@@ -147,11 +149,12 @@ export class ModelPickerModal extends Modal {
       this.highlightedValue = optionValues[0];
     }
 
+    const listInnerEl = this.listEl.createDiv({ cls: 'opencodian-model-picker-list-inner' });
+
     if (this.options.emptySelectionLabel) {
       const selected = !this.options.selectedRef;
-      const emptyOptionEl = this.listEl.createDiv({ cls: 'opencodian-model-picker-empty-option' });
       this.renderOption(
-        emptyOptionEl,
+        listInnerEl,
         {
           ref: '',
           providerId: '',
@@ -167,25 +170,42 @@ export class ModelPickerModal extends Modal {
           empty: true,
         },
       );
+
+      if (groups.length > 0) {
+        listInnerEl.createDiv({ cls: 'opencodian-model-picker-divider' });
+      }
+    }
+
+    if (groups.length === 0 && this.query.trim()) {
+      listInnerEl.createDiv({
+        cls: 'opencodian-model-picker-empty',
+        text: t('settings.model.picker.noResults'),
+      });
+      return;
     }
 
     if (groups.length === 0) {
-      this.listEl.createDiv({
+      listInnerEl.createDiv({
         cls: 'opencodian-model-picker-empty',
-        text: this.query.trim()
-          ? t('settings.model.picker.noResults')
-          : t('settings.model.noModels'),
+        text: t('settings.model.noModels'),
       });
       return;
     }
 
     for (const group of groups) {
-      const groupEl = this.listEl.createDiv({ cls: 'opencodian-model-picker-group' });
+      const groupEl = listInnerEl.createDiv({ cls: 'opencodian-model-picker-group' });
       const headerEl = groupEl.createDiv({ cls: 'opencodian-model-picker-group-header' });
-      headerEl.createDiv({
+
+      const headerTitleEl = headerEl.createDiv({ cls: 'opencodian-model-picker-group-title-wrap' });
+      const iconEl = headerTitleEl.createDiv({ cls: 'opencodian-model-picker-group-icon' });
+      setIcon(iconEl, 'bot');
+      void this.applyProviderIcon(iconEl, group.providerId, group.providerName);
+
+      headerTitleEl.createDiv({
         cls: 'opencodian-model-picker-group-title',
         text: group.providerName,
       });
+
       headerEl.createDiv({
         cls: `opencodian-model-source-badge is-${group.source}`,
         text: t(`settings.model.sourceBadge.${group.source}` as const),
@@ -213,6 +233,7 @@ export class ModelPickerModal extends Modal {
     });
     optionEl.toggleClass('is-selected', flags.selected);
     optionEl.toggleClass('is-highlighted', flags.highlighted);
+    optionEl.toggleClass('is-empty', !!flags.empty);
     optionEl.addEventListener('mouseenter', () => {
       this.highlightedValue = value;
       this.syncHighlight();
@@ -309,5 +330,18 @@ export class ModelPickerModal extends Modal {
   private async choose(option: ModelPickerOption | null): Promise<void> {
     await this.options.onChoose(option);
     this.close();
+  }
+
+  private async applyProviderIcon(targetEl: HTMLElement, providerId: string, label: string): Promise<void> {
+    const url = await ProviderIconService.resolveIconUrl(this.app, providerId);
+    if (!url) {
+      return;
+    }
+    targetEl.empty();
+    const imgEl = document.createElement('img');
+    imgEl.classList.add('opencodian-provider-icon-image');
+    imgEl.src = url;
+    imgEl.alt = label;
+    targetEl.appendChild(imgEl);
   }
 }

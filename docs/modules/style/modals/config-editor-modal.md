@@ -19,6 +19,7 @@
 - 代理 / 命令设置目录：`.opencodian-agent-editor-*`、`.opencodian-settings-catalog-scroll`、`.opencodian-agent-catalog-scroll`、`.opencodian-command-catalog-scroll`（项目代理编辑器分组卡片、默认折叠的高级区，以及代理 / 命令目录最大高度 + 内部滚动）。
 - MCP 设置：`.opencodian-mcp-*`（management toolbar + metric cards、server cards、runtime switch label、status/detail modal、editor modal grouped form）。
 - provider 卡片 / 预设卡片：`.opencodian-settings-provider-*`、`.opencodian-preset-*`。
+- 模型选择弹层：`.opencodian-model-picker-*`（列表、搜索、筛选、选项、provider 分组标题与图标、source badge、空状态、响应式折行）。
 
 ## 关联 TS 组件
 
@@ -134,3 +135,15 @@ Guardrail: 这次增强只允许 classic mode 获得更明确的 child panel rhy
 - formatter config 中 `.opencodian-settings-block` 直接包含的 builtin / custom rows 会在 classic 和 tabbed 两种模式下获得左右 inset、首尾 spacing、row spacing，并把内部 `Setting` 约束为 `1fr + 180-260px` 两列，避免“内置格式化器”标题下的行贴边、贴顶或右侧下拉过宽。
 
 Guardrail: MCP、Formatter、Model availability 的精修只能增加局部节奏和分隔，不应恢复 section 内的大卡片套大卡片、decorative blur、gradient、hover lift 或 heavy shadow。
+
+## 2026-05-13 Model picker visual refresh
+
+模型选择弹层（`ModelPickerModal`）进行视觉重构：
+
+- 控件区使用更紧凑的 `36px` 高度和 `10px` 圆角，搜索框与 provider 下拉在 `520px` 以下自动垂直堆叠。
+- 列表区新增 `.opencodian-model-picker-list-inner` 内层容器与 `.opencodian-model-picker-divider` 分隔线，空选项现在融入列表流。
+- provider 分组标题支持 `.opencodian-model-picker-group-icon` 图标位，标题取消全大写，改用 `13px` semibold。
+- source badge 缩小为 `10px` 的 muted pill，不再使用高对比色块。
+- 模型选项取消外边框，改用 transparent background + hover tonal lift；选中状态使用更克制的 `7%` accent mix，避免像独立按钮。
+- 空选项（如“跟随当前会话模型”）选中时使用更淡的 `4%` accent mix，保持 subdued。
+- 选项间距从 `8px` 收紧到 `2px`，分组间距保持 `16px`，形成更清晰的“紧凑列表 + 分组留白”节奏。

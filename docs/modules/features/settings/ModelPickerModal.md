@@ -16,10 +16,11 @@
 
 - 可先通过 provider 下拉缩小范围，再按 provider / model 名称和 ID 过滤
 - 保留 provider 分组结构，而不是退化成扁平列表
-- 支持一个顶部的空值选项，例如“未配置”或“跟随当前会话模型”
+- 支持一个顶部的空值选项，例如“未配置”或“跟随当前会话模型”；该选项现在以 subdued 列表项样式融入列表流，不再使用突出的独立按钮样式
 - 选中后通过回调把 `ModelPickerOption | null` 交回调用方，再由调用方决定写回哪个设置字段
 - 搜索框带常驻清空按钮和本地最近搜索历史，历史候选层使用插件自绘浮层，避免原生 `datalist` 在 Obsidian 滚动容器里出现定位漂移
 - provider 筛选继续以 select 保存状态和触发 change，但视觉菜单由 `SettingsDropdownControl` 接管，避免 macOS / Windows 原生菜单差异
+- provider 分组标题现在会尝试渲染 provider icon（通过 `ProviderIconService`），无图标时回退到 `bot` Lucide 图标
 
 ## 关键输入
 
