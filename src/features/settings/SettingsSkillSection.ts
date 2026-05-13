@@ -3,13 +3,14 @@
  * Skill settings section for OpenCode skill discovery and permission control.
  */
 
-import { MarkdownRenderer, Modal, normalizePath, Notice, requestUrl, setIcon, Setting } from 'obsidian';
+import { MarkdownRenderer, Modal, normalizePath, Notice, requestUrl, setIcon } from 'obsidian';
 
 import type { PermissionAction, PermissionConfig } from '../../core/types';
 import { getServerBaseUrl } from '../../core/types/settings';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { normalizeContextPath } from '../../shared/contextPath';
 import type { SkillInfo, SkillSourceGroups } from '../chat/services/SkillCatalogService';
 
 const logger = createLogger('SettingsSkillSection');
@@ -18,6 +19,9 @@ const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const SKILL_NAME_MAX_LENGTH = 64;
 const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
 const SKILL_COMPATIBILITY_MAX_LENGTH = 500;
+const SKILL_CATALOG_RETRY_DELAYS_MS = [0, 300, 700] as const;
+const SKILL_RESTART_RETRY_DELAYS_MS = [0, 500] as const;
+let skillServiceRestartQueue: Promise<void> = Promise.resolve();
 const ALLOWED_SKILL_FRONTMATTER_KEYS = new Set([
   'allowed-tools',
   'compatibility',
@@ -37,6 +41,12 @@ const SOURCE_LABEL_KEYS: Record<keyof SkillSourceGroups, TranslationKey> = {
 };
 
 type SkillPermissionSelection = 'inherit' | PermissionAction;
+type SkillCatalogTab = 'project' | 'external';
+
+interface SkillPermissionDisplayCache {
+  globalPermission?: SkillPermissionSelection;
+  skillPermission?: SkillPermissionSelection;
+}
 
 interface SettingsSkillSectionOptions {
   plugin: OpenCodianPlugin;
@@ -47,10 +57,17 @@ interface SettingsSkillSectionOptions {
   ) => HTMLHeadingElement;
 }
 
+const skillPermissionDisplayCache = new WeakMap<OpenCodianPlugin, SkillPermissionDisplayCache>();
+
 export class SettingsSkillSection {
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: SettingsSkillSectionOptions['createSectionHeading'];
   private bodyEl: HTMLElement | null = null;
+  private listEl: HTMLElement | null = null;
+  private activeTab: SkillCatalogTab = 'project';
+  private cachedSkills: SkillInfo[] | null = null;
+  private readonly selectedSkillKeys = new Set<string>();
+  private bulkPermissionSelection: SkillPermissionSelection = 'inherit';
 
   constructor(options: SettingsSkillSectionOptions) {
     this.plugin = options.plugin;
@@ -63,14 +80,16 @@ export class SettingsSkillSection {
     return heading;
   }
 
-  attachTabbed(containerEl: HTMLElement, _secondaryTabId: string): void {
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.activeTab = this.resolveSkillCatalogTab(secondaryTabId);
     this.render(containerEl);
   }
 
   private render(containerEl: HTMLElement): void {
     this.bodyEl = containerEl.createDiv({ cls: 'opencodian-skill-settings-shell' });
     this.renderToolbar(this.bodyEl);
-    void this.renderSkillList(this.bodyEl);
+    this.listEl = this.bodyEl.createDiv({ cls: 'opencodian-skill-list' });
+    void this.renderSkillList(this.listEl);
   }
 
   private renderToolbar(containerEl: HTMLElement): void {
@@ -80,11 +99,12 @@ export class SettingsSkillSection {
     });
     this.renderPermissionControl(panelEl);
     const toolbarEl = panelEl.createDiv({ cls: 'opencodian-skill-toolbar' });
-    this.renderCreateSkillControl(toolbarEl);
-    this.renderRefreshButton(toolbarEl);
+    this.renderCatalogToolbar(toolbarEl);
   }
 
   private renderPermissionControl(containerEl: HTMLElement): void {
+    const permissionCache = this.getPermissionDisplayCache();
+    const cachedGlobalPermission = permissionCache.globalPermission;
     const clusterEl = containerEl.createDiv({ cls: 'opencodian-skill-permission-cluster' });
     const copyEl = clusterEl.createDiv({ cls: 'opencodian-skill-permission-copy' });
     copyEl.createDiv({
@@ -97,15 +117,13 @@ export class SettingsSkillSection {
     });
     const globalStatusEl = copyEl.createDiv({
       cls: 'opencodian-skill-permission-global-status',
-      text: t('settings.skills.permission.globalStatus.loading'),
+      text: cachedGlobalPermission
+        ? this.formatGlobalPermissionStatus(cachedGlobalPermission)
+        : t('settings.skills.permission.globalStatus.loading'),
     });
     void this.getCurrentGlobalPermission().then((permission) => {
-      globalStatusEl.setText(
-        t('settings.skills.permission.globalStatus.value').replace(
-          '{permission}',
-          this.formatPermissionSelection(permission),
-        ),
-      );
+      permissionCache.globalPermission = permission;
+      globalStatusEl.setText(this.formatGlobalPermissionStatus(permission));
     });
 
     const actionEl = clusterEl.createDiv({ cls: 'opencodian-skill-permission-actions' });
@@ -117,11 +135,12 @@ export class SettingsSkillSection {
     this.addPermissionOption(dropdownEl, 'allow', t('settings.skills.permission.allow'));
     this.addPermissionOption(dropdownEl, 'ask', t('settings.skills.permission.ask'));
     this.addPermissionOption(dropdownEl, 'deny', t('settings.skills.permission.deny'));
-    dropdownEl.value = 'inherit';
+    dropdownEl.value = permissionCache.skillPermission ?? 'inherit';
     dropdownEl.addEventListener('change', () => {
       void this.updateSkillDefaultPermission(dropdownEl.value as SkillPermissionSelection);
     });
     void this.getCurrentSkillPermission().then((permission) => {
+      permissionCache.skillPermission = permission;
       dropdownEl.value = permission;
     });
 
@@ -181,6 +200,22 @@ export class SettingsSkillSection {
     return t('settings.skills.permission.globalStatus.unset');
   }
 
+  private formatGlobalPermissionStatus(permission: SkillPermissionSelection): string {
+    return t('settings.skills.permission.globalStatus.value').replace(
+      '{permission}',
+      this.formatPermissionSelection(permission),
+    );
+  }
+
+  private getPermissionDisplayCache(): SkillPermissionDisplayCache {
+    let cache = skillPermissionDisplayCache.get(this.plugin);
+    if (!cache) {
+      cache = {};
+      skillPermissionDisplayCache.set(this.plugin, cache);
+    }
+    return cache;
+  }
+
   private async updateSkillDefaultPermission(value: SkillPermissionSelection): Promise<void> {
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) {
@@ -192,80 +227,109 @@ export class SettingsSkillSection {
     } else {
       await configManager.setToolPermission('skill', value);
     }
+    this.getPermissionDisplayCache().skillPermission = value;
     await this.restartLocalServiceAfterPermissionWrite();
   }
 
-  private renderCreateSkillControl(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.skills.create.label'))
-      .setDesc(t('settings.skills.create.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.skills.create.button'))
-          .onClick(() => {
-            this.openSkillModal({
-              name: this.nextSkillName(),
-              description: '',
-              location: '.opencode/skills/new-skill/SKILL.md',
-              content: this.createSkillTemplate('new-skill'),
-            }, { mode: 'create' });
-          });
-      });
+  private renderCatalogToolbar(containerEl: HTMLElement): void {
+    const copyEl = containerEl.createDiv({ cls: 'opencodian-skill-toolbar-copy' });
+    if (this.activeTab === 'project') {
+      copyEl.createDiv({ cls: 'opencodian-skill-toolbar-title', text: t('settings.skills.create.label') });
+      copyEl.createDiv({ cls: 'opencodian-skill-toolbar-desc', text: t('settings.skills.create.desc') });
+    } else {
+      copyEl.createDiv({ cls: 'opencodian-skill-toolbar-title', text: t('settings.skills.external.label') });
+      copyEl.createDiv({ cls: 'opencodian-skill-toolbar-desc', text: t('settings.skills.external.desc') });
+    }
+
+    const actionsEl = containerEl.createDiv({ cls: 'opencodian-skill-toolbar-actions' });
+    if (this.activeTab === 'project') {
+      this.renderCreateSkillButton(actionsEl);
+    } else {
+      this.renderRefreshButton(actionsEl, 'toolbar');
+    }
   }
 
-  private renderRefreshButton(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.skills.refresh'))
-          .onClick(() => {
-            if (!this.bodyEl) {
-              return;
-            }
-
-            this.bodyEl.empty();
-            this.renderToolbar(this.bodyEl);
-            void this.renderSkillList(this.bodyEl, true);
-          });
-      });
+  private renderCreateSkillButton(containerEl: HTMLElement): void {
+    const buttonEl = containerEl.createEl('button', {
+      cls: 'mod-cta opencodian-skill-toolbar-action opencodian-skill-create-action',
+      text: t('settings.skills.create.button'),
+      attr: { type: 'button' },
+    });
+    buttonEl.addEventListener('click', () => {
+      this.openSkillModal({
+        name: this.nextSkillName(),
+        description: '',
+        location: '.opencode/skills/new-skill/SKILL.md',
+        content: this.createSkillTemplate('new-skill'),
+      }, { mode: 'create' });
+    });
   }
 
-  private async renderSkillList(containerEl: HTMLElement, forceRefresh = false): Promise<void> {
-    const listEl = containerEl.createDiv({ cls: 'opencodian-skill-list' });
+  private renderRefreshButton(containerEl: HTMLElement, placement: 'toolbar' | 'bulk'): void {
+    const buttonEl = containerEl.createEl('button', {
+      cls: [
+        placement === 'toolbar' ? 'opencodian-skill-toolbar-action' : 'opencodian-skill-bulk-action',
+        'opencodian-skill-refresh-action',
+      ].join(' '),
+      text: t('settings.skills.refresh'),
+      attr: { type: 'button' },
+    });
+    buttonEl.addEventListener('click', () => {
+      void this.refreshSkillCatalog();
+    });
+  }
+
+  private async refreshSkillCatalog(): Promise<void> {
+    if (!this.bodyEl) {
+      return;
+    }
+
+    await restartLocalServiceAfterSkillCatalogWrite(this.plugin);
+    await this.refreshSkillList(true);
+  }
+
+  private async renderSkillList(listEl: HTMLElement, forceRefresh = false): Promise<void> {
+    listEl.empty();
     listEl.createDiv({
       cls: 'opencodian-settings-inline-empty opencodian-skill-loading',
       text: t('settings.skills.loading'),
     });
 
     try {
-      const skills = await this.fetchSkills(forceRefresh);
+      const skills = forceRefresh || !this.cachedSkills ? await this.fetchSkills(forceRefresh) : this.cachedSkills;
+      this.cachedSkills = skills;
       listEl.empty();
       const groups = this.groupBySource(skills);
-      const allEmpty = Object.values(groups).every((group) => group.length === 0);
-      if (allEmpty) {
-        listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty') });
+      const projectSkills = groups.project;
+      const externalSources = (Object.keys(SOURCE_LABEL_KEYS) as Array<keyof SkillSourceGroups>).filter(
+        (source) => source !== 'project',
+      );
+      const externalCount = externalSources.reduce((count, source) => count + groups[source].length, 0);
+      this.pruneSelectedSkillKeys(skills);
+
+      if (this.activeTab === 'project') {
+        this.renderSkillBatchBar(listEl, projectSkills, { allowDelete: true, allowRefresh: true });
+        if (projectSkills.length === 0) {
+          listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.project') });
+          return;
+        }
+        this.renderSkillSourceSection(listEl, 'project', projectSkills);
         return;
       }
 
-      for (const source of Object.keys(SOURCE_LABEL_KEYS) as Array<keyof SkillSourceGroups>) {
+      const externalSkills = externalSources.flatMap((source) => groups[source]);
+      this.renderSkillBatchBar(listEl, externalSkills, { allowDelete: false, allowRefresh: false });
+      if (externalCount === 0) {
+        listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.external') });
+        return;
+      }
+
+      for (const source of externalSources) {
         const sourceSkills = groups[source];
         if (sourceSkills.length === 0) {
           continue;
         }
-
-        const sectionEl = listEl.createDiv({
-          cls: 'opencodian-skill-source-section',
-          attr: { 'data-skill-source': source },
-        });
-        const headerEl = sectionEl.createDiv({ cls: 'opencodian-skill-source-header' });
-        headerEl.createEl('h3', { text: t(SOURCE_LABEL_KEYS[source]) });
-        headerEl.createSpan({
-          cls: 'opencodian-skill-count',
-          text: t('settings.skills.count').replace('{count}', String(sourceSkills.length)),
-        });
-        for (const skill of sourceSkills) {
-          this.renderSkillCard(sectionEl, skill);
-        }
+        this.renderSkillSourceSection(listEl, source, sourceSkills);
       }
     } catch (error) {
       listEl.empty();
@@ -277,8 +341,113 @@ export class SettingsSkillSection {
     }
   }
 
+  private resolveSkillCatalogTab(tabId: string): SkillCatalogTab {
+    return tabId === 'external' ? 'external' : 'project';
+  }
+
+  private renderSkillBatchBar(
+    containerEl: HTMLElement,
+    skills: SkillInfo[],
+    options: { allowDelete: boolean; allowRefresh: boolean },
+  ): void {
+    const selectedSkills = this.getSelectedVisibleSkills(skills);
+    const allSelected = skills.length > 0 && selectedSkills.length === skills.length;
+    const barEl = containerEl.createDiv({ cls: 'opencodian-skill-bulk-bar' });
+    const permissionGroupEl = barEl.createDiv({ cls: 'opencodian-skill-bulk-permission-group' });
+    const permissionSelectEl = permissionGroupEl.createEl('select', {
+      cls: 'dropdown opencodian-skill-bulk-permission-select',
+      attr: { 'aria-label': t('settings.skills.bulk.permission') },
+    });
+    this.addPermissionOption(permissionSelectEl, 'inherit', t('settings.skills.itemPermission.inherit'));
+    this.addPermissionOption(permissionSelectEl, 'allow', t('settings.skills.permission.allow'));
+    this.addPermissionOption(permissionSelectEl, 'ask', t('settings.skills.permission.ask'));
+    this.addPermissionOption(permissionSelectEl, 'deny', t('settings.skills.permission.deny'));
+    permissionSelectEl.value = this.bulkPermissionSelection;
+    permissionSelectEl.addEventListener('change', () => {
+      this.bulkPermissionSelection = permissionSelectEl.value as SkillPermissionSelection;
+      void this.applyBatchSkillPermission(selectedSkills, this.bulkPermissionSelection);
+    });
+    permissionGroupEl.createSpan({
+      cls: 'opencodian-skill-bulk-count',
+      text: t('settings.skills.bulk.selected', { count: String(selectedSkills.length) }),
+    });
+
+    const actionsEl = barEl.createDiv({ cls: 'opencodian-skill-bulk-actions' });
+    const selectLabelEl = actionsEl.createEl('label', { cls: 'opencodian-skill-bulk-action opencodian-skill-bulk-select-all' });
+    const selectAllEl = selectLabelEl.createEl('input', {
+      attr: { type: 'checkbox', 'aria-label': t('settings.skills.bulk.selectAll') },
+    }) as HTMLInputElement;
+    selectAllEl.checked = allSelected;
+    selectAllEl.disabled = skills.length === 0;
+    selectLabelEl.createSpan({ text: t('settings.skills.bulk.selectAll') });
+    selectAllEl.addEventListener('change', () => {
+      for (const skill of skills) {
+        const key = this.getSkillSelectionKey(skill);
+        if (selectAllEl.checked) {
+          this.selectedSkillKeys.add(key);
+        } else {
+          this.selectedSkillKeys.delete(key);
+        }
+      }
+      this.renderLoadedSkillList();
+    });
+
+    if (options.allowRefresh) {
+      this.renderRefreshButton(actionsEl, 'bulk');
+    }
+
+    if (options.allowDelete) {
+      const deleteButtonEl = actionsEl.createEl('button', {
+        cls: 'mod-warning opencodian-skill-bulk-action opencodian-skill-bulk-delete-action',
+        text: t('settings.skills.bulk.delete', { count: String(selectedSkills.length) }),
+        attr: { type: 'button' },
+      });
+      deleteButtonEl.disabled = selectedSkills.length === 0;
+      deleteButtonEl.addEventListener('click', () => {
+        void this.deleteSelectedProjectSkills(selectedSkills);
+      });
+    }
+  }
+
+  private renderSkillSourceSection(
+    containerEl: HTMLElement,
+    source: keyof SkillSourceGroups,
+    sourceSkills: SkillInfo[],
+  ): void {
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-skill-source-section',
+      attr: { 'data-skill-source': source },
+    });
+    const headerEl = sectionEl.createDiv({ cls: 'opencodian-skill-source-header' });
+    headerEl.createEl('h3', { text: t(SOURCE_LABEL_KEYS[source]) });
+    headerEl.createSpan({
+      cls: 'opencodian-skill-count',
+      text: t('settings.skills.count').replace('{count}', String(sourceSkills.length)),
+    });
+    for (const skill of sourceSkills) {
+      this.renderSkillCard(sectionEl, skill);
+    }
+  }
+
   private renderSkillCard(containerEl: HTMLElement, skill: SkillInfo): void {
     const cardEl = containerEl.createDiv({ cls: 'opencodian-skill-card opencodian-skill-row' });
+    const selectionEl = cardEl.createEl('input', {
+      cls: 'opencodian-skill-select-checkbox',
+      attr: {
+        type: 'checkbox',
+        'aria-label': t('settings.skills.bulk.selectSkill', { name: skill.name }),
+      },
+    }) as HTMLInputElement;
+    selectionEl.checked = this.selectedSkillKeys.has(this.getSkillSelectionKey(skill));
+    selectionEl.addEventListener('change', () => {
+      const key = this.getSkillSelectionKey(skill);
+      if (selectionEl.checked) {
+        this.selectedSkillKeys.add(key);
+      } else {
+        this.selectedSkillKeys.delete(key);
+      }
+      this.renderLoadedSkillList();
+    });
     const contentEl = cardEl.createDiv({ cls: 'opencodian-skill-card-content' });
     const headerEl = contentEl.createDiv({ cls: 'opencodian-skill-card-header' });
     const titleEl = headerEl.createDiv({ cls: 'opencodian-skill-title-row' });
@@ -290,17 +459,22 @@ export class SettingsSkillSection {
 
     contentEl.createEl('small', { text: skill.location, cls: 'opencodian-skill-source' });
     const actionsEl = cardEl.createDiv({ cls: 'opencodian-skill-row-actions' });
-    this.renderSkillPermissionDropdown(actionsEl, skill.name);
-    new Setting(actionsEl)
-      .setClass('opencodian-skill-row-action')
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.skills.open'))
-          .onClick(() => {
-            this.openSkillModal(skill, { mode: this.resolveVaultRelativeSkillPath(skill.location) ? 'edit' : 'view' });
-          });
-      });
-    this.renderSkillDeleteButton(actionsEl, skill);
+    const permissionGroupEl = actionsEl.createDiv({ cls: 'opencodian-skill-row-permission-group' });
+    this.renderSkillPermissionDropdown(permissionGroupEl, skill.name);
+    const buttonGroupEl = actionsEl.createDiv({ cls: 'opencodian-skill-row-button-group' });
+    this.renderSkillOpenButton(buttonGroupEl, skill);
+    this.renderSkillDeleteButton(buttonGroupEl, skill);
+  }
+
+  private renderSkillOpenButton(containerEl: HTMLElement, skill: SkillInfo): void {
+    const buttonEl = containerEl.createEl('button', {
+      cls: 'opencodian-skill-row-action opencodian-skill-row-open-action',
+      text: t('settings.skills.open'),
+      attr: { type: 'button' },
+    });
+    buttonEl.addEventListener('click', () => {
+      this.openSkillModal(skill, { mode: this.resolveVaultRelativeSkillPath(skill.location) ? 'edit' : 'view' });
+    });
   }
 
   private renderSkillDeleteButton(containerEl: HTMLElement, skill: SkillInfo): void {
@@ -329,42 +503,110 @@ export class SettingsSkillSection {
     }
     await this.plugin.app.vault.adapter.remove(path);
     new Notice(t('settings.skills.notice.deleted', { path }));
-    if (!this.bodyEl) {
+    await restartLocalServiceAfterSkillCatalogWrite(this.plugin);
+    await this.refreshSkillList(true);
+  }
+
+  private async applyBatchSkillPermission(skills: SkillInfo[], value: SkillPermissionSelection): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager || skills.length === 0) {
       return;
     }
-    this.bodyEl.empty();
-    this.renderToolbar(this.bodyEl);
-    await this.renderSkillList(this.bodyEl, true);
+    for (const skill of skills) {
+      if (value === 'inherit') {
+        await configManager.clearSkillPermissionPattern(skill.name);
+      } else {
+        await configManager.setSkillPermissionPattern(skill.name, value);
+      }
+    }
+    await this.restartLocalServiceAfterPermissionWrite();
+    this.renderLoadedSkillList();
+  }
+
+  private async deleteSelectedProjectSkills(skills: SkillInfo[]): Promise<void> {
+    const deletableSkills = skills
+      .map((skill) => ({ skill, path: this.resolveProjectSkillPath(skill.location) }))
+      .filter((entry): entry is { skill: SkillInfo; path: string } => Boolean(entry.path));
+    if (deletableSkills.length === 0) {
+      return;
+    }
+    const names = deletableSkills.map(({ skill }) => skill.name).join(', ');
+    if (!window.confirm(t('settings.skills.bulk.delete.confirm', {
+      count: String(deletableSkills.length),
+      names,
+    }))) {
+      return;
+    }
+    for (const { path, skill } of deletableSkills) {
+      await this.plugin.app.vault.adapter.remove(path);
+      this.selectedSkillKeys.delete(this.getSkillSelectionKey(skill));
+    }
+    new Notice(t('settings.skills.bulk.deleted', { count: String(deletableSkills.length) }));
+    await restartLocalServiceAfterSkillCatalogWrite(this.plugin);
+    await this.refreshSkillList(true);
+  }
+
+  private getSelectedVisibleSkills(skills: SkillInfo[]): SkillInfo[] {
+    return skills.filter((skill) => this.selectedSkillKeys.has(this.getSkillSelectionKey(skill)));
+  }
+
+  private getSkillSelectionKey(skill: SkillInfo): string {
+    return `${this.classifySource(skill.location)}:${skill.name}:${skill.location}`;
+  }
+
+  private pruneSelectedSkillKeys(skills: SkillInfo[]): void {
+    const availableKeys = new Set(skills.map((skill) => this.getSkillSelectionKey(skill)));
+    for (const key of Array.from(this.selectedSkillKeys)) {
+      if (!availableKeys.has(key)) {
+        this.selectedSkillKeys.delete(key);
+      }
+    }
+  }
+
+  private renderLoadedSkillList(): void {
+    if (!this.listEl) {
+      return;
+    }
+    void this.renderSkillList(this.listEl);
+  }
+
+  private async refreshSkillList(forceRefresh = false): Promise<void> {
+    if (!this.listEl) {
+      return;
+    }
+    await this.renderSkillList(this.listEl, forceRefresh);
   }
 
   private renderSkillPermissionDropdown(containerEl: HTMLElement, skillName: string): void {
-    new Setting(containerEl)
-      .setClass('opencodian-skill-row-action')
-      .setName(t('settings.skills.itemPermission.label'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('inherit', t('settings.skills.itemPermission.inherit'))
-          .addOption('allow', t('settings.skills.permission.allow'))
-          .addOption('ask', t('settings.skills.permission.ask'))
-          .addOption('deny', t('settings.skills.permission.deny'))
-          .setValue('inherit')
-          .onChange(async (value) => {
-            const configManager = this.plugin.opencodeConfigManager;
-            if (!configManager) {
-              return;
-            }
-            if (value === 'inherit') {
-              await configManager.clearSkillPermissionPattern(skillName);
-            } else {
-              await configManager.setSkillPermissionPattern(skillName, value as PermissionAction);
-            }
-            await this.restartLocalServiceAfterPermissionWrite();
-          });
+    const dropdownEl = containerEl.createEl('select', {
+      cls: 'dropdown opencodian-skill-row-action opencodian-skill-row-permission-select',
+      attr: { 'aria-label': t('settings.skills.itemPermission.label') },
+    });
+    this.addPermissionOption(dropdownEl, 'inherit', t('settings.skills.itemPermission.inherit'));
+    this.addPermissionOption(dropdownEl, 'allow', t('settings.skills.permission.allow'));
+    this.addPermissionOption(dropdownEl, 'ask', t('settings.skills.permission.ask'));
+    this.addPermissionOption(dropdownEl, 'deny', t('settings.skills.permission.deny'));
+    dropdownEl.value = 'inherit';
+    dropdownEl.addEventListener('change', () => {
+      void this.updateSkillPatternPermission(skillName, dropdownEl.value as SkillPermissionSelection);
+    });
 
-        void this.getCurrentSkillPatternPermission(skillName).then((permission) => {
-          dropdown.setValue(permission);
-        });
-      });
+    void this.getCurrentSkillPatternPermission(skillName).then((permission) => {
+      dropdownEl.value = permission;
+    });
+  }
+
+  private async updateSkillPatternPermission(skillName: string, value: SkillPermissionSelection): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      return;
+    }
+    if (value === 'inherit') {
+      await configManager.clearSkillPermissionPattern(skillName);
+    } else {
+      await configManager.setSkillPermissionPattern(skillName, value);
+    }
+    await this.restartLocalServiceAfterPermissionWrite();
   }
 
   private async getCurrentSkillPermission(): Promise<SkillPermissionSelection> {
@@ -423,39 +665,52 @@ export class SettingsSkillSection {
   }
 
   private async restartLocalServiceAfterPermissionWrite(): Promise<void> {
-    if (this.plugin.settings.server.mode !== 'local') {
-      new Notice(t('settings.server.remoteManageUnavailable'));
-      return;
-    }
-
-    try {
-      const isRunning = await this.plugin.openCodeService.checkHealth();
-      if (isRunning) {
-        await this.plugin.openCodeService.stop();
-      }
-      await this.plugin.openCodeService.start();
+    const restarted = await queueSkillServiceRestart(
+      this.plugin,
+      'settings.skills.permission.restartFailed',
+      { notifyRemote: true },
+    );
+    if (restarted) {
       new Notice(t('settings.skills.permission.restartSuccess'));
-    } catch (error) {
-      logger.error('Failed to restart OpenCode after skill permission change:', error);
-      new Notice(t('settings.skills.permission.restartFailed'));
     }
   }
 
   private async fetchSkills(_forceRefresh: boolean): Promise<SkillInfo[]> {
-    const response = await requestUrl({
-      url: `${getServerBaseUrl(this.plugin.settings.server)}/skill`,
-      method: 'GET',
-      headers: this.getRequestHeaders(),
-    });
+    let lastError: unknown;
+    for (const [index, delayMs] of SKILL_CATALOG_RETRY_DELAYS_MS.entries()) {
+      if (delayMs > 0) {
+        await this.wait(delayMs);
+      }
+      try {
+        const response = await requestUrl({
+          url: this.buildSkillCatalogUrl(),
+          method: 'GET',
+          headers: this.getRequestHeaders(),
+        });
 
-    if (response.status >= 400) {
-      throw new Error(`HTTP ${response.status} from /skill`);
+        if (response.status >= 400) {
+          throw new Error(`HTTP ${response.status} from /skill`);
+        }
+
+        const payload = typeof response.json === 'object' && response.json !== null
+          ? response.json
+          : JSON.parse(response.text);
+        return this.normalizeSkillsPayload(payload);
+      } catch (error) {
+        lastError = error;
+        if (index < SKILL_CATALOG_RETRY_DELAYS_MS.length - 1) {
+          logger.warn('Skill catalog request failed; retrying:', error);
+        }
+      }
     }
 
-    const payload = typeof response.json === 'object' && response.json !== null
-      ? response.json
-      : JSON.parse(response.text);
-    return this.normalizeSkillsPayload(payload);
+    throw lastError instanceof Error ? lastError : new Error('Failed to fetch skill catalog');
+  }
+
+  private async wait(delayMs: number): Promise<void> {
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, delayMs);
+    });
   }
 
   private normalizeSkillsPayload(payload: unknown): SkillInfo[] {
@@ -474,6 +729,15 @@ export class SettingsSkillSection {
         content: typeof skill.content === 'string' ? skill.content : '',
       }))
       .filter((skill) => skill.name.trim().length > 0);
+  }
+
+  private buildSkillCatalogUrl(): string {
+    const url = new URL(`${getServerBaseUrl(this.plugin.settings.server)}/skill`);
+    const adapter = (this.plugin.app?.vault?.adapter ?? {}) as { basePath?: string };
+    if (typeof adapter.basePath === 'string' && adapter.basePath.trim()) {
+      url.searchParams.set('directory', normalizeContextPath(adapter.basePath));
+    }
+    return url.toString();
   }
 
   private groupBySource(skills: SkillInfo[]): SkillSourceGroups {
@@ -539,12 +803,7 @@ export class SettingsSkillSection {
       plugin: this.plugin,
       skill,
       onSaved: async () => {
-        if (!this.bodyEl) {
-          return;
-        }
-        this.bodyEl.empty();
-        this.renderToolbar(this.bodyEl);
-        await this.renderSkillList(this.bodyEl, true);
+        await this.refreshSkillList(true);
       },
     }).open();
   }
@@ -781,6 +1040,7 @@ class SkillDetailModal extends Modal {
     await this.ensureParentDir(path);
     await this.plugin.app.vault.adapter.write(path, this.content);
     new Notice(t('settings.skills.notice.saved', { path }));
+    await restartLocalServiceAfterSkillCatalogWrite(this.plugin);
     await this.onSaved();
     this.close();
   }
@@ -793,6 +1053,7 @@ class SkillDetailModal extends Modal {
     }
     await this.plugin.app.vault.adapter.remove(path);
     new Notice(t('settings.skills.notice.deleted', { path }));
+    await restartLocalServiceAfterSkillCatalogWrite(this.plugin);
     await this.onSaved();
     this.close();
   }
@@ -968,4 +1229,60 @@ function parseSimpleFrontmatter(text: string): Record<string, unknown> {
     result[match[1]!] = match[2]!.replace(/^["']|["']$/gu, '').trim();
   }
   return result;
+}
+
+async function restartLocalServiceAfterSkillCatalogWrite(plugin: OpenCodianPlugin): Promise<void> {
+  await queueSkillServiceRestart(plugin, 'settings.skills.notice.restartFailed');
+}
+
+async function queueSkillServiceRestart(
+  plugin: OpenCodianPlugin,
+  failureNoticeKey: TranslationKey,
+  options: { notifyRemote?: boolean } = {},
+): Promise<boolean> {
+  if (plugin.settings.server.mode !== 'local') {
+    if (options.notifyRemote) {
+      new Notice(t('settings.server.remoteManageUnavailable'));
+    }
+    return false;
+  }
+
+  const restartTask = skillServiceRestartQueue.then(
+    () => restartLocalSkillService(plugin, failureNoticeKey),
+    () => restartLocalSkillService(plugin, failureNoticeKey),
+  );
+  skillServiceRestartQueue = restartTask.then(
+    () => undefined,
+    () => undefined,
+  );
+  return restartTask;
+}
+
+async function restartLocalSkillService(plugin: OpenCodianPlugin, failureNoticeKey: TranslationKey): Promise<boolean> {
+  let lastError: unknown;
+  for (const delayMs of SKILL_RESTART_RETRY_DELAYS_MS) {
+    if (delayMs > 0) {
+      await waitMs(delayMs);
+    }
+    try {
+      const isRunning = await plugin.openCodeService.checkHealth();
+      if (isRunning) {
+        await plugin.openCodeService.stop();
+      }
+      await plugin.openCodeService.start();
+      return true;
+    } catch (error) {
+      lastError = error;
+      logger.warn('OpenCode restart attempt failed after skill settings change:', error);
+    }
+  }
+  logger.error('Failed to restart OpenCode after skill settings change:', lastError);
+  new Notice(t(failureNoticeKey));
+  return false;
+}
+
+async function waitMs(delayMs: number): Promise<void> {
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, delayMs);
+  });
 }

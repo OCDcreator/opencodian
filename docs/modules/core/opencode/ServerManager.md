@@ -182,15 +182,9 @@ Windows 上 `launcherPid` 往往是 `cmd.exe` / `node.exe` 之类的包装层；
 
 - `pluginIsolationMode === 'pure'`: 设置 `OPENCODE_PURE=true`
 - basic auth: 设置 `OPENCODE_SERVER_USERNAME` / `OPENCODE_SERVER_PASSWORD`
-- `modelSourceMode === 'server'`:
-  - `OPENCODE_DISABLE_PROJECT_CONFIG=true`
-  - 清掉 `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
-- `modelSourceMode === 'merge'`:
-  - 不禁用 project config
-  - 清掉 `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
-- 其他情况（本地 project config 模式）:
-  - 同样清掉 `OPENCODE_DISABLE_PROJECT_CONFIG` / `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
-  - 让 OpenCode 直接按 `cwd=<vault>` 去解析当前 vault 的 `.opencode` 配置
+- 所有 `modelSourceMode`:
+  - 清掉 `OPENCODE_DISABLE_PROJECT_CONFIG` / `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
+  - 让 OpenCode 直接按 `cwd=<vault>` 去解析当前 vault 的 `.opencode` 配置；模型来源模式只影响 OpenCodian 的 model catalog 合并/过滤，不再通过禁用整个 project config 来实现，避免项目 skills/tools 被一起隐藏。
 
 另外，spawn 前仍会清理一批会污染配置作用域的 `OPENCODE_*` 覆盖变量（例如 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG_CONTENT`、`OPENCODE_PERMISSION`、`OPENCODE_PLUGIN_META_FILE` 等），避免插件本地 `4196` sidecar 沿用外部终端或旧集成留下的配置注入。
 

@@ -225,5 +225,7 @@ describe('SettingsToolSection custom tool authoring', () => {
       '.opencode/tools/new-tool.ts',
       expect.stringContaining('export default tool({'),
     );
+    expect(plugin.openCodeService.stop).toHaveBeenCalledTimes(1);
+    expect(plugin.openCodeService.start).toHaveBeenCalledTimes(1);
   });
 });

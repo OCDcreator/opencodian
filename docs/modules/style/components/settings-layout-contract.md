@@ -53,13 +53,15 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 ## Skill Catalog Styles
 
 - `.opencodian-skill-settings-shell`：Skills 标签页的布局 shell，只负责控制面板与来源列表之间的垂直 rhythm，不再把整个技能页包成一个大 settings block。
-- `.opencodian-skill-control-panel` / `.opencodian-skill-toolbar`：全局权限 dropdown、新建技能和刷新按钮的独立控制栏，外层使用 section token，内部 setting items 会被压平为透明工具条内容，避免把三个控制渲染成三张并排卡片。
+- `.opencodian-skill-control-panel` / `.opencodian-skill-toolbar`：全局权限 dropdown 和当前标签的 scope action 控制栏。项目技能页只在顶部显示新建技能，外部技能页只在顶部显示刷新；工具条使用轻量 copy/action 两列，不再通过 Obsidian `Setting` row 渲染。
 - `.opencodian-skill-permission-help-modal` / `.opencodian-skill-permission-help*`：默认技能权限的解释弹窗，使用三列卡片说明 allow / ask / deny，窄屏退为单列，并在底部提供官方文档链接。
-- `.opencodian-skill-list`：纵向 flex 容器，承载来源分组后的技能列表。
+- `.opencodian-skill-list`：纵向 flex 容器，承载来源分组后的技能列表。项目技能与外部技能的切换由设置布局自身的二级标签承载，不再在 Skills 页面内部维护额外分段控件。
+- `.opencodian-skill-bulk-bar` / `.opencodian-skill-bulk-permission-group` / `.opencodian-skill-bulk-actions`：技能批量操作条，宽屏为“左侧批量权限 select + 已选数量，右侧动作组”。项目技能动作组包含全选、Refresh 和批量 Delete；批量权限下拉选择即应用，不再显示 Apply 按钮。外部技能页不渲染删除按钮，刷新保留在外部页顶部工具条。
 - `.opencodian-skill-source-section` / `.opencodian-skill-source-header`：每个技能来源的独立分区与标题行，显示来源名和计数，让用户按来源扫描，而不是先穿过一个大卡片。
-- `.opencodian-skill-card`：紧凑技能行，宽屏为“名称/描述/路径 + 操作区”两列，避免在列表中展开完整 SKILL.md。
+- `.opencodian-skill-card`：紧凑技能行，宽屏为“选择框 + 名称/描述/路径 + 操作区”三列，避免在列表中展开完整 SKILL.md。
+- `.opencodian-skill-select-checkbox`：列表行选择控件，尺寸跟随 Obsidian 原生 checkbox，不额外发明选择 affordance。
 - `.opencodian-skill-source-chip`：技能来源的低调 monospace chip。
-- `.opencodian-skill-row-actions` / `.opencodian-skill-row-action`：承载单技能 permission dropdown 与打开按钮，保持 setting row 的信息区隐藏。
+- `.opencodian-skill-row-actions` / `.opencodian-skill-row-permission-group` / `.opencodian-skill-row-button-group`：技能卡片右侧操作区，宽屏固定为“左侧单技能 permission select + 右侧按钮组”。项目技能按钮组显示 Open 和 Delete；外部技能不显示 Delete。项目目录刷新属于 bulk card 的 catalog-level 操作，不在每个技能行重复出现。
 - `.opencodian-skill-detail-modal` / `.opencodian-skill-detail-shell` / `.opencodian-skill-detail-layout`：技能详情编辑器的宽屏双栏布局，宽度进一步收在约 `1120px` 内，避免超宽窗口下显得过扁；双栏采用更明显的编辑器比例 `1.22fr / 0.78fr`，让源码区更主、预览区更辅。`modal-content` 本身是 `overflow: hidden` 的纵向 flex，shell 吃掉剩余高度，双栏区在中段独立滚动。
 - `.opencodian-skill-editor-textarea` / `.opencodian-skill-preview-content`：源码与预览面板改为 `flex: 1` 的内部滚动区域，不再依赖固定大高度把 footer 挤到 modal 视窗外。
 - `.opencodian-skill-detail-actions` / `.opencodian-skill-detail-action-button`：技能详情底部操作区，使用独立 footer 和直接按钮元素承载 `Save / Delete / Close`，保证较矮窗口下右下角操作仍留在 modal 内。

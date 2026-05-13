@@ -535,20 +535,6 @@ export class LocalSidecarLauncher {
       delete env.OPENCODE_SERVER_PASSWORD;
     }
 
-    if (this.config.modelSourceMode === 'server') {
-      env.OPENCODE_DISABLE_PROJECT_CONFIG = 'true';
-      delete env.OPENCODE_CONFIG_DIR;
-      delete env.OPENCODE_CONFIG_CONTENT;
-      return env;
-    }
-
-    if (this.config.modelSourceMode === 'merge') {
-      delete env.OPENCODE_DISABLE_PROJECT_CONFIG;
-      delete env.OPENCODE_CONFIG_DIR;
-      delete env.OPENCODE_CONFIG_CONTENT;
-      return env;
-    }
-
     delete env.OPENCODE_DISABLE_PROJECT_CONFIG;
     delete env.OPENCODE_CONFIG_DIR;
     delete env.OPENCODE_CONFIG_CONTENT;

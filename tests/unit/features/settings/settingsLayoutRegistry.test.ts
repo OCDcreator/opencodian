@@ -69,6 +69,16 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       expect(ids).toContain(tab.defaultSecondaryTabId);
     }
   });
+
+  it('splits Skills into project and external secondary tabs', () => {
+    const skillsTab = getPrimaryTabDefinition('skills');
+
+    expect(skillsTab!.defaultSecondaryTabId).toBe('project');
+    expect(skillsTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'project',
+      'external',
+    ]);
+  });
 });
 
 describe('resolvePrimaryTabId', () => {

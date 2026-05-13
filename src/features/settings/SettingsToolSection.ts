@@ -176,7 +176,7 @@ export class SettingsToolSection {
         button
           .setButtonText(t('settings.tools.refresh'))
           .onClick(async () => {
-            await this.refresh();
+            await this.refresh({ restartLocalService: true });
           });
       })
       .addButton((button) => {
@@ -353,7 +353,7 @@ export class SettingsToolSection {
   private async createProjectTool(): Promise<void> {
     const targetPath = await this.toolFileService.createProjectTool();
     new Notice(t('settings.tools.custom.notice.saved').replace('{path}', targetPath));
-    await this.refresh();
+    await this.refresh({ restartLocalService: true });
   }
 
   private async openToolFile(file: ToolFileInfo): Promise<void> {
@@ -362,7 +362,7 @@ export class SettingsToolSection {
       file: { ...file, content },
       plugin: this.plugin,
       onSaved: async () => {
-        await this.refresh();
+        await this.refresh({ restartLocalService: true });
       },
     }).open();
   }
@@ -377,12 +377,15 @@ export class SettingsToolSection {
     }
     await this.toolFileService.deleteProjectTool(file);
     new Notice(t('settings.tools.custom.notice.deleted').replace('{path}', file.path));
-    await this.refresh();
+    await this.refresh({ restartLocalService: true });
   }
 
-  private async refresh(): Promise<void> {
+  private async refresh(options: { restartLocalService?: boolean } = {}): Promise<void> {
     if (!this.bodyEl) {
       return;
+    }
+    if (options.restartLocalService) {
+      await this.restartLocalServiceAfterToolCatalogWrite();
     }
     await this.render();
   }
@@ -429,6 +432,22 @@ export class SettingsToolSection {
     });
     await this.restartLocalServiceAfterPermissionWrite();
     await this.refresh();
+  }
+
+  private async restartLocalServiceAfterToolCatalogWrite(): Promise<void> {
+    if (this.plugin.settings.server.mode !== 'local') {
+      return;
+    }
+
+    try {
+      const isRunning = await this.plugin.openCodeService.checkHealth();
+      if (isRunning) {
+        await this.plugin.openCodeService.stop();
+      }
+      await this.plugin.openCodeService.start();
+    } catch {
+      new Notice(t('settings.tools.custom.notice.restartFailed'));
+    }
   }
 
   private async restartLocalServiceAfterPermissionWrite(): Promise<void> {

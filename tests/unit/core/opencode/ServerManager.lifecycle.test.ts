@@ -255,6 +255,22 @@ function registerStateAndHealthTests(context: ServerManagerContext): void {
 }
 
 function registerEnvironmentAndBinaryTests(context: ServerManagerContext): void {
+  describe('server model source mode', () => {
+    it('keeps project config enabled so project skills and tools are discoverable', () => {
+      context.setManager(new ServerManager({
+        ...context.defaultConfig,
+        modelSourceMode: 'server',
+      }));
+
+      context.getManager().setWorkingDirectory(context.testVaultPath);
+      const env = context.getLauncherTestAccess().getSpawnEnv();
+
+      expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
+      expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
+      expect(env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+    });
+  });
+
   describe('local-only model source mode', () => {
     it('should not inject a provider whitelist into the managed server env', () => {
       context.setManager(new ServerManager({

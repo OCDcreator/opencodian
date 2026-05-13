@@ -33,6 +33,7 @@
 - `renderCustomTools()` 现在分三层：authoring 工具栏、项目/全局工具定义文件列表、运行时 catalog custom tool 权限列表。
 - authoring 工具栏提供 `New tool`、刷新和文档入口；新建工具会写入 `.opencode/tools/new-tool.ts`，并在名称冲突时递增为 `new-tool-2.ts` 等。
 - 项目/全局工具文件发现与模板创建委托给 `SettingsToolFileService`，避免 UI owner 继续持有文件系统细节。
+- 新建、编辑、删除项目工具文件以及手动刷新 Custom tools 页时，会先重启本地 OpenCode 服务，再重新渲染目录，避免运行时 custom tool catalog 停留在旧快照。
 - 工具文件卡片按来源排序，先项目后全局；文件名作为默认 tool name。对于文档支持的 named exports（运行时名称为 `<filename>_<export>`），文件卡片保留提示，具体运行时 tool id 仍由下方 catalog 权限列表展示。
 - `renderRuntimeCustomTools()` 保留原有 `openCodeCatalogStateStore` 接入，从 registry tool ids 中分出 custom tools，并按真实 tool id 写入权限。
 - 没有运行时 catalog 时不再把整个自定义页显示为空；文件管理功能仍可离线使用。
@@ -48,7 +49,7 @@
 - `setGlobalToolPermission()` 写入或清除 `permission["*"]`。
 - `setToolPermissionSelection()` 写入或清除具体 `permission.<tool>`。
 - 写入后调用 `plugin.saveSettings()`，并关闭 config sync、model reload 和 UI apply，避免权限编辑触发无关刷新。
-- 权限写入后会自动重启本地 OpenCode 服务；远程模式下显示 remote 管理不可用提示，让用户在远程主机侧处理。
+- 权限写入后会自动重启本地 OpenCode 服务；远程模式下显示 remote 管理不可用提示，让用户在远程主机侧处理。工具文件 catalog 写入也复用同样的本地重启语义，但远程模式只重新渲染，不尝试管理远程进程。
 
 ## 依赖
 

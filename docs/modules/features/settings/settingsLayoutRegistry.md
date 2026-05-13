@@ -34,7 +34,7 @@
 | `style` | `presets`, `background`, `layout`, `user`, `assistant`, `input`, `scrollbar`, `advanced` |
 | `debug` | `general`, `modules`, `logs`, `actions` |
 | `user` | `profile`, `prompt`, `tags` |
-| `skills` | `catalog` |
+| `skills` | `project`, `external` |
 | `tools` | `builtin`, `custom` |
 | `acp` | `agents` |
 

@@ -187,9 +187,10 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     id: 'skills',
     labelKey: 'settings.skills.title',
     icon: 'brain',
-    defaultSecondaryTabId: 'catalog',
+    defaultSecondaryTabId: 'project',
     secondaryTabs: [
-      { id: 'catalog', labelKey: 'settings.skills.tab.catalog' },
+      { id: 'project', labelKey: 'settings.skills.tab.project' },
+      { id: 'external', labelKey: 'settings.skills.tab.external' },
     ],
   },
   {
