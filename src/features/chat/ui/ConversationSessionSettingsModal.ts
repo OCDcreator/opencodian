@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This modal owns the session settings form, inherited-global summary, and settings deep-link behavior together. */
 import type { App } from 'obsidian';
 import { Modal } from 'obsidian';
 
@@ -34,6 +35,13 @@ interface PluginSettingsSummary {
 }
 
 const PLUGIN_ID = 'opencodian';
+const SUMMARY_SETTINGS_TARGETS: Record<string, string> = {
+  title: 'title',
+  compaction: 'compaction',
+  questions: 'questions',
+  rendering: 'rendering',
+};
+const CLASSIC_SETTINGS_SCROLL_RETRY_DELAYS_MS = [0, 80, 200, 400] as const;
 
 export class ConversationSessionSettingsModal extends Modal {
   private chatFontSizeInputEl: HTMLInputElement | null = null;
@@ -291,11 +299,15 @@ export class ConversationSessionSettingsModal extends Modal {
     const rows: Array<{
       id: string;
       label: string;
+      description?: string;
       chips: Array<{ text: string }>;
     }> = [
       {
         id: 'title',
         label: t('chat.sessionSettings.modal.summary.titleGeneration'),
+        description: summary.titleMode === 'ai'
+          ? t('chat.sessionSettings.modal.summary.titleGeneration.smartDesc')
+          : t('chat.sessionSettings.modal.summary.titleGeneration.firstMessageDesc'),
         chips: [
           {
             text: summary.titleMode === 'ai'
@@ -354,7 +366,7 @@ export class ConversationSessionSettingsModal extends Modal {
 
   private createSummaryRow(
     containerEl: HTMLElement,
-    row: { id: string; label: string; chips: Array<{ text: string }> },
+    row: { id: string; label: string; description?: string; chips: Array<{ text: string }> },
     openSettingsLabel: string,
   ): void {
     const rowEl = containerEl.createDiv({
@@ -362,10 +374,19 @@ export class ConversationSessionSettingsModal extends Modal {
       attr: { 'data-summary': row.id },
     });
 
-    rowEl.createDiv({
+    const labelGroupEl = rowEl.createDiv({
+      cls: 'opencodian-session-settings-summary-label-group',
+    });
+    labelGroupEl.createDiv({
       cls: 'opencodian-session-settings-summary-label',
       text: row.label,
     });
+    if (row.description) {
+      labelGroupEl.createDiv({
+        cls: 'opencodian-session-settings-summary-description',
+        text: row.description,
+      });
+    }
 
     const chipsEl = rowEl.createDiv({
       cls: 'opencodian-session-settings-summary-chips',
@@ -383,12 +404,181 @@ export class ConversationSessionSettingsModal extends Modal {
       attr: { type: 'button' },
     });
     linkEl.addEventListener('click', () => {
+      const target = this.prepareSettingsTarget(row.id);
       const appSetting = (this.app as typeof this.app & {
         setting: { open: () => void; openTabById: (id: string) => void };
       }).setting;
       appSetting.open();
       appSetting.openTabById('opencodian');
+      if (target?.layoutMode !== 'tabbed') {
+        this.scheduleClassicSettingsDeepLink(row.id, target?.plugin);
+      }
     });
+  }
+
+  private prepareSettingsTarget(rowId: string): {
+    layoutMode?: string;
+    plugin?: {
+      settings?: {
+        settingsPanelScrollTop?: number;
+      };
+      scheduleSettingsUiStateSave?: () => void;
+    };
+  } | null {
+    const secondaryTab = SUMMARY_SETTINGS_TARGETS[rowId];
+    if (!secondaryTab) {
+      return null;
+    }
+
+    const plugin = (this.app as typeof this.app & {
+      plugins: {
+        plugins: Record<string, unknown>;
+      };
+    }).plugins?.plugins?.[PLUGIN_ID] as
+      | {
+        settings?: {
+          settingsLayoutMode?: string;
+          settingsTabbedPrimaryTab?: string;
+          settingsTabbedSecondaryTabByPrimary?: Record<string, string>;
+          settingsPanelScrollTop?: number;
+        };
+        saveSettings?: () => Promise<void> | void;
+        scheduleSettingsUiStateSave?: () => void;
+        settingsTab?: {
+          prepareScrollToConversationOnNextOpen?: (secondaryTab?: string) => void;
+        };
+      }
+      | undefined
+      | null;
+
+    if (!plugin?.settings) {
+      return null;
+    }
+
+    plugin.settingsTab?.prepareScrollToConversationOnNextOpen?.(secondaryTab);
+
+    if (plugin.settings.settingsLayoutMode === 'tabbed') {
+      plugin.settings.settingsTabbedPrimaryTab = 'conversation';
+      plugin.settings.settingsTabbedSecondaryTabByPrimary = {
+        ...plugin.settings.settingsTabbedSecondaryTabByPrimary,
+        conversation: secondaryTab,
+      };
+      void plugin.saveSettings?.();
+    }
+
+    return {
+      layoutMode: plugin.settings.settingsLayoutMode,
+      plugin,
+    };
+  }
+
+  private scheduleClassicSettingsDeepLink(
+    rowId: string,
+    plugin?: {
+      settings?: {
+        settingsPanelScrollTop?: number;
+      };
+      scheduleSettingsUiStateSave?: () => void;
+    },
+  ): void {
+    const targetId = SUMMARY_SETTINGS_TARGETS[rowId];
+    if (!targetId) {
+      return;
+    }
+
+    for (const delay of CLASSIC_SETTINGS_SCROLL_RETRY_DELAYS_MS) {
+      window.setTimeout(() => {
+        window.requestAnimationFrame(() => {
+          this.scrollClassicSettingsHeadingIntoView(targetId, plugin);
+        });
+      }, delay);
+    }
+  }
+
+  private scrollClassicSettingsHeadingIntoView(
+    targetId: string,
+    plugin?: {
+      settings?: {
+        settingsPanelScrollTop?: number;
+      };
+      scheduleSettingsUiStateSave?: () => void;
+    },
+  ): void {
+    const settingsRootEl = document.querySelector<HTMLElement>('.opencodian-settings--classic');
+    if (!settingsRootEl) {
+      return;
+    }
+
+    const targetEl = settingsRootEl.querySelector<HTMLElement>(
+      `[data-settings-target="conversation-${targetId}"]`,
+    );
+    const headingEl = targetEl?.querySelector<HTMLElement>('.opencodian-settings-subsection-heading')
+      ?? this.resolveClassicSettingsHeadingByText(settingsRootEl, targetId);
+    if (!headingEl) {
+      return;
+    }
+
+    const scrollContainer = this.resolveClassicSettingsScrollContainer(settingsRootEl);
+    const headingRect = headingEl.getBoundingClientRect();
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const quickNavEl = settingsRootEl.querySelector<HTMLElement>('.opencodian-settings-quick-nav');
+    const quickNavOffset = quickNavEl ? this.resolveVisibleOffset(quickNavEl, containerRect) : 0;
+    const targetScrollTop = Math.max(
+      0,
+      scrollContainer.scrollTop + (headingRect.top - containerRect.top) - quickNavOffset,
+    );
+
+    scrollContainer.scrollTop = targetScrollTop;
+    if (plugin?.settings) {
+      plugin.settings.settingsPanelScrollTop = targetScrollTop;
+    }
+    plugin?.scheduleSettingsUiStateSave?.();
+  }
+
+  private resolveClassicSettingsScrollContainer(settingsRootEl: HTMLElement): HTMLElement {
+    const closestScrollContainer = settingsRootEl.closest<HTMLElement>(
+      '.vertical-tab-content, .vertical-tab-content-container, .modal-content',
+    );
+    return closestScrollContainer ?? settingsRootEl;
+  }
+
+  private resolveVisibleOffset(
+    element: HTMLElement,
+    containerRect: DOMRect | Pick<DOMRect, 'top' | 'bottom'>,
+  ): number {
+    const elementRect = element.getBoundingClientRect();
+    const visibleTop = Math.max(elementRect.top, containerRect.top);
+    const visibleBottom = Math.min(elementRect.bottom, containerRect.bottom);
+    return Math.max(0, visibleBottom - visibleTop);
+  }
+
+  private resolveClassicSettingsHeadingByText(
+    settingsRootEl: HTMLElement,
+    targetId: string,
+  ): HTMLElement | undefined {
+    const targetTitle = this.resolveClassicSettingsTargetTitle(targetId);
+    if (!targetTitle) {
+      return undefined;
+    }
+
+    return Array.from(
+      settingsRootEl.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading'),
+    ).find((candidate) => candidate.textContent?.trim() === targetTitle);
+  }
+
+  private resolveClassicSettingsTargetTitle(targetId: string): string | null {
+    switch (targetId) {
+      case 'title':
+        return t('settings.titleGeneration.title');
+      case 'compaction':
+        return t('settings.conversation.compaction.projectNote');
+      case 'questions':
+        return t('settings.conversation.questions.title');
+      case 'rendering':
+        return t('settings.conversation.rendering.title');
+      default:
+        return null;
+    }
   }
 
   private async handleSave(): Promise<void> {

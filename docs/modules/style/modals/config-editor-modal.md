@@ -55,7 +55,7 @@
 
 - `.opencodian-session-settings-summary-divider`：显示设置与只读摘要之间的分隔区。
 - `.opencodian-session-settings-summary-row`：单行摘要的卡片 / grid 容器。
-- `.opencodian-session-settings-summary-label`：摘要行左侧标签。
+- `.opencodian-session-settings-summary-label-group` / `.opencodian-session-settings-summary-label` / `.opencodian-session-settings-summary-description`：摘要行左侧标签与可选说明。
 - `.opencodian-session-settings-summary-chips` / `.opencodian-session-settings-summary-chip`：右侧只读状态 chip 列表。
 - `.opencodian-session-settings-summary-link`：跳转主设置页的 “Open settings” 按钮。
 - 窄屏响应式规则会把摘要行改成单列，并让 chip 与按钮自然折行。

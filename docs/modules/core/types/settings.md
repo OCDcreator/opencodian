@@ -232,11 +232,11 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `modelSourceMode` | `ModelSourceMode` | `'merge'` | 模型来源模式 |
 | `defaultProvider` | `string` | `'anthropic'` | 默认提供商 |
 | `defaultModel` | `string` | `'claude-3-5-sonnet-20241022'` | 默认模型 |
-| `titleMode` | `TitleMode` | `'default'` | 标题生成模式 |
+| `titleMode` | `TitleMode` | `'default'` | 标题生成模式：首条消息标题，或优先等待 OpenCode 自动命名并在失败时使用备用模型的智能标题生成 |
 | `questionDisplayMode` | `QuestionDisplayMode` | `'all'` | 问题显示模式 |
 | `questionCardPosition` | `QuestionCardPosition` | `'inline'` | 问题卡片位置 |
 | `showAnsweredQuestionCards` | `boolean` | `true` | 显示已回答问题卡片 |
-| `aiTitleModel` | `string` | `''` | AI 标题专用模型 |
+| `aiTitleModel` | `string` | `''` | 智能标题无法从 OpenCode 获取标题时使用的备用标题模型 |
 | `disabledModelRefs` | `string[]` | `[]` | 插件侧禁用的 `provider/model` 列表 |
 | `renderUserMarkupAsCodeBlocks` | `boolean` | `true` | 用户标记渲染为代码块 |
 | `pluginIsolationMode` | `PluginIsolationMode` | `'default'` | 插件隔离模式 |

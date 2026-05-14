@@ -79,7 +79,10 @@ export class SettingsSectionCoordinator {
   scrollToSectionByTitle(sectionTitle: string): void {
     const headingEl = Array.from(
       this.containerEl.querySelectorAll<HTMLHeadingElement>('.opencodian-settings-section-heading'),
-    ).find((candidate) => candidate.dataset.sectionTitle === sectionTitle);
+    ).find((candidate) =>
+      candidate.dataset.sectionTitle === sectionTitle
+      || candidate.textContent?.trim() === sectionTitle
+    );
 
     if (!headingEl) {
       return;

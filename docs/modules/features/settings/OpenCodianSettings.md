@@ -73,6 +73,7 @@
 - **Conversation**
   - `SettingsConversationSection` 现在接管 title mode、`aiTitleModel` picker、project-scoped compaction editor（写入 `.opencode/opencode.json`）、global chat font size、question card display/position、answered-card toggle 与 user-markup render toggle
   - conversation section 现在复用 `createSettingsBlock()` 拆成“会话标题 / 上下文压缩（项目级） / 阅读与显示 / 提问交互 / 消息渲染”五个二级分组，而不是单层平铺
+  - 从会话设置弹窗跳转全局设置时，tabbed 布局会切到 Conversation 的对应二级标签；classic 布局会把 `secondaryTab` 映射到对应二级分组标题并在打开后滚动定位
   - `OpenCodianSettings` 不再直接铺开 conversation section 的 DOM/state/model-picker wiring，只保留 owner 装配与 block seam 透传
 - **Agents**
   - `SettingsAgentsSection` 现在接管 agent 目录壳层：合并 runtime built-in/project agent 与 project `.opencode/opencode.json` override

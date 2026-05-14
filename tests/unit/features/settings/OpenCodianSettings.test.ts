@@ -421,7 +421,82 @@ describe('SettingsSectionCoordinator quick nav', () => {
       top: 660,
     });
   });
+});
 
+describe('SettingsSectionCoordinator subsection navigation', () => {
+  it('scrolls to subsection headings that are not registered in quick-nav', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    const scrollContainer = document.createElement('div');
+    scrollContainer.className = 'vertical-tab-content-container';
+    let scrollTop = 200;
+    const scrollTo = jest.fn(({ top }: { top: number }) => {
+      scrollTop = top;
+    });
+
+    Object.defineProperty(scrollContainer, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => {
+        scrollTop = value;
+      },
+    });
+    Object.defineProperty(scrollContainer, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+    Object.defineProperty(scrollContainer, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 80,
+        right: 800,
+        bottom: 680,
+        width: 800,
+        height: 600,
+        x: 0,
+        y: 80,
+        toJSON: () => '',
+      }),
+    });
+
+    document.body.appendChild(scrollContainer);
+    scrollContainer.appendChild(containerEl);
+
+    coordinator.beginDisplay('Settings');
+    coordinator.createSectionHeading(containerEl, {
+      title: 'Conversation',
+      tooltip: 'Conversation settings',
+    });
+    const titleBlockHeadingEl = containerEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading opencodian-settings-section-heading',
+      text: 'Conversation Title',
+    });
+    Object.defineProperty(titleBlockHeadingEl, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 520,
+        right: 800,
+        bottom: 556,
+        width: 800,
+        height: 36,
+        x: 0,
+        y: 520,
+        toJSON: () => '',
+      }),
+    });
+    coordinator.finishDisplay();
+
+    coordinator.scrollToSectionByTitle('Conversation Title');
+
+    expect(scrollTo).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      top: 640,
+    });
+  });
+});
+
+describe('SettingsSectionCoordinator quick nav tooltip', () => {
   it('renders quick-nav tooltip content in a body-level overlay instead of inside the settings container', () => {
     const { coordinator, containerEl } = createCoordinator();
     document.body.appendChild(containerEl);

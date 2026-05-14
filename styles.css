@@ -11054,12 +11054,24 @@ img.opencodian-model-provider-header-icon {
   border-top: 1px solid var(--background-modifier-border);
 }
 
+.opencodian-session-settings-summary-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  flex: 0 1 360px;
+}
+
 .opencodian-session-settings-summary-label {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-normal);
-  white-space: nowrap;
-  min-width: 72px;
+}
+
+.opencodian-session-settings-summary-description {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
 .opencodian-session-settings-summary-chips {
@@ -11155,6 +11167,11 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-session-settings-summary-label {
     min-width: unset;
+  }
+
+  .opencodian-session-settings-summary-label-group {
+    min-width: 100%;
+    flex-basis: 100%;
   }
 }
 

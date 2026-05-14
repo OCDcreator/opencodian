@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Conversation settings tests cover title, compaction, display, question, rendering, and deep-link target contracts together. */
 import type { App } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
@@ -400,7 +401,7 @@ describe('SettingsConversationSection', () => {
   });
 
   it('renders conversation settings as grouped blocks instead of a flat list', () => {
-    createSection();
+    const { containerEl } = createSection();
 
     expect(blockRecords).toEqual([
       {
@@ -423,6 +424,17 @@ describe('SettingsConversationSection', () => {
         title: t('settings.conversation.rendering.title'),
         description: t('settings.conversation.rendering.desc'),
       },
+    ]);
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('[data-settings-target]')).map(
+        (element) => element.dataset.settingsTarget,
+      ),
+    ).toEqual([
+      'conversation-title',
+      'conversation-compaction',
+      'conversation-display',
+      'conversation-questions',
+      'conversation-rendering',
     ]);
   });
 });

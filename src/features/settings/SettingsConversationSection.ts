@@ -145,22 +145,27 @@ export class SettingsConversationSection {
       title: t('settings.titleGeneration.title'),
       description: t('settings.titleGeneration.groupDesc'),
     });
+    this.markSettingsTarget(titleGenerationBodyEl, 'title');
     const compactionBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.compaction.projectNote'),
       description: t('settings.conversation.compaction.projectNoteDesc'),
     });
+    this.markSettingsTarget(compactionBodyEl, 'compaction');
     const displayBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.display.title'),
       description: t('settings.conversation.display.desc'),
     });
+    this.markSettingsTarget(displayBodyEl, 'display');
     const questionBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.questions.title'),
       description: t('settings.conversation.questions.desc'),
     });
+    this.markSettingsTarget(questionBodyEl, 'questions');
     const renderingBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.rendering.title'),
       description: t('settings.conversation.rendering.desc'),
     });
+    this.markSettingsTarget(renderingBodyEl, 'rendering');
 
     this.renderTitleBlock(titleGenerationBodyEl);
     this.renderCompactionBlock(compactionBodyEl);
@@ -186,7 +191,12 @@ export class SettingsConversationSection {
     ];
 
     for (const block of blocks) {
-      const blockEl = containerEl.createDiv({ attr: { 'data-section-block': block.id } });
+      const blockEl = containerEl.createDiv({
+        attr: {
+          'data-section-block': block.id,
+          'data-settings-target': `conversation-${block.id}`,
+        },
+      });
       block.render(blockEl);
       if (block.id !== secondaryTabId) {
         blockEl.style.display = 'none';
@@ -243,6 +253,13 @@ export class SettingsConversationSection {
     void this.loadTitleModels();
     this.registerProjectCompactionConfigListeners();
     void this.loadProjectCompactionConfig();
+  }
+
+  private markSettingsTarget(bodyEl: HTMLElement, blockId: string): void {
+    const blockEl = bodyEl.closest<HTMLElement>('.opencodian-settings-block');
+    const targetEl = blockEl ?? bodyEl;
+    targetEl.dataset.sectionBlock = blockId;
+    targetEl.dataset.settingsTarget = `conversation-${blockId}`;
   }
 
   private registerProjectCompactionConfigListeners(): void {

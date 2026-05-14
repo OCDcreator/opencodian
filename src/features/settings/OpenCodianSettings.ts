@@ -196,7 +196,26 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       return;
     }
 
-    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.conversation.title'));
+    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(
+      this.resolveConversationSettingsScrollTitle(secondaryTab),
+    );
+  }
+
+  private resolveConversationSettingsScrollTitle(secondaryTab?: string): string {
+    switch (secondaryTab) {
+      case 'title':
+        return t('settings.titleGeneration.title');
+      case 'compaction':
+        return t('settings.conversation.compaction.projectNote');
+      case 'questions':
+        return t('settings.conversation.questions.title');
+      case 'rendering':
+        return t('settings.conversation.rendering.title');
+      case 'display':
+        return t('settings.conversation.display.title');
+      default:
+        return t('settings.conversation.title');
+    }
   }
 
   // ─── Main display ──────────────────────────────────────────────────

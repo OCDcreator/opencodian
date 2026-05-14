@@ -191,6 +191,14 @@ The main settings conversation section now uses nested blocks. Locale additions:
 3. `settings.conversation.questions.*`
 4. `settings.conversation.rendering.*`
 
+## 2026-05-14 Title generation wording
+
+Title-generation labels now use user-facing names: "First message title" and "Smart title generation". The setting copy explains that smart generation waits for OpenCode first and only uses the backup model if OpenCode does not produce a title.
+
+Additional session-settings summary copy explains the inherited title mode inside the per-conversation settings modal:
+1. `chat.sessionSettings.modal.summary.titleGeneration.firstMessageDesc`
+2. `chat.sessionSettings.modal.summary.titleGeneration.smartDesc`
+
 ## 2026-04-23 Conversation compaction help modal
 
 The conversation settings "project compaction" block now supports per-field help modals. Locale additions:

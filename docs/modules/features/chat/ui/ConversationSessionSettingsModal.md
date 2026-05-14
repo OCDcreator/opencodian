@@ -46,7 +46,9 @@ class ConversationSessionSettingsModal extends Modal {
 - 顶部 hero 区显示当前会话标题、继承说明与“会话覆盖”语义 badge，避免用户把它误认为全局设置
 - modal 主体包含聊天字体大小的单一显示设置
 - Display 分组下方新增 4 行只读摘要：Title generation、Context compaction、Question cards、Rendering，每行提供一个 “Open settings” 按钮
+- Title generation 摘要会根据当前全局模式显示用户向说明：首条消息标题会说明直接使用第一条用户消息开头，智能标题会说明先等待 OpenCode 自动命名，失败时再使用备用模型
 - 摘要通过 `this.app.plugins` 读取 `PLUGIN_ID` 对应插件的当前 settings，用于展示正在继承的全局默认值
+- “Open settings” 会把全局设置页定位到 Conversation 对应二级项；tabbed layout 下更新 `settingsTabbedPrimaryTab` / `settingsTabbedSecondaryTabByPrimary`，classic layout 下优先通过 `data-settings-target="conversation-*"` 找到二级分组并做 deferred scroll，标题文本匹配只作为兼容兜底
 - number input 留空时会回写 `null` 语义（继承）；只有输入内容时才做正数 / supported-range 校验
 - 如果字段回到 inherit，`buildOverrides()` 会直接返回 `undefined`，上游可以把 `Conversation.sessionSettings` 折叠删除
 - `handleSave()` 支持 async `onSave`，保存期间会 disable save/cancel button，并把错误显示在 modal 内部
@@ -59,6 +61,7 @@ class ConversationSessionSettingsModal extends Modal {
 | `createSummaryDivider()` | 在显示设置与全局默认摘要之间插入视觉分隔与说明 |
 | `createSummaryRows()` | 创建 Title generation / Context compaction / Question cards / Rendering 四行摘要 |
 | `createSummaryRow()` | 渲染单行标签、摘要 chip 与 “Open settings” 动作 |
+| `prepareSettingsTarget()` | 在打开全局设置页前同步 tabbed layout 的目标 primary/secondary tab，或准备 classic layout 的滚动定位 |
 
 ## 与其他模块的交互
 

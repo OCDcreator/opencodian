@@ -191,6 +191,14 @@ t('settings.server.started')
 3. `settings.conversation.questions.*`
 4. `settings.conversation.rendering.*`
 
+## 2026-05-14 Title generation wording
+
+标题生成相关文案现在使用面向用户的名称：“首条消息标题”和“智能标题生成”。设置说明会解释智能标题会先等待 OpenCode 自动命名，只有在 OpenCode 没有生成标题时才使用备用模型。
+
+会话设置弹窗中的全局默认摘要也新增标题模式说明：
+1. `chat.sessionSettings.modal.summary.titleGeneration.firstMessageDesc`
+2. `chat.sessionSettings.modal.summary.titleGeneration.smartDesc`
+
 ## 2026-04-23 Conversation compaction help modal
 
 会话设置里的“上下文压缩（项目级）”现在也支持按字段打开帮助弹窗。Locale 侧新增：

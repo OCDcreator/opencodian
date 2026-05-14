@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与 AI 标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
+`SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
 
 当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成五个二级分组：
 
@@ -17,10 +17,12 @@
 
 其中“上下文压缩（项目级）”分组现在为每个压缩字段都挂了帮助按钮，点击后会打开 `ConversationCompactionHelpModal`，用通俗语言解释字段语义、OpenCode 默认策略和调参影响。
 
+每个 conversation 二级分组都会标记稳定 `data-settings-target="conversation-{title|compaction|display|questions|rendering}"`，供会话设置弹窗和调试断言做深链定位；不要只依赖本地化标题文本匹配。
+
 这个 owner 的职责边界刻意保持在"**conversation section 装配 + title-model refresh orchestration**"：
 
 - 持有 conversation section 级别的 DOM 组装与设置写回
-- 维护 `aiTitleModel` 的 availability-aware 标签解析与 warning action
+- 维护备用标题模型 `aiTitleModel` 的 availability-aware 标签解析与 warning action
 - 维护项目级 compaction 配置的读取、展示、输入校验与 `.opencode/opencode.json` 写入
 - 维护 global chat font size 的输入校验、设置写回，以及保存后的当前聊天运行时重应用
 - 协调 `ModelPickerModal` 与设置页的 title-model refresh callback 注册位
