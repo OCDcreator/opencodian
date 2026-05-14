@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- Session lifecycle tests keep transport fallback cases together to share the host fixture. */
 import {
   OpenCodeSessionLifecycleCoordinator,
   type OpenCodeSessionLifecycleCoordinatorHost,
@@ -105,8 +106,20 @@ describe('OpenCodeSessionLifecycleCoordinator', () => {
     host.postLegacy.mockResolvedValue({ id: 'legacy-session' });
 
     await expect(coordinator.createSession(undefined, { setCurrent: false })).resolves.toBe('legacy-session');
-    expect(host.postLegacy).toHaveBeenCalledWith('/session', { title: 'New Conversation' });
+    expect(host.postLegacy).toHaveBeenCalledWith('/session', {});
     expect(coordinator.getSessionId()).toBe('manual-session');
+  });
+
+  it('omits the title when creating a default session so OpenCode can generate its own default title', async () => {
+    const sdk = createSdk({
+      create: jest.fn().mockResolvedValue({ id: 'sdk-session' }),
+    });
+    const host = createHost(sdk);
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+
+    await expect(coordinator.createSession()).resolves.toBe('sdk-session');
+
+    expect(sdk.create).toHaveBeenCalledWith({});
   });
 
   it('falls back to legacy listing when SDK reads fail', async () => {
@@ -268,6 +281,28 @@ describe('OpenCodeSessionLifecycleCoordinator', () => {
     expect(host.deleteLegacy).toHaveBeenCalledWith('/session/session-1');
     expect(host.patchLegacy).toHaveBeenCalledWith('/session/session-2', { title: 'Renamed' });
     expect(coordinator.getSessionId()).toBeNull();
+  });
+
+  it('suppresses only the first provisional title update when the server still has an official default title', async () => {
+    const sdk = createSdk({
+      get: jest.fn().mockResolvedValue({
+        id: 'session-1',
+        title: 'New session - 2026-05-14T10:00:00.000Z',
+        time: { created: 1, updated: 2 },
+      }),
+      update: jest.fn().mockResolvedValue(undefined),
+    });
+    const host = createHost(sdk);
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+
+    await expect(coordinator.updateSessionTitle('session-1', 'Local provisional')).resolves.toBeUndefined();
+    await expect(coordinator.updateSessionTitle('session-1', 'Local fallback')).resolves.toBeUndefined();
+
+    expect(sdk.update).toHaveBeenCalledTimes(1);
+    expect(sdk.update).toHaveBeenCalledWith({
+      sessionID: 'session-1',
+      title: 'Local fallback',
+    });
   });
 
   it('forwards session subscriptions through the shared sync runtime', () => {

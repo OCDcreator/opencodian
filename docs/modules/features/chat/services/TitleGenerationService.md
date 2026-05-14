@@ -9,6 +9,7 @@
 
 最近这块逻辑的关键变化有两点：
 
+- 标题请求现在优先等待 OpenCode 官方 session title；官方标题仍保持默认值或读取失败时才进入本地兜底生成
 - 标题请求现在优先走结构化输出 `json_schema`
 - `aiTitleModel` 不再盲信配置值，而是会结合模型目录和 `disabledModelRefs` 做 availability-aware 拦截
 
@@ -23,6 +24,12 @@ export type TitleGenerationCallback = (
   conversationId: string,
   result: TitleGenerationResult
 ) => Promise<void>;
+
+export interface TitleGenerationOptions {
+  sessionId?: string;
+  officialPollAttempts?: number;
+  officialPollIntervalMs?: number;
+}
 ```
 
 内部状态仍然很简单：
@@ -39,14 +46,18 @@ private readonly activeGenerations = new Map<string, AbortController>();
 
 1. 取消同一 conversation 已存在的标题任务
 2. 建立新的 `AbortController`
-3. 通过 `resolveModel()` 解析标题模型
-4. 按 locale 构建标题 prompt 与 system prompt
-5. 截断用户首条消息到 600 字符
-6. 创建临时 session：`createSession('Title Generation', { setCurrent: false })`
-7. 调用 `requestAssistantResponse(...)`
-8. 优先从 `response.structured.title` 提取标题，失败时再回退到文本首行解析
-9. 通过回调把结果交回调用方
-10. 在 `finally` 中删除活动记录并 best-effort 清理临时 session
+3. 如果调用方传入真实 OpenCode `sessionId`，或能通过 `conversationId` 解析到 `openCodeSessionId`，轮询公开的 `listSessions()` 结果，等待官方后台 `ensureTitle()` 把 `"New session - <ISO>"` 改成真实标题
+4. 如果拿到非默认官方标题，直接回调成功，不创建本地临时 session
+5. 官方标题仍是默认值、读取失败或超时后，才进入本地兜底：通过 `resolveModel()` 解析标题模型
+6. 按 locale 构建标题 prompt 与 system prompt
+7. 截断用户首条消息到 600 字符
+8. 创建临时 session：`createSession('Title Generation', { setCurrent: false })`
+9. 调用 `requestAssistantResponse(...)`
+10. 优先从 `response.structured.title` 提取标题，失败时再回退到文本首行解析
+11. 通过回调把结果交回调用方
+12. 在 `finally` 中删除活动记录并 best-effort 清理临时 session
+
+官方标题识别规则与 OpenCode upstream 对齐：`"New session - <ISO>"` 与 `"Child session - <ISO>"` 仍视为默认标题，不会作为成功标题返回。只有官方和本地兜底都无法产出标题时，调用方才会收到 `success: false` 并展示标题生成失败状态。
 
 ### 标题模型解析
 
@@ -85,13 +96,13 @@ private readonly activeGenerations = new Map<string, AbortController>();
 ## 与其他模块的交互
 
 - `OpenCodianView`: 发起标题生成并接收结果回调
-- `OpenCodeService`: 创建临时 session、发送非流式请求、删除临时 session
+- `OpenCodeService`: 读取真实 session title；官方标题失败后创建临时 session、发送非流式请求、删除临时 session
 - `core/prompts/titleGeneration.ts`: 提供 locale-aware prompt 和 system prompt
 - `ModelConfigService`: 用于 availability-aware 标题模型解析
 
 ## 注意事项
 
-- `cancelConversation()` / `cancelAll()` 仍然只是本地忽略结果，不会强制中断服务端请求。
+- `cancelConversation()` / `cancelAll()` 仍然只是本地忽略结果，不会强制中断服务端请求；官方标题轮询会在 abort 后停止等待。
 - 结构化输出不是唯一来源；如果模型没返回 `structured.title`，仍会回退到纯文本解析。
 - 设置页会保留不可用的 `aiTitleModel` 并显示警告按钮，提醒用户该功能当前不会生效。
 - 只有在“无法读取可用性信息”这类解析异常时，才会回退到当前会话模型。

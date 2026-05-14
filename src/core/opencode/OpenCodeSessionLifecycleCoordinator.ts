@@ -7,6 +7,7 @@ import {
 } from './OpenCodeSyncEventRuntimeCoordinator';
 
 const logger = createLogger('OpenCodeSessionLifecycleCoordinator');
+const OPENCODE_DEFAULT_TITLE_PATTERN = /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 export interface Session {
   id: string;
@@ -78,7 +79,7 @@ export interface SessionMessage {
 
 export interface OpenCodeSessionLifecycleSdk {
   abort(request: { sessionID: string }): Promise<unknown>;
-  create(request: { title: string }): Promise<unknown>;
+  create(request?: { title?: string }): Promise<unknown>;
   get(request: { sessionID: string }): Promise<unknown>;
   list(): Promise<unknown>;
   messages(request: { sessionID: string }): Promise<unknown>;
@@ -124,6 +125,7 @@ export interface OpenCodeSessionLifecycleCoordinatorHost {
 
 export class OpenCodeSessionLifecycleCoordinator {
   private currentSessionId: string | null = null;
+  private readonly suppressedInitialDefaultTitleUpdates = new Set<string>();
 
   constructor(
     private readonly host: OpenCodeSessionLifecycleCoordinatorHost,
@@ -131,9 +133,7 @@ export class OpenCodeSessionLifecycleCoordinator {
   ) {}
 
   async createSession(title?: string, options: { setCurrent?: boolean } = {}): Promise<string> {
-    const request = {
-      title: title ?? 'New Conversation',
-    };
+    const request = title ? { title } : {};
 
     const response = this.host.shouldUseSdkCrud()
       ? await this.host.getSdkSession().create(request)
@@ -315,6 +315,10 @@ export class OpenCodeSessionLifecycleCoordinator {
   }
 
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    if (await this.shouldSuppressInitialDefaultTitleUpdate(sessionId, title)) {
+      return;
+    }
+
     if (this.host.shouldUseSdkCrud()) {
       await this.host.getSdkSession().update({
         sessionID: sessionId,
@@ -324,5 +328,26 @@ export class OpenCodeSessionLifecycleCoordinator {
     }
 
     await this.host.patchLegacy<Session>(`/session/${sessionId}`, { title });
+  }
+
+  private async shouldSuppressInitialDefaultTitleUpdate(sessionId: string, title: string): Promise<boolean> {
+    if (!sessionId || this.suppressedInitialDefaultTitleUpdates.has(sessionId)) {
+      return false;
+    }
+
+    try {
+      const session = await this.getSessionInfo(sessionId);
+      if (
+        OPENCODE_DEFAULT_TITLE_PATTERN.test(session.title)
+        && !OPENCODE_DEFAULT_TITLE_PATTERN.test(title)
+      ) {
+        this.suppressedInitialDefaultTitleUpdates.add(sessionId);
+        return true;
+      }
+    } catch {
+      return false;
+    }
+
+    return false;
   }
 }

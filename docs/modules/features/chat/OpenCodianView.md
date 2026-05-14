@@ -226,6 +226,7 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 `initializeFirstTab()` / `restorePersistedTabs()` / `createNewConversation()` / `loadConversation()` / fork / rewind 这些 conversation lifecycle 入口现在先经由 `services/ConversationLoadRecoveryCoordinator.ts`：它直接承接首开 bootstrap / persisted restore / fallback-create，再分别复用 `ConversationTabOpenCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationViewStateService`。消息区的 `renderMessage()` / `renderMessages()`、empty-rewind notice、single-user body rerender、pseudo-stream reveal、full rerender、tail patch 与 append-only 增量更新则统一收束到 `services/ConversationRenderService.ts`，而 conversation fingerprint / visual signature / render-list shaping 则由 `services/ConversationIdentityRuntime.ts` 统一提供。其中 loaded-conversation 的 resolve / reload retry / server-sync 判定先经由 `runtime/ConversationLoadRuntimeBridge.ts` 落回 view host，tab/pane activation 预刷新会先经由 `runtime/TabViewActivationBridge.ts` 落回 view host，active-tab conversation/session 写回则先经由 `runtime/TabConversationActivationBridge.ts` 收束 activation 入口，再复用 `runtime/TabConversationStateBridge.ts` 落回 view host，loaded-conversation 的 preflight cleanup / hydration shell 则先经由 `runtime/ConversationTransitionBridge.ts` 收束，再由 `runtime/ConversationHydrationRenderBridge.ts` 处理 scroll/class restore，而消息装载完成后的 background-task rebuild / message rerender / post-render outcome / baseline 则继续经由 `runtime/ConversationHydrationOutcomeBridge.ts` 收束。主链路仍然保持原来的语义：
 
 - 在切换对话时取消旧对话的标题生成
+- 首条消息后的标题链路仍由 view 发起并接收回调；实际官方标题优先、本地兜底、以及首次 provisional server 写入抑制分别由 `TitleGenerationService` 和 `OpenCodeSessionLifecycleCoordinator` 承接，view 只负责更新本地 conversation/title status 与 tab 标题
 - 清空当前消息区并重置 turn 状态
 - 把 `openCodeSessionId` 交给 `openCodeService`
 - 在必要时调用 `syncConversationMessagesFromServer()`
@@ -605,7 +606,7 @@ effort selector 的 variant 列表继续直接按当前 provider/model 查询 `f
 - `ContextFileCatalogService`：composer 文件上下文选择器使用的 Vault catalog 构建、缓存与增量更新
 - `FocusContextRuntimeService`：活动编辑器 focus preview、MarkdownView 回退查找，以及 retained-selection runtime coordinator 的入口转发
 - `ContextUsageService`：context usage state 维护
-- `TitleGenerationService`：AI 标题生成
+- `TitleGenerationService`：官方 OpenCode 标题优先、本地 AI 标题兜底的首条消息标题生成
 - `composerContext`、`renderGroups`、`collapsible`、`forkMessages`
 - `ui/modelSelector/*`：模型选择器列表渲染、交互和 trigger display state
 - `ContextRing`、`QuestionDock`、`SessionTodoDock`、`NavigationSidebar`、`EffortSelector`

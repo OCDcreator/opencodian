@@ -19,6 +19,12 @@ export type TitleGenerationCallback = (
   result: TitleGenerationResult
 ) => Promise<void>;
 
+export interface TitleGenerationOptions {
+  sessionId?: string;
+  officialPollAttempts?: number;
+  officialPollIntervalMs?: number;
+}
+
 const TITLE_GENERATION_OUTPUT_FORMAT: LocalOutputFormat = {
   type: 'json_schema',
   schema: {
@@ -33,16 +39,22 @@ const TITLE_GENERATION_OUTPUT_FORMAT: LocalOutputFormat = {
   },
 };
 
+const OFFICIAL_TITLE_POLL_ATTEMPTS = 12;
+const OFFICIAL_TITLE_POLL_INTERVAL_MS = 1_500;
+const OPENCODE_DEFAULT_TITLE_PATTERN = /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
 export class TitleGenerationService {
   private readonly activeGenerations = new Map<string, AbortController>();
 
   constructor(private readonly plugin: OpenCodianPlugin) {}
 
+  // eslint-disable-next-line max-params -- Existing view seam passes model and callback separately; options are only for official-title polling.
   async generateTitle(
     conversationId: string,
     userMessage: string,
     currentModel: { provider: string; model: string },
     callback: TitleGenerationCallback,
+    options: TitleGenerationOptions = {},
   ): Promise<void> {
     this.cancelConversation(conversationId);
 
@@ -55,6 +67,18 @@ export class TitleGenerationService {
     let tempSessionId: string | null = null;
 
     try {
+      const officialTitle = await this.waitForOfficialTitle(conversationId, options, controller.signal);
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (officialTitle) {
+        await this.safeCallback(callback, conversationId, {
+          success: true,
+          title: officialTitle,
+        });
+        return;
+      }
+
       const { provider, model } = await this.resolveModel(currentModel);
       tempSessionId = await this.plugin.openCodeService.createSession('Title Generation', { setCurrent: false });
       const response = await this.plugin.openCodeService.requestAssistantResponse(prompt, {
@@ -96,6 +120,84 @@ export class TitleGenerationService {
         }
       }
     }
+  }
+
+  private async waitForOfficialTitle(
+    conversationId: string,
+    options: TitleGenerationOptions,
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    const sessionId = options.sessionId?.trim()
+      ?? await this.resolveConversationSessionId(conversationId);
+    if (!sessionId) {
+      return null;
+    }
+
+    const attempts = Math.max(1, options.officialPollAttempts ?? OFFICIAL_TITLE_POLL_ATTEMPTS);
+    const intervalMs = Math.max(0, options.officialPollIntervalMs ?? OFFICIAL_TITLE_POLL_INTERVAL_MS);
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (signal.aborted) {
+        return null;
+      }
+
+      try {
+        const title = await this.readOfficialSessionTitle(sessionId);
+        if (title) {
+          return title;
+        }
+      } catch {
+        return null;
+      }
+
+      if (attempt < attempts - 1 && intervalMs > 0) {
+        await this.delay(intervalMs, signal);
+      }
+    }
+
+    return null;
+  }
+
+  private async readOfficialSessionTitle(sessionId: string): Promise<string | null> {
+    const sessions = await this.plugin.openCodeService.listSessions();
+    const session = sessions.find((item) => item.id === sessionId);
+    return typeof session?.title === 'string'
+      ? this.normalizeOfficialTitle(session.title)
+      : null;
+  }
+
+  private async resolveConversationSessionId(conversationId: string): Promise<string | null> {
+    try {
+      const conversation = await this.plugin.getConversationById(conversationId, {
+        preferCache: true,
+      });
+      return conversation?.openCodeSessionId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeOfficialTitle(rawTitle: string): string | null {
+    const title = rawTitle.trim();
+    if (!title || OPENCODE_DEFAULT_TITLE_PATTERN.test(title)) {
+      return null;
+    }
+
+    return title.length > 100 ? `${title.substring(0, 97)}...` : title;
+  }
+
+  private async delay(ms: number, signal: AbortSignal): Promise<void> {
+    if (ms <= 0 || signal.aborted) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const timeout = window.setTimeout(resolve, ms);
+      signal.addEventListener('abort', () => {
+        window.clearTimeout(timeout);
+        resolve();
+      }, { once: true });
+    });
   }
 
   cancelConversation(conversationId: string): void {

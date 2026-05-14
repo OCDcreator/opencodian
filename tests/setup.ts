@@ -5,6 +5,7 @@
 // Mock Obsidian API globals
 global.document = document;
 global.window = window;
+const setupDocument = document;
 
 type CreateElOptions = {
   cls?: string;
@@ -37,7 +38,7 @@ function applyCreateElOptions<T extends Element>(element: T, options?: CreateElO
 if (!('createEl' in HTMLElement.prototype)) {
   Object.defineProperty(HTMLElement.prototype, 'createEl', {
     value(tag: string, options?: CreateElOptions) {
-      const element = applyCreateElOptions(document.createElement(tag), options);
+      const element = applyCreateElOptions(setupDocument.createElement(tag), options);
       this.appendChild(element);
       return element;
     },
@@ -66,7 +67,7 @@ if (!('createSpan' in HTMLElement.prototype)) {
 
 function createSvgElement(this: Element, tag: string, options?: CreateElOptions) {
   const element = applyCreateElOptions(
-    document.createElementNS('http://www.w3.org/2000/svg', tag),
+    setupDocument.createElementNS('http://www.w3.org/2000/svg', tag),
     options as CreateElOptions | undefined,
   );
   this.appendChild(element);
