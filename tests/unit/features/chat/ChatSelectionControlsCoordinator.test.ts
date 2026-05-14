@@ -173,6 +173,9 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(
       modelTrigger?.querySelector<HTMLElement>('.opencodian-model-trigger-text')?.textContent,
     ).toBe('Claude 3.7 Sonnet');
+    expect(modelTrigger?.getAttribute('title')).toBe(
+      'Current tab send override: Anthropic/Claude 3.7 Sonnet',
+    );
     expect(modelTrigger?.querySelector('img')?.getAttribute('src')).toBe(
       'app://vault/provider-icons/anthropic.svg',
     );
@@ -200,6 +203,7 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(
       modelTrigger?.querySelector<HTMLElement>('.opencodian-model-trigger-text')?.textContent,
     ).toBe('o4-mini');
+    expect(modelTrigger?.getAttribute('title')).toBe('Current tab send override: OpenAI/o4-mini');
     expect(fixture.host.updateEffortSelectorDisplay).toHaveBeenCalled();
     expect(fixture.host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(2);
     expect(modelTrigger?.hasClass('is-open')).toBe(false);

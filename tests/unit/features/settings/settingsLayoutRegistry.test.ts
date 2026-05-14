@@ -79,6 +79,19 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'external',
     ]);
   });
+
+  it('exposes conversation sharing as its own secondary tab', () => {
+    const conversationTab = getPrimaryTabDefinition('conversation');
+
+    expect(conversationTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'title',
+      'compaction',
+      'sharing',
+      'display',
+      'questions',
+      'rendering',
+    ]);
+  });
 });
 
 describe('resolvePrimaryTabId', () => {

@@ -35,7 +35,12 @@
 
 - export paths 与 blocked commands 仍按逐行 trim + 去空行的旧规则写回
 - `allowExternalAccess` / `allowedExportPaths` 在这一轮被明确成 **插件侧 reminder / helper 文案**：它们不会假装替代 `.opencode` 里的 `external_directory` 权限规则
-- blocked commands 仍按当前平台优先显示 Unix 或 Windows 输入框
+- blocked commands 仍按当前平台优先显示 Unix 或 Windows 输入框，并在保存插件设置后同步写入当前项目 `.opencode/opencode.json` 的 `permission.bash` deny patterns
+- 同步 blocked commands 时会通过 `OpencodeConfigManager.syncManagedBashDenyPatterns()` 维护插件上一轮管理的 deny pattern：保留用户自定义的 `permission.bash` 默认值、allow/ask/deny pattern 和其他 `permission` 字段，只替换插件文本框对应的旧 deny 项
+- blocked commands 同步成功后会复用权限变更的 auto-restart 策略：开启自动重启且当前是本地运行服务时执行 stop → wait → start；未开启时提示手动重启；remote 模式提示插件无法管理远程服务
+- 如果当前 vault path / config manager 不可用，blocked commands 仍会保存到插件设置，并通过 Notice 与日志提示无法同步 OpenCode bash 权限
+- blocked commands 文案明确这是 OpenCode bash permission 同步，不是操作系统级沙箱
+- blocked commands setting 带有帮助按钮，打开 `OpenCodeProjectConfigHelpModal` 解释 `permission.bash` deny pattern、能力边界和官方 permissions/tools 文档链接
 - Windows 下仍额外显示 Unix blocklist，因为 Git Bash 仍可能执行 Unix 命令
 
 ## 关键方法
@@ -45,13 +50,15 @@
 | `attach()` | 挂载整个 security section，并触发初次 config status 刷新 |
 | `updatePermissionMode()` | 写回 permission template、刷新 config status，并按设置决定是否自动重启 |
 | `applyConfigRestart()` | 执行 config file 区块的 apply-and-restart 动作 |
+| `syncBlockedCommands()` | 把 blocked commands 同步为 OpenCode `permission.bash` deny patterns，失败时保留插件设置并提示 |
 
 ## 与其他模块的交互
 
 - `OpenCodianSettings`: 创建该 owner，自身只保留 section heading 装配入口
-- `OpencodeConfigManager`: 提供 `.opencode/opencode.json` 的读取与路径信息
+- `OpencodeConfigManager`: 提供 `.opencode/opencode.json` 的读取、路径信息，以及 blocked commands → bash deny patterns 的合并写入
 - `OpenCodeService`: 提供重启所需的 `checkHealth()`、`stop()`、`start()` runtime API
 - `OpencodeConfigModal`: config file 编辑按钮对应的弹窗入口
+- `OpenCodeProjectConfigHelpModal`: 为 blocked commands / `permission.bash` 提供用户可读解释和官方文档链接
 
 ## 注意事项
 

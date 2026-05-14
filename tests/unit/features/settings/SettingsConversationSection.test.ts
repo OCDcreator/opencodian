@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Conversation settings tests cover title, compaction, display, question, rendering, and deep-link target contracts together. */
+/* eslint-disable max-lines, max-lines-per-function -- Conversation settings tests cover title, compaction, display, question, rendering, and deep-link target contracts together. */
 import type { App } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
@@ -165,9 +165,14 @@ function createExtraButtonControl(): MockExtraButtonControl {
 function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>): ConversationSectionPlugin {
   const updateCompactionConfig = jest.fn().mockResolvedValue(undefined);
   const getCompactionConfig = jest.fn().mockResolvedValue(undefined);
+  const updateShareConfig = jest.fn().mockResolvedValue(undefined);
+  const getShareConfig = jest.fn().mockResolvedValue(undefined);
   const reapplyCompactionConfigFromProjectConfig = jest.fn().mockResolvedValue({
     status: 'applied',
   });
+  const listSessions = jest.fn().mockResolvedValue([]);
+  const getSessionMessages = jest.fn().mockResolvedValue([]);
+  const unshareSession = jest.fn().mockResolvedValue({ id: 'session-1', title: 'Unshared', time: { created: 1, updated: 2 } });
 
   return {
     settings: {
@@ -181,10 +186,18 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
     opencodeConfigManager: {
       getCompactionConfig,
       getConfigPath: jest.fn().mockReturnValue('/test/.opencode/opencode.json'),
+      getShareConfig,
       updateCompactionConfig,
+      updateShareConfig,
     } as never,
     openCodeService: {
       reapplyCompactionConfigFromProjectConfig,
+      checkHealth: jest.fn().mockResolvedValue(true),
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      listSessions,
+      getSessionMessages,
+      unshareSession,
     } as never,
   } as unknown as ConversationSectionPlugin;
 }
@@ -239,6 +252,10 @@ function createSection(plugin = createPlugin(), app = createApp()) {
 
 function findToggle(name: string): ToggleRecord | undefined {
   return toggleRecords.find((record) => record.name === name);
+}
+
+function findDropdown(name: string): DropdownRecord | undefined {
+  return dropdownRecords.find((record) => record.name === name);
 }
 
 function findText(name: string): TextRecord | undefined {
@@ -380,7 +397,7 @@ describe('SettingsConversationSection', () => {
     expect(plugin.reapplyConversationSessionDefaults).not.toHaveBeenCalled();
   });
 
-  it('saves compaction settings through project config with full-object save', async () => {
+  it('saves compaction settings through project config as focused patches', async () => {
     const plugin = createPlugin();
     createSection(plugin);
     const autoToggle = findToggle(t('settings.conversation.compaction.auto.name'));
@@ -389,15 +406,163 @@ describe('SettingsConversationSection', () => {
     await autoToggle?.onChange?.(false);
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
-    expect(updateCompactionConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ auto: false, prune: true, tail_turns: 2 }),
-    );
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ auto: false });
     const reapply = (plugin.openCodeService as { reapplyCompactionConfigFromProjectConfig: jest.Mock })
       .reapplyCompactionConfigFromProjectConfig;
-    expect(reapply).toHaveBeenCalledWith(
-      expect.objectContaining({ auto: false }),
-    );
+    expect(reapply).toHaveBeenCalledWith({ auto: false });
     expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('saves project share mode through project config', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const shareDropdown = findDropdown(t('settings.conversation.share.mode.name'));
+    expect(shareDropdown).toBeDefined();
+
+    await shareDropdown?.onChange?.('auto');
+
+    const updateShareConfig = (plugin.opencodeConfigManager as { updateShareConfig: jest.Mock }).updateShareConfig;
+    expect(updateShareConfig).toHaveBeenCalledWith('auto');
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('lists shared sessions in the project sharing block with copy, preview, and unshare actions', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    (plugin.openCodeService as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'Shared research',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+      {
+        id: 'session-2',
+        title: 'Private',
+        time: { created: 1, updated: 3 },
+      },
+    ]);
+    (plugin.openCodeService as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      {
+        info: { id: 'm1', sessionID: 'session-1', role: 'user', time: { created: 1 } },
+        parts: [{ id: 'p1', sessionID: 'session-1', messageID: 'm1', type: 'text', text: 'hello' }],
+      },
+      {
+        info: { id: 'm2', sessionID: 'session-1', role: 'assistant', time: { created: 2 } },
+        parts: [
+          { id: 'p2', sessionID: 'session-1', messageID: 'm2', type: 'tool', text: 'long tool output' },
+          { id: 'p3', sessionID: 'session-1', messageID: 'm2', type: 'text', text: 'assistant reply' },
+        ],
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-1"]');
+    expect(rowEl?.textContent).toContain('Shared research');
+    expect(containerEl.querySelector('[data-shared-session-id="session-2"]')).toBeNull();
+
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="copy-shared-session-link"]')?.click();
+    await Promise.resolve();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://opencode.ai/s/session-1');
+
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-1"]');
+    expect(previewEl?.textContent).toContain('hello');
+    expect(previewEl?.textContent).toContain('assistant reply');
+    expect(previewEl?.querySelector('details:not([open])')?.textContent).toContain('long tool output');
+
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="unshare-shared-session"]')?.click();
+    await Promise.resolve();
+    expect((plugin.openCodeService as { unshareSession: jest.Mock }).unshareSession).toHaveBeenCalledWith('session-1');
+  });
+
+  it('checks share diagnostics from the sharing block', async () => {
+    const requestUrl = obsidian.requestUrl as jest.Mock;
+    requestUrl.mockResolvedValue({ status: 200, text: '', json: null, headers: {}, arrayBuffer: new ArrayBuffer(0) });
+    const plugin = createPlugin();
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const checkButton = containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]');
+    expect(containerEl.textContent).toContain('Project mode');
+    expect(containerEl.textContent).toContain('Not checked');
+
+    checkButton?.click();
+    for (let i = 0; i < 6; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(plugin.openCodeService.checkHealth).toHaveBeenCalled();
+    expect(requestUrl).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://opncd.ai/api/share',
+      method: 'GET',
+      throw: false,
+    }));
+    expect(containerEl.textContent).toContain('Connected');
+    expect(containerEl.textContent).toContain('Reachable');
+  });
+
+  it('shows route guidance when the share host connection closes during TLS', async () => {
+    const requestUrl = obsidian.requestUrl as jest.Mock;
+    requestUrl.mockRejectedValue(new Error('net::ERR_CONNECTION_CLOSED'));
+    const plugin = createPlugin();
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]')?.click();
+    for (let i = 0; i < 6; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(containerEl.textContent).toContain('TLS');
+    expect(containerEl.textContent).toContain('working proxy');
+  });
+
+  it('updates the share diagnostics when share mode is disabled', async () => {
+    const plugin = createPlugin();
+    const { containerEl } = createSection(plugin);
+    const shareDropdown = findDropdown(t('settings.conversation.share.mode.name'));
+
+    await shareDropdown?.onChange?.('disabled');
+
+    expect(containerEl.textContent).toContain('Disabled in Conversation > Sharing');
+  });
+
+  it('restarts the local service after saving project share mode so OpenCode rereads share config', async () => {
+    jest.useFakeTimers();
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const shareDropdown = findDropdown(t('settings.conversation.share.mode.name'));
+    const savePromise = shareDropdown?.onChange?.('disabled');
+    const stop = (plugin.openCodeService as { stop: jest.Mock }).stop;
+    for (let attempt = 0; attempt < 10 && stop.mock.calls.length === 0; attempt += 1) {
+      await Promise.resolve();
+    }
+    await Promise.resolve();
+    jest.advanceTimersByTime(1000);
+    await savePromise;
+
+    expect(plugin.openCodeService.checkHealth).toHaveBeenCalledTimes(1);
+    expect(plugin.openCodeService.stop).toHaveBeenCalledTimes(1);
+    expect(plugin.openCodeService.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains that smart title generation waits for OpenCode before using an independent backup model', () => {
+    expect(t('settings.titleGeneration.groupDesc')).toBe(
+      'Choose first-message titles or smart titles. Smart titles wait for the official OpenCode title first; the backup title model only runs when OpenCode does not produce one, and it is independent from OpenCode `small_model`.',
+    );
   });
 
   it('renders conversation settings as grouped blocks instead of a flat list', () => {
@@ -411,6 +576,10 @@ describe('SettingsConversationSection', () => {
       {
         title: t('settings.conversation.compaction.projectNote'),
         description: t('settings.conversation.compaction.projectNoteDesc'),
+      },
+      {
+        title: t('settings.conversation.share.projectNote'),
+        description: t('settings.conversation.share.projectNoteDesc'),
       },
       {
         title: t('settings.conversation.display.title'),
@@ -429,9 +598,10 @@ describe('SettingsConversationSection', () => {
       Array.from(containerEl.querySelectorAll<HTMLElement>('[data-settings-target]')).map(
         (element) => element.dataset.settingsTarget,
       ),
-    ).toEqual([
+      ).toEqual([
       'conversation-title',
       'conversation-compaction',
+      'conversation-sharing',
       'conversation-display',
       'conversation-questions',
       'conversation-rendering',
@@ -453,7 +623,7 @@ describe('SettingsConversationSection compaction fields', () => {
     document.body.innerHTML = '';
   });
 
-  it('saves prune toggle through project config with full-object save', async () => {
+  it('saves prune toggle through project config as a focused patch', async () => {
     const plugin = createPlugin();
     createSection(plugin);
 
@@ -462,13 +632,11 @@ describe('SettingsConversationSection compaction fields', () => {
     await pruneToggle?.onChange?.(false);
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
-    expect(updateCompactionConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ prune: false, auto: true, tail_turns: 2 }),
-    );
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ prune: false });
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
   });
 
-  it('saves tail_turns number through project config with full-object save', async () => {
+  it('saves tail_turns number through project config as a focused patch', async () => {
     const plugin = createPlugin();
     createSection(plugin);
 
@@ -478,34 +646,72 @@ describe('SettingsConversationSection compaction fields', () => {
     await tailTurnsText?.onChange?.('5');
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
-    expect(updateCompactionConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ tail_turns: 5, auto: true, prune: true }),
-    );
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ tail_turns: 5 });
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
   });
 
-  it('rejects non-integer tail_turns values like 1.9', async () => {
+  it('allows zero for every numeric compaction input', async () => {
     const plugin = createPlugin();
     createSection(plugin);
 
     const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+    const preserveText = findText(t('settings.conversation.compaction.preserveRecentTokens.name'));
+    const reservedText = findText(t('settings.conversation.compaction.reserved.name'));
+
+    expect(tailTurnsText?.control.inputEl.min).toBe('0');
+    expect(preserveText?.control.inputEl.min).toBe('0');
+    expect(reservedText?.control.inputEl.min).toBe('0');
+
+    await tailTurnsText?.onChange?.('0');
+    await preserveText?.onChange?.('0');
+    await reservedText?.onChange?.('0');
+
+    const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ tail_turns: 0 });
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ preserve_recent_tokens: 0 });
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ reserved: 0 });
+  });
+
+  it('rejects non-integer tail_turns values like 1.9 and resets the input', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+    if (!tailTurnsText) {
+      throw new Error('Expected tail turns field');
+    }
+    tailTurnsText.control.inputEl.value = '1.9';
 
     await tailTurnsText?.onChange?.('1.9');
 
+    expect(tailTurnsText.control.inputEl.value).toBe('2');
     expect(
       (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig,
     ).not.toHaveBeenCalled();
   });
 
-  it('ignores invalid tail_turns values', async () => {
+  it('rejects invalid numeric compaction values by restoring the current valid UI value', async () => {
     const plugin = createPlugin();
     createSection(plugin);
 
     const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+    const preserveText = findText(t('settings.conversation.compaction.preserveRecentTokens.name'));
+    const reservedText = findText(t('settings.conversation.compaction.reserved.name'));
 
-    await tailTurnsText?.onChange?.('0');
-    await tailTurnsText?.onChange?.('-1');
-    await tailTurnsText?.onChange?.('abc');
+    if (!tailTurnsText || !preserveText || !reservedText) {
+      throw new Error('Expected compaction numeric fields');
+    }
+
+    tailTurnsText.control.inputEl.value = '-1';
+    await tailTurnsText.onChange?.('-1');
+    preserveText.control.inputEl.value = 'abc';
+    await preserveText.onChange?.('abc');
+    reservedText.control.inputEl.value = '1.2';
+    await reservedText.onChange?.('1.2');
+
+    expect(tailTurnsText.control.inputEl.value).toBe('2');
+    expect(preserveText.control.inputEl.value).toBe('');
+    expect(reservedText.control.inputEl.value).toBe('');
 
     expect(
       (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig,
@@ -522,9 +728,7 @@ describe('SettingsConversationSection compaction fields', () => {
     await preserveText?.onChange?.('8000');
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
-    expect(updateCompactionConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ preserve_recent_tokens: 8000 }),
-    );
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ preserve_recent_tokens: 8000 });
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
   });
 
@@ -535,9 +739,7 @@ describe('SettingsConversationSection compaction fields', () => {
     const preserveText = findText(t('settings.conversation.compaction.preserveRecentTokens.name')); await preserveText?.onChange?.('');
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
-    expect(updateCompactionConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ preserve_recent_tokens: undefined }),
-    );
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ preserve_recent_tokens: undefined });
   });
 
   it('saves reserved tokens number through project config', async () => {
@@ -550,9 +752,7 @@ describe('SettingsConversationSection compaction fields', () => {
     await reservedText?.onChange?.('16000');
 
     const updateCompactionConfig = (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig;
-    expect(updateCompactionConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ reserved: 16000 }),
-    );
+    expect(updateCompactionConfig).toHaveBeenCalledWith({ reserved: 16000 });
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.savedApplied'));
   });
 

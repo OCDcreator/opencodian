@@ -146,7 +146,10 @@ export class ChatSelectionControlsCoordinator {
       textEl.textContent = displayState.text;
     }
 
-    this.modelSelectorTrigger.setAttribute('title', displayState.title);
+    this.modelSelectorTrigger.setAttribute(
+      'title',
+      t('chat.modelSelector.currentTabOverrideTitle', { model: displayState.title }),
+    );
     void this.updateModelSelectorIcon(current?.provider ?? null, displayState.iconLabel);
     this.host.updateEffortSelectorDisplay();
   }

@@ -65,6 +65,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     secondaryTabs: [
       { id: 'title', labelKey: 'settings.conversation.tab.title' },
       { id: 'compaction', labelKey: 'settings.conversation.tab.compaction' },
+      { id: 'sharing', labelKey: 'settings.conversation.tab.sharing' },
       { id: 'display', labelKey: 'settings.conversation.tab.display' },
       { id: 'questions', labelKey: 'settings.conversation.tab.questions' },
       { id: 'rendering', labelKey: 'settings.conversation.tab.rendering' },

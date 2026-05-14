@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- SettingsToolSection owns the built-in/custom tools settings surface and still carries UI, file authoring, and permission wiring together. */
 import { Notice, Setting } from 'obsidian';
 
 import { t } from '../../i18n';
@@ -7,13 +8,21 @@ import { ToolDetailModal, type ToolFileInfo, type ToolFileSource } from './Setti
 import { SettingsToolFileService } from './SettingsToolFileService';
 
 type ToolPermissionAction = 'allow' | 'deny' | 'ask';
-type ToolPermissionSelection = ToolPermissionAction | 'inherit';
+type ToolPermissionSelection = ToolPermissionAction | 'inherit' | 'custom';
 type GlobalToolPermissionSelection = ToolPermissionAction | 'opencode-default';
-type ToolPermissionMap = Record<string, string>;
+type ToolPermissionMap = Record<string, unknown>;
 
 interface ToolCatalogStoreLike {
   classifyToolIds(toolIds: string[]): { builtin: string[]; custom: string[] };
   getToolCatalogSnapshot(): { registryToolIds: string[] };
+}
+
+interface ToolRowRenderOptions {
+  containerEl: HTMLElement;
+  toolId: string;
+  displayName: string;
+  currentPermissions: ToolPermissionMap;
+  permissionKey?: string;
 }
 
 const TOOL_GROUPS: Array<{ labelKey: string; descKey: string; toolNames: string[] }> = [
@@ -55,6 +64,14 @@ const TOOL_GROUPS: Array<{ labelKey: string; descKey: string; toolNames: string[
 ];
 
 const TOOL_DOC_URL = 'https://opencode.ai/docs/custom-tools';
+const BUILTIN_TOOL_PERMISSION_KEY_ALIASES: Record<string, string> = {
+  write: 'edit',
+  multiedit: 'edit',
+  apply_patch: 'edit',
+  patch: 'edit',
+  web_fetch: 'webfetch',
+  web_search: 'websearch',
+};
 
 export class SettingsToolSection {
   private bodyEl: HTMLElement | null = null;
@@ -98,7 +115,13 @@ export class SettingsToolSection {
         }
 
         const identity = getToolIdentity(toolName);
-        this.renderToolRow(rowsEl, identity.normalizedName, identity.displayName, currentPermissions);
+        this.renderToolRow({
+          containerEl: rowsEl,
+          toolId: identity.normalizedName,
+          displayName: identity.displayName,
+          currentPermissions,
+          permissionKey: this.getBuiltinPermissionKey(identity.normalizedName),
+        });
       }
     }
   }
@@ -274,6 +297,7 @@ export class SettingsToolSection {
           .addOption('allow', t('settings.tools.permission.allow'))
           .addOption('ask', t('settings.tools.permission.ask'))
           .addOption('deny', t('settings.tools.permission.deny'))
+          .addOption('custom', t('settings.tools.permission.custom'))
           .setValue(selection)
           .onChange(async (value) => {
             await this.setToolPermissionSelection(toolName, this.normalizePermissionSelection(value));
@@ -305,23 +329,26 @@ export class SettingsToolSection {
 
     for (const toolId of custom.sort((left, right) => left.localeCompare(right))) {
       const identity = getToolIdentity(toolId, identityContext);
-      this.renderToolRow(rowsEl, toolId, identity.displayName, currentPermissions);
+      this.renderToolRow({
+        containerEl: rowsEl,
+        toolId,
+        displayName: identity.displayName,
+        currentPermissions,
+      });
     }
   }
 
-  private renderToolRow(
-    containerEl: HTMLElement,
-    toolId: string,
-    displayName: string,
-    currentPermissions: ToolPermissionMap,
-  ): void {
-    const permission = this.getEffectivePermissionForTool(currentPermissions, toolId);
-    const selection = this.getExplicitPermissionSelection(currentPermissions, toolId);
-    const permissionSource = selection === 'inherit' ? 'inherit' : 'override';
+  private renderToolRow(options: ToolRowRenderOptions): void {
+    const { containerEl, toolId, displayName, currentPermissions } = options;
+    const permissionKey = options.permissionKey ?? toolId;
+    const permission = this.getEffectivePermissionForTool(currentPermissions, permissionKey);
+    const selection = this.getExplicitPermissionSelection(currentPermissions, permissionKey);
+    const permissionSource = selection === 'inherit' ? 'inherit' : selection === 'custom' ? 'custom' : 'override';
     const rowEl = containerEl.createDiv({
       cls: 'opencodian-tool-permission-row',
       attr: {
         'data-tool-id': toolId,
+        'data-tool-permission-key': permissionKey,
         'data-tool-permission': permission,
         'data-tool-permission-source': permissionSource,
       },
@@ -336,9 +363,10 @@ export class SettingsToolSection {
           .addOption('allow', t('settings.tools.permission.allow'))
           .addOption('ask', t('settings.tools.permission.ask'))
           .addOption('deny', t('settings.tools.permission.deny'))
+          .addOption('custom', t('settings.tools.permission.custom'))
           .setValue(selection)
           .onChange(async (value) => {
-            await this.setToolPermissionSelection(toolId, this.normalizePermissionSelection(value));
+            await this.setToolPermissionSelection(permissionKey, this.normalizePermissionSelection(value));
           });
       });
   }
@@ -413,6 +441,10 @@ export class SettingsToolSection {
   private async setToolPermissionSelection(toolId: string, selection: ToolPermissionSelection): Promise<void> {
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) {
+      return;
+    }
+
+    if (selection === 'custom') {
       return;
     }
 
@@ -496,6 +528,9 @@ export class SettingsToolSection {
     if (value === 'allow' || value === 'ask' || value === 'deny') {
       return value;
     }
+    if (value && typeof value === 'object') {
+      return 'custom';
+    }
     return 'inherit';
   }
 
@@ -507,7 +542,10 @@ export class SettingsToolSection {
     return 'opencode-default';
   }
 
-  private getEffectivePermissionForTool(permissions: ToolPermissionMap, toolId: string): ToolPermissionAction {
+  private getEffectivePermissionForTool(permissions: ToolPermissionMap, toolId: string): ToolPermissionAction | 'custom' {
+    if (permissions[toolId] && typeof permissions[toolId] === 'object') {
+      return 'custom';
+    }
     return this.normalizePermissionAction(permissions[toolId] ?? permissions['*'] ?? 'allow');
   }
 
@@ -542,15 +580,22 @@ export class SettingsToolSection {
     if (value === 'inherit') {
       return value;
     }
+    if (value === 'custom') {
+      return value;
+    }
     return this.normalizePermissionAction(value);
   }
 
-  private normalizePermissionAction(value: string): ToolPermissionAction {
+  private normalizePermissionAction(value: unknown): ToolPermissionAction {
     if (value === 'deny' || value === 'ask') {
       return value;
     }
 
     return 'allow';
+  }
+
+  private getBuiltinPermissionKey(toolId: string): string {
+    return BUILTIN_TOOL_PERMISSION_KEY_ALIASES[toolId] ?? toolId;
   }
 
   private getCatalogStore(): ToolCatalogStoreLike | null {

@@ -348,6 +348,43 @@ describe('OpencodeConfigManager plugin compatibility', () => {
 
 });
 
+describe('OpencodeConfigManager share config helpers', () => {
+  it('round-trips project share mode while preserving adjacent fields', async () => {
+    await manager.write({
+      default_agent: 'build',
+      share: 'manual',
+      formatter: {
+        biome: {
+          disabled: true,
+        },
+      },
+    });
+
+    const shareManager = manager as OpencodeConfigManager & {
+      getShareConfig(): Promise<'manual' | 'auto' | 'disabled' | undefined>;
+      updateShareConfig(value: 'manual' | 'auto' | 'disabled' | null | undefined): Promise<void>;
+    };
+
+    expect(await shareManager.getShareConfig()).toBe('manual');
+
+    await shareManager.updateShareConfig('auto');
+    expect(await shareManager.getShareConfig()).toBe('auto');
+    expect(await manager.read()).toEqual(expect.objectContaining({
+      default_agent: 'build',
+      formatter: {
+        biome: {
+          disabled: true,
+        },
+      },
+      share: 'auto',
+    }));
+
+    await shareManager.updateShareConfig(null);
+    expect(await shareManager.getShareConfig()).toBeUndefined();
+    expect((await manager.read()).default_agent).toBe('build');
+  });
+});
+
 describe('OpencodeConfigManager session agent command helpers', () => {
   it('updates compaction and default agent config while preserving adjacent fields', async () => {
     await manager.write({

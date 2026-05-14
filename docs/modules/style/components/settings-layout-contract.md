@@ -58,6 +58,14 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 - `.opencodian-skill-list`：纵向 flex 容器，承载来源分组后的技能列表。项目技能与外部技能的切换由设置布局自身的二级标签承载，不再在 Skills 页面内部维护额外分段控件。
 - `.opencodian-skill-bulk-bar` / `.opencodian-skill-bulk-permission-group` / `.opencodian-skill-bulk-actions`：技能批量操作条，宽屏为“左侧批量权限 select + 已选数量，右侧动作组”。项目技能动作组包含全选、Refresh 和批量 Delete；批量权限下拉选择即应用，不再显示 Apply 按钮。外部技能页不渲染删除按钮，刷新保留在外部页顶部工具条。
 - `.opencodian-skill-source-section` / `.opencodian-skill-source-header`：每个技能来源的独立分区与标题行，显示来源名和计数，让用户按来源扫描，而不是先穿过一个大卡片。
+
+## Shared Session Manager Styles
+
+- `.opencodian-share-policy-panel` / `.opencodian-share-policy-*`：Conversation > Sharing 顶部的分享策略控制面板。左侧解释项目级策略，右侧保留 Obsidian dropdown 与帮助按钮，当前模式以低调状态 chip 显示，避免把公开分享配置伪装成普通表单行。
+- `.opencodian-share-diagnostics*`：分享策略面板内的诊断区。按钮会检查项目 share mode、OpenCode 服务健康状态和公共分享主机可达性，用 compact status rows 显示 ok / warning / error。
+- `.opencodian-shared-sessions` / `.opencodian-shared-sessions-header`：已分享会话管理区，使用标题、说明、公开数量与刷新按钮组成轻量工具头，不复用截图式的单行 setting layout。
+- `.opencodian-shared-session-row`：单个已分享会话的数据行，左侧为标题、更新时间、公开 URL，右侧为复制、预览、取消分享动作；多行共享一个 list surface，窄屏改为单列。
+- `.opencodian-shared-session-preview` / `.opencodian-shared-session-message*`：完整会话预览区域。普通文本直接展开，工具调用和长输出由 `<details>` 默认折叠；消息之间使用 transcript 分隔线，避免在 setting row 内继续嵌套卡片。
 - `.opencodian-skill-card`：紧凑技能行，宽屏为“选择框 + 名称/描述/路径 + 操作区”三列，避免在列表中展开完整 SKILL.md。
 - `.opencodian-skill-select-checkbox`：列表行选择控件，尺寸跟随 Obsidian 原生 checkbox，不额外发明选择 affordance。
 - `.opencodian-skill-source-chip`：技能来源的低调 monospace chip。

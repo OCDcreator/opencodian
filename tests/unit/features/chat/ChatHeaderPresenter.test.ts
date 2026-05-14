@@ -115,6 +115,23 @@ describe('ChatHeaderPresenter', () => {
     expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.localExternal'));
   });
 
+  it('ignores late server status results after destroy clears header DOM refs', async () => {
+    const fixture = createFixture();
+    let resolveAvailability: ((value: ChatServerAvailability) => void) | null = null;
+    fixture.host.resolveServerAvailability.mockImplementation(() =>
+      new Promise((resolve) => {
+        resolveAvailability = resolve;
+      })
+    );
+
+    const refreshPromise = fixture.presenter.refreshServerStatusBadge();
+    fixture.presenter.destroy();
+    resolveAvailability?.('running');
+    await expect(refreshPromise).resolves.toBeUndefined();
+
+    expect(fixture.host.refreshContextUsageIndicator).not.toHaveBeenCalled();
+  });
+
   it('syncs title assets and layout callbacks on css changes', () => {
     const fixture = createFixture();
     const wordmarkEl = fixture.headerEl.querySelector<HTMLImageElement>('.opencodian-title-text');

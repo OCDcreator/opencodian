@@ -8,6 +8,7 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
+import { OpenCodeProjectConfigHelpModal } from './OpenCodeProjectConfigHelpModal';
 
 const logger = createLogger('SettingsSecuritySection');
 
@@ -71,7 +72,7 @@ export class SettingsSecuritySection {
 
     this.renderAutoRestartSetting(containerEl);
     this.renderConfigFileSetting(containerEl, configManager);
-    this.renderBlocklistSettings(containerEl);
+    this.renderBlocklistSettings(containerEl, configManager);
 
     return headingEl;
   }
@@ -105,7 +106,8 @@ export class SettingsSecuritySection {
       void this.updateConfigStatus(configStatusSetting, configManager).catch(() => {});
       this.renderAutoRestartSetting(containerEl);
     } else if (secondaryTabId === 'safety') {
-      this.renderBlocklistSettings(containerEl);
+      const configManager = vaultPath ? new OpencodeConfigManager(vaultPath) : null;
+      this.renderBlocklistSettings(containerEl, configManager);
     }
   }
 
@@ -315,11 +317,14 @@ export class SettingsSecuritySection {
     await this.plugin.openCodeService.start();
   }
 
-  private renderBlocklistSettings(containerEl: HTMLElement): void {
+  private renderBlocklistSettings(
+    containerEl: HTMLElement,
+    configManager?: OpencodeConfigManager | null,
+  ): void {
     this.renderBlocklistToggle(containerEl);
     this.renderExternalAccessToggle(containerEl);
     this.renderAllowedExportPathsSetting(containerEl);
-    this.renderPlatformBlockedCommandsSetting(containerEl);
+    this.renderPlatformBlockedCommandsSetting(containerEl, configManager);
   }
 
   private renderBlocklistToggle(containerEl: HTMLElement): void {
@@ -365,12 +370,15 @@ export class SettingsSecuritySection {
       });
   }
 
-  private renderPlatformBlockedCommandsSetting(containerEl: HTMLElement): void {
+  private renderPlatformBlockedCommandsSetting(
+    containerEl: HTMLElement,
+    configManager?: OpencodeConfigManager | null,
+  ): void {
     const platformKey = getCurrentPlatformKey();
     const isWindows = platformKey === 'windows';
     const platformLabel = isWindows ? 'Windows' : 'Unix';
 
-    new Setting(containerEl)
+    const blockedCommandsSetting = new Setting(containerEl)
       .setName(t('settings.security.blockedCommands.name', { platform: platformLabel }))
       .setDesc(t('settings.security.blockedCommands.desc'))
       .addTextArea((text) => {
@@ -381,20 +389,27 @@ export class SettingsSecuritySection {
           .setPlaceholder(placeholder)
           .setValue(this.plugin.settings.blockedCommands[platformKey].join('\n'))
           .onChange(async (value) => {
-            this.plugin.settings.blockedCommands[platformKey] = this.parseNonEmptyLines(value);
+            const previousBlockedCommands = [...this.plugin.settings.blockedCommands[platformKey]];
+            const nextBlockedCommands = this.parseNonEmptyLines(value);
+            this.plugin.settings.blockedCommands[platformKey] = nextBlockedCommands;
             await this.plugin.saveSettings();
+            await this.syncBlockedCommands(configManager, nextBlockedCommands, previousBlockedCommands);
           });
         text.inputEl.rows = 6;
         text.inputEl.cols = 40;
       });
+    this.addBashPermissionHelpButton(blockedCommandsSetting);
 
     if (isWindows) {
-      this.renderUnixBlockedCommandsSetting(containerEl);
+      this.renderUnixBlockedCommandsSetting(containerEl, configManager);
     }
   }
 
-  private renderUnixBlockedCommandsSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+  private renderUnixBlockedCommandsSetting(
+    containerEl: HTMLElement,
+    configManager?: OpencodeConfigManager | null,
+  ): void {
+    const blockedCommandsSetting = new Setting(containerEl)
       .setName(t('settings.security.blockedCommands.unixName'))
       .setDesc(t('settings.security.blockedCommands.unixDesc'))
       .addTextArea((text) => {
@@ -402,12 +417,47 @@ export class SettingsSecuritySection {
           .setPlaceholder('rm -rf\nchmod 777\nmkfs')
           .setValue(this.plugin.settings.blockedCommands.unix.join('\n'))
           .onChange(async (value) => {
-            this.plugin.settings.blockedCommands.unix = this.parseNonEmptyLines(value);
+            const previousBlockedCommands = [...this.plugin.settings.blockedCommands.unix];
+            const nextBlockedCommands = this.parseNonEmptyLines(value);
+            this.plugin.settings.blockedCommands.unix = nextBlockedCommands;
             await this.plugin.saveSettings();
+            await this.syncBlockedCommands(configManager, nextBlockedCommands, previousBlockedCommands);
           });
         text.inputEl.rows = 4;
         text.inputEl.cols = 40;
       });
+    this.addBashPermissionHelpButton(blockedCommandsSetting);
+  }
+
+  private async syncBlockedCommands(
+    configManager: OpencodeConfigManager | null | undefined,
+    nextBlockedCommands: string[],
+    previousBlockedCommands: string[],
+  ): Promise<void> {
+    if (!configManager) {
+      logger.warn('Cannot sync blocked commands because the OpenCode config manager is unavailable.');
+      new Notice(t('settings.security.blockedCommands.syncUnavailable'));
+      return;
+    }
+
+    try {
+      await configManager.syncManagedBashDenyPatterns(nextBlockedCommands, previousBlockedCommands);
+      await this.handlePermissionModeRestart();
+    } catch (error) {
+      logger.error('Failed to sync blocked commands to OpenCode bash permissions:', error);
+      new Notice(t('settings.security.blockedCommands.syncFailed'));
+    }
+  }
+
+  private addBashPermissionHelpButton(setting: Setting): void {
+    setting.addExtraButton((button) => {
+      button
+        .setIcon('help-circle')
+        .setTooltip(t('settings.projectConfigHelp.open'))
+        .onClick(() => {
+          new OpenCodeProjectConfigHelpModal(this.app, 'bashPermission').open();
+        });
+    });
   }
 
   private parseNonEmptyLines(value: string): string[] {

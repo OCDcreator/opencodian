@@ -17,8 +17,9 @@
 
 - `renderBuiltinTools()` 按文件、搜索、执行、网络、智能、元工具和计划工具分组渲染，每组使用 `opencodian-tool-group-panel` 和说明文案呈现。
 - 每个工具先通过 `isBuiltinToolName()` 校验，再用 `getToolIdentity()` 获取标准名称和显示名称。
-- 每个权限行默认显示 `inherit`（跟随默认）；只有存在 `permission.<tool>` 时才显示具体 allow / ask / deny 覆盖。
-- 行外层带 `data-tool-permission` 和 `data-tool-permission-source`，前者表达最终生效值，后者表达 inherited / override 来源，供 CSS 做低调状态提示。
+- 每个权限行默认显示 `inherit`（跟随默认）；只有存在对应 canonical permission key 时才显示具体 allow / ask / deny 覆盖。
+- Built-in 页签会把 UI tool id 映射到 OpenCode canonical permission key：`write` / `multiedit` / `apply_patch` / `patch` 写入和读取 `edit`，`web_fetch` 写入和读取 `webfetch`，`web_search` 写入和读取 `websearch`。Custom 工具文件和运行时 custom tool catalog 仍按真实 tool id 写入，避免误映射用户自定义工具。
+- 行外层带 `data-tool-id`、`data-tool-permission-key`、`data-tool-permission` 和 `data-tool-permission-source`；`data-tool-id` 保留 UI/运行时展示 id，`data-tool-permission-key` 表达实际读写 key，permission/source 表达 inherited / override / custom 状态，供 CSS 做低调状态提示。
 
 ### 默认权限
 
@@ -26,7 +27,8 @@
 - 默认权限区复用 Skills 权限区的 control-panel / permission-cluster 视觉结构：标题、说明、状态摘要和右侧 dropdown 的层级与 Skills 保持一致，只替换成 Tools 的 `permission["*"]` 语义。Custom 页签里的 New tool / Refresh / Docs 工具条也放在同一张控制卡下方，对齐 Skills 的“权限 cluster + toolbar”层级。
 - 默认权限下拉包含 `OpenCode default`、`allow`、`ask`、`deny`。选择 `OpenCode default` 会调用 `clearToolPermission('*')` 删除全局默认；选择具体值会调用 `setToolPermission('*', value)`。
 - 没有配置 `permission["*"]` 时，面板说明使用 OpenCode 默认值：大多数工具允许，`external_directory` / `doom_loop` 保护先询问。
-- 单工具行选择 `Follow default` 时会删除对应 `permission.<tool>`，回到 `permission["*"]` 或 OpenCode 默认。
+- 单工具行选择 `Follow default` 时会删除对应 canonical `permission.<tool>`，回到 `permission["*"]` 或 OpenCode 默认。
+- 如果已有 patterned/object permission（例如 `permission.webfetch` 是对象），行会显示 `Custom rules` / `data-tool-permission-source="custom"`，不会把对象规则误读成 allow；保持 `Custom rules` 选择不会写回，用户明确选择具体权限或 `Follow default` 时才覆盖/清除该 key。
 
 ### 自定义工具
 

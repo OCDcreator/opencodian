@@ -1,11 +1,13 @@
+/* eslint-disable max-lines, max-lines-per-function -- This settings-section suite keeps the Obsidian Setting mocks, permission config fixtures, and blocked-command sync coverage together. */
 import * as fs from 'fs';
-import type { App } from 'obsidian';
+import type { App, ExtraButtonComponent } from 'obsidian';
 import { Setting } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
 import { OpencodeConfigManager } from '../../../../src/core/config';
 import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/types';
+import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/OpenCodeProjectConfigHelpModal';
 import { SettingsSecuritySection } from '../../../../src/features/settings/SettingsSecuritySection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -67,12 +69,26 @@ interface ButtonRecord {
   onClick?: () => void | Promise<void>;
 }
 
+interface MockExtraButtonControl {
+  extraSettingsEl: HTMLElement;
+  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockExtraButtonControl>;
+  setIcon: jest.MockedFunction<(icon: string) => MockExtraButtonControl>;
+  setTooltip: jest.MockedFunction<(value: string) => MockExtraButtonControl>;
+}
+
+interface ExtraButtonRecord {
+  control: MockExtraButtonControl;
+  name: string;
+  onClick?: () => void | Promise<void>;
+}
+
 type SecuritySectionPlugin = Pick<OpenCodianPlugin, 'app' | 'settings' | 'saveSettings' | 'openCodeService'>;
 
 const dropdownRecords: DropdownRecord[] = [];
 const toggleRecords: ToggleRecord[] = [];
 const textAreaRecords: TextAreaRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
+const extraButtonRecords: ExtraButtonRecord[] = [];
 const settingRecordMap = new WeakMap<Setting, SettingRecord>();
 const settingRecords: SettingRecord[] = [];
 const tempDirs: string[] = [];
@@ -175,6 +191,25 @@ function createButtonRecord(name: string): ButtonRecord {
   return record;
 }
 
+function createExtraButtonRecord(name: string): ExtraButtonRecord {
+  const record: ExtraButtonRecord = {
+    name,
+    control: {
+      extraSettingsEl: document.createElement('span'),
+      onClick: jest.fn(),
+      setIcon: jest.fn(),
+      setTooltip: jest.fn(),
+    },
+  };
+  record.control.onClick.mockImplementation((callback) => {
+    record.onClick = callback;
+    return record.control;
+  });
+  record.control.setIcon.mockReturnValue(record.control);
+  record.control.setTooltip.mockReturnValue(record.control);
+  return record;
+}
+
 function cloneSettings() {
   return {
     ...DEFAULT_SETTINGS,
@@ -267,6 +302,7 @@ function createPlugin(options?: {
   } as App;
 
   const configManager = basePath ? new OpencodeConfigManager(basePath) : null;
+  let lastSavedPermissionMode = settings.permissionMode;
   const plugin: SecuritySectionPlugin = {
     app,
     settings,
@@ -283,9 +319,14 @@ function createPlugin(options?: {
       return;
     }
 
+    if (plugin.settings.permissionMode === lastSavedPermissionMode) {
+      return;
+    }
+
     const config = await configManager.read();
     config.permission = permissionForMode(plugin.settings.permissionMode);
     await configManager.write(config);
+    lastSavedPermissionMode = plugin.settings.permissionMode;
   });
 
   return { app, basePath, configManager, plugin };
@@ -326,6 +367,7 @@ describe('SettingsSecuritySection', () => {
     toggleRecords.length = 0;
     textAreaRecords.length = 0;
     buttonRecords.length = 0;
+    extraButtonRecords.length = 0;
     settingRecords.length = 0;
     tempDirs.length = 0;
     jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
@@ -370,6 +412,15 @@ describe('SettingsSecuritySection', () => {
       const record = createButtonRecord(ensureSettingRecord(this).name);
       buttonRecords.push(record);
       callback(record.control);
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
+      this: Setting,
+      callback: (control: ExtraButtonComponent) => unknown,
+    ) {
+      const record = createExtraButtonRecord(ensureSettingRecord(this).name);
+      extraButtonRecords.push(record);
+      callback(record.control as unknown as ExtraButtonComponent);
       return this;
     });
   });
@@ -520,5 +571,142 @@ describe('SettingsSecuritySection', () => {
     expect(plugin.settings.allowedExportPaths).toEqual(['~/Desktop', '/tmp/export']);
     expect(plugin.settings.blockedCommands[currentPlatformKey]).toEqual(['rm -rf', 'chmod 777']);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
+  });
+
+  it('syncs blocked commands to OpenCode bash deny patterns', async () => {
+    const { app, configManager, plugin } = createPlugin({
+      settings: {
+        blockedCommands: {
+          ...DEFAULT_SETTINGS.blockedCommands,
+          [currentPlatformKey]: ['rm -rf'],
+        },
+      },
+    });
+    await configManager?.write({
+      permission: {
+        '*': 'ask',
+        bash: 'ask',
+        edit: 'ask',
+      },
+    });
+    const section = new SettingsSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const blockedCommandsRecord = textAreaRecords.find(
+      (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
+    );
+    await blockedCommandsRecord?.onChange?.('rm -rf\n\n chmod 777 ');
+
+    const config = await configManager?.read();
+    expect(config?.permission).toEqual({
+      '*': 'ask',
+      bash: {
+        '*': 'ask',
+        'rm -rf': 'deny',
+        'chmod 777': 'deny',
+      },
+      edit: 'ask',
+    });
+  });
+
+  it('restarts the local service after blocked commands are synced when auto restart is enabled', async () => {
+    const { app, plugin } = createPlugin({
+      settings: {
+        autoRestartOnPermissionChange: true,
+      },
+    });
+    const section = new SettingsSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const blockedCommandsRecord = textAreaRecords.find(
+      (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
+    );
+    await blockedCommandsRecord?.onChange?.('rm -rf');
+
+    expect(plugin.openCodeService.checkHealth).toHaveBeenCalledTimes(1);
+    expect(plugin.openCodeService.stop).toHaveBeenCalledTimes(1);
+    expect(plugin.openCodeService.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the bash permission help modal from the blocked commands help button', () => {
+    const openSpy = jest.spyOn(OpenCodeProjectConfigHelpModal.prototype, 'open').mockImplementation(() => {});
+    const { app, plugin } = createPlugin();
+    const section = new SettingsSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const blockedHelpButton = extraButtonRecords.find(
+      (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
+    );
+    blockedHelpButton?.onClick?.();
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves custom bash permission rules while replacing plugin-managed blocked commands', async () => {
+    const { app, configManager, plugin } = createPlugin({
+      settings: {
+        blockedCommands: {
+          ...DEFAULT_SETTINGS.blockedCommands,
+          [currentPlatformKey]: ['rm -rf'],
+        },
+      },
+    });
+    await configManager?.write({
+      permission: {
+        '*': 'ask',
+        bash: {
+          '*': 'ask',
+          'npm test': 'allow',
+          'curl *': 'ask',
+          'rm -rf': 'deny',
+        },
+        external_directory: {
+          '*': 'ask',
+          '/tmp/*': 'allow',
+        },
+      },
+    });
+    const section = new SettingsSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const blockedCommandsRecord = textAreaRecords.find(
+      (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
+    );
+    await blockedCommandsRecord?.onChange?.('chmod 777');
+
+    const config = await configManager?.read();
+    expect(config?.permission).toEqual({
+      '*': 'ask',
+      bash: {
+        '*': 'ask',
+        'npm test': 'allow',
+        'curl *': 'ask',
+        'chmod 777': 'deny',
+      },
+      external_directory: {
+        '*': 'ask',
+        '/tmp/*': 'allow',
+      },
+    });
   });
 });

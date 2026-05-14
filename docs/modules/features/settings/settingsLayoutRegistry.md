@@ -23,7 +23,7 @@
 | `general` | `basic`, `language` |
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
-| `conversation` | `title`, `compaction`, `display`, `questions`, `rendering` |
+| `conversation` | `title`, `compaction`, `sharing`, `display`, `questions`, `rendering` |
 | `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
 | `mcp` | `overview` |

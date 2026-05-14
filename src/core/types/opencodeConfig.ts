@@ -61,6 +61,8 @@ export interface OpencodeCommandConfig {
 
 export type OpencodeCommandConfigRecord = Record<string, OpencodeCommandConfig>;
 
+export type OpencodeShareMode = 'manual' | 'auto' | 'disabled';
+
 export interface OpencodeCompactionConfig {
   auto?: boolean;
   prune?: boolean;
@@ -144,6 +146,7 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   agent?: OpencodeAgentConfigRecord;
   command?: OpencodeCommandConfigRecord;
   default_agent?: string;
+  share?: OpencodeShareMode;
   compaction?: OpencodeCompactionConfig;
   formatter?: OpencodeFormatterConfig;
   mcp?: OpencodeMcpConfigRecord;

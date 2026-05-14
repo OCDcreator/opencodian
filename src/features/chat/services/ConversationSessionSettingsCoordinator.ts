@@ -1,8 +1,10 @@
 import type { App } from 'obsidian';
 
+import type { Session } from '../../../core/opencode/OpenCodeSessionLifecycleCoordinator';
 import type {
   Conversation,
   ConversationSessionSettings,
+  OpencodeShareMode,
 } from '../../../core/types';
 import {
   normalizeConversationSessionSettings,
@@ -23,26 +25,75 @@ export interface ConversationSessionSettingsCoordinatorHost {
   getChatContainerEl(): HTMLElement | null;
   saveConversation(conversation: Conversation): Promise<void>;
   showNotice(message: string): void;
+  shareSession?(sessionId: string): Promise<Session>;
+  unshareSession?(sessionId: string): Promise<Session>;
+  listSessions?(): Promise<Session[]>;
+  copyText?(text: string): Promise<void>;
+  getProjectShareMode?(): Promise<OpencodeShareMode | undefined>;
 }
 
 export class ConversationSessionSettingsCoordinator {
   constructor(private readonly host: ConversationSessionSettingsCoordinatorHost) {}
 
-  openCurrentConversationSettings(): void {
+  async openCurrentConversationSettings(): Promise<void> {
     const conversation = this.host.getCurrentConversation();
     if (!conversation) {
       this.host.showNotice(t('chat.sessionSettings.noConversation'));
       return;
     }
 
+    await this.openConversationSettingsModal(conversation);
+  }
+
+  private async openConversationSettingsModal(conversation: Conversation): Promise<void> {
+    const shareUrl = await this.getCurrentShareUrl(conversation.openCodeSessionId);
+    const shareMode = await this.getProjectShareMode();
+
     new ConversationSessionSettingsModal(this.host.app, {
       conversationTitle: conversation.title || t('chat.history.untitled'),
       defaults: this.resolveEffectiveSettings(conversation),
       initialOverrides: conversation.sessionSettings,
+      shareUrl,
+      shareMode,
       onSave: async (overrides) => {
         await this.saveConversationOverrides(conversation, overrides);
       },
+      onPreview: (overrides) => {
+        this.previewConversationOverrides(conversation, overrides);
+      },
+      onCancelPreview: () => {
+        this.applyConversationVisualState(conversation);
+      },
+      onShare: async () => {
+        await this.shareCurrentConversation(conversation);
+      },
+      onUnshare: async () => {
+        await this.unshareCurrentConversation(conversation);
+      },
     }).open();
+  }
+
+  private async getCurrentShareUrl(sessionId: string): Promise<string | null> {
+    try {
+      const sessions = this.host.listSessions
+        ? await this.host.listSessions()
+        : await this.resolveOpenCodeService().listSessions?.() ?? [];
+      return this.getShareUrl(sessions.find((session) => session.id === sessionId) ?? null);
+    } catch {
+      return null;
+    }
+  }
+
+  private async getProjectShareMode(): Promise<OpencodeShareMode | undefined> {
+    try {
+      if (this.host.getProjectShareMode) {
+        return await this.host.getProjectShareMode();
+      }
+      const manager = this.resolveOpenCodianPlugin()?.opencodeConfigManager;
+      return await manager?.getShareConfig?.();
+    } catch {
+      return undefined;
+    }
   }
 
   resolveEffectiveSettings(
@@ -92,5 +143,124 @@ export class ConversationSessionSettingsCoordinator {
     }
 
     this.host.showNotice(t('chat.sessionSettings.saved'));
+  }
+
+  private previewConversationOverrides(
+    conversation: Conversation,
+    overrides?: Partial<ConversationSessionSettings> | null,
+  ): void {
+    const normalizedOverrides = normalizeConversationSessionSettings(overrides);
+    const previewConversation = {
+      ...conversation,
+      sessionSettings: normalizedOverrides
+        && Object.values(normalizedOverrides).every((value) => value === null)
+        ? undefined
+        : normalizedOverrides,
+    };
+
+    this.applyConversationVisualState(previewConversation);
+  }
+
+  private async shareCurrentConversation(conversation: Conversation): Promise<void> {
+    let session: Session;
+    try {
+      session = await this.shareSession(conversation.openCodeSessionId);
+    } catch (error) {
+      throw new Error(this.getShareFailureMessage(error));
+    }
+    const shareUrl = this.getShareUrl(session);
+    if (!shareUrl) {
+      this.host.showNotice(t('chat.sessionSharing.shareNoUrl'));
+      return;
+    }
+
+    await this.copyText(shareUrl);
+    this.host.showNotice(t('chat.sessionSharing.shareCopied'));
+  }
+
+  private async unshareCurrentConversation(conversation: Conversation): Promise<void> {
+    await this.unshareSession(conversation.openCodeSessionId);
+    this.host.showNotice(t('chat.sessionSharing.unshared'));
+  }
+
+  private async shareSession(sessionId: string): Promise<Session> {
+    if (this.host.shareSession) {
+      return this.host.shareSession(sessionId);
+    }
+    return this.resolveOpenCodeService().shareSession(sessionId);
+  }
+
+  private async unshareSession(sessionId: string): Promise<Session> {
+    if (this.host.unshareSession) {
+      return this.host.unshareSession(sessionId);
+    }
+    return this.resolveOpenCodeService().unshareSession(sessionId);
+  }
+
+  private async copyText(text: string): Promise<void> {
+    if (this.host.copyText) {
+      await this.host.copyText(text);
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+  }
+
+  private resolveOpenCodeService(): {
+    listSessions?(): Promise<Session[]>;
+    shareSession(sessionId: string): Promise<Session>;
+    unshareSession(sessionId: string): Promise<Session>;
+  } {
+    const plugin = this.resolveOpenCodianPlugin();
+
+    if (!plugin?.openCodeService) {
+      throw new Error(t('chat.sessionSharing.serviceUnavailable'));
+    }
+
+    return plugin.openCodeService;
+  }
+
+  private resolveOpenCodianPlugin(): {
+    opencodeConfigManager?: {
+      getShareConfig?(): Promise<OpencodeShareMode | undefined>;
+    };
+    openCodeService?: {
+      listSessions?(): Promise<Session[]>;
+      shareSession(sessionId: string): Promise<Session>;
+      unshareSession(sessionId: string): Promise<Session>;
+    };
+  } | undefined {
+    return (this.host.app as typeof this.host.app & {
+      plugins?: {
+        plugins?: Record<string, unknown>;
+      };
+    }).plugins?.plugins?.opencodian as
+      | {
+        opencodeConfigManager?: {
+          getShareConfig?(): Promise<OpencodeShareMode | undefined>;
+        };
+        openCodeService?: {
+          listSessions?(): Promise<Session[]>;
+          shareSession(sessionId: string): Promise<Session>;
+          unshareSession(sessionId: string): Promise<Session>;
+        };
+      }
+      | undefined;
+  }
+
+  private getShareUrl(session: Session | null): string | null {
+    const share = session?.share;
+    if (!share || typeof share !== 'object') {
+      return null;
+    }
+    const url = (share as { url?: unknown }).url;
+    return typeof url === 'string' && url.trim().length > 0 ? url : null;
+  }
+
+  private getShareFailureMessage(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes('sharing is disabled')) {
+      return t('chat.sessionSharing.disabledByProjectConfig');
+    }
+    return t('chat.sessionSharing.shareFailed');
   }
 }

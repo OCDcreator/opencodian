@@ -7,7 +7,7 @@ import { createLogger } from '../../shared';
 import type {
   OpencodeAgentConfig, OpencodeAgentConfigRecord, OpencodeCommandConfig,
   OpencodeCommandConfigRecord, OpencodeCompactionConfig, OpencodeConfig,
-  OpencodeFormatterConfig, OpencodePluginSpec, PermissionAction, PermissionConfig,
+  OpencodeFormatterConfig, OpencodePluginSpec, OpencodeShareMode, PermissionAction, PermissionConfig,
   PermissionMode, ToolPermission,
 } from '../types';
 import { prepareCommandPatchWithScopedAgent, removeCommandScopedAgent } from './commandScopedAgent';
@@ -50,6 +50,8 @@ const PERMISSION_MODE_TEMPLATES: Record<PermissionMode, PermissionAction | Permi
   normal: NORMAL_PERMISSION_TEMPLATE,
   plan: PLAN_PERMISSION_TEMPLATE,
 };
+
+const SHARE_MODES: ReadonlySet<string> = new Set(['manual', 'auto', 'disabled']);
 
 export class OpencodeConfigManager {
   private vaultPath: string;
@@ -178,6 +180,23 @@ export class OpencodeConfigManager {
       config.compaction = next;
     } else {
       delete config.compaction;
+    }
+    await this.write(config);
+  }
+
+  async getShareConfig(): Promise<OpencodeShareMode | undefined> {
+    const share = (await this.read()).share;
+    return typeof share === 'string' && SHARE_MODES.has(share)
+      ? share as OpencodeShareMode
+      : undefined;
+  }
+
+  async updateShareConfig(share: OpencodeShareMode | null | undefined): Promise<void> {
+    const config = await this.read();
+    if (share) {
+      config.share = share;
+    } else {
+      delete config.share;
     }
     await this.write(config);
   }
@@ -369,6 +388,55 @@ export class OpencodeConfigManager {
       return;
     }
     delete permission[tool as keyof PermissionConfig];
+    await this.write(config);
+  }
+
+  async syncManagedBashDenyPatterns(
+    patterns: string[],
+    previousManagedPatterns: string[] = [],
+  ): Promise<void> {
+    const nextPatterns = this.normalizePermissionPatterns(patterns);
+    const previousPatterns = this.normalizePermissionPatterns(previousManagedPatterns);
+    const config = await this.read();
+
+    if (typeof config.permission === 'string') {
+      config.permission = { '*': config.permission };
+    }
+    if (!config.permission || typeof config.permission !== 'object') {
+      config.permission = {};
+    }
+
+    const permission = config.permission as PermissionConfig;
+    const currentBashPermission = permission.bash;
+    const nextBashPermission: Record<string, PermissionAction> = typeof currentBashPermission === 'string'
+      ? { '*': currentBashPermission }
+      : currentBashPermission && typeof currentBashPermission === 'object'
+        ? this.cloneConfigObject(currentBashPermission)
+        : {};
+
+    if (!nextBashPermission['*'] && permission['*']) {
+      nextBashPermission['*'] = permission['*'];
+    }
+
+    for (const pattern of previousPatterns) {
+      if (nextBashPermission[pattern] === 'deny') {
+        delete nextBashPermission[pattern];
+      }
+    }
+
+    for (const pattern of nextPatterns) {
+      nextBashPermission[pattern] = 'deny';
+    }
+
+    const bashPatterns = Object.keys(nextBashPermission);
+    if (bashPatterns.length === 0) {
+      delete permission.bash;
+    } else if (bashPatterns.length === 1 && nextBashPermission['*']) {
+      permission.bash = nextBashPermission['*'];
+    } else {
+      permission.bash = nextBashPermission;
+    }
+
     await this.write(config);
   }
 
@@ -635,6 +703,14 @@ export class OpencodeConfigManager {
       throw new Error(`OpenCode ${entryKind} id is required`);
     }
     return normalizedEntryId;
+  }
+
+  private normalizePermissionPatterns(patterns: string[]): string[] {
+    return Array.from(new Set(
+      patterns
+        .map((pattern) => pattern.trim())
+        .filter((pattern) => pattern.length > 0),
+    ));
   }
 
   private mergeConfigObjects<T extends Record<string, unknown>>(

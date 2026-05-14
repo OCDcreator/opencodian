@@ -5,7 +5,7 @@
 
 ## 概述
 
-定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、结构化 agent / command / compaction / formatter / MCP 配置，以及 OpenCode 仍兼容的 deprecated `mode` / top-level `tools` 字段。供 `ModelConfigService`、`OpencodeConfigManager` 和 `McpConfigService` 读写 OpenCode 原生配置时使用。类型设计允许完整配置、provider 级配置、formatter entry 与 MCP entry 保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
+定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、顶层 share 模式、结构化 agent / command / compaction / formatter / MCP 配置，以及 OpenCode 仍兼容的 deprecated `mode` / top-level `tools` 字段。供 `ModelConfigService`、`OpencodeConfigManager` 和 `McpConfigService` 读写 OpenCode 原生配置时使用。类型设计允许完整配置、provider 级配置、formatter entry 与 MCP entry 保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
 
 ## 导入关系
 
@@ -31,6 +31,7 @@
 | `OpencodeAgentConfigRecord` | `Record<string, OpencodeAgentConfig>` — 原生 / deprecated agent map |
 | `OpencodeCommandConfig` | 结构化命令配置（`template?`, `description?`, `agent?`, `subtask?`, `model?`, `temperature?`, `top_p?`） |
 | `OpencodeCommandConfigRecord` | `Record<string, OpencodeCommandConfig>` — 命令 map |
+| `OpencodeShareMode` | 顶层 share 模式（`'manual' \| 'auto' \| 'disabled'`） |
 | `OpencodeCompactionConfig` | 压缩配置（`auto?`, `prune?`, `tail_turns?`, `preserve_recent_tokens?`, `reserved?`） |
 | `OpencodeFormatterEntryConfig` | 单个 formatter 条目配置（`disabled?`, `command?`, `environment?`, `extensions?`, `[key: string]: unknown`） |
 | `OpencodeFormatterConfig` | formatter 配置联合：`false`（全部禁用）或 `Record<string, OpencodeFormatterEntryConfig>`（按 formatter 覆盖） |
@@ -41,14 +42,14 @@
 | `OpencodeMcpConfigRecord` | `Record<string, OpencodeMcpEntryConfig>` — 项目 MCP server map |
 | `OpencodeToolConfig` | `Record<string, boolean>` — top-level 工具开关 |
 | `OpencodeModelConfigSubset` | 模型相关配置子集（`model?`, `small_model?`, `provider?`, `enabled_providers?`, `disabled_providers?`） |
-| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `compaction?`, `formatter?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
+| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `share?`, `compaction?`, `formatter?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
 
 ## 核心逻辑
 
 ### 配置层级
 
 - `OpencodeModelConfigSubset` — 仅模型/提供商相关字段，供 `ModelConfigService` 局部读写
-- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`compaction`、`formatter`、`mcp`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
+- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`share`、`compaction`、`formatter`、`mcp`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
 
 ### 插件声明格式
 
@@ -143,6 +144,7 @@ Ownership facts:
   },
   "enabled_providers": ["anthropic"],
   "default_agent": "build",
+  "share": "manual",
   "compaction": {
     "auto": true,
     "reserved": 10000
@@ -210,6 +212,7 @@ Ownership facts:
 | `agent` | `Record<string, OpencodeAgentConfig>?` | 代理配置 |
 | `command` | `Record<string, OpencodeCommandConfig>?` | 命令配置；OpenCodian 会消费 `temperature` / `top_p` patch 并转换成 command-owned hidden agent |
 | `default_agent` | `string?` | 默认 primary agent |
+| `share` | `OpencodeShareMode?` | 会话分享模式；缺失时 OpenCode 默认 `manual` |
 | `compaction` | `OpencodeCompactionConfig?` | 压缩配置 |
 | `formatter` | `OpencodeFormatterConfig?` | 项目级 formatter 配置；缺失表示默认自动探测，`false` 表示全部禁用，对象表示 per-formatter 覆盖 |
 | `mcp` | `OpencodeMcpConfigRecord?` | 项目级 MCP server 配置；settings panel 只对 project-owned entry 执行 add/edit/delete |

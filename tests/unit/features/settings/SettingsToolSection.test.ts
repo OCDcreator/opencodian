@@ -208,6 +208,53 @@ describe('SettingsToolSection custom tool authoring', () => {
     expect(plugin.openCodeService.start).toHaveBeenCalledTimes(2);
   });
 
+  it('writes builtin UI aliases through canonical OpenCode permission keys', async () => {
+    const plugin = createPlugin({ permission: { '*': 'ask' } });
+    const containerEl = document.createElement('div');
+
+    await new SettingsToolSection(containerEl, plugin as never, 'builtin').render();
+    const writeDropdown = dropdownRecords.find((record) => record.name === 'Write');
+    const webSearchDropdown = dropdownRecords.find((record) => record.name === 'WebSearch');
+
+    await writeDropdown?.onChange?.('deny');
+    await webSearchDropdown?.onChange?.('ask');
+
+    expect(plugin.opencodeConfigManager.setToolPermission).toHaveBeenCalledWith('edit', 'deny');
+    expect(plugin.opencodeConfigManager.setToolPermission).toHaveBeenCalledWith('websearch', 'ask');
+    expect(plugin.opencodeConfigManager.setToolPermission).not.toHaveBeenCalledWith('write', expect.anything());
+    expect(plugin.opencodeConfigManager.setToolPermission).not.toHaveBeenCalledWith('web_search', expect.anything());
+  });
+
+  it('reads canonical builtin permissions and preserves object rules as custom overrides', async () => {
+    const plugin = createPlugin({
+      permission: {
+        '*': 'ask',
+        edit: 'deny',
+        webfetch: { '*': 'ask', 'https://internal.example/**': 'deny' },
+      },
+    });
+    const containerEl = document.createElement('div');
+
+    await new SettingsToolSection(containerEl, plugin as never, 'builtin').render();
+    const writeDropdown = dropdownRecords.find((record) => record.name === 'Write');
+    const webFetchDropdown = dropdownRecords.find((record) => record.name === 'WebFetch');
+    const webFetchRow = containerEl.querySelector('[data-tool-id="web_fetch"]');
+
+    expect(writeDropdown?.control.setValue).toHaveBeenCalledWith('deny');
+    expect(webFetchDropdown?.control.setValue).toHaveBeenCalledWith('custom');
+    expect(webFetchRow?.getAttribute('data-tool-permission')).toBe('custom');
+    expect(webFetchRow?.getAttribute('data-tool-permission-source')).toBe('custom');
+
+    await webFetchDropdown?.onChange?.('custom');
+    expect(plugin.opencodeConfigManager.setToolPermission).not.toHaveBeenCalled();
+    expect(plugin.opencodeConfigManager.clearToolPermission).not.toHaveBeenCalled();
+
+    await webFetchDropdown?.onChange?.('inherit');
+
+    expect(plugin.opencodeConfigManager.clearToolPermission).toHaveBeenCalledWith('webfetch');
+    expect(plugin.opencodeConfigManager.clearToolPermission).not.toHaveBeenCalledWith('web_fetch');
+  });
+
   it('creates a default project tool file from the custom tools page', async () => {
     const plugin = createPlugin();
     const adapter = plugin.app.vault.adapter;

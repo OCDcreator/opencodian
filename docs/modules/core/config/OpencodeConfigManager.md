@@ -38,6 +38,8 @@ class OpencodeConfigManager {
   getFormatterConfig(): Promise<OpencodeFormatterConfig | undefined>;
   updateFormatterConfig(formatter: OpencodeFormatterConfig | null | undefined): Promise<void>;
   updateCompactionConfig(compaction: OpencodeCompactionConfig | null | undefined): Promise<void>;
+  getShareConfig(): Promise<OpencodeShareMode | undefined>;
+  updateShareConfig(share: OpencodeShareMode | null | undefined): Promise<void>;
   getDefaultAgent(): Promise<string | undefined>;
   updateDefaultAgent(defaultAgent: string | null | undefined): Promise<void>;
   getAgentConfig(): Promise<OpencodeAgentConfigRecord>;
@@ -53,6 +55,7 @@ class OpencodeConfigManager {
   setNormalMode(): Promise<void>;
   setPlanMode(): Promise<void>;
   setToolPermission(tool: string, action: PermissionAction): Promise<void>;
+  syncManagedBashDenyPatterns(patterns: string[], previousManagedPatterns?: string[]): Promise<void>;
   setSkillPermissionPattern(pattern: string, action: PermissionAction): Promise<void>;
   setAgentSkillPermission(agentId: string, action: PermissionAction | undefined): Promise<void>;
   setAgentSkillToolEnabled(agentId: string, enabled: boolean | undefined): Promise<void>;
@@ -112,7 +115,9 @@ getCommandScopedAgentId(commandId: string): string
 
 这点很重要：`plan` 只是 OpenCodian 的 shorthand，不是上游 OpenCode 的原生权限模式；上游仍是 rule-based `permission + pattern + action` 语义。
 
-`setToolPermission()` 允许增量改某一个工具权限；如果原始 `permission` 是字符串，会先转成对象形态 `{ '*': 原值 }`。当目标是 `skill` 且已有 `permission.skill` 对象时，它只更新 `permission.skill['*']`，保留单技能 pattern 覆盖。
+`setToolPermission()` 允许增量改某一个工具权限；如果原始 `permission` 是字符串，会先转成对象形态 `{ '*': 原值 }`。调用方需要传入 OpenCode canonical permission key（例如 `edit`、`webfetch`、`websearch`），UI 层负责把展示用 tool id 映射到这些 key。当目标是 `skill` 且已有 `permission.skill` 对象时，它只更新 `permission.skill['*']`，保留单技能 pattern 覆盖。
+
+`syncManagedBashDenyPatterns()` 专门供 Security 设置里的 blocked commands 使用，把插件管理的命令列表同步为 `permission.bash.<pattern> = 'deny'`。它会把字符串简写提升为对象规则，保留 `permission.bash['*']`、用户自定义 allow/ask/deny pattern、以及 `permission` 里的其他工具字段；替换时只移除上一轮插件管理且当前仍为 `deny` 的旧 pattern，避免粗暴覆盖用户手写规则。
 
 `setSkillPermissionPattern()` 专门写 `permission.skill.<pattern>`，用于 Skills 设置页给单个 skill name 或 pattern 配置 allow / ask / deny。它会把字符串简写提升为 `{ '*': 原值 }`，并保留已有 `permission.skill` 默认规则。
 
@@ -141,6 +146,7 @@ getCommandScopedAgentId(commandId: string): string
 manager 内提供了更细粒度的项目配置 helper，供当前 session settings、Agents settings 与 Commands/slash-command UI/runtime 共同复用：
 
 - `getCompactionConfig()` / `updateCompactionConfig()`：读写 `compaction`，并在 patch 时保留已有未知字段
+- `getShareConfig()` / `updateShareConfig()`：读写顶层 `share`，仅接受 OpenCode 支持的 `manual` / `auto` / `disabled` 模式；传入空值删除字段并回到 OpenCode 默认
 - `getFormatterConfig()` / `updateFormatterConfig()`：读写 `formatter`，具体 exact-write 规则委托给 `formatterConfig.ts`，允许删除 formatter 条目并保留 formatter entry 内未知字段
 - `getDefaultAgent()` / `updateDefaultAgent()`：读写并 trim `default_agent`，空字符串会删除字段
 - `getAgentConfig()`：把 native `agent` 与 deprecated `mode` 合并成单个 map，读取时优先返回 native `agent`
@@ -181,6 +187,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 | `getPluginConfig()` | 返回 `plugin` 数组副本 |
 | `updatePluginConfig(plugins)` | 更新或删除 `plugin` 字段 |
 | `getCompactionConfig()` / `updateCompactionConfig()` | 读写 `compaction`，支持 patch merge 与删除 |
+| `getShareConfig()` / `updateShareConfig()` | 读写顶层 `share` 模式，支持删除字段回到默认 |
 | `getFormatterConfig()` / `updateFormatterConfig()` | 读写 `formatter`，具体 exact subtree write 规则委托给 `formatterConfig.ts` |
 | `getDefaultAgent()` / `updateDefaultAgent()` | 读写 `default_agent`，空值时删除 |
 | `getAgentConfig()` / `upsertAgentConfig()` / `removeAgentConfig()` | 兼容 deprecated `mode` 导入的 agent helper |
@@ -191,12 +198,13 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 | `setPlanMode()` | 写入“禁止写入”的计划模式权限对象 |
 | `setToolPermission(tool, action)` | 改单个工具的权限 |
 | `clearToolPermission(tool)` | 删除单个工具权限；`tool='*'` 时删除全局默认并回到 OpenCode 默认值 |
+| `syncManagedBashDenyPatterns(patterns, previousManagedPatterns)` | 合并写入 Security blocked commands 对应的 `permission.bash` deny patterns |
 | `notifyRestartRequired()` | 弹 Notice，不执行重启 |
 
 ## 与其他模块的交互
 
 - `src/main.ts` 会在设置同步时创建并使用它来落地 `permissionMode`。
-- `src/features/settings/SettingsSecuritySection.ts` 通过 `summarizePermissionConfig()` 把 `.opencode` 权限规则转成 template/custom 状态文案。
+- `src/features/settings/SettingsSecuritySection.ts` 通过 `summarizePermissionConfig()` 把 `.opencode` 权限规则转成 template/custom 状态文案，并通过 `syncManagedBashDenyPatterns()` 同步 blocked commands 到 OpenCode bash permissions。
 - `src/features/settings/SettingsToolSection.ts` 通过 `setToolPermission()` / `clearToolPermission()` 管理 `permission["*"]` 默认值与单工具覆盖。
 - `src/core/config/ModelConfigService.ts` 通过它读写模型相关字段所在的完整配置文件。
 - `src/core/config/PluginManagementService.ts` 通过它读写项目级 `plugin` 配置，并复用它暴露的 `.opencode` 路径。
@@ -238,3 +246,13 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 1. `OpencodeConfigManager` is the sole writer of compaction config to `.opencode/opencode.json` via `updateCompactionConfig()`.
 2. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings; `getCompactionConfig()` reads from this file.
 3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not managed by this configuration manager.
+
+## 2026-05-14 Share config alignment
+
+OpenCode supports a top-level `share` mode in `.opencode/opencode.json`:
+
+1. `manual` allows explicit sharing through commands and is the upstream default when the field is absent.
+2. `auto` automatically shares new conversations.
+3. `disabled` turns sharing off.
+
+`OpencodeConfigManager.getShareConfig()` returns only recognized modes, and `updateShareConfig(null)` removes the field so projects can inherit the upstream default instead of writing a redundant value.

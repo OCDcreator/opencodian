@@ -57,7 +57,7 @@ export class ChatHeaderPresenter {
 
 - `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在包含 history → session settings → global settings 这条会话/全局配置链路
 - `startServerStatusLoop()` 立即刷新一次 status badge，然后每 5 秒重新查询 host 的 server availability
-- `refreshServerStatusBadge()` 更新 `is-running` / `is-offline` 等状态 class，并根据 local/remote mode 选择 status 文案
+- `refreshServerStatusBadge()` 更新 `is-running` / `is-offline` 等状态 class，并根据 local/remote mode 选择 status 文案；如果 async availability 返回时 header 已销毁，会重新检查 DOM refs 并跳过写入，避免设置页/视图切换期间的空节点错误
 - `applyLocaleTexts()` 刷新所有 header tooltip，并按最后一次 availability 立即重算 status label
 - `destroy()` 停止 polling 并释放 presenter 内部 DOM refs
 

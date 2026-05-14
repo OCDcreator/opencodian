@@ -253,6 +253,9 @@ export class ChatHeaderPresenter {
     this.isRefreshingServerStatus = true;
     try {
       const availability = await this.host.resolveServerAvailability();
+      if (!this.serverStatusBadgeEl || !this.serverStatusTextEl) {
+        return;
+      }
       if (availability !== this.lastServerAvailability) {
         logger.debug(`Chat server availability -> ${availability}`);
         this.lastServerAvailability = availability;

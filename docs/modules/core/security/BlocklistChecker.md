@@ -7,6 +7,8 @@
 
 `BlocklistChecker.ts` 目前只导出一个纯函数 `isCommandBlocked()`，用于把待执行命令与用户配置的黑名单模式逐条匹配，并返回布尔结果。它不负责读取设置，也不返回命中的具体模式。
 
+Security 设置里的 blocked commands 现在还会同步到项目 `.opencode/opencode.json` 的 `permission.bash` deny patterns；这条同步链路由 `SettingsSecuritySection` 和 `OpencodeConfigManager` 负责，不在本模块内实现。本模块仍只是插件侧的本地匹配 helper。
+
 ## 导入关系
 
 ```text

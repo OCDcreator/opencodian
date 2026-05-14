@@ -3,6 +3,7 @@ import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { ConversationCompactionHelpModal } from '../../../../src/features/settings/ConversationCompactionHelpModal';
+import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/OpenCodeProjectConfigHelpModal';
 import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -167,6 +168,17 @@ describe('SettingsConversationSection compaction help', () => {
     const reservedHelpButton = extraButtonRecords.find((record) => record.name === t('settings.conversation.compaction.reserved.name'));
 
     reservedHelpButton?.onClick?.();
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the sharing help modal from the share mode help button', () => {
+    const openSpy = jest.spyOn(OpenCodeProjectConfigHelpModal.prototype, 'open').mockImplementation(() => {});
+    createSection();
+
+    const shareHelpButton = extraButtonRecords.find((record) => record.name === t('settings.conversation.share.mode.name'));
+
+    shareHelpButton?.onClick?.();
 
     expect(openSpy).toHaveBeenCalledTimes(1);
   });

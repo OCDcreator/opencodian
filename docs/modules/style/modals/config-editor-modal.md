@@ -11,7 +11,9 @@
 
 - 配置编辑：`.opencodian-config-editor*`、`.opencodian-config-help*`、`.opencodian-config-buttons`。
 - 压缩帮助弹窗：`.opencodian-conversation-compaction-help-modal`、`.opencodian-conversation-compaction-help`、`.opencodian-compaction-help-*`（宽桌面卡片式 help modal，避免沿用默认窄容器和内部滚动）。
-- 会话设置：`.opencodian-session-settings-*`（中性 hero、分组 card、两栏字段、内容自适应三态 segmented button、数字输入、错误提示，以及全局默认值摘要行）。
+- 项目配置帮助弹窗：`.opencodian-project-config-help-modal`、`.opencodian-project-config-help`、`.opencodian-project-config-help-*`（用于 share / permission.bash 这类项目级 OpenCode 配置解释，主体是短列表 + 官方链接区）。
+- 会话设置分享动作：`.opencodian-session-settings-sharing-status`、`.opencodian-session-settings-sharing-url`、`.opencodian-session-settings-sharing-hint`、`.opencodian-session-settings-sharing-actions` 与 `.opencodian-session-settings-sharing-button`，用于当前会话的分享状态、公开链接、禁用提示、share/unshare 操作按钮。
+- 会话设置：`.opencodian-session-settings-*`（中性 hero、分组 card、两栏字段、内容自适应三态 segmented button、数字输入、错误提示、sticky footer，以及全局默认值摘要行）。
 - 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`、`.opencodian-context-detail-modal*`。
 - 模型开关管理：`.opencodian-model-toggle-*`。
 - 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）。

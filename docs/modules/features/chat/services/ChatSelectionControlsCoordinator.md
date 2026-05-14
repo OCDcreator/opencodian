@@ -12,7 +12,7 @@
 - 通过 `ModelSelectionRuntime` 加载并缓存 model catalog bundle / available providers，维护 requested/current/resolved model selection
 - 创建 toolbar 内的 permission / model selector 容器，并把 permission 容器交给 `PermissionModeSelectorCoordinator`
 - 维护 model selector 的搜索、keyboard navigation、sticky header cleanup 与 provider icon 刷新
-- 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动
+- 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
 - 委托 `PermissionModeSelectorCoordinator` 维护 permission selector 的 mode label、selected state 与 dropdown open/close lifecycle
 - 通过共享 escape handler 收束两个 selector 的关闭行为
 
@@ -62,6 +62,7 @@ export class ChatSelectionControlsCoordinator {
 
 - `OpenCodianView` 现在只提供 model catalog data source、tab override writeback、model-source mode / server availability 查询、provider icon service 调用和 permission-mode settings writeback等 host seam
 - model dropdown/search/list/selection display lifecycle 仍集中在 `ChatSelectionControlsCoordinator`；model catalog cache、selection resolution、switch-model notice 与 unavailable follow-up 已进一步收束到 `ModelSelectionRuntime`
+- 当前聊天模型选择写入 active-tab `modelOverride`，用于当前标签后续发送；不要把它描述为会话设置弹窗里的持久化 session setting。
 - permission dropdown lifecycle 由 `PermissionModeSelectorCoordinator` 承接，并仍通过 shared Escape handler 与 model dropdown 一起关闭
 - send pipeline options、`ModelCatalogStateService`、provider availability 语义与 icon fallback 顺序没有变化
 - 该模块刻意不接管 context usage、effort selector 或 input glass/theme；这些仍在相邻 owner 中维护

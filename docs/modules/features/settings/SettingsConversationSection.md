@@ -7,23 +7,27 @@
 
 `SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
 
-当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成五个二级分组：
+当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成六个二级分组：
 
 - 会话标题
 - 上下文压缩（项目级）
+- 会话分享（项目级）
 - 阅读与显示
 - 提问交互
 - 消息渲染
 
 其中“上下文压缩（项目级）”分组现在为每个压缩字段都挂了帮助按钮，点击后会打开 `ConversationCompactionHelpModal`，用通俗语言解释字段语义、OpenCode 默认策略和调参影响。
 
-每个 conversation 二级分组都会标记稳定 `data-settings-target="conversation-{title|compaction|display|questions|rendering}"`，供会话设置弹窗和调试断言做深链定位；不要只依赖本地化标题文本匹配。
+“会话分享（项目级）”分组使用独立的分享策略面板承载 share mode，而不是普通单行 setting。该面板保留项目配置帮助按钮，点击后打开 `OpenCodeProjectConfigHelpModal`。该弹窗说明分享会创建公开链接、不是 Markdown 导出，并链接 OpenCode share / config 官方文档。策略面板内还提供分享诊断区，可检查当前项目模式、OpenCode 服务健康状态，以及公共分享主机 `https://opncd.ai` 的网络可达性。策略面板下方是已分享会话管理区，显示公开会话数量、刷新动作、复制链接、预览和取消分享。
+
+每个 conversation 二级分组都会标记稳定 `data-settings-target="conversation-{title|compaction|sharing|display|questions|rendering}"`，供会话设置弹窗和调试断言做深链定位；不要只依赖本地化标题文本匹配。
 
 这个 owner 的职责边界刻意保持在"**conversation section 装配 + title-model refresh orchestration**"：
 
 - 持有 conversation section 级别的 DOM 组装与设置写回
-- 维护备用标题模型 `aiTitleModel` 的 availability-aware 标签解析与 warning action
+- 维护备用标题模型 `aiTitleModel` 的 availability-aware 标签解析与 warning action；智能标题会先等待 OpenCode 官方标题，只有未产出时才使用该备用模型
 - 维护项目级 compaction 配置的读取、展示、输入校验与 `.opencode/opencode.json` 写入
+- 维护项目级 `share` 配置的读取、展示与 `.opencode/opencode.json` 写入
 - 维护 global chat font size 的输入校验、设置写回，以及保存后的当前聊天运行时重应用
 - 协调 `ModelPickerModal` 与设置页的 title-model refresh callback 注册位
 - 统一 question card / user markup 相关设置保存后的 conversation UI 刷新动作
@@ -35,9 +39,10 @@
 `attach()` 会在一个 owner 内完成 conversation section 的主要阶段：
 
 - 创建 section heading
-- 通过 `OpenCodianSettings.createSettingsBlock()` 创建五个 conversation 二级分组卡片
+- 通过 `OpenCodianSettings.createSettingsBlock()` 创建六个 conversation 二级分组卡片
 - 在“会话标题”块装配 title mode dropdown 与 AI title model picker
 - 在“上下文压缩（项目级）”块装配 compaction controls
+- 在“会话分享（项目级）”块装配 OpenCode `share` mode dropdown
 - 在“阅读与显示”块装配 global session default chat font size
 - 在“提问交互”块装配 question display mode、question card position、answered-card toggle
 - 在“消息渲染”块装配 user markup 渲染 toggle
@@ -62,9 +67,24 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 
 - Read via `OpencodeConfigManager.getCompactionConfig()`
 - Save via `OpencodeConfigManager.updateCompactionConfig(patch)`
+- Numeric fields accept non-negative integers, including `0`; invalid negative/decimal/non-number edits reset the input back to the current valid UI value instead of leaving dirty text behind
+- Saves are patch-shaped, so changing one field does not write the whole default compaction object and accidentally override inherited OpenCode defaults
 - After write, call `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` to reload sidecar
-- While the settings tab is open, delegate `.opencode/opencode.json` `create` / `modify` / `delete` / `rename` watching to `ProjectConfigFileWatcher` and reload the compaction controls when that file changes externally
+- While the settings tab is open, delegate `.opencode/opencode.json` `create` / `modify` / `delete` / `rename` watching to `ProjectConfigFileWatcher` and reload the project conversation controls when that file changes externally
 - Show `configUnavailable` notice when config manager is missing
+
+### share config (project-scoped)
+
+The sharing block edits OpenCode's top-level `share` field:
+
+- Read via `OpencodeConfigManager.getShareConfig()`
+- Save via `OpencodeConfigManager.updateShareConfig(mode)`
+- Supported modes are `manual`, `auto`, and `disabled`; missing or unrecognized values display as upstream default `manual`
+- This is a project config setting, not a per-conversation session override
+- After saving, local managed OpenCode services are restarted when currently running so the running server rereads `share`; remote mode shows the standard remote-management Notice instead of pretending the plugin can reload it
+- The share setting is rendered inside a dedicated share-policy panel with a current-mode chip, a help button backed by `OpenCodeProjectConfigHelpModal`, and a diagnostics action that checks project mode, `OpenCodeService.checkHealth()`, and public share host reachability
+- The sharing block also renders a shared-session manager backed by `OpenCodeService.listSessions()`: it filters sessions with `session.share.url`, shows a public-session count and refresh action, shows the public URL, supports copy/unshare, and opens a full message preview through `OpenCodeService.getSessionMessages()`
+- Shared-session previews render all messages; non-text parts and text longer than 800 characters are placed in closed `<details>` blocks so tool calls and long output are present but folded by default
 
 ### chat font size (global session default)
 
@@ -83,10 +103,11 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 
 - `OpenCodianSettings.ts`: 创建并复用 owner，向其提供 section heading seam、settings block seam 与 title-model refresh callback 注册位
 - `ConversationCompactionHelpModal.ts`: 为 compaction 字段提供 topic-driven help modal
+- `OpenCodeProjectConfigHelpModal.ts`: 为 share mode 提供用户可读解释和官方文档链接
 - `main.ts`: 提供 `reapplyConversationSessionDefaults()`，把 settings 保存后的默认值变化桥接到当前聊天视图运行时
-- `OpencodeConfigManager.ts`: 提供 `getCompactionConfig()` / `updateCompactionConfig()` 读写项目 `.opencode/opencode.json` 中的 compaction 配置
-- `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置
-- `ProjectConfigFileWatcher.ts`: 监听当前 vault 的 `.opencode/opencode.json` 外部文件变更并触发 compaction 控件回读
+- `OpencodeConfigManager.ts`: 提供 `getCompactionConfig()` / `updateCompactionConfig()` 与 `getShareConfig()` / `updateShareConfig()` 读写项目 `.opencode/opencode.json` 中的 conversation 相关项目配置
+- `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置，并提供 shared-session manager 所需的 `listSessions()` / `getSessionMessages()` / `unshareSession()`
+- `ProjectConfigFileWatcher.ts`: 监听当前 vault 的 `.opencode/opencode.json` 外部文件变更并触发项目 conversation 控件回读
 - `ModelConfigService.ts`: 提供 AI 标题模型使用的有效模型目录
 - `modelPicker.ts`: 构建并解析 AI 标题模型 picker group / 选项
 - `ModelPickerModal.ts`: 提供 AI 标题模型的搜索式 picker
@@ -94,11 +115,12 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 ## 注意事项
 
 - 不要改变 title model fallback、follow-current 语义、chat font-size 的即时重应用语义，或 question card refresh / conversation rendering 触发条件。
+- 备用标题模型是 OpenCodian 智能标题的兜底模型，独立于 OpenCode 顶层 `small_model`；文案和 picker 说明必须继续保持这个边界。
 - compaction 配置已改为项目级，不再从 plugin settings 或 conversation session settings 读取或写入。
-- settings 页面打开期间，如果外部工具直接改动或删除 `.opencode/opencode.json`，compaction controls 会自动回读项目配置并刷新到最新状态；不需要手动重开设置页。
+- settings 页面打开期间，如果外部工具直接改动或删除 `.opencode/opencode.json`，项目级 compaction/share controls 会自动回读项目配置并刷新到最新状态；不需要手动重开设置页。
 - 手动触发的 `session.summarize()` 是 per-session 操作，不受本项目配置 UI 管理。
 - 如果后续继续推进 conversation lane，优先在这个 owner 内扩展完整 section lifecycle，而不是回到 `OpenCodianSettings` 主类里追加闭包。
-- conversation section 的新增设置应先判断归属到哪个现有二级分组；只有在职责明显独立时才新增第六个 block。
+- conversation section 的新增设置应先判断归属到哪个现有二级分组；只有在职责明显独立时才新增新的 block。
 - 新增的 compaction 字段如果需要解释，优先继续复用现有 help-button + topic modal，而不是把长说明直接塞进 setting desc。
 
 ## 2026-04-23 Compaction config alignment
@@ -114,6 +136,7 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 
 - `title` — renders title mode settings + AI title model picker
 - `compaction` — renders project-scoped compaction controls
+- `sharing` — renders project-scoped OpenCode share mode controls
 - `display` — renders chat font size settings
 - `questions` — renders question card display/position/answered-card toggles
 - `rendering` — renders user markup render toggle

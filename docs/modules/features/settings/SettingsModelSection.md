@@ -21,8 +21,8 @@
 `attach()` 会在一个 owner 内完成模型 section 的主要阶段：
 
 - 创建 common / config / availability / tools 四个 block
-- 装配默认聊天模型 picker、source mode 切换与手动 refresh 的入口控制
-- 装配 OpenCode 顶层 `small_model` 的 Common-tab 入口，让轻量备用模型不再只藏在项目配置弹窗里
+- 装配默认聊天模型 picker、source mode 切换与手动 refresh 的入口控制；默认聊天模型是 OpenCodian 发请求时的默认值，不会自动写入 OpenCode 项目级 `model`
+- 装配 OpenCode 顶层 `small_model` 的 Common-tab 入口，让轻量备用模型不再只藏在项目配置弹窗里；它与 OpenCodian 的备用标题模型设置保持独立
 - 把 project provider workspace 卡片与 JSON 入口交给 `SettingsModelCatalogCoordinator`
 - 把 availability catalog DOM host 交给 `SettingsModelCatalogPresenter`
 - 把 provider icon cache 概览、刷新、预热与显示模式设置交给 `SettingsModelIconCacheManager`
@@ -60,6 +60,8 @@
 
 - 不要把 provider/model accordion、probe badge/detail 或 catalog filter 逻辑重新塞回这里；那仍属于 `SettingsModelCatalogPresenter`。
 - 不要改变 model availability layering、`disabledModelRefs` 过滤、provider icon fallback 或 title-generation fallback 语义。
+- 默认聊天模型文案必须继续说明它只是 OpenCodian 请求默认；修改 `.opencode/opencode.json` 的项目 `model` 应走 Provider & Model Config / 项目配置编辑入口。
+- OpenCode `small_model` 文案必须避免暗示它等同于 OpenCodian 备用标题模型。
 - 如果后续继续推进 settings/model lane，优先扩展 `SettingsModelCatalogCoordinator` 或 `SettingsModelIconCacheManager` 这类相邻 owner，而不是回到 `OpenCodianSettings` 主类或 `SettingsModelSection` shell 里追加大段闭包。
 
 ## 2026-04-24 Tabbed layout support

@@ -34,6 +34,10 @@ function createCoordinator(options?: {
     getChatContainerEl: jest.fn().mockReturnValue(document.createElement('div')),
     saveConversation,
     showNotice: jest.fn(),
+    shareSession: jest.fn().mockResolvedValue({ share: { url: 'https://opencode.ai/s/session-1' } }),
+    unshareSession: jest.fn().mockResolvedValue({ share: undefined }),
+    listSessions: jest.fn().mockResolvedValue([]),
+    copyText: jest.fn().mockResolvedValue(undefined),
   } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
 
   return {

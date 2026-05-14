@@ -4,6 +4,7 @@ import { Modal } from 'obsidian';
 
 import type {
   ConversationSessionSettings,
+  OpencodeShareMode,
   QuestionCardPosition,
   QuestionDisplayMode,
   TitleMode,
@@ -24,10 +25,19 @@ interface ConversationSessionSettingsModalOptions {
   onSave(
     overrides: ConversationSessionSettings | undefined,
   ): Promise<void> | void;
+  onPreview?(
+    overrides: ConversationSessionSettings | undefined,
+  ): void;
+  onCancelPreview?(): void;
+  onShare?(): Promise<void> | void;
+  onUnshare?(): Promise<void> | void;
+  shareUrl?: string | null;
+  shareMode?: OpencodeShareMode;
 }
 
 interface PluginSettingsSummary {
   titleMode: TitleMode;
+  chatFontSizePx: number;
   questionDisplayMode: QuestionDisplayMode;
   questionCardPosition: QuestionCardPosition;
   showAnsweredQuestionCards: boolean;
@@ -38,6 +48,7 @@ const PLUGIN_ID = 'opencodian';
 const SUMMARY_SETTINGS_TARGETS: Record<string, string> = {
   title: 'title',
   compaction: 'compaction',
+  display: 'display',
   questions: 'questions',
   rendering: 'rendering',
 };
@@ -48,6 +59,7 @@ export class ConversationSessionSettingsModal extends Modal {
   private errorEl: HTMLElement | null = null;
   private saveButtonEl: HTMLButtonElement | null = null;
   private cancelButtonEl: HTMLButtonElement | null = null;
+  private didSave = false;
 
   constructor(
     app: App,
@@ -79,8 +91,14 @@ export class ConversationSessionSettingsModal extends Modal {
       defaultValue: `${this.options.defaults.chatFontSizePx}px`,
       placeholder: String(this.options.defaults.chatFontSizePx),
       initialValue: this.options.initialOverrides?.chatFontSizePx,
+      min: 10,
+      max: 24,
+    });
+    this.chatFontSizeInputEl.addEventListener('input', () => {
+      this.handlePreview();
     });
 
+    this.createSharingSection(bodyEl);
     this.createSummaryDivider(bodyEl);
 
     const globalSectionEl = this.createSection(bodyEl, {
@@ -90,11 +108,14 @@ export class ConversationSessionSettingsModal extends Modal {
     });
     this.createSummaryRows(globalSectionEl);
 
-    this.errorEl = bodyEl.createDiv({
+    const footerEl = this.contentEl.createDiv({
+      cls: 'opencodian-session-settings-footer',
+    });
+    this.errorEl = footerEl.createDiv({
       cls: 'opencodian-session-settings-error',
     });
 
-    const actionsEl = bodyEl.createDiv({
+    const actionsEl = footerEl.createDiv({
       cls: 'opencodian-session-settings-actions',
     });
     this.cancelButtonEl = actionsEl.createEl('button', {
@@ -117,12 +138,16 @@ export class ConversationSessionSettingsModal extends Modal {
   }
 
   onClose(): void {
+    if (!this.didSave) {
+      this.options.onCancelPreview?.();
+    }
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-session-settings-modal');
     this.chatFontSizeInputEl = null;
     this.errorEl = null;
     this.saveButtonEl = null;
     this.cancelButtonEl = null;
+    this.didSave = false;
   }
 
   private createHero(containerEl: HTMLElement): void {
@@ -231,12 +256,102 @@ export class ConversationSessionSettingsModal extends Modal {
       const current = Number(inputEl.value) || Number(options.placeholder) || 0;
       const next = clampValue(Math.round((current + delta) * 100) / 100);
       inputEl.value = String(next);
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
     decBtn.addEventListener('click', () => { applyStep(-step); });
     incBtn.addEventListener('click', () => { applyStep(step); });
 
     return inputEl;
+  }
+
+  private createSharingSection(containerEl: HTMLElement): void {
+    if (!this.options.onShare && !this.options.onUnshare) {
+      return;
+    }
+
+    const sectionEl = this.createSection(containerEl, {
+      section: 'sharing',
+      title: t('chat.sessionSharing.title'),
+      description: t('chat.sessionSharing.desc'),
+    });
+
+    const isKnownUnshared = this.options.shareUrl === null;
+    const isShared = Boolean(this.options.shareUrl);
+    const isSharingDisabled = this.options.shareMode === 'disabled';
+    const statusText = isShared
+      ? t('chat.sessionSharing.status.shared')
+      : isSharingDisabled
+        ? t('chat.sessionSharing.status.disabled')
+        : t('chat.sessionSharing.status.notShared');
+    const statusEl = sectionEl.createDiv({
+      cls: 'opencodian-session-settings-sharing-status',
+      attr: { 'data-share-status': isShared ? 'shared' : isSharingDisabled ? 'disabled' : 'not-shared' },
+      text: statusText,
+    });
+    if (this.options.shareUrl) {
+      statusEl.createDiv({
+        cls: 'opencodian-session-settings-sharing-url',
+        attr: { 'data-share-url': 'true' },
+        text: this.options.shareUrl,
+      });
+    }
+    if (isSharingDisabled && !isShared) {
+      sectionEl.createDiv({
+        cls: 'opencodian-session-settings-sharing-hint',
+        text: t('chat.sessionSharing.disabledByProjectConfig'),
+      });
+    }
+
+    const actionsEl = sectionEl.createDiv({
+      cls: 'opencodian-session-settings-sharing-actions',
+    });
+
+    if (this.options.onShare) {
+      const shareButtonEl = actionsEl.createEl('button', {
+        cls: 'mod-cta opencodian-session-settings-sharing-button',
+        text: t('chat.sessionSharing.shareAndCopy'),
+        attr: { type: 'button', 'data-action': 'share-session' },
+      });
+      shareButtonEl.disabled = isSharingDisabled;
+      if (isSharingDisabled) {
+        shareButtonEl.title = t('chat.sessionSharing.disabledByProjectConfig');
+      }
+      shareButtonEl.addEventListener('click', () => {
+        void this.runSharingAction(shareButtonEl, this.options.onShare);
+      });
+    }
+
+    if (this.options.onUnshare && !isKnownUnshared) {
+      const unshareButtonEl = actionsEl.createEl('button', {
+        cls: 'opencodian-session-settings-sharing-button',
+        text: t('chat.sessionSharing.unshare'),
+        attr: { type: 'button', 'data-action': 'unshare-session' },
+      });
+      unshareButtonEl.addEventListener('click', () => {
+        void this.runSharingAction(unshareButtonEl, this.options.onUnshare);
+      });
+    }
+  }
+
+  private async runSharingAction(
+    buttonEl: HTMLButtonElement,
+    action: (() => Promise<void> | void) | undefined,
+  ): Promise<void> {
+    if (!action) {
+      return;
+    }
+
+    buttonEl.disabled = true;
+    this.setError('');
+    try {
+      await action();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.setError(message);
+    } finally {
+      buttonEl.disabled = false;
+    }
   }
 
   private createFieldShell(
@@ -286,6 +401,7 @@ export class ConversationSessionSettingsModal extends Modal {
     const s = plugin?.settings;
     return {
       titleMode: s?.titleMode ?? 'default',
+      chatFontSizePx: normalizeChatFontSizePx(s?.chatFontSizePx, this.options.defaults.chatFontSizePx),
       questionDisplayMode: s?.questionDisplayMode ?? 'all',
       questionCardPosition: s?.questionCardPosition ?? 'inline',
       showAnsweredQuestionCards: s?.showAnsweredQuestionCards ?? true,
@@ -321,6 +437,13 @@ export class ConversationSessionSettingsModal extends Modal {
         label: t('chat.sessionSettings.modal.summary.compaction'),
         chips: [
           { text: t('chat.sessionSettings.modal.summary.globalLevel') },
+        ],
+      },
+      {
+        id: 'display',
+        label: t('chat.sessionSettings.modal.displayGroup'),
+        chips: [
+          { text: `${summary.chatFontSizePx}px` },
         ],
       },
       {
@@ -572,6 +695,8 @@ export class ConversationSessionSettingsModal extends Modal {
         return t('settings.titleGeneration.title');
       case 'compaction':
         return t('settings.conversation.compaction.projectNote');
+      case 'display':
+        return t('settings.conversation.display.title');
       case 'questions':
         return t('settings.conversation.questions.title');
       case 'rendering':
@@ -587,12 +712,27 @@ export class ConversationSessionSettingsModal extends Modal {
 
     try {
       await this.options.onSave(this.buildOverrides());
+      this.didSave = true;
       this.close();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.setError(message);
     } finally {
       this.setBusy(false);
+    }
+  }
+
+  private handlePreview(): void {
+    if (!this.options.onPreview) {
+      return;
+    }
+
+    try {
+      this.options.onPreview(this.buildOverrides());
+      this.setError('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.setError(message);
     }
   }
 

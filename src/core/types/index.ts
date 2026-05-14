@@ -200,5 +200,6 @@ export {
   type OpencodeProviderConfig,
   type OpencodeProviderModelConfig,
   type OpencodeProviderModelLimit,
+  type OpencodeShareMode,
   type OpencodeToolConfig,
 } from './opencodeConfig';

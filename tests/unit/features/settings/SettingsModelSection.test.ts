@@ -18,6 +18,12 @@ describe('SettingsModelSection', () => {
     jest.restoreAllMocks();
   });
 
+  it('explains that the default chat model is OpenCodian request-only and not the OpenCode project model', () => {
+    expect(t('settings.model.defaultChatModel.desc')).toBe(
+      'OpenCodian request default for new chats before any current-tab send override is applied. This does not write OpenCode project `model`; use Project config sync/editing when you want to change `.opencode/opencode.json`.',
+    );
+  });
+
   it('renders the unavailable state and clears refresh callbacks when no model config service exists', () => {
     let refreshModelsCallback: (() => void) | undefined = () => {};
     let refreshCatalogStatusCallback: (() => void) | undefined = () => {};
