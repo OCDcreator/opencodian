@@ -140,10 +140,10 @@ Guardrail: MCP、Formatter、Model availability 的精修只能增加局部节�
 
 模型选择弹层（`ModelPickerModal`）进行视觉重构：
 
-- 控件区使用更紧凑的 `36px` 高度和 `10px` 圆角，搜索框与 provider 下拉在 `520px` 以下自动垂直堆叠。
+- 控件区使用统一的 `40px` 高度和 `10px` 圆角，搜索框与 provider 下拉在 `520px` 以下自动垂直堆叠。
 - 列表区新增 `.opencodian-model-picker-list-inner` 内层容器与 `.opencodian-model-picker-divider` 分隔线，空选项现在融入列表流。
 - provider 分组标题支持 `.opencodian-model-picker-group-icon` 图标位，标题取消全大写，改用 `13px` semibold。
 - source badge 缩小为 `10px` 的 muted pill，不再使用高对比色块。
-- 模型选项取消外边框，改用 transparent background + hover tonal lift；选中状态使用更克制的 `7%` accent mix，避免像独立按钮。
-- 空选项（如“跟随当前会话模型”）选中时使用更淡的 `4%` accent mix，保持 subdued。
+- 模型选项取消外边框，改用 transparent background + hover tonal lift；选中状态只保留勾选与轻边框，避免非悬浮状态下出现绿色背景。
+- 空选项（如“跟随当前会话模型”）选中时同样不铺 accent 背景，保持 subdued。
 - 选项间距从 `8px` 收紧到 `2px`，分组间距保持 `16px`，形成更清晰的“紧凑列表 + 分组留白”节奏。

@@ -20,6 +20,7 @@ import { ModelConfigModal } from './ModelConfigModal';
 import {
   buildModelPickerGroups,
   findModelPickerOption,
+  findModelPickerOptionByRef,
   type ModelPickerGroup,
 } from './modelPicker';
 import { ModelPickerModal } from './ModelPickerModal';
@@ -40,6 +41,7 @@ export interface SettingsModelCatalogRuntimeState {
   configBodyEl: HTMLElement;
   availabilityManagementEl: HTMLElement;
   defaultModelButton: ButtonComponent | null;
+  smallModelButton: ButtonComponent | null;
   refreshModelsButton: ButtonComponent | null;
   isRefreshingModelCatalog: boolean;
 }
@@ -209,6 +211,24 @@ export class SettingsModelCatalogCoordinator {
     runtime.defaultModelButton.setDisabled(runtime.modelPickerGroups.length === 0);
   }
 
+  updateSmallModelButton(): void {
+    const runtime = this.options.getRuntime();
+    if (!runtime?.smallModelButton) {
+      return;
+    }
+
+    const selected = findModelPickerOptionByRef(
+      runtime.modelPickerGroups,
+      runtime.localModelConfig?.small_model,
+    );
+    runtime.smallModelButton.setButtonText(
+      selected
+        ? `${selected.providerName} / ${selected.modelName}`
+        : t('settings.model.smallModel.unconfigured'),
+    );
+    runtime.smallModelButton.setDisabled(runtime.modelPickerGroups.length === 0);
+  }
+
   async applyProviderAvailabilityChange(
     providerIds: Iterable<string>,
     enabled: boolean,
@@ -301,6 +321,30 @@ export class SettingsModelCatalogCoordinator {
     }).open();
   }
 
+  openSmallModelPicker(): void {
+    const runtime = this.options.getRuntime();
+    if (!runtime) {
+      return;
+    }
+
+    new ModelPickerModal(this.options.app, {
+      title: t('settings.model.smallModel.pickerTitle'),
+      description: t('settings.model.smallModel.pickerDesc'),
+      groups: runtime.modelPickerGroups,
+      selectedRef: runtime.localModelConfig?.small_model ?? '',
+      emptySelectionLabel: t('settings.model.smallModel.unconfigured'),
+      onChoose: async (option) => {
+        const currentConfig = await runtime.modelConfigService.readLocalModelConfig();
+        await runtime.modelConfigService.writeLocalModelConfig({
+          ...currentConfig,
+          small_model: option?.ref || undefined,
+        });
+        await this.refreshModelSettings({ forceViewReload: true });
+        await this.options.refreshIconCacheOverview();
+      },
+    }).open();
+  }
+
   renderAvailabilityManagement(): void {
     const runtime = this.options.getRuntime();
     const modelCatalogPresenter = this.options.getPresenter();
@@ -345,6 +389,7 @@ export class SettingsModelCatalogCoordinator {
       this.updateCommonSummary();
       this.renderConfigCards();
       this.updateDefaultModelButton();
+      this.updateSmallModelButton();
       this.renderAvailabilityManagement();
       this.options.refreshTitleModels();
 

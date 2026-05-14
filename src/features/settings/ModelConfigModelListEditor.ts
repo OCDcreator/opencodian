@@ -5,6 +5,7 @@ import {
   createModelConfigKeyValueState,
   type ModelConfigModalFlow,
 } from './modelConfigModalState';
+import { ModelConfigStructuredOptionsEditor } from './ModelConfigStructuredOptionsEditor';
 import {
   createEmptyModel,
   type FetchedProviderModelCandidate,
@@ -73,7 +74,17 @@ interface ModelConfigModelListEditorOptions {
 }
 
 export class ModelConfigModelListEditor {
-  constructor(private readonly options: ModelConfigModelListEditorOptions) {}
+  private readonly structuredOptionsEditor: ModelConfigStructuredOptionsEditor;
+
+  constructor(private readonly options: ModelConfigModelListEditorOptions) {
+    this.structuredOptionsEditor = new ModelConfigStructuredOptionsEditor({
+      bindEditableControl: options.bindEditableControl,
+      createTextField: options.createTextField,
+      createSubsectionHeader: options.createSubsectionHeader,
+      updatePreview: options.updatePreview,
+      rerender: options.rerender,
+    });
+  }
 
   renderWorkspaceModelsSection(
     containerEl: HTMLElement,
@@ -343,6 +354,8 @@ export class ModelConfigModelListEditor {
       placeholder: '65536',
       description: t('settings.model.visualEditor.outputLimitDesc'),
     });
+
+    this.structuredOptionsEditor.render(detailsEl, model);
 
     this.renderModelCollectionEditor(detailsEl, model, 'options', {
       title: t('settings.model.visualEditor.modelOptionsTitle'),

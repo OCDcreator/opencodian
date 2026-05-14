@@ -183,6 +183,47 @@ describe('ModelConfigModal opening flows', () => {
     expect(getSelectedProviderState(modal)?.models).toHaveLength(1);
   });
 
+  it('renders structured common model option controls in expanded model cards', async () => {
+    const plugin = createPlugin({
+      modelConfigService: {
+        readLocalModelConfig: jest.fn().mockResolvedValue({
+          provider: {
+            openai: {
+              name: 'OpenAI',
+              npm: '@ai-sdk/openai',
+              options: {
+                baseURL: 'https://api.openai.com/v1',
+              },
+              models: {
+                'gpt-4o': {
+                  options: {
+                    reasoningEffort: 'high',
+                    textVerbosity: 'medium',
+                    thinking: {
+                      type: 'enabled',
+                      budgetTokens: 4096,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
+      },
+    });
+    const modal = new ModelConfigModal({} as App, plugin as never);
+
+    await modal.onOpen();
+    modal.contentEl.querySelector<HTMLButtonElement>('.opencodian-model-workspace-model-expand')?.click();
+
+    expect(modal.contentEl.textContent).toContain(t('settings.model.visualEditor.structuredOptionsTitle'));
+    expect(modal.contentEl.textContent).toContain(t('settings.model.visualEditor.reasoningEffort'));
+    expect(modal.contentEl.textContent).toContain(t('settings.model.visualEditor.textVerbosity'));
+    expect(modal.contentEl.textContent).toContain(t('settings.model.visualEditor.thinkingBudgetTokens'));
+  });
+
   it('asks for confirmation before closing with unsaved changes', async () => {
     const plugin = createPlugin();
     const modal = new ModelConfigModal({} as App, plugin as never, {

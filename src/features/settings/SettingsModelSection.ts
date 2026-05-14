@@ -148,6 +148,7 @@ export class SettingsModelSection {
     this.iconCacheManager.attachTools(toolsBodyEl);
     this.catalogCoordinator.updateCommonSummary();
     this.catalogCoordinator.updateDefaultModelButton();
+    this.catalogCoordinator.updateSmallModelButton();
     void this.iconCacheManager.refreshIconCacheOverview();
     void this.bootstrapModelSection();
 
@@ -186,6 +187,7 @@ export class SettingsModelSection {
     this.iconCacheManager.attachTools(toolsBodyEl);
     this.catalogCoordinator.updateCommonSummary();
     this.catalogCoordinator.updateDefaultModelButton();
+    this.catalogCoordinator.updateSmallModelButton();
 
     const blocks: Record<string, HTMLElement> = {
       common: commonWrapper,
@@ -270,6 +272,7 @@ export class SettingsModelSection {
       availabilityManagementEl: availabilityBodyEl,
       iconCacheOverviewSetting: null,
       defaultModelButton: null,
+      smallModelButton: null,
       refreshModelsButton: null,
       refreshIconCacheButton: null,
       warmIconCacheButton: null,
@@ -323,6 +326,19 @@ export class SettingsModelSection {
           });
       });
     this.setSettingDescWithFormatting(modelSourceSetting, t('settings.model.source.desc'));
+
+    const smallModelSetting = new Setting(commonBodyEl)
+      .setName(t('settings.model.smallModel.name'))
+      .addButton((btn) => {
+        runtime.smallModelButton = btn;
+        btn
+          .setButtonText(t('settings.model.smallModel.unconfigured'))
+          .onClick(() => {
+            this.catalogCoordinator.openSmallModelPicker();
+          });
+      });
+    this.setSettingDescWithFormatting(smallModelSetting, t('settings.model.smallModel.desc'));
+    this.catalogCoordinator.updateSmallModelButton();
 
     new Setting(commonBodyEl)
       .setName(t('settings.model.refresh.name'))

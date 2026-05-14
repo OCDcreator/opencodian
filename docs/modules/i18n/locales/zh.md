@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近几轮先后扩展了会话设置弹窗分组布局相关键、项目级 compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（会话标题、阅读与显示、提问交互、消息渲染）。本轮新增 `settings.server.executablePath.*` 与 `settings.server.help.executablePath.*`，用于说明本地 OpenCode 可执行文件路径覆盖项。
+OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它覆盖插件设置、聊天交互、状态提示、帮助说明和 Liquid Glass 参数解释，是中文界面的主要文案来源。最近几轮先后扩展了会话设置弹窗分组布局相关键、项目级 compaction notice 键，以及主设置页 conversation section 的二级分组标题/描述键（会话标题、阅读与显示、提问交互、消息渲染）。本轮新增 `settings.server.executablePath.*` 与 `settings.server.help.executablePath.*`，用于说明本地 OpenCode 可执行文件路径覆盖项；模型 picker 的 provider 筛选文案也保持全中文显示。
 
 会话设置弹窗本轮还新增了 `chat.sessionSettings.modal.globalDefaultsGroup`、`globalDefaultsDesc` 和 `summary.*` 文案，用于 Display 分组下方的全局默认值摘要行与“打开设置”按钮。
 
@@ -216,4 +216,9 @@ New Chinese keys added for the tabbed settings layout:
 - `settings.ui.tab.*` — UI 二级标签（通用）
 - `settings.style.tab.*` — 样式二级标签（预设/背景/布局/用户/助手/输入/滚动条/高级）
 - `settings.debug.tab.*` — 调试二级标签（通用/模块/日志/操作）
+
+## 2026-05-14 模型完全披露文案
+
+- `settings.model.smallModel.*` — Common 标签中的 OpenCode `small_model` 选择器文案与空态
+- `settings.model.visualEditor.structuredOptions*` — 原始 key/value 编辑器前的常见 `models.<id>.options` 结构化控件文案
 - `settings.user.tab.*` — 用户二级标签（档案/提示词/标签）

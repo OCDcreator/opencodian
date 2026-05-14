@@ -85,6 +85,8 @@ interface ModelConfigModalOpenOptions {
 
 模型导入使用 provider 当前填写的 `baseURL + apiKey + 接口格式` 直接请求模型列表；导入策略是“只导入缺失模型”，避免覆盖已手工维护的模型定义。拉取结果在模型区里以次级导入条展示，不再与主表单同权重堆叠。模型高级配置里，`options` 与 `variants` 被单独拆出：前者表示调用参数，后者表示同一模型的多档预设，其余未知顶层字段继续保留在“其他高级字段”里。
 
+2026-05-14 起，展开模型卡片后会在原始 `options` key/value 列表前显示一组常用选项控件：`reasoningEffort`、`textVerbosity`、`reasoningSummary`、`include`、`thinking.type` 和 `thinking.budgetTokens`。这些控件不引入新的保存路径，只通过 `modelConfigStructuredOptions.ts` 同步同一个 `models.<id>.options` 对象；原始 key/value 编辑器仍保留在下方，继续承担未知供应商字段和 escape hatch。
+
 ### 未保存关闭保护
 
 弹窗打开后会记录一份表单快照。若用户修改过内容但尚未保存，关闭弹窗时会弹出确认框；如果内容没有变化，则直接关闭。快照生成逻辑现在集中在 `createModelConfigModalSnapshot()`，新增 provider 流程会把 JSON draft 一并纳入比较，避免“只改 JSON draft 但没改表单”时误判成无改动。
@@ -125,8 +127,10 @@ interface ModelConfigModalOpenOptions {
 - 依赖 `OpenCodeService` 在本地模式下重启服务
 - 依赖 [modelConfigModalState.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/modelConfigModalState.md) 管理快照 / JSON draft / 表单同步
 - 依赖 [modelConfigSavePlan.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/modelConfigSavePlan.md) 管理保存计划与序列化
+- 依赖 [modelConfigStructuredOptions.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/modelConfigStructuredOptions.md) 同步常见 `models.<id>.options` 结构化控件
 - 依赖 [ModelConfigProviderEditor.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigProviderEditor.md) 持有 provider 工具条、表单区、默认模型与 preview 渲染
 - 依赖 [ModelConfigModelListEditor.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigModelListEditor.md) 持有模型列表、模型卡片与高级字段编辑
+- 依赖 [ModelConfigStructuredOptionsEditor.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigStructuredOptionsEditor.md) 渲染常见 model options 控件
 - 使用 `t()` 获取所有 UI 文案和错误提示
 
 ## 配置项

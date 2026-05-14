@@ -22,6 +22,7 @@
 
 - 创建 common / config / availability / tools 四个 block
 - 装配默认聊天模型 picker、source mode 切换与手动 refresh 的入口控制
+- 装配 OpenCode 顶层 `small_model` 的 Common-tab 入口，让轻量备用模型不再只藏在项目配置弹窗里
 - 把 project provider workspace 卡片与 JSON 入口交给 `SettingsModelCatalogCoordinator`
 - 把 availability catalog DOM host 交给 `SettingsModelCatalogPresenter`
 - 把 provider icon cache 概览、刷新、预热与显示模式设置交给 `SettingsModelIconCacheManager`
@@ -51,6 +52,7 @@
 - `OpenCodianSettings.ts`: 创建并复用 owner，向其提供 section heading/block seam、inline-code 渲染、server-state 桥接，以及 refresh callback 注册位
 - `ModelCatalogStateService.ts`: 提供 scoped catalog state 和 provider/model availability 写回逻辑
 - `SettingsModelCatalogCoordinator.ts`: 管理 catalog refresh、workspace cards、default model picker、source mode 与 availability 写回
+- `SettingsModelCatalogCoordinator.ts`: 同时负责 Common-tab `small_model` picker 的本地 `.opencode` 写回
 - `SettingsModelCatalogPresenter.ts`: 管理 availability catalog 的 provider accordion、搜索、bulk toggle 与 probe presentation
 - `SettingsModelIconCacheManager.ts`: 管理 provider icon cache 工具区、overview 刷新与 provider icon rendering callback
 
@@ -65,6 +67,7 @@
 Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings layout. It routes content by secondary tab:
 
 - `common` — renders default model picker + source mode + refresh
+- `common` — renders default model picker + OpenCode `small_model` picker + source mode + refresh
 - `project-config` — renders provider workspace cards
 - `availability` — renders provider/model catalog with accordion/search/toggle
 - `tools` — renders provider icon cache tools

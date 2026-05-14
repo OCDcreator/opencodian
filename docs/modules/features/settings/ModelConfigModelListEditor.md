@@ -5,12 +5,12 @@
 
 ## 概述
 
-`ModelConfigModelListEditor` 是 `ModelConfigModal` provider 表单下的模型列表 / 模型卡片 owner。它接管 workspace 与 add-provider 流程里的模型添加、删除、启用开关、折叠展开、高级字段编辑，以及 workspace 模型拉取结果的缺失导入面板。
+`ModelConfigModelListEditor` 是 `ModelConfigModal` provider 表单下的模型列表 / 模型卡片 owner。它接管 workspace 与 add-provider 流程里的模型添加、删除、启用开关、折叠展开、高级字段编辑、常见 `models.<id>.options` 结构化控件，以及 workspace 模型拉取结果的缺失导入面板。
 
 ## 导入关系
 
 ```text
-上游: obsidian (setIcon), ../../i18n, modelConfigModalState, modelConfigWorkspace
+上游: obsidian (setIcon), ../../i18n, modelConfigModalState, modelConfigWorkspace, modelConfigStructuredOptions
 下游: ModelConfigProviderEditor
 ```
 
@@ -52,6 +52,7 @@ export interface ModelConfigKeyValueEditorConfig { ... }
 模型卡片展开后渲染：
 
 - context / output limits
+- 常见 model `options` 控件：`reasoningEffort`、`textVerbosity`、`reasoningSummary`、`include`、`thinking.type`、`thinking.budgetTokens`
 - model `options`
 - model `variants`
 - 其他高级字段 `extraFields`
@@ -67,12 +68,13 @@ export interface ModelConfigKeyValueEditorConfig { ... }
 | `renderFetchedModelCandidates()` | 渲染 fetch 后的候选模型摘要与“导入缺失模型”操作 |
 | `renderModelCard()` | 渲染单个模型卡片的折叠状态 |
 | `renderModelCardHeader()` | 渲染 model id/name、workspace 启用开关与删除操作 |
-| `renderExpandedModelCardDetails()` | 渲染 context/output 与高级 key-value 字段 |
+| `renderExpandedModelCardDetails()` | 渲染 context/output、常见 options 控件与高级 key-value 字段 |
 
 ## 与其他模块的交互
 
 - 被 [ModelConfigProviderEditor.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigProviderEditor.md) 创建并委托渲染模型相关区块。
 - 使用 `modelConfigWorkspace` 的 `ProviderFormState` / `ModelFormState` / `FetchedProviderModelCandidate` 与 `createEmptyModel()`。
+- 创建 [ModelConfigStructuredOptionsEditor.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigStructuredOptionsEditor.md) 渲染常见 options 控件，并通过 `modelConfigStructuredOptions` 在结构化控件与原始 `options` key/value state 之间同步。
 - 通过 callback 调用 modal 原有 `fetchModelsForProvider()` / `importFetchedModels()`，不直接访问 service 或通知 side effects。
 
 ## 注意事项
@@ -80,4 +82,5 @@ export interface ModelConfigKeyValueEditorConfig { ... }
 - 不要按模型 card/header/advanced fields 再拆小文件；本 owner 的边界就是模型列表编辑。
 - 不要改变 add-provider 与 workspace 的 UI 差异，尤其是新增流程不显示 model enabled toggle。
 - 模型启用状态仍写入 form state，最终由 `modelConfigSavePlan.ts` 规划 `disabledModelRefs`。
+- 结构化 options 控件只是常见字段的可视化入口；原始 `options` key/value 编辑器必须继续保留，供未知供应商字段使用。
 - 模型拉取导入策略仍为“只导入缺失模型”，由 modal side-effect 方法执行。

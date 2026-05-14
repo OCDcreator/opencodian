@@ -216,4 +216,9 @@ New keys added for the tabbed settings layout:
 - `settings.ui.tab.*` — UI secondary tab labels (general)
 - `settings.style.tab.*` — style secondary tab labels (presets/background/layout/user/assistant/input/scrollbar/advanced)
 - `settings.debug.tab.*` — debug secondary tab labels (general/modules/logs/actions)
+
+## 2026-05-14 Model disclosure keys
+
+- `settings.model.smallModel.*` — Common-tab OpenCode `small_model` picker labels and empty state
+- `settings.model.visualEditor.structuredOptions*` — structured common `models.<id>.options` controls before the raw key/value editor
 - `settings.user.tab.*` — user secondary tab labels (profile/prompt/tags)
