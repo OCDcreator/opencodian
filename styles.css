@@ -6558,6 +6558,11 @@ img.opencodian-model-provider-header-icon {
   gap: var(--opencodian-settings-space-md);
 }
 
+/* Debug action buttons: allow wrapping on narrow viewports */
+.opencodian-settings .opencodian-debug-actions .setting-item-control {
+  flex-wrap: wrap;
+}
+
 .opencodian-settings .opencodian-settings-block-desc {
   color: var(--text-muted);
   font-size: 12px;

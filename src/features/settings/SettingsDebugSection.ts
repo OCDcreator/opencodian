@@ -112,7 +112,7 @@ export class SettingsDebugSection {
     this.addInlineSerializedArgsSetting(logsBlockEl);
     const logPathText = this.addLogPathSetting(logsBlockEl, platformKey);
 
-    const actionsBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'actions' } });
+    const actionsBlockEl = containerEl.createDiv({ cls: 'opencodian-debug-actions', attr: { 'data-section-block': 'actions' } });
     this.addDiagnosticActionsSetting(actionsBlockEl, logPathText);
     this.addConsoleHelpBlock(actionsBlockEl);
 
