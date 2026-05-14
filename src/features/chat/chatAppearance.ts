@@ -47,6 +47,9 @@ export function getChatAppearanceCssVariables(
   return {
     '--opencodian-messages-pad-top': `${appearance.layout.messagesPaddingTop}px`,
     '--opencodian-messages-pad-x': `${appearance.layout.messagesPaddingX}px`,
+    '--opencodian-message-pad-x': `${appearance.layout.messagePaddingX}px`,
+    '--opencodian-content-pad-x': `${appearance.layout.contentPaddingX}px`,
+    '--opencodian-content-pad-y': `${appearance.layout.contentPaddingY}px`,
     '--opencodian-sticky-header-gap': `${appearance.sticky.headerGap}px`,
     '--opencodian-sticky-mask-height': `${appearance.sticky.maskHeight}px`,
     '--opencodian-sticky-mask-blur': `${appearance.sticky.maskBlur}px`,

@@ -195,6 +195,48 @@ export class SettingsStyleSection {
     });
     this.addNumericStyleControl(layoutGroupEl, {
       group: 'layout',
+      name: t('settings.style.layout.messagePaddingX.name'),
+      desc: t('settings.style.layout.messagePaddingX.desc'),
+      min: 0,
+      max: 48,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.layout.messagePaddingX,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().layout.messagePaddingX,
+      setValue: (appearance, value) => {
+        appearance.layout.messagePaddingX = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
+      name: t('settings.style.layout.contentPaddingX.name'),
+      desc: t('settings.style.layout.contentPaddingX.desc'),
+      min: 0,
+      max: 32,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.layout.contentPaddingX,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().layout.contentPaddingX,
+      setValue: (appearance, value) => {
+        appearance.layout.contentPaddingX = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
+      name: t('settings.style.layout.contentPaddingY.name'),
+      desc: t('settings.style.layout.contentPaddingY.desc'),
+      min: 0,
+      max: 32,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.layout.contentPaddingY,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().layout.contentPaddingY,
+      setValue: (appearance, value) => {
+        appearance.layout.contentPaddingY = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.sticky.headerGap.name'),
       desc: t('settings.style.sticky.headerGap.desc'),
       min: 0,

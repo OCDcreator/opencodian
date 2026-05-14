@@ -196,11 +196,14 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-chat-font-size: 13px;
   --opencodian-composer-stack-height: 0px;
   --opencodian-messages-pad-top: 12px;
-  --opencodian-messages-pad-x: 16px;
+  --opencodian-messages-pad-x: 0px;
+  --opencodian-message-pad-x: 21px;
+  --opencodian-content-pad-x: 10px;
+  --opencodian-content-pad-y: 5px;
   --opencodian-sticky-header-gap: 6px;
   --opencodian-sticky-push-gap: 0px;
   --opencodian-sticky-mask-height: 18px;
-  --opencodian-sticky-mask-blur: 24px;
+  --opencodian-sticky-mask-blur: 0px;
   --opencodian-theme-bg-opacity: 0.92;
   --opencodian-theme-bg-blur: 2px;
   --opencodian-theme-bg-scale: 1.08;
@@ -225,9 +228,9 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-user-time-color: var(--text-muted);
   --opencodian-assistant-radius: 14px;
   --opencodian-assistant-pad-y: 0px;
-  --opencodian-assistant-pad-x: 28px;
-  --opencodian-assistant-content-pad-y: 10px;
-  --opencodian-assistant-content-pad-x: 14px;
+  --opencodian-assistant-pad-x: var(--opencodian-message-pad-x);
+  --opencodian-assistant-content-pad-y: var(--opencodian-content-pad-y);
+  --opencodian-assistant-content-pad-x: var(--opencodian-content-pad-x);
   --opencodian-assistant-bg-opacity: 72%;
   --opencodian-assistant-blur: 10px;
   --opencodian-assistant-shadow-blur: 24px;
@@ -7910,7 +7913,7 @@ img.opencodian-model-provider-header-icon {
   align-items: flex-end;
   
   /* Base styles */
-  padding: 4px 28px 4px;
+  padding: 4px var(--opencodian-message-pad-x) 4px;
   max-width: 95%;
   animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 0;
@@ -7940,7 +7943,7 @@ img.opencodian-model-provider-header-icon {
   border: 1px solid var(--opencodian-glass-border);
   border-radius: var(--opencodian-user-radius);
   border-end-end-radius: var(--opencodian-user-tail-radius);
-  padding: 6px 14px 7px;
+  padding: var(--opencodian-content-pad-y) var(--opencodian-content-pad-x) calc(var(--opencodian-content-pad-y) + 1px);
   box-shadow: 
     0 10px var(--opencodian-user-shadow-blur) var(--opencodian-glass-shadow),
     0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 90%, transparent) inset,
@@ -8093,7 +8096,7 @@ img.opencodian-model-provider-header-icon {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 28px 4px;
+  padding: 12px var(--opencodian-message-pad-x) 4px;
   max-width: 100%;
   animation: none;
 }

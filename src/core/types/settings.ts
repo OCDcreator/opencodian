@@ -647,6 +647,12 @@ export interface ModelProviderConfig {
 export interface ChatAppearanceLayoutSettings {
   messagesPaddingTop: number;
   messagesPaddingX: number;
+  /** Horizontal padding on the message element itself (user & assistant). Replaces the hardcoded 28px. */
+  messagePaddingX: number;
+  /** Horizontal padding on the inner content bubble (user & assistant). Replaces the hardcoded 14px. */
+  contentPaddingX: number;
+  /** Vertical padding on the inner content bubble (user & assistant). Replaces the hardcoded 6-10px. */
+  contentPaddingY: number;
 }
 
 export interface ChatAppearanceStickySettings {
@@ -811,12 +817,15 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
   return {
     layout: {
       messagesPaddingTop: 12,
-      messagesPaddingX: 16,
+      messagesPaddingX: 0,
+      messagePaddingX: 21,
+      contentPaddingX: 10,
+      contentPaddingY: 5,
     },
     sticky: {
       headerGap: 6,
       maskHeight: 18,
-      maskBlur: 24,
+      maskBlur: 0,
     },
     background: {
       imagePath: '',
@@ -1515,16 +1524,26 @@ function normalizeChatAppearanceInputSettings(
   };
 }
 
+function normalizeChatAppearanceLayoutSettings(
+  layout: Partial<ChatAppearanceLayoutSettings> | null | undefined,
+  defaults: ChatAppearanceLayoutSettings,
+): ChatAppearanceLayoutSettings {
+  return {
+    messagesPaddingTop: normalizeFiniteNumberInRange(layout?.messagesPaddingTop, defaults.messagesPaddingTop, 0, 32),
+    messagesPaddingX: normalizeFiniteNumberInRange(layout?.messagesPaddingX, defaults.messagesPaddingX, 0, 32),
+    messagePaddingX: normalizeFiniteNumberInRange(layout?.messagePaddingX, defaults.messagePaddingX, 0, 48),
+    contentPaddingX: normalizeFiniteNumberInRange(layout?.contentPaddingX, defaults.contentPaddingX, 0, 32),
+    contentPaddingY: normalizeFiniteNumberInRange(layout?.contentPaddingY, defaults.contentPaddingY, 0, 32),
+  };
+}
+
 export function normalizeChatAppearanceSettings(
   appearance?: PartialChatAppearanceSettings | null,
 ): ChatAppearanceSettings {
   const defaults = getDefaultChatAppearanceSettings();
 
   return {
-    layout: {
-      ...defaults.layout,
-      ...(appearance?.layout ?? {}),
-    },
+    layout: normalizeChatAppearanceLayoutSettings(appearance?.layout, defaults.layout),
     sticky: {
       ...defaults.sticky,
       ...(appearance?.sticky ?? {}),
