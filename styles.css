@@ -6658,7 +6658,6 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings .opencodian-share-policy-desc {
-  max-width: 70ch;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
@@ -6797,10 +6796,6 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
-}
-
-.opencodian-settings .opencodian-shared-sessions-desc {
-  max-width: 76ch;
 }
 
 .opencodian-settings .opencodian-shared-sessions-tools {
@@ -12871,7 +12866,6 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-plugin-block-desc {
-  max-width: 68ch;
   padding: 4px 0 0;
   font-size: 12px;
   line-height: 1.55;

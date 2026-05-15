@@ -243,7 +243,6 @@
 }
 
 .opencodian-settings .opencodian-share-policy-desc {
-  max-width: 70ch;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
@@ -382,10 +381,6 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
-}
-
-.opencodian-settings .opencodian-shared-sessions-desc {
-  max-width: 76ch;
 }
 
 .opencodian-settings .opencodian-shared-sessions-tools {
