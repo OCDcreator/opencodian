@@ -138,6 +138,26 @@ Guardrail: 这次增强只允许 classic mode 获得更明确的 child panel rhy
 
 Guardrail: MCP、Formatter、Model availability 的精修只能增加局部节奏和分隔，不应恢复 section 内的大卡片套大卡片、decorative blur、gradient、hover lift 或 heavy shadow。
 
+### 2026-05-15 formatter/lsp overview readability pass
+
+Formatter & LSP overview 顶部的 2x2 meta cards 不再把状态写成一整句 desc：
+
+- `.opencodian-formatter-overview-meta-card` 继续使用 object token 的边框、背景和 row radius，但新增 `data-tone` 语义色，只做非常轻的 tonal tint，不引入 gradient、blur 或 hover lift。
+- `.opencodian-formatter-overview-meta-body` / `-value` / `-description` 把主值和解释拆成两层，mode 卡片显示“模式名 + 说明”，config path 卡片用 monospace 主值显示长路径。
+- `.opencodian-formatter-overview-meta-pills` + `-pill` 负责 runtime 小胶囊，把 Formatter / LSP 在线状态拆开显示，避免 `Formatter: ... · LSP: ...` 这种长句挤在一行里。
+- `.opencodian-formatter-summary-card` 也同步从单行文本改成 `label + emphasized value`，保持概览区的层级一致性。
+
+Guardrail: 这轮只是把 overview 信息拆层，不应该把卡片做成营销面板。保持 settings token、低对比 tint、无 decorative motion、无 glassmorphism。
+
+### 2026-05-15 formatter/lsp runtime panel header pass
+
+- `.opencodian-formatter-runtime-panel` 现在作为 runtime 卡片外壳，统一承接 object token 的边框、背景和圆角。
+- `.opencodian-formatter-runtime-panel-summary` + `.opencodian-formatter-runtime-panel-header` 给 formatter 与 LSP 卡片提供一致的标题区层级：左侧 title，右侧 meta chip。
+- `已检测格式化器` 使用 `details/summary` 原生折叠，`.opencodian-formatter-runtime-panel-chevron` 根据 `[open]` 状态旋转；整个 summary 行可点击，而不是只在标题旁边放一个小按钮。
+- `LSP` 卡片复用同一套 header 样式，但保留静态 header，不引入不必要的折叠交互。
+
+Guardrail: 这轮只增加更清晰的标题层级和原生折叠 affordance，不应引入厚重工具栏、夸张 hover 动画或额外装饰图标。
+
 ### 2026-05-15 model availability rhythm pass
 
 provider / model 管理区在交换 actions 与 search 行顺序后，纵向节奏改成“两层 gap”而不是依赖零散 margin 叠加：

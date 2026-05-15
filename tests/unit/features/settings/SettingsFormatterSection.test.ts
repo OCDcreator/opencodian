@@ -21,12 +21,25 @@ interface DropdownRecord {
   onChange?: (value: string) => void | Promise<void>;
 }
 
+interface MockButtonControl {
+  setButtonText: jest.MockedFunction<(text: string) => MockButtonControl>;
+  setCta: jest.MockedFunction<() => MockButtonControl>;
+  setWarning: jest.MockedFunction<() => MockButtonControl>;
+  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
+}
+
+interface ButtonRecord {
+  text: string;
+  onClick?: () => void | Promise<void>;
+}
+
 interface SettingRecord {
   name?: string;
   desc?: string;
 }
 
 const dropdownRecords: DropdownRecord[] = [];
+const buttonRecords: ButtonRecord[] = [];
 const settingRecords: SettingRecord[] = [];
 
 function getSettingRecord(setting: Setting): SettingRecord {
@@ -79,40 +92,58 @@ function findSettingRecordByDesc(desc: string): SettingRecord | undefined {
   return settingRecords.find((record) => record.desc === desc);
 }
 
+function findOverviewMetaCard(containerEl: HTMLElement, label: string): HTMLElement | undefined {
+  return Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-formatter-overview-meta-card'))
+    .find((card) => card.querySelector('.opencodian-formatter-overview-meta-label')?.textContent === label);
+}
+
 function createPlugin(overrides?: {
   formatterConfig?: unknown;
+  lspConfig?: unknown;
   runtimeStatus?: unknown;
+  lspRuntimeStatus?: unknown;
   runtimeError?: Error;
+  lspRuntimeError?: Error;
   configPath?: string;
   hasConfigManager?: boolean;
 }): {
   plugin: OpenCodianPlugin;
   updateFormatterConfig: jest.Mock;
   getFormatterConfig: jest.Mock;
+  updateLspConfig: jest.Mock;
+  getLspConfig: jest.Mock;
 } {
   const updateFormatterConfig = jest.fn().mockResolvedValue(undefined);
   const getFormatterConfig = jest.fn().mockResolvedValue(overrides?.formatterConfig ?? undefined);
+  const updateLspConfig = jest.fn().mockResolvedValue(undefined);
+  const getLspConfig = jest.fn().mockResolvedValue(overrides?.lspConfig ?? undefined);
 
   const configManager = overrides?.hasConfigManager === false
     ? null
     : {
         getFormatterConfig,
         updateFormatterConfig,
+        getLspConfig,
+        updateLspConfig,
         getConfigPath: () => overrides?.configPath ?? '/vault/.opencode/opencode.json',
       };
 
   const getFormatterStatus = overrides?.runtimeError
     ? jest.fn().mockRejectedValue(overrides.runtimeError)
     : jest.fn().mockResolvedValue(overrides?.runtimeStatus ?? []);
+  const getLspStatus = overrides?.lspRuntimeError
+    ? jest.fn().mockRejectedValue(overrides.lspRuntimeError)
+    : jest.fn().mockResolvedValue(overrides?.lspRuntimeStatus ?? []);
 
   const plugin = {
     opencodeConfigManager: configManager,
     openCodeService: {
       getFormatterStatus,
+      getLspStatus,
     },
   } as unknown as OpenCodianPlugin;
 
-  return { plugin, updateFormatterConfig, getFormatterConfig };
+  return { plugin, updateFormatterConfig, getFormatterConfig, updateLspConfig, getLspConfig };
 }
 
 async function flushPromises(): Promise<void> {
@@ -127,6 +158,7 @@ beforeEach(() => {
   setLocale('en');
   document.body.innerHTML = '';
   dropdownRecords.length = 0;
+  buttonRecords.length = 0;
   settingRecords.length = 0;
   displayRefresh = jest.fn();
 
@@ -147,6 +179,29 @@ beforeEach(() => {
     const record = createDropdownRecord(name);
     dropdownRecords.push(record);
     callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
+    this: Setting,
+    callback: (control: MockButtonControl) => unknown,
+  ) {
+    const record: ButtonRecord = { text: '' };
+    const control: MockButtonControl = {
+      setButtonText: jest.fn().mockImplementation((text: string) => {
+        record.text = text;
+        return control;
+      }),
+      setCta: jest.fn().mockReturnValue(undefined as never),
+      setWarning: jest.fn().mockReturnValue(undefined as never),
+      onClick: jest.fn().mockImplementation((handler: () => void | Promise<void>) => {
+        record.onClick = handler;
+        return control;
+      }),
+    };
+    control.setCta.mockReturnValue(control);
+    control.setWarning.mockReturnValue(control);
+    buttonRecords.push(record);
+    callback(control);
     return this;
   });
 });
@@ -187,10 +242,10 @@ describe('SettingsFormatterSection attach (classic layout)', () => {
 
     expect(dropdownRecords.map((record) => record.name)).toEqual([
       t('settings.formatter.config.modeSwitch'),
+      t('settings.formatter.lsp.modeSwitch'),
     ]);
-    expect(findSettingRecord(t('settings.formatter.overview.modeLabel'))?.desc).toContain(
-      t('settings.formatter.mode.default'),
-    );
+    expect(containerEl.textContent).toContain(t('settings.formatter.overview.modeLabel'));
+    expect(containerEl.textContent).toContain(t('settings.formatter.mode.default'));
   });
 });
 
@@ -212,7 +267,7 @@ describe('SettingsFormatterSection attachTabbed (tabbed layout)', () => {
     expect(headings[0]?.textContent).toBe(t('settings.formatter.tab.overview'));
   });
 
-  it('renders config block for config tab', () => {
+  it('renders formatter block for formatter tab', () => {
     const { plugin } = createPlugin();
     const section = new SettingsFormatterSection({
       plugin,
@@ -222,11 +277,147 @@ describe('SettingsFormatterSection attachTabbed (tabbed layout)', () => {
     const containerEl = document.createElement('div');
     document.body.appendChild(containerEl);
 
-    section.attachTabbed(containerEl, 'config');
+    section.attachTabbed(containerEl, 'formatter');
 
     const headings = containerEl.querySelectorAll('.opencodian-settings-subsection-heading');
     expect(headings.length).toBeGreaterThanOrEqual(1);
-    expect(headings[0]?.textContent).toBe(t('settings.formatter.tab.config'));
+    expect(headings[0]?.textContent).toBe(t('settings.formatter.tab.formatter'));
+  });
+
+  it('renders lsp block for lsp tab', () => {
+    const { plugin } = createPlugin();
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+
+    const headings = containerEl.querySelectorAll('.opencodian-settings-subsection-heading');
+    expect(headings.length).toBeGreaterThanOrEqual(1);
+    expect(headings[0]?.textContent).toBe(t('settings.formatter.tab.lsp'));
+  });
+});
+
+describe('SettingsFormatterSection LSP settings', () => {
+  it('shows lsp runtime summary in overview without requiring formatter runtime entries', async () => {
+    const { plugin } = createPlugin({
+      runtimeStatus: [],
+      lspRuntimeStatus: [{ id: 'tsserver', root: '/vault', status: 'running' }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    expect(findSettingRecord('tsserver')?.desc).toContain('running');
+  });
+
+  it('renders detected formatter runtime list as an open collapsible panel', async () => {
+    const { plugin } = createPlugin({
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    const panelEl = containerEl.querySelector('.opencodian-formatter-runtime-panel-collapsible') as HTMLElement | null;
+    expect(panelEl).not.toBeNull();
+    expect(panelEl?.dataset.collapsed).toBe('false');
+    expect(panelEl?.querySelector('.opencodian-formatter-runtime-panel-title')?.textContent)
+      .toBe(t('settings.formatter.overview.formatterList.title'));
+  });
+
+  it('collapses detected formatter runtime list when clicking the title row', async () => {
+    const { plugin } = createPlugin({
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    const panelEl = containerEl.querySelector('.opencodian-formatter-runtime-panel-collapsible') as HTMLElement | null;
+    const buttonEl = panelEl?.querySelector('.opencodian-formatter-runtime-panel-summary') as HTMLButtonElement | null;
+    const listEl = panelEl?.querySelector('.opencodian-formatter-runtime-list') as HTMLElement | null;
+    expect(buttonEl).not.toBeNull();
+    expect(listEl?.hidden).toBe(false);
+
+    buttonEl?.click();
+
+    expect(panelEl?.dataset.collapsed).toBe('true');
+    expect(buttonEl?.getAttribute('aria-expanded')).toBe('false');
+    expect(listEl?.hidden).toBe(true);
+  });
+
+  it('switches lsp mode to disabled by writing false config', async () => {
+    const { plugin, updateLspConfig } = createPlugin();
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const modeDropdown = findDropdown(t('settings.formatter.lsp.modeSwitch'));
+    await modeDropdown?.onChange?.('disabled');
+    await flushPromises();
+
+    expect(updateLspConfig).toHaveBeenCalledWith(false);
+  });
+
+  it('blocks saving a custom lsp entry without extensions', async () => {
+    const { plugin, updateLspConfig } = createPlugin({
+      lspConfig: {
+        'custom-server': {
+          command: ['custom-lsp', '--stdio'],
+        },
+      },
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const saveButton = buttonRecords.find((record) => record.text === t('settings.formatter.lsp.custom.save'));
+    expect(saveButton).toBeDefined();
+
+    await saveButton?.onClick?.();
+    await flushPromises();
+
+    expect(updateLspConfig).not.toHaveBeenCalled();
   });
 });
 
@@ -370,9 +561,10 @@ describe('SettingsFormatterSection runtime status presentation', () => {
     section.attachTabbed(containerEl, 'overview');
     await flushPromises();
 
-    expect(findSettingRecord(t('settings.formatter.overview.runtimeStatus'))?.desc).toBe(
-      t('settings.formatter.overview.runtimeOnline'),
-    );
+    const runtimeCard = findOverviewMetaCard(containerEl, t('settings.formatter.overview.runtimeStatus'));
+    expect(runtimeCard).toBeDefined();
+    expect(runtimeCard?.textContent).toContain(t('settings.formatter.overview.runtimeOnline'));
+    expect(runtimeCard?.querySelectorAll('.opencodian-formatter-overview-meta-pill')).toHaveLength(2);
     expect(findSettingRecordByDesc(t('settings.formatter.overview.noRuntime'))).toBeUndefined();
   });
 
@@ -389,10 +581,38 @@ describe('SettingsFormatterSection runtime status presentation', () => {
     section.attachTabbed(containerEl, 'overview');
     await flushPromises();
 
-    expect(findSettingRecord(t('settings.formatter.overview.runtimeStatus'))?.desc).toBe(
-      t('settings.formatter.overview.runtimeError'),
-    );
+    const runtimeCard = findOverviewMetaCard(containerEl, t('settings.formatter.overview.runtimeStatus'));
+    expect(runtimeCard).toBeDefined();
+    expect(runtimeCard?.textContent).toContain(t('settings.formatter.overview.runtimeError'));
+    expect(runtimeCard?.querySelectorAll('.opencodian-formatter-overview-meta-pill')).toHaveLength(2);
     expect(findSettingRecordByDesc(t('settings.formatter.overview.noRuntime'))).toBeDefined();
+  });
+
+  it('renders mode cards with separated primary value and description', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: { prettier: { disabled: true } },
+      lspConfig: false,
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    const formatterModeCard = findOverviewMetaCard(containerEl, t('settings.formatter.overview.modeLabel'));
+    const lspModeCard = findOverviewMetaCard(containerEl, t('settings.formatter.lsp.overview.modeLabel'));
+
+    expect(formatterModeCard?.querySelector('.opencodian-formatter-overview-meta-value-pill')?.textContent)
+      .toBe(t('settings.formatter.mode.custom'));
+    expect(formatterModeCard?.querySelector('.opencodian-formatter-overview-meta-description')?.textContent)
+      .toBe(t('settings.formatter.mode.customDesc'));
+    expect(lspModeCard?.querySelector('.opencodian-formatter-overview-meta-value-pill')?.textContent)
+      .toBe(t('settings.formatter.mode.disabled'));
   });
 });
 
@@ -748,7 +968,24 @@ describe('SettingsFormatterSection CSS contract', () => {
     );
 
     const summaryCardRule = findRule('\\.opencodian-formatter-summary-card', 'background:');
-    const runtimeListRule = findRule('\\.opencodian-formatter-runtime-list', 'background:');
+    const summaryCardLabelRule = findRule('\\.opencodian-formatter-summary-card-label', 'text-transform:');
+    const summaryCardValueRule = findRule('\\.opencodian-formatter-summary-card-value', 'font-size:');
+    const overviewCardRule = findRule('\\.opencodian-formatter-overview-meta-card', 'background:');
+    const overviewAccentRule = findRule('\\.opencodian-formatter-overview-meta-card\\[data-tone=\"accent\"\\]', 'background:');
+    const overviewBodyRule = findRule('\\.opencodian-formatter-overview-meta-body', 'display:');
+    const overviewMonoRule = findRule('\\.opencodian-formatter-overview-meta-value\\.is-mono', 'font-family:');
+    const overviewValuePillRule = findRule('\\.opencodian-formatter-overview-meta-value-pill', 'border-radius:');
+    const overviewValuePillAccentRule = findRule('\\.opencodian-formatter-overview-meta-value-pill\\[data-tone=\"accent\"\\]', 'background:');
+    const overviewPillsRule = findRule('\\.opencodian-formatter-overview-meta-pills', 'display:');
+    const overviewPillRule = findRule('\\.opencodian-formatter-overview-meta-pill', 'border-radius:');
+    const overviewPillSuccessRule = findRule('\\.opencodian-formatter-overview-meta-pill\\[data-tone=\"success\"\\]', 'background:');
+    const runtimePanelRule = findRule('\\.opencodian-formatter-runtime-panel', 'background:');
+    const runtimePanelHeaderRule = findRule('\\.opencodian-formatter-runtime-panel-header', 'border-bottom:');
+    const runtimePanelMetaRule = findRule('\\.opencodian-formatter-runtime-panel-meta', 'border-radius:');
+    const runtimePanelStaticRule = findRule('\\.opencodian-formatter-runtime-panel-summary\\.is-static \\.opencodian-formatter-runtime-panel-header', 'border-bottom-color:');
+    const runtimeListRule = findRule('\\.opencodian-formatter-runtime-list', 'padding:');
+    const runtimeListHiddenRule = findRule('\\.opencodian-formatter-runtime-list\\[hidden\\]', 'display:');
+    const runtimeTableShellRule = findRule('\\.opencodian-formatter-runtime-table-shell', 'border:');
     const tableRule = findRule('\\.opencodian-formatter-table', 'background:');
     const builtinRowRule = findRule(
       '\\.opencodian-formatter-builtin-row,\\s*\\.opencodian-formatter-custom-row',
@@ -793,8 +1030,28 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(summaryCardRule).toContain('var(--opencodian-settings-object-bg');
     expect(summaryCardRule).toContain('var(--opencodian-settings-radius-row');
     expect(summaryCardRule).toContain('box-shadow: none');
-    expect(runtimeListRule).toContain('var(--opencodian-settings-object-bg');
-    expect(tableRule).toContain('var(--opencodian-settings-row-bg');
+    expect(summaryCardLabelRule).toContain('text-transform: uppercase');
+    expect(summaryCardValueRule).toContain('font-size: 22px');
+    expect(overviewCardRule).toContain('var(--opencodian-settings-object-bg');
+    expect(overviewCardRule).toContain('var(--opencodian-settings-radius-row');
+    expect(overviewAccentRule).toContain('var(--interactive-accent)');
+    expect(overviewBodyRule).toContain('display: flex');
+    expect(overviewMonoRule).toContain('var(--font-monospace)');
+    expect(overviewValuePillRule).toContain('border-radius: 999px');
+    expect(overviewValuePillAccentRule).toContain('var(--interactive-accent)');
+    expect(overviewPillsRule).toContain('flex-wrap: wrap');
+    expect(overviewPillRule).toContain('border-radius: 999px');
+    expect(overviewPillSuccessRule).toContain('var(--color-green)');
+    expect(runtimePanelRule).toContain('var(--opencodian-settings-object-bg');
+    expect(runtimePanelHeaderRule).toContain('border-bottom: 1px solid transparent');
+    expect(runtimePanelMetaRule).toContain('border-radius: 999px');
+    expect(runtimePanelStaticRule).toContain('border-bottom-color: var(--opencodian-settings-row-border)');
+    expect(runtimeListRule).toContain('padding: 12px');
+    expect(runtimeListHiddenRule).toContain('display: none');
+    expect(runtimeTableShellRule).toContain('border: 1px solid var(--opencodian-settings-row-border)');
+    expect(runtimeTableShellRule).toContain('var(--opencodian-settings-radius-inline)');
+    expect(tableRule).toContain('background: transparent');
+    expect(tableRule).toContain('border: 0');
     expect(builtinRowRule).toContain('var(--opencodian-settings-object-bg');
     expect(builtinRowRule).toContain('box-shadow: none');
     expect(fieldsRule).toContain('var(--opencodian-settings-row-bg');

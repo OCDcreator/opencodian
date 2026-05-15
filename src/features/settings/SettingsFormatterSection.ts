@@ -5,6 +5,9 @@ import type {
   OpencodeFormatterConfig,
   OpencodeFormatterEntryConfig,
   OpencodeFormatterStatus,
+  OpencodeLspConfig,
+  OpencodeLspEntryConfig,
+  OpencodeLspStatus,
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -30,6 +33,29 @@ interface FormatterRuntimeState {
 interface FormatterBuiltinDefinition {
   name: string;
   extensions: string[];
+}
+
+interface LspRuntimeState {
+  items: OpencodeLspStatus[];
+  fetchFailed: boolean;
+}
+
+interface LspBuiltinDefinition {
+  id: string;
+  extensions: string[];
+}
+
+interface OverviewMetaCardOptions {
+  label: string;
+  value?: string;
+  description?: string;
+  monoValue?: boolean;
+  valueAsPill?: boolean;
+  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
+  pills?: Array<{
+    text: string;
+    tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
+  }>;
 }
 
 const FORMATTER_BUILTIN_CATALOG: readonly FormatterBuiltinDefinition[] = [
@@ -75,6 +101,13 @@ const FORMATTER_BUILTIN_CATALOG: readonly FormatterBuiltinDefinition[] = [
   { name: 'dfmt', extensions: ['.d'] },
 ];
 
+const LSP_BUILTIN_CATALOG: readonly LspBuiltinDefinition[] = [
+  { id: 'tsserver', extensions: ['.ts', '.tsx', '.js', '.jsx'] },
+  { id: 'gopls', extensions: ['.go'] },
+  { id: 'rust-analyzer', extensions: ['.rs'] },
+  { id: 'pyright', extensions: ['.py', '.pyi'] },
+];
+
 export class SettingsFormatterSection {
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: (
@@ -100,21 +133,27 @@ export class SettingsFormatterSection {
     );
 
     this.renderOverviewBlock(containerEl);
-    this.renderConfigBlock(containerEl);
+    this.renderFormatterConfigBlock(containerEl);
+    this.renderLspConfigBlock(containerEl);
 
     return headingEl;
   }
 
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    containerEl.addClass('opencodian-formatter-tab-stack');
     switch (secondaryTabId) {
       case 'overview':
-        this.renderOverviewBlock(containerEl);
+        this.renderOverviewTabbed(containerEl);
         break;
+      case 'formatter':
       case 'config':
-        this.renderConfigBlock(containerEl);
+        this.renderFormatterConfigTabbed(containerEl);
+        break;
+      case 'lsp':
+        this.renderLspConfigTabbed(containerEl);
         break;
       default:
-        this.renderOverviewBlock(containerEl);
+        this.renderOverviewTabbed(containerEl);
     }
   }
 
@@ -126,12 +165,35 @@ export class SettingsFormatterSection {
     return configManager.getFormatterConfig();
   }
 
-  private async loadRuntimeStatus(): Promise<FormatterRuntimeState> {
+  private async loadFormatterRuntimeStatus(): Promise<FormatterRuntimeState> {
     try {
       const result = await this.plugin.openCodeService.getFormatterStatus();
       if (Array.isArray(result)) {
         return {
           items: result as OpencodeFormatterStatus[],
+          fetchFailed: false,
+        };
+      }
+      return { items: [], fetchFailed: false };
+    } catch {
+      return { items: [], fetchFailed: true };
+    }
+  }
+
+  private async loadLspConfig(): Promise<OpencodeLspConfig | undefined> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager || typeof configManager.getLspConfig !== 'function') {
+      return undefined;
+    }
+    return configManager.getLspConfig();
+  }
+
+  private async loadLspRuntimeStatus(): Promise<LspRuntimeState> {
+    try {
+      const result = await this.plugin.openCodeService.getLspStatus();
+      if (Array.isArray(result)) {
+        return {
+          items: result as OpencodeLspStatus[],
           fetchFailed: false,
         };
       }
@@ -166,27 +228,168 @@ export class SettingsFormatterSection {
   }
 
   private async renderOverviewContent(containerEl: HTMLElement): Promise<void> {
-    const [formatterConfig, runtimeState] = await Promise.all([
+    const [formatterConfig, formatterRuntimeState, lspConfig, lspRuntimeState] = await Promise.all([
       this.loadFormatterConfig(),
-      this.loadRuntimeStatus(),
+      this.loadFormatterRuntimeStatus(),
+      this.loadLspConfig(),
+      this.loadLspRuntimeStatus(),
     ]);
 
     const mode = this.resolveFormatterMode(formatterConfig);
+    const lspMode = this.resolveFormatterMode(lspConfig);
     const configManager = this.plugin.opencodeConfigManager;
 
-    new Setting(containerEl)
-      .setName(t('settings.formatter.overview.modeLabel'))
-      .setDesc(`${this.getModeLabel(mode)} — ${this.getModeDescription(mode)}`);
+    this.renderOverviewMetaGrid(containerEl, {
+      formatterMode: this.getModeLabel(mode),
+      formatterModeDescription: this.getModeDescription(mode),
+      formatterModeTone: this.getModeTone(mode),
+      lspMode: this.getModeLabel(lspMode),
+      lspModeDescription: this.getLspModeDescription(lspMode),
+      lspModeTone: this.getModeTone(lspMode),
+      configPath: configManager?.getConfigPath() ?? '—',
+      runtimeStatusPills: this.getCombinedRuntimeStatusPills(
+        formatterRuntimeState.fetchFailed,
+        lspRuntimeState.fetchFailed,
+      ),
+      runtimeTone: this.getCombinedRuntimeTone(
+        formatterRuntimeState.fetchFailed,
+        lspRuntimeState.fetchFailed,
+      ),
+    });
+    this.renderSummaryCards(containerEl, formatterConfig, formatterRuntimeState.items);
+    this.renderFormatterList(containerEl, formatterRuntimeState);
+    this.renderLspOverview(containerEl, lspConfig, lspRuntimeState);
+  }
 
-    if (configManager) {
-      new Setting(containerEl)
-        .setName(t('settings.formatter.overview.configPath'))
-        .setDesc(configManager.getConfigPath());
+  private renderOverviewMetaGrid(
+    containerEl: HTMLElement,
+    values: {
+      formatterMode: string;
+      formatterModeDescription: string;
+      formatterModeTone: OverviewMetaCardOptions['tone'];
+      lspMode: string;
+      lspModeDescription: string;
+      lspModeTone: OverviewMetaCardOptions['tone'];
+      configPath: string;
+      runtimeStatusPills: OverviewMetaCardOptions['pills'];
+      runtimeTone: OverviewMetaCardOptions['tone'];
+    },
+  ): void {
+    const gridEl = containerEl.createDiv({ cls: 'opencodian-formatter-overview-meta-grid' });
+    this.addOverviewMetaCard(gridEl, {
+      label: t('settings.formatter.overview.modeLabel'),
+      value: values.formatterMode,
+      description: values.formatterModeDescription,
+      valueAsPill: true,
+      tone: values.formatterModeTone,
+    });
+    this.addOverviewMetaCard(gridEl, {
+      label: t('settings.formatter.lsp.overview.modeLabel'),
+      value: values.lspMode,
+      description: values.lspModeDescription,
+      valueAsPill: true,
+      tone: values.lspModeTone,
+    });
+    this.addOverviewMetaCard(gridEl, {
+      label: t('settings.formatter.overview.configPath'),
+      value: values.configPath,
+      monoValue: true,
+    });
+    this.addOverviewMetaCard(gridEl, {
+      label: t('settings.formatter.overview.runtimeStatus'),
+      value: 'Formatter · LSP',
+      pills: values.runtimeStatusPills,
+      tone: values.runtimeTone,
+    });
+  }
+
+  private addOverviewMetaCard(parentEl: HTMLElement, options: OverviewMetaCardOptions): void {
+    const cardEl = parentEl.createDiv({ cls: 'opencodian-formatter-overview-meta-card' });
+    if (options.tone) {
+      cardEl.dataset.tone = options.tone;
     }
+    cardEl.createDiv({
+      cls: 'opencodian-formatter-overview-meta-label',
+      text: options.label,
+    });
+    const bodyEl = cardEl.createDiv({ cls: 'opencodian-formatter-overview-meta-body' });
+    if (options.value) {
+      if (options.valueAsPill) {
+        const pillEl = bodyEl.createSpan({
+          cls: 'opencodian-formatter-overview-meta-value-pill',
+          text: options.value,
+        });
+        if (options.tone) {
+          pillEl.dataset.tone = options.tone;
+        }
+      } else {
+        bodyEl.createDiv({
+          cls: `opencodian-formatter-overview-meta-value${options.monoValue ? ' is-mono' : ''}`,
+          text: options.value,
+        });
+      }
+    }
+    if (options.description) {
+      bodyEl.createDiv({
+        cls: 'opencodian-formatter-overview-meta-description',
+        text: options.description,
+      });
+    }
+    if (options.pills && options.pills.length > 0) {
+      const pillsEl = bodyEl.createDiv({
+        cls: 'opencodian-formatter-overview-meta-pills',
+      });
+      for (const pill of options.pills) {
+        const pillEl = pillsEl.createSpan({
+          cls: 'opencodian-formatter-overview-meta-pill',
+          text: pill.text,
+        });
+        if (pill.tone) {
+          pillEl.dataset.tone = pill.tone;
+        }
+      }
+    }
+  }
 
-    this.renderRuntimeStatusSetting(containerEl, runtimeState.fetchFailed);
-    this.renderSummaryCards(containerEl, formatterConfig, runtimeState.items);
-    this.renderFormatterList(containerEl, runtimeState);
+  private getCombinedRuntimeStatusPills(
+    formatterFetchFailed: boolean,
+    lspFetchFailed: boolean,
+  ): OverviewMetaCardOptions['pills'] {
+    return [
+      {
+        text: `Formatter ${t(formatterFetchFailed ? 'settings.formatter.overview.runtimeError' : 'settings.formatter.overview.runtimeOnline')}`,
+        tone: formatterFetchFailed ? 'danger' : 'success',
+      },
+      {
+        text: `LSP ${t(lspFetchFailed ? 'settings.formatter.lsp.overview.runtimeError' : 'settings.formatter.lsp.overview.runtimeOnline')}`,
+        tone: lspFetchFailed ? 'danger' : 'success',
+      },
+    ];
+  }
+
+  private getCombinedRuntimeTone(
+    formatterFetchFailed: boolean,
+    lspFetchFailed: boolean,
+  ): OverviewMetaCardOptions['tone'] {
+    if (!formatterFetchFailed && !lspFetchFailed) {
+      return 'success';
+    }
+    if (formatterFetchFailed && lspFetchFailed) {
+      return 'danger';
+    }
+    return 'warning';
+  }
+
+  private getModeTone(mode: FormatterMode): OverviewMetaCardOptions['tone'] {
+    switch (mode) {
+      case 'custom':
+        return 'accent';
+      case 'disabled':
+        return 'warning';
+      case 'default':
+      default:
+        return 'neutral';
+    }
   }
 
   private renderRuntimeStatusSetting(
@@ -231,10 +434,21 @@ export class SettingsFormatterSection {
   }
 
   private addSummaryCard(parentEl: HTMLElement, text: string): void {
-    parentEl.createDiv({
+    const cardEl = parentEl.createDiv({
       cls: 'opencodian-formatter-summary-card',
-      text,
     });
+    const [label, ...rest] = text.split(/[:：]\s*/);
+    const value = rest.join(': ');
+    cardEl.createDiv({
+      cls: 'opencodian-formatter-summary-card-label',
+      text: label ?? text,
+    });
+    if (value) {
+      cardEl.createDiv({
+        cls: 'opencodian-formatter-summary-card-value',
+        text: value,
+      });
+    }
   }
 
   private renderFormatterList(
@@ -251,13 +465,45 @@ export class SettingsFormatterSection {
       return;
     }
 
-    const listEl = containerEl.createDiv({ cls: 'opencodian-formatter-runtime-list' });
-    listEl.createEl('h4', {
-      text: t('settings.formatter.overview.formatterList.title'),
-      cls: 'opencodian-settings-subsection-heading',
+    const panelEl = containerEl.createDiv({
+      cls: 'opencodian-formatter-runtime-panel opencodian-formatter-runtime-panel-collapsible',
+    });
+    panelEl.dataset.collapsed = 'false';
+    const summaryEl = panelEl.createDiv({
+      cls: 'opencodian-formatter-runtime-panel-summary',
+      attr: {
+        role: 'button',
+        tabindex: '0',
+        'aria-expanded': 'true',
+      },
+    });
+    this.renderRuntimePanelHeader(summaryEl, {
+      title: t('settings.formatter.overview.formatterList.title'),
+      meta: String(runtimeState.items.length),
+      metaTone: 'accent',
+      collapsible: true,
     });
 
-    const tableEl = listEl.createEl('table', { cls: 'opencodian-formatter-table' });
+    const listEl = panelEl.createDiv({ cls: 'opencodian-formatter-runtime-list' });
+    const toggleCollapsed = () => {
+      const collapsed = panelEl.dataset.collapsed === 'true';
+      const nextCollapsed = !collapsed;
+      panelEl.dataset.collapsed = nextCollapsed ? 'true' : 'false';
+      summaryEl.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
+      listEl.hidden = nextCollapsed;
+    };
+    summaryEl.addEventListener('click', toggleCollapsed);
+    summaryEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleCollapsed();
+      }
+    });
+
+    const tableShellEl = listEl.createDiv({
+      cls: 'opencodian-formatter-runtime-table-shell',
+    });
+    const tableEl = tableShellEl.createEl('table', { cls: 'opencodian-formatter-table' });
     const theadEl = tableEl.createEl('thead');
     const headerRowEl = theadEl.createEl('tr');
     headerRowEl.createEl('th', { text: t('settings.formatter.overview.formatterList.name') });
@@ -279,21 +525,37 @@ export class SettingsFormatterSection {
     }
   }
 
-  private renderConfigBlock(containerEl: HTMLElement): void {
+  private renderFormatterConfigBlock(containerEl: HTMLElement): void {
     const configEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     configEl.createEl('h4', {
-      text: t('settings.formatter.tab.config'),
+      text: t('settings.formatter.tab.formatter'),
       cls: 'opencodian-settings-subsection-heading',
     });
     const bodyEl = configEl.createDiv({ cls: 'opencodian-settings-block-body' });
 
-    void this.renderConfigContent(bodyEl);
+    void this.renderFormatterConfigContent(bodyEl);
   }
 
-  private async renderConfigContent(containerEl: HTMLElement): Promise<void> {
+  private renderOverviewTabbed(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', {
+      text: t('settings.formatter.tab.overview'),
+      cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
+    });
+    void this.renderOverviewContent(containerEl);
+  }
+
+  private renderFormatterConfigTabbed(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', {
+      text: t('settings.formatter.tab.formatter'),
+      cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
+    });
+    void this.renderFormatterConfigContent(containerEl);
+  }
+
+  private async renderFormatterConfigContent(containerEl: HTMLElement): Promise<void> {
     const [formatterConfig, runtimeState] = await Promise.all([
       this.loadFormatterConfig(),
-      this.loadRuntimeStatus(),
+      this.loadFormatterRuntimeStatus(),
     ]);
     const mode = this.resolveFormatterMode(formatterConfig);
 
@@ -948,6 +1210,480 @@ export class SettingsFormatterSection {
     }
   }
 
+  private renderLspOverview(
+    containerEl: HTMLElement,
+    lspConfig: OpencodeLspConfig | undefined,
+    runtimeState: LspRuntimeState,
+  ): void {
+    const sectionEl = containerEl.createDiv({ cls: 'opencodian-formatter-runtime-panel' });
+    const headerEl = sectionEl.createDiv({
+      cls: 'opencodian-formatter-runtime-panel-summary is-static',
+    });
+    this.renderRuntimePanelHeader(headerEl, {
+      title: t('settings.formatter.tab.lsp'),
+      meta: runtimeState.fetchFailed ? t('settings.formatter.lsp.overview.runtimeError') : String(runtimeState.items.length),
+      metaTone: runtimeState.fetchFailed ? 'danger' : 'accent',
+    });
+
+    const bodyEl = sectionEl.createDiv({ cls: 'opencodian-formatter-runtime-list' });
+
+    new Setting(bodyEl)
+      .setName(t('settings.formatter.lsp.overview.runtimeStatus'))
+      .setDesc(t(
+        runtimeState.fetchFailed
+          ? 'settings.formatter.lsp.overview.runtimeError'
+          : 'settings.formatter.lsp.overview.runtimeOnline',
+      ));
+
+    const mode = this.resolveFormatterMode(lspConfig);
+    new Setting(bodyEl)
+      .setName(t('settings.formatter.lsp.overview.modeLabel'))
+      .setDesc(`${this.getModeLabel(mode)} — ${this.getLspModeDescription(mode)}`);
+
+    if (runtimeState.fetchFailed) {
+      new Setting(bodyEl).setDesc(t('settings.formatter.lsp.overview.noRuntime'));
+      return;
+    }
+
+    for (const item of runtimeState.items) {
+      new Setting(bodyEl)
+        .setName(item.id)
+        .setDesc(`${item.status}${item.root ? ` · ${item.root}` : ''}`);
+    }
+  }
+
+  private renderRuntimePanelHeader(
+    containerEl: HTMLElement,
+    options: {
+      title: string;
+      meta?: string;
+      metaTone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
+      collapsible?: boolean;
+    },
+  ): void {
+    const shellEl = containerEl.createDiv({
+      cls: 'opencodian-formatter-runtime-panel-header',
+    });
+    const titleGroupEl = shellEl.createDiv({
+      cls: 'opencodian-formatter-runtime-panel-title-group',
+    });
+    titleGroupEl.createEl('div', {
+      cls: 'opencodian-formatter-runtime-panel-title',
+      text: options.title,
+    });
+
+    const rightEl = shellEl.createDiv({
+      cls: 'opencodian-formatter-runtime-panel-header-meta',
+    });
+    if (options.meta) {
+      const metaEl = rightEl.createSpan({
+        cls: 'opencodian-formatter-runtime-panel-meta',
+        text: options.meta,
+      });
+      if (options.metaTone) {
+        metaEl.dataset.tone = options.metaTone;
+      }
+    }
+  }
+
+  private renderLspConfigBlock(containerEl: HTMLElement): void {
+    const configEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    configEl.createEl('h4', {
+      text: t('settings.formatter.tab.lsp'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+    const bodyEl = configEl.createDiv({ cls: 'opencodian-settings-block-body' });
+
+    void this.renderLspConfigContent(bodyEl);
+  }
+
+  private renderLspConfigTabbed(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', {
+      text: t('settings.formatter.tab.lsp'),
+      cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
+    });
+    void this.renderLspConfigContent(containerEl);
+  }
+
+  private async renderLspConfigContent(containerEl: HTMLElement): Promise<void> {
+    const [lspConfig, runtimeState] = await Promise.all([
+      this.loadLspConfig(),
+      this.loadLspRuntimeStatus(),
+    ]);
+    const mode = this.resolveFormatterMode(lspConfig);
+
+    new Setting(containerEl)
+      .setName(t('settings.formatter.lsp.modeSwitch'))
+      .setDesc(t('settings.formatter.lsp.modeSwitchDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('default', t('settings.formatter.mode.default'));
+        dropdown.addOption('disabled', t('settings.formatter.mode.disabled'));
+        dropdown.addOption('custom', t('settings.formatter.mode.custom'));
+        dropdown.setValue(mode);
+        dropdown.onChange(async (value) => {
+          await this.handleLspModeSwitch(value as FormatterMode);
+        });
+      });
+
+    if (runtimeState.fetchFailed) {
+      new Setting(containerEl)
+        .setDesc(t('settings.formatter.lsp.runtimeOfflineNote'));
+    }
+
+    if (mode !== 'custom') {
+      return;
+    }
+
+    const configObj = typeof lspConfig === 'object' ? lspConfig : {};
+    const builtinDefinitions = this.resolveLspBuiltinDefinitions(runtimeState.items);
+    const builtinIds = new Set(builtinDefinitions.map((item) => item.id));
+
+    this.renderBuiltinLspEditors(containerEl, builtinDefinitions, configObj);
+    this.renderCustomLspList(containerEl, builtinIds, configObj);
+    this.renderLspAdvancedJsonEditor(containerEl);
+  }
+
+  private renderBuiltinLspEditors(
+    containerEl: HTMLElement,
+    builtinDefinitions: readonly LspBuiltinDefinition[],
+    configObj: Record<string, OpencodeLspEntryConfig>,
+  ): void {
+    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    sectionEl.createEl('h4', {
+      text: t('settings.formatter.lsp.builtinList.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+
+    for (const definition of builtinDefinitions) {
+      const entry = configObj[definition.id];
+      const action = this.resolveBuiltinEntryAction(entry);
+      const rowEl = sectionEl.createDiv({ cls: 'opencodian-formatter-builtin-row' });
+
+      new Setting(rowEl)
+        .setName(definition.id)
+        .setDesc(`${definition.extensions.join(', ')} · ${t(`settings.formatter.config.builtin.rowStatus.${action === 'override' ? 'overridden' : action === 'disable' ? 'disabled' : 'default'}`)}`)
+        .addDropdown((dropdown) => {
+          dropdown.addOption('default', t('settings.formatter.config.builtin.useDefault'));
+          dropdown.addOption('disable', t('settings.formatter.config.builtin.projectDisable'));
+          dropdown.addOption('override', t('settings.formatter.config.builtin.projectOverride'));
+          dropdown.setValue(action);
+          dropdown.onChange(async (value) => {
+            await this.handleBuiltinLspActionChange(definition.id, value as BuiltinEntryAction);
+          });
+        });
+
+      if (action === 'override') {
+        this.renderLspEditorFields(rowEl, definition.id, entry ?? {}, true);
+      }
+    }
+  }
+
+  private async handleBuiltinLspActionChange(name: string, action: BuiltinEntryAction): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
+
+    try {
+      const currentConfig = await this.loadLspConfig();
+      const current = typeof currentConfig === 'object' ? { ...currentConfig } : {};
+      const existingEntry = current[name];
+
+      switch (action) {
+        case 'default':
+          delete current[name];
+          break;
+        case 'disable':
+          current[name] = { ...this.preserveUnknownLspFields(existingEntry), disabled: true };
+          break;
+        case 'override': {
+          const preserved = this.preserveUnknownLspFields(existingEntry);
+          delete preserved.disabled;
+          current[name] = preserved;
+          break;
+        }
+      }
+
+      await configManager.updateLspConfig(current);
+      new Notice(t('settings.formatter.lsp.builtin.saved'));
+      this.requestDisplayRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(t('settings.formatter.lsp.builtin.saveFailed', { error: message }));
+    }
+  }
+
+  private renderCustomLspList(
+    containerEl: HTMLElement,
+    builtinIds: Set<string>,
+    configObj: Record<string, OpencodeLspEntryConfig>,
+  ): void {
+    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    sectionEl.createEl('h4', {
+      text: t('settings.formatter.lsp.customList.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+
+    const customEntries = Object.entries(configObj).filter(([key]) => !builtinIds.has(key));
+
+    if (customEntries.length === 0) {
+      new Setting(sectionEl).setDesc(t('settings.formatter.lsp.customList.empty'));
+      return;
+    }
+
+    for (const [name, entry] of customEntries) {
+      const rowEl = sectionEl.createDiv({ cls: 'opencodian-formatter-custom-row' });
+      new Setting(rowEl)
+        .setName(name)
+        .setDesc((entry.command ?? []).join(' '));
+      this.renderLspEditorFields(rowEl, name, entry, false);
+    }
+  }
+
+  private renderLspEditorFields(
+    rowEl: HTMLElement,
+    name: string,
+    entry: OpencodeLspEntryConfig,
+    builtin: boolean,
+  ): void {
+    const fieldsEl = rowEl.createDiv({ cls: 'opencodian-formatter-custom-fields' });
+
+    new Setting(fieldsEl)
+      .setName(t('settings.formatter.lsp.command'))
+      .setDesc(t('settings.formatter.lsp.commandDesc'))
+      .addText((text) => {
+        text.setPlaceholder(t('settings.formatter.lsp.commandPlaceholder'))
+          .setValue((entry.command ?? []).join(' '));
+        text.inputEl.addClass('opencodian-lsp-command-input');
+      });
+
+    this.renderLspEnvironmentEditor(fieldsEl, entry.env);
+
+    new Setting(fieldsEl)
+      .setName(t('settings.formatter.lsp.extensions'))
+      .setDesc(t('settings.formatter.lsp.extensionsDesc'))
+      .addText((text) => {
+        text.setPlaceholder(t('settings.formatter.lsp.extensionsPlaceholder'))
+          .setValue((entry.extensions ?? []).join(' '));
+        text.inputEl.addClass('opencodian-lsp-extensions-input');
+      });
+
+    new Setting(fieldsEl)
+      .setName(t('settings.formatter.lsp.initialization'))
+      .setDesc(t('settings.formatter.lsp.initializationDesc'));
+    const initText = fieldsEl.createEl('textarea', { cls: 'opencodian-lsp-initialization-input' });
+    initText.value = JSON.stringify(entry.initialization ?? {}, null, 2);
+
+    new Setting(fieldsEl)
+      .addButton((btn) => {
+        btn.setButtonText(
+          builtin
+            ? t('settings.formatter.lsp.builtin.save')
+            : t('settings.formatter.lsp.custom.save'),
+        ).setCta()
+          .onClick(async () => {
+            await this.saveLspEntryFromFields(fieldsEl, name, builtin);
+          });
+      });
+  }
+
+  private renderLspEnvironmentEditor(
+    fieldsEl: HTMLElement,
+    env: Record<string, string> | undefined,
+  ): void {
+    const envContainer = fieldsEl.createDiv({ cls: 'opencodian-formatter-env-editor' });
+
+    new Setting(envContainer)
+      .setName(t('settings.formatter.lsp.environment'))
+      .setDesc(t('settings.formatter.lsp.environmentDesc'));
+
+    const rowsContainer = envContainer.createDiv({ cls: 'opencodian-formatter-env-rows' });
+    for (const [key, value] of Object.entries(env ?? {})) {
+      this.addEnvRow(rowsContainer, key, value);
+    }
+
+    new Setting(envContainer)
+      .addButton((btn) => {
+        btn.setButtonText(t('settings.formatter.config.builtin.envAdd'))
+          .onClick(() => this.addEnvRow(rowsContainer, '', ''));
+      });
+  }
+
+  private async saveLspEntryFromFields(
+    fieldsEl: HTMLElement,
+    name: string,
+    builtin: boolean,
+  ): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
+
+    const commandInput = fieldsEl.querySelector('.opencodian-lsp-command-input') as HTMLInputElement | null;
+    const extensionsInput = fieldsEl.querySelector('.opencodian-lsp-extensions-input') as HTMLInputElement | null;
+    const initializationInput = fieldsEl.querySelector('.opencodian-lsp-initialization-input') as HTMLTextAreaElement | null;
+
+    const command = (commandInput?.value?.trim() ?? '').split(/\s+/).filter(Boolean);
+    const extensions = this.normalizeExtensions((extensionsInput?.value?.trim() ?? '').split(/\s+/).filter(Boolean));
+
+    if (command.length === 0) {
+      new Notice(t('settings.formatter.config.custom.commandRequired'));
+      return;
+    }
+    if (!builtin && extensions.length === 0) {
+      new Notice(t('settings.formatter.lsp.custom.extensionsRequired'));
+      return;
+    }
+
+    let initialization: Record<string, unknown> | undefined;
+    try {
+      initialization = JSON.parse(initializationInput?.value?.trim() || '{}') as Record<string, unknown>;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(t('settings.formatter.lsp.initializationInvalid', { error: message }));
+      return;
+    }
+
+    try {
+      const currentConfig = await this.loadLspConfig();
+      const current = typeof currentConfig === 'object' ? { ...currentConfig } : {};
+      const nextEntry: OpencodeLspEntryConfig = {
+        ...this.preserveUnknownLspFields(current[name]),
+        command,
+      };
+      if (extensions.length > 0) {
+        nextEntry.extensions = extensions;
+      } else {
+        delete nextEntry.extensions;
+      }
+      const env = this.collectEnvironmentFromRows(fieldsEl);
+      if (Object.keys(env).length > 0) {
+        nextEntry.env = env;
+      } else {
+        delete nextEntry.env;
+      }
+      if (Object.keys(initialization).length > 0) {
+        nextEntry.initialization = initialization;
+      } else {
+        delete nextEntry.initialization;
+      }
+      delete nextEntry.disabled;
+      current[name] = nextEntry;
+      await configManager.updateLspConfig(current);
+      new Notice(
+        builtin
+          ? t('settings.formatter.lsp.builtin.saved')
+          : t('settings.formatter.lsp.custom.saved'),
+      );
+      this.requestDisplayRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(
+        builtin
+          ? t('settings.formatter.lsp.builtin.saveFailed', { error: message })
+          : t('settings.formatter.lsp.custom.saveFailed', { error: message }),
+      );
+    }
+  }
+
+  private renderLspAdvancedJsonEditor(containerEl: HTMLElement): void {
+    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    sectionEl.createEl('h4', {
+      text: t('settings.formatter.lsp.advanced.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+
+    new Setting(sectionEl)
+      .setDesc(t('settings.formatter.lsp.advanced.desc'));
+
+    const editorContainer = sectionEl.createDiv({ cls: 'opencodian-formatter-json-editor' });
+    const textareaEl = editorContainer.createEl('textarea', {
+      cls: 'opencodian-formatter-json-textarea',
+    });
+    textareaEl.rows = 12;
+    textareaEl.spellcheck = false;
+    void this.loadLspJsonEditorContent(textareaEl);
+
+    const buttonBar = sectionEl.createDiv({ cls: 'opencodian-formatter-json-buttons' });
+    new Setting(buttonBar)
+      .addButton((btn) => {
+        btn.setButtonText(t('settings.formatter.lsp.advanced.format'))
+          .onClick(() => this.formatJsonEditor(textareaEl));
+      })
+      .addButton((btn) => {
+        btn.setButtonText(t('settings.formatter.lsp.advanced.reload'))
+          .onClick(async () => {
+            await this.loadLspJsonEditorContent(textareaEl);
+          });
+      })
+      .addButton((btn) => {
+        btn.setButtonText(t('settings.formatter.lsp.advanced.save'))
+          .setCta()
+          .onClick(async () => {
+            await this.saveLspJsonEditorContent(textareaEl);
+          });
+      });
+  }
+
+  private async loadLspJsonEditorContent(textareaEl: HTMLTextAreaElement): Promise<void> {
+    const lspConfig = await this.loadLspConfig();
+    textareaEl.value = JSON.stringify(
+      typeof lspConfig === 'object' ? lspConfig : typeof lspConfig === 'boolean' ? lspConfig : {},
+      null,
+      2,
+    );
+  }
+
+  private async saveLspJsonEditorContent(textareaEl: HTMLTextAreaElement): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(textareaEl.value);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(t('settings.formatter.lsp.advanced.invalidJson', { error: message }));
+      return;
+    }
+
+    if (parsed === false) {
+      await configManager.updateLspConfig(false);
+      this.requestDisplayRefresh();
+      return;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      new Notice(t('settings.formatter.lsp.advanced.invalidJson', { error: 'Must be an object or false' }));
+      return;
+    }
+    await configManager.updateLspConfig(parsed as Record<string, OpencodeLspEntryConfig>);
+    this.requestDisplayRefresh();
+  }
+
+  private async handleLspModeSwitch(mode: FormatterMode): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager || typeof configManager.updateLspConfig !== 'function') {
+      new Notice(t('settings.formatter.notice.modeChangeFailed', { error: 'Config manager unavailable' }));
+      return;
+    }
+
+    try {
+      switch (mode) {
+        case 'default':
+          await configManager.updateLspConfig(null);
+          break;
+        case 'disabled':
+          await configManager.updateLspConfig(false);
+          break;
+        case 'custom': {
+          const current = await this.loadLspConfig();
+          await configManager.updateLspConfig(typeof current === 'object' ? current : {});
+          break;
+        }
+      }
+      this.requestDisplayRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(t('settings.formatter.notice.modeChangeFailed', { error: message }));
+    }
+  }
+
   private normalizeFormatterName(raw: string): string {
     return raw
       .trim()
@@ -989,6 +1725,20 @@ export class SettingsFormatterSection {
     return result;
   }
 
+  private preserveUnknownLspFields(
+    entry: OpencodeLspEntryConfig | undefined,
+  ): Record<string, unknown> {
+    if (!entry) return {};
+    const known = new Set(['disabled', 'command', 'extensions', 'env', 'initialization']);
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(entry)) {
+      if (!known.has(key)) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
   private collectEnvironmentFromRows(parentEl: HTMLElement): Record<string, string> {
     const environment: Record<string, string> = {};
     const envRows = parentEl.querySelectorAll('.opencodian-formatter-env-row');
@@ -1020,6 +1770,23 @@ export class SettingsFormatterSection {
     return Array.from(definitions.values());
   }
 
+  private resolveLspBuiltinDefinitions(
+    runtimeItems: readonly OpencodeLspStatus[],
+  ): LspBuiltinDefinition[] {
+    const definitions = new Map(
+      LSP_BUILTIN_CATALOG.map((item) => [item.id, { ...item }]),
+    );
+    for (const item of runtimeItems) {
+      if (!definitions.has(item.id)) {
+        definitions.set(item.id, {
+          id: item.id,
+          extensions: [],
+        });
+      }
+    }
+    return Array.from(definitions.values());
+  }
+
   private getModeLabel(mode: FormatterMode): string {
     switch (mode) {
       case 'default':
@@ -1039,6 +1806,17 @@ export class SettingsFormatterSection {
         return t('settings.formatter.mode.disabledDesc');
       case 'custom':
         return t('settings.formatter.mode.customDesc');
+    }
+  }
+
+  private getLspModeDescription(mode: FormatterMode): string {
+    switch (mode) {
+      case 'default':
+        return t('settings.formatter.lsp.mode.defaultDesc');
+      case 'disabled':
+        return t('settings.formatter.lsp.mode.disabledDesc');
+      case 'custom':
+        return t('settings.formatter.lsp.mode.customDesc');
     }
   }
 }
