@@ -29,6 +29,10 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 同日 F3 扩展 `settings.formatter.config.*` 键空间，新增内置格式化器编辑（builtin list / action dropdown / override fields for command/environment/extensions）、自定义格式化器 CRUD（add / save / delete / nameConflict）、高级 JSON 编辑器（format / reload / save / invalidJson）和运行时离线提示对应的中文文案。
 
+本轮继续扩展 `settings.formatter.overview.formatterList.*`，新增已检测格式化器表格的本地搜索标签、占位符和无匹配空态文案，用于支持按名称 / 扩展名快速筛选运行时 formatter 列表。
+
+本轮补齐 `settings.formatter.tab.formatter`、`settings.formatter.tab.lsp` 与 `settings.formatter.lsp.*` 键空间，覆盖 Formatter 页中语言服务概览、模式切换、内置/自定义 LSP 编辑器、初始化 JSON、环境变量和高级 JSON 编辑器的中文文案，避免中文运行时回退到裸 translation key。
+
 2026-04-26 的导航重组又新增了 `settings.mcp.title`、`settings.mcp.tab.overview` 和 `settings.quickNav.mcpDesc`，因为 MCP 已提升为独立一级设置页，并在 classic 布局的 quick-nav 中单独露出。`settings.server.tab.*` 现在只描述剩余的服务器二级标签（连接 / 认证 / 状态）。
 
 本轮新增 `settings.style.input.contextRing.*` 键，为输入区样式设置里的上下文圆环样式下拉框提供中文标签、描述和“经典圆环 / 刻度圆环”两个选项。
@@ -139,7 +143,7 @@ t('settings.server.started')
 - 中文文案应保持与英文键空间一一对应，不要单边新增键
 - 该文件很长，修改时优先按前缀搜索已有键，避免重复定义或局部风格漂移
 - 帮助文本通常比英文版本更长（中文表达更 verbose）
-- 参数插值 `{param}` 在中文语境中同样适用
+- 参数插值 `{param}` 与 `{{param}}` 在中文语境中同样适用，新增键需保持与英文表相同的占位符名称
 - 保持与英文表键顺序一致，便于 diff 对比
 
 ## 说明型长文本组织
@@ -155,7 +159,7 @@ t('settings.server.started')
 
 修改本文件时，请确保：
 - [ ] 键名与 `en.ts` 完全一致
-- [ ] 参数占位符 `{xxx}` 数量和名称一致
+- [ ] 参数占位符 `{xxx}` / `{{xxx}}` 数量和名称一致
 - [ ] 新增键同时在 `en.ts` 添加
 - [ ] 帮助文本风格统一（口语化、第二人称）
 

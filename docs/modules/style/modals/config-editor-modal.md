@@ -92,6 +92,7 @@ Formatter settings 现在使用共享 settings hierarchy token：
 - runtime table、override fields、custom fields 和 JSON editor 使用 row tokens。
 - environment key/value rows 使用 inline tokens。
 - enabled / disabled formatter badges 保留语义状态色。
+- detected formatter 表格的搜索区、sticky 表头、排序按钮、扩展名列和状态列有独立样式钩子，用于保持密集扫读：搜索框内联标签，排序按钮重置 Obsidian 默认 button chrome，扩展名使用 monospace，状态 chip 右对齐。
 
 Guardrail: 不要引入 formatter-only card hierarchy、渐变、decorative blur、hover lift、side-stripe border 或未定义的 settings radius token。
 
@@ -153,10 +154,21 @@ Guardrail: 这轮只是把 overview 信息拆层，不应该把卡片做成营�
 
 - `.opencodian-formatter-runtime-panel` 现在作为 runtime 卡片外壳，统一承接 object token 的边框、背景和圆角。
 - `.opencodian-formatter-runtime-panel-summary` + `.opencodian-formatter-runtime-panel-header` 给 formatter 与 LSP 卡片提供一致的标题区层级：左侧 title，右侧 meta chip。
-- `已检测格式化器` 使用 `details/summary` 原生折叠，`.opencodian-formatter-runtime-panel-chevron` 根据 `[open]` 状态旋转；整个 summary 行可点击，而不是只在标题旁边放一个小按钮。
+- `已检测格式化器` 使用 runtime panel summary 行承载折叠交互，整个 summary 行可点击，而不是只在标题旁边放一个小按钮。
 - `LSP` 卡片复用同一套 header 样式，但保留静态 header，不引入不必要的折叠交互。
 
 Guardrail: 这轮只增加更清晰的标题层级和原生折叠 affordance，不应引入厚重工具栏、夸张 hover 动画或额外装饰图标。
+
+### 2026-05-16 formatter runtime table search/sort pass
+
+- `.opencodian-formatter-runtime-toolbar` 在已检测 formatter 表格上方提供紧凑工具条，目前只承载本地搜索；它使用 flex + wrap，保留窄侧栏下换行能力。
+- `.opencodian-formatter-runtime-search-input` 复用 inline surface token、pill radius 和 focus ring，避免把搜索框做成独立大卡片。
+- `.opencodian-formatter-runtime-table-shell` 是表格内部滚动容器，`thead` / `th` 都设置 sticky 层级，确保表格内部滚动时表头始终置顶。
+- `.opencodian-formatter-runtime-list` 保留 12px 顶部 padding，确保 formatter 工具条与 LSP 运行时条目都不会贴住 panel header 分隔线。
+- `.opencodian-formatter-sort-header` 直接让 `Name` / `Extensions` / `Status` 原生表头承载排序交互，不再渲染 button；默认保持 muted，排序激活时使用 text-accent、`aria-sort` 和 CSS chevron 指示方向。
+- 表格搜索和排序只调整当前 runtime 表格视图，不改变 formatter runtime 数据，也不写入项目配置。
+
+Guardrail: 这轮是工作台式表格控制增强，不应引入独立筛选面板、持久排序设置、复杂多选过滤器或新的卡片层级。
 
 ### 2026-05-15 model availability rhythm pass
 

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, no-useless-escape */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -95,6 +95,12 @@ function findSettingRecordByDesc(desc: string): SettingRecord | undefined {
 function findOverviewMetaCard(containerEl: HTMLElement, label: string): HTMLElement | undefined {
   return Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-formatter-overview-meta-card'))
     .find((card) => card.querySelector('.opencodian-formatter-overview-meta-label')?.textContent === label);
+}
+
+function getFormatterRuntimeRowNames(containerEl: HTMLElement): string[] {
+  return Array.from(containerEl.querySelectorAll<HTMLTableRowElement>('.opencodian-formatter-table tbody tr'))
+    .map((row) => row.querySelector('td')?.textContent ?? '')
+    .filter(Boolean);
 }
 
 function createPlugin(overrides?: {
@@ -372,6 +378,122 @@ describe('SettingsFormatterSection LSP settings', () => {
     expect(listEl?.hidden).toBe(true);
   });
 
+  it('filters detected formatter runtime rows by fuzzy name or extension search', async () => {
+    const { plugin } = createPlugin({
+      runtimeStatus: [
+        { name: 'prettier', extensions: ['.js', '.ts'], enabled: true },
+        { name: 'shfmt', extensions: ['.sh', '.bash'], enabled: false },
+        { name: 'terraform', extensions: ['.tf', '.tfvars'], enabled: false },
+      ],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    const searchInput = containerEl.querySelector('.opencodian-formatter-runtime-search-input') as HTMLInputElement | null;
+    expect(searchInput).not.toBeNull();
+
+    searchInput!.value = 'bash';
+    searchInput!.dispatchEvent(new Event('input'));
+
+    expect(getFormatterRuntimeRowNames(containerEl)).toEqual(['shfmt']);
+    expect(containerEl.querySelector('.opencodian-formatter-runtime-panel-meta')?.textContent).toBe('1 / 3');
+  });
+
+  it('marks formatter runtime table columns for compact responsive styling', async () => {
+    const { plugin } = createPlugin({
+      runtimeStatus: [
+        { name: 'prettier', extensions: ['.js', '.ts'], enabled: true },
+      ],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    expect(containerEl.querySelector('.opencodian-formatter-table-col-status')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-formatter-table-name')?.textContent).toBe('prettier');
+    expect(containerEl.querySelector('.opencodian-formatter-table-extensions')?.textContent).toBe('.js, .ts');
+    expect(containerEl.querySelector('.opencodian-formatter-table-status .opencodian-formatter-status-badge')?.textContent)
+      .toBe(t('settings.formatter.overview.formatterList.enabled'));
+  });
+
+  it('shows an empty runtime table row when formatter search has no matches', async () => {
+    const { plugin } = createPlugin({
+      runtimeStatus: [
+        { name: 'prettier', extensions: ['.js', '.ts'], enabled: true },
+        { name: 'shfmt', extensions: ['.sh', '.bash'], enabled: false },
+      ],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    const searchInput = containerEl.querySelector('.opencodian-formatter-runtime-search-input') as HTMLInputElement | null;
+    searchInput!.value = 'nope';
+    searchInput!.dispatchEvent(new Event('input'));
+
+    expect(getFormatterRuntimeRowNames(containerEl)).toEqual([
+      t('settings.formatter.overview.formatterList.noMatches'),
+    ]);
+    expect(containerEl.querySelector('.opencodian-formatter-table-empty')).not.toBeNull();
+  });
+
+  it('sorts detected formatter runtime rows by status from the status header', async () => {
+    const { plugin } = createPlugin({
+      runtimeStatus: [
+        { name: 'shfmt', extensions: ['.sh'], enabled: false },
+        { name: 'prettier', extensions: ['.js'], enabled: true },
+        { name: 'terraform', extensions: ['.tf'], enabled: false },
+      ],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    const statusSortHeader = Array.from(containerEl.querySelectorAll<HTMLTableCellElement>('.opencodian-formatter-sort-header'))
+      .find((header) => header.textContent?.includes(t('settings.formatter.overview.formatterList.status')));
+    expect(statusSortHeader).toBeDefined();
+    expect(statusSortHeader?.getAttribute('aria-sort')).toBe('none');
+
+    statusSortHeader!.click();
+
+    expect(getFormatterRuntimeRowNames(containerEl)).toEqual(['prettier', 'shfmt', 'terraform']);
+    expect(statusSortHeader?.getAttribute('aria-sort')).toBe('descending');
+
+    statusSortHeader!.click();
+
+    expect(getFormatterRuntimeRowNames(containerEl)).toEqual(['shfmt', 'terraform', 'prettier']);
+    expect(statusSortHeader?.getAttribute('aria-sort')).toBe('ascending');
+  });
+
   it('switches lsp mode to disabled by writing false config', async () => {
     const { plugin, updateLspConfig } = createPlugin();
     const section = new SettingsFormatterSection({
@@ -613,6 +735,27 @@ describe('SettingsFormatterSection runtime status presentation', () => {
       .toBe(t('settings.formatter.mode.customDesc'));
     expect(lspModeCard?.querySelector('.opencodian-formatter-overview-meta-value-pill')?.textContent)
       .toBe(t('settings.formatter.mode.disabled'));
+  });
+
+  it('does not render raw translation keys in Chinese formatter overview', async () => {
+    setLocale('zh');
+    const { plugin } = createPlugin({
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+      lspRuntimeStatus: [{ id: 'tsserver', root: '/vault', status: 'running' }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    expect(containerEl.textContent).not.toContain('settings.');
+    expect(containerEl.textContent).toContain('语言服务');
   });
 });
 
@@ -985,8 +1128,21 @@ describe('SettingsFormatterSection CSS contract', () => {
     const runtimePanelStaticRule = findRule('\\.opencodian-formatter-runtime-panel-summary\\.is-static \\.opencodian-formatter-runtime-panel-header', 'border-bottom-color:');
     const runtimeListRule = findRule('\\.opencodian-formatter-runtime-list', 'padding:');
     const runtimeListHiddenRule = findRule('\\.opencodian-formatter-runtime-list\\[hidden\\]', 'display:');
+    const runtimeToolbarRule = findRule('\\.opencodian-formatter-runtime-toolbar', 'display:');
+    const runtimeSearchInputRule = findRule('\\.opencodian-formatter-runtime-search-input', 'background:');
+    const formatterSortHeaderRule = findRule('\\.opencodian-formatter-sort-header', 'cursor:');
+    const formatterSortHeaderActiveRule = findRule(
+      '\\.opencodian-formatter-sort-header\\[data-sort-direction="asc"\\],\\s*\\.opencodian-formatter-sort-header\\[data-sort-direction="desc"\\]',
+      'var(--text-accent)',
+    );
     const runtimeTableShellRule = findRule('\\.opencodian-formatter-runtime-table-shell', 'border:');
     const tableRule = findRule('\\.opencodian-formatter-table', 'background:');
+    const tableTheadRule = findRule('\\.opencodian-formatter-table thead', 'position:');
+    const tableHeaderRule = findRule('\\.opencodian-formatter-table th', 'position:');
+    const formatterSortHeaderAscRule = findRule('\\.opencodian-formatter-sort-header\\[data-sort-direction="asc"\\]::after', 'border-top:');
+    const formatterSortHeaderDescRule = findRule('\\.opencodian-formatter-sort-header\\[data-sort-direction="desc"\\]::after', 'border-right:');
+    const tableStatusRule = findRule('\\.opencodian-formatter-table-status', 'text-align:');
+    const tableExtensionsRule = findRule('\\.opencodian-formatter-table-extensions', 'font-family:');
     const builtinRowRule = findRule(
       '\\.opencodian-formatter-builtin-row,\\s*\\.opencodian-formatter-custom-row',
       'background:',
@@ -1046,12 +1202,32 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(runtimePanelHeaderRule).toContain('border-bottom: 1px solid transparent');
     expect(runtimePanelMetaRule).toContain('border-radius: 999px');
     expect(runtimePanelStaticRule).toContain('border-bottom-color: var(--opencodian-settings-row-border)');
-    expect(runtimeListRule).toContain('padding: 12px');
+    expect(runtimeListRule).toContain('padding: 12px 14px 14px');
     expect(runtimeListHiddenRule).toContain('display: none');
+    expect(runtimeToolbarRule).toContain('grid-template-columns: minmax(220px, 360px) minmax(0, 1fr)');
+    expect(runtimeSearchInputRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(runtimeSearchInputRule).toContain('padding: 0 12px');
+    expect(formatterSortHeaderRule).toContain('cursor: pointer');
+    expect(formatterSortHeaderRule).toContain('user-select: none');
+    expect(formatterSortHeaderActiveRule).toContain('var(--text-accent)');
     expect(runtimeTableShellRule).toContain('border: 1px solid var(--opencodian-settings-row-border)');
+    expect(runtimeTableShellRule).toContain('max-height: min(480px, 52vh)');
+    expect(runtimeTableShellRule).toContain('position: relative');
     expect(runtimeTableShellRule).toContain('var(--opencodian-settings-radius-inline)');
     expect(tableRule).toContain('background: transparent');
     expect(tableRule).toContain('border: 0');
+    expect(tableRule).toContain('overflow: visible');
+    expect(tableRule).toContain('table-layout: fixed');
+    expect(tableTheadRule).toContain('position: sticky');
+    expect(tableTheadRule).toContain('z-index: 3');
+    expect(tableHeaderRule).toContain('position: sticky');
+    expect(tableHeaderRule).toContain('z-index: 4');
+    expect(formatterSortHeaderAscRule).toContain('border-top: 1.5px solid currentColor');
+    expect(formatterSortHeaderAscRule).toContain('rotate(45deg)');
+    expect(formatterSortHeaderDescRule).toContain('border-right: 1.5px solid currentColor');
+    expect(formatterSortHeaderDescRule).toContain('rotate(45deg)');
+    expect(tableStatusRule).toContain('text-align: right');
+    expect(tableExtensionsRule).toContain('var(--font-monospace)');
     expect(builtinRowRule).toContain('var(--opencodian-settings-object-bg');
     expect(builtinRowRule).toContain('box-shadow: none');
     expect(fieldsRule).toContain('var(--opencodian-settings-row-bg');

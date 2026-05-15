@@ -240,6 +240,34 @@ UI 需要把三态转成一致的用户语言，但内部保存时仍保留原�
 - 切到 `disabled`：写入 `false`
 - 切到 `custom`：初始化为空对象或保留现有 object
 
+除了顶层三态外，custom object mode 内还存在**entry-level disabled** 语义，二者不能混淆：
+
+- 顶层 `false`
+  - 意味着整个 formatter 或整个 lsp 子系统对当前项目禁用
+- object mode 下的 entry-level `disabled`
+  - 意味着只禁用某个具体内置项或自定义项
+
+实现时必须明确映射：
+
+- formatter builtin entry
+  - `default` → 删除该 entry
+  - `disable` → `{ disabled: true }` 或带未知字段保留的 disabled entry
+  - `override` → 去除 `disabled` 并保存 override 字段
+- lsp entry
+  - `default` → 删除该 entry
+  - `disable` → `{ disabled: true }`
+  - `override` → 保存 `command` / `extensions` / `env` / `initialization`
+
+对于 LSP，需要额外处理一个语义上可疑但 upstream schema 允许出现的情况：
+
+- `{ command: [...], disabled: true }`
+
+插件 UI 不应主动生成这种状态。若从磁盘读到它：
+
+- visual editor 以 `disabled` 为优先语义展示
+- 保留原始未知/多余字段，避免静默丢数据
+- 若用户切回 override，再显式去掉 `disabled`
+
 ### Unknown Field Preservation
 
 视觉编辑器只应覆盖本轮负责的字段。
@@ -284,6 +312,14 @@ Overview 与 Formatter 页把它当成“当前 runtime 结果”，不等同于
 - `Formatter` / `LSP` 页仍允许本地配置编辑
 - builtin 列表不能因为 runtime 失败而完全消失
 
+在真正开始 UI 实现前，必须先验证：
+
+- SDK facade 确实暴露 `formatter.status()` / `lsp.status()`
+- 返回结构是否满足当前 spec 假设
+- error path 与空结果 path 是否能被稳定区分
+
+如果实际 SDK surface 与这里不同，实现必须先调整 runtime data path，再继续构建 overview cards。
+
 ## Builtin Catalog Strategy
 
 formatter 与 LSP 的 builtin 列表都不能纯依赖一次 runtime 返回。
@@ -304,6 +340,7 @@ formatter 与 LSP 的 builtin 列表都不能纯依赖一次 runtime 返回。
 - 需要从 upstream builtin server 列表中整理一份最小稳定 catalog
 - catalog 只负责名称、默认扩展名、必要说明
 - 不要把复杂启动逻辑复制进插件
+- catalog 的维护责任留在插件仓库本身；新增或变更 upstream builtin 时，需要在对应模块文档里记录更新来源
 
 ## Interaction Rules
 
@@ -342,6 +379,12 @@ formatter / lsp 都遵循：
 - 编辑 `initialization`
 
 自定义名称必须有稳定 normalize 规则，并在冲突时给出可理解提示。
+
+对自定义 LSP，`extensions` 在 schema 类型层面可以是 optional，但在插件保存校验层面必须视为 required。也就是说：
+
+- type 定义保留 upstream 的 optional 形状
+- visual editor 在保存前强制校验非空
+- JSON editor 保留原始输入自由度，但在用户保存 invalid subtree 时给出明确错误
 
 ### Field Editing
 
@@ -477,6 +520,20 @@ formatter / lsp 都遵循：
 - 若入口命名变化影响设置文档，也要同步说明
 - 如架构边界改变，更新相关 requirements/status 文档
 
+## Migration And Backward Compatibility
+
+这次改动不需要对用户已有 `.opencode/opencode.json` 做数据迁移：
+
+- formatter subtree 仍然使用原字段
+- 新增的是 UI 入口整合和 lsp subtree 的可视化编辑能力
+- 旧用户只会看到设置入口改名和新的二级页签结构，不应看到 config shape 被自动重写
+
+实现时要特别验证：
+
+- 已有 formatter-only 配置能被原样读取
+- 用户未触碰 lsp 时，不应平白写入新的 `lsp` subtree
+- 只浏览页面、不保存时，不应产生配置文件噪声
+
 ## Risks
 
 ### Layout Density Risk
@@ -486,6 +543,8 @@ formatter / lsp 都遵循：
 ### Schema Drift Risk
 
 upstream formatter / LSP schema 仍可能演进。视觉编辑器必须保留 unknown fields，JSON editor 也必须继续作为完整兜底。
+
+当前设计明确建立在 “top-level 仍是 `boolean | object`” 这一 upstream 假设上。若未来 schema 引入新的顶层模式，实现需要优先扩展 state model，而不是强行套用现有三态。
 
 ### Runtime vs Config Confusion
 

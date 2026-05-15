@@ -28,8 +28,10 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
 ### Tabbed
 - `overview` secondary tab: no extra full-card wrapper around the entire pane; starts with a 2x2 meta-card grid for formatter mode / LSP mode / config path / combined runtime health, then renders formatter summary cards, detected formatter table, and LSP runtime summary as separate sections
   - the overview cards are intentionally structured, not plain desc strings: mode cards split primary mode label from the explanatory sentence, config path uses a monospace primary value, and runtime health renders separate Formatter / LSP status pills instead of one long combined sentence
-  - detected formatter runtime now lives inside a native `details > summary` panel that is open by default; the whole title row is clickable and collapses the table without changing runtime data semantics
-  - the formatter and LSP runtime blocks share the same panel-header vocabulary, so both cards use the same title / meta chip hierarchy even though only the formatter table is collapsible
+  - detected formatter runtime now lives inside a native summary panel that is open by default; the whole title row is clickable and collapses the table without changing runtime data semantics
+  - the detected formatter table includes local fuzzy search across formatter names/extensions, clickable sortable `Name` / `Extensions` / `Status` headers, a matching-count meta chip, and an empty row when the current search has no matches
+  - runtime table cells expose compact styling hooks (`opencodian-formatter-table-name`, `-extensions`, `-status`, and column header classes), allowing CSS to keep extensions monospace, status chips right-aligned, and the sortable header controls visually native instead of inheriting Obsidian's full button chrome
+  - the formatter and LSP runtime blocks share the same panel-header vocabulary and body spacing, so both cards use the same title / meta chip hierarchy even though only the formatter table is collapsible
 - `formatter` secondary tab: mode switch dropdown, then when custom mode active:
   - Builtin formatter editors sourced from the upstream builtin catalog, so they still render even when runtime status is offline
   - Custom formatter list with add/edit/delete

@@ -29,6 +29,10 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 同日 F3 扩展 `settings.formatter.config.*` 键空间，新增内置格式化器编辑（builtin list / action dropdown / override fields for command/environment/extensions）、自定义格式化器 CRUD（add / save / delete / nameConflict）、高级 JSON 编辑器（format / reload / save / invalidJson）和运行时离线提示对应的英文文案。
 
+本轮继续扩展 `settings.formatter.overview.formatterList.*`，新增 detected formatter 表格的本地搜索标签、占位符和无匹配空态文案，用于支持按名称 / 扩展名快速筛选运行时 formatter 列表。
+
+本轮补齐 `settings.formatter.tab.formatter`、`settings.formatter.tab.lsp` 与 `settings.formatter.lsp.*` 键空间，覆盖 Formatter 页中 Language servers 概览、模式切换、内置/自定义 LSP 编辑器、初始化 JSON、环境变量和高级 JSON 编辑器的英文文案，避免中文运行时回退到裸 translation key。
+
 2026-04-26 navigation reorg added `settings.mcp.title`, `settings.mcp.tab.overview`, and `settings.quickNav.mcpDesc`, because MCP has been promoted to its own primary settings tab and classic quick-nav entry. `settings.server.tab.*` now only describes the remaining server secondary tabs (connection/auth/status).
 
 本轮新增 `settings.style.input.contextRing.*` 键，为输入区样式设置里的上下文圆环样式下拉框提供英文标签、描述和 `Classic ring` / `Segmented ring` 两个选项。
@@ -147,7 +151,7 @@ t('settings.server.started')
 - 新增翻译键时，英文表与中文表必须同步保持键名一致
 - 如果某个键只出现在中文表、不出现在英文表，类型安全和回退逻辑都会变差
 - 帮助文本（`.help.` 键）通常为多行长文本，使用 `\n` 换行
-- 参数插值占位符使用 `{paramName}` 格式
+- 参数插值占位符支持 `{paramName}` 与 `{{paramName}}`，新增键优先保持同一键在中英文中的占位符名称一致
 - 本文件是 i18n 类型安全的基础，修改需谨慎
 
 ## Liquid Glass 帮助键

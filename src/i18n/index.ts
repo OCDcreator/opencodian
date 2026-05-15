@@ -60,7 +60,8 @@ export function t(key: TranslationKey, params?: TranslationParams): string {
   const translation = translations[currentLocale][key] ?? translations.en[key] ?? key;
   
   if (params) {
-    return translation.replace(/\{(\w+)\}/g, (match, paramKey) => {
+    return translation.replace(/\{\{(\w+)\}\}|\{(\w+)\}/g, (match, doubleBraceKey, singleBraceKey) => {
+      const paramKey = doubleBraceKey ?? singleBraceKey;
       return String(params[paramKey] ?? match);
     });
   }

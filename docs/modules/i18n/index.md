@@ -5,7 +5,7 @@
 
 ## 概述
 
-基于静态翻译表的轻量级国际化（i18n）系统。支持英文（en）和中文（zh）两种语言，通过 `setLocale()` 切换语言，`t()` 函数翻译键值。翻译键使用点分层级命名（如 `settings.server.started`），支持 `{param}` 模板插值。
+基于静态翻译表的轻量级国际化（i18n）系统。支持英文（en）和中文（zh）两种语言，通过 `setLocale()` 切换语言，`t()` 函数翻译键值。翻译键使用点分层级命名（如 `settings.server.started`），支持 `{param}` 与 `{{param}}` 两种模板插值。
 
 ## 导入关系
 
@@ -39,10 +39,13 @@ type TranslationParams = Record<string, string | number>;
 
 ### 参数插值
 
-`{paramName}` 占位符通过正则 `/\{(\w+)\}/g` 替换：
+`{paramName}` 与 `{{paramName}}` 占位符都会被 `t(key, params)` 替换。保留单花括号是为了兼容旧文案，双花括号用于较新的 formatter / LSP 文案：
 ```typescript
 t('settings.model.refresh.success', { count: 5 })
 // → "Found 5 providers" (en) 或 "找到 5 个提供商" (zh)
+
+t('settings.formatter.overview.summary.detected', { count: 1 })
+// → "Detected: 1" (en) 或 "已检测：1" (zh)
 ```
 
 ### 语言切换

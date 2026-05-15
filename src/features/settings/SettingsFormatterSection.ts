@@ -14,6 +14,8 @@ import type OpenCodianPlugin from '../../main';
 
 type FormatterMode = 'default' | 'disabled' | 'custom';
 type BuiltinEntryAction = 'default' | 'disable' | 'override';
+type FormatterRuntimeSortDirection = 'asc' | 'desc';
+type FormatterRuntimeSortKey = 'name' | 'extensions' | 'status';
 
 interface SettingsFormatterSectionOptions {
   plugin: OpenCodianPlugin;
@@ -500,29 +502,221 @@ export class SettingsFormatterSection {
       }
     });
 
+    const runtimeItems = [...runtimeState.items];
+    let searchQuery = '';
+    let sortKey: FormatterRuntimeSortKey | null = null;
+    let sortDirection: FormatterRuntimeSortDirection = 'asc';
+    const metaEl = summaryEl.querySelector('.opencodian-formatter-runtime-panel-meta');
+
+    const toolbarEl = listEl.createDiv({ cls: 'opencodian-formatter-runtime-toolbar' });
+    const searchLabelEl = toolbarEl.createEl('label', {
+      cls: 'opencodian-formatter-runtime-search-label',
+    });
+    searchLabelEl.createSpan({
+      cls: 'opencodian-formatter-runtime-search-text',
+      text: t('settings.formatter.overview.formatterList.searchLabel'),
+    });
+    const searchInputEl = searchLabelEl.createEl('input', {
+      cls: 'opencodian-formatter-runtime-search-input',
+      attr: {
+        type: 'search',
+        placeholder: t('settings.formatter.overview.formatterList.searchPlaceholder'),
+        'aria-label': t('settings.formatter.overview.formatterList.searchLabel'),
+      },
+    });
+
     const tableShellEl = listEl.createDiv({
       cls: 'opencodian-formatter-runtime-table-shell',
     });
     const tableEl = tableShellEl.createEl('table', { cls: 'opencodian-formatter-table' });
     const theadEl = tableEl.createEl('thead');
     const headerRowEl = theadEl.createEl('tr');
-    headerRowEl.createEl('th', { text: t('settings.formatter.overview.formatterList.name') });
-    headerRowEl.createEl('th', { text: t('settings.formatter.overview.formatterList.extensions') });
-    headerRowEl.createEl('th', { text: t('settings.formatter.overview.formatterList.status') });
+    const sortHeaders = new Map<FormatterRuntimeSortKey, HTMLTableCellElement>();
+    this.addFormatterRuntimeSortHeader(
+      headerRowEl,
+      sortHeaders,
+      'name',
+      t('settings.formatter.overview.formatterList.name'),
+    );
+    this.addFormatterRuntimeSortHeader(
+      headerRowEl,
+      sortHeaders,
+      'extensions',
+      t('settings.formatter.overview.formatterList.extensions'),
+    );
+    this.addFormatterRuntimeSortHeader(
+      headerRowEl,
+      sortHeaders,
+      'status',
+      t('settings.formatter.overview.formatterList.status'),
+    );
 
     const tbodyEl = tableEl.createEl('tbody');
-    for (const formatter of runtimeState.items) {
-      const rowEl = tbodyEl.createEl('tr');
-      rowEl.createEl('td', { text: formatter.name });
-      rowEl.createEl('td', { text: formatter.extensions.join(', ') });
-      const statusCellEl = rowEl.createEl('td');
-      statusCellEl.createSpan({
-        cls: `opencodian-formatter-status-badge ${formatter.enabled ? 'is-enabled' : 'is-disabled'}`,
-        text: formatter.enabled
-          ? t('settings.formatter.overview.formatterList.enabled')
-          : t('settings.formatter.overview.formatterList.notEnabled'),
+    const renderRows = () => {
+      const visibleItems = this.getVisibleFormatterRuntimeItems(
+        runtimeItems,
+        searchQuery,
+        sortKey,
+        sortDirection,
+      );
+      tbodyEl.empty();
+      if (metaEl) {
+        metaEl.textContent = visibleItems.length === runtimeItems.length
+          ? String(runtimeItems.length)
+          : `${visibleItems.length} / ${runtimeItems.length}`;
+      }
+      for (const [key, headerEl] of sortHeaders) {
+        const active = sortKey === key;
+        headerEl.dataset.sortDirection = active ? sortDirection : 'none';
+        headerEl.setAttribute(
+          'aria-sort',
+          active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none',
+        );
+      }
+      if (visibleItems.length === 0) {
+        const emptyRowEl = tbodyEl.createEl('tr');
+        emptyRowEl.createEl('td', {
+          cls: 'opencodian-formatter-table-empty',
+          text: t('settings.formatter.overview.formatterList.noMatches'),
+          attr: { colspan: '3' },
+        });
+        return;
+      }
+      for (const formatter of visibleItems) {
+        const rowEl = tbodyEl.createEl('tr');
+        rowEl.createEl('td', {
+          cls: 'opencodian-formatter-table-name',
+          text: formatter.name,
+        });
+        rowEl.createEl('td', {
+          cls: 'opencodian-formatter-table-extensions',
+          text: formatter.extensions.join(', '),
+        });
+        const statusCellEl = rowEl.createEl('td', {
+          cls: 'opencodian-formatter-table-status',
+        });
+        statusCellEl.createSpan({
+          cls: `opencodian-formatter-status-badge ${formatter.enabled ? 'is-enabled' : 'is-disabled'}`,
+          text: formatter.enabled
+            ? t('settings.formatter.overview.formatterList.enabled')
+            : t('settings.formatter.overview.formatterList.notEnabled'),
+        });
+      }
+    };
+    searchInputEl.addEventListener('input', () => {
+      searchQuery = searchInputEl.value;
+      renderRows();
+    });
+    const toggleSort = (key: FormatterRuntimeSortKey) => {
+      if (sortKey === key) {
+        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortKey = key;
+        sortDirection = key === 'status' ? 'desc' : 'asc';
+      }
+      renderRows();
+    };
+    for (const [key, headerEl] of sortHeaders) {
+      headerEl.addEventListener('click', () => {
+        toggleSort(key);
+      });
+      headerEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          toggleSort(key);
+        }
       });
     }
+    renderRows();
+  }
+
+  private addFormatterRuntimeSortHeader(
+    headerRowEl: HTMLTableRowElement,
+    sortHeaders: Map<FormatterRuntimeSortKey, HTMLTableCellElement>,
+    key: FormatterRuntimeSortKey,
+    label: string,
+  ): void {
+    const headerEl = headerRowEl.createEl('th', {
+      cls: `opencodian-formatter-sort-header opencodian-formatter-table-col-${key}`,
+      text: label,
+      attr: {
+        tabindex: '0',
+        'aria-sort': 'none',
+        'data-sort-direction': 'none',
+      },
+    });
+    sortHeaders.set(key, headerEl);
+  }
+
+  private getVisibleFormatterRuntimeItems(
+    items: readonly OpencodeFormatterStatus[],
+    searchQuery: string,
+    sortKey: FormatterRuntimeSortKey | null,
+    sortDirection: FormatterRuntimeSortDirection,
+  ): OpencodeFormatterStatus[] {
+    const query = searchQuery.trim();
+    const filtered = query
+      ? items.filter((item) => this.matchesFormatterRuntimeSearch(item, query))
+      : [...items];
+    if (!sortKey) {
+      return filtered;
+    }
+    return [...filtered].sort((a, b) => this.compareFormatterRuntimeItems(a, b, sortKey, sortDirection));
+  }
+
+  private compareFormatterRuntimeItems(
+    a: OpencodeFormatterStatus,
+    b: OpencodeFormatterStatus,
+    key: FormatterRuntimeSortKey,
+    direction: FormatterRuntimeSortDirection,
+  ): number {
+    const directionFactor = direction === 'asc' ? 1 : -1;
+    let comparison = 0;
+    switch (key) {
+      case 'extensions':
+        comparison = a.extensions.join(', ').localeCompare(b.extensions.join(', '));
+        break;
+      case 'status':
+        comparison = Number(a.enabled) - Number(b.enabled);
+        break;
+      case 'name':
+      default:
+        comparison = a.name.localeCompare(b.name);
+        break;
+    }
+    if (comparison !== 0) {
+      return comparison * directionFactor;
+    }
+    return a.name.localeCompare(b.name);
+  }
+
+  private matchesFormatterRuntimeSearch(
+    item: OpencodeFormatterStatus,
+    searchQuery: string,
+  ): boolean {
+    const normalizedQuery = this.normalizeFormatterRuntimeSearch(searchQuery);
+    if (!normalizedQuery) {
+      return true;
+    }
+    const target = this.normalizeFormatterRuntimeSearch(`${item.name} ${item.extensions.join(' ')}`);
+    return target.includes(normalizedQuery) || this.isOrderedFuzzyMatch(normalizedQuery, target);
+  }
+
+  private normalizeFormatterRuntimeSearch(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  private isOrderedFuzzyMatch(query: string, target: string): boolean {
+    let queryIndex = 0;
+    for (const char of target) {
+      if (char === query[queryIndex]) {
+        queryIndex += 1;
+        if (queryIndex === query.length) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private renderFormatterConfigBlock(containerEl: HTMLElement): void {
