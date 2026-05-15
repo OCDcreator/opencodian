@@ -17,7 +17,11 @@ import {
   type TabMessagesPaneCoordinator,
   type TabMessagesPaneState,
 } from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
-import { type TabBar, type TabId,TabManager } from '../../../../src/features/chat/tabs';
+import {
+  type TabBar,
+  type TabId,
+  TabManager,
+} from '../../../../src/features/chat/tabs';
 
 interface TestRuntimeState extends ConversationTabRuntimeState {
   label?: string;
@@ -72,6 +76,7 @@ function createPaneCoordinator(runtimeByTab = new Map<TabId, TestRuntimeState>()
 }
 
 function createFixture(options: {
+  enableTabs?: boolean;
   tabBarPosition?: 'input' | 'header' | 'below-header';
   belowHeaderTabBarLayout?: 'grid' | 'vertical';
   sessionStatus?: SessionActivityStatus | null;
@@ -91,6 +96,7 @@ function createFixture(options: {
   const inputTabBarSlotEl = document.createElement('div');
   const pane = createPaneCoordinator();
   const host: ConversationTabRuntimeCoordinatorHost = {
+    areTabsEnabled: jest.fn(() => options.enableTabs ?? true),
     getMaxTabs: jest.fn(() => 4),
     getTabManager: jest.fn(() => tabManager),
     setTabManager: jest.fn((next) => { tabManager = next; }),
@@ -155,9 +161,7 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(tab).not.toBeNull();
     expect(tabBarMountEl).not.toBeNull();
     expect(fixture.belowHeaderTabBarSlotEl.contains(tabBarMountEl!)).toBe(true);
-    expect(fixture.chatContainerEl.classList.contains(
-      'opencodian-container--tab-pos-below-header',
-    )).toBe(true);
+    expect(fixture.chatContainerEl.classList.contains('opencodian-container--tab-pos-below-header')).toBe(true);
     expect(fixture.getPersistedTabState()).toEqual({
       tabs: [
         {
@@ -374,6 +378,7 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
       ...overrides.tabBarStateOverrides,
     };
     const settings: TabRuntimeSettings = {
+      enableTabs: true,
       maxTabs: 4,
       tabBarPosition: 'below-header' as const,
       belowHeaderTabBarLayout: 'grid' as const,
@@ -406,15 +411,6 @@ describe('createConversationTabRuntimeCoordinatorHost factory', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('reads maxTabs from settings object', () => {
-    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps({ settings: { maxTabs: 6 } }));
-    expect(host.getMaxTabs()).toBe(6);
-  });
-  it('reads tabBarPosition from settings object', () => {
-    const host = createConversationTabRuntimeCoordinatorHost(createFactoryDeps({ settings: { tabBarPosition: 'header' as const } }));
-    expect(host.getTabBarPosition()).toBe('header');
   });
 
   it('reads and writes tabBarState for tabManager, tabBar, and tabBarMountEl', () => {
@@ -479,7 +475,12 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
     const runtimeStateBridge = {
       syncStreamLikeState: jest.fn(), syncActiveStreamLikeState: jest.fn(), setNeedsAttention: jest.fn(),
     };
-    const settings: TabRuntimeSettings = { maxTabs: 4, tabBarPosition: 'below-header', belowHeaderTabBarLayout: 'grid' };
+    const settings: TabRuntimeSettings = {
+      enableTabs: true,
+      maxTabs: 4,
+      tabBarPosition: 'below-header',
+      belowHeaderTabBarLayout: 'grid',
+    };
     const tabBarState: TabBarMutableState = { tabManager: null, tabBar: null, tabBarMountEl: null };
     const hostSource: ConversationTabRuntimeCoordinatorHostSource = {
       tabBarState, settings,

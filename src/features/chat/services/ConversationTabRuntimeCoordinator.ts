@@ -40,6 +40,7 @@ export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState
   queuedFollowUpSend?: PrepareMessageSendOptions | null;
 }
 export interface ConversationTabRuntimeCoordinatorHost {
+  areTabsEnabled(): boolean;
   getMaxTabs(): number;
   getTabManager(): TabManager | null;
   setTabManager(tabManager: TabManager | null): void;
@@ -107,6 +108,7 @@ export interface TabBarMutableState {
 }
 
 export interface TabRuntimeSettings {
+  enableTabs: boolean;
   maxTabs: number;
   tabBarPosition: TabBarPosition;
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
@@ -116,6 +118,7 @@ export function createConversationTabRuntimeCoordinatorHost(
 ): ConversationTabRuntimeCoordinatorHost {
   const { tabBarState, settings, plugin, view } = source;
   return {
+    areTabsEnabled: () => settings.enableTabs,
     getMaxTabs: () => settings.maxTabs,
     getTabManager: () => tabBarState.tabManager,
     setTabManager: (tabManager) => { tabBarState.tabManager = tabManager; },
@@ -232,6 +235,12 @@ export class ConversationTabRuntimeCoordinator<
     const tabBar = this.host.getTabBar();
     const tabManager = this.host.getTabManager();
     if (!tabBar || !tabManager) {
+      return;
+    }
+    if (!this.host.areTabsEnabled()) {
+      const items = tabManager.getTabBarItems();
+      this.syncDisabledParentNavigationMount(items);
+      tabBar.renderParentNavigation(items, this.getTabBarLayoutMode());
       return;
     }
     tabBar.render(tabManager.getTabBarItems(), this.getTabBarLayoutMode());
@@ -507,6 +516,11 @@ export class ConversationTabRuntimeCoordinator<
     const slots = this.collectTabBarSlots();
     if (!slots) return;
     const { chatContainerEl, tabBarMountEl, positionSlots } = slots;
+    if (!this.host.areTabsEnabled()) {
+      this.applyTabBarDisabledClasses(chatContainerEl, positionSlots);
+      this.renderTabBar();
+      return;
+    }
     const pos = this.host.getTabBarPosition();
     const isBelowHeader = pos === 'below-header';
     const isVerticalBelowHeader = isBelowHeader && this.host.getBelowHeaderTabBarLayout() === 'vertical';
@@ -547,6 +561,26 @@ export class ConversationTabRuntimeCoordinator<
     chatContainerEl.toggleClass('opencodian-container--tab-pos-input', pos === 'input');
     chatContainerEl.toggleClass('opencodian-container--tab-layout-grid', isBelowHeader && layout === 'grid');
     chatContainerEl.toggleClass('opencodian-container--tab-layout-vertical', isVerticalBelowHeader);
+    chatContainerEl.toggleClass('opencodian-container--tabs-disabled', false);
+  }
+
+  private applyTabBarDisabledClasses(
+    chatContainerEl: HTMLElement,
+    slots: {
+      headerTabBarSlotEl: HTMLElement;
+      belowHeaderTabBarSlotEl: HTMLElement;
+      outerVerticalTabBarSlotEl: HTMLElement;
+      inputTabBarSlotEl: HTMLElement;
+    },
+  ): void {
+    chatContainerEl.toggleClass('opencodian-container--tab-pos-header', false);
+    chatContainerEl.toggleClass('opencodian-container--tab-pos-below-header', false);
+    chatContainerEl.toggleClass('opencodian-container--tab-pos-input', false);
+    chatContainerEl.toggleClass('opencodian-container--tab-layout-grid', false);
+    chatContainerEl.toggleClass('opencodian-container--tab-layout-vertical', false);
+    chatContainerEl.toggleClass('opencodian-container--tabs-disabled', true);
+
+    this.clearSlotActiveClasses(slots);
   }
 
   private applySlotActiveClasses(
@@ -562,10 +596,60 @@ export class ConversationTabRuntimeCoordinator<
     slots.belowHeaderTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === slots.belowHeaderTabBarSlotEl);
     slots.outerVerticalTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === slots.outerVerticalTabBarSlotEl);
     slots.inputTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === slots.inputTabBarSlotEl);
+    slots.headerTabBarSlotEl.classList.remove('is-parent-only');
+    slots.belowHeaderTabBarSlotEl.classList.remove('is-parent-only');
+    slots.outerVerticalTabBarSlotEl.classList.remove('is-parent-only');
+    slots.inputTabBarSlotEl.classList.remove('is-parent-only');
+  }
+
+  private syncDisabledParentNavigationMount(items: ReturnType<TabManager['getTabBarItems']>): void {
+    const slots = this.collectTabBarSlots();
+    if (!slots) return;
+    const shouldShowParentNavigation = this.shouldShowDisabledParentNavigation(items);
+    const targetSlot = this.getDisabledParentNavigationTargetSlot(slots.positionSlots);
+    this.clearSlotActiveClasses(slots.positionSlots);
+    if (!shouldShowParentNavigation) {
+      slots.tabBarMountEl.remove();
+      return;
+    }
+    if (slots.tabBarMountEl.parentElement !== targetSlot) {
+      slots.tabBarMountEl.remove();
+      targetSlot.appendChild(slots.tabBarMountEl);
+    }
+    targetSlot.classList.add('is-active-slot', 'is-parent-only');
+  }
+
+  private shouldShowDisabledParentNavigation(items: ReturnType<TabManager['getTabBarItems']>): boolean {
+    const activeItem = items.find((item) => item.isActive);
+    return Boolean(activeItem?.parentTabId);
+  }
+
+  private getDisabledParentNavigationTargetSlot(slots: {
+    headerTabBarSlotEl: HTMLElement;
+    belowHeaderTabBarSlotEl: HTMLElement;
+    outerVerticalTabBarSlotEl: HTMLElement;
+    inputTabBarSlotEl: HTMLElement;
+  }): HTMLElement {
+    const isBelowHeader = this.host.getTabBarPosition() === 'below-header';
+    const isVerticalBelowHeader = isBelowHeader && this.host.getBelowHeaderTabBarLayout() === 'vertical';
+    return this.getTabBarTargetSlot({ ...slots, isBelowHeader, isVerticalBelowHeader });
+  }
+
+  private clearSlotActiveClasses(slots: {
+    headerTabBarSlotEl: HTMLElement;
+    belowHeaderTabBarSlotEl: HTMLElement;
+    outerVerticalTabBarSlotEl: HTMLElement;
+    inputTabBarSlotEl: HTMLElement;
+  }): void {
+    slots.headerTabBarSlotEl.classList.remove('is-active-slot', 'is-parent-only');
+    slots.belowHeaderTabBarSlotEl.classList.remove('is-active-slot', 'is-parent-only');
+    slots.outerVerticalTabBarSlotEl.classList.remove('is-active-slot', 'is-parent-only');
+    slots.inputTabBarSlotEl.classList.remove('is-active-slot', 'is-parent-only');
   }
 
   private createTabManager(): TabManager {
     return new TabManager(t('chat.tab.new'), {
+      areTabsEnabled: () => this.host.areTabsEnabled(),
       getMaxTabs: () => this.host.getMaxTabs(),
       onChanged: () => {
         this.renderTabBar();

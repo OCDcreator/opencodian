@@ -48,6 +48,7 @@
 ## 与其他模块的交互
 
 - 依赖 `settings.ts` 的 `normalize*` / `getDefault*` 工具函数，但不把这些纯函数重新包装成新的 facade。
+- 会话标签启用状态通过 `normalizeTabsEnabled()` 在启动快照构建阶段清洗一次，只有持久化值明确为 `false` 才禁用；最终 settings merge 直接使用该归一化结果或默认值，避免重复清洗和历史设置误关标签入口。
 - 依赖 `core/theme` 的 preset 解析与 appearance override 计算，确保 theme startup 顺序与原逻辑一致。
 - 被 `main.ts` 调用后，`loadSettings()` 只负责状态落位、可写性标记与必要的持久化回写。
 

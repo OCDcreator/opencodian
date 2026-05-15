@@ -5,12 +5,12 @@
 
 ## 概述
 
-`SettingsUiSection` 是 settings/UI 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 UI section 的完整 lifecycle：max tabs、tab position、below-header layout、auto scroll、chat scroll mode 与 open-in-main-tab 的 setting 装配与保存。
+`SettingsUiSection` 是 settings/UI 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 UI section 的完整 lifecycle：conversation tabs enable toggle、max tabs、tab position、below-header layout、auto scroll、chat scroll mode 与 open-in-main-tab 的 setting 装配与保存。
 
 这个 owner 的职责边界保持在“**UI section 装配 + setting writeback orchestration**”：
 
 - 持有 UI section 的 heading、slider、dropdown 与 toggle 组装
-- 统一写回 `maxTabs`、tab 布局、滚动模式与主标签页打开开关
+- 统一写回 `enableTabs`、`maxTabs`、tab 布局、滚动模式与主标签页打开开关
 - 保持默认值、保存时机与 settings key 不变
 
 ## 核心逻辑
@@ -20,8 +20,9 @@
 `attach()` 会在一个 owner 内完成 UI section 的全部挂载流程：
 
 - 创建 UI section heading
-- 注册 max tabs slider
-- 注册 tab position / below-header layout / chat scroll mode dropdown
+- 注册 conversation tabs enable toggle
+- 在 `enableTabs` 为 true 时注册 max tabs slider 与 tab position / below-header layout dropdown
+- 注册 chat scroll mode dropdown
 - 注册 auto scroll 与 open-in-main-tab toggle
 
 这样 `OpenCodianSettings` 不再直接展开 UI section 的控件 wiring，只保留 owner 创建。
@@ -35,6 +36,8 @@ UI owner 内的每个控件都继续沿用既有语义：
 - 每次变更后调用 `plugin.saveSettings()`
 
 本轮不改变 tab bar layout、chat scroll mode、默认值或保存时机，只收束 owner 边界。
+
+`enableTabs` toggle 只写回标签入口开关，不修改 `tabState`。禁用标签时，聊天运行时会隐藏/绕开标签入口，但会话、历史记录、标题、后台任务与子会话对应的 conversation 数据仍由原有存储链路负责。UI section 会把 tab 数量、位置和下方布局这些子设置隐藏；toggle 变更保存后只重绘这组 tab 子控件，避免重建 auto-scroll、chat scroll mode、open-in-main-tab 等无关控件造成设置页跳动。
 
 ## 关键方法
 

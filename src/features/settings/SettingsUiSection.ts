@@ -35,7 +35,8 @@ export class SettingsUiSection {
       t('settings.quickNav.uiDesc'),
     );
 
-    this.renderAllContent(containerEl);
+    const contentEl = containerEl.createDiv({ cls: 'opencodian-settings-ui-content' });
+    this.renderAllContent(contentEl);
 
     return headingEl;
   }
@@ -45,12 +46,39 @@ export class SettingsUiSection {
   }
 
   private renderAllContent(containerEl: HTMLElement): void {
-    this.addMaxTabsSetting(containerEl);
-    this.addTabPositionSetting(containerEl);
-    this.addBelowHeaderTabLayoutSetting(containerEl);
+    this.addEnableTabsSetting(containerEl, () => {
+      this.renderTabOptionControls(tabOptionsEl);
+    });
+    const tabOptionsEl = containerEl.createDiv({ cls: 'opencodian-settings-ui-tab-options' });
+    this.renderTabOptionControls(tabOptionsEl);
     this.addAutoScrollSetting(containerEl);
     this.addChatScrollModeSetting(containerEl);
     this.addOpenInMainTabSetting(containerEl);
+  }
+
+  private addEnableTabsSetting(containerEl: HTMLElement, refreshTabOptions: () => void): void {
+    new Setting(containerEl)
+      .setName(t('settings.ui.enableTabs.name'))
+      .setDesc(t('settings.ui.enableTabs.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableTabs)
+          .onChange(async (value) => {
+            this.plugin.settings.enableTabs = value;
+            await this.plugin.saveSettings();
+            refreshTabOptions();
+          })
+      );
+  }
+
+  private renderTabOptionControls(containerEl: HTMLElement): void {
+    containerEl.empty();
+    if (!this.plugin.settings.enableTabs) {
+      return;
+    }
+    this.addMaxTabsSetting(containerEl);
+    this.addTabPositionSetting(containerEl);
+    this.addBelowHeaderTabLayoutSetting(containerEl);
   }
 
   private addMaxTabsSetting(containerEl: HTMLElement): void {

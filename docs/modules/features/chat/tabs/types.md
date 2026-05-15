@@ -65,6 +65,7 @@ interface TabCreateOptions {
 
 interface TabManagerOptions {
   getMaxTabs: () => number;
+  areTabsEnabled?: () => boolean;
   onChanged?: () => void;
 }
 
@@ -96,8 +97,8 @@ interface CloseTabsResult {
 | `TabBarItem` | 面向标签栏 UI 的精简数据（含可选父标签 ID、序号和 canClose） |
 | `TabBarLayoutMode` | 标签栏布局模式（4 种） |
 | `RestoredTabState` | 持久化/恢复时的标签状态快照，包含旧 tab id 与旧 parent id 以便恢复父子关系 |
-| `TabCreateOptions` | 创建标签时的运行时选项，目前用于记录子会话返回父标签的 `parentTabId` |
-| `TabManagerOptions` | TabManager 构造选项（动态最大标签数 + 变更回调） |
+| `TabCreateOptions` | 创建标签时的运行时选项，用于记录子会话返回父标签的 `parentTabId`，以及让隐藏子会话通过 `ignoreMaxTabs` 跳过可见标签上限 |
+| `TabManagerOptions` | TabManager 构造选项（动态最大标签数、可选标签启用状态 + 变更回调） |
 | `TabConversationLike` | 对话的最小公共类型（只需 id + title） |
 | `CloseTabResult` | 单标签关闭结果 |
 | `CloseTabsResult` | 批量关闭结果 |
@@ -122,7 +123,7 @@ interface CloseTabsResult {
 
 ## 配置项
 
-无直接配置。`TabManagerOptions.getMaxTabs` 来自 `plugin.settings.maxTabs`。
+无直接配置。`TabManagerOptions.getMaxTabs` 来自 `plugin.settings.maxTabs`，`areTabsEnabled` 通常来自 `plugin.settings.enableTabs`。
 
 ## 注意事项
 

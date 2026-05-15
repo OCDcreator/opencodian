@@ -37,6 +37,7 @@ import {
   normalizeSettingsTabbedSecondaryTabByPrimary,
   normalizeSlashCommandSkillMode,
   normalizeTabBarPosition,
+  normalizeTabsEnabled,
 } from '../../../../src/core/types/settings';
 import {
   DEBUG_MODULE_REGISTRY,
@@ -140,6 +141,7 @@ import {
       expect(DEFAULT_SETTINGS.disabledModelRefs).toEqual([]);
       expect(DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks).toBe(true);
       expect(DEFAULT_SETTINGS.pluginIsolationMode).toBe('default');
+      expect(DEFAULT_SETTINGS.enableTabs).toBe(true);
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);
       expect(DEFAULT_SETTINGS.tabBarPosition).toBe('below-header');
       expect(DEFAULT_SETTINGS.belowHeaderTabBarLayout).toBe('grid');
@@ -147,7 +149,7 @@ import {
       expect(DEFAULT_SETTINGS.chatFontSizePx).toBe(13);
       expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
       expect(DEFAULT_SETTINGS.inputPanelTheme).toBe('preset');
-      expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
+      expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(0);
       expect(DEFAULT_SETTINGS.chatAppearance.background.imagePath).toBe('');
       expect(DEFAULT_SETTINGS.chatAppearance.background.fitMode).toBe('cover');
       expect(DEFAULT_SETTINGS.chatAppearance.background.opacity).toBe(92);
@@ -275,6 +277,13 @@ import {
   });
 
   describe('tab bar setting normalization', () => {
+    it('normalizes tab enablement to enabled unless explicitly false', () => {
+      expect(normalizeTabsEnabled(true)).toBe(true);
+      expect(normalizeTabsEnabled(false)).toBe(false);
+      expect(normalizeTabsEnabled('false')).toBe(true);
+      expect(normalizeTabsEnabled(undefined)).toBe(true);
+    });
+
     it('normalizes invalid tab bar positions to below-header', () => {
       expect(normalizeTabBarPosition('header')).toBe('header');
       expect(normalizeTabBarPosition('input')).toBe('input');

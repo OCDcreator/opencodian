@@ -113,4 +113,54 @@ describe('TabBar', () => {
 
     expect(onTabClick).toHaveBeenCalledWith(items[0].id);
   });
+
+  it('renders only the parent breadcrumb for disabled tab UI', () => {
+    const items = createItems(2, 1);
+    items[0].title = 'Parent session';
+    items[1].title = 'Child session';
+    items[1].parentTabId = items[0].id;
+    const onTabClick = jest.fn();
+    const onTabClose = jest.fn();
+    const containerEl = document.createElement('div');
+    const tabBar = new TabBar(containerEl, {
+      onTabClick,
+      onTabClose,
+    });
+
+    tabBar.renderParentNavigation(items, 'below-header-grid');
+
+    expect(containerEl.querySelector('.opencodian-tab-bar-parent-breadcrumb')).not.toBeNull();
+    const closeEl = containerEl.querySelector<HTMLButtonElement>('.opencodian-tab-bar-parent-close');
+    expect(closeEl).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-tab-bar-item')).toBeNull();
+    expect(containerEl.querySelector('.opencodian-tab-bar-overflow')).toBeNull();
+
+    closeEl?.click();
+
+    expect(onTabClose).toHaveBeenCalledWith(items[1].id);
+  });
+
+  it('renders a close-only affordance for an orphan active child tab', () => {
+    const items = createItems(1, 0);
+    items[0].title = 'Orphan child';
+    items[0].parentTabId = 'missing-parent';
+    items[0].canClose = true;
+    const onTabClose = jest.fn();
+    const containerEl = document.createElement('div');
+    const tabBar = new TabBar(containerEl, {
+      onTabClick: jest.fn(),
+      onTabClose,
+    });
+
+    tabBar.renderParentNavigation(items, 'below-header-grid');
+
+    expect(containerEl.querySelector('.opencodian-tab-bar-parent-breadcrumb')).toBeNull();
+    const closeEl = containerEl.querySelector<HTMLButtonElement>('.opencodian-tab-bar-parent-close');
+    expect(closeEl).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-tab-bar-item')).toBeNull();
+
+    closeEl?.click();
+
+    expect(onTabClose).toHaveBeenCalledWith(items[0].id);
+  });
 });

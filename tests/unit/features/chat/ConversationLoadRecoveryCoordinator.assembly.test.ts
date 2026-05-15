@@ -90,6 +90,7 @@ function createAssemblyDeps(
     tabOpenHost: {
       getTabManager: jest.fn(() => null),
       getMaxTabs: jest.fn(() => 4),
+      isActiveTabStreaming: jest.fn(() => false),
       createConversation: jest.fn().mockResolvedValue(conversation),
       canCreateTab: jest.fn(() => true),
       createTab: jest.fn(),
@@ -247,6 +248,7 @@ describe('assembleConversationLoadRecovery', () => {
       tabOpenHost: {
         getTabManager: jest.fn(() => null),
         getMaxTabs: jest.fn(() => 4),
+        isActiveTabStreaming: jest.fn(() => false),
         createConversationFromSession: jest.fn().mockResolvedValue(conversation),
         showNotice: jest.fn(),
       } as never,

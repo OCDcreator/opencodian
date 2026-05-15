@@ -181,7 +181,9 @@ describe('ConversationTabOpenCoordinator', () => {
 
   describe('openTaskToolSession', () => {
     it('creates conversation from session, opens tab, and activates it', async () => {
-      const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+      const tabManager = new TabManager('New chat', {
+        getMaxTabs: () => 4,
+      });
       const parentTab = tabManager.createTab(createConversation('parent'))!;
       const conversation = createConversation('from-session');
       const host = createHost({
@@ -205,24 +207,27 @@ describe('ConversationTabOpenCoordinator', () => {
       expect(port.activateTab).toHaveBeenCalledWith(tabs[1]!.id);
     });
 
-    it('shows max-tabs notice without creating conversation when tab limit is reached', async () => {
+    it('creates child sessions even when the visible tab limit is reached', async () => {
       const tabManager = new TabManager('New chat', { getMaxTabs: () => 1 });
-      tabManager.createTab(createConversation('existing'));
+      const parentTab = tabManager.createTab(createConversation('existing'))!;
+      const conversation = createConversation('child-over-limit');
       const host = createHost({
         getTabManager: jest.fn().mockReturnValue(tabManager),
         getMaxTabs: jest.fn().mockReturnValue(1),
+        createConversationFromSession: jest.fn().mockResolvedValue(conversation),
       });
       const port = createPort();
       const coordinator = new ConversationTabOpenCoordinator(host, port);
 
       await coordinator.openTaskToolSession('session-1');
 
-      expect(host.createConversationFromSession).not.toHaveBeenCalled();
+      const tabs = tabManager.getAllTabs();
+      expect(tabs).toHaveLength(2);
+      expect(tabs[1]?.conversationId).toBe(conversation.id);
+      expect(tabs[1]?.parentTabId).toBe(parentTab.id);
+      expect(port.activateTab).toHaveBeenCalledWith(tabs[1]!.id);
       expect(host.deleteConversation).not.toHaveBeenCalled();
-      expect(host.showNotice).toHaveBeenCalledWith(
-        t('chat.tab.maxReached', { count: '1' }),
-      );
-      expect(port.activateTab).not.toHaveBeenCalled();
+      expect(host.showNotice).not.toHaveBeenCalledWith(t('chat.tab.maxReached', { count: '1' }));
     });
 
     it('syncs active tab conversation and loads when tab manager is absent', async () => {
@@ -261,7 +266,7 @@ describe('ConversationTabOpenCoordinator', () => {
 
       await coordinator.openTaskToolSession('session-1');
 
-      expect(host.showNotice).toHaveBeenCalledWith('Failed to open subagent session');
+      expect(host.showNotice).toHaveBeenCalledWith(t('chat.tab.childOpenFailed'));
     });
   });
 });

@@ -63,6 +63,10 @@ export function normalizeTabBarPosition(value: unknown): TabBarPosition {
   }
 }
 
+export function normalizeTabsEnabled(value: unknown): boolean {
+  return value === false ? false : true;
+}
+
 export function normalizeBelowHeaderTabBarLayout(value: unknown): BelowHeaderTabBarLayout {
   switch (value) {
     case 'grid':
@@ -1741,6 +1745,7 @@ export interface OpenCodianSettings {
   allowedExportPaths: string[];
 
   // UI settings
+  enableTabs: boolean;
   maxTabs: number;
   tabBarPosition: TabBarPosition;
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
@@ -1903,6 +1908,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   systemPrompt: '',
   allowedExportPaths: ['~/Desktop', '~/Downloads'],
 
+  enableTabs: true,
   maxTabs: 3,
   tabBarPosition: 'below-header',
   belowHeaderTabBarLayout: 'grid',

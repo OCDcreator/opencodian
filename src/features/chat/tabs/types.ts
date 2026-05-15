@@ -44,10 +44,12 @@ export interface RestoredTabState {
 
 export interface TabCreateOptions {
   parentTabId?: TabId | null;
+  ignoreMaxTabs?: boolean;
 }
 
 export interface TabManagerOptions {
   getMaxTabs: () => number;
+  areTabsEnabled?: () => boolean;
   onChanged?: () => void;
 }
 

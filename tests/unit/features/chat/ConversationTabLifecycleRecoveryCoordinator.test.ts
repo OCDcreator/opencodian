@@ -116,6 +116,28 @@ describe('ConversationTabLifecycleRecoveryCoordinator', () => {
     expect(host.showNotice).not.toHaveBeenCalled();
   });
 
+  it('still creates an internal fallback tab after closing the final tab when tabs are disabled', async () => {
+    const fallbackConversation = createConversation('disabled-fallback');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+      areTabsEnabled: () => false,
+    });
+    const tab = tabManager.createTab(createConversation('only-disabled'));
+    const host = createHost({
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      createConversation: jest.fn().mockResolvedValue(fallbackConversation),
+    });
+    const port = createPort();
+    const coordinator = new ConversationTabLifecycleRecoveryCoordinator(host, port);
+
+    await coordinator.closeTabAndRecover(tab!.id);
+
+    const [fallbackTab] = tabManager.getAllTabs();
+    expect(fallbackTab?.conversationId).toBe(fallbackConversation.id);
+    expect(port.activateTab).toHaveBeenCalledWith(fallbackTab!.id);
+    expect(port.createConversationInNewTab).not.toHaveBeenCalled();
+  });
+
   it('deletes unique conversations and activates the next tab when the active tab is removed', async () => {
     const tabManager = new TabManager('New chat', {
       getMaxTabs: () => 4,
@@ -158,6 +180,28 @@ describe('ConversationTabLifecycleRecoveryCoordinator', () => {
     expect(host.createConversation).not.toHaveBeenCalled();
   });
 
+  it('creates an internal fallback tab after deletion closes every tab when tabs are disabled', async () => {
+    const fallbackConversation = createConversation('disabled-delete-fallback');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+      areTabsEnabled: () => false,
+    });
+    tabManager.createTab(createConversation('first'));
+    const host = createHost({
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      createConversation: jest.fn().mockResolvedValue(fallbackConversation),
+    });
+    const port = createPort();
+    const coordinator = new ConversationTabLifecycleRecoveryCoordinator(host, port);
+
+    await coordinator.deleteConversationsAndRecover(['first']);
+
+    const [fallbackTab] = tabManager.getAllTabs();
+    expect(fallbackTab?.conversationId).toBe(fallbackConversation.id);
+    expect(port.activateTab).toHaveBeenCalledWith(fallbackTab!.id);
+    expect(port.createConversationInNewTab).not.toHaveBeenCalled();
+  });
+
   it('keeps the no-tab-manager current-conversation deletion fallback delegated', async () => {
     const host = createHost({
       getCurrentConversationId: jest.fn().mockReturnValue('current'),
@@ -185,5 +229,32 @@ describe('ConversationTabLifecycleRecoveryCoordinator', () => {
     expect(host.resetTabManager).toHaveBeenCalledTimes(1);
     expect(port.createConversationInNewTab).toHaveBeenCalledTimes(1);
     expect(host.removeTabMessagesPane).not.toHaveBeenCalled();
+  });
+
+  it('creates an internal fallback tab after reset deletes all conversations when tabs are disabled', async () => {
+    let tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+      areTabsEnabled: () => false,
+    });
+    const fallbackConversation = createConversation('disabled-reset-fallback');
+    const host = createHost({
+      getTabManager: jest.fn(() => tabManager),
+      resetTabManager: jest.fn(() => {
+        tabManager = new TabManager('New chat', {
+          getMaxTabs: () => 4,
+          areTabsEnabled: () => false,
+        });
+      }),
+      createConversation: jest.fn().mockResolvedValue(fallbackConversation),
+    });
+    const port = createPort();
+    const coordinator = new ConversationTabLifecycleRecoveryCoordinator(host, port);
+
+    await coordinator.deleteAllConversationsAndReset(['first', 'second']);
+
+    const [fallbackTab] = tabManager.getAllTabs();
+    expect(fallbackTab?.conversationId).toBe(fallbackConversation.id);
+    expect(port.activateTab).toHaveBeenCalledWith(fallbackTab!.id);
+    expect(port.createConversationInNewTab).not.toHaveBeenCalled();
   });
 });

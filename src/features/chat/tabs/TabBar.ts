@@ -41,6 +41,13 @@ export class TabBar {
     }
   }
 
+  renderParentNavigation(items: TabBarItem[], layout: TabBarLayoutMode): void {
+    this.closeOverflowMenu();
+    this.containerEl.empty();
+    this.containerEl.setAttribute('data-layout', layout);
+    this.renderParentBreadcrumb(items, layout);
+  }
+
   destroy(): void {
     this.closeOverflowMenu();
     this.containerEl.empty();
@@ -95,10 +102,20 @@ export class TabBar {
     const parentItem = activeItem?.parentTabId
       ? items.find((item) => item.id === activeItem.parentTabId)
       : null;
-    if (!parentItem) {
+    if (!activeItem?.parentTabId) {
       return;
     }
 
+    if (parentItem) {
+      this.renderParentBackButton(parentItem, layout);
+    }
+
+    if (activeItem.canClose) {
+      this.renderParentCloseButton(activeItem, layout);
+    }
+  }
+
+  private renderParentBackButton(parentItem: TabBarItem, layout: TabBarLayoutMode): void {
     const label = t('chat.tab.backToParent', { title: parentItem.title });
     const useTooltip = layout !== 'below-header-vertical';
     const breadcrumbEl = this.containerEl.createEl('button', {
@@ -127,6 +144,36 @@ export class TabBar {
     breadcrumbEl.addEventListener('click', (event) => {
       event.preventDefault();
       this.callbacks.onTabClick(parentItem.id);
+    });
+  }
+
+  private renderParentCloseButton(item: TabBarItem, layout: TabBarLayoutMode): void {
+    const label = t('chat.tab.close');
+    const useTooltip = layout !== 'below-header-vertical';
+    const closeEl = this.containerEl.createEl('button', {
+      cls: useTooltip
+        ? 'opencodian-tab-bar-parent-close opencodian-tooltip-trigger'
+        : 'opencodian-tab-bar-parent-close',
+      attr: useTooltip
+        ? {
+            type: 'button',
+            'data-tooltip': label,
+          }
+        : {
+            type: 'button',
+          },
+    });
+    this.attachTooltipLabel(closeEl, label);
+    closeEl.setAttribute('aria-label', label);
+
+    const iconEl = closeEl.createSpan({ cls: 'opencodian-tab-bar-parent-close-icon' });
+    iconEl.setAttribute('aria-hidden', 'true');
+    setIcon(iconEl, 'x');
+
+    closeEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.callbacks.onTabClose(item.id);
     });
   }
 

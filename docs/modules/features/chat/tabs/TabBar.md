@@ -37,7 +37,7 @@ interface TabBarCallbacks {
 每个标签按钮显示序号徽章、标题文本和状态指示器。支持 CSS class 标记（`is-active`, `is-streaming`, `has-background-task`, `needs-attention`）。左键点击切换标签，右键点击关闭标签。
 
 ### 父会话返回
-当激活标签的 `parentTabId` 指向当前 tab 列表中的父标签时，`render()` 会在标签按钮前渲染 `opencodian-tab-bar-parent-breadcrumb`。点击面包屑复用 `onTabClick(parentTabId)` 切回父 tab，不内联渲染子会话内容。
+当激活标签的 `parentTabId` 指向当前 tab 列表中的父标签时，`render()` 会在标签按钮前渲染 `opencodian-tab-bar-parent-breadcrumb`。点击面包屑复用 `onTabClick(parentTabId)` 切回父 tab，不内联渲染子会话内容。`renderParentNavigation()` 会只渲染父会话面包屑和关闭当前子 tab 的 `opencodian-tab-bar-parent-close` 图标按钮，不渲染标签按钮或溢出菜单，供禁用可见标签 UI 后的隐藏子会话返回与清理入口使用。若父 tab 已缺失但 active child 仍有 `parentTabId`，则省略返回面包屑并保留 close-only 图标，方便清理孤儿隐藏子会话。
 
 ### 溢出菜单
 超出可见限制的标签显示为 `+N` 按钮。点击后在 `document.body` 上创建浮动菜单，支持 Escape 和外部点击关闭。菜单位置根据锚点和视口空间自动计算（上方/下方）。
@@ -55,6 +55,7 @@ interface TabBarCallbacks {
 | 方法 | 说明 |
 |------|------|
 | `render(items, layout)` | 渲染标签栏（清空后重建） |
+| `renderParentNavigation(items, layout)` | 只渲染 active child 的返回父会话面包屑和关闭当前子会话按钮 |
 | `destroy()` | 销毁组件，清理 DOM 和事件 |
 
 ## 数据流

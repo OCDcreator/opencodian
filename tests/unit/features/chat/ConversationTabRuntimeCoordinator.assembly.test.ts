@@ -80,6 +80,7 @@ function createAssemblyDeps(): ConversationTabRuntimeCoordinatorDependencies<Tes
     setNeedsAttention: jest.fn(),
   };
   const settings: TabRuntimeSettings = {
+    enableTabs: true,
     maxTabs: 4,
     tabBarPosition: 'below-header',
     belowHeaderTabBarLayout: 'grid',

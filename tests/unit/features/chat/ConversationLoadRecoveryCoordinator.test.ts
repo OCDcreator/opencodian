@@ -349,6 +349,35 @@ describe('ConversationLoadRecoveryCoordinator forking', () => {
     expect(host.showNotice).toHaveBeenCalledWith(t('chat.fork.successNewTab'));
   });
 
+  it('forks into the current tab when tabs are disabled even if new-tab was chosen', async () => {
+    const conversation = createConversation('source-tabs-disabled');
+    const targetMessage = createMessage('fork-message-disabled');
+    conversation.messages = [targetMessage];
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+      areTabsEnabled: () => false,
+    });
+    tabManager.createTab(conversation);
+    const forkConversation = createConversation('forked-tabs-disabled', 'Forked Without Tabs');
+    const host = createHost(conversation, {
+      chooseForkTarget: jest.fn().mockResolvedValue('new-tab'),
+      getTabManager: jest.fn(() => tabManager),
+      createConversationFromSession: jest.fn().mockResolvedValue(forkConversation),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleForkRequest(targetMessage);
+
+    expect(tabManager.getAllTabs()).toHaveLength(1);
+    expect(host.syncActiveTabConversation).toHaveBeenCalledWith(forkConversation);
+    expect(port.loadConversation).toHaveBeenCalledWith(forkConversation.id, {
+      forceServerSync: false,
+    });
+    expect(port.activateTab).not.toHaveBeenCalled();
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.fork.successCurrentTab'));
+  });
+
   it('cleans up the forked conversation when the new-tab target exceeds max tabs', async () => {
     const conversation = createConversation('source-max');
     const targetMessage = createMessage('fork-message-max');

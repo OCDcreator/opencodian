@@ -4,10 +4,11 @@ import { t } from '../../../i18n';
 import type { TabData, TabId } from '../tabs';
 
 interface ConversationTabOpenTabManager {
+  areTabsEnabled?(): boolean;
   canCreateTab(): boolean;
   createTab(
     conversation?: Pick<Conversation, 'id' | 'title'> | null,
-    options?: { parentTabId?: TabId | null },
+    options?: { ignoreMaxTabs?: boolean; parentTabId?: TabId | null },
   ): TabData | null;
   getActiveTab(): TabData | null;
 }
@@ -40,6 +41,11 @@ export class ConversationTabOpenCoordinator {
 
   async createConversationInNewTab(): Promise<void> {
     const tabManager = this.host.getTabManager();
+    if (!this.areTabsEnabled(tabManager)) {
+      await this.createConversationInCurrentTab();
+      return;
+    }
+
     if (!tabManager) {
       return;
     }
@@ -105,10 +111,10 @@ export class ConversationTabOpenCoordinator {
     }
 
     const tabManager = this.host.getTabManager();
-    if (tabManager && !tabManager.canCreateTab()) {
-      this.host.showNotice(t('chat.tab.maxReached', {
-        count: String(this.host.getMaxTabs()),
-      }));
+    // With no internal tab runtime, replacing the current session would discard
+    // the only visible stream. Normal tab-backed child sessions run in parallel.
+    if (!tabManager && this.host.isActiveTabStreaming()) {
+      this.host.showNotice(t('chat.tab.newBlockedWhileStreaming'));
       return;
     }
 
@@ -119,26 +125,31 @@ export class ConversationTabOpenCoordinator {
 
       if (tabManager) {
         const parentTab = tabManager.getActiveTab();
-        const tab = tabManager.createTab(conversation, { parentTabId: parentTab?.id ?? null });
+        const tab = tabManager.createTab(conversation, {
+          ignoreMaxTabs: true,
+          parentTabId: parentTab?.id ?? null,
+        });
         if (tab) {
           await this.port.activateTab(tab.id);
           return;
         }
         await this.host.deleteConversation(conversation.id);
-        this.host.showNotice(t('chat.tab.maxReached', {
-          count: String(this.host.getMaxTabs()),
-        }));
+        this.host.showNotice(t('chat.tab.childOpenFailed'));
         return;
       }
 
       this.port.syncActiveTabConversation(conversation);
       await this.port.loadConversation(conversation.id, { forceServerSync: true });
     } catch {
-      this.host.showNotice('Failed to open subagent session');
+      this.host.showNotice(t('chat.tab.childOpenFailed'));
     }
   }
 
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : 'Failed to create conversation';
+  }
+
+  private areTabsEnabled(tabManager: ConversationTabOpenTabManager | null): boolean {
+    return tabManager?.areTabsEnabled?.() ?? true;
   }
 }

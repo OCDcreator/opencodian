@@ -616,6 +616,7 @@ effort selector 的 variant 列表继续直接按当前 provider/model 查询 `f
 源码里直接读取的高频设置包括：
 
 - `maxTabs`
+- `enableTabs`
 - `tabBarPosition`
 - `belowHeaderTabBarLayout`
 - `chatScrollMode`
@@ -638,6 +639,8 @@ effort selector 的 variant 列表继续直接按当前 provider/model 查询 `f
 - `renderUserMarkupAsCodeBlocks`
 - `server.mode`
 - `tabState`
+
+`enableTabs` 通过 `ConversationTabRuntimeCoordinator` 注入 `TabManager.areTabsEnabled()`。视图仍保留内部 active tab 和 `tabState`，相邻 coordinator 通过 tab manager 判断是否隐藏/绕开 new-tab 入口，因此禁用标签不会清理会话、历史、标题、后台任务或 child-session conversation。
 
 ## 注意事项
 

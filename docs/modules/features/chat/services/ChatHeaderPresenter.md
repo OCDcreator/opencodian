@@ -56,6 +56,7 @@ export class ChatHeaderPresenter {
 ## 关键行为
 
 - `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在包含 history → session settings → global settings 这条会话/全局配置链路
+- “新建标签”圆形加号带有 `opencodian-header-btn--new-tab` class；当 `ConversationTabRuntimeCoordinator` 给聊天容器加上 `opencodian-container--tabs-disabled` 时，core CSS 会隐藏这个入口，只保留“当前标签新建会话”入口，避免禁用标签后 header 上出现两个等价的新建按钮
 - `startServerStatusLoop()` 立即刷新一次 status badge，然后每 5 秒重新查询 host 的 server availability
 - `refreshServerStatusBadge()` 更新 `is-running` / `is-offline` 等状态 class，并根据 local/remote mode 选择 status 文案；如果 async availability 返回时 header 已销毁，会重新检查 DOM refs 并跳过写入，避免设置页/视图切换期间的空节点错误
 - `applyLocaleTexts()` 刷新所有 header tooltip，并按最后一次 availability 立即重算 status label

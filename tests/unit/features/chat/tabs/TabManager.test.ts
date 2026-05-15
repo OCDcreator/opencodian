@@ -27,6 +27,17 @@ describe('TabManager', () => {
     expect(manager.createTab({ id: 'conv-2', title: 'Chat 2' })).toBeNull();
   });
 
+  it('can create internal hidden tabs beyond the visible max tab limit', () => {
+    const manager = createManager(1);
+
+    expect(manager.createTab({ id: 'conv-1', title: 'Chat 1' })).not.toBeNull();
+    expect(manager.createTab(
+      { id: 'conv-2', title: 'Chat 2' },
+      { ignoreMaxTabs: true },
+    )).not.toBeNull();
+    expect(manager.getTabCount()).toBe(2);
+  });
+
   it('switches and closes tabs with fallback activation', () => {
     const manager = createManager();
     const first = manager.createTab({ id: 'conv-1', title: 'Chat 1' })!;
@@ -132,5 +143,46 @@ describe('TabManager', () => {
     expect(tabs[1]?.parentTabId).toBe(tabs[0]?.id);
     expect(tabs[1]?.parentTabId).not.toBe('old-parent-tab');
     expect(manager.getTabBarItems()[1]?.parentTabId).toBe(tabs[0]?.id);
+  });
+
+  it('restores all hidden tabs when visible tab UI is disabled', () => {
+    const manager = new TabManager('New chat', {
+      getMaxTabs: () => 1,
+      areTabsEnabled: () => false,
+    });
+    const conversations = new Map([
+      ['conv-1', { id: 'conv-1', title: 'Chat 1' }],
+      ['conv-2', { id: 'conv-2', title: 'Chat 2' }],
+    ]);
+
+    manager.restoreTabs([
+      {
+        id: 'old-tab-1',
+        conversationId: 'conv-1',
+        title: 'Chat 1',
+        modelOverride: null,
+      },
+      {
+        id: 'old-tab-2',
+        parentTabId: 'old-tab-1',
+        conversationId: 'conv-2',
+        title: 'Chat 2',
+        modelOverride: null,
+      },
+    ], 1, conversations);
+
+    expect(manager.getTabCount()).toBe(2);
+    expect(manager.getActiveTab()?.conversationId).toBe('conv-2');
+  });
+
+  it('allows an orphan child tab to be closed even when it is the only tab', () => {
+    const manager = createManager();
+
+    manager.createTab(
+      { id: 'child', title: 'Child session' },
+      { parentTabId: 'missing-parent' },
+    );
+
+    expect(manager.getTabBarItems()[0]?.canClose).toBe(true);
   });
 });

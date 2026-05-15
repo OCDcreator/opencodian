@@ -100,7 +100,7 @@ describe('chat appearance settings', () => {
     });
 
     expect(normalized.layout.messagesPaddingTop).toBe(24);
-    expect(normalized.layout.messagesPaddingX).toBe(16);
+    expect(normalized.layout.messagesPaddingX).toBe(0);
     expect(normalized.background).toEqual({
       imagePath: '.opencodian/theme-backgrounds/bg.png',
       imageMimeType: '',

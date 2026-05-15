@@ -112,6 +112,7 @@ export class ChatHeaderPresenter {
         void this.host.createConversationInNewTab();
       },
     );
+    this.newConversationBtnEl.addClass('opencodian-header-btn--new-tab');
     this.newConversationCurrentTabBtnEl = this.buildActionButton(
       actionsEl,
       'opencodian-message-square-plus',

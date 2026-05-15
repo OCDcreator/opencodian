@@ -89,6 +89,16 @@ describe('ChatHeaderPresenter', () => {
     expect(fixture.host.openSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('marks the new-tab action for tab-disabled container CSS', () => {
+    const fixture = createFixture();
+
+    const actionButtons = fixture.headerEl.querySelectorAll<HTMLElement>('.opencodian-header-btn');
+    const newTabButton = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-btn--new-tab');
+
+    expect(actionButtons).toHaveLength(5);
+    expect(newTabButton).toBe(actionButtons[0]);
+  });
+
   it('refreshes status classes and relabels status when server mode changes', async () => {
     const fixture = createFixture();
     const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');

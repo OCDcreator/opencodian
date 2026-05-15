@@ -26,8 +26,12 @@ export class TabManager {
     return this.tabs.length < this.options.getMaxTabs();
   }
 
+  areTabsEnabled(): boolean {
+    return this.options.areTabsEnabled?.() ?? true;
+  }
+
   createTab(conversation?: TabConversationLike | null, options?: TabCreateOptions): TabData | null {
-    if (!this.canCreateTab()) {
+    if (!options?.ignoreMaxTabs && !this.canCreateTab()) {
       return null;
     }
 
@@ -131,7 +135,7 @@ export class TabManager {
     this.tabs.length = 0;
     this.activeTabId = null;
 
-    const maxTabs = this.options.getMaxTabs();
+    const maxTabs = this.areTabsEnabled() ? this.options.getMaxTabs() : items.length;
     const limitedItems = items.slice(0, Math.max(1, maxTabs));
     let restoredActiveIndex: number | null = null;
     const restoredIdMap = new Map<TabId, TabId>();
@@ -185,6 +189,7 @@ export class TabManager {
   getTabBarItems(): TabBarItem[] {
     return this.tabs.map((tab, index) => {
       const data = tab.getData();
+      const hasParentLink = Boolean(data.parentTabId);
       return {
         id: data.id,
         parentTabId: data.parentTabId,
@@ -194,7 +199,7 @@ export class TabManager {
         isStreaming: data.isStreaming,
         hasBackgroundTask: data.hasBackgroundTask,
         needsAttention: data.needsAttention,
-        canClose: this.tabs.length > 1,
+        canClose: this.tabs.length > 1 || hasParentLink,
       };
     });
   }

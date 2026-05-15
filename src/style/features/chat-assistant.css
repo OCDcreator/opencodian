@@ -739,6 +739,13 @@
   transform: translateY(-1px);
 }
 
+.opencodian-fork-target-note {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* Tool use */
 .opencodian-tool-use {
   margin: 8px 0;

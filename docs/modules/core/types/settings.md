@@ -127,6 +127,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 |------|------|
 | `normalizeEffortLevel(value)` | 归一化努力级别，`'max'` → `'xhigh'`，默认 `'high'` |
 | `normalizeThinkingBudget(value)` | 归一化思考预算，支持字符串/数字输入 |
+| `normalizeTabsEnabled(value)` | 归一化会话标签启用状态；只有明确 `false` 才禁用，未知值默认启用 |
 | `normalizeTabBarPosition(value)` | 归一化标签栏位置 |
 | `normalizeBelowHeaderTabBarLayout(value)` | 归一化下方标签布局 |
 | `normalizeTitleMode(value)` | 归一化标题模式 |
@@ -250,6 +251,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `mediaFolder` | `string` | `''` | 媒体文件夹 |
 | `systemPrompt` | `string` | `''` | 系统提示词 |
 | `allowedExportPaths` | `string[]` | `['~/Desktop', '~/Downloads']` | 保存的外部路径列表，供调试导出与手动规则编辑复用 |
+| `enableTabs` | `boolean` | `true` | 是否显示会话标签控件并允许新标签打开子会话；禁用时保留 `tabState` 和会话数据 |
 | `maxTabs` | `number` | `3` | 最大标签数 |
 | `tabBarPosition` | `TabBarPosition` | `'below-header'` | 标签栏位置 |
 | `belowHeaderTabBarLayout` | `BelowHeaderTabBarLayout` | `'grid'` | 下方标签布局 |
@@ -327,6 +329,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 - `normalizeSlashCommandSkillMode()` 只接受 `'direct'` 或 `'skills-command'`，未知值回退到默认直显模式
 - `modelAvailabilitySectionOpen` / `modelToolsSectionOpen` 属于设置页 UI 状态，和 `settingsPanelScrollTop` 一样会被持久化
 - 归一化函数设计原则：未知值回退到默认值，而非报错
+- `enableTabs` 是显示/入口开关，不是会话存储迁移开关；禁用时不能清空 `tabState`，以便重新启用后恢复原标签上下文
 
 ## 2026-04-23 Compaction config alignment
 

@@ -43,6 +43,7 @@ import {
 const logger = createLogger('ConversationLoadRecoveryCoordinator');
 
 interface ConversationLoadRecoveryTabManager {
+  areTabsEnabled?(): boolean;
   canCreateTab(): boolean;
   createTab(conversation?: Pick<Conversation, 'id' | 'title'> | null): TabData | null;
   getActiveTabModelOverride(): TabModelOverride | null;
@@ -130,7 +131,9 @@ export function createConversationLoadRecoveryHost(
     loadConversations: () => deps.loadConversations(),
     getConversations: () => deps.getConversations(),
     createConversation: () => deps.createConversation(),
-    chooseForkTarget: () => chooseForkTarget(deps.app),
+    chooseForkTarget: () => chooseForkTarget(deps.app, {
+      allowNewTab: deps.getTabManager()?.areTabsEnabled?.() ?? true,
+    }),
     confirmRewind: () => window.confirm(t('chat.rewind.confirm')),
     revertSession: (sessionId, messageId) => deps.revertSession(sessionId, messageId),
     unrevertSession: (sessionId) => deps.unrevertSession(sessionId),
@@ -386,7 +389,7 @@ export class ConversationLoadRecoveryCoordinator {
         message,
       );
 
-      if (target === 'new-tab') {
+      if (target === 'new-tab' && this.areTabsEnabled(tabManager)) {
         await this.openForkInNewTab(
           tabManager,
           forkConversation,
@@ -420,6 +423,11 @@ export class ConversationLoadRecoveryCoordinator {
     forkConversation: Conversation,
     activeModelOverride: TabModelOverride | null,
   ): Promise<void> {
+    if (!this.areTabsEnabled(tabManager)) {
+      await this.openForkInCurrentTab(forkConversation);
+      return;
+    }
+
     if (!tabManager.canCreateTab()) {
       await this.host.deleteConversation(forkConversation.id);
       this.host.showNotice(t('chat.fork.maxTabsReached', {
@@ -448,6 +456,10 @@ export class ConversationLoadRecoveryCoordinator {
   private buildForkTitle(sourceTitle: string): string {
     const baseTitle = sourceTitle?.trim() || t('chat.tab.new');
     return `Fork: ${baseTitle}`;
+  }
+
+  private areTabsEnabled(tabManager: ConversationLoadRecoveryTabManager | null): boolean {
+    return tabManager?.areTabsEnabled?.() ?? true;
   }
 }
 

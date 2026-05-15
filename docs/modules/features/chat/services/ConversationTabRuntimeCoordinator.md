@@ -26,6 +26,7 @@ export interface TabBarMutableState {
 }
 
 export interface TabRuntimeSettings {
+  enableTabs: boolean;
   maxTabs: number;
   tabBarPosition: TabBarPosition;
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
@@ -48,6 +49,7 @@ export interface TabRuntimeViewSource {
 }
 
 export interface TabRuntimeSettings {
+  enableTabs: boolean;
   maxTabs: number;
   tabBarPosition: TabBarPosition;
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
@@ -60,6 +62,7 @@ export interface TabRuntimePersistence {
 }
 
 export interface ConversationTabRuntimeCoordinatorHost {
+  areTabsEnabled(): boolean;
   getMaxTabs(): number;
   getTabManager(): TabManager | null;
   setTabManager(tabManager: TabManager | null): void;
@@ -157,6 +160,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 ## 关键行为
 
 - `initializeTabSystem()` 一次性创建 `TabBar`、`TabManager` 与 tab bar mount，并把 `TabManager.onChanged` 统一接到 `renderTabBar()` + `persistTabState()`
+- `enableTabs === false` 时仍创建并保留 `TabManager`，但 `applyTabBarLayout()` 会隐藏普通 tab bar、清空标签按钮渲染，并只留下 `opencodian-container--tabs-disabled` 状态 class；当 active tab 是隐藏子会话且带 `parentTabId` 时，会按用户当前的 tab placement（header / below-header grid / below-header vertical / input）挂载 parent-only navigation。父 tab 存在时渲染返回父会话面包屑和关闭当前子会话按钮；父 tab 已缺失时渲染 close-only 清理入口。这保证禁用标签不会清空 active tab、persisted `tabState`、背景任务 badge 来源或会话标题同步状态，同时仍给子会话提供可见返回与清理入口
 - `applyTabBarLayout()` 继续保留 header / below-header grid / below-header vertical / input slot 的原有 CSS class 与 render 顺序
 - `persistTabState()` 持久化 tab id、parent tab id、conversation id、title、model override 与 active index，并继续区分 scheduled save 与 `flush` immediate save
 - `handleTabSwitch()` 先让 `TabManager` 切换 active tab，再转交 activation port；`handleTabClose()` 只转交 close/recovery port
@@ -199,3 +203,4 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 4. **Follow-up queue 上限**：queued follow-up 是 stream-backed send-intent 暂存，不是 message truth source；每个 tab 只允许一个，不能扩展成 unbounded queue，也不能用于没有明确 stream completion 触发的 busy 状态。
 5. **`initializeTabSystem()` 的原子性**：TabBar、TabManager 与 tab bar mount 在一次调用中创建，`TabManager.onChanged` 统一接到 `renderTabBar()` + `persistTabState()`；不能拆成多次独立初始化，否则中间状态会渲染不完整的 tab bar。
 6. **`persistTabState()` 的 scheduled vs flush 区分**：常规切换用 scheduled save，关闭/销毁用 flush immediate save；不能统一用 scheduled，否则快速关闭 tab 可能丢失状态。
+7. **禁用标签不等于删除标签状态**：`areTabsEnabled()` 只影响 tab bar UI 与新标签入口，不能重置 `TabManager` 或 `tabState`。

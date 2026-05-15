@@ -215,6 +215,56 @@ describe('SettingsUiSection', () => {
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('saves the conversation tabs toggle without touching persisted tab state', async () => {
+    const plugin = createPlugin({
+      enableTabs: true,
+      tabState: {
+        tabs: [{ conversationId: 'conv-1', title: 'Conversation', modelOverride: null }],
+        activeTabIndex: 0,
+      },
+    });
+    createSection(plugin);
+
+    const enableTabsToggle = findToggle(t('settings.ui.enableTabs.name'));
+
+    expect(enableTabsToggle?.control.setValue).toHaveBeenCalledWith(true);
+
+    await enableTabsToggle?.onChange?.(false);
+
+    expect(plugin.settings.enableTabs).toBe(false);
+    expect(plugin.settings.tabState).toEqual({
+      tabs: [{ conversationId: 'conv-1', title: 'Conversation', modelOverride: null }],
+      activeTabIndex: 0,
+    });
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('only rerenders tab-specific controls when the conversation tabs toggle changes', async () => {
+    const plugin = createPlugin({ enableTabs: true });
+    createSection(plugin);
+    const enableTabsToggle = findToggle(t('settings.ui.enableTabs.name'));
+
+    await enableTabsToggle?.onChange?.(false);
+
+    expect(toggleRecords.filter((record) => record.name === t('settings.ui.enableTabs.name'))).toHaveLength(1);
+    expect(toggleRecords.filter((record) => record.name === t('settings.ui.autoScroll.name'))).toHaveLength(1);
+    expect(toggleRecords.filter((record) => record.name === t('settings.ui.openInMainTab.name'))).toHaveLength(1);
+    expect(dropdownRecords.filter((record) => record.name === t('settings.ui.chatScrollMode.name'))).toHaveLength(1);
+    expect(sliderRecords.filter((record) => record.name === t('settings.ui.maxTabs.name'))).toHaveLength(1);
+    expect(dropdownRecords.filter((record) => record.name === t('settings.ui.tabPosition.name'))).toHaveLength(1);
+    expect(dropdownRecords.filter((record) => record.name === t('settings.ui.belowHeaderTabLayout.name'))).toHaveLength(1);
+  });
+
+  it('hides tab placement settings when conversation tabs are disabled', () => {
+    const plugin = createPlugin({ enableTabs: false });
+    createSection(plugin);
+
+    expect(findToggle(t('settings.ui.enableTabs.name'))).toBeDefined();
+    expect(findSlider(t('settings.ui.maxTabs.name'))).toBeUndefined();
+    expect(findDropdown(t('settings.ui.tabPosition.name'))).toBeUndefined();
+    expect(findDropdown(t('settings.ui.belowHeaderTabLayout.name'))).toBeUndefined();
+  });
+
   it('saves tab layout and scroll mode dropdown changes', async () => {
     const plugin = createPlugin();
     createSection(plugin);

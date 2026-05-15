@@ -3,6 +3,7 @@ import { t } from '../../../i18n';
 import type { CloseTabResult, CloseTabsResult, TabData, TabId } from '../tabs';
 
 interface ConversationTabLifecycleRecoveryTabManager {
+  areTabsEnabled?(): boolean;
   getTab(tabId: TabId): TabData | null;
   getActiveTab(): TabData | null;
   getAllTabs(): TabData[];
@@ -98,6 +99,10 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     }
 
     if (tabManager.getTabCount() === 0) {
+      if (!this.areTabsEnabled(tabManager)) {
+        await this.createSilentFallbackTab(tabManager);
+        return;
+      }
       await this.port.createConversationInNewTab();
       return;
     }
@@ -119,6 +124,11 @@ export class ConversationTabLifecycleRecoveryCoordinator {
 
     this.host.clearTabMessagesPanes();
     this.host.resetTabManager();
+    const tabManager = this.host.getTabManager();
+    if (tabManager && !this.areTabsEnabled(tabManager)) {
+      await this.createSilentFallbackTab(tabManager);
+      return;
+    }
     await this.port.createConversationInNewTab();
   }
 
@@ -135,5 +145,9 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     if (nextTab) {
       await this.port.activateTab(nextTab.id);
     }
+  }
+
+  private areTabsEnabled(tabManager: ConversationTabLifecycleRecoveryTabManager): boolean {
+    return tabManager.areTabsEnabled?.() ?? true;
   }
 }

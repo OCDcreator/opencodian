@@ -1431,6 +1431,8 @@ export const zhTranslations = {
   'settings.security.exportPaths.desc': '可复用的路径列表，用于调试导出和手动编辑权限规则。',
 
   // UI settings
+  'settings.ui.enableTabs.name': '启用会话标签',
+  'settings.ui.enableTabs.desc': '显示标签控件，并在标签中打开子会话。禁用后不会清空会话、历史记录、标题或后台任务状态。',
   'settings.ui.maxTabs.name': '最大标签数',
   'settings.ui.maxTabs.desc': '对话标签的最大数量（3-10）',
   'settings.ui.tabPosition.name': '标签栏位置',
@@ -1625,6 +1627,7 @@ export const zhTranslations = {
   'chat.tab.created': '已创建新标签',
   'chat.tab.newCurrentCreated': '已创建新对话',
   'chat.tab.maxReached': '已达到最大标签数（{count}）',
+  'chat.tab.childOpenFailed': '无法打开子代理会话',
   'chat.tab.newBlockedWhileStreaming': '正在生成回复，请稍后再试',
   'chat.slashCommand.executionFailed': '运行 /{command} 失败：{message}',
   'slashCommand.menu.loading': '正在加载斜杠命令…',
@@ -1655,6 +1658,7 @@ export const zhTranslations = {
   'chat.fork.chooseTarget': '选择分叉目标',
   'chat.fork.targetCurrentTab': '分叉到当前标签',
   'chat.fork.targetNewTab': '分叉到新标签',
+  'chat.fork.newTabDisabled': '已禁用会话标签，因此隐藏分叉到新标签选项。',
   'chat.fork.successCurrentTab': '已在当前标签创建分叉对话',
   'chat.fork.successNewTab': '已在新标签创建分叉对话',
   'chat.fork.failed': '分叉对话失败',

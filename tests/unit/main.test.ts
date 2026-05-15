@@ -1,6 +1,6 @@
 /* eslint-disable max-lines */
 import type { StorageService } from '../../src/core/storage';
-import type { Conversation } from '../../src/core/types';
+import { type Conversation, DEFAULT_SETTINGS } from '../../src/core/types';
 import { OpenCodianView } from '../../src/features/chat/OpenCodianView';
 import OpenCodianPlugin from '../../src/main';
 
@@ -758,6 +758,44 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
     ).runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
 
     expect(openCodianView.invalidateSlashCommandMenuCatalog).toHaveBeenCalledWith({ preload: true });
+  });
+
+  it('reapplies tab layout when settings refresh open views', () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      app: {
+        workspace: {
+          getLeavesOfType: jest.Mock<Array<{ view: unknown }>, [string]>;
+        };
+      };
+      settings: typeof DEFAULT_SETTINGS;
+    };
+    const openCodianView = Object.assign(Object.create(OpenCodianView.prototype), {
+      applyLocaleTexts: jest.fn(),
+      contentEl: document.createElement('div'),
+      applyChatAppearanceSettings: jest.fn(),
+      applyChatScrollMode: jest.fn(),
+      applyTabBarLayout: jest.fn(),
+      reloadModelCatalog: jest.fn(),
+    });
+
+    plugin.settings = { ...DEFAULT_SETTINGS };
+    plugin.app = {
+      workspace: {
+        getLeavesOfType: jest.fn().mockReturnValue([
+          { view: {} },
+          { view: openCodianView },
+        ]),
+      },
+    };
+
+    (
+      plugin as unknown as {
+        runtimeCoordinator: { refreshOpenCodianViews: (options?: { reloadModels?: boolean; applyUi?: boolean }) => void };
+      }
+    ).runtimeCoordinator.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
+
+    expect(openCodianView.applyTabBarLayout).toHaveBeenCalledTimes(1);
+    expect(openCodianView.reloadModelCatalog).not.toHaveBeenCalled();
   });
 
   it('warms slash command catalogs when the server becomes running', () => {

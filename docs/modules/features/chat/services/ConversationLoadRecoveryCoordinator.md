@@ -128,11 +128,12 @@ export class ConversationLoadRecoveryCoordinator {
 - fork target 选择、fork-session 创建、fork 前消息克隆，以及 fork conversation 持久化现在统一在 coordinator 内编排
 - `new-tab` 分支仍保留 max-tabs guard、必要时删除新建 fork conversation、激活新 tab 后复制 active model override
 - `current-tab` 分支仍先写回 active-tab conversation，再走 `loadConversation(..., { forceServerSync: false })`
+- 当 `TabManager.areTabsEnabled()` 为 false，即使 fork target 选择了 `new-tab`，也会降级为 current-tab 打开 fork conversation；这样禁用标签只影响打开入口，不会阻断 fork 会话、历史记录或标题保存
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 不再拥有 `createConversationLoadRecoveryHost` 私有方法；host 组装已通过 `createConversationLoadRecoveryHost(deps)` 工厂函数集中到此 coordinator 文件
-- 工厂函数吸收了四项组装逻辑：`showNotice`（直接 `new Notice`）、`confirmRewind`（直接 `window.confirm(t(...))`）、`chooseForkTarget`（直接调用 `chooseForkTarget(app)`）、`resetPersistedTabState`（使用 `getDefaultPersistedTabState()` + setter）
+- 工厂函数吸收了四项组装逻辑：`showNotice`（直接 `new Notice`）、`confirmRewind`（直接 `window.confirm(t(...))`）、`chooseForkTarget`（调用 `chooseForkTarget(app, { allowNewTab })`，其中 `allowNewTab` 来自当前 `TabManager.areTabsEnabled()`）、`resetPersistedTabState`（使用 `getDefaultPersistedTabState()` + setter）
 - `OpenCodianView` 传入更低层级的扁平依赖对象（含 `app`、`setPersistedTabState` 等），不再传入 `chooseForkTarget` / `confirmRewind` / `showNotice` / `resetPersistedTabState` 回调
 - `ConversationLoadRecoveryCoordinator` 负责把 create/load/bootstrap/delete-recovery/fork/rewind 入口拼成一条可读的 lifecycle surface，并直接承接 first-open / persisted-restore 决策
 - `ConversationViewStateService`、`ConversationTabOpenCoordinator` 与 `ConversationTabLifecycleRecoveryCoordinator` 继续各自保有更细的 activation / open / delete 语义

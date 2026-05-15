@@ -1431,6 +1431,8 @@ export const enTranslations = {
   'settings.security.exportPaths.desc': 'Reusable paths for debug exports and manual permission-rule editing.',
 
   // UI settings
+  'settings.ui.enableTabs.name': 'Enable conversation tabs',
+  'settings.ui.enableTabs.desc': 'Show tab controls and open child sessions in tabs. Disabling tabs keeps conversations, history, titles, and background task state intact.',
   'settings.ui.maxTabs.name': 'Maximum tabs',
   'settings.ui.maxTabs.desc': 'Maximum number of conversation tabs (3-10)',
   'settings.ui.tabPosition.name': 'Tab bar position',
@@ -1625,6 +1627,7 @@ export const enTranslations = {
   'chat.tab.created': 'New tab created',
   'chat.tab.newCurrentCreated': 'New conversation created',
   'chat.tab.maxReached': 'Maximum tabs reached ({count})',
+  'chat.tab.childOpenFailed': 'Failed to open the subagent session',
   'chat.tab.newBlockedWhileStreaming': 'A response is still streaming. Please try again in a moment.',
   'chat.slashCommand.executionFailed': 'Failed to run /{command}: {message}',
   'slashCommand.menu.loading': 'Loading slash commands…',
@@ -1655,6 +1658,7 @@ export const enTranslations = {
   'chat.fork.chooseTarget': 'Fork conversation',
   'chat.fork.targetCurrentTab': 'Fork in current tab',
   'chat.fork.targetNewTab': 'Fork to new tab',
+  'chat.fork.newTabDisabled': 'New-tab fork targets are hidden because conversation tabs are disabled.',
   'chat.fork.successCurrentTab': 'Forked conversation in current tab',
   'chat.fork.successNewTab': 'Forked conversation in new tab',
   'chat.fork.failed': 'Failed to fork conversation',
