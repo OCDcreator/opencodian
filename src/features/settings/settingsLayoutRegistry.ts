@@ -31,7 +31,6 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'basic',
     secondaryTabs: [
       { id: 'basic', labelKey: 'settings.general.tab.basic' },
-      { id: 'language', labelKey: 'settings.general.tab.language' },
     ],
   },
   {
@@ -68,7 +67,6 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'sharing', labelKey: 'settings.conversation.tab.sharing' },
       { id: 'display', labelKey: 'settings.conversation.tab.display' },
       { id: 'questions', labelKey: 'settings.conversation.tab.questions' },
-      { id: 'rendering', labelKey: 'settings.conversation.tab.rendering' },
     ],
   },
   {
@@ -132,7 +130,6 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'config',
     secondaryTabs: [
       { id: 'config', labelKey: 'settings.security.tab.config' },
-      { id: 'permissions', labelKey: 'settings.security.tab.permissions' },
       { id: 'safety', labelKey: 'settings.security.tab.safety' },
     ],
   },
@@ -219,6 +216,17 @@ const PRIMARY_TAB_MAP = new Map<string, SettingsPrimaryTabDefinition>();
 const LEGACY_PRIMARY_TAB_ID_MAP: Record<string, string> = {
   language: 'general',
 };
+const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
+  general: {
+    language: 'basic',
+  },
+  conversation: {
+    rendering: 'display',
+  },
+  security: {
+    permissions: 'config',
+  },
+};
 for (const tab of SETTINGS_PRIMARY_TABS) {
   PRIMARY_TAB_MAP.set(tab.id, tab);
 }
@@ -244,9 +252,10 @@ export function resolveSecondaryTabId(primaryTabId: string, candidate: string): 
     return resolveSecondaryTabId(SETTINGS_PRIMARY_TABS[0]?.id ?? 'general', candidate);
   }
 
-  const exists = primary.secondaryTabs.some((t) => t.id === candidate);
+  const normalizedCandidate = LEGACY_SECONDARY_TAB_ID_MAP[resolvedPrimaryTabId]?.[candidate] ?? candidate;
+  const exists = primary.secondaryTabs.some((t) => t.id === normalizedCandidate);
   if (exists) {
-    return candidate;
+    return normalizedCandidate;
   }
 
   return primary.defaultSecondaryTabId;

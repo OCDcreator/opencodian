@@ -14,15 +14,12 @@ import {
 } from '../../../../src/features/settings/settingsLayoutRegistry';
 
 describe('SETTINGS_PRIMARY_TABS', () => {
-  it('defines general as a real primary tab with basic/language secondary tabs', () => {
+  it('defines general as a single-page primary tab without extra secondary navigation', () => {
     const generalTab = getPrimaryTabDefinition('general');
     expect(generalTab).toBeDefined();
     expect(generalTab!.labelKey).toBe('settings.general.title');
     expect(generalTab!.defaultSecondaryTabId).toBe('basic');
-    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
-      'basic',
-      'language',
-    ]);
+    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['basic']);
   });
 
   it('defines all expected primary tabs in order', () => {
@@ -89,7 +86,6 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'sharing',
       'display',
       'questions',
-      'rendering',
     ]);
   });
 });
@@ -127,6 +123,12 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('model', '')).toBe('common');
     expect(resolveSecondaryTabId('server', '  ')).toBe('connection');
     expect(resolveSecondaryTabId('general', 'general')).toBe('basic');
+  });
+
+  it('maps legacy secondary ids to their merged targets', () => {
+    expect(resolveSecondaryTabId('general', 'language')).toBe('basic');
+    expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
+    expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
   });
 
   it('falls back to the first primary for unknown primary ids', () => {
@@ -188,6 +190,6 @@ describe('getPrimaryTabDefinition', () => {
     expect(def!.id).toBe('general');
     expect(def!.labelKey).toBe('settings.general.title');
     expect(def!.defaultSecondaryTabId).toBe('basic');
-    expect(def!.secondaryTabs).toHaveLength(2);
+    expect(def!.secondaryTabs).toHaveLength(1);
   });
 });

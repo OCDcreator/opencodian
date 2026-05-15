@@ -192,7 +192,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   prepareScrollToConversationOnNextOpen(secondaryTab?: string): void {
     if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
-      this.getOrCreateTabbedRenderer().switchToPrimaryTab('conversation', secondaryTab ?? 'display');
+      const resolvedSecondaryTab = secondaryTab === 'rendering' ? 'display' : secondaryTab;
+      this.getOrCreateTabbedRenderer().switchToPrimaryTab('conversation', resolvedSecondaryTab ?? 'display');
       return;
     }
 
@@ -210,7 +211,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       case 'questions':
         return t('settings.conversation.questions.title');
       case 'rendering':
-        return t('settings.conversation.rendering.title');
       case 'display':
         return t('settings.conversation.display.title');
       default:

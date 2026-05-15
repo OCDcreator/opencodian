@@ -112,12 +112,7 @@ export class SettingsTabbedRenderer {
 
     // Secondary tab bar
     const primaryDef = SETTINGS_PRIMARY_TABS.find((pt) => pt.id === activePrimaryId);
-    if (
-      primaryDef
-      && primaryDef.secondaryTabs.length > 0
-      && activePrimaryId !== 'general'
-      && activePrimaryId !== 'mcp'
-    ) {
+    if (primaryDef && primaryDef.secondaryTabs.length > 1) {
       const secondaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-secondary' });
       for (const secondaryTab of primaryDef.secondaryTabs) {
         const tabEl = secondaryBarEl.createEl('button', {

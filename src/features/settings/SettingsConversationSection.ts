@@ -220,9 +220,8 @@ export class SettingsConversationSection {
       { id: 'title', render: (el) => this.renderTitleBlock(el) },
       { id: 'compaction', render: (el) => this.renderCompactionBlock(el) },
       { id: 'sharing', render: (el) => this.renderSharingBlock(el) },
-      { id: 'display', render: (el) => this.renderDisplayBlock(el) },
+      { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
       { id: 'questions', render: (el) => this.renderQuestionsBlock(el) },
-      { id: 'rendering', render: (el) => this.renderRenderingBlock(el) },
     ];
 
     for (const block of blocks) {
@@ -278,6 +277,11 @@ export class SettingsConversationSection {
 
   private renderDisplayBlock(containerEl: HTMLElement): void {
     this.addChatFontSizeSetting(containerEl);
+  }
+
+  private renderDisplayTabBlock(containerEl: HTMLElement): void {
+    this.renderDisplayBlock(containerEl);
+    this.renderRenderingBlock(containerEl);
   }
 
   private renderQuestionsBlock(containerEl: HTMLElement): void {
