@@ -142,17 +142,16 @@ export class SettingsModelCatalogPresenter {
 
     containerEl.empty();
 
-    const blockEl = this.renderModelToggleBlock(containerEl, options);
-    const catalogSectionEl = catalogState
-      ? this.renderCatalogOverview(blockEl, catalogState)
-      : null;
+    const blockEl = this.renderModelToggleBlock(containerEl);
     const catalogContext = catalogState
       ? this.createCatalogRenderContext(catalogState)
       : null;
+    const catalogSectionEl = catalogState
+      ? this.renderCatalogOverview(blockEl, catalogState, catalogContext)
+      : null;
 
-    if (catalogSectionEl && catalogContext) {
-      this.renderCatalogActions(catalogSectionEl, catalogContext);
-    }
+    const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
+    this.renderAvailabilityControls(controlsEl, options);
 
     this.renderProviderList(blockEl, catalogContext, disabledModelRefs);
     this.restoreOuterScrollHostPosition(outerScrollHostSnapshot);
@@ -177,18 +176,12 @@ export class SettingsModelCatalogPresenter {
     };
   }
 
-  private renderModelToggleBlock(
-    containerEl: HTMLElement,
-    options: SettingsModelCatalogPresenterRenderOptions,
-  ): HTMLElement {
+  private renderModelToggleBlock(containerEl: HTMLElement): HTMLElement {
     const descText = t('settings.model.toggle.desc');
     if (descText.trim().length > 0) {
       const descEl = containerEl.createDiv({ cls: 'opencodian-model-toggle-desc' });
       this.applyInlineCodeText(descEl, descText);
     }
-
-    const controlsEl = containerEl.createDiv({ cls: 'opencodian-model-availability-controls' });
-    this.renderAvailabilityControls(controlsEl, options);
 
     return containerEl;
   }
@@ -297,8 +290,12 @@ export class SettingsModelCatalogPresenter {
   private renderCatalogOverview(
     blockEl: HTMLElement,
     catalogState: ModelCatalogState,
+    context: ModelCatalogRenderContext | null,
   ): HTMLElement {
     const catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
+    if (context) {
+      this.renderCatalogActions(catalogSectionEl, context);
+    }
     const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
     this.renderModelCatalogSummaryCards(summaryEl, catalogState);
     return catalogSectionEl;

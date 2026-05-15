@@ -186,6 +186,28 @@ describe('SettingsModelCatalogPresenter', () => {
     expect(containerEl.querySelector('.opencodian-model-toggle-provider-scrollbar-proxy')).toBeNull();
   });
 
+  it('renders bulk actions before the catalog summary and keeps availability search controls after it', () => {
+    const { presenter } = createPresenter();
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    presenter.setPreferredCatalogTab('merge');
+
+    presenter.render({
+      containerEl,
+      catalogState: createCatalogState() as never,
+    });
+
+    const actionsEl = containerEl.querySelector<HTMLElement>('.opencodian-model-catalog-actions');
+    const summaryEl = containerEl.querySelector<HTMLElement>('.opencodian-model-catalog-summary-grid');
+    const controlsEl = containerEl.querySelector<HTMLElement>('.opencodian-model-availability-controls');
+
+    expect(actionsEl).not.toBeNull();
+    expect(summaryEl).not.toBeNull();
+    expect(controlsEl).not.toBeNull();
+    expect(actionsEl!.compareDocumentPosition(summaryEl!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(summaryEl!.compareDocumentPosition(controlsEl!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it('skips the secondary availability description when the copy is empty', () => {
     const { presenter } = createPresenter();
     const containerEl = document.createElement('div');
@@ -325,5 +347,35 @@ describe('SettingsModelCatalogPresenter CSS contract', () => {
     expect(classicBlockRule).toContain('backdrop-filter: none');
     expect(classicDescRule).toContain('var(--opencodian-settings-object-border');
     expect(classicProviderSiblingRule).toContain('var(--opencodian-settings-space-md');
+  });
+
+  it('keeps the catalog actions, summary cards, and availability controls on a consistent vertical rhythm', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    const findRule = (selector: string, required?: string): string => (
+      Array.from(css.matchAll(new RegExp(`${selector}\\s*\\{[^}]*\\}`, 'g')))
+        .map((match) => match[0])
+        .find((rule) => (required ? rule.includes(required) : true)) ?? ''
+    );
+
+    const managementRule = findRule(
+      '\\.opencodian-settings \\.opencodian-settings-section \\.opencodian-model-toggle-management',
+      'gap:',
+    );
+    const catalogsRule = findRule('\\.opencodian-model-toggle-catalogs', 'display: grid');
+    const actionsRule = findRule('\\.opencodian-model-catalog-actions', 'margin-top: 0');
+    const summaryGridRule = findRule('\\.opencodian-model-catalog-summary-grid', 'margin-bottom: 0');
+    const controlsRule = findRule('\\.opencodian-model-availability-controls', 'margin-bottom: 0');
+
+    expect(managementRule).toContain('gap: var(--opencodian-settings-space-lg');
+    expect(catalogsRule).toContain('display: grid');
+    expect(catalogsRule).toContain('gap: var(--opencodian-settings-space-lg');
+    expect(catalogsRule).toContain('margin-bottom: 0');
+    expect(actionsRule).toContain('margin-top: 0');
+    expect(summaryGridRule).toContain('margin-bottom: 0');
+    expect(controlsRule).toContain('margin-bottom: 0');
   });
 });

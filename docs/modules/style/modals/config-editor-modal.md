@@ -138,6 +138,16 @@ Guardrail: 这次增强只允许 classic mode 获得更明确的 child panel rhy
 
 Guardrail: MCP、Formatter、Model availability 的精修只能增加局部节奏和分隔，不应恢复 section 内的大卡片套大卡片、decorative blur、gradient、hover lift 或 heavy shadow。
 
+### 2026-05-15 model availability rhythm pass
+
+provider / model 管理区在交换 actions 与 search 行顺序后，纵向节奏改成“两层 gap”而不是依赖零散 margin 叠加：
+
+- `.opencodian-model-toggle-management` 作为外层 stack，显式覆盖共享 section-body 的默认 `8px` gap，改用 `12px` 主节奏。
+- `.opencodian-model-toggle-catalogs` 自己再用 `12px` 子节奏串联 bulk actions 与 summary cards，不再额外吃 bottom margin。
+- `.opencodian-model-availability-controls` 与 `.opencodian-model-catalog-summary-grid` 去掉各自的 `margin-bottom`，provider list 顶部也不再额外补 `margin-top`。
+
+Guardrail: 如果后续继续调整 availability 区，不要再把 `actions / summary / controls / provider list` 的纵向空隙拆回多个 margin。优先让外层 stack 决定主节奏，让 catalogs 子容器决定内部节奏。
+
 ## 2026-05-13 Model picker visual refresh
 
 模型选择弹层（`ModelPickerModal`）进行视觉重构：

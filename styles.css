@@ -12121,7 +12121,7 @@ img.opencodian-model-provider-header-icon {
   display: flex;
   flex-wrap: wrap;
   gap: var(--opencodian-settings-space-md, 8px);
-  margin-bottom: var(--opencodian-settings-space-lg, 12px);
+  margin-bottom: 0;
 }
 
 .opencodian-model-availability-search {
@@ -12211,8 +12211,9 @@ img.opencodian-model-provider-header-icon {
   accent-color: var(--interactive-accent);
 }
 
-.opencodian-model-toggle-management {
+.opencodian-settings .opencodian-settings-section .opencodian-model-toggle-management {
   margin: 0;
+  gap: var(--opencodian-settings-space-lg, 12px);
 }
 
 .opencodian-model-toggle-block {
@@ -12243,7 +12244,9 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-model-toggle-catalogs {
-  margin-bottom: 8px;
+  display: grid;
+  gap: var(--opencodian-settings-space-lg, 12px);
+  margin-bottom: 0;
 }
 
 .opencodian-model-toggle-catalogs .opencodian-model-catalog {
@@ -12256,7 +12259,7 @@ img.opencodian-model-provider-header-icon {
   justify-content: flex-start;
   gap: 12px 18px;
   flex-wrap: wrap;
-  margin-top: var(--opencodian-settings-space-md, 8px);
+  margin-top: 0;
   padding: 8px 10px;
   border: 1px solid var(--opencodian-settings-row-border, var(--background-modifier-border));
   border-radius: var(--opencodian-settings-radius-row, 10px);
@@ -12333,7 +12336,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-model-toggle-provider-list {
   --opencodian-model-toggle-provider-preview-height: 112px;
   min-width: 0;
-  margin-top: 2px;
+  margin-top: 0;
   max-height: calc(var(--opencodian-model-toggle-provider-preview-height) * 4 + 48px);
   overflow-y: auto;
   padding-right: 0;
@@ -13699,7 +13702,7 @@ img.opencodian-model-provider-header-icon {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 .opencodian-model-catalog-summary-card {
