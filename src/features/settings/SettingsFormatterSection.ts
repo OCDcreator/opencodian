@@ -1246,20 +1246,19 @@ export class SettingsFormatterSection {
       setExpanded(rowEl.getAttribute('aria-expanded') !== 'true');
     };
     rowEl.addEventListener('click', (event) => {
-      if (this.shouldIgnoreBuiltinRowToggle(event.target, fieldsEl)) return;
+      if (this.shouldIgnoreBuiltinRowToggle(event.target)) return;
       toggleExpanded();
-    });
+    }, { capture: true });
     rowEl.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
-      if (this.shouldIgnoreBuiltinRowToggle(event.target, fieldsEl)) return;
+      if (this.shouldIgnoreBuiltinRowToggle(event.target)) return;
       event.preventDefault();
       toggleExpanded();
     });
   }
 
-  private shouldIgnoreBuiltinRowToggle(target: EventTarget | null, fieldsEl: HTMLElement): boolean {
+  private shouldIgnoreBuiltinRowToggle(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return true;
-    if (fieldsEl.contains(target)) return true;
     return Boolean(target.closest('button, input, select, textarea, a, [contenteditable="true"]'));
   }
 

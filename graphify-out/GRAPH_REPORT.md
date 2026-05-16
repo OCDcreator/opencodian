@@ -1,7 +1,7 @@
 # Graph Report - /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/src  (2026-05-16)
 
 ## Corpus Check
-- 393 files · ~351,474 words
+- 393 files · ~351,470 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -573,11 +573,11 @@ Nodes (0):
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 18`, `Community 19`, `Community 21`, `Community 23`, `Community 26`, `Community 27`, `Community 29`, `Community 30`, `Community 31`, `Community 32`, `Community 33`, `Community 36`, `Community 38`, `Community 41`, `Community 44`, `Community 47`, `Community 48`?**
-  _High betweenness centrality (0.425) - this node is a cross-community bridge._
+  _High betweenness centrality (0.403) - this node is a cross-community bridge._
 - **Why does `OpenCodianView` connect `Community 1` to `Community 0`, `Community 33`, `Community 4`, `Community 5`, `Community 8`, `Community 10`, `Community 13`, `Community 16`, `Community 19`, `Community 21`, `Community 24`, `Community 26`?**
-  _High betweenness centrality (0.091) - this node is a cross-community bridge._
+  _High betweenness centrality (0.087) - this node is a cross-community bridge._
 - **Why does `OpenCodeService` connect `Community 11` to `Community 0`, `Community 33`, `Community 3`, `Community 4`, `Community 6`, `Community 8`, `Community 13`, `Community 14`, `Community 18`, `Community 22`, `Community 23`, `Community 30`?**
-  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+  _High betweenness centrality (0.051) - this node is a cross-community bridge._
 - **Are the 555 inferred relationships involving `t()` (e.g. with `.getEmptyConversationTitle()` and `.generateDefaultTitle()`) actually correct?**
   _`t()` has 555 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**

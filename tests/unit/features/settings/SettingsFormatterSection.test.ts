@@ -732,6 +732,82 @@ describe('SettingsFormatterSection builtin list search', () => {
     expect(getBuiltinStatusChip(containerEl, 'gofmt').hidden).toBe(false);
   });
 
+  it('collapses builtin formatter override fields from non-control card body clicks', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        prettier: {
+          command: ['npx', 'prettier', '--write', '$FILE'],
+          environment: { PRETTIER_CACHE: 'true' },
+          extensions: ['.js', '.ts', '.md'],
+        },
+      },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'formatter');
+    await flushPromises();
+
+    const rowEl = getBuiltinRow(containerEl, 'prettier');
+    const fieldsEl = rowEl.querySelector<HTMLElement>('.opencodian-formatter-override-fields');
+    const envInputEl = fieldsEl?.querySelector<HTMLInputElement>('.opencodian-formatter-env-row input');
+    expect(rowEl.getAttribute('aria-expanded')).toBe('true');
+    expect(fieldsEl?.hidden).toBe(false);
+
+    envInputEl?.click();
+
+    expect(rowEl.getAttribute('aria-expanded')).toBe('true');
+    expect(fieldsEl?.hidden).toBe(false);
+
+    fieldsEl?.click();
+
+    expect(rowEl.getAttribute('aria-expanded')).toBe('false');
+    expect(fieldsEl?.hidden).toBe(true);
+  });
+
+  it('collapses builtin formatter rows when nested body elements stop propagation', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        prettier: {
+          command: ['npx', 'prettier', '--write', '$FILE'],
+          extensions: ['.js', '.ts', '.md'],
+        },
+      },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'formatter');
+    await flushPromises();
+
+    const rowEl = getBuiltinRow(containerEl, 'prettier');
+    const fieldsEl = rowEl.querySelector<HTMLElement>('.opencodian-formatter-override-fields');
+    const bodyTargetEl = fieldsEl?.createSpan({ cls: 'opencodian-test-body-target' });
+    expect(rowEl.getAttribute('aria-expanded')).toBe('true');
+    expect(fieldsEl?.hidden).toBe(false);
+    expect(bodyTargetEl).not.toBeNull();
+
+    bodyTargetEl?.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+    bodyTargetEl?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(rowEl.getAttribute('aria-expanded')).toBe('false');
+    expect(fieldsEl?.hidden).toBe(true);
+  });
+
   it('collapses builtin language server override fields by clicking the card', async () => {
     const { plugin } = createPlugin({
       lspConfig: {

@@ -3367,6 +3367,11 @@
   cursor: auto;
 }
 
+.opencodian-formatter-builtin-row.is-collapsible .opencodian-formatter-override-fields[hidden],
+.opencodian-formatter-builtin-row.is-collapsible .opencodian-formatter-custom-fields[hidden] {
+  display: none;
+}
+
 .opencodian-settings-block > .opencodian-formatter-builtin-row,
 .opencodian-formatter-builtin-scroll > .opencodian-formatter-builtin-row,
 .opencodian-settings-block > .opencodian-formatter-custom-row {

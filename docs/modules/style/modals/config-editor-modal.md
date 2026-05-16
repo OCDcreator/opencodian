@@ -175,6 +175,7 @@ Guardrail: 这轮是工作台式表格控制增强，不应引入独立筛选面
 
 - `.opencodian-formatter-override-fields`、`.opencodian-formatter-custom-fields` 和 `.opencodian-formatter-env-editor` 内部的 `Setting` row 改为局部两列 grid：左侧说明保留密度，右侧字段列使用 `minmax(280px, 1fr)` 吃满可用编辑区域。
 - command、extensions、environment 以及 LSP initialization 输入显式 `width: 100%` / `max-width: 100%`，避免 Obsidian 默认 text input 宽度截断 `例如 prettier --write $FILE` 这类 inline hint。
+- builtin formatter/LSP override fields 显式支持 `[hidden] { display: none; }`，避免基础 `display: flex` 规则覆盖折叠态，导致 DOM 已折叠但视觉仍显示表单。
 - 900px 以下退为单列，按钮与字段左对齐，避免窄设置面板里为了显示 placeholder 产生横向溢出。
 
 Guardrail: 只放宽 formatter/LSP 编辑字段，不放宽 builtin row 顶部 action dropdown，也不把所有设置页 input 全局拉长。

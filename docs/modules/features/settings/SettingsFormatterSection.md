@@ -78,7 +78,7 @@ Each builtin formatter (from the upstream builtin catalog, with runtime badges m
 | `disable` | Writes `{ disabled: true }` preserving unknown fields |
 | `override` | Opens command/environment/extensions fields; saves override to config |
 
-Override fields: `command` (space-split string → array), `environment` (key/value rows), `extensions` (space-split, auto-dot-prefix, dedup). Builtin override rows are collapsible by clicking the row outside interactive controls; collapsing hides only the override fields and keeps the name, extensions, status chip, and action dropdown visible.
+Override fields: `command` (space-split string → array), `environment` (key/value rows), `extensions` (space-split, auto-dot-prefix, dedup). Builtin override rows are collapsible by clicking any non-control area of the row, including the expanded override body; collapsing hides only the override fields and keeps the name, extensions, status chip, and action dropdown visible.
 
 If override fields are cleared and saved with no content, the entry is removed from config (reverts to default).
 
