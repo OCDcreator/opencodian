@@ -147,6 +147,10 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 
 无。
 
+## 2026-05-16 Plugin availability settings
+
+Settings exports now include the plugin-side disabled plugin spec fields used by plugin management docs and settings UI.
+
 ## 注意事项
 
 - 这是高耦合入口，新增导出时要警惕循环依赖和 import 体积膨胀

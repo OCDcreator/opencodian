@@ -195,6 +195,10 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 这让设置页可以把“provider 级开关”和“model 级禁用”分开表达。
 
+### 项目插件禁用引用
+
+`OpenCodianSettings.disabledPluginSpecs` 存储插件侧项目插件禁用列表，由插件管理设置页用于标记 config plugin 和 directory plugin 的启用状态。
+
 ### 聊天气泡元数据样式
 
 `ChatAppearanceSettings` 最近扩展了两类样式字段：
@@ -239,6 +243,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `showAnsweredQuestionCards` | `boolean` | `true` | 显示已回答问题卡片 |
 | `aiTitleModel` | `string` | `''` | 智能标题无法从 OpenCode 获取标题时使用的备用标题模型 |
 | `disabledModelRefs` | `string[]` | `[]` | 插件侧禁用的 `provider/model` 列表 |
+| `disabledPluginSpecs` | `string[]` | `[]` | 插件侧禁用的项目插件 spec / 文件引用列表 |
 | `renderUserMarkupAsCodeBlocks` | `boolean` | `true` | 用户标记渲染为代码块 |
 | `pluginIsolationMode` | `PluginIsolationMode` | `'default'` | 插件隔离模式 |
 | `providers` | `ModelProviderConfig[]` | Anthropic | 提供商列表 |

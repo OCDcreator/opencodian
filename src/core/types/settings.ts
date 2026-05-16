@@ -626,6 +626,27 @@ export function normalizeDisabledModelRefs(value: unknown): string[] {
 }
 
 /**
+ * Normalizes `disabledPluginSpecs` – an array of serialized plugin specifier
+ * strings that the user has explicitly disabled. Each entry is the serialized
+ * form produced by `PluginManagementService.formatPluginSpec()`: either a bare
+ * npm name (`"opencode-wakatime"`) or a JSON tuple (`'["@org/plugin",{"v":true}]'`).
+ */
+export function normalizeDisabledPluginSpecs(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    ),
+  );
+}
+
+/**
  * Get blocked commands for the Bash tool.
  *
  * On Windows, the Bash tool runs in a Git Bash/MSYS2 environment but can still
@@ -1729,6 +1750,7 @@ export interface OpenCodianSettings {
   showAnsweredQuestionCards: boolean;
   aiTitleModel: string;
   disabledModelRefs: string[];
+  disabledPluginSpecs: string[];
   renderUserMarkupAsCodeBlocks: boolean;
   pluginIsolationMode: PluginIsolationMode;
   providers: ModelProviderConfig[];
@@ -1888,6 +1910,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   showAnsweredQuestionCards: true,
   aiTitleModel: '',
   disabledModelRefs: [],
+  disabledPluginSpecs: [],
   renderUserMarkupAsCodeBlocks: true,
   pluginIsolationMode: 'default',
   providers: [
@@ -1971,6 +1994,7 @@ export function normalizeModelProviderPluginDebugSettings(
     OpenCodianSettings,
     | 'aiTitleModel'
     | 'disabledModelRefs'
+    | 'disabledPluginSpecs'
     | 'renderUserMarkupAsCodeBlocks'
     | 'pluginIsolationMode'
     | 'providerIconLibrary'
@@ -1989,6 +2013,7 @@ export function normalizeModelProviderPluginDebugSettings(
   OpenCodianSettings,
   | 'aiTitleModel'
   | 'disabledModelRefs'
+  | 'disabledPluginSpecs'
   | 'renderUserMarkupAsCodeBlocks'
   | 'pluginIsolationMode'
   | 'providerIconLibrary'
@@ -2020,6 +2045,7 @@ export function normalizeModelProviderPluginDebugSettings(
   return {
     aiTitleModel: typeof value?.aiTitleModel === 'string' ? value.aiTitleModel.trim() : '',
     disabledModelRefs: normalizeDisabledModelRefs(value?.disabledModelRefs),
+    disabledPluginSpecs: normalizeDisabledPluginSpecs(value?.disabledPluginSpecs),
     renderUserMarkupAsCodeBlocks: normalizeBoolean(
       value?.renderUserMarkupAsCodeBlocks,
       DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,

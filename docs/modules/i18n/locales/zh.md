@@ -261,3 +261,7 @@ New Chinese keys added for the tabbed settings layout:
 ## 2026-05-15 会话标签开关
 
 新增 `settings.ui.enableTabs.name` 和 `settings.ui.enableTabs.desc`，用于 UI 设置里的“启用会话标签”开关。该文案说明禁用标签只隐藏/禁用标签控件，不清空会话、历史记录、标题或后台任务状态。
+
+## 2026-05-16 插件管理控制
+
+插件设置文案现在覆盖安装区，以及每个插件条目的启用/禁用、卸载和删除控制。

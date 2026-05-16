@@ -56,6 +56,7 @@
 
 - 这里只处理启动期 bootstrap normalization；保存路径、UI refresh、locale/theme side effects 仍在 `main.ts`。
 - 不能改变 conversation preload、plugin load order、provider/model disable layering 或 locale keys。
+- `disabledPluginSpecs` 在启动归一化时保持为清洗后的字符串列表，供插件管理快照合并项目插件禁用状态。
 
 ## 2026-04-23 Compaction config alignment
 

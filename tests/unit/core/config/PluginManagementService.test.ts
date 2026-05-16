@@ -57,6 +57,8 @@ describe('PluginManagementService', () => {
     ]);
     expect(snapshot.projectConfigPlugins[1].kind).toBe('local');
     expect(snapshot.projectDirectoryPlugins.map((item) => item.displayName)).toEqual(['project-local.js']);
+    expect(snapshot.disabledProjectConfigPlugins).toEqual([]);
+    expect(snapshot.disabledProjectDirectoryPlugins).toEqual([]);
     expect(snapshot.globalInfluenceDetected).toBe(true);
   });
 
@@ -88,6 +90,10 @@ describe('PluginManagementService', () => {
     ]);
     expect(snapshot.globalDirectoryPlugins.map((item) => item.displayName)).toEqual(['global-local.js']);
     expect(snapshot.projectDirectoryPlugins.map((item) => item.displayName)).toEqual(['project-local.js']);
+    expect(snapshot.globalDirectories.map((directory) => directory.disabledFiles)).toEqual([[]]);
+    expect(snapshot.projectDirectories.map((directory) => directory.disabledFiles)).toEqual([[]]);
+    expect(snapshot.disabledProjectConfigPlugins).toEqual([]);
+    expect(snapshot.disabledProjectDirectoryPlugins).toEqual([]);
   });
 
   it('creates the project OMO config file', async () => {

@@ -24,6 +24,7 @@ export interface PluginEntry {
   displayName: string;
   fullPath?: string;
   options?: OpencodePluginOptions;
+  disabled: boolean;
 }
 
 export interface PluginDirectorySnapshot {
@@ -31,6 +32,7 @@ export interface PluginDirectorySnapshot {
   path: string;
   exists: boolean;
   files: string[];
+  disabledFiles: string[];
 }
 
 export interface PluginEnvironmentSnapshot {
@@ -45,6 +47,8 @@ export interface PluginEnvironmentSnapshot {
   globalDirectoryPlugins: PluginEntry[];
   projectConfigPlugins: PluginEntry[];
   projectDirectoryPlugins: PluginEntry[];
+  disabledProjectConfigPlugins: PluginEntry[];
+  disabledProjectDirectoryPlugins: PluginEntry[];
   globalDirectories: PluginDirectorySnapshot[];
   projectDirectories: PluginDirectorySnapshot[];
   globalInfluenceDetected: boolean;
@@ -54,6 +58,7 @@ export interface PluginEnvironmentSnapshot {
 
 const DIRECTORY_PLUGIN_FOLDERS = ['plugins'] as const;
 const DIRECTORY_PLUGIN_EXTENSIONS = new Set(['.js', '.ts', '.mjs', '.cjs']);
+const DISABLED_EXTENSION_SUFFIX = '.disabled';
 const DEFAULT_OMO_TEMPLATE = `{
   // Project-level oh-my-opencode config
 }
@@ -74,6 +79,7 @@ export class PluginManagementService {
   async inspect(
     serviceMode: ServerMode,
     isolationMode: PluginIsolationMode,
+    disabledPluginSpecs: readonly string[] = [],
   ): Promise<PluginEnvironmentSnapshot> {
     const [globalConfig, projectConfig, globalDirectories, projectDirectories] = await Promise.all([
       this.readConfigFile(this.getGlobalConfigPath()),
@@ -84,8 +90,10 @@ export class PluginManagementService {
 
     const globalConfigPlugins = this.extractConfigPlugins(globalConfig, 'global');
     const projectConfigPlugins = this.extractConfigPlugins(projectConfig, 'project');
-    const globalDirectoryPlugins = this.flattenDirectoryPlugins(globalDirectories, 'global');
-    const projectDirectoryPlugins = this.flattenDirectoryPlugins(projectDirectories, 'project');
+    const globalDirectoryPlugins = this.flattenActiveDirectoryPlugins(globalDirectories, 'global');
+    const projectDirectoryPlugins = this.flattenActiveDirectoryPlugins(projectDirectories, 'project');
+    const disabledProjectDirectoryPlugins = this.flattenDisabledDirectoryPlugins(projectDirectories, 'project');
+    const disabledProjectConfigPlugins = this.parseDisabledSpecEntries(disabledPluginSpecs);
     const omoConfigPath = this.getProjectOmoConfigPath();
 
     return {
@@ -100,6 +108,8 @@ export class PluginManagementService {
       globalDirectoryPlugins,
       projectConfigPlugins,
       projectDirectoryPlugins,
+      disabledProjectConfigPlugins,
+      disabledProjectDirectoryPlugins,
       globalDirectories,
       projectDirectories,
       globalInfluenceDetected: globalConfigPlugins.length > 0 || globalDirectoryPlugins.length > 0,
@@ -165,6 +175,114 @@ export class PluginManagementService {
       });
   }
 
+  // ---------------------------------------------------------------------------
+  // Enable / disable / install / uninstall
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Compute the next `disabledPluginSpecs` array after toggling config-based
+   * plugin entries.  Callers should persist the returned array into settings
+   * and separately call `updateProjectConfigPlugins()` to keep the config
+   * file in sync.
+   */
+  applyConfigPluginAvailabilityChange(
+    disabledPluginSpecs: readonly string[],
+    serializedSpecs: readonly string[],
+    enabled: boolean,
+  ): string[] {
+    const next = new Set(disabledPluginSpecs);
+    for (const spec of serializedSpecs) {
+      if (enabled) {
+        next.delete(spec);
+      } else {
+        next.add(spec);
+      }
+    }
+    return [...next].sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
+   * Toggle a directory-based plugin by renaming its file extension.
+   *
+   * - To **disable**: append `.disabled` to the file.
+   * - To **enable**: strip the `.disabled` suffix.
+   *
+   * Throws if the destination path already exists (collision guard).
+   */
+  async toggleDirectoryPlugin(filePath: string, enabled: boolean): Promise<string> {
+    if (enabled) {
+      // Enable: strip .disabled suffix
+      if (!filePath.endsWith(DISABLED_EXTENSION_SUFFIX)) {
+        return filePath;
+      }
+      const activePath = filePath.slice(0, -DISABLED_EXTENSION_SUFFIX.length);
+      if (fs.existsSync(activePath)) {
+        throw new Error(`Cannot enable plugin: ${path.basename(activePath)} already exists`);
+      }
+      await fs.promises.rename(filePath, activePath);
+      return activePath;
+    }
+
+    // Disable: append .disabled suffix
+    if (filePath.endsWith(DISABLED_EXTENSION_SUFFIX)) {
+      return filePath;
+    }
+    const disabledPath = filePath + DISABLED_EXTENSION_SUFFIX;
+    if (fs.existsSync(disabledPath)) {
+      throw new Error(`Cannot disable plugin: ${path.basename(disabledPath)} already exists`);
+    }
+    await fs.promises.rename(filePath, disabledPath);
+    return disabledPath;
+  }
+
+  /**
+   * Install a plugin by adding its spec to the project config's `plugin[]`
+   * array.  The caller should also remove it from `disabledPluginSpecs` if
+   * it was previously disabled.
+   */
+  async installConfigPlugin(spec: OpencodePluginSpec): Promise<void> {
+    const config = await this.configManager.read();
+    const plugins: OpencodePluginSpec[] = Array.isArray(config.plugin) ? [...config.plugin] : [];
+
+    // Avoid duplicates (compare serialized form)
+    const serialized = this.formatPluginSpec(spec);
+    const alreadyPresent = plugins.some((p) => this.formatPluginSpec(p) === serialized);
+    if (!alreadyPresent) {
+      plugins.push(spec);
+    }
+    await this.configManager.updatePluginConfig(plugins);
+  }
+
+  /**
+   * Uninstall a config-based plugin by removing its spec from the project
+   * config's `plugin[]` array.  The caller should also remove it from
+   * `disabledPluginSpecs`.
+   */
+  async uninstallConfigPlugin(serializedSpec: string): Promise<void> {
+    const config = await this.configManager.read();
+    if (!Array.isArray(config.plugin)) {
+      return;
+    }
+
+    const plugins = config.plugin.filter(
+      (p) => this.formatPluginSpec(p) !== serializedSpec,
+    );
+    await this.configManager.updatePluginConfig(plugins);
+  }
+
+  /**
+   * Delete a directory-based plugin file from disk.
+   */
+  async deleteDirectoryPlugin(filePath: string): Promise<void> {
+    if (fs.existsSync(filePath)) {
+      await fs.promises.unlink(filePath);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
   private getGlobalConfigPath(): string {
     return path.join(this.globalConfigDir, 'opencode.json');
   }
@@ -191,20 +309,46 @@ export class PluginManagementService {
             path: folderPath,
             exists: false,
             files: [],
+            disabledFiles: [],
           };
         }
 
         const directoryEntries = await fs.promises.readdir(folderPath, { withFileTypes: true });
-        const files = directoryEntries
-          .filter((entry) => entry.isFile() && DIRECTORY_PLUGIN_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
-          .map((entry) => path.join(folderPath, entry.name))
-          .sort((left, right) => left.localeCompare(right));
+        const files: string[] = [];
+        const disabledFiles: string[] = [];
+
+        for (const entry of directoryEntries) {
+          if (!entry.isFile()) {
+            continue;
+          }
+          const fullPath = path.join(folderPath, entry.name);
+          const ext = path.extname(entry.name).toLowerCase();
+
+          if (DIRECTORY_PLUGIN_EXTENSIONS.has(ext)) {
+            files.push(fullPath);
+          } else if (ext === DISABLED_EXTENSION_SUFFIX || entry.name.includes(DISABLED_EXTENSION_SUFFIX)) {
+            // Only treat as a disabled plugin if the base name (before
+            // `.disabled`) has a recognized plugin extension.
+            const disabledSuffixIndex = entry.name.lastIndexOf(DISABLED_EXTENSION_SUFFIX);
+            if (disabledSuffixIndex > 0) {
+              const baseName = entry.name.slice(0, disabledSuffixIndex);
+              const baseExt = path.extname(baseName).toLowerCase();
+              if (DIRECTORY_PLUGIN_EXTENSIONS.has(baseExt)) {
+                disabledFiles.push(fullPath);
+              }
+            }
+          }
+        }
+
+        files.sort((a, b) => a.localeCompare(b));
+        disabledFiles.sort((a, b) => a.localeCompare(b));
 
         return {
           scope,
           path: folderPath,
           exists: true,
           files,
+          disabledFiles,
         };
       }),
     );
@@ -230,11 +374,12 @@ export class PluginManagementService {
         specifier: parsed.specifier,
         displayName: parsed.specifier,
         options: parsed.options,
+        disabled: false,
       }];
     });
   }
 
-  private flattenDirectoryPlugins(
+  private flattenActiveDirectoryPlugins(
     directories: PluginDirectorySnapshot[],
     scope: PluginEntryScope,
   ): PluginEntry[] {
@@ -246,8 +391,62 @@ export class PluginManagementService {
         specifier: filePath,
         displayName: path.basename(filePath),
         fullPath: filePath,
+        disabled: false,
       }))
     );
+  }
+
+  private flattenDisabledDirectoryPlugins(
+    directories: PluginDirectorySnapshot[],
+    scope: PluginEntryScope,
+  ): PluginEntry[] {
+    return directories.flatMap((directory) =>
+      directory.disabledFiles.map((filePath) => ({
+        kind: 'local' as const,
+        scope,
+        source: 'directory' as const,
+        specifier: filePath,
+        displayName: path.basename(filePath).replace(/\.disabled$/, ''),
+        fullPath: filePath,
+        disabled: true,
+      }))
+    );
+  }
+
+  private parseDisabledSpecEntries(disabledPluginSpecs: readonly string[]): PluginEntry[] {
+    return disabledPluginSpecs.map((serialized) => {
+      let specifier = serialized;
+      let options: OpencodePluginOptions | undefined;
+
+      if (serialized.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(serialized) as unknown;
+          if (
+            Array.isArray(parsed)
+            && parsed.length === 2
+            && typeof parsed[0] === 'string'
+            && parsed[1]
+            && typeof parsed[1] === 'object'
+            && !Array.isArray(parsed[1])
+          ) {
+            specifier = parsed[0];
+            options = parsed[1] as OpencodePluginOptions;
+          }
+        } catch {
+          // Invalid JSON tuple – treat entire string as specifier
+        }
+      }
+
+      return {
+        kind: this.classifySpecifier(specifier),
+        scope: 'project' as const,
+        source: 'config' as const,
+        specifier,
+        displayName: specifier,
+        options,
+        disabled: true,
+      };
+    });
   }
 
   private parseConfigPlugin(

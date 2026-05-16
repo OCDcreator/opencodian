@@ -490,6 +490,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
         ?? getDefaultInputPanelLiquidGlassSettings(),
       debugLogPaths: normalizedModelProviderPluginDebugSettings.debugLogPaths,
       disabledModelRefs: normalizedSettings?.disabledModelRefs ?? [],
+      disabledPluginSpecs: normalizedSettings?.disabledPluginSpecs ?? [],
       chatAppearance: normalizedChatAppearance,
       theme: normalizedTheme,
       tabState: normalizedSettings?.tabState ?? getDefaultPersistedTabState(),

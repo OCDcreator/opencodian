@@ -103,6 +103,7 @@ export {
   normalizeCompactionReservedTokens,
   normalizeContextRingStyleId,
   normalizeDisabledModelRefs,
+  normalizeDisabledPluginSpecs,
   normalizeEffortLevel,
   normalizeGlassRefractionInputPanelThemeId,
   normalizeInputPanelActionButtonStyleId,

@@ -69,7 +69,9 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - For code, style, manifest, or build-pipeline changes, run `npm run build` first.
 - A successful `npm run build` must be followed immediately by Test Vault deployment only when the change touches deploy-relevant runtime files (`src/main.ts`, `manifest.json`, `styles.css`, `assets/`, `src/style/`, `src/core/theme/`, `src/features/settings/`) or when the user explicitly asks to deploy.
 - After a successful build, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to the Test Vault plugin directory:
-  `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+  - **Windows**: `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+  - **macOS**: `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+  Deploy to whichever host is available (SSH `desktop-gs1a9np` for Windows, local copy for macOS).
 - If the user asks to “部署到测试库”, treat that as the standard Test Vault deployment flow above; just perform the sequential copy + `BUILD_ID` verification and report the result briefly instead of re-explaining the whole process each time.
 - `npm run build` now includes the CSS merge step automatically; if you only need to refresh the generated root `styles.css`, run `npm run build:css`.
 - If the change touches bundled assets (for example `assets/`, provider icons, branding, or other runtime-loaded files), also copy `dist/assets/` into that same Test Vault plugin directory before verification.

@@ -1376,6 +1376,26 @@ export const enTranslations = {
   'settings.plugins.path.missing': 'missing',
   'settings.plugins.missingPath': 'missing',
 
+  // Plugin install / enable / disable / delete
+  'settings.plugins.install.name': 'Install plugin',
+  'settings.plugins.install.desc': 'Enter an npm package name to add it to the project config. The plugin will load after the next server restart.',
+  'settings.plugins.install.placeholder': 'opencode-wakatime',
+  'settings.plugins.install.button': 'Install',
+  'settings.plugins.install.success': 'Plugin added to project config.',
+  'settings.plugins.install.failed': 'Failed to install plugin.',
+  'settings.plugins.install.duplicate': 'This plugin is already in the project config.',
+  'settings.plugins.entry.enable': 'Enable',
+  'settings.plugins.entry.disable': 'Disable',
+  'settings.plugins.entry.delete': 'Remove',
+  'settings.plugins.entry.deleteConfirm': 'Remove this plugin from the project?',
+  'settings.plugins.entry.enabled': 'Enabled',
+  'settings.plugins.entry.disabled': 'Disabled',
+  'settings.plugins.entry.toggleSaved': 'Plugin state updated.',
+  'settings.plugins.entry.deleteSuccess': 'Plugin removed.',
+  'settings.plugins.entry.deleteFailed': 'Failed to remove plugin.',
+  'settings.plugins.disabledSection.title': 'Disabled plugins',
+  'settings.plugins.disabledSection.desc': 'These plugins are installed but currently disabled.',
+
   // Security settings
   'settings.security.permissionMode.name': 'Permission template',
   'settings.security.permissionMode.desc': 'Choose which OpenCodian template to write into this vault’s `.opencode/opencode.json`.',

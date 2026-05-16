@@ -1376,6 +1376,26 @@ export const zhTranslations = {
   'settings.plugins.path.missing': '不存在',
   'settings.plugins.missingPath': '不存在',
 
+  // Plugin install / enable / disable / delete
+  'settings.plugins.install.name': '安装插件',
+  'settings.plugins.install.desc': '输入 npm 包名将其添加到项目配置。插件将在下次服务重启后加载。',
+  'settings.plugins.install.placeholder': 'opencode-wakatime',
+  'settings.plugins.install.button': '安装',
+  'settings.plugins.install.success': '插件已添加到项目配置。',
+  'settings.plugins.install.failed': '安装插件失败。',
+  'settings.plugins.install.duplicate': '该插件已在项目配置中。',
+  'settings.plugins.entry.enable': '启用',
+  'settings.plugins.entry.disable': '禁用',
+  'settings.plugins.entry.delete': '移除',
+  'settings.plugins.entry.deleteConfirm': '确定从项目中移除此插件？',
+  'settings.plugins.entry.enabled': '已启用',
+  'settings.plugins.entry.disabled': '已禁用',
+  'settings.plugins.entry.toggleSaved': '插件状态已更新。',
+  'settings.plugins.entry.deleteSuccess': '插件已移除。',
+  'settings.plugins.entry.deleteFailed': '移除插件失败。',
+  'settings.plugins.disabledSection.title': '已禁用的插件',
+  'settings.plugins.disabledSection.desc': '这些插件已安装但当前处于禁用状态。',
+
   // Security settings
   'settings.security.permissionMode.name': '权限模板',
   'settings.security.permissionMode.desc': '选择要写入当前 vault `.opencode/opencode.json` 的 OpenCodian 权限模板。',

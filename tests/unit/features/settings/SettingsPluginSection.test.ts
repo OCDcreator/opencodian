@@ -136,9 +136,12 @@ function createSnapshot(
         source: 'config',
         specifier: 'demo-plugin',
         displayName: 'demo-plugin',
+        disabled: false,
       },
     ],
     projectDirectoryPlugins: [],
+    disabledProjectConfigPlugins: [],
+    disabledProjectDirectoryPlugins: [],
     globalDirectories: [],
     projectDirectories: [],
     globalInfluenceDetected: false,
@@ -313,7 +316,7 @@ describe('SettingsPluginSection', () => {
     const refreshButton = findButton(t('settings.plugins.actions.refresh'));
 
     expect(editor?.control.inputEl.value).toBe('demo-plugin');
-    expect(inspectSpy).toHaveBeenNthCalledWith(1, 'local', 'default');
+    expect(inspectSpy).toHaveBeenNthCalledWith(1, 'local', 'default', []);
 
     await refreshButton?.onClick?.();
     await flushAsync();
@@ -321,7 +324,7 @@ describe('SettingsPluginSection', () => {
     expect(editor?.control.inputEl.value).toBe('updated-plugin');
     expect(refreshButton?.control.setDisabled).toHaveBeenNthCalledWith(1, true);
     expect(refreshButton?.control.setDisabled).toHaveBeenNthCalledWith(2, false);
-    expect(inspectSpy).toHaveBeenNthCalledWith(2, 'local', 'default');
+    expect(inspectSpy).toHaveBeenNthCalledWith(2, 'local', 'default', []);
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.plugins.refresh.success'));
   });
 
@@ -376,7 +379,7 @@ describe('SettingsPluginSection', () => {
 
     expect(plugin.settings.pluginIsolationMode).toBe('pure');
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-    expect(inspectSpy).toHaveBeenNthCalledWith(2, 'local', 'pure');
+    expect(inspectSpy).toHaveBeenNthCalledWith(2, 'local', 'pure', []);
     expect(noticeSpy).toHaveBeenNthCalledWith(1, t('settings.plugins.isolation.updated'));
     expect(noticeSpy).toHaveBeenNthCalledWith(2, t('settings.plugins.restart.local'));
   });

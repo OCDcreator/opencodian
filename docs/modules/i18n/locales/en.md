@@ -261,3 +261,7 @@ New keys added for the tabbed settings layout:
 ## 2026-05-15 Conversation tabs toggle
 
 Added `settings.ui.enableTabs.name` and `settings.ui.enableTabs.desc` for the UI settings toggle that hides/disables conversation tab controls while preserving conversations, history, titles, and background task state.
+
+## 2026-05-16 Plugin management controls
+
+Plugin settings locale keys now cover the install section plus per-entry enable/disable, uninstall, and delete controls.

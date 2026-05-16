@@ -3727,6 +3727,66 @@
   color: var(--text-faint);
 }
 
+/* Managed plugin entry row with toggle and delete */
+.opencodian-plugin-source-item.is-plugin-disabled {
+  opacity: 0.55;
+}
+
+.opencodian-plugin-source-item:has(.opencodian-plugin-toggle) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.opencodian-plugin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.opencodian-plugin-toggle input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+.opencodian-plugin-toggle-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.opencodian-plugin-entry-desc {
+  flex: 1;
+  min-width: 0;
+}
+
+.opencodian-plugin-entry-delete {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.opencodian-plugin-entry-delete:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-plugin-entry-delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .opencodian-model-catalog-panel {
   border: none;
   border-radius: 0;
