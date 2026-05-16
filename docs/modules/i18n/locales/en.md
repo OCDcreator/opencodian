@@ -31,7 +31,7 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮继续扩展 `settings.formatter.overview.formatterList.*`，新增 detected formatter 表格的本地搜索标签、占位符和无匹配空态文案，用于支持按名称 / 扩展名快速筛选运行时 formatter 列表。
 
-本轮补齐 `settings.formatter.tab.formatter`、`settings.formatter.tab.lsp` 与 `settings.formatter.lsp.*` 键空间，覆盖 Formatter 页中 Language servers 概览、模式切换、内置/自定义 LSP 编辑器、初始化 JSON、环境变量和高级 JSON 编辑器的英文文案，避免中文运行时回退到裸 translation key。随后新增 `settings.formatter.help.*`，用于 formatter / LSP mode 行的帮助按钮、普通用户能理解的解释弹窗，以及官方 Formatter / LSP 文档链接标签。
+本轮补齐 `settings.formatter.tab.formatter`、`settings.formatter.tab.lsp` 与 `settings.formatter.lsp.*` 键空间，覆盖 Formatter 页中 Language servers 概览、模式切换、内置/自定义 LSP 编辑器、初始化 JSON、环境变量和高级 JSON 编辑器的英文文案，避免中文运行时回退到裸 translation key。随后新增 `settings.formatter.help.*`，用于 formatter / LSP mode 行的帮助按钮、普通用户能理解的解释弹窗，以及官方 Formatter / LSP 文档链接标签。后续又新增 `settings.formatter.builtinSearch.*`，为内置 formatter / LSP 长列表的自定义模糊搜索框、占位符、aria label、清除按钮、计数 chip 和无匹配空态提供英文文案。
 
 2026-04-26 navigation reorg added `settings.mcp.title`, `settings.mcp.tab.overview`, and `settings.quickNav.mcpDesc`, because MCP has been promoted to its own primary settings tab and classic quick-nav entry. `settings.server.tab.*` now only describes the remaining server secondary tabs (connection/auth/status).
 

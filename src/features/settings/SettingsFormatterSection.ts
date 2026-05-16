@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, max-lines-per-function */
 import { Notice, Setting } from 'obsidian';
 
 import type {
@@ -46,6 +46,18 @@ interface LspRuntimeState {
 interface LspBuiltinDefinition {
   id: string;
   extensions: string[];
+}
+
+type BuiltinSearchScope = 'formatter' | 'lsp';
+
+interface BuiltinSearchEntry {
+  id: string;
+  extensions: string[];
+}
+
+interface BuiltinSearchController {
+  emptyEl: HTMLElement;
+  registerRow: (id: string, rowEl: HTMLElement) => void;
 }
 
 interface OverviewMetaCardOptions {
@@ -105,10 +117,50 @@ const FORMATTER_BUILTIN_CATALOG: readonly FormatterBuiltinDefinition[] = [
 ];
 
 const LSP_BUILTIN_CATALOG: readonly LspBuiltinDefinition[] = [
-  { id: 'tsserver', extensions: ['.ts', '.tsx', '.js', '.jsx'] },
+  { id: 'deno', extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs'] },
+  { id: 'typescript', extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'] },
+  { id: 'vue', extensions: ['.vue'] },
+  { id: 'eslint', extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue'] },
+  { id: 'oxlint', extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.astro', '.svelte'] },
+  {
+    id: 'biome',
+    extensions: [
+      '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.json', '.jsonc', '.vue',
+      '.astro', '.svelte', '.css', '.graphql', '.gql', '.html',
+    ],
+  },
   { id: 'gopls', extensions: ['.go'] },
-  { id: 'rust-analyzer', extensions: ['.rs'] },
+  { id: 'ruby-lsp', extensions: ['.rb', '.rake', '.gemspec', '.ru'] },
+  { id: 'ty', extensions: ['.py', '.pyi'] },
   { id: 'pyright', extensions: ['.py', '.pyi'] },
+  { id: 'elixir-ls', extensions: ['.ex', '.exs'] },
+  { id: 'zls', extensions: ['.zig', '.zon'] },
+  { id: 'csharp', extensions: ['.cs', '.csx'] },
+  { id: 'razor', extensions: ['.razor', '.cshtml'] },
+  { id: 'fsharp', extensions: ['.fs', '.fsi', '.fsx', '.fsscript'] },
+  { id: 'sourcekit-lsp', extensions: ['.swift', '.objc', '.objcpp'] },
+  { id: 'rust', extensions: ['.rs'] },
+  { id: 'clangd', extensions: ['.c', '.cpp', '.cc', '.cxx', '.c++', '.h', '.hpp', '.hh', '.hxx', '.h++'] },
+  { id: 'svelte', extensions: ['.svelte'] },
+  { id: 'astro', extensions: ['.astro'] },
+  { id: 'jdtls', extensions: ['.java'] },
+  { id: 'kotlin-ls', extensions: ['.kt', '.kts'] },
+  { id: 'yaml-ls', extensions: ['.yaml', '.yml'] },
+  { id: 'lua-ls', extensions: ['.lua'] },
+  { id: 'php intelephense', extensions: ['.php'] },
+  { id: 'prisma', extensions: ['.prisma'] },
+  { id: 'dart', extensions: ['.dart'] },
+  { id: 'ocaml-lsp', extensions: ['.ml', '.mli'] },
+  { id: 'bash', extensions: ['.sh', '.bash', '.zsh', '.ksh'] },
+  { id: 'terraform', extensions: ['.tf', '.tfvars'] },
+  { id: 'texlab', extensions: ['.tex', '.bib'] },
+  { id: 'dockerfile', extensions: ['.dockerfile', 'Dockerfile'] },
+  { id: 'gleam', extensions: ['.gleam'] },
+  { id: 'clojure-lsp', extensions: ['.clj', '.cljs', '.cljc', '.edn'] },
+  { id: 'nixd', extensions: ['.nix'] },
+  { id: 'tinymist', extensions: ['.typ', '.typc'] },
+  { id: 'haskell-language-server', extensions: ['.hs', '.lhs'] },
+  { id: 'julials', extensions: ['.jl'] },
 ];
 
 export class SettingsFormatterSection {
@@ -509,21 +561,42 @@ export class SettingsFormatterSection {
     let sortDirection: FormatterRuntimeSortDirection = 'asc';
     const metaEl = summaryEl.querySelector('.opencodian-formatter-runtime-panel-meta');
 
-    const toolbarEl = listEl.createDiv({ cls: 'opencodian-formatter-runtime-toolbar' });
-    const searchLabelEl = toolbarEl.createEl('label', {
-      cls: 'opencodian-formatter-runtime-search-label',
+    const toolbarEl = listEl.createDiv({
+      cls: 'opencodian-formatter-runtime-toolbar opencodian-builtin-list-search',
+    });
+    toolbarEl.dataset.searchScope = 'runtime-formatter';
+    const searchFieldEl = toolbarEl.createDiv({ cls: 'opencodian-builtin-list-search-field' });
+    const searchLabelEl = searchFieldEl.createEl('label', {
+      cls: 'opencodian-formatter-runtime-search-label opencodian-builtin-list-search-label',
     });
     searchLabelEl.createSpan({
       cls: 'opencodian-formatter-runtime-search-text',
       text: t('settings.formatter.overview.formatterList.searchLabel'),
     });
     const searchInputEl = searchLabelEl.createEl('input', {
-      cls: 'opencodian-formatter-runtime-search-input',
+      cls: 'opencodian-formatter-runtime-search-input opencodian-builtin-list-search-input',
       attr: {
         type: 'search',
+        autocomplete: 'off',
+        spellcheck: 'false',
+        role: 'combobox',
+        'aria-autocomplete': 'list',
+        'aria-expanded': 'false',
         placeholder: t('settings.formatter.overview.formatterList.searchPlaceholder'),
         'aria-label': t('settings.formatter.overview.formatterList.searchLabel'),
       },
+    });
+    searchInputEl.dataset.searchScope = 'runtime-formatter';
+    const popoverEl = searchFieldEl.createDiv({
+      cls: 'opencodian-builtin-list-search-popover',
+      attr: { role: 'listbox' },
+    });
+    popoverEl.hidden = true;
+    const toolbarCountEl = toolbarEl.createSpan({ cls: 'opencodian-builtin-list-search-count' });
+    const clearButtonEl = toolbarEl.createEl('button', {
+      cls: 'opencodian-builtin-list-search-clear',
+      text: t('settings.formatter.builtinSearch.clear'),
+      attr: { type: 'button' },
     });
 
     const tableShellEl = listEl.createDiv({
@@ -553,6 +626,67 @@ export class SettingsFormatterSection {
     );
 
     const tbodyEl = tableEl.createEl('tbody');
+    let activeSuggestionIndex = -1;
+    let suggestionItems: OpencodeFormatterStatus[] = [];
+    const hidePopover = () => {
+      popoverEl.hidden = true;
+      searchInputEl.setAttribute('aria-expanded', 'false');
+      searchInputEl.removeAttribute('aria-activedescendant');
+    };
+    const selectFormatterSuggestion = (formatter: OpencodeFormatterStatus) => {
+      searchInputEl.value = formatter.name;
+      searchQuery = formatter.name;
+      activeSuggestionIndex = -1;
+      renderRows();
+      hidePopover();
+      searchInputEl.focus();
+    };
+    const renderPopover = () => {
+      popoverEl.empty();
+      const query = searchInputEl.value.trim();
+      if (!query || suggestionItems.length === 0) {
+        hidePopover();
+        return;
+      }
+
+      suggestionItems.forEach((formatter, index) => {
+        const optionEl = popoverEl.createEl('button', {
+          cls: 'opencodian-builtin-list-search-option',
+          attr: {
+            id: `opencodian-runtime-formatter-search-option-${index}`,
+            type: 'button',
+            role: 'option',
+            'aria-selected': index === activeSuggestionIndex ? 'true' : 'false',
+          },
+        });
+        optionEl.dataset.value = formatter.name;
+        optionEl.createSpan({
+          cls: 'opencodian-builtin-list-search-option-name',
+          text: formatter.name,
+        });
+        optionEl.createSpan({
+          cls: 'opencodian-builtin-list-search-option-detail',
+          text: formatter.extensions.join(', '),
+        });
+        optionEl.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+        });
+        optionEl.addEventListener('click', () => {
+          selectFormatterSuggestion(formatter);
+        });
+      });
+
+      popoverEl.hidden = false;
+      searchInputEl.setAttribute('aria-expanded', 'true');
+      if (activeSuggestionIndex >= 0) {
+        searchInputEl.setAttribute(
+          'aria-activedescendant',
+          `opencodian-runtime-formatter-search-option-${activeSuggestionIndex}`,
+        );
+      } else {
+        searchInputEl.removeAttribute('aria-activedescendant');
+      }
+    };
     const renderRows = () => {
       const visibleItems = this.getVisibleFormatterRuntimeItems(
         runtimeItems,
@@ -565,6 +699,17 @@ export class SettingsFormatterSection {
         metaEl.textContent = visibleItems.length === runtimeItems.length
           ? String(runtimeItems.length)
           : `${visibleItems.length} / ${runtimeItems.length}`;
+      }
+      toolbarCountEl.textContent = t('settings.formatter.builtinSearch.count', {
+        shown: visibleItems.length,
+        total: runtimeItems.length,
+      });
+      clearButtonEl.hidden = !searchInputEl.value.trim();
+      suggestionItems = searchInputEl.value.trim()
+        ? this.getFormatterRuntimeSearchSuggestions(runtimeItems, searchInputEl.value).slice(0, 8)
+        : [];
+      if (activeSuggestionIndex >= suggestionItems.length) {
+        activeSuggestionIndex = suggestionItems.length - 1;
       }
       for (const [key, headerEl] of sortHeaders) {
         const active = sortKey === key;
@@ -603,10 +748,53 @@ export class SettingsFormatterSection {
             : t('settings.formatter.overview.formatterList.notEnabled'),
         });
       }
+      renderPopover();
     };
     searchInputEl.addEventListener('input', () => {
       searchQuery = searchInputEl.value;
+      activeSuggestionIndex = -1;
       renderRows();
+    });
+    searchInputEl.addEventListener('focus', () => {
+      renderPopover();
+    });
+    searchInputEl.addEventListener('blur', () => {
+      window.setTimeout(hidePopover, 120);
+    });
+    searchInputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        hidePopover();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') {
+        return;
+      }
+      if (suggestionItems.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      if (event.key === 'ArrowDown') {
+        activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, suggestionItems.length - 1);
+        renderPopover();
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        activeSuggestionIndex = activeSuggestionIndex <= 0 ? suggestionItems.length - 1 : activeSuggestionIndex - 1;
+        renderPopover();
+        return;
+      }
+      const selectedFormatter = suggestionItems[activeSuggestionIndex >= 0 ? activeSuggestionIndex : 0];
+      if (selectedFormatter) {
+        selectFormatterSuggestion(selectedFormatter);
+      }
+    });
+    clearButtonEl.addEventListener('click', () => {
+      searchInputEl.value = '';
+      searchQuery = '';
+      activeSuggestionIndex = -1;
+      renderRows();
+      searchInputEl.focus();
     });
     const toggleSort = (key: FormatterRuntimeSortKey) => {
       if (sortKey === key) {
@@ -701,6 +889,39 @@ export class SettingsFormatterSection {
     }
     const target = this.normalizeFormatterRuntimeSearch(`${item.name} ${item.extensions.join(' ')}`);
     return target.includes(normalizedQuery) || this.isOrderedFuzzyMatch(normalizedQuery, target);
+  }
+
+  private getFormatterRuntimeSearchSuggestions(
+    items: readonly OpencodeFormatterStatus[],
+    searchQuery: string,
+  ): OpencodeFormatterStatus[] {
+    const query = searchQuery.trim();
+    if (!query) {
+      return [];
+    }
+    return items
+      .filter((item) => this.matchesFormatterRuntimeSearch(item, query))
+      .sort((left, right) => this.compareFormatterRuntimeSearchSuggestions(left, right, query));
+  }
+
+  private compareFormatterRuntimeSearchSuggestions(
+    left: OpencodeFormatterStatus,
+    right: OpencodeFormatterStatus,
+    searchQuery: string,
+  ): number {
+    const normalizedQuery = this.normalizeFormatterRuntimeSearch(searchQuery);
+    const score = (item: OpencodeFormatterStatus): number => {
+      const name = this.normalizeFormatterRuntimeSearch(item.name);
+      const extensions = this.normalizeFormatterRuntimeSearch(item.extensions.join(' '));
+      if (name === normalizedQuery) return 0;
+      if (name.startsWith(normalizedQuery)) return 1;
+      if (name.includes(normalizedQuery)) return 2;
+      if (extensions.includes(normalizedQuery)) return 3;
+      return 4;
+    };
+    const scoreDelta = score(left) - score(right);
+    if (scoreDelta !== 0) return scoreDelta;
+    return left.name.localeCompare(right.name);
   }
 
   private normalizeFormatterRuntimeSearch(value: string): string {
@@ -803,13 +1024,24 @@ export class SettingsFormatterSection {
       return;
     }
 
+    const searchController = this.renderBuiltinSearchControl(
+      sectionEl,
+      'formatter',
+      builtinDefinitions.map((definition) => ({
+        id: definition.name,
+        extensions: definition.extensions,
+      })),
+    );
+    const scrollEl = sectionEl.createDiv({ cls: 'opencodian-formatter-builtin-scroll' });
+    scrollEl.appendChild(searchController.emptyEl);
     const runtimeMap = new Map<string, OpencodeFormatterStatus>();
     for (const item of runtimeState.items) {
       runtimeMap.set(item.name, item);
     }
 
     for (const definition of builtinDefinitions) {
-      this.renderBuiltinFormatterRow(sectionEl, definition, configObj, runtimeMap.get(definition.name));
+      const rowEl = this.renderBuiltinFormatterRow(scrollEl, definition, configObj, runtimeMap.get(definition.name));
+      searchController.registerRow(definition.name, rowEl);
     }
   }
 
@@ -818,12 +1050,13 @@ export class SettingsFormatterSection {
     definition: FormatterBuiltinDefinition,
     configObj: Record<string, OpencodeFormatterEntryConfig>,
     runtimeStatus: OpencodeFormatterStatus | undefined,
-  ): void {
+  ): HTMLElement {
     const { name } = definition;
     const entry = configObj[name];
     const action = this.resolveBuiltinEntryAction(entry);
 
     const rowEl = parentEl.createDiv({ cls: 'opencodian-formatter-builtin-row' });
+    rowEl.dataset.builtinId = name;
 
     new Setting(rowEl)
       .setName(name)
@@ -841,6 +1074,8 @@ export class SettingsFormatterSection {
     if (action === 'override') {
       this.renderOverrideFields(rowEl, name, entry ?? {});
     }
+
+    return rowEl;
   }
 
   private resolveBuiltinEntryAction(
@@ -1551,10 +1786,14 @@ export class SettingsFormatterSection {
       cls: 'opencodian-settings-subsection-heading',
     });
 
+    const searchController = this.renderBuiltinSearchControl(sectionEl, 'lsp', builtinDefinitions);
+    const scrollEl = sectionEl.createDiv({ cls: 'opencodian-formatter-builtin-scroll' });
+    scrollEl.appendChild(searchController.emptyEl);
     for (const definition of builtinDefinitions) {
       const entry = configObj[definition.id];
       const action = this.resolveBuiltinEntryAction(entry);
-      const rowEl = sectionEl.createDiv({ cls: 'opencodian-formatter-builtin-row' });
+      const rowEl = scrollEl.createDiv({ cls: 'opencodian-formatter-builtin-row' });
+      rowEl.dataset.builtinId = definition.id;
 
       new Setting(rowEl)
         .setName(definition.id)
@@ -1572,7 +1811,251 @@ export class SettingsFormatterSection {
       if (action === 'override') {
         this.renderLspEditorFields(rowEl, definition.id, entry ?? {}, true);
       }
+      searchController.registerRow(definition.id, rowEl);
     }
+  }
+
+  private renderBuiltinSearchControl(
+    sectionEl: HTMLElement,
+    scope: BuiltinSearchScope,
+    entries: readonly BuiltinSearchEntry[],
+  ): BuiltinSearchController {
+    const rowMap = new Map<string, HTMLElement>();
+    const searchEl = sectionEl.createDiv({ cls: 'opencodian-builtin-list-search' });
+    searchEl.dataset.searchScope = scope;
+
+    const fieldEl = searchEl.createDiv({ cls: 'opencodian-builtin-list-search-field' });
+    const labelEl = fieldEl.createEl('label', {
+      cls: 'opencodian-builtin-list-search-label',
+      text: t('settings.formatter.builtinSearch.label'),
+    });
+    const inputEl = fieldEl.createEl('input', {
+      cls: 'opencodian-builtin-list-search-input',
+      attr: {
+        type: 'search',
+        autocomplete: 'off',
+        spellcheck: 'false',
+        role: 'combobox',
+        'aria-autocomplete': 'list',
+        'aria-expanded': 'false',
+        'aria-label': t(scope === 'formatter'
+          ? 'settings.formatter.builtinSearch.formatterAria'
+          : 'settings.formatter.builtinSearch.lspAria'),
+        placeholder: t(scope === 'formatter'
+          ? 'settings.formatter.builtinSearch.formatterPlaceholder'
+          : 'settings.formatter.builtinSearch.lspPlaceholder'),
+      },
+    });
+    inputEl.dataset.searchScope = scope;
+    labelEl.appendChild(inputEl);
+
+    const popoverEl = fieldEl.createDiv({
+      cls: 'opencodian-builtin-list-search-popover',
+      attr: { role: 'listbox' },
+    });
+    popoverEl.hidden = true;
+
+    const metaEl = searchEl.createSpan({ cls: 'opencodian-builtin-list-search-count' });
+    const clearButtonEl = searchEl.createEl('button', {
+      cls: 'opencodian-builtin-list-search-clear',
+      text: t('settings.formatter.builtinSearch.clear'),
+      attr: { type: 'button' },
+    });
+    const emptyEl = sectionEl.createDiv({
+      cls: 'opencodian-builtin-list-search-empty',
+      text: t('settings.formatter.builtinSearch.noMatches'),
+    });
+    emptyEl.hidden = true;
+
+    let activeIndex = -1;
+    let suggestionEntries: BuiltinSearchEntry[] = [];
+
+    const selectEntry = (entry: BuiltinSearchEntry) => {
+      inputEl.value = entry.id;
+      activeIndex = -1;
+      refresh();
+      hidePopover();
+      inputEl.focus();
+    };
+
+    const hidePopover = () => {
+      popoverEl.hidden = true;
+      inputEl.setAttribute('aria-expanded', 'false');
+      inputEl.removeAttribute('aria-activedescendant');
+    };
+
+    const renderPopover = () => {
+      popoverEl.empty();
+      const query = inputEl.value.trim();
+      if (!query || suggestionEntries.length === 0) {
+        hidePopover();
+        return;
+      }
+
+      suggestionEntries.forEach((entry, index) => {
+        const optionEl = popoverEl.createEl('button', {
+          cls: 'opencodian-builtin-list-search-option',
+          attr: {
+            id: `opencodian-${scope}-builtin-search-option-${index}`,
+            type: 'button',
+            role: 'option',
+            'aria-selected': index === activeIndex ? 'true' : 'false',
+          },
+        });
+        optionEl.dataset.value = entry.id;
+        optionEl.createSpan({ cls: 'opencodian-builtin-list-search-option-name', text: entry.id });
+        optionEl.createSpan({
+          cls: 'opencodian-builtin-list-search-option-detail',
+          text: entry.extensions.join(', '),
+        });
+        optionEl.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+        });
+        optionEl.addEventListener('click', () => {
+          selectEntry(entry);
+        });
+      });
+
+      popoverEl.hidden = false;
+      inputEl.setAttribute('aria-expanded', 'true');
+      if (activeIndex >= 0) {
+        inputEl.setAttribute('aria-activedescendant', `opencodian-${scope}-builtin-search-option-${activeIndex}`);
+      } else {
+        inputEl.removeAttribute('aria-activedescendant');
+      }
+    };
+
+    const refresh = () => {
+      const query = inputEl.value.trim();
+      const filteredEntries = query
+        ? entries.filter((entry) => this.matchesBuiltinSearch(entry, query))
+            .sort((left, right) => this.compareBuiltinSearchEntries(left, right, query))
+        : [...entries];
+      const visibleIds = new Set(filteredEntries.map((entry) => entry.id));
+      let firstVisibleRowEl: HTMLElement | null = null;
+      let lastVisibleRowEl: HTMLElement | null = null;
+      for (const [id, rowEl] of rowMap) {
+        rowEl.removeClass('is-first-visible');
+        rowEl.removeClass('is-last-visible');
+        const isVisible = query ? visibleIds.has(id) : true;
+        rowEl.hidden = !isVisible;
+        if (isVisible) {
+          if (!firstVisibleRowEl) {
+            firstVisibleRowEl = rowEl;
+          }
+          lastVisibleRowEl = rowEl;
+        }
+      }
+      firstVisibleRowEl?.addClass('is-first-visible');
+      lastVisibleRowEl?.addClass('is-last-visible');
+
+      suggestionEntries = query ? filteredEntries.slice(0, 8) : [];
+      if (activeIndex >= suggestionEntries.length) {
+        activeIndex = suggestionEntries.length - 1;
+      }
+      metaEl.textContent = t('settings.formatter.builtinSearch.count', {
+        shown: filteredEntries.length,
+        total: entries.length,
+      });
+      clearButtonEl.hidden = !query;
+      emptyEl.hidden = !query || filteredEntries.length > 0;
+      renderPopover();
+    };
+
+    inputEl.addEventListener('input', () => {
+      activeIndex = -1;
+      refresh();
+    });
+    inputEl.addEventListener('focus', () => {
+      renderPopover();
+    });
+    inputEl.addEventListener('blur', () => {
+      window.setTimeout(hidePopover, 120);
+    });
+    inputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        hidePopover();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') {
+        return;
+      }
+      if (suggestionEntries.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      if (event.key === 'ArrowDown') {
+        activeIndex = Math.min(activeIndex + 1, suggestionEntries.length - 1);
+        renderPopover();
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        activeIndex = activeIndex <= 0 ? suggestionEntries.length - 1 : activeIndex - 1;
+        renderPopover();
+        return;
+      }
+      const selectedEntry = suggestionEntries[activeIndex >= 0 ? activeIndex : 0];
+      if (selectedEntry) {
+        selectEntry(selectedEntry);
+      }
+    });
+    clearButtonEl.addEventListener('click', () => {
+      inputEl.value = '';
+      activeIndex = -1;
+      refresh();
+      inputEl.focus();
+    });
+
+    refresh();
+    return {
+      emptyEl,
+      registerRow: (id, rowEl) => {
+        rowMap.set(id, rowEl);
+        refresh();
+      },
+    };
+  }
+
+  private matchesBuiltinSearch(entry: BuiltinSearchEntry, query: string): boolean {
+    const searchableText = `${entry.id} ${entry.extensions.join(' ')}`.toLowerCase();
+    return query.toLowerCase().split(/\s+/).every((token) => {
+      if (!token) return true;
+      return searchableText.includes(token) || this.isSubsequence(token, searchableText);
+    });
+  }
+
+  private compareBuiltinSearchEntries(
+    left: BuiltinSearchEntry,
+    right: BuiltinSearchEntry,
+    query: string,
+  ): number {
+    const normalizedQuery = query.trim().toLowerCase();
+    const score = (entry: BuiltinSearchEntry): number => {
+      const id = entry.id.toLowerCase();
+      const extensions = entry.extensions.join(' ').toLowerCase();
+      if (id === normalizedQuery) return 0;
+      if (id.startsWith(normalizedQuery)) return 1;
+      if (id.includes(normalizedQuery)) return 2;
+      if (extensions.includes(normalizedQuery)) return 3;
+      return 4;
+    };
+    const scoreDelta = score(left) - score(right);
+    if (scoreDelta !== 0) return scoreDelta;
+    return left.id.localeCompare(right.id);
+  }
+
+  private isSubsequence(needle: string, haystack: string): boolean {
+    let index = 0;
+    for (const char of haystack) {
+      if (char === needle[index]) {
+        index++;
+        if (index === needle.length) {
+          return true;
+        }
+      }
+    }
+    return needle.length === 0;
   }
 
   private async handleBuiltinLspActionChange(name: string, action: BuiltinEntryAction): Promise<void> {

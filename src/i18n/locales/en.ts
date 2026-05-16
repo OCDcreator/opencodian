@@ -2370,6 +2370,16 @@ export const enTranslations = {
   'settings.formatter.help.link.formatters': 'OpenCode formatters documentation',
   'settings.formatter.help.link.lsp': 'OpenCode LSP server documentation',
 
+  // Formatter & LSP builtin search
+  'settings.formatter.builtinSearch.label': 'Search',
+  'settings.formatter.builtinSearch.formatterPlaceholder': 'Name or extension',
+  'settings.formatter.builtinSearch.lspPlaceholder': 'Server or extension',
+  'settings.formatter.builtinSearch.formatterAria': 'Search builtin formatters',
+  'settings.formatter.builtinSearch.lspAria': 'Search builtin language servers',
+  'settings.formatter.builtinSearch.clear': 'Clear',
+  'settings.formatter.builtinSearch.count': '{{shown}} / {{total}}',
+  'settings.formatter.builtinSearch.noMatches': 'No matching builtins',
+
   // Formatter config - builtin editors
   'settings.formatter.config.builtinList.title': 'Builtin formatters',
   'settings.formatter.config.builtinList.empty': 'No builtin formatters detected in this project',

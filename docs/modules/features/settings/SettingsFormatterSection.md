@@ -16,6 +16,7 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
 - Adds a shared help button to the formatter and LSP mode settings; it opens `OpenCodeProjectConfigHelpModal` with the `formatterLsp` topic and links to official OpenCode formatter / LSP documentation
 - Builtin formatter editing: per-formatter action dropdown (use-default / disable / override), with command/environment/extensions override fields
 - Builtin LSP editing: per-server action dropdown (use-default / disable / override), with command/extensions/env/initialization override fields
+- Builtin formatter and LSP lists include a shared custom fuzzy-search control: typing filters rows immediately, opens a styled suggestions popover, supports arrow-key navigation, Enter selection, Escape dismissal, and mouse selection
 - Custom formatter CRUD: add by name, edit command/environment/extensions, delete; names are normalized (trim, lowercase, spaces-to-hyphens)
 - Custom LSP CRUD: add/edit/delete project-local language servers; custom entries require `extensions`
 - Advanced JSON editors: direct `formatter` and `lsp` subtree editing with format/reload/save; preserves unknown entry fields
@@ -32,13 +33,16 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
   - detected formatter runtime now lives inside a native summary panel that is open by default; the whole title row is clickable and collapses the table without changing runtime data semantics
   - the detected formatter table includes local fuzzy search across formatter names/extensions, clickable sortable `Name` / `Extensions` / `Status` headers, a matching-count meta chip, and an empty row when the current search has no matches
   - runtime table cells expose compact styling hooks (`opencodian-formatter-table-name`, `-extensions`, `-status`, and column header classes), allowing CSS to keep extensions monospace, status chips right-aligned, and the sortable header controls visually native instead of inheriting Obsidian's full button chrome
+  - detected formatter search now uses the same custom fuzzy combobox vocabulary as builtin formatter / LSP search: inline label, count chip, clear button, styled suggestions popover, arrow-key movement, Enter selection, Escape dismissal, and mouse selection
   - the formatter and LSP runtime blocks share the same panel-header vocabulary and body spacing, so both cards use the same title / meta chip hierarchy even though only the formatter table is collapsible
 - `formatter` secondary tab: mode switch dropdown, then when custom mode active:
   - Builtin formatter editors sourced from the upstream builtin catalog, so they still render even when runtime status is offline
+  - Builtin formatter rows live in a fixed-height internal scroll region; the custom search combobox stays sticky at the top of the section
   - Custom formatter list with add/edit/delete
   - Advanced JSON textarea with format/reload/save
 - `lsp` secondary tab: mode switch dropdown, then when custom mode active:
-  - Builtin LSP editors sourced from a repo-maintained builtin catalog plus runtime-discovered entries
+  - Builtin LSP editors sourced from a repo-maintained upstream catalog plus runtime-discovered entries
+  - Builtin LSP rows use the same fixed-height internal scroll region and sticky search combobox as formatter rows
   - Custom LSP list with add/edit/delete
   - `initialization` JSON field per entry
   - Advanced JSON textarea with format/reload/save
@@ -76,6 +80,8 @@ Override fields: `command` (space-split string → array), `environment` (key/va
 
 If override fields are cleared and saved with no content, the entry is removed from config (reverts to default).
 
+The builtin formatter list has an inline search control before the rows. Its custom popover ranks exact/prefix/name matches before extension-only matches, filters the rendered rows in place, marks the first and last visible rows for spacing, shows a row-token empty state when no builtin matches, and keeps each row's action dropdown and override fields mounted so project edits are not lost while searching.
+
 ## Custom Formatter Editing
 
 Custom formatters are config entries whose key does not match any builtin catalog entry and are not `disabled: true`.
@@ -100,6 +106,8 @@ Unknown fields in formatter entries are preserved through both visual editors an
 - Top-level LSP mode mirrors formatter: missing key = default, `false` = fully disabled, object = custom
 - Entry-level `disabled: true` only disables a specific server; it is distinct from top-level `lsp: false`
 - Builtin LSP rows use the same use-default / disable / override action model as formatters
+- The static builtin LSP catalog mirrors upstream OpenCode server ids so the UI can browse/edit builtin servers even before `lsp.status()` is available; runtime-only ids are still merged in afterward
+- The builtin LSP list reuses the same custom fuzzy-search control as formatter rows, including keyboard selection and Escape dismissal
 - Custom LSP entries must provide at least one extension in the visual editor, even though the upstream type keeps `extensions` optional
 - The visual editor preserves unknown fields and only normalizes known writable fields: `command`, `extensions`, `env`, and `initialization`
 

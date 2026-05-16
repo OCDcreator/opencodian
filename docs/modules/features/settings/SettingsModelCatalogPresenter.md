@@ -30,6 +30,8 @@
 
 当前 owner 内部又按 render lifecycle 拆成了几段稳定阶段：bulk provider actions、catalog summary、controls、provider accordion header/actions，以及 expanded model list + bulk model toggles。2026-04-24 起，availability 内容不再额外创建一层 `.opencodian-model-toggle-block` inner shell，而是直接渲染进 `SettingsModelSection` 提供的外层 block body，这样 classic / tabbed 两种模式都不会出现“外层 block 再包一层大卡片”的双层容器感；同日也把 catalog bulk action 条压成更紧凑的横向信息条，让 `服务器目录` 标题与 provider/model 计数同行显示，按钮保持在右侧。当前搜索/筛选 controls 则放在摘要卡片之后，便于把批量动作区顶到第一行；外层 management stack 现在提供统一主节奏，catalogs 内部再用单一 gap 管 actions 与 summary 的子节奏，避免“上面贴住、下面过松”的节奏漂移。当前 provider 列表继续使用单一 `.opencodian-model-toggle-provider-list` 作为原生滚动容器，presenter 在重渲染时会同时保留 provider 列表自身的 `scrollTop` 和外层 settings scroll host 的 `scrollTop`，避免展开 provider 后整个设置页突然跳回顶部。这样后续继续收束时，优先在 presenter 内沿这些生命周期 helper 延伸，而不是把 catalog availability 语义重新摊回调用方。
 
+`render()` 的 DOM 阶段只保留后续确实需要读取的节点引用；catalog overview 这类一次性区块按副作用渲染，避免为未消费的中间容器制造额外 owner state。
+
 ### provider / model availability 表达
 
 presenter 会把 `ModelCatalogState` 里的几层 availability 信号叠加到 UI 上，并把纯展示推导委托给 `SettingsModelCatalogAvailability.ts`：

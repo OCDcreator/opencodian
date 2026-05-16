@@ -2370,6 +2370,16 @@ export const zhTranslations = {
   'settings.formatter.help.link.formatters': 'OpenCode 格式化工具文档',
   'settings.formatter.help.link.lsp': 'OpenCode LSP 服务器文档',
 
+  // Formatter & LSP 内置搜索
+  'settings.formatter.builtinSearch.label': '搜索',
+  'settings.formatter.builtinSearch.formatterPlaceholder': '名称或扩展名',
+  'settings.formatter.builtinSearch.lspPlaceholder': '服务或扩展名',
+  'settings.formatter.builtinSearch.formatterAria': '搜索内置格式化器',
+  'settings.formatter.builtinSearch.lspAria': '搜索内置语言服务',
+  'settings.formatter.builtinSearch.clear': '清除',
+  'settings.formatter.builtinSearch.count': '{{shown}} / {{total}}',
+  'settings.formatter.builtinSearch.noMatches': '没有匹配的内置项',
+
   // Formatter 配置 — 内置编辑器
   'settings.formatter.config.builtinList.title': '内置格式化器',
   'settings.formatter.config.builtinList.empty': '当前项目未检测到内置格式化器',

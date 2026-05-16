@@ -1,4 +1,4 @@
-/* eslint-disable max-lines, no-useless-escape */
+/* eslint-disable max-lines, max-lines-per-function, no-useless-escape */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -55,6 +55,46 @@ const dropdownRecords: DropdownRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
 const extraButtonRecords: ExtraButtonRecord[] = [];
 const settingRecords: SettingRecord[] = [];
+const upstreamLspBuiltinIds = [
+  'deno',
+  'typescript',
+  'vue',
+  'eslint',
+  'oxlint',
+  'biome',
+  'gopls',
+  'ruby-lsp',
+  'ty',
+  'pyright',
+  'elixir-ls',
+  'zls',
+  'csharp',
+  'razor',
+  'fsharp',
+  'sourcekit-lsp',
+  'rust',
+  'clangd',
+  'svelte',
+  'astro',
+  'jdtls',
+  'kotlin-ls',
+  'yaml-ls',
+  'lua-ls',
+  'php intelephense',
+  'prisma',
+  'dart',
+  'ocaml-lsp',
+  'bash',
+  'terraform',
+  'texlab',
+  'dockerfile',
+  'gleam',
+  'clojure-lsp',
+  'nixd',
+  'tinymist',
+  'haskell-language-server',
+  'julials',
+];
 
 function getSettingRecord(setting: Setting): SettingRecord {
   const existing = (setting as Setting & { __record?: SettingRecord }).__record;
@@ -115,6 +155,24 @@ function getFormatterRuntimeRowNames(containerEl: HTMLElement): string[] {
   return Array.from(containerEl.querySelectorAll<HTMLTableRowElement>('.opencodian-formatter-table tbody tr'))
     .map((row) => row.querySelector('td')?.textContent ?? '')
     .filter(Boolean);
+}
+
+function getBuiltinSearchInput(containerEl: HTMLElement, scope: 'formatter' | 'lsp'): HTMLInputElement {
+  const inputEl = containerEl.querySelector<HTMLInputElement>(
+    `.opencodian-builtin-list-search-input[data-search-scope="${scope}"]`,
+  );
+  if (!inputEl) {
+    throw new Error(`Missing ${scope} builtin search input`);
+  }
+  return inputEl;
+}
+
+function getBuiltinRow(containerEl: HTMLElement, id: string): HTMLElement {
+  const rowEl = containerEl.querySelector<HTMLElement>(`.opencodian-formatter-builtin-row[data-builtin-id="${id}"]`);
+  if (!rowEl) {
+    throw new Error(`Missing builtin row ${id}`);
+  }
+  return rowEl;
 }
 
 function createPlugin(overrides?: {
@@ -347,6 +405,135 @@ describe('SettingsFormatterSection attachTabbed (tabbed layout)', () => {
   });
 });
 
+describe('SettingsFormatterSection LSP builtin catalog', () => {
+  it('renders the full upstream builtin LSP catalog without runtime status', async () => {
+    const { plugin } = createPlugin({
+      lspConfig: {},
+      lspRuntimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const renderedBuiltinIds = dropdownRecords
+      .map((record) => record.name)
+      .filter((name) => upstreamLspBuiltinIds.includes(name));
+    expect(renderedBuiltinIds).toEqual(upstreamLspBuiltinIds);
+  });
+});
+
+describe('SettingsFormatterSection builtin list search', () => {
+  it('filters builtin formatter rows and supports mouse selection from fuzzy suggestions', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {},
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const inputEl = getBuiltinSearchInput(containerEl, 'formatter');
+    inputEl.value = 'pre';
+    inputEl.dispatchEvent(new Event('input'));
+
+    const options = Array.from(containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-builtin-list-search-option'));
+    expect(options.map((option) => option.dataset.value)).toContain('prettier');
+    expect(getBuiltinRow(containerEl, 'prettier').hidden).toBe(false);
+    expect(getBuiltinRow(containerEl, 'gofmt').hidden).toBe(true);
+
+    options.find((option) => option.dataset.value === 'prettier')?.click();
+
+    expect(inputEl.value).toBe('prettier');
+    expect(getBuiltinRow(containerEl, 'prettier').hidden).toBe(false);
+    expect(getBuiltinRow(containerEl, 'gofmt').hidden).toBe(true);
+  });
+
+  it('filters builtin language server rows and supports keyboard selection from fuzzy suggestions', async () => {
+    const { plugin } = createPlugin({
+      lspConfig: {},
+      lspRuntimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const inputEl = getBuiltinSearchInput(containerEl, 'lsp');
+    expect(getBuiltinRow(containerEl, 'deno').hasClass('is-first-visible')).toBe(true);
+
+    inputEl.value = 'type';
+    inputEl.dispatchEvent(new Event('input'));
+
+    expect(getBuiltinRow(containerEl, 'typescript').hidden).toBe(false);
+    expect(getBuiltinRow(containerEl, 'gopls').hidden).toBe(true);
+    expect(getBuiltinRow(containerEl, 'typescript').hasClass('is-first-visible')).toBe(true);
+    expect(getBuiltinRow(containerEl, 'typescript').hasClass('is-last-visible')).toBe(true);
+
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(containerEl.querySelector('.opencodian-builtin-list-search-option[aria-selected="true"]')?.getAttribute('data-value'))
+      .toBe('typescript');
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(inputEl.value).toBe('typescript');
+    expect(getBuiltinRow(containerEl, 'typescript').hidden).toBe(false);
+    expect(getBuiltinRow(containerEl, 'gopls').hidden).toBe(true);
+
+    inputEl.value = 'go';
+    inputEl.dispatchEvent(new Event('input'));
+    const popoverEl = containerEl.querySelector<HTMLElement>('.opencodian-builtin-list-search-popover');
+    expect(popoverEl?.hidden).toBe(false);
+
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(popoverEl?.hidden).toBe(true);
+  });
+
+  it('keeps bottom spacing when builtin language server search has no matches', async () => {
+    const { plugin } = createPlugin({
+      lspConfig: {},
+      lspRuntimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const inputEl = getBuiltinSearchInput(containerEl, 'lsp');
+    inputEl.value = 'ddddd';
+    inputEl.dispatchEvent(new Event('input'));
+
+    const emptyEl = containerEl.querySelector<HTMLElement>('.opencodian-builtin-list-search-empty');
+    expect(emptyEl?.hidden).toBe(false);
+    expect(emptyEl?.textContent).toBe(t('settings.formatter.builtinSearch.noMatches'));
+  });
+});
+
 describe('SettingsFormatterSection LSP settings', () => {
   it('shows lsp runtime summary in overview without requiring formatter runtime entries', async () => {
     const { plugin } = createPlugin({
@@ -438,12 +625,25 @@ describe('SettingsFormatterSection LSP settings', () => {
 
     const searchInput = containerEl.querySelector('.opencodian-formatter-runtime-search-input') as HTMLInputElement | null;
     expect(searchInput).not.toBeNull();
+    expect(searchInput?.hasClass('opencodian-builtin-list-search-input')).toBe(true);
 
     searchInput!.value = 'bash';
     searchInput!.dispatchEvent(new Event('input'));
 
+    const optionEls = Array.from(containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-builtin-list-search-option'));
+    expect(optionEls.map((option) => option.dataset.value)).toContain('shfmt');
     expect(getFormatterRuntimeRowNames(containerEl)).toEqual(['shfmt']);
     expect(containerEl.querySelector('.opencodian-formatter-runtime-panel-meta')?.textContent).toBe('1 / 3');
+
+    searchInput!.value = 'pre';
+    searchInput!.dispatchEvent(new Event('input'));
+    searchInput!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(containerEl.querySelector('.opencodian-builtin-list-search-option[aria-selected="true"]')?.getAttribute('data-value'))
+      .toBe('prettier');
+    searchInput!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(searchInput!.value).toBe('prettier');
+    expect(getFormatterRuntimeRowNames(containerEl)).toEqual(['prettier']);
   });
 
   it('marks formatter runtime table columns for compact responsive styling', async () => {
@@ -1194,6 +1394,23 @@ describe('SettingsFormatterSection CSS contract', () => {
     const runtimeListHiddenRule = findRule('\\.opencodian-formatter-runtime-list\\[hidden\\]', 'display:');
     const runtimeToolbarRule = findRule('\\.opencodian-formatter-runtime-toolbar', 'display:');
     const runtimeSearchInputRule = findRule('\\.opencodian-formatter-runtime-search-input', 'background:');
+    const builtinSearchRule = findRule('\\.opencodian-builtin-list-search', 'grid-template-columns:');
+    const builtinSearchStickyRule = findRule(
+      '\\.opencodian-settings-block > \\.opencodian-builtin-list-search',
+      'position:',
+    );
+    const builtinScrollRule = findRule('\\.opencodian-formatter-builtin-scroll', 'max-height:');
+    const builtinSearchInputRule = findRule('\\.opencodian-builtin-list-search-input', 'background:');
+    const builtinSearchInputFocusRule = findRule('\\.opencodian-builtin-list-search-input:focus-visible', 'outline:');
+    const builtinSearchCountRule = findRule('\\.opencodian-builtin-list-search-count', 'border-radius:');
+    const builtinSearchClearRule = findRule('\\.opencodian-builtin-list-search-clear', 'background:');
+    const builtinSearchPopoverRule = findRule('\\.opencodian-builtin-list-search-popover', 'position:');
+    const builtinSearchOptionRule = findRule('\\.opencodian-builtin-list-search-option', 'grid-template-columns:');
+    const builtinSearchOptionActiveRule = findRule(
+      '\\.opencodian-builtin-list-search-option:hover,\\s*\\.opencodian-builtin-list-search-option\\[aria-selected="true"\\]',
+      'background:',
+    );
+    const builtinSearchOptionDetailRule = findRule('\\.opencodian-builtin-list-search-option-detail', 'font-family:');
     const formatterSortHeaderRule = findRule('\\.opencodian-formatter-sort-header', 'cursor:');
     const formatterSortHeaderActiveRule = findRule(
       '\\.opencodian-formatter-sort-header\\[data-sort-direction="asc"\\],\\s*\\.opencodian-formatter-sort-header\\[data-sort-direction="desc"\\]',
@@ -1227,7 +1444,7 @@ describe('SettingsFormatterSection CSS contract', () => {
       'margin-top:',
     );
     const formatterRowRule = findRule(
-      '\\.opencodian-settings-block > \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings-block > \\.opencodian-formatter-custom-row',
+      '\\.opencodian-settings-block > \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-formatter-builtin-scroll > \\.opencodian-formatter-builtin-row,\\s*\\.opencodian-settings-block > \\.opencodian-formatter-custom-row',
       'margin-left:',
     );
     const formatterFirstRowRule = findRule(
@@ -1271,6 +1488,27 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(runtimeToolbarRule).toContain('grid-template-columns: minmax(220px, 360px) minmax(0, 1fr)');
     expect(runtimeSearchInputRule).toContain('var(--opencodian-settings-inline-bg');
     expect(runtimeSearchInputRule).toContain('padding: 0 12px');
+    expect(builtinSearchRule).toContain('minmax(220px, 420px)');
+    expect(builtinSearchRule).toContain('var(--opencodian-settings-row-bg');
+    expect(builtinSearchStickyRule).toContain('position: sticky');
+    expect(builtinSearchStickyRule).toContain('top: 0');
+    expect(builtinSearchStickyRule).toContain('margin-right: calc(var(--opencodian-settings-space-lg) + 12px)');
+    expect(builtinScrollRule).toContain('max-height: min(520px, 58vh)');
+    expect(builtinScrollRule).toContain('overflow-y: auto');
+    expect(builtinScrollRule).toContain('padding-top: var(--opencodian-settings-space-lg)');
+    expect(builtinScrollRule).toContain('padding-right: 12px');
+    expect(builtinScrollRule).toContain('scroll-padding-top: var(--opencodian-settings-space-lg)');
+    expect(builtinSearchInputRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(builtinSearchInputRule).toContain('min-height: 32px');
+    expect(builtinSearchInputFocusRule).toContain('var(--opencodian-settings-focus-ring)');
+    expect(builtinSearchCountRule).toContain('border-radius: 999px');
+    expect(builtinSearchClearRule).toContain('background: transparent');
+    expect(builtinSearchPopoverRule).toContain('position: absolute');
+    expect(builtinSearchPopoverRule).toContain('max-height: 260px');
+    expect(builtinSearchOptionRule).toContain('minmax(120px, 180px)');
+    expect(builtinSearchOptionRule).toContain('border-radius: var(--opencodian-settings-radius-inline)');
+    expect(builtinSearchOptionActiveRule).toContain('var(--interactive-accent)');
+    expect(builtinSearchOptionDetailRule).toContain('var(--font-monospace)');
     expect(formatterSortHeaderRule).toContain('cursor: pointer');
     expect(formatterSortHeaderRule).toContain('user-select: none');
     expect(formatterSortHeaderActiveRule).toContain('var(--text-accent)');

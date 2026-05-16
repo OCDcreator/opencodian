@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

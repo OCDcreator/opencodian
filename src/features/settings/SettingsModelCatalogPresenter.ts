@@ -146,9 +146,9 @@ export class SettingsModelCatalogPresenter {
     const catalogContext = catalogState
       ? this.createCatalogRenderContext(catalogState)
       : null;
-    const catalogSectionEl = catalogState
-      ? this.renderCatalogOverview(blockEl, catalogState, catalogContext)
-      : null;
+    if (catalogState) {
+      this.renderCatalogOverview(blockEl, catalogState, catalogContext);
+    }
 
     const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
     this.renderAvailabilityControls(controlsEl, options);
