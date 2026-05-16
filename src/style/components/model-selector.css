@@ -1452,6 +1452,10 @@ img.opencodian-model-provider-header-icon {
   align-items: center;
 }
 
+.opencodian-style-setting.opencodian-style-setting-long-text {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+}
+
 .opencodian-style-setting .setting-item-control {
   display: flex;
   align-items: center;
@@ -1460,6 +1464,12 @@ img.opencodian-model-provider-header-icon {
   width: 360px;
   min-width: 360px;
   max-width: 360px;
+}
+
+.opencodian-style-setting.opencodian-style-setting-long-text .setting-item-control {
+  width: 100%;
+  min-width: 0;
+  max-width: 520px;
 }
 
 .opencodian-style-setting .setting-item-info,

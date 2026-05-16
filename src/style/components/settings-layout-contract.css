@@ -190,6 +190,28 @@
   gap: var(--opencodian-settings-space-md);
 }
 
+.opencodian-settings .opencodian-wide-text-setting.setting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, clamp(320px, 42vw, 520px));
+  gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
+  align-items: center;
+}
+
+.opencodian-settings .opencodian-wide-text-setting .setting-item-control {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.opencodian-settings .opencodian-wide-text-setting input[type="text"],
+.opencodian-settings .opencodian-wide-text-setting input[type="password"],
+.opencodian-settings .opencodian-wide-text-setting input:not([type]) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* Debug action buttons: allow wrapping on narrow viewports */
 .opencodian-settings .opencodian-debug-actions .setting-item-control {
   flex-wrap: wrap;
@@ -555,6 +577,15 @@
   }
 
   .opencodian-settings .opencodian-settings-section .setting-item-control {
+    justify-content: flex-start;
+  }
+
+  .opencodian-settings .opencodian-wide-text-setting.setting-item {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .opencodian-settings .opencodian-wide-text-setting .setting-item-control {
     justify-content: flex-start;
   }
 

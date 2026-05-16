@@ -15,6 +15,7 @@
 - `.opencodian-settings-section` / `.opencodian-settings-block.opencodian-settings-section`：共享 section block surface，使用 section 背景、边框与半径 token；legacy `.opencodian-settings-block` 本身保持兼容，不会单独触发契约样式。
 - `.opencodian-settings-section-body` / `.opencodian-settings-block-body`：section 内部纵向 rhythm，普通设置行在这里按 row-card 规则排列。
 - `.opencodian-settings-section .setting-item`：普通设置项的轻量 row-card 样式，和 object-card 等更重实体 surface 区分。
+- `.opencodian-wide-text-setting`：给路径、URL、访问令牌等长文本设置项使用的宽字段 row。它只放宽明确标记的输入，控制列在桌面端限制在 `clamp(320px, 42vw, 520px)`，窄屏退为单列，避免把 host/port/数字类短输入一起拉长。
 - `.opencodian-theme-style-card` / `.opencodian-style-input-lock-note` / `.opencodian-debug-help-item`：在本轮只映射到 object token weight，不把样式设置、debug help 等复杂区域完整迁移成统一 object-card。
 
 ## Mode-Aware Hierarchy Taxonomy

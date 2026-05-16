@@ -204,6 +204,7 @@ export class SettingsDebugSection {
     new Setting(containerEl)
       .setName(t('settings.debug.logPath.name'))
       .setDesc(t('settings.debug.logPath.desc', { platform: platformLabel }))
+      .setClass('opencodian-wide-text-setting')
       .addText((text) => {
         logPathText = text;
         text

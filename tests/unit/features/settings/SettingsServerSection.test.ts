@@ -69,6 +69,7 @@ const dropdownRecords: DropdownRecord[] = [];
 const toggleRecords: ToggleRecord[] = [];
 const textRecords: TextRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
+const settingClassRecords: string[] = [];
 
 function createDropdownRecord(name: string): DropdownRecord {
   const record: DropdownRecord = {
@@ -214,12 +215,17 @@ describe('SettingsServerSection', () => {
     toggleRecords.length = 0;
     textRecords.length = 0;
     buttonRecords.length = 0;
+    settingClassRecords.length = 0;
 
     jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
       (this as Setting & { __settingName?: string }).__settingName = name;
       return this;
     });
     jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting, cls: string) {
+      settingClassRecords.push(cls);
       return this;
     });
     jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
@@ -302,6 +308,7 @@ describe('SettingsServerSection', () => {
       t('settings.server.host.name'),
       t('settings.server.port.name'),
     ]);
+    expect(settingClassRecords.filter((cls) => cls === 'opencodian-wide-text-setting')).toHaveLength(1);
     expect(buttonRecords.filter((record) => record.name === t('settings.server.status.name'))).toHaveLength(3);
     expect(onServerStateChange).toHaveBeenCalledWith({
       healthy: true,

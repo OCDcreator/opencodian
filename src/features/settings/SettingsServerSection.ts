@@ -174,7 +174,7 @@ export class SettingsServerSection {
 
     const executablePathSetting = new Setting(containerEl)
       .setName(t('settings.server.executablePath.name'))
-      .setDesc(t('settings.server.executablePath.desc'))
+      .setDesc(t('settings.server.executablePath.desc')).setClass('opencodian-wide-text-setting')
       .addText((text) => {
         const commitExecutablePathChange = async () => {
           const nextPath = text.inputEl.value.trim();
@@ -268,7 +268,7 @@ export class SettingsServerSection {
   private renderRemoteSettings(containerEl: HTMLElement): void {
     const remoteUrlSetting = new Setting(containerEl)
       .setName(t('settings.server.remoteUrl.name'))
-      .setDesc(t('settings.server.remoteUrl.desc'))
+      .setDesc(t('settings.server.remoteUrl.desc')).setClass('opencodian-wide-text-setting')
       .addText((text) =>
         text
           .setPlaceholder('https://ai.example.com')
@@ -341,7 +341,7 @@ export class SettingsServerSection {
     if (!isLocalMode && this.plugin.settings.server.auth.type === 'bearer') {
       const tokenSetting = new Setting(containerEl)
         .setName(t('settings.server.auth.token.name'))
-        .setDesc(t('settings.server.auth.token.desc'))
+        .setDesc(t('settings.server.auth.token.desc')).setClass('opencodian-wide-text-setting')
         .addText((text) => {
           text
             .setPlaceholder('Bearer token')

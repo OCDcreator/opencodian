@@ -664,7 +664,8 @@ export class SettingsStyleSection {
 
     const advancedSetting = new Setting(advancedGroupEl)
       .setName(t('settings.style.advanced.customCssDeclarations.name'))
-      .setClass('opencodian-style-setting');
+      .setClass('opencodian-style-setting')
+      .setClass('opencodian-style-setting-long-text');
     this.setSettingDescWithFormatting(
       advancedSetting,
       t('settings.style.advanced.customCssDeclarations.desc'),

@@ -28,6 +28,7 @@
 - mode 切换继续保留 local→remote 自动填充 base URL、local 下 bearer→none fallback 的旧语义
 - local OpenCode executable path / host / port 仍沿用原生 `change` / `blur` 事件提交与错误提示；可执行文件路径留空表示继续使用自动探测
 - remote URL、basic auth、bearer token 仍直接写回 plugin settings，并在 mode/auth 切换后请求 settings 面板整体重建
+- executable path、remote URL 和 bearer token 这些长文本字段会标记 `.opencodian-wide-text-setting`，让 inline hint/path 在设置布局中获得更宽但有上限的输入列；host/port/username/password 继续保持普通紧凑宽度
 
 ### 状态与动作
 

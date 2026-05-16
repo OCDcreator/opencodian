@@ -3765,6 +3765,10 @@ img.opencodian-model-provider-header-icon {
   align-items: center;
 }
 
+.opencodian-style-setting.opencodian-style-setting-long-text {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+}
+
 .opencodian-style-setting .setting-item-control {
   display: flex;
   align-items: center;
@@ -3773,6 +3777,12 @@ img.opencodian-model-provider-header-icon {
   width: 360px;
   min-width: 360px;
   max-width: 360px;
+}
+
+.opencodian-style-setting.opencodian-style-setting-long-text .setting-item-control {
+  width: 100%;
+  min-width: 0;
+  max-width: 520px;
 }
 
 .opencodian-style-setting .setting-item-info,
@@ -6605,6 +6615,28 @@ img.opencodian-model-provider-header-icon {
   gap: var(--opencodian-settings-space-md);
 }
 
+.opencodian-settings .opencodian-wide-text-setting.setting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, clamp(320px, 42vw, 520px));
+  gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
+  align-items: center;
+}
+
+.opencodian-settings .opencodian-wide-text-setting .setting-item-control {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.opencodian-settings .opencodian-wide-text-setting input[type="text"],
+.opencodian-settings .opencodian-wide-text-setting input[type="password"],
+.opencodian-settings .opencodian-wide-text-setting input:not([type]) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* Debug action buttons: allow wrapping on narrow viewports */
 .opencodian-settings .opencodian-debug-actions .setting-item-control {
   flex-wrap: wrap;
@@ -6970,6 +7002,15 @@ img.opencodian-model-provider-header-icon {
   }
 
   .opencodian-settings .opencodian-settings-section .setting-item-control {
+    justify-content: flex-start;
+  }
+
+  .opencodian-settings .opencodian-wide-text-setting.setting-item {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .opencodian-settings .opencodian-wide-text-setting .setting-item-control {
     justify-content: flex-start;
   }
 
@@ -14223,6 +14264,47 @@ img.opencodian-model-provider-header-icon {
   box-shadow: none;
 }
 
+.opencodian-formatter-override-fields .setting-item,
+.opencodian-formatter-custom-fields .setting-item,
+.opencodian-formatter-env-editor .setting-item {
+  display: grid;
+  grid-template-columns: minmax(168px, 0.34fr) minmax(280px, 1fr);
+  gap: var(--opencodian-settings-space-sm) var(--opencodian-settings-space-lg);
+  align-items: center;
+}
+
+.opencodian-formatter-override-fields .setting-item-info,
+.opencodian-formatter-custom-fields .setting-item-info,
+.opencodian-formatter-env-editor .setting-item-info {
+  min-width: 0;
+}
+
+.opencodian-formatter-override-fields .setting-item-control,
+.opencodian-formatter-custom-fields .setting-item-control,
+.opencodian-formatter-env-editor .setting-item-control {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.opencodian-formatter-override-fields input[type="text"],
+.opencodian-formatter-custom-fields input[type="text"],
+.opencodian-formatter-override-fields textarea,
+.opencodian-formatter-custom-fields textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-formatter-command-input,
+.opencodian-formatter-extensions-input,
+.opencodian-lsp-command-input,
+.opencodian-lsp-extensions-input,
+.opencodian-lsp-initialization-input {
+  font-family: var(--font-monospace);
+}
+
 .opencodian-formatter-env-editor {
   display: flex;
   flex-direction: column;
@@ -14287,6 +14369,20 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-formatter-runtime-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .opencodian-formatter-override-fields .setting-item,
+  .opencodian-formatter-custom-fields .setting-item,
+  .opencodian-formatter-env-editor .setting-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .opencodian-formatter-override-fields .setting-item-control,
+  .opencodian-formatter-custom-fields .setting-item-control,
+  .opencodian-formatter-env-editor .setting-item-control {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .opencodian-formatter-runtime-table-shell {

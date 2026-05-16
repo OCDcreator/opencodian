@@ -1,7 +1,7 @@
 # Graph Report - /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/src  (2026-05-16)
 
 ## Corpus Check
-- 393 files · ~351,075 words
+- 393 files · ~351,077 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -558,9 +558,11 @@ Nodes (0):
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 9`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 17`, `Community 18`, `Community 19`, `Community 22`, `Community 24`, `Community 25`, `Community 27`, `Community 28`, `Community 29`, `Community 30`, `Community 32`, `Community 33`, `Community 34`, `Community 35`, `Community 37`, `Community 39`, `Community 41`, `Community 42`, `Community 43`?**
-  _High betweenness centrality (0.451) - this node is a cross-community bridge._
+  _High betweenness centrality (0.386) - this node is a cross-community bridge._
 - **Why does `OpenCodianView` connect `Community 1` to `Community 0`, `Community 3`, `Community 4`, `Community 5`, `Community 8`, `Community 11`, `Community 12`, `Community 15`, `Community 17`, `Community 18`, `Community 21`, `Community 25`, `Community 30`?**
-  _High betweenness centrality (0.071) - this node is a cross-community bridge._
+  _High betweenness centrality (0.089) - this node is a cross-community bridge._
+- **Why does `OpenCodeService` connect `Community 10` to `Community 0`, `Community 33`, `Community 1`, `Community 3`, `Community 4`, `Community 6`, `Community 9`, `Community 11`, `Community 14`, `Community 24`, `Community 30`?**
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
 - **Are the 554 inferred relationships involving `t()` (e.g. with `.getEmptyConversationTitle()` and `.generateDefaultTitle()`) actually correct?**
   _`t()` has 554 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**
@@ -568,6 +570,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.02 - nodes in this community are weakly interconnected._
-- **Should `Community 3` be split into smaller, more focused modules?**
   _Cohesion score 0.02 - nodes in this community are weakly interconnected._

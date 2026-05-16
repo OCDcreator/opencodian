@@ -3353,6 +3353,47 @@
   box-shadow: none;
 }
 
+.opencodian-formatter-override-fields .setting-item,
+.opencodian-formatter-custom-fields .setting-item,
+.opencodian-formatter-env-editor .setting-item {
+  display: grid;
+  grid-template-columns: minmax(168px, 0.34fr) minmax(280px, 1fr);
+  gap: var(--opencodian-settings-space-sm) var(--opencodian-settings-space-lg);
+  align-items: center;
+}
+
+.opencodian-formatter-override-fields .setting-item-info,
+.opencodian-formatter-custom-fields .setting-item-info,
+.opencodian-formatter-env-editor .setting-item-info {
+  min-width: 0;
+}
+
+.opencodian-formatter-override-fields .setting-item-control,
+.opencodian-formatter-custom-fields .setting-item-control,
+.opencodian-formatter-env-editor .setting-item-control {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.opencodian-formatter-override-fields input[type="text"],
+.opencodian-formatter-custom-fields input[type="text"],
+.opencodian-formatter-override-fields textarea,
+.opencodian-formatter-custom-fields textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-formatter-command-input,
+.opencodian-formatter-extensions-input,
+.opencodian-lsp-command-input,
+.opencodian-lsp-extensions-input,
+.opencodian-lsp-initialization-input {
+  font-family: var(--font-monospace);
+}
+
 .opencodian-formatter-env-editor {
   display: flex;
   flex-direction: column;
@@ -3417,6 +3458,20 @@
 
   .opencodian-formatter-runtime-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .opencodian-formatter-override-fields .setting-item,
+  .opencodian-formatter-custom-fields .setting-item,
+  .opencodian-formatter-env-editor .setting-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .opencodian-formatter-override-fields .setting-item-control,
+  .opencodian-formatter-custom-fields .setting-item-control,
+  .opencodian-formatter-env-editor .setting-item-control {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .opencodian-formatter-runtime-table-shell {

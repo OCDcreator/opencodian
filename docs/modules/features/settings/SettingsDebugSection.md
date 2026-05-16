@@ -37,6 +37,7 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 - `Generate log file`：调用 `writeDiagnosticLogFile(targetDirectory, 'settings-export')`
 - `Clear recent logs`：清空 logger 最近缓存
 - `Copy version / BUILD_ID`：复制 `OpenCodian <version> BUILD_ID=<id>`
+- 日志导出路径输入标记 `.opencodian-wide-text-setting`，复用设置页长文本字段布局，让 macOS/Windows 路径 placeholder 不再挤在默认短控制列里
 
 ## 与其他模块的交互
 

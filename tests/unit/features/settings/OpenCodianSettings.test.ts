@@ -902,6 +902,18 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-quick-nav/);
     expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-tab-primary/);
     expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-section\s+\.setting-item/);
+    expect(contractCss).toMatch(
+      /\.opencodian-settings\s+\.opencodian-wide-text-setting\.setting-item\s*\{[\s\S]*minmax\(280px,\s*clamp\(320px,\s*42vw,\s*520px\)\)/,
+    );
+    expect(contractCss).toMatch(
+      /\.opencodian-settings\s+\.opencodian-wide-text-setting\s+\.setting-item-control\s*\{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/,
+    );
+    expect(legacyCss).toMatch(
+      /\.opencodian-style-setting\.opencodian-style-setting-long-text\s*\{[\s\S]*minmax\(360px,\s*520px\)/,
+    );
+    expect(legacyCss).toMatch(
+      /\.opencodian-style-setting\.opencodian-style-setting-long-text\s+\.setting-item-control\s*\{[\s\S]*max-width:\s*520px;/,
+    );
 
     expect(legacyCss).not.toMatch(/\.opencodian-settings-tab-panel\s*\{[^}]*box-shadow:/);
     expect(legacyCss).not.toMatch(/\.opencodian-style-section\s*\{[^}]*border-left:\s*[2-9]px/);

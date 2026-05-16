@@ -1524,6 +1524,22 @@ describe('SettingsFormatterSection CSS contract', () => {
       'background:',
     );
     const envRowRule = findRule('\\.opencodian-formatter-env-row', 'background:');
+    const fieldSettingRule = findRule(
+      '\\.opencodian-formatter-override-fields \\.setting-item,\\s*\\.opencodian-formatter-custom-fields \\.setting-item,\\s*\\.opencodian-formatter-env-editor \\.setting-item',
+      'grid-template-columns:',
+    );
+    const fieldControlRule = findRule(
+      '\\.opencodian-formatter-override-fields \\.setting-item-control,\\s*\\.opencodian-formatter-custom-fields \\.setting-item-control,\\s*\\.opencodian-formatter-env-editor \\.setting-item-control',
+      'width:',
+    );
+    const fieldInputRule = findRule(
+      '\\.opencodian-formatter-override-fields input\\[type="text"\\],\\s*\\.opencodian-formatter-custom-fields input\\[type="text"\\],\\s*\\.opencodian-formatter-override-fields textarea,\\s*\\.opencodian-formatter-custom-fields textarea',
+      'width:',
+    );
+    const responsiveFieldRule = findRule(
+      '\\.opencodian-formatter-override-fields \\.setting-item,\\s*\\.opencodian-formatter-custom-fields \\.setting-item,\\s*\\.opencodian-formatter-env-editor \\.setting-item',
+      'grid-template-columns: 1fr',
+    );
     const jsonEditorRule = findRule('\\.opencodian-formatter-json-editor', 'background:');
     const buttonBarRule = findRule('\\.opencodian-formatter-json-buttons', 'background:');
     const classicSummaryGridRule = findRule(
@@ -1627,6 +1643,13 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(builtinRowRule).toContain('box-shadow: none');
     expect(fieldsRule).toContain('var(--opencodian-settings-row-bg');
     expect(envRowRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(fieldSettingRule).toContain('minmax(168px, 0.34fr)');
+    expect(fieldSettingRule).toContain('minmax(280px, 1fr)');
+    expect(fieldControlRule).toContain('width: 100%');
+    expect(fieldControlRule).toContain('min-width: 0');
+    expect(fieldInputRule).toContain('box-sizing: border-box');
+    expect(fieldInputRule).toContain('max-width: 100%');
+    expect(responsiveFieldRule).toContain('grid-template-columns: 1fr');
     expect(jsonEditorRule).toContain('var(--opencodian-settings-row-bg');
     expect(buttonBarRule).toContain('background: transparent');
     expect(classicSummaryGridRule).toContain('var(--opencodian-settings-object-border');

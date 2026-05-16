@@ -27,6 +27,7 @@
 - `SettingsStyleBackgroundSection` 继续负责 background preview/upload/fit-mode/reset lifecycle
 - `SettingsStyleInputPanelSection` 现在负责 input theme family/variant 切换、glass-refraction 控制和局部 rerender guard
 - `SettingsStylePresetSection` 与 `settingsStyleControls.ts` 成为新的相邻厚 owner；`SettingsStyleSection` 通过 factory seam 把它们注入 background/input 子区块
+- advanced custom CSS declarations 使用 `.opencodian-style-setting-long-text`，只放宽这一个长 textarea 的控制列，避免样式面板里的普通数字和颜色控件被一并拉宽
 
 ## 关键方法
 
