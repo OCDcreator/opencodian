@@ -1,3 +1,6 @@
+import { Notice } from 'obsidian';
+
+import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import type {
   SessionCommandInput,
   SessionCommandTemplateContext,
@@ -7,9 +10,13 @@ import type {
   OpencodeCommandConfigRecord,
   SlashCommandSkillMode,
 } from '../../../core/types';
+import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { FocusContextPreview } from '../composerContext';
 import type { TabId } from '../tabs';
+import type { ModelSelectorSelection } from '../ui/modelSelector/types';
+import type { CommandMdFile } from './CommandMdFileLoader';
+import { loadCommandsFromConfigDir } from './CommandMdFileLoader';
 import type { SendPreparationServerAvailability } from './MessageSendPreparationService';
 
 const logger = createLogger('SlashCommandExecutionService');
@@ -23,6 +30,41 @@ export interface SlashCommandRuntimeCatalogEntry {
 
 export interface SlashCommandRuntimeSkillEntry {
   name?: string;
+}
+
+export interface CompactSessionOpenCodeService {
+  getSessionContextUsageSnapshot(sessionId: string): Promise<{
+    providerId?: string | null;
+    modelId?: string | null;
+  } | null>;
+  summarizeSession(
+    sessionId: string,
+    providerID: string,
+    modelID: string,
+    share: boolean,
+  ): Promise<boolean>;
+}
+
+export async function executeCompactSession(
+  sessionId: string,
+  service: CompactSessionOpenCodeService,
+  getModel: () => ModelSelectorSelection | null,
+  getModelResolution: () => ResolvedModelSelection,
+): Promise<boolean> {
+  const snapshot = await service.getSessionContextUsageSnapshot(sessionId);
+  const currentModel = getModel();
+  const currentModelResolution = getModelResolution();
+  const providerID = snapshot?.providerId ?? currentModel?.provider ?? currentModelResolution.provider ?? '';
+  const modelID = snapshot?.modelId ?? currentModel?.model ?? currentModelResolution.model ?? '';
+  if (!providerID || !modelID) {
+    new Notice(t('slashCommand.compact.noModel'));
+    return false;
+  }
+
+  new Notice(t('slashCommand.compact.starting'));
+  const compacted = await service.summarizeSession(sessionId, providerID, modelID, false);
+  new Notice(t(compacted ? 'slashCommand.compact.success' : 'slashCommand.compact.failed'));
+  return compacted;
 }
 
 export interface SlashCommandExecutionHost {
@@ -39,11 +81,13 @@ export interface SlashCommandExecutionHost {
   getProjectCommands(): Promise<OpencodeCommandConfigRecord>;
   getRuntimeCommands(): Promise<SlashCommandRuntimeCatalogEntry[]>;
   getRuntimeSkills(): Promise<SlashCommandRuntimeSkillEntry[]>;
+  getMdFileCommands(): Promise<CommandMdFile[]>;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   getVaultPath(): string | null;
   refreshActiveFocusContextPreview(): void;
   getActiveFocusContextPreview(): FocusContextPreview | null;
   runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<unknown>;
+  runCompactSession(sessionId: string): Promise<boolean>;
   startConversationSyncLoop(): void;
   syncVisibleConversationInBackground(): Promise<void>;
   notifySlashCommandFailed(commandId: string, error: unknown): void;
@@ -61,7 +105,10 @@ export interface SlashCommandExecutionHostDependencies {
   ensureServerReadyForChat: (
     availability: Exclude<SlashCommandServerAvailability, 'running' | 'external'>,
   ) => Promise<boolean>;
-  opencodeConfigManager: { getCommandConfig(): Promise<OpencodeCommandConfigRecord> } | null;
+  opencodeConfigManager: {
+    getCommandConfig(): Promise<OpencodeCommandConfigRecord>;
+    getConfigDir(): string;
+  } | null;
   getSlashCommandSkillMode: () => SlashCommandSkillMode;
   openCodeServiceSdk: {
     command: { list(): Promise<unknown> };
@@ -70,6 +117,7 @@ export interface SlashCommandExecutionHostDependencies {
   openCodeService: {
     runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<unknown>;
   };
+  runCompactSession: (sessionId: string) => Promise<boolean>;
   getVaultPath: () => string | null;
   composerContextViewFacade: { refreshActiveFocusContextPreview(): void };
   getTabRuntimeState: (
@@ -224,6 +272,30 @@ function collectRuntimeSkillNames(runtimeSkills: SlashCommandRuntimeSkillEntry[]
   );
 }
 
+function findMdFileCommand(commands: CommandMdFile[], commandId: string): CommandMdFile | null {
+  return commands.find((command) => command.id === commandId) ?? null;
+}
+
+function expandMdFileCommandTemplate(template: string, argumentsText: string): string {
+  const args = argumentsText.trim();
+  const positionalArgs = args.split(/\s+/);
+  return template.replace(/\$(\d+|[A-Za-z_][A-Za-z0-9_]*)/g, (token, name: string) => {
+    if (/^\d+$/.test(name)) {
+      return positionalArgs[Number(name) - 1] ?? '';
+    }
+
+    if (name === 'ARGUMENTS' || name === 'ARGS') {
+      return args;
+    }
+
+    if (/^[A-Z][A-Z0-9_]*$/.test(name)) {
+      return '';
+    }
+
+    return args;
+  });
+}
+
 function parsePrefixedSkillCommand(argumentsText: string): ParsedSlashCommandInput | null {
   const normalizedArguments = argumentsText.trim();
   if (!normalizedArguments) {
@@ -241,10 +313,23 @@ function parsePrefixedSkillCommand(argumentsText: string): ParsedSlashCommandInp
   };
 }
 
+function shouldUseBuiltInCompactCommand(
+  parsedCommand: ParsedSlashCommandInput,
+  hasProjectOverride: boolean,
+  runtimeCommands: SlashCommandRuntimeCatalogEntry[],
+): boolean {
+  if (parsedCommand.command !== 'compact' || hasProjectOverride) {
+    return false;
+  }
+
+  const runtimeCompact = runtimeCommands.find((command) => command.name === 'compact');
+  return !runtimeCompact || runtimeCompact.source === 'command';
+}
+
 export class SlashCommandExecutionService {
   constructor(private readonly host: SlashCommandExecutionHost) {}
 
-  async tryRunSlashCommand(content: string): Promise<boolean> {
+  async tryRunSlashCommand(content: string): Promise<boolean | string> {
     const parsedCommand = parseSlashCommandInput(content);
     if (!parsedCommand) {
       return false;
@@ -255,16 +340,16 @@ export class SlashCommandExecutionService {
       return false;
     }
 
-    // Known skills fall through to prompt expansion (SkillContentExpander handles them)
-    const runtimeSkills = await this.host.getRuntimeSkills();
-    const runtimeSkillNames = collectRuntimeSkillNames(runtimeSkills);
-    if (runtimeSkillNames.has(parsedCommand.command)) {
-      return false;
-    }
-
     let executableCommand = parsedCommand;
 
     try {
+      // Known skills fall through to prompt expansion (SkillContentExpander handles them)
+      const runtimeSkills = await this.host.getRuntimeSkills();
+      const runtimeSkillNames = collectRuntimeSkillNames(runtimeSkills);
+      if (runtimeSkillNames.has(parsedCommand.command)) {
+        return false;
+      }
+
       const skillMode = this.host.getSlashCommandSkillMode();
       const projectCommands = await this.host.getProjectCommands();
       const isPrefixedSkillCommand =
@@ -299,6 +384,10 @@ export class SlashCommandExecutionService {
 
         const hasProjectOverride = hasProjectCommand(projectCommands, parsedCommand.command);
         const runtimeCommands = await this.host.getRuntimeCommands();
+        if (shouldUseBuiltInCompactCommand(parsedCommand, hasProjectOverride, runtimeCommands)) {
+          return this.handleCompactCommand();
+        }
+
         const runtimeSkillNames = skillMode === 'skills-command'
           ? collectRuntimeSkillNames(await this.host.getRuntimeSkills())
           : new Set<string>();
@@ -310,6 +399,16 @@ export class SlashCommandExecutionService {
           )
         );
         if (!isRuntimeCommand) {
+          if (!hasProjectOverride) {
+            const mdFileCommand = findMdFileCommand(
+              await this.host.getMdFileCommands(),
+              parsedCommand.command,
+            );
+            if (mdFileCommand) {
+              return expandMdFileCommandTemplate(mdFileCommand.template, parsedCommand.arguments);
+            }
+          }
+
           return false;
         }
       }
@@ -337,6 +436,23 @@ export class SlashCommandExecutionService {
       this.host.notifySlashCommandFailed(executableCommand.command, error);
       return true;
     }
+  }
+
+  private async handleCompactCommand(): Promise<boolean> {
+    const ready = await this.ensureServerReadyForCommand();
+    if (!ready) {
+      return true;
+    }
+
+    const conversation = await this.prepareExecutionContext();
+    const sessionId = conversation?.openCodeSessionId;
+    if (!sessionId) {
+      new Notice(t('slashCommand.compact.noSession'));
+      return true;
+    }
+
+    await this.host.runCompactSession(sessionId);
+    return true;
   }
 
   private async ensureServerReadyForCommand(): Promise<boolean> {
@@ -422,6 +538,7 @@ export function createSlashCommandExecutionHost(
       const runtimeSkills = await deps.openCodeServiceSdk.app.skills();
       return Array.isArray(runtimeSkills) ? runtimeSkills : [];
     },
+    getMdFileCommands: async () => loadCommandsFromConfigDir(deps.opencodeConfigManager?.getConfigDir()),
     getSlashCommandSkillMode: () => deps.getSlashCommandSkillMode(),
     getVaultPath: () => deps.getVaultPath(),
     refreshActiveFocusContextPreview: () =>
@@ -430,6 +547,7 @@ export function createSlashCommandExecutionHost(
       deps.getTabRuntimeState(deps.getActiveTabId())?.focusContextPreview ?? null,
     runSessionCommand: (sessionId, input) =>
       deps.openCodeService.runSessionCommand(sessionId, input),
+    runCompactSession: (sessionId) => deps.runCompactSession(sessionId),
     startConversationSyncLoop: () =>
       deps.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
     syncVisibleConversationInBackground: () =>

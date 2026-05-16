@@ -53,6 +53,8 @@ export function createMessageSendPreparationHost(
 ): MessageSendPreparationHost;
 ```
 
+`PrepareMessageSendOptions.skipSlashCommand` 是 send runtime 消费的控制字段，preparation 本身不解释；它用于 markdown file command template 重新进入普通 prompt path 时避免再次触发 slash command interception。
+
 ## 关键行为
 
 ### preflight 判定

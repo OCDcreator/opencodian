@@ -8,7 +8,9 @@
 @import 'components/inline-permission.css';
 @import 'components/config-status.css';
 @import 'components/navigation-sidebar.css';
+@import 'components/modified-files-sidebar.css';
 @import 'components/effort-selector.css';
+@import 'components/lsp-status-indicator.css';
 @import 'components/settings-dropdown.css';
 @import 'components/settings-layout-contract.css';
 @import 'features/chat-user.css';

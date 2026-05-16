@@ -44,7 +44,7 @@ export type {
 } from './SendPipelineTypes';
 
 export interface SendPipelineSlashCommandPort {
-  tryRunSlashCommand(content: string): Promise<boolean>;
+  tryRunSlashCommand(content: string): Promise<boolean | string>;
 }
 
 export interface SendPipelineHostDependencies {
@@ -144,11 +144,18 @@ export class SendPipelineRuntime {
   ) {}
 
   async sendMessage(input: string | PrepareMessageSendOptions): Promise<void> {
-    const preparationOptions = typeof input === 'string' ? { content: input } : input;
-    const content = preparationOptions.content;
+    let preparationOptions = typeof input === 'string' ? { content: input } : input;
+    let content = preparationOptions.content;
 
-    if (await this.slashCommandExecutionService?.tryRunSlashCommand(content)) {
-      return;
+    if (!preparationOptions.skipSlashCommand) {
+      const slashCommandResult = await this.slashCommandExecutionService?.tryRunSlashCommand(content);
+      if (slashCommandResult === true) {
+        return;
+      }
+      if (typeof slashCommandResult === 'string') {
+        preparationOptions = { ...preparationOptions, content: slashCommandResult, skipSlashCommand: true };
+        content = slashCommandResult;
+      }
     }
 
     const preparedSend = await this.messageSendPreparationService.prepareMessageSend(preparationOptions);

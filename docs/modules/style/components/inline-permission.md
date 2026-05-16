@@ -23,5 +23,5 @@
 ## 修改注意点
 
 - 此文件同时服务 3 套 UI，改一个区块前先确认类名前缀，避免误伤其他卡片。
-- 权限按钮颜色有明确语义（once/always/reject），不要改成难以辨识的同色系。
+- 权限按钮颜色有明确语义（once/always/session/reject）；`session` 使用略淡的 accent 色，位置介于 always 与 reject 之间。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

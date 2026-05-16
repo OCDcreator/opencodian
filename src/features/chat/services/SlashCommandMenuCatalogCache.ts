@@ -1,9 +1,11 @@
 import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
+import * as path from 'path';
 
 import {
   buildRuntimeSkillSourceMap,
   buildVisibleSlashCommandMenuItems,
   mergeSlashCommandCatalog,
+  type SlashCommandCatalogEntry,
   type SlashCommandMenuItem,
 } from '../../../core/config/slashCommandCatalog';
 import { getAttachedOpenCodeAppAgents } from '../../../core/opencode/OpenCodeAppCatalogSidecar';
@@ -11,11 +13,13 @@ import type {
   OpencodeAgentConfigRecord,
   OpencodeCommandConfigRecord,
 } from '../../../core/types';
+import { t } from '../../../i18n';
 import {
   AgentMentionCandidateService,
   type AgentSelectionCandidate,
 } from './AgentMentionCandidateService';
 import type { AgentMentionCandidate } from './AgentMentionComposerController';
+import { loadCommandsFromConfigDir } from './CommandMdFileLoader';
 
 const SLASH_COMMAND_MENU_CACHE_TTL_MS = 120_000;
 const AGENT_MENTION_CANDIDATES_PROMISE_KEY = Symbol('opencodian.agentMentionCandidatesPromise');
@@ -210,6 +214,32 @@ function buildHiddenCommandCacheKey(commandIds: string[]): string {
     .join('\u0000');
 }
 
+function appendSyntheticCompactCommand(
+  catalog: SlashCommandCatalogEntry[],
+  hiddenCommandIds: Set<string>,
+): SlashCommandCatalogEntry[] {
+  if (catalog.some((entry) => entry.id === 'compact')) {
+    return catalog;
+  }
+
+  return catalog.concat({
+    id: 'compact',
+    template: '/compact',
+    description: t('slashCommand.compact.description'),
+    agent: '',
+    model: '',
+    hasProjectOverride: false,
+    hidden: hiddenCommandIds.has('compact'),
+    runtimeAvailable: true,
+    source: 'command',
+    subtask: false,
+  });
+}
+
+function resolveProjectConfigDir(vaultPath: string | null): string | null {
+  return vaultPath ? path.join(vaultPath, '.opencode') : null;
+}
+
 export class SlashCommandMenuCatalogCache {
   private cacheEntry: SlashCommandMenuCatalogCacheEntry | null = null;
   private generation = 0;
@@ -279,11 +309,12 @@ export class SlashCommandMenuCatalogCache {
     const token = Symbol('slash-command-menu-catalog-load');
 
     const promise = (async () => {
-      const [runtimeCommandsResult, runtimeSkillsResult, projectCommands, projectAgents] = await Promise.all([
+      const [runtimeCommandsResult, runtimeSkillsResult, projectCommands, projectAgents, mdFileCommands] = await Promise.all([
         this.host.loadRuntimeCommands(),
         this.host.loadRuntimeSkills().catch(() => []),
         this.host.loadProjectCommands(),
         this.host.loadProjectAgents(),
+        Promise.resolve(loadCommandsFromConfigDir(resolveProjectConfigDir(this.host.getVaultPath()))).catch(() => []),
       ]);
       const runtimeSkills = normalizeRuntimeSkills(runtimeSkillsResult);
       const runtimeSkillSources = buildRuntimeSkillSourceMap(
@@ -309,14 +340,16 @@ export class SlashCommandMenuCatalogCache {
           projectAgents,
         }))
         .catch(() => []);
+      const hiddenCommandIds = new Set(this.host.getHiddenCommandIds());
       const items = buildVisibleSlashCommandMenuItems(
-        mergeSlashCommandCatalog({
+        appendSyntheticCompactCommand(mergeSlashCommandCatalog({
           runtimeCommands,
           runtimeSkillSources,
           projectCommands,
           projectAgents,
-          hiddenCommandIds: new Set(this.host.getHiddenCommandIds()),
-        }),
+          hiddenCommandIds,
+          mdFileCommands,
+        }), hiddenCommandIds),
       );
       attachAgentMentionCandidatesToSlashCommandMenuItems(items, agentMentionCandidates);
       attachAgentSelectionCandidatesToSlashCommandMenuItems(items, agentSelectionCandidates);

@@ -65,7 +65,7 @@ export class AcpTransportOwner {
     };
 
     const unsubscribe = this.onNotification((notification) => {
-      const chunk = this.translateNotification(notification);
+      const chunk = this.translateNotification(notification, acpSessionId);
       if (chunk) {
         chunks.push(chunk);
         wake();
@@ -108,7 +108,7 @@ export class AcpTransportOwner {
     this.aborted = true;
   }
 
-  private translateNotification(notification: AcpNotification): StreamChunk | null {
+  private translateNotification(notification: AcpNotification, sessionId: string): StreamChunk | null {
     switch (notification.type) {
       case 'text':
         return translateAcpMessageChunk(notification.text);
@@ -132,6 +132,7 @@ export class AcpTransportOwner {
         return {
           type: 'permission_request',
           id: notification.id,
+          sessionID: sessionId,
           permission: notification.tool,
           patterns: notification.patterns,
           metadata: {},

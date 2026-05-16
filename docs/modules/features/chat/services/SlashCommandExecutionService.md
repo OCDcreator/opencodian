@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，只为当前 runtime 已注册的 backend slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。project config 仍会参与 override语义判断，但单独存在于 `.opencode/opencode.json` 的 command 不会在 runtime 注册前被当作可执行命令。
+`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，为当前 runtime 已注册的 backend slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。project config 仍会参与 override语义判断，但单独存在于 `.opencode/opencode.json` 的 command 不会在 runtime 注册前被当作可执行命令；`.opencode/commands/**/*.md` markdown command 则在没有同名 runtime/project command 时展开为普通 prompt 发送。
 
 这层 owner 当前只覆盖：
 
@@ -13,6 +13,7 @@
 - 识别 runtime `sdk.command.list()` 返回的普通 commands / skill commands，并在命令 ID 同时出现在 project config 时保留 override 语义
 - 按插件设置 `slashCommandSkillMode` 决定 skill 是直接 `/skill args`，还是 `/skills skill args`
 - 复用现有 foreground busy / server readiness gate
+- 在普通 runtime/project command dispatch 前拦截未被 project/runtime command 覆盖的 `/compact`，调用 host 提供的 `runCompactSession()` 专用路径，而不是走 `session.command()`
 - 从活动会话与 focus preview 收集 OpenCodian placeholder runtime context：
   - `vaultPath`
   - `currentNotePath`
@@ -20,6 +21,7 @@
   - `externalContextPaths`
   - `conversationTitle`
 - 在 command 请求发出后启动现有 conversation sync loop，并触发一次 visible conversation background sync
+- 对 markdown file command，跳过 `session.command()`，将 template（含简单 `$ARGUMENTS` / `$1` / `$UPPER_CASE` 占位展开，缺失值清空）交回 send pipeline 作为普通用户消息发送
 
 它**仍不负责** slash autocomplete、hidden menu UI 或 command-owned hidden agent generation；这些分别留在 `ComposerInputShellCoordinator`、`slashCommandCatalog`/`SettingsCommandsSection` 与 `OpencodeConfigManager`。
 
@@ -35,6 +37,8 @@ export class SlashCommandExecutionService {
 export function createSlashCommandExecutionHost(
   deps: SlashCommandExecutionHostDependencies,
 ): SlashCommandExecutionHost;
+
+export function executeCompactSession(...): Promise<boolean>;
 ```
 
 - 返回 `true`：当前输入已经被当作 slash command 消费（包括 ready/busy/error path）
@@ -53,10 +57,12 @@ export function createSlashCommandExecutionHost(
 - **已知的 runtime skill 命令**（`source === 'skill'`）现在也会 fall through 到 prompt 展开路径，由 `SkillContentExpander` 处理，而不是直接作为 session command 执行；这确保 skill 内容通过 XML 展开而非命令调用
 - runtime commands 统一使用 `sdk.command.list()` 判断
 - project config 只用于识别“这个 runtime command 是否同时存在 project override”，不会让 runtime 未注册的 command 提前执行
+- markdown command 只在 runtime command 不存在且 project config 没有同名 command 时接管；因此 `.opencode/commands/*.md` 不会覆盖 JSON/runtime command
 - runtime catalog 会过滤掉 `source === 'mcp'` 的条目
 - `slashCommandSkillMode === 'direct'` 时，runtime `source === 'skill'` 可以直接用 `/skill-id arguments` 执行
 - `slashCommandSkillMode === 'skills-command'` 时，直接 `/skill-id` 不接管；只有 `/skills skill-id arguments` 会映射为真实 `session.command({ command: 'skill-id' })`
 - 如果某个 runtime command 同时也有 project override，direct `/command` 仍按该 runtime command 执行，不会被 `/skills` 前缀规则错误降级
+- `/compact` 是 synthetic command：只在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate，再用当前 OpenCode session 调用 view host 的 manual compaction seam；无 active session 时显示专用 notice
 
 ### 执行前 gate
 
@@ -86,6 +92,8 @@ export function createSlashCommandExecutionHost(
 - `SendPipelineRuntime` 现在多了一条最前面的 slash interception seam：
   - 先问 `SlashCommandExecutionService.tryRunSlashCommand()`
   - 如果返回 `false`，再继续普通 `prepareMessageSend()` + streaming pipeline
+- markdown command 会通过 `runMdFileCommandAsMessage()` 重新进入 send pipeline，并设置 skip-slash 标志避免 template 以 `/` 开头时再次递归拦截
 - slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
+- `/compact` 不属于普通 slash command runtime：`executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
 - `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda

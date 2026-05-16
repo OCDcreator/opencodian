@@ -17,7 +17,7 @@
 - 在 toolbar slot 内挂载 `ChatAgentSelectionCoordinator`，提供 OpenCode default / primary agent 下拉框；提交 prompt 时把该 composer 级选择附加为 `SurfaceInvocationIntent.primaryAgent`，选中后把焦点还给 textarea
 - 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
-- 把 selection controls/context-usage/effort 这些既有子控件挂到稳定的 toolbar slot
+- 把 selection controls/context-usage/effort/modified-files toggle 这些既有子控件挂到稳定的 toolbar slot
 
 ## 公开接口
 
@@ -33,6 +33,7 @@ export interface ComposerInputShellCoordinatorHost {
   mountSelectionControls(toolbar: HTMLElement): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
+  mountModifiedFilesToggle(container: HTMLElement): void;
   isActiveTabStreaming(): boolean;
   cancelStreaming(): void;
   isTabForegroundBusy(): boolean;

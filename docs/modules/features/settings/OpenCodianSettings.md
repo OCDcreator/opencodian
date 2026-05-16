@@ -155,7 +155,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 滚动恢复与 quick-nav 现在由 `SettingsSectionCoordinator` 持有；`OpenCodianSettings` 只保留“下一次打开前记录意图”的公开入口。当前恢复链路仍然包括：
 
 - `settingsPanelScrollTop` 持久化到插件设置
-- `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` / `prepareScrollToConversationOnNextOpen()` 在下次打开前注册意图
+- `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` / `prepareScrollToLspOnNextOpen()` / `prepareScrollToConversationOnNextOpen()` 在下次打开前注册意图；LSP 入口在 tabbed 模式切到 Formatter -> Language servers，在 classic 模式滚动到语言服务小节
 - 已显示的设置页在整页刷新前会先捕获当前 `scrollTop`，覆盖 Formatter/MCP/Server 等 `requestDisplayRefresh()` 触发的即时重建
 - `MutationObserver` + 多次延迟重试用于等待 DOM 稳定
 

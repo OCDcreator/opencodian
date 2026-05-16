@@ -1,0 +1,209 @@
+/* ==================== Modified Files Sidebar ==================== */
+
+.opencodian-modified-files-sidebar-host {
+  position: absolute;
+  inset: 0;
+  z-index: 220;
+  pointer-events: none;
+}
+
+.opencodian-modified-files-sidebar {
+  position: absolute;
+  right: 8px;
+  top: 72px;
+  width: 280px;
+  max-height: min(420px, calc(100% - 144px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--opencodian-glass-border);
+  border-radius: 12px;
+  background: var(--opencodian-glass-base);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px var(--opencodian-glass-shadow);
+  color: var(--text-normal);
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.opencodian-modified-files-sidebar.visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.opencodian-modified-files-sidebar.collapsed {
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+}
+
+.opencodian-modified-files-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-modified-files-sidebar-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.opencodian-modified-files-sidebar-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.opencodian-modified-files-sidebar-collapse:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-modified-files-sidebar-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.opencodian-modified-files-sidebar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.opencodian-modified-files-sidebar-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-modified-files-sidebar-path {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-modified-files-sidebar-path:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.opencodian-modified-files-sidebar-meta,
+.opencodian-modified-files-sidebar-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opencodian-modified-files-sidebar-meta {
+  justify-content: space-between;
+}
+
+.opencodian-modified-files-sidebar-stats {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.opencodian-modified-files-sidebar-additions {
+  color: var(--text-success);
+}
+
+.opencodian-modified-files-sidebar-deletions {
+  color: var(--text-error);
+}
+
+.opencodian-modified-files-sidebar-status {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.opencodian-modified-files-sidebar-status.status-added {
+  background: color-mix(in srgb, var(--text-success) 18%, transparent);
+  color: var(--text-success);
+}
+
+.opencodian-modified-files-sidebar-status.status-deleted {
+  background: color-mix(in srgb, var(--text-error) 18%, transparent);
+  color: var(--text-error);
+}
+
+.opencodian-modified-files-sidebar-empty {
+  padding: 18px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.opencodian-modified-files-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.opencodian-modified-files-toggle:hover,
+.opencodian-modified-files-toggle.is-active {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-modified-files-toggle-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.opencodian-modified-files-toggle-badge.is-empty {
+  display: none;
+}

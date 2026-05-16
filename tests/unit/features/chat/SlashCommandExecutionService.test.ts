@@ -48,6 +48,7 @@ function createHost(
     getProjectCommands: jest.fn().mockResolvedValue({}),
     getRuntimeCommands: jest.fn().mockResolvedValue([]),
     getRuntimeSkills: jest.fn().mockResolvedValue([]),
+    getMdFileCommands: jest.fn().mockResolvedValue([]),
     getSlashCommandSkillMode: jest.fn().mockReturnValue('direct'),
     getVaultPath: jest.fn().mockReturnValue('/vault'),
     refreshActiveFocusContextPreview: jest.fn(),
@@ -62,6 +63,7 @@ function createHost(
       parts: [],
     }),
     startConversationSyncLoop: jest.fn(),
+    runCompactSession: jest.fn().mockResolvedValue(true),
     syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
     notifySlashCommandFailed: jest.fn(),
     ...overrides,
@@ -104,6 +106,7 @@ function createDependencies(
     ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
     opencodeConfigManager: {
       getCommandConfig: jest.fn().mockResolvedValue({}),
+      getConfigDir: jest.fn().mockReturnValue('/vault/.opencode'),
     },
     getSlashCommandSkillMode: jest.fn().mockReturnValue('direct'),
     openCodeServiceSdk: {
@@ -117,6 +120,7 @@ function createDependencies(
     openCodeService: {
       runSessionCommand: jest.fn().mockResolvedValue(undefined),
     },
+    runCompactSession: jest.fn().mockResolvedValue(true),
     getVaultPath: jest.fn().mockReturnValue('/vault'),
     composerContextViewFacade: {
       refreshActiveFocusContextPreview: jest.fn(),
@@ -137,6 +141,7 @@ function createDependencies(
   };
 }
 
+// eslint-disable-next-line max-lines-per-function -- Slash command execution scenarios share one host fixture for readable call-order assertions.
 describe('SlashCommandExecutionService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -161,6 +166,64 @@ describe('SlashCommandExecutionService', () => {
     const service = new SlashCommandExecutionService(host);
 
     await expect(service.tryRunSlashCommand('/missing keep this literal')).resolves.toBe(false);
+
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
+  });
+
+  it('runs markdown file commands as regular messages when no runtime or project command overrides them', async () => {
+    const host = createHost({
+      getRuntimeCommands: jest.fn().mockResolvedValue([]),
+      getMdFileCommands: jest.fn().mockResolvedValue([
+        {
+          id: 'docs:review',
+          template: 'Review $ARGUMENTS in $1',
+          description: 'Review docs',
+          filePath: '/vault/.opencode/commands/docs/review.md',
+        },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/docs:review notes/plan.md carefully'))
+      .resolves.toBe('Review notes/plan.md carefully in notes/plan.md');
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
+  });
+
+  it('clears markdown file command placeholders when arguments are missing', async () => {
+    const host = createHost({
+      getRuntimeCommands: jest.fn().mockResolvedValue([]),
+      getMdFileCommands: jest.fn().mockResolvedValue([
+        {
+          id: 'draft',
+          template: 'Draft $TITLE with $ARGUMENTS and $1.',
+          description: 'Draft docs',
+          filePath: '/vault/.opencode/commands/draft.md',
+        },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/draft'))
+      .resolves.toBe('Draft  with  and .');
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
+  });
+
+  it('does not let markdown file commands override project command IDs', async () => {
+    const host = createHost({
+      getProjectCommands: jest.fn().mockResolvedValue({ review: { template: 'Project review' } }),
+      getRuntimeCommands: jest.fn().mockResolvedValue([]),
+      getMdFileCommands: jest.fn().mockResolvedValue([
+        {
+          id: 'review',
+          template: 'Markdown review',
+          description: '',
+          filePath: '/vault/.opencode/commands/review.md',
+        },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/review')).resolves.toBe(false);
 
     expect(host.runSessionCommand).not.toHaveBeenCalled();
   });
@@ -233,6 +296,38 @@ describe('SlashCommandExecutionService', () => {
       'runSessionCommand',
       'syncVisibleConversationInBackground',
     ]);
+  });
+
+  it('lets project compact commands override the built-in compaction handler', async () => {
+    const host = createHost({
+      getProjectCommands: jest.fn().mockResolvedValue({ compact: { template: 'Project compact' } }),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'compact', source: 'command' },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/compact aggressively')).resolves.toBe(true);
+
+    expect(host.runCompactSession).not.toHaveBeenCalled();
+    expect(host.runSessionCommand).toHaveBeenCalledWith('session-1', expect.objectContaining({
+      command: 'compact',
+      arguments: 'aggressively',
+    }));
+  });
+
+  it('uses built-in compaction only when runtime catalog has no project override', async () => {
+    const host = createHost({
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'compact', source: 'command' },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/compact')).resolves.toBe(true);
+
+    expect(host.runCompactSession).toHaveBeenCalledWith('session-1');
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
   });
 
   it('executes runtime commands and direct skill commands while ignoring MCP entries', async () => {

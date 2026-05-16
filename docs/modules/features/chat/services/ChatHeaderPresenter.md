@@ -5,13 +5,13 @@
 
 ## 概述
 
-`ChatHeaderPresenter` 承接聊天视图 header 与 server status shell 的 DOM / lifecycle ownership，避免 `OpenCodianView` 继续直接维护 header button refs、status interval 和品牌资源刷新。
+`ChatHeaderPresenter` 承接聊天视图 header、server status shell 与 LSP status lifecycle 的 DOM / polling ownership，避免 `OpenCodianView` 继续直接维护 header button refs、status interval、LSP refresh coordinator 和品牌资源刷新。
 
 它负责：
 
 - 创建 title logo、wordmark、header tab bar slot 和 header actions
-- 渲染 server status badge、状态 class 与本地/远端文案
-- 管理 status polling、手动 refresh 和 locale refresh
+- 渲染 server status badge、LSP status indicator、状态 class 与本地/远端文案
+- 管理 server/LSP status polling、手动 refresh 和 locale refresh
 - 绑定 new-tab、current-tab、history、conversation session settings、settings 与 server-section action callbacks
 - 在 css-change 时刷新 logo/wordmark，并通知 view 做 color/layout sync
 
@@ -35,6 +35,7 @@ export interface ChatHeaderPresenterHost {
   isLocalServerMode(): boolean;
   refreshContextUsageIndicator(): void;
   openServerSettings(): void;
+  openLspSettings?(): void;
   createConversationInNewTab(): Promise<void>;
   createConversationInCurrentTab(): Promise<void>;
   showConversationHistory(event: MouseEvent): void;
@@ -46,7 +47,9 @@ export class ChatHeaderPresenter {
   build(headerEl: HTMLElement): void;
   getTabBarSlotEl(): HTMLElement | null;
   applyLocaleTexts(): void;
+  updateLspStatus(status: LspStatusSummary): void;
   startServerStatusLoop(): void;
+  startLspStatusLoop(getStatus: () => Promise<unknown>, openSettings: () => void): void;
   stopServerStatusLoop(): void;
   refreshServerStatusBadge(): Promise<void>;
   destroy(): void;
@@ -55,7 +58,8 @@ export class ChatHeaderPresenter {
 
 ## 关键行为
 
-- `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在包含 history → session settings → global settings 这条会话/全局配置链路
+- `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在包含 server status、LSP status、history → session settings → global settings 这条会话/全局配置链路
+- LSP status indicator 展示 `lsp.status()` 的 server connection summary；`startLspStatusLoop()` 在 presenter 内创建并持有 `LspStatusRefreshCoordinator`，把状态更新转发给 UI 组件，并在 `destroy()` 中停止轮询
 - “新建标签”圆形加号带有 `opencodian-header-btn--new-tab` class；当 `ConversationTabRuntimeCoordinator` 给聊天容器加上 `opencodian-container--tabs-disabled` 时，core CSS 会隐藏这个入口，只保留“当前标签新建会话”入口，避免禁用标签后 header 上出现两个等价的新建按钮
 - `startServerStatusLoop()` 立即刷新一次 status badge，然后每 5 秒重新查询 host 的 server availability
 - `refreshServerStatusBadge()` 更新 `is-running` / `is-offline` 等状态 class，并根据 local/remote mode 选择 status 文案；如果 async availability 返回时 header 已销毁，会重新检查 DOM refs 并跳过写入，避免设置页/视图切换期间的空节点错误
@@ -64,7 +68,7 @@ export class ChatHeaderPresenter {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只创建 presenter、提供 host callbacks，并保存 `getTabBarSlotEl()` 的返回值供 tab bar layout 使用
+- `OpenCodianView` 只创建 presenter、提供 host callbacks，并保存 `getTabBarSlotEl()` 的返回值供 tab bar layout 使用；LSP lifecycle 只通过 `startLspStatusLoop(getStatus, openSettings)` 注入 service/query 与 settings callback
 - server manager、OpenCode service health check、settings tab 打开逻辑仍留在 view / plugin 层，通过 host seam 注入
 - Presenter 不接触 model selector、permission selector、composer input 或 send pipeline 语义
 

@@ -9,15 +9,16 @@ import type { OpencodeCommandConfigRecord } from '../../../../src/core/types';
 function createRuntimeCommand(
   overrides: Partial<RuntimeCommand> & { name: string },
 ): RuntimeCommand {
+  const { name, ...rest } = overrides;
   return {
-    name: overrides.name,
+    name,
     template: '',
     description: '',
     source: 'command',
     subtask: false,
     agent: '',
     model: '',
-    ...overrides,
+    ...rest,
   } as RuntimeCommand;
 }
 
@@ -115,6 +116,69 @@ describe('slashCommandCatalog', () => {
         source: 'skill',
         subtask: false,
       },
+    ]);
+  });
+
+  it('adds markdown file commands without overriding runtime or project commands', () => {
+    const merged = mergeSlashCommandCatalog({
+      runtimeCommands: [createRuntimeCommand({ name: 'runtime-first' })],
+      runtimeSkillSources: new Map(),
+      projectCommands: {
+        'project-first': { template: 'Project template' },
+      },
+      projectAgents: {},
+      hiddenCommandIds: new Set(),
+      mdFileCommands: [
+        {
+          id: 'runtime-first',
+          template: 'Markdown runtime duplicate',
+          description: '',
+          filePath: '/vault/.opencode/commands/runtime-first.md',
+        },
+        {
+          id: 'project-first',
+          template: 'Markdown project duplicate',
+          description: '',
+          filePath: '/vault/.opencode/commands/project-first.md',
+        },
+        {
+          id: 'docs:review',
+          template: 'Review $ARGUMENTS',
+          description: 'Review docs',
+          filePath: '/vault/.opencode/commands/docs/review.md',
+        },
+      ],
+    });
+
+    expect(merged.map((entry) => ({
+      id: entry.id,
+      source: entry.source,
+      template: entry.template,
+      runtimeAvailable: entry.runtimeAvailable,
+    }))).toEqual([
+      {
+        id: 'runtime-first',
+        source: 'command',
+        template: '',
+        runtimeAvailable: true,
+      },
+      {
+        id: 'docs:review',
+        source: 'md-command',
+        template: 'Review $ARGUMENTS',
+        runtimeAvailable: true,
+      },
+      {
+        id: 'project-first',
+        source: 'project',
+        template: 'Project template',
+        runtimeAvailable: false,
+      },
+    ]);
+
+    expect(buildVisibleSlashCommandMenuItems(merged)).toEqual([
+      expect.objectContaining({ id: 'runtime-first', source: 'command' }),
+      expect.objectContaining({ id: 'docs:review', source: 'md-command' }),
     ]);
   });
 });

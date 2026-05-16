@@ -242,6 +242,7 @@ import {
   createMessageSendPreparationHost,
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
+import { ModifiedFilesSidebarCoordinator } from './services/ModifiedFilesSidebarCoordinator';
 import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
@@ -266,6 +267,7 @@ import {
 } from './services/SessionTodoHostAdapter';
 import {
   createSlashCommandExecutionHost,
+  executeCompactSession,
   SlashCommandExecutionService,
 } from './services/SlashCommandExecutionService';
 import { SlashCommandMenuCatalogCache } from './services/SlashCommandMenuCatalogCache';
@@ -476,6 +478,7 @@ export class OpenCodianView extends ItemView {
 
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
+  private modifiedFilesSidebarCoordinator: ModifiedFilesSidebarCoordinator;
 
   // Effort selector
   private effortSelector: EffortSelector | null = null;
@@ -724,6 +727,10 @@ export class OpenCodianView extends ItemView {
           },
         });
         this.effortSelector.updateDisplay();
+      },
+      mountModifiedFilesToggle: (container) => {
+        this.modifiedFilesSidebarCoordinator.mountToggle(container);
+        this.refreshModifiedFilesSidebar();
       },
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       cancelStreaming: () => {
@@ -1007,6 +1014,7 @@ export class OpenCodianView extends ItemView {
       destroyNavigationSidebar: () => {
         this.navigationSidebar?.destroy();
         this.navigationSidebar = null;
+        this.modifiedFilesSidebarCoordinator.destroy();
       },
       updateNavigationSidebarVisibility: () => {
         this.navigationSidebar?.updateVisibility();
@@ -1199,6 +1207,7 @@ export class OpenCodianView extends ItemView {
     super(leaf);
     this.plugin = plugin;
     this.messageComponent = new Component();
+    this.modifiedFilesSidebarCoordinator = new ModifiedFilesSidebarCoordinator();
     this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
@@ -1207,11 +1216,8 @@ export class OpenCodianView extends ItemView {
       loadRuntimeCommands: async () => this.plugin.openCodeService.sdk.command.list(),
       loadRuntimeSkills: async () => this.plugin.openCodeService.sdk.app.skills(),
       getVaultPath: () => getVaultBasePath(this.app),
-      onWarmLoadFailed: (error) => {
-        logger.debug('Failed to preload slash command menu items:', error);
-      },
+      onWarmLoadFailed: (error) => { logger.debug('Failed to preload slash command menu items:', error); },
     });
-
     const surfaceRuntime = this.createSurfaceRuntimeWiring();
     this.titleGenerationService = surfaceRuntime.titleGenerationService;
     this.tabMessagesPaneCoordinator = surfaceRuntime.tabMessagesPaneCoordinator;
@@ -1787,6 +1793,12 @@ export class OpenCodianView extends ItemView {
         getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
         openCodeServiceSdk: this.plugin.openCodeService.sdk,
         openCodeService: this.plugin.openCodeService,
+        runCompactSession: (sessionId) => executeCompactSession(
+          sessionId,
+          this.plugin.openCodeService,
+          () => this.getCurrentSessionModel(),
+          () => this.getCurrentSessionModelResolution(),
+        ),
         getVaultPath: () => getVaultBasePath(this.app),
         composerContextViewFacade: this.composerContextViewFacade,
         getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
@@ -2280,6 +2292,7 @@ export class OpenCodianView extends ItemView {
       },
       applySessionDiffUpdate: (_tabId, _update) => {
         // stored in sessionStateStore via OpenCodeService sync handler
+        this.refreshModifiedFilesSidebar();
       },
     };
   }
@@ -2565,6 +2578,17 @@ export class OpenCodianView extends ItemView {
     await measureStep('startServerStatusLoop', () => {
       this.chatHeaderPresenter.startServerStatusLoop();
     });
+    await measureStep('startLspStatusLoop', () => {
+      this.chatHeaderPresenter.startLspStatusLoop(
+        () => this.plugin.openCodeService.getLspStatus(),
+        () => {
+          this.plugin.settingsTab?.prepareScrollToLspOnNextOpen();
+          const settings = this.appSettings();
+          settings.open();
+          settings.openTabById('opencodian');
+        },
+      );
+    });
     await measureStep('initializeMarkdownService', () => {
       if (this.messagesShellEl) {
         this.markdownService = new MarkdownRenderService({
@@ -2612,7 +2636,9 @@ export class OpenCodianView extends ItemView {
     this.contextRing?.destroy();
     this.contextRing = null;
     this.contextRingContainerEl = null;
+    this.modifiedFilesSidebarCoordinator.destroy();
     this.chatVisualDemoCoordinator.destroyAll();
+    this.permissionInlineCardRenderer.clearSessionApprovals();
 
     // Cleanup navigation sidebar
     this.conversationTabRuntimeCoordinator.destroyTabSystem();
@@ -2718,6 +2744,7 @@ export class OpenCodianView extends ItemView {
   private rebuildNavigationSidebar(): void {
     this.navigationSidebar?.destroy();
     this.navigationSidebar = null;
+    this.modifiedFilesSidebarCoordinator.destroy();
 
     if (!this.messagesShellEl || !this.messagesContainer) {
       return;
@@ -2740,6 +2767,16 @@ export class OpenCodianView extends ItemView {
           this.scrollToBottom({ tabId, behavior: 'smooth', enableAutoScroll: true });
         },
       },
+    );
+    this.modifiedFilesSidebarCoordinator.mountSidebar(outerMountEl as HTMLElement, this.app);
+    this.refreshModifiedFilesSidebar();
+  }
+
+  private refreshModifiedFilesSidebar(): void {
+    const sessionId = this.currentConversation?.openCodeSessionId ?? null;
+    this.modifiedFilesSidebarCoordinator.refresh(
+      sessionId,
+      (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),
     );
   }
 
@@ -2797,6 +2834,7 @@ export class OpenCodianView extends ItemView {
 
   private async handleTabSwitch(tabId: string): Promise<void> {
     await this.conversationTabRuntimeCoordinator.handleTabSwitch(tabId);
+    this.refreshModifiedFilesSidebar();
   }
 
   private async handleTabClose(tabId: string): Promise<void> {
@@ -2805,6 +2843,7 @@ export class OpenCodianView extends ItemView {
 
   private async activateTab(tabId: string): Promise<void> {
     await this.conversationTabRuntimeCoordinator.activateTab(tabId);
+    this.refreshModifiedFilesSidebar();
   }
 
   public applyTabBarLayout(): void {
@@ -3001,6 +3040,7 @@ export class OpenCodianView extends ItemView {
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
   ): Promise<void> {
     await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
+    this.refreshModifiedFilesSidebar();
     await this.childSessionGraphCoordinator.refreshGraph();
   }
 
@@ -3511,18 +3551,16 @@ export class OpenCodianView extends ItemView {
     request: Extract<import('../../core/types').StreamChunk, { type: 'permission_request' }>,
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
-    const result = await this.permissionInlineCardRenderer.collectResponse(
-      request,
-      tabId,
-    );
-    if (!result) {
-      logger.error('No streaming message element found for permission card');
-      return;
-    }
-
-    // Send response to server
     try {
-      await this.plugin.openCodeService.respondToPermission(request.id, result);
+      const responded = await this.permissionInlineCardRenderer.collectAndRespond(
+        request,
+        tabId,
+        (requestId, reply) => this.plugin.openCodeService.respondToPermission(requestId, reply),
+      );
+      if (!responded) {
+        logger.error('No streaming message element found for permission card');
+        return;
+      }
     } catch (error) {
       logger.error('Failed to respond to permission:', error);
       new Notice(t('permissionDialog.notice.error'));

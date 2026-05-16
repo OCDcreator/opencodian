@@ -5,7 +5,7 @@
 
 ## 概述
 
-`AcpTransportOwner` 是 ACP 通知到 OpenCodian `StreamChunk` 的翻译 owner。它负责创建或复用 ACP session、发送用户消息、订阅 ACP notification，并把文本、thinking、tool、usage、permission 和 done 信号转成聊天流可消费的 chunk。
+`AcpTransportOwner` 是 ACP 通知到 OpenCodian `StreamChunk` 的翻译 owner。它负责创建或复用 ACP session、发送用户消息、订阅 ACP notification，并把文本、thinking、tool、usage、permission 和 done 信号转成聊天流可消费的 chunk；permission chunk 会带上当前 ACP `sessionID`，保持与 OpenCode SSE permission chunk 的形状一致。
 
 ## 关键导出
 

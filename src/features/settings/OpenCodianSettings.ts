@@ -190,6 +190,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.server.title'));
   }
 
+  prepareScrollToLspOnNextOpen(): void {
+    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
+      this.getOrCreateTabbedRenderer().switchToPrimaryTab('formatter', 'lsp');
+      return;
+    }
+
+    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.formatter.tab.lsp'));
+  }
+
   prepareScrollToConversationOnNextOpen(secondaryTab?: string): void {
     if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
       const resolvedSecondaryTab = secondaryTab === 'rendering' ? 'display' : secondaryTab;

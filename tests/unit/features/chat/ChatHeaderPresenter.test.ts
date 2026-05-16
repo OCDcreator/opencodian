@@ -56,6 +56,15 @@ function createFixture() {
 }
 
 describe('ChatHeaderPresenter', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.hide = jest.fn(function (this: HTMLElement) {
+      this.style.display = 'none';
+    });
+    HTMLElement.prototype.show = jest.fn(function (this: HTMLElement) {
+      this.style.display = '';
+    });
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
     document.body.classList.remove('theme-dark');

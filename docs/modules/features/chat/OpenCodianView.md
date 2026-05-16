@@ -11,6 +11,7 @@
 - 对话加载、发送、流式渲染和后台同步
 - 多标签页和按 tab 隔离的运行时状态
 - 模型、权限、effort、context usage 等工具栏控件
+- 当前 session modified files 右侧浮动面板与 toolbar toggle 的 coordinator 装配，并在 tab/session 切换或 conversation load 后刷新当前 session diff entries
 - 文件/选区上下文附件、选区高亮保留
 - question / todo / background task / OMO notice 等辅助交互
 - 外观主题、输入面板玻璃效果，以及 CPU/WebGL diamond demo 与 glass octahedron 实验演示
@@ -70,7 +71,7 @@ interface TabRuntimeState {
 }
 ```
 
-这些状态现在通过 `services/ConversationTabRuntimeCoordinator.ts` 统一进入 tab runtime owner；该 coordinator 组合 `TabMessagesPaneCoordinator`、first-open restore、close/recovery 与 stream-like writeback 端口，负责 tab manager / tab bar / persisted-state / active pane 等生命周期。`OpenCodianView` 仍定义 `TabRuntimeState` 的 shape，并把 runtime factory / navigation/sidebar writeback / scroll policy 作为 host seam 提供给 pane coordinator。每个 tab 都有自己的：
+这些状态现在通过 `services/ConversationTabRuntimeCoordinator.ts` 统一进入 tab runtime owner；该 coordinator 组合 `TabMessagesPaneCoordinator`、first-open restore、close/recovery 与 stream-like writeback 端口，负责 tab manager / tab bar / persisted-state / active pane 等生命周期。`OpenCodianView` 仍定义 `TabRuntimeState` 的 shape，并把 runtime factory / navigation sidebar writeback / scroll policy 作为 host seam 提供给 pane coordinator；modified-files UI lifecycle 已委托给 `ModifiedFilesSidebarCoordinator`。每个 tab 都有自己的：
 
 - streaming 控制器
 - DOM pane
@@ -93,6 +94,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 - `currentConversation` / `currentConversationRevertState`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
+- `services/LspStatusRefreshCoordinator.ts` 的 host seam：调用 `OpenCodeService.getLspStatus()`，把 language server connection summary 推送给 header indicator
 - `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、active-tab context usage refresh，以及 per-conversation session settings notice/save；当前 OpenCode session 的 share/unshare 由该相邻 owner 通过插件实例解析，避免继续增长 view shell
 - 一个面向 settings shell 的公开 bridge：`reapplyCurrentConversationSessionSettings()` 会直接复用上述 coordinator，让 settings/conversation 里的 global session default 修改可以立刻落回当前聊天运行时
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
@@ -101,8 +103,9 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `services/ConversationIdentityRuntime.ts` 的 host seam：conversation sync fingerprint、interrupted-sync preservation log fingerprint、message visual signature，以及 render-list shaping（消息可见性过滤、assistant merge、compaction divider 注入）
 - `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动
+- `SessionPermissionTracker`：记录“本次会话允许”的临时权限批准；view 在权限卡片返回 `session` 时保存当前 `sessionID` 的 scope，同一会话再次请求相同 scope 时自动回复，并通过 service 边界发送 OpenCode 支持的 `always`
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及共享 composer catalog 加载入口
-- `SlashCommandMenuCatalogCache`：缓存 runtime commands + skills 与项目级 command/agent 配置合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效
+- `SlashCommandMenuCatalogCache` / `SlashCommandExecutionService` 的 host seam：缓存 runtime commands + skills、项目级 command/agent 配置与 `.opencode/commands/**/*.md` markdown commands 合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效。view 还为 synthetic `/compact` command 提供 manual compaction seam，解析当前 session/provider/model 后调用 `OpenCodeService.summarizeSession(..., false)` 并显示 Obsidian notice。
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background 与 experimental demo / glass octahedron 相关 DOM 引用
@@ -115,7 +118,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 1. `buildUI()`
 2. `initializeTabSystem()`，实际 tab manager / tab bar / layout 初始化由 `ConversationTabRuntimeCoordinator` 执行
-3. `chatHeaderPresenter.startServerStatusLoop()`
+3. `chatHeaderPresenter.startServerStatusLoop()` 与 `lspStatusRefreshCoordinator.start()` 分别启动 server 和 LSP connection summary 刷新
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
 6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新
@@ -168,11 +171,11 @@ send pipeline 调试摘要函数（`summarizeContentBlocksForDebug`、`summarize
 header DOM、server status badge、title logo/wordmark、new/current-tab、history 与 settings 按钮现在由 `services/ChatHeaderPresenter.ts` 承接。`OpenCodianView` 只保留 presenter host seam：
 
 - server availability 查询与 settings server mode 读取
-- settings / server section / history / new-tab callbacks
+- settings / server section / LSP section / history / new-tab callbacks
 - tooltip 标签、plugin asset URL、css-change 注册和 layout/color sync 回调
 - header tab bar slot 写回给 tab bar layout
 
-server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；view 不再直接持有 header button refs 或 status interval 状态。
+server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。
 
 ### Conversation history / actions ownership
 

@@ -322,6 +322,7 @@ export type StreamChunk =
   | {
       type: 'permission_request';
       id: string;
+      sessionID: string;
       permission: string;
       patterns: string[];
       metadata: Record<string, unknown>;

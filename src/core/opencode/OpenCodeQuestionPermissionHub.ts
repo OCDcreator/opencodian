@@ -7,6 +7,7 @@ import type {
 
 const logger = createLogger('OpenCodeQuestionPermissionHub');
 const QUESTION_MUTATION_MAX_RETRIES = 2;
+type OpenCodePermissionWireReply = Exclude<PermissionReply, 'session'>;
 
 export interface OpenCodeQuestionSdk {
   list(): Promise<unknown>;
@@ -16,8 +17,8 @@ export interface OpenCodeQuestionSdk {
 
 export interface OpenCodePermissionSdk {
   list(): Promise<unknown>;
-  reply(request: { requestID: string; reply: PermissionReply; message?: string }): Promise<unknown>;
-  respond(request: { sessionID: string; permissionID: string; response: PermissionReply }): Promise<unknown>;
+  reply(request: { requestID: string; reply: OpenCodePermissionWireReply; message?: string }): Promise<unknown>;
+  respond(request: { sessionID: string; permissionID: string; response: OpenCodePermissionWireReply }): Promise<unknown>;
 }
 
 export interface OpenCodeQuestionPermissionHubHost {
@@ -56,6 +57,10 @@ function normalizeStringArray(raw: unknown): string[] {
   return Array.isArray(raw)
     ? raw.filter((value): value is string => typeof value === 'string')
     : [];
+}
+
+function toOpenCodePermissionWireReply(reply: PermissionReply): OpenCodePermissionWireReply {
+  return reply === 'session' ? 'always' : reply;
 }
 
 export function normalizePermissionRequest(raw: unknown): PermissionRequest | null {
@@ -253,7 +258,7 @@ export class OpenCodeQuestionPermissionHub {
     await this.host.getSdkPermission().respond({
       sessionID: sessionId,
       permissionID: permissionId,
-      response: reply,
+      response: toOpenCodePermissionWireReply(reply),
     });
   }
 
@@ -285,13 +290,16 @@ export class OpenCodeQuestionPermissionHub {
       if (this.host.shouldUseSdkCrud()) {
         await this.host.getSdkPermission().reply({
           requestID,
-          reply,
+          reply: toOpenCodePermissionWireReply(reply),
           message,
         });
         return;
       }
 
-      await this.host.postLegacy(`/permission/${requestID}/reply`, { reply, message });
+      await this.host.postLegacy(`/permission/${requestID}/reply`, {
+        reply: toOpenCodePermissionWireReply(reply),
+        message,
+      });
     } catch (error) {
       logger.error('Failed to respond to permission:', error);
       throw error;

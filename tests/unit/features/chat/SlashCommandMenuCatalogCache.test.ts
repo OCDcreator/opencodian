@@ -58,6 +58,16 @@ function createHost(
   } as jest.Mocked<SlashCommandMenuCatalogCacheHost>;
 }
 
+const COMPACT_MENU_ITEM = {
+  id: 'compact',
+  description: 'Compact the current conversation to free context',
+  hasProjectOverride: false,
+  runtimeAvailable: true,
+  skillSource: undefined,
+  source: 'command',
+  subtask: false,
+};
+
 describe('SlashCommandMenuCatalogCache', () => {
   it('caches merged slash menu items for repeated loads', async () => {
     const host = createHost();
@@ -66,14 +76,18 @@ describe('SlashCommandMenuCatalogCache', () => {
     const first = await cache.load();
     const second = await cache.load();
 
-    expect(first).toEqual([{
-      id: 'review',
-      description: 'Review code',
-      hasProjectOverride: false,
-      runtimeAvailable: true,
-      source: 'command',
-      subtask: false,
-    }]);
+    expect(first).toEqual([
+      {
+        id: 'review',
+        description: 'Review code',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        skillSource: undefined,
+        source: 'command',
+        subtask: false,
+      },
+      COMPACT_MENU_ITEM,
+    ]);
     expect(second).toBe(first);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(1);
     expect(host.loadProjectCommands).toHaveBeenCalledTimes(1);
@@ -99,14 +113,18 @@ describe('SlashCommandMenuCatalogCache', () => {
       }),
     ]);
 
-    await expect(userLoad).resolves.toEqual([{
-      id: 'commit',
-      description: 'Create commit',
-      hasProjectOverride: false,
-      runtimeAvailable: true,
-      source: 'command',
-      subtask: false,
-    }]);
+    await expect(userLoad).resolves.toEqual([
+      {
+        id: 'commit',
+        description: 'Create commit',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        skillSource: undefined,
+        source: 'command',
+        subtask: false,
+      },
+      COMPACT_MENU_ITEM,
+    ]);
     expect(host.onWarmLoadFailed).not.toHaveBeenCalled();
   });
 
@@ -121,11 +139,11 @@ describe('SlashCommandMenuCatalogCache', () => {
     });
     const cache = new SlashCommandMenuCatalogCache(host);
 
-    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'review']);
+    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'review', 'compact']);
 
     hiddenCommandIds = ['review'];
 
-    expect((await cache.load()).map((item) => item.id)).toEqual(['commit']);
+    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'compact']);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(2);
   });
 
@@ -148,14 +166,18 @@ describe('SlashCommandMenuCatalogCache', () => {
     });
 
     expect(host.onWarmLoadFailed).toHaveBeenCalledTimes(1);
-    await expect(cache.load()).resolves.toEqual([{
-      id: 'init',
-      description: 'Guided setup',
-      hasProjectOverride: false,
-      runtimeAvailable: true,
-      source: 'command',
-      subtask: false,
-    }]);
+    await expect(cache.load()).resolves.toEqual([
+      {
+        id: 'init',
+        description: 'Guided setup',
+        hasProjectOverride: false,
+        runtimeAvailable: true,
+        skillSource: undefined,
+        source: 'command',
+        subtask: false,
+      },
+      COMPACT_MENU_ITEM,
+    ]);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(2);
   });
 
@@ -172,6 +194,7 @@ describe('SlashCommandMenuCatalogCache', () => {
     await expect(cache.load()).resolves.toEqual([
       expect.objectContaining({ id: 'review', source: 'command' }),
       expect.objectContaining({ id: 'frontend-design', source: 'skill' }),
+      COMPACT_MENU_ITEM,
     ]);
   });
 
@@ -199,6 +222,7 @@ describe('SlashCommandMenuCatalogCache', () => {
         source: 'skill',
         skillSource: { kind: 'project' },
       }),
+      COMPACT_MENU_ITEM,
     ]);
   });
 });
@@ -364,6 +388,7 @@ describe('SlashCommandMenuCatalogCache — project-only filtering', () => {
 
     await expect(cache.load()).resolves.toEqual([
       expect.objectContaining({ id: 'review', source: 'command' }),
+      COMPACT_MENU_ITEM,
     ]);
   });
 });

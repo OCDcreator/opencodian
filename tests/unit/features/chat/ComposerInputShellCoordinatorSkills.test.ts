@@ -47,6 +47,7 @@ function createFixture() {
     mountSelectionControls: jest.fn(),
     mountContextUsageIndicator: jest.fn(),
     mountEffortSelector: jest.fn(),
+    mountModifiedFilesToggle: jest.fn(),
     isActiveTabStreaming: jest.fn(() => false),
     cancelStreaming: jest.fn(),
     isTabForegroundBusy: jest.fn(() => false),

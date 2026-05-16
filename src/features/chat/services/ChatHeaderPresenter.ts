@@ -2,6 +2,8 @@ import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import { LspStatusIndicator, type LspStatusSummary } from '../ui/LspStatusIndicator';
+import { LspStatusRefreshCoordinator } from './LspStatusRefreshCoordinator';
 
 const logger = createLogger('OpenCodianView');
 
@@ -51,6 +53,7 @@ export interface ChatHeaderPresenterHost {
   isLocalServerMode(): boolean;
   refreshContextUsageIndicator(): void;
   openServerSettings(): void;
+  openLspSettings?(): void;
   createConversationInNewTab(): Promise<void>;
   createConversationInCurrentTab(): Promise<void>;
   showConversationHistory(event: MouseEvent): void;
@@ -64,12 +67,15 @@ export class ChatHeaderPresenter {
   private titleWordmarkEl: HTMLImageElement | null = null;
   private serverStatusBadgeEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
+  private lspStatusIndicator: LspStatusIndicator | null = null;
   private newConversationBtnEl: HTMLElement | null = null;
   private newConversationCurrentTabBtnEl: HTMLElement | null = null;
   private historyBtnEl: HTMLElement | null = null;
   private conversationSessionSettingsBtnEl: HTMLElement | null = null;
   private settingsBtnEl: HTMLElement | null = null;
   private serverStatusIntervalId: number | null = null;
+  private lspStatusRefreshCoordinator: LspStatusRefreshCoordinator | null = null;
+  private openLspSettingsCallback: (() => void) | null = null;
   private isRefreshingServerStatus = false;
   private lastServerAvailability: ChatServerAvailability | null = null;
   private hasRegisteredCssChangeListener = false;
@@ -104,6 +110,11 @@ export class ChatHeaderPresenter {
 
     const actionsEl = headerEl.createDiv({ cls: 'opencodian-header-actions' });
     this.buildStatusBadge(actionsEl);
+    this.lspStatusIndicator = new LspStatusIndicator(actionsEl, {
+      onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
+      setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
+    });
+    this.lspStatusIndicator.load();
     this.newConversationBtnEl = this.buildActionButton(
       actionsEl,
       'opencodian-circle-plus',
@@ -185,6 +196,25 @@ export class ChatHeaderPresenter {
     if (this.serverStatusTextEl) {
       this.serverStatusTextEl.setText(this.getServerStatusLabel(this.lastServerAvailability ?? 'checking'));
     }
+
+    this.lspStatusIndicator?.refreshLocale();
+  }
+
+  updateLspStatus(status: LspStatusSummary): void {
+    this.lspStatusIndicator?.update(status);
+  }
+
+  startLspStatusLoop(
+    getStatus: () => Promise<unknown>,
+    openSettings: () => void,
+  ): void {
+    this.openLspSettingsCallback = openSettings;
+    this.lspStatusRefreshCoordinator?.stop();
+    this.lspStatusRefreshCoordinator = new LspStatusRefreshCoordinator(
+      getStatus,
+      (status) => this.updateLspStatus(status),
+    );
+    this.lspStatusRefreshCoordinator.start();
   }
 
   startServerStatusLoop(): void {
@@ -204,11 +234,16 @@ export class ChatHeaderPresenter {
 
   destroy(): void {
     this.stopServerStatusLoop();
+    this.lspStatusRefreshCoordinator?.stop();
+    this.lspStatusRefreshCoordinator = null;
+    this.openLspSettingsCallback = null;
     this.headerTabBarSlotEl = null;
     this.logoContainerEl = null;
     this.titleWordmarkEl = null;
     this.serverStatusBadgeEl = null;
     this.serverStatusTextEl = null;
+    this.lspStatusIndicator?.unload();
+    this.lspStatusIndicator = null;
     this.newConversationBtnEl = null;
     this.newConversationCurrentTabBtnEl = null;
     this.historyBtnEl = null;

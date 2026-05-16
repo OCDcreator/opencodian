@@ -10,9 +10,9 @@
 它负责：
 
 - 过滤 runtime `source === 'mcp'` 的条目，同时保留 `source === 'skill'` 供 direct 或 `/skills` 模式使用
-- 合并 runtime slash command 与 project `.opencode/opencode.json` `command` map
+- 合并 runtime slash command、project `.opencode/opencode.json` `command` map 与 `.opencode/commands/**/*.md` markdown commands
 - 从 command-owned hidden agent 中回填 `temperature` / `top_p` 与 base agent
-- 标记 catalog/menu item 的 `source: 'command' | 'skill' | 'project'`
+- 标记 catalog/menu item 的 `source: 'command' | 'skill' | 'project' | 'md-command'`
 - 对 runtime skill 额外根据 `app.skills()` 返回的 `location` 推导来源标签（project / OpenCode project / plugin / global / custom）
 - 标记 `hiddenSlashCommands` 驱动的 menu hidden 状态
 - 为 chat-side slash autocomplete 导出只包含可见条目的轻量 menu item 列表
@@ -22,6 +22,7 @@
 ```ts
 export interface SlashCommandCatalogEntry { ... }
 export interface SlashCommandMenuItem { ... }
+export interface MdCommandEntry { ... }
 export interface MergeSlashCommandCatalogOptions { ... }
 
 export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean;
@@ -40,6 +41,7 @@ export function buildVisibleSlashCommandMenuItems(
 - project 字段继续覆盖 runtime `template` / `description` / `agent` / `model` / `subtask`
 - `command.agent === opencodian-command:<id>` 时，会尝试从对应 hidden agent `options.opencodianCommand.baseAgent` 回填 editor/menu 看到的 agent，而不是泄露内部 agent id
 - runtime 不存在、但 project config 存在的命令会保留为 `runtimeAvailable: false`，供 settings/catalog/editor 继续显示
+- markdown command 只在 runtime/project 没有同名 command 时进入 catalog，source 为 `md-command` 且可直接进入 chat autocomplete；它不会覆盖 JSON/runtime command truth
 - runtime skill 会保留为 `source: 'skill'`，后续由 chat/menu 层按用户设置决定显示成 `/skill` 还是 `/skills skill`
 - runtime skill 若能从 `location` 识别出 plugin cache、project `.claude/.agents`、project `.opencode` 等路径，会把结果写入 `skillSource`，供聊天输入区渲染多语言来源说明；识别失败时回落到 `custom`
 
@@ -59,3 +61,4 @@ export function buildVisibleSlashCommandMenuItems(
 
 - 不要把这层合并规则重新复制回 `SettingsCommandsSection`、`ComposerInputShellCoordinator` 或 `OpenCodeService`
 - 这里只负责 catalog merge / menu 投影，不接管 runtime placeholder expansion 或 `runSessionCommand()` 执行
+- markdown command 输入使用 core-local `MdCommandEntry` 结构类型，避免 core catalog 反向导入 chat service loader

@@ -860,6 +860,7 @@ export class OpenCodeStreamEventTransformer {
       chunks.push({
         type: 'permission_request',
         id: permission.id,
+        sessionID: permission.sessionID,
         permission: permission.permission,
         patterns: permission.patterns,
         metadata: permission.metadata,

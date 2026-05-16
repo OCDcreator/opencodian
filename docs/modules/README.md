@@ -186,6 +186,7 @@ docs/modules/
 │   │   │   ├── ConversationViewStateService.md
 │   │   │   ├── MessageFinalizationService.md
 │   │   │   ├── MessageSendPreparationService.md
+│   │   │   ├── ModifiedFilesSidebarCoordinator.md
 │   │   │   ├── PermissionModeSelectorCoordinator.md
 │   │   │   ├── PersistentAssistantNoticeService.md
 │   │   │   ├── ScrollManager.md

@@ -80,6 +80,7 @@ export interface PrepareMessageSendOptions {
   syntheticTextParts?: PromptSyntheticTextPartInput[];
   invocationIntent?: SurfaceInvocationIntent;
   targetTabId?: TabId;
+  skipSlashCommand?: boolean;
 }
 
 export interface PreparedMessageSend {

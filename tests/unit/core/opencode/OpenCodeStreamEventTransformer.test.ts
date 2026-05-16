@@ -148,6 +148,7 @@ describe('OpenCodeStreamEventTransformer event routing', () => {
         {
           type: 'permission_request',
           id: 'permission-1',
+          sessionID: 'test-session',
           permission: 'write',
           patterns: ['notes/**'],
           metadata: { source: 'tool' },

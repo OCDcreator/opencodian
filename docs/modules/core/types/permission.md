@@ -23,7 +23,8 @@
 |------|------|
 | `PermissionAction` | `'allow' \| 'deny' \| 'ask'` — 单个权限的动作 |
 | `ToolPermission` | `PermissionAction \| Record<string, PermissionAction>` — 工具级权限（支持路径/模式级细粒度） |
-| `PermissionReply` | `'once' \| 'always' \| 'reject'` — 用户对权限请求的响应 |
+| `PermissionReply` | `'once' \| 'always' \| 'session' \| 'reject'` — 用户对权限请求的响应；`session` 为插件侧临时语义，发给 SDK 前映射为 `always` |
+| `SessionPermissionTracker` | 内存中的 per-session approval tracker；key 包含 session、tool、action 和完整排序后的 pattern set；不持久化，插件 reload 后清空 |
 
 ### 权限配置
 
@@ -85,9 +86,10 @@
 
 1. OpenCode server 在工具执行前发送 `permission_request` SSE 事件
 2. 客户端展示权限卡片，显示工具名、命令/文件路径、元数据
-3. 用户选择 `'once'` / `'always'` / `'reject'`
-4. 客户端发送 `respondToPermission(requestID, reply, message?)` 到 server
+3. 用户选择 `'once'` / `'always'` / `'session'` / `'reject'`
+4. 客户端发送 `respondToPermission(requestID, reply, message?)` 到 server；service 边界会把本地 `session` 映射为 OpenCode wire value `always`
 5. `'always'` 响应会将对应 patterns 加入自动批准列表
+6. `'session'` 只在插件本地记录当前 `sessionID` 的 approval，并在 SDK 边界按 OpenCode 支持的协议发送 `'always'`
 
 ## 关键方法
 
@@ -141,6 +143,7 @@
 - `OpencodeConfig` 类型在此文件中通过 `type OpencodeConfig = BaseOpencodeConfig` 重导出，供交叉引用使用
 - `ToolPermission` 支持 `Record<string, PermissionAction>` 形式，允许按文件路径/模式设置不同权限
 - `PermissionRequest.always` 字段包含可自动批准的 patterns，`'always'` 响应应参考此列表
+- `PermissionReply.session` 不是 OpenCode SDK 原生值；`OpenCodeQuestionPermissionHub` 会在 SDK / legacy HTTP 边界映射成 `'always'`，本地 tracker 只负责会话内临时记忆
 - `PermissionRequest.tool` 字段可选，仅在工具调用触发的权限请求中存在（含 `messageID` 和 `callID`）
 - `PermissionSettings.useProjectConfig` 控制是否使用项目级配置文件的权限设置
 

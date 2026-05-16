@@ -7,7 +7,7 @@
 
 `SendPipelineRuntime` 是第七阶段新增的发送子系统 runtime。它把原先仍挂在 `OpenCodianView.sendMessage()` 里的整条发送 ownership 搬成独立模块。第二刀后，它进一步变成发送子系统的 composition root，负责装配：
 
-- 在真正 prepare/send 之前先给 slash command runtime owner 一个拦截机会
+- 在真正 prepare/send 之前先给 slash command runtime owner 一个拦截机会；由 markdown file command 重新进入普通 prompt 路径时可通过 `skipSlashCommand` 跳过这一步，避免递归拦截
 - 调用 `MessageSendPreparationService` 完成 send preflight / optimistic bootstrap
 - 发起真实 `openCodeService.sendMessage()` stream，并创建 streaming shell 与 `StreamController`
 - 把 stream loop / chunk router 交给 `StreamChunkRouter`
@@ -58,7 +58,7 @@ export class SendPipelineRuntime {
 
 ### stream bootstrap
 
-- 先调用可选的 `tryRunSlashCommand()`；如果输入已经被已知 slash command 消费，整个普通 streaming send path 直接短路
+- 先调用可选的 `tryRunSlashCommand()`；如果输入已经被已知 slash command 消费，整个普通 streaming send path 直接短路；`PrepareMessageSendOptions.skipSlashCommand` 为 true 时跳过 slash 拦截，供 `.opencode/commands/*.md` template 作为普通 prompt 发送
 - 先把字符串或结构化 prompt input 归一化，再调用 `prepareMessageSend()` 获取 `PreparedMessageSend`
 - 如果 active tab runtime 在 preparation 之后已经失效，直接中止，不继续发流
 - 进入 streaming 状态后，再创建真实 stream、streaming shell 和 `StreamController`

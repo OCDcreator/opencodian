@@ -74,7 +74,37 @@ export interface PermissionRequest {
 }
 
 /** Permission response type */
-export type PermissionReply = 'once' | 'always' | 'reject';
+export type PermissionReply = 'once' | 'always' | 'session' | 'reject';
+
+/** Tracks permissions approved for the current plugin session; cleared on reload. */
+export class SessionPermissionTracker {
+  private approved = new Set<string>();
+
+  addSessionApproval(sessionId: string, toolName: string, action: string, patterns: string[]): void {
+    this.approved.add(this.makeKey(sessionId, toolName, action, patterns));
+  }
+
+  isSessionApproved(sessionId: string, toolName: string, action: string, patterns: string[]): boolean {
+    return this.approved.has(this.makeKey(sessionId, toolName, action, patterns));
+  }
+
+  clearSession(sessionId: string): void {
+    for (const key of this.approved) {
+      if (key.startsWith(`${sessionId}:`)) {
+        this.approved.delete(key);
+      }
+    }
+  }
+
+  clearAll(): void {
+    this.approved.clear();
+  }
+
+  private makeKey(sessionId: string, toolName: string, action: string, patterns: string[]): string {
+    const sortedPatterns = [...(patterns || [])].sort().join(',');
+    return `${sessionId}:${toolName}:${action}:${sortedPatterns}`;
+  }
+}
 
 /** Permission response input */
 export interface PermissionReplyInput {

@@ -11,7 +11,7 @@ import {
   getCommandScopedAgentMetadata,
 } from './commandScopedAgent';
 
-export type SlashCommandCatalogSource = 'command' | 'skill' | 'project';
+export type SlashCommandCatalogSource = 'command' | 'skill' | 'project' | 'md-command';
 export type SlashCommandMenuItemSource = SlashCommandCatalogSource | 'skills-command';
 export type SlashCommandSkillSourceKind =
   | 'project'
@@ -59,12 +59,19 @@ export interface SlashCommandMenuItem {
   subtask: boolean;
 }
 
+export interface MdCommandEntry {
+  id: string;
+  template: string;
+  description: string;
+}
+
 export interface MergeSlashCommandCatalogOptions {
   runtimeCommands: RuntimeCommand[];
   runtimeSkillSources: Map<string, SlashCommandSkillSource>;
   projectCommands: OpencodeCommandConfigRecord;
   projectAgents: OpencodeAgentConfigRecord;
   hiddenCommandIds: Set<string>;
+  mdFileCommands?: MdCommandEntry[];
 }
 
 export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
@@ -164,10 +171,12 @@ function getSourceSortRank(source: SlashCommandCatalogSource): number {
       return 0;
     case 'skill':
       return 1;
-    case 'project':
+    case 'md-command':
       return 2;
-    default:
+    case 'project':
       return 3;
+    default:
+      return 4;
   }
 }
 
@@ -306,6 +315,7 @@ export function mergeSlashCommandCatalog(
     projectCommands,
     projectAgents,
     hiddenCommandIds,
+    mdFileCommands,
   } = options;
   const mergedEntries = new Map<string, SlashCommandCatalogEntry>();
 
@@ -360,6 +370,28 @@ export function mergeSlashCommandCatalog(
       skillSource: undefined,
       subtask: normalizeCommandSubtask(undefined, projectCommand),
     });
+  }
+
+  if (mdFileCommands) {
+    for (const mdCommand of mdFileCommands) {
+      if (mergedEntries.has(mdCommand.id)) {
+        continue;
+      }
+
+      mergedEntries.set(mdCommand.id, {
+        id: mdCommand.id,
+        template: mdCommand.template,
+        description: mdCommand.description || `Custom command from ${mdCommand.id}.md`,
+        agent: '',
+        model: '',
+        hasProjectOverride: false,
+        hidden: hiddenCommandIds.has(mdCommand.id),
+        runtimeAvailable: true,
+        source: 'md-command',
+        skillSource: undefined,
+        subtask: false,
+      });
+    }
   }
 
   return Array.from(mergedEntries.values()).sort((left, right) => {
