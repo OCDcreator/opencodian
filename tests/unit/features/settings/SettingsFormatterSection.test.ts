@@ -697,6 +697,14 @@ describe('SettingsFormatterSection builtin list search', () => {
     expect(getBuiltinStatusChip(containerEl, 'prettier').dataset.status).toBe('disable');
     expect(getBuiltinStatusChip(containerEl, 'biome').textContent).toBe(t('settings.formatter.builtinSearch.status.default'));
     expect(getBuiltinStatusChip(containerEl, 'biome').dataset.status).toBe('default');
+    expect(
+      getBuiltinRow(containerEl, 'gofmt')
+        .querySelector('.setting-item-name .opencodian-builtin-row-status-chip'),
+    ).toBe(getBuiltinStatusChip(containerEl, 'gofmt'));
+    expect(
+      getBuiltinRow(containerEl, 'gofmt')
+        .querySelector('.opencodian-builtin-row-meta .opencodian-builtin-row-status-chip'),
+    ).toBeNull();
     expect(findSettingRecord('gofmt')?.desc).toBeUndefined();
     expect(getBuiltinRow(containerEl, 'gofmt').querySelectorAll('.opencodian-builtin-row-extensions')).toHaveLength(1);
   });
@@ -1847,6 +1855,10 @@ describe('SettingsFormatterSection CSS contract', () => {
       '\\.opencodian-formatter-builtin-row > \\.setting-item,\\s*\\.opencodian-formatter-custom-row > \\.setting-item',
       'grid-template-columns:',
     );
+    const formatterBuiltinNameRule = findRule(
+      '\\.opencodian-formatter-builtin-row > \\.setting-item \\.setting-item-name',
+      'display:',
+    );
     const formatterControlRule = findRule(
       '\\.opencodian-formatter-builtin-row > \\.setting-item \\.setting-item-control,\\s*\\.opencodian-formatter-custom-row > \\.setting-item \\.setting-item-control',
       'width:',
@@ -1944,6 +1956,8 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(formatterFirstRowRule).toContain('var(--opencodian-settings-space-lg');
     expect(formatterSettingRule).toContain('minmax(180px, 260px)');
     expect(formatterSettingRule).toContain('background: transparent');
+    expect(formatterBuiltinNameRule).toContain('inline-flex');
+    expect(formatterBuiltinNameRule).toContain('flex-wrap: wrap');
     expect(formatterControlRule).toContain('260px');
     expect(formatterCss).not.toContain('linear-gradient');
     expect(formatterCss).not.toContain('backdrop-filter');

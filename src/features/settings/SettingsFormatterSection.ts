@@ -1172,7 +1172,7 @@ export class SettingsFormatterSection {
     const rowEl = parentEl.createDiv({ cls: 'opencodian-formatter-builtin-row' });
     rowEl.dataset.builtinId = name;
 
-    new Setting(rowEl)
+    const setting = new Setting(rowEl)
       .setName(name)
       .addDropdown((dropdown) => {
         dropdown.addOption('default', t('settings.formatter.config.builtin.useDefault'));
@@ -1184,7 +1184,8 @@ export class SettingsFormatterSection {
         });
       });
 
-    this.renderBuiltinRowMeta(rowEl, action, runtimeStatus?.extensions ?? definition.extensions);
+    this.renderBuiltinRowStatusChip(setting, rowEl, name, action);
+    this.renderBuiltinRowMeta(rowEl, runtimeStatus?.extensions ?? definition.extensions);
     if (action === 'override') {
       const fieldsEl = this.renderOverrideFields(rowEl, name, entry ?? {});
       this.attachBuiltinRowCollapse(rowEl, fieldsEl);
@@ -1203,7 +1204,6 @@ export class SettingsFormatterSection {
 
   private renderBuiltinRowMeta(
     rowEl: HTMLElement,
-    action: BuiltinEntryAction,
     extensions: readonly string[],
   ): HTMLElement {
     const metaEl = rowEl.createDiv({ cls: 'opencodian-builtin-row-meta' });
@@ -1211,12 +1211,40 @@ export class SettingsFormatterSection {
       cls: 'opencodian-builtin-row-extensions',
       text: extensions.join(', '),
     });
-    const statusChipEl = metaEl.createSpan({
+    return metaEl;
+  }
+
+  private renderBuiltinRowStatusChip(
+    setting: Setting,
+    rowEl: HTMLElement,
+    name: string,
+    action: BuiltinEntryAction,
+  ): HTMLElement {
+    if (!setting.settingEl.parentElement) {
+      rowEl.prepend(setting.settingEl);
+    }
+
+    let nameEl = setting.settingEl.querySelector<HTMLElement>('.setting-item-name');
+    if (!nameEl) {
+      nameEl = setting.settingEl.createDiv({ cls: 'setting-item-name' });
+    }
+    if (!nameEl.textContent?.trim()) {
+      nameEl.setText(name);
+    }
+
+    return this.createBuiltinRowStatusChip(nameEl, action);
+  }
+
+  private createBuiltinRowStatusChip(
+    parentEl: HTMLElement,
+    action: BuiltinEntryAction,
+  ): HTMLElement {
+    const statusChipEl = parentEl.createSpan({
       cls: 'opencodian-builtin-row-chip opencodian-builtin-row-status-chip',
       text: this.getBuiltinActionChipLabel(action),
     });
     statusChipEl.dataset.status = action;
-    return metaEl;
+    return statusChipEl;
   }
 
   private getBuiltinActionChipLabel(action: BuiltinEntryAction): string {
@@ -1961,7 +1989,7 @@ export class SettingsFormatterSection {
       const rowEl = scrollEl.createDiv({ cls: 'opencodian-formatter-builtin-row' });
       rowEl.dataset.builtinId = definition.id;
 
-      new Setting(rowEl)
+      const setting = new Setting(rowEl)
         .setName(definition.id)
         .addDropdown((dropdown) => {
           dropdown.addOption('default', t('settings.formatter.config.builtin.useDefault'));
@@ -1973,7 +2001,8 @@ export class SettingsFormatterSection {
           });
         });
 
-      this.renderBuiltinRowMeta(rowEl, action, definition.extensions);
+      this.renderBuiltinRowStatusChip(setting, rowEl, definition.id, action);
+      this.renderBuiltinRowMeta(rowEl, definition.extensions);
       if (action === 'override') {
         const fieldsEl = this.renderLspEditorFields(rowEl, definition.id, entry ?? {}, true);
         this.attachBuiltinRowCollapse(rowEl, fieldsEl);

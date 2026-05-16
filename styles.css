@@ -14319,6 +14319,13 @@ img.opencodian-model-provider-header-icon {
   box-shadow: none;
 }
 
+.opencodian-formatter-builtin-row > .setting-item .setting-item-name {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-sm);
+}
+
 .opencodian-formatter-builtin-row > .setting-item .setting-item-control,
 .opencodian-formatter-custom-row > .setting-item .setting-item-control {
   width: 260px;
