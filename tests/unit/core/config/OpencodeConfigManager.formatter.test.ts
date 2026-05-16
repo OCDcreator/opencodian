@@ -218,3 +218,72 @@ describe('OpencodeConfigManager formatter config', () => {
     expect(config.provider?.demo?.name).toBe('Demo');
   });
 });
+
+describe('OpencodeConfigManager lsp config', () => {
+  it('returns undefined when no lsp config exists', async () => {
+    expect(await manager.getLspConfig()).toBeUndefined();
+  });
+
+  it('reads boolean false lsp config', async () => {
+    await manager.write({ lsp: false });
+    expect(await manager.getLspConfig()).toBe(false);
+  });
+
+  it('reads object lsp config with entries and unknown fields', async () => {
+    await manager.write({
+      lsp: {
+        tsserver: {
+          command: ['typescript-language-server', '--stdio'],
+          extensions: ['.ts', '.tsx'],
+          env: { NODE_ENV: 'development' },
+          initialization: { preferences: { includePackageJsonAutoImports: 'on' } },
+          futureField: 'keep-me',
+        },
+      },
+    });
+
+    expect(await manager.getLspConfig()).toEqual({
+      tsserver: {
+        command: ['typescript-language-server', '--stdio'],
+        extensions: ['.ts', '.tsx'],
+        env: { NODE_ENV: 'development' },
+        initialization: { preferences: { includePackageJsonAutoImports: 'on' } },
+        futureField: 'keep-me',
+      },
+    });
+  });
+
+  it('updateLspConfig uses exact write and preserves unrelated top-level fields', async () => {
+    await manager.write({
+      provider: { demo: { name: 'Demo' } },
+      lsp: {
+        tsserver: { disabled: true },
+        pyright: { command: ['pyright-langserver', '--stdio'] },
+      },
+    });
+
+    await manager.updateLspConfig({
+      tsserver: { disabled: false, futureField: 'keep' },
+    });
+
+    const config = await manager.read();
+    expect(config.provider?.demo?.name).toBe('Demo');
+    expect(config.lsp).toEqual({
+      tsserver: { disabled: false, futureField: 'keep' },
+    });
+  });
+
+  it('updateLspConfig deletes lsp field when passed null', async () => {
+    await manager.write({ lsp: false });
+    await manager.updateLspConfig(null);
+
+    expect((await manager.read()).lsp).toBeUndefined();
+  });
+
+  it('updateLspConfig preserves explicit empty object lsp config', async () => {
+    await manager.write({ lsp: { tsserver: { disabled: true } } });
+    await manager.updateLspConfig({});
+
+    expect((await manager.read()).lsp).toEqual({});
+  });
+});

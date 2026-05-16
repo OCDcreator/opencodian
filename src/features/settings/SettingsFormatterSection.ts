@@ -11,6 +11,7 @@ import type {
 } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { OpenCodeProjectConfigHelpModal } from './OpenCodeProjectConfigHelpModal';
 
 type FormatterMode = 'default' | 'disabled' | 'custom';
 type BuiltinEntryAction = 'default' | 'disable' | 'override';
@@ -753,7 +754,7 @@ export class SettingsFormatterSection {
     ]);
     const mode = this.resolveFormatterMode(formatterConfig);
 
-    new Setting(containerEl)
+    const modeSetting = new Setting(containerEl)
       .setName(t('settings.formatter.config.modeSwitch'))
       .setDesc(t('settings.formatter.config.modeSwitchDesc'))
       .addDropdown((dropdown) => {
@@ -765,6 +766,7 @@ export class SettingsFormatterSection {
           await this.handleModeSwitch(value as FormatterMode);
         });
       });
+    this.addFormatterLspHelpButton(modeSetting);
 
     if (runtimeState.fetchFailed) {
       new Setting(containerEl)
@@ -1506,7 +1508,7 @@ export class SettingsFormatterSection {
     ]);
     const mode = this.resolveFormatterMode(lspConfig);
 
-    new Setting(containerEl)
+    const modeSetting = new Setting(containerEl)
       .setName(t('settings.formatter.lsp.modeSwitch'))
       .setDesc(t('settings.formatter.lsp.modeSwitchDesc'))
       .addDropdown((dropdown) => {
@@ -1518,6 +1520,7 @@ export class SettingsFormatterSection {
           await this.handleLspModeSwitch(value as FormatterMode);
         });
       });
+    this.addFormatterLspHelpButton(modeSetting);
 
     if (runtimeState.fetchFailed) {
       new Setting(containerEl)
@@ -1876,6 +1879,17 @@ export class SettingsFormatterSection {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.notice.modeChangeFailed', { error: message }));
     }
+  }
+
+  private addFormatterLspHelpButton(setting: Setting): void {
+    setting.addExtraButton((button) => {
+      button
+        .setIcon('help-circle')
+        .setTooltip(t('settings.formatter.help.tooltip'))
+        .onClick(() => {
+          new OpenCodeProjectConfigHelpModal(this.plugin.app, 'formatterLsp').open();
+        });
+    });
   }
 
   private normalizeFormatterName(raw: string): string {

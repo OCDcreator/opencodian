@@ -44,4 +44,20 @@ describe('OpenCodeProjectConfigHelpModal', () => {
       'https://opencode.ai/docs/zh-cn/tools',
     ]);
   });
+
+  it('explains formatter and language server settings in plain language and links to official docs', () => {
+    const modal = new OpenCodeProjectConfigHelpModal({} as App, 'formatterLsp');
+
+    modal.onOpen();
+
+    expect(modal.contentEl.querySelector('h2')?.textContent).toBe(t('settings.formatter.help.title'));
+    expect(modal.contentEl.textContent).toContain('Formatters clean up code after OpenCode edits a file');
+    expect(modal.contentEl.textContent).toContain('Language servers help OpenCode understand code structure');
+    expect(
+      Array.from(modal.contentEl.querySelectorAll<HTMLAnchorElement>('a')).map((link) => link.href),
+    ).toEqual([
+      'https://opencode.ai/docs/zh-cn/formatters/',
+      'https://opencode.ai/docs/zh-cn/lsp/',
+    ]);
+  });
 });

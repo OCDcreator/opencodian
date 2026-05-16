@@ -2,7 +2,7 @@ import { App, Modal } from 'obsidian';
 
 import { t } from '../../i18n';
 
-export type OpenCodeProjectConfigHelpTopic = 'share' | 'bashPermission';
+export type OpenCodeProjectConfigHelpTopic = 'share' | 'bashPermission' | 'formatterLsp';
 
 const HELP_LINKS: Record<OpenCodeProjectConfigHelpTopic, { href: string; labelKey: string }[]> = {
   share: [
@@ -23,6 +23,16 @@ const HELP_LINKS: Record<OpenCodeProjectConfigHelpTopic, { href: string; labelKe
     {
       href: 'https://opencode.ai/docs/zh-cn/tools',
       labelKey: 'settings.security.blockedCommands.help.link.tools',
+    },
+  ],
+  formatterLsp: [
+    {
+      href: 'https://opencode.ai/docs/zh-cn/formatters/',
+      labelKey: 'settings.formatter.help.link.formatters',
+    },
+    {
+      href: 'https://opencode.ai/docs/zh-cn/lsp/',
+      labelKey: 'settings.formatter.help.link.lsp',
     },
   ],
 };
@@ -83,9 +93,15 @@ export class OpenCodeProjectConfigHelpModal extends Modal {
   }
 
   private get baseKey(): string {
-    return this.topic === 'share'
-      ? 'settings.conversation.share.help'
-      : 'settings.security.blockedCommands.help';
+    switch (this.topic) {
+      case 'share':
+        return 'settings.conversation.share.help';
+      case 'bashPermission':
+        return 'settings.security.blockedCommands.help';
+      case 'formatterLsp':
+      default:
+        return 'settings.formatter.help';
+    }
   }
 
   private tr(key: string): string {

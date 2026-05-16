@@ -2323,8 +2323,8 @@ export const enTranslations = {
   'settings.user.tab.tags': 'Tags',
 
   // Formatter settings
-  'settings.formatter.title': 'Formatter',
-  'settings.quickNav.formatterDesc': 'View detected formatter status and manage project formatter configuration',
+  'settings.formatter.title': 'Formatter & Language Servers',
+  'settings.quickNav.formatterDesc': 'View detected formatter and language server status, and manage project code intelligence configuration',
   'settings.formatter.tab.overview': 'Overview',
   'settings.formatter.tab.formatter': 'Formatters',
   'settings.formatter.tab.lsp': 'Language servers',
@@ -2361,6 +2361,14 @@ export const enTranslations = {
   'settings.formatter.config.modeSwitchDesc': 'Switch between default auto-detection, full disable, or custom per-formatter configuration',
   'settings.formatter.notice.modeChanged': 'Formatter mode updated',
   'settings.formatter.notice.modeChangeFailed': 'Failed to update formatter mode: {{error}}',
+  'settings.formatter.help.tooltip': 'Explain formatters and language servers',
+  'settings.formatter.help.title': 'Formatters and language servers',
+  'settings.formatter.help.intro': 'These two settings control what OpenCode does after it edits code and how much code context it can understand while it works.',
+  'settings.formatter.help.point1': 'Formatters clean up code after OpenCode edits a file. They run tools such as Prettier, gofmt, rustfmt, or ruff so generated changes follow your project style.',
+  'settings.formatter.help.point2': 'Language servers help OpenCode understand code structure, references, diagnostics, and project-specific signals. They do not format code, they give the model better code awareness.',
+  'settings.formatter.help.point3': 'Leave both on Default unless something is wrong. Use Disabled to turn all of that category off, or Custom when you need to disable one tool, override a command, add environment variables, or map a server to file extensions.',
+  'settings.formatter.help.link.formatters': 'OpenCode formatters documentation',
+  'settings.formatter.help.link.lsp': 'OpenCode LSP server documentation',
 
   // Formatter config - builtin editors
   'settings.formatter.config.builtinList.title': 'Builtin formatters',

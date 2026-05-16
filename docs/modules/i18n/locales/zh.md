@@ -25,13 +25,13 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 2026-04-26 的 MCP 设置页布局收口又补了一组 `settings.server.mcp.add.group.*` 和 `settings.server.mcp.add.type` 文案，用于把新增服务器表单整理成 `基础信息` / `连接配置` / `OAuth` 分组卡片，并把原先直接借标题承载的类型切换改成独立 `类型` 字段标签。随后 MCP management panel 又新增 `action.monitor/edit/delete`、`runtimeSwitch.*`、`ownership.*`、`editor.*`、`details.*`、`delete.confirm` 和项目配置增删改通知，用于明确区分运行时真相与项目配置真相。
 
-同日 F2 新增 `settings.formatter.*` 和 `settings.quickNav.formatterDesc` 系列键，为 Formatter 一级设置页提供概览（runtime status / summary cards / detected formatter table）、配置（mode switch）和模式切换通知的中文文案。
+同日 F2 新增 `settings.formatter.*` 和 `settings.quickNav.formatterDesc` 系列键，为“格式化工具和语言服务”一级设置页提供概览（runtime status / summary cards / detected formatter table）、配置（mode switch）和模式切换通知的中文文案；后续导航修正把该一级标题与 quick-nav 描述对齐到 formatter + language server 双入口。
 
 同日 F3 扩展 `settings.formatter.config.*` 键空间，新增内置格式化器编辑（builtin list / action dropdown / override fields for command/environment/extensions）、自定义格式化器 CRUD（add / save / delete / nameConflict）、高级 JSON 编辑器（format / reload / save / invalidJson）和运行时离线提示对应的中文文案。
 
 本轮继续扩展 `settings.formatter.overview.formatterList.*`，新增已检测格式化器表格的本地搜索标签、占位符和无匹配空态文案，用于支持按名称 / 扩展名快速筛选运行时 formatter 列表。
 
-本轮补齐 `settings.formatter.tab.formatter`、`settings.formatter.tab.lsp` 与 `settings.formatter.lsp.*` 键空间，覆盖 Formatter 页中语言服务概览、模式切换、内置/自定义 LSP 编辑器、初始化 JSON、环境变量和高级 JSON 编辑器的中文文案，避免中文运行时回退到裸 translation key。
+本轮补齐 `settings.formatter.tab.formatter`、`settings.formatter.tab.lsp` 与 `settings.formatter.lsp.*` 键空间，覆盖 Formatter 页中语言服务概览、模式切换、内置/自定义 LSP 编辑器、初始化 JSON、环境变量和高级 JSON 编辑器的中文文案，避免中文运行时回退到裸 translation key。随后新增 `settings.formatter.help.*`，用于 formatter / LSP mode 行的帮助按钮、普通用户能理解的解释弹窗，以及官方 Formatter / LSP 文档链接标签。
 
 2026-04-26 的导航重组又新增了 `settings.mcp.title`、`settings.mcp.tab.overview` 和 `settings.quickNav.mcpDesc`，因为 MCP 已提升为独立一级设置页，并在 classic 布局的 quick-nav 中单独露出。`settings.server.tab.*` 现在只描述剩余的服务器二级标签（连接 / 认证 / 状态）。
 

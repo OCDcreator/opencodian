@@ -108,7 +108,8 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'overview',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.formatter.tab.overview' },
-      { id: 'config', labelKey: 'settings.formatter.tab.config' },
+      { id: 'formatter', labelKey: 'settings.formatter.tab.formatter' },
+      { id: 'lsp', labelKey: 'settings.formatter.tab.lsp' },
     ],
   },
   {

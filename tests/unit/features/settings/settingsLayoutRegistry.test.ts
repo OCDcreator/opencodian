@@ -88,6 +88,16 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'questions',
     ]);
   });
+
+  it('splits formatter settings into formatter and language server secondary tabs', () => {
+    const formatterTab = getPrimaryTabDefinition('formatter');
+
+    expect(formatterTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'overview',
+      'formatter',
+      'lsp',
+    ]);
+  });
 });
 
 describe('resolvePrimaryTabId', () => {

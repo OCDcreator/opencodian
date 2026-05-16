@@ -7,11 +7,16 @@ import { createLogger } from '../../shared';
 import type {
   OpencodeAgentConfig, OpencodeAgentConfigRecord, OpencodeCommandConfig,
   OpencodeCommandConfigRecord, OpencodeCompactionConfig, OpencodeConfig,
-  OpencodeFormatterConfig, OpencodePluginSpec, OpencodeShareMode, PermissionAction, PermissionConfig,
+  OpencodeFormatterConfig, OpencodeLspConfig, OpencodePluginSpec, OpencodeShareMode, PermissionAction, PermissionConfig,
   PermissionMode, ToolPermission,
 } from '../types';
 import { prepareCommandPatchWithScopedAgent, removeCommandScopedAgent } from './commandScopedAgent';
-import { readFormatterConfigValue, writeFormatterConfigValue } from './formatterConfig';
+import {
+  readFormatterConfigValue,
+  readLspConfigValue,
+  writeFormatterConfigValue,
+  writeLspConfigValue,
+} from './formatterConfig';
 import { isRecord, OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
 const logger = createLogger('OpencodeConfigManager');
@@ -149,6 +154,10 @@ export class OpencodeConfigManager {
     return readFormatterConfigValue(await this.read());
   }
 
+  async getLspConfig(): Promise<OpencodeLspConfig | undefined> {
+    return readLspConfigValue(await this.read());
+  }
+
   /**
    * Write the formatter subtree exactly. Unlike compaction/agent helpers that use
    * deep merge, this replaces the entire formatter value so that removed entries
@@ -159,6 +168,14 @@ export class OpencodeConfigManager {
   ): Promise<void> {
     const config = await this.read();
     writeFormatterConfigValue(config, formatter);
+    await this.write(config);
+  }
+
+  async updateLspConfig(
+    lsp: OpencodeLspConfig | null | undefined,
+  ): Promise<void> {
+    const config = await this.read();
+    writeLspConfigValue(config, lsp);
     await this.write(config);
   }
 

@@ -2323,8 +2323,8 @@ export const zhTranslations = {
   'settings.user.tab.tags': '标签',
 
   // Formatter 设置
-  'settings.formatter.title': '格式化工具',
-  'settings.quickNav.formatterDesc': '查看已检测的格式化器状态，管理项目格式化器配置',
+  'settings.formatter.title': '格式化工具和语言服务',
+  'settings.quickNav.formatterDesc': '查看已检测的格式化器和语言服务状态，管理项目代码智能配置',
   'settings.formatter.tab.overview': '概览',
   'settings.formatter.tab.formatter': '格式化器',
   'settings.formatter.tab.lsp': '语言服务',
@@ -2361,6 +2361,14 @@ export const zhTranslations = {
   'settings.formatter.config.modeSwitchDesc': '在默认自动检测、全部禁用或自定义按格式化器配置之间切换',
   'settings.formatter.notice.modeChanged': '格式化模式已更新',
   'settings.formatter.notice.modeChangeFailed': '更新格式化模式失败: {{error}}',
+  'settings.formatter.help.tooltip': '解释格式化器和语言服务',
+  'settings.formatter.help.title': '格式化器和语言服务',
+  'settings.formatter.help.intro': '这两组设置分别决定 OpenCode 改完代码后怎么整理格式，以及它工作时能不能更好地理解代码上下文。',
+  'settings.formatter.help.point1': '格式化器负责在 OpenCode 编辑文件后把代码排整齐。它会运行 Prettier、gofmt、rustfmt、ruff 这类工具，让生成的改动符合项目代码风格。',
+  'settings.formatter.help.point2': '语言服务负责帮助 OpenCode 理解代码结构、引用关系、诊断信息和项目里的信号。它不负责排版代码，而是让模型更懂代码。',
+  'settings.formatter.help.point3': '一般保持默认即可，让 OpenCode 自动检测。遇到问题时，用“全部禁用”关闭整类能力；需要精细控制时，用“自定义”禁用某个工具、覆盖命令、添加环境变量，或把语言服务绑定到特定扩展名。',
+  'settings.formatter.help.link.formatters': 'OpenCode 格式化工具文档',
+  'settings.formatter.help.link.lsp': 'OpenCode LSP 服务器文档',
 
   // Formatter 配置 — 内置编辑器
   'settings.formatter.config.builtinList.title': '内置格式化器',

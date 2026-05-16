@@ -5,7 +5,7 @@
 
 ## 概述
 
-定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、顶层 share 模式、结构化 agent / command / compaction / formatter / MCP 配置，以及 OpenCode 仍兼容的 deprecated `mode` / top-level `tools` 字段。供 `ModelConfigService`、`OpencodeConfigManager` 和 `McpConfigService` 读写 OpenCode 原生配置时使用。类型设计允许完整配置、provider 级配置、formatter entry 与 MCP entry 保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
+定义 `.opencode/opencode.json` 配置文件的 TypeScript 类型映射，涵盖 provider 配置、模型参数、插件数组、顶层 share 模式、结构化 agent / command / compaction / formatter / LSP / MCP 配置，以及 OpenCode 仍兼容的 deprecated `mode` / top-level `tools` 字段。供 `ModelConfigService`、`OpencodeConfigManager` 和 `McpConfigService` 读写 OpenCode 原生配置时使用。类型设计允许完整配置、provider 级配置、formatter entry、LSP entry 与 MCP entry 保留未知字段，同时把 `OpencodeModelConfigSubset` 保持为显式字段列表，便于局部读写模型相关配置。
 
 ## 导入关系
 
@@ -36,20 +36,23 @@
 | `OpencodeFormatterEntryConfig` | 单个 formatter 条目配置（`disabled?`, `command?`, `environment?`, `extensions?`, `[key: string]: unknown`） |
 | `OpencodeFormatterConfig` | formatter 配置联合：`false`（全部禁用）或 `Record<string, OpencodeFormatterEntryConfig>`（按 formatter 覆盖） |
 | `OpencodeFormatterStatus` | SDK `formatter.status()` 返回的运行时状态（`name`, `extensions`, `enabled`） |
+| `OpencodeLspEntryConfig` | 单个 language server 条目配置（`disabled?`, `command?`, `env?`, `extensions?`, `initialization?`, `[key: string]: unknown`） |
+| `OpencodeLspConfig` | LSP 配置联合：`false`（全部禁用）或 `Record<string, OpencodeLspEntryConfig>`（按 language server 覆盖） |
+| `OpencodeLspStatus` | SDK `lsp.status()` 返回的运行时状态（`id`, `root?`, `status`, unknown fields） |
 | `OpencodeMcpTransportType` | MCP transport 类型（`local` / `remote`） |
 | `OpencodeMcpOAuthConfig` | MCP OAuth 配置（`clientId?`, `clientSecret?`, `scope?`, `redirectUri?`, unknown fields） |
 | `OpencodeMcpEntryConfig` | 单个 MCP server 配置（local command/environment 或 remote url/headers/oauth，保留 unknown fields） |
 | `OpencodeMcpConfigRecord` | `Record<string, OpencodeMcpEntryConfig>` — 项目 MCP server map |
 | `OpencodeToolConfig` | `Record<string, boolean>` — top-level 工具开关 |
 | `OpencodeModelConfigSubset` | 模型相关配置子集（`model?`, `small_model?`, `provider?`, `enabled_providers?`, `disabled_providers?`） |
-| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `share?`, `compaction?`, `formatter?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
+| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `share?`, `compaction?`, `formatter?`, `lsp?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
 
 ## 核心逻辑
 
 ### 配置层级
 
 - `OpencodeModelConfigSubset` — 仅模型/提供商相关字段，供 `ModelConfigService` 局部读写
-- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`share`、`compaction`、`formatter`、`mcp`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
+- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`share`、`compaction`、`formatter`、`lsp`、`mcp`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
 
 ### 插件声明格式
 

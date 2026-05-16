@@ -13,6 +13,7 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
 - Displays project LSP config read from `OpencodeConfigManager.getLspConfig()`
 - Supports top-level mode switching between `default` / `disabled` / `custom` via `OpencodeConfigManager.updateFormatterConfig()`
 - Supports the same top-level mode switching semantics for the `lsp` subtree via `OpencodeConfigManager.updateLspConfig()`
+- Adds a shared help button to the formatter and LSP mode settings; it opens `OpenCodeProjectConfigHelpModal` with the `formatterLsp` topic and links to official OpenCode formatter / LSP documentation
 - Builtin formatter editing: per-formatter action dropdown (use-default / disable / override), with command/environment/extensions override fields
 - Builtin LSP editing: per-server action dropdown (use-default / disable / override), with command/extensions/env/initialization override fields
 - Custom formatter CRUD: add by name, edit command/environment/extensions, delete; names are normalized (trim, lowercase, spaces-to-hyphens)
@@ -50,6 +51,7 @@ Tabbed formatter / LSP panes intentionally avoid an extra outer `.opencodian-set
 - `OpencodeConfigManager` — reads/writes `.opencode/opencode.json > lsp`
 - `OpenCodeService.getFormatterStatus()` — SDK `formatter.status()` via catalog query coordinator
 - `OpenCodeService.getLspStatus()` — SDK `lsp.status()` via catalog query coordinator
+- `OpenCodeProjectConfigHelpModal` — plain-language formatter/LSP explanation and official documentation links
 - `OpencodeFormatterConfig`, `OpencodeFormatterEntryConfig`, `OpencodeFormatterStatus`, `OpencodeLspConfig`, `OpencodeLspEntryConfig`, and `OpencodeLspStatus` types from `src/core/types/opencodeConfig.ts`
 
 ## Mode Switch Mapping

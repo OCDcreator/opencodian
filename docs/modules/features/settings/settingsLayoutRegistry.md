@@ -27,7 +27,7 @@
 | `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
 | `mcp` | `overview` |
-| `formatter` | `overview`, `config` |
+| `formatter` | `overview`, `formatter`, `lsp` |
 | `plugins` | `overview`, `global`, `project-directory`, `omo` |
 | `security` | `config`, `permissions`, `safety` |
 | `ui` | `general` |

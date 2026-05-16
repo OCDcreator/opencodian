@@ -153,7 +153,7 @@ describe('SettingsTabbedRenderer', () => {
     expect(generalBlockEl?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
   });
 
-  it('shows MCP as a top-level tab between Commands and Formatter', () => {
+  it('shows MCP as a top-level tab before formatter and language servers', () => {
     const { renderer } = createRendererState();
     const containerEl = document.createElement('div');
 
@@ -164,7 +164,9 @@ describe('SettingsTabbedRenderer', () => {
     ).map((element) => element.textContent?.trim());
     expect(primaryLabels).toContain('MCP');
     expect(primaryLabels.indexOf('Commands')).toBeLessThan(primaryLabels.indexOf('MCP'));
-    expect(primaryLabels.indexOf('MCP')).toBeLessThan(primaryLabels.indexOf('Formatter'));
+    expect(primaryLabels.indexOf('MCP')).toBeLessThan(
+      primaryLabels.indexOf('Formatter & Language Servers'),
+    );
   });
 
   it('does not expose general secondary tab switching anymore', () => {
@@ -341,7 +343,7 @@ describe('SettingsTabbedRenderer tab content routing', () => {
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual(['Overview', 'Config']);
+    ).toEqual(['Overview', 'Formatters', 'Language servers']);
   });
 
   it('delegates user secondary panels through one user content seam', () => {

@@ -95,6 +95,30 @@ export type OpencodeFormatterConfig =
   | boolean
   | Record<string, OpencodeFormatterEntryConfig>;
 
+/**
+ * Single language server entry configuration.
+ * Mirrors the OpenCode LSP subtree shape used by the formatter/LSP settings UI.
+ * Unknown fields are preserved for forward compatibility with upstream OpenCode.
+ */
+export interface OpencodeLspEntryConfig {
+  disabled?: boolean;
+  command?: string[];
+  env?: Record<string, string>;
+  extensions?: string[];
+  initialization?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * LSP configuration in .opencode/opencode.json.
+ * - `undefined` (field absent) → default mode (OpenCode auto-detects language servers)
+ * - `false` → all language servers disabled
+ * - `Record<string, OpencodeLspEntryConfig>` → custom mode (per-server overrides)
+ */
+export type OpencodeLspConfig =
+  | boolean
+  | Record<string, OpencodeLspEntryConfig>;
+
 export type OpencodeMcpTransportType = 'local' | 'remote';
 
 export interface OpencodeMcpOAuthConfig {
@@ -129,6 +153,16 @@ export interface OpencodeFormatterStatus {
   enabled: boolean;
 }
 
+/**
+ * Runtime language server status returned by SDK lsp.status().
+ */
+export interface OpencodeLspStatus {
+  id: string;
+  root?: string;
+  status: string;
+  [key: string]: unknown;
+}
+
 export type OpencodeToolConfig = Record<string, boolean>;
 
 export interface OpencodeModelConfigSubset {
@@ -149,6 +183,7 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   share?: OpencodeShareMode;
   compaction?: OpencodeCompactionConfig;
   formatter?: OpencodeFormatterConfig;
+  lsp?: OpencodeLspConfig;
   mcp?: OpencodeMcpConfigRecord;
   mode?: OpencodeAgentConfigRecord;
   tools?: OpencodeToolConfig;

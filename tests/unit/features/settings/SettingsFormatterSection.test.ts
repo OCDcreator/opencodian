@@ -33,6 +33,19 @@ interface ButtonRecord {
   onClick?: () => void | Promise<void>;
 }
 
+interface MockExtraButtonControl {
+  setIcon: jest.MockedFunction<(icon: string) => MockExtraButtonControl>;
+  setTooltip: jest.MockedFunction<(tooltip: string) => MockExtraButtonControl>;
+  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockExtraButtonControl>;
+}
+
+interface ExtraButtonRecord {
+  icon?: string;
+  tooltip?: string;
+  name: string;
+  onClick?: () => void | Promise<void>;
+}
+
 interface SettingRecord {
   name?: string;
   desc?: string;
@@ -40,6 +53,7 @@ interface SettingRecord {
 
 const dropdownRecords: DropdownRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
+const extraButtonRecords: ExtraButtonRecord[] = [];
 const settingRecords: SettingRecord[] = [];
 
 function getSettingRecord(setting: Setting): SettingRecord {
@@ -165,6 +179,7 @@ beforeEach(() => {
   document.body.innerHTML = '';
   dropdownRecords.length = 0;
   buttonRecords.length = 0;
+  extraButtonRecords.length = 0;
   settingRecords.length = 0;
   displayRefresh = jest.fn();
 
@@ -207,6 +222,30 @@ beforeEach(() => {
     control.setCta.mockReturnValue(control);
     control.setWarning.mockReturnValue(control);
     buttonRecords.push(record);
+    callback(control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
+    this: Setting,
+    callback: (control: MockExtraButtonControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record: ExtraButtonRecord = { name };
+    const control: MockExtraButtonControl = {
+      setIcon: jest.fn().mockImplementation((icon: string) => {
+        record.icon = icon;
+        return control;
+      }),
+      setTooltip: jest.fn().mockImplementation((tooltip: string) => {
+        record.tooltip = tooltip;
+        return control;
+      }),
+      onClick: jest.fn().mockImplementation((handler: () => void | Promise<void>) => {
+        record.onClick = handler;
+        return control;
+      }),
+    };
+    extraButtonRecords.push(record);
     callback(control);
     return this;
   });
@@ -540,6 +579,31 @@ describe('SettingsFormatterSection LSP settings', () => {
     await flushPromises();
 
     expect(updateLspConfig).not.toHaveBeenCalled();
+  });
+
+});
+
+describe('SettingsFormatterSection help buttons', () => {
+  it('adds formatter and language server help buttons to mode settings', async () => {
+    const { plugin } = createPlugin();
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attach(containerEl);
+    await flushPromises();
+
+    expect(
+      extraButtonRecords.filter((record) => record.tooltip === t('settings.formatter.help.tooltip'))
+        .map((record) => record.name),
+    ).toEqual([
+      t('settings.formatter.config.modeSwitch'),
+      t('settings.formatter.lsp.modeSwitch'),
+    ]);
   });
 });
 
