@@ -20,6 +20,7 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
 - Custom formatter CRUD: add by name, edit command/environment/extensions, delete; names are normalized (trim, lowercase, spaces-to-hyphens)
 - Custom LSP CRUD: add/edit/delete project-local language servers; custom entries require `extensions`
 - Advanced JSON editors: direct `formatter` and `lsp` subtree editing with format/reload/save; preserves unknown entry fields
+- Formatter/LSP config changes refresh only the active formatter subtree. The section renders the next subtree into a detached staging element, then swaps it into the visible container while preserving outer settings scroll and temporary min-height, so add/delete/mode-save actions do not clear the full settings page or flash the panel.
 
 ## Layout
 
@@ -100,6 +101,8 @@ A textarea shows the current `formatter` subtree as formatted JSON. Actions:
 - **Save**: validates JSON structure (must be object or `false`), then writes via `updateFormatterConfig`; refreshes display on success
 
 Unknown fields in formatter entries are preserved through both visual editors and the JSON editor.
+
+Successful formatter custom add/edit/delete, builtin action changes, mode switches, and advanced JSON saves call the section-local content refresh path instead of `requestDisplayRefresh()`. If the section is already detached, the code falls back to the parent display refresh as a safety net.
 
 ## LSP Notes
 

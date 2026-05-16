@@ -15,14 +15,15 @@
 - 支持调用方显式提供 settings 滚动容器；标准设置页仍自动发现 Obsidian 的 vertical-tab 容器，editor-area settings view 则锁定自己的 `contentEl`
 - 在 classic quick-nav 上管理 body-level tooltip overlay，让提示可以越过 settings 滚动容器而不被裁切
 - 维护 `prepareRestoreScrollOnNextOpen()` / `prepareScrollToSectionOnNextOpen()` 的打开意图
-- 在 post-render 阶段绑定 scroll persistence，并用 `MutationObserver` + retry timers 恢复滚动位置
+- 在已显示的设置页被整页重建前捕获当前 `scrollTop`，再在 post-render 阶段绑定 scroll persistence，并用 `MutationObserver` + retry timers 恢复滚动位置
+- 对仍然必须整页重建的路径，`beginDisplay()` 会在清空面板前临时锁定当前 panel 高度，`finishDisplay()` 下一帧恢复原始 `min-height`，避免可见设置内容瞬间坍塌导致跳顶或闪动
 - 在 `hide()` 时收尾 restore work、capture 当前 scrollTop，并清理监听器
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `beginDisplay()` | 清空 panel chrome、按需准备 quick-nav host，并保留本次 display 的 pending scroll intent；tabbed 布局可以关闭 quick-nav。调用方现在还可以传入自定义 panel title renderer，用品牌标题替代默认纯文本 `h2` |
+| `beginDisplay()` | 对已绑定滚动监听的可见设置页先捕获当前 `scrollTop`，再清空 panel chrome、按需准备 quick-nav host，并保留本次 display 的 pending scroll intent；tabbed 布局可以关闭 quick-nav。调用方现在还可以传入自定义 panel title renderer，用品牌标题替代默认纯文本 `h2` |
 | `createSectionHeading()` | 创建 section heading，同时把该分区注册到 quick-nav 数据集 |
 | `finishDisplay()` | 构建 quick-nav、安排 post-render setup，并在初次打开时清理 quick-nav 焦点 |
 | `scrollToSectionByTitle()` / quick-nav click handler | 统一走容器级滚动定位，扣除当前 sticky quick-nav 的实际可见高度，而不是单纯依赖 `scrollIntoView()` 与固定 `scroll-margin-top`；`scrollToSectionByTitle()` 会先匹配 `data-section-title`，再按 heading 文本匹配二级 block 标题 |

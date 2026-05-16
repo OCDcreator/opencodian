@@ -291,7 +291,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   // ─── Tabbed layout ─────────────────────────────────────────────────
 
   private renderTabbedDisplay(containerEl: HTMLElement): void {
-    containerEl.empty();
     this.sectionCoordinator.beginDisplay(t('settings.title'), {
       showQuickNav: false,
       renderPanelTitle: (hostEl) => { this.renderPanelTitle(hostEl); },

@@ -48,6 +48,7 @@ import { SettingsUserSection } from './SettingsUserSection';
 export class OpenCodianSettingsView extends ItemView {
   private readonly plugin: OpenCodianPlugin;
   private readonly settingsRootEl: HTMLElement;
+  private settingsScrollTop = 0;
   private refreshModelsCallback?: () => void;
   private refreshTitleModelsCallback?: () => void;
   private refreshModelCatalogStatusCallback?: () => void;
@@ -76,12 +77,13 @@ export class OpenCodianSettingsView extends ItemView {
     this.plugin = plugin;
     this.settingsRootEl = this.contentEl;
 
-    // Scroll coordinator that does NOT persist scroll position
-    // (avoids collision with the standard settings tab's scroll state)
+    // Keep editor-area scroll local so it does not collide with the standard settings tab.
     this.sectionCoordinator = new SettingsSectionCoordinator({
       containerEl: this.settingsRootEl,
-      getSavedScrollTop: () => 0,
-      setSavedScrollTop: () => {},
+      getSavedScrollTop: () => this.settingsScrollTop,
+      setSavedScrollTop: (scrollTop) => {
+        this.settingsScrollTop = scrollTop;
+      },
       scheduleScrollStateSave: () => {},
       getScrollContainer: () => this.settingsRootEl,
     });
@@ -184,7 +186,6 @@ export class OpenCodianSettingsView extends ItemView {
   // ─── Tabbed layout ─────────────────────────────────────────────────
 
   private renderTabbedDisplay(containerEl: HTMLElement): void {
-    containerEl.empty();
     this.sectionCoordinator.beginDisplay(t('settings.title'), {
       showQuickNav: false,
       renderPanelTitle: (hostEl) => { this.renderPanelTitle(hostEl); },

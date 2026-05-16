@@ -113,7 +113,7 @@
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
 
-从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / MCP / Formatter / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式现在还会通过 `beginDisplay({ showQuickNav: false })` 关闭 quick-nav，只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
+从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / MCP / Formatter / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式也必须先进入 `beginDisplay({ showQuickNav: false })`，由 coordinator 捕获当前滚动位置后再清空重建内容；不要在调用 `beginDisplay()` 前额外 `empty()` 容器，否则新增/删除格式化器等 tabbed 刷新会先把滚动容器夹回顶部。tabbed 模式只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 
 2026-04-26 的后续导航微调又把 `MCP` 固定到 `Commands` 和 `Formatter` 之间：一级标签顺序、classic section 挂载顺序和 quick-nav 按钮顺序都保持一致，避免在两种布局之间切换时看到不同的导航位置。
 
@@ -156,6 +156,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 - `settingsPanelScrollTop` 持久化到插件设置
 - `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` / `prepareScrollToConversationOnNextOpen()` 在下次打开前注册意图
+- 已显示的设置页在整页刷新前会先捕获当前 `scrollTop`，覆盖 Formatter/MCP/Server 等 `requestDisplayRefresh()` 触发的即时重建
 - `MutationObserver` + 多次延迟重试用于等待 DOM 稳定
 
 这是最近文档里最容易漏掉的行为之一，因为它已经不只是简单的“记住 scrollTop”。

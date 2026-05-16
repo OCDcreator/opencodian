@@ -32,7 +32,7 @@ export class OpenCodianSettingsView extends ItemView
 
 ### 编辑区设置视图生命周期
 
-`onOpen()` 调用 `renderSettings()` 构建完整设置界面；`onClose()` 负责销毁 section owner、dropdown enhancer、滚动 coordinator 与待执行的 `requestAnimationFrame` 刷新。该 view 把设置 UI 挂在 `ItemView.contentEl` / `.view-content` 内，而不是直接改写 `.workspace-leaf-content` 外壳；滚动 coordinator 显式以这个内容根节点作为滚动容器，quick-nav 跳转也只滚动 `contentEl`，并固定返回 `0`，不会复用标准 settings tab 的 `settingsPanelScrollTop`。
+`onOpen()` 调用 `renderSettings()` 构建完整设置界面；`onClose()` 负责销毁 section owner、dropdown enhancer、滚动 coordinator 与待执行的 `requestAnimationFrame` 刷新。该 view 把设置 UI 挂在 `ItemView.contentEl` / `.view-content` 内，而不是直接改写 `.workspace-leaf-content` 外壳；滚动 coordinator 显式以这个内容根节点作为滚动容器，quick-nav 跳转也只滚动 `contentEl`。编辑区设置页维护自己的内存态 `settingsScrollTop`，用于同一 leaf 内的即时重绘恢复，但不会写入标准 settings tab 的 `settingsPanelScrollTop`。
 
 ### Classic / Tabbed 复用
 
@@ -94,6 +94,6 @@ main.ts callback
 
 - 该模块是 editor-area settings shell，不应新增 provider/model/server 等业务逻辑；优先扩展对应 section owner。
 - 修改 classic / tabbed 的分区顺序时，需要同时检查标准 settings tab、editor-area settings view、`SettingsTabbedRenderer`、locale 文案和模块文档是否仍一致。
-- 该 view 刻意不持久化自己的滚动位置，避免和标准设置页滚动恢复状态冲突。
+- 该 view 只在 leaf 生命周期内保存自己的滚动位置，避免即时重绘跳回顶部，同时不持久化到标准设置页滚动恢复状态。
 - classic quick-nav 在编辑区内必须锁定 `contentEl` 作为滚动容器；不要让 fallback 误选外层 workspace leaf，否则平铺模式跳转会把整个视图滚出可视区域。
 - editor-area 专用样式应定位 `.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings`，不要把 `.opencodian-settings` 直接挂到 leaf 外壳上，否则 Obsidian `Setting` 行会落在异常层级。

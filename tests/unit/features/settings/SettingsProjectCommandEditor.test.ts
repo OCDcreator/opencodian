@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Project command editor tests cover rendering, save/delete validation, and stable local refresh regression cases together. */
 import { Setting } from 'obsidian';
 import * as obsidian from 'obsidian';
 
@@ -238,6 +239,7 @@ function renderEditor(options: {
   return {
     containerEl,
     configManager,
+    editor,
     onConfigChanged,
   };
 }
@@ -351,6 +353,36 @@ afterEach(() => {
 });
 
 describe('SettingsProjectCommandEditor', () => {
+  it('keeps the editor height and scroll stable when re-rendering after config changes', () => {
+    const requestFrameSpy = jest
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation(() => 1);
+    const { containerEl, editor, onConfigChanged } = renderEditor();
+    Object.defineProperty(containerEl, 'offsetHeight', {
+      configurable: true,
+      value: 420,
+    });
+    let scrollTop = 96;
+    Object.defineProperty(containerEl, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => {
+        scrollTop = value;
+      },
+    });
+
+    editor.render({
+      containerEl,
+      commands: [],
+      onConfigChanged,
+      projectCommands: {},
+    });
+
+    expect(containerEl.style.minHeight).toBe('420px');
+    expect(containerEl.scrollTop).toBe(96);
+    expect(requestFrameSpy).toHaveBeenCalled();
+  });
+
   it('renders the supported OpenCodian command placeholder reference', () => {
     const { containerEl } = renderEditor();
 

@@ -153,6 +153,7 @@ function renderEditor(options: { projectAgents?: OpencodeAgentConfigRecord } = {
   return {
     containerEl,
     configManager,
+    editor,
     onConfigChanged,
   };
 }
@@ -246,6 +247,35 @@ beforeEach(() => {
 afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
 
 describe('SettingsProjectAgentEditor layout and creation', () => {
+  it('keeps the editor height and scroll stable when re-rendering after config changes', () => {
+    const requestFrameSpy = jest
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation(() => 1);
+    const { containerEl, editor, onConfigChanged } = renderEditor();
+    Object.defineProperty(containerEl, 'offsetHeight', {
+      configurable: true,
+      value: 480,
+    });
+    let scrollTop = 144;
+    Object.defineProperty(containerEl, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => {
+        scrollTop = value;
+      },
+    });
+
+    editor.render({
+      containerEl,
+      onConfigChanged,
+      projectAgents: {},
+    });
+
+    expect(containerEl.style.minHeight).toBe('480px');
+    expect(containerEl.scrollTop).toBe(144);
+    expect(requestFrameSpy).toHaveBeenCalled();
+  });
+
   it('renders grouped editor sections and keeps advanced settings collapsed by default', () => {
     const { containerEl } = renderEditor();
 

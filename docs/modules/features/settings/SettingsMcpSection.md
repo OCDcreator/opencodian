@@ -14,6 +14,7 @@
 - toolbar: 显示说明、`Refresh` 和 `Add Server`
 - stats: Total / Connected / Needs auth / Failed
 - server cards: 名称、transport badge、endpoint summary、运行时状态、项目拥有/运行时只读提示、操作按钮
+- stats 和 server card 列表在 runtime snapshot / project ownership 刷新时只重绘自己的局部容器；刷新前会临时锁定局部高度并保存 `scrollTop`，下一帧恢复，避免 Add/Delete/Refresh 造成列表坍塌或轻微跳动。
 
 ### 运行时操作
 

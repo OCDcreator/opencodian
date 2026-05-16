@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- MCP settings owns runtime actions, project ownership rendering, and stable local refresh behavior together. */
 /**
  * MCP settings section owner for the dedicated MCP settings category.
  * Renders runtime MCP status from OpenCodeService seams.
@@ -257,23 +258,26 @@ export class SettingsMcpSection {
     if (!this.overviewContainerEl) {
       return;
     }
-    this.overviewContainerEl.empty();
 
-    const counts = countByStatus(snapshot.servers);
+    this.renderWithStableLocalRefresh(this.overviewContainerEl, () => {
+      this.overviewContainerEl?.empty();
 
-    const cardsRow = this.overviewContainerEl.createDiv({ cls: 'opencodian-mcp-overview-cards' });
+      const counts = countByStatus(snapshot.servers);
 
-    this.renderCountCard(cardsRow, t('settings.server.mcp.overview.total'), counts.total);
-    this.renderCountCard(cardsRow, t('settings.server.mcp.overview.connected'), counts.connected);
-    this.renderCountCard(cardsRow, t('settings.server.mcp.overview.needsAuth'), counts.needsAuth);
-    this.renderCountCard(cardsRow, t('settings.server.mcp.overview.failed'), counts.failed);
+      const cardsRow = this.overviewContainerEl!.createDiv({ cls: 'opencodian-mcp-overview-cards' });
 
-    const refreshInfo = this.overviewContainerEl.createDiv({ cls: 'opencodian-mcp-overview-refresh-info' });
-    const timeLabel = snapshot.updatedAt
-      ? new Date(snapshot.updatedAt).toLocaleTimeString()
-      : t('settings.server.mcp.overview.never');
-    refreshInfo.createSpan({
-      text: `${t('settings.server.mcp.overview.lastRefresh')}: ${timeLabel}`,
+      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.total'), counts.total);
+      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.connected'), counts.connected);
+      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.needsAuth'), counts.needsAuth);
+      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.failed'), counts.failed);
+
+      const refreshInfo = this.overviewContainerEl!.createDiv({ cls: 'opencodian-mcp-overview-refresh-info' });
+      const timeLabel = snapshot.updatedAt
+        ? new Date(snapshot.updatedAt).toLocaleTimeString()
+        : t('settings.server.mcp.overview.never');
+      refreshInfo.createSpan({
+        text: `${t('settings.server.mcp.overview.lastRefresh')}: ${timeLabel}`,
+      });
     });
   }
 
@@ -287,24 +291,50 @@ export class SettingsMcpSection {
     if (!this.serverListContainerEl) {
       return;
     }
-    this.serverListContainerEl.empty();
-    this.actionButtons.length = 0;
+    this.renderWithStableLocalRefresh(this.serverListContainerEl, () => {
+      this.serverListContainerEl?.empty();
+      this.actionButtons.length = 0;
 
-    const servers = snapshot.servers;
-    const names = Object.keys(servers);
+      const servers = snapshot.servers;
+      const names = Object.keys(servers);
 
-    if (names.length === 0) {
-      this.serverListContainerEl.createDiv({
-        cls: 'opencodian-mcp-empty',
-        text: t('settings.server.mcp.empty'),
-      });
-      return;
+      if (names.length === 0) {
+        this.serverListContainerEl!.createDiv({
+          cls: 'opencodian-mcp-empty',
+          text: t('settings.server.mcp.empty'),
+        });
+        return;
+      }
+
+      for (const name of names) {
+        const status = servers[name];
+        this.renderServerCard(this.serverListContainerEl!, snapshot, name, status);
+      }
+    });
+  }
+
+  private renderWithStableLocalRefresh(containerEl: HTMLElement, render: () => void): void {
+    const previousScrollTop = containerEl.scrollTop;
+    const previousMinHeight = containerEl.style.minHeight;
+    const measuredHeight = containerEl.offsetHeight;
+    if (measuredHeight > 0) {
+      containerEl.style.minHeight = `${measuredHeight}px`;
     }
 
-    for (const name of names) {
-      const status = servers[name];
-      this.renderServerCard(this.serverListContainerEl!, snapshot, name, status);
+    render();
+
+    if (previousScrollTop > 0) {
+      containerEl.scrollTop = previousScrollTop;
     }
+    window.requestAnimationFrame(() => {
+      if (!containerEl.isConnected) {
+        return;
+      }
+      if (previousScrollTop > 0) {
+        containerEl.scrollTop = previousScrollTop;
+      }
+      containerEl.style.minHeight = previousMinHeight;
+    });
   }
 
   private renderServerCard(

@@ -59,6 +59,8 @@ export class SettingsSectionCoordinator {
   private settingsPanelRestoreScrollContainerEl: HTMLElement | null = null;
   private settingsPanelRestoreScrollListener?: () => void;
   private settingsPanelRestoreSettleTimeoutId: number | null = null;
+  private settingsPanelMinHeightRestoreFrameId: number | null = null;
+  private settingsPanelPreviousMinHeight: string | null = null;
   private settingsScrollPersistenceSuspended = false;
   private displayPendingOpenScrollTop: number | null = null;
   private displayPendingOpenSectionTitle: string | null = null;
@@ -107,8 +109,10 @@ export class SettingsSectionCoordinator {
     this.sections = [];
     this.quickNavEl = null;
 
+    this.captureVisibleScrollBeforeRebuild();
     this.clearSettingsPanelRestoreWork();
     this.teardownScrollPersistence();
+    this.preservePanelHeightDuringRebuild();
     if (this.settingsPanelPostRenderFrameId !== null) {
       window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
       this.settingsPanelPostRenderFrameId = null;
@@ -161,6 +165,7 @@ export class SettingsSectionCoordinator {
       this.displayPendingOpenScrollTop,
       this.displayPendingOpenSectionTitle,
     );
+    this.schedulePanelHeightRestore();
     this.clearInitialQuickNavFocus();
     this.displayPendingOpenScrollTop = null;
     this.displayPendingOpenSectionTitle = null;
@@ -176,6 +181,7 @@ export class SettingsSectionCoordinator {
       window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
       this.settingsPanelPostRenderFrameId = null;
     }
+    this.clearPanelHeightProtection();
     this.sections = [];
     this.quickNavEl = null;
   }
@@ -513,6 +519,17 @@ export class SettingsSectionCoordinator {
     this.scheduleScrollStateSave();
   }
 
+  private captureVisibleScrollBeforeRebuild(): void {
+    if (!this.settingsScrollHandler || !this.settingsScrollContainerEl) {
+      return;
+    }
+    if (!this.settingsScrollContainerEl.isConnected || !this.settingsScrollContainerEl.contains(this.containerEl)) {
+      return;
+    }
+
+    this.captureSettingsPanelScrollPosition();
+  }
+
   private finishPendingOpenVisibility(): void {
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -742,6 +759,42 @@ export class SettingsSectionCoordinator {
     this.settingsPanelRestoreScrollListener = undefined;
     this.settingsPanelRestoreScrollContainerEl = null;
     this.settingsScrollPersistenceSuspended = false;
+  }
+
+  private preservePanelHeightDuringRebuild(): void {
+    this.clearPanelHeightProtection();
+    const currentHeight = this.containerEl.offsetHeight;
+    if (currentHeight <= 0) {
+      return;
+    }
+
+    this.settingsPanelPreviousMinHeight = this.containerEl.style.minHeight;
+    this.containerEl.style.minHeight = `${currentHeight}px`;
+  }
+
+  private schedulePanelHeightRestore(): void {
+    if (this.settingsPanelPreviousMinHeight === null) {
+      return;
+    }
+
+    const previousMinHeight = this.settingsPanelPreviousMinHeight;
+    this.settingsPanelMinHeightRestoreFrameId = window.requestAnimationFrame(() => {
+      this.settingsPanelMinHeightRestoreFrameId = null;
+      this.settingsPanelPreviousMinHeight = null;
+      this.containerEl.style.minHeight = previousMinHeight;
+    });
+  }
+
+  private clearPanelHeightProtection(): void {
+    if (this.settingsPanelMinHeightRestoreFrameId !== null) {
+      window.cancelAnimationFrame(this.settingsPanelMinHeightRestoreFrameId);
+      this.settingsPanelMinHeightRestoreFrameId = null;
+    }
+
+    if (this.settingsPanelPreviousMinHeight !== null) {
+      this.containerEl.style.minHeight = this.settingsPanelPreviousMinHeight;
+      this.settingsPanelPreviousMinHeight = null;
+    }
   }
 
   private teardownScrollPersistence(): void {

@@ -14,6 +14,7 @@
 - 在 template 字段旁展示 OpenCodian 支持的 placeholder token reference
 - 保存到当前 vault 的 `.opencode/opencode.json`
 - 删除当前已存在的 project command override
+- 保存/删除后由上层刷新 editor 时，`render()` 会在清空本地表单容器前锁定当前高度并记录 `scrollTop`，重绘后立即恢复滚动、下一帧释放高度，避免长 command 表单局部闪动。
 
 runtime placeholder 展开与 slash execution runtime 已落地在相邻 runtime owner；这个 editor 现在额外负责把命令级 sampling patch 交给 `OpencodeConfigManager` 转换成 command-owned hidden agent。
 

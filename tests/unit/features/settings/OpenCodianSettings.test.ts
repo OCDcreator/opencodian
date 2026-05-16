@@ -134,6 +134,46 @@ function registerScrollRestoreSuiteHooks() {
 describe('SettingsSectionCoordinator scroll restore logging', () => {
   registerScrollRestoreSuiteHooks();
 
+  it('captures the current settings scroll before rebuilding the panel', () => {
+    const { coordinator, containerEl, state } = createCoordinator();
+    const scrollContainer = document.createElement('div');
+    scrollContainer.className = 'vertical-tab-content-container';
+    installClampedScrollState(scrollContainer, {
+      clientHeight: 200,
+      scrollHeight: 900,
+    });
+    document.body.appendChild(scrollContainer);
+    scrollContainer.appendChild(containerEl);
+
+    coordinator.beginDisplay('Settings');
+    coordinator.finishDisplay();
+    jest.advanceTimersByTime(1);
+
+    scrollContainer.scrollTop = 360;
+    coordinator.beginDisplay('Settings');
+
+    expect(state.settingsPanelScrollTop).toBe(360);
+  });
+
+  it('keeps the settings panel height stable while rebuilding visible content', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    Object.defineProperty(containerEl, 'offsetHeight', {
+      configurable: true,
+      value: 720,
+    });
+    containerEl.style.minHeight = '12px';
+    containerEl.createDiv({ text: 'old settings content' });
+
+    coordinator.beginDisplay('Settings');
+
+    expect(containerEl.style.minHeight).toBe('720px');
+
+    coordinator.finishDisplay();
+    jest.advanceTimersByTime(1);
+
+    expect(containerEl.style.minHeight).toBe('12px');
+  });
+
   it('logs a single restore success and clears pending work after mutation succeeds', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const { coordinator, containerEl } = createCoordinator();
@@ -607,6 +647,82 @@ function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
   document.body.appendChild(tab.containerEl);
   return { app, plugin, tab };
 }
+
+describe('OpenCodianSettingTab scroll restoration', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('captures tabbed settings scroll before clearing tabbed content during refresh', () => {
+    jest.useFakeTimers();
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    let nextFrameId = 0;
+    const frameTimeouts = new Map<number, number>();
+    window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      const frameId = ++nextFrameId;
+      const timeoutId = window.setTimeout(() => {
+        frameTimeouts.delete(frameId);
+        callback(Date.now());
+      }, 0);
+      frameTimeouts.set(frameId, timeoutId);
+      return frameId;
+    }) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = ((frameId: number): void => {
+      const timeoutId = frameTimeouts.get(frameId);
+      if (timeoutId === undefined) {
+        return;
+      }
+      window.clearTimeout(timeoutId);
+      frameTimeouts.delete(frameId);
+    }) as typeof window.cancelAnimationFrame;
+
+    try {
+      const { plugin, tab } = createSettingsTab('tabbed');
+      const scrollContainer = document.createElement('div');
+      scrollContainer.className = 'vertical-tab-content-container';
+      installClampedScrollState(scrollContainer, {
+        clientHeight: 200,
+        scrollHeight: 1200,
+      });
+      scrollContainer.appendChild(tab.containerEl);
+      document.body.appendChild(scrollContainer);
+
+      Object.assign(tab as unknown as Record<string, unknown>, {
+        getOrCreateTabbedRenderer: () => ({
+          renderDisplay: (containerEl: HTMLElement) => {
+            containerEl.createDiv({ text: 'tabbed content' });
+          },
+        }),
+      });
+      const empty = tab.containerEl.empty.bind(tab.containerEl);
+      Object.defineProperty(tab.containerEl, 'empty', {
+        configurable: true,
+        value: () => {
+          scrollContainer.scrollTop = 0;
+          empty();
+        },
+      });
+
+      tab.display();
+      jest.advanceTimersByTime(1);
+      scrollContainer.scrollTop = 480;
+      tab.display();
+
+      expect(plugin.settings.settingsPanelScrollTop).toBe(480);
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+      jest.useRealTimers();
+    }
+  });
+});
 
 describe('OpenCodianSettingTab layout shell', () => {
   beforeEach(() => {

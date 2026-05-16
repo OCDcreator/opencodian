@@ -34,6 +34,8 @@
 
 commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 editor，继续留在相邻 command config/runtime owners。
 
+保存/删除后由上层刷新 editor 时，`render()` 会在清空本地表单容器前锁定当前高度并记录 `scrollTop`，重绘后立即恢复滚动、下一帧释放高度，避免长 agent 表单局部闪动。
+
 ## 核心逻辑
 
 ### project agent 选择与表单回填

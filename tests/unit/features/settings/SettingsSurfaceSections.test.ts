@@ -243,6 +243,74 @@ describe('settings Skills, Tools, and ACP layout surfaces', () => {
     expect(plugin.openCodeService.start).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the skill list scroll position after local list re-renders', async () => {
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      window.setTimeout(() => callback(Date.now()), 0);
+      return 1;
+    }) as typeof window.requestAnimationFrame;
+    try {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          skills: [
+            {
+              name: 'alpha',
+              description: 'First project skill',
+              location: '.opencode/skills/alpha/SKILL.md',
+              content: '# Alpha',
+            },
+            {
+              name: 'beta',
+              description: 'Second project skill',
+              location: '.opencode/skills/beta/SKILL.md',
+              content: '# Beta',
+            },
+          ],
+        },
+        text: '',
+      });
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      document.body.appendChild(containerEl);
+
+      new SettingsSkillSection({
+        plugin: plugin as never,
+        createSectionHeading: createHeading,
+      }).attachTabbed(containerEl, 'project');
+      await flushPromises();
+
+      const listEl = containerEl.querySelector<HTMLElement>('.opencodian-skill-list');
+      expect(listEl).not.toBeNull();
+      let scrollTop = 180;
+      Object.defineProperty(listEl, 'scrollTop', {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      });
+      const empty = listEl!.empty.bind(listEl);
+      Object.defineProperty(listEl, 'empty', {
+        configurable: true,
+        value: () => {
+          scrollTop = 0;
+          empty();
+        },
+      });
+
+      containerEl.querySelector<HTMLInputElement>('.opencodian-skill-select-checkbox')?.dispatchEvent(
+        new Event('change'),
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(listEl!.scrollTop).toBe(180);
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+    }
+  });
+
   it('shows delete only for current-vault project skills', async () => {
     mockRequestUrl.mockResolvedValue({
       status: 200,

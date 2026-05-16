@@ -263,6 +263,93 @@ describe('SettingsMcpSection subscriptions and status', () => {
     expect(containerEl.querySelectorAll('.opencodian-mcp-server-card')).toHaveLength(1);
   });
 
+  it('keeps MCP server list height and scroll stable during local catalog refresh', async () => {
+    jest.useFakeTimers();
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    let nextFrameId = 0;
+    const frameTimeouts = new Map<number, number>();
+    window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      const frameId = ++nextFrameId;
+      const timeoutId = window.setTimeout(() => {
+        frameTimeouts.delete(frameId);
+        callback(Date.now());
+      }, 0);
+      frameTimeouts.set(frameId, timeoutId);
+      return frameId;
+    }) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = ((frameId: number): void => {
+      const timeoutId = frameTimeouts.get(frameId);
+      if (timeoutId === undefined) {
+        return;
+      }
+      window.clearTimeout(timeoutId);
+      frameTimeouts.delete(frameId);
+    }) as typeof window.cancelAnimationFrame;
+
+    try {
+      let catalogListener: ((snapshot: { mcp: McpServerSnapshot }) => void) | null = null;
+      const plugin = createPlugin({
+        servers: { first: { status: 'connected' } },
+        updatedAt: null,
+      });
+      (plugin.openCodeService.subscribeToCatalogUpdates as jest.Mock).mockImplementation(
+        (listener: (snapshot: { mcp: McpServerSnapshot }) => void) => {
+          catalogListener = listener;
+          return jest.fn();
+        },
+      );
+      const section = new SettingsMcpSection({
+        plugin: plugin as unknown as OpenCodianPlugin,
+        createSectionHeading,
+        requestDisplayRefresh: jest.fn(),
+      });
+      const containerEl = document.createElement('div');
+      document.body.appendChild(containerEl);
+
+      section.attachTabbed(containerEl, 'mcp');
+      await flushAsync();
+      jest.advanceTimersByTime(1);
+
+      const listEl = containerEl.querySelector<HTMLElement>('.opencodian-mcp-server-list');
+      expect(listEl).not.toBeNull();
+      Object.defineProperty(listEl!, 'offsetHeight', {
+        configurable: true,
+        value: 360,
+      });
+      let scrollTop = 120;
+      Object.defineProperty(listEl!, 'scrollTop', {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      });
+
+      catalogListener!({
+        mcp: {
+          servers: {
+            first: { status: 'connected' },
+            second: { status: 'failed', error: 'boom' },
+          },
+          updatedAt: Date.now(),
+        },
+      });
+
+      expect(listEl!.style.minHeight).toBe('360px');
+      expect(listEl!.scrollTop).toBe(120);
+
+      jest.advanceTimersByTime(1);
+
+      expect(listEl!.style.minHeight).toBe('');
+      expect(listEl!.scrollTop).toBe(120);
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+      jest.useRealTimers();
+    }
+  });
+
   it('cleans up catalog subscription on dispose', async () => {
     const unsubscribe = jest.fn();
     const plugin = createPlugin();

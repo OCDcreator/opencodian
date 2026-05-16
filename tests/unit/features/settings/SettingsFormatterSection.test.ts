@@ -28,9 +28,21 @@ interface MockButtonControl {
   onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
 }
 
+interface MockTextControl {
+  setPlaceholder: jest.MockedFunction<(value: string) => MockTextControl>;
+  setValue: jest.MockedFunction<(value: string) => MockTextControl>;
+  onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextControl>;
+  inputEl: HTMLInputElement;
+}
+
 interface ButtonRecord {
   text: string;
   onClick?: () => void | Promise<void>;
+}
+
+interface TextRecord {
+  control: MockTextControl;
+  name: string;
 }
 
 interface MockExtraButtonControl {
@@ -53,6 +65,7 @@ interface SettingRecord {
 
 const dropdownRecords: DropdownRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
+const textRecords: TextRecord[] = [];
 const extraButtonRecords: ExtraButtonRecord[] = [];
 const settingRecords: SettingRecord[] = [];
 const upstreamLspBuiltinIds = [
@@ -127,6 +140,25 @@ function createDropdownRecord(name: string): DropdownRecord {
   return record;
 }
 
+function createTextRecord(name: string): TextRecord {
+  const record: TextRecord = {
+    name,
+    control: {
+      setPlaceholder: jest.fn(),
+      setValue: jest.fn(),
+      onChange: jest.fn(),
+      inputEl: document.createElement('input'),
+    },
+  };
+  record.control.setPlaceholder.mockReturnValue(record.control);
+  record.control.setValue.mockImplementation((value) => {
+    record.control.inputEl.value = value;
+    return record.control;
+  });
+  record.control.onChange.mockReturnValue(record.control);
+  return record;
+}
+
 function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
   const headingEl = document.createElement('h2');
   headingEl.textContent = title;
@@ -136,6 +168,10 @@ function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHead
 
 function findDropdown(name: string): DropdownRecord | undefined {
   return dropdownRecords.find((record) => record.name === name);
+}
+
+function findText(name: string): TextRecord | undefined {
+  return textRecords.find((record) => record.name === name);
 }
 
 function findSettingRecord(name: string): SettingRecord | undefined {
@@ -237,6 +273,7 @@ beforeEach(() => {
   document.body.innerHTML = '';
   dropdownRecords.length = 0;
   buttonRecords.length = 0;
+  textRecords.length = 0;
   extraButtonRecords.length = 0;
   settingRecords.length = 0;
   displayRefresh = jest.fn();
@@ -281,6 +318,16 @@ beforeEach(() => {
     control.setWarning.mockReturnValue(control);
     buttonRecords.push(record);
     callback(control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
+    this: Setting,
+    callback: (control: MockTextControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createTextRecord(name);
+    textRecords.push(record);
+    callback(record.control);
     return this;
   });
   jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
@@ -912,7 +959,7 @@ describe('SettingsFormatterSection mode switching', () => {
     expect(updateFormatterConfig).not.toHaveBeenCalled();
   });
 
-  it('refreshes display after successful mode switch', async () => {
+  it('refreshes formatter content locally after successful mode switch', async () => {
     const { plugin } = createPlugin();
     const section = new SettingsFormatterSection({
       plugin,
@@ -929,7 +976,8 @@ describe('SettingsFormatterSection mode switching', () => {
     await modeDropdown?.onChange?.('disabled');
     await flushPromises();
 
-    expect(displayRefresh).toHaveBeenCalledTimes(1);
+    expect(displayRefresh).not.toHaveBeenCalled();
+    expect(findDropdown(t('settings.formatter.config.modeSwitch'))).toBeDefined();
   });
 });
 
@@ -1260,6 +1308,45 @@ describe('SettingsFormatterSection custom formatter list', () => {
     section.attachTabbed(containerEl, 'config');
     await flushPromises();
 
+    expect(findSettingRecord('my-custom')).toBeDefined();
+  });
+
+  it('adds custom formatter without clearing the visible settings content', async () => {
+    const { plugin, getFormatterConfig, updateFormatterConfig } = createPlugin({
+      formatterConfig: {},
+      runtimeStatus: [],
+    });
+    const requestDisplayRefresh = jest.fn(() => {
+      throw new Error('full settings refresh should not run');
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+    const visibleBeforeSave = containerEl.textContent ?? '';
+
+    getFormatterConfig.mockResolvedValueOnce({});
+    getFormatterConfig.mockResolvedValueOnce({
+      'my-custom': { command: [] },
+    });
+    const nameText = findText(t('settings.formatter.config.custom.addName'));
+    nameText!.control.inputEl.value = 'my-custom';
+    const addButton = buttonRecords.find((record) => record.text === t('settings.formatter.config.custom.addButton'));
+
+    await addButton?.onClick?.();
+    expect(containerEl.textContent).toBe(visibleBeforeSave);
+    await flushPromises();
+
+    expect(updateFormatterConfig).toHaveBeenCalledWith({
+      'my-custom': { command: [] },
+    });
+    expect(requestDisplayRefresh).not.toHaveBeenCalled();
     expect(findSettingRecord('my-custom')).toBeDefined();
   });
 

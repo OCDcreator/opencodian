@@ -91,6 +91,7 @@ export class SettingsProjectCommandEditor {
     private readonly configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
   ) {}
 
+  // eslint-disable-next-line max-lines-per-function -- Project command editing keeps field wiring, validation, and stable local refresh in one stateful form.
   render(options: SettingsProjectCommandEditorRenderOptions): void {
     const {
       commands,
@@ -100,6 +101,7 @@ export class SettingsProjectCommandEditor {
       skillMode = 'direct',
     } = options;
 
+    const restoreContainer = this.preserveContainerBeforeRender(containerEl);
     containerEl.replaceChildren();
 
     const sortedCommands = [...commands].sort((left, right) => left.id.localeCompare(right.id));
@@ -308,6 +310,31 @@ export class SettingsProjectCommandEditor {
       });
 
     syncEditorControls();
+    restoreContainer();
+  }
+
+  private preserveContainerBeforeRender(containerEl: HTMLElement): () => void {
+    const previousScrollTop = containerEl.scrollTop;
+    const previousMinHeight = containerEl.style.minHeight;
+    const measuredHeight = containerEl.offsetHeight;
+    if (measuredHeight > 0) {
+      containerEl.style.minHeight = `${measuredHeight}px`;
+    }
+
+    return () => {
+      if (previousScrollTop > 0) {
+        containerEl.scrollTop = previousScrollTop;
+      }
+      window.requestAnimationFrame(() => {
+        if (!containerEl.isConnected) {
+          return;
+        }
+        if (previousScrollTop > 0) {
+          containerEl.scrollTop = previousScrollTop;
+        }
+        containerEl.style.minHeight = previousMinHeight;
+      });
+    };
   }
 
   private renderPlaceholderReference(containerEl: HTMLElement): void {

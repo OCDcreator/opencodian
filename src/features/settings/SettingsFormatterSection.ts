@@ -171,6 +171,10 @@ export class SettingsFormatterSection {
     tooltip?: string,
   ) => HTMLHeadingElement;
   private readonly requestDisplayRefresh: () => void;
+  private activeRenderContainerEl: HTMLElement | null = null;
+  private activeRenderMode: 'classic' | 'tabbed' | null = null;
+  private activeSecondaryTabId = 'overview';
+  private contentRefreshRunId = 0;
 
   constructor(options: SettingsFormatterSectionOptions) {
     this.plugin = options.plugin;
@@ -178,7 +182,11 @@ export class SettingsFormatterSection {
     this.requestDisplayRefresh = options.requestDisplayRefresh;
   }
 
-  dispose(): void {}
+  dispose(): void {
+    this.contentRefreshRunId += 1;
+    this.activeRenderContainerEl = null;
+    this.activeRenderMode = null;
+  }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     const headingEl = this.createSectionHeading(
@@ -187,29 +195,94 @@ export class SettingsFormatterSection {
       t('settings.quickNav.formatterDesc'),
     );
 
-    this.renderOverviewBlock(containerEl);
-    this.renderFormatterConfigBlock(containerEl);
-    this.renderLspConfigBlock(containerEl);
+    const contentEl = containerEl.createDiv({ cls: 'opencodian-formatter-classic-stack' });
+    this.activeRenderContainerEl = contentEl;
+    this.activeRenderMode = 'classic';
+    this.activeSecondaryTabId = 'overview';
+    void this.renderClassicContent(contentEl);
 
     return headingEl;
   }
 
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.activeRenderContainerEl = containerEl;
+    this.activeRenderMode = 'tabbed';
+    this.activeSecondaryTabId = secondaryTabId;
+    void this.renderTabbedContent(containerEl, secondaryTabId);
+  }
+
+  private renderClassicContent(containerEl: HTMLElement): Promise<void> {
+    return Promise.all([
+      this.renderOverviewBlock(containerEl),
+      this.renderFormatterConfigBlock(containerEl),
+      this.renderLspConfigBlock(containerEl),
+    ]).then(() => undefined);
+  }
+
+  private renderTabbedContent(containerEl: HTMLElement, secondaryTabId: string): Promise<void> {
     containerEl.addClass('opencodian-formatter-tab-stack');
     switch (secondaryTabId) {
       case 'overview':
-        this.renderOverviewTabbed(containerEl);
-        break;
+        return this.renderOverviewTabbed(containerEl);
       case 'formatter':
       case 'config':
-        this.renderFormatterConfigTabbed(containerEl);
-        break;
+        return this.renderFormatterConfigTabbed(containerEl);
       case 'lsp':
-        this.renderLspConfigTabbed(containerEl);
-        break;
+        return this.renderLspConfigTabbed(containerEl);
       default:
-        this.renderOverviewTabbed(containerEl);
+        return this.renderOverviewTabbed(containerEl);
     }
+  }
+
+  private async requestContentRefresh(): Promise<void> {
+    const containerEl = this.activeRenderContainerEl;
+    const renderMode = this.activeRenderMode;
+    if (!containerEl || !renderMode || !containerEl.isConnected) {
+      this.requestDisplayRefresh();
+      return;
+    }
+
+    const runId = ++this.contentRefreshRunId;
+    const previousMinHeight = containerEl.style.minHeight;
+    const measuredHeight = containerEl.offsetHeight;
+    const scrollContainerEl = this.getScrollContainer(containerEl);
+    const scrollTop = scrollContainerEl?.scrollTop ?? 0;
+    if (measuredHeight > 0) {
+      containerEl.style.minHeight = `${measuredHeight}px`;
+    }
+
+    const stagingEl = document.createElement('div');
+    stagingEl.className = containerEl.className;
+    if (renderMode === 'classic') {
+      await this.renderClassicContent(stagingEl);
+    } else {
+      await this.renderTabbedContent(stagingEl, this.activeSecondaryTabId);
+    }
+
+    if (runId !== this.contentRefreshRunId || !containerEl.isConnected) {
+      return;
+    }
+
+    containerEl.className = stagingEl.className;
+    containerEl.replaceChildren(...Array.from(stagingEl.childNodes));
+    if (scrollContainerEl) {
+      scrollContainerEl.scrollTop = scrollTop;
+    }
+    window.requestAnimationFrame(() => {
+      if (!containerEl.isConnected) {
+        return;
+      }
+      if (scrollContainerEl?.isConnected) {
+        scrollContainerEl.scrollTop = scrollTop;
+      }
+      containerEl.style.minHeight = previousMinHeight;
+    });
+  }
+
+  private getScrollContainer(containerEl: HTMLElement): HTMLElement | null {
+    return containerEl.closest<HTMLElement>(
+      '.vertical-tab-content-container, .vertical-tab-content, .modal-content',
+    );
   }
 
   private async loadFormatterConfig(): Promise<OpencodeFormatterConfig | undefined> {
@@ -271,7 +344,7 @@ export class SettingsFormatterSection {
     return 'default';
   }
 
-  private renderOverviewBlock(containerEl: HTMLElement): void {
+  private async renderOverviewBlock(containerEl: HTMLElement): Promise<void> {
     const overviewEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     overviewEl.createEl('h4', {
       text: t('settings.formatter.tab.overview'),
@@ -279,7 +352,7 @@ export class SettingsFormatterSection {
     });
     const bodyEl = overviewEl.createDiv({ cls: 'opencodian-settings-block-body' });
 
-    void this.renderOverviewContent(bodyEl);
+    await this.renderOverviewContent(bodyEl);
   }
 
   private async renderOverviewContent(containerEl: HTMLElement): Promise<void> {
@@ -941,7 +1014,7 @@ export class SettingsFormatterSection {
     return false;
   }
 
-  private renderFormatterConfigBlock(containerEl: HTMLElement): void {
+  private async renderFormatterConfigBlock(containerEl: HTMLElement): Promise<void> {
     const configEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     configEl.createEl('h4', {
       text: t('settings.formatter.tab.formatter'),
@@ -949,23 +1022,23 @@ export class SettingsFormatterSection {
     });
     const bodyEl = configEl.createDiv({ cls: 'opencodian-settings-block-body' });
 
-    void this.renderFormatterConfigContent(bodyEl);
+    await this.renderFormatterConfigContent(bodyEl);
   }
 
-  private renderOverviewTabbed(containerEl: HTMLElement): void {
+  private async renderOverviewTabbed(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl('h4', {
       text: t('settings.formatter.tab.overview'),
       cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
     });
-    void this.renderOverviewContent(containerEl);
+    await this.renderOverviewContent(containerEl);
   }
 
-  private renderFormatterConfigTabbed(containerEl: HTMLElement): void {
+  private async renderFormatterConfigTabbed(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl('h4', {
       text: t('settings.formatter.tab.formatter'),
       cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
     });
-    void this.renderFormatterConfigContent(containerEl);
+    await this.renderFormatterConfigContent(containerEl);
   }
 
   private async renderFormatterConfigContent(containerEl: HTMLElement): Promise<void> {
@@ -1137,7 +1210,7 @@ export class SettingsFormatterSection {
 
       await configManager.updateFormatterConfig(current);
       new Notice(t('settings.formatter.config.builtin.saved'));
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.config.builtin.saveFailed', { error: message }));
@@ -1289,7 +1362,7 @@ export class SettingsFormatterSection {
 
       await configManager.updateFormatterConfig(current);
       new Notice(t('settings.formatter.config.builtin.saved'));
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.config.builtin.saveFailed', { error: message }));
@@ -1435,7 +1508,7 @@ export class SettingsFormatterSection {
       current[name] = newEntry;
       await configManager.updateFormatterConfig(current);
       new Notice(t('settings.formatter.config.custom.saved'));
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.config.custom.saveFailed', { error: message }));
@@ -1453,7 +1526,7 @@ export class SettingsFormatterSection {
 
       await configManager.updateFormatterConfig(current);
       new Notice(t('settings.formatter.config.custom.deleted'));
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.config.custom.deleteFailed', { error: message }));
@@ -1498,7 +1571,7 @@ export class SettingsFormatterSection {
               current[normalizedName] = { command: [] };
               await configManager.updateFormatterConfig(current);
               new Notice(t('settings.formatter.config.custom.saved'));
-              this.requestDisplayRefresh();
+              await this.requestContentRefresh();
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
               new Notice(t('settings.formatter.config.custom.saveFailed', { error: message }));
@@ -1588,7 +1661,7 @@ export class SettingsFormatterSection {
       try {
         await configManager.updateFormatterConfig(false);
         new Notice(t('settings.formatter.config.advanced.saved'));
-        this.requestDisplayRefresh();
+        await this.requestContentRefresh();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         new Notice(t('settings.formatter.config.advanced.saveFailed', { error: message }));
@@ -1604,7 +1677,7 @@ export class SettingsFormatterSection {
     try {
       await configManager.updateFormatterConfig(parsed as Record<string, OpencodeFormatterEntryConfig>);
       new Notice(t('settings.formatter.config.advanced.saved'));
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.config.advanced.saveFailed', { error: message }));
@@ -1634,7 +1707,7 @@ export class SettingsFormatterSection {
         }
       }
       new Notice(t('settings.formatter.notice.modeChanged'));
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.notice.modeChangeFailed', { error: message }));
@@ -1717,7 +1790,7 @@ export class SettingsFormatterSection {
     }
   }
 
-  private renderLspConfigBlock(containerEl: HTMLElement): void {
+  private async renderLspConfigBlock(containerEl: HTMLElement): Promise<void> {
     const configEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     configEl.createEl('h4', {
       text: t('settings.formatter.tab.lsp'),
@@ -1725,15 +1798,15 @@ export class SettingsFormatterSection {
     });
     const bodyEl = configEl.createDiv({ cls: 'opencodian-settings-block-body' });
 
-    void this.renderLspConfigContent(bodyEl);
+    await this.renderLspConfigContent(bodyEl);
   }
 
-  private renderLspConfigTabbed(containerEl: HTMLElement): void {
+  private async renderLspConfigTabbed(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl('h4', {
       text: t('settings.formatter.tab.lsp'),
       cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
     });
-    void this.renderLspConfigContent(containerEl);
+    await this.renderLspConfigContent(containerEl);
   }
 
   private async renderLspConfigContent(containerEl: HTMLElement): Promise<void> {
@@ -2084,7 +2157,7 @@ export class SettingsFormatterSection {
 
       await configManager.updateLspConfig(current);
       new Notice(t('settings.formatter.lsp.builtin.saved'));
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.lsp.builtin.saveFailed', { error: message }));
@@ -2251,7 +2324,7 @@ export class SettingsFormatterSection {
           ? t('settings.formatter.lsp.builtin.saved')
           : t('settings.formatter.lsp.custom.saved'),
       );
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(
@@ -2325,7 +2398,7 @@ export class SettingsFormatterSection {
 
     if (parsed === false) {
       await configManager.updateLspConfig(false);
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
       return;
     }
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -2333,7 +2406,7 @@ export class SettingsFormatterSection {
       return;
     }
     await configManager.updateLspConfig(parsed as Record<string, OpencodeLspEntryConfig>);
-    this.requestDisplayRefresh();
+    await this.requestContentRefresh();
   }
 
   private async handleLspModeSwitch(mode: FormatterMode): Promise<void> {
@@ -2357,7 +2430,7 @@ export class SettingsFormatterSection {
           break;
         }
       }
-      this.requestDisplayRefresh();
+      await this.requestContentRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(t('settings.formatter.notice.modeChangeFailed', { error: message }));

@@ -42,6 +42,158 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+describe('OpenCodianSettingsView scroll restoration', () => {
+  it('restores the editor-area settings scroll after an immediate re-render', async () => {
+    jest.useFakeTimers();
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    let nextFrameId = 0;
+    const frameTimeouts = new Map<number, number>();
+    window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      const frameId = ++nextFrameId;
+      const timeoutId = window.setTimeout(() => {
+        frameTimeouts.delete(frameId);
+        callback(Date.now());
+      }, 0);
+      frameTimeouts.set(frameId, timeoutId);
+      return frameId;
+    }) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = ((frameId: number): void => {
+      const timeoutId = frameTimeouts.get(frameId);
+      if (timeoutId === undefined) {
+        return;
+      }
+      window.clearTimeout(timeoutId);
+      frameTimeouts.delete(frameId);
+    }) as typeof window.cancelAnimationFrame;
+    try {
+      const { view } = createSettingsView('classic');
+      let scrollTop = 0;
+      Object.defineProperty(view.contentEl, 'scrollHeight', {
+        configurable: true,
+        value: 1600,
+      });
+      Object.defineProperty(view.contentEl, 'clientHeight', {
+        configurable: true,
+        value: 400,
+      });
+      Object.defineProperty(view.contentEl, 'scrollTop', {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      });
+      const renderMarker = (containerEl: HTMLElement) => {
+        containerEl.createDiv({ cls: 'settings-render-marker', text: 'rendered' });
+      };
+      Object.assign(view as unknown as Record<string, unknown>, {
+        renderClassicGeneralSection: renderMarker,
+        addServerSettings: jest.fn(),
+        addMcpSettings: jest.fn(),
+        addModelSettings: jest.fn(),
+        addConversationSettings: jest.fn(),
+        addAgentsSettings: jest.fn(),
+        addCommandsSettings: jest.fn(),
+        addFormatterSettings: jest.fn(),
+        addPluginSettings: jest.fn(),
+        addSecuritySettings: jest.fn(),
+        addUISettings: jest.fn(),
+        addStyleSettings: jest.fn(),
+        addDebugSettings: jest.fn(),
+        addUserSettings: jest.fn(),
+        addSkillsSettings: jest.fn(),
+        addToolsSettings: jest.fn(),
+        addAcpSettings: jest.fn(),
+      });
+
+      await view.onOpen();
+      jest.advanceTimersByTime(1);
+      scrollTop = 420;
+
+      (view as unknown as { renderSettings: () => void }).renderSettings();
+      scrollTop = 0;
+      jest.advanceTimersByTime(1);
+
+      expect(view.contentEl.scrollTop).toBe(420);
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+      jest.useRealTimers();
+    }
+  });
+
+  it('captures editor-area tabbed scroll before clearing tabbed content during refresh', async () => {
+    jest.useFakeTimers();
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    let nextFrameId = 0;
+    const frameTimeouts = new Map<number, number>();
+    window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      const frameId = ++nextFrameId;
+      const timeoutId = window.setTimeout(() => {
+        frameTimeouts.delete(frameId);
+        callback(Date.now());
+      }, 0);
+      frameTimeouts.set(frameId, timeoutId);
+      return frameId;
+    }) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = ((frameId: number): void => {
+      const timeoutId = frameTimeouts.get(frameId);
+      if (timeoutId === undefined) {
+        return;
+      }
+      window.clearTimeout(timeoutId);
+      frameTimeouts.delete(frameId);
+    }) as typeof window.cancelAnimationFrame;
+    try {
+      const { view } = createSettingsView('tabbed');
+      let scrollTop = 0;
+      Object.defineProperty(view.contentEl, 'scrollHeight', {
+        configurable: true,
+        value: 1600,
+      });
+      Object.defineProperty(view.contentEl, 'clientHeight', {
+        configurable: true,
+        value: 400,
+      });
+      Object.defineProperty(view.contentEl, 'scrollTop', {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      });
+      const empty = view.contentEl.empty.bind(view.contentEl);
+      Object.defineProperty(view.contentEl, 'empty', {
+        configurable: true,
+        value: () => {
+          scrollTop = 0;
+          empty();
+        },
+      });
+      Object.assign(view as unknown as Record<string, unknown>, {
+        getOrCreateTabbedRenderer: () => ({
+          renderDisplay: (containerEl: HTMLElement) => {
+            containerEl.createDiv({ text: 'tabbed content' });
+          },
+        }),
+      });
+
+      await view.onOpen();
+      jest.advanceTimersByTime(1);
+      scrollTop = 520;
+      (view as unknown as { renderSettings: () => void }).renderSettings();
+
+      expect((view as unknown as { settingsScrollTop: number }).settingsScrollTop).toBe(520);
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe('OpenCodianSettingsView classic layout', () => {
   it('renders editor-area classic settings inside the ItemView content element', async () => {
     const { view } = createSettingsView('classic');

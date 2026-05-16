@@ -90,6 +90,12 @@ export class SettingsProjectAgentEditor {
       mergedAgents,
     } = options;
 
+    const previousScrollTop = containerEl.scrollTop;
+    const previousMinHeight = containerEl.style.minHeight;
+    const measuredHeight = containerEl.offsetHeight;
+    if (measuredHeight > 0) {
+      containerEl.style.minHeight = `${measuredHeight}px`;
+    }
     containerEl.replaceChildren();
     const layoutEl = containerEl.createDiv({ cls: 'opencodian-agent-editor-layout' });
     const {
@@ -345,6 +351,26 @@ export class SettingsProjectAgentEditor {
       setDeleteButton: (button) => {
         deleteButton = button;
       },
+    });
+    this.restoreContainerAfterRender(containerEl, previousScrollTop, previousMinHeight);
+  }
+
+  private restoreContainerAfterRender(
+    containerEl: HTMLElement,
+    previousScrollTop: number,
+    previousMinHeight: string,
+  ): void {
+    if (previousScrollTop > 0) {
+      containerEl.scrollTop = previousScrollTop;
+    }
+    window.requestAnimationFrame(() => {
+      if (!containerEl.isConnected) {
+        return;
+      }
+      if (previousScrollTop > 0) {
+        containerEl.scrollTop = previousScrollTop;
+      }
+      containerEl.style.minHeight = previousMinHeight;
     });
   }
 

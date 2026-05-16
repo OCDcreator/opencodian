@@ -289,6 +289,10 @@ export class SettingsSkillSection {
   }
 
   private async renderSkillList(listEl: HTMLElement, forceRefresh = false): Promise<void> {
+    const previousScrollTop = listEl.scrollTop;
+    const restoreScrollTop = () => {
+      this.restoreScrollTopAfterRender(listEl, previousScrollTop);
+    };
     listEl.empty();
     listEl.createDiv({
       cls: 'opencodian-settings-inline-empty opencodian-skill-loading',
@@ -311,9 +315,11 @@ export class SettingsSkillSection {
         this.renderSkillBatchBar(listEl, projectSkills, { allowDelete: true, allowRefresh: true });
         if (projectSkills.length === 0) {
           listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.project') });
+          restoreScrollTop();
           return;
         }
         this.renderSkillSourceSection(listEl, 'project', projectSkills);
+        restoreScrollTop();
         return;
       }
 
@@ -321,6 +327,7 @@ export class SettingsSkillSection {
       this.renderSkillBatchBar(listEl, externalSkills, { allowDelete: false, allowRefresh: false });
       if (externalCount === 0) {
         listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.external') });
+        restoreScrollTop();
         return;
       }
 
@@ -331,14 +338,30 @@ export class SettingsSkillSection {
         }
         this.renderSkillSourceSection(listEl, source, sourceSkills);
       }
+      restoreScrollTop();
     } catch (error) {
       listEl.empty();
       logger.error('Failed to render skills:', error);
       listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty') });
+      restoreScrollTop();
       if (forceRefresh) {
         new Notice(t('settings.skills.empty'));
       }
     }
+  }
+
+  private restoreScrollTopAfterRender(containerEl: HTMLElement, scrollTop: number): void {
+    if (scrollTop <= 0) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (!containerEl.isConnected) {
+        return;
+      }
+
+      containerEl.scrollTop = scrollTop;
+    });
   }
 
   private resolveSkillCatalogTab(tabId: string): SkillCatalogTab {
