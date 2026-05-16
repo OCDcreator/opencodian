@@ -203,12 +203,31 @@ function getBuiltinSearchInput(containerEl: HTMLElement, scope: 'formatter' | 'l
   return inputEl;
 }
 
+function getBuiltinStatusFilter(containerEl: HTMLElement, scope: 'formatter' | 'lsp'): HTMLSelectElement {
+  const selectEl = containerEl.querySelector<HTMLSelectElement>(
+    `.opencodian-builtin-list-status-filter[data-search-scope="${scope}"]`,
+  );
+  if (!selectEl) {
+    throw new Error(`Missing ${scope} builtin status filter`);
+  }
+  return selectEl;
+}
+
 function getBuiltinRow(containerEl: HTMLElement, id: string): HTMLElement {
   const rowEl = containerEl.querySelector<HTMLElement>(`.opencodian-formatter-builtin-row[data-builtin-id="${id}"]`);
   if (!rowEl) {
     throw new Error(`Missing builtin row ${id}`);
   }
   return rowEl;
+}
+
+function getBuiltinStatusChip(containerEl: HTMLElement, id: string): HTMLElement {
+  const chipEl = getBuiltinRow(containerEl, id)
+    .querySelector<HTMLElement>('.opencodian-builtin-row-status-chip');
+  if (!chipEl) {
+    throw new Error(`Missing builtin status chip for ${id}`);
+  }
+  return chipEl;
 }
 
 function createPlugin(overrides?: {
@@ -220,6 +239,7 @@ function createPlugin(overrides?: {
   lspRuntimeError?: Error;
   configPath?: string;
   hasConfigManager?: boolean;
+  serverMode?: 'local' | 'remote';
 }): {
   plugin: OpenCodianPlugin;
   updateFormatterConfig: jest.Mock;
@@ -251,7 +271,15 @@ function createPlugin(overrides?: {
 
   const plugin = {
     opencodeConfigManager: configManager,
+    settings: {
+      server: {
+        mode: overrides?.serverMode ?? 'local',
+      },
+    },
     openCodeService: {
+      checkHealth: jest.fn().mockResolvedValue(true),
+      stop: jest.fn().mockResolvedValue(undefined),
+      start: jest.fn().mockResolvedValue(undefined),
       getFormatterStatus,
       getLspStatus,
     },
@@ -579,6 +607,160 @@ describe('SettingsFormatterSection builtin list search', () => {
     expect(emptyEl?.hidden).toBe(false);
     expect(emptyEl?.textContent).toBe(t('settings.formatter.builtinSearch.noMatches'));
   });
+
+  it('filters builtin formatter rows by project status', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        gofmt: { command: ['gofmt'] },
+        prettier: { disabled: true },
+      },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'formatter');
+    await flushPromises();
+
+    const filterEl = getBuiltinStatusFilter(containerEl, 'formatter');
+    filterEl.value = 'disable';
+    filterEl.dispatchEvent(new Event('change'));
+
+    expect(getBuiltinRow(containerEl, 'prettier').hidden).toBe(false);
+    expect(getBuiltinRow(containerEl, 'gofmt').hidden).toBe(true);
+
+    filterEl.value = 'override';
+    filterEl.dispatchEvent(new Event('change'));
+
+    expect(getBuiltinRow(containerEl, 'prettier').hidden).toBe(true);
+    expect(getBuiltinRow(containerEl, 'gofmt').hidden).toBe(false);
+  });
+
+  it('combines builtin language server search and status filters', async () => {
+    const { plugin } = createPlugin({
+      lspConfig: {
+        typescript: { command: ['typescript-language-server', '--stdio'] },
+        deno: { disabled: true },
+      },
+      lspRuntimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const inputEl = getBuiltinSearchInput(containerEl, 'lsp');
+    const filterEl = getBuiltinStatusFilter(containerEl, 'lsp');
+    inputEl.value = 'type';
+    inputEl.dispatchEvent(new Event('input'));
+    filterEl.value = 'override';
+    filterEl.dispatchEvent(new Event('change'));
+
+    expect(getBuiltinRow(containerEl, 'typescript').hidden).toBe(false);
+    expect(getBuiltinRow(containerEl, 'deno').hidden).toBe(true);
+    expect(getBuiltinRow(containerEl, 'gopls').hidden).toBe(true);
+  });
+
+  it('renders builtin formatter project status as chips', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        gofmt: { command: ['gofmt'] },
+        prettier: { disabled: true },
+      },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'formatter');
+    await flushPromises();
+
+    expect(getBuiltinStatusChip(containerEl, 'gofmt').textContent).toBe(t('settings.formatter.builtinSearch.status.override'));
+    expect(getBuiltinStatusChip(containerEl, 'gofmt').dataset.status).toBe('override');
+    expect(getBuiltinStatusChip(containerEl, 'prettier').textContent).toBe(t('settings.formatter.builtinSearch.status.disable'));
+    expect(getBuiltinStatusChip(containerEl, 'prettier').dataset.status).toBe('disable');
+    expect(getBuiltinStatusChip(containerEl, 'biome').textContent).toBe(t('settings.formatter.builtinSearch.status.default'));
+    expect(getBuiltinStatusChip(containerEl, 'biome').dataset.status).toBe('default');
+    expect(findSettingRecord('gofmt')?.desc).toBeUndefined();
+    expect(getBuiltinRow(containerEl, 'gofmt').querySelectorAll('.opencodian-builtin-row-extensions')).toHaveLength(1);
+  });
+
+  it('collapses builtin formatter override fields by clicking the card', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        gofmt: { command: ['gofmt'], extensions: ['.go'] },
+      },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'formatter');
+    await flushPromises();
+
+    const rowEl = getBuiltinRow(containerEl, 'gofmt');
+    const fieldsEl = rowEl.querySelector<HTMLElement>('.opencodian-formatter-override-fields');
+    expect(rowEl.querySelector('.opencodian-builtin-row-collapse')).toBeNull();
+    expect(rowEl.getAttribute('aria-expanded')).toBe('true');
+    expect(fieldsEl?.hidden).toBe(false);
+
+    rowEl.click();
+
+    expect(rowEl.getAttribute('aria-expanded')).toBe('false');
+    expect(fieldsEl?.hidden).toBe(true);
+    expect(getBuiltinStatusChip(containerEl, 'gofmt').hidden).toBe(false);
+  });
+
+  it('collapses builtin language server override fields by clicking the card', async () => {
+    const { plugin } = createPlugin({
+      lspConfig: {
+        typescript: { command: ['typescript-language-server', '--stdio'] },
+      },
+      lspRuntimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const rowEl = getBuiltinRow(containerEl, 'typescript');
+    const fieldsEl = rowEl.querySelector<HTMLElement>('.opencodian-formatter-custom-fields');
+    expect(rowEl.querySelector('.opencodian-builtin-row-collapse')).toBeNull();
+    expect(rowEl.getAttribute('aria-expanded')).toBe('true');
+    expect(fieldsEl?.hidden).toBe(false);
+
+    rowEl.click();
+
+    expect(rowEl.getAttribute('aria-expanded')).toBe('false');
+    expect(fieldsEl?.hidden).toBe(true);
+  });
 });
 
 describe('SettingsFormatterSection LSP settings', () => {
@@ -895,6 +1077,33 @@ describe('SettingsFormatterSection mode switching', () => {
     await flushPromises();
 
     expect(updateFormatterConfig).toHaveBeenCalledWith(false);
+  });
+
+  it('restarts the local OpenCode service after formatter mode changes', async () => {
+    const { plugin } = createPlugin();
+    const openCodeService = plugin.openCodeService as unknown as {
+      checkHealth: jest.Mock;
+      stop: jest.Mock;
+      start: jest.Mock;
+    };
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const modeDropdown = findDropdown(t('settings.formatter.config.modeSwitch'));
+    await modeDropdown?.onChange?.('disabled');
+    await flushPromises();
+
+    expect(openCodeService.checkHealth).toHaveBeenCalledTimes(1);
+    expect(openCodeService.stop).toHaveBeenCalledTimes(1);
+    expect(openCodeService.start).toHaveBeenCalledTimes(1);
   });
 
   it('switches to custom mode by writing object config', async () => {

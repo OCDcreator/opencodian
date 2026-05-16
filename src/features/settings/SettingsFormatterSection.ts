@@ -49,10 +49,12 @@ interface LspBuiltinDefinition {
 }
 
 type BuiltinSearchScope = 'formatter' | 'lsp';
+type BuiltinStatusFilter = 'all' | BuiltinEntryAction;
 
 interface BuiltinSearchEntry {
   id: string;
   extensions: string[];
+  status: BuiltinEntryAction;
 }
 
 interface BuiltinSearchController {
@@ -328,6 +330,41 @@ export class SettingsFormatterSection {
       return { items: [], fetchFailed: false };
     } catch {
       return { items: [], fetchFailed: true };
+    }
+  }
+
+  private async updateFormatterConfigAndReload(
+    formatter: OpencodeFormatterConfig | null | undefined,
+  ): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) return;
+    await configManager.updateFormatterConfig(formatter);
+    await this.restartLocalServiceAfterProjectConfigWrite();
+  }
+
+  private async updateLspConfigAndReload(
+    lsp: OpencodeLspConfig | null | undefined,
+  ): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
+    await configManager.updateLspConfig(lsp);
+    await this.restartLocalServiceAfterProjectConfigWrite();
+  }
+
+  private async restartLocalServiceAfterProjectConfigWrite(): Promise<void> {
+    if (this.plugin.settings.server.mode !== 'local') {
+      new Notice(t('settings.server.remoteManageUnavailable'));
+      return;
+    }
+
+    try {
+      const isRunning = await this.plugin.openCodeService.checkHealth();
+      if (isRunning) {
+        await this.plugin.openCodeService.stop();
+      }
+      await this.plugin.openCodeService.start();
+    } catch {
+      new Notice(t('settings.formatter.notice.restartFailed'));
     }
   }
 
@@ -1100,10 +1137,14 @@ export class SettingsFormatterSection {
     const searchController = this.renderBuiltinSearchControl(
       sectionEl,
       'formatter',
-      builtinDefinitions.map((definition) => ({
-        id: definition.name,
-        extensions: definition.extensions,
-      })),
+      builtinDefinitions.map((definition) => {
+        const entry = configObj[definition.name];
+        return {
+          id: definition.name,
+          extensions: definition.extensions,
+          status: this.resolveBuiltinEntryAction(entry),
+        };
+      }),
     );
     const scrollEl = sectionEl.createDiv({ cls: 'opencodian-formatter-builtin-scroll' });
     scrollEl.appendChild(searchController.emptyEl);
@@ -1133,7 +1174,6 @@ export class SettingsFormatterSection {
 
     new Setting(rowEl)
       .setName(name)
-      .setDesc(this.getBuiltinStatusDesc(action, definition, runtimeStatus))
       .addDropdown((dropdown) => {
         dropdown.addOption('default', t('settings.formatter.config.builtin.useDefault'));
         dropdown.addOption('disable', t('settings.formatter.config.builtin.projectDisable'));
@@ -1144,8 +1184,10 @@ export class SettingsFormatterSection {
         });
       });
 
+    this.renderBuiltinRowMeta(rowEl, action, runtimeStatus?.extensions ?? definition.extensions);
     if (action === 'override') {
-      this.renderOverrideFields(rowEl, name, entry ?? {});
+      const fieldsEl = this.renderOverrideFields(rowEl, name, entry ?? {});
+      this.attachBuiltinRowCollapse(rowEl, fieldsEl);
     }
 
     return rowEl;
@@ -1159,26 +1201,66 @@ export class SettingsFormatterSection {
     return 'override';
   }
 
-  private getBuiltinStatusDesc(
+  private renderBuiltinRowMeta(
+    rowEl: HTMLElement,
     action: BuiltinEntryAction,
-    definition: FormatterBuiltinDefinition,
-    runtimeStatus: OpencodeFormatterStatus | undefined,
-  ): string {
-    const parts: string[] = [];
-    const exts = (runtimeStatus?.extensions ?? definition.extensions).join(', ');
-    parts.push(exts);
+    extensions: readonly string[],
+  ): HTMLElement {
+    const metaEl = rowEl.createDiv({ cls: 'opencodian-builtin-row-meta' });
+    metaEl.createSpan({
+      cls: 'opencodian-builtin-row-extensions',
+      text: extensions.join(', '),
+    });
+    const statusChipEl = metaEl.createSpan({
+      cls: 'opencodian-builtin-row-chip opencodian-builtin-row-status-chip',
+      text: this.getBuiltinActionChipLabel(action),
+    });
+    statusChipEl.dataset.status = action;
+    return metaEl;
+  }
+
+  private getBuiltinActionChipLabel(action: BuiltinEntryAction): string {
     switch (action) {
       case 'default':
-        parts.push(t('settings.formatter.config.builtin.rowStatus.default'));
-        break;
+        return t('settings.formatter.builtinSearch.status.default');
       case 'disable':
-        parts.push(t('settings.formatter.config.builtin.rowStatus.disabled'));
-        break;
+        return t('settings.formatter.builtinSearch.status.disable');
       case 'override':
-        parts.push(t('settings.formatter.config.builtin.rowStatus.overridden'));
-        break;
+        return t('settings.formatter.builtinSearch.status.override');
     }
-    return parts.join(' · ');
+  }
+
+  private attachBuiltinRowCollapse(
+    rowEl: HTMLElement,
+    fieldsEl: HTMLElement,
+  ): void {
+    rowEl.addClass('is-collapsible');
+    rowEl.tabIndex = 0;
+    rowEl.setAttribute('aria-expanded', 'true');
+    const setExpanded = (expanded: boolean) => {
+      fieldsEl.hidden = !expanded;
+      rowEl.toggleClass('is-collapsed', !expanded);
+      rowEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+    const toggleExpanded = () => {
+      setExpanded(rowEl.getAttribute('aria-expanded') !== 'true');
+    };
+    rowEl.addEventListener('click', (event) => {
+      if (this.shouldIgnoreBuiltinRowToggle(event.target, fieldsEl)) return;
+      toggleExpanded();
+    });
+    rowEl.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (this.shouldIgnoreBuiltinRowToggle(event.target, fieldsEl)) return;
+      event.preventDefault();
+      toggleExpanded();
+    });
+  }
+
+  private shouldIgnoreBuiltinRowToggle(target: EventTarget | null, fieldsEl: HTMLElement): boolean {
+    if (!(target instanceof HTMLElement)) return true;
+    if (fieldsEl.contains(target)) return true;
+    return Boolean(target.closest('button, input, select, textarea, a, [contenteditable="true"]'));
   }
 
   private async handleBuiltinActionChange(
@@ -1208,7 +1290,7 @@ export class SettingsFormatterSection {
         }
       }
 
-      await configManager.updateFormatterConfig(current);
+      await this.updateFormatterConfigAndReload(current);
       new Notice(t('settings.formatter.config.builtin.saved'));
       await this.requestContentRefresh();
     } catch (error) {
@@ -1221,7 +1303,7 @@ export class SettingsFormatterSection {
     rowEl: HTMLElement,
     name: string,
     entry: OpencodeFormatterEntryConfig,
-  ): void {
+  ): HTMLElement {
     const fieldsEl = rowEl.createDiv({ cls: 'opencodian-formatter-override-fields' });
 
     const commandStr = (entry.command ?? []).join(' ');
@@ -1256,6 +1338,7 @@ export class SettingsFormatterSection {
             await this.saveOverrideFromFields(fieldsEl, name);
           });
       });
+    return fieldsEl;
   }
 
   private renderEnvironmentEditor(
@@ -1360,7 +1443,7 @@ export class SettingsFormatterSection {
         delete current[name];
       }
 
-      await configManager.updateFormatterConfig(current);
+      await this.updateFormatterConfigAndReload(current);
       new Notice(t('settings.formatter.config.builtin.saved'));
       await this.requestContentRefresh();
     } catch (error) {
@@ -1506,7 +1589,7 @@ export class SettingsFormatterSection {
       }
 
       current[name] = newEntry;
-      await configManager.updateFormatterConfig(current);
+      await this.updateFormatterConfigAndReload(current);
       new Notice(t('settings.formatter.config.custom.saved'));
       await this.requestContentRefresh();
     } catch (error) {
@@ -1524,7 +1607,7 @@ export class SettingsFormatterSection {
       const current = typeof currentConfig === 'object' ? { ...currentConfig } : {};
       delete current[name];
 
-      await configManager.updateFormatterConfig(current);
+      await this.updateFormatterConfigAndReload(current);
       new Notice(t('settings.formatter.config.custom.deleted'));
       await this.requestContentRefresh();
     } catch (error) {
@@ -1569,7 +1652,7 @@ export class SettingsFormatterSection {
               }
 
               current[normalizedName] = { command: [] };
-              await configManager.updateFormatterConfig(current);
+              await this.updateFormatterConfigAndReload(current);
               new Notice(t('settings.formatter.config.custom.saved'));
               await this.requestContentRefresh();
             } catch (error) {
@@ -1659,7 +1742,7 @@ export class SettingsFormatterSection {
 
     if (parsed === false) {
       try {
-        await configManager.updateFormatterConfig(false);
+        await this.updateFormatterConfigAndReload(false);
         new Notice(t('settings.formatter.config.advanced.saved'));
         await this.requestContentRefresh();
       } catch (error) {
@@ -1675,7 +1758,7 @@ export class SettingsFormatterSection {
     }
 
     try {
-      await configManager.updateFormatterConfig(parsed as Record<string, OpencodeFormatterEntryConfig>);
+      await this.updateFormatterConfigAndReload(parsed as Record<string, OpencodeFormatterEntryConfig>);
       new Notice(t('settings.formatter.config.advanced.saved'));
       await this.requestContentRefresh();
     } catch (error) {
@@ -1694,15 +1777,15 @@ export class SettingsFormatterSection {
     try {
       switch (mode) {
         case 'default':
-          await configManager.updateFormatterConfig(null);
+          await this.updateFormatterConfigAndReload(null);
           break;
         case 'disabled':
-          await configManager.updateFormatterConfig(false);
+          await this.updateFormatterConfigAndReload(false);
           break;
         case 'custom': {
           const current = await this.loadFormatterConfig();
           const nextConfig = typeof current === 'object' ? current : {};
-          await configManager.updateFormatterConfig(nextConfig);
+          await this.updateFormatterConfigAndReload(nextConfig);
           break;
         }
       }
@@ -1859,7 +1942,18 @@ export class SettingsFormatterSection {
       cls: 'opencodian-settings-subsection-heading',
     });
 
-    const searchController = this.renderBuiltinSearchControl(sectionEl, 'lsp', builtinDefinitions);
+    const searchController = this.renderBuiltinSearchControl(
+      sectionEl,
+      'lsp',
+      builtinDefinitions.map((definition) => {
+        const entry = configObj[definition.id];
+        return {
+          id: definition.id,
+          extensions: definition.extensions,
+          status: this.resolveBuiltinEntryAction(entry),
+        };
+      }),
+    );
     const scrollEl = sectionEl.createDiv({ cls: 'opencodian-formatter-builtin-scroll' });
     scrollEl.appendChild(searchController.emptyEl);
     for (const definition of builtinDefinitions) {
@@ -1870,7 +1964,6 @@ export class SettingsFormatterSection {
 
       new Setting(rowEl)
         .setName(definition.id)
-        .setDesc(`${definition.extensions.join(', ')} · ${t(`settings.formatter.config.builtin.rowStatus.${action === 'override' ? 'overridden' : action === 'disable' ? 'disabled' : 'default'}`)}`)
         .addDropdown((dropdown) => {
           dropdown.addOption('default', t('settings.formatter.config.builtin.useDefault'));
           dropdown.addOption('disable', t('settings.formatter.config.builtin.projectDisable'));
@@ -1881,8 +1974,10 @@ export class SettingsFormatterSection {
           });
         });
 
+      this.renderBuiltinRowMeta(rowEl, action, definition.extensions);
       if (action === 'override') {
-        this.renderLspEditorFields(rowEl, definition.id, entry ?? {}, true);
+        const fieldsEl = this.renderLspEditorFields(rowEl, definition.id, entry ?? {}, true);
+        this.attachBuiltinRowCollapse(rowEl, fieldsEl);
       }
       searchController.registerRow(definition.id, rowEl);
     }
@@ -1929,6 +2024,19 @@ export class SettingsFormatterSection {
     popoverEl.hidden = true;
 
     const metaEl = searchEl.createSpan({ cls: 'opencodian-builtin-list-search-count' });
+    const filterEl = searchEl.createEl('select', {
+      cls: 'opencodian-builtin-list-status-filter',
+      attr: {
+        'aria-label': t(scope === 'formatter'
+          ? 'settings.formatter.builtinSearch.formatterStatusAria'
+          : 'settings.formatter.builtinSearch.lspStatusAria'),
+      },
+    });
+    filterEl.dataset.searchScope = scope;
+    this.addBuiltinStatusFilterOption(filterEl, 'all', t('settings.formatter.builtinSearch.status.all'));
+    this.addBuiltinStatusFilterOption(filterEl, 'default', t('settings.formatter.builtinSearch.status.default'));
+    this.addBuiltinStatusFilterOption(filterEl, 'override', t('settings.formatter.builtinSearch.status.override'));
+    this.addBuiltinStatusFilterOption(filterEl, 'disable', t('settings.formatter.builtinSearch.status.disable'));
     const clearButtonEl = searchEl.createEl('button', {
       cls: 'opencodian-builtin-list-search-clear',
       text: t('settings.formatter.builtinSearch.clear'),
@@ -2000,17 +2108,20 @@ export class SettingsFormatterSection {
 
     const refresh = () => {
       const query = inputEl.value.trim();
-      const filteredEntries = query
-        ? entries.filter((entry) => this.matchesBuiltinSearch(entry, query))
-            .sort((left, right) => this.compareBuiltinSearchEntries(left, right, query))
-        : [...entries];
+      const statusFilter = filterEl.value as BuiltinStatusFilter;
+      const filteredEntries = entries
+        .filter((entry) => statusFilter === 'all' || entry.status === statusFilter)
+        .filter((entry) => !query || this.matchesBuiltinSearch(entry, query))
+        .sort((left, right) => query
+          ? this.compareBuiltinSearchEntries(left, right, query)
+          : left.id.localeCompare(right.id));
       const visibleIds = new Set(filteredEntries.map((entry) => entry.id));
       let firstVisibleRowEl: HTMLElement | null = null;
       let lastVisibleRowEl: HTMLElement | null = null;
       for (const [id, rowEl] of rowMap) {
         rowEl.removeClass('is-first-visible');
         rowEl.removeClass('is-last-visible');
-        const isVisible = query ? visibleIds.has(id) : true;
+        const isVisible = visibleIds.has(id);
         rowEl.hidden = !isVisible;
         if (isVisible) {
           if (!firstVisibleRowEl) {
@@ -2030,8 +2141,8 @@ export class SettingsFormatterSection {
         shown: filteredEntries.length,
         total: entries.length,
       });
-      clearButtonEl.hidden = !query;
-      emptyEl.hidden = !query || filteredEntries.length > 0;
+      clearButtonEl.hidden = !query && statusFilter === 'all';
+      emptyEl.hidden = (!query && statusFilter === 'all') || filteredEntries.length > 0;
       renderPopover();
     };
 
@@ -2075,9 +2186,14 @@ export class SettingsFormatterSection {
     });
     clearButtonEl.addEventListener('click', () => {
       inputEl.value = '';
+      filterEl.value = 'all';
       activeIndex = -1;
       refresh();
       inputEl.focus();
+    });
+    filterEl.addEventListener('change', () => {
+      activeIndex = -1;
+      refresh();
     });
 
     refresh();
@@ -2088,6 +2204,17 @@ export class SettingsFormatterSection {
         refresh();
       },
     };
+  }
+
+  private addBuiltinStatusFilterOption(
+    selectEl: HTMLSelectElement,
+    value: BuiltinStatusFilter,
+    label: string,
+  ): void {
+    selectEl.createEl('option', {
+      text: label,
+      attr: { value },
+    });
   }
 
   private matchesBuiltinSearch(entry: BuiltinSearchEntry, query: string): boolean {
@@ -2155,7 +2282,7 @@ export class SettingsFormatterSection {
         }
       }
 
-      await configManager.updateLspConfig(current);
+      await this.updateLspConfigAndReload(current);
       new Notice(t('settings.formatter.lsp.builtin.saved'));
       await this.requestContentRefresh();
     } catch (error) {
@@ -2196,7 +2323,7 @@ export class SettingsFormatterSection {
     name: string,
     entry: OpencodeLspEntryConfig,
     builtin: boolean,
-  ): void {
+  ): HTMLElement {
     const fieldsEl = rowEl.createDiv({ cls: 'opencodian-formatter-custom-fields' });
 
     new Setting(fieldsEl)
@@ -2236,6 +2363,7 @@ export class SettingsFormatterSection {
             await this.saveLspEntryFromFields(fieldsEl, name, builtin);
           });
       });
+    return fieldsEl;
   }
 
   private renderLspEnvironmentEditor(
@@ -2318,7 +2446,7 @@ export class SettingsFormatterSection {
       }
       delete nextEntry.disabled;
       current[name] = nextEntry;
-      await configManager.updateLspConfig(current);
+      await this.updateLspConfigAndReload(current);
       new Notice(
         builtin
           ? t('settings.formatter.lsp.builtin.saved')
@@ -2397,7 +2525,7 @@ export class SettingsFormatterSection {
     }
 
     if (parsed === false) {
-      await configManager.updateLspConfig(false);
+      await this.updateLspConfigAndReload(false);
       await this.requestContentRefresh();
       return;
     }
@@ -2405,7 +2533,7 @@ export class SettingsFormatterSection {
       new Notice(t('settings.formatter.lsp.advanced.invalidJson', { error: 'Must be an object or false' }));
       return;
     }
-    await configManager.updateLspConfig(parsed as Record<string, OpencodeLspEntryConfig>);
+    await this.updateLspConfigAndReload(parsed as Record<string, OpencodeLspEntryConfig>);
     await this.requestContentRefresh();
   }
 
@@ -2419,14 +2547,14 @@ export class SettingsFormatterSection {
     try {
       switch (mode) {
         case 'default':
-          await configManager.updateLspConfig(null);
+          await this.updateLspConfigAndReload(null);
           break;
         case 'disabled':
-          await configManager.updateLspConfig(false);
+          await this.updateLspConfigAndReload(false);
           break;
         case 'custom': {
           const current = await this.loadLspConfig();
-          await configManager.updateLspConfig(typeof current === 'object' ? current : {});
+          await this.updateLspConfigAndReload(typeof current === 'object' ? current : {});
           break;
         }
       }
