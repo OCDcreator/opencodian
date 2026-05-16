@@ -13977,7 +13977,11 @@ img.opencodian-model-provider-header-icon {
   padding-top: var(--opencodian-settings-space-lg);
   padding-right: 12px;
   scroll-padding-top: var(--opencodian-settings-space-lg);
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+}
+
+.opencodian-formatter-builtin-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .opencodian-builtin-list-search-field {

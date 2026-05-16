@@ -1400,6 +1400,10 @@ describe('SettingsFormatterSection CSS contract', () => {
       'position:',
     );
     const builtinScrollRule = findRule('\\.opencodian-formatter-builtin-scroll', 'max-height:');
+    const builtinScrollWebkitRule = findRule(
+      '\\.opencodian-formatter-builtin-scroll::-webkit-scrollbar',
+      'display:',
+    );
     const builtinSearchInputRule = findRule('\\.opencodian-builtin-list-search-input', 'background:');
     const builtinSearchInputFocusRule = findRule('\\.opencodian-builtin-list-search-input:focus-visible', 'outline:');
     const builtinSearchCountRule = findRule('\\.opencodian-builtin-list-search-count', 'border-radius:');
@@ -1498,6 +1502,8 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(builtinScrollRule).toContain('padding-top: var(--opencodian-settings-space-lg)');
     expect(builtinScrollRule).toContain('padding-right: 12px');
     expect(builtinScrollRule).toContain('scroll-padding-top: var(--opencodian-settings-space-lg)');
+    expect(builtinScrollRule).toContain('scrollbar-width: none');
+    expect(builtinScrollWebkitRule).toContain('display: none');
     expect(builtinSearchInputRule).toContain('var(--opencodian-settings-inline-bg');
     expect(builtinSearchInputRule).toContain('min-height: 32px');
     expect(builtinSearchInputFocusRule).toContain('var(--opencodian-settings-focus-ring)');
