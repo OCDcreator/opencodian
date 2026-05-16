@@ -35,6 +35,7 @@ owner 内部把快照刷新链路集中起来：
 - 用当前 `server.mode` 与 `pluginIsolationMode` 调用 `PluginManagementService.inspect()`
 - 将 `projectConfigSpecs` 格式化回 textarea，保持 project config editor 与快照同步
 - 渲染 service/isolation/global influence、global/project plugin 来源、project directory 与 OMO 状态
+- 插件来源分组会把路径状态和已检测插件数分开渲染：目录路径逐行显示 `available/missing`，插件条目只代表实际检测结果，避免“路径不存在但下方还有插件”的误读
 - 在手动 refresh 时显示成功/失败 notice
 
 `dispose()` 会递增 refresh run id，避免 settings tab 关闭或重建后的旧异步刷新继续更新旧 DOM。

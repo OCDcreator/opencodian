@@ -3629,13 +3629,38 @@
   border-top: none;
 }
 
+.opencodian-plugin-source-header {
+  display: flex;
+  gap: var(--opencodian-settings-space-sm);
+  align-items: center;
+  justify-content: space-between;
+}
+
 .opencodian-plugin-source-title {
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-normal);
 }
 
+.opencodian-plugin-source-count {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 1px 7px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: var(--opencodian-settings-inline-bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .opencodian-plugin-source-path {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-xs);
   margin-top: var(--opencodian-settings-space-sm);
   padding: 8px 10px;
   border: 1px solid var(--opencodian-settings-inline-border);
@@ -3647,7 +3672,42 @@
   word-break: break-word;
 }
 
+.opencodian-plugin-source-path-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--opencodian-settings-space-sm);
+  align-items: start;
+}
+
+.opencodian-plugin-source-path-label {
+  min-width: 0;
+}
+
+.opencodian-plugin-source-path-status {
+  padding: 0 6px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.opencodian-plugin-source-path-row[data-path-status="available"] .opencodian-plugin-source-path-status {
+  color: var(--text-accent);
+}
+
+.opencodian-plugin-source-path-row[data-path-status="missing"] .opencodian-plugin-source-path-status {
+  color: var(--text-faint);
+}
+
 .opencodian-plugin-source-list {
+  margin-top: var(--opencodian-settings-space-md);
+}
+
+.opencodian-plugin-source-path + .opencodian-plugin-source-empty {
   margin-top: var(--opencodian-settings-space-md);
 }
 

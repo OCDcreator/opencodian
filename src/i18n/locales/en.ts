@@ -1371,6 +1371,9 @@ export const enTranslations = {
   'settings.plugins.kind.npm': 'npm',
   'settings.plugins.kind.local': 'local',
   'settings.plugins.none': 'None detected.',
+  'settings.plugins.detectedCount': 'Detected plugins',
+  'settings.plugins.path.available': 'detected',
+  'settings.plugins.path.missing': 'missing',
   'settings.plugins.missingPath': 'missing',
 
   // Security settings

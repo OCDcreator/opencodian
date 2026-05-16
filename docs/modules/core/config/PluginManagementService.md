@@ -10,7 +10,7 @@
 服务同时覆盖 3 类对象：
 
 - 配置文件里的 `plugin` 数组
-- `plugin/` 与 `plugins/` 目录下的脚本文件
+- 官方 `plugins/` 目录下的脚本文件
 - 项目级 `oh-my-opencode.jsonc`
 
 ## 导入关系
@@ -72,8 +72,8 @@ export interface PluginEnvironmentSnapshot {
 
 1. 全局配置文件 `<home>/.config/opencode/opencode.json`
 2. 项目配置文件 `<vault>/.opencode/opencode.json`
-3. 全局 `plugin/` 与 `plugins/` 目录扫描结果
-4. 项目 `plugin/` 与 `plugins/` 目录扫描结果
+3. 全局 `plugins/` 目录扫描结果
+4. 项目 `plugins/` 目录扫描结果
 
 之后它会把配置式插件和目录式插件分别标准化，再组合成 `PluginEnvironmentSnapshot`。这份快照里同时保留：
 
@@ -85,10 +85,7 @@ export interface PluginEnvironmentSnapshot {
 
 ### 目录插件扫描规则
 
-目录扫描固定检查两个文件夹名：
-
-- `plugin`
-- `plugins`
+目录扫描固定检查 OpenCode 当前官方文档里的 `plugins` 文件夹名：
 
 只收录以下扩展名的文件：
 
@@ -108,8 +105,6 @@ export interface PluginEnvironmentSnapshot {
 | `updateProjectConfigPlugins(plugins)` | 通过 `OpencodeConfigManager` 更新项目配置的 `plugin` 字段 |
 | `ensureProjectPluginDirectory()` | 创建 `<vault>/.opencode/plugins` |
 | `ensureProjectOmoConfig()` | 创建 `<vault>/.opencode/oh-my-opencode.jsonc`，若不存在则写入占位模板 |
-
-需要注意，虽然扫描会同时看 `plugin/` 和 `plugins/`，但自动创建时只会创建 `plugins/`。
 
 ### 配置式插件解析
 
@@ -154,7 +149,7 @@ export interface PluginEnvironmentSnapshot {
 global opencode.json + project opencode.json
   -> 配置式 plugin 解析
 
-global/project plugin + plugins 目录
+global/project plugins 目录
   -> 目录式 plugin 扫描
 
 两类结果

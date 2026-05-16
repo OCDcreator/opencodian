@@ -16,9 +16,14 @@ const logger = createLogger('SettingsPluginSection');
 interface PluginEntryGroupRenderOptions {
   containerEl: HTMLElement;
   title: string;
-  pathLabel: string;
+  paths: PluginSourcePathRenderModel[];
   entries: PluginEntry[];
   emptyText: string;
+}
+
+interface PluginSourcePathRenderModel {
+  label: string;
+  status?: 'available' | 'missing';
 }
 
 interface SettingsPluginSectionOptions {
@@ -360,21 +365,21 @@ export class SettingsPluginSection {
     this.renderPluginEntryGroup({
       containerEl,
       title: t('settings.plugins.global.configTitle'),
-      pathLabel: snapshot.globalConfigPath,
+      paths: this.createSingleSourcePath(snapshot.globalConfigPath),
       entries: snapshot.globalConfigPlugins,
       emptyText: t('settings.plugins.none'),
     });
     this.renderPluginEntryGroup({
       containerEl,
       title: t('settings.plugins.global.directoryTitle'),
-      pathLabel: this.describePluginDirectories(snapshot.globalDirectories),
+      paths: this.createDirectorySourcePaths(snapshot.globalDirectories),
       entries: snapshot.globalDirectoryPlugins,
       emptyText: t('settings.plugins.none'),
     });
     this.renderPluginEntryGroup({
       containerEl,
       title: t('settings.plugins.projectConfig.title'),
-      pathLabel: snapshot.projectConfigPath,
+      paths: this.createSingleSourcePath(snapshot.projectConfigPath),
       entries: snapshot.projectConfigPlugins,
       emptyText: t('settings.plugins.none'),
     });
@@ -385,7 +390,7 @@ export class SettingsPluginSection {
     this.renderPluginEntryGroup({
       containerEl,
       title: t('settings.plugins.projectDirectory.filesTitle'),
-      pathLabel: this.describePluginDirectories(snapshot.projectDirectories),
+      paths: this.createDirectorySourcePaths(snapshot.projectDirectories),
       entries: snapshot.projectDirectoryPlugins,
       emptyText: t('settings.plugins.projectDirectory.empty'),
     });
@@ -430,16 +435,36 @@ export class SettingsPluginSection {
   }
 
   private renderPluginEntryGroup(options: PluginEntryGroupRenderOptions): void {
-    const { containerEl, title, pathLabel, entries, emptyText } = options;
+    const { containerEl, title, paths, entries, emptyText } = options;
     const groupEl = containerEl.createDiv({ cls: 'opencodian-plugin-source-group' });
-    const titleEl = groupEl.createDiv({
+    const headerEl = groupEl.createDiv({ cls: 'opencodian-plugin-source-header' });
+    const titleEl = headerEl.createDiv({
       cls: 'opencodian-plugin-source-title',
     });
     this.applyInlineCodeText(titleEl, title);
-    const pathEl = groupEl.createDiv({
-      cls: 'opencodian-plugin-source-path',
+    headerEl.createSpan({
+      text: String(entries.length),
+      cls: 'opencodian-plugin-source-count',
+      attr: { 'aria-label': t('settings.plugins.detectedCount') },
     });
-    this.applyInlineCodeText(pathEl, pathLabel);
+
+    const pathListEl = groupEl.createDiv({ cls: 'opencodian-plugin-source-path' });
+    for (const sourcePath of paths) {
+      const pathRowEl = pathListEl.createDiv({
+        cls: 'opencodian-plugin-source-path-row',
+        attr: sourcePath.status ? { 'data-path-status': sourcePath.status } : undefined,
+      });
+      const labelEl = pathRowEl.createSpan({ cls: 'opencodian-plugin-source-path-label' });
+      this.applyInlineCodeText(labelEl, sourcePath.label);
+      if (sourcePath.status) {
+        pathRowEl.createSpan({
+          text: sourcePath.status === 'available'
+            ? t('settings.plugins.path.available')
+            : t('settings.plugins.path.missing'),
+          cls: 'opencodian-plugin-source-path-status',
+        });
+      }
+    }
 
     if (entries.length === 0) {
       const emptyEl = groupEl.createDiv({
@@ -458,16 +483,17 @@ export class SettingsPluginSection {
     }
   }
 
-  private describePluginDirectories(
-    directories: Array<{ path: string; exists: boolean }>,
-  ): string {
-    if (directories.length === 0) {
-      return '';
-    }
+  private createSingleSourcePath(label: string): PluginSourcePathRenderModel[] {
+    return [{ label }];
+  }
 
-    return directories
-      .map((directory) => `${directory.path}${directory.exists ? '' : ` (${t('settings.plugins.missingPath')})`}`)
-      .join(' · ');
+  private createDirectorySourcePaths(
+    directories: Array<{ path: string; exists: boolean }>,
+  ): PluginSourcePathRenderModel[] {
+    return directories.map((directory) => ({
+      label: directory.path,
+      status: directory.exists ? 'available' : 'missing',
+    }));
   }
 
   private describePluginEntry(entry: PluginEntry): string {

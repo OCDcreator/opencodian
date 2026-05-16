@@ -481,6 +481,10 @@ describe('Settings plugin/catalog CSS contract', () => {
       '\\.opencodian-plugin-source-item,\\s*\\.opencodian-plugin-source-empty',
       'background:',
     );
+    const sourceEmptySpacingRule = findRule(
+      '\\.opencodian-plugin-source-path \\+ \\.opencodian-plugin-source-empty',
+      'margin-top:',
+    );
     const pluginCatalogCss = css.slice(
       css.indexOf('.opencodian-plugin-block'),
       css.indexOf('.opencodian-mcp-overview-shell'),
@@ -506,6 +510,7 @@ describe('Settings plugin/catalog CSS contract', () => {
     expect(summaryRule).toContain('var(--opencodian-settings-row-bg');
     expect(sourcePathRule).toContain('var(--opencodian-settings-inline-bg');
     expect(sourceItemRule).toContain('var(--opencodian-settings-object-bg');
+    expect(sourceEmptySpacingRule).toContain('var(--opencodian-settings-space-md');
     expect(pluginCatalogCss).not.toContain('linear-gradient');
     expect(pluginCatalogCss).not.toContain('backdrop-filter');
     expect(pluginCatalogCss).not.toContain('transform: translateY');

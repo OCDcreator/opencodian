@@ -52,7 +52,7 @@ export interface PluginEnvironmentSnapshot {
   omoConfigExists: boolean;
 }
 
-const DIRECTORY_PLUGIN_FOLDERS = ['plugin', 'plugins'] as const;
+const DIRECTORY_PLUGIN_FOLDERS = ['plugins'] as const;
 const DIRECTORY_PLUGIN_EXTENSIONS = new Set(['.js', '.ts', '.mjs', '.cjs']);
 const DEFAULT_OMO_TEMPLATE = `{
   // Project-level oh-my-opencode config

@@ -104,7 +104,7 @@ Agents、Commands 和 Plugin settings 现在共享同一组 plugin/catalog densi
 - `.opencodian-plugin-block` 是无框 section shell，不再是一张嵌套大卡片。
 - catalog `Setting` rows 和 plugin summary rows 使用 row tokens。
 - agent editor groups 和 plugin source items 使用 object tokens。
-- plugin source paths 使用 inline tokens。
+- plugin source paths 使用 inline tokens；目录来源需要逐行显示 path status chip，并用 count chip 表示该分组实际检测到的插件数，避免把 missing directory 和 detected plugin entries 混成一个状态；路径块后面的 list 和 empty state 都必须保留同一档 `--opencodian-settings-space-md` 间距。
 
 Guardrail: 不要在 `.opencodian-plugin-block*`、`.opencodian-settings-catalog-scroll`、`.opencodian-agent-editor-*` 或 `.opencodian-plugin-source-*` 重新引入大卡片套小卡片、渐变、decorative blur、hover lift、side-stripe border 或未定义的 settings radius token。
 

@@ -1371,6 +1371,9 @@ export const zhTranslations = {
   'settings.plugins.kind.npm': 'npm',
   'settings.plugins.kind.local': '本地',
   'settings.plugins.none': '未检测到。',
+  'settings.plugins.detectedCount': '已检测插件数',
+  'settings.plugins.path.available': '已检测',
+  'settings.plugins.path.missing': '不存在',
   'settings.plugins.missingPath': '不存在',
 
   // Security settings

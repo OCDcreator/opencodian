@@ -60,6 +60,36 @@ describe('PluginManagementService', () => {
     expect(snapshot.globalInfluenceDetected).toBe(true);
   });
 
+  it('only inspects the official plural plugins directories', async () => {
+    const globalConfigDir = path.join(testHome, '.config', 'opencode');
+    fs.mkdirSync(path.join(globalConfigDir, 'plugin'), { recursive: true });
+    fs.mkdirSync(path.join(globalConfigDir, 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(globalConfigDir, 'plugin', 'legacy-global.js'), 'export default {};', 'utf-8');
+    fs.writeFileSync(path.join(globalConfigDir, 'plugins', 'global-local.js'), 'export default {};', 'utf-8');
+
+    const configManager = new OpencodeConfigManager(testVault);
+    fs.mkdirSync(path.join(configManager.getConfigDir(), 'plugin'), { recursive: true });
+    fs.mkdirSync(configManager.getPluginDir(), { recursive: true });
+    fs.writeFileSync(
+      path.join(configManager.getConfigDir(), 'plugin', 'legacy-project.js'),
+      'export default {};',
+      'utf-8',
+    );
+    fs.writeFileSync(path.join(configManager.getPluginDir(), 'project-local.js'), 'export default {};', 'utf-8');
+
+    const service = new PluginManagementService(testVault, { globalConfigDir });
+    const snapshot = await service.inspect('local', 'default');
+
+    expect(snapshot.globalDirectories.map((directory) => directory.path)).toEqual([
+      path.join(globalConfigDir, 'plugins'),
+    ]);
+    expect(snapshot.projectDirectories.map((directory) => directory.path)).toEqual([
+      configManager.getPluginDir(),
+    ]);
+    expect(snapshot.globalDirectoryPlugins.map((item) => item.displayName)).toEqual(['global-local.js']);
+    expect(snapshot.projectDirectoryPlugins.map((item) => item.displayName)).toEqual(['project-local.js']);
+  });
+
   it('creates the project OMO config file', async () => {
     const service = new PluginManagementService(testVault, {
       globalConfigDir: path.join(testHome, '.config', 'opencode'),
