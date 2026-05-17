@@ -22,7 +22,7 @@ owner 会并行读取：
 - `openCodeService.sdk.command.list()`：当前 runtime scope 的 slash command 目录
 - `OpencodeConfigManager.getCommandConfig()`：当前 vault `.opencode/opencode.json` 里的 project `command` map
 - `OpencodeConfigManager.getAgentConfig()`：当前 vault 里的 project/legacy agent map，用来识别 command-owned hidden agent
-- 然后把这些输入交给 `mergeSlashCommandCatalog()`，避免 settings/chat 再维护两份不同的 merge 规则
+- 然后把这些输入交给 `mergeSlashCommandCatalog()`，再追加 `appendSyntheticBuiltinCommands()` 注入的合成内置命令（`/compact`、`/undo`、`/redo`、`/new`、`/share`、`/unshare`），避免 settings/chat 再维护两份不同的 merge 规则
 
 合并时：
 

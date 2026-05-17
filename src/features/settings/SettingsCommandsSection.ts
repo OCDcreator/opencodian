@@ -9,6 +9,9 @@ import {
   type OpencodeCommandConfigRecord,
   type SlashCommandSkillMode,
 } from '../../core/types';
+import {
+  appendSyntheticBuiltinCommands,
+} from '../../features/chat/services/SlashCommandMenuCatalogCache';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -215,13 +218,16 @@ export class SettingsCommandsSection {
 
       const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
       const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
-      const mergedCommands = mergeSlashCommandCatalog({
-        runtimeCommands,
-        runtimeSkillSources: new Map(),
-        projectCommands,
-        projectAgents,
+      const mergedCommands = appendSyntheticBuiltinCommands(
+        mergeSlashCommandCatalog({
+          runtimeCommands,
+          runtimeSkillSources: new Map(),
+          projectCommands,
+          projectAgents,
+          hiddenCommandIds,
+        }),
         hiddenCommandIds,
-      });
+      );
       this.renderCatalog({
         catalogBodyEl,
         configManager,
