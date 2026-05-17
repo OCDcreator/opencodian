@@ -1,4 +1,4 @@
-import { Setting } from 'obsidian';
+import { setIcon, Setting } from 'obsidian';
 
 import type { BelowHeaderTabBarLayout, ChatScrollMode, TabBarPosition } from '../../core/types';
 import { t } from '../../i18n';
@@ -52,6 +52,7 @@ export class SettingsUiSection {
     const tabOptionsEl = containerEl.createDiv({ cls: 'opencodian-settings-ui-tab-options' });
     this.renderTabOptionControls(tabOptionsEl);
     this.addAutoScrollSetting(containerEl);
+    this.addModifiedFilesSidebarSetting(containerEl);
     this.addChatScrollModeSetting(containerEl);
     this.addOpenInMainTabSetting(containerEl);
   }
@@ -142,6 +143,32 @@ export class SettingsUiSection {
             await this.plugin.saveSettings();
           })
       );
+  }
+
+  private addModifiedFilesSidebarSetting(containerEl: HTMLElement): void {
+    const setting = new Setting(containerEl)
+      .setDesc(t('settings.ui.modifiedFilesSidebar.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showModifiedFilesSidebar)
+          .onChange(async (value) => {
+            this.plugin.settings.showModifiedFilesSidebar = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    const nameEl = setting.nameEl;
+    nameEl.empty();
+    nameEl.createSpan({ text: t('settings.ui.modifiedFilesSidebar.name') });
+    const helpButton = nameEl.createEl('span', {
+      cls: 'opencodian-setting-help-button',
+      attr: {
+        'aria-label': t('settings.ui.modifiedFilesSidebar.helpBody'),
+        'data-tooltip': t('settings.ui.modifiedFilesSidebar.helpBody'),
+        'data-tooltip-position': 'bottom',
+      },
+    });
+    setIcon(helpButton, 'info');
   }
 
   private addChatScrollModeSetting(containerEl: HTMLElement): void {

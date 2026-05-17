@@ -728,10 +728,6 @@ export class OpenCodianView extends ItemView {
         });
         this.effortSelector.updateDisplay();
       },
-      mountModifiedFilesToggle: (container) => {
-        this.modifiedFilesSidebarCoordinator.mountToggle(container);
-        this.refreshModifiedFilesSidebar();
-      },
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       cancelStreaming: () => {
         this.cancelStreaming();
@@ -2774,6 +2770,7 @@ export class OpenCodianView extends ItemView {
 
   private refreshModifiedFilesSidebar(): void {
     const sessionId = this.currentConversation?.openCodeSessionId ?? null;
+    this.modifiedFilesSidebarCoordinator.setVisible(this.plugin.settings.showModifiedFilesSidebar);
     this.modifiedFilesSidebarCoordinator.refresh(
       sessionId,
       (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),

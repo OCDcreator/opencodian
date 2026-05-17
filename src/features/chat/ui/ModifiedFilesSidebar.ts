@@ -11,12 +11,12 @@ import type { SessionDiffEntry } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 
 export class ModifiedFilesSidebar extends Component {
+  private wrapperEl: HTMLElement;
   private hostEl: HTMLElement;
+  private badgeEl: HTMLElement;
   private containerEl: HTMLElement;
   private headerEl!: HTMLElement;
   private listEl!: HTMLElement;
-  private toggleButtonEl!: HTMLButtonElement;
-  private isVisible = false;
   private entries: SessionDiffEntry[] = [];
 
   constructor(
@@ -24,8 +24,15 @@ export class ModifiedFilesSidebar extends Component {
     private readonly parentEl: HTMLElement,
   ) {
     super();
-    this.hostEl = this.parentEl.createDiv({ cls: 'opencodian-modified-files-sidebar-host' });
-    this.containerEl = this.hostEl.createDiv({ cls: 'opencodian-modified-files-sidebar' });
+    this.wrapperEl = this.parentEl.createDiv({ cls: 'opencodian-modified-files-sidebar-host' });
+    // Invisible hover zone covers both the strip and the expanded sidebar so
+    // the cursor can move from one to the other without dropping :hover.
+    const hoverZone = this.wrapperEl.createDiv({ cls: 'opencodian-modified-files-hover-zone' });
+    this.hostEl = hoverZone.createDiv({ cls: 'opencodian-modified-files-trigger-strip is-empty' });
+    this.badgeEl = this.hostEl.createSpan({ cls: 'opencodian-modified-files-strip-badge', text: '0' });
+    // Sidebar is a sibling of the strip inside the hover zone — not a child of
+    // the 38px-tall strip — so max-height resolves against the viewport.
+    this.containerEl = hoverZone.createDiv({ cls: 'opencodian-modified-files-sidebar' });
     this.load();
   }
 
@@ -33,7 +40,7 @@ export class ModifiedFilesSidebar extends Component {
     this.headerEl = this.containerEl.createDiv({ cls: 'opencodian-modified-files-sidebar-header' });
     this.headerEl.createSpan({ cls: 'opencodian-modified-files-sidebar-title', text: t('modifiedFiles.title') });
 
-    this.toggleButtonEl = this.headerEl.createEl('button', {
+    const collapseButtonEl = this.headerEl.createEl('button', {
       cls: 'opencodian-modified-files-sidebar-collapse opencodian-tooltip-trigger',
       attr: {
         type: 'button',
@@ -42,8 +49,7 @@ export class ModifiedFilesSidebar extends Component {
         'data-tooltip-align': 'left',
       },
     });
-    setIcon(this.toggleButtonEl, 'panel-right-close');
-    this.registerDomEvent(this.toggleButtonEl, 'click', () => this.toggle());
+    setIcon(collapseButtonEl, 'panel-right-close');
 
     this.listEl = this.containerEl.createDiv({ cls: 'opencodian-modified-files-sidebar-list' });
     this.render();
@@ -51,25 +57,18 @@ export class ModifiedFilesSidebar extends Component {
 
   updateEntries(entries: SessionDiffEntry[]): void {
     this.entries = entries.map((entry) => ({ ...entry }));
+    this.badgeEl.textContent = String(this.entries.length);
+    const empty = this.entries.length === 0;
+    this.badgeEl.classList.toggle('is-empty', empty);
+    this.hostEl.classList.toggle('is-empty', empty);
     this.render();
   }
 
-  toggle(): void {
-    this.isVisible = !this.isVisible;
-    this.containerEl.classList.toggle('visible', this.isVisible);
-    this.containerEl.classList.toggle('collapsed', !this.isVisible);
-  }
-
-  show(): void {
-    if (!this.isVisible) {
-      this.toggle();
-    }
+  setVisible(enabled: boolean): void {
+    this.wrapperEl.classList.toggle('is-disabled', !enabled);
   }
 
   private render(): void {
-    this.containerEl.classList.toggle('visible', this.isVisible);
-    this.containerEl.classList.toggle('collapsed', !this.isVisible);
-
     if (!this.listEl) {
       return;
     }
@@ -139,6 +138,6 @@ export class ModifiedFilesSidebar extends Component {
 
   destroy(): void {
     this.unload();
-    this.hostEl.remove();
+    this.wrapperEl.remove();
   }
 }

@@ -1772,6 +1772,7 @@ export interface OpenCodianSettings {
   tabBarPosition: TabBarPosition;
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
   enableAutoScroll: boolean;
+  showModifiedFilesSidebar: boolean;
   chatFontSizePx: number;
   chatScrollMode: ChatScrollMode;
   inputPanelTheme: InputPanelThemeId;
@@ -1936,6 +1937,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   tabBarPosition: 'below-header',
   belowHeaderTabBarLayout: 'grid',
   enableAutoScroll: true,
+  showModifiedFilesSidebar: true,
   chatFontSizePx: DEFAULT_CHAT_FONT_SIZE_PX,
   chatScrollMode: 'sticky-mask',
   inputPanelTheme: 'preset',

@@ -79,23 +79,25 @@ export class SettingsPluginSection {
       pluginService, containerEl, currentRunId, secondaryTabId,
     );
 
-    // Install section is always visible regardless of tab
-    let installInputEl: HTMLInputElement | null = null;
-    const installSetting = new Setting(containerEl)
-      .setName(t('settings.plugins.install.name'))
-      .addText((text) => {
-        installInputEl = text.inputEl;
-        text.setPlaceholder(t('settings.plugins.install.placeholder'));
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.plugins.install.button'))
-          .setCta()
-          .onClick(async () => {
-            await this.handleInstall(installInputEl, pluginService, refreshPluginSnapshot);
-          });
-      });
-    this.setSettingDescWithFormatting(installSetting, t('settings.plugins.install.desc'));
+    // Install section only shown on overview tab
+    if (secondaryTabId === 'overview') {
+      let installInputEl: HTMLInputElement | null = null;
+      const installSetting = new Setting(containerEl)
+        .setName(t('settings.plugins.install.name'))
+        .addText((text) => {
+          installInputEl = text.inputEl;
+          text.setPlaceholder(t('settings.plugins.install.placeholder'));
+        })
+        .addButton((button) => {
+          button
+            .setButtonText(t('settings.plugins.install.button'))
+            .setCta()
+            .onClick(async () => {
+              await this.handleInstall(installInputEl, pluginService, refreshPluginSnapshot);
+            });
+        });
+      this.setSettingDescWithFormatting(installSetting, t('settings.plugins.install.desc'));
+    }
 
     if (secondaryTabId === 'overview') {
       const overviewEl = containerEl.createDiv({ attr: { 'data-section-block': 'overview' } });
@@ -195,7 +197,7 @@ export class SettingsPluginSection {
         }
 
         this.renderPluginOverview(overviewEl, snapshot);
-        this.renderPluginSources(globalSourcesEl, snapshot, pluginService, currentRunId, async () => { await refreshPluginSnapshot(false); });
+        this.renderPluginSources(globalSourcesEl, snapshot, { pluginService, currentRunId, fullRefresh: async () => { await refreshPluginSnapshot(false); } });
         this.renderPluginProjectDirectory(projectDirectoryEl, snapshot, pluginService, currentRunId);
         this.renderPluginOmoSection(omoEl, snapshot);
 
@@ -363,7 +365,7 @@ export class SettingsPluginSection {
 
       inputEl.value = '';
       new Notice(t('settings.plugins.install.success'));
-      this.showRestartNotice();
+      await this.restartManagedServerIfNeeded();
       await refresh(false);
     } catch (error) {
       logger.error('Install failed:', error);
@@ -475,7 +477,7 @@ export class SettingsPluginSection {
         const omoEl = containerEl.querySelector('[data-section-block="omo"] .opencodian-plugin-block-body') as HTMLElement;
 
         if (overviewEl) this.renderPluginOverview(overviewEl, snapshot);
-        if (globalSourcesEl) this.renderPluginSources(globalSourcesEl, snapshot, pluginService, currentRunId);
+        if (globalSourcesEl) this.renderPluginSources(globalSourcesEl, snapshot, { pluginService, currentRunId });
         if (projectDirEl) this.renderPluginProjectDirectory(projectDirEl, snapshot, pluginService, currentRunId);
         if (omoEl) this.renderPluginOmoSection(omoEl, snapshot);
 
@@ -548,10 +550,13 @@ export class SettingsPluginSection {
   private renderPluginSources(
     containerEl: HTMLElement,
     snapshot: PluginEnvironmentSnapshot,
-    pluginService: PluginManagementService,
-    currentRunId: number,
-    fullRefresh?: () => Promise<void>,
+    ctx: {
+      pluginService: PluginManagementService;
+      currentRunId: number;
+      fullRefresh?: () => Promise<void>;
+    },
   ): void {
+    const { pluginService, currentRunId, fullRefresh } = ctx;
     containerEl.empty();
 
     // Global sources — read-only
@@ -579,7 +584,7 @@ export class SettingsPluginSection {
         this.plugin.settings.disabledPluginSpecs,
       );
       if (currentRunId !== this.refreshRunId) return;
-      this.renderPluginSources(containerEl, snap, pluginService, currentRunId);
+      this.renderPluginSources(containerEl, snap, ctx);
     });
 
     this.renderManagedEntryGroup(containerEl, {
@@ -917,6 +922,28 @@ export class SettingsPluginSection {
         ? t('settings.plugins.restart.local')
         : t('settings.plugins.restart.remote'),
     );
+  }
+
+  /**
+   * Auto-restart the managed local server so plugin changes take effect
+   * immediately. In remote mode, falls back to a manual restart notice.
+   */
+  private async restartManagedServerIfNeeded(): Promise<void> {
+    if (this.plugin.settings.server.mode !== 'local') {
+      new Notice(t('settings.plugins.restart.remote'));
+      return;
+    }
+
+    try {
+      const isRunning = await this.plugin.openCodeService.checkHealth();
+      if (isRunning) {
+        await this.plugin.openCodeService.stop();
+      }
+      await this.plugin.openCodeService.start();
+    } catch (error) {
+      logger.error('Auto-restart after plugin install failed:', error);
+      new Notice(t('settings.plugins.restart.local'));
+    }
   }
 
   private async ensureAndOpenProjectOmoConfig(pluginService: PluginManagementService): Promise<string | null> {

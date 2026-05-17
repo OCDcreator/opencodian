@@ -6054,12 +6054,55 @@ img.opencodian-model-provider-header-icon {
   pointer-events: none;
 }
 
+.opencodian-modified-files-trigger-strip {
+  position: absolute;
+  right: 0;
+  top: 80px;
+  width: 6px;
+  height: 38px;
+  border-radius: 3px 0 0 3px;
+  background: var(--interactive-accent);
+  cursor: pointer;
+  opacity: 0.3;
+  pointer-events: auto;
+  transition: opacity 0.2s, width 0.2s;
+}
+
+.opencodian-modified-files-hover-zone:hover .opencodian-modified-files-trigger-strip {
+  width: 10px;
+  opacity: 0.7;
+}
+
+.opencodian-modified-files-trigger-strip.is-empty {
+  display: none;
+}
+
+.opencodian-modified-files-strip-badge {
+  position: absolute;
+  top: 8px;
+  left: -10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.opencodian-modified-files-strip-badge.is-empty {
+  display: none;
+}
+
 .opencodian-modified-files-sidebar {
   position: absolute;
-  right: 8px;
-  top: 72px;
+  right: 12px;
+  top: 80px;
   width: 280px;
-  max-height: min(420px, calc(100% - 144px));
+  max-height: min(420px, calc(100% - 160px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -6071,21 +6114,30 @@ img.opencodian-model-provider-header-icon {
   box-shadow: 0 8px 24px var(--opencodian-glass-shadow);
   color: var(--text-normal);
   opacity: 0;
-  transform: translateX(12px);
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateX(12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-.opencodian-modified-files-sidebar.visible {
-  opacity: 1;
-  transform: translateX(0);
+.opencodian-modified-files-hover-zone {
+  position: absolute;
+  right: 0;
+  top: 60px;
+  bottom: 60px;
+  width: 6px;
   pointer-events: auto;
+  transition: width 0s 0.25s;
 }
 
-.opencodian-modified-files-sidebar.collapsed {
-  opacity: 0;
-  transform: translateX(12px);
-  pointer-events: none;
+.opencodian-modified-files-hover-zone:hover {
+  width: 300px;
+  transition: width 0s;
+}
+
+.opencodian-modified-files-hover-zone:hover .opencodian-modified-files-sidebar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
 }
 
 .opencodian-modified-files-sidebar-header {
@@ -6215,43 +6267,7 @@ img.opencodian-model-provider-header-icon {
   text-align: center;
 }
 
-.opencodian-modified-files-toggle {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.opencodian-modified-files-toggle:hover,
-.opencodian-modified-files-toggle.is-active {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.opencodian-modified-files-toggle-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 16px;
-}
-
-.opencodian-modified-files-toggle-badge.is-empty {
+.opencodian-modified-files-sidebar-host.is-disabled {
   display: none;
 }
 

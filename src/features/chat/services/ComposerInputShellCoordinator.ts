@@ -46,7 +46,6 @@ export interface ComposerInputShellCoordinatorHost {
   mountSelectionControls(toolbar: HTMLElement): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
-  mountModifiedFilesToggle(container: HTMLElement): void;
   isActiveTabStreaming(): boolean;
   cancelStreaming(): void;
   isTabForegroundBusy(): boolean;
@@ -211,7 +210,6 @@ export class ComposerInputShellCoordinator {
     this.host.mountSelectionControls(toolbarEl);
     this.host.mountContextUsageIndicator(toolbarEl.createDiv({ cls: 'opencodian-context-usage-slot' }));
     this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
-    this.host.mountModifiedFilesToggle(toolbarEl.createDiv({ cls: 'opencodian-modified-files-toggle-slot' }));
 
     this.initializeLayoutMetrics();
   }
