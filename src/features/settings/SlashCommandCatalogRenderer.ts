@@ -75,7 +75,7 @@ export class SlashCommandCatalogRenderer {
     this.pillsEl = controlsEl.createDiv({ cls: 'opencodian-cmd-catalog-filter-pills' });
     this.renderPills(this.pillsEl, callbacks);
 
-    this.batchBarEl = catalogBodyEl.createDiv({ cls: 'opencodian-cmd-catalog-batch-bar' });
+    this.batchBarEl = null;
     this.scrollEl = catalogBodyEl.createDiv({ cls: 'opencodian-cmd-catalog-scroll' });
 
     this.rerenderGrid(callbacks);
@@ -97,9 +97,17 @@ export class SlashCommandCatalogRenderer {
     const previousScrollTop = this.scrollEl?.scrollTop ?? 0;
 
     // Batch bar
-    this.batchBarEl?.replaceChildren();
     if (this.selectedIds.size > 0) {
-      this.renderBatchBar(this.batchBarEl!, this.lastCommands, callbacks);
+      if (!this.batchBarEl || !this.batchBarEl.isConnected) {
+        this.batchBarEl = document.createElement('div');
+        this.batchBarEl.className = 'opencodian-cmd-catalog-batch-bar';
+        this.scrollEl?.parentElement?.insertBefore(this.batchBarEl, this.scrollEl);
+      }
+      this.batchBarEl.replaceChildren();
+      this.renderBatchBar(this.batchBarEl, this.lastCommands, callbacks);
+    } else {
+      this.batchBarEl?.remove();
+      this.batchBarEl = null;
     }
     // Card grid
     this.scrollEl?.replaceChildren();
@@ -215,7 +223,15 @@ export class SlashCommandCatalogRenderer {
     });
     const header = card.createDiv({ cls: 'opencodian-cmd-catalog-card-header' });
     const left = header.createDiv({ cls: 'opencodian-cmd-catalog-card-left' });
-    const selectCb = left.createEl('input', { attr: { type: 'checkbox' } });
+    const displayId = getDisplayId(cmd);
+    const commandLabel = `/${displayId}`;
+    const selectCb = left.createEl('input', {
+      cls: 'opencodian-cmd-catalog-select-checkbox',
+      attr: {
+        type: 'checkbox',
+        'aria-label': t('settings.commands.catalog.selection.toggle', { command: commandLabel }),
+      },
+    });
     selectCb.checked = this.selectedIds.has(cmd.id);
     selectCb.addEventListener('click', (e) => e.stopPropagation());
     selectCb.addEventListener('change', () => {
@@ -224,7 +240,7 @@ export class SlashCommandCatalogRenderer {
     });
     const name = left.createDiv({
       cls: 'opencodian-cmd-catalog-card-name',
-      text: `/${getDisplayId(cmd)}`,
+      text: commandLabel,
     });
     name.createSpan({
       cls: `opencodian-cmd-catalog-chip opencodian-cmd-catalog-chip-source-${cmd.source}`,
@@ -255,13 +271,34 @@ export class SlashCommandCatalogRenderer {
         text: t('settings.commands.catalog.model', { model: cmd.model }),
       });
     }
-    const toggleWrap = header.createDiv({ cls: 'opencodian-cmd-catalog-card-toggle' });
-    const toggle = toggleWrap.createEl('input', {
-      attr: { type: 'checkbox', class: 'opencodian-cmd-catalog-toggle-checkbox' },
+    const toggleWrap = header.createEl('label', {
+      cls: 'checkbox-container opencodian-cmd-catalog-card-toggle',
     });
+    const toggle = toggleWrap.createEl('input', {
+      attr: {
+        type: 'checkbox',
+        class: 'opencodian-cmd-catalog-toggle-checkbox',
+        role: 'switch',
+      },
+    });
+    const syncToggleLabel = () => {
+      const stateLabel = toggle.checked
+        ? t('settings.commands.catalog.visibility.visible')
+        : t('settings.commands.catalog.visibility.hidden');
+      toggle.setAttribute('aria-checked', String(toggle.checked));
+      toggle.setAttribute('aria-label', t('settings.commands.catalog.visibility.toggle', {
+        command: commandLabel,
+        state: stateLabel,
+      }));
+      toggleWrap.classList.toggle('is-enabled', toggle.checked);
+      toggleWrap.setAttribute('title', stateLabel);
+    };
     toggle.checked = !cmd.hidden;
+    syncToggleLabel();
     toggle.addEventListener('click', (e) => e.stopPropagation());
+    toggleWrap.addEventListener('click', (e) => e.stopPropagation());
     toggle.addEventListener('change', async () => {
+      syncToggleLabel();
       await updateVisibility(cmd.id, toggle.checked);
       refreshCatalogPreservingSearch();
     });

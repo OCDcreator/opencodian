@@ -274,4 +274,4 @@ New Chinese keys added for the tabbed settings layout:
 
 ## 2026-05-17 命令目录卡片 UI
 
-新增 `settings.commands.catalog.*` 系列键，用于卡片式命令目录：搜索占位符 (`searchPlaceholder`)、筛选标签 (`filterAll/filterSkills/filterCommands/filterEnabled/filterDisabled`)、来源/状态芯片 (`chip.skill/chip.command/chip.project/chip.md-command/chip.subtask/chip.hidden/chip.unavailable`)、多选批量操作 (`selectedCount/batchEnable/batchDisable`) 和无匹配空态 (`noResults`)。
+新增 `settings.commands.catalog.*` 系列键，用于卡片式命令目录：搜索占位符 (`searchPlaceholder`)、筛选标签 (`filterAll/filterSkills/filterCommands/filterEnabled/filterDisabled`)、来源/状态芯片 (`chip.skill/chip.command/chip.project/chip.md-command/chip.subtask/chip.hidden/chip.unavailable`)、多选批量操作 (`selectedCount/batchEnable/batchDisable`)、可见性 / 选择 aria 文案 (`visibility.toggle` / `selection.toggle`) 和无匹配空态 (`noResults`)。

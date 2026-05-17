@@ -2208,7 +2208,7 @@
 
 .opencodian-cmd-catalog-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   align-items: start;
 }
@@ -2249,11 +2249,48 @@
   min-width: 0;
 }
 
-.opencodian-cmd-catalog-card-left input[type="checkbox"] {
+.opencodian-cmd-catalog-select-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
   margin: 0;
-  accent-color: var(--interactive-accent);
   flex: 0 0 auto;
+  border: 1.5px solid color-mix(in srgb, var(--text-muted) 64%, var(--background-modifier-border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--background-primary) 84%, transparent);
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.opencodian-cmd-catalog-select-checkbox::after {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border: solid var(--text-on-accent, var(--background-primary));
+  border-width: 0 0 2px 2px;
+  opacity: 0;
+  transform: rotate(-45deg);
+}
+
+.opencodian-cmd-catalog-select-checkbox:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 62%, var(--background-modifier-border-hover));
+}
+
+.opencodian-cmd-catalog-select-checkbox:checked {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+}
+
+.opencodian-cmd-catalog-select-checkbox:checked::after {
+  opacity: 1;
+}
+
+.opencodian-cmd-catalog-select-checkbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--opencodian-settings-focus-ring, color-mix(in srgb, var(--interactive-accent) 22%, transparent));
 }
 
 .opencodian-cmd-catalog-card-name {
@@ -2320,13 +2357,11 @@
 
 .opencodian-cmd-catalog-card-toggle {
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
+  margin: 0;
+  cursor: pointer;
 }
 
 .opencodian-cmd-catalog-toggle-checkbox {
-  margin: 0;
-  accent-color: var(--interactive-accent);
   cursor: pointer;
 }
 
@@ -2350,6 +2385,12 @@
   color: var(--text-muted);
   font-size: 13px;
   text-align: center;
+}
+
+@media (max-width: 720px) {
+  .opencodian-cmd-catalog-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── End Command Catalog Card Layout ──────────────────────── */

@@ -387,9 +387,18 @@ describe('SettingsCommandsSection catalog shell', () => {
     expect(plugin.opencodeConfigManager?.getAgentConfig).toHaveBeenCalledTimes(1);
 
     // init is visible (toggle checked)
-    expect(findCard(containerEl, '/init')?.toggleCheckbox.checked).toBe(true);
+    const initToggle = findCard(containerEl, '/init')?.toggleCheckbox;
+    expect(initToggle?.checked).toBe(true);
+    expect(initToggle?.getAttribute('role')).toBe('switch');
+    expect(initToggle?.getAttribute('aria-checked')).toBe('true');
+    expect(initToggle?.parentElement?.classList.contains('checkbox-container')).toBe(true);
+    expect(initToggle?.parentElement?.classList.contains('is-enabled')).toBe(true);
     // review is hidden (toggle unchecked)
-    expect(findCard(containerEl, '/review')?.toggleCheckbox.checked).toBe(false);
+    const reviewToggle = findCard(containerEl, '/review')?.toggleCheckbox;
+    expect(reviewToggle?.checked).toBe(false);
+    expect(reviewToggle?.getAttribute('role')).toBe('switch');
+    expect(reviewToggle?.getAttribute('aria-checked')).toBe('false');
+    expect(reviewToggle?.parentElement?.classList.contains('is-enabled')).toBe(false);
     // deploy is visible (project-only, not hidden)
     expect(findCard(containerEl, '/deploy')?.toggleCheckbox.checked).toBe(true);
     // mcp-prompt should not appear
@@ -416,6 +425,7 @@ describe('SettingsCommandsSection catalog shell', () => {
     await flushAsync();
 
     expect(plugin.settings.hiddenSlashCommands).toEqual(['init', 'review']);
+    expect(initCard!.toggleCheckbox.parentElement?.classList.contains('is-enabled')).toBe(false);
     expect(plugin.saveSettings).toHaveBeenCalledWith({
       syncConfig: false,
       reloadModels: false,
@@ -677,5 +687,27 @@ describe('SettingsCommandsSection catalog shell', () => {
     await flushAsync();
 
     expect(plugin.settings.hiddenSlashCommands).toEqual([]);
+  });
+
+  it('does not render an empty batch bar before commands are selected', async () => {
+    const plugin = createPlugin({
+      runtimeCommands: [
+        createRuntimeCommand({ name: 'init' }),
+      ],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    expect(containerEl.querySelector('.opencodian-cmd-catalog-batch-bar')).toBeNull();
+
+    const initCard = findCard(containerEl, '/init');
+    const initCb = initCard?.card.querySelector<HTMLInputElement>('.opencodian-cmd-catalog-select-checkbox');
+
+    initCb!.checked = true;
+    initCb!.dispatchEvent(new Event('change'));
+    await flushAsync();
+
+    expect(containerEl.querySelector('.opencodian-cmd-catalog-batch-bar')).not.toBeNull();
   });
 });

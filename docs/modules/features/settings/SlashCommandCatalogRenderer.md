@@ -55,4 +55,4 @@
 
 - 本 renderer 不持有数据加载或 visibility 持久化逻辑，所有状态变更通过回调委托给上层
 - 搜索、筛选和多选状态在 renderer 实例上持久化，refresh 不会重置这些 UI 状态
-- CSS 样式前缀统一为 `opencodian-cmd-catalog-*`，定义在 `config-editor-modal.css`
+- CSS 样式前缀统一为 `opencodian-cmd-catalog-*`，定义在 `config-editor-modal.css`。批量操作条只在存在选中项时进入 DOM，避免空条占位；卡片网格桌面态固定两列，窄屏退成单列；卡片左侧批量选择保持方形 checkbox，右侧可见性控制复用 Obsidian `checkbox-container` 开关样式并保留 `role="switch"`。
