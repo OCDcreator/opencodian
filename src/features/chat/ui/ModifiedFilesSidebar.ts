@@ -122,8 +122,12 @@ export class ModifiedFilesSidebar extends Component {
 
   private formatPath(filePath: string): string {
     const basePath = this.getVaultBasePath();
-    if (basePath && filePath.startsWith(`${basePath}/`)) {
-      return filePath.slice(basePath.length + 1);
+    if (!basePath) return filePath;
+    // Normalize separators so Windows backslash paths (C:\vault\...) are handled
+    const normFile = filePath.replace(/\\/g, '/');
+    const normBase = basePath.replace(/\\/g, '/');
+    if (normFile.startsWith(`${normBase}/`)) {
+      return normFile.slice(normBase.length + 1);
     }
     return filePath;
   }

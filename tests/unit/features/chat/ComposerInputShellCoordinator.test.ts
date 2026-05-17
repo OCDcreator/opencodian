@@ -191,8 +191,7 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
-    expect(fixture.host.mountModifiedFilesToggle).toHaveBeenCalledTimes(1);
-    expect(fixture.host.submitMessage).toHaveBeenCalledWith({
+    expect(fixture.host.mountModifiedFilesToggle).toHaveBeenCalledTimes(1); expect(fixture.host.submitMessage).toHaveBeenCalledWith({
       kind: 'prompt',
       content: 'Hello coordinator',
     });
