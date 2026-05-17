@@ -75,7 +75,7 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 | `createSkillModeSetting()` | 渲染 skill invocation mode 下拉框并写回 `slashCommandSkillMode` |
 | `dispose()` | 递增 refresh run id，避免旧异步请求回写已重建的设置页 |
 | `refreshCatalog()` | 并行加载 runtime/project commands，合并后同时刷新 editor 与 catalog |
-| `renderCatalog()` | 先委托 `SettingsProjectCommandEditor` 渲染项目命令表单，再按当前 skill mode 为每个 command 渲染人类可读的 slash label 与 visible toggle |
+| `renderCatalog()` | 先委托 `SettingsProjectCommandEditor` 渲染项目命令表单，再委托 `SlashCommandCatalogRenderer` 渲染卡片式目录 |
 | `updateCommandVisibility()` | 把用户 hide/unhide 操作写回 `hiddenSlashCommands` |
 
 ## 与其他模块的交互
@@ -85,6 +85,7 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 - `OpencodeConfigManager`: 读取当前 vault 的 project `command` / `agent` 配置，并负责 command-owned hidden agent lifecycle
 - `core/config/slashCommandCatalog.ts`: 提供共享 catalog merge 与 visible-menu projection 规则
 - `SettingsProjectCommandEditor.ts`: 负责 project command 核心字段表单、保存 / 删除 action 与 notice
+- `SlashCommandCatalogRenderer.ts`: 负责 catalog 的搜索、筛选、卡片网格渲染和多选批量操作
 - `core/types/settings.ts`: 提供插件设置里的 `hiddenSlashCommands` 与 `slashCommandSkillMode`
 - `i18n/locales/*`: 提供 Commands section 标题、catalog 来源、可见性和错误文案
 
@@ -93,6 +94,18 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 - 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`。
 - project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀。
 - `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径。
+
+## 2026-05-17 Card-based catalog with search/filter/multi-select
+
+Catalog 从简单 `Setting` 行列表升级为卡片式网格布局。卡片渲染逻辑已提取到 companion owner `SlashCommandCatalogRenderer`：
+
+- 搜索栏使用 `enhanceSearchInput()`，支持搜索历史和模糊匹配（`fuzzyMatch()` 对 command ID + description + display ID 做子序列匹配）
+- 筛选标签（All / Skills / Commands / Enabled / Disabled）通过 `catalogFilter` 状态驱动 `applyFilters()` 过滤
+- 每个命令卡片包含：多选复选框、`/command-name`、来源芯片（Skill / Command / Project / MD）、状态芯片（Subtask / Unavailable）、可折叠描述、可见性切换
+- 多选状态 `selectedCommandIds` 支持批量启用/禁用，通过 `updateVisibility` 回调一次性写回
+- 展开状态 `expandedCommandIds` 允许点击卡片展开完整描述
+- 滚动容器 `.opencodian-cmd-catalog-scroll` 独立于控件区域，最大高度 `min(460px, 52vh)`
+- CSS 样式前缀统一为 `opencodian-cmd-catalog-*`，定义在 `config-editor-modal.css`
 
 ## 2026-04-24 Tabbed layout support
 

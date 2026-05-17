@@ -271,3 +271,7 @@ New Chinese keys added for the tabbed settings layout:
 ## 2026-05-16 插件管理控制
 
 插件设置文案现在覆盖安装区，以及每个插件条目的启用/禁用、卸载和删除控制。
+
+## 2026-05-17 命令目录卡片 UI
+
+新增 `settings.commands.catalog.*` 系列键，用于卡片式命令目录：搜索占位符 (`searchPlaceholder`)、筛选标签 (`filterAll/filterSkills/filterCommands/filterEnabled/filterDisabled`)、来源/状态芯片 (`chip.skill/chip.command/chip.project/chip.md-command/chip.subtask/chip.hidden/chip.unavailable`)、多选批量操作 (`selectedCount/batchEnable/batchDisable`) 和无匹配空态 (`noResults`)。

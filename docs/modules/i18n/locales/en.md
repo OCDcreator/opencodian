@@ -271,3 +271,7 @@ Added `settings.ui.enableTabs.name` and `settings.ui.enableTabs.desc` for the UI
 ## 2026-05-16 Plugin management controls
 
 Plugin settings locale keys now cover the install section plus per-entry enable/disable, uninstall, and delete controls.
+
+## 2026-05-17 Command catalog card UI
+
+Added `settings.commands.catalog.*` keys for the card-based command catalog: `searchPlaceholder`, filter pills (`filterAll/filterSkills/filterCommands/filterEnabled/filterDisabled`), source/status chips (`chip.skill/chip.command/chip.project/chip.md-command/chip.subtask/chip.hidden/chip.unavailable`), multi-select batch actions (`selectedCount/batchEnable/batchDisable`), and `noResults` empty state.

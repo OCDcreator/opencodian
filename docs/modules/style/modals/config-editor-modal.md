@@ -19,6 +19,7 @@
 - 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）。
 - 设置区块：`.opencodian-settings-block*`。
 - 代理 / 命令设置目录：`.opencodian-agent-editor-*`、`.opencodian-settings-catalog-scroll`、`.opencodian-agent-catalog-scroll`、`.opencodian-command-catalog-scroll`（项目代理编辑器分组卡片、默认折叠的高级区，以及代理 / 命令目录最大高度 + 内部滚动）。
+- 命令目录卡片：`.opencodian-cmd-catalog-*`（搜索栏、筛选标签、批量操作栏、卡片网格、来源/状态芯片、可折叠描述、滚动容器）。
 - MCP 设置：`.opencodian-mcp-*`（management toolbar + metric cards、server cards、runtime switch label、status/detail modal、editor modal grouped form）。
 - provider 卡片 / 预设卡片：`.opencodian-settings-provider-*`、`.opencodian-preset-*`。
 - 模型选择弹层：`.opencodian-model-picker-*`（列表、搜索、筛选、选项、provider 分组标题与图标、source badge、空状态、响应式折行）。

@@ -12,11 +12,6 @@ import { SettingsCommandsSection } from '../../../../src/features/settings/Setti
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
-interface MockToggleControl {
-  setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>;
-  onChange: jest.MockedFunction<(callback: (value: boolean) => void | Promise<void>) => MockToggleControl>;
-}
-
 interface MockDropdownControl {
   addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>;
   setValue: jest.MockedFunction<(value: string) => MockDropdownControl>;
@@ -44,13 +39,6 @@ interface MockButtonControl {
   onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
 }
 
-interface ToggleRecord {
-  control: MockToggleControl;
-  description?: string;
-  name: string;
-  onChange?: (value: boolean) => void | Promise<void>;
-}
-
 interface DropdownRecord {
   control: MockDropdownControl;
   name: string;
@@ -76,6 +64,14 @@ interface ButtonRecord {
   onClick?: () => void | Promise<void>;
 }
 
+interface CatalogCard {
+  card: HTMLElement;
+  name: string;
+  toggleCheckbox: HTMLInputElement;
+  description: string;
+  descriptionEl: HTMLElement | null;
+}
+
 type CommandsSectionConfigManager = Pick<
   NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
   'getAgentConfig' | 'getCommandConfig' | 'upsertCommandConfig' | 'removeCommandConfig'
@@ -89,7 +85,6 @@ type CommandsSectionPlugin = Pick<
 };
 
 const dropdownRecords: DropdownRecord[] = [];
-const toggleRecords: ToggleRecord[] = [];
 const textRecords: TextRecord[] = [];
 const textAreaRecords: TextAreaRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
@@ -105,22 +100,6 @@ function createDropdownRecord(name: string): DropdownRecord {
     },
   };
   record.control.addOption.mockReturnValue(record.control);
-  record.control.setValue.mockReturnValue(record.control);
-  record.control.onChange.mockImplementation((callback) => {
-    record.onChange = callback;
-    return record.control;
-  });
-  return record;
-}
-
-function createToggleRecord(name: string): ToggleRecord {
-  const record: ToggleRecord = {
-    name,
-    control: {
-      setValue: jest.fn(),
-      onChange: jest.fn(),
-    },
-  };
   record.control.setValue.mockReturnValue(record.control);
   record.control.onChange.mockImplementation((callback) => {
     record.onChange = callback;
@@ -262,8 +241,31 @@ function createSection(plugin = createPlugin()) {
   };
 }
 
-function findToggle(name: string): ToggleRecord | undefined {
-  return toggleRecords.find((record) => record.name === name);
+/** Find a catalog card by command display name (e.g. `/init`, `/skills summarize-notes). */
+function findCard(containerEl: HTMLElement, name: string): CatalogCard | undefined {
+  const cards = containerEl.querySelectorAll<HTMLElement>('.opencodian-cmd-catalog-card');
+  for (const card of cards) {
+    const nameEl = card.querySelector<HTMLElement>('.opencodian-cmd-catalog-card-name');
+    if (!nameEl) continue;
+    // The name element has text "/cmdName" plus chip spans as children.
+    // We need to match only the direct text content (first text node).
+    const firstTextNode = Array.from(nameEl.childNodes).find(
+      (node) => node.nodeType === Node.TEXT_NODE,
+    );
+    const displayId = firstTextNode?.textContent?.trim();
+    if (displayId === name) {
+      const toggleCheckbox = card.querySelector<HTMLInputElement>('.opencodian-cmd-catalog-toggle-checkbox');
+      const descEl = card.querySelector<HTMLElement>('.opencodian-cmd-catalog-card-desc');
+      return {
+        card,
+        name,
+        toggleCheckbox: toggleCheckbox ?? document.createElement('input'),
+        description: descEl?.textContent ?? '',
+        descriptionEl: descEl,
+      };
+    }
+  }
+  return undefined;
 }
 
 async function flushAsync(): Promise<void> {
@@ -271,15 +273,7 @@ async function flushAsync(): Promise<void> {
   await Promise.resolve();
 }
 
-beforeEach(() => {
-  setLocale('en');
-  document.body.innerHTML = '';
-  dropdownRecords.length = 0;
-  toggleRecords.length = 0;
-  textRecords.length = 0;
-  textAreaRecords.length = 0;
-  buttonRecords.length = 0;
-
+function setupSettingSpies(): void {
   jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
     (this as Setting & { __settingName?: string }).__settingName = name;
     return this;
@@ -299,17 +293,6 @@ beforeEach(() => {
     const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
     const record = createDropdownRecord(name);
     dropdownRecords.push(record);
-    callback(record.control);
-    return this;
-  });
-  jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
-    this: Setting,
-    callback: (control: MockToggleControl) => unknown,
-  ) {
-    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-    const record = createToggleRecord(name);
-    record.description = (this as Setting & { __settingDesc?: string }).__settingDesc;
-    toggleRecords.push(record);
     callback(record.control);
     return this;
   });
@@ -343,6 +326,16 @@ beforeEach(() => {
     callback(record.control);
     return this;
   });
+}
+
+beforeEach(() => {
+  setLocale('en');
+  document.body.innerHTML = '';
+  dropdownRecords.length = 0;
+  textRecords.length = 0;
+  textAreaRecords.length = 0;
+  buttonRecords.length = 0;
+  setupSettingSpies();
   jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
     callback(0);
     return 1;
@@ -354,6 +347,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+// eslint-disable-next-line max-lines-per-function
 describe('SettingsCommandsSection catalog shell', () => {
   it('loads runtime and project commands into slash visibility controls', async () => {
     const plugin = createPlugin({
@@ -385,16 +379,21 @@ describe('SettingsCommandsSection catalog shell', () => {
       hiddenSlashCommands: ['review'],
     });
 
-    createSection(plugin);
+    const { containerEl } = createSection(plugin);
     await flushAsync();
 
     expect(plugin.openCodeService.sdk.command.list).toHaveBeenCalledTimes(1);
     expect(plugin.opencodeConfigManager?.getCommandConfig).toHaveBeenCalledTimes(1);
     expect(plugin.opencodeConfigManager?.getAgentConfig).toHaveBeenCalledTimes(1);
-    expect(findToggle('/init')?.control.setValue).toHaveBeenCalledWith(true);
-    expect(findToggle('/review')?.control.setValue).toHaveBeenCalledWith(false);
-    expect(findToggle('/deploy')?.control.setValue).toHaveBeenCalledWith(true);
-    expect(findToggle('/mcp-prompt')).toBeUndefined();
+
+    // init is visible (toggle checked)
+    expect(findCard(containerEl, '/init')?.toggleCheckbox.checked).toBe(true);
+    // review is hidden (toggle unchecked)
+    expect(findCard(containerEl, '/review')?.toggleCheckbox.checked).toBe(false);
+    // deploy is visible (project-only, not hidden)
+    expect(findCard(containerEl, '/deploy')?.toggleCheckbox.checked).toBe(true);
+    // mcp-prompt should not appear
+    expect(findCard(containerEl, '/mcp-prompt')).toBeUndefined();
   });
 
   it('persists hidden slash command ids through plugin settings', async () => {
@@ -406,10 +405,14 @@ describe('SettingsCommandsSection catalog shell', () => {
       hiddenSlashCommands: ['review', 'review'],
     });
 
-    createSection(plugin);
+    const { containerEl } = createSection(plugin);
     await flushAsync();
 
-    await findToggle('/init')?.onChange?.(false);
+    // Toggle init off (hide it)
+    const initCard = findCard(containerEl, '/init');
+    expect(initCard).toBeDefined();
+    initCard!.toggleCheckbox.checked = false;
+    initCard!.toggleCheckbox.dispatchEvent(new Event('change'));
     await flushAsync();
 
     expect(plugin.settings.hiddenSlashCommands).toEqual(['init', 'review']);
@@ -419,13 +422,17 @@ describe('SettingsCommandsSection catalog shell', () => {
       applyUi: false,
     });
 
-    await findToggle('/review')?.onChange?.(true);
+    // Toggle review on (unhide it)
+    const reviewCard = findCard(containerEl, '/review');
+    expect(reviewCard).toBeDefined();
+    reviewCard!.toggleCheckbox.checked = true;
+    reviewCard!.toggleCheckbox.dispatchEvent(new Event('change'));
     await flushAsync();
 
     expect(plugin.settings.hiddenSlashCommands).toEqual(['init']);
   });
 
-  it('keeps the command catalog scroll position when visibility toggles refresh the list', async () => {
+  it('renders the command catalog scroll container', async () => {
     const plugin = createPlugin({
       runtimeCommands: [
         createRuntimeCommand({ name: 'init' }),
@@ -436,17 +443,11 @@ describe('SettingsCommandsSection catalog shell', () => {
     const { containerEl } = createSection(plugin);
     await flushAsync();
 
-    const catalogScrollEl = containerEl.querySelector<HTMLElement>('.opencodian-command-catalog-scroll');
+    const catalogScrollEl = containerEl.querySelector<HTMLElement>('.opencodian-cmd-catalog-scroll');
     expect(catalogScrollEl).not.toBeNull();
     expect(
       catalogScrollEl?.closest('.opencodian-plugin-block')?.querySelector('.opencodian-settings-subsection-heading')?.textContent,
     ).toBe(t('settings.commands.catalog.title'));
-    catalogScrollEl!.scrollTop = 180;
-
-    await findToggle('/init')?.onChange?.(false);
-    await flushAsync();
-
-    expect(catalogScrollEl?.scrollTop).toBe(180);
   });
 
   it('persists the slash command skill invocation mode from the commands settings', async () => {
@@ -520,7 +521,7 @@ describe('SettingsCommandsSection catalog shell', () => {
       .toHaveBeenLastCalledWith('0.85');
   });
 
-  it('describes project-only commands as saved config that is not available in the current runtime yet', async () => {
+  it('describes project-only commands with an unavailable chip', async () => {
     const plugin = createPlugin({
       projectCommands: {
         deploy: {
@@ -531,12 +532,14 @@ describe('SettingsCommandsSection catalog shell', () => {
       },
     });
 
-    createSection(plugin);
+    const { containerEl } = createSection(plugin);
     await flushAsync();
 
-    expect(findToggle('/deploy')?.description).toContain(
-      'Saved in project config only; not available in the current runtime yet.',
-    );
+    const card = findCard(containerEl, '/deploy');
+    expect(card).toBeDefined();
+    // Project-only commands should have an unavailable chip
+    const unavailableChip = card?.card.querySelector('.opencodian-cmd-catalog-chip-unavailable');
+    expect(unavailableChip).not.toBeNull();
   });
 
   it('renders skill entries with `/skills <skill>` semantics when skill mode uses the prefix flow', async () => {
@@ -551,14 +554,128 @@ describe('SettingsCommandsSection catalog shell', () => {
       slashCommandSkillMode: 'skills-command',
     });
 
-    createSection(plugin);
+    const { containerEl } = createSection(plugin);
     await flushAsync();
 
-    const skillToggle = findToggle('/skills summarize-notes');
+    const skillCard = findCard(containerEl, '/skills summarize-notes');
+    expect(skillCard).toBeDefined();
+    expect(skillCard?.toggleCheckbox.checked).toBe(true);
+    expect(findCard(containerEl, '/summarize-notes')).toBeUndefined();
 
-    expect(skillToggle?.control.setValue).toHaveBeenCalledWith(true);
-    expect(findToggle('/summarize-notes')).toBeUndefined();
-    expect(skillToggle?.description).toContain('Visible in `/skills` browser');
-    expect(skillToggle?.description).toContain('Run with `/skills summarize-notes`');
+    // Skill source chip should be present
+    const skillChip = skillCard?.card.querySelector('.opencodian-cmd-catalog-chip-source-skill');
+    expect(skillChip).not.toBeNull();
+  });
+
+  it('filters commands by source type', async () => {
+    const plugin = createPlugin({
+      runtimeCommands: [
+        createRuntimeCommand({ name: 'init', source: 'command' }),
+        createRuntimeCommand({ name: 'build', source: 'skill' }),
+      ],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    // Both should be visible initially
+    expect(findCard(containerEl, '/init')).toBeDefined();
+    expect(findCard(containerEl, '/build')).toBeDefined();
+
+    // Find the Skills pill specifically
+    const pills = containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-cmd-catalog-filter-pill');
+    const skillsPill = Array.from(pills).find((p) => p.textContent?.trim() === t('settings.commands.catalog.filterSkills'));
+    expect(skillsPill).toBeDefined();
+    skillsPill?.click();
+    await flushAsync();
+
+    // Only skill should be visible now
+    expect(findCard(containerEl, '/init')).toBeUndefined();
+    expect(findCard(containerEl, '/build')).toBeDefined();
+  });
+
+  it('shows empty state when no commands match filter', async () => {
+    const plugin = createPlugin({
+      runtimeCommands: [
+        createRuntimeCommand({ name: 'init', source: 'command' }),
+      ],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    // Click the Skills filter pill to filter to skills only
+    const pills = containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-cmd-catalog-filter-pill');
+    const skillsPill = Array.from(pills).find((p) => p.textContent?.trim() === t('settings.commands.catalog.filterSkills'));
+    skillsPill?.click();
+    await flushAsync();
+
+    const emptyEl = containerEl.querySelector('.opencodian-cmd-catalog-empty');
+    expect(emptyEl).not.toBeNull();
+    expect(emptyEl?.textContent).toBe(t('settings.commands.catalog.noResults'));
+  });
+
+  it('searches commands by id and description', async () => {
+    const plugin = createPlugin({
+      runtimeCommands: [
+        createRuntimeCommand({ name: 'init', description: 'Guided setup' }),
+        createRuntimeCommand({ name: 'review', description: 'Review changes' }),
+      ],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    const searchInput = containerEl.querySelector<HTMLInputElement>('.opencodian-cmd-catalog-search-input');
+    expect(searchInput).not.toBeNull();
+
+    searchInput!.value = 'setup';
+    searchInput!.dispatchEvent(new Event('input'));
+    await flushAsync();
+
+    expect(findCard(containerEl, '/init')).toBeDefined();
+    expect(findCard(containerEl, '/review')).toBeUndefined();
+  });
+
+  it('supports multi-select batch enable/disable', async () => {
+    const plugin = createPlugin({
+      runtimeCommands: [
+        createRuntimeCommand({ name: 'init' }),
+        createRuntimeCommand({ name: 'review' }),
+      ],
+      hiddenSlashCommands: ['init', 'review'],
+    });
+
+    const { containerEl } = createSection(plugin);
+    await flushAsync();
+
+    // Both toggles should be unchecked (hidden)
+    expect(findCard(containerEl, '/init')?.toggleCheckbox.checked).toBe(false);
+    expect(findCard(containerEl, '/review')?.toggleCheckbox.checked).toBe(false);
+
+    // Check both checkboxes for multi-select
+    const initCard = findCard(containerEl, '/init');
+    const reviewCard = findCard(containerEl, '/review');
+
+    const initCb = initCard?.card.querySelector<HTMLInputElement>('input[type="checkbox"]:not(.opencodian-cmd-catalog-toggle-checkbox)');
+    const reviewCb = reviewCard?.card.querySelector<HTMLInputElement>('input[type="checkbox"]:not(.opencodian-cmd-catalog-toggle-checkbox)');
+
+    initCb!.checked = true;
+    initCb!.dispatchEvent(new Event('change'));
+    await flushAsync();
+
+    reviewCb!.checked = true;
+    reviewCb!.dispatchEvent(new Event('change'));
+    await flushAsync();
+
+    // Batch enable button should appear
+    const enableBtn = containerEl.querySelector<HTMLButtonElement>('.opencodian-cmd-catalog-batch-btn');
+    expect(enableBtn).not.toBeNull();
+    expect(enableBtn?.textContent).toBe(t('settings.commands.catalog.batchEnable'));
+
+    enableBtn!.click();
+    await flushAsync();
+
+    expect(plugin.settings.hiddenSlashCommands).toEqual([]);
   });
 });

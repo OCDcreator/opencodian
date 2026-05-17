@@ -19,6 +19,9 @@ import { createLogger } from '../../shared';
 import {
   SettingsProjectCommandEditor,
 } from './SettingsProjectCommandEditor';
+import {
+  SlashCommandCatalogRenderer,
+} from './SlashCommandCatalogRenderer';
 
 const logger = createLogger('SettingsCommandsSection');
 
@@ -70,6 +73,7 @@ export class SettingsCommandsSection {
   ) => HTMLHeadingElement;
   private projectCommandEditor: SettingsProjectCommandEditor | null = null;
   private refreshRunId = 0;
+  private readonly catalogRenderer = new SlashCommandCatalogRenderer();
 
   constructor(options: SettingsCommandsSectionOptions) {
     this.plugin = options.plugin;
@@ -189,9 +193,7 @@ export class SettingsCommandsSection {
       cls: 'opencodian-plugin-block-desc',
       text: t('settings.commands.catalog.desc'),
     });
-    return blockEl.createDiv({
-      cls: 'opencodian-plugin-block-body opencodian-settings-catalog-scroll opencodian-command-catalog-scroll',
-    });
+    return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
   }
 
   private async refreshCatalog(options: {
@@ -200,12 +202,7 @@ export class SettingsCommandsSection {
     currentRunId: number;
     editorBodyEl: HTMLElement;
   }): Promise<void> {
-    const {
-      catalogBodyEl,
-      configManager,
-      currentRunId,
-      editorBodyEl,
-    } = options;
+    const { catalogBodyEl, configManager, currentRunId, editorBodyEl } = options;
 
     try {
       const [runtimeCommandsResult, projectCommands, projectAgents] = await Promise.all([
@@ -214,9 +211,7 @@ export class SettingsCommandsSection {
         configManager.getAgentConfig(),
       ]);
 
-      if (currentRunId !== this.refreshRunId) {
-        return;
-      }
+      if (currentRunId !== this.refreshRunId) return;
 
       const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
       const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
@@ -240,10 +235,7 @@ export class SettingsCommandsSection {
         projectCommands,
       });
     } catch (error) {
-      if (currentRunId !== this.refreshRunId) {
-        return;
-      }
-
+      if (currentRunId !== this.refreshRunId) return;
       logger.error('Failed to load command catalog:', error);
       editorBodyEl.replaceChildren();
       this.renderCatalogLoadFailure(catalogBodyEl, error);
@@ -252,161 +244,38 @@ export class SettingsCommandsSection {
 
   private renderCatalog(context: CommandCatalogRenderContext): void {
     const {
-      catalogBodyEl,
-      configManager,
-      currentRunId,
-      editorBodyEl,
-      mergedCommands,
-      editorCommands,
-      projectCommands,
+      catalogBodyEl, configManager, currentRunId, editorBodyEl,
+      mergedCommands, editorCommands, projectCommands,
     } = context;
 
     this.projectCommandEditor?.render({
       commands: editorCommands,
       containerEl: editorBodyEl,
       onConfigChanged: async () => {
-        await this.refreshCatalog({
-          catalogBodyEl,
-          configManager,
-          currentRunId,
-          editorBodyEl,
-        });
+        await this.refreshCatalog({ catalogBodyEl, configManager, currentRunId, editorBodyEl });
       },
       projectCommands,
       skillMode: this.getSkillMode(),
     });
 
-    this.renderWithPreservedScroll(catalogBodyEl, () => {
-      catalogBodyEl.replaceChildren();
-
-      if (mergedCommands.length === 0) {
-        catalogBodyEl.createDiv({ text: t('settings.commands.catalog.empty') });
-        return;
-      }
-
-      for (const command of mergedCommands) {
-        const setting = new Setting(catalogBodyEl)
-          .setName(this.buildCommandSettingName(command))
-          .setDesc(this.buildCommandDescription(command));
-
-        setting.addToggle((toggle) => {
-          toggle
-            .setValue(!command.hidden)
-            .onChange(async (value) => {
-              await this.updateCommandVisibility(command.id, value);
-              await this.refreshCatalog({
-                catalogBodyEl,
-                configManager,
-                currentRunId,
-                editorBodyEl,
-              });
-            });
-        });
-      }
+    this.catalogRenderer.render(catalogBodyEl, mergedCommands, {
+      getDisplayId: (cmd) => this.getCommandDisplayId(cmd),
+      updateVisibility: (id, visible) => this.updateCommandVisibility(id, visible),
+      refreshCatalog: () => { void this.refreshCatalog({ catalogBodyEl, configManager, currentRunId, editorBodyEl }); },
+      refreshCatalogPreservingSearch: () => { void this.refreshCatalog({ catalogBodyEl, configManager, currentRunId, editorBodyEl }); },
     });
   }
 
   private renderCatalogLoadFailure(catalogBodyEl: HTMLElement, error: unknown): void {
-    this.renderWithPreservedScroll(catalogBodyEl, () => {
-      catalogBodyEl.replaceChildren();
-      const message = error instanceof Error ? error.message : String(error);
-      new Setting(catalogBodyEl)
-        .setName(t('settings.commands.loadFailed.name'))
-        .setDesc(t('settings.commands.loadFailed.desc', { message }));
-    });
-  }
-
-  private renderWithPreservedScroll(containerEl: HTMLElement, render: () => void): void {
-    const previousScrollTop = containerEl.scrollTop;
-    render();
-    this.restoreScrollTopAfterRender(containerEl, previousScrollTop);
-  }
-
-  private restoreScrollTopAfterRender(containerEl: HTMLElement, scrollTop: number): void {
-    if (scrollTop <= 0) {
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      if (!containerEl.isConnected) {
-        return;
-      }
-
-      containerEl.scrollTop = scrollTop;
-    });
-  }
-
-  private buildCommandDescription(command: SlashCommandCatalogEntry): string {
-    const parts = [
-      this.getSourceLabel(command),
-      this.getVisibilityLabel(command),
-    ];
-
-    if (this.isSkillsCommandSkill(command)) {
-      parts.push(t('settings.commands.catalog.status.skillRunsViaSkillsCommand', {
-        command: command.id,
-      }));
-    }
-
-    if (!command.runtimeAvailable) {
-      parts.push(t('settings.commands.catalog.status.runtimeUnavailable'));
-    }
-
-    if (command.subtask) {
-      parts.push(t('settings.commands.catalog.status.subtask'));
-    }
-
-    if (command.agent) {
-      parts.push(t('settings.commands.catalog.agent', { agent: command.agent }));
-    }
-
-    if (command.model) {
-      parts.push(t('settings.commands.catalog.model', { model: command.model }));
-    }
-
-    if (command.description) {
-      parts.push(command.description);
-    }
-
-    return parts.join(' · ');
-  }
-
-  private buildCommandSettingName(command: SlashCommandCatalogEntry): string {
-    return `/${this.getCommandDisplayId(command)}`;
+    catalogBodyEl.replaceChildren();
+    const message = error instanceof Error ? error.message : String(error);
+    new Setting(catalogBodyEl)
+      .setName(t('settings.commands.loadFailed.name'))
+      .setDesc(t('settings.commands.loadFailed.desc', { message }));
   }
 
   private getCommandDisplayId(command: SlashCommandCatalogEntry): string {
-    return this.isSkillsCommandSkill(command)
-      ? `skills ${command.id}`
-      : command.id;
-  }
-
-  private getVisibilityLabel(command: SlashCommandCatalogEntry): string {
-    if (this.isSkillsCommandSkill(command)) {
-      return command.hidden
-        ? t('settings.commands.catalog.visibility.skillHiddenViaSkillsCommand')
-        : t('settings.commands.catalog.visibility.skillVisibleViaSkillsCommand');
-    }
-
-    return command.hidden
-      ? t('settings.commands.catalog.visibility.hidden')
-      : t('settings.commands.catalog.visibility.visible');
-  }
-
-  private getSourceLabel(command: SlashCommandCatalogEntry): string {
-    if (command.source === 'skill') {
-      return t('settings.commands.catalog.source.skill');
-    }
-
-    if (command.runtimeAvailable && command.hasProjectOverride) {
-      return t('settings.commands.catalog.source.runtimeOverride');
-    }
-
-    if (command.runtimeAvailable) {
-      return t('settings.commands.catalog.source.runtime');
-    }
-
-    return t('settings.commands.catalog.source.projectOnly');
+    return this.isSkillsCommandSkill(command) ? `skills ${command.id}` : command.id;
   }
 
   private isSkillsCommandSkill(command: SlashCommandCatalogEntry): boolean {
@@ -418,18 +287,10 @@ export class SettingsCommandsSection {
   }
 
   private async updateCommandVisibility(commandId: string, visible: boolean): Promise<void> {
-    const nextHiddenSlashCommands = buildNextHiddenSlashCommands(
-      this.plugin.settings.hiddenSlashCommands,
-      commandId,
-      visible,
+    this.plugin.settings.hiddenSlashCommands = buildNextHiddenSlashCommands(
+      this.plugin.settings.hiddenSlashCommands, commandId, visible,
     );
-
-    this.plugin.settings.hiddenSlashCommands = nextHiddenSlashCommands;
-    await this.plugin.saveSettings({
-      syncConfig: false,
-      reloadModels: false,
-      applyUi: false,
-    });
+    await this.plugin.saveSettings({ syncConfig: false, reloadModels: false, applyUi: false });
   }
 
   private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
@@ -438,5 +299,4 @@ export class SettingsCommandsSection {
       blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
     });
   }
-
 }
