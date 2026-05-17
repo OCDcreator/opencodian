@@ -27,7 +27,7 @@
 
 ### 卡片
 
-每个命令卡片包含：多选复选框、`/command-name`、来源芯片（Skill / Command / Project / MD）、状态芯片（Subtask / Unavailable）、可折叠描述、可见性切换。点击卡片或描述文本切换展开状态。
+每个命令卡片包含：多选复选框、`/command-name`、来源芯片（Skill / Command / Project / MD）、内置芯片（Built-in，仅白名单命令显示）、状态芯片（Subtask / Unavailable）、可折叠描述、可见性切换。点击卡片或描述文本切换展开状态。
 
 ### 多选批量操作
 

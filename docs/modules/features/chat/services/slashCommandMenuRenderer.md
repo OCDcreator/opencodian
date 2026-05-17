@@ -26,6 +26,7 @@ export function renderAgentMentionMenu(options: RenderAgentMentionMenuOptions): 
 - 空列表时根据 `status` 渲染 loading / empty / noMatches / loadFailed 状态行；slash menu 使用 `slashCommand.menu.*` locale 键，agent mention menu 使用独立的 `agentMention.menu.*` locale 键（通过 `getAgentMentionMenuStateText()` 渲染）
 - 有命令时，菜单顶部先渲染一条 `slashCommand.menu.hint` 提示文案（斜杠命令仅在输入框开头生效），随后输出 title、source badge、skill provenance 文案和 description；mid-text 模式下（用户在文本中间触发 slash 补全）不显示该 hint，避免与 `/skills <skill>` 等可在中间输入的技能命令产生误导
 - runtime 返回的普通 slash command badge 显示为 `command`，不再把 command 来源展示成更含糊的“runtime”；skill / override / project 继续使用各自来源文案
+- 内置命令（白名单内如 `init`、`review`、`help` 等）额外显示 `built-in` badge，并支持 i18n 翻译 description；非内置命令保持原始 description
 - 有 agent 候选时输出 `@id` 标题、可选 displayName badge 和 description
 - `mouseenter` 与 `click` 只通过回调把 index 交还给调用方，不直接持有 coordinator 状态
 - skill provenance 文案基于 catalog 的 `skillSource` 做多语言映射，不重新推断路径来源

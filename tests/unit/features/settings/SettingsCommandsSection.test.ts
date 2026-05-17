@@ -639,7 +639,7 @@ describe('SettingsCommandsSection catalog shell', () => {
     const searchInput = containerEl.querySelector<HTMLInputElement>('.opencodian-cmd-catalog-search-input');
     expect(searchInput).not.toBeNull();
 
-    searchInput!.value = 'setup';
+    searchInput!.value = 'Guided';
     searchInput!.dispatchEvent(new Event('input'));
     await flushAsync();
 

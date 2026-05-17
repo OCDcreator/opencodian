@@ -15,7 +15,9 @@
 - 标记 catalog/menu item 的 `source: 'command' | 'skill' | 'project' | 'md-command'`
 - 对 runtime skill 额外根据 `app.skills()` 返回的 `location` 推导来源标签（project / OpenCode project / plugin / global / custom）
 - 标记 `hiddenSlashCommands` 驱动的 menu hidden 状态
+- 通过 `BUILTIN_COMMAND_IDS` 常量标识 OpenCode 内置命令（compact、undo、redo、new、share、unshare、init、review、help），runtime 命令合并时设置 `isBuiltin: BUILTIN_COMMAND_IDS.has(name)`，project/md-command 设置 `isBuiltin: false`
 - 为 chat-side slash autocomplete 导出只包含可见条目的轻量 menu item 列表
+- 对非 skill 的运行时命令，根据命令 ID 尝试 i18n 翻译 description，使中文环境下显示中文介绍语；项目覆盖的 description 始终优先于翻译。description 翻译仅影响 UI 展示（settings catalog / slash menu），实际命令执行仍使用原始 template/name
 
 ## 公开导出
 
@@ -48,7 +50,8 @@ export function buildVisibleSlashCommandMenuItems(
 ### menu 可见性投影
 
 - `mergeSlashCommandCatalog()` 保留 `hidden` 状态，供 settings/catalog shell 继续显示 visible toggle
-- `buildVisibleSlashCommandMenuItems()` 再只投影 chat slash menu 真正需要的 `id` / `description` / `runtimeAvailable` / `hasProjectOverride` / `source` / `skillSource` / `subtask`
+- `mergeSlashCommandCatalog()` 为每个条目计算 `isBuiltin` 并通过 `buildVisibleSlashCommandMenuItems()` 投影到 `SlashCommandMenuItem.isBuiltin`，使 chat/composer 可区分内置命令与用户自定义命令
+- `buildVisibleSlashCommandMenuItems()` 再只投影 chat slash menu 真正需要的 `id` / `description` / `runtimeAvailable` / `hasProjectOverride` / `source` / `skillSource` / `subtask` / `isBuiltin`
 - 这一步会额外丢弃 `runtimeAvailable: false` 的 project-only 条目，避免 autocomplete 提前暴露 runtime 尚未注册的命令
 - 因此 `hiddenSlashCommands` 只影响 autocomplete/menu 可见性，不影响 command config 本身；project-only command 仍然只留在 settings catalog
 

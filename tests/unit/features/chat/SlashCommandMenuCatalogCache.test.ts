@@ -66,15 +66,16 @@ const COMPACT_MENU_ITEM = {
   skillSource: undefined,
   source: 'command',
   subtask: false,
+  isBuiltin: true,
 };
 
 const SYNTHETIC_BUILTIN_MENU_ITEMS = [
   COMPACT_MENU_ITEM,
-  { id: 'undo', description: 'Undo the last user message', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
-  { id: 'redo', description: 'Redo the last undone message', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
-  { id: 'new', description: 'Start a new conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
-  { id: 'share', description: 'Share the current conversation and copy link', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
-  { id: 'unshare', description: 'Stop sharing the current conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
+  { id: 'undo', description: 'Undo the last user message', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
+  { id: 'redo', description: 'Redo the last undone message', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
+  { id: 'new', description: 'Start a new conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
+  { id: 'share', description: 'Share the current conversation and copy link', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
+  { id: 'unshare', description: 'Stop sharing the current conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
 ];
 
 describe('SlashCommandMenuCatalogCache', () => {
@@ -88,12 +89,13 @@ describe('SlashCommandMenuCatalogCache', () => {
     expect(first).toEqual([
       {
         id: 'review',
-        description: 'Review code',
+        description: 'Review changes [commit|branch|pr], defaults to uncommitted',
         hasProjectOverride: false,
         runtimeAvailable: true,
         skillSource: undefined,
         source: 'command',
         subtask: false,
+        isBuiltin: true,
       },
       ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
@@ -131,6 +133,7 @@ describe('SlashCommandMenuCatalogCache', () => {
         skillSource: undefined,
         source: 'command',
         subtask: false,
+        isBuiltin: false,
       },
       ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
@@ -178,12 +181,13 @@ describe('SlashCommandMenuCatalogCache', () => {
     await expect(cache.load()).resolves.toEqual([
       {
         id: 'init',
-        description: 'Guided setup',
+        description: 'Guided AGENTS.md setup',
         hasProjectOverride: false,
         runtimeAvailable: true,
         skillSource: undefined,
         source: 'command',
         subtask: false,
+        isBuiltin: true,
       },
       ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);

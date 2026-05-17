@@ -24,7 +24,7 @@ export function filterSlashCommandMenuItems(
 - ID 前缀匹配拥有最高权重，非连续字符匹配用于支持轻量 fuzzy 搜索
 - 返回结果按分数降序排列
 - direct skill mode 下，runtime `source: 'skill'` 与普通 runtime/project command 一样参与顶层过滤
-- `skills-command` mode 下，顶层过滤隐藏单个 skill 并追加合成 `/skills` 入口
+- `skills-command` mode 下，顶层过滤隐藏单个 skill 并追加合成 `/skills` 入口（`isBuiltin: false`，非 OpenCode 内置）
 - `/skills <query>` nested 查询只过滤 skill items，并把显示/插入文本改成 `/skills <id> `
 - 调用方传入 `isMidText` 时，过滤结果会强制限定为 skill-only：direct mode 直接返回 skill entries，`skills-command` mode 则返回 `/skills <id> ` 形式的 prefixed skill entries；普通 command 不会出现在句中 slash 弹框里
 

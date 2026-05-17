@@ -246,6 +246,12 @@ export class SlashCommandCatalogRenderer {
       cls: `opencodian-cmd-catalog-chip opencodian-cmd-catalog-chip-source-${cmd.source}`,
       text: getSourceChipLabel(cmd.source),
     });
+    if (cmd.isBuiltin) {
+      name.createSpan({
+        cls: 'opencodian-cmd-catalog-chip opencodian-cmd-catalog-chip-builtin',
+        text: t('settings.commands.catalog.chip.builtin'),
+      });
+    }
     if (cmd.subtask) {
       left.createSpan({
         cls: 'opencodian-cmd-catalog-chip opencodian-cmd-catalog-chip-subtask',

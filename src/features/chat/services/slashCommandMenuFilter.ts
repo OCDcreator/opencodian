@@ -72,6 +72,7 @@ function buildSkillsCommandMenuItem(description: string): SlashCommandMenuItem {
     runtimeAvailable: false,
     source: 'skills-command',
     subtask: false,
+    isBuiltin: false,
   };
 }
 

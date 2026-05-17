@@ -177,6 +177,12 @@ function renderSlashCommandMenuItem(itemEl: HTMLElement, item: SlashCommandMenuI
       text: sourceBadge.text,
     });
   }
+  if (item.isBuiltin) {
+    titleRowEl.createDiv({
+      cls: 'opencodian-slash-command-menu-badge opencodian-slash-command-menu-badge--builtin',
+      text: t('slashCommand.sourceBadge.builtin'),
+    });
+  }
 
   const skillSourceText = buildSkillSourceText(item);
   if (skillSourceText) {

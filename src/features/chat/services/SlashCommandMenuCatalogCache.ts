@@ -238,6 +238,7 @@ export function appendSyntheticBuiltinCommands(
       runtimeAvailable: true,
       source: 'command',
       subtask: false,
+      isBuiltin: true,
     });
   }
 

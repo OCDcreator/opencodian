@@ -102,11 +102,13 @@ describe('slashCommandCatalog', () => {
     expect(buildVisibleSlashCommandMenuItems(merged)).toEqual([
       {
         id: 'init',
-        description: 'Guided setup',
+        description: 'Guided AGENTS.md setup',
         hasProjectOverride: false,
         runtimeAvailable: true,
         source: 'command',
         subtask: false,
+        isBuiltin: true,
+        skillSource: undefined,
       },
       {
         id: 'skill-review',
@@ -115,6 +117,8 @@ describe('slashCommandCatalog', () => {
         runtimeAvailable: true,
         source: 'skill',
         subtask: false,
+        isBuiltin: false,
+        skillSource: undefined,
       },
     ]);
   });

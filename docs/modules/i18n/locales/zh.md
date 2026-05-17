@@ -43,6 +43,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 本轮还新增 `slashCommand.sourceBadge.command`，让聊天 slash menu 里的 runtime-backed 普通命令显示 `command` badge；旧的“运行时”文案保留给真正需要表达 runtime 来源的其他上下文。
 
+本轮新增 `settings.commands.catalog.chip.builtin` 和 `slashCommand.sourceBadge.builtin`，为 settings catalog 和聊天 slash menu 中的内置命令提供“内置”badge 文案。
+
 本轮新增 `slashCommand.menu.hint`，用于在 slash command 一级补全框顶部提示用户“斜杠命令仅在输入框开头输入时生效”。
 
 本轮新增 `slashCommand.mdCommand.prefix.user` / `project`，为 `.opencode/commands/*.md` markdown command 来源标签预留中文文案。
@@ -56,6 +58,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 源码约 2050 行。
 
 本轮新增 `slashCommand.undo.*`、`slashCommand.redo.*`、`slashCommand.new.*`、`slashCommand.share.*`、`slashCommand.unshare.*` 系列 i18n 键，为 5 个新增 synthetic builtin slash commands 提供 description、notice 和状态文案。
+
+本轮新增 `slashCommand.init.description`、`slashCommand.review.description`、`slashCommand.help.description`，为 OpenCode 内置运行时命令提供介绍语翻译；文案与 OpenCode 源码中的实际 description 对齐（init: "初始化 AGENTS.md 设置向导"、review: "审查更改 [commit|branch|pr]，默认未提交更改"、help: "显示 OpenCode 帮助信息"）。同时更新 `settings.commands.editor.description.placeholder` 为中文占位符。
 
 ## 导入关系
 

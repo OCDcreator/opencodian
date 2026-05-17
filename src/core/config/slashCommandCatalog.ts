@@ -1,5 +1,6 @@
 import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 
+import { t, type TranslationKey } from '../../i18n';
 import type {
   OpencodeAgentConfig,
   OpencodeAgentConfigRecord,
@@ -13,6 +14,20 @@ import {
 
 export type SlashCommandCatalogSource = 'command' | 'skill' | 'project' | 'md-command';
 export type SlashCommandMenuItemSource = SlashCommandCatalogSource | 'skills-command';
+
+/** Known built-in command IDs that come from OpenCode itself (not user-defined). */
+export const BUILTIN_COMMAND_IDS = new Set([
+  'compact',
+  'undo',
+  'redo',
+  'new',
+  'share',
+  'unshare',
+  'init',
+  'review',
+  'help',
+]);
+
 export type SlashCommandSkillSourceKind =
   | 'project'
   | 'opencodeProject'
@@ -45,6 +60,7 @@ export interface SlashCommandCatalogEntry {
   source: SlashCommandCatalogSource;
   skillSource?: SlashCommandSkillSource;
   subtask: boolean;
+  isBuiltin: boolean;
 }
 
 export interface SlashCommandMenuItem {
@@ -57,6 +73,7 @@ export interface SlashCommandMenuItem {
   source: SlashCommandMenuItemSource;
   skillSource?: SlashCommandSkillSource;
   subtask: boolean;
+  isBuiltin: boolean;
 }
 
 export interface MdCommandEntry {
@@ -203,13 +220,33 @@ function stripRuntimeSkillDescriptionPrefix(description: string): string {
   return description.replace(/^\([^()]*\s+-\s*Skill\)\s*/i, '').trim();
 }
 
+function translateCommandDescription(commandId: string, fallbackDescription: string): string {
+  const key = `slashCommand.${commandId}.description` as TranslationKey;
+  const translation = t(key);
+  // t() returns the key itself if no translation exists; fall back to runtime description
+  return translation !== key ? translation : fallbackDescription;
+}
+
 function normalizeSlashCommandDescription(
+  commandId: string,
   runtimeCommand: RuntimeCommand | undefined,
   projectCommand: OpencodeCommandConfig | undefined,
   source: SlashCommandCatalogSource,
 ): string {
   const description = normalizeCommandDescription(runtimeCommand, projectCommand);
-  return source === 'skill' ? stripRuntimeSkillDescriptionPrefix(description) : description;
+  if (source === 'skill') {
+    return stripRuntimeSkillDescriptionPrefix(description);
+  }
+  // Only translate built-in commands for UI display; actual execution uses template/name.
+  if (!BUILTIN_COMMAND_IDS.has(commandId)) {
+    return description;
+  }
+  // Built-in: preserve project override if present, otherwise translate.
+  const hasProjectDescription = typeof projectCommand?.description === 'string' && projectCommand.description.trim().length > 0;
+  if (hasProjectDescription) {
+    return description;
+  }
+  return translateCommandDescription(commandId, description);
 }
 
 function normalizeCommandTemplate(
@@ -329,7 +366,7 @@ export function mergeSlashCommandCatalog(
     mergedEntries.set(runtimeCommand.name, {
       id: runtimeCommand.name,
       template: normalizeCommandTemplate(runtimeCommand, projectCommand),
-      description: normalizeSlashCommandDescription(runtimeCommand, projectCommand, normalizedSource),
+      description: normalizeSlashCommandDescription(runtimeCommand.name, runtimeCommand, projectCommand, normalizedSource),
       agent: normalizeCommandAgent(
         runtimeCommand.name,
         runtimeCommand,
@@ -347,6 +384,7 @@ export function mergeSlashCommandCatalog(
         ? runtimeSkillSources.get(runtimeCommand.name)
         : undefined,
       subtask: normalizeCommandSubtask(runtimeCommand, projectCommand),
+      isBuiltin: BUILTIN_COMMAND_IDS.has(runtimeCommand.name),
     });
   }
 
@@ -369,6 +407,7 @@ export function mergeSlashCommandCatalog(
       source: 'project',
       skillSource: undefined,
       subtask: normalizeCommandSubtask(undefined, projectCommand),
+      isBuiltin: false,
     });
   }
 
@@ -390,6 +429,7 @@ export function mergeSlashCommandCatalog(
         source: 'md-command',
         skillSource: undefined,
         subtask: false,
+        isBuiltin: false,
       });
     }
   }
@@ -425,5 +465,6 @@ export function buildVisibleSlashCommandMenuItems(
       source: entry.source,
       skillSource: entry.skillSource,
       subtask: entry.subtask,
+      isBuiltin: entry.isBuiltin,
     }));
 }
