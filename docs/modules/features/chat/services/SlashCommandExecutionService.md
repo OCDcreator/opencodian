@@ -63,6 +63,13 @@ export function executeCompactSession(...): Promise<boolean>;
 - `slashCommandSkillMode === 'skills-command'` 时，直接 `/skill-id` 不接管；只有 `/skills skill-id arguments` 会映射为真实 `session.command({ command: 'skill-id' })`
 - 如果某个 runtime command 同时也有 project override，direct `/command` 仍按该 runtime command 执行，不会被 `/skills` 前缀规则错误降级
 - `/compact` 是 synthetic command：只在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate，再用当前 OpenCode session 调用 view host 的 manual compaction seam；无 active session 时显示专用 notice
+- `/undo`、`/redo`、`/new`、`/share`、`/unshare` 是额外的 synthetic builtin commands，与 `/compact` 共享同一条检测路径：只在没有同名 project override 且 runtime 未提供非内置条目时走插件内置逻辑
+  - `/undo`：查找当前会话最后一条用户消息的 `sourceMessageId`，调用 `revertSession()` 撤销，成功后触发 background sync
+  - `/redo`：调用 `unrevertSession()` 重做，成功后触发 background sync
+  - `/new`：调用 `createNewConversation()` 创建新会话
+  - `/share`：调用 `shareSession()` 分享，成功后将 URL 复制到剪贴板
+  - `/unshare`：调用 `unshareSession()` 取消分享
+- 所有 synthetic builtin 的 host 方法在 `createSlashCommandExecutionHost()` 工厂中从 `deps.openCodeService` 直接映射，不需要 `OpenCodianView` 提供额外辅助方法
 
 ### 执行前 gate
 
@@ -97,3 +104,4 @@ export function executeCompactSession(...): Promise<boolean>;
 - `/compact` 不属于普通 slash command runtime：`executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
 - `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda
+- synthetic builtin commands（`/compact`、`/undo`、`/redo`、`/new`、`/share`、`/unshare`）的 host 方法（`revertSession`、`unrevertSession`、`shareSession`、`unshareSession`、`createNewConversation`）直接从 `deps.openCodeService` 和 `deps.createNewConversation` 映射，不经过 view 层新增方法

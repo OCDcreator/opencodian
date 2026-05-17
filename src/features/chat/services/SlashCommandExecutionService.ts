@@ -88,6 +88,11 @@ export interface SlashCommandExecutionHost {
   getActiveFocusContextPreview(): FocusContextPreview | null;
   runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<unknown>;
   runCompactSession(sessionId: string): Promise<boolean>;
+  revertSession(sessionId: string, messageID: string): Promise<boolean>;
+  unrevertSession(sessionId: string): Promise<boolean>;
+  shareSession(sessionId: string): Promise<string | null>;
+  unshareSession(sessionId: string): Promise<boolean>;
+  createNewConversation(): Promise<void>;
   startConversationSyncLoop(): void;
   syncVisibleConversationInBackground(): Promise<void>;
   notifySlashCommandFailed(commandId: string, error: unknown): void;
@@ -102,27 +107,21 @@ export interface SlashCommandExecutionHostDependencies {
   notifyForegroundBusy: () => void;
   getServerAvailability: () => Promise<SlashCommandServerAvailability>;
   chatHeaderPresenter: { refreshServerStatusBadge(): Promise<void> };
-  ensureServerReadyForChat: (
-    availability: Exclude<SlashCommandServerAvailability, 'running' | 'external'>,
-  ) => Promise<boolean>;
-  opencodeConfigManager: {
-    getCommandConfig(): Promise<OpencodeCommandConfigRecord>;
-    getConfigDir(): string;
-  } | null;
+  ensureServerReadyForChat: (availability: Exclude<SlashCommandServerAvailability, 'running' | 'external'>) => Promise<boolean>;
+  opencodeConfigManager: { getCommandConfig(): Promise<OpencodeCommandConfigRecord>; getConfigDir(): string } | null;
   getSlashCommandSkillMode: () => SlashCommandSkillMode;
-  openCodeServiceSdk: {
-    command: { list(): Promise<unknown> };
-    app: { skills(): Promise<unknown> };
-  };
+  openCodeServiceSdk: { command: { list(): Promise<unknown> }; app: { skills(): Promise<unknown> } };
   openCodeService: {
     runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<unknown>;
+    revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean>;
+    unrevertSession(sessionId: string): Promise<boolean>;
+    shareSession(sessionId: string): Promise<unknown>;
+    unshareSession(sessionId: string): Promise<unknown>;
   };
   runCompactSession: (sessionId: string) => Promise<boolean>;
   getVaultPath: () => string | null;
   composerContextViewFacade: { refreshActiveFocusContextPreview(): void };
-  getTabRuntimeState: (
-    tabId: TabId | null,
-  ) => { focusContextPreview?: FocusContextPreview | null } | null;
+  getTabRuntimeState: (tabId: TabId | null) => { focusContextPreview?: FocusContextPreview | null } | null;
   conversationSyncBridgePorts: {
     getLoopControl(): { startConversationSyncLoop(): void };
     getVisibleSyncFollowUp(): { syncVisibleConversationInBackground(): Promise<void> };
@@ -140,18 +139,12 @@ function extractAgentFromArguments(argumentsText: string): { cleanedArguments: s
   const tokens = argumentsText.split(/\s+/);
   const agentTokens: string[] = [];
   const remainingTokens: string[] = [];
-
   for (const token of tokens) {
     if (!token) continue;
-    // Match @agent with optional trailing punctuation, reject emails
     const match = /^@([a-zA-Z0-9_-]+)[.,;:!?]*$/.exec(token);
-    if (match) {
-      agentTokens.push(match[1]);
-    } else {
-      remainingTokens.push(token);
-    }
+    if (match) agentTokens.push(match[1]);
+    else remainingTokens.push(token);
   }
-
   return {
     cleanedArguments: remainingTokens.join(' '),
     agent: agentTokens.length > 0 ? agentTokens[agentTokens.length - 1] : undefined,
@@ -160,59 +153,30 @@ function extractAgentFromArguments(argumentsText: string): { cleanedArguments: s
 
 function parseSlashCommandInput(content: string): ParsedSlashCommandInput | null {
   const trimmedContent = content.trim();
-  if (!trimmedContent || trimmedContent.startsWith('//')) {
-    return null;
-  }
+  if (!trimmedContent || trimmedContent.startsWith('//')) return null;
 
   // Strategy 1: /command at start of text
   if (trimmedContent.startsWith('/')) {
     const commandBody = trimmedContent.slice(1);
-    if (!commandBody || /^\s/.test(commandBody)) {
-      return null;
-    }
-
+    if (!commandBody || /^\s/.test(commandBody)) return null;
     const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
-    if (!commandMatch) {
-      return null;
-    }
-
+    if (!commandMatch) return null;
     const command = commandMatch[1]?.trim() ?? '';
-    if (!command) {
-      return null;
-    }
-
-    const rawArguments = commandMatch[2] ?? '';
-    const { cleanedArguments, agent } = extractAgentFromArguments(rawArguments);
-    return {
-      command,
-      arguments: cleanedArguments,
-      agent,
-    };
+    if (!command) return null;
+    const { cleanedArguments, agent } = extractAgentFromArguments(commandMatch[2] ?? '');
+    return { command, arguments: cleanedArguments, agent };
   }
 
-  // Strategy 2: /command after whitespace (mid-text, e.g. "some text /command args")
-  // Use global regex and take the LAST match to prefer the rightmost /command.
+  // Strategy 2: /command after whitespace (mid-text) — take LAST match
   const midRegex = /\s\/(\S+)/g;
   let lastMidMatch: RegExpExecArray | null = null;
   let currentMatch: RegExpExecArray | null;
-  while ((currentMatch = midRegex.exec(trimmedContent)) !== null) {
-    lastMidMatch = currentMatch;
-  }
-
-  if (!lastMidMatch?.[1]) {
-    return null;
-  }
-
+  while ((currentMatch = midRegex.exec(trimmedContent)) !== null) lastMidMatch = currentMatch;
+  if (!lastMidMatch?.[1]) return null;
   // Reject //
-  const slashPosition = lastMidMatch.index + 1;
-  if (slashPosition > 0 && trimmedContent[slashPosition - 1] === '/') {
-    return null;
-  }
-
+  if (lastMidMatch.index > 0 && trimmedContent[lastMidMatch.index] === '/') return null;
   const commandName = lastMidMatch[1].trim();
-  if (!commandName) {
-    return null;
-  }
+  if (!commandName) return null;
 
   const afterCommand = trimmedContent.slice(lastMidMatch.index + lastMidMatch[0].length);
   const rawArguments = afterCommand.trim();
@@ -225,10 +189,7 @@ function parseSlashCommandInput(content: string): ParsedSlashCommandInput | null
   };
 }
 
-function hasProjectCommand(
-  projectCommands: OpencodeCommandConfigRecord,
-  commandId: string,
-): boolean {
+function hasProjectCommand(projectCommands: OpencodeCommandConfigRecord, commandId: string): boolean {
   return Object.prototype.hasOwnProperty.call(projectCommands, commandId);
 }
 
@@ -239,41 +200,26 @@ interface RuntimeCommandMatchOptions {
 }
 
 function isRunnableRuntimeCommand(
-  command: SlashCommandRuntimeCatalogEntry,
-  commandId: string,
-  options: RuntimeCommandMatchOptions,
+  command: SlashCommandRuntimeCatalogEntry, commandId: string, options: RuntimeCommandMatchOptions,
 ): boolean {
-  if (command.name !== commandId || command.source === 'mcp') {
-    return false;
-  }
-
-  if (options.hasProjectOverride) {
-    return true;
-  }
-
-  const isRuntimeSkill = command.source === 'skill' || options.runtimeSkillNames.has(commandId);
-  return !isRuntimeSkill || options.skillMode === 'direct';
+  if (command.name !== commandId || command.source === 'mcp') return false;
+  if (options.hasProjectOverride) return true;
+  const isSkill = command.source === 'skill' || options.runtimeSkillNames.has(commandId);
+  return !isSkill || options.skillMode === 'direct';
 }
 
 function isRuntimeSkillCommand(
-  command: SlashCommandRuntimeCatalogEntry,
-  commandId: string,
-  runtimeSkillNames: Set<string>,
+  command: SlashCommandRuntimeCatalogEntry, commandId: string, runtimeSkillNames: Set<string>,
 ): boolean {
-  return command.name === commandId
-    && (command.source === 'skill' || runtimeSkillNames.has(commandId));
+  return command.name === commandId && (command.source === 'skill' || runtimeSkillNames.has(commandId));
 }
 
 function collectRuntimeSkillNames(runtimeSkills: SlashCommandRuntimeSkillEntry[]): Set<string> {
-  return new Set(
-    runtimeSkills
-      .map((skill) => skill.name?.trim())
-      .filter((name): name is string => Boolean(name)),
-  );
+  return new Set(runtimeSkills.map((s) => s.name?.trim()).filter((n): n is string => Boolean(n)));
 }
 
 function findMdFileCommand(commands: CommandMdFile[], commandId: string): CommandMdFile | null {
-  return commands.find((command) => command.id === commandId) ?? null;
+  return commands.find((c) => c.id === commandId) ?? null;
 }
 
 function expandMdFileCommandTemplate(template: string, argumentsText: string): string {
@@ -313,17 +259,22 @@ function parsePrefixedSkillCommand(argumentsText: string): ParsedSlashCommandInp
   };
 }
 
-function shouldUseBuiltInCompactCommand(
+const SYNTHETIC_BUILTIN_COMMAND_IDS = new Set(['compact', 'undo', 'redo', 'new', 'share', 'unshare']);
+
+function shouldUseBuiltInSyntheticCommand(
   parsedCommand: ParsedSlashCommandInput,
   hasProjectOverride: boolean,
   runtimeCommands: SlashCommandRuntimeCatalogEntry[],
+  mdFileCommands: CommandMdFile[],
 ): boolean {
-  if (parsedCommand.command !== 'compact' || hasProjectOverride) {
+  if (!SYNTHETIC_BUILTIN_COMMAND_IDS.has(parsedCommand.command) || hasProjectOverride) {
     return false;
   }
-
-  const runtimeCompact = runtimeCommands.find((command) => command.name === 'compact');
-  return !runtimeCompact || runtimeCompact.source === 'command';
+  if (mdFileCommands.some((c) => c.id === parsedCommand.command)) {
+    return false;
+  }
+  const runtimeMatch = runtimeCommands.find((command) => command.name === parsedCommand.command);
+  return !runtimeMatch || runtimeMatch.source === 'command';
 }
 
 export class SlashCommandExecutionService {
@@ -384,8 +335,9 @@ export class SlashCommandExecutionService {
 
         const hasProjectOverride = hasProjectCommand(projectCommands, parsedCommand.command);
         const runtimeCommands = await this.host.getRuntimeCommands();
-        if (shouldUseBuiltInCompactCommand(parsedCommand, hasProjectOverride, runtimeCommands)) {
-          return this.handleCompactCommand();
+        const mdFileCommands = await this.host.getMdFileCommands();
+        if (shouldUseBuiltInSyntheticCommand(parsedCommand, hasProjectOverride, runtimeCommands, mdFileCommands)) {
+          return this.handleSyntheticBuiltinCommand(parsedCommand.command);
         }
 
         const runtimeSkillNames = skillMode === 'skills-command'
@@ -400,10 +352,7 @@ export class SlashCommandExecutionService {
         );
         if (!isRuntimeCommand) {
           if (!hasProjectOverride) {
-            const mdFileCommand = findMdFileCommand(
-              await this.host.getMdFileCommands(),
-              parsedCommand.command,
-            );
+            const mdFileCommand = findMdFileCommand(mdFileCommands, parsedCommand.command);
             if (mdFileCommand) {
               return expandMdFileCommandTemplate(mdFileCommand.template, parsedCommand.arguments);
             }
@@ -438,20 +387,72 @@ export class SlashCommandExecutionService {
     }
   }
 
-  private async handleCompactCommand(): Promise<boolean> {
+  private async handleSyntheticBuiltinCommand(commandId: string): Promise<boolean> {
     const ready = await this.ensureServerReadyForCommand();
-    if (!ready) {
-      return true;
+    if (!ready) return true;
+    switch (commandId) {
+      case 'compact': return this.handleCompactCommand();
+      case 'undo': return this.handleUndoCommand();
+      case 'redo': return this.handleRedoCommand();
+      case 'new': return this.handleNewCommand();
+      case 'share': return this.handleShareCommand();
+      case 'unshare': return this.handleUnshareCommand();
+      default: return false;
     }
+  }
 
-    const conversation = await this.prepareExecutionContext();
-    const sessionId = conversation?.openCodeSessionId;
-    if (!sessionId) {
-      new Notice(t('slashCommand.compact.noSession'));
-      return true;
-    }
-
+  private async handleCompactCommand(): Promise<boolean> {
+    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    if (!sessionId) { new Notice(t('slashCommand.compact.noSession')); return true; }
     await this.host.runCompactSession(sessionId);
+    return true;
+  }
+
+  private async handleUndoCommand(): Promise<boolean> {
+    const conversation = await this.prepareExecutionContext();
+    if (!conversation?.openCodeSessionId) { new Notice(t('slashCommand.undo.noSession')); return true; }
+    const lastUserMsg = [...conversation.messages].reverse()
+      .find((m) => m.role === 'user' && m.sourceMessageId);
+    if (!lastUserMsg?.sourceMessageId) { new Notice(t('slashCommand.undo.noUserMessage')); return true; }
+    try {
+      const ok = await this.host.revertSession(conversation.openCodeSessionId, lastUserMsg.sourceMessageId);
+      new Notice(t(ok ? 'slashCommand.undo.success' : 'slashCommand.undo.failed'));
+      if (ok) await this.host.syncVisibleConversationInBackground();
+    } catch { new Notice(t('slashCommand.undo.failed')); }
+    return true;
+  }
+
+  private async handleRedoCommand(): Promise<boolean> {
+    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    if (!sessionId) { new Notice(t('slashCommand.redo.noSession')); return true; }
+    try {
+      const ok = await this.host.unrevertSession(sessionId);
+      new Notice(t(ok ? 'slashCommand.redo.success' : 'slashCommand.redo.failed'));
+      if (ok) await this.host.syncVisibleConversationInBackground();
+    } catch { new Notice(t('slashCommand.redo.failed')); }
+    return true;
+  }
+
+  private async handleNewCommand(): Promise<boolean> {
+    await this.host.createNewConversation();
+    return true;
+  }
+
+  private async handleShareCommand(): Promise<boolean> {
+    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    if (!sessionId) { new Notice(t('slashCommand.share.noSession')); return true; }
+    new Notice(t('slashCommand.share.starting'));
+    const url = await this.host.shareSession(sessionId);
+    if (url) { await navigator.clipboard.writeText(url); new Notice(t('slashCommand.share.success')); }
+    else { new Notice(t('slashCommand.share.failed')); }
+    return true;
+  }
+
+  private async handleUnshareCommand(): Promise<boolean> {
+    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    if (!sessionId) { new Notice(t('slashCommand.unshare.noSession')); return true; }
+    const ok = await this.host.unshareSession(sessionId);
+    new Notice(t(ok ? 'slashCommand.unshare.success' : 'slashCommand.unshare.failed'));
     return true;
   }
 
@@ -467,20 +468,10 @@ export class SlashCommandExecutionService {
 
   private async prepareExecutionContext(): Promise<Conversation | null> {
     const conversation = await this.host.ensureConversationReady();
-    if (!conversation) {
-      return null;
-    }
-
+    if (!conversation) return null;
     const tabId = this.host.getActiveTabId();
-    if (!tabId || !this.host.ensureTabRuntime(tabId)) {
-      return null;
-    }
-
-    if (this.host.isTabForegroundBusy(tabId)) {
-      this.host.notifyForegroundBusy();
-      return null;
-    }
-
+    if (!tabId || !this.host.ensureTabRuntime(tabId)) return null;
+    if (this.host.isTabForegroundBusy(tabId)) { this.host.notifyForegroundBusy(); return null; }
     return conversation;
   }
 
@@ -503,11 +494,7 @@ export class SlashCommandExecutionService {
   }
 
   private resolveCurrentSelection(focusPreview: FocusContextPreview | null): string {
-    if (focusPreview?.kind !== 'selection') {
-      return '';
-    }
-
-    return focusPreview.textSnapshot ?? '';
+    return focusPreview?.kind === 'selection' ? focusPreview.textSnapshot ?? '' : '';
   }
 }
 
@@ -516,10 +503,7 @@ export function createSlashCommandExecutionHost(
 ): SlashCommandExecutionHost {
   return {
     ensureConversationReady: async () => {
-      if (!deps.getCurrentConversation()) {
-        await deps.createNewConversation();
-      }
-
+      if (!deps.getCurrentConversation()) await deps.createNewConversation();
       return deps.getCurrentConversation();
     },
     getActiveTabId: () => deps.getActiveTabId(),
@@ -548,6 +532,20 @@ export function createSlashCommandExecutionHost(
     runSessionCommand: (sessionId, input) =>
       deps.openCodeService.runSessionCommand(sessionId, input),
     runCompactSession: (sessionId) => deps.runCompactSession(sessionId),
+    revertSession: (sessionId, messageID) => deps.openCodeService.revertSession(sessionId, messageID),
+    unrevertSession: (sessionId) => deps.openCodeService.unrevertSession(sessionId),
+    shareSession: async (sessionId) => {
+      try {
+        const s = await deps.openCodeService.shareSession(sessionId);
+        const share = (s as Record<string, unknown>)?.share as Record<string, unknown> | undefined;
+        return share?.url as string ?? null;
+      } catch { return null; }
+    },
+    unshareSession: async (sessionId) => {
+      try { await deps.openCodeService.unshareSession(sessionId); return true; }
+      catch { return false; }
+    },
+    createNewConversation: () => deps.createNewConversation(),
     startConversationSyncLoop: () =>
       deps.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
     syncVisibleConversationInBackground: () =>

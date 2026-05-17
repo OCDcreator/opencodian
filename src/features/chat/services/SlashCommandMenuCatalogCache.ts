@@ -214,26 +214,34 @@ function buildHiddenCommandCacheKey(commandIds: string[]): string {
     .join('\u0000');
 }
 
-function appendSyntheticCompactCommand(
+const SYNTHETIC_BUILTIN_COMMAND_IDS = ['compact', 'undo', 'redo', 'new', 'share', 'unshare'] as const;
+
+function appendSyntheticBuiltinCommands(
   catalog: SlashCommandCatalogEntry[],
   hiddenCommandIds: Set<string>,
 ): SlashCommandCatalogEntry[] {
-  if (catalog.some((entry) => entry.id === 'compact')) {
-    return catalog;
+  const existingIds = new Set(catalog.map((entry) => entry.id));
+  const syntheticEntries: SlashCommandCatalogEntry[] = [];
+
+  for (const id of SYNTHETIC_BUILTIN_COMMAND_IDS) {
+    if (existingIds.has(id)) {
+      continue;
+    }
+    syntheticEntries.push({
+      id,
+      template: `/${id}`,
+      description: t(`slashCommand.${id}.description`),
+      agent: '',
+      model: '',
+      hasProjectOverride: false,
+      hidden: hiddenCommandIds.has(id),
+      runtimeAvailable: true,
+      source: 'command',
+      subtask: false,
+    });
   }
 
-  return catalog.concat({
-    id: 'compact',
-    template: '/compact',
-    description: t('slashCommand.compact.description'),
-    agent: '',
-    model: '',
-    hasProjectOverride: false,
-    hidden: hiddenCommandIds.has('compact'),
-    runtimeAvailable: true,
-    source: 'command',
-    subtask: false,
-  });
+  return syntheticEntries.length > 0 ? catalog.concat(syntheticEntries) : catalog;
 }
 
 function resolveProjectConfigDir(vaultPath: string | null): string | null {
@@ -342,7 +350,7 @@ export class SlashCommandMenuCatalogCache {
         .catch(() => []);
       const hiddenCommandIds = new Set(this.host.getHiddenCommandIds());
       const items = buildVisibleSlashCommandMenuItems(
-        appendSyntheticCompactCommand(mergeSlashCommandCatalog({
+        appendSyntheticBuiltinCommands(mergeSlashCommandCatalog({
           runtimeCommands,
           runtimeSkillSources,
           projectCommands,

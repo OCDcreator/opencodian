@@ -68,6 +68,15 @@ const COMPACT_MENU_ITEM = {
   subtask: false,
 };
 
+const SYNTHETIC_BUILTIN_MENU_ITEMS = [
+  COMPACT_MENU_ITEM,
+  { id: 'undo', description: 'Undo the last user message', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
+  { id: 'redo', description: 'Redo the last undone message', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
+  { id: 'new', description: 'Start a new conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
+  { id: 'share', description: 'Share the current conversation and copy link', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
+  { id: 'unshare', description: 'Stop sharing the current conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false },
+];
+
 describe('SlashCommandMenuCatalogCache', () => {
   it('caches merged slash menu items for repeated loads', async () => {
     const host = createHost();
@@ -86,7 +95,7 @@ describe('SlashCommandMenuCatalogCache', () => {
         source: 'command',
         subtask: false,
       },
-      COMPACT_MENU_ITEM,
+      ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
     expect(second).toBe(first);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(1);
@@ -123,7 +132,7 @@ describe('SlashCommandMenuCatalogCache', () => {
         source: 'command',
         subtask: false,
       },
-      COMPACT_MENU_ITEM,
+      ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
     expect(host.onWarmLoadFailed).not.toHaveBeenCalled();
   });
@@ -139,11 +148,11 @@ describe('SlashCommandMenuCatalogCache', () => {
     });
     const cache = new SlashCommandMenuCatalogCache(host);
 
-    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'review', 'compact']);
+    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'review', 'compact', 'undo', 'redo', 'new', 'share', 'unshare']);
 
     hiddenCommandIds = ['review'];
 
-    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'compact']);
+    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'compact', 'undo', 'redo', 'new', 'share', 'unshare']);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(2);
   });
 
@@ -176,7 +185,7 @@ describe('SlashCommandMenuCatalogCache', () => {
         source: 'command',
         subtask: false,
       },
-      COMPACT_MENU_ITEM,
+      ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(2);
   });
@@ -194,7 +203,7 @@ describe('SlashCommandMenuCatalogCache', () => {
     await expect(cache.load()).resolves.toEqual([
       expect.objectContaining({ id: 'review', source: 'command' }),
       expect.objectContaining({ id: 'frontend-design', source: 'skill' }),
-      COMPACT_MENU_ITEM,
+      ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
   });
 
@@ -222,7 +231,7 @@ describe('SlashCommandMenuCatalogCache', () => {
         source: 'skill',
         skillSource: { kind: 'project' },
       }),
-      COMPACT_MENU_ITEM,
+      ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
   });
 });
@@ -388,7 +397,7 @@ describe('SlashCommandMenuCatalogCache — project-only filtering', () => {
 
     await expect(cache.load()).resolves.toEqual([
       expect.objectContaining({ id: 'review', source: 'command' }),
-      COMPACT_MENU_ITEM,
+      ...SYNTHETIC_BUILTIN_MENU_ITEMS,
     ]);
   });
 });

@@ -20,7 +20,7 @@ project-only command 仍会参与 merge 以提供 override/source 信息，但�
 - runtime `source === 'skill'` 会进入缓存；后续由 `slashCommandMenuFilter.ts` 按 `slashCommandSkillMode` 决定直显或 `/skills` 前缀。
 - `.opencode/commands/**/*.md` 会通过 host seam 读入并作为 `source: "md-command"` 合并；同名 runtime/project command 优先，markdown command 不覆盖已有 command truth。
 - 如果某个 runtime skill 出现在 `sdk.app.skills()` 里、但当前 `sdk.command.list()` 没返回同名条目，cache 会补一条 synthetic `source: "skill"` menu item。这样 `/skills` 前缀模式仍然能继续展开 skill 二级候选，composer 高亮也能把 `/skills skill-name` 识别成已知 skill，而不是出现只有 `/skills` 根项、没有后续候选的断链状态。
-- cache 会额外注入 synthetic `/compact` command menu item（除非同名 runtime/project entry 已存在或被 hidden commands 隐藏），让手动会话压缩能出现在 `/` autocomplete；实际执行不走普通 `session.command()`，而由 `SlashCommandExecutionService` 的专用路径处理。
+- cache 会额外注入 synthetic builtin command menu items（`/compact`、`/undo`、`/redo`、`/new`、`/share`、`/unshare`），除非同名 runtime/project entry 已存在或被 hidden commands 隐藏；实际执行由 `SlashCommandExecutionService` 的专用路径处理，不走普通 `session.command()`
 - `sdk.app.skills()` 失败时不会让整个 slash menu 失败；cache 会回退到“只有 command/source 没有 provenance”的 catalog，保证 `/` 菜单仍可用。
 - `sdk.app.agents()` sidecar 失败时只会让 `@agent` / 主 Agent selector 候选为空，不会破坏 slash menu 加载。
 - runtime skill 的 `location` 会在 cache 内转换成 `skillSource`，供 UI 按当前语言显示“项目 / OpenCode 项目 / 插件：xxx / 全局 / 自定义路径”等来源说明。

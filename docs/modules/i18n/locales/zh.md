@@ -55,6 +55,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 源码约 2050 行。
 
+本轮新增 `slashCommand.undo.*`、`slashCommand.redo.*`、`slashCommand.new.*`、`slashCommand.share.*`、`slashCommand.unshare.*` 系列 i18n 键，为 5 个新增 synthetic builtin slash commands 提供 description、notice 和状态文案。
+
 ## 导入关系
 
 ```text
