@@ -21,7 +21,7 @@
 | `text` | `TextChunk` | `content` |
 | `tool_use` | `ToolUseChunk` | `id`, `name`, `input`, `toolMetadata?`, `resultVisibility?` |
 | `tool_result` | `ToolResultChunk` | `id`, `content`, `isError?` |
-| `error` | `ErrorChunk` | `content` |
+| `error` | `ErrorChunk` | `content`, `errorClass?` (SdkErrorClass) |
 | `done` | `DoneChunk` | （无字段） |
 
 ### 工具调用类型

@@ -56,6 +56,7 @@
 - `thinking` 会先 flush 文本，再保证 thinking block 的边界正确
 - `tool_use` / `tool_result` 会在文本和 thinking 之间强制断开
 - `done` 会统一补齐所有尚未持久化的 block
+- `error` 根据 `errorClass` 通过 `ERROR_CLASS_ICONS` 映射渲染差异化图标（not_found→🔍, forbidden→🔒, provider_auth→🔑, bad_request→⚠️, rate_limit→⏳, server_error→💥, 其余→❌），并将分类写入 `dataset.errorClass` 供 CSS 使用
 
 ### 结构化输出工具过滤
 

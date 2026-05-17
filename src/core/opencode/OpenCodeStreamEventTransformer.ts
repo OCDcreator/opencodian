@@ -15,6 +15,7 @@ import type {
   Part,
 } from './OpenCodeSessionLifecycleCoordinator';
 import { OpenCodeStreamingRuntimeContext } from './OpenCodeStreamingRuntimeCoordinator';
+import { classifySdkError } from './sdkErrorClassification';
 
 export interface OpenCodeStreamEventTransformerHost {
   observeRuntimeToolNames(toolNames: Iterable<string>): boolean;
@@ -348,6 +349,14 @@ export class OpenCodeStreamEventTransformer {
         streamContext,
         chunks,
         mutations,
+      });
+    }
+
+    if (eventData.type?.startsWith('session.next.')) {
+      this.host.logStreamingDebug('service-session-next-event', {
+        sessionId,
+        eventType: eventData.type,
+        properties: eventData.properties ? Object.keys(eventData.properties) : [],
       });
     }
 
@@ -892,13 +901,16 @@ export class OpenCodeStreamEventTransformer {
     chunks,
     mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
-    const errorName = extractStructuredErrorName(eventData.properties?.error);
-    const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
+    const errorPayload = eventData.properties?.error;
+    const errorName = extractStructuredErrorName(errorPayload);
+    const errorMessage = extractStructuredErrorMessage(errorPayload) ?? 'Unknown error';
+    const errorClass = classifySdkError(errorPayload);
     state.lastErrorMessage = errorMessage;
     this.host.logStreamingDebug('service-session-error', {
       sessionId,
       errorName,
       errorMessage,
+      errorClass,
     });
     if (errorName === 'MessageAbortedError') {
       return { chunks, mutations, stop: true };
@@ -907,6 +919,7 @@ export class OpenCodeStreamEventTransformer {
     chunks.push({
       type: 'error',
       content: errorMessage,
+      errorClass,
     });
     return { chunks, mutations, stop: true };
   }

@@ -36,6 +36,7 @@ export interface ToolResultChunk {
 export interface ErrorChunk {
   type: 'error';
   content: string;
+  errorClass?: import('../../core/opencode/sdkErrorClassification').SdkErrorClass;
 }
 
 export interface DoneChunk {

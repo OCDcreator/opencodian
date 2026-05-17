@@ -12,6 +12,23 @@ const OPENCODE_DEFAULT_TITLE_PATTERN = /^(New session - |Child session - )\d{4}-
 export interface Session {
   id: string;
   title: string;
+  cost?: number;
+  tokens?: {
+    input: number;
+    output: number;
+    reasoning: number;
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
+  agent?: string;
+  model?: {
+    id: string;
+    providerID: string;
+    variant?: string;
+  };
+  path?: string;
   revert?: {
     messageID: string;
     partID?: string;

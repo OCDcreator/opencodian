@@ -165,6 +165,7 @@ describe('OpenCodeStreamEventTransformer event routing', () => {
       sessionId: 'test-session',
       errorName: 'MessageAbortedError',
       errorMessage: 'Aborted',
+      errorClass: expect.any(String),
     });
   });
 });

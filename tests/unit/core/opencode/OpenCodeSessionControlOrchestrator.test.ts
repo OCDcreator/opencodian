@@ -111,60 +111,18 @@ it('builds context usage from session info, messages, and model catalog', async 
         time: { created: 1000, updated: 9000 },
       }),
       getSessionMessages: jest.fn().mockResolvedValue([
-        {
-          info: {
-            id: 'assistant-1',
-            sessionID: 'session-1',
-            role: 'assistant',
-            providerID: 'openai',
-            modelID: 'gpt-4.1',
-            cost: 0.1,
-            tokens: {
-              input: 10,
-              output: 5,
-              reasoning: 0,
-              cache: { read: 0, write: 0 },
-            },
-            time: { created: 2000 },
-          },
-          parts: [],
-        },
-        {
-          info: {
-            id: 'assistant-2',
-            sessionID: 'session-1',
-            role: 'assistant',
-            providerID: 'openai',
-            modelID: 'gpt-5',
-            cost: 0.2,
-            tokens: {
-              input: 0,
-              output: 0,
-              reasoning: 0,
-              cache: { read: 0, write: 0 },
-            },
-            time: { created: 3000 },
-          },
-          parts: [],
-        },
-        {
-          info: {
-            id: 'assistant-3',
-            sessionID: 'session-1',
-            role: 'assistant',
-            providerID: 'openai',
-            modelID: 'gpt-5',
-            cost: 0.3,
-            tokens: {
-              input: 40,
-              output: 20,
-              reasoning: 10,
-              cache: { read: 5, write: 5 },
-            },
-            time: { created: 4000 },
-          },
-          parts: [],
-        },
+        { info: { id: 'assistant-1', sessionID: 'session-1', role: 'assistant',
+            providerID: 'openai', modelID: 'gpt-4.1', cost: 0.1,
+            tokens: { input: 10, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+            time: { created: 2000 } }, parts: [] },
+        { info: { id: 'assistant-2', sessionID: 'session-1', role: 'assistant',
+            providerID: 'openai', modelID: 'gpt-5', cost: 0.2,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            time: { created: 3000 } }, parts: [] },
+        { info: { id: 'assistant-3', sessionID: 'session-1', role: 'assistant',
+            providerID: 'openai', modelID: 'gpt-5', cost: 0.3,
+            tokens: { input: 40, output: 20, reasoning: 10, cache: { read: 5, write: 5 } },
+            time: { created: 4000 } }, parts: [] },
       ]),
       getAvailableModels: jest.fn().mockResolvedValue({
         providers: [
@@ -202,29 +160,96 @@ it('builds context usage from session info, messages, and model catalog', async 
     expect(snapshot?.totalCost).toBeCloseTo(0.6, 6);
   });
 
-it('carries upstream compaction metadata through local session contracts', async () => {
-    const summaryMessage: SessionMessage = {
-      info: {
-        id: 'assistant-summary',
-        sessionID: 'session-1',
-        role: 'assistant',
-        summary: true,
-        time: { created: 5000 },
-      },
-      parts: [
-        {
-          id: 'part-compaction',
-          sessionID: 'session-1',
-          messageID: 'user-compaction',
-          type: 'compaction',
-          auto: true,
-          overflow: true,
-          tail_start_id: 'message-tail',
-          metadata: {
-            compaction_continue: true,
+  it('uses session-level tokens and model when available, skipping message scan', async () => {
+    const sessionSdk = createSessionSdk();
+    const host = createHost(sessionSdk, createPartSdk(), {
+      getSessionInfo: jest.fn().mockResolvedValue({
+        id: 'session-fast',
+        title: 'Fast path',
+        cost: 0.42,
+        tokens: { input: 100, output: 50, reasoning: 5, cache: { read: 10, write: 2 } },
+        model: { id: 'gpt-5', providerID: 'openai' },
+        time: { created: 1000, updated: 5000 },
+      }),
+      getSessionMessages: jest.fn().mockResolvedValue([]),
+      getAvailableModels: jest.fn().mockResolvedValue({
+        providers: [
+          {
+            id: 'openai',
+            name: 'OpenAI',
+            models: [{ id: 'gpt-5', name: 'GPT-5', contextWindow: 400000 }],
           },
+        ],
+        defaults: {},
+      }),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    const snapshot = await orchestrator.getSessionContextUsageSnapshot('session-fast');
+
+    expect(snapshot).toMatchObject({
+      sessionId: 'session-fast',
+      sessionTitle: 'Fast path',
+      providerId: 'openai',
+      providerName: 'OpenAI',
+      modelId: 'gpt-5',
+      modelName: 'GPT-5',
+      contextWindow: 400000,
+      inputTokens: 100,
+      outputTokens: 50,
+      reasoningTokens: 5,
+      cacheReadTokens: 10,
+      cacheWriteTokens: 2,
+      totalCost: 0.42,
+    });
+    expect(host.getSessionMessages).not.toHaveBeenCalled();
+  });
+
+  it('falls back to message scan when session has no tokens or model', async () => {
+    const sessionSdk = createSessionSdk();
+    const host = createHost(sessionSdk, createPartSdk(), {
+      getSessionInfo: jest.fn().mockResolvedValue({
+        id: 'session-slow',
+        title: 'Fallback',
+        time: { created: 1000, updated: 9000 },
+      }),
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'a1', sessionID: 'session-slow', role: 'assistant',
+            providerID: 'openai', modelID: 'gpt-5', cost: 0.1,
+            tokens: { input: 10, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+            time: { created: 2000 },
+          },
+          parts: [],
         },
-      ],
+      ]),
+      getAvailableModels: jest.fn().mockResolvedValue({
+        providers: [{ id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-5', name: 'GPT-5', contextWindow: 400000 }] }],
+        defaults: {},
+      }),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    const snapshot = await orchestrator.getSessionContextUsageSnapshot('session-slow');
+
+    expect(snapshot).toMatchObject({
+      sessionId: 'session-slow',
+      modelId: 'gpt-5',
+      totalCost: 0.1,
+    });
+    expect(host.getSessionMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries upstream compaction metadata through local session contracts', async () => {
+    const summaryMessage: SessionMessage = {
+      info: { id: 'assistant-summary', sessionID: 'session-1', role: 'assistant',
+        summary: true, time: { created: 5000 } },
+      parts: [{
+        id: 'part-compaction', sessionID: 'session-1', messageID: 'user-compaction',
+        type: 'compaction', auto: true, overflow: true, tail_start_id: 'message-tail',
+        metadata: { compaction_continue: true },
+      }],
     };
     const sessionSdk = createSessionSdk();
     const host = createHost(sessionSdk, createPartSdk(), {

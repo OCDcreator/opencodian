@@ -118,6 +118,7 @@ describe('OpenCodeService SDK stream completion metadata', () => {
     expect(chunks).toContainEqual({
       type: 'error',
       content: 'Incorrect API key provided. (HTTP 401)',
+      errorClass: expect.any(String),
     });
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
   });

@@ -1,7 +1,10 @@
 import { createLogger } from '../../shared';
 import { createSdkClient, type CreateSdkClientOptions } from './createSdkClient';
 import { attachOpenCodeAppAgents } from './OpenCodeAppCatalogSidecar';
+import { extractSdkErrorCause } from './sdkErrorClassification';
 import type { SdkOpencodeClient } from './sdkTypes';
+
+export type { SdkErrorClass } from './sdkErrorClassification';
 
 const logger = createLogger('OpenCodeService');
 export const SDK_FACADE_NAMESPACE_NAMES = [
@@ -28,6 +31,7 @@ export const SDK_FACADE_NAMESPACE_NAMES = [
   'session',
   'tool',
   'tui',
+  'v2',
   'vcs',
   'worktree',
 ] as const;
@@ -139,8 +143,17 @@ export function extractSdkErrorMessage(
   options: OpenCodeSdkErrorMessageOptions = {},
 ): string | null {
   if (error instanceof Error) {
-    return getSdkErrorText(error.message, options.trimMessage)
-      ?? (options.includeName ? getSdkErrorText(error.name, options.trimMessage) : null)
+    const cause = extractSdkErrorCause(error);
+    const causeBodyMessage = cause?.body?.data?.message
+      ? getSdkErrorText(cause.body.data.message, options.trimMessage)
+      : null;
+    const causeBodyName = cause?.body?.name
+      ? getSdkErrorText(cause.body.name, options.trimMessage)
+      : null;
+
+    return causeBodyMessage
+      ?? getSdkErrorText(error.message, options.trimMessage)
+      ?? (options.includeName ? causeBodyName ?? getSdkErrorText(error.name, options.trimMessage) : null)
       ?? options.fallbackMessage
       ?? null;
   }
@@ -172,10 +185,6 @@ export function describeSdkError(
   error: unknown,
   fallbackMessage = 'OpenCode SDK request failed',
 ): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
   if (typeof error === 'string') {
     return error;
   }
@@ -306,6 +315,7 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
   readonly session: OpenCodeSdkFacadeNamespace<'session'>;
   readonly tool: OpenCodeSdkFacadeNamespace<'tool'>;
   readonly tui: OpenCodeSdkFacadeNamespace<'tui'>;
+  readonly v2: OpenCodeSdkFacadeNamespace<'v2'>;
   readonly vcs: OpenCodeSdkFacadeNamespace<'vcs'>;
   readonly worktree: OpenCodeSdkFacadeNamespace<'worktree'>;
 
@@ -338,6 +348,7 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
     this.session = this.createNamespaceFacade('session');
     this.tool = this.createNamespaceFacade('tool');
     this.tui = this.createNamespaceFacade('tui');
+    this.v2 = this.createNamespaceFacade('v2');
     this.vcs = this.createNamespaceFacade('vcs');
     this.worktree = this.createNamespaceFacade('worktree');
   }

@@ -13,7 +13,7 @@
 - 在 `app.skills()` 结果上附带同一 app namespace 的 `app.agents()` promise sidecar，供 chat composer catalog 在不加厚 view host 的情况下复用 runtime agent truth
 - 对外导出共享的 structured-error message helper 与 `OpenCodeServiceDiagnostics`，供 `OpenCodeService` 的 prompt/health/probe/logging follow-up 复用同一套错误整形口径
 
-当前 façade 覆盖的 namespace 与 OpenCode OpenAPI 对齐，包括 `app`、`auth`、`command`、`config`、`event`、`experimental`、`file`、`find`、`formatter`、`global`、`instance`、`lsp`、`mcp`、`part`、`path`、`permission`、`project`、`provider`、`pty`、`question`、`session`、`tool`、`tui`、`vcs`、`worktree`。
+当前 façade 覆盖的 namespace 与 OpenCode OpenAPI 对齐，包括 `app`、`auth`、`command`、`config`、`event`、`experimental`、`file`、`find`、`formatter`、`global`、`instance`、`lsp`、`mcp`、`part`、`path`、`permission`、`project`、`provider`、`pty`、`question`、`session`、`tool`、`tui`、`v2`、`vcs`、`worktree`。
 
 ## 核心逻辑
 

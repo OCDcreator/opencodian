@@ -56,7 +56,7 @@
 - `streamResponse()` 先根据 `useSdkStream` 选择 SDK 或 legacy transport，把 `OpenCodeService` 的入口分流收束到同一个 runtime seam。
 - `streamSdkResponse()` 先用传入的 `subscribe(signal)` 建立 SDK event stream，再执行 `startPrompt()`，避免 prompt 启动后立刻产生的 reasoning delta 在订阅前丢失。
 - 如果 SDK iterator 在第一条事件前抛错，coordinator 会通过 host 的 legacy SSE 请求参数立即切到 `/event`，保持既有 SDK-first / legacy fallback 策略。
-- 一旦已经收到首个 SDK event，后续异常不会再切回 legacy，而是直接产出 `error` chunk。
+- 一旦已经收到首个 SDK event，后续异常不会再切回 legacy，而是直接产出 `error` chunk（含 `errorClass` 分类字段）。
 - `streamLegacyResponse()` 则直接执行 legacy prompt 启动后进入 `/event` 读取。
 - 每个 event outcome 都会先调用 host `applyStreamMutations()`，再 yield 对应 `StreamChunk`，避免 canonical graph 落后于本地 loose chunk；message/part merge 和 delta fallback 由 `OpenCodeSessionStateStore` 处理。
 

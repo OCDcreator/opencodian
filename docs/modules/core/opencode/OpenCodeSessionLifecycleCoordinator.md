@@ -24,7 +24,7 @@
 
 ## 核心类型 / 接口
 
-- `Session` / `Message` / `Part` / `SessionMessage`: session lifecycle 公开接口复用的基础形状；其中 `Session.time.compacting`、`Message.summary`、`Part.auto/overflow/tail_start_id/metadata` 已保留 upstream compaction 元字段，供后续 live state / transcript 适配继续消费。
+- `Session` / `Message` / `Part` / `SessionMessage`: session lifecycle 公开接口复用的基础形状；`Session` 新增可选字段 `cost?`、`tokens?`（含 input/output/reasoning/cache 细分）、`agent?`、`model?`（含 id/providerID/variant）和 `path?`，用于透传 server 端会话级 usage/元数据。
 - `OpenCodeSessionLifecycleSdk`: coordinator 依赖的最小 session SDK 面，只覆盖 abort/create/get/list/messages/todo/status/delete/update；当前 host 可直接注入 `OpenCodeSdkFacade.session`，不再需要 `OpenCodeService` 先包一层 CRUD adapter。
 - `OpenCodeSessionLifecycleSyncRuntime`: 对 `OpenCodeSyncEventRuntimeCoordinator` 的最小订阅面抽象。
 - `OpenCodeSessionLifecycleCoordinatorHost`: host seam，提供 SDK CRUD/abort 开关、legacy HTTP helper、normalizer、revert 过滤、canonical snapshot 写入、tool 观测与日志。

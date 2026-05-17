@@ -62,7 +62,7 @@
 - 对 `message.part.delta` 复用 part type/message id，把 reasoning / thinking delta 转成 `thinking` chunk，把普通文本 delta 转成 `text`，同时产出 part delta mutation；reasoning delta 会更新 dedupe 游标，避免后续 `part.updated` 重复渲染，空白 delta 只保留 canonical mutation 不触发 UI thinking 块
 - 对 `permission.asked`、`file.edited`、`question.asked` 做结构化 chunk 映射；其中 permission chunk 会复用同一套请求归一化，保留 `sessionID`、`always` 与可选 `tool` 引用，避免流式路径和 polling 路径的权限语义漂移
 - `question.asked` 仍是 AskQuestion 主路径；同时，`question` tool-part 如果明确处于 `state.status === 'waiting'` 且 `state.metadata` / `state.metadata.request` / `state.metadata.question` / part 本身能通过 host 的 `normalizeQuestionRequest()`，会补发 `question_request` chunk，作为事件丢失或 alternate stream shape 的保守回退
-- 对 `session.error` / `session.idle` 返回 stop 信号，同时保留错误与 debug 信息
+- 对 `session.error` / `session.idle` 返回 stop 信号。`session.error` 现在通过 `classifySdkError()` 对错误分类，将 `errorClass` 记入 debug 日志并附加到 error chunk；未注册处理器的 `session.next.*` 事件会通过 `logStreamingDebug` 记录事件类型与 properties key 列表，用于诊断新 SDK 事件类型
 
 ### `parseSSEEvents()`
 

@@ -50,7 +50,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `StreamChunk` | 联合类型，14 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用） |
+| `StreamChunk` | 联合类型，15 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `error` 可带 `errorClass?` 字段标识错误类型，`tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用） |
 
 ### OMO 兼容
 

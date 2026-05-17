@@ -50,6 +50,7 @@ orchestrator 现在承接以下共享控制流：
 - 选取“最后一个带有效 token 的 assistant message”作为展示模型/上下文窗口/usage 的来源
 - 聚合 assistant cost，总结 input/output/reasoning/cache token 数
 - 透传 session-level `time.compacting` 到 `compactingAt`，为后续 compaction live-state UI 保留事实来源
+- 当 `session.tokens` 和 `session.model` 均非空时，优先从 session info 直接读取 cost/tokens/model，跳过消息扫描路径；否则回退到原有的并行请求 + 消息扫描
 
 这样 `OpenCodeService` 不再直接持有 context-usage 计算细节，也避免相关逻辑继续散落在 session lifecycle 与 message API 之间。
 

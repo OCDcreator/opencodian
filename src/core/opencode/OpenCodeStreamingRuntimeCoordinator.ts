@@ -10,6 +10,7 @@ import type {
   OpenCodeStreamMutation,
 } from './OpenCodeStreamEventTransformer';
 import { OpenCodeStreamingFinalizationCoordinator } from './OpenCodeStreamingFinalizationCoordinator';
+import { classifySdkError } from './sdkErrorClassification';
 import type { SdkEvent } from './sdkTypes';
 
 const logger = createLogger('OpenCodeStreamingRuntimeCoordinator');
@@ -422,6 +423,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
     return {
       type: 'error',
       content: error instanceof Error ? error.message : 'Unknown error',
+      errorClass: classifySdkError(error),
     };
   }
 

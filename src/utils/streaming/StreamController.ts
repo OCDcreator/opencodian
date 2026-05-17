@@ -4,6 +4,7 @@ import { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 import { ToolCallRenderer } from './ToolCallRenderer';
 import type {
   ContentBlock,
+  ErrorChunk,
   StreamChunk,
   StreamControllerOptions,
   StreamEventCallbacks,
@@ -18,6 +19,15 @@ import { createStreamState } from './types';
 
 const logger = createLogger('StreamController');
 const STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96;
+
+const ERROR_CLASS_ICONS: Record<string, string> = {
+  not_found: '🔍',
+  forbidden: '🔒',
+  bad_request: '⚠️',
+  provider_auth: '🔑',
+  rate_limit: '⏳',
+  server_error: '💥',
+};
 
 export class StreamController {
   private containerEl: HTMLElement;
@@ -125,7 +135,7 @@ export class StreamController {
         break;
 
       case 'error':
-        await this.handleErrorChunk(chunk.content);
+        await this.handleErrorChunk(chunk);
         break;
 
       case 'done':
@@ -340,20 +350,27 @@ export class StreamController {
       : undefined;
   }
 
-  private async handleErrorChunk(content: string): Promise<void> {
+  private async handleErrorChunk(chunk: ErrorChunk): Promise<void> {
     await this.flushPendingTextRender();
     this.finalizeThinkingBlock();
     await this.finalizeCurrentTextRender();
     this.finalizeTextBlock();
-    this.callbacks.onError?.(content);
+    this.callbacks.onError?.(chunk.content);
 
     const errorEl = this.state.currentContentEl!.createDiv({
       cls: 'streaming-error-block',
     });
-    errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
+
+    if (chunk.errorClass) {
+      errorEl.dataset.errorClass = chunk.errorClass;
+    }
+
+    const icon = ERROR_CLASS_ICONS[chunk.errorClass ?? ''] ?? '❌';
+
+    errorEl.createSpan({ cls: 'streaming-error-icon', text: icon });
     errorEl.createSpan({
       cls: 'streaming-error-text',
-      text: content.trim() || 'Unknown error',
+      text: chunk.content.trim() || 'Unknown error',
     });
   }
 

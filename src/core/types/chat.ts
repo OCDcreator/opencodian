@@ -314,7 +314,7 @@ export type StreamChunk =
   | { type: 'file_edited'; file: string }
   | { type: 'message_metadata'; messageId: string; timestamp: number; modelId?: string }
   | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
-  | { type: 'error'; content: string }
+  | { type: 'error'; content: string; errorClass?: import('../opencode/sdkErrorClassification').SdkErrorClass }
   | { type: 'message_start' }
   | { type: 'message_stop' }
   | { type: 'content_block_start'; index: number }
