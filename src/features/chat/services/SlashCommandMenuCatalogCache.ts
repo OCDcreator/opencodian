@@ -214,7 +214,7 @@ function buildHiddenCommandCacheKey(commandIds: string[]): string {
     .join('\u0000');
 }
 
-const SYNTHETIC_BUILTIN_COMMAND_IDS = ['compact', 'undo', 'redo', 'new', 'share', 'unshare'] as const;
+export const SYNTHETIC_BUILTIN_COMMAND_IDS = ['compact', 'undo', 'redo', 'new', 'share', 'unshare'] as const;
 
 export function appendSyntheticBuiltinCommands(
   catalog: SlashCommandCatalogEntry[],

@@ -11,6 +11,7 @@ import {
 } from '../../core/types';
 import {
   appendSyntheticBuiltinCommands,
+  SYNTHETIC_BUILTIN_COMMAND_IDS,
 } from '../../features/chat/services/SlashCommandMenuCatalogCache';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -36,6 +37,7 @@ interface CommandCatalogRenderContext {
   currentRunId: number;
   editorBodyEl: HTMLElement;
   mergedCommands: SlashCommandCatalogEntry[];
+  editorCommands: SlashCommandCatalogEntry[];
   projectCommands: OpencodeCommandConfigRecord;
 }
 
@@ -218,22 +220,23 @@ export class SettingsCommandsSection {
 
       const runtimeCommands = Array.isArray(runtimeCommandsResult) ? runtimeCommandsResult : [];
       const hiddenCommandIds = new Set(this.plugin.settings.hiddenSlashCommands);
-      const mergedCommands = appendSyntheticBuiltinCommands(
-        mergeSlashCommandCatalog({
-          runtimeCommands,
-          runtimeSkillSources: new Map(),
-          projectCommands,
-          projectAgents,
-          hiddenCommandIds,
-        }),
+      const baseMergedCommands = mergeSlashCommandCatalog({
+        runtimeCommands,
+        runtimeSkillSources: new Map(),
+        projectCommands,
+        projectAgents,
         hiddenCommandIds,
-      );
+      });
+      const mergedCommands = appendSyntheticBuiltinCommands(baseMergedCommands, hiddenCommandIds);
+      const syntheticIds = new Set<string>(SYNTHETIC_BUILTIN_COMMAND_IDS);
+      const editorCommands = baseMergedCommands.filter((c) => !syntheticIds.has(c.id));
       this.renderCatalog({
         catalogBodyEl,
         configManager,
         currentRunId,
         editorBodyEl,
         mergedCommands,
+        editorCommands,
         projectCommands,
       });
     } catch (error) {
@@ -254,11 +257,12 @@ export class SettingsCommandsSection {
       currentRunId,
       editorBodyEl,
       mergedCommands,
+      editorCommands,
       projectCommands,
     } = context;
 
     this.projectCommandEditor?.render({
-      commands: mergedCommands,
+      commands: editorCommands,
       containerEl: editorBodyEl,
       onConfigChanged: async () => {
         await this.refreshCatalog({
