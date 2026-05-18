@@ -26,6 +26,7 @@ export interface ModelCatalogBundle {
   currentEnabledProviderIds: string[];
   serverConfig: OpencodeModelConfigSubset;
   effectiveProviderConfig: ProviderAvailabilityConfig;
+  providerDirectory: ProviderDirectorySnapshot;
 }
 ```
 
@@ -36,6 +37,7 @@ export interface ModelCatalogBundle {
 - `currentEnabledProviderIds`: 当前作用域下真正视为“provider 已启用”的 provider ID 列表；设置页用它避免把服务端当前不可用的 provider 误显示成绿色启用。
 - `serverConfig`: 插件使用的“继承层 provider 配置”。本地模式优先来自本机磁盘配置，远程模式回退到服务端默认作用域 `config.get()`；它用于标注服务端禁用状态和 provider 开关继承值。
 - `effectiveProviderConfig`: 以 `serverConfig` 为继承基线，再叠加当前项目 `.opencode/opencode.json` 的 provider 可用性覆盖；本地数组按字段替换继承数组。
+- `providerDirectory`: 当前 vault 作用域下 `provider.list()` 返回的辅助 provider directory 快照，包含 directory catalog、connected provider ID 和 defaults。它只用于设置页诊断 / 连接状态展示，不参与 `server`、`baseEffective` 或 `effective` 的模型目录扩展。
 - `serverConfig`、`effectiveProviderConfig` 与 `currentEnabledProviderIds` 现在来自同一个 inherited-config resolution seam，避免服务层重复手写 scope merge / enablement 条件。
 
 ## 关键行为
@@ -55,9 +57,10 @@ export interface ModelCatalogBundle {
 ### 构建 catalog
 
 - `getLocalCatalog()`：调用 `buildCatalogFromConfig(..., 'local')`
-- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`，再交给 `assembleServerModelCatalog()` 组装 runtime catalog、继承配置解析与 server 目录。其中：
+- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getProviderDirectory({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`，再交给 `assembleServerModelCatalog()` 组装 runtime catalog、provider directory 快照、继承配置解析与 server 目录。其中：
   - 目录作用域下的 runtime provider/model 列表直接来自 `config.providers()`
-  - 不再把 `provider.list()` 当成 `opencode models` / 设置页服务器目录的等价数据源
+  - `provider.list()` 只保存在 `providerDirectory` 里，用于 provider 连接 / 目录诊断；只出现在 `provider.list()` 里的 provider 不会扩大 `服务器目录` 或最终可选模型
+  - `provider.list()` 读取失败只记录 warning 并返回空 `providerDirectory` 快照，不会阻断 `config.providers()` 驱动的服务器目录
   - 不再把 `config.get().provider` 整包当成“服务器目录”
   - 本地模式不会把“无 `directory` 的 `/config`”直接当成全局配置，而是优先读取本机 `XDG_CONFIG_HOME/opencode`、`~/.opencode` 与 managed 目录中的继承配置
   - 远程模式才把“无 `directory` 的 `/config`”当成默认作用域兜底

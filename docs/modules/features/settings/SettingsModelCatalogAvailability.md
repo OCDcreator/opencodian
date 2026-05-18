@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsModelCatalogAvailability` 是 settings/model catalog 的 availability presentation owner。它集中计算 provider/model 可用性展示所需的纯描述结果：状态 class、状态文案、server-disabled 约束 badge、probe badge/detail、disabled scope 优先级、空目录 placeholder reason，以及 provider model 预览文本。
+`SettingsModelCatalogAvailability` 是 settings/model catalog 的 availability presentation owner。它集中计算 provider/model 可用性展示所需的纯描述结果：状态 class、状态文案、server-disabled 约束 badge、probe badge/detail、provider directory summary/badge、disabled scope 优先级、空目录 placeholder reason，以及 provider model 预览文本。
 
 这个模块只消费 `ModelCatalogStateService` / `ModelConfigService` 已经产出的 `ModelCatalogProvider` 与 `ProviderAvailabilityProbe` 数据，不读取或写回 `.opencode` 配置，也不改变 local/server/effective/disabled 目录合并语义。
 
@@ -15,6 +15,7 @@
 - `getProviderAvailabilityStatusClass()` / `getProviderAvailabilityStatusLabel()`：把 provider enabled、disabled model count、server catalog mode 与 disabled scopes 映射成稳定 badge class 与文案。
 - `getProviderServerConstraintBadge()`：在 effective/disabled 视图中单独表达 inherited server-disabled 约束，避免把 server default disabled 与 project disabled 混为一谈。
 - `getProviderAvailabilityProbeBadge()` / `describeProviderAvailabilityProbe()`：把 provider probe 运行态、错误态与 ready 结果转换成 badge/detail 展示描述。
+- `describeProviderDirectorySummary()` / `getProviderDirectoryBadge()`：把 `provider.list()` 的 listed / connected 辅助状态转换成设置页 summary 与 provider 行诊断 badge；它们只描述诊断信号，不改变 provider/model 可选性，也不把 listed outside catalog 的 provider 变成可操作项。
 - `describeModelAvailabilitySummary()`、`describeProviderModels()`、`getCatalogPlaceholderReason()`：为 provider header 与空模型列表提供 summary / preview / placeholder reason。
 
 ## 与其他模块的交互

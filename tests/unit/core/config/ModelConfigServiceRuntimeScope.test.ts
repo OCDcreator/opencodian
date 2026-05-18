@@ -3,6 +3,21 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { ModelConfigService } from '../../../../src/core/config/ModelConfigService';
+import { clearRecentLogs, getRecentLogEntries } from '../../../../src/shared';
+
+const CONFIG_PATH = '/vault/.opencode/opencode.json';
+
+function createConfigManager(readResult = {}) {
+  return {
+    read: jest.fn().mockResolvedValue(readResult),
+    write: jest.fn(),
+    getConfigPath: jest.fn().mockReturnValue(CONFIG_PATH),
+  };
+}
+
+function provider(id: string, name: string, modelId: string, modelName = name) {
+  return { id, name, models: [{ id: modelId, name: modelName }] };
+}
 
 function createOpenCodeServiceMock(overrides: Partial<{
   getAvailableModels: jest.Mock;
@@ -22,11 +37,7 @@ function createOpenCodeServiceMock(overrides: Partial<{
       connected: [],
     }),
     getResolvedModelConfig: jest.fn().mockResolvedValue({}),
-    getSettingsSnapshot: jest.fn().mockReturnValue({
-      server: {
-        mode: 'remote',
-      },
-    }),
+    getSettingsSnapshot: jest.fn().mockReturnValue({ server: { mode: 'remote' } }),
     probeProviderResponse: jest.fn().mockResolvedValue({
       providerId: 'deepseek',
       modelId: 'deepseek-chat',
@@ -38,35 +49,112 @@ function createOpenCodeServiceMock(overrides: Partial<{
 }
 
 describe('ModelConfigService runtime scope catalogs', () => {
-  it('ignores provider.list entries that are outside config.providers runtime results', async () => {
-    const configManager = {
-      read: jest.fn().mockResolvedValue({
-        provider: {
-          deepseek: { name: 'DeepSeek', models: { 'deepseek-chat': { name: 'DeepSeek Chat' } } },
-          openai: { name: 'OpenAI', models: { 'gpt-4.1': { name: 'GPT-4.1' } } },
-          anthropic: { name: 'Anthropic', models: { 'claude-sonnet': { name: 'Claude Sonnet' } } },
-          groq: { name: 'Groq', models: { llama: { name: 'Llama' } } },
-          gemini: { name: 'Gemini', models: { 'gemini-pro': { name: 'Gemini Pro' } } },
-          xai: { name: 'xAI', models: { grok: { name: 'Grok' } } },
-          ollama: { name: 'Ollama', models: { 'qwen2.5': { name: 'Qwen 2.5' } } },
-        },
-      }),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+  beforeEach(() => {
+    clearRecentLogs();
+  });
+
+  it('captures provider.list-only entries in providerDirectory without widening the server catalog', async () => {
+    const configManager = createConfigManager();
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: { deepseek: 'deepseek-chat' },
+        providers: [provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat')],
+      }),
+      getProviderDirectory: jest.fn().mockResolvedValue({
+        defaults: {
+          deepseek: 'deepseek-chat',
+          openrouter: 'gpt-5',
+        },
         providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
+          provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat'),
+          provider('openrouter', 'OpenRouter', 'gpt-5', 'GPT-5'),
         ],
+        connected: ['deepseek', 'openrouter'],
+      }),
+      getResolvedModelConfig: jest.fn().mockResolvedValue({}),
+    });
+
+    const service = new ModelConfigService(configManager as never, openCodeService as never);
+    const catalogs = await service.getCatalogs('server');
+
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledTimes(1);
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledWith({ includeDirectory: true });
+    expect(catalogs.providerDirectory.catalog.providers.map((provider) => provider.id)).toEqual(['deepseek', 'openrouter']);
+    expect(catalogs.providerDirectory.connectedProviderIds).toEqual(['deepseek', 'openrouter']);
+    expect(catalogs.providerDirectory.defaults).toEqual({
+      deepseek: 'deepseek-chat',
+      openrouter: 'gpt-5',
+    });
+    expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+  });
+
+  it('keeps the server catalog when provider directory loading fails', async () => {
+    const configManager = createConfigManager();
+    const openCodeService = createOpenCodeServiceMock({
+      getAvailableModels: jest.fn().mockResolvedValue({
+        defaults: { deepseek: 'deepseek-chat' },
+        providers: [provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat')],
+      }),
+      getProviderDirectory: jest.fn().mockRejectedValue(new Error('provider.list unavailable')),
+      getResolvedModelConfig: jest.fn().mockResolvedValue({}),
+    });
+
+    const service = new ModelConfigService(configManager as never, openCodeService as never);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    try {
+      const catalogs = await service.getCatalogs('server');
+
+      expect(openCodeService.getProviderDirectory).toHaveBeenCalledTimes(1);
+      expect(openCodeService.getProviderDirectory).toHaveBeenCalledWith({ includeDirectory: true });
+      expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+      expect(catalogs.baseEffective.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+      expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+      expect(catalogs.providerDirectory).toEqual({
+        catalog: {
+          providers: [],
+          defaults: {},
+        },
+        connectedProviderIds: [],
+        defaults: {},
+      });
+      expect(getRecentLogEntries()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            level: 'warn',
+            scope: 'ModelConfigService',
+            message: expect.stringContaining('Failed to load OpenCode provider directory'),
+          }),
+        ]),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('ignores provider.list entries that are outside config.providers runtime results', async () => {
+    const configManager = createConfigManager({
+      provider: {
+        deepseek: { name: 'DeepSeek', models: { 'deepseek-chat': { name: 'DeepSeek Chat' } } },
+        openai: { name: 'OpenAI', models: { 'gpt-4.1': { name: 'GPT-4.1' } } },
+        anthropic: { name: 'Anthropic', models: { 'claude-sonnet': { name: 'Claude Sonnet' } } },
+        groq: { name: 'Groq', models: { llama: { name: 'Llama' } } },
+        gemini: { name: 'Gemini', models: { 'gemini-pro': { name: 'Gemini Pro' } } },
+        xai: { name: 'xAI', models: { grok: { name: 'Grok' } } },
+        ollama: { name: 'Ollama', models: { 'qwen2.5': { name: 'Qwen 2.5' } } },
+      },
+    });
+    const openCodeService = createOpenCodeServiceMock({
+      getAvailableModels: jest.fn().mockResolvedValue({
+        defaults: { deepseek: 'deepseek-chat' },
+        providers: [provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat')],
       }),
       getProviderDirectory: jest.fn().mockResolvedValue({
         defaults: { deepseek: 'deepseek-chat' },
         providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
-          { id: 'openrouter', name: 'OpenRouter', models: [{ id: 'gpt-5', name: 'GPT-5' }] },
-          { id: 'anthropic', name: 'Anthropic', models: [{ id: 'claude-sonnet', name: 'Claude Sonnet' }] },
+          provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat'),
+          provider('openrouter', 'OpenRouter', 'gpt-5', 'GPT-5'),
+          provider('anthropic', 'Anthropic', 'claude-sonnet', 'Claude Sonnet'),
         ],
         connected: ['deepseek'],
       }),
@@ -78,7 +166,8 @@ describe('ModelConfigService runtime scope catalogs', () => {
     const service = new ModelConfigService(configManager as never, openCodeService as never);
     const catalogs = await service.getCatalogs('merge');
 
-    expect(openCodeService.getProviderDirectory).not.toHaveBeenCalled();
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledTimes(1);
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledWith({ includeDirectory: true });
     expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual([
       'anthropic',
@@ -92,24 +181,20 @@ describe('ModelConfigService runtime scope catalogs', () => {
   });
 
   it('prefers the current scoped runtime when it still exposes a provider', async () => {
-    const configManager = {
-      read: jest.fn().mockResolvedValue({}),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+    const configManager = createConfigManager();
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: { deepseek: 'deepseek-chat' },
         providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
-          { id: 'codexzh', name: 'CodexZH', models: [{ id: 'gpt-5.4', name: 'GPT-5.4' }] },
+          provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat'),
+          provider('codexzh', 'CodexZH', 'gpt-5.4', 'GPT-5.4'),
         ],
       }),
       getProviderDirectory: jest.fn().mockResolvedValue({
         defaults: { deepseek: 'deepseek-chat', codexzh: 'gpt-5.4' },
         providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
-          { id: 'codexzh', name: 'CodexZH', models: [{ id: 'gpt-5.4', name: 'GPT-5.4' }] },
+          provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat'),
+          provider('codexzh', 'CodexZH', 'gpt-5.4', 'GPT-5.4'),
         ],
         connected: ['deepseek', 'codexzh'],
       }),
@@ -126,13 +211,11 @@ describe('ModelConfigService runtime scope catalogs', () => {
     const catalogs = await service.getCatalogs('merge');
 
     expect(openCodeService.getAvailableModels).toHaveBeenCalledWith({ includeDirectory: true });
-    expect(openCodeService.getProviderDirectory).not.toHaveBeenCalled();
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledTimes(1);
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledWith({ includeDirectory: true });
     expect(openCodeService.getResolvedModelConfig).toHaveBeenNthCalledWith(1, { includeDirectory: true });
     expect(openCodeService.getResolvedModelConfig).toHaveBeenNthCalledWith(2, { includeDirectory: false });
-    expect(catalogs.server.providers.map((provider) => provider.id)).toEqual([
-      'codexzh',
-      'deepseek',
-    ]);
+    expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['codexzh', 'deepseek']);
     expect(catalogs.currentEnabledProviderIds).toEqual(['codexzh', 'deepseek']);
     expect(catalogs.baseEffective.providers.map((provider) => provider.id)).toEqual(['codexzh', 'deepseek']);
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual(['codexzh', 'deepseek']);
@@ -153,28 +236,16 @@ describe('ModelConfigService default scope and directory config', () => {
       'utf-8',
     );
 
-    const configManager = {
-      read: jest.fn().mockResolvedValue({}),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+    const configManager = createConfigManager();
     const openCodeService = createOpenCodeServiceMock({
-      getSettingsSnapshot: jest.fn().mockReturnValue({
-        server: {
-          mode: 'local',
-        },
-      }),
+      getSettingsSnapshot: jest.fn().mockReturnValue({ server: { mode: 'local' } }),
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: { deepseek: 'deepseek-chat' },
-        providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
-        ],
+        providers: [provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat')],
       }),
       getProviderDirectory: jest.fn().mockResolvedValue({
         defaults: { deepseek: 'deepseek-chat' },
-        providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
-        ],
+        providers: [provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat')],
         connected: ['deepseek'],
       }),
       getResolvedModelConfig: jest.fn()
@@ -198,9 +269,7 @@ describe('ModelConfigService default scope and directory config', () => {
       );
       const catalogs = await service.getCatalogs('merge');
 
-      expect(catalogs.server.providers.map((provider) => provider.id)).toEqual([
-        'deepseek',
-      ]);
+      expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
       expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('ccodezh');
       expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('codexzh');
       expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('kimi-for-coding');
@@ -214,26 +283,20 @@ describe('ModelConfigService default scope and directory config', () => {
   });
 
   it('uses directory-scoped resolved config for effective provider availability', async () => {
-    const configManager = {
-      read: jest.fn().mockResolvedValue({
-        disabled_providers: ['zhipuai'],
-      }),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+    const configManager = createConfigManager({ disabled_providers: ['zhipuai'] });
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: { opencode: 'big-pickle' },
         providers: [
-          { id: 'opencode', name: 'OpenCode Zen', models: [{ id: 'big-pickle', name: 'Big Pickle' }] },
-          { id: 'kimi-for-coding', name: 'Kimi For Coding', models: [{ id: 'kimi-k2-thinking', name: 'Kimi K2 Thinking' }] },
+          provider('opencode', 'OpenCode Zen', 'big-pickle', 'Big Pickle'),
+          provider('kimi-for-coding', 'Kimi For Coding', 'kimi-k2-thinking', 'Kimi K2 Thinking'),
         ],
       }),
       getProviderDirectory: jest.fn().mockResolvedValue({
         defaults: { opencode: 'big-pickle', 'kimi-for-coding': 'kimi-k2-thinking' },
         providers: [
-          { id: 'opencode', name: 'OpenCode Zen', models: [{ id: 'big-pickle', name: 'Big Pickle' }] },
-          { id: 'kimi-for-coding', name: 'Kimi For Coding', models: [{ id: 'kimi-k2-thinking', name: 'Kimi K2 Thinking' }] },
+          provider('opencode', 'OpenCode Zen', 'big-pickle', 'Big Pickle'),
+          provider('kimi-for-coding', 'Kimi For Coding', 'kimi-k2-thinking', 'Kimi K2 Thinking'),
         ],
         connected: ['opencode', 'kimi-for-coding'],
       }),
@@ -258,17 +321,11 @@ describe('ModelConfigService default scope and directory config', () => {
   });
 
   it('does not widen the server catalog with provider.list when config.providers is incomplete', async () => {
-    const configManager = {
-      read: jest.fn().mockResolvedValue({}),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+    const configManager = createConfigManager();
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: { deepseek: 'deepseek-chat' },
-        providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
-        ],
+        providers: [provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat')],
       }),
       getProviderDirectory: jest.fn().mockResolvedValue({
         defaults: {
@@ -277,14 +334,10 @@ describe('ModelConfigService default scope and directory config', () => {
           'kimi-for-coding': 'kimi-k2-thinking',
         },
         providers: [
-          { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
-          { id: 'opencode', name: 'OpenCode Zen', models: [{ id: 'big-pickle', name: 'Big Pickle' }] },
-          {
-            id: 'kimi-for-coding',
-            name: 'Kimi For Coding',
-            models: [{ id: 'kimi-k2-thinking', name: 'Kimi K2 Thinking' }],
-          },
-          { id: 'openrouter', name: 'OpenRouter', models: [{ id: 'gpt-5', name: 'GPT-5' }] },
+          provider('deepseek', 'DeepSeek', 'deepseek-chat', 'DeepSeek Chat'),
+          provider('opencode', 'OpenCode Zen', 'big-pickle', 'Big Pickle'),
+          provider('kimi-for-coding', 'Kimi For Coding', 'kimi-k2-thinking', 'Kimi K2 Thinking'),
+          provider('openrouter', 'OpenRouter', 'gpt-5', 'GPT-5'),
         ],
         connected: ['deepseek', 'opencode', 'kimi-for-coding'],
       }),
@@ -304,10 +357,9 @@ describe('ModelConfigService default scope and directory config', () => {
     const service = new ModelConfigService(configManager as never, openCodeService as never);
     const catalogs = await service.getCatalogs('merge');
 
-    expect(openCodeService.getProviderDirectory).not.toHaveBeenCalled();
-    expect(catalogs.server.providers.map((provider) => provider.id)).toEqual([
-      'deepseek',
-    ]);
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledTimes(1);
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledWith({ includeDirectory: true });
+    expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
     expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('ccodezh');
     expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('openrouter');
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual(['deepseek']);
@@ -316,13 +368,7 @@ describe('ModelConfigService default scope and directory config', () => {
 
 describe('ModelConfigService provider availability probes', () => {
   it('reports project-disabled providers ahead of server-disabled in availability probes', async () => {
-    const configManager = {
-      read: jest.fn().mockResolvedValue({
-        disabled_providers: ['alibaba'],
-      }),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+    const configManager = createConfigManager({ disabled_providers: ['alibaba'] });
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: {},
@@ -354,22 +400,14 @@ describe('ModelConfigService provider availability probes', () => {
   });
 
   it('allows a project override to probe a provider when the current scoped runtime still exposes it', async () => {
-    const configManager = {
-      read: jest.fn().mockResolvedValue({
-        enabled_providers: ['alibaba'],
-        disabled_providers: [],
-      }),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+    const configManager = createConfigManager({
+      enabled_providers: ['alibaba'],
+      disabled_providers: [],
+    });
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: { alibaba: 'qwen-max' },
-        providers: [{
-          id: 'alibaba',
-          name: 'Alibaba',
-          models: [{ id: 'qwen-max', name: 'Qwen Max' }],
-        }],
+        providers: [provider('alibaba', 'Alibaba', 'qwen-max', 'Qwen Max')],
       }),
       getResolvedModelConfig: jest.fn()
         .mockResolvedValueOnce({
@@ -412,14 +450,10 @@ describe('ModelConfigService provider availability probes', () => {
   });
 
   it('reports missing when no provider entry remains for a real send probe', async () => {
-    const configManager = {
-      read: jest.fn().mockResolvedValue({
-        enabled_providers: ['alibaba'],
-        disabled_providers: [],
-      }),
-      write: jest.fn(),
-      getConfigPath: jest.fn().mockReturnValue('/vault/.opencode/opencode.json'),
-    };
+    const configManager = createConfigManager({
+      enabled_providers: ['alibaba'],
+      disabled_providers: [],
+    });
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
         defaults: {},

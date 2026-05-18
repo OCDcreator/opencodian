@@ -34,6 +34,14 @@ function createModelCatalogProvider(provider: ModelSelectorProvider): ModelCatal
   };
 }
 
+function createEmptyProviderDirectory(): ModelCatalogBundle['providerDirectory'] {
+  return {
+    catalog: { providers: [], defaults: {} },
+    connectedProviderIds: [],
+    defaults: {},
+  };
+}
+
 function createCatalogBundle(
   effectiveProviders: ModelSelectorProvider[],
   baseProviders: ModelSelectorProvider[] = effectiveProviders,
@@ -60,6 +68,7 @@ function createCatalogBundle(
     currentEnabledProviderIds: effectiveProviders.map((provider) => provider.id),
     serverConfig: {},
     effectiveProviderConfig: {},
+    providerDirectory: createEmptyProviderDirectory(),
   };
 }
 

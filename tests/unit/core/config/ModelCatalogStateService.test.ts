@@ -1,4 +1,13 @@
+import type { ModelCatalogBundle } from '../../../../src/core/config';
 import { ModelCatalogStateService } from '../../../../src/core/config/ModelCatalogStateService';
+
+function createEmptyProviderDirectory(): ModelCatalogBundle['providerDirectory'] {
+  return {
+    catalog: { providers: [], defaults: {} },
+    connectedProviderIds: [],
+    defaults: {},
+  };
+}
 
 function createModelConfigServiceMock(overrides: Partial<{
   readLocalModelConfig: jest.Mock;
@@ -16,6 +25,7 @@ function createModelConfigServiceMock(overrides: Partial<{
       currentEnabledProviderIds: [],
       serverConfig: {},
       effectiveProviderConfig: {},
+      providerDirectory: createEmptyProviderDirectory(),
     }),
     writeLocalModelConfig: jest.fn().mockResolvedValue(undefined),
     testProviderAvailability: jest.fn().mockResolvedValue({
@@ -81,6 +91,7 @@ describe('ModelCatalogStateService', () => {
         currentEnabledProviderIds: [],
         serverConfig: {},
         effectiveProviderConfig: { disabled_providers: ['deepseek'] },
+        providerDirectory: createEmptyProviderDirectory(),
       }),
     });
 
@@ -146,6 +157,7 @@ describe('ModelCatalogStateService', () => {
         currentEnabledProviderIds: ['openai'],
         serverConfig: { disabled_providers: ['alibaba'] },
         effectiveProviderConfig: { disabled_providers: ['deepseek'] },
+        providerDirectory: createEmptyProviderDirectory(),
       }),
     });
 
@@ -156,6 +168,90 @@ describe('ModelCatalogStateService', () => {
     expect(
       state.providerStatusCatalogs.server.providers.find((provider) => provider.id === 'alibaba')?.disabledScopes,
     ).toEqual(['global']);
+  });
+});
+
+describe('ModelCatalogStateService provider directory and updates', () => {
+  it('exposes provider directory status without widening server or effective display catalogs', async () => {
+    const deepseekProvider = {
+      id: 'deepseek',
+      name: 'DeepSeek',
+      models: [{
+        id: 'deepseek-chat',
+        name: 'DeepSeek Chat',
+        source: 'server' as const,
+        existsInLocal: false,
+        existsInServer: true,
+      }],
+      source: 'server' as const,
+      existsInLocal: false,
+      existsInServer: true,
+    };
+    const modelConfigService = createModelConfigServiceMock({
+      getCatalogs: jest.fn().mockResolvedValue({
+        local: { providers: [], defaults: {} },
+        server: { providers: [deepseekProvider], defaults: {} },
+        baseEffective: { providers: [deepseekProvider], defaults: {} },
+        effective: { providers: [deepseekProvider], defaults: {} },
+        currentEnabledProviderIds: ['deepseek'],
+        serverConfig: {},
+        effectiveProviderConfig: {},
+        providerDirectory: {
+          catalog: {
+            providers: [
+              deepseekProvider,
+              {
+                id: 'openrouter',
+                name: 'OpenRouter',
+                models: [{
+                  id: 'gpt-5',
+                  name: 'GPT-5',
+                  source: 'server' as const,
+                  existsInLocal: false,
+                  existsInServer: true,
+                }],
+                source: 'server' as const,
+                existsInLocal: false,
+                existsInServer: true,
+              },
+            ],
+            defaults: {},
+          },
+          connectedProviderIds: ['deepseek', 'ghost-connected'],
+          defaults: {},
+        },
+      }),
+    });
+
+    const service = new ModelCatalogStateService(modelConfigService as never);
+    const state = await service.getCatalogState('merge');
+
+    expect(state.providerDirectoryStatuses.deepseek).toMatchObject({
+      providerId: 'deepseek',
+      listed: true,
+      connected: true,
+      directoryModelCount: 1,
+      inServerCatalog: true,
+      inEffectiveCatalog: true,
+    });
+    expect(state.providerDirectoryStatuses.openrouter).toMatchObject({
+      providerId: 'openrouter',
+      listed: true,
+      connected: false,
+      directoryModelCount: 1,
+      inServerCatalog: false,
+      inEffectiveCatalog: false,
+    });
+    expect(state.providerDirectoryStatuses['ghost-connected']).toMatchObject({
+      providerId: 'ghost-connected',
+      listed: false,
+      connected: true,
+      directoryModelCount: 0,
+      inServerCatalog: false,
+      inEffectiveCatalog: false,
+    });
+    expect(state.displayCatalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+    expect(state.displayCatalogs.effective.providers.map((provider) => provider.id)).toEqual(['deepseek']);
   });
 
   it('writes provider availability changes through the local config owner', async () => {
@@ -190,6 +286,7 @@ describe('ModelCatalogStateService', () => {
           currentEnabledProviderIds: [],
           serverConfig: { disabled_providers: ['alibaba'] },
           effectiveProviderConfig: { disabled_providers: ['alibaba'] },
+          providerDirectory: createEmptyProviderDirectory(),
         },
         displayCatalogs: {
           local: { providers: [], defaults: {} },
@@ -203,6 +300,7 @@ describe('ModelCatalogStateService', () => {
           effective: { providers: [], defaults: {} },
           disabled: { providers: [], defaults: {} },
         },
+        providerDirectoryStatuses: {},
       },
       providerIds: [' alibaba '],
       enabled: true,

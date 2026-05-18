@@ -2,11 +2,13 @@ import type { ModelCatalogProvider } from '../../../../src/core/config/modelConf
 import {
   describeModelAvailabilitySummary,
   describeProviderAvailabilityProbe,
+  describeProviderDirectorySummary,
   describeProviderModels,
   getCatalogPlaceholderReason,
   getProviderAvailabilityProbeBadge,
   getProviderAvailabilityStatusClass,
   getProviderAvailabilityStatusLabel,
+  getProviderDirectoryBadge,
   getProviderPrimaryDisabledReason,
   getProviderServerConstraintBadge,
   type ProviderAvailabilityCheckState,
@@ -120,5 +122,49 @@ describe('SettingsModelCatalogAvailability', () => {
       'This provider is disabled by the current project config, so it stays visible here even though no runtime model list is available.',
     );
     expect(describeProviderModels(longProvider)).toBe('Model 1 · Model 2 · Model 3 · Model 4 · Model 5 · Model 6 · +2');
+  });
+
+  it('describes provider-directory summary and row badges as auxiliary metadata', () => {
+    expect(describeProviderDirectorySummary({
+      openai: {
+        providerId: 'openai',
+        listed: true,
+        connected: true,
+        directoryModelCount: 2,
+        inServerCatalog: true,
+        inEffectiveCatalog: true,
+      },
+      openrouter: {
+        providerId: 'openrouter',
+        listed: true,
+        connected: false,
+        directoryModelCount: 1,
+        inServerCatalog: false,
+        inEffectiveCatalog: false,
+      },
+    })).toBe('1 connected · 2 listed · 1 listed outside catalog');
+
+    expect(getProviderDirectoryBadge({
+      providerId: 'openai',
+      listed: true,
+      connected: true,
+      directoryModelCount: 2,
+      inServerCatalog: true,
+      inEffectiveCatalog: true,
+    })).toEqual({
+      text: 'Directory: connected',
+      className: 'is-diagnostic',
+    });
+    expect(getProviderDirectoryBadge({
+      providerId: 'openrouter',
+      listed: true,
+      connected: false,
+      directoryModelCount: 1,
+      inServerCatalog: false,
+      inEffectiveCatalog: false,
+    })).toEqual({
+      text: 'Directory: listed',
+      className: 'is-partial',
+    });
   });
 });

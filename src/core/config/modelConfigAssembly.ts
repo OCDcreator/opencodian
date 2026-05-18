@@ -27,7 +27,18 @@ export interface ModelServerCatalogAssemblyResult {
   runtime: ModelCatalog;
   configResolution: InheritedModelConfigResolution;
   server: ModelCatalog;
+  providerDirectory: ProviderDirectorySnapshot;
 }
+
+export interface ProviderDirectorySnapshot {
+  catalog: ModelCatalog;
+  connectedProviderIds: string[];
+  defaults: Record<string, string>;
+}
+
+export type ProviderDirectoryRuntimeResult = ModelCatalogRuntimeResult & {
+  connected: string[];
+};
 
 export type ProviderAvailabilityProbePlanStatus =
   | 'available'
@@ -50,6 +61,7 @@ export interface ProviderAvailabilityProbePlan {
 
 export function assembleServerModelCatalog(options: {
   runtimeResult: ModelCatalogRuntimeResult;
+  providerDirectoryResult?: ProviderDirectoryRuntimeResult;
   localServerMode: boolean;
   localConfig: OpencodeModelConfigSubset;
   scopedConfig: OpencodeModelConfigSubset;
@@ -64,6 +76,12 @@ export function assembleServerModelCatalog(options: {
     diskInheritedConfig: options.diskInheritedConfig,
   });
   const runtime = catalogFromRuntimeResult(options.runtimeResult);
+  const providerDirectoryResult = options.providerDirectoryResult ?? {
+    providers: [],
+    defaults: {},
+    connected: [],
+  };
+  const providerDirectoryCatalog = catalogFromRuntimeResult(providerDirectoryResult);
 
   return {
     runtime,
@@ -72,6 +90,11 @@ export function assembleServerModelCatalog(options: {
       runtime,
       configResolution.mergedScopedConfig,
     ),
+    providerDirectory: {
+      catalog: providerDirectoryCatalog,
+      connectedProviderIds: [...providerDirectoryResult.connected],
+      defaults: { ...providerDirectoryCatalog.defaults },
+    },
   };
 }
 

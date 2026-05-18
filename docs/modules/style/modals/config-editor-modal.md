@@ -16,6 +16,7 @@
 - 会话设置：`.opencodian-session-settings-*`（中性 hero、分组 card、两栏字段、内容自适应三态 segmented button、数字输入、错误提示、sticky footer，以及全局默认值摘要行）。
 - 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`、`.opencodian-context-detail-modal*`。
 - 模型开关管理：`.opencodian-model-toggle-*`。
+- 模型 provider directory 诊断：`.opencodian-model-provider-directory-summary`（显示 `provider.list()` connected / listed / listed outside catalog 辅助计数，不承担可选模型目录布局）与 `.opencodian-model-status-badge.is-diagnostic`（provider 行的中性目录诊断 badge）。
 - 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）。
 - 设置区块：`.opencodian-settings-block*`。
 - 代理 / 命令设置目录：`.opencodian-agent-editor-*`、`.opencodian-settings-catalog-scroll`、`.opencodian-agent-catalog-scroll`、`.opencodian-command-catalog-scroll`（项目代理编辑器分组卡片、默认折叠的高级区，以及代理 / 命令目录最大高度 + 内部滚动）。

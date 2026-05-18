@@ -1,6 +1,7 @@
 import {
   type ModelCatalogStateMode,
   type ProviderAvailabilityProbe,
+  type ProviderDirectoryStatus,
 } from '../../core/config';
 import type { ModelCatalogProvider } from '../../core/config/modelConfig';
 import { t } from '../../i18n';
@@ -217,6 +218,53 @@ export function getProviderAvailabilityProbeBadge(
     default:
       return null;
   }
+}
+
+export function describeProviderDirectorySummary(
+  statuses: Record<string, ProviderDirectoryStatus>,
+): string | null {
+  const statusValues = Object.values(statuses);
+  if (statusValues.length === 0) {
+    return null;
+  }
+
+  const connectedCount = statusValues.filter((status) => status.connected).length;
+  const listedCount = statusValues.filter((status) => status.listed).length;
+  const directoryOnlyCount = statusValues.filter((status) => (
+    status.listed && !status.inServerCatalog && !status.inEffectiveCatalog
+  )).length;
+
+  return t('settings.model.providerDirectory.summary', {
+    connected: String(connectedCount),
+    listed: String(listedCount),
+    directoryOnly: String(directoryOnlyCount),
+  });
+}
+
+export function getProviderDirectoryBadge(
+  status: ProviderDirectoryStatus | undefined,
+): { text: string; className: 'is-diagnostic' | 'is-partial' } | null {
+  if (!status) {
+    return null;
+  }
+
+  const className = status.inEffectiveCatalog ? 'is-diagnostic' : 'is-partial';
+
+  if (status.connected) {
+    return {
+      text: t('settings.model.providerDirectory.badge.connected'),
+      className,
+    };
+  }
+
+  if (status.listed) {
+    return {
+      text: t('settings.model.providerDirectory.badge.listed'),
+      className,
+    };
+  }
+
+  return null;
 }
 
 export function describeProviderAvailabilityProbe(

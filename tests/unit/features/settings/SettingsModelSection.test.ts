@@ -1,8 +1,17 @@
 import { Setting } from 'obsidian';
 
+import type { ModelCatalogBundle } from '../../../../src/core/config';
 import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
 import { t } from '../../../../src/i18n';
 import { ProviderIconService } from '../../../../src/utils/icons';
+
+function createEmptyProviderDirectory(): ModelCatalogBundle['providerDirectory'] {
+  return {
+    catalog: { providers: [], defaults: {} },
+    connectedProviderIds: [],
+    defaults: {},
+  };
+}
 
 describe('SettingsModelSection', () => {
   const flushAsyncWork = async () => {
@@ -123,6 +132,7 @@ describe('SettingsModelSection', () => {
       currentEnabledProviderIds: [],
       serverConfig: {},
       effectiveProviderConfig: {},
+      providerDirectory: createEmptyProviderDirectory(),
     });
     jest.spyOn(ProviderIconService, 'getProviderCacheState').mockResolvedValue({
       providers: [],

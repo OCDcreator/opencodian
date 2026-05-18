@@ -17,11 +17,13 @@ import { enhanceSearchInput } from './searchInputEnhancer';
 import {
   describeModelAvailabilitySummary,
   describeProviderAvailabilityProbe,
+  describeProviderDirectorySummary,
   describeProviderModels,
   getCatalogPlaceholderReason,
   getProviderAvailabilityProbeBadge,
   getProviderAvailabilityStatusClass,
   getProviderAvailabilityStatusLabel,
+  getProviderDirectoryBadge,
   getProviderPrimaryDisabledReason,
   getProviderServerConstraintBadge,
   isProviderDisabledByScope,
@@ -86,8 +88,16 @@ interface ProviderRenderState {
   providerProjectDisabled: boolean;
   providerCheckState: ProviderAvailabilityCheckState;
   availabilityDisplayState: ProviderAvailabilityDisplayState;
+  providerDirectoryStatus: ModelCatalogState['providerDirectoryStatuses'][string] | undefined;
   isExpanded: boolean;
   modelsToRender: ModelCatalogProviderModel[];
+}
+
+interface ProviderBadgesRenderOptions {
+  provider: ModelCatalogProvider;
+  availabilityDisplayState: ProviderAvailabilityDisplayState;
+  providerCheckState: ProviderAvailabilityCheckState;
+  providerDirectoryStatus: ModelCatalogState['providerDirectoryStatuses'][string] | undefined;
 }
 
 export class SettingsModelCatalogPresenter {
@@ -297,6 +307,7 @@ export class SettingsModelCatalogPresenter {
     const catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
     const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
     this.renderModelCatalogSummaryCards(summaryEl, catalogState);
+    this.renderProviderDirectorySummary(catalogSectionEl, catalogState);
     return catalogSectionEl;
   }
 
@@ -509,6 +520,7 @@ export class SettingsModelCatalogPresenter {
       providerProjectDisabled: primaryDisabledReason === 'project',
       providerCheckState: this.providerAvailabilityChecks.get(provider.id) ?? { status: 'idle' },
       availabilityDisplayState,
+      providerDirectoryStatus: catalogContext.catalogState.providerDirectoryStatuses[provider.id],
       isExpanded: isAutoExpanded || this.expandedProviderIds.has(provider.id),
       modelsToRender,
     };
@@ -577,7 +589,7 @@ export class SettingsModelCatalogPresenter {
     providerHeaderEl: HTMLElement,
     state: ProviderRenderState,
   ): void {
-    const { provider, availabilityDisplayState, providerCheckState } = state;
+    const { provider, availabilityDisplayState, providerCheckState, providerDirectoryStatus } = state;
     const expandButtonEl = providerHeaderEl.createEl('button', {
       cls: 'opencodian-model-toggle-provider-expand',
     });
@@ -601,7 +613,12 @@ export class SettingsModelCatalogPresenter {
       cls: 'opencodian-model-toggle-provider-meta',
       text: describeModelAvailabilitySummary(availabilityDisplayState),
     });
-    this.renderProviderBadges(providerInfoEl, provider, availabilityDisplayState, providerCheckState);
+    this.renderProviderBadges(providerInfoEl, {
+      provider,
+      availabilityDisplayState,
+      providerCheckState,
+      providerDirectoryStatus,
+    });
   }
 
   private toggleProviderExpanded(providerId: string): void {
@@ -615,10 +632,14 @@ export class SettingsModelCatalogPresenter {
 
   private renderProviderBadges(
     providerInfoEl: HTMLElement,
-    provider: ModelCatalogProvider,
-    availabilityDisplayState: ProviderAvailabilityDisplayState,
-    providerCheckState: ProviderAvailabilityCheckState,
+    options: ProviderBadgesRenderOptions,
   ): void {
+    const {
+      provider,
+      availabilityDisplayState,
+      providerCheckState,
+      providerDirectoryStatus,
+    } = options;
     const badgesEl = providerInfoEl.createDiv({ cls: 'opencodian-model-toggle-provider-badges' });
     badgesEl.createSpan({
       cls: `opencodian-model-source-badge is-${provider.source}`,
@@ -634,6 +655,13 @@ export class SettingsModelCatalogPresenter {
       badgesEl.createSpan({
         cls: `opencodian-model-status-badge ${serverDisabledBadge.className}`,
         text: serverDisabledBadge.text,
+      });
+    }
+    const providerDirectoryBadge = getProviderDirectoryBadge(providerDirectoryStatus);
+    if (providerDirectoryBadge) {
+      badgesEl.createSpan({
+        cls: `opencodian-model-status-badge ${providerDirectoryBadge.className}`,
+        text: providerDirectoryBadge.text,
       });
     }
     const probeBadge = getProviderAvailabilityProbeBadge(providerCheckState);
@@ -968,6 +996,21 @@ export class SettingsModelCatalogPresenter {
         this.rerender();
       });
     }
+  }
+
+  private renderProviderDirectorySummary(
+    containerEl: HTMLElement,
+    catalogState: ModelCatalogState,
+  ): void {
+    const summary = describeProviderDirectorySummary(catalogState.providerDirectoryStatuses);
+    if (!summary) {
+      return;
+    }
+
+    containerEl.createDiv({
+      cls: 'opencodian-model-provider-directory-summary',
+      text: summary,
+    });
   }
 
   private async runProviderAvailabilityCheck(providerId: string): Promise<void> {

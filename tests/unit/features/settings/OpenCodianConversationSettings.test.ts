@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
+import type { ModelCatalogBundle } from '../../../../src/core/config';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
 import { setLocale, t } from '../../../../src/i18n';
@@ -22,6 +23,14 @@ interface DropdownRecord {
   name: string;
   control: MockDropdownControl;
   onChange?: (value: string) => void | Promise<void>;
+}
+
+function createEmptyProviderDirectory(): ModelCatalogBundle['providerDirectory'] {
+  return {
+    catalog: { providers: [], defaults: {} },
+    connectedProviderIds: [],
+    defaults: {},
+  };
 }
 
 interface ToggleRecord {
@@ -354,6 +363,7 @@ describe('OpenCodian conversation settings', () => {
         currentEnabledProviderIds: [],
         serverConfig: {},
         effectiveProviderConfig: {},
+        providerDirectory: createEmptyProviderDirectory(),
       }),
     };
     const plugin = {

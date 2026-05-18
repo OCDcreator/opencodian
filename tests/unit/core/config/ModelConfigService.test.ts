@@ -94,7 +94,8 @@ describe('ModelConfigService catalog projection', () => {
     const catalogs = await service.getCatalogs('merge', ['openai/gpt-4.1']);
 
     expect(openCodeService.getAvailableModels).toHaveBeenCalledWith({ includeDirectory: true });
-    expect(openCodeService.getProviderDirectory).not.toHaveBeenCalled();
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledTimes(1);
+    expect(openCodeService.getProviderDirectory).toHaveBeenCalledWith({ includeDirectory: true });
     expect(openCodeService.getResolvedModelConfig).toHaveBeenCalledWith({ includeDirectory: true });
     expect(openCodeService.getResolvedModelConfig).toHaveBeenCalledWith({ includeDirectory: false });
     expect(catalogs.baseEffective.providers.map((provider) => provider.id)).toEqual(['anthropic', 'openai']);

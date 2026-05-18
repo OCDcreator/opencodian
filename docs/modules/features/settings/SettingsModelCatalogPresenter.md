@@ -12,6 +12,7 @@
 - 持有当前激活的 catalog tab、provider 展开态、搜索词、`仅看已禁用` / `仅看已启用` 过滤状态
 - 根据 `ModelCatalogStateService` 提供的 `ModelCatalogState` 渲染 provider/model availability 视图
 - 展示 provider probe loading / success / error / catalog-only 等 badge 与 detail（文案/class 由 `SettingsModelCatalogAvailability.ts` 计算）
+- 展示 provider directory 的 connected/listed 辅助 summary 与 provider 行诊断 badge，但不把 listed outside catalog provider 渲染成可操作行
 - 发出 provider/model availability semantic toggle 事件，真正的 settings 写回由 `SettingsModelSection` 提供 callback
 
 ## 核心逻辑
@@ -40,6 +41,7 @@ presenter 会把 `ModelCatalogState` 里的几层 availability 信号叠加到 U
 - `currentEnabledProviderIds` 对 provider 当前是否真的进入有效目录的判断
 - `disabledModelRefs` 对 model 级禁用的表达
 - `ModelCatalogStateService.probeProvider()` 结果对 provider probe badge/detail 的表达
+- `providerDirectoryStatuses` 对 `provider.list()` listed / connected 诊断状态的表达；这只影响 summary 与诊断 badge，不进入搜索结果、bulk action provider IDs 或 model toggle 集合
 
 它只负责**呈现**这些状态；并不改 `ModelConfigService` 的 merge 规则，也不改变 provider availability 语义。若后续要新增 availability 文案、badge class、placeholder reason 或 disabled-scope 优先级，应先扩展 `SettingsModelCatalogAvailability.ts`，避免把纯 descriptor 逻辑重新塞回 presenter。
 

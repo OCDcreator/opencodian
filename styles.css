@@ -12850,6 +12850,12 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-success);
 }
 
+.opencodian-model-status-badge.is-diagnostic {
+  background: color-mix(in srgb, var(--background-modifier-border-hover) 24%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
+  color: color-mix(in srgb, var(--text-muted) 92%, var(--text-normal));
+}
+
 .opencodian-model-status-badge.is-partial {
   background: color-mix(in srgb, var(--text-warning) 10%, var(--background-primary));
   border-color: color-mix(in srgb, var(--text-warning) 18%, var(--background-modifier-border));
@@ -15366,6 +15372,13 @@ img.opencodian-model-provider-header-icon {
   line-height: 1.3;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+.opencodian-model-provider-directory-summary {
+  margin-top: calc(-1 * var(--opencodian-settings-space-xs, 4px));
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .opencodian-model-picker-modal .modal-header {

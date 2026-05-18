@@ -18,12 +18,22 @@ import type {
 
 export type ModelCatalogStateMode = 'local' | 'server' | 'effective' | 'disabled';
 
+export interface ProviderDirectoryStatus {
+  providerId: string;
+  listed: boolean;
+  connected: boolean;
+  directoryModelCount: number;
+  inServerCatalog: boolean;
+  inEffectiveCatalog: boolean;
+}
+
 export interface ModelCatalogState {
   localModelConfig: OpencodeModelConfigSubset;
   disabledModelRefs: string[];
   catalogs: ModelCatalogBundle;
   displayCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
   providerStatusCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
+  providerDirectoryStatuses: Record<string, ProviderDirectoryStatus>;
 }
 
 export class ModelCatalogStateService {
@@ -46,6 +56,7 @@ export class ModelCatalogStateService {
         disabled: this.buildDisabledCatalog(catalogs, localModelConfig, normalizedDisabledModelRefs),
       },
       providerStatusCatalogs: statusCatalogs,
+      providerDirectoryStatuses: this.buildProviderDirectoryStatuses(catalogs),
     };
   }
 
@@ -193,6 +204,31 @@ export class ModelCatalogStateService {
         Object.entries(catalog.defaults).filter(([providerId]) => providers.some((provider) => provider.id === providerId)),
       ),
     };
+  }
+
+  private buildProviderDirectoryStatuses(catalogs: ModelCatalogBundle): Record<string, ProviderDirectoryStatus> {
+    const directoryProviderById = new Map(
+      catalogs.providerDirectory.catalog.providers.map((provider) => [provider.id, provider]),
+    );
+    const providerIds = Array.from(new Set([
+      ...directoryProviderById.keys(),
+      ...catalogs.providerDirectory.connectedProviderIds,
+    ])).sort((left, right) => left.localeCompare(right));
+    const connectedProviderIds = new Set(catalogs.providerDirectory.connectedProviderIds);
+    const serverProviderIds = new Set(catalogs.server.providers.map((provider) => provider.id));
+    const effectiveProviderIds = new Set(catalogs.effective.providers.map((provider) => provider.id));
+
+    return Object.fromEntries(providerIds.map((providerId) => {
+      const directoryProvider = directoryProviderById.get(providerId);
+      return [providerId, {
+        providerId,
+        listed: Boolean(directoryProvider),
+        connected: connectedProviderIds.has(providerId),
+        directoryModelCount: directoryProvider?.models.length ?? 0,
+        inServerCatalog: serverProviderIds.has(providerId),
+        inEffectiveCatalog: effectiveProviderIds.has(providerId),
+      }];
+    }));
   }
 
   private decorateCatalogWithCurrentDisabledScopes(

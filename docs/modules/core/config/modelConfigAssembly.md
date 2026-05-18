@@ -11,10 +11,13 @@
 - `assembleModelCatalog()`：`baseEffective`、`effective` 与 `currentEnabledProviderIds`
 - `resolveProviderAvailabilityProbePlan()`：provider probe 状态、测试模型选择与真实发送判定
 
+`assembleServerModelCatalog()` 现在同时接收可选的 `providerDirectoryResult`。这份数据来自 directory-scoped `provider.list()`，会被规范化为独立的 `ProviderDirectorySnapshot`，只表达 provider directory / connected 状态。`server` 目录仍只由 `config.providers()` 的 runtime result 与 scoped metadata 组装，避免把 provider-list-only 条目误当成实际可发送模型。
+
 ## 关键导出
 
 - `ModelCatalogAssemblyResult`
 - `ModelServerCatalogAssemblyResult`
+- `ProviderDirectorySnapshot`
 - `ProviderAvailabilityProbePlan`
 - `assembleServerModelCatalog()`
 - `assembleModelCatalog()`

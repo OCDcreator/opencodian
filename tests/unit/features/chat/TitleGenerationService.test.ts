@@ -1,9 +1,16 @@
 /* eslint-disable max-lines-per-function -- Title generation tests keep the official-title and local-fallback harness inline for readable flow coverage. */
+import type { ModelCatalogBundle } from '../../../../src/core/config';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { TitleGenerationService } from '../../../../src/features/chat/services/TitleGenerationService';
 import type OpenCodianPlugin from '../../../../src/main';
 
 describe('TitleGenerationService', () => {
+  const createEmptyProviderDirectory = (): ModelCatalogBundle['providerDirectory'] => ({
+    catalog: { providers: [], defaults: {} },
+    connectedProviderIds: [],
+    defaults: {},
+  });
+
   const createHarness = () => {
     const openCodeService = {
       listSessions: jest.fn().mockResolvedValue([]),
@@ -233,6 +240,10 @@ describe('TitleGenerationService', () => {
         providers: [],
         defaults: {},
       },
+      currentEnabledProviderIds: [],
+      serverConfig: {},
+      effectiveProviderConfig: {},
+      providerDirectory: createEmptyProviderDirectory(),
     });
     openCodeService.requestAssistantResponse.mockResolvedValue({
       content: 'Title: Use the current conversation model',

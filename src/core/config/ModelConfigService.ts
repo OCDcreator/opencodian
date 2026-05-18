@@ -18,11 +18,15 @@ import {
   type ModelServerCatalogAssemblyResult,
   parseOpencodeConfigText,
   type ProviderAvailabilityConfig,
+  type ProviderDirectoryRuntimeResult,
+  type ProviderDirectorySnapshot,
   resolveProviderAvailabilityProbePlan,
 } from './modelConfig';
 import type { OpencodeConfigManager } from './OpencodeConfigManager';
 
 const logger = createLogger('ModelConfigService');
+
+export type { ProviderDirectorySnapshot };
 
 export interface ModelCatalogBundle {
   local: ModelCatalog;
@@ -32,6 +36,7 @@ export interface ModelCatalogBundle {
   currentEnabledProviderIds: string[];
   serverConfig: OpencodeModelConfigSubset;
   effectiveProviderConfig: ProviderAvailabilityConfig;
+  providerDirectory: ProviderDirectorySnapshot;
 }
 
 export type ProviderAvailabilityProbeStatus =
@@ -137,6 +142,7 @@ export class ModelConfigService {
       currentEnabledProviderIds: assembledCatalog.currentEnabledProviderIds,
       serverConfig: serverState.configResolution.inheritedConfig,
       effectiveProviderConfig: assembledCatalog.effectiveProviderConfig,
+      providerDirectory: serverState.providerDirectory,
       effective: assembledCatalog.effective,
     };
     return bundle;
@@ -208,8 +214,9 @@ export class ModelConfigService {
   ): Promise<ModelServerCatalogAssemblyResult> {
     const resolvedLocalConfig = localConfig ?? await this.readLocalModelConfig();
     const localServerMode = this.isLocalServerMode();
-    const [runtimeResult, scopedConfig, defaultScopeConfig, diskInheritedConfig] = await Promise.all([
+    const [runtimeResult, providerDirectoryResult, scopedConfig, defaultScopeConfig, diskInheritedConfig] = await Promise.all([
       this.openCodeService.getAvailableModels({ includeDirectory: true }),
+      this.loadProviderDirectory(),
       this.openCodeService.getResolvedModelConfig({ includeDirectory: true }),
       this.openCodeService.getResolvedModelConfig({ includeDirectory: false }),
       localServerMode ? this.readLocalInheritedModelConfig() : Promise.resolve(undefined),
@@ -217,12 +224,24 @@ export class ModelConfigService {
 
     return assembleServerModelCatalog({
       runtimeResult,
+      providerDirectoryResult,
       localServerMode,
       localConfig: resolvedLocalConfig,
       scopedConfig,
       defaultScopeConfig,
       diskInheritedConfig,
     });
+  }
+
+  private async loadProviderDirectory(): Promise<ProviderDirectoryRuntimeResult | undefined> {
+    try {
+      return await this.openCodeService.getProviderDirectory({ includeDirectory: true });
+    } catch (error) {
+      logger.warn('Failed to load OpenCode provider directory; continuing with empty providerDirectory snapshot', {
+        error,
+      });
+      return undefined;
+    }
   }
 
   private isLocalServerMode(): boolean {

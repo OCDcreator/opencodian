@@ -49,6 +49,11 @@ function createCatalogState() {
       currentEnabledProviderIds: ['openai'],
       serverConfig: {},
       effectiveProviderConfig: { disabled_providers: ['alibaba'] },
+      providerDirectory: {
+        catalog: { providers: [], defaults: {} },
+        connectedProviderIds: [],
+        defaults: {},
+      },
     },
     displayCatalogs: {
       local: { providers: [], defaults: {} },
@@ -62,6 +67,7 @@ function createCatalogState() {
       effective: { providers: [provider, disabledProvider], defaults: {} },
       disabled: { providers: [disabledProvider], defaults: {} },
     },
+    providerDirectoryStatuses: {},
   };
 }
 
@@ -162,6 +168,93 @@ describe('SettingsModelCatalogPresenter', () => {
     );
     expect(actionButtons).toHaveLength(2);
 
+    actionButtons[1].click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onProviderAvailabilityChange).toHaveBeenCalledWith(['openai'], false);
+  });
+
+  it('renders provider directory summary and a connected badge for visible providers', () => {
+    const { presenter } = createPresenter();
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    presenter.setPreferredCatalogTab('merge');
+    const catalogState = createCatalogState();
+    catalogState.providerDirectoryStatuses = {
+      openai: {
+        providerId: 'openai',
+        listed: true,
+        connected: true,
+        directoryModelCount: 1,
+        inServerCatalog: true,
+        inEffectiveCatalog: true,
+      },
+    };
+
+    presenter.render({
+      containerEl,
+      catalogState: catalogState as never,
+    });
+
+    expect(containerEl.querySelector('.opencodian-model-provider-directory-summary')?.textContent).toBe(
+      '1 connected · 1 listed · 0 listed outside catalog',
+    );
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-model-status-badge'))
+        .map((element) => element.textContent),
+    ).toContain('Directory: connected');
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-model-status-badge.is-diagnostic'))
+        .map((element) => element.textContent),
+    ).toContain('Directory: connected');
+  });
+
+  it('counts provider-list-only entries without rendering them as rows or action targets', async () => {
+    const { presenter, onProviderAvailabilityChange } = createPresenter();
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    presenter.setPreferredCatalogTab('merge');
+    const catalogState = createCatalogState();
+    catalogState.catalogs.providerDirectory = {
+      catalog: { providers: [], defaults: {} },
+      connectedProviderIds: [],
+      defaults: {},
+    };
+    catalogState.providerDirectoryStatuses = {
+      openai: {
+        providerId: 'openai',
+        listed: true,
+        connected: true,
+        directoryModelCount: 1,
+        inServerCatalog: true,
+        inEffectiveCatalog: true,
+      },
+      openrouter: {
+        providerId: 'openrouter',
+        listed: true,
+        connected: false,
+        directoryModelCount: 1,
+        inServerCatalog: false,
+        inEffectiveCatalog: false,
+      },
+    };
+
+    presenter.render({
+      containerEl,
+      catalogState: catalogState as never,
+    });
+
+    expect(containerEl.querySelector('.opencodian-model-provider-directory-summary')?.textContent).toBe(
+      '1 connected · 2 listed · 1 listed outside catalog',
+    );
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-model-toggle-provider-name'))
+        .map((element) => element.textContent),
+    ).toEqual(['OpenAI']);
+
+    const actionButtons = Array.from(
+      containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-model-catalog-actions-buttons button'),
+    );
     actionButtons[1].click();
     await new Promise((resolve) => setTimeout(resolve, 0));
 

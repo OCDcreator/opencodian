@@ -9,6 +9,7 @@
 
 - 读取 `local/server/baseEffective/effective/currentEnabledProviderIds` 后再派生 `displayCatalogs` / `providerStatusCatalogs`
 - 统一 provider 当前启用态、project-disabled、global-disabled 与 disabled placeholder 的表达
+- 派生 provider directory / connected 诊断状态，但不把 directory-only provider 加进展示目录
 - 收束 provider availability 批量写回和 model availability 的 `disabledModelRefs` 归并
 - 继续复用 `ModelConfigService.testProviderAvailability()` 做逐 provider probe
 
@@ -32,11 +33,13 @@ export interface ModelCatalogState {
   catalogs: ModelCatalogBundle;
   displayCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
   providerStatusCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
+  providerDirectoryStatuses: Record<string, ProviderDirectoryStatus>;
 }
 ```
 
 - `displayCatalogs`: settings 目录卡片真正展示的 local / server / effective / disabled 四张视图
 - `providerStatusCatalogs`: 与展示视图平行的状态视图；provider/model 会带上当前轮次计算后的 `disabledScopes`
+- `providerDirectoryStatuses`: 从 `catalogs.providerDirectory` 派生的只读诊断状态，记录 provider 是否在 `provider.list()` 目录中、是否 connected、directory model 数，以及是否已经存在于 server / effective catalog。它不参与 `displayCatalogs` 构建。
 - `disabledModelRefs`: 进入本轮 catalog state API 前已经规范化的插件侧 model disable 集合
 
 ## 关键行为
@@ -48,6 +51,7 @@ service 会同时生成：
 - `displayCatalogs.server`：保留当前 runtime / server catalog 的 provider 集合，不因为当前禁用态而删 provider
 - `providerStatusCatalogs.server`：在同一集合上叠加 `global` / `project` disabled scope，供 settings UI 决定 badge 与 toggle disable
 - `displayCatalogs.disabled`：汇总当前目录里被 provider 或 model availability 排除的项，并补上仅存在于配置层的 disabled placeholder
+- `providerDirectoryStatuses`：保留 `provider.list()` 的 connected / listed 信号，供 presenter 渲染辅助 summary 与 badge；只出现在 provider directory 里的 provider 不会出现在 provider 行、批量开关目标或模型开关里
 
 这让 presenter 不再需要自己拼 disabled catalog、server placeholder 或 `currentEnabledProviderIds` 判定。
 
@@ -80,4 +84,4 @@ service 会同时生成：
 
 - 这个 service 负责“catalog state 语义”，不是 DOM owner；不要把 settings markup、probe badge 文案或搜索状态移进来。
 - `baseEffective` 与 filtered `effective` 的区分必须保留；service 只是在其上加一层 settings 可消费的状态视图。
-- provider discovery 仍然以 `ModelConfigService` / `config.providers(directory)` 为准，不要在这里重新引入 `provider.list()` 语义。
+- provider discovery 仍然以 `ModelConfigService` / `config.providers(directory)` 为准；`provider.list()` 只可作为 `providerDirectoryStatuses` 的辅助诊断信号，不要用它扩展 server / effective catalog。

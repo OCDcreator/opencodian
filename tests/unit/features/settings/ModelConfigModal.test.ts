@@ -2,15 +2,33 @@ import type { App } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Modal } from 'obsidian';
 
+import type { ModelCatalogBundle } from '../../../../src/core/config';
 import { ModelConfigModal } from '../../../../src/features/settings/ModelConfigModal';
 import { t } from '../../../../src/i18n';
 import { ProviderIconService } from '../../../../src/utils/icons/ProviderIconService';
+
+function createEmptyCatalogBundle(): ModelCatalogBundle {
+  return {
+    local: { providers: [], defaults: {} },
+    server: { providers: [], defaults: {} },
+    baseEffective: { providers: [], defaults: {} },
+    effective: { providers: [], defaults: {} },
+    currentEnabledProviderIds: [],
+    serverConfig: {},
+    effectiveProviderConfig: {},
+    providerDirectory: {
+      catalog: { providers: [], defaults: {} },
+      connectedProviderIds: [],
+      defaults: {},
+    },
+  };
+}
 
 function createPlugin(overrides: Record<string, unknown> = {}) {
   return {
     modelConfigService: {
       readLocalModelConfig: jest.fn().mockResolvedValue({}),
-      getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+      getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
       getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
       writeLocalModelConfig: jest.fn().mockResolvedValue(undefined),
     },
@@ -116,7 +134,7 @@ describe('ModelConfigModal opening flows', () => {
             },
           },
         }),
-        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
         getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
       },
     });
@@ -168,7 +186,7 @@ describe('ModelConfigModal opening flows', () => {
             },
           },
         }),
-        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
         getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
       },
     });
@@ -209,7 +227,7 @@ describe('ModelConfigModal opening flows', () => {
             },
           },
         }),
-        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
         getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
       },
     });
@@ -268,7 +286,7 @@ describe('ModelConfigModal save plan', () => {
             },
           },
         }),
-        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
         getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
         writeLocalModelConfig,
       },
@@ -315,7 +333,7 @@ describe('ModelConfigModal save plan', () => {
             },
           },
         }),
-        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
         getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
         writeLocalModelConfig,
       },
@@ -385,7 +403,7 @@ describe('ModelConfigModal save plan', () => {
             },
           },
         }),
-        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
         getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
         writeLocalModelConfig,
       },

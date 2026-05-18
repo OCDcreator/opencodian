@@ -61,6 +61,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮新增 `slashCommand.init.description`、`slashCommand.review.description`、`slashCommand.help.description`，为 OpenCode 内置运行时命令提供介绍语翻译；文案与 OpenCode 源码中的实际 description 对齐（init: "Guided AGENTS.md setup"、review: "Review changes [commit|branch|pr], defaults to uncommitted"、help: "Show OpenCode help"）。同时更新 `settings.commands.editor.description.placeholder` 为中文占位符。
 
+本轮维护 `settings.model.providerDirectory.*` 键，为 settings/model 目录中的 provider directory 诊断提供英文 summary 与 badge 文案。它只表达 `provider.list()` 的 connected / listed 辅助状态，并把 listed outside catalog 作为诊断计数呈现，不改变 `config.providers()` 驱动的服务器目录或可选模型。
+
 ## 导入关系
 
 ```text
