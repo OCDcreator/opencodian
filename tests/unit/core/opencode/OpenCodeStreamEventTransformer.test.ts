@@ -35,38 +35,40 @@ function createState(): OpenCodeStreamEventState {
 describe('OpenCodeStreamEventTransformer session.next observation', () => {
   const sessionNextTypes = [
     'session.next.agent.switched', 'session.next.prompted',
-    'session.next.step.started', 'session.next.step.ended',
+    'session.next.step.started',
     'session.next.text.started', 'session.next.text.ended',
     'session.next.reasoning.started', 'session.next.reasoning.ended',
     'session.next.tool.called', 'session.next.tool.success',
   ];
 
+  const handle = (
+    transformer: OpenCodeStreamEventTransformer,
+    type: string,
+    properties: Record<string, unknown>,
+  ) => transformer.handleStreamingEvent(
+    { type, properties: { sessionID: 'test-session', ...properties } },
+    'test-session',
+    createState(),
+    { partTypeMap: new Map() },
+  );
+
   it.each(sessionNextTypes)('observes %s without stream output', (type) => {
     const host = createHost();
     const transformer = new OpenCodeStreamEventTransformer(host);
 
-    const outcome = transformer.handleStreamingEvent(
-      {
-        type,
-        properties: {
-          sessionID: 'test-session',
-          callID: 'call-1',
-          reasoningID: 'reasoning-1',
-          text: 'redacted text',
-          input: { secret: 'redacted input' },
-          output: { secret: 'redacted output' },
-          prompt: { text: 'redacted prompt' },
-          reason: 'redacted reason',
-          agent: 'build',
-          finish: 'stop',
-          cost: 0.01,
-          tokens: { input: 1, output: 2, reasoning: 3, cache: { write: 4, read: 5 } },
-        },
-      },
-      'test-session',
-      createState(),
-      { partTypeMap: new Map() },
-    );
+    const outcome = handle(transformer, type, {
+      callID: 'call-1',
+      reasoningID: 'reasoning-1',
+      text: 'redacted text',
+      input: { secret: 'redacted input' },
+      output: { secret: 'redacted output' },
+      prompt: { text: 'redacted prompt' },
+      reason: 'redacted reason',
+      agent: 'build',
+      finish: 'stop',
+      cost: 0.01,
+      tokens: { input: 1, output: 2, reasoning: 3, cache: { write: 4, read: 5 } },
+    });
 
     expect(outcome).toEqual({ chunks: [], mutations: [], stop: false });
     expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-next-event', {
@@ -95,15 +97,7 @@ describe('OpenCodeStreamEventTransformer session.next observation', () => {
       cache: { write: 2, read: 'hidden', detail: { text: 'cache-sensitive' } },
     } as never;
 
-    transformer.handleStreamingEvent(
-      {
-        type: 'session.next.step.ended',
-        properties: { sessionID: 'test-session', tokens: unsafeTokens },
-      },
-      'test-session',
-      createState(),
-      { partTypeMap: new Map() },
-    );
+    handle(transformer, 'session.next.step.ended', { tokens: unsafeTokens });
 
     expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-next-event', {
       eventType: 'session.next.step.ended',
@@ -121,24 +115,47 @@ describe('OpenCodeStreamEventTransformer session.next observation', () => {
     expect(JSON.stringify(host.logStreamingDebug.mock.calls)).not.toContain('not-a-number');
   });
 
+  it('emits usage from session.next.step.ended token counts', () => {
+    const host = createHost();
+    const transformer = new OpenCodeStreamEventTransformer(host);
+
+    const outcome = handle(transformer, 'session.next.step.ended', {
+      finish: 'stop',
+      cost: 0.001234,
+      tokens: { total: 1234, input: 800, output: 400, reasoning: 34, cache: { write: 0, read: 0 } },
+    });
+
+    expect(outcome.stop).toBe(false);
+    expect(outcome.mutations).toEqual([]);
+    expect(outcome.chunks).toContainEqual({ type: 'usage', inputTokens: 800, outputTokens: 434, sessionId: 'test-session' });
+  });
+
+  it('does not emit session.next.step.ended usage when tokens are invalid', () => {
+    const host = createHost();
+    const transformer = new OpenCodeStreamEventTransformer(host);
+
+    expect(() => handle(transformer, 'session.next.step.ended', {
+      tokens: { output: 400, reasoning: 34 } as never,
+    })).not.toThrow();
+
+    const outcome = handle(transformer, 'session.next.step.ended', {
+      tokens: { input: '800', output: 400, reasoning: 34 } as never,
+    });
+
+    expect(outcome.chunks.filter((chunk) => chunk.type === 'usage')).toEqual([]);
+    expect(outcome.mutations).toEqual([]);
+    expect(outcome.stop).toBe(false);
+  });
+
   it('keeps unknown session.next events observe-only', () => {
     const host = createHost();
     const transformer = new OpenCodeStreamEventTransformer(host);
 
-    const outcome = transformer.handleStreamingEvent(
-      {
-        type: 'session.next.future.event',
-        properties: {
-          sessionID: 'test-session',
-          text: 'redacted text',
-          input: { secret: 'redacted input' },
-          usage: { input: 9, output: 9 },
-        },
-      },
-      'test-session',
-      createState(),
-      { partTypeMap: new Map() },
-    );
+    const outcome = handle(transformer, 'session.next.future.event', {
+      text: 'redacted text',
+      input: { secret: 'redacted input' },
+      usage: { input: 9, output: 9 },
+    });
 
     expect(outcome).toEqual({ chunks: [], mutations: [], stop: false });
     expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-next-event', {
@@ -172,22 +189,8 @@ describe('OpenCodeStreamEventTransformer session.next observation', () => {
     expect(outcome).toEqual({
       chunks: [{ type: 'text', content: 'Hi' }],
       mutations: [
-        {
-          type: 'message.upserted',
-          sessionID: 'test-session',
-          messageID: 'assistant-1',
-          role: 'assistant',
-          createdAt: undefined,
-        },
-        {
-          type: 'part.delta',
-          sessionID: 'test-session',
-          messageID: 'assistant-1',
-          partID: 'part-text',
-          field: 'text',
-          delta: 'Hi',
-          partType: 'text',
-        },
+        { type: 'message.upserted', sessionID: 'test-session', messageID: 'assistant-1', role: 'assistant', createdAt: undefined },
+        { type: 'part.delta', sessionID: 'test-session', messageID: 'assistant-1', partID: 'part-text', field: 'text', delta: 'Hi', partType: 'text' },
       ],
       stop: false,
     });

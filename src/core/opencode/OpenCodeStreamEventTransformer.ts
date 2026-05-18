@@ -335,7 +335,7 @@ export class OpenCodeStreamEventTransformer {
       'session.next.agent.switched': this.handleSessionNextObserved.bind(this),
       'session.next.prompted': this.handleSessionNextObserved.bind(this),
       'session.next.step.started': this.handleSessionNextObserved.bind(this),
-      'session.next.step.ended': this.handleSessionNextObserved.bind(this),
+      'session.next.step.ended': this.handleSessionNextStepEnded.bind(this),
       'session.next.text.started': this.handleSessionNextObserved.bind(this),
       'session.next.text.ended': this.handleSessionNextObserved.bind(this),
       'session.next.reasoning.started': this.handleSessionNextObserved.bind(this),
@@ -975,6 +975,12 @@ export class OpenCodeStreamEventTransformer {
     sessionId,
     mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    this.logSessionNextEvent(eventData, sessionId);
+
+    return { chunks: [], mutations, stop: false };
+  }
+
+  private logSessionNextEvent(eventData: OpenCodeStreamEvent, sessionId: string): void {
     const properties = eventData.properties;
     const rawTokens = properties?.tokens;
     const safeTokens = rawTokens ? {
@@ -999,8 +1005,28 @@ export class OpenCodeStreamEventTransformer {
       agent: properties?.agent,
       cost: properties?.cost,
     });
+  }
 
-    return { chunks: [], mutations, stop: false };
+  private handleSessionNextStepEnded({
+    eventData,
+    sessionId,
+    chunks,
+    mutations,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    this.logSessionNextEvent(eventData, sessionId);
+
+    const tokens = eventData.properties?.tokens;
+    if (typeof tokens?.input === 'number') {
+      chunks.unshift({
+        type: 'usage',
+        inputTokens: tokens.input,
+        outputTokens: (typeof tokens.output === 'number' ? tokens.output : 0)
+          + (typeof tokens.reasoning === 'number' ? tokens.reasoning : 0),
+        sessionId,
+      });
+    }
+
+    return { chunks, mutations, stop: false };
   }
 
   private handleQuestionAsked({
