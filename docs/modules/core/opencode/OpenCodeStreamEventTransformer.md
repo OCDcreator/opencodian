@@ -64,7 +64,7 @@
 - `question.asked` 仍是 AskQuestion 主路径；同时，`question` tool-part 如果明确处于 `state.status === 'waiting'` 且 `state.metadata` / `state.metadata.request` / `state.metadata.question` / part 本身能通过 host 的 `normalizeQuestionRequest()`，会补发 `question_request` chunk，作为事件丢失或 alternate stream shape 的保守回退
 - 对 `session.error` / `session.idle` 返回 stop 信号。`session.error` 现在通过 `classifySdkError()` 对错误分类，将 `errorClass` 记入 debug 日志并附加到 error chunk
 - 对已知 `session.next.*` 实验性事件做 typed observe-only 处理：`session.next.agent.switched`、`session.next.prompted`、`session.next.step.started`、`session.next.text.started`、`session.next.text.ended`、`session.next.reasoning.started`、`session.next.reasoning.ended`、`session.next.tool.called`、`session.next.tool.success`
-- `session.next.step.ended` 会在 `tokens.input` 为数字时额外产出 `usage` chunk，并把 `tokens.reasoning` 计入 `outputTokens`，让 UI usage 显示包含模型生成的 reasoning token
+- `session.next.step.ended` 会在 `tokens.input` 为有限数字时额外产出 `usage` chunk，并只累加有限的 `tokens.output` / `tokens.reasoning`，让 UI usage 显示包含模型生成的 reasoning token 且避免 NaN / Infinity 污染 usage 状态
 - 其余 `session.next.*` 不产出 chunks、不产出 mutations、不触发 stop；未知 `session.next.*` 也保持 observe-only fallback，避免干扰 interleaved `message.part.*` 主路径
 - `session.next.*` debug 日志只记录安全 metadata：eventType、sessionId、callID、reasoningID、hasText、hasInput、已知 numeric token counts、finish、agent、cost；禁止记录 text、prompt.text、tool input/output、reason 或 token 子对象里的未知内容字段
 

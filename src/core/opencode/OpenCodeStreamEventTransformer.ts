@@ -1016,12 +1016,15 @@ export class OpenCodeStreamEventTransformer {
     this.logSessionNextEvent(eventData, sessionId);
 
     const tokens = eventData.properties?.tokens;
-    if (typeof tokens?.input === 'number') {
+    const inputTokens = tokens?.input;
+    if (Number.isFinite(inputTokens)) {
+      const outputTokens = tokens?.output;
+      const reasoningTokens = tokens?.reasoning;
       chunks.unshift({
         type: 'usage',
-        inputTokens: tokens.input,
-        outputTokens: (typeof tokens.output === 'number' ? tokens.output : 0)
-          + (typeof tokens.reasoning === 'number' ? tokens.reasoning : 0),
+        inputTokens: inputTokens as number,
+        outputTokens: (Number.isFinite(outputTokens) ? outputTokens as number : 0)
+          + (Number.isFinite(reasoningTokens) ? reasoningTokens as number : 0),
         sessionId,
       });
     }
