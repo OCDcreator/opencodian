@@ -1674,52 +1674,6 @@ export class OpenCodianView extends ItemView {
     conversationSyncBridgePorts: ConversationSyncBridgePorts,
     conversationRenderService: ConversationRenderService,
   ): OpenCodianViewInteractionRuntimeWiring {
-    const messageSendPreparationService = new MessageSendPreparationService(
-      createMessageSendPreparationHost({
-        getCurrentConversation: () => this.currentConversation,
-        createNewConversation: async () => {
-          await this.createNewConversation();
-          return this.currentConversation;
-        },
-        createConversationWriteTicket: (conversationId) =>
-          this.createConversationWriteTicket(conversationId),
-        commitConversationWrite: (conversation, ticket, reason, write) =>
-          this.commitConversationWrite(conversation, ticket, reason, write),
-        getActiveTabId: () => this.getActiveTabId(),
-        ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
-        isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
-        conversationTabRuntimeCoordinator: this.conversationTabRuntimeCoordinator,
-        getServerAvailability: () => this.getServerAvailability(),
-        chatHeaderPresenter: this.chatHeaderPresenter,
-        settingsTab: this.plugin.settingsTab ?? null,
-        getServerMode: () => this.plugin.settings.server.mode,
-        openPluginSettingsAtServerSection: () => this.openPluginSettingsAtServerSection(),
-        startServer: () => this.plugin.openCodeService.start(),
-        notifyForegroundBusy: () => {
-          new Notice(t('chat.tab.processingBlocked'));
-        },
-        assistantShellViewHostAdapter: this.assistantShellViewHostAdapter,
-        messageFinalizationService: this.messageFinalizationService,
-        chatSelectionControlsCoordinator: this.chatSelectionControlsCoordinator,
-        reloadModelCatalog: () => this.reloadModelCatalog(),
-        getSendMessageOptions: () => this.getSendMessageOptions(),
-        appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
-        openCodeService: this.plugin.openCodeService,
-        backgroundTaskHost: this.backgroundTaskHost,
-        conversationSyncBridgePorts,
-        conversationRenderService,
-        scrollToBottom: (options) => this.scrollToBottom(options),
-        applyFallbackConversationTitle: (conversationId, firstMessage) =>
-          this.applyFallbackConversationTitle(conversationId, firstMessage),
-        getTitleMode: () => this.plugin.settings.titleMode,
-        startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
-          void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
-        },
-        activeTabContextUsageCoordinator: this.activeTabContextUsageCoordinator,
-        syncTabStreamLikeState: (tabId) => this.syncTabStreamLikeState(tabId),
-      }),
-      this.composerContextViewFacade.sendContext,
-    );
     const messageFinalizationService = new MessageFinalizationService(
       createMessageFinalizationHost({
         getCurrentConversation: () => this.currentConversation,
@@ -1747,6 +1701,52 @@ export class OpenCodianView extends ItemView {
           this.formatModelId(this.getCurrentSessionModel()),
         scrollToBottom: (options) => this.scrollToBottom(options),
       }),
+    );
+    const messageSendPreparationService = new MessageSendPreparationService(
+      createMessageSendPreparationHost({
+        getCurrentConversation: () => this.currentConversation,
+        createNewConversation: async () => {
+          await this.createNewConversation();
+          return this.currentConversation;
+        },
+        createConversationWriteTicket: (conversationId) =>
+          this.createConversationWriteTicket(conversationId),
+        commitConversationWrite: (conversation, ticket, reason, write) =>
+          this.commitConversationWrite(conversation, ticket, reason, write),
+        getActiveTabId: () => this.getActiveTabId(),
+        ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
+        isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
+        conversationTabRuntimeCoordinator: this.conversationTabRuntimeCoordinator,
+        getServerAvailability: () => this.getServerAvailability(),
+        chatHeaderPresenter: this.chatHeaderPresenter,
+        settingsTab: this.plugin.settingsTab ?? null,
+        getServerMode: () => this.plugin.settings.server.mode,
+        openPluginSettingsAtServerSection: () => this.openPluginSettingsAtServerSection(),
+        startServer: () => this.plugin.openCodeService.start(),
+        notifyForegroundBusy: () => {
+          new Notice(t('chat.tab.processingBlocked'));
+        },
+        assistantShellViewHostAdapter: this.assistantShellViewHostAdapter,
+        messageFinalizationService,
+        chatSelectionControlsCoordinator: this.chatSelectionControlsCoordinator,
+        reloadModelCatalog: () => this.reloadModelCatalog(),
+        getSendMessageOptions: () => this.getSendMessageOptions(),
+        appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
+        openCodeService: this.plugin.openCodeService,
+        backgroundTaskHost: this.backgroundTaskHost,
+        conversationSyncBridgePorts,
+        conversationRenderService,
+        scrollToBottom: (options) => this.scrollToBottom(options),
+        applyFallbackConversationTitle: (conversationId, firstMessage) =>
+          this.applyFallbackConversationTitle(conversationId, firstMessage),
+        getTitleMode: () => this.plugin.settings.titleMode,
+        startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
+          void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
+        },
+        activeTabContextUsageCoordinator: this.activeTabContextUsageCoordinator,
+        syncTabStreamLikeState: (tabId) => this.syncTabStreamLikeState(tabId),
+      }),
+      this.composerContextViewFacade.sendContext,
     );
     const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
       this.createAssistantNoticeCardRendererHost(),

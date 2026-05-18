@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: lint compaction (max-lines-per-function 200 gate)
+> **最近更新**: send pipeline host wiring initialization order
 
 ## 概述
 
@@ -345,7 +345,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`；prompt submission 会把 `syntheticTextParts` 与显式 `invocationIntent` 一并透传，composer `@agent` 选中项和主 Agent selector 选择也走这条 intent seam
 2. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
 3. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
-4. `createMessageSendPreparationHost()` 工厂函数（定义在 `MessageSendPreparationService.ts`）接收 `MessageSendPreparationHostDependencies` 扁平依赖，在工厂内部装配完整的 `MessageSendPreparationHost` 回调对象；view 只提供原始 service 引用和简单 lambda，不再拥有 `createMessageSendPreparationSeam` 方法
+4. `createInteractionRuntimeWiring()` 先构造本地 `MessageFinalizationService`，再把该实例传给 `createMessageSendPreparationHost()`；server offline / unavailable 的准备阶段错误终结流因此不会读取尚未赋值的 view 字段
 5. `MessageSendPreparationService` 再把 optimistic user message 落到本地 conversation，并保持 save / render / scroll 时序
 6. 首条 user message 时，仍先写 fallback title，再按设置异步触发 AI title generation
 7. `SendPipelineRuntime` 调用 `openCodeService.sendMessage()`，创建 streaming shell 与 `StreamController`
