@@ -34,7 +34,7 @@ export function buildLocalStreamOutcome(options: {
         finalizedAssistantMessageId,
       )
     : null;
-  const retryErrorNoticeMessage = shouldPersistInterruptedState && options.sessionRetryMessage
+  const retryErrorNoticeMessage = shouldPersistInterruptedState && !hasStreamContentBlocks && options.sessionRetryMessage
     ? buildStreamErrorNotice(
         finalizedTimestamp,
         options.sessionRetryMessage,

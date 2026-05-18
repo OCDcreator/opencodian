@@ -166,6 +166,33 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.shouldSyncFromServer).toBe(false);
   });
 
+  it('ignores session retry message when stream has partial visible content', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Partial' },
+      ]),
+    };
+    const routedStream = createRoutedStream({
+      streamInterrupted: true,
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+      sessionRetryMessage: 'Insufficient balance.',
+    });
+
+    expect(outcome.hasStreamContentBlocks).toBe(true);
+    expect(outcome.shouldPersistInterruptedState).toBe(true);
+    expect(outcome.streamErrorNoticeMessage).toBeNull();
+  });
+
   it('uses the session retry message as an error notice for silent interrupted streams', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(700);
     const preparedSend = createPreparedSend();
