@@ -14,6 +14,7 @@ export function buildLocalStreamOutcome(options: {
   runtime: SendPipelineTabRuntime;
   streamController: SendPipelineStreamController | null;
   routedStream: StreamChunkRouterResult;
+  sessionRetryMessage?: string | null;
 }): LocalStreamOutcome {
   const finalizedTimestamp = options.routedStream.finalizedAssistantMetadata?.timestamp ?? Date.now();
   const finalizedModelId = options.routedStream.finalizedAssistantMetadata?.modelId
@@ -33,6 +34,17 @@ export function buildLocalStreamOutcome(options: {
         finalizedAssistantMessageId,
       )
     : null;
+  const retryErrorNoticeMessage = shouldPersistInterruptedState && options.sessionRetryMessage
+    ? buildStreamErrorNotice(
+        finalizedTimestamp,
+        options.sessionRetryMessage,
+        finalizedModelId,
+        finalizedAssistantMessageId,
+      )
+    : null;
+  const effectiveShouldPersistInterruptedState = retryErrorNoticeMessage
+    ? false
+    : shouldPersistInterruptedState;
 
   return {
     finalizedTimestamp,
@@ -42,8 +54,8 @@ export function buildLocalStreamOutcome(options: {
     streamContentBlocks,
     streamedTextContent,
     hasStreamContentBlocks,
-    shouldPersistInterruptedState,
-    streamErrorNoticeMessage,
+    shouldPersistInterruptedState: effectiveShouldPersistInterruptedState,
+    streamErrorNoticeMessage: streamErrorNoticeMessage ?? retryErrorNoticeMessage,
     interruptedNoticeMessage: null,
     shouldSyncFromServer: shouldSyncAfterStream({
       streamCompleted: options.routedStream.streamCompleted,

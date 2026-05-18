@@ -43,7 +43,24 @@ export class StreamLocalFinalizer {
       runtime: this.options.runtime,
       streamController: this.options.streamController,
       routedStream: this.options.routedStream,
+      sessionRetryMessage: this.getSessionRetryMessage(),
     });
+  }
+
+  private getSessionRetryMessage(): string | null {
+    const sessionId = this.options.preparedSend.conversation.openCodeSessionId;
+    const runtime = this.options.runtime;
+    if (sessionId && runtime.sessionStatusSessionId && runtime.sessionStatusSessionId !== sessionId) {
+      return null;
+    }
+
+    const status = runtime.sessionStatus;
+    if (status?.type !== 'retry') {
+      return null;
+    }
+
+    const message = status.message.trim();
+    return message.length > 0 ? message : null;
   }
 
   private logFinalizationEntry(outcome: LocalStreamOutcome): void {

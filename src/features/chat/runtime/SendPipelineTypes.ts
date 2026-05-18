@@ -1,4 +1,7 @@
 import type {
+  SessionActivityStatus,
+} from '../../../core/opencode';
+import type {
   ChatMessage,
   Conversation,
   PromptContextItem,
@@ -27,6 +30,8 @@ export interface SendPipelineTabRuntime {
   pendingEditedFiles: Set<string>;
   pendingQuestionResolution: QuestionResolution | null;
   isConversationSyncInFlight: boolean;
+  sessionStatusSessionId?: string | null;
+  sessionStatus?: SessionActivityStatus | null;
 }
 
 export interface SendPipelineStreamController {

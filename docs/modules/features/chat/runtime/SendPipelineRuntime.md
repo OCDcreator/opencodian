@@ -40,7 +40,7 @@ export class SendPipelineRuntime {
 - `SendPipelinePersistencePort`
 - `SendPipelineDebugPort`
 
-`SendPipelineRuntime` 本身继续拿组合后的 runtime host，但 `StreamChunkRouter`、`StreamLocalFinalizer`、`SendPipelineTrace` 等子模块只声明各自真正依赖的 port 子集。
+`SendPipelineRuntime` 本身继续拿组合后的 runtime host，但 `StreamChunkRouter`、`StreamLocalFinalizer`、`SendPipelineTrace` 等子模块只声明各自真正依赖的 port 子集；其中本地收尾会从 tab runtime 的 session status snapshot 读取 retry message，用于 silent interrupted stream 的 error notice。
 
 第二刀后，runtime 子目录内部又继续细分成几层：
 

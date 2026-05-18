@@ -5,7 +5,7 @@
 
 ## 概述
 
-`buildLocalStreamOutcome` 是本地收尾阶段的纯推导函数。它只根据 router 输出、tab runtime、stream controller 当前 block 和 prepared send，生成 `LocalStreamOutcome`，不做任何 DOM、副作用或持久化。
+`buildLocalStreamOutcome` 是本地收尾阶段的纯推导函数。它只根据 router 输出、tab runtime、stream controller 当前 block、prepared send 和可选 session retry message，生成 `LocalStreamOutcome`，不做任何 DOM、副作用或持久化。
 
 ## 公开函数
 
@@ -25,8 +25,9 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 ## 关键规则
 
 - metadata 优先使用服务端 `message_metadata`，没有时才回退到本地时间和 active model
-- 只有“中断、未完成、且没有真实 error”时才保留 interrupted state
+- 只有“中断、未完成、且没有真实 error/retry message”时才保留 interrupted state
 - 只有“没有 block 且有 error”时才通过 `AssistantNoticeRenderer.buildStreamErrorNotice()` 构建 error notice
+- silent interrupted stream 如果遇到 session retry message，会复用 error notice path 展示服务端 retry 原因，而不是落到通用 interrupted notice
 - `shouldSyncFromServer` 继续复用 `MessageFinalizationService.shouldSyncAfterStream()`
 
 ## 下游消费者

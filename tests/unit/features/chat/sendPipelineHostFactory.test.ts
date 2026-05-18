@@ -7,7 +7,7 @@ import {
   type SendPipelineStreamController,
   type SendPipelineTabRuntime,
 } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
-import type { StreamingChunk,StreamingContentBlock } from '../../../../src/utils/streaming';
+import type { ContentBlock, StreamChunk } from '../../../../src/utils/streaming';
 
 function createTabRuntime(): SendPipelineTabRuntime {
   return {
@@ -21,10 +21,10 @@ function createTabRuntime(): SendPipelineTabRuntime {
 }
 
 function createStreamController(): SendPipelineStreamController {
-  const contentBlocks: StreamingContentBlock[] = [];
+  const contentBlocks: ContentBlock[] = [];
   return {
     startStream: jest.fn(),
-    handleChunk: jest.fn().mockImplementation(async (chunk: StreamingChunk) => {
+    handleChunk: jest.fn().mockImplementation(async (chunk: StreamChunk) => {
       if (chunk.type === 'text') contentBlocks.push({ type: 'text', content: chunk.content });
     }),
     cancelStream: jest.fn(),
@@ -59,6 +59,7 @@ function createFullDeps(overrides: Partial<SendPipelineHostDependencies> = {}): 
     finalizeBackgroundTaskIndicatorAfterPrimaryStream: jest.fn().mockResolvedValue(undefined),
     removeEmptyAssistantShells: jest.fn(),
     syncTabStreamLikeState: jest.fn(),
+    transitionTabSessionLifecycle: jest.fn().mockReturnValue(true),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
     sendStreamMessage: jest.fn().mockImplementation(() => (async function* () {})()),
     detachStream: jest.fn(),

@@ -61,6 +61,13 @@ describe('StreamLocalFinalizer', () => {
       pendingEditedFiles: new Set<string>(),
       pendingQuestionResolution: null,
       isConversationSyncInFlight: false,
+      sessionStatusSessionId: 'session-1',
+      sessionStatus: {
+        type: 'retry' as const,
+        attempt: 1,
+        message: ' Insufficient balance. ',
+        next: 123,
+      },
     };
     const routedStream = {
       resetStreamingState: jest.fn(),
@@ -72,6 +79,7 @@ describe('StreamLocalFinalizer', () => {
       host: host as never,
       preparedSend: {
         tabId: 'tab-1',
+        conversation: { openCodeSessionId: 'session-1' },
       } as never,
       runtime,
       streamController: null,
@@ -80,6 +88,9 @@ describe('StreamLocalFinalizer', () => {
 
     await finalizer.finalize();
 
+    expect(buildLocalStreamOutcome).toHaveBeenCalledWith(expect.objectContaining({
+      sessionRetryMessage: 'Insufficient balance.',
+    }));
     expect(finalizeStreamingShell).toHaveBeenCalled();
     expect(host.finalizeBackgroundTaskIndicatorAfterPrimaryStream).toHaveBeenCalledWith('tab-1');
     expect(host.transitionTabSessionLifecycle).toHaveBeenCalledWith(

@@ -9,7 +9,7 @@
 
 ## 关键类型
 
-- `SendPipelineTabRuntime`：发送链路真正需要读写的 tab 级 streaming 状态切片
+- `SendPipelineTabRuntime`：发送链路真正需要读写的 tab 级 streaming 状态切片，并暴露可选 session status snapshot 供本地收尾读取 retry message
 - `SendPipelineStreamController` / `SendPipelineStreamElements`：stream shell 与流式渲染控制器边界
 - `SendPipelinePreparationPort` / `SendPipelineFinalizationPort`：对 `MessageSendPreparationService` 与 `MessageFinalizationService` 的窄接口。preparation port 还暴露 `consumeQueuedFollowUpSend()`，供 stream finalization 后按 tab 取回一条 queued send-intent 并重新走正常 send path
 - `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port；其中 transport port 现在显式接收 preparation 阶段生成的稳定 `messageID` / `requestParts`，并支持可选 top-level `agent`；persistence port 暴露 conversation write ticket + commit，而不是直接 save conversation；shell port 只保留 streaming shell 创建、reveal、notice placeholder 渲染与 timestamp 收尾，并由 `AssistantShellRenderer.ts` 统一实现 shell adapter

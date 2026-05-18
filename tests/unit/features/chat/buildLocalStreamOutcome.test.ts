@@ -165,4 +165,34 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.streamErrorNoticeMessage).toBeNull();
     expect(outcome.shouldSyncFromServer).toBe(false);
   });
+
+  it('uses the session retry message as an error notice for silent interrupted streams', () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(700);
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const routedStream = createRoutedStream({
+      streamInterrupted: true,
+      streamTimedOut: true,
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController: null,
+      routedStream,
+      sessionRetryMessage: 'Insufficient balance or no resource package. Please recharge.',
+    });
+
+    expect(outcome.shouldPersistInterruptedState).toBe(false);
+    expect(outcome.streamErrorNoticeMessage).toEqual(expect.objectContaining({
+      id: 'assistant-error-notice-700',
+      content: 'Insufficient balance or no resource package. Please recharge.',
+      timestamp: 700,
+      modelId: 'openai/gpt-5.4',
+      displayStyle: 'notice',
+      noticeTone: 'error',
+    }));
+    expect(outcome.interruptedNoticeMessage).toBeNull();
+    expect(outcome.shouldSyncFromServer).toBe(false);
+    nowSpy.mockRestore();
+  });
 });

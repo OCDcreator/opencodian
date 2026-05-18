@@ -378,14 +378,14 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 - server readiness action card 提示流程（`ensureServerReadyForChat` / `refreshStatusSurfaces`），已迁到 `services/MessageSendPreparationService.ts`；view 通过 host 原语提供 DOM 与服务访问
 - slash command execution host 装配，已迁到 `services/SlashCommandExecutionService.ts`；`createSlashCommandExecutionHost()` 工厂函数接收 `SlashCommandExecutionHostDependencies` 扁平依赖，view 只传递原始 service 引用和简单 lambda
 - stream loop、pending/timeout/interruption 已迁到 `runtime/StreamChunkRouter.ts`
-- 本地 streaming shell/notice 渲染、第一次本地保存已迁到 `runtime/StreamLocalFinalizer.ts`
+- 本地 streaming shell/notice 渲染、session retry message 读取与第一次本地保存已迁到 `runtime/StreamLocalFinalizer.ts`
 - post-stream finalization / post-sync orchestration 已迁到 `services/MessageFinalizationService.ts`
 - `OpenCodianView` 本身只保留 runtime host 装配与 bridge 方法；streaming tool-call start/end 与 primary-stream background-task finalize 触发也已经下沉到 `runtime/BackgroundTaskStreamTriggerCoordinator.ts`
 - 消息区 patch / rerender 细节仍继续复用 `ConversationRenderService`
 
 第八阶段起，host 装配 lifecycle 已移入 `SendPipelineRuntime.createSendPipelineRuntimeHost()`。view 现在只保留 `createSendPipelineHostDependencies()` 扁平依赖工厂，返回 `SendPipelineHostDependencies` 供工厂函数消费。该依赖对象覆盖的能力簇仍为：
 
-- `SendPipelineViewPort`
+- `SendPipelineViewPort`（含 active tab、tab runtime 和 session retry message 查询）
 - `SendPipelineTransportPort`
 - `SendPipelineShellPort`
 - `SendPipelinePersistencePort`
