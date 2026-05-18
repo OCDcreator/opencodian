@@ -58,6 +58,7 @@ export interface OpenCodeStreamEvent {
     id?: string;
     permission?: string;
     patterns?: string[];
+    always?: string[];
     metadata?: Record<string, unknown>;
     part?: OpenCodeStreamPart;
     parts?: OpenCodeStreamPart[];
@@ -73,6 +74,27 @@ export interface OpenCodeStreamEvent {
     };
     file?: string;
     text?: string;
+    timestamp?: string;
+    callID?: string;
+    agent?: string;
+    model?: { id: string; providerID: string; variant: string };
+    finish?: string;
+    cost?: number;
+    tokens?: {
+      total?: number;
+      input: number;
+      output: number;
+      reasoning: number;
+      cache: { write: number; read: number };
+    };
+    reasoningID?: string;
+    prompt?: { text?: string; files?: unknown[]; agents?: unknown[]; references?: unknown[] };
+    reason?: string;
+    attempt?: number;
+    output?: unknown;
+    input?: unknown;
+    tool?: string | { messageID?: string; callID?: string };
+    provider?: { id: string; name: string };
     questions?: Array<{
       question?: string;
       header?: string;
@@ -310,6 +332,16 @@ export class OpenCodeStreamEventTransformer {
       'session.error': this.handleSessionError.bind(this),
       'session.idle': this.handleSessionIdle.bind(this),
       'question.asked': this.handleQuestionAsked.bind(this),
+      'session.next.agent.switched': this.handleSessionNextObserved.bind(this),
+      'session.next.prompted': this.handleSessionNextObserved.bind(this),
+      'session.next.step.started': this.handleSessionNextObserved.bind(this),
+      'session.next.step.ended': this.handleSessionNextObserved.bind(this),
+      'session.next.text.started': this.handleSessionNextObserved.bind(this),
+      'session.next.text.ended': this.handleSessionNextObserved.bind(this),
+      'session.next.reasoning.started': this.handleSessionNextObserved.bind(this),
+      'session.next.reasoning.ended': this.handleSessionNextObserved.bind(this),
+      'session.next.tool.called': this.handleSessionNextObserved.bind(this),
+      'session.next.tool.success': this.handleSessionNextObserved.bind(this),
     };
     this.streamingPartUpdatedHandlers = {
       tool: this.handleToolPartUpdated.bind(this),
@@ -354,12 +386,10 @@ export class OpenCodeStreamEventTransformer {
 
     if (eventData.type?.startsWith('session.next.')) {
       this.host.logStreamingDebug('service-session-next-event', {
-        sessionId,
         eventType: eventData.type,
-        messageID: eventData.properties?.messageID,
-        partID: eventData.properties?.partID,
-        toolID: eventData.properties?.toolID,
+        sessionId,
       });
+      return { chunks: [], mutations, stop: false };
     }
 
     return { chunks, mutations, stop: false };
@@ -938,6 +968,28 @@ export class OpenCodeStreamEventTransformer {
       lastTextDelta: state.lastTextDelta,
     });
     return { chunks, mutations, stop: true };
+  }
+
+  private handleSessionNextObserved({
+    eventData,
+    sessionId,
+    mutations,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const properties = eventData.properties;
+    this.host.logStreamingDebug('service-session-next-event', {
+      eventType: eventData.type,
+      sessionId,
+      callID: properties?.callID,
+      reasoningID: properties?.reasoningID,
+      hasText: typeof properties?.text === 'string' && properties.text.length > 0,
+      hasInput: properties?.input !== undefined,
+      tokens: properties?.tokens,
+      finish: properties?.finish,
+      agent: properties?.agent,
+      cost: properties?.cost,
+    });
+
+    return { chunks: [], mutations, stop: false };
   }
 
   private handleQuestionAsked({

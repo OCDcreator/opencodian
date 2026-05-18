@@ -32,7 +32,134 @@ function createState(): OpenCodeStreamEventState {
   };
 }
 
+describe('OpenCodeStreamEventTransformer session.next observation', () => {
+  const sessionNextTypes = [
+    'session.next.agent.switched', 'session.next.prompted',
+    'session.next.step.started', 'session.next.step.ended',
+    'session.next.text.started', 'session.next.text.ended',
+    'session.next.reasoning.started', 'session.next.reasoning.ended',
+    'session.next.tool.called', 'session.next.tool.success',
+  ];
+
+  it.each(sessionNextTypes)('observes %s without stream output', (type) => {
+    const host = createHost();
+    const transformer = new OpenCodeStreamEventTransformer(host);
+
+    const outcome = transformer.handleStreamingEvent(
+      {
+        type,
+        properties: {
+          sessionID: 'test-session',
+          callID: 'call-1',
+          reasoningID: 'reasoning-1',
+          text: 'redacted text',
+          input: { secret: 'redacted input' },
+          output: { secret: 'redacted output' },
+          prompt: { text: 'redacted prompt' },
+          reason: 'redacted reason',
+          agent: 'build',
+          finish: 'stop',
+          cost: 0.01,
+          tokens: { input: 1, output: 2, reasoning: 3, cache: { write: 4, read: 5 } },
+        },
+      },
+      'test-session',
+      createState(),
+      { partTypeMap: new Map() },
+    );
+
+    expect(outcome).toEqual({ chunks: [], mutations: [], stop: false });
+    expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-next-event', {
+      eventType: type,
+      sessionId: 'test-session',
+      callID: 'call-1',
+      reasoningID: 'reasoning-1',
+      hasText: true,
+      hasInput: true,
+      tokens: { input: 1, output: 2, reasoning: 3, cache: { write: 4, read: 5 } },
+      finish: 'stop',
+      agent: 'build',
+      cost: 0.01,
+    });
+    expect(JSON.stringify(host.logStreamingDebug.mock.calls)).not.toContain('redacted');
+  });
+
+  it('keeps unknown session.next events observe-only', () => {
+    const host = createHost();
+    const transformer = new OpenCodeStreamEventTransformer(host);
+
+    const outcome = transformer.handleStreamingEvent(
+      {
+        type: 'session.next.future.event',
+        properties: {
+          sessionID: 'test-session',
+          text: 'redacted text',
+          input: { secret: 'redacted input' },
+          usage: { input: 9, output: 9 },
+        },
+      },
+      'test-session',
+      createState(),
+      { partTypeMap: new Map() },
+    );
+
+    expect(outcome).toEqual({ chunks: [], mutations: [], stop: false });
+    expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-next-event', {
+      eventType: 'session.next.future.event',
+      sessionId: 'test-session',
+    });
+  });
+
+  it('keeps message part delta handling unchanged', () => {
+    const transformer = new OpenCodeStreamEventTransformer(createHost());
+
+    const outcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.delta',
+        properties: {
+          sessionID: 'test-session',
+          messageID: 'assistant-1',
+          partID: 'part-text',
+          field: 'text',
+          delta: 'Hi',
+        },
+      },
+      'test-session',
+      createState(),
+      {
+        partTypeMap: new Map([['part-text', 'text']]),
+        partMessageIdMap: new Map([['part-text', 'assistant-1']]),
+      },
+    );
+
+    expect(outcome).toEqual({
+      chunks: [{ type: 'text', content: 'Hi' }],
+      mutations: [
+        {
+          type: 'message.upserted',
+          sessionID: 'test-session',
+          messageID: 'assistant-1',
+          role: 'assistant',
+          createdAt: undefined,
+        },
+        {
+          type: 'part.delta',
+          sessionID: 'test-session',
+          messageID: 'assistant-1',
+          partID: 'part-text',
+          field: 'text',
+          delta: 'Hi',
+          partType: 'text',
+        },
+      ],
+      stop: false,
+    });
+  });
+
+});
+
 describe('OpenCodeStreamEventTransformer event routing', () => {
+
   it('delegates question.asked payloads to normalized question_request chunks', () => {
     const host = createHost();
     const transformer = new OpenCodeStreamEventTransformer(host);
