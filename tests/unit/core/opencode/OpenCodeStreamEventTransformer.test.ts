@@ -38,7 +38,7 @@ describe('OpenCodeStreamEventTransformer session.next observation', () => {
     'session.next.step.started',
     'session.next.text.started', 'session.next.text.ended',
     'session.next.reasoning.started', 'session.next.reasoning.ended',
-    'session.next.tool.called', 'session.next.tool.success',
+    'session.next.tool.input.started', 'session.next.tool.input.ended',
   ];
 
   const handle = (

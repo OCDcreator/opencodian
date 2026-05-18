@@ -67,7 +67,7 @@ export interface OpenCodeStreamEvent {
     partID?: string;
     toolID?: string;
     result?: string;
-    error?: unknown;
+    error?: unknown | { type?: string; message?: string };
     usage?: {
       input?: number;
       output?: number;
@@ -92,9 +92,11 @@ export interface OpenCodeStreamEvent {
     reason?: string;
     attempt?: number;
     output?: unknown;
-    input?: unknown;
+    input?: unknown | Record<string, unknown>;
+    structured?: { preview?: string; truncated?: boolean; loaded?: unknown[] };
+    content?: Array<{ type: string; text?: string }>;
     tool?: string | { messageID?: string; callID?: string };
-    provider?: { id: string; name: string };
+    provider?: { id?: string; name?: string; executed?: boolean };
     questions?: Array<{
       question?: string;
       header?: string;
@@ -340,8 +342,11 @@ export class OpenCodeStreamEventTransformer {
       'session.next.text.ended': this.handleSessionNextObserved.bind(this),
       'session.next.reasoning.started': this.handleSessionNextObserved.bind(this),
       'session.next.reasoning.ended': this.handleSessionNextObserved.bind(this),
-      'session.next.tool.called': this.handleSessionNextObserved.bind(this),
-      'session.next.tool.success': this.handleSessionNextObserved.bind(this),
+      'session.next.tool.input.started': this.handleSessionNextObserved.bind(this),
+      'session.next.tool.input.ended': this.handleSessionNextObserved.bind(this),
+      'session.next.tool.called': this.handleSessionNextToolCalled.bind(this),
+      'session.next.tool.success': this.handleSessionNextToolSuccess.bind(this),
+      'session.next.tool.failed': this.handleSessionNextToolFailed.bind(this),
     };
     this.streamingPartUpdatedHandlers = {
       tool: this.handleToolPartUpdated.bind(this),
@@ -490,6 +495,25 @@ export class OpenCodeStreamEventTransformer {
     } catch {
       return '[unserializable-tool-input]';
     }
+  }
+
+  private sanitizeToolInput(input: unknown): Record<string, unknown> {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return {};
+    }
+
+    return { ...(input as Record<string, unknown>) };
+  }
+
+  private extractSessionNextToolResultText(content: NonNullable<OpenCodeStreamEvent['properties']>['content']): string {
+    if (!Array.isArray(content)) {
+      return '';
+    }
+
+    return content
+      .filter((item) => item.type === 'text' && typeof item.text === 'string')
+      .map((item) => item.text as string)
+      .join('');
   }
 
   private createUsageChunks(
@@ -978,6 +1002,147 @@ export class OpenCodeStreamEventTransformer {
     this.logSessionNextEvent(eventData, sessionId);
 
     return { chunks: [], mutations, stop: false };
+  }
+
+  private handleSessionNextToolCalled({
+    eventData,
+    sessionId,
+    state,
+    chunks,
+    mutations,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const properties = eventData.properties;
+    const callID = properties?.callID;
+    const toolName = typeof properties?.tool === 'string' && properties.tool.trim()
+      ? properties.tool.trim()
+      : 'unknown';
+
+    if (typeof callID !== 'string' || !callID.trim()) {
+      this.logSessionNextToolEvent(eventData, sessionId, {
+        callID,
+        toolName,
+        hasInput: properties?.input !== undefined,
+      });
+      return { chunks: [], mutations, stop: false };
+    }
+
+    if (state.processedToolIds.has(callID)) {
+      this.logSessionNextToolEvent(eventData, sessionId, {
+        callID,
+        toolName,
+        hasInput: properties?.input !== undefined,
+      });
+      return { chunks: [], mutations, stop: false };
+    }
+
+    this.host.observeRuntimeToolNames([toolName]);
+    const toolKind = this.host.getOpenCodeToolKind(toolName);
+    this.logSessionNextToolEvent(eventData, sessionId, {
+      callID,
+      toolName,
+      toolKind,
+      hasInput: properties?.input !== undefined,
+    });
+    const input = this.sanitizeToolInput(properties?.input);
+    state.processedToolIds.add(callID);
+    state.toolInputSnapshots.set(callID, this.getToolInputSnapshot(input));
+    chunks.push({
+      type: 'tool_use',
+      id: callID,
+      name: toolName,
+      kind: toolKind,
+      input,
+    });
+
+    return { chunks, mutations, stop: false };
+  }
+
+  private handleSessionNextToolSuccess({
+    eventData,
+    sessionId,
+    state,
+    chunks,
+    mutations,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const properties = eventData.properties;
+    const callID = properties?.callID;
+    this.logSessionNextToolEvent(eventData, sessionId, {
+      callID,
+      contentItemCount: Array.isArray(properties?.content) ? properties.content.length : 0,
+    });
+
+    if (typeof callID !== 'string' || !callID.trim()) {
+      return { chunks: [], mutations, stop: false };
+    }
+
+    const resultKey = `${callID}_result`;
+    if (state.processedToolIds.has(resultKey)) {
+      return { chunks: [], mutations, stop: false };
+    }
+
+    state.processedToolIds.add(resultKey);
+    chunks.push({
+      type: 'tool_result',
+      toolUseId: callID,
+      content: this.extractSessionNextToolResultText(properties?.content),
+    });
+
+    return { chunks, mutations, stop: false };
+  }
+
+  private handleSessionNextToolFailed({
+    eventData,
+    sessionId,
+    state,
+    chunks,
+    mutations,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
+    const properties = eventData.properties;
+    const callID = properties?.callID;
+    const errorPayload = properties?.error;
+    const errorType = errorPayload && typeof errorPayload === 'object'
+      ? (errorPayload as { type?: unknown }).type
+      : undefined;
+    const errorMessage = errorPayload && typeof errorPayload === 'object'
+      && typeof (errorPayload as { message?: unknown }).message === 'string'
+      && (errorPayload as { message: string }).message.trim()
+      ? (errorPayload as { message: string }).message
+      : 'Tool execution failed';
+    this.logSessionNextToolEvent(eventData, sessionId, {
+      callID,
+      errorType: typeof errorType === 'string' ? errorType : undefined,
+    });
+
+    if (typeof callID !== 'string' || !callID.trim()) {
+      return { chunks: [], mutations, stop: false };
+    }
+
+    const resultKey = `${callID}_result`;
+    if (state.processedToolIds.has(resultKey)) {
+      return { chunks: [], mutations, stop: false };
+    }
+
+    state.processedToolIds.add(resultKey);
+    chunks.push({
+      type: 'tool_result',
+      toolUseId: callID,
+      content: errorMessage,
+      isError: true,
+    });
+
+    return { chunks, mutations, stop: false };
+  }
+
+  private logSessionNextToolEvent(
+    eventData: OpenCodeStreamEvent,
+    sessionId: string,
+    metadata: Record<string, unknown>,
+  ): void {
+    this.host.logStreamingDebug('service-session-next-tool-event', {
+      eventType: eventData.type,
+      sessionId,
+      ...metadata,
+    });
   }
 
   private logSessionNextEvent(eventData: OpenCodeStreamEvent, sessionId: string): void {
