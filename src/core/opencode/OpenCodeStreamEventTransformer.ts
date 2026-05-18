@@ -356,7 +356,8 @@ export class OpenCodeStreamEventTransformer {
       this.host.logStreamingDebug('service-session-next-event', {
         sessionId,
         eventType: eventData.type,
-        properties: eventData.properties ? Object.keys(eventData.properties) : [],
+        messageID: eventData.properties?.messageID,
+        properties: eventData.properties ?? {},
       });
     }
 

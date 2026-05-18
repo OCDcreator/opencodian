@@ -52,7 +52,7 @@
 
 ### 启动环境与二进制解析
 
-- `getSpawnEnv()` 负责清理污染 `OPENCODE_*` 覆盖项，并按 `pluginIsolationMode` / auth 组装运行时环境。`modelSourceMode` 不再写 `OPENCODE_DISABLE_PROJECT_CONFIG`，避免只想改变模型来源时连带隐藏项目 skills/tools。
+- `getSpawnEnv()` 负责清理污染 `OPENCODE_*` 覆盖项，并按 `pluginIsolationMode` / auth 组装运行时环境。同时注入 `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM=true` 以启用 `session.next.*` 实验性事件系统。`modelSourceMode` 不再写 `OPENCODE_DISABLE_PROJECT_CONFIG`，避免只想改变模型来源时连带隐藏项目 skills/tools。
 - `findOpenCodeBinary()` + `resolveExecutableCandidate()` 负责跨平台二进制候选解析。
 - 如果 `settings.server.local.executablePath` 非空，启动器会先尝试该路径（含 `~/` home 展开），再进入平台默认候选。
 - macOS / Linux 默认候选现在覆盖官方安装器常见的 `~/.opencode/bin/opencode`，用于 GUI 应用没有继承 shell `PATH` 的场景。

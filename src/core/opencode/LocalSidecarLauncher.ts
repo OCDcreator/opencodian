@@ -539,6 +539,8 @@ export class LocalSidecarLauncher {
     delete env.OPENCODE_CONFIG_DIR;
     delete env.OPENCODE_CONFIG_CONTENT;
 
+    env.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM = 'true';
+
     return env;
   }
 }
