@@ -76,12 +76,49 @@ describe('OpenCodeStreamEventTransformer session.next observation', () => {
       reasoningID: 'reasoning-1',
       hasText: true,
       hasInput: true,
-      tokens: { input: 1, output: 2, reasoning: 3, cache: { write: 4, read: 5 } },
+      tokens: { total: undefined, input: 1, output: 2, reasoning: 3, cache: { write: 4, read: 5 } },
       finish: 'stop',
       agent: 'build',
       cost: 0.01,
     });
     expect(JSON.stringify(host.logStreamingDebug.mock.calls)).not.toContain('redacted');
+  });
+
+  it('redacts unexpected token fields from session.next debug logs', () => {
+    const host = createHost();
+    const transformer = new OpenCodeStreamEventTransformer(host);
+    const unsafeTokens = {
+      total: 10,
+      input: 1,
+      output: 'not-a-number',
+      detail: { text: 'sensitive' },
+      cache: { write: 2, read: 'hidden', detail: { text: 'cache-sensitive' } },
+    } as never;
+
+    transformer.handleStreamingEvent(
+      {
+        type: 'session.next.step.ended',
+        properties: { sessionID: 'test-session', tokens: unsafeTokens },
+      },
+      'test-session',
+      createState(),
+      { partTypeMap: new Map() },
+    );
+
+    expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-next-event', {
+      eventType: 'session.next.step.ended',
+      sessionId: 'test-session',
+      callID: undefined,
+      reasoningID: undefined,
+      hasText: false,
+      hasInput: false,
+      tokens: { total: 10, input: 1, output: undefined, reasoning: undefined, cache: { write: 2, read: undefined } },
+      finish: undefined,
+      agent: undefined,
+      cost: undefined,
+    });
+    expect(JSON.stringify(host.logStreamingDebug.mock.calls)).not.toContain('sensitive');
+    expect(JSON.stringify(host.logStreamingDebug.mock.calls)).not.toContain('not-a-number');
   });
 
   it('keeps unknown session.next events observe-only', () => {

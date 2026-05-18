@@ -976,6 +976,17 @@ export class OpenCodeStreamEventTransformer {
     mutations,
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const properties = eventData.properties;
+    const rawTokens = properties?.tokens;
+    const safeTokens = rawTokens ? {
+      total: typeof rawTokens.total === 'number' ? rawTokens.total : undefined,
+      input: typeof rawTokens.input === 'number' ? rawTokens.input : undefined,
+      output: typeof rawTokens.output === 'number' ? rawTokens.output : undefined,
+      reasoning: typeof rawTokens.reasoning === 'number' ? rawTokens.reasoning : undefined,
+      cache: rawTokens.cache ? {
+        write: typeof rawTokens.cache.write === 'number' ? rawTokens.cache.write : undefined,
+        read: typeof rawTokens.cache.read === 'number' ? rawTokens.cache.read : undefined,
+      } : undefined,
+    } : undefined;
     this.host.logStreamingDebug('service-session-next-event', {
       eventType: eventData.type,
       sessionId,
@@ -983,7 +994,7 @@ export class OpenCodeStreamEventTransformer {
       reasoningID: properties?.reasoningID,
       hasText: typeof properties?.text === 'string' && properties.text.length > 0,
       hasInput: properties?.input !== undefined,
-      tokens: properties?.tokens,
+      tokens: safeTokens,
       finish: properties?.finish,
       agent: properties?.agent,
       cost: properties?.cost,
