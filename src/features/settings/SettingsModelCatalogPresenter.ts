@@ -17,7 +17,6 @@ import { enhanceSearchInput } from './searchInputEnhancer';
 import {
   describeModelAvailabilitySummary,
   describeProviderAvailabilityProbe,
-  describeProviderDirectorySummary,
   describeProviderModels,
   getCatalogPlaceholderReason,
   getProviderAvailabilityProbeBadge,
@@ -112,6 +111,8 @@ export class SettingsModelCatalogPresenter {
   private modelAvailabilityOnlyDisabled = false;
   private modelAvailabilityOnlyEnabled = false;
   private providerListScrollTop = 0;
+  private catalogOverviewCollapsed = true;
+  private searchControlsCollapsed = true;
   private readonly providerAvailabilityChecks = new Map<string, ProviderAvailabilityCheckState>();
   private lastRenderState: SettingsModelCatalogPresenterRenderState | null = null;
 
@@ -159,8 +160,12 @@ export class SettingsModelCatalogPresenter {
       this.renderCatalogOverview(blockEl, catalogState);
     }
 
-    const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
-    this.renderAvailabilityControls(controlsEl, options, catalogContext);
+    if (!this.searchControlsCollapsed) {
+      const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
+      this.renderAvailabilityControls(controlsEl, options, catalogContext);
+    }
+
+    this.renderSectionHeaderToggles(containerEl);
 
     this.renderProviderList(blockEl, catalogContext, disabledModelRefs);
     this.restoreOuterScrollHostPosition(outerScrollHostSnapshot);
@@ -305,10 +310,60 @@ export class SettingsModelCatalogPresenter {
     catalogState: ModelCatalogState,
   ): HTMLElement {
     const catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
-    const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
-    this.renderModelCatalogSummaryCards(summaryEl, catalogState);
-    this.renderProviderDirectorySummary(catalogSectionEl, catalogState);
+
+    // Summary cards grid (collapsible)
+    if (!this.catalogOverviewCollapsed) {
+      const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
+      this.renderModelCatalogSummaryCards(summaryEl, catalogState);
+    } else {
+      catalogSectionEl.addClass('is-collapsed');
+    }
+
     return catalogSectionEl;
+  }
+
+  private renderSectionHeaderToggles(containerEl: HTMLElement): void {
+    const detailsEl = containerEl.closest('details');
+    const summaryEl = detailsEl?.querySelector('.opencodian-settings-block-summary');
+    if (!summaryEl) {
+      return;
+    }
+
+    const existingToggles = summaryEl.querySelector('.opencodian-model-section-toggles');
+    if (existingToggles) {
+      existingToggles.remove();
+    }
+
+    const togglesEl = summaryEl.createDiv({ cls: 'opencodian-model-section-toggles' });
+
+    // Catalog overview toggle
+    const overviewBtn = togglesEl.createEl('button', {
+      cls: 'opencodian-model-section-toggle clickable-icon',
+      attr: { 'aria-label': t('settings.model.catalog.overviewToggle') },
+    });
+    setIcon(overviewBtn, this.catalogOverviewCollapsed ? 'chevron-right' : 'chevron-down');
+    overviewBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.catalogOverviewCollapsed = !this.catalogOverviewCollapsed;
+      this.rerender();
+    });
+
+    // Search controls toggle
+    const searchBtn = togglesEl.createEl('button', {
+      cls: 'opencodian-model-section-toggle clickable-icon',
+      attr: { 'aria-label': t('settings.model.catalog.searchToggle') },
+    });
+    setIcon(searchBtn, 'search');
+    if (this.searchControlsCollapsed) {
+      searchBtn.addClass('is-off');
+    }
+    searchBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.searchControlsCollapsed = !this.searchControlsCollapsed;
+      this.rerender();
+    });
   }
 
   private createCatalogRenderContext(catalogState: ModelCatalogState): ModelCatalogRenderContext {
@@ -996,21 +1051,6 @@ export class SettingsModelCatalogPresenter {
         this.rerender();
       });
     }
-  }
-
-  private renderProviderDirectorySummary(
-    containerEl: HTMLElement,
-    catalogState: ModelCatalogState,
-  ): void {
-    const summary = describeProviderDirectorySummary(catalogState.providerDirectoryStatuses);
-    if (!summary) {
-      return;
-    }
-
-    containerEl.createDiv({
-      cls: 'opencodian-model-provider-directory-summary',
-      text: summary,
-    });
   }
 
   private async runProviderAvailabilityCheck(providerId: string): Promise<void> {

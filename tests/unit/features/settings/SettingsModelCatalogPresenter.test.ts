@@ -196,9 +196,6 @@ describe('SettingsModelCatalogPresenter', () => {
       catalogState: catalogState as never,
     });
 
-    expect(containerEl.querySelector('.opencodian-model-provider-directory-summary')?.textContent).toBe(
-      '1 connected · 1 listed · 0 listed outside catalog',
-    );
     expect(
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-model-status-badge'))
         .map((element) => element.textContent),
@@ -244,9 +241,6 @@ describe('SettingsModelCatalogPresenter', () => {
       catalogState: catalogState as never,
     });
 
-    expect(containerEl.querySelector('.opencodian-model-provider-directory-summary')?.textContent).toBe(
-      '1 connected · 2 listed · 1 listed outside catalog',
-    );
     expect(
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-model-toggle-provider-name'))
         .map((element) => element.textContent),

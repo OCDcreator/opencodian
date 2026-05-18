@@ -1130,6 +1130,8 @@ export const enTranslations = {
   'settings.model.catalog.disabledTitle': 'Currently disabled',
   'settings.model.catalog.disabledDesc': 'Shows items currently disabled by provider toggles or model toggles. A fully disabled provider appears as a whole provider; a partially disabled provider shows only the disabled models.',
   'settings.model.catalog.summary': '{providers} providers · {models} models',
+  'settings.model.catalog.overviewToggle': 'Toggle catalog overview',
+  'settings.model.catalog.searchToggle': 'Toggle search and filter bar',
   'settings.model.catalog.empty': 'No models found',
   'settings.model.catalog.hiddenByProjectDisable': 'This provider is disabled by the current project config, so it stays visible here even though no runtime model list is available.',
   'settings.model.catalog.hiddenByServerDisable': 'This provider is disabled by the server config, so it appears here even though the runtime model list is unavailable.',

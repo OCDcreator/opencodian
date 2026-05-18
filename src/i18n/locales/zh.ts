@@ -1130,6 +1130,8 @@ export const zhTranslations = {
   'settings.model.catalog.disabledTitle': '当前禁用列表',
   'settings.model.catalog.disabledDesc': '显示当前被 provider 开关或模型开关禁用的项。整 provider 禁用时会显示整个 provider；只禁用部分模型时只显示被禁用的模型。',
   'settings.model.catalog.summary': '{providers} 个提供商 · {models} 个模型',
+  'settings.model.catalog.overviewToggle': '折叠/展开目录概览',
+  'settings.model.catalog.searchToggle': '折叠/展开搜索和筛选栏',
   'settings.model.catalog.empty': '没有找到模型',
   'settings.model.catalog.hiddenByProjectDisable': '这个提供商被当前项目配置禁用了，所以即使运行时没有模型列表，这里也会保留显示。',
   'settings.model.catalog.hiddenByServerDisable': '这个提供商被服务端配置禁用了，所以即使运行时没有模型列表，这里也会保留显示。',
