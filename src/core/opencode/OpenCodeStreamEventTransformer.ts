@@ -93,6 +93,7 @@ export interface OpenCodeStreamEvent {
     attempt?: number;
     output?: unknown;
     input?: unknown | Record<string, unknown>;
+    name?: string;
     structured?: { preview?: string; truncated?: boolean; loaded?: unknown[] };
     content?: Array<{ type: string; text?: string }>;
     tool?: string | { messageID?: string; callID?: string };
@@ -586,11 +587,13 @@ export class OpenCodeStreamEventTransformer {
       return;
     }
 
+    const wasEmittedBySessionNextTool = state.processedToolIds.has(`${toolId}_session_next_tool_use`);
     const nextSnapshot = this.getToolInputSnapshot(toolInput);
     const previousSnapshot = state.toolInputSnapshots.get(toolId);
     const shouldEmitToolUse =
-      !state.processedToolIds.has(toolId)
-      || nextSnapshot !== previousSnapshot;
+      !wasEmittedBySessionNextTool
+      && (!state.processedToolIds.has(toolId)
+        || nextSnapshot !== previousSnapshot);
 
     if (shouldEmitToolUse) {
       state.processedToolIds.add(toolId);
@@ -1013,9 +1016,9 @@ export class OpenCodeStreamEventTransformer {
   }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const properties = eventData.properties;
     const callID = properties?.callID;
-    const toolName = typeof properties?.tool === 'string' && properties.tool.trim()
-      ? properties.tool.trim()
-      : 'unknown';
+    const toolName = (typeof properties?.tool === 'string' && properties.tool.trim())
+      || (typeof properties?.name === 'string' && properties.name.trim())
+      || 'unknown';
 
     if (typeof callID !== 'string' || !callID.trim()) {
       this.logSessionNextToolEvent(eventData, sessionId, {
@@ -1045,6 +1048,7 @@ export class OpenCodeStreamEventTransformer {
     });
     const input = this.sanitizeToolInput(properties?.input);
     state.processedToolIds.add(callID);
+    state.processedToolIds.add(`${callID}_session_next_tool_use`);
     state.toolInputSnapshots.set(callID, this.getToolInputSnapshot(input));
     chunks.push({
       type: 'tool_use',

@@ -238,6 +238,9 @@ describe('OpenCodeStreamEventTransformer session.next tool events', () => {
     expect(handle(transformer, state, 'session.next.tool.called', { callID: 'call-read', tool: 'read', input: { filePath: 'x' } }).chunks).toEqual([
       { type: 'tool_use', id: 'call-read', name: 'read', kind: 'builtin', input: { filePath: 'x' } },
     ]);
+    expect(handle(transformer, createState(), 'session.next.tool.called', { callID: 'call-name', name: 'read', input: { filePath: 'named.ts' } }).chunks).toEqual([
+      { type: 'tool_use', id: 'call-name', name: 'read', kind: 'builtin', input: { filePath: 'named.ts' } },
+    ]);
     expect(host.observeRuntimeToolNames).toHaveBeenCalledWith(['read']);
     expect(host.getOpenCodeToolKind).toHaveBeenCalledWith('read');
     expect(state.processedToolIds.has('call-read')).toBe(true);
@@ -251,7 +254,7 @@ describe('OpenCodeStreamEventTransformer session.next tool events', () => {
     expect(handle(transformer, createState(), 'session.next.tool.failed', { callID: 'call-failed', error: { type: 'unknown', message: 'fail' } }).chunks).toEqual([
       { type: 'tool_result', toolUseId: 'call-failed', content: 'fail', isError: true },
     ]);
-    expect(handle(transformer, state, 'message.part.updated', { messageID: 'assistant-1', part: { id: 'part-tool', sessionID: 'test-session', messageID: 'assistant-1', type: 'tool', callID: 'call-read', tool: 'read', state: { status: 'running', input: { filePath: 'x' } } } }).chunks.filter((chunk) => chunk.type === 'tool_use')).toEqual([]);
+    expect(handle(transformer, state, 'message.part.updated', { messageID: 'assistant-1', part: { id: 'part-tool', sessionID: 'test-session', messageID: 'assistant-1', type: 'tool', callID: 'call-read', tool: 'read', state: { status: 'completed', output: 'done' } } }).chunks.filter((chunk) => chunk.type === 'tool_use')).toEqual([]);
   });
 });
 
