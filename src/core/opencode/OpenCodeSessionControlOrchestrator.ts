@@ -180,11 +180,22 @@ export class OpenCodeSessionControlOrchestrator {
     session: Session,
     sessionId: string,
   ): Promise<SessionContextUsageSnapshot> {
-    const providersResult = await this.host.getAvailableModels();
     const rawPId = session.model?.providerID ?? null;
     const rawMId = session.model?.id ?? null;
-    const provider = rawPId ? providersResult.providers.find((p) => p.id === rawPId) : undefined;
-    const model = provider && rawMId ? provider.models.find((m) => m.id === rawMId) : undefined;
+    let providerName: string | null = rawPId;
+    let modelName: string | null = rawMId;
+    let contextWindow = 0;
+
+    try {
+      const providersResult = await this.host.getAvailableModels();
+      const provider = rawPId ? providersResult.providers.find((p) => p.id === rawPId) : undefined;
+      const model = provider && rawMId ? provider.models.find((m) => m.id === rawMId) : undefined;
+      providerName = provider?.name ?? rawPId;
+      modelName = model?.name ?? rawMId;
+      contextWindow = model?.contextWindow ?? 0;
+    } catch {
+      // Fall back to raw IDs when model catalog is unavailable
+    }
 
     return {
       sessionId,
@@ -193,10 +204,10 @@ export class OpenCodeSessionControlOrchestrator {
       updatedAt: session.time.updated,
       compactingAt: typeof session.time.compacting === 'number' ? session.time.compacting : null,
       providerId: rawPId,
-      providerName: provider?.name ?? rawPId,
+      providerName,
       modelId: rawMId,
-      modelName: model?.name ?? rawMId,
-      contextWindow: model?.contextWindow ?? 0,
+      modelName,
+      contextWindow,
       inputTokens: session.tokens?.input ?? 0,
       outputTokens: session.tokens?.output ?? 0,
       reasoningTokens: session.tokens?.reasoning ?? 0,

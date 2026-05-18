@@ -9,7 +9,7 @@ SDK 错误分类工具。根据 SDK 1.15.3 error interceptor 包装后的错误�
 
 ## 核心逻辑
 
-- `classifySdkError(error)` 检查 `error.cause.body.name`（SDK 结构化错误名）和 `error.cause.status`（HTTP 状态码）进行分类
+- `classifySdkError(error)` 检查 `error.cause.body.name`（SDK 结构化错误名）优先于 `error.cause.status`（HTTP 状态码）进行分类；非 Error 实例路径与 Error 实例路径使用一致的 name-first 优先级；两条路径均识别 `SessionNextRetryError`
 - `extractSdkErrorCause(error)` 从 `Error.cause` 中提取 SDK 包装的结构化错误信息（status + body）
 - `SdkErrorClass` 类型导出供 StreamChunk、ErrorChunk 等使用
 

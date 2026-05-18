@@ -51,6 +51,7 @@ orchestrator 现在承接以下共享控制流：
 - 聚合 assistant cost，总结 input/output/reasoning/cache token 数
 - 透传 session-level `time.compacting` 到 `compactingAt`，为后续 compaction live-state UI 保留事实来源
 - 当 `session.tokens` 和 `session.model` 均非空时，优先从 session info 直接读取 cost/tokens/model，跳过消息扫描路径；否则回退到原有的并行请求 + 消息扫描
+- session-level 快速路径在模型目录获取失败时回退到原始 provider/model ID（`contextWindow: 0`），不丢失已有的 tokens/cost 数据
 
 这样 `OpenCodeService` 不再直接持有 context-usage 计算细节，也避免相关逻辑继续散落在 session lifecycle 与 message API 之间。
 

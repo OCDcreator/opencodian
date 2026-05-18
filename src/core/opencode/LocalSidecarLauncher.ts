@@ -535,10 +535,9 @@ export class LocalSidecarLauncher {
       delete env.OPENCODE_SERVER_PASSWORD;
     }
 
-    delete env.OPENCODE_DISABLE_PROJECT_CONFIG;
-    delete env.OPENCODE_CONFIG_DIR;
-    delete env.OPENCODE_CONFIG_CONTENT;
-
+    // Required for OpenCode >= 1.15 to emit session.next.* SSE events.
+    // Safe to set on older versions (flag is ignored). Remove when the flag
+    // becomes the default or is removed upstream.
     env.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM = 'true';
 
     return env;

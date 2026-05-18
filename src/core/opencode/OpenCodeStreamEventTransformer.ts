@@ -357,7 +357,8 @@ export class OpenCodeStreamEventTransformer {
         sessionId,
         eventType: eventData.type,
         messageID: eventData.properties?.messageID,
-        properties: eventData.properties ?? {},
+        partID: eventData.properties?.partID,
+        toolID: eventData.properties?.toolID,
       });
     }
 

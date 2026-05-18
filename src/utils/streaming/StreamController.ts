@@ -1,3 +1,4 @@
+import type { SdkErrorClass } from '../../core/opencode/sdkErrorClassification';
 import { createLogger, getToolIdentity, isInternalStructuredOutputTool } from '../../shared';
 import type { MarkdownRenderService } from '../markdown';
 import { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
@@ -20,13 +21,14 @@ import { createStreamState } from './types';
 const logger = createLogger('StreamController');
 const STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96;
 
-const ERROR_CLASS_ICONS: Record<string, string> = {
+const ERROR_CLASS_ICONS: Record<SdkErrorClass, string> = {
   not_found: '🔍',
   forbidden: '🔒',
   bad_request: '⚠️',
   provider_auth: '🔑',
   rate_limit: '⏳',
   server_error: '💥',
+  unknown: '❌',
 };
 
 export class StreamController {
@@ -365,7 +367,7 @@ export class StreamController {
       errorEl.dataset.errorClass = chunk.errorClass;
     }
 
-    const icon = ERROR_CLASS_ICONS[chunk.errorClass ?? ''] ?? '❌';
+    const icon = ERROR_CLASS_ICONS[chunk.errorClass ?? 'unknown'];
 
     errorEl.createSpan({ cls: 'streaming-error-icon', text: icon });
     errorEl.createSpan({

@@ -38,6 +38,11 @@ export function classifySdkError(error: unknown): SdkErrorClass {
   if (!(error instanceof Error)) {
     if (error && typeof error === 'object') {
       const record = error as { status?: unknown; data?: { statusCode?: unknown }; name?: unknown };
+      const errorName = typeof record.name === 'string' ? record.name : null;
+      if (errorName === 'NotFoundError') return 'not_found';
+      if (errorName === 'ProviderAuthError') return 'provider_auth';
+      if (errorName === 'BadRequest') return 'bad_request';
+      if (errorName === 'SessionNextRetryError') return 'server_error';
       if (typeof record.status === 'number') {
         const classified = classifyByHttpStatus(record.status);
         if (classified) return classified;
@@ -46,10 +51,6 @@ export function classifySdkError(error: unknown): SdkErrorClass {
         const classified = classifyByHttpStatus(record.data.statusCode);
         if (classified) return classified;
       }
-      const errorName = typeof record.name === 'string' ? record.name : null;
-      if (errorName === 'NotFoundError') return 'not_found';
-      if (errorName === 'ProviderAuthError') return 'provider_auth';
-      if (errorName === 'BadRequest') return 'bad_request';
     }
     return 'unknown';
   }
