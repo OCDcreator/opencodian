@@ -41,6 +41,7 @@
 - `.opencodian-settings-section` 标记可见的 section surface。
 - `data-settings-surface='section'` 给测试与后续 QA 提供稳定的 surface marker。
 - `.opencodian-settings-section-body` 标记普通 setting row 接收 row-card styling 的 body 区域。
+- collapsible block 默认仍把 description 放进 summary；当 `descriptionPlacement: 'footer'` 时，description 会渲染成 `.opencodian-settings-block-footer-desc`，作为 details 外的 block footer 常驻显示。这样折叠态可以只显示标题和底部说明，展开态则把说明保留在整张卡片最底部。
 
 ## 注意事项
 

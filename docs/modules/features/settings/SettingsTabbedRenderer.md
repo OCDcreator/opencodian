@@ -19,6 +19,7 @@
 通过 `TabRendererDependencies` 接口接收所有外部依赖，避免直接依赖 `OpenCodianSettingTab`。依赖包括：
 
 - 创建 heading、settings block、帮助按钮等共享 UI 回调
+- settings block 回调透传 `descriptionPlacement`，让具体 section 可以选择把 collapsible block 的说明放在 summary 或底部 footer
 - 模型/服务器状态回调
 - section owner 实例注册回调
 - 用户设置 content panel 渲染回调（单一 seam，具体 profile/prompt/tags 路由留给 `SettingsUserSection`）

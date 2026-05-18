@@ -43,6 +43,7 @@ interface SettingsBlockOptions {
   collapsible?: boolean;
   defaultOpen?: boolean;
   onToggle?: (isOpen: boolean) => void;
+  descriptionPlacement?: 'summary' | 'footer';
 }
 
 type ServerStatus = ReturnType<OpenCodianPlugin['openCodeService']['getServerStatus']>;

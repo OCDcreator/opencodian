@@ -182,15 +182,28 @@ Guardrail: 这轮是工作台式表格控制增强，不应引入独立筛选面
 
 Guardrail: 只放宽 formatter/LSP 编辑字段，不放宽 builtin row 顶部 action dropdown，也不把所有设置页 input 全局拉长。
 
+### 2026-05-18 model availability actions pass
+
+模型可用性区不再渲染单独的 catalog bulk actions 信息条：
+
+- `.opencodian-model-catalog-summary-grid` 保持 auto-fit grid，但把最小列宽和 gap 收紧，避免在窄设置面板里硬挤内容。
+- `.opencodian-model-catalog-summary-card` 保留 title/meta 上下两行结构，只收紧 padding、gap 和高度，避免横排摘要在中文文案下溢出。
+- `.opencodian-model-availability-controls` 现在同时承载搜索框、已启用/已禁用筛选，以及 catalog bulk provider actions，并用四列 grid 让它们在常规设置面板宽度下保持同一行。
+- `.opencodian-model-catalog-actions-buttons` 保留为批量按钮容器，放在 controls 行最右列，默认不换行；窄屏下才恢复换行与全宽按钮。
+- `.opencodian-model-catalog-actions*` 顶部信息条样式已移除，避免摘要卡片上方再出现重复的 title/count 容器。
+- `.opencodian-settings-block-footer-desc` 用于把模型可用性说明放到整个 collapsible card 底部；该 footer 在 details 外侧，折叠态仍可见。
+
+Guardrail: 后续不要把 provider 批量启用/禁用重新做成摘要卡片上方的独立横条，也不要把 summary card 的 title/meta 改成单行横排；模型可用性说明不要放回 collapsible summary 顶部。如果需要更多 bulk 行为，优先放进搜索/筛选 controls 右侧或在窄屏自然换行。
+
 ### 2026-05-15 model availability rhythm pass
 
 provider / model 管理区在交换 actions 与 search 行顺序后，纵向节奏改成“两层 gap”而不是依赖零散 margin 叠加：
 
 - `.opencodian-model-toggle-management` 作为外层 stack，显式覆盖共享 section-body 的默认 `8px` gap，改用 `12px` 主节奏。
-- `.opencodian-model-toggle-catalogs` 自己再用 `12px` 子节奏串联 bulk actions 与 summary cards，不再额外吃 bottom margin。
+- `.opencodian-model-toggle-catalogs` 自己再用 `12px` 子节奏承载 summary cards，不再额外吃 bottom margin。
 - `.opencodian-model-availability-controls` 与 `.opencodian-model-catalog-summary-grid` 去掉各自的 `margin-bottom`，provider list 顶部也不再额外补 `margin-top`。
 
-Guardrail: 如果后续继续调整 availability 区，不要再把 `actions / summary / controls / provider list` 的纵向空隙拆回多个 margin。优先让外层 stack 决定主节奏，让 catalogs 子容器决定内部节奏。
+Guardrail: 如果后续继续调整 availability 区，不要再把 `summary / controls / provider list` 的纵向空隙拆回多个 margin。优先让外层 stack 决定主节奏，让 catalogs 子容器决定内部节奏。
 
 ## 2026-05-13 Model picker visual refresh
 

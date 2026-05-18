@@ -17,6 +17,7 @@ export interface SettingsBlockOptions {
   collapsible?: boolean;
   defaultOpen?: boolean;
   onToggle?: (isOpen: boolean) => void;
+  descriptionPlacement?: 'summary' | 'footer';
 }
 
 export function renderLanguageSetting(
@@ -52,6 +53,7 @@ export function createSettingsBlock(
     collapsible = false,
     defaultOpen = true,
     onToggle,
+    descriptionPlacement = 'summary',
   } = options;
 
   const hostEl = containerEl.createDiv({
@@ -82,13 +84,23 @@ export function createSettingsBlock(
     cls: 'opencodian-settings-subsection-heading opencodian-settings-section-heading',
     text: title,
   });
-  const descEl = summaryEl.createDiv({ cls: 'opencodian-settings-block-desc' });
-  applyInlineCodeTextToTarget(descEl, description);
+  if (descriptionPlacement === 'summary') {
+    const descEl = summaryEl.createDiv({ cls: 'opencodian-settings-block-desc' });
+    applyInlineCodeTextToTarget(descEl, description);
+  }
 
-  return detailsEl.createDiv({
+  const bodyEl = detailsEl.createDiv({
     cls: 'opencodian-settings-block-body opencodian-settings-section-body',
     attr: { 'data-settings-surface': 'section-body' },
   });
+  if (descriptionPlacement === 'footer') {
+    const descEl = hostEl.createDiv({
+      cls: 'opencodian-settings-block-desc opencodian-settings-block-footer-desc',
+    });
+    applyInlineCodeTextToTarget(descEl, description);
+  }
+
+  return bodyEl;
 }
 
 export function setSettingDescWithFormatting(

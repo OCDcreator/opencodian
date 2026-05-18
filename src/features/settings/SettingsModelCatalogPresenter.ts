@@ -63,7 +63,6 @@ interface ModelCatalogRenderContext {
   catalogState: ModelCatalogState;
   selectedCatalog: ModelCatalog;
   providerStatusById: Map<string, ModelCatalogProvider>;
-  selectedCatalogTitle: string;
   selectedCatalogProviderIds: string[];
   catalogScopedProviderIds: string[];
 }
@@ -147,11 +146,11 @@ export class SettingsModelCatalogPresenter {
       ? this.createCatalogRenderContext(catalogState)
       : null;
     if (catalogState) {
-      this.renderCatalogOverview(blockEl, catalogState, catalogContext);
+      this.renderCatalogOverview(blockEl, catalogState);
     }
 
     const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
-    this.renderAvailabilityControls(controlsEl, options);
+    this.renderAvailabilityControls(controlsEl, options, catalogContext);
 
     this.renderProviderList(blockEl, catalogContext, disabledModelRefs);
     this.restoreOuterScrollHostPosition(outerScrollHostSnapshot);
@@ -189,11 +188,15 @@ export class SettingsModelCatalogPresenter {
   private renderAvailabilityControls(
     controlsEl: HTMLElement,
     options: SettingsModelCatalogPresenterRenderOptions,
+    catalogContext: ModelCatalogRenderContext | null,
   ): void {
     const searchInputEl = this.renderAvailabilitySearchInput(controlsEl);
     this.restoreAvailabilitySearchSelection(searchInputEl, options.restoreSearchSelection);
     this.renderAvailabilityFilterToggle(controlsEl, 'disabled');
     this.renderAvailabilityFilterToggle(controlsEl, 'enabled');
+    if (catalogContext) {
+      this.renderCatalogActionButtons(controlsEl, catalogContext);
+    }
   }
 
   private renderAvailabilitySearchInput(controlsEl: HTMLElement): HTMLInputElement {
@@ -290,12 +293,8 @@ export class SettingsModelCatalogPresenter {
   private renderCatalogOverview(
     blockEl: HTMLElement,
     catalogState: ModelCatalogState,
-    context: ModelCatalogRenderContext | null,
   ): HTMLElement {
     const catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
-    if (context) {
-      this.renderCatalogActions(catalogSectionEl, context);
-    }
     const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
     this.renderModelCatalogSummaryCards(summaryEl, catalogState);
     return catalogSectionEl;
@@ -319,35 +318,20 @@ export class SettingsModelCatalogPresenter {
       catalogState,
       selectedCatalog,
       providerStatusById,
-      selectedCatalogTitle: this.getCatalogTabTitle(this.activeCatalogTab),
       selectedCatalogProviderIds,
       catalogScopedProviderIds,
     };
   }
 
-  private renderCatalogActions(
-    catalogSectionEl: HTMLElement,
+  private renderCatalogActionButtons(
+    controlsEl: HTMLElement,
     context: ModelCatalogRenderContext,
   ): void {
     if (this.activeCatalogTab === 'disabled' || context.selectedCatalogProviderIds.length === 0) {
       return;
     }
 
-    const catalogActionsEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-actions' });
-    const catalogActionsInfoEl = catalogActionsEl.createDiv({ cls: 'opencodian-model-catalog-actions-info' });
-    catalogActionsInfoEl.createDiv({
-      cls: 'opencodian-model-catalog-actions-title',
-      text: context.selectedCatalogTitle,
-    });
-    catalogActionsInfoEl.createDiv({
-      cls: 'opencodian-model-catalog-actions-meta',
-      text: t('settings.model.catalog.summary', {
-        providers: String(context.selectedCatalog.providers.length),
-        models: String(this.getCatalogModelCount(context.selectedCatalog)),
-      }),
-    });
-
-    const catalogActionsButtonsEl = catalogActionsEl.createDiv({
+    const catalogActionsButtonsEl = controlsEl.createDiv({
       cls: 'opencodian-model-catalog-actions-buttons',
     });
     const enableCatalogProvidersButton = this.createActionButton(
@@ -921,20 +905,6 @@ export class SettingsModelCatalogPresenter {
     }
 
     this.render(this.lastRenderState, options);
-  }
-
-  private getCatalogTabTitle(mode: ModelCatalogStateMode): string {
-    switch (mode) {
-      case 'local':
-        return t('settings.model.catalog.localTitle');
-      case 'server':
-        return t('settings.model.catalog.serverTitle');
-      case 'disabled':
-        return t('settings.model.catalog.disabledTitle');
-      case 'effective':
-      default:
-        return t('settings.model.catalog.effectiveTitle');
-    }
   }
 
   private renderModelCatalogSummaryCards(

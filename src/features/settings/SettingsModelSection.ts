@@ -21,6 +21,7 @@ interface SettingsModelBlockOptions {
   collapsible?: boolean;
   defaultOpen?: boolean;
   onToggle?: (isOpen: boolean) => void;
+  descriptionPlacement?: 'summary' | 'footer';
 }
 
 interface SettingsModelSectionOptions {
@@ -242,6 +243,7 @@ export class SettingsModelSection {
       title: t('settings.model.availability.title'),
       description: t('settings.model.availability.desc'),
       collapsible: true,
+      descriptionPlacement: 'footer',
       defaultOpen: this.plugin.settings.modelAvailabilitySectionOpen,
       onToggle: (isOpen) => {
         this.plugin.settings.modelAvailabilitySectionOpen = isOpen;

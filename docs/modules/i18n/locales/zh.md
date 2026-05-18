@@ -279,3 +279,7 @@ New Chinese keys added for the tabbed settings layout:
 ## 2026-05-17 命令目录卡片 UI
 
 新增 `settings.commands.catalog.*` 系列键，用于卡片式命令目录：搜索占位符 (`searchPlaceholder`)、筛选标签 (`filterAll/filterSkills/filterCommands/filterEnabled/filterDisabled`)、来源/状态芯片 (`chip.skill/chip.command/chip.project/chip.md-command/chip.subtask/chip.hidden/chip.unavailable`)、多选批量操作 (`selectedCount/batchEnable/batchDisable`)、可见性 / 选择 aria 文案 (`visibility.toggle` / `selection.toggle`) 和无匹配空态 (`noResults`)。
+
+## 2026-05-18 模型可用性批量按钮文案
+
+`settings.model.availability.enableAllProviders` / `disableAllProviders` 的中文文案去掉“一键”，改为更短的“启用所有提供商 / 禁用所有提供商”，配合模型可用性工具行的同排布局。

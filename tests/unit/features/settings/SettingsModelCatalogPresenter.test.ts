@@ -187,7 +187,7 @@ describe('SettingsModelCatalogPresenter', () => {
     expect(containerEl.querySelector('.opencodian-model-toggle-provider-scrollbar-proxy')).toBeNull();
   });
 
-  it('renders bulk actions before the catalog summary and keeps availability search controls after it', () => {
+  it('renders bulk actions in the availability controls after the catalog summary', () => {
     const { presenter } = createPresenter();
     const containerEl = document.createElement('div');
     document.body.appendChild(containerEl);
@@ -198,15 +198,16 @@ describe('SettingsModelCatalogPresenter', () => {
       catalogState: createCatalogState() as never,
     });
 
-    const actionsEl = containerEl.querySelector<HTMLElement>('.opencodian-model-catalog-actions');
     const summaryEl = containerEl.querySelector<HTMLElement>('.opencodian-model-catalog-summary-grid');
     const controlsEl = containerEl.querySelector<HTMLElement>('.opencodian-model-availability-controls');
+    const actionButtonsEl = containerEl.querySelector<HTMLElement>('.opencodian-model-catalog-actions-buttons');
 
-    expect(actionsEl).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-model-catalog-actions')).toBeNull();
     expect(summaryEl).not.toBeNull();
     expect(controlsEl).not.toBeNull();
-    expect(actionsEl!.compareDocumentPosition(summaryEl!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(actionButtonsEl).not.toBeNull();
     expect(summaryEl!.compareDocumentPosition(controlsEl!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(controlsEl!.contains(actionButtonsEl)).toBe(true);
   });
 
   it('skips the secondary availability description when the copy is empty', () => {
@@ -367,15 +368,32 @@ describe('SettingsModelCatalogPresenter CSS contract', () => {
       'gap:',
     );
     const catalogsRule = findRule('\\.opencodian-model-toggle-catalogs', 'display: grid');
-    const actionsRule = findRule('\\.opencodian-model-catalog-actions', 'margin-top: 0');
+    const summaryCardGridRule = findRule('\\.opencodian-model-catalog-summary-grid', 'grid-template-columns:');
+    const summaryCardRule = findRule('\\.opencodian-model-catalog-summary-card', 'min-height: 52px');
+    const actionsRule = findRule('\\.opencodian-model-catalog-actions-buttons', 'flex-wrap: nowrap');
+    const actionButtonRule = findRule('\\.opencodian-model-toggle-action-button', 'min-width: 110px');
+    const footerDescRule = findRule('\\.opencodian-settings-block > \\.opencodian-settings-block-footer-desc', 'padding-bottom: 24px');
     const summaryGridRule = findRule('\\.opencodian-model-catalog-summary-grid', 'margin-bottom: 0');
     const controlsRule = findRule('\\.opencodian-model-availability-controls', 'margin-bottom: 0');
 
     expect(managementRule).toContain('gap: var(--opencodian-settings-space-lg');
+    expect(managementRule).toContain('padding-bottom: 0');
     expect(catalogsRule).toContain('display: grid');
     expect(catalogsRule).toContain('gap: var(--opencodian-settings-space-lg');
     expect(catalogsRule).toContain('margin-bottom: 0');
-    expect(actionsRule).toContain('margin-top: 0');
+    expect(summaryCardGridRule).toContain('repeat(auto-fit, minmax(150px, 1fr))');
+    expect(summaryCardGridRule).toContain('gap: 6px');
+    expect(summaryCardRule).toContain('flex-direction: column');
+    expect(summaryCardRule).toContain('box-sizing: border-box');
+    expect(summaryCardRule).toContain('min-height: 52px');
+    expect(controlsRule).toContain('display: grid');
+    expect(controlsRule).toContain('grid-template-columns: minmax(220px, 1fr) auto auto auto');
+    expect(actionsRule).toContain('flex-wrap: nowrap');
+    expect(actionsRule).toContain('margin-left: 0');
+    expect(actionButtonRule).toContain('min-width: 110px');
+    expect(actionButtonRule).toContain('padding-inline: 10px');
+    expect(footerDescRule).toContain('padding-bottom: 24px');
+    expect(controlsRule).toContain('align-items: center');
     expect(summaryGridRule).toContain('margin-bottom: 0');
     expect(controlsRule).toContain('margin-bottom: 0');
   });
