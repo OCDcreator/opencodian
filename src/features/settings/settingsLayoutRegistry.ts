@@ -5,8 +5,8 @@
  * This registry only owns layout orchestration — no setting save logic lives here.
  */
 
-import type { TranslationKey } from '../../i18n';
 import type { AgentBackendKind } from '../../core/types/chat';
+import type { TranslationKey } from '../../i18n';
 
 export interface SettingsPrimaryTab {
   id: string;

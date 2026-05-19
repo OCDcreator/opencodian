@@ -1,9 +1,10 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, expect,it } from '@jest/globals';
+
 import {
   AgentCapability,
-  OPENCODE_FULL_CAPABILITIES,
   getActiveBackendCapabilities,
   hasCapability,
+  OPENCODE_FULL_CAPABILITIES,
 } from '../../../../src/core/agents/AgentCapability';
 
 describe('AgentCapability', () => {

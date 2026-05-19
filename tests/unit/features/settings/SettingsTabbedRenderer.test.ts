@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 
-import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import { SettingsAgentsSection } from '../../../../src/features/settings/SettingsAgentsSection';
 import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
 import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
