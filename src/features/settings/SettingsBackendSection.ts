@@ -37,11 +37,22 @@ export class SettingsBackendSection {
   }
 
   private addDefaultBackendSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const enabledBackends = this.getEnabledBackends();
+    const setting = new Setting(containerEl)
       .setName(t('settings.agent.default'))
-      .setDesc(t('settings.agent.default.desc'))
+      .setDesc(enabledBackends.length === 0 ? t('settings.agent.default.empty.desc') : t('settings.agent.default.desc'));
+
+    if (enabledBackends.length === 0) {
+      setting.controlEl.createDiv({
+        cls: 'opencodian-settings-inline-notice',
+        text: t('settings.agent.empty.notice'),
+      });
+      return;
+    }
+
+    setting
       .addDropdown((dropdown) => {
-        for (const backend of this.getEnabledBackends()) {
+        for (const backend of enabledBackends) {
           const option = BACKEND_OPTIONS.find((candidate) => candidate.id === backend);
           if (option) {
             dropdown.addOption(option.id, t(option.labelKey));
@@ -50,8 +61,10 @@ export class SettingsBackendSection {
         dropdown
           .setValue(this.plugin.settings.activeBackend ?? '')
           .onChange(async (value) => {
-            this.plugin.settings.activeBackend = value as AgentBackendKind;
-            await this.plugin.saveSettings();
+            if (value) {
+              this.plugin.settings.activeBackend = value as AgentBackendKind;
+              await this.plugin.saveSettings();
+            }
           });
       });
   }
@@ -79,7 +92,7 @@ export class SettingsBackendSection {
             .setValue(enabled)
             .setDisabled(false)
             .onChange(async (value) => {
-              this.setBackendEnabled(backend.id, value);
+              await this.setBackendEnabled(backend.id, value);
               await this.plugin.saveSettings();
               this.requestDisplayRefresh();
             });
@@ -91,7 +104,7 @@ export class SettingsBackendSection {
     return this.plugin.settings.enabledBackends;
   }
 
-  private setBackendEnabled(backend: AgentBackendKind, enabled: boolean): void {
+  private async setBackendEnabled(backend: AgentBackendKind, enabled: boolean): Promise<void> {
     const enabledBackends = new Set(this.getEnabledBackends());
     if (enabled) {
       enabledBackends.add(backend);
@@ -104,6 +117,14 @@ export class SettingsBackendSection {
       .filter((candidate) => enabledBackends.has(candidate));
 
     this.ensureValidBackendState();
+
+    if (backend === 'opencode' && !enabled) {
+      try {
+        await this.plugin.openCodeService?.stop();
+      } catch {
+        // Best effort: disabling the setting should still be saved if shutdown fails.
+      }
+    }
   }
 
   private ensureValidBackendState(): void {
