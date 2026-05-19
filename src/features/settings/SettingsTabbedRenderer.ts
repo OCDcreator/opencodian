@@ -8,8 +8,11 @@
 import type { App } from 'obsidian';
 import { setIcon, Setting } from 'obsidian';
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { renderAgentSwitcherChips } from './AgentSwitcherChips';
+import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsBackendSection } from './SettingsBackendSection';
@@ -85,6 +88,7 @@ export class SettingsTabbedRenderer {
   }
 
   renderDisplay(containerEl: HTMLElement): void {
+    containerEl.classList.add('opencodian-settings-tabbed');
     const visibleTabs = SETTINGS_PRIMARY_TABS.filter((tab) => {
       if (!tab.backendRequired) return true;
       return this.deps.plugin.settings.enabledBackends.includes(tab.backendRequired);
@@ -108,6 +112,20 @@ export class SettingsTabbedRenderer {
     if (!visibleSecondaryTabs.some((tab) => tab.id === activeSecondaryId)) {
       activeSecondaryId = visibleSecondaryTabs[0]?.id ?? primaryDef?.defaultSecondaryTabId ?? 'basic';
     }
+
+    const enabledAgents = this.getEnabledAgents();
+    const selectedAgent = this.getSelectedAgent(enabledAgents);
+    renderAgentSwitcherFloatingIcons(containerEl, {
+      selectedAgent,
+      enabledAgents,
+      onSelect: (agent) => { this.switchAgent(agent); },
+    });
+
+    renderAgentSwitcherChips(containerEl, {
+      selectedAgent,
+      enabledAgents,
+      onSelect: (agent) => { this.switchAgent(agent); },
+    });
 
     // Primary tab bar
     const primaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-primary' });
@@ -171,6 +189,37 @@ export class SettingsTabbedRenderer {
     };
     void this.deps.plugin.saveSettings();
     this.deps.requestDisplayRefresh();
+  }
+
+  private switchAgent(agent: AgentBackendKind): void {
+    const agentPrimaryTab = SETTINGS_PRIMARY_TABS.find((tab) => tab.backendRequired === agent);
+    const resolvedPrimary = agentPrimaryTab?.id ?? 'general';
+    const resolvedSecondary = getActiveSecondaryTabId(
+      resolvedPrimary,
+      this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
+    );
+
+    this.deps.plugin.settings.activeBackend = agent;
+    this.deps.plugin.settings.settingsTabbedPrimaryTab = resolvedPrimary;
+    this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary = {
+      ...this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
+      [resolvedPrimary]: resolvedSecondary,
+    };
+    void this.deps.plugin.saveSettings();
+    this.deps.requestDisplayRefresh();
+  }
+
+  private getEnabledAgents(): AgentBackendKind[] {
+    return this.deps.plugin.settings.enabledBackends;
+  }
+
+  private getSelectedAgent(enabledAgents: AgentBackendKind[]): AgentBackendKind | undefined {
+    const activeBackend = this.deps.plugin.settings.activeBackend;
+    if (activeBackend && enabledAgents.includes(activeBackend)) {
+      return activeBackend;
+    }
+
+    return enabledAgents[0];
   }
 
   private switchSecondaryTab(primaryTabId: string, secondaryTabId: string): void {

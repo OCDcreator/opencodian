@@ -2310,6 +2310,127 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 
+/* components/agent-switcher.css */
+.opencodian-settings-tabbed {
+  position: relative;
+}
+
+.opencodian-agent-switcher-hover-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 99;
+  width: 80px;
+  pointer-events: auto;
+}
+
+.opencodian-agent-switcher-floating {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 200ms ease;
+}
+
+.opencodian-agent-switcher-hover-zone:hover + .opencodian-agent-switcher-floating,
+.opencodian-agent-switcher-floating:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.opencodian-agent-switcher-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  animation: agent-icon-idle 3.5s ease-in-out infinite;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.opencodian-agent-switcher-icon:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: scale(1.08) translateY(-2px);
+}
+
+.opencodian-agent-switcher-icon:active {
+  transform: scale(0.95);
+}
+
+.opencodian-agent-switcher-icon.opencodian-agent-switcher-clicked {
+  animation: agent-icon-click 220ms ease;
+}
+
+.opencodian-agent-switcher-icon.opencodian-agent-switcher-selected {
+  border-left: 3px solid var(--interactive-accent);
+  background: var(--background-secondary-alt);
+}
+
+@keyframes agent-icon-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.opencodian-agent-switcher-icon.entering {
+  animation: agent-icon-enter 300ms ease forwards;
+}
+
+@keyframes agent-icon-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes agent-icon-click {
+  0% { transform: scale(0.95); }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.opencodian-agent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.opencodian-agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.opencodian-agent-chip:hover {
+  background: var(--background-secondary-alt);
+}
+
+.opencodian-agent-chip.opencodian-agent-chip-selected {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+
 /* components/model-selector.css */
 /* ============================================================
    Model Selector - Opencode Style

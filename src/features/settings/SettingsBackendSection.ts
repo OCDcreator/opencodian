@@ -4,7 +4,7 @@ import type { AgentBackendKind } from '../../core/types/chat';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 
-const BACKEND_OPTIONS: Array<{
+export const BACKEND_OPTIONS: Array<{
   id: AgentBackendKind;
   labelKey: TranslationKey;
   descriptionKey: TranslationKey;
