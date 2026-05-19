@@ -1731,10 +1731,10 @@ export interface OpenCodianSettings {
   // User preferences
   userName: string;
 
-  /** Currently active backend for new conversations. Default: 'opencode'. */
-  activeBackend: AgentBackendKind;
+  /** Currently active backend for new conversations, if one is enabled. */
+  activeBackend: AgentBackendKind | undefined;
 
-  /** List of enabled backends. At least one must always be enabled. */
+  /** List of enabled backends. It can be empty when all agents are disabled. */
   enabledBackends: AgentBackendKind[];
 
   // Server configuration

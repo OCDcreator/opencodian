@@ -246,7 +246,7 @@ export class SettingsTabbedRenderer {
   // ─── Per-section tabbed content ────────────────────────────────────
 
   private renderGeneralContent(containerEl: HTMLElement, secondaryTabId: string): void {
-    if (secondaryTabId === 'backend') {
+    if (secondaryTabId === 'agents') {
       const backendSection = new SettingsBackendSection({
         plugin: this.deps.plugin,
         requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },

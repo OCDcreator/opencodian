@@ -14,12 +14,12 @@ import {
 } from '../../../../src/features/settings/settingsLayoutRegistry';
 
 describe('SETTINGS_PRIMARY_TABS', () => {
-  it('defines general with basic and backend secondary tabs', () => {
+  it('defines general with basic and agents secondary tabs', () => {
     const generalTab = getPrimaryTabDefinition('general');
     expect(generalTab).toBeDefined();
     expect(generalTab!.labelKey).toBe('settings.general.title');
     expect(generalTab!.defaultSecondaryTabId).toBe('basic');
-    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['basic', 'backend']);
+    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['basic', 'agents']);
   });
 
   it('defines all expected primary tabs in order', () => {
@@ -160,6 +160,7 @@ describe('resolveSecondaryTabId', () => {
 
   it('maps legacy secondary ids to their merged targets', () => {
     expect(resolveSecondaryTabId('general', 'language')).toBe('basic');
+    expect(resolveSecondaryTabId('general', 'backend')).toBe('agents');
     expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
     expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
   });

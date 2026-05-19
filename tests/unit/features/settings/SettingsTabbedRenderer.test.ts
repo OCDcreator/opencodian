@@ -122,7 +122,7 @@ describe('SettingsTabbedRenderer', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders the general primary tab with basic and backend secondary tabs', () => {
+  it('renders the general primary tab with basic and agents secondary tabs', () => {
     const { renderer, renderLayoutModeSetting, renderLanguageSetting, renderSettingsInEditorAreaSetting } =
       createRendererState();
     const containerEl = document.createElement('div');
@@ -138,7 +138,7 @@ describe('SettingsTabbedRenderer', () => {
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual(['Basic', 'Backend Management']);
+    ).toEqual(['Basic', 'Agent Management']);
     expect(renderLayoutModeSetting).toHaveBeenCalledTimes(1);
     expect(renderLanguageSetting).toHaveBeenCalledTimes(1);
     expect(renderSettingsInEditorAreaSetting).toHaveBeenCalledTimes(1);

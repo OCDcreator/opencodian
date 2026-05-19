@@ -34,7 +34,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'basic',
     secondaryTabs: [
       { id: 'basic', labelKey: 'settings.general.tab.basic' },
-      { id: 'backend', labelKey: 'settings.general.tab.backend' },
+      { id: 'agents', labelKey: 'settings.general.tab.agents' },
     ],
   },
   {
@@ -234,6 +234,7 @@ const LEGACY_PRIMARY_TAB_ID_MAP: Record<string, string> = {
 const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
   general: {
     language: 'basic',
+    backend: 'agents',
   },
   conversation: {
     rendering: 'display',

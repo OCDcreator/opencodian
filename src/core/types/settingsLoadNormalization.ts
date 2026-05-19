@@ -474,8 +474,9 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
     settings: {
       ...DEFAULT_SETTINGS,
       ...normalizedSettings,
-      activeBackend: normalizedSettings?.activeBackend ?? 'opencode',
-      enabledBackends: normalizedSettings?.enabledBackends ?? ['opencode'],
+      activeBackend: normalizedSettings?.activeBackend
+        ?? (normalizedSettings?.enabledBackends?.length ? normalizedSettings.enabledBackends[0] : undefined),
+      enabledBackends: normalizedSettings?.enabledBackends ?? (savedSettings ? ['opencode'] : []),
       server: context.normalizedServer,
       enableTabs: normalizedSettings?.enableTabs ?? DEFAULT_SETTINGS.enableTabs,
       tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),
