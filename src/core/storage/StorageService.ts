@@ -199,6 +199,7 @@ export class StorageService {
       titleGenerationStatus: persistedConversation.titleGenerationStatus,
       messageCount: persistedConversation.messages.length,
       openCodeSessionId: persistedConversation.openCodeSessionId,
+      backend: persistedConversation.backend ?? 'opencode',
       currentNote: persistedConversation.currentNote,
       externalContextPaths: persistedConversation.externalContextPaths,
       sessionSettings: normalizeConversationSessionSettings(persistedConversation.sessionSettings),
@@ -220,6 +221,7 @@ export class StorageService {
         titleGenerationStatus: conversation.titleGenerationStatus,
         messageCount: persistedConversation.messages.length,
         openCodeSessionId: conversation.openCodeSessionId,
+        backend: conversation.backend ?? 'opencode',
       },
       'saveConversation',
     );
@@ -236,6 +238,9 @@ export class StorageService {
       // Ensure messages array exists
       if (!data.messages) {
         data.messages = [];
+      }
+      if (!data.backend) {
+        data.backend = 'opencode';
       }
       data.sessionSettings = normalizeConversationSessionSettings(data.sessionSettings);
       const elapsedMs = getPerformanceTimestampMs() - startedAt;

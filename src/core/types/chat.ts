@@ -334,6 +334,9 @@ export type StreamChunk =
     }
   | { type: 'question_request'; request: QuestionRequest };
 
+/** Logical agent backend identity. Determines which adapter owns a session. */
+export type AgentBackendKind = 'opencode' | 'claude-code' | 'codex' | 'copilot' | 'pi';
+
 /** Conversation metadata */
 export interface ConversationMeta {
   id: string;
@@ -344,6 +347,7 @@ export interface ConversationMeta {
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
   messageCount: number;
   openCodeSessionId?: string;
+  backend?: AgentBackendKind;
 }
 
 export interface BackgroundTaskActiveAnchorMetadata {
@@ -375,4 +379,6 @@ export interface Conversation {
   transport?: 'opencode' | 'acp';
   acpSessionId?: string;
   acpAgentId?: string;
+  /** Which agent backend owns this conversation. Old data defaults to 'opencode'. */
+  backend?: AgentBackendKind;
 }

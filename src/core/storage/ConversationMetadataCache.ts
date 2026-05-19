@@ -88,6 +88,7 @@ export function buildConversationMetaFromStoredRecord(
     titleGenerationStatus,
     messageCount,
     openCodeSessionId: typeof data.openCodeSessionId === 'string' ? data.openCodeSessionId : undefined,
+    backend: data.backend ?? 'opencode',
   };
 }
 
