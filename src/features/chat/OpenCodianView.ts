@@ -658,7 +658,9 @@ export class OpenCodianView extends ItemView {
     titleGenerationService: TitleGenerationService,
   ): ConversationHistoryActionsHost {
     return {
-      getConversations: () => this.plugin.getConversations(),
+      getConversations: () => this.plugin.getConversations().filter(
+        (conversation) => (conversation.backend ?? 'opencode') === this.plugin.settings.activeBackend,
+      ),
       getCurrentConversation: () => this.currentConversation,
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       loadConversation: (conversationId) => this.loadConversation(conversationId),

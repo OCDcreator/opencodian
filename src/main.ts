@@ -638,6 +638,7 @@ export default class OpenCodianPlugin extends Plugin {
           updatedAt: meta.updatedAt,
           lastResponseAt: meta.lastResponseAt,
           titleGenerationStatus: meta.titleGenerationStatus,
+          backend: meta.backend,
           openCodeSessionId: meta.openCodeSessionId ?? meta.id,
           messages: [],
         })),
@@ -665,6 +666,7 @@ export default class OpenCodianPlugin extends Plugin {
       title: this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      backend: this.settings.activeBackend,
       openCodeSessionId: sessionId,
       messages: [],
     };
@@ -685,6 +687,7 @@ export default class OpenCodianPlugin extends Plugin {
       title: initial?.title || this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      backend: this.settings.activeBackend,
       openCodeSessionId: sessionId,
       messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
       currentNote: initial?.currentNote,
