@@ -559,6 +559,10 @@ export class OpenCodianView extends ItemView {
     return getActiveBackendCapabilities();
   }
 
+  private isOpenCodeBackendActive(): boolean {
+    return this.plugin.settings.activeBackend === 'opencode';
+  }
+
   private createChatHeaderPresenterHost(): ChatHeaderPresenterHost {
     return {
       setTooltipLabel: (element, label, position) => {
@@ -576,6 +580,7 @@ export class OpenCodianView extends ItemView {
       },
       resolveServerAvailability: () => this.getServerAvailability(),
       isLocalServerMode: () => this.plugin.settings.server.mode === 'local',
+      isOpenCodeBackend: () => this.isOpenCodeBackendActive(),
       refreshContextUsageIndicator: () => {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
@@ -609,7 +614,9 @@ export class OpenCodianView extends ItemView {
         }));
       },
       onGraphUpdated: (graph) => {
-        this.childSessionGraphCoordinator.render(graph);
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          this.childSessionGraphCoordinator.render(graph);
+        }
       },
       getMessagesContainerEl: () => this.messagesContainer,
     };
@@ -723,6 +730,10 @@ export class OpenCodianView extends ItemView {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
       mountEffortSelector: (container) => {
+        if (!hasCapability(this.caps, AgentCapability.Thinking)) {
+          return;
+        }
+
         this.effortContainerEl = container;
         this.effortSelector = new EffortSelector(container, {
           getVariants: () => {
@@ -789,6 +800,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {
+    if (!this.isOpenCodeBackendActive()) {
+      return Promise.resolve([]);
+    }
+
     if (!this.plugin.opencodeConfigManager) {
       return Promise.resolve([]);
     }
@@ -797,6 +812,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleSlashCommandMenuPreload(): void {
+    if (!this.isOpenCodeBackendActive()) {
+      return;
+    }
+
     if (this.slashCommandMenuPreloadTimerId !== null) {
       window.clearTimeout(this.slashCommandMenuPreloadTimerId);
     }
@@ -1008,7 +1027,7 @@ export class OpenCodianView extends ItemView {
         this.messagesContainer = messagesEl;
         this.childSessionGraphCoordinator.clearContainer();
         const currentGraph = this.childSessionGraphCoordinator?.getGraph() ?? null;
-        if (currentGraph) {
+        if (currentGraph && hasCapability(this.caps, AgentCapability.Subagents)) {
           this.childSessionGraphCoordinator.render(currentGraph);
         }
       },
@@ -1310,7 +1329,12 @@ export class OpenCodianView extends ItemView {
         },
         renderMarkdownInto: (container, markdown) =>
           this.renderMarkdownInto(container, markdown),
-        renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+          if (hasCapability(this.caps, AgentCapability.Subagents)) {
+            return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+          }
+          return Promise.resolve();
+        },
         syncBackgroundTaskStateFromConversation: (conversation) => {
           this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
         },
@@ -1601,12 +1625,20 @@ export class OpenCodianView extends ItemView {
       tabRuntimeStateBridge,
       host: this.createBackgroundTaskIndicatorCoordinatorHost(),
     });
+    const backgroundTaskIndicatorRenderPort = {
+      renderIfNeeded: (tabId?: TabId | null) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
+    };
     this.backgroundTaskHost = createBackgroundTaskViewHost({
       timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
-      indicatorRenderPort: backgroundTaskIndicatorCoordinator,
+      indicatorRenderPort: backgroundTaskIndicatorRenderPort,
     });
     const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
-      backgroundTaskIndicatorCoordinator,
+      backgroundTaskIndicatorRenderPort,
       backgroundTaskRuntime.backgroundTaskTimelineService,
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
       backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
@@ -1916,8 +1948,12 @@ export class OpenCodianView extends ItemView {
         this.plugin.openCodeService.getCachedSessionDiffEntries(sessionId),
       appendPersistentNotice: (options) =>
         this.persistentAssistantNoticeService.appendMessage(options),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
       handleRestoreRewindRequest: () => this.handleRestoreRewindRequest(),
       openPluginSettingsPreservingScroll: () => {
         this.openPluginSettingsPreservingScroll();
@@ -2170,8 +2206,12 @@ export class OpenCodianView extends ItemView {
       },
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
       hasInterruptedLocalAssistantTail: (messages) => hasInterruptedLocalAssistantTail(messages),
       transitionTabSessionLifecycle: (tabId, phase, reason) =>
         this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
@@ -2235,8 +2275,12 @@ export class OpenCodianView extends ItemView {
       },
       rerenderSingleUserMessage: (previousMessageId, message) =>
         conversationRenderService.rerenderSingleUserMessage(previousMessageId, message),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
       ...createDebugLogCallbacks(),
     };
@@ -2321,7 +2365,12 @@ export class OpenCodianView extends ItemView {
   private createBackgroundTaskCompletionNoticeServiceHost(): BackgroundTaskCompletionNoticeServiceHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      appendPersistentAssistantNoticeMessage: (options) => this.persistentAssistantNoticeService.appendMessage(options),
+      appendPersistentAssistantNoticeMessage: (options) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.persistentAssistantNoticeService.appendMessage(options);
+        }
+        return Promise.resolve();
+      },
     };
   }
 
@@ -2492,6 +2541,7 @@ export class OpenCodianView extends ItemView {
   private createUserMessageContentRendererHost(): UserMessageContentRendererHost {
     return {
       getRenderUserMarkupAsCodeBlocks: () => this.plugin.settings.renderUserMarkupAsCodeBlocks,
+      hasCompactionCapability: () => hasCapability(this.caps, AgentCapability.Compaction),
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
       scheduleActiveSettledScrollToBottomIfNeeded: () => {
         this.scheduleActiveSettledScrollToBottomIfNeeded();
@@ -2797,7 +2847,10 @@ export class OpenCodianView extends ItemView {
 
   private refreshModifiedFilesSidebar(): void {
     const sessionId = this.currentConversation?.openCodeSessionId ?? null;
-    this.modifiedFilesSidebarCoordinator.setVisible(this.plugin.settings.showModifiedFilesSidebar);
+    this.modifiedFilesSidebarCoordinator.setVisible(
+      this.plugin.settings.showModifiedFilesSidebar
+      && hasCapability(this.caps, AgentCapability.Context),
+    );
     this.modifiedFilesSidebarCoordinator.refresh(
       sessionId,
       (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),

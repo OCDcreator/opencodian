@@ -51,6 +51,7 @@ export interface ChatHeaderPresenterHost {
   scheduleComposerLayoutSync(): void;
   resolveServerAvailability(): Promise<ChatServerAvailability>;
   isLocalServerMode(): boolean;
+  isOpenCodeBackend(): boolean;
   refreshContextUsageIndicator(): void;
   openServerSettings(): void;
   openLspSettings?(): void;
@@ -110,11 +111,13 @@ export class ChatHeaderPresenter {
 
     const actionsEl = headerEl.createDiv({ cls: 'opencodian-header-actions' });
     this.buildStatusBadge(actionsEl);
-    this.lspStatusIndicator = new LspStatusIndicator(actionsEl, {
-      onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
-      setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
-    });
-    this.lspStatusIndicator.load();
+    if (this.host.isOpenCodeBackend()) {
+      this.lspStatusIndicator = new LspStatusIndicator(actionsEl, {
+        onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
+        setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
+      });
+      this.lspStatusIndicator.load();
+    }
     this.newConversationBtnEl = this.buildActionButton(
       actionsEl,
       'opencodian-circle-plus',
@@ -208,6 +211,13 @@ export class ChatHeaderPresenter {
     getStatus: () => Promise<unknown>,
     openSettings: () => void,
   ): void {
+    if (!this.host.isOpenCodeBackend()) {
+      this.lspStatusRefreshCoordinator?.stop();
+      this.lspStatusRefreshCoordinator = null;
+      this.openLspSettingsCallback = null;
+      return;
+    }
+
     this.openLspSettingsCallback = openSettings;
     this.lspStatusRefreshCoordinator?.stop();
     this.lspStatusRefreshCoordinator = new LspStatusRefreshCoordinator(
