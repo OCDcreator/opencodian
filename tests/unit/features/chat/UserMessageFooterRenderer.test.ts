@@ -9,6 +9,7 @@ describe('UserMessageFooterRenderer', () => {
   function createRenderer(isStreaming = false) {
     const host: UserMessageFooterRendererHost = {
       isStreaming: jest.fn(() => isStreaming),
+      hasBranchingCapability: jest.fn(() => true),
       handleRewindRequest: jest.fn(),
       handleForkRequest: jest.fn(),
     };

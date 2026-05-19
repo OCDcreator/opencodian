@@ -12,6 +12,7 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
+import { SettingsBackendSection } from './SettingsBackendSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
@@ -84,17 +85,33 @@ export class SettingsTabbedRenderer {
   }
 
   renderDisplay(containerEl: HTMLElement): void {
-    const activePrimaryId = resolvePrimaryTabId(
+    const visibleTabs = SETTINGS_PRIMARY_TABS.filter((tab) => {
+      if (!tab.backendRequired) return true;
+      return this.deps.plugin.settings.enabledBackends.includes(tab.backendRequired);
+    });
+    let activePrimaryId = resolvePrimaryTabId(
       this.deps.plugin.settings.settingsTabbedPrimaryTab,
     );
-    const activeSecondaryId = getActiveSecondaryTabId(
+    if (!visibleTabs.some((tab) => tab.id === activePrimaryId)) {
+      activePrimaryId = 'general';
+    }
+
+    const primaryDef = visibleTabs.find((pt) => pt.id === activePrimaryId);
+    const visibleSecondaryTabs = (primaryDef?.secondaryTabs ?? []).filter((tab) => {
+      if (!tab.backendRequired) return true;
+      return this.deps.plugin.settings.enabledBackends.includes(tab.backendRequired);
+    });
+    let activeSecondaryId = getActiveSecondaryTabId(
       activePrimaryId,
       this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
     );
+    if (!visibleSecondaryTabs.some((tab) => tab.id === activeSecondaryId)) {
+      activeSecondaryId = visibleSecondaryTabs[0]?.id ?? primaryDef?.defaultSecondaryTabId ?? 'basic';
+    }
 
     // Primary tab bar
     const primaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-primary' });
-    for (const primaryTab of SETTINGS_PRIMARY_TABS) {
+    for (const primaryTab of visibleTabs) {
       const tabEl = primaryBarEl.createEl('button', {
         cls: `opencodian-settings-tab-primary${primaryTab.id === activePrimaryId ? ' opencodian-settings-tab-active' : ''}`,
       });
@@ -112,10 +129,9 @@ export class SettingsTabbedRenderer {
     }
 
     // Secondary tab bar
-    const primaryDef = SETTINGS_PRIMARY_TABS.find((pt) => pt.id === activePrimaryId);
-    if (primaryDef && primaryDef.secondaryTabs.length > 1) {
+    if (primaryDef && visibleSecondaryTabs.length > 1) {
       const secondaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-secondary' });
-      for (const secondaryTab of primaryDef.secondaryTabs) {
+      for (const secondaryTab of visibleSecondaryTabs) {
         const tabEl = secondaryBarEl.createEl('button', {
           cls: `opencodian-settings-tab-secondary${secondaryTab.id === activeSecondaryId ? ' opencodian-settings-tab-active' : ''}`,
           text: t(secondaryTab.labelKey),
@@ -229,7 +245,16 @@ export class SettingsTabbedRenderer {
 
   // ─── Per-section tabbed content ────────────────────────────────────
 
-  private renderGeneralContent(containerEl: HTMLElement, _secondaryTabId: string): void {
+  private renderGeneralContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    if (secondaryTabId === 'backend') {
+      const backendSection = new SettingsBackendSection({
+        plugin: this.deps.plugin,
+        requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+      });
+      backendSection.attach(containerEl);
+      return;
+    }
+
     const blockBodyEl = containerEl
       .createDiv({
         cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-general-merged-block',

@@ -14,12 +14,12 @@ import {
 } from '../../../../src/features/settings/settingsLayoutRegistry';
 
 describe('SETTINGS_PRIMARY_TABS', () => {
-  it('defines general as a single-page primary tab without extra secondary navigation', () => {
+  it('defines general with basic and backend secondary tabs', () => {
     const generalTab = getPrimaryTabDefinition('general');
     expect(generalTab).toBeDefined();
     expect(generalTab!.labelKey).toBe('settings.general.title');
     expect(generalTab!.defaultSecondaryTabId).toBe('basic');
-    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['basic']);
+    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['basic', 'backend']);
   });
 
   it('defines all expected primary tabs in order', () => {
@@ -87,6 +87,29 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'display',
       'questions',
     ]);
+  });
+
+  it('marks OpenCode-only settings tabs with backend requirements', () => {
+    const opencodeOnlyPrimaryTabs = [
+      'server',
+      'model',
+      'agents',
+      'commands',
+      'mcp',
+      'formatter',
+      'plugins',
+      'skills',
+      'tools',
+      'acp',
+    ];
+
+    for (const tabId of opencodeOnlyPrimaryTabs) {
+      expect(getPrimaryTabDefinition(tabId)?.backendRequired).toBe('opencode');
+    }
+
+    const conversationTab = getPrimaryTabDefinition('conversation');
+    expect(conversationTab?.secondaryTabs.filter((tab) => tab.backendRequired === 'opencode').map((tab) => tab.id))
+      .toEqual(['compaction', 'sharing', 'questions']);
   });
 
   it('splits formatter settings into formatter and language server secondary tabs', () => {
@@ -200,6 +223,6 @@ describe('getPrimaryTabDefinition', () => {
     expect(def!.id).toBe('general');
     expect(def!.labelKey).toBe('settings.general.title');
     expect(def!.defaultSecondaryTabId).toBe('basic');
-    expect(def!.secondaryTabs).toHaveLength(1);
+    expect(def!.secondaryTabs).toHaveLength(2);
   });
 });

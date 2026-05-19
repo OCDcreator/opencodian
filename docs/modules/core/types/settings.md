@@ -28,6 +28,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `OpenCodianSettings` | 完整设置接口（约 40 个字段） |
 | `DEFAULT_SETTINGS` | 默认设置常量对象 |
 
+`OpenCodianSettings` 现在包含 backend 管理字段：`activeBackend` 表示新会话默认 backend，`enabledBackends` 表示设置页当前启用的 backend 集合。Phase 0 默认值固定为 `opencode` / `['opencode']`，非 OpenCode backend 只作为 UI 可见性和后续迁移占位。
+
 ### 服务器与安全
 
 | 类型 | 说明 |

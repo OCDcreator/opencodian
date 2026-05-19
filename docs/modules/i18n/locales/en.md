@@ -63,6 +63,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮维护 `settings.model.providerDirectory.*` 键，为 settings/model 目录中的 provider directory 诊断提供英文 summary 与 badge 文案。它只表达 `provider.list()` 的 connected / listed 辅助状态，并把 listed outside catalog 作为诊断计数呈现，不改变 `config.providers()` 驱动的服务器目录或可选模型。
 
+本轮新增 `settings.general.tab.backend` 与 `settings.backend.*` 键，为 Phase 0 Backend Management 面板提供英文标题、默认 backend 下拉、enabled backend 列表、Coming Soon 描述和启用状态标签。
+
 ## 导入关系
 
 ```text

@@ -8,6 +8,7 @@ import {
   normalizeDebugModuleSettings,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
+import type { AgentBackendKind } from './chat';
 
 /** Permission mode for tool execution */
 export type PermissionMode = 'yolo' | 'plan' | 'normal';
@@ -1730,6 +1731,12 @@ export interface OpenCodianSettings {
   // User preferences
   userName: string;
 
+  /** Currently active backend for new conversations. Default: 'opencode'. */
+  activeBackend: AgentBackendKind;
+
+  /** List of enabled backends. At least one must always be enabled. */
+  enabledBackends: AgentBackendKind[];
+
   // Server configuration
   server: ServerConfig;
 
@@ -1876,6 +1883,8 @@ export function normalizeSettingsTabbedSecondaryTabByPrimary(
 /** Default settings */
 export const DEFAULT_SETTINGS: OpenCodianSettings = {
   userName: '',
+  activeBackend: 'opencode',
+  enabledBackends: ['opencode'],
 
   server: {
     mode: 'local',

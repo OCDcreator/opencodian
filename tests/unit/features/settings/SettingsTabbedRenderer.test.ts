@@ -1,5 +1,6 @@
 import type { App } from 'obsidian';
 
+import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { SettingsAgentsSection } from '../../../../src/features/settings/SettingsAgentsSection';
 import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
@@ -19,6 +20,7 @@ import { setLocale } from '../../../../src/i18n';
 function createRendererState(options?: {
   primaryTabId?: string;
   secondaryTabs?: Record<string, string>;
+  enabledBackends?: AgentBackendKind[];
 }) {
   const plugin = {
     settings: {
@@ -26,6 +28,7 @@ function createRendererState(options?: {
       settingsLayoutMode: 'tabbed' as const,
       settingsTabbedPrimaryTab: options?.primaryTabId ?? 'general',
       settingsTabbedSecondaryTabByPrimary: options?.secondaryTabs ?? { general: 'basic' },
+      enabledBackends: options?.enabledBackends ?? DEFAULT_SETTINGS.enabledBackends,
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
   };
@@ -119,7 +122,7 @@ describe('SettingsTabbedRenderer', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders the general primary tab as one merged panel without secondary tabs', () => {
+  it('renders the general primary tab with basic and backend secondary tabs', () => {
     const { renderer, renderLayoutModeSetting, renderLanguageSetting, renderSettingsInEditorAreaSetting } =
       createRendererState();
     const containerEl = document.createElement('div');
@@ -135,7 +138,7 @@ describe('SettingsTabbedRenderer', () => {
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual([]);
+    ).toEqual(['Basic', 'Backend Management']);
     expect(renderLayoutModeSetting).toHaveBeenCalledTimes(1);
     expect(renderLanguageSetting).toHaveBeenCalledTimes(1);
     expect(renderSettingsInEditorAreaSetting).toHaveBeenCalledTimes(1);
@@ -169,7 +172,7 @@ describe('SettingsTabbedRenderer', () => {
     );
   });
 
-  it('does not expose general secondary tab switching anymore', () => {
+  it('keeps general secondary tabs structural without switching during initial render', () => {
     const { plugin, renderer, requestDisplayRefresh } = createRendererState();
     const containerEl = document.createElement('div');
 
@@ -178,13 +181,49 @@ describe('SettingsTabbedRenderer', () => {
     const secondaryTabs = Array.from(
       containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary'),
     );
-    expect(secondaryTabs).toHaveLength(0);
+    expect(secondaryTabs).toHaveLength(2);
 
     expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({
       general: 'basic',
     });
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(requestDisplayRefresh).not.toHaveBeenCalled();
+  });
+
+  it('falls back to general and hides OpenCode-only tabs when OpenCode is disabled', () => {
+    const { renderer } = createRendererState({
+      primaryTabId: 'server',
+      enabledBackends: ['codex'],
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    const primaryLabels = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'),
+    ).map((element) => element.textContent?.trim());
+    expect(primaryLabels).not.toContain('Server');
+    expect(primaryLabels).not.toContain('Models');
+    expect(primaryLabels).toContain('General');
+    expectSingleContentShell(containerEl, 'general', 'basic');
+  });
+
+  it('filters OpenCode-only conversation secondary tabs when OpenCode is disabled', () => {
+    const { renderer } = createRendererState({
+      primaryTabId: 'conversation',
+      secondaryTabs: { conversation: 'compaction' },
+      enabledBackends: ['codex'],
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
+        (element) => element.textContent?.trim(),
+      ),
+    ).toEqual(['Title', 'Display & rendering']);
+    expectSingleContentShell(containerEl, 'conversation', 'title');
   });
 
   it('renders every primary tab inside one structural content shell', () => {

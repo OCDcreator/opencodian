@@ -39,6 +39,8 @@
 4. 生成最终 `OpenCodianSettings`；
 5. 决定本次启动是否需要把归一化结果立即写回磁盘。
 
+最终 settings merge 还会为 Phase 0 backend 管理补齐 `activeBackend: 'opencode'` 与 `enabledBackends: ['opencode']` 默认值，确保旧设置快照升级后可以立即渲染 Backend Management 面板。
+
 ### server / theme / input-panel 迁移
 
 - `normalizeServerSettingsOnLoad()` 兼容旧的扁平 `server.{host,port,autoStart}` 结构，并保留 legacy `4096` → local sidecar 默认端口迁移信号。嵌套 server 设置中的 `local.executablePath` 会被 trim；旧扁平结构统一回填为空字符串，表示继续自动探测。

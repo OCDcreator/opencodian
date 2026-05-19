@@ -9,8 +9,8 @@
 
 ## 主要定义
 
-- `SettingsPrimaryTab`: 一级标签定义，包含 id、labelKey、icon、defaultSecondaryTabId
-- `SettingsSecondaryTab`: 二级标签定义，包含 id、labelKey
+- `SettingsPrimaryTab`: 一级标签定义，包含 id、labelKey、icon、defaultSecondaryTabId，可选 `backendRequired`
+- `SettingsSecondaryTab`: 二级标签定义，包含 id、labelKey，可选 `backendRequired`
 - `SettingsPrimaryTabDefinition`: 完整的一级标签定义，包含 secondaryTabs 数组
 - `SETTINGS_PRIMARY_TABS`: 所有一级标签及其二级标签的静态配置数组
 
@@ -20,10 +20,10 @@
 
 | 一级标签 | 二级标签 |
 |---------|---------|
-| `general` | `basic`, `language` |
+| `general` | `basic`, `backend` |
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
-| `conversation` | `title`, `compaction`, `sharing`, `display`, `questions`, `rendering` |
+| `conversation` | `title`, `compaction`, `sharing`, `display`, `questions` |
 | `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
 | `mcp` | `overview` |
@@ -47,4 +47,4 @@
 
 ## 模式集成
 
-`settingsLayoutMode` 为 `'classic'` 时不使用本 registry。为 `'tabbed'` 时，`SettingsTabbedRenderer` 读取本 registry 构建标签栏并路由内容面板。
+`settingsLayoutMode` 为 `'classic'` 时不使用本 registry。为 `'tabbed'` 时，`SettingsTabbedRenderer` 读取本 registry 构建标签栏并路由内容面板。带 `backendRequired` 的 OpenCode-only 标签会在对应 backend 被禁用时隐藏。

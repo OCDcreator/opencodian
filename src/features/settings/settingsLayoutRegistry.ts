@@ -6,17 +6,20 @@
  */
 
 import type { TranslationKey } from '../../i18n';
+import type { AgentBackendKind } from '../../core/types/chat';
 
 export interface SettingsPrimaryTab {
   id: string;
   labelKey: TranslationKey;
   icon: string;
   defaultSecondaryTabId: string;
+  backendRequired?: AgentBackendKind;
 }
 
 export interface SettingsSecondaryTab {
   id: string;
   labelKey: TranslationKey;
+  backendRequired?: AgentBackendKind;
 }
 
 export interface SettingsPrimaryTabDefinition extends SettingsPrimaryTab {
@@ -31,6 +34,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'basic',
     secondaryTabs: [
       { id: 'basic', labelKey: 'settings.general.tab.basic' },
+      { id: 'backend', labelKey: 'settings.general.tab.backend' },
     ],
   },
   {
@@ -38,6 +42,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.server.title',
     icon: 'server',
     defaultSecondaryTabId: 'connection',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'connection', labelKey: 'settings.server.tab.connection' },
       { id: 'auth', labelKey: 'settings.server.tab.auth' },
@@ -49,6 +54,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.model.title',
     icon: 'bot',
     defaultSecondaryTabId: 'common',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'common', labelKey: 'settings.model.tab.common' },
       { id: 'project-config', labelKey: 'settings.model.tab.projectConfig' },
@@ -63,10 +69,10 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'title',
     secondaryTabs: [
       { id: 'title', labelKey: 'settings.conversation.tab.title' },
-      { id: 'compaction', labelKey: 'settings.conversation.tab.compaction' },
-      { id: 'sharing', labelKey: 'settings.conversation.tab.sharing' },
+      { id: 'compaction', labelKey: 'settings.conversation.tab.compaction', backendRequired: 'opencode' },
+      { id: 'sharing', labelKey: 'settings.conversation.tab.sharing', backendRequired: 'opencode' },
       { id: 'display', labelKey: 'settings.conversation.tab.display' },
-      { id: 'questions', labelKey: 'settings.conversation.tab.questions' },
+      { id: 'questions', labelKey: 'settings.conversation.tab.questions', backendRequired: 'opencode' },
     ],
   },
   {
@@ -74,6 +80,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.agents.title',
     icon: 'users',
     defaultSecondaryTabId: 'default',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'default', labelKey: 'settings.agents.tab.default' },
       { id: 'catalog', labelKey: 'settings.agents.tab.catalog' },
@@ -86,6 +93,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.commands.title',
     icon: 'terminal-square',
     defaultSecondaryTabId: 'mode',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'mode', labelKey: 'settings.commands.tab.mode' },
       { id: 'editor', labelKey: 'settings.commands.tab.editor' },
@@ -97,6 +105,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.mcp.title',
     icon: 'blocks',
     defaultSecondaryTabId: 'overview',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.mcp.tab.overview' },
     ],
@@ -106,6 +115,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.formatter.title',
     icon: 'paintbrush',
     defaultSecondaryTabId: 'overview',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.formatter.tab.overview' },
       { id: 'formatter', labelKey: 'settings.formatter.tab.formatter' },
@@ -117,6 +127,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.plugins.title',
     icon: 'package',
     defaultSecondaryTabId: 'overview',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.plugins.tab.overview' },
       { id: 'global', labelKey: 'settings.plugins.tab.global' },
@@ -187,6 +198,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.skills.title',
     icon: 'brain',
     defaultSecondaryTabId: 'project',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'project', labelKey: 'settings.skills.tab.project' },
       { id: 'external', labelKey: 'settings.skills.tab.external' },
@@ -197,6 +209,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.tools.title',
     icon: 'wrench',
     defaultSecondaryTabId: 'builtin',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'builtin', labelKey: 'settings.tools.tab.builtin' },
       { id: 'custom', labelKey: 'settings.tools.tab.custom' },
@@ -207,6 +220,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.acp.title',
     icon: 'radio-tower',
     defaultSecondaryTabId: 'agents',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'agents', labelKey: 'settings.acp.tab.agents' },
     ],
