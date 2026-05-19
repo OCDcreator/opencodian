@@ -113,6 +113,7 @@ repo-local owner guard 入口脚本。它读取 git diff 范围，构建 guarded
 
 - `--range <git-range>` / `OWNER_GUARD_DIFF_RANGE`
 - `--mode normal|maintainability-refactor` / `OWNER_GUARD_MODE`
+- `--approved <reason>` / `OWNER_GUARD_APPROVED` for audited, user-approved Class B guarded-file touches
 
 默认范围：
 
@@ -239,7 +240,7 @@ npm run list:module-docs -- --range origin/main...HEAD
 - graphify graph 固定为 `src/` 范围；不要把 `npm run graphify:update:src` 替换成 whole-repo `graphify update .`。
 - 模块文档 guard 通过 `module-docs.config.json` 配置；新增源码根、样式根、特殊入口或非源码文档例外时必须同步更新该文件。
 - `check-module-doc-diff.mjs` 支持 `--range <range>` 或 `MODULE_DOC_DIFF_RANGE`，本地 verify 默认使用 `HEAD`，分支审核建议使用 `origin/main...HEAD`。
-- `check-owner-guard.mjs` 支持 `--range <range>` / `OWNER_GUARD_DIFF_RANGE` 和 `--mode <mode>` / `OWNER_GUARD_MODE`；本地默认范围是 `HEAD`，`maintainability-refactor` 只用于明确的净减少 guarded ownership 的维护性整改。
+- `check-owner-guard.mjs` 支持 `--range <range>` / `OWNER_GUARD_DIFF_RANGE`、`--mode <mode>` / `OWNER_GUARD_MODE` 和 `--approved <reason>` / `OWNER_GUARD_APPROVED`；本地默认范围是 `HEAD`，`maintainability-refactor` 只用于明确的净减少 guarded ownership 的维护性整改，`--approved` 只用于记录人工批准的 Class B guarded-file touch，不能绕过净新增 runtime ownership。
 
 ## 注意事项
 

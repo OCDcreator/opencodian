@@ -35,6 +35,7 @@
 | `applyLocaleTexts()` | 委托 header presenter、selection controls coordinator 与 composer input coordinator 刷新 header/status、selector、placeholder、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `invalidateSlashCommandMenuCatalog()` | 立刻清空 slash command menu catalog 缓存，并可选触发一次后台 warm preload |
+| `createConversationInCurrentTab()` | 公开给插件命令层使用，委托 `ConversationLoadRecoveryCoordinator.createConversationInCurrentTab()`，确保全局 `new-conversation` 命令会真正替换当前视图的 active conversation |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
 | `toggleGlassOctahedron()` | 切换实验性的 glass octahedron overlay |

@@ -107,6 +107,15 @@ export function detectMode(rawMode = process.env.OWNER_GUARD_MODE ?? 'normal') {
     : 'normal';
 }
 
+export function detectApproval(rawApproval = process.env.OWNER_GUARD_APPROVED) {
+  if (typeof rawApproval !== 'string') {
+    return null;
+  }
+
+  const reason = rawApproval.trim();
+  return reason.length > 0 ? reason : null;
+}
+
 export function detectDiffRange(root, rawRange = process.env.OWNER_GUARD_DIFF_RANGE) {
   if (rawRange) {
     return rawRange;
@@ -249,6 +258,7 @@ export function collectThinLayerHints(changedPaths) {
 
 export function evaluateOwnerGuard({
   mode = 'normal',
+  approval = null,
   changedPaths = [],
   fileAssessments = {},
   thinLayerHints = [],
@@ -325,6 +335,20 @@ export function evaluateOwnerGuard({
   }
 
   if (guardTouches.length > 0) {
+    if (approval) {
+      return {
+        ok: true,
+        className: 'ClassB',
+        ruleId: 'RULE_1_HOTSPOT_CLASS_B_APPROVED',
+        touchedFiles: guardTouches,
+        approval,
+        reasons: [
+          'A guarded thick-owner file was modified by a Class B change with explicit approval.',
+        ],
+        thinLayerHints,
+      };
+    }
+
     return {
       ok: false,
       className: 'ClassB',
@@ -361,6 +385,10 @@ export function formatOwnerGuardResult(result, { range, mode } = {}) {
 
   if (result.reasons?.length) {
     lines.push(...result.reasons.map((reason) => `- ${reason}`));
+  }
+
+  if (result.approval) {
+    lines.push(`- approval: ${result.approval}`);
   }
 
   if (result.thinLayerHints?.length) {

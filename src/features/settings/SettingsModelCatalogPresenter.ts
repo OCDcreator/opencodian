@@ -111,8 +111,8 @@ export class SettingsModelCatalogPresenter {
   private modelAvailabilityOnlyDisabled = false;
   private modelAvailabilityOnlyEnabled = false;
   private providerListScrollTop = 0;
-  private catalogOverviewCollapsed = true;
-  private searchControlsCollapsed = true;
+  private catalogOverviewCollapsed = false;
+  private searchControlsCollapsed = false;
   private readonly providerAvailabilityChecks = new Map<string, ProviderAvailabilityCheckState>();
   private lastRenderState: SettingsModelCatalogPresenterRenderState | null = null;
 

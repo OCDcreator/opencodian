@@ -133,4 +133,52 @@ describe('evaluateOwnerGuard', () => {
       }),
     );
   });
+
+  test('allows explicitly approved Class B guarded-file touches', () => {
+    expect(
+      callExport('evaluateOwnerGuard', {
+        mode: 'normal',
+        approval: 'user approved opencodian:new-conversation command fix',
+        changedPaths: ['src/main.ts'],
+        fileAssessments: {
+          'src/main.ts': {
+            presentationOnly: false,
+            netNewOwnership: false,
+            addedLineCount: 4,
+            removedLineCount: 1,
+          },
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: true,
+        className: 'ClassB',
+        ruleId: 'RULE_1_HOTSPOT_CLASS_B_APPROVED',
+        approval: 'user approved opencodian:new-conversation command fix',
+      }),
+    );
+  });
+
+  test('keeps net-new runtime ownership non-bypassable by approval', () => {
+    expect(
+      callExport('evaluateOwnerGuard', {
+        mode: 'normal',
+        approval: 'user approved the change',
+        changedPaths: ['src/core/opencode/OpenCodeService.ts'],
+        fileAssessments: {
+          'src/core/opencode/OpenCodeService.ts': {
+            presentationOnly: false,
+            netNewOwnership: true,
+            addedLineCount: 24,
+            removedLineCount: 2,
+          },
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: false,
+        ruleId: 'RULE_3_NET_NEW_OWNERSHIP',
+      }),
+    );
+  });
 });

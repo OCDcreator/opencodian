@@ -380,6 +380,28 @@ describe('OpenCodianPlugin.toggleLiquidDiamondDemoForCurrentView', () => {
   });
 });
 
+describe('OpenCodianPlugin.startNewConversationForCurrentView', () => {
+  it('activates the chat view and opens a new conversation in the current view', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      activateView: jest.Mock<Promise<void>, []>;
+      getOpenCodianView: () => { createConversationInCurrentTab: jest.Mock<Promise<void>, []> } | null;
+    };
+    const view = {
+      createConversationInCurrentTab: jest.fn().mockResolvedValue(undefined),
+    };
+
+    plugin.activateView = jest.fn().mockResolvedValue(undefined);
+    jest
+      .spyOn(plugin as unknown as { getOpenCodianView: () => typeof view | null }, 'getOpenCodianView')
+      .mockReturnValue(view);
+
+    await plugin.startNewConversationForCurrentView();
+
+    expect(plugin.activateView).toHaveBeenCalledTimes(1);
+    expect(view.createConversationInCurrentTab).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('OpenCodianPlugin.toggleLiquidDiamondWebGlDemoForCurrentView', () => {
   it('activates the view and forwards the WebGL toggle to the current OpenCodian view', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {

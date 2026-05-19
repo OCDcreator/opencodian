@@ -3027,8 +3027,13 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Create a new conversation in the current tab */
-  private async createNewConversationInCurrentTab(): Promise<void> {
+  async createConversationInCurrentTab(): Promise<void> {
     await this.conversationLoadRecoveryCoordinator.createConversationInCurrentTab();
+  }
+
+  /** Create a new conversation in the current tab */
+  private async createNewConversationInCurrentTab(): Promise<void> {
+    await this.createConversationInCurrentTab();
   }
 
   /** Load a conversation */

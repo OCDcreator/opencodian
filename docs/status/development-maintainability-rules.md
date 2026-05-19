@@ -20,6 +20,7 @@
 - When touching those files, prefer deleting assembly/import surface or moving stable responsibility into an existing adjacent owner.
 - `npm run check:owner-guard` now enforces this rule for Class B feature changes; local `verify` checks `HEAD`, local `pre-push` checks `origin/main...HEAD`, and CI remains the final non-bypassable gate.
 - Explicit `maintainability-refactor` runs may touch guarded files only when they net-reduce guarded ownership and are invoked with the matching owner-guard mode.
+- A user-approved, targeted Class B guarded-file touch can be made auditable with `npm run check:owner-guard -- --approved "<reason>"` or `OWNER_GUARD_APPROVED="<reason>"`; this only waives `RULE_1_HOTSPOT_CLASS_B` and does not bypass `RULE_3_NET_NEW_OWNERSHIP`.
 - Do not add thin helper / adapter / provider / factory modules unless the module is reused in 3+ places or isolates a high-risk dependency.
 - Do not move complexity sideways into more files without reducing ownership, import surface, or test responsibility.
 - Prefer existing service / coordinator / runtime owners before creating new files.

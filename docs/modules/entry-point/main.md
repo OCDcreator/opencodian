@@ -126,6 +126,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 入口层直接注册这些 UI 能力，并把启动后的跨视图刷新调度交给 `PluginRuntimeCoordinator`：
 
 - `activateView()`: 按 `openInMainTab` 决定在主标签页或右侧边栏打开 `OpenCodianView`。
+- `startNewConversationForCurrentView()`: 供 `new-conversation` 命令使用；先激活聊天视图，再委托当前 `OpenCodianView` 的 current-tab 新建会话入口，避免只创建后台 conversation 而 UI 仍停在旧 session。
 - ribbon 图标：`bot`
 - 命令：
 - `open-view`
@@ -180,6 +181,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 | `loadSettings()` | 读取并迁移历史设置，生成当前版本的归一化配置 |
 | `saveSettings()` | 同步服务层、写回存储、刷新所有视图、同步 `.opencode` 权限配置 |
 | `activateView()` | 打开或定位 `OpenCodianView` |
+| `startNewConversationForCurrentView()` | 激活聊天视图并在当前视图/当前 tab 打开新会话 |
 | `loadConversations()` | 预加载会话元数据，保证视图恢复前数据已就绪 |
 | `createConversation()` | 创建 OpenCode session 并建立本地 conversation |
 | `getConversationById()` | 从缓存或磁盘获取完整 conversation |

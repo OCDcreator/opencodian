@@ -3,6 +3,7 @@ import process from 'node:process';
 import {
   buildGuardTargetAssessments,
   collectThinLayerHints,
+  detectApproval,
   detectDiffRange,
   detectMode,
   evaluateOwnerGuard,
@@ -17,11 +18,13 @@ function main() {
   const root = repoRoot();
   const range = detectDiffRange(root, args.range);
   const mode = detectMode(args.mode);
+  const approval = detectApproval(args.approved);
   const changedPaths = readGitDiffNameOnly(root, range);
   const fileAssessments = buildGuardTargetAssessments(root, range, changedPaths);
   const thinLayerHints = collectThinLayerHints(changedPaths);
   const result = evaluateOwnerGuard({
     mode,
+    approval,
     changedPaths,
     fileAssessments,
     thinLayerHints,

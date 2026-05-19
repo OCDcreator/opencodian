@@ -255,7 +255,7 @@ export default class OpenCodianPlugin extends Plugin {
       id: 'new-conversation',
       name: '新建会话',
       callback: async () => {
-        await this.createConversation();
+        await this.startNewConversationForCurrentView();
       },
     });
 
@@ -362,6 +362,11 @@ export default class OpenCodianPlugin extends Plugin {
 
   async reapplyConversationSessionDefaults(): Promise<void> {
     await this.getOpenCodianView()?.reapplyCurrentConversationSessionSettings();
+  }
+
+  async startNewConversationForCurrentView(): Promise<void> {
+    await this.activateView();
+    await this.getOpenCodianView()?.createConversationInCurrentTab();
   }
 
   async toggleLiquidDiamondDemoForCurrentView(): Promise<void> {
