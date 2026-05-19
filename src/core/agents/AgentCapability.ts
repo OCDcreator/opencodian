@@ -6,6 +6,9 @@
  * See docs/requirements/multi-agent-foundation/09-chat-surface-migration.md §9 for
  * the complete capability → UI mapping table.
  */
+
+import type { AgentServiceRegistry } from './backend/AgentServiceRegistry';
+
 export const AgentCapability = {
   Tools: 'tools',
   Mcp: 'mcp',
@@ -24,6 +27,7 @@ export const AgentCapability = {
   Config: 'config',
   FileOps: 'file-ops',
   Shell: 'shell',
+  Sharing: 'sharing',
   Export: 'export',
 } as const;
 
@@ -33,19 +37,48 @@ export type AgentCapability = (typeof AgentCapability)[keyof typeof AgentCapabil
 export type BackendCapabilities = ReadonlySet<AgentCapability>;
 
 /**
- * OpenCode's full capability set. Phase 0 hardcodes this as the only backend.
- * Phase 1 will replace getActiveBackendCapabilities() with a registry lookup.
+ * OpenCode's full capability set. Used as fallback when no registry is set.
+ * Frozen to prevent accidental mutation.
  */
-export const OPENCODE_FULL_CAPABILITIES: BackendCapabilities = new Set<AgentCapability>(
-  Object.values(AgentCapability),
+export const OPENCODE_FULL_CAPABILITIES: BackendCapabilities = Object.freeze(
+  new Set<AgentCapability>(Object.values(AgentCapability)),
 );
+
+/** Empty capability set for when no backend is active. */
+export const EMPTY_CAPABILITIES: BackendCapabilities = Object.freeze(
+  new Set<AgentCapability>(),
+);
+
+// ---------------------------------------------------------------------------
+// Module-level registry reference for getActiveBackendCapabilities()
+// ---------------------------------------------------------------------------
+
+let _registry: AgentServiceRegistry | null = null;
+
+/**
+ * Set the global registry reference. Called once during plugin initialization.
+ */
+export function setAgentServiceRegistry(registry: AgentServiceRegistry | null): void {
+  _registry = registry;
+}
 
 /**
  * Get the capabilities of the currently active backend.
- * Phase 0: always returns OpenCode's full capabilities.
- * Phase 1+: will read from AgentServiceRegistry.
+ *
+ * - If a registry is set and has an active adapter, returns its capabilities.
+ * - If no registry or no active adapter, returns EMPTY_CAPABILITIES.
+ * - Falls back to OPENCODE_FULL_CAPABILITIES only during initialisation
+ *   before the registry is wired.
  */
 export function getActiveBackendCapabilities(): BackendCapabilities {
+  if (_registry) {
+    const active = _registry.getActive();
+    if (active) {
+      return active.capabilities;
+    }
+    return EMPTY_CAPABILITIES;
+  }
+  // Pre-registry fallback — happens during early startup
   return OPENCODE_FULL_CAPABILITIES;
 }
 

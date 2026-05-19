@@ -63,6 +63,8 @@ export class SettingsBackendSection {
           .onChange(async (value) => {
             if (value) {
               this.plugin.settings.activeBackend = value as AgentBackendKind;
+              // Sync registry active backend
+              this.plugin.agentServiceRegistry?.setActive(value as AgentBackendKind);
               await this.plugin.saveSettings();
             }
           });
@@ -116,13 +118,42 @@ export class SettingsBackendSection {
       .map((option) => option.id)
       .filter((candidate) => enabledBackends.has(candidate));
 
+    // Sync registry enabled state
+    if (this.plugin.agentServiceRegistry) {
+      if (enabled) {
+        this.plugin.agentServiceRegistry.setEnabled(backend);
+      } else {
+        this.plugin.agentServiceRegistry.setDisabled(backend);
+      }
+    }
+
     this.ensureValidBackendState();
 
+    // Stop the OpenCode server when disabling OpenCode backend
     if (backend === 'opencode' && !enabled) {
       try {
-        await this.plugin.openCodeService?.stop();
+        const adapter = this.plugin.agentServiceRegistry?.get('opencode');
+        if (adapter) {
+          await adapter.stop();
+        } else {
+          await this.plugin.openCodeService?.stop();
+        }
       } catch {
         // Best effort: disabling the setting should still be saved if shutdown fails.
+      }
+    }
+
+    // Start the OpenCode server when enabling OpenCode backend
+    if (backend === 'opencode' && enabled) {
+      try {
+        const adapter = this.plugin.agentServiceRegistry?.get('opencode');
+        if (adapter) {
+          await adapter.start();
+        } else {
+          await this.plugin.openCodeService?.start();
+        }
+      } catch {
+        // Best effort: enabling should still be saved if startup fails.
       }
     }
   }

@@ -22,6 +22,8 @@ interface ConversationSessionSettingsModalOptions {
   conversationTitle: string;
   defaults: ConversationSessionSettingsModalDefaults;
   initialOverrides?: ConversationSessionSettings;
+  /** Whether to show the compaction summary row. Defaults to false. */
+  showCompactionSummary?: boolean;
   onSave(
     overrides: ConversationSessionSettings | undefined,
   ): Promise<void> | void;
@@ -432,13 +434,15 @@ export class ConversationSessionSettingsModal extends Modal {
           },
         ],
       },
-      {
-        id: 'compaction',
-        label: t('chat.sessionSettings.modal.summary.compaction'),
-        chips: [
-          { text: t('chat.sessionSettings.modal.summary.globalLevel') },
-        ],
-      },
+      ...(this.options.showCompactionSummary
+        ? [{
+            id: 'compaction',
+            label: t('chat.sessionSettings.modal.summary.compaction'),
+            chips: [
+              { text: t('chat.sessionSettings.modal.summary.globalLevel') },
+            ],
+          }]
+        : []),
       {
         id: 'display',
         label: t('chat.sessionSettings.modal.displayGroup'),

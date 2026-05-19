@@ -353,6 +353,7 @@ describe('ConversationSessionSettingsModal', () => {
       defaults: {
         chatFontSizePx: 15,
       },
+      showCompactionSummary: true,
       onSave: jest.fn(),
     }), {
       plugins: {

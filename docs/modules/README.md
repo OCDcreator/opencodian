@@ -49,6 +49,13 @@ docs/modules/
 ├── entry-point/
 │   └── main.md
 ├── core/
+│   ├── agents/
+│   │   ├── AgentCapability.md
+│   │   └── backend/
+│   │       ├── index.md
+│   │       ├── AgentService.md
+│   │       ├── OpenCodeAdapter.md
+│   │       └── AgentServiceRegistry.md
 │   ├── config/
 │   │   ├── index.md
 │   │   ├── commandScopedAgent.md

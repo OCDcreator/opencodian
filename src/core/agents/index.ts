@@ -1,5 +1,12 @@
 export type { BackendCapabilities } from './AgentCapability';
-export { AgentCapability, getActiveBackendCapabilities, hasCapability,OPENCODE_FULL_CAPABILITIES } from './AgentCapability';
+export {
+  AgentCapability,
+  EMPTY_CAPABILITIES,
+  getActiveBackendCapabilities,
+  hasCapability,
+  OPENCODE_FULL_CAPABILITIES,
+  setAgentServiceRegistry,
+} from './AgentCapability';
 export { AgentCatalogService } from './AgentCatalogService';
 export { AgentInvocationService } from './AgentInvocationService';
 export { ChildSessionGraphService } from './ChildSessionGraphService';
@@ -15,6 +22,24 @@ export {
   SystemAgentGuardService,
   type SystemAgentRiskLabel,
 } from './SystemAgentGuardService';
+export {
+  type AgentAuthCapability,
+  type AgentBranchCapability,
+  type AgentConfigCapability,
+  type AgentConnectionStatus,
+  type AgentMcpCapability,
+  type AgentModelCapability,
+  type AgentPermissionCapability,
+  type AgentQuestionCapability,
+  AgentServiceRegistry,
+  type AgentService,
+  type AgentServiceInfo,
+  type AgentToolCapability,
+  type AgentTodoCapability,
+  type Disposable as AgentDisposable,
+  type StatusChangeHandler,
+  OpenCodeAdapter,
+} from './backend';
 export {
   type AgentCatalogInput,
   type AgentMentionIntent,

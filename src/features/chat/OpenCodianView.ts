@@ -635,6 +635,8 @@ export class OpenCodianView extends ItemView {
       showNotice: (message) => {
         new Notice(message);
       },
+      supportsSessionSharing: () => hasCapability(this.caps, AgentCapability.Sharing),
+      supportsCompaction: () => hasCapability(this.caps, AgentCapability.Compaction),
     };
   }
 
@@ -716,9 +718,13 @@ export class OpenCodianView extends ItemView {
       addChosenFileContextToActiveTab: async () => {
         await this.composerContextViewFacade.addChosenFileContextToActiveTab();
       },
-      mountSelectionControls: (toolbar) => {
-        this.chatSelectionControlsCoordinator.build(toolbar);
+      mountSelectionControls: (toolbar, options) => {
+        this.chatSelectionControlsCoordinator.build(toolbar, {
+          showModels: options.showModels && hasCapability(this.caps, AgentCapability.Models),
+          showPermissions: options.showPermissions && hasCapability(this.caps, AgentCapability.Permissions),
+        });
       },
+      shouldMountAgentSelector: () => hasCapability(this.caps, AgentCapability.Subagents),
       mountContextUsageIndicator: (container) => {
         if (!hasCapability(this.caps, AgentCapability.Context)) {
           return;
@@ -3015,6 +3021,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private async getServerAvailability(): Promise<ChatServerAvailability> {
+    // If OpenCode backend is disabled, always report offline
+    if (!this.plugin.settings.enabledBackends.includes('opencode')) {
+      return 'offline';
+    }
+
     const isHealthy = await this.plugin.openCodeService.checkHealth();
     const internalStatus = this.plugin.openCodeService.getServerStatus();
     const hasManagedProcess = this.plugin.openCodeService.isServerProcessRunning();

@@ -60,13 +60,20 @@ export class ChatSelectionControlsCoordinator {
     });
   }
 
-  build(toolbarEl: HTMLElement): void {
+  build(toolbarEl: HTMLElement, options?: { showModels?: boolean; showPermissions?: boolean }): void {
     this.destroy();
     this.toolbarEl = toolbarEl;
     this.registerEscapeHandler();
 
-    this.permissionSelector.mount(toolbarEl.createDiv({ cls: 'opencodian-permission-selector' }));
-    this.mountModelSelector(toolbarEl.createDiv({ cls: 'opencodian-model-selector' }));
+    const showModels = options?.showModels !== false;
+    const showPermissions = options?.showPermissions !== false;
+
+    if (showPermissions) {
+      this.permissionSelector.mount(toolbarEl.createDiv({ cls: 'opencodian-permission-selector' }));
+    }
+    if (showModels) {
+      this.mountModelSelector(toolbarEl.createDiv({ cls: 'opencodian-model-selector' }));
+    }
   }
 
   async reloadModelCatalog(): Promise<void> {

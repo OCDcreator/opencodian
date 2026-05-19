@@ -4,6 +4,9 @@ import { addIcon, Notice, Plugin } from 'obsidian';
 import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
+import { setAgentServiceRegistry } from './core/agents/AgentCapability';
+import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
+import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
@@ -65,6 +68,7 @@ export default class OpenCodianPlugin extends Plugin {
   settings: OpenCodianSettings;
   storage: StorageService;
   openCodeService: OpenCodeService;
+  agentServiceRegistry: AgentServiceRegistry;
   opencodeConfigManager: OpencodeConfigManager | null = null;
   modelConfigService: ModelConfigService | null = null;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
@@ -187,6 +191,13 @@ export default class OpenCodianPlugin extends Plugin {
           },
         },
       );
+
+      // Wire agent service registry
+      this.agentServiceRegistry = new AgentServiceRegistry();
+      const openCodeAdapter = new OpenCodeAdapter(this.openCodeService);
+      this.agentServiceRegistry.register(openCodeAdapter);
+      this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
+      setAgentServiceRegistry(this.agentServiceRegistry);
     });
 
     await this.startupCoordinator.measureStartupStep('configureVaultScopedServices', () => {
@@ -213,6 +224,12 @@ export default class OpenCodianPlugin extends Plugin {
 
   private async startConfiguredLocalServerIfNeeded(): Promise<void> {
     if (!isLocalServerMode(this.settings.server) || !this.settings.server.local.autoStart) {
+      return;
+    }
+
+    // Skip server startup if OpenCode agent is not enabled
+    if (!this.settings.enabledBackends.includes('opencode')) {
+      logger.debug('OpenCode agent disabled — skipping local server startup');
       return;
     }
 
@@ -321,10 +338,13 @@ export default class OpenCodianPlugin extends Plugin {
 
   onunload() {
     this.runtimeCoordinator.dispose();
-    this.openCodeService?.dispose();
+    // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
     });
+    // Dispose registry (which disposes adapters, which disposes OpenCodeService)
+    this.agentServiceRegistry?.dispose();
+    setAgentServiceRegistry(null);
     this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();
     delete document.body.dataset.opencodianProviderIconMode;
 
@@ -870,6 +890,11 @@ export default class OpenCodianPlugin extends Plugin {
     logger.debug(`Server status changed: ${status}`);
     this.settingsTab?.refreshServerStatusDisplay();
     broadcastServerStatusToSettingsViews(this);
+    // Forward to adapter for registry-level status subscribers
+    const adapter = this.agentServiceRegistry?.get('opencode');
+    if (adapter && 'notifyStatusChange' in adapter) {
+      (adapter as import('./core/agents/backend/OpenCodeAdapter').OpenCodeAdapter).notifyStatusChange(status);
+    }
     if (status === 'running') {
       this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
     }

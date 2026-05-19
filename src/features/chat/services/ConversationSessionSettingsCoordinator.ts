@@ -30,6 +30,10 @@ export interface ConversationSessionSettingsCoordinatorHost {
   listSessions?(): Promise<Session[]>;
   copyText?(text: string): Promise<void>;
   getProjectShareMode?(): Promise<OpencodeShareMode | undefined>;
+  /** Whether to show session sharing controls. Defaults to false. */
+  supportsSessionSharing?(): boolean;
+  /** Whether to show compaction summary row. Defaults to false. */
+  supportsCompaction?(): boolean;
 }
 
 export class ConversationSessionSettingsCoordinator {
@@ -46,13 +50,17 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private async openConversationSettingsModal(conversation: Conversation): Promise<void> {
-    const shareUrl = await this.getCurrentShareUrl(conversation.openCodeSessionId);
-    const shareMode = await this.getProjectShareMode();
+    const showSharing = this.host.supportsSessionSharing?.() === true;
+    const showCompaction = this.host.supportsCompaction?.() === true;
+
+    const shareUrl = showSharing ? await this.getCurrentShareUrl(conversation.openCodeSessionId) : undefined;
+    const shareMode = showSharing ? await this.getProjectShareMode() : undefined;
 
     new ConversationSessionSettingsModal(this.host.app, {
       conversationTitle: conversation.title || t('chat.history.untitled'),
       defaults: this.resolveEffectiveSettings(conversation),
       initialOverrides: conversation.sessionSettings,
+      showCompactionSummary: showCompaction,
       shareUrl,
       shareMode,
       onSave: async (overrides) => {
@@ -64,12 +72,12 @@ export class ConversationSessionSettingsCoordinator {
       onCancelPreview: () => {
         this.applyConversationVisualState(conversation);
       },
-      onShare: async () => {
+      onShare: showSharing ? async () => {
         await this.shareCurrentConversation(conversation);
-      },
-      onUnshare: async () => {
+      } : undefined,
+      onUnshare: showSharing ? async () => {
         await this.unshareCurrentConversation(conversation);
-      },
+      } : undefined,
     }).open();
   }
 

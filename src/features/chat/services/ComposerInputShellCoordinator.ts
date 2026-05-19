@@ -43,9 +43,11 @@ export interface ComposerInputShellCoordinatorHost {
   getInputPlaceholder(): string;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   addChosenFileContextToActiveTab(): Promise<void>;
-  mountSelectionControls(toolbar: HTMLElement): void;
+  mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
+  /** Whether to mount the agent (@agent) selector and sync agent mentions. Defaults to true. */
+  shouldMountAgentSelector?(): boolean;
   isActiveTabStreaming(): boolean;
   cancelStreaming(): void;
   isTabForegroundBusy(): boolean;
@@ -149,7 +151,9 @@ export class ComposerInputShellCoordinator {
     });
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
-      this.agentMentionController.syncContent(this.inputTextareaEl?.value ?? '');
+      if (this.host.shouldMountAgentSelector?.() !== false) {
+        this.agentMentionController.syncContent(this.inputTextareaEl?.value ?? '');
+      }
       this.syncHighlightBackdrop();
       void this.refreshComposerSuggestionMenu();
     });
@@ -206,8 +210,13 @@ export class ComposerInputShellCoordinator {
     this.updateSendButtonState();
 
     const toolbarEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
-    this.agentSelectionController.mount(toolbarEl.createDiv({ cls: 'opencodian-agent-selector' }));
-    this.host.mountSelectionControls(toolbarEl);
+    if (this.host.shouldMountAgentSelector?.() !== false) {
+      this.agentSelectionController.mount(toolbarEl.createDiv({ cls: 'opencodian-agent-selector' }));
+    }
+    this.host.mountSelectionControls(toolbarEl, {
+      showModels: true,   // Host will gate based on capability
+      showPermissions: true, // Host will gate based on capability
+    });
     this.host.mountContextUsageIndicator(toolbarEl.createDiv({ cls: 'opencodian-context-usage-slot' }));
     this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
 
@@ -326,6 +335,10 @@ export class ComposerInputShellCoordinator {
     this.host.scheduleSettledScrollToBottomIfNeeded();
   }
 
+  private get shouldHandleAgentFeatures(): boolean {
+    return this.host.shouldMountAgentSelector?.() !== false;
+  }
+
   private trySubmitCurrentInput(): void {
     if (!this.inputTextareaEl) {
       return;
@@ -337,11 +350,17 @@ export class ComposerInputShellCoordinator {
     }
 
     const rawContent = this.inputTextareaEl.value;
+    const mentionIntents = this.shouldHandleAgentFeatures
+      ? this.agentMentionController.resolveMentionIntents(rawContent)
+      : [];
+    const selectedAgentId = this.shouldHandleAgentFeatures
+      ? this.agentSelectionController.getSelectedAgentId()
+      : undefined;
     const submission = buildComposerInputSubmissionWithAgentIntents(
       rawContent,
       this.host.getComposerInputMode(),
-      this.agentMentionController.resolveMentionIntents(rawContent),
-      this.agentSelectionController.getSelectedAgentId(),
+      mentionIntents,
+      selectedAgentId,
     );
     if (!submission) {
       return;
@@ -397,7 +416,10 @@ export class ComposerInputShellCoordinator {
     // agent suggestions while the user is actively selecting a command name;
     // once a command is chosen and arguments are being typed, @ should trigger
     // agent mentions normally.
-    const agentQuery = this.agentMentionController.getQuery(textarea);
+    // Skip agent mention queries when the agent feature is disabled.
+    const agentQuery = this.shouldHandleAgentFeatures
+      ? this.agentMentionController.getQuery(textarea)
+      : null;
     const isSelectingSlashCommand = getSlashCommandMenuQuery(textarea) !== null;
     if (agentQuery && !isSelectingSlashCommand) {
       this.clearSlashCommandMenu();
@@ -416,6 +438,9 @@ export class ComposerInputShellCoordinator {
   }
 
   private tryHandleAgentMentionMenuKeydown(event: KeyboardEvent): boolean {
+    if (!this.shouldHandleAgentFeatures) {
+      return false;
+    }
     return this.agentMentionController.tryHandleKeydown(
       event,
       this.inputTextareaEl,
