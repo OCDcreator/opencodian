@@ -32,6 +32,7 @@ function createFixture() {
     showConversationHistory: jest.fn(),
     openConversationSessionSettings: jest.fn(),
     openSettings: jest.fn(),
+    isOpenCodeBackend: jest.fn(() => true),
   };
 
   const headerEl = document.createElement('div');

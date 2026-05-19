@@ -8,6 +8,7 @@ function createRenderer() {
     }),
     scheduleActiveSettledScrollToBottomIfNeeded: jest.fn(),
     openContextAttachment: jest.fn(),
+    hasCompactionCapability: jest.fn().mockReturnValue(true),
   };
   const renderer = new UserMessageContentRenderer(host);
   return { host, renderer };
