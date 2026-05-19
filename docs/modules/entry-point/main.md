@@ -19,6 +19,8 @@
 
 设置保存编排（`saveSettings()`、主题/外观变更、背景资源管理、防抖定时器）已从 `main.ts` 提取到 `OpenCodianSettingsRuntimeCoordinator`。`main.ts` 保留公共 API 表面，所有设置运行时调用委托给该 coordinator。
 
+文件头部保留了针对 `simple-import-sort/imports` 的局部豁免：入口导入按启动编排 seam 手工分组，避免 owner-guard 保护下的 wiring 变更频繁触发与行为无关的排序 diff。
+
 ## 导入关系
 
 ```text

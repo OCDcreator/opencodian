@@ -7,6 +7,8 @@
 
 `ComposerInputShellCoordinator` 承接聊天输入区 shell 的 DOM 与 layout lifecycle，避免 `OpenCodianView` 继续直接维护 textarea、自适应高度、send/stop 按钮、slash autocomplete / `@agent` menu 和 composer stack metrics。
 
+该 owner 当前仍是一个大文件，这是有意的：textarea、overlay、focus 恢复和 layout sync 共享同一批 DOM 引用与生命周期，拆散后比本地集中维护更容易引入回归。
+
 它负责：
 
 - 创建 input tab bar slot、composer shell、context row、textarea、footer、toolbar slots，以及挂在 composer shell 上方的 slash menu overlay
@@ -62,6 +64,7 @@ export class ComposerInputShellCoordinator {
 ## 关键行为
 
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam；textarea 被 `opencodian-input-highlight-container` 包裹，内含 `opencodian-input-highlight-backdrop` 和 textarea 两个同级元素
+- `build()` 在挂载 toolbar 子控件后会清理空 slot；当当前 backend 没有 agent/model/permission/context/effort 控件可显示时，整个 `opencodian-input-toolbar` 会被移除，避免空壳 toolbar 把 add/send 按钮悬在半空
 - `build()` 设置 textarea 的 scroll 事件监听器，同步 backdrop 的 scrollTop 以保持滚动一致
 - `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionPillSpans()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内，并写入 agent pill metadata；slash 高亮则先依赖已加载的 `slashCommandMenuCatalogItems` 做精确判定，只把 catalog 中真实存在的 `/command`、direct `/skill`，以及 prefixed mode 下存在的 `/skills skill-name` 包裹为高亮 span。普通命令使用 `opencodian-input-highlight-command`，直接或 prefixed skill 使用 `opencodian-input-highlight-skill`，裸 `/skills` 入口仍按 command 语义显示；拼错的 `/using-superpowert` 这类未知 token 不会上色
 - `syncTextareaHeight()` 在调整 textarea 高度的同时同步 backdrop 高度

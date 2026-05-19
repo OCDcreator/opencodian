@@ -9,6 +9,24 @@ export {
 } from './AgentCapability';
 export { AgentCatalogService } from './AgentCatalogService';
 export { AgentInvocationService } from './AgentInvocationService';
+export {
+  type AgentAuthCapability,
+  type AgentBranchCapability,
+  type AgentConfigCapability,
+  type AgentConnectionStatus,
+  type Disposable as AgentDisposable,
+  type AgentMcpCapability,
+  type AgentModelCapability,
+  type AgentPermissionCapability,
+  type AgentQuestionCapability,
+  type AgentService,
+  type AgentServiceInfo,
+  AgentServiceRegistry,
+  type AgentTodoCapability,
+  type AgentToolCapability,
+  OpenCodeAdapter,
+  type StatusChangeHandler,
+} from './backend';
 export { ChildSessionGraphService } from './ChildSessionGraphService';
 export {
   AGENT_FILE_ROOTS,
@@ -22,24 +40,6 @@ export {
   SystemAgentGuardService,
   type SystemAgentRiskLabel,
 } from './SystemAgentGuardService';
-export {
-  type AgentAuthCapability,
-  type AgentBranchCapability,
-  type AgentConfigCapability,
-  type AgentConnectionStatus,
-  type AgentMcpCapability,
-  type AgentModelCapability,
-  type AgentPermissionCapability,
-  type AgentQuestionCapability,
-  AgentServiceRegistry,
-  type AgentService,
-  type AgentServiceInfo,
-  type AgentToolCapability,
-  type AgentTodoCapability,
-  type Disposable as AgentDisposable,
-  type StatusChangeHandler,
-  OpenCodeAdapter,
-} from './backend';
 export {
   type AgentCatalogInput,
   type AgentMentionIntent,

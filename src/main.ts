@@ -1,3 +1,4 @@
+/* eslint-disable simple-import-sort/imports -- Entry-point bootstrap imports stay manually clustered by startup seam so owner-guarded wiring changes do not create unrelated reorder churn. */
 import * as fs from 'fs';
 import type { Editor, MarkdownView } from 'obsidian';
 import { addIcon, Notice, Plugin } from 'obsidian';

@@ -1,16 +1,15 @@
-import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals';
+import { afterEach,beforeEach, describe, expect, it, jest } from '@jest/globals';
 
+import { AgentCapability, OPENCODE_FULL_CAPABILITIES } from '../../../../../src/core/agents/AgentCapability';
+import type {
+  AgentConnectionStatus,
+  AgentService,
+  Disposable,
+} from '../../../../../src/core/agents/backend/AgentService';
 import {
   AgentServiceRegistry,
 } from '../../../../../src/core/agents/backend/AgentServiceRegistry';
-import type {
-  AgentService,
-  AgentConnectionStatus,
-  AgentServiceInfo,
-  Disposable,
-} from '../../../../../src/core/agents/backend/AgentService';
 import type { AgentBackendKind } from '../../../../../src/core/types/chat';
-import { AgentCapability, OPENCODE_FULL_CAPABILITIES, EMPTY_CAPABILITIES } from '../../../../../src/core/agents/AgentCapability';
 
 // ---------------------------------------------------------------------------
 // Mock adapter
@@ -140,7 +139,7 @@ describe('AgentServiceRegistry', () => {
 
     it('skips unregistered backends', () => {
       registry.register(createMockAdapter('opencode'));
-      const active = registry.setEnabledBackends(['opencode', 'codex']);
+      registry.setEnabledBackends(['opencode', 'codex']);
       expect(registry.isEnabled('opencode')).toBe(true);
       expect(registry.isEnabled('codex')).toBe(false);
     });

@@ -11,6 +11,7 @@
  * See docs/requirements/multi-agent-foundation/03-opencode-adapter.md.
  */
 
+import type { OpenCodeService } from '../../opencode/OpenCodeService';
 import type { AgentBackendKind } from '../../types/chat';
 import {
   type AgentCapability,
@@ -27,12 +28,11 @@ import type {
   AgentQuestionCapability,
   AgentService,
   AgentServiceInfo,
-  AgentToolCapability,
   AgentTodoCapability,
+  AgentToolCapability,
   Disposable,
   StatusChangeHandler,
 } from './AgentService';
-import type { OpenCodeService } from '../../opencode/OpenCodeService';
 
 /**
  * Maps OpenCodeService server status strings to AgentConnectionStatus.

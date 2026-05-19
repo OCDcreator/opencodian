@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This owner keeps composer textarea, @agent selector, slash menu, and layout sync together because they share DOM, focus, and overlay lifecycle. */
 import { setIcon } from 'obsidian';
 
 import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
@@ -219,6 +220,7 @@ export class ComposerInputShellCoordinator {
     });
     this.host.mountContextUsageIndicator(toolbarEl.createDiv({ cls: 'opencodian-context-usage-slot' }));
     this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
+    this.pruneEmptyToolbar(toolbarEl);
 
     this.initializeLayoutMetrics();
   }
@@ -323,6 +325,18 @@ export class ComposerInputShellCoordinator {
     }
 
     this.scheduleLayoutSync();
+  }
+
+  private pruneEmptyToolbar(toolbarEl: HTMLElement): void {
+    for (const child of Array.from(toolbarEl.children)) {
+      if (child instanceof HTMLElement && child.childElementCount === 0 && (child.textContent ?? '').trim().length === 0) {
+        child.remove();
+      }
+    }
+
+    if (toolbarEl.childElementCount === 0) {
+      toolbarEl.remove();
+    }
   }
 
   private syncLayoutMetrics(): void {

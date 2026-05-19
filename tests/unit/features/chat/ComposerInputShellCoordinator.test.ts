@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This suite intentionally keeps shared DOM fixture helpers and coordinator interaction coverage together. */
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
 import {
   buildComposerInputSubmission,
@@ -43,7 +44,7 @@ function slashItem(id: string, description: string, overrides: Partial<SlashComm
   return { id, description, hasProjectOverride: false, runtimeAvailable: true, source: 'command', subtask: false, ...overrides };
 }
 
-function createFixture() {
+function createFixture(options: { shouldMountAgentSelector?: boolean } = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
   let inputContainerHeight = 88;
@@ -67,6 +68,7 @@ function createFixture() {
     mountSelectionControls: jest.fn(),
     mountContextUsageIndicator: jest.fn(),
     mountEffortSelector: jest.fn(),
+    shouldMountAgentSelector: jest.fn(() => options.shouldMountAgentSelector ?? true),
     isActiveTabStreaming: jest.fn(() => isStreaming),
     cancelStreaming: jest.fn(),
     isTabForegroundBusy: jest.fn(() => isForegroundBusy),
@@ -196,6 +198,12 @@ describe('ComposerInputShellCoordinator', () => {
     });
     expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
     expect(fixture.textarea.value).toBe('');
+  });
+
+  it('removes the empty toolbar when no selector, model, permission, context, or effort controls are mounted', () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    expect(fixture.container.querySelector('.opencodian-input-toolbar')).toBeNull();
   });
 
   it('keeps submit gating and send/stop affordance inside the coordinator', () => {

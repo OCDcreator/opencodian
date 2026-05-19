@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { OpenCodeAdapter } from '../../../../../src/core/agents/backend/OpenCodeAdapter';
 import { AgentCapability, OPENCODE_FULL_CAPABILITIES } from '../../../../../src/core/agents/AgentCapability';
+import { OpenCodeAdapter } from '../../../../../src/core/agents/backend/OpenCodeAdapter';
 
 // ---------------------------------------------------------------------------
 // Mock OpenCodeService

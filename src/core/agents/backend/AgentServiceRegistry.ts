@@ -9,14 +9,12 @@
  * See docs/requirements/multi-agent-foundation/02-architecture.md §5.
  */
 
-import type { AgentBackendKind } from '../../types/chat';
 import { createLogger } from '../../../shared';
+import type { AgentBackendKind } from '../../types/chat';
 import type {
-  AgentConnectionStatus,
   AgentService,
   AgentServiceInfo,
   Disposable,
-  StatusChangeHandler,
 } from './AgentService';
 
 const logger = createLogger('AgentServiceRegistry');

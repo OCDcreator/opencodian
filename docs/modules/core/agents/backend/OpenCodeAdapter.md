@@ -14,6 +14,7 @@
 - 声明 `OPENCODE_FULL_CAPABILITIES`，让 OpenCode 在 Phase 0 支持完整 capability 集合
 - 实现所有可选 capability interface，并把 session、todo、question、permission、model、MCP、config、tool、auth 调用委托给 `OpenCodeService`
 - 提供 adapter 级 `onStatusChange()` 订阅与 `notifyStatusChange()` 通知入口
+- 保留 `underlying` 过渡访问口，供尚未迁移到统一接口的 OpenCode 专有调用路径复用
 
 ## 依赖
 

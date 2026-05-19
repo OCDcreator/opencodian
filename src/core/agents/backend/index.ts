@@ -16,11 +16,10 @@ export type {
   AgentQuestionCapability,
   AgentService,
   AgentServiceInfo,
-  AgentToolCapability,
   AgentTodoCapability,
+  AgentToolCapability,
   Disposable,
   StatusChangeHandler,
 } from './AgentService';
-
-export { OpenCodeAdapter } from './OpenCodeAdapter';
 export { AgentServiceRegistry } from './AgentServiceRegistry';
+export { OpenCodeAdapter } from './OpenCodeAdapter';

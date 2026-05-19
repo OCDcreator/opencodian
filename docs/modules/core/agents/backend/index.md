@@ -12,6 +12,7 @@
 - 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型和可选 capability interface
 - 导出 `OpenCodeAdapter` 作为当前 OpenCode backend 的 adapter 实现
 - 导出 `AgentServiceRegistry` 作为 adapter 注册与 active backend 解析 owner
+- 保持 type-only 导出与 value 导出分层，避免 barrel 额外引入运行时副作用
 
 ## 依赖
 
