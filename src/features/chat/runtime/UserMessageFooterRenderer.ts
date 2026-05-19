@@ -11,6 +11,7 @@ const I18N_KEY_ATTR = 'data-i18n-key';
 
 export interface UserMessageFooterRendererHost {
   isStreaming(): boolean;
+  hasBranchingCapability(): boolean;
   handleRewindRequest(message: ChatMessage): Promise<void> | void;
   handleForkRequest(message: ChatMessage): Promise<void> | void;
 }
@@ -20,7 +21,9 @@ export class UserMessageFooterRenderer {
 
   render(messageEl: HTMLElement, message: ChatMessage, copyContent?: string): void {
     const footerEl = messageEl.createDiv({ cls: 'opencodian-user-message-footer' });
-    const hasActions = Boolean(copyContent) || Boolean(message.sourceMessageId);
+    const canRenderBranchingActions =
+      Boolean(message.sourceMessageId) && this.host.hasBranchingCapability();
+    const hasActions = Boolean(copyContent) || canRenderBranchingActions;
 
     if (hasActions) {
       const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
@@ -29,7 +32,7 @@ export class UserMessageFooterRenderer {
         this.renderCopyButton(actionsEl, copyContent);
       }
 
-      if (message.sourceMessageId) {
+      if (canRenderBranchingActions) {
         this.renderActionButton(actionsEl, {
           i18nKey: 'chat.rewind.button',
           icon: REWIND_ICON,

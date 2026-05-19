@@ -8,6 +8,11 @@ import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope } from 'obsidian';
 
 import {
+  AgentCapability,
+  getActiveBackendCapabilities,
+  hasCapability,
+} from '../../core/agents/AgentCapability';
+import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
 import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
@@ -549,6 +554,11 @@ export class OpenCodianView extends ItemView {
     return this.questionRuntimeServices.dockCoordinator;
   }
 
+  /** Get current backend capabilities. Phase 0: always OpenCode full set. */
+  private get caps() {
+    return getActiveBackendCapabilities();
+  }
+
   private createChatHeaderPresenterHost(): ChatHeaderPresenterHost {
     return {
       setTooltipLabel: (element, label, position) => {
@@ -677,10 +687,14 @@ export class OpenCodianView extends ItemView {
   private createComposerInputShellCoordinatorHost(): ComposerInputShellCoordinatorHost {
     return {
       attachSessionTodo: (container) => {
-        this.sessionTodoCoordinator.attach(container);
+        if (hasCapability(this.caps, AgentCapability.Todos)) {
+          this.sessionTodoCoordinator.attach(container);
+        }
       },
       attachQuestionDock: (container) => {
-        this.questionDockSlotCoordinator.attach(container);
+        if (hasCapability(this.caps, AgentCapability.Questions)) {
+          this.questionDockSlotCoordinator.attach(container);
+        }
       },
       setContextRowElement: (element) => {
         this.composerContextViewFacade.setContextRowElement(element);
@@ -697,6 +711,9 @@ export class OpenCodianView extends ItemView {
         this.chatSelectionControlsCoordinator.build(toolbar);
       },
       mountContextUsageIndicator: (container) => {
+        if (!hasCapability(this.caps, AgentCapability.Context)) {
+          return;
+        }
         this.contextRingContainerEl = container;
         this.contextRing = new ContextRing(container, () => {
           this.activeTabContextUsageCoordinator.openContextUsageDetails();
@@ -1155,7 +1172,9 @@ export class OpenCodianView extends ItemView {
   }
 
   private renderSessionTodoDock(tabId: TabId | null = this.getActiveTabId()): void {
-    this.sessionTodoCoordinator.render(tabId);
+    if (hasCapability(this.caps, AgentCapability.Todos)) {
+      this.sessionTodoCoordinator.render(tabId);
+    }
   }
 
   private beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1405,7 +1424,9 @@ export class OpenCodianView extends ItemView {
         shouldUseAboveInputQuestionDock: () => this.plugin.settings.questionCardPosition === 'above_input',
       },
       () => {
-        this.questionDockCoordinator.render();
+        if (hasCapability(this.caps, AgentCapability.Questions)) {
+          this.questionDockCoordinator.render();
+        }
       },
     );
     const conversationHistoryActionsCoordinator = new ConversationHistoryActionsCoordinator(
@@ -2031,7 +2052,9 @@ export class OpenCodianView extends ItemView {
         this.tabManager?.setActiveTabContextUsage(contextUsage);
       },
       renderContextUsageIndicator: (state) => {
-        this.contextRing?.update(state);
+        if (hasCapability(this.caps, AgentCapability.Context)) {
+          this.contextRing?.update(state);
+        }
       },
       getSessionContextUsageSnapshot: (sessionId) =>
         this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId),
@@ -2480,6 +2503,8 @@ export class OpenCodianView extends ItemView {
   private createUserMessageFooterRendererHost(): UserMessageFooterRendererHost {
     return {
       isStreaming: () => this.isActiveTabStreaming(),
+      hasBranchingCapability: () =>
+        hasCapability(getActiveBackendCapabilities(), AgentCapability.Branching),
       handleRewindRequest: (message) => this.handleRewindRequest(message),
       handleForkRequest: (message) => this.handleForkRequest(message),
     };
@@ -3553,6 +3578,10 @@ export class OpenCodianView extends ItemView {
     request: Extract<import('../../core/types').StreamChunk, { type: 'permission_request' }>,
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
+    if (!hasCapability(this.caps, AgentCapability.Permissions)) {
+      return;
+    }
+
     try {
       const responded = await this.permissionInlineCardRenderer.collectAndRespond(
         request,
