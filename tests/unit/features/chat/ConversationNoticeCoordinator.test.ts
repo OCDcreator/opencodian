@@ -12,6 +12,8 @@ const mockAppendPersistentNotice = jest.fn();
 const mockRenderBackgroundTaskIndicatorIfNeeded = jest.fn();
 const mockHandleRestoreRewindRequest = jest.fn();
 const mockOpenPluginSettingsPreservingScroll = jest.fn();
+const mockHasAnyEnabledBackend = jest.fn();
+const mockHasBackendConnection = jest.fn();
 
 function createHost(): ConversationNoticeCoordinatorHost {
   return {
@@ -25,22 +27,28 @@ function createHost(): ConversationNoticeCoordinatorHost {
     renderBackgroundTaskIndicatorIfNeeded: mockRenderBackgroundTaskIndicatorIfNeeded,
     handleRestoreRewindRequest: mockHandleRestoreRewindRequest,
     openPluginSettingsPreservingScroll: mockOpenPluginSettingsPreservingScroll,
+    hasAnyEnabledBackend: mockHasAnyEnabledBackend,
+    hasBackendConnection: mockHasBackendConnection,
   };
 }
 
-describe('ConversationNoticeCoordinator', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockGetActiveTabId.mockReturnValue('tab-active');
-    mockGetCurrentSessionModel.mockReturnValue({ provider: 'anthropic', model: 'claude' });
-    mockFormatModelId.mockReturnValue('anthropic/claude');
-    mockIsConversationRewound.mockReturnValue(false);
-    mockGetSessionDiff.mockResolvedValue([]);
-    mockGetCachedSessionDiffEntries.mockReturnValue([]);
-    mockAppendPersistentNotice.mockResolvedValue(undefined);
-    mockRenderBackgroundTaskIndicatorIfNeeded.mockResolvedValue(undefined);
-    mockHandleRestoreRewindRequest.mockResolvedValue(undefined);
-  });
+function resetConversationNoticeMocks(): void {
+  jest.clearAllMocks();
+  mockGetActiveTabId.mockReturnValue('tab-active');
+  mockGetCurrentSessionModel.mockReturnValue({ provider: 'anthropic', model: 'claude' });
+  mockFormatModelId.mockReturnValue('anthropic/claude');
+  mockIsConversationRewound.mockReturnValue(false);
+  mockGetSessionDiff.mockResolvedValue([]);
+  mockGetCachedSessionDiffEntries.mockReturnValue([]);
+  mockAppendPersistentNotice.mockResolvedValue(undefined);
+  mockRenderBackgroundTaskIndicatorIfNeeded.mockResolvedValue(undefined);
+  mockHandleRestoreRewindRequest.mockResolvedValue(undefined);
+  mockHasAnyEnabledBackend.mockReturnValue(true);
+  mockHasBackendConnection.mockReturnValue(true);
+}
+
+describe('ConversationNoticeCoordinator stream notices', () => {
+  beforeEach(resetConversationNoticeMocks);
 
   describe('createStreamErrorNotice', () => {
     it('builds a timestamped error notice with model id', () => {
@@ -58,6 +66,10 @@ describe('ConversationNoticeCoordinator', () => {
       }));
     });
   });
+});
+
+describe('ConversationNoticeCoordinator empty conversation notices', () => {
+  beforeEach(resetConversationNoticeMocks);
 
   describe('empty conversation notice', () => {
     it('checks rewound state', () => {
@@ -85,7 +97,22 @@ describe('ConversationNoticeCoordinator', () => {
         noticeActions: [{ type: 'restore_rewind' }],
       }));
     });
+
+    it('builds a backend-guidance notice when no backend is enabled', () => {
+      mockHasAnyEnabledBackend.mockReturnValue(false);
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+
+      expect(coordinator.createEmptyConversationNotice()).toEqual(expect.objectContaining({
+        id: 'opencodian-empty-state-no-backend',
+        noticeTone: 'warning',
+      }));
+      expect(coordinator.createEmptyConversationNotice().content).not.toBe(t('chat.empty.description'));
+    });
   });
+});
+
+describe('ConversationNoticeCoordinator diff notices', () => {
+  beforeEach(resetConversationNoticeMocks);
 
   describe('formatDiffNoticeMarkdown', () => {
     it('renders vault links, stats, and status', () => {
@@ -193,6 +220,10 @@ describe('ConversationNoticeCoordinator', () => {
       expect(mockRenderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     });
   });
+});
+
+describe('ConversationNoticeCoordinator error and action helpers', () => {
+  beforeEach(resetConversationNoticeMocks);
 
   describe('getFriendlyStreamErrorMessage', () => {
     it('returns server-no-response for empty input', () => {

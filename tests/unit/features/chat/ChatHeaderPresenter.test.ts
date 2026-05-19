@@ -9,6 +9,7 @@ function createFixture() {
   let cssChangeListener: (() => void) | null = null;
   let availability: ChatServerAvailability = 'checking';
   let localServerMode = true;
+  let openCodeBackend = true;
 
   const host: jest.Mocked<ChatHeaderPresenterHost> = {
     setTooltipLabel: jest.fn((element, label, position) => {
@@ -32,7 +33,7 @@ function createFixture() {
     showConversationHistory: jest.fn(),
     openConversationSessionSettings: jest.fn(),
     openSettings: jest.fn(),
-    isOpenCodeBackend: jest.fn(() => true),
+    isOpenCodeBackend: jest.fn(() => openCodeBackend),
   };
 
   const headerEl = document.createElement('div');
@@ -49,6 +50,9 @@ function createFixture() {
     },
     setLocalServerMode: (nextLocalServerMode: boolean) => {
       localServerMode = nextLocalServerMode;
+    },
+    setOpenCodeBackend: (nextOpenCodeBackend: boolean) => {
+      openCodeBackend = nextOpenCodeBackend;
     },
     dispatchCssChange: () => {
       cssChangeListener?.();
@@ -133,6 +137,12 @@ describe('ChatHeaderPresenter', () => {
 
     expect(statusBadgeEl?.classList.contains('is-external')).toBe(true);
     expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.localExternal'));
+
+    fixture.setAvailability('disabled');
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(statusBadgeEl?.classList.contains('is-disabled')).toBe(true);
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.disabled'));
   });
 
   it('ignores late server status results after destroy clears header DOM refs', async () => {
@@ -171,5 +181,16 @@ describe('ChatHeaderPresenter', () => {
     expect(logoEl?.innerHTML).toContain('clip0_dark');
     expect(fixture.host.scheduleChatSurfaceColorSync).toHaveBeenCalledTimes(1);
     expect(fixture.host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the LSP indicator when the active backend is not OpenCode', () => {
+    const fixture = createFixture();
+    fixture.presenter.destroy();
+    fixture.headerEl.innerHTML = '';
+    fixture.setOpenCodeBackend(false);
+
+    fixture.presenter.build(fixture.headerEl);
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status-indicator')).toBeNull();
   });
 });

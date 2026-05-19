@@ -39,6 +39,7 @@ export interface OpenCodianSettingsRuntimeCoordinatorHost {
   getVaultBasePath(): string | null;
   refreshOpenCodianViews(options: { reloadModels?: boolean; applyUi?: boolean }): void;
   invalidateSlashCommandMenuCatalogs(options?: { preload?: boolean }): void;
+  scheduleDeferredRuntimeWarmup?(): void;
   applyProviderIconColorMode(): void;
   getOpenCodianLeaves(): WorkspaceLeaf[];
   onSettingsPersistenceBlocked(message: string): void;
@@ -58,6 +59,7 @@ export interface OpenCodianSettingsRuntimeCoordinatorHost {
 5. 刷新所有已打开的视图
 6. 失效 slash command 菜单缓存
 7. 同步 `.opencode` 权限配置
+8. 当设置已经回到 `enabledBackends` 包含 `opencode` 且 `server.mode=local`、`autoStart=true` 时，调度一次 deferred runtime warmup，让从 disabled/remote/offline 恢复到本地托管时能自动拉起服务，而不是等到下次 reload 或会话 bootstrap
 
 ### 主题/外观变更
 
@@ -87,7 +89,7 @@ export interface OpenCodianSettingsRuntimeCoordinatorHost {
 ## 与其他模块的交互
 
 - `main.ts`: 构造本模块并提供 host callbacks
-- `PluginRuntimeCoordinator`: 通过 host callback 进行跨视图刷新
+- `PluginRuntimeCoordinator`: 通过 host callback 进行跨视图刷新，并在恢复到本地 auto-start 运行时时调度 deferred warmup
 - `StorageService`: 通过 host callback 读写设置和主题背景资源
 - `OpenCodeService`: 通过 host callback 同步设置
 

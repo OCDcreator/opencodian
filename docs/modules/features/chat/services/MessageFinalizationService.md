@@ -56,7 +56,7 @@ export function shouldSyncAfterStream(
 export function getFriendlyServerStartErrorMessage(error: unknown): string;
 
 export function getUnavailableServerMessage(
-  availability: 'checking' | 'starting' | 'offline',
+  availability: 'checking' | 'disabled' | 'starting' | 'offline',
 ): string;
 
 export interface FinalizeMessageOptions {
@@ -82,7 +82,7 @@ export class MessageFinalizationService {
   finalizeAssistantMessageWithServerUnavailableError(
     messageEl: HTMLElement,
     contentEl: HTMLElement,
-    availability: 'checking' | 'starting' | 'offline',
+    availability: 'checking' | 'disabled' | 'starting' | 'offline',
   ): Promise<void>;
 }
 ```
@@ -137,6 +137,7 @@ export class MessageFinalizationService {
 纯函数，不依赖 host。将 server 不可用状态分类为用户友好的 i18n 消息：
 
 - `starting` → `chat.error.serverStarting`
+- `disabled` → 复用 chat surface 的 no-backend 引导文案
 - 其他（`offline`、`checking`）→ `chat.error.serverOffline`
 
 ### finalizeAssistantMessageWithError

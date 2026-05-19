@@ -81,6 +81,20 @@ describe('MessageSendPreparationService ensureServerReadyForChat', () => {
     expect(host.startServer).not.toHaveBeenCalled();
   });
 
+  it('opens settings instead of starting the service when no backend is enabled', async () => {
+    const { host, container } = createServerReadinessHost({
+      getServerAvailability: jest.fn().mockResolvedValue('disabled'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const resultPromise = service.ensureServerReadyForChat('disabled');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    simulateButtonClickAfterRender(container.contentEl, 'Enable backend');
+
+    expect(await resultPromise).toBe(false);
+    expect(host.openPluginSettingsAtServerSection).toHaveBeenCalled();
+    expect(host.startServer).not.toHaveBeenCalled();
+  });
+
   it('returns false when skip is chosen and server stays offline', async () => {
     const { host, container } = createServerReadinessHost({
       getServerAvailability: jest.fn().mockResolvedValue('offline'),

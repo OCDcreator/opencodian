@@ -29,7 +29,8 @@ describe('MessageSendPreparationService follow-up queue', () => {
       targetTabId: 'tab-1',
     });
     expect(host.notifyForegroundBusy).not.toHaveBeenCalled();
-    expect(host.getServerAvailability).not.toHaveBeenCalled();
+    // Early disabled-backend guard calls getServerAvailability before the busy check.
+    expect(host.getServerAvailability).toHaveBeenCalledTimes(1);
   });
 
   it('keeps existing busy blocking semantics when a busy tab already has a queued follow-up', async () => {
@@ -48,8 +49,9 @@ describe('MessageSendPreparationService follow-up queue', () => {
       targetTabId: 'tab-1',
     });
     expect(host.notifyForegroundBusy).toHaveBeenCalledTimes(1);
-    expect(host.getServerAvailability).not.toHaveBeenCalled();
-    expect(callOrder).toEqual(['notifyForegroundBusy']);
+    // Early disabled-backend guard calls getServerAvailability before the busy check.
+    expect(host.getServerAvailability).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(['getServerAvailability', 'notifyForegroundBusy']);
   });
 
   it('does not queue when no canonical conversation is available', async () => {

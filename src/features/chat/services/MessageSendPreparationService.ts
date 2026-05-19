@@ -32,6 +32,7 @@ const logger = createLogger('MessageSendPreparationService');
 
 export type SendPreparationServerAvailability =
   'checking'
+  | 'disabled'
   | 'running'
   | 'starting'
   | 'offline'
@@ -130,7 +131,7 @@ export interface MessageSendPreparationHost {
   refreshSettingsTabStatus(): void;
   getServerMode(): 'local' | 'remote';
   createAssistantShellContainer(): SendPipelineStreamElements;
-  getUnavailableServerPromptMessage(availability: 'checking' | 'starting' | 'offline'): string;
+  getUnavailableServerPromptMessage(availability: 'checking' | 'disabled' | 'starting' | 'offline'): string;
   finalizeAssistantMessageWithServerError(
     messageEl: HTMLElement,
     contentEl: HTMLElement,
@@ -139,7 +140,7 @@ export interface MessageSendPreparationHost {
   finalizeAssistantMessageWithServerUnavailableError(
     messageEl: HTMLElement,
     contentEl: HTMLElement,
-    availability: 'checking' | 'starting' | 'offline',
+    availability: 'checking' | 'disabled' | 'starting' | 'offline',
   ): Promise<void>;
   openPluginSettingsAtServerSection(): void;
   startServer(): Promise<void>;
@@ -221,7 +222,7 @@ export interface MessageSendPreparationHostDependencies {
   notifyForegroundBusy: () => void;
   assistantShellViewHostAdapter: { createAssistantShellContainer(): SendPipelineStreamElements };
   messageFinalizationService: {
-    getUnavailableServerPromptMessage(availability: 'checking' | 'starting' | 'offline'): string;
+    getUnavailableServerPromptMessage(availability: 'checking' | 'disabled' | 'starting' | 'offline'): string;
     finalizeAssistantMessageWithServerError(
       messageEl: HTMLElement,
       contentEl: HTMLElement,
@@ -230,7 +231,7 @@ export interface MessageSendPreparationHostDependencies {
     finalizeAssistantMessageWithServerUnavailableError(
       messageEl: HTMLElement,
       contentEl: HTMLElement,
-      availability: 'checking' | 'starting' | 'offline',
+      availability: 'checking' | 'disabled' | 'starting' | 'offline',
     ): Promise<void>;
   };
   chatSelectionControlsCoordinator: {
@@ -299,6 +300,14 @@ export class MessageSendPreparationService {
     const tabId = options.targetTabId ?? this.host.getActiveTabId();
     if (!tabId || !this.isTargetTabActive(options.targetTabId)) {
       return null;
+    }
+    // Check server availability BEFORE creating a conversation/session,
+    // so we never bootstrap an orphan session when the backend is disabled/offline.
+    const earlyAvailability = await this.host.getServerAvailability();
+    if (earlyAvailability !== 'running' && earlyAvailability !== 'external') {
+      if (!(await this.ensureServerReadyForChat(earlyAvailability))) {
+        return null;
+      }
     }
     const conversation = await this.host.ensureConversationReady();
     if (!conversation) return null;
@@ -455,15 +464,19 @@ export class MessageSendPreparationService {
       text: `${t('chat.serverPrompt.currentStatus')} ${t(
         availability === 'starting'
           ? 'chat.serverStatus.starting'
-          : 'chat.serverStatus.offline'
+          : availability === 'disabled'
+            ? 'chat.serverStatus.disabled'
+            : 'chat.serverStatus.offline'
       )}`,
     });
 
     const buttonRow = cardEl.createDiv({ cls: 'opencodian-server-action-buttons' });
     const serverMode = this.host.getServerMode();
-    const primaryButtonLabel = serverMode === 'local'
-      ? t('chat.serverPrompt.start')
-      : t('chat.serverPrompt.retry');
+    const primaryButtonLabel = availability === 'disabled'
+      ? t('chat.serverPrompt.enableBackend')
+      : serverMode === 'local'
+        ? t('chat.serverPrompt.start')
+        : t('chat.serverPrompt.retry');
     const startBtn = buttonRow.createEl('button', {
       cls: 'opencodian-server-action-btn mod-cta',
       text: primaryButtonLabel,
@@ -483,6 +496,17 @@ export class MessageSendPreparationService {
       settingsBtn.addEventListener('click', () => resolve('settings'));
     });
 
+    if (choice === 'start' && availability === 'disabled') {
+      this.host.openPluginSettingsAtServerSection();
+      // Bail out — the user must enable a backend and re-send manually.
+      await this.host.finalizeAssistantMessageWithServerUnavailableError(
+        messageEl,
+        contentEl,
+        'disabled',
+      );
+      return false;
+    }
+
     if (choice === 'settings') this.host.openPluginSettingsAtServerSection();
     if (choice === 'settings' || choice === 'skip') {
       await this.refreshStatusSurfaces();
@@ -492,7 +516,7 @@ export class MessageSendPreparationService {
         return true;
       }
       await this.host.finalizeAssistantMessageWithServerUnavailableError(
-        messageEl, contentEl, latestAvailability as 'checking' | 'starting' | 'offline',
+        messageEl, contentEl, latestAvailability as 'checking' | 'disabled' | 'starting' | 'offline',
       );
       return false;
     }

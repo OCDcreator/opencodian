@@ -11,6 +11,7 @@ export interface ConversationSyncLoadRuntimeHostAdapterHost {
   getConversationById: ConversationSyncViewHost['getConversationById'];
   shouldSyncConversationFromServer: ConversationLoadRuntimeBridgeHost['shouldSyncConversationFromServer'];
   getConversationSyncFingerprint: ConversationSyncViewHost['getConversationSyncFingerprint'];
+  canSyncConversationWithServer: ConversationSyncViewHost['canSyncConversationWithServer'];
   syncConversationMessagesFromServer: ConversationSyncViewHost['syncConversationMessagesFromServer'];
   syncConversationMessagesFromCanonicalState:
     ConversationSyncViewHost['syncConversationMessagesFromCanonicalState'];
@@ -37,6 +38,7 @@ export function createConversationSyncLoadRuntimeHosts(
       getConversationById: (id) => host.getConversationById(id),
       getConversationSyncFingerprint: (messages) =>
         host.getConversationSyncFingerprint(messages),
+      canSyncConversationWithServer: () => host.canSyncConversationWithServer(),
       syncConversationMessagesFromServer: (
         conversation,
         tabId,

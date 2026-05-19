@@ -111,6 +111,7 @@ function createViewHost(options?: {
     getConversationSyncFingerprint: jest.fn().mockImplementation((messages: ChatMessage[]) =>
       `fingerprint:${messages.length}`,
     ),
+    canSyncConversationWithServer: jest.fn().mockResolvedValue(true),
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue(
       options?.syncResult ?? {
         changed: true,
@@ -190,6 +191,9 @@ describe('ConversationSyncHostAdapter', () => {
     const hosts = createConversationSyncHosts(viewHost);
 
     await expect(
+      hosts.bridgeHost.canSyncConversationWithServer(),
+    ).resolves.toBe(true);
+    await expect(
       hosts.bridgeHost.syncConversationMessagesFromServer(
         currentConversation,
         'tab-active',
@@ -212,6 +216,7 @@ describe('ConversationSyncHostAdapter', () => {
     );
     await hosts.visiblePostSyncRouterHost.renderBackgroundTaskIndicatorIfNeeded('tab-active');
 
+    expect(viewHost.canSyncConversationWithServer).toHaveBeenCalledTimes(1);
     expect(viewHost.syncConversationMessagesFromServer).toHaveBeenCalledWith(
       currentConversation,
       'tab-active',

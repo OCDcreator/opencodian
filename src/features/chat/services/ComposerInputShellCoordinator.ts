@@ -59,6 +59,11 @@ export interface ComposerInputShellCoordinatorHost {
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
+  getComposerAvailabilityState?(): {
+    kind: 'ready' | 'no-backend' | 'backend-offline';
+    title?: string;
+    description?: string;
+  };
 }
 
 export class ComposerInputShellCoordinator {
@@ -71,6 +76,7 @@ export class ComposerInputShellCoordinator {
   private inputTextareaEl: HTMLTextAreaElement | null = null;
   private highlightBackdropEl: HTMLElement | null = null;
   private placeholderOverlayEl: HTMLElement | null = null;
+  private disabledStateEl: HTMLElement | null = null;
   private slashCommandMenuEl: HTMLElement | null = null;
   private layoutSyncFrameId: number | null = null;
   private inputContainerResizeObserver: ResizeObserver | null = null;
@@ -162,6 +168,9 @@ export class ComposerInputShellCoordinator {
       this.syncHighlightBackdropScroll();
     });
     this.inputTextareaEl.addEventListener('keydown', (event) => {
+      if (this.isComposerInteractionDisabled()) {
+        return;
+      }
       if (this.tryHandleAgentMentionMenuKeydown(event)) {
         return;
       }
@@ -209,6 +218,7 @@ export class ComposerInputShellCoordinator {
       }
     });
     this.updateSendButtonState();
+    this.updateComposerAvailabilityState();
 
     const toolbarEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
     if (this.host.shouldMountAgentSelector?.() !== false) {
@@ -248,6 +258,7 @@ export class ComposerInputShellCoordinator {
     const textSpan = this.placeholderOverlayEl?.querySelector('.opencodian-input-placeholder-text');
     if (textSpan) { textSpan.textContent = placeholderText; }
     this.updateSendButtonState();
+    this.updateComposerAvailabilityState();
     this.agentSelectionController.applyLocaleTexts();
   }
 
@@ -257,6 +268,7 @@ export class ComposerInputShellCoordinator {
     }
 
     this.sendBtnEl.empty();
+    this.sendBtnEl.disabled = this.isComposerInteractionDisabled();
     if (this.host.isActiveTabStreaming()) {
       setIcon(this.sendBtnEl, 'square');
       this.sendBtnEl.addClass('opencodian-stop-btn');
@@ -302,6 +314,7 @@ export class ComposerInputShellCoordinator {
     this.sendBtnEl = null;
     this.inputTextareaEl = null;
     this.highlightBackdropEl = null;
+    this.disabledStateEl = null;
     this.slashCommandMenuEl = null;
     this.slashCommandMenuCatalogItems = null;
     this.slashCommandMenuController.reset();
@@ -358,6 +371,10 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
+    if (this.isComposerInteractionDisabled()) {
+      return;
+    }
+
     if (this.host.isTabForegroundBusy()) {
       this.host.showProcessingBlockedNotice();
       return;
@@ -409,6 +426,46 @@ export class ComposerInputShellCoordinator {
       this.highlightBackdropEl.style.height = `${nextHeight}px`;
     }
     this.scheduleLayoutSync();
+  }
+
+  updateComposerAvailabilityState(): void {
+    const state = this.host.getComposerAvailabilityState?.() ?? { kind: 'ready' as const };
+    const isDisabled = state.kind !== 'ready';
+
+    this.composerShellEl?.toggleClass('is-composer-disabled', isDisabled);
+    this.inputWrapperEl?.toggleClass('is-composer-disabled', isDisabled);
+    this.inputTextareaEl?.toggleAttribute('disabled', isDisabled);
+    this.addContextBtnEl?.toggleAttribute('disabled', isDisabled);
+    this.updateSendButtonState();
+
+    if (!this.inputWrapperEl) {
+      return;
+    }
+
+    if (!isDisabled) {
+      this.disabledStateEl?.remove();
+      this.disabledStateEl = null;
+      return;
+    }
+
+    if (!this.disabledStateEl) {
+      this.disabledStateEl = this.inputWrapperEl.createDiv({ cls: 'opencodian-composer-disabled-state' });
+    } else {
+      this.disabledStateEl.empty();
+    }
+
+    this.disabledStateEl.createDiv({
+      cls: 'opencodian-composer-disabled-title',
+      text: state.title ?? t('chat.empty.noBackend.title'),
+    });
+    this.disabledStateEl.createDiv({
+      cls: 'opencodian-composer-disabled-description',
+      text: state.description ?? t('chat.empty.noBackend.description'),
+    });
+  }
+
+  private isComposerInteractionDisabled(): boolean {
+    return (this.host.getComposerAvailabilityState?.().kind ?? 'ready') !== 'ready';
   }
 
   private async refreshComposerSuggestionMenu(): Promise<void> {

@@ -55,6 +55,8 @@ export function createMessageSendPreparationHost(
 
 `PrepareMessageSendOptions.skipSlashCommand` 是 send runtime 消费的控制字段，preparation 本身不解释；它用于 markdown file command template 重新进入普通 prompt path 时避免再次触发 slash command interception。
 
+`SendPreparationServerAvailability` 现在额外包含 `disabled`，专门表示“当前没有任何 enabled backend，或当前聊天 surface 没有一个可用的 backend truth”，不再借用 `offline` 去表达配置层关闭状态。
+
 ## 关键行为
 
 ### preflight 判定
@@ -117,6 +119,7 @@ export function createMessageSendPreparationHost(
 `MessageSendPreparationService` 拥有服务器不可用时的 action card 提示流程：
 
 - `ensureServerReadyForChat()` 在服务器不处于 `running` / `external` 时展示交互式 action card，提供三个按钮：启动服务 / 跳过 / 打开设置
+- 当 availability 为 `disabled` 时，primary CTA 改为“Enable backend”，点击后直接打开设置而不是误调用 `startServer()`；这样聊天 surface 会把“没有任何 enabled backend”和“backend offline”区分成两种恢复路径
 - 用户选择"启动"后，禁用按钮并调用 `startServer()`，成功后刷新状态并移除 card，失败则通过 `MessageFinalizationService` 显示错误
 - 用户选择"跳过"或"设置"后，重新检查服务器状态，若已就绪则移除 card 继续，否则通过 `MessageFinalizationService` 显示不可用错误
 - `refreshStatusSurfaces()` 统一刷新 badge 和 settings tab 的服务器状态显示

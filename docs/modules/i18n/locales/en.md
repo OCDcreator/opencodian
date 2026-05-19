@@ -65,6 +65,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮新增 `settings.general.tab.backend` 与 `settings.backend.*` 键，为 Phase 0 Backend Management 面板提供英文标题、默认 backend 下拉、enabled backend 列表、Coming Soon 描述和启用状态标签。
 
+本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，用于聊天区区分“没有任何 enabled backend”与“backend 已启用但当前离线”两类状态，不再把两者都压成 generic offline wording。
+
 ## 导入关系
 
 ```text

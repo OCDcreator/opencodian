@@ -65,6 +65,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 本轮新增 `settings.general.tab.backend` 与 `settings.backend.*` 键，为 Phase 0 Backend Management 面板提供中文标题、默认 backend 下拉、已启用 backend 列表、即将推出描述和启用状态标签。
 
+本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，让聊天区可以明确区分“尚未启用任何 backend”和“backend 已启用但当前离线”两类状态，而不是继续共用笼统的离线文案。
+
 ## 导入关系
 
 ```text

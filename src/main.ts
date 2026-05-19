@@ -45,6 +45,7 @@ import {
   setInlineSerializedDebugLogArgsEnabled,
 } from './shared';
 import { registerBuiltinGlassAdapters } from './utils/glass';
+import type { AgentBackendKind } from './core/types/chat';
 
 const logger = createLogger('OpenCodian');
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
@@ -84,6 +85,8 @@ export default class OpenCodianPlugin extends Plugin {
     getSettings: () => this.settings ?? null,
     getOpenCodeService: () => this.openCodeService ?? null,
     getOpenCodianLeaves: () => this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN),
+    hasEnabledBackend: (backendId: AgentBackendKind) =>
+      this.settings?.enabledBackends?.includes(backendId) ?? false,
     applyProviderIconColorMode: () => this.applyProviderIconColorMode(),
     startConfiguredLocalServerIfNeeded: () => this.startConfiguredLocalServerIfNeeded(),
     logServerStatusSnapshot: (source?: string) => this.logServerStatusSnapshot(source),
@@ -109,6 +112,7 @@ export default class OpenCodianPlugin extends Plugin {
         getVaultBasePath: () => getVaultBasePath(this.app),
         refreshOpenCodianViews: (options) => this.runtimeCoordinator.refreshOpenCodianViews(options),
         invalidateSlashCommandMenuCatalogs: (options) => this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs(options),
+        scheduleDeferredRuntimeWarmup: () => this.runtimeCoordinator.scheduleDeferredRuntimeWarmup(),
         applyProviderIconColorMode: () => this.applyProviderIconColorMode(),
         getOpenCodianLeaves: () => this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN),
         onSettingsPersistenceBlocked: (message) => this.warnSettingsPersistenceBlocked(message),
@@ -677,6 +681,11 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Create a new conversation */
   async createConversation(): Promise<Conversation> {
+    // Guard: do not bootstrap an OpenCode session when the opencode backend is disabled.
+    if (!Array.isArray(this.settings.enabledBackends) || !this.settings.enabledBackends.includes('opencode')) {
+      throw new Error('Cannot create conversation: opencode backend is not enabled');
+    }
+
     await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
 
     // Create session in OpenCode

@@ -46,6 +46,11 @@ export interface ComposerInputShellCoordinatorHost {
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
+  getComposerAvailabilityState?(): {
+    kind: 'ready' | 'no-backend' | 'backend-offline';
+    title?: string;
+    description?: string;
+  };
 }
 
 export class ComposerInputShellCoordinator {
@@ -64,6 +69,7 @@ export class ComposerInputShellCoordinator {
 ## 关键行为
 
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam；textarea 被 `opencodian-input-highlight-container` 包裹，内含 `opencodian-input-highlight-backdrop` 和 textarea 两个同级元素
+- `build()` 之后会立即根据 host 的 composer availability state 同步输入壳层；当没有 enabled backend，或当前 backend 虽已启用但运行时不可连接时，textarea / add-context / send 会被禁用，并在 input wrapper 内渲染一条紧凑的 disabled-state 说明块，避免留下意义不明的输入空白
 - `build()` 在挂载 toolbar 子控件后会清理空 slot；当当前 backend 没有 agent/model/permission/context/effort 控件可显示时，整个 `opencodian-input-toolbar` 会被移除，避免空壳 toolbar 把 add/send 按钮悬在半空
 - `build()` 设置 textarea 的 scroll 事件监听器，同步 backdrop 的 scrollTop 以保持滚动一致
 - `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionPillSpans()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内，并写入 agent pill metadata；slash 高亮则先依赖已加载的 `slashCommandMenuCatalogItems` 做精确判定，只把 catalog 中真实存在的 `/command`、direct `/skill`，以及 prefixed mode 下存在的 `/skills skill-name` 包裹为高亮 span。普通命令使用 `opencodian-input-highlight-command`，直接或 prefixed skill 使用 `opencodian-input-highlight-skill`，裸 `/skills` 入口仍按 command 语义显示；拼错的 `/using-superpowert` 这类未知 token 不会上色
@@ -73,6 +79,7 @@ export class ComposerInputShellCoordinator {
 - `@agent` menu 复用同一个 overlay 容器；当光标前 token 命中 `@query` 时优先展示 agent 候选，离开该 token 后再恢复 slash query 检测
 - `applyLocaleTexts()` 刷新 placeholder overlay 文本、add-context tooltip 和 send/stop tooltip；textarea 不再设置 `aria-label`，避免在 Obsidian Electron 中产生多余的原生 hover tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
+- `updateComposerAvailabilityState()` 只消费 host 给出的高层 surface 状态，不直接判断 backend / service；这样“无 backend”和“backend offline”的运行时所有权仍留在 `OpenCodianView`
 - `refreshSlashCommandMenu()` 只负责调用 `SlashCommandMenuCoordinator.refresh()`；菜单 coordinator 每次 slash query 刷新都会向 host 读取 merged visible menu items，再通过 `slashCommandMenuFilter.ts` 本地过滤。host 背后的 `SlashCommandMenuCatalogCache` 继续负责 TTL / pending promise / hidden-command cache key，因此设置页隐藏命令或切换 skill 模式后不会被 composer 层旧数组挡住，也不会每次按键直接打 SDK
 - slash catalog 首次异步加载完成后，coordinator 会重新执行一次 backdrop 高亮同步，这样输入中的已知 slash item 能在 catalog 到位后立即着色，而未知 token 会自动退回普通文本
 - `SlashCommandMenuCoordinator` 会把 `getSlashCommandSkillMode()` 传给过滤 helper；direct mode 直接展示 skill，prefixed mode 则顶层展示 `/skills` 并在 `/skills <query>` 下展示 nested skill suggestions

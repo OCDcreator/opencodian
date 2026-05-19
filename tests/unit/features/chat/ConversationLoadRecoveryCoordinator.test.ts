@@ -193,6 +193,28 @@ describe('ConversationLoadRecoveryCoordinator initialization', () => {
     expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
   });
 
+  it('falls back to an empty tab when initial conversation bootstrap fails', async () => {
+    const conversation = createConversation('load-created');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(conversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getConversations: jest.fn().mockReturnValue([]),
+      createConversation: jest.fn().mockRejectedValue(new Error('Cannot create conversation: opencode backend is not enabled')),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await expect(coordinator.initializeFirstTab()).resolves.toBeUndefined();
+
+    const tabs = tabManager.getAllTabs();
+    expect(host.createConversation).toHaveBeenCalledTimes(1);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBeNull();
+    expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
+  });
+
   it('resets persisted tab state when restore returns no tabs', () => {
     const conversation = createConversation('missing');
     const tabManager = {

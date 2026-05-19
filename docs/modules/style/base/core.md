@@ -14,6 +14,7 @@
 - `.opencodian-messages`、`.opencodian-turn*`：消息列表、分轮结构与 sticky header 行为。
 - `.opencodian-tab-bar*`、`.opencodian-tab-bar-parent-breadcrumb*`、`.opencodian-tab-bar-parent-close*`、`.opencodian-tab-overflow-menu*`：多会话标签栏、子会话返回父 tab 面包屑、隐藏子会话关闭按钮与溢出菜单样式。
 - `.opencodian-container--tabs-disabled`：禁用会话标签时隐藏普通 tab bar slot 与 header 的 new-tab 专用按钮；当 slot 带有 `is-parent-only` 时仍显示返回父会话面包屑。它只影响可见控件，不改变内部 active tab / `tabState` 数据。
+- `.opencodian-server-status-badge.is-disabled`：后端全部禁用时服务器状态徽章的灰色文本样式，与 `.is-checking`/`.is-starting`/`.is-running`/`.is-external`/`.is-offline` 并列。
 - `.opencodian-theme-background-*`：主题背景图层、遮罩、叠加高光。
 - 关键变量组：`--opencodian-glass-*`、`--opencodian-composer-*`、`--opencodian-status-*`、`--opencodian-shadow-*`。
 - 输入区字体默认值由 `--opencodian-composer-font-family` 提供，并可被聊天外观设置生成的容器变量覆盖。

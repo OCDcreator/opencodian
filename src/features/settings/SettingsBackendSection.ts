@@ -1,10 +1,11 @@
 import { Setting } from 'obsidian';
 
+import { IMPLEMENTED_AGENT_BACKENDS } from '../../core/agents/backend';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 
-export const BACKEND_OPTIONS: Array<{
+const ALL_BACKEND_OPTIONS: Array<{
   id: AgentBackendKind;
   labelKey: TranslationKey;
   descriptionKey: TranslationKey;
@@ -15,6 +16,11 @@ export const BACKEND_OPTIONS: Array<{
   { id: 'copilot', labelKey: 'settings.agent.name.copilot', descriptionKey: 'settings.agent.copilot.desc' },
   { id: 'pi', labelKey: 'settings.agent.name.pi', descriptionKey: 'settings.agent.pi.desc' },
 ];
+
+export const BACKEND_OPTIONS = ALL_BACKEND_OPTIONS.filter(
+  (option): option is (typeof ALL_BACKEND_OPTIONS)[number] =>
+    IMPLEMENTED_AGENT_BACKENDS.includes(option.id),
+);
 
 interface SettingsBackendSectionOptions {
   plugin: OpenCodianPlugin;
@@ -103,7 +109,9 @@ export class SettingsBackendSection {
   }
 
   private getEnabledBackends(): AgentBackendKind[] {
-    return this.plugin.settings.enabledBackends;
+    return this.plugin.settings.enabledBackends.filter((backend) =>
+      IMPLEMENTED_AGENT_BACKENDS.includes(backend),
+    );
   }
 
   private async setBackendEnabled(backend: AgentBackendKind, enabled: boolean): Promise<void> {
@@ -159,6 +167,7 @@ export class SettingsBackendSection {
   }
 
   private ensureValidBackendState(): void {
+    this.plugin.settings.enabledBackends = this.getEnabledBackends();
     if (!this.plugin.settings.enabledBackends.includes(this.plugin.settings.activeBackend as AgentBackendKind)) {
       this.plugin.settings.activeBackend = this.plugin.settings.enabledBackends[0];
     }

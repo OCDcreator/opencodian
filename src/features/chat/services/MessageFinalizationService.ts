@@ -242,11 +242,15 @@ export function getFriendlyServerStartErrorMessage(error: unknown): string {
   return `${t('chat.error.serverStartFailed')}\n${rawMessage}`;
 }
 
-export type UnavailableServerAvailability = 'checking' | 'starting' | 'offline';
+export type UnavailableServerAvailability = 'checking' | 'disabled' | 'starting' | 'offline';
 
 export function getUnavailableServerMessage(availability: UnavailableServerAvailability): string {
   if (availability === 'starting') {
     return t('chat.error.serverStarting');
+  }
+
+  if (availability === 'disabled') {
+    return t('chat.empty.noBackend.description');
   }
 
   return t('chat.error.serverOffline');

@@ -30,6 +30,8 @@ export interface ConversationNoticeCoordinatorHost {
   renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
   handleRestoreRewindRequest(): Promise<void>;
   openPluginSettingsPreservingScroll(): void;
+  hasAnyEnabledBackend(): boolean;
+  hasBackendConnection(): boolean;
 }
 
 export class ConversationNoticeCoordinator {
@@ -49,6 +51,35 @@ export class ConversationNoticeCoordinator {
 
   createEmptyConversationNotice(): ChatMessage {
     const rewound = this.host.isConversationRewound();
+    const hasAnyEnabledBackend = this.host.hasAnyEnabledBackend();
+    const hasBackendConnection = this.host.hasBackendConnection();
+
+    if (!rewound && !hasAnyEnabledBackend) {
+      return {
+        id: 'opencodian-empty-state-no-backend',
+        role: 'assistant',
+        content: t('chat.empty.noBackend.description'),
+        timestamp: Date.now(),
+        displayStyle: 'notice',
+        noticeTitle: t('chat.empty.noBackend.title'),
+        noticeTone: 'warning',
+        noticeActions: [{ type: 'open_model_settings' as const }],
+      };
+    }
+
+    if (!rewound && !hasBackendConnection) {
+      return {
+        id: 'opencodian-empty-state-backend-offline',
+        role: 'assistant',
+        content: t('chat.empty.backendOffline.description'),
+        timestamp: Date.now(),
+        displayStyle: 'notice',
+        noticeTitle: t('chat.empty.backendOffline.title'),
+        noticeTone: 'warning',
+        noticeActions: [{ type: 'open_model_settings' as const }],
+      };
+    }
+
     return {
       id: rewound ? 'opencodian-empty-rewind' : 'opencodian-empty-state',
       role: 'assistant',

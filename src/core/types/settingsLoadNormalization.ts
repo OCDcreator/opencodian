@@ -1,3 +1,4 @@
+import { IMPLEMENTED_AGENT_BACKENDS } from '../agents/backend';
 import type { SettingsLoadResult } from '../storage';
 import {
   areChatAppearanceSettingsEqual,
@@ -5,6 +6,7 @@ import {
   getThemePresetDefinition,
   resolveThemeChatAppearance,
 } from '../theme';
+import type { AgentBackendKind } from './chat';
 import {
   DEFAULT_SETTINGS,
   getDefaultChatAppearanceSettings,
@@ -458,25 +460,31 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
   );
   const migratedTabbedSettings = normalizedTabbedPrimaryTab === 'server'
     && normalizedTabbedSecondaryTabByPrimary.server === 'mcp'
-    ? {
-        primaryTab: 'mcp',
+      ? {
+          primaryTab: 'mcp',
         secondaryTabByPrimary: {
           ...normalizedTabbedSecondaryTabByPrimary,
           mcp: normalizedTabbedSecondaryTabByPrimary.mcp ?? 'overview',
         },
       }
-    : {
-        primaryTab: normalizedTabbedPrimaryTab,
-        secondaryTabByPrimary: normalizedTabbedSecondaryTabByPrimary,
-      };
+      : {
+          primaryTab: normalizedTabbedPrimaryTab,
+          secondaryTabByPrimary: normalizedTabbedSecondaryTabByPrimary,
+        };
+  const normalizedEnabledBackends: AgentBackendKind[] = Array.isArray(normalizedSettings?.enabledBackends)
+    ? normalizedSettings.enabledBackends.filter((backend): backend is AgentBackendKind =>
+      IMPLEMENTED_AGENT_BACKENDS.includes(backend as AgentBackendKind))
+    : [...DEFAULT_SETTINGS.enabledBackends];
+  const normalizedActiveBackend = normalizedEnabledBackends.includes(normalizedSettings?.activeBackend as AgentBackendKind)
+    ? normalizedSettings?.activeBackend as AgentBackendKind
+    : normalizedEnabledBackends[0];
 
   return {
     settings: {
       ...DEFAULT_SETTINGS,
       ...normalizedSettings,
-      activeBackend: normalizedSettings?.activeBackend
-        ?? (normalizedSettings?.enabledBackends?.length ? normalizedSettings.enabledBackends[0] : undefined),
-      enabledBackends: normalizedSettings?.enabledBackends ?? (savedSettings ? ['opencode'] : []),
+      activeBackend: normalizedActiveBackend,
+      enabledBackends: normalizedEnabledBackends,
       server: context.normalizedServer,
       enableTabs: normalizedSettings?.enableTabs ?? DEFAULT_SETTINGS.enableTabs,
       tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),

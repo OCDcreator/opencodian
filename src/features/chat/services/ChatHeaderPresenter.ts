@@ -16,6 +16,7 @@ const TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-lig
 const TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
 const SERVER_STATUS_CLASS_NAMES = [
   'is-checking',
+  'is-disabled',
   'is-running',
   'is-starting',
   'is-offline',
@@ -24,6 +25,7 @@ const SERVER_STATUS_CLASS_NAMES = [
 
 type ServerStatusTranslationKey =
   | 'chat.serverStatus.checking'
+  | 'chat.serverStatus.disabled'
   | 'chat.serverStatus.running'
   | 'chat.serverStatus.starting'
   | 'chat.serverStatus.offline'
@@ -31,13 +33,20 @@ type ServerStatusTranslationKey =
 
 const SERVER_STATUS_KEY_BY_AVAILABILITY: Record<ChatServerAvailability, ServerStatusTranslationKey> = {
   checking: 'chat.serverStatus.checking',
+  disabled: 'chat.serverStatus.disabled',
   running: 'chat.serverStatus.running',
   starting: 'chat.serverStatus.starting',
   offline: 'chat.serverStatus.offline',
   external: 'chat.serverStatus.external',
 };
 
-export type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
+export type ChatServerAvailability =
+  | 'checking'
+  | 'disabled'
+  | 'running'
+  | 'starting'
+  | 'offline'
+  | 'external';
 
 export interface ChatHeaderPresenterHost {
   setTooltipLabel(
@@ -53,6 +62,7 @@ export interface ChatHeaderPresenterHost {
   isLocalServerMode(): boolean;
   isOpenCodeBackend(): boolean;
   refreshContextUsageIndicator(): void;
+  onServerAvailabilityRefreshed?(): void;
   openServerSettings(): void;
   openLspSettings?(): void;
   createConversationInNewTab(): Promise<void>;
@@ -312,6 +322,7 @@ export class ChatHeaderPresenter {
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability));
       this.host.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
       this.host.refreshContextUsageIndicator();
+      this.host.onServerAvailabilityRefreshed?.();
     } finally {
       this.isRefreshingServerStatus = false;
     }

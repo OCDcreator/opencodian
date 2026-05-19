@@ -12,6 +12,14 @@
 
 ---
 
+## 2026-05-20 Phase 0 capability finish
+
+- Completed the Phase 0/1 chat capability finish for backend-aware UX without moving new runtime ownership back into `main.ts`.
+- Split no-enabled-backend vs backend-offline chat states so the composer, empty notices, and status surfaces explain why sending is unavailable instead of leaving a blank input area.
+- Tightened Phase 0 backend exposure to implemented backends only, keeping fresh installs on `opencode` by default and filtering unsupported persisted backend ids during settings load.
+- Hardened send/session preflight so unavailable backends are checked before optimistic conversation bootstrap, preventing offline or disabled first-send flows from creating orphan OpenCode sessions.
+- Reduced offline runtime noise by routing background and signal server fallbacks through suppressed verbose logging, and added regression coverage for canonical fallback, composer availability, settings normalization, and backend settings filtering.
+
 ## 2026-04-25 Lane a3-formatter-settings — F2 Formatter top-level settings UI
 
 Added the top-level Formatter settings page with two secondary views (overview, config).

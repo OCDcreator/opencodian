@@ -507,6 +507,10 @@ body[data-opencodian-provider-icon-mode="color"] {
   color: var(--text-error);
 }
 
+.opencodian-server-status-badge.is-disabled {
+  color: var(--text-muted);
+}
+
 .opencodian-header-btn {
   display: flex;
   align-items: center;

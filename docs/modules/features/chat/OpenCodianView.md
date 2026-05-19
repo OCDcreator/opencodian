@@ -107,6 +107,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `SessionPermissionTracker`：记录“本次会话允许”的临时权限批准；view 在权限卡片返回 `session` 时保存当前 `sessionID` 的 scope，同一会话再次请求相同 scope 时自动回复，并通过 service 边界发送 OpenCode 支持的 `always`
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及共享 composer catalog 加载入口
 - `SlashCommandMenuCatalogCache` / `SlashCommandExecutionService` 的 host seam：缓存 runtime commands + skills、项目级 command/agent 配置与 `.opencode/commands/**/*.md` markdown commands 合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效。view 还为 synthetic `/compact` command 提供 manual compaction seam，解析当前 session/provider/model 后调用 `OpenCodeService.summarizeSession(..., false)` 并显示 Obsidian notice。
+- slash command catalog 的后台 warm preload 现在也受 chat-surface availability guard 约束：当 header/composer 已把状态解释为 `disabled` 或 `offline` 时，view 不再提前 `warm()` runtime slash catalog，避免 backend 不可用时额外制造一次预热拒连日志。
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background 与 experimental demo / glass octahedron 相关 DOM 引用
@@ -122,7 +123,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 3. `chatHeaderPresenter.startServerStatusLoop()` 与 `lspStatusRefreshCoordinator.start()` 分别启动 server 和 LSP connection summary 刷新
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
-6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新
+6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新；当 `enabledBackends` 不包含 `opencode` 时，这一步会跳过启动，避免“全部智能体禁用”场景继续建立 OpenCode-only signal 订阅并制造离线噪音
 7. `initializeFirstTab()`：恢复持久化 tabs、加载首个对话；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
 
 结束时会输出一条 `[view-open]` 汇总日志，包含各阶段耗时拆分。
@@ -176,7 +177,7 @@ header DOM、server status badge、title logo/wordmark、new/current-tab、histo
 - tooltip 标签、plugin asset URL、css-change 注册和 layout/color sync 回调
 - header tab bar slot 写回给 tab bar layout
 
-server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。
+server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。Phase 0/1 backend-capability 收尾还在这个 seam 上补了一层 surface 语义：当 `enabledBackends` 为空，或当前 active backend 并不是一个真正启用中的 OpenCode surface 时，header 会把状态解释为 `disabled`，并阻止 chat header / LSP 继续做 OpenCode-only 轮询。
 
 ### Conversation history / actions ownership
 
@@ -199,6 +200,8 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 - 供后续 glass/theme 逻辑读取的 composer shell / input wrapper DOM refs
 
 稳定聊天视图当前明确只启用 prompt 输入模式：`getComposerInputMode()` 固定返回 `prompt`，意外进入的 shell submission 会被记录并忽略，不会走本地-only shell 状态。后续如果要开启 shell parity，入口必须通过 `OpenCodeService.runSessionShell()` / `session.shell`，并复用 canonical session/message/part projection，而不是在 view 内新增 shell 消息状态。
+
+Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增了一层高阶 composer availability state：`OpenCodianView` 负责把“没有任何 enabled backend”和“backend 已启用但当前运行时不可连接”聚合成统一 surface 状态，再交给 `ComposerInputShellCoordinator` 渲染禁用壳层；具体 textarea/button 禁用与说明块 DOM 不回流到 view。
 
 这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；toolbar 里的 selector 区域也已经进一步交给专门 owner，input shell 只保留 slot 级挂载职责。
 

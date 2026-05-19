@@ -518,6 +518,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
   private readonly conversationIdentityRuntime: ConversationIdentityRuntime;
+  private lastResolvedServerAvailability: ChatServerAvailability | null = null;
   private conversationSyncBridgePorts!: ConversationSyncBridgePorts;
   private tabConversationSyncFingerprintRuntimePort!:
     TabConversationSyncFingerprintRuntimePort;
@@ -560,7 +561,35 @@ export class OpenCodianView extends ItemView {
   }
 
   private isOpenCodeBackendActive(): boolean {
-    return this.plugin.settings.activeBackend === 'opencode';
+    return this.plugin.settings.activeBackend === 'opencode'
+      && this.plugin.settings.enabledBackends.includes('opencode');
+  }
+
+  private hasAnyEnabledBackend(): boolean {
+    const enabledBackends = this.plugin.settings.enabledBackends;
+    if (!Array.isArray(enabledBackends)) {
+      return false;
+    }
+    return enabledBackends.length > 0;
+  }
+
+  private hasBackendConnection(): boolean {
+    const enabledBackends = this.plugin.settings.enabledBackends;
+    if (!Array.isArray(enabledBackends)) {
+      return false;
+    }
+    return this.hasAnyEnabledBackend()
+      && enabledBackends.includes(this.plugin.settings.activeBackend ?? 'opencode');
+  }
+
+  private async canSyncConversationWithServer(): Promise<boolean> {
+    const availability = await this.getServerAvailability();
+    return availability === 'running' || availability === 'external';
+  }
+
+  private shouldStartConversationSessionSignalRuntime(): boolean {
+    return Array.isArray(this.plugin.settings.enabledBackends)
+      && this.plugin.settings.enabledBackends.includes('opencode');
   }
 
   private createChatHeaderPresenterHost(): ChatHeaderPresenterHost {
@@ -583,6 +612,9 @@ export class OpenCodianView extends ItemView {
       isOpenCodeBackend: () => this.isOpenCodeBackendActive(),
       refreshContextUsageIndicator: () => {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
+      },
+      onServerAvailabilityRefreshed: () => {
+        this.updateComposerAvailabilityUi();
       },
       openServerSettings: () => {
         this.openPluginSettingsAtServerSection();
@@ -781,6 +813,7 @@ export class OpenCodianView extends ItemView {
       scheduleSettledScrollToBottomIfNeeded: () => {
         this.scheduleSettledScrollToBottomIfNeeded();
       },
+      getComposerAvailabilityState: () => this.getComposerAvailabilityState(),
     };
   }
 
@@ -832,7 +865,13 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      this.slashCommandMenuCatalogCache.warm();
+      void this.getServerAvailability().then((availability) => {
+        if (availability === 'disabled' || availability === 'offline' || availability === 'checking') {
+          return;
+        }
+
+        this.slashCommandMenuCatalogCache.warm();
+      });
     }, 0);
   }
 
@@ -1967,6 +2006,8 @@ export class OpenCodianView extends ItemView {
           this.plugin.settingsTab?.scrollToModelSection();
         }, 50);
       },
+      hasAnyEnabledBackend: () => this.hasAnyEnabledBackend(),
+      hasBackendConnection: () => this.hasBackendConnection(),
     };
   }
 
@@ -2203,6 +2244,7 @@ export class OpenCodianView extends ItemView {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getConversationSyncFingerprint: (messages) =>
         this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
+      canSyncConversationWithServer: () => this.canSyncConversationWithServer(),
       syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
       syncConversationMessagesFromCanonicalState: (conversation, tabId, reason, options) =>
@@ -2681,7 +2723,9 @@ export class OpenCodianView extends ItemView {
       this.wireEventHandlers();
     });
     await measureStep('startConversationSessionSignalRuntime', () => {
-      this.conversationSessionSignalRuntime.start();
+      if (this.shouldStartConversationSessionSignalRuntime()) {
+        this.conversationSessionSignalRuntime.start();
+      }
     });
     await measureStep('initializeFirstTab', () => this.initializeFirstTab());
     this.plugin.registerConversationCachePinProvider(this.conversationCachePinProvider);
@@ -2783,6 +2827,7 @@ export class OpenCodianView extends ItemView {
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
     this.composerInputShellCoordinator.build(this.inputContainer);
+    this.updateComposerAvailabilityUi();
     this.applyChatAppearanceSettings();
 
     const outerMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
@@ -3005,6 +3050,11 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  public refreshAvailabilityUi(): void {
+    void this.chatHeaderPresenter.refreshServerStatusBadge();
+    this.updateComposerAvailabilityUi();
+  }
+
   private openPluginSettingsPreservingScroll(): void {
     const savedScrollTop = this.plugin.settings.settingsPanelScrollTop;
     this.plugin.settingsTab?.prepareRestoreScrollOnNextOpen(savedScrollTop);
@@ -3021,9 +3071,15 @@ export class OpenCodianView extends ItemView {
   }
 
   private async getServerAvailability(): Promise<ChatServerAvailability> {
-    // If OpenCode backend is disabled, always report offline
-    if (!this.plugin.settings.enabledBackends.includes('opencode')) {
-      return 'offline';
+    if (!this.hasAnyEnabledBackend()) {
+      this.lastResolvedServerAvailability = 'disabled';
+      return 'disabled';
+    }
+
+    // If OpenCode backend is disabled, report disabled-like state instead of probing OpenCode.
+    if (!Array.isArray(this.plugin.settings.enabledBackends) || !this.plugin.settings.enabledBackends.includes('opencode')) {
+      this.lastResolvedServerAvailability = 'disabled';
+      return 'disabled';
     }
 
     const isHealthy = await this.plugin.openCodeService.checkHealth();
@@ -3031,18 +3087,68 @@ export class OpenCodianView extends ItemView {
     const hasManagedProcess = this.plugin.openCodeService.isServerProcessRunning();
 
     if (isHealthy && !hasManagedProcess) {
+      this.lastResolvedServerAvailability = 'external';
       return 'external';
     }
 
     if (isHealthy) {
+      this.lastResolvedServerAvailability = 'running';
       return 'running';
     }
 
     if (internalStatus === 'starting' || internalStatus === 'restarting') {
+      this.lastResolvedServerAvailability = 'starting';
       return 'starting';
     }
 
+    this.lastResolvedServerAvailability = 'offline';
     return 'offline';
+  }
+
+  private getComposerAvailabilityState(): {
+    kind: 'ready' | 'no-backend' | 'backend-offline';
+    title: string;
+    description: string;
+  } {
+    if (!this.hasAnyEnabledBackend()) {
+      return {
+        kind: 'no-backend',
+        title: t('chat.empty.noBackend.title'),
+        description: t('chat.empty.noBackend.description'),
+      };
+    }
+
+    if (!Array.isArray(this.plugin.settings.enabledBackends) || !this.plugin.settings.enabledBackends.includes('opencode')) {
+      return {
+        kind: 'backend-offline',
+        title: t('chat.empty.backendOffline.title'),
+        description: t('chat.empty.backendOffline.description'),
+      };
+    }
+
+    if (this.lastResolvedServerAvailability === 'offline' || this.lastResolvedServerAvailability === 'disabled') {
+      return {
+        kind: 'backend-offline',
+        title: t('chat.empty.backendOffline.title'),
+        description: t('chat.empty.backendOffline.description'),
+      };
+    }
+
+    if (this.lastResolvedServerAvailability === 'running' || this.lastResolvedServerAvailability === 'external') {
+      return {
+        kind: 'ready',
+        title: '',
+        description: '',
+      };
+    }
+
+    // null (initial load before first health check) or 'starting'/'checking' — optimistic ready.
+    // The first onServerAvailabilityRefreshed callback will correct the state within one polling cycle.
+    return {
+      kind: 'ready',
+      title: '',
+      description: '',
+    };
   }
 
   public toggleLiquidDiamondDemo(): void {
@@ -3166,6 +3272,10 @@ export class OpenCodianView extends ItemView {
   /** Update send button icon based on streaming state */
   private updateSendButtonState() {
     this.composerInputShellCoordinator.updateSendButtonState();
+  }
+
+  private updateComposerAvailabilityUi(): void {
+    this.composerInputShellCoordinator.updateComposerAvailabilityState();
   }
 
   private createUserMessageRenderFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null {

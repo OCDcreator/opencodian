@@ -26,6 +26,7 @@
 ## 核心类型 / 状态
 
 - `PluginRuntimeCoordinatorHost`: 入口注入的 host seam，提供 settings、OpenCode service、当前 OpenCodian leaves、provider icon color mode 应用、本地服务启动、server snapshot 记录和 settings tab model-loaded 通知。
+- `PluginRuntimeCoordinatorHost.hasEnabledBackend()`: 可选 backend availability seam，允许 runtime warmup 在入口层就跳过“backend 已整体禁用”的场景，而不是继续做无意义的 health snapshot。
 - `RuntimeRefreshOptions`: 控制跨视图刷新是否 reload models、是否 apply UI。
 - `SlashCommandCatalogInvalidationOptions`: 透传给 `OpenCodianView.invalidateSlashCommandMenuCatalog()` 的 preload 选项。
 - `RuntimeWarmupSource`: 区分 startup deferred warmup 和 session-bootstrap 强制 warmup。
@@ -55,6 +56,7 @@
 ### Deferred runtime warmup
 
 - `scheduleDeferredRuntimeWarmup()` 只在当前 settings 是 local server mode 且 `autoStart` 为 true 时排队 warmup。
+- 如果入口已经确认 `opencode` backend 当前未启用，deferred warmup 与 session-bootstrap warmup 都会直接跳过，不再额外调用 `logServerStatusSnapshot()` 触发一次离线探测日志。
 - 如果 timer 或 warmup promise 已存在，不重复排队。
 - `ensureRuntimeWarmupReadyForSessionBootstrap()` 用于创建 session 前的安全栅栏：如果 deferred timer 还没跑，先取消 timer 并以 `session-bootstrap` source 立即 warmup；如果 warmup 已在运行则等待同一个 promise。
 - `runDeferredRuntimeWarmup()` 保持原启动语义：记录开始日志，调用 host 启动本地服务，再写 server status snapshot，最后记录耗时。

@@ -80,6 +80,7 @@
 14. 启动结束时输出一行汇总日志；这条汇总同样走 `always`。若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
 15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。
 16. `onload()` 返回后再后台调度 deferred runtime warmup：本地 sidecar 自启动与首个 server snapshot 不再阻塞插件注册和视图恢复；真正需要新 session 的路径（当前主要是 `createConversation()`）才会显式接管并等待这次 warmup，避免首次建会话撞上未就绪 server，同时不拖慢已有会话的视图首开。
+17. 这条 warmup 现在还会先看当前是否真的启用了 `opencode` backend。若用户把所有 backend 都禁用，`main.ts` 只向 `PluginRuntimeCoordinator` 暴露 enabled-backend truth，不再触发启动期的 runtime warmup / snapshot 探测，避免聊天界面已明确显示“已禁用”时后台仍做无意义的本地服务离线探测并产生日志噪音。
 
 这里没有调用 `OpenCodeService.initialize()`；实际运行时由 `main.ts` 自己决定是否启动服务。
 
@@ -149,6 +150,11 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 - `reloadModelCatalog()`
 - `refreshCurrentConversationRendering()`
 - `refreshQuestionUi()`
+
+同时它还统一拥有插件级 runtime warmup gate：
+
+- 只有 `enabledBackends` 里包含 `opencode`，且当前 server 仍是 local auto-start 模式时，才会安排 deferred warmup 或被 `createConversation()` 接管为 session-bootstrap warmup。
+- 这个 gate 只决定“是否值得启动/探测本地 runtime”，不会改变既有会话、历史记录、tab runtime 或会话绑定 backend 的持久化语义。
 
 ### 会话缓存与本地持久化
 

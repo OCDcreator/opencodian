@@ -10,7 +10,6 @@ import {
   type ConversationSyncBridgeRuntimeCoordinator,
   type ConversationSyncBridgeSyncResult,
 } from '../../../../src/features/chat/services/ConversationSyncBridge';
-import type { TabConversationSyncContext } from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
 import type { ConversationSyncVisiblePostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';
 
 type Mocked<T> = {
@@ -51,11 +50,15 @@ function createSyncResult(
 function createHost(options?: {
   currentConversation?: Conversation | null;
   syncResult?: ConversationSyncBridgeSyncResult;
+  canSyncConversationWithServer?: boolean;
 }): Mocked<ConversationSyncBridgeHost> {
   const conversation = options?.currentConversation ?? createConversation('active');
 
   return {
     getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    canSyncConversationWithServer: jest.fn().mockResolvedValue(
+      options?.canSyncConversationWithServer ?? true,
+    ),
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue(
       options?.syncResult ?? createSyncResult(conversation),
     ),
@@ -110,6 +113,14 @@ function createBackgroundPostSyncRouter(): Mocked<
     routeBackgroundTabSyncComplete: jest.fn().mockResolvedValue(undefined),
     routeSignalSyncComplete: jest.fn().mockResolvedValue(undefined),
   };
+}
+
+async function flushAsyncSignalSync(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 describe('ConversationSyncBridge', () => {
@@ -247,8 +258,7 @@ describe('ConversationSyncBridge', () => {
       diff: [{ file: 'notes.md', additions: 1, deletions: 0 }],
     });
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncSignalSync();
 
     expect(orchestration.scheduleConversationSyncFromSignal).not.toHaveBeenCalled();
     expect(orchestration.syncConversationFromSignal).not.toHaveBeenCalled();
@@ -336,6 +346,12 @@ describe('ConversationSyncBridge canonical sync events', () => {
       }),
     });
   });
+});
+
+describe('ConversationSyncBridge canonical sync fallback events', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('falls back to server sync when canonical state is missing for signal events', async () => {
     const hiddenConversation = createConversation('hidden');
@@ -358,9 +374,10 @@ describe('ConversationSyncBridge canonical sync events', () => {
       visiblePostSyncRouter,
       backgroundPostSyncRouter,
     });
+    let signalSyncPromise: Promise<void> | null = null;
 
     orchestration.syncConversationFromSignal.mockImplementation(async (_tabId, reason, callbacks) => {
-      await callbacks.syncTabConversation({
+      signalSyncPromise = callbacks.syncTabConversation({
         tabId: 'tab-bg',
         conversation: hiddenConversation,
         previousFingerprint: 'hidden-old',
@@ -368,6 +385,7 @@ describe('ConversationSyncBridge canonical sync events', () => {
         activeTabId: 'tab-active',
         tabHasBackgroundTask: true,
       });
+      await signalSyncPromise;
     });
 
     bridge.applySessionSyncEvent('tab-bg', {
@@ -379,8 +397,8 @@ describe('ConversationSyncBridge canonical sync events', () => {
       delta: 'hi',
     });
 
-    await Promise.resolve();
-    await Promise.resolve();
+    expect(signalSyncPromise).not.toBeNull();
+    await signalSyncPromise;
 
     expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
       hiddenConversation,
@@ -404,74 +422,19 @@ describe('ConversationSyncBridge canonical sync events', () => {
       }),
     });
   });
+
 });
 
-describe('ConversationSyncBridge background polling', () => {
+describe('ConversationSyncBridge signal-event server guard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('uses canonical state before server sync for background-tab polling callbacks', async () => {
-    const backgroundConversation = createConversation('background');
+  it('skips signal-event server fallback when the backend is unavailable', async () => {
+    const hiddenConversation = createConversation('hidden-disabled');
     const host = createHost({
       currentConversation: createConversation('active'),
-      syncResult: createSyncResult(backgroundConversation, {
-        changed: false,
-        fingerprint: 'background-new',
-      }),
-    });
-    const runtimeCoordinator = createRuntimeCoordinator();
-    const orchestration = createOrchestration();
-    const visiblePostSyncRouter = createVisiblePostSyncRouter();
-    const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
-    const bridge = new ConversationSyncBridge({
-      host,
-      runtimeCoordinator,
-      orchestrationService: orchestration,
-      visiblePostSyncRouter,
-      backgroundPostSyncRouter,
-    });
-    let backgroundCallback: ((context: TabConversationSyncContext) => Promise<void>) | null = null;
-
-    orchestration.syncBackgroundTaskTabs.mockImplementation(async (callback) => {
-      backgroundCallback = callback;
-    });
-
-    await bridge.syncBackgroundTaskTabsInBackground();
-    expect(backgroundCallback).not.toBeNull();
-
-    await backgroundCallback?.({
-      tabId: 'tab-bg',
-      conversation: backgroundConversation,
-      previousFingerprint: 'background-old',
-    });
-
-    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
-      backgroundConversation,
-      'tab-bg',
-      'background-tab-sync',
-    );
-    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
-    expect(backgroundPostSyncRouter.routeBackgroundTabSyncComplete).toHaveBeenCalledWith({
-      syncContext: {
-        tabId: 'tab-bg',
-        conversation: backgroundConversation,
-        previousFingerprint: 'background-old',
-      },
-      syncResult: expect.objectContaining({
-        fingerprint: 'background-new',
-      }),
-    });
-  });
-
-  it('falls back to server sync for background-tab polling when canonical state is missing', async () => {
-    const backgroundConversation = createConversation('background-fallback');
-    const host = createHost({
-      currentConversation: createConversation('active'),
-      syncResult: createSyncResult(backgroundConversation, {
-        changed: false,
-        fingerprint: 'background-fallback-new',
-      }),
+      canSyncConversationWithServer: false,
     });
     host.syncConversationMessagesFromCanonicalState.mockResolvedValue(null);
     const runtimeCoordinator = createRuntimeCoordinator();
@@ -485,40 +448,93 @@ describe('ConversationSyncBridge background polling', () => {
       visiblePostSyncRouter,
       backgroundPostSyncRouter,
     });
-    let backgroundCallback: ((context: TabConversationSyncContext) => Promise<void>) | null = null;
 
-    orchestration.syncBackgroundTaskTabs.mockImplementation(async (callback) => {
-      backgroundCallback = callback;
-    });
-
-    await bridge.syncBackgroundTaskTabsInBackground();
-    expect(backgroundCallback).not.toBeNull();
-
-    await backgroundCallback?.({
-      tabId: 'tab-bg',
-      conversation: backgroundConversation,
-      previousFingerprint: 'background-fallback-old',
-    });
-
-    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
-      backgroundConversation,
-      'tab-bg',
-      'background-tab-sync',
-    );
-    expect(host.syncConversationMessagesFromServer).toHaveBeenCalledWith(
-      backgroundConversation,
-      'tab-bg',
-      'background-tab-sync',
-    );
-    expect(backgroundPostSyncRouter.routeBackgroundTabSyncComplete).toHaveBeenCalledWith({
-      syncContext: {
+    orchestration.syncConversationFromSignal.mockImplementation(async (_tabId, reason, callbacks) => {
+      await callbacks.syncTabConversation({
         tabId: 'tab-bg',
-        conversation: backgroundConversation,
-        previousFingerprint: 'background-fallback-old',
-      },
-      syncResult: expect.objectContaining({
-        fingerprint: 'background-fallback-new',
-      }),
+        conversation: hiddenConversation,
+        previousFingerprint: 'hidden-disabled-old',
+        reason,
+        activeTabId: 'tab-active',
+        tabHasBackgroundTask: true,
+      });
     });
+
+    bridge.applySessionSyncEvent('tab-bg', {
+      sessionId: hiddenConversation.openCodeSessionId,
+      type: 'message.part.delta',
+      messageId: 'assistant-next',
+      partId: 'part-text',
+      field: 'text',
+      delta: 'hi',
+    });
+
+    await flushAsyncSignalSync();
+
+    expect(host.canSyncConversationWithServer).toHaveBeenCalledTimes(1);
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      hiddenConversation,
+      'tab-bg',
+      'sync-event:message.part.delta',
+      { suppressVerboseLogs: true },
+    );
+    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
+    expect(backgroundPostSyncRouter.routeSignalSyncComplete).not.toHaveBeenCalled();
+  });
+
+  it('skips visible signal-event server fallback when the backend is unavailable', async () => {
+    const conversation = createConversation('visible-disabled', {
+      messages: [
+        {
+          id: 'assistant-old',
+          role: 'assistant',
+          content: 'old',
+          timestamp: 1,
+        } as ChatMessage,
+      ],
+    });
+    const host = createHost({
+      currentConversation: conversation,
+      canSyncConversationWithServer: false,
+    });
+    host.syncConversationMessagesFromCanonicalState.mockResolvedValue(null);
+    const runtimeCoordinator = createRuntimeCoordinator();
+    const orchestration = createOrchestration();
+    const visiblePostSyncRouter = createVisiblePostSyncRouter();
+    const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
+    const bridge = new ConversationSyncBridge({
+      host,
+      runtimeCoordinator,
+      orchestrationService: orchestration,
+      visiblePostSyncRouter,
+      backgroundPostSyncRouter,
+    });
+
+    orchestration.syncConversationFromSignal.mockImplementation(async (_tabId, _reason, callbacks) => {
+      await callbacks.syncVisibleConversation();
+    });
+
+    bridge.applySessionSyncEvent('tab-active', {
+      sessionId: conversation.openCodeSessionId,
+      type: 'message.updated',
+      info: {
+        id: 'assistant-next',
+        sessionID: conversation.openCodeSessionId,
+        role: 'assistant',
+        time: { created: 2 },
+      },
+    });
+
+    await flushAsyncSignalSync();
+
+    expect(host.canSyncConversationWithServer).toHaveBeenCalledTimes(1);
+    expect(host.syncConversationMessagesFromCanonicalState).toHaveBeenCalledWith(
+      conversation,
+      'tab-active',
+      'sync-event:message.updated',
+      { suppressVerboseLogs: true },
+    );
+    expect(host.syncConversationMessagesFromServer).not.toHaveBeenCalled();
+    expect(visiblePostSyncRouter.routeVisibleSyncComplete).not.toHaveBeenCalled();
   });
 });

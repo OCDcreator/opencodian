@@ -44,7 +44,10 @@ function slashItem(id: string, description: string, overrides: Partial<SlashComm
   return { id, description, hasProjectOverride: false, runtimeAvailable: true, source: 'command', subtask: false, ...overrides };
 }
 
-function createFixture(options: { shouldMountAgentSelector?: boolean } = {}) {
+function createFixture(options: {
+  shouldMountAgentSelector?: boolean;
+  composerAvailabilityState?: { kind: 'ready' | 'no-backend' | 'backend-offline'; title?: string; description?: string };
+} = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
   let inputContainerHeight = 88;
@@ -84,6 +87,7 @@ function createFixture(options: { shouldMountAgentSelector?: boolean } = {}) {
     }),
     setComposerStackHeight: jest.fn(),
     scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+    getComposerAvailabilityState: jest.fn(() => options.composerAvailabilityState ?? { kind: 'ready' }),
   };
 
   const container = document.createElement('div');
@@ -204,6 +208,41 @@ describe('ComposerInputShellCoordinator', () => {
     const fixture = createFixture({ shouldMountAgentSelector: false });
 
     expect(fixture.container.querySelector('.opencodian-input-toolbar')).toBeNull();
+  });
+
+  it('renders a disabled composer shell when no backend is enabled', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerAvailabilityState: {
+        kind: 'no-backend',
+        title: 'No backend enabled',
+        description: 'Enable at least one backend to start chatting.',
+      },
+    });
+
+    expect(fixture.textarea.disabled).toBe(true);
+    expect(fixture.sendBtn.disabled).toBe(true);
+    expect(fixture.addContextBtn.disabled).toBe(true);
+    expect(fixture.container.querySelector('.opencodian-composer-disabled-state')?.textContent)
+      .toContain('No backend enabled');
+  });
+
+  it('refreshes composer availability state when locale-driven refresh reapplies texts', () => {
+    const fixture = createFixture();
+
+    fixture.host.getComposerAvailabilityState.mockReturnValue({
+      kind: 'backend-offline',
+      title: 'Backend unavailable',
+      description: 'The current backend is enabled, but it is not connected right now.',
+    });
+
+    fixture.coordinator.applyLocaleTexts();
+
+    expect(fixture.textarea.disabled).toBe(true);
+    expect(fixture.sendBtn.disabled).toBe(true);
+    expect(
+      fixture.container.querySelector('.opencodian-composer-disabled-state')?.textContent,
+    ).toContain('Backend unavailable');
   });
 
   it('keeps submit gating and send/stop affordance inside the coordinator', () => {

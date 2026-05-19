@@ -88,9 +88,27 @@ describe('MessageSendPreparationService', () => {
 
     expect(result).toBeNull();
     expect(ensureReadySpy).toHaveBeenCalledWith('offline');
+    expect(host.ensureConversationReady).not.toHaveBeenCalled();
     expect(host.saveConversation).not.toHaveBeenCalled();
     expect(host.renderMessage).not.toHaveBeenCalled();
     expect(conversation.messages).toHaveLength(0);
+
+    ensureReadySpy.mockRestore();
+  });
+
+  it('does not create a conversation before prompting when no backend is enabled', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation, [], {
+      getServerAvailability: jest.fn().mockResolvedValue('disabled'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const ensureReadySpy = jest.spyOn(service, 'ensureServerReadyForChat').mockResolvedValue(false);
+
+    const result = await service.prepareMessageSend({ content: 'Hello' });
+
+    expect(result).toBeNull();
+    expect(ensureReadySpy).toHaveBeenCalledWith('disabled');
+    expect(host.ensureConversationReady).not.toHaveBeenCalled();
 
     ensureReadySpy.mockRestore();
   });
@@ -172,7 +190,9 @@ describe('MessageSendPreparationService optimistic preparation', () => {
     expect(conversation.messages[0]).toBe(result?.userMessage);
     expect(conversation.updatedAt).toBe(result?.userMessage.timestamp);
     expect(callOrder).toEqual([
+      'getServerAvailability',
       'transitionTabSessionLifecycle:preparing',
+      'getServerAvailability',
       'refreshSettingsTabStatus',
       'ensureSelectedModelAvailable',
       'saveConversation',
@@ -337,8 +357,9 @@ describe('MessageSendPreparationService context preparation', () => {
 
     expect(result).toBeNull();
     expect(host.notifyForegroundBusy).toHaveBeenCalledTimes(1);
-    expect(host.getServerAvailability).not.toHaveBeenCalled();
-    expect(callOrder).toEqual(['notifyForegroundBusy']);
+    // Early disabled-backend guard calls getServerAvailability before the busy check.
+    expect(host.getServerAvailability).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(['getServerAvailability', 'notifyForegroundBusy']);
   });
 
   it('enters streaming state and clears staged input state in the existing order', () => {

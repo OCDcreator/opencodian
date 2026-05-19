@@ -2073,6 +2073,35 @@
   box-shadow: none !important;
 }
 
+.opencodian-input-wrapper.is-composer-disabled .opencodian-input-highlight-container,
+.opencodian-input-wrapper.is-composer-disabled .opencodian-composer-footer {
+  opacity: 0.48;
+  pointer-events: none;
+}
+
+.opencodian-composer-disabled-state {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--background-secondary) 82%, transparent);
+}
+
+.opencodian-composer-disabled-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-composer-disabled-description {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
 .opencodian-input-toolbar {
   --opencodian-input-toolbar-control-gap: 10px;
   --opencodian-input-toolbar-control-height: 30px;

@@ -221,9 +221,14 @@ export class ConversationLoadRecoveryCoordinator {
       return;
     }
 
-    let initialConversation = this.host.getConversations()[0];
+    let initialConversation: Conversation | null = this.host.getConversations()[0] ?? null;
     if (!initialConversation) {
-      initialConversation = await measureStep('createConversation', () => this.host.createConversation());
+      try {
+        initialConversation = await measureStep('createConversation', () => this.host.createConversation());
+      } catch (error) {
+        logger.warn('Failed to bootstrap initial conversation; falling back to an empty tab', error);
+        initialConversation = null;
+      }
     }
 
     const tab = await measureStep('createTab', () => tabManager.createTab(initialConversation));
