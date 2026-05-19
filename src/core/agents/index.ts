@@ -1,3 +1,5 @@
+export { AgentCapability, OPENCODE_FULL_CAPABILITIES, getActiveBackendCapabilities, hasCapability } from './AgentCapability';
+export type { BackendCapabilities } from './AgentCapability';
 export { AgentCatalogService } from './AgentCatalogService';
 export { AgentInvocationService } from './AgentInvocationService';
 export { ChildSessionGraphService } from './ChildSessionGraphService';
