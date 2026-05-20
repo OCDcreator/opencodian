@@ -3,54 +3,84 @@
 }
 
 .opencodian-agent-switcher-hover-zone {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 99;
-  width: 80px;
-  pointer-events: auto;
+  display: none;
 }
 
 .opencodian-agent-switcher-floating {
-  position: absolute;
-  left: 8px;
+  position: fixed;
+  left: var(--opencodian-agent-switcher-fixed-left, 0);
   top: 50%;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  opacity: 0;
-  pointer-events: none;
+  gap: 6px;
+  width: 4px;
+  padding: 6px 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 56%, transparent);
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--background-primary) 42%, transparent),
+    0 8px 18px color-mix(in srgb, var(--text-normal) 8%, transparent);
+  opacity: 0.72;
+  pointer-events: auto;
   transform: translateY(-50%);
-  transition: opacity 200ms ease;
+  transition:
+    width 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
-.opencodian-agent-switcher-hover-zone:hover + .opencodian-agent-switcher-floating,
-.opencodian-agent-switcher-floating:hover {
+.opencodian-agent-switcher-floating:hover,
+.opencodian-agent-switcher-floating:focus-within {
+  width: 40px;
+  padding: 6px 3px;
   opacity: 1;
-  pointer-events: auto;
+  border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border-hover));
+  background: color-mix(in srgb, var(--background-secondary) 98%, transparent);
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--background-primary) 54%, transparent),
+    0 10px 22px color-mix(in srgb, var(--text-normal) 12%, transparent);
 }
 
 .opencodian-agent-switcher-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   padding: 0;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  background: var(--background-secondary);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-normal);
   cursor: pointer;
-  animation: agent-icon-idle 3.5s ease-in-out infinite;
-  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition:
+    opacity 120ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.opencodian-agent-switcher-floating:hover .opencodian-agent-switcher-icon,
+.opencodian-agent-switcher-floating:focus-within .opencodian-agent-switcher-icon {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .opencodian-agent-switcher-icon:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: scale(1.08) translateY(-2px);
+  background: color-mix(in srgb, var(--background-modifier-hover) 70%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  transform: translateX(0) translateY(-1px);
 }
 
 .opencodian-agent-switcher-icon:active {
@@ -62,22 +92,44 @@
 }
 
 .opencodian-agent-switcher-icon.opencodian-agent-switcher-selected {
-  border-left: 3px solid var(--interactive-accent);
-  background: var(--background-secondary-alt);
+  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border-hover));
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary-alt));
 }
 
-@keyframes agent-icon-idle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+.opencodian-agent-switcher-icon--lobehub svg {
+  display: none;
+}
+
+.opencodian-agent-switcher-lobehub-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.opencodian-agent-switcher-lobehub-img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.opencodian-agent-switcher-lobehub-img--dark {
+  display: none;
+}
+
+body.theme-dark .opencodian-agent-switcher-lobehub-img--light {
+  display: none;
+}
+
+body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
+  display: block;
 }
 
 .opencodian-agent-switcher-icon.entering {
-  animation: agent-icon-enter 300ms ease forwards;
-}
-
-@keyframes agent-icon-enter {
-  from { opacity: 0; transform: translateY(8px) scale(0.9); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  animation: none;
 }
 
 @keyframes agent-icon-click {
