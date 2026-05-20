@@ -13,7 +13,7 @@
 - 在发送前解析 `Conversation.externalContextPaths`，并与一次性的 composer draft context 合并
 - 在 preparation 阶段通过 `AgentInvocationService` 把显式 agent intent 翻译成 top-level main `agent` 与 native invocation parts
 - 先构造稳定 `messageID + parts[]` send payload、seed canonical user message，再落地 optimistic user message，并保持现有 save / render / scroll 时序
-- 维持首条 user message 的 fallback title 与 AI title kickoff 条件
+- 维持 OpenCode 首条 user message 的 fallback title 与 AI title kickoff 条件
 - 在 stream 真正开始前，统一进入 streaming 状态并通过 composer send-context 端口清理 pending edited files / draft context items
 
 它不直接调用 `openCodeService.sendMessage()`，也不消费 stream chunk。真实的 stream 调用、chunk router、pending/timeout/interruption，以及 stream 结束后的 finalization 现在由 `runtime/SendPipelineRuntime.ts` / `MessageFinalizationService` 接手。
@@ -93,6 +93,7 @@ export function createMessageSendPreparationHost(
 - 只有当前 conversation 在 optimistic append 之后，user message 数量为 `1` 时，才进入 first-message title 路径
 - fallback title 始终先于 AI title kickoff
 - 是否启动 AI title generation 仍由 view 当前设置决定
+- 这条路径当前只属于 `conversation.backend === 'opencode'`（缺省旧会话也按 OpenCode 处理）。Claude Code conversation 不会调用 `applyFallbackConversationTitle()` 或 `startAiConversationTitleGeneration()`，避免在 Claude Code 尚未接入标题机制时触发 OpenCode 专用逻辑。
 
 ### stream 进入点
 

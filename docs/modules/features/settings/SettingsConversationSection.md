@@ -7,6 +7,8 @@
 
 `SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
 
+它必须按当前 active backend 过滤能力：聊天字体大小与 user markup 渲染是通用显示设置，Claude Code 和 OpenCode 都可以显示；标题生成、项目级 compaction、会话分享与问答卡片当前都依赖 OpenCode 机制，只有 active backend 为 `opencode` 时才装配、加载模型目录或监听 `.opencode/opencode.json`。
+
 当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成六个二级分组：
 
 - 会话标题
@@ -39,7 +41,7 @@
 `attach()` 会在一个 owner 内完成 conversation section 的主要阶段：
 
 - 创建 section heading
-- 通过 `OpenCodianSettings.createSettingsBlock()` 创建六个 conversation 二级分组卡片
+- 通过 `OpenCodianSettings.createSettingsBlock()` 创建当前 backend 可用的 conversation 二级分组卡片
 - 在“会话标题”块装配 title mode dropdown 与 AI title model picker
 - 在“上下文压缩（项目级）”块装配 compaction controls
 - 在“会话分享（项目级）”块装配 OpenCode `share` mode dropdown
@@ -48,7 +50,7 @@
 - 在“消息渲染”块装配 user markup 渲染 toggle
 - 注册首次与后续模型目录变化时复用的 title-model refresh callback
 
-这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建、block 样式 seam 与 callback bridge。
+这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建、block 样式 seam 与 callback bridge。Claude Code active 时，classic 和 tabbed layout 都只显示显示/渲染类通用分组，不会启动 OpenCode title-model refresh、project config listener 或 share/compaction load。
 
 ### title-model refresh orchestration
 
@@ -115,6 +117,7 @@ The sharing block edits OpenCode's top-level `share` field:
 ## 注意事项
 
 - 不要改变 title model fallback、follow-current 语义、chat font-size 的即时重应用语义，或 question card refresh / conversation rendering 触发条件。
+- 新增 conversation 选项时先判定是否后端无关。只改本地显示的选项可以在所有 backend 展示；任何读写 `.opencode/opencode.json`、调用 OpenCode session API、依赖 OpenCode title/question/share/compaction 语义的选项都必须继续只在 OpenCode active 时展示。
 - 备用标题模型是 OpenCodian 智能标题的兜底模型，独立于 OpenCode 顶层 `small_model`；文案和 picker 说明必须继续保持这个边界。
 - compaction 配置已改为项目级，不再从 plugin settings 或 conversation session settings 读取或写入。
 - settings 页面打开期间，如果外部工具直接改动或删除 `.opencode/opencode.json`，项目级 compaction/share controls 会自动回读项目配置并刷新到最新状态；不需要手动重开设置页。
@@ -141,4 +144,4 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `questions` — renders question card display/position/answered-card toggles
 - `rendering` — renders user markup render toggle
 
-The classic `attach()` method remains unchanged.
+The classic `attach()` method remains the full-list owner, but both classic and tabbed paths now apply the same active-backend visibility rules.

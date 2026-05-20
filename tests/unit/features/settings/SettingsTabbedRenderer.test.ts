@@ -236,12 +236,8 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    expect(
-      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
-        (element) => element.textContent?.trim(),
-      ),
-    ).toEqual(['Title', 'Display & rendering']);
-    expectSingleContentShell(containerEl, 'conversation', 'title');
+    expect(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).toHaveLength(0);
+    expectSingleContentShell(containerEl, 'conversation', 'display');
   });
 
   it('shows only OpenCode-owned settings when OpenCode is the active backend', () => {

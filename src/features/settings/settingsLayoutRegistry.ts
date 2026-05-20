@@ -76,9 +76,9 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     id: 'conversation',
     labelKey: 'settings.conversation.title',
     icon: 'messages-square',
-    defaultSecondaryTabId: 'title',
+    defaultSecondaryTabId: 'display',
     secondaryTabs: [
-      { id: 'title', labelKey: 'settings.conversation.tab.title' },
+      { id: 'title', labelKey: 'settings.conversation.tab.title', backendRequired: 'opencode' },
       { id: 'compaction', labelKey: 'settings.conversation.tab.compaction', backendRequired: 'opencode' },
       { id: 'sharing', labelKey: 'settings.conversation.tab.sharing', backendRequired: 'opencode' },
       { id: 'display', labelKey: 'settings.conversation.tab.display' },
@@ -150,6 +150,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.security.title',
     icon: 'shield',
     defaultSecondaryTabId: 'config',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'config', labelKey: 'settings.security.tab.config' },
       { id: 'safety', labelKey: 'settings.security.tab.safety' },

@@ -21,6 +21,7 @@ import type {
 import {
   normalizeChatFontSizePx,
 } from '../../core/types';
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -159,6 +160,17 @@ export class SettingsConversationSection {
     this.sharedSessionsContainerEl = null;
   }
 
+  private getActiveBackend(): AgentBackendKind | undefined {
+    const activeBackend = this.plugin.settings.activeBackend;
+    return activeBackend && this.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.plugin.settings.enabledBackends[0];
+  }
+
+  private isOpenCodeActive(): boolean {
+    return this.getActiveBackend() === 'opencode';
+  }
+
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     this.resetState();
     this.setSharedCallbacks();
@@ -169,42 +181,67 @@ export class SettingsConversationSection {
       t('settings.quickNav.conversationDesc'),
     );
 
-    const titleGenerationBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.titleGeneration.title'),
-      description: t('settings.titleGeneration.groupDesc'),
-    });
-    this.markSettingsTarget(titleGenerationBodyEl, 'title');
-    const compactionBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.conversation.compaction.projectNote'),
-      description: t('settings.conversation.compaction.projectNoteDesc'),
-    });
-    this.markSettingsTarget(compactionBodyEl, 'compaction');
-    const sharingBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.conversation.share.projectNote'),
-      description: t('settings.conversation.share.projectNoteDesc'),
-    });
-    this.markSettingsTarget(sharingBodyEl, 'sharing');
+    const isOpenCodeActive = this.isOpenCodeActive();
+    const titleGenerationBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.titleGeneration.title'),
+          description: t('settings.titleGeneration.groupDesc'),
+        })
+      : null;
+    if (titleGenerationBodyEl) {
+      this.markSettingsTarget(titleGenerationBodyEl, 'title');
+    }
+    const compactionBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.compaction.projectNote'),
+          description: t('settings.conversation.compaction.projectNoteDesc'),
+        })
+      : null;
+    if (compactionBodyEl) {
+      this.markSettingsTarget(compactionBodyEl, 'compaction');
+    }
+    const sharingBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.share.projectNote'),
+          description: t('settings.conversation.share.projectNoteDesc'),
+        })
+      : null;
+    if (sharingBodyEl) {
+      this.markSettingsTarget(sharingBodyEl, 'sharing');
+    }
     const displayBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.display.title'),
       description: t('settings.conversation.display.desc'),
     });
     this.markSettingsTarget(displayBodyEl, 'display');
-    const questionBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.conversation.questions.title'),
-      description: t('settings.conversation.questions.desc'),
-    });
-    this.markSettingsTarget(questionBodyEl, 'questions');
+    const questionBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.questions.title'),
+          description: t('settings.conversation.questions.desc'),
+        })
+      : null;
+    if (questionBodyEl) {
+      this.markSettingsTarget(questionBodyEl, 'questions');
+    }
     const renderingBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.rendering.title'),
       description: t('settings.conversation.rendering.desc'),
     });
     this.markSettingsTarget(renderingBodyEl, 'rendering');
 
-    this.renderTitleBlock(titleGenerationBodyEl);
-    this.renderCompactionBlock(compactionBodyEl);
-    this.renderSharingBlock(sharingBodyEl);
+    if (titleGenerationBodyEl) {
+      this.renderTitleBlock(titleGenerationBodyEl);
+    }
+    if (compactionBodyEl) {
+      this.renderCompactionBlock(compactionBodyEl);
+    }
+    if (sharingBodyEl) {
+      this.renderSharingBlock(sharingBodyEl);
+    }
     this.renderDisplayBlock(displayBodyEl);
-    this.renderQuestionsBlock(questionBodyEl);
+    if (questionBodyEl) {
+      this.renderQuestionsBlock(questionBodyEl);
+    }
     this.renderRenderingBlock(renderingBodyEl);
 
     this.finishAttach();
@@ -217,11 +254,17 @@ export class SettingsConversationSection {
     this.setSharedCallbacks();
 
     const blocks: { id: string; render: (el: HTMLElement) => void }[] = [
-      { id: 'title', render: (el) => this.renderTitleBlock(el) },
-      { id: 'compaction', render: (el) => this.renderCompactionBlock(el) },
-      { id: 'sharing', render: (el) => this.renderSharingBlock(el) },
+      ...(this.isOpenCodeActive()
+        ? [
+            { id: 'title', render: (el: HTMLElement) => this.renderTitleBlock(el) },
+            { id: 'compaction', render: (el: HTMLElement) => this.renderCompactionBlock(el) },
+            { id: 'sharing', render: (el: HTMLElement) => this.renderSharingBlock(el) },
+          ]
+        : []),
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
-      { id: 'questions', render: (el) => this.renderQuestionsBlock(el) },
+      ...(this.isOpenCodeActive()
+        ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
+        : []),
     ];
 
     for (const block of blocks) {
@@ -296,9 +339,11 @@ export class SettingsConversationSection {
 
   private finishAttach(): void {
     this.updateTitleModelSettingVisibility();
-    void this.loadTitleModels();
-    this.registerProjectConfigListeners();
-    void this.loadProjectConversationConfig();
+    if (this.isOpenCodeActive()) {
+      void this.loadTitleModels();
+      this.registerProjectConfigListeners();
+      void this.loadProjectConversationConfig();
+    }
   }
 
   private markSettingsTarget(bodyEl: HTMLElement, blockId: string): void {

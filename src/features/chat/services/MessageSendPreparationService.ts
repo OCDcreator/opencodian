@@ -383,7 +383,7 @@ export class MessageSendPreparationService {
     this.host.setAutoScrollEnabled(tabId, true);
     await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
-    if (this.isFirstUserMessage(conversation)) {
+    if (this.isFirstUserMessage(conversation) && (conversation.backend ?? 'opencode') === 'opencode') {
       await this.host.applyFallbackConversationTitle(conversation.id, options.content);
       if (this.host.shouldGenerateAiTitle()) this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
     }

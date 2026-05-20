@@ -279,6 +279,42 @@ describe('ConversationSessionSettingsModal', () => {
     );
   });
 
+  it('hides OpenCode-only inherited summary rows for Claude Code sessions', () => {
+    const modal = attachMockApp(new ConversationSessionSettingsModal({} as never, {
+      conversationTitle: 'Claude thread',
+      defaults: {
+        chatFontSizePx: 15,
+      },
+      showTitleSummary: false,
+      showQuestionsSummary: false,
+      showCompactionSummary: false,
+      onSave: jest.fn(),
+    }), {
+      plugins: {
+        plugins: {
+          opencodian: {
+            settings: {
+              titleMode: 'ai',
+              chatFontSizePx: 16,
+              questionDisplayMode: 'all',
+              questionCardPosition: 'inline',
+              showAnsweredQuestionCards: true,
+              renderUserMarkupAsCodeBlocks: true,
+            },
+          },
+        },
+      },
+    });
+
+    modal.onOpen();
+
+    expect(modal.contentEl.querySelector('[data-summary="title"]')).toBeNull();
+    expect(modal.contentEl.querySelector('[data-summary="questions"]')).toBeNull();
+    expect(modal.contentEl.querySelector('[data-summary="compaction"]')).toBeNull();
+    expect(modal.contentEl.querySelector('[data-summary="display"]')).not.toBeNull();
+    expect(modal.contentEl.querySelector('[data-summary="rendering"]')).not.toBeNull();
+  });
+
   it('opens the global title settings on the conversation title tab in tabbed mode', () => {
     const open = jest.fn();
     const openTabById = jest.fn();

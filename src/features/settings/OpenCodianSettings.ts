@@ -7,6 +7,7 @@
 
 import { App, PluginSettingTab, Setting } from 'obsidian';
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { SettingsAcpSection } from './SettingsAcpSection';
@@ -280,23 +281,31 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
-    this.addClaudeCodeSettings(containerEl);
-    this.addServerSettings(containerEl);
-    this.addModelSettings(containerEl);
+    if (this.isActiveBackend('claude-code')) {
+      this.addClaudeCodeSettings(containerEl);
+    }
+    if (this.isActiveBackend('opencode')) {
+      this.addServerSettings(containerEl);
+      this.addModelSettings(containerEl);
+    }
     this.addConversationSettings(containerEl);
-    this.addAgentsSettings(containerEl);
-    this.addCommandsSettings(containerEl);
-    this.addMcpSettings(containerEl);
-    this.addFormatterSettings(containerEl);
-    this.addPluginSettings(containerEl);
-    this.addSecuritySettings(containerEl);
+    if (this.isActiveBackend('opencode')) {
+      this.addAgentsSettings(containerEl);
+      this.addCommandsSettings(containerEl);
+      this.addMcpSettings(containerEl);
+      this.addFormatterSettings(containerEl);
+      this.addPluginSettings(containerEl);
+      this.addSecuritySettings(containerEl);
+    }
     this.addUISettings(containerEl);
     this.addStyleSettings(containerEl);
     this.addDebugSettings(containerEl);
     this.addUserSettings(containerEl);
-    this.addSkillsSettings(containerEl);
-    this.addToolsSettings(containerEl);
-    this.addAcpSettings(containerEl);
+    if (this.isActiveBackend('opencode')) {
+      this.addSkillsSettings(containerEl);
+      this.addToolsSettings(containerEl);
+      this.addAcpSettings(containerEl);
+    }
 
     this.sectionCoordinator.finishDisplay();
   }
@@ -320,6 +329,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   private renderPanelTitle(containerEl: HTMLElement): void {
     renderSettingsPanelTitle(containerEl, this.app, this.plugin);
+  }
+
+  private getActiveBackend(): AgentBackendKind | undefined {
+    const activeBackend = this.plugin.settings.activeBackend;
+    return activeBackend && this.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.plugin.settings.enabledBackends[0];
+  }
+
+  private isActiveBackend(backend: AgentBackendKind): boolean {
+    return this.getActiveBackend() === backend;
   }
 
   // ─── Layout mode control ───────────────────────────────────────────

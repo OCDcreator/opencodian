@@ -33,8 +33,12 @@ export interface ConversationSessionSettingsCoordinatorHost {
   getProjectShareMode?(): Promise<OpencodeShareMode | undefined>;
   /** Whether to show session sharing controls. Defaults to false. */
   supportsSessionSharing?(): boolean;
+  /** Whether to show title-generation summary rows. OpenCode conversations default to true. */
+  supportsTitleGeneration?(): boolean;
   /** Whether to show compaction summary row. Defaults to false. */
   supportsCompaction?(): boolean;
+  /** Whether to show question-card summary rows. OpenCode conversations default to true. */
+  supportsQuestions?(): boolean;
 }
 
 export class ConversationSessionSettingsCoordinator {
@@ -62,7 +66,9 @@ export class ConversationSessionSettingsCoordinator {
       conversationTitle: conversation.title || t('chat.history.untitled'),
       defaults: this.resolveEffectiveSettings(conversation),
       initialOverrides: conversation.sessionSettings,
+      showTitleSummary: this.shouldShowTitleSummary(conversation),
       showCompactionSummary: showCompaction,
+      showQuestionsSummary: this.shouldShowQuestionsSummary(conversation),
       shareUrl,
       shareMode,
       onSave: async (overrides) => {
@@ -81,6 +87,22 @@ export class ConversationSessionSettingsCoordinator {
         await this.unshareCurrentConversation(conversation);
       } : undefined,
     }).open();
+  }
+
+  private shouldShowTitleSummary(conversation: Conversation): boolean {
+    const hostSupport = this.host.supportsTitleGeneration?.();
+    if (hostSupport !== undefined) {
+      return hostSupport;
+    }
+    return (conversation.backend ?? 'opencode') === 'opencode';
+  }
+
+  private shouldShowQuestionsSummary(conversation: Conversation): boolean {
+    const hostSupport = this.host.supportsQuestions?.();
+    if (hostSupport !== undefined) {
+      return hostSupport;
+    }
+    return (conversation.backend ?? 'opencode') === 'opencode';
   }
 
   private async getCurrentShareUrl(sessionId: string): Promise<string | null> {

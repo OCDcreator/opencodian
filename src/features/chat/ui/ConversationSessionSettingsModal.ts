@@ -22,8 +22,12 @@ interface ConversationSessionSettingsModalOptions {
   conversationTitle: string;
   defaults: ConversationSessionSettingsModalDefaults;
   initialOverrides?: ConversationSessionSettings;
+  /** Whether to show the title-generation global summary row. Defaults to true. */
+  showTitleSummary?: boolean;
   /** Whether to show the compaction summary row. Defaults to false. */
   showCompactionSummary?: boolean;
+  /** Whether to show question-card global summary rows. Defaults to true. */
+  showQuestionsSummary?: boolean;
   onSave(
     overrides: ConversationSessionSettings | undefined,
   ): Promise<void> | void;
@@ -420,20 +424,22 @@ export class ConversationSessionSettingsModal extends Modal {
       description?: string;
       chips: Array<{ text: string }>;
     }> = [
-      {
-        id: 'title',
-        label: t('chat.sessionSettings.modal.summary.titleGeneration'),
-        description: summary.titleMode === 'ai'
-          ? t('chat.sessionSettings.modal.summary.titleGeneration.smartDesc')
-          : t('chat.sessionSettings.modal.summary.titleGeneration.firstMessageDesc'),
-        chips: [
-          {
-            text: summary.titleMode === 'ai'
-              ? t('settings.titleGeneration.mode.ai')
-              : t('settings.titleGeneration.mode.default'),
-          },
-        ],
-      },
+      ...(this.options.showTitleSummary !== false
+        ? [{
+            id: 'title',
+            label: t('chat.sessionSettings.modal.summary.titleGeneration'),
+            description: summary.titleMode === 'ai'
+              ? t('chat.sessionSettings.modal.summary.titleGeneration.smartDesc')
+              : t('chat.sessionSettings.modal.summary.titleGeneration.firstMessageDesc'),
+            chips: [
+              {
+                text: summary.titleMode === 'ai'
+                  ? t('settings.titleGeneration.mode.ai')
+                  : t('settings.titleGeneration.mode.default'),
+              },
+            ],
+          }]
+        : []),
       ...(this.options.showCompactionSummary
         ? [{
             id: 'compaction',
@@ -450,27 +456,29 @@ export class ConversationSessionSettingsModal extends Modal {
           { text: `${summary.chatFontSizePx}px` },
         ],
       },
-      {
-        id: 'questions',
-        label: t('chat.sessionSettings.modal.summary.questions'),
-        chips: [
-          {
-            text: summary.questionDisplayMode === 'all'
-              ? t('settings.conversation.questionDisplayMode.all')
-              : t('settings.conversation.questionDisplayMode.single'),
-          },
-          {
-            text: summary.questionCardPosition === 'inline'
-              ? t('settings.conversation.questionCardPosition.inline')
-              : t('settings.conversation.questionCardPosition.aboveInput'),
-          },
-          {
-            text: summary.showAnsweredQuestionCards
-              ? t('chat.sessionSettings.modal.summary.showAnswered')
-              : t('chat.sessionSettings.modal.summary.hideAnswered'),
-          },
-        ],
-      },
+      ...(this.options.showQuestionsSummary !== false
+        ? [{
+            id: 'questions',
+            label: t('chat.sessionSettings.modal.summary.questions'),
+            chips: [
+              {
+                text: summary.questionDisplayMode === 'all'
+                  ? t('settings.conversation.questionDisplayMode.all')
+                  : t('settings.conversation.questionDisplayMode.single'),
+              },
+              {
+                text: summary.questionCardPosition === 'inline'
+                  ? t('settings.conversation.questionCardPosition.inline')
+                  : t('settings.conversation.questionCardPosition.aboveInput'),
+              },
+              {
+                text: summary.showAnsweredQuestionCards
+                  ? t('chat.sessionSettings.modal.summary.showAnswered')
+                  : t('chat.sessionSettings.modal.summary.hideAnswered'),
+              },
+            ],
+          }]
+        : []),
       {
         id: 'rendering',
         label: t('chat.sessionSettings.modal.summary.rendering'),

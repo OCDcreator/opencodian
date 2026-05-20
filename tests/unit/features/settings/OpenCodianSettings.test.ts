@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- This file covers both SettingsSectionCoordinator integration and OpenCodianSettingTab layout shell behavior; keeping those regression cases together makes the settings-surface contract easier to review. */
+/* eslint-disable max-lines, max-lines-per-function -- This file covers both SettingsSectionCoordinator integration and OpenCodianSettingTab layout shell behavior; keeping those regression cases together makes the settings-surface contract easier to review. */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -775,7 +775,7 @@ describe('OpenCodianSettingTab layout shell', () => {
       Array.from(tab.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual(['General', 'Claude Code']);
+    ).toEqual(['General']);
     const generalBlock = tab.containerEl.querySelector<HTMLElement>('.opencodian-settings-general-merged-block');
     expect(generalBlock).not.toBeNull();
     expect(
@@ -857,6 +857,48 @@ describe('OpenCodianSettingTab layout shell', () => {
     ).map((element) => element.textContent?.trim());
     expect(labels.indexOf('Commands')).toBeLessThan(labels.indexOf('MCP'));
     expect(labels.indexOf('MCP')).toBeLessThan(labels.indexOf('Formatter'));
+  });
+
+  it('hides OpenCode-owned classic settings sections when Claude Code is active', () => {
+    const { plugin, tab } = createSettingsTab('classic');
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    plugin.settings.activeBackend = 'claude-code';
+    const appendHeading = (title: string) => (containerEl: HTMLElement) => {
+      (tab as unknown as { createSectionHeading: (host: HTMLElement, heading: string, tooltip?: string) => HTMLHeadingElement })
+        .createSectionHeading(containerEl, title, `${title} tooltip`);
+    };
+
+    Object.assign(tab as unknown as Record<string, unknown>, {
+      addServerSettings: appendHeading('Server'),
+      addMcpSettings: appendHeading('MCP'),
+      addModelSettings: appendHeading('Model'),
+      addConversationSettings: appendHeading('Conversation'),
+      addAgentsSettings: appendHeading('Agents'),
+      addCommandsSettings: appendHeading('Commands'),
+      addFormatterSettings: appendHeading('Formatter'),
+      addPluginSettings: appendHeading('Plugins'),
+      addSecuritySettings: appendHeading('Security'),
+      addUISettings: appendHeading('UI'),
+      addStyleSettings: appendHeading('Style'),
+      addDebugSettings: appendHeading('Debug'),
+      addUserSettings: appendHeading('User'),
+      addClaudeCodeSettings: appendHeading('Claude Code'),
+      addSkillsSettings: appendHeading('Skills'),
+      addToolsSettings: appendHeading('Tools'),
+      addAcpSettings: appendHeading('ACP'),
+      renderLayoutModeSetting: jest.fn(),
+      renderLanguageSetting: jest.fn(),
+    });
+
+    tab.display();
+
+    const labels = Array.from(
+      tab.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn'),
+    ).map((element) => element.textContent?.trim());
+    expect(labels).toEqual(['General', 'Claude Code', 'Conversation', 'UI', 'Style', 'Debug', 'User']);
+    expect(labels).not.toContain('Server');
+    expect(labels).not.toContain('Model');
+    expect(labels).not.toContain('Security');
   });
 
   it('does not render quick-nav in tabbed layout mode', () => {

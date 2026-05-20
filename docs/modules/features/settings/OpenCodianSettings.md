@@ -14,6 +14,8 @@
 
 布局模式通过 `settingsLayoutMode` settings 字段持久化，新用户默认 `'tabbed'`，老用户升级默认 `'classic'`。标签模式的标签结构定义在 `settingsLayoutRegistry.ts`，渲染委托给 `SettingsTabbedRenderer`。
 
+classic 和 tabbed 两种布局都必须按当前 active backend 过滤后端专属 section：OpenCode active 时显示 Server / Model / Agents / Commands / MCP / Formatter / Plugins / Security / Skills / Tools / ACP 等 OpenCode-owned 分区；Claude Code active 时只显示 Claude Code 自身分区以及 Conversation / UI / Style / Debug / User 等通用分区。不要仅因为某个 backend 在 `enabledBackends` 中就显示它的专属设置。
+
 ## Settings Layout Contract
 
 标准 settings tab 的根设置容器会暴露稳定布局契约标记：`data-settings-surface="page"` 和 `data-settings-layout-mode="classic|tabbed"`。CSS 与测试应优先使用这些 data marker 做页面 surface / layout mode 的契约检查，而不是只从 `.opencodian-settings--classic` 或 `.opencodian-settings--tabbed` 等视觉 class 推断当前模式。
@@ -38,26 +40,26 @@
 
 ## 主要分区
 
-`display()` 会重建整个设置面板，并依次挂载这些分区：
+`display()` 会重建整个设置面板，并按当前 active backend 挂载这些分区：
 
 - General
-- Claude Code
-- Server
-- MCP
-- Model
+- Claude Code（仅 Claude Code active）
+- Server（仅 OpenCode active）
+- MCP（仅 OpenCode active）
+- Model（仅 OpenCode active）
 - Conversation
-- Agents
-- Commands
-- Formatter
-- Plugins
-- Security
+- Agents（仅 OpenCode active）
+- Commands（仅 OpenCode active）
+- Formatter（仅 OpenCode active）
+- Plugins（仅 OpenCode active）
+- Security（仅 OpenCode active）
 - UI
 - Style
 - Debug
 - User
-- Skills
-- Tools (Built-in + Custom)
-- ACP Agents
+- Skills（仅 OpenCode active）
+- Tools (Built-in + Custom)（仅 OpenCode active）
+- ACP Agents（仅 OpenCode active）
 
 其中最近变化较大的几块是：
 
@@ -101,6 +103,7 @@
 - **Security**
   - config file status / permission mode / restart action 现已委托给 `SettingsSecuritySection`
   - blocklist、external access、export path 与平台 blocked commands 的 section 组装同样收口到专属 owner
+  - security section 当前读写 `.opencode/opencode.json` 并管理 OpenCode permission/restart/blocklist 语义，只能在 OpenCode active 时显示；Claude Code 的 permission mode 属于 `SettingsClaudeCodeSection`
 - **Tools**
   - `SettingsToolSection` 继续管理 built-in tool permission 分组，并新增自定义工具文件管理：可在 `.opencode/tools/` 创建默认 TS 工具模板、编辑/删除项目工具文件、只读展示 `~/.config/opencode/tools` 全局工具，并保留运行时 catalog custom tool 的真实 tool id 权限控制
   - 自定义工具的启用 / 询问 / 拒绝仍写入项目 `.opencode/opencode.json` 的 `permission.<toolName>`；文件管理不直接执行或加载工具
@@ -117,7 +120,7 @@
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
 
-从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / MCP / Formatter / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式也必须先进入 `beginDisplay({ showQuickNav: false })`，由 coordinator 捕获当前滚动位置后再清空重建内容；不要在调用 `beginDisplay()` 前额外 `empty()` 容器，否则新增/删除格式化器等 tabbed 刷新会先把滚动容器夹回顶部。tabbed 模式只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
+从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载当前 backend 可见的 General / backend-specific sections / Conversation / UI / Style / Debug / User 等 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式也必须先进入 `beginDisplay({ showQuickNav: false })`，由 coordinator 捕获当前滚动位置后再清空重建内容；不要在调用 `beginDisplay()` 前额外 `empty()` 容器，否则新增/删除格式化器等 tabbed 刷新会先把滚动容器夹回顶部。tabbed 模式只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 
 2026-04-26 的后续导航微调又把 `MCP` 固定到 `Commands` 和 `Formatter` 之间：一级标签顺序、classic section 挂载顺序和 quick-nav 按钮顺序都保持一致，避免在两种布局之间切换时看到不同的导航位置。
 
