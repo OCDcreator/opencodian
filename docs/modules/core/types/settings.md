@@ -30,6 +30,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `OpenCodianSettings` 现在包含 backend 管理字段：`activeBackend` 表示新会话默认 backend，`enabledBackends` 表示设置页当前启用的 backend 集合。Phase 0 默认值固定为 `opencode` / `['opencode']`，非 OpenCode backend 只作为 UI 可见性和后续迁移占位。
 
+`backendSettings.claudeCode` 是 Claude Code 专属设置对象。它包含 executable path、显式 `settingSources`、Claude permission mode、thinking、effort、additional directories、model/fallback model。默认 `settingSources` 是 `['project']`，但保存的空数组表示显式 none，不能被归一化回默认值。
+
 ### 服务器与安全
 
 | 类型 | 说明 |
@@ -129,6 +131,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 |------|------|
 | `normalizeEffortLevel(value)` | 归一化努力级别，`'max'` → `'xhigh'`，默认 `'high'` |
 | `normalizeThinkingBudget(value)` | 归一化思考预算，支持字符串/数字输入 |
+| `normalizeBackendSettings(value)` | 归一化 backend 专属设置对象，目前包含 Claude Code hidden foundation |
+| `normalizeClaudeCodeBackendSettings(value)` | 归一化 Claude Code executable、setting sources、permission/thinking/effort、additional directories 和 model 字段 |
 | `normalizeTabsEnabled(value)` | 归一化会话标签启用状态；只有明确 `false` 才禁用，未知值默认启用 |
 | `normalizeTabBarPosition(value)` | 归一化标签栏位置 |
 | `normalizeBelowHeaderTabBarLayout(value)` | 归一化下方标签布局 |

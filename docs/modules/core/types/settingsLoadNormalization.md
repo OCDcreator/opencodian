@@ -40,7 +40,7 @@
 4. 生成最终 `OpenCodianSettings`；
 5. 决定本次启动是否需要把归一化结果立即写回磁盘。
 
-最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。当前实现只保留 `opencode`，避免旧快照或手写设置启用尚未接入的 backend。
+最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。当前实现只保留 `opencode`，避免旧快照或手写设置启用尚未接入的 backend。`backendSettings.claudeCode` 仍会归一化并持久保留，作为隐藏 foundation，不能因此把 Claude 暴露成已实现 backend。
 
 ### server / theme / input-panel 迁移
 
@@ -51,6 +51,7 @@
 ## 与其他模块的交互
 
 - 依赖 `settings.ts` 的 `normalize*` / `getDefault*` 工具函数，但不把这些纯函数重新包装成新的 facade。
+- Claude Code backend settings 在启动期通过 `normalizeBackendSettings()` 清洗：`settingSources` 默认 `['project']`，显式空数组保留为空，invalid permission/thinking/effort/additionalDirectories 回退安全默认。
 - 会话标签启用状态通过 `normalizeTabsEnabled()` 在启动快照构建阶段清洗一次，只有持久化值明确为 `false` 才禁用；最终 settings merge 直接使用该归一化结果或默认值，避免重复清洗和历史设置误关标签入口。
 - 依赖 `core/theme` 的 preset 解析与 appearance override 计算，确保 theme startup 顺序与原逻辑一致。
 - 依赖 `core/agents/backend` 的 `IMPLEMENTED_AGENT_BACKENDS` 清洗 backend 设置，使新安装和旧设置都只落到已实现 backend。

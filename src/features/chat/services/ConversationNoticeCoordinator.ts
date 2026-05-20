@@ -168,6 +168,10 @@ export class ConversationNoticeCoordinator {
       return t('chat.error.serverNoResponse');
     }
 
+    if (lowerMessage.includes('claude code')) {
+      return `${t('chat.error.sendFailed')}\n${message}`;
+    }
+
     if (NETWORK_ERROR_PATTERNS.some((pattern) => lowerMessage.includes(pattern))) {
       return t('chat.error.serverConnection');
     }

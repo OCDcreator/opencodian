@@ -242,6 +242,13 @@ describe('ConversationNoticeCoordinator error and action helpers', () => {
       expect(coordinator.getFriendlyStreamErrorMessage('HTTP 0 error')).toBe(t('chat.error.serverConnection'));
     });
 
+    it('keeps Claude Code errors backend-specific even when the SDK reports fetch failures', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      const message = 'Claude Code stream failed: TypeError: fetch failed';
+
+      expect(coordinator.getFriendlyStreamErrorMessage(message)).toBe(`${t('chat.error.sendFailed')}\n${message}`);
+    });
+
     it('returns server-binary-missing for opencode-not-found', () => {
       const coordinator = new ConversationNoticeCoordinator(createHost());
       expect(coordinator.getFriendlyStreamErrorMessage('opencode not found')).toBe(t('chat.error.serverBinaryMissing'));

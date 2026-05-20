@@ -53,12 +53,13 @@ class ConversationMetadataCache {
     "createdAt": 1710000000000,
     "updatedAt": 1710000001000,
     "messageCount": 12,
-    "openCodeSessionId": "session-1"
+    "openCodeSessionId": "session-1",
+    "backendSessionId": "session-1"
   }
 }
 ```
 
-`data` 里只保留历史列表必需字段，不复制完整 `messages`。
+`data` 里只保留历史列表必需字段，不复制完整 `messages`。Phase 0/1 multi-backend 迁移后，sidecar 会同时保留 `openCodeSessionId` 兼容字段和通用 `backendSessionId` / `backendAgentId`；从旧完整 session JSON fallback 时，缺失的 `backendSessionId` 会由 `openCodeSessionId` 或 legacy `acpSessionId` 回填。
 
 ### 读取路径
 

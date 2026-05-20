@@ -1,3 +1,4 @@
+import { getConversationBackendSessionId } from '../../../core/types';
 import type {
   PreparedMessageSend,
   PrepareMessageSendOptions,
@@ -97,7 +98,7 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
     refreshServerStatusBadge: () => deps.refreshServerStatusBadge(),
   };
   const transportPort: SendPipelineTransportPort = {
-    sendStreamMessage: (content, options) => deps.sendStreamMessage(content, options),
+    sendStreamMessage: (conversation, content, options) => deps.sendStreamMessage(conversation, content, options),
     detachStream: (sessionId) => deps.detachStream(sessionId),
     syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
       deps.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
@@ -218,8 +219,9 @@ export class SendPipelineRuntime {
     }
 
     this.messageSendPreparationService.enterStreamingState(preparedSend.tabId);
-    const stream = this.host.sendStreamMessage(content, {
-      sessionId: preparedSend.conversation.openCodeSessionId,
+    const backendSessionId = getConversationBackendSessionId(preparedSend.conversation);
+    const stream = this.host.sendStreamMessage(preparedSend.conversation, content, {
+      sessionId: backendSessionId,
       ...preparedSend.modelOptions,
       ...(preparedSend.resolvedAgentInvocation?.agent
         ? { agent: preparedSend.resolvedAgentInvocation.agent }

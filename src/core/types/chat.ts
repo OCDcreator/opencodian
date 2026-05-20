@@ -347,6 +347,8 @@ export interface ConversationMeta {
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
   messageCount: number;
   openCodeSessionId?: string;
+  backendSessionId?: string;
+  backendAgentId?: string;
   backend?: AgentBackendKind;
 }
 
@@ -370,15 +372,29 @@ export interface Conversation {
   updatedAt: number;
   lastResponseAt?: number;
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
-  openCodeSessionId: string;
+  openCodeSessionId?: string;
+  backendSessionId?: string;
+  backendAgentId?: string;
   messages: ChatMessage[];
   currentNote?: string;
   externalContextPaths?: string[];
   sessionSettings?: ConversationSessionSettings;
   backgroundTaskMetadata?: ConversationBackgroundTaskMetadata;
   transport?: 'opencode' | 'acp';
+  /** Legacy ACP session id retained for persisted compatibility. Use backendSessionId for new code. */
   acpSessionId?: string;
+  /** Legacy ACP agent id retained for persisted compatibility. Use backendAgentId for new code. */
   acpAgentId?: string;
   /** Which agent backend owns this conversation. Old data defaults to 'opencode'. */
   backend?: AgentBackendKind;
+}
+
+export function getConversationBackendSessionId(
+  conversation: {
+    backendSessionId?: string | null;
+    openCodeSessionId?: string | null;
+    acpSessionId?: string | null;
+  },
+): string | undefined {
+  return conversation.backendSessionId ?? conversation.openCodeSessionId ?? conversation.acpSessionId ?? undefined;
 }

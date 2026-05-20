@@ -30,6 +30,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `StreamChunk` | type | 流式事件联合类型（13 种事件） |
 | `TabContextState` | type | 标签页上下文状态 |
 | `createEmptyTabContextState` | function | 创建空白上下文状态 |
+| `getConversationBackendSessionId` | function | 按 `backendSessionId → openCodeSessionId → acpSessionId` 解析 backend-neutral session id |
 | `UsageInfo` | type | Token 使用信息 |
 | `ImageAttachment` | type | 图片附件 |
 | `ToolCallInfo` | type | 工具调用信息 |

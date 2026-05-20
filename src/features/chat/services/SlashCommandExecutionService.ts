@@ -10,6 +10,7 @@ import type {
   OpencodeCommandConfigRecord,
   SlashCommandSkillMode,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { FocusContextPreview } from '../composerContext';
@@ -366,6 +367,11 @@ export class SlashCommandExecutionService {
       if (!conversation) {
         return true;
       }
+      const sessionId = getConversationBackendSessionId(conversation);
+      if (!sessionId) {
+        this.host.notifySlashCommandFailed(executableCommand.command, new Error('No backend session available'));
+        return true;
+      }
 
       this.host.refreshActiveFocusContextPreview();
       this.host.startConversationSyncLoop();
@@ -377,7 +383,7 @@ export class SlashCommandExecutionService {
       if (executableCommand.agent) {
         commandInput.agent = executableCommand.agent;
       }
-      await this.host.runSessionCommand(conversation.openCodeSessionId, commandInput);
+      await this.host.runSessionCommand(sessionId, commandInput);
       await this.host.syncVisibleConversationInBackground();
       return true;
     } catch (error) {
@@ -402,7 +408,8 @@ export class SlashCommandExecutionService {
   }
 
   private async handleCompactCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    const conversation = await this.prepareExecutionContext();
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
     if (!sessionId) { new Notice(t('slashCommand.compact.noSession')); return true; }
     await this.host.runCompactSession(sessionId);
     return true;
@@ -423,7 +430,8 @@ export class SlashCommandExecutionService {
   }
 
   private async handleRedoCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    const conversation = await this.prepareExecutionContext();
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
     if (!sessionId) { new Notice(t('slashCommand.redo.noSession')); return true; }
     try {
       const ok = await this.host.unrevertSession(sessionId);
@@ -439,7 +447,8 @@ export class SlashCommandExecutionService {
   }
 
   private async handleShareCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    const conversation = await this.prepareExecutionContext();
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
     if (!sessionId) { new Notice(t('slashCommand.share.noSession')); return true; }
     new Notice(t('slashCommand.share.starting'));
     const url = await this.host.shareSession(sessionId);
@@ -449,7 +458,8 @@ export class SlashCommandExecutionService {
   }
 
   private async handleUnshareCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
+    const conversation = await this.prepareExecutionContext();
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
     if (!sessionId) { new Notice(t('slashCommand.unshare.noSession')); return true; }
     const ok = await this.host.unshareSession(sessionId);
     new Notice(t(ok ? 'slashCommand.unshare.success' : 'slashCommand.unshare.failed'));

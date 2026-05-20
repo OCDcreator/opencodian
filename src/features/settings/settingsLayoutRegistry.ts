@@ -38,6 +38,16 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     ],
   },
   {
+    id: 'claude-code',
+    labelKey: 'settings.claudeCode.title',
+    icon: 'sparkles',
+    defaultSecondaryTabId: 'runtime',
+    backendRequired: 'claude-code',
+    secondaryTabs: [
+      { id: 'runtime', labelKey: 'settings.claudeCode.tab.runtime' },
+    ],
+  },
+  {
     id: 'server',
     labelKey: 'settings.server.title',
     icon: 'server',

@@ -28,6 +28,7 @@ export interface ConversationLoadRecoveryHost {
   persistTabState(options?: { flush?: boolean }): void;
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
+  getActiveBackend(): AgentBackendKind | undefined;
   createConversation(): Promise<Conversation>;
   chooseForkTarget(): Promise<ForkTarget | null>;
   confirmRewind(): boolean;
@@ -51,6 +52,7 @@ export interface ConversationLoadRecoveryHostDependencies {
   persistTabState(options?: { flush?: boolean }): void;
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
+  getActiveBackend(): AgentBackendKind | undefined;
   createConversation(): Promise<Conversation>;
   app: App;  // factory absorbs chooseForkTarget(app)
   revertSession(sessionId: string, messageId: string): Promise<boolean>;
@@ -111,8 +113,8 @@ export class ConversationLoadRecoveryCoordinator {
 ### lifecycle 入口收束
 
 - `createConversationInNewTab()` / `createConversationInCurrentTab()` / `loadConversation()` / `initializeFirstTab()` / `restorePersistedTabs()` / delete recovery 入口现在都先经过这个 coordinator
-- 首开 bootstrap 会先 `loadConversations()`，再处理 persisted tab restore；restore 失败时仍会 reset tab state 并立即 `persistTabState({ flush: true })`
-- 没有 persisted tabs 时，仍优先复用第一条已有 conversation；只有完全没有会话时才调用 `createConversation()`
+- 首开 bootstrap 会先 `loadConversations()`，再处理 persisted tab restore；restore 只允许恢复当前 active backend 拥有的 conversation tab。persisted state 中如果只剩其他 backend 的 tab，会 reset tab state 并立即 `persistTabState({ flush: true })`
+- 没有可恢复的 persisted tabs 时，仍优先复用当前 active backend 的第一条已有 conversation；只有该 backend 完全没有会话时才调用 `createConversation()`
 - 如果首开时 `createConversation()` 因 backend 被禁用或 bootstrap 不可用而失败，coordinator 会记录 warning 并回退为创建一个 empty tab，而不是把整个 view open 流程打断
 - 这样 `OpenCodianView` 不再分别直连 create/load/bootstrap/delete 的多组 owner，只保留一条 conversation-lifecycle seam
 - 首开 bootstrap 现在还会输出 `[view-open] initializeFirstTab ...` 性能汇总，把 `loadConversations`、restore、create/activate 等关键步骤拆开记时，方便确认首屏慢在“会话列表恢复”还是“激活已选 tab”

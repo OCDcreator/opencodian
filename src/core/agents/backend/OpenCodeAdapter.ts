@@ -20,6 +20,7 @@ import {
 import type {
   AgentAuthCapability,
   AgentBranchCapability,
+  AgentChatCapability,
   AgentConfigCapability,
   AgentConnectionStatus,
   AgentMcpCapability,
@@ -28,6 +29,7 @@ import type {
   AgentQuestionCapability,
   AgentService,
   AgentServiceInfo,
+  AgentSessionCapability,
   AgentTodoCapability,
   AgentToolCapability,
   Disposable,
@@ -63,6 +65,8 @@ function mapServerStatus(status: string): AgentConnectionStatus {
 export class OpenCodeAdapter
   implements
     AgentService,
+    AgentChatCapability,
+    AgentSessionCapability,
     AgentBranchCapability,
     AgentTodoCapability,
     AgentQuestionCapability,
@@ -147,6 +151,37 @@ export class OpenCodeAdapter
   /** Underlying OpenCodeService for direct access when needed. */
   get underlying(): OpenCodeService {
     return this.service;
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentChatCapability
+  // -------------------------------------------------------------------------
+
+  async *sendMessage(request: { sessionId: string; content: string; options?: Record<string, unknown> }) {
+    yield* this.service.sendMessage(request.content, {
+      ...(request.options ?? {}),
+      sessionId: request.sessionId,
+    });
+  }
+
+  cancelStream(sessionId: string): void {
+    this.service.cancelStream(sessionId);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentSessionCapability
+  // -------------------------------------------------------------------------
+
+  async createSession(title?: string, options?: Record<string, unknown>): Promise<string> {
+    return this.service.createSession(title, options as Parameters<OpenCodeService['createSession']>[1]);
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.service.deleteSession(sessionId);
+  }
+
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    await this.service.updateSessionTitle(sessionId, title);
   }
 
   // -------------------------------------------------------------------------

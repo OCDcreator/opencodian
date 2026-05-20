@@ -1,4 +1,7 @@
-import type { StreamChunk as CoreStreamChunk } from '../../../core/types';
+import {
+  getConversationBackendSessionId,
+  type StreamChunk as CoreStreamChunk,
+} from '../../../core/types';
 import { createLogger } from '../../../shared';
 import { PendingIndicatorController } from './PendingIndicatorController';
 import { hasVisibleStreamingContent } from './sendPipelineContent';
@@ -311,14 +314,14 @@ export class StreamChunkRouter {
       this.streamInterrupted = true;
       logger.warn('Stream idle timeout reached, detaching local stream and continuing background sync', {
         conversationId: this.options.preparedSend.conversation.id,
-        sessionId: this.options.preparedSend.conversation.openCodeSessionId,
+        sessionId: getConversationBackendSessionId(this.options.preparedSend.conversation),
         timeoutMs,
         timeoutReason: this.receivedMeaningfulChunk ? 'idle-after-content' : 'no-visible-content',
         hasVisibleAssistantContent: Boolean(this.options.streamController?.getContentBlocks().length),
       });
 
       this.options.streamController?.cancelStream();
-      this.options.host.detachStream(this.options.preparedSend.conversation.openCodeSessionId);
+      this.options.host.detachStream(getConversationBackendSessionId(this.options.preparedSend.conversation));
       this.resetStreamingState();
     }, timeoutMs);
   }

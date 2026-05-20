@@ -5,16 +5,16 @@
 
 ## 概述
 
-`SettingsBackendSection` 负责 `General > Agent Management` 设置面板。它管理当前已实现 agent backend 的启用范围与新会话默认 agent，并在 OpenCode backend 开关变化时以 best-effort 方式同步 runtime 生命周期。
+`SettingsBackendSection` 负责 `General > Agent Management` 设置面板。它管理当前已实现 agent backend 的启用范围与当前 active agent，并在 OpenCode backend 开关变化时以 best-effort 方式同步 runtime 生命周期。
 
 ## 职责
 
-- 渲染新会话默认 backend 的下拉选择，选项来自当前 enabled backend 列表
+- 渲染 active backend 的下拉选择，选项来自当前 enabled backend 列表；切换后会刷新设置页，让 tabbed settings surface 立即进入对应 backend 的专属设置面
 - 通过 `IMPLEMENTED_AGENT_BACKENDS` 过滤已知 backend，目前只渲染已实现的 `opencode` 开关
 - 导出 `BACKEND_OPTIONS`，让 agent switcher 复用同一组已实现 backend id 与 locale key
 - 允许所有 backend 被禁用，并在没有 enabled backend 时显示空状态提示
 - 在当前 active backend 被禁用时回退到 enabled 列表中的第一个 backend
-- 更新设置时同步 `AgentServiceRegistry` 的 enabled/active 状态，并在 OpenCode 启用/禁用时尝试 start/stop adapter 或 legacy `openCodeService`
+- 更新设置时同步 `AgentServiceRegistry` 的 enabled/active 状态，触发聊天视图的 active-backend change 监听，并在 OpenCode 启用/禁用时尝试 start/stop adapter 或 legacy `openCodeService`
 
 ## 公共导出
 
@@ -24,7 +24,7 @@
 ## 集成
 
 - `SettingsTabbedRenderer`: 在 `general/backend` 二级标签下创建并挂载本 section
-- `OpenCodianSettings.activeBackend`: 保存新会话默认 backend
+- `OpenCodianSettings.activeBackend`: 保存当前 active backend，决定新会话创建、设置 tab 可见性和聊天 view 的 backend surface 切换
 - `OpenCodianSettings.enabledBackends`: 保存启用 backend 范围，并在读取/渲染时过滤到已实现 backend
 - `AgentServiceRegistry`: 同步 active backend、enabled backend 状态，并优先通过 `get('opencode')` 管理 OpenCode adapter 生命周期
 - `OpenCodeService`: 当 registry adapter 不存在时作为 OpenCode start/stop fallback

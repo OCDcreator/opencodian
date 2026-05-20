@@ -41,6 +41,7 @@
 `display()` 会重建整个设置面板，并依次挂载这些分区：
 
 - General
+- Claude Code
 - Server
 - MCP
 - Model
@@ -89,6 +90,9 @@
 - **UI**
   - `SettingsUiSection` 现在接管 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 的完整 section lifecycle
   - `OpenCodianSettings` 不再直接铺开 UI section 的 dropdown/toggle/slider wiring，只保留 owner 装配
+- **Claude Code**
+  - `SettingsClaudeCodeSection` 现在接管 Claude Code Phase 1 配置基础，包括 executable path、setting sources、permission mode、model/fallback model、thinking/effort、additional directories 与 runtime diagnostics
+  - 该 section 只写入 `backendSettings.claudeCode`；`claude-code` 是否启用由 General / Backend 的 `SettingsBackendSection` 管理，runtime 注册由 `main.ts` 的 backend registry bootstrap 管理
 - **Style**
   - `SettingsStyleSection` 现在接管 theme preset、layout/user/assistant/scrollbar/input/advanced 分组、custom CSS 与 reset / refresh 编排
   - 聊天背景图上传/调参/预览拖拽继续由 `SettingsStyleBackgroundSection` 作为 style owner 的子区块 owner 处理

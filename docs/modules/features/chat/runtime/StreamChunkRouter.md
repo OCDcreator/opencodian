@@ -62,6 +62,7 @@ export class StreamChunkRouter {
 - 在没有任何 meaningful / 可见 chunk 到达前，router 使用 60 秒 no-visible-content timeout，避免 prompt 被服务端接受但长期没有 assistant 输出时让用户持续等待。
 - 一旦 text / thinking / tool / question / permission 等 meaningful chunk 到达，router 切回 5 分钟 idle timeout，保留长任务和工具调用的耐心窗口。
 - timeout log 会记录 `timeoutReason`，区分 `no-visible-content` 与 `idle-after-content`。
+- timeout detach 使用 `getConversationBackendSessionId()` 解析 session id；这让本地 stream 取消路径不再硬依赖 `openCodeSessionId`，但最终 sync/history 仍按各 backend capability 分阶段迁移。
 
 ### 可渲染 chunk
 

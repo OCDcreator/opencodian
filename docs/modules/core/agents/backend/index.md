@@ -5,34 +5,47 @@
 
 ## 概述
 
-`backend/index.ts` 是 agent backend 抽象层的 barrel 入口。它集中导出当前已实现 backend 列表、`AgentService` 契约、OpenCode adapter 和 registry，供上层 runtime 与 UI 通过一个稳定路径接入多代理 backend 能力。
+`backend/index.ts` 是 agent backend 抽象层的 barrel 入口。它集中导出当前已实现 backend 列表、`AgentService` 契约、OpenCode adapter、Claude Code adapter 和 registry，供上层 runtime 与 UI 通过一个稳定路径接入多代理 backend 能力。
 
 ## 职责
 
-- 导出 `IMPLEMENTED_AGENT_BACKENDS`，作为设置归一化与 UI 过滤的运行时白名单；当前仅包含 `opencode`
-- 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型和可选 capability interface
+- 导出 `IMPLEMENTED_AGENT_BACKENDS`，作为设置归一化与 UI 过滤的运行时白名单；当前包含 `opencode` 与 `claude-code`
+- 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型、chat/session 请求类型和可选 capability interface
 - 导出 `OpenCodeAdapter` 作为当前 OpenCode backend 的 adapter 实现
+- 导出 backend routing helper，供入口、聊天视图和发送管线按 conversation owner / active backend 做 capability narrowing
+- 导出 Claude Code adapter、SDK loader、options builder、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
 - 导出 `AgentServiceRegistry` 作为 adapter 注册与 active backend 解析 owner
 - 保持 type-only 导出与 value 导出分层，避免 barrel 额外引入运行时副作用
 
 ## 公共导出
 
-- `IMPLEMENTED_AGENT_BACKENDS`: 已实现 backend kind 的 readonly tuple，用 `AgentBackendKind` 约束元素类型。
+- `IMPLEMENTED_AGENT_BACKENDS`: 已实现 backend kind 的 readonly tuple，用 `AgentBackendKind` 约束元素类型；当前为 `['opencode', 'claude-code']`。
 - `AgentServiceRegistry`: backend adapter 注册、启用状态和 active backend 解析 owner。
+- `getConversationChatBackendService` / `getConversationSessionBackendService` / `getActiveSessionBackendService`: backend routing helper。
 - `OpenCodeAdapter`: OpenCode backend 的 `AgentService` adapter 实现。
+- `ClaudeCodeAdapter`: Claude Code official Agent SDK adapter，生产 runtime 通过 `ClaudeCodeSdkLoader` lazy-load 官方 SDK。
+- `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、process、stream 转换与 permission/question bridge helper。
 - `AgentService` / `AgentServiceInfo` / `AgentConnectionStatus` / `Disposable` / `StatusChangeHandler`: backend 抽象层核心契约与共享类型。
-- `AgentAuthCapability` / `AgentBranchCapability` / `AgentConfigCapability` / `AgentMcpCapability` / `AgentModelCapability` / `AgentPermissionCapability` / `AgentQuestionCapability` / `AgentTodoCapability` / `AgentToolCapability`: 可选 capability interface。
+- `AgentChatSendRequest`: backend-neutral chat 发送请求类型。
+- `AgentChatCapability` / `AgentSessionCapability` / `AgentAuthCapability` / `AgentBranchCapability` / `AgentConfigCapability` / `AgentMcpCapability` / `AgentModelCapability` / `AgentPermissionCapability` / `AgentQuestionCapability` / `AgentTodoCapability` / `AgentToolCapability`: 可选 capability interface。
 
 ## 依赖
 
 - `src/core/agents/backend/AgentService.ts`：核心类型导出面
+- `src/core/agents/backend/AgentBackendRouting.ts`：conversation/active backend capability routing helper
 - `src/core/agents/backend/OpenCodeAdapter.ts`：OpenCode adapter 实现
 - `src/core/agents/backend/AgentServiceRegistry.ts`：backend registry 实现
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`：Claude Code adapter
+- `src/core/agents/backend/ClaudeCodeSdkLoader.ts`：官方 Claude Agent SDK dynamic import facade
+- `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`：Claude SDK options 形状 builder
+- `src/core/agents/backend/ClaudeCodeProcessResolver.ts`：Claude process/executable 解析 helper
+- `src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
+- `src/core/agents/backend/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper
 - `src/core/types/chat.ts`：提供 `AgentBackendKind` 类型约束
 
 ## 维护约束
 
 - 只聚合 backend 抽象层的公共导出，不在 barrel 中加入运行时逻辑
-- 更新已实现 backend 时必须同步 `IMPLEMENTED_AGENT_BACKENDS`，避免设置页暴露尚未接入的 backend
+- 更新已实现 backend 时必须同步 `IMPLEMENTED_AGENT_BACKENDS`，避免设置页暴露尚未接入的 backend；新增 backend 进入列表前必须有 adapter、settings normalization、routing tests 和 runtime smoke 证据
 - 新增 backend adapter 或共享类型时，只有需要成为跨目录公共 API 的符号才从这里导出
 - 保持 type-only 导出与 value 导出分离，避免 barrel 引入不必要的运行时依赖

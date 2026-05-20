@@ -162,10 +162,10 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 
 后续流程分成两层：
 
-- `createConversation()` 会先接管尚未完成的 deferred runtime warmup，再在 OpenCode 侧创建 session，最后建立本地 conversation 记录。
+- `createConversation()` 会通过 `AgentServiceRegistry` 解析 active session backend；OpenCode 会话仍会先接管 deferred runtime warmup，非 OpenCode backend 则直接调用其 `AgentSessionCapability.createSession()`，并只写 `backendSessionId`。
 - `createConversationFromSession()` 允许已有 OpenCode session 映射为新的本地 conversation。
 - `getConversationById()` 默认优先从磁盘补全完整消息，再更新内存缓存；`preferCache` 可跳过这一步。
-- `deleteConversation()` 会先把本地缓存删掉，再 best-effort 删除 OpenCode session，最后清理本地存储。
+- `deleteConversation()` 会先把本地缓存删掉，再按 conversation owner 解析 session backend 并 best-effort 删除 backend session，最后清理本地存储。历史 conversation 缺失 `backend` 时继续按 OpenCode 处理。
 
 ### 主题背景资源与诊断导出
 
@@ -273,6 +273,7 @@ graph TD
 ### 其他注意事项
 
 - `loadConversations()` 只加载元数据，不加载消息正文；正文由 `getConversationById()` 按需补读。
+- 会话元数据加载会把 legacy `openCodeSessionId` 回填为 `backendSessionId`；新建 OpenCode 会话会双写两者。删除和标题同步这类 OpenCode-only 路径只在能解析到 OpenCode session id 时调用底层 `OpenCodeService`。
 - 本地 server auto-start 已改成注册完成后的后台 warmup；冷启动 trace 现在更接近"插件何时可见"，而不是"sidecar 何时 ready"。
 - 启动 trace 会同时记录顶层 phase 和嵌套子步骤；诊断报告里的总耗时只汇总顶层 phase，避免双重累计。
 - `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。

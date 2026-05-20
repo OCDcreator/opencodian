@@ -1,8 +1,11 @@
+/* eslint-disable max-lines, max-lines-per-function -- Tabbed settings coverage keeps active-backend filtering, content routing, and section-shell contracts with one renderer fixture. */
+
 import type { App } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import { SettingsAgentsSection } from '../../../../src/features/settings/SettingsAgentsSection';
+import { SettingsClaudeCodeSection } from '../../../../src/features/settings/SettingsClaudeCodeSection';
 import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
 import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
@@ -21,7 +24,9 @@ function createRendererState(options?: {
   primaryTabId?: string;
   secondaryTabs?: Record<string, string>;
   enabledBackends?: AgentBackendKind[];
+  activeBackend?: AgentBackendKind;
 }) {
+  const setActive = jest.fn();
   const plugin = {
     settings: {
       ...DEFAULT_SETTINGS,
@@ -29,8 +34,12 @@ function createRendererState(options?: {
       settingsTabbedPrimaryTab: options?.primaryTabId ?? 'general',
       settingsTabbedSecondaryTabByPrimary: options?.secondaryTabs ?? { general: 'basic' },
       enabledBackends: options?.enabledBackends ?? DEFAULT_SETTINGS.enabledBackends,
+      activeBackend: options?.activeBackend ?? DEFAULT_SETTINGS.activeBackend,
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
+    agentServiceRegistry: {
+      setActive,
+    },
   };
 
   const requestDisplayRefresh = jest.fn();
@@ -96,6 +105,7 @@ function createRendererState(options?: {
     renderLanguageSetting,
     renderSettingsInEditorAreaSetting,
     renderUserContent,
+    setActive,
   };
 }
 
@@ -134,6 +144,11 @@ describe('SettingsTabbedRenderer', () => {
         (element) => element.textContent?.trim(),
       ),
     ).toContain('General');
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary')).map(
+        (element) => element.textContent?.trim(),
+      ),
+    ).not.toContain('Claude Code');
     expect(
       Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).map(
         (element) => element.textContent?.trim(),
@@ -194,6 +209,7 @@ describe('SettingsTabbedRenderer', () => {
     const { renderer } = createRendererState({
       primaryTabId: 'server',
       enabledBackends: ['codex'],
+      activeBackend: 'codex',
     });
     const containerEl = document.createElement('div');
 
@@ -205,6 +221,7 @@ describe('SettingsTabbedRenderer', () => {
     expect(primaryLabels).not.toContain('Server');
     expect(primaryLabels).not.toContain('Models');
     expect(primaryLabels).toContain('General');
+    expect(primaryLabels).not.toContain('Claude Code');
     expectSingleContentShell(containerEl, 'general', 'basic');
   });
 
@@ -213,6 +230,7 @@ describe('SettingsTabbedRenderer', () => {
       primaryTabId: 'conversation',
       secondaryTabs: { conversation: 'compaction' },
       enabledBackends: ['codex'],
+      activeBackend: 'codex',
     });
     const containerEl = document.createElement('div');
 
@@ -224,6 +242,63 @@ describe('SettingsTabbedRenderer', () => {
       ),
     ).toEqual(['Title', 'Display & rendering']);
     expectSingleContentShell(containerEl, 'conversation', 'title');
+  });
+
+  it('shows only OpenCode-owned settings when OpenCode is the active backend', () => {
+    const { renderer } = createRendererState({
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'opencode',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    const primaryLabels = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'),
+    ).map((element) => element.textContent?.trim());
+    expect(primaryLabels).toContain('Server');
+    expect(primaryLabels).toContain('Model');
+    expect(primaryLabels).not.toContain('Claude Code');
+  });
+
+  it('shows only Claude-owned settings when Claude Code is the active backend', () => {
+    const { renderer } = createRendererState({
+      primaryTabId: 'server',
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'claude-code',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    const primaryLabels = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'),
+    ).map((element) => element.textContent?.trim());
+    expect(primaryLabels).toContain('Claude Code');
+    expect(primaryLabels).not.toContain('Server');
+    expect(primaryLabels).not.toContain('Model');
+    expectSingleContentShell(containerEl, 'general', 'basic');
+  });
+
+  it('syncs the backend registry when the settings agent switcher changes active backend', () => {
+    const { renderer, plugin, setActive, requestDisplayRefresh } = createRendererState({
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'opencode',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+    const claudeChip = Array.from(
+      containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-agent-chip'),
+    ).find((element) => element.textContent?.trim() === 'Claude Code');
+    expect(claudeChip).toBeTruthy();
+
+    claudeChip?.click();
+
+    expect(plugin.settings.activeBackend).toBe('claude-code');
+    expect(setActive).toHaveBeenCalledWith('claude-code');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(requestDisplayRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('renders every primary tab inside one structural content shell', () => {
@@ -247,6 +322,9 @@ describe('SettingsTabbedRenderer', () => {
 
     jest.spyOn(SettingsServerSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
       containerEl.createDiv({ cls: 'server-tab-marker' });
+    });
+    jest.spyOn(SettingsClaudeCodeSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'claude-code-tab-marker' });
     });
     jest.spyOn(SettingsModelSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
       containerEl.createDiv({ cls: 'model-tab-marker' });
@@ -296,6 +374,24 @@ describe('SettingsTabbedRenderer', () => {
     }
 
     expect(renderedShellCount).toBe(Object.keys(secondaryByPrimary).length);
+  });
+
+  it('renders the active Claude Code primary tab inside one structural content shell', () => {
+    jest.spyOn(SettingsClaudeCodeSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'claude-code-tab-marker' });
+    });
+    const { renderer } = createRendererState({
+      primaryTabId: 'claude-code',
+      secondaryTabs: { 'claude-code': 'runtime' },
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'claude-code',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expectSingleContentShell(containerEl, 'claude-code', 'runtime');
+    expect(containerEl.querySelector('.claude-code-tab-marker')).not.toBeNull();
   });
 });
 
@@ -412,6 +508,25 @@ describe('SettingsTabbedRenderer tab content routing', () => {
         (element) => element.textContent?.trim(),
       ),
     ).toEqual(['Connection', 'Authentication', 'Status']);
+  });
+
+  it('hides the Claude Code configuration tab until Claude is the active backend', () => {
+    jest.spyOn(SettingsClaudeCodeSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
+      containerEl.createDiv({ cls: 'claude-code-tab-marker', text: 'claude-settings' });
+    });
+    const { renderer, plugin } = createRendererState({
+      primaryTabId: 'claude-code',
+      secondaryTabs: { 'claude-code': 'runtime' },
+      enabledBackends: ['opencode'],
+      activeBackend: 'opencode',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expectSingleContentShell(containerEl, 'general', 'basic');
+    expect(containerEl.querySelector('.claude-code-tab-marker')).toBeNull();
+    expect(plugin.settings.enabledBackends).toEqual(['opencode']);
   });
 });
 

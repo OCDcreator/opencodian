@@ -6,6 +6,7 @@ import type {
   PersistedTabState,
 } from '../../../core/types';
 import { getDefaultPersistedTabState } from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import {
   createLogger,
@@ -72,6 +73,7 @@ export interface ConversationLoadRecoveryHost {
   persistTabState(options?: { flush?: boolean }): void;
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
+  getActiveBackend(): AgentBackendKind | undefined;
   createConversation(): Promise<Conversation>;
   chooseForkTarget(): Promise<ForkTarget | null>;
   confirmRewind(): boolean;
@@ -101,6 +103,7 @@ export interface ConversationLoadRecoveryHostDependencies {
   persistTabState(options?: { flush?: boolean }): void;
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
+  getActiveBackend(): AgentBackendKind | undefined;
   createConversation(): Promise<Conversation>;
   app: App;
   revertSession(sessionId: string, messageId: string): Promise<boolean>;
@@ -130,6 +133,7 @@ export function createConversationLoadRecoveryHost(
     persistTabState: (options) => deps.persistTabState(options),
     loadConversations: () => deps.loadConversations(),
     getConversations: () => deps.getConversations(),
+    getActiveBackend: () => deps.getActiveBackend(),
     createConversation: () => deps.createConversation(),
     chooseForkTarget: () => chooseForkTarget(deps.app, {
       allowNewTab: deps.getTabManager()?.areTabsEnabled?.() ?? true,
@@ -221,7 +225,7 @@ export class ConversationLoadRecoveryCoordinator {
       return;
     }
 
-    let initialConversation: Conversation | null = this.host.getConversations()[0] ?? null;
+    let initialConversation: Conversation | null = this.getActiveBackendConversations()[0] ?? null;
     if (!initialConversation) {
       try {
         initialConversation = await measureStep('createConversation', () => this.host.createConversation());
@@ -252,11 +256,21 @@ export class ConversationLoadRecoveryCoordinator {
       return null;
     }
 
+    const activeConversations = this.getActiveBackendConversations();
     const conversationMap = new Map(
-      this.host.getConversations().map((conversation) => [conversation.id, conversation] as const),
+      activeConversations.map((conversation) => [conversation.id, conversation] as const),
     );
+    const activeConversationIds = new Set(conversationMap.keys());
+    const filteredTabs = (savedState.tabs as RestoredTabState[]).filter(
+      (tab) => tab.conversationId && activeConversationIds.has(tab.conversationId),
+    );
+    if (filteredTabs.length === 0) {
+      this.host.resetPersistedTabState();
+      this.host.persistTabState({ flush: true });
+      return null;
+    }
     const restoredTab = tabManager.restoreTabs(
-      savedState.tabs as RestoredTabState[],
+      filteredTabs,
       savedState.activeTabIndex,
       conversationMap,
     );
@@ -268,6 +282,13 @@ export class ConversationLoadRecoveryCoordinator {
     }
 
     return restoredTab.id;
+  }
+
+  private getActiveBackendConversations(): Conversation[] {
+    const activeBackend = this.host.getActiveBackend() ?? 'opencode';
+    return this.host.getConversations().filter(
+      (conversation) => (conversation.backend ?? 'opencode') === activeBackend,
+    );
   }
 
   async handleRewindRequest(message: ChatMessage): Promise<void> {

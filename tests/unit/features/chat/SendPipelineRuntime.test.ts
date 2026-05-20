@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Send pipeline runtime regression coverage intentionally keeps the host/test builders with scenario assertions. */
 import type {
   ChatMessage,
   Conversation,
@@ -352,7 +353,7 @@ describe('SendPipelineRuntime', () => {
 
     expect(preparationPort.enterStreamingState).toHaveBeenCalledWith('tab-1');
     expect(preparationPort.completePreparedStreamStart).toHaveBeenCalledWith('tab-1');
-    expect(host.sendStreamMessage).toHaveBeenCalledWith('Hello', {
+    expect(host.sendStreamMessage).toHaveBeenCalledWith(preparedSend.conversation, 'Hello', {
       sessionId: 'session-1',
       provider: 'openai',
       model: 'gpt-5.4',
@@ -381,6 +382,37 @@ describe('SendPipelineRuntime', () => {
       editedFiles: ['notes.md'],
     }));
     expect(callOrder).not.toContain('saveConversation');
+  });
+
+  it('uses backendSessionId for backend-neutral transport when openCodeSessionId is absent', async () => {
+    const preparedSend = createPreparedSend({
+      conversation: {
+        id: 'conversation-claude',
+        title: 'Claude',
+        createdAt: 1,
+        updatedAt: 1,
+        backend: 'claude-code',
+        backendSessionId: 'claude-session-1',
+        messages: [createUserMessage()],
+      },
+    });
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(preparedSend);
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController, [], {
+      sendStreamMessage: jest.fn().mockImplementation(() => createAsyncStream([
+        { type: 'message_start' },
+        { type: 'message_stop' },
+      ])),
+    });
+    const runtime = new SendPipelineRuntime(host, preparationPort, finalizationPort);
+
+    await runtime.sendMessage('Hello Claude');
+
+    expect(host.sendStreamMessage).toHaveBeenCalledWith(preparedSend.conversation, 'Hello Claude', expect.objectContaining({
+      sessionId: 'claude-session-1',
+    }));
   });
 });
 
@@ -487,7 +519,7 @@ describe('SendPipelineRuntime transport payload and local notices', () => {
 
     await runtime.sendMessage('Hello');
 
-    expect(host.sendStreamMessage).toHaveBeenCalledWith('Hello', {
+    expect(host.sendStreamMessage).toHaveBeenCalledWith(preparedSend.conversation, 'Hello', {
       sessionId: 'session-1',
       provider: 'openai',
       model: 'gpt-5.4',

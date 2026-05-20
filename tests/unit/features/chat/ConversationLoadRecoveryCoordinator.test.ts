@@ -1,7 +1,10 @@
+/* eslint-disable max-lines -- Conversation recovery coverage keeps initialization, active-backend restore, rewind, fork, and host factory regressions with one shared fixture. */
+
 import type {
   ChatMessage,
   Conversation,
 } from '../../../../src/core/types';
+import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import {
   ConversationLoadRecoveryCoordinator,
   type ConversationLoadRecoveryHost,
@@ -21,6 +24,20 @@ function createConversation(id: string, title = `Chat ${id}`): Conversation {
     openCodeSessionId: `${id}-session`,
     messages: [],
   };
+}
+
+function createBackendConversation(
+  id: string,
+  backend: AgentBackendKind,
+  title = `Chat ${id}`,
+): Conversation {
+  const conversation = createConversation(id, title);
+  conversation.backend = backend;
+  conversation.backendSessionId = `${id}-${backend}-session`;
+  if (backend !== 'opencode') {
+    delete conversation.openCodeSessionId;
+  }
+  return conversation;
 }
 
 function createMessage(
@@ -68,6 +85,7 @@ function createHost(
     persistTabState: jest.fn(),
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
+    getActiveBackend: jest.fn(() => 'opencode'),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     chooseForkTarget: jest.fn().mockResolvedValue('current-tab'),
     confirmRewind: jest.fn(() => true),
@@ -168,6 +186,56 @@ describe('ConversationLoadRecoveryCoordinator initialization', () => {
     expect(tabs).toHaveLength(1);
     expect(tabs[0]?.conversationId).toBe(conversation.id);
     expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
+  });
+
+  it('uses only active-backend conversations during first-open bootstrap', async () => {
+    const opencodeConversation = createBackendConversation('opencode-existing', 'opencode');
+    const claudeConversation = createBackendConversation('claude-existing', 'claude-code');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(claudeConversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getActiveBackend: jest.fn(() => 'claude-code'),
+      getConversations: jest.fn().mockReturnValue([opencodeConversation, claudeConversation]),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.initializeFirstTab();
+
+    const tabs = tabManager.getAllTabs();
+    expect(host.createConversation).not.toHaveBeenCalled();
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBe(claudeConversation.id);
+  });
+
+  it('restores only active-backend persisted tabs', () => {
+    const opencodeConversation = createBackendConversation('opencode-restored', 'opencode');
+    const claudeConversation = createBackendConversation('claude-restored', 'claude-code');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(claudeConversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getActiveBackend: jest.fn(() => 'claude-code'),
+      getPersistedTabState: jest.fn().mockReturnValue({
+        tabs: [
+          { conversationId: opencodeConversation.id, title: opencodeConversation.title, modelOverride: null },
+          { conversationId: claudeConversation.id, title: claudeConversation.title, modelOverride: null },
+        ],
+        activeTabIndex: 0,
+      }),
+      getConversations: jest.fn().mockReturnValue([opencodeConversation, claudeConversation]),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    const restoredTabId = coordinator.restorePersistedTabs();
+
+    expect(restoredTabId).toBeTruthy();
+    expect(tabManager.getAllTabs()).toHaveLength(1);
+    expect(tabManager.getActiveTab()?.conversationId).toBe(claudeConversation.id);
   });
 
   it('creates a new conversation when first open has no persisted tabs or existing conversations', async () => {

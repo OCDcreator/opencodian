@@ -19,6 +19,29 @@ export type EffortLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 /** Thinking budget for custom models */
 export type ThinkingBudget = 0 | 1024 | 4096 | 8192 | 16384;
 
+export type ClaudeCodeSettingSource = 'user' | 'project' | 'local';
+export type ClaudeCodePermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+export type ClaudeCodeEffort = 'low' | 'medium' | 'high' | 'max';
+export type ClaudeCodeThinking =
+  | { type: 'adaptive' }
+  | { type: 'disabled' }
+  | { type: 'fixed'; budgetTokens: number };
+
+export interface ClaudeCodeBackendSettings {
+  executablePath: string;
+  settingSources: ClaudeCodeSettingSource[];
+  permissionMode: ClaudeCodePermissionMode;
+  thinking: ClaudeCodeThinking;
+  effort: ClaudeCodeEffort;
+  additionalDirectories: string[];
+  model: string;
+  fallbackModel: string;
+}
+
+export interface BackendSettings {
+  claudeCode: ClaudeCodeBackendSettings;
+}
+
 export function normalizeEffortLevel(value: unknown): EffortLevel {
   switch (value) {
     case 'minimal':
@@ -32,6 +55,136 @@ export function normalizeEffortLevel(value: unknown): EffortLevel {
     default:
       return 'high';
   }
+}
+
+export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings {
+  return {
+    executablePath: '',
+    settingSources: ['project'],
+    permissionMode: 'default',
+    thinking: { type: 'adaptive' },
+    effort: 'medium',
+    additionalDirectories: [],
+    model: '',
+    fallbackModel: '',
+  };
+}
+
+export function getDefaultBackendSettings(): BackendSettings {
+  return {
+    claudeCode: getDefaultClaudeCodeBackendSettings(),
+  };
+}
+
+export function normalizeClaudeCodeSettingSources(value: unknown): ClaudeCodeSettingSource[] {
+  if (value === 'none') {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    return ['project'];
+  }
+
+  const normalized = value
+    .map((entry) => typeof entry === 'string' ? entry.trim() : '')
+    .filter((entry): entry is ClaudeCodeSettingSource =>
+      entry === 'user' || entry === 'project' || entry === 'local');
+
+  return [...new Set(normalized)];
+}
+
+export function normalizeClaudeCodePermissionMode(value: unknown): ClaudeCodePermissionMode {
+  switch (value) {
+    case 'acceptEdits':
+    case 'bypassPermissions':
+    case 'plan':
+    case 'default':
+      return value;
+    case 'auto':
+    case 'normal':
+      return 'default';
+    case 'dontAsk':
+      return 'bypassPermissions';
+    default:
+      return 'default';
+  }
+}
+
+export function normalizeClaudeCodeEffort(value: unknown): ClaudeCodeEffort {
+  switch (value) {
+    case 'low':
+    case 'medium':
+    case 'high':
+    case 'max':
+      return value;
+    case 'minimal':
+      return 'low';
+    case 'xhigh':
+      return 'max';
+    default:
+      return 'medium';
+  }
+}
+
+export function normalizeClaudeCodeThinking(value: unknown): ClaudeCodeThinking {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { type: 'adaptive' };
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (candidate.type === 'disabled') {
+    return { type: 'disabled' };
+  }
+  if (candidate.type === 'fixed') {
+    const budgetTokens = typeof candidate.budgetTokens === 'number'
+      && Number.isFinite(candidate.budgetTokens)
+      && candidate.budgetTokens > 0
+      ? Math.floor(candidate.budgetTokens)
+      : 4096;
+    return { type: 'fixed', budgetTokens };
+  }
+  return { type: 'adaptive' };
+}
+
+export function normalizeClaudeCodeAdditionalDirectories(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((entry) => typeof entry === 'string' ? entry.trim() : '')
+      .filter((entry) => entry.length > 0),
+  )];
+}
+
+export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBackendSettings {
+  const defaults = getDefaultClaudeCodeBackendSettings();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return defaults;
+  }
+
+  const candidate = value as Partial<Record<keyof ClaudeCodeBackendSettings, unknown>>;
+  return {
+    executablePath: typeof candidate.executablePath === 'string'
+      ? candidate.executablePath.trim()
+      : defaults.executablePath,
+    settingSources: normalizeClaudeCodeSettingSources(candidate.settingSources),
+    permissionMode: normalizeClaudeCodePermissionMode(candidate.permissionMode),
+    thinking: normalizeClaudeCodeThinking(candidate.thinking),
+    effort: normalizeClaudeCodeEffort(candidate.effort),
+    additionalDirectories: normalizeClaudeCodeAdditionalDirectories(candidate.additionalDirectories),
+    model: typeof candidate.model === 'string' ? candidate.model.trim() : defaults.model,
+    fallbackModel: typeof candidate.fallbackModel === 'string' ? candidate.fallbackModel.trim() : defaults.fallbackModel,
+  };
+}
+
+export function normalizeBackendSettings(value: unknown): BackendSettings {
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { claudeCode?: unknown }
+    : {};
+  return {
+    claudeCode: normalizeClaudeCodeBackendSettings(candidate.claudeCode),
+  };
 }
 
 export function normalizeThinkingBudget(value: unknown): ThinkingBudget {
@@ -1737,6 +1890,9 @@ export interface OpenCodianSettings {
   /** List of enabled backends. It can be empty when all agents are disabled. */
   enabledBackends: AgentBackendKind[];
 
+  /** Backend-specific settings that should not be flattened into OpenCode fields. */
+  backendSettings: BackendSettings;
+
   // Server configuration
   server: ServerConfig;
 
@@ -1885,6 +2041,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   userName: '',
   activeBackend: 'opencode',
   enabledBackends: ['opencode'],
+  backendSettings: getDefaultBackendSettings(),
 
   server: {
     mode: 'local',

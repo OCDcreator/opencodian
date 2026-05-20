@@ -66,6 +66,7 @@ export function createMessageSendPreparationHost(
 - 如果前台 tab 已经处于 busy，会先尝试把当前 prompt send-intent 存为该 tab 的一个 queued follow-up；入队只在本 tab 正在 streaming 且具备明确 post-stream 出队触发时成功。server-busy、retry、同 session 其他 tab streaming、或该 tab 已有 queued follow-up 时，保持既有 blocked notice 语义。
 - queued follow-up 会携带 `targetTabId`，重新进入 preparation 时必须仍指向 active tab；如果用户已经切到别的 tab，preparation 会中止，避免把 queued intent 发进错误 conversation。
 - busy enqueue 只发生在 conversation、active tab 与 tab runtime 均存在之后；缺失 canonical/session 上下文时直接中止，不创建 queued prompt。
+- preparation 现在通过 `getConversationBackendSessionId()` 解析 backend-neutral session id。旧 OpenCode conversation 会继续使用 `openCodeSessionId`；未来 Claude conversation 可只带 `backendSessionId`。如果 conversation 没有任何 backend session id，preparation 会复位 lifecycle 并中止，不 seed canonical user message，也不入队 follow-up。
 
 ### optimistic bootstrap 时序
 
@@ -76,7 +77,7 @@ export function createMessageSendPreparationHost(
 - Skill 展开通过 `SkillContentExpander` 完成，返回的 `syntheticParts`（不再是 `syntheticBlocks`）会映射为带 metadata 的 synthetic text parts：`{ text, ignored: false, metadata: { kind: 'skill-expansion', skillName } }`，使下游渲染层能识别并隐藏 skill 合成内容
 - 如果上游提供 `invocationIntent`，`AgentInvocationService` 会先把它解析成 top-level main `agent` 与 `agent` / `subtask` native parts；这些 invocation parts 会和普通 parts 一起进入稳定 payload，而不是被拼回纯文本
 - selected `@agent` 的 source span 会先从 transport text part 中剔除，避免同一 mention 同时以普通文本和 native `agent` part 发送；optimistic user bubble 仍保留用户实际输入的可见文本
-- 先把同一批稳定 `optimisticUserParts` seed 到 canonical session graph，再构造本地 optimistic user message；plugin synthetic parts 因此属于 canonical part truth，而不是靠 fallback `Conversation.messages.content` 重建
+- 先把同一批稳定 `optimisticUserParts` seed 到当前 backend session 的 canonical session graph，再构造本地 optimistic user message；plugin synthetic parts 因此属于 canonical part truth，而不是靠 fallback `Conversation.messages.content` 重建
 - optimistic user message 继续使用合并后的 context items 构造 `contextAttachments`，但不把本地 UI bubble 直接当成最终真相
 - 保持既有顺序：
   - `seedCanonicalUserMessage()`

@@ -63,6 +63,7 @@ export class SendPipelineRuntime {
 - 如果 active tab runtime 在 preparation 之后已经失效，直接中止，不继续发流
 - 进入 streaming 状态后，再创建真实 stream、streaming shell 和 `StreamController`
 - transport 层收到的是 `PreparedMessageSend.contextItems`，也就是“持久路径 + 一次性 composer context”的合并结果，而不是单独的 draft context
+- transport 层接收完整 `PreparedMessageSend.conversation` 和 `sessionId`；`sessionId` 来自 `getConversationBackendSessionId()`，因此 OpenCode 旧会话继续使用 `openCodeSessionId`，非 OpenCode 后端可以只提供 `backendSessionId`
 - transport 层现在还会直接复用 `PreparedMessageSend.messageID` 与 `requestParts`，避免 send preparation 和真正 transport 再各自生成一批不同的 part id
 - 如果 preparation 阶段解析出了显式 main agent，transport 层还会把它透传给 `openCodeService.sendMessage()` 的 top-level `agent`
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
@@ -113,6 +114,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - `OpenCodianView` 只保留 `createSendPipelineHostDependencies()` 扁平依赖工厂，返回 `SendPipelineHostDependencies` 对象供 `createSendPipelineRuntimeHost()` 消费
 - slash command 识别与 `runSessionCommand()` delegation 继续留在专用 `SlashCommandExecutionService`
 - `createSendPipelineRuntimeHost()` 把 `SendPipelineHostDependencies` 按 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
+- `sendStreamMessage()` host seam 会收到完整 `Conversation`，由 `OpenCodianView` 根据 conversation backend 选择具体 adapter；runtime 本身只负责传递 owner 信息，不直接知道 OpenCode 或 Claude 的实现细节
 - `MessageSendPreparationService` 只负责“发之前能不能发、optimistic user message 何时落地、何时进入 streaming state”
 - `PreparedMessageSend` 现在是 send preparation 与 transport 之间的稳定 payload handoff，负责把 canonical seed 使用的 `messageID + parts[]` 原样带进 `openCodeService.sendMessage()`
 - `SendPipelineRuntime` 负责“真正发流，并装配 chunk router / local finalizer / post-stream finalizer”

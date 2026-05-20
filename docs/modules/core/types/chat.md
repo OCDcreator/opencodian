@@ -43,8 +43,8 @@
 | `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
 | `ConversationBackgroundTaskMetadata` | 会话级 background-task lifecycle 缓存（当前只包含可选 `activeAnchor`，用于 hydration/recovery 恢复 active anchor 生命周期，不承载消息正文、工具输出、结构化 payload 或 `contentBlocks` 真值） |
 | `BackgroundTaskActiveAnchorMetadata` | active background-task anchor 的轻量字段（`startedAt`, `anchorKey`, `modeTag`, `waitingForFollowUp`, `updatedAt`） |
-| `ConversationMeta` | 会话元数据（不含消息体） |
-| `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据） |
+| `ConversationMeta` | 会话元数据（不含消息体），同时保留 legacy `openCodeSessionId?` 与 backend-neutral `backendSessionId?` / `backendAgentId?` |
+| `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据）；`openCodeSessionId?` 是 OpenCode 兼容字段，通用发送路径应通过 `getConversationBackendSessionId()` 读取 backend session |
 
 ### 流式事件
 
@@ -143,6 +143,7 @@
 | 方法 | 说明 |
 |------|------|
 | `createEmptyTabContextState()` | 创建空白的标签页上下文状态对象，所有字段归零/置空 |
+| `getConversationBackendSessionId(conversation)` | 按 `backendSessionId → openCodeSessionId → acpSessionId` 顺序解析通用 backend session id；用于 Phase 0/1 发送链路与持久化兼容层 |
 
 ## 数据流
 
@@ -172,7 +173,8 @@
 - `ChatMessage.compactionDivider` 携带结构化 compaction 分界元数据（`auto`, `overflow`, `tailStartId`），替代旧 plain-text marker
 - `ChatMessage.summary` 当前由 OpenCode 原生 assistant `summary` 字段透传，主要用于 compaction report 的 merge/render 语义
 - `ChatMessage.streamState` 目前仅支持 `'interrupted'`，标记被取消的流
-- `Conversation.openCodeSessionId` 是 OpenCode 服务端的会话 ID，与本地 `Conversation.id` 不同
+- `Conversation.openCodeSessionId` 是 OpenCode 服务端的 legacy 会话 ID，与本地 `Conversation.id` 不同；新 backend 会话可以只写 `backendSessionId`，OpenCode 旧数据会在加载和保存时回填到 `backendSessionId`
+- `Conversation.backendAgentId` / legacy `acpAgentId` 用于记录 backend-owned agent identity；新代码应优先读写 `backendAgentId`
 - `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记
 - `ContentBlock.durationSeconds` 仅用于 `thinking` 类型块
 - `toolMetadata` 当前是 UI-safe 白名单字段，主要用于 `task` / subagent 卡片的 child session linkage，不等于原始 OpenCode metadata 全量透传

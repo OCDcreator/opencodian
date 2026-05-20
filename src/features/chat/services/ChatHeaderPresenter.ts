@@ -40,6 +40,13 @@ const SERVER_STATUS_KEY_BY_AVAILABILITY: Record<ChatServerAvailability, ServerSt
   external: 'chat.serverStatus.external',
 };
 
+interface HeaderActionButtonConfig {
+  actionId: string;
+  iconName: string;
+  getTooltipLabel: () => string;
+  onClick: (event: MouseEvent) => void;
+}
+
 export type ChatServerAvailability =
   | 'checking'
   | 'disabled'
@@ -128,47 +135,47 @@ export class ChatHeaderPresenter {
       });
       this.lspStatusIndicator.load();
     }
-    this.newConversationBtnEl = this.buildActionButton(
-      actionsEl,
-      'opencodian-circle-plus',
-      () => t('chat.tab.newTooltip'),
-      () => {
+    this.newConversationBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'new-tab',
+      iconName: 'opencodian-circle-plus',
+      getTooltipLabel: () => t('chat.tab.newTooltip'),
+      onClick: () => {
         void this.host.createConversationInNewTab();
       },
-    );
+    });
     this.newConversationBtnEl.addClass('opencodian-header-btn--new-tab');
-    this.newConversationCurrentTabBtnEl = this.buildActionButton(
-      actionsEl,
-      'opencodian-message-square-plus',
-      () => t('chat.tab.newCurrentTooltip'),
-      () => {
+    this.newConversationCurrentTabBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'new-current-tab',
+      iconName: 'opencodian-message-square-plus',
+      getTooltipLabel: () => t('chat.tab.newCurrentTooltip'),
+      onClick: () => {
         void this.host.createConversationInCurrentTab();
       },
-    );
-    this.historyBtnEl = this.buildActionButton(
-      actionsEl,
-      'history',
-      () => t('chat.history.open'),
-      (event) => {
+    });
+    this.historyBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'history',
+      iconName: 'history',
+      getTooltipLabel: () => t('chat.history.open'),
+      onClick: (event) => {
         this.host.showConversationHistory(event);
       },
-    );
-    this.conversationSessionSettingsBtnEl = this.buildActionButton(
-      actionsEl,
-      'sliders-horizontal',
-      () => t('chat.sessionSettings.open'),
-      () => {
+    });
+    this.conversationSessionSettingsBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'session-settings',
+      iconName: 'sliders-horizontal',
+      getTooltipLabel: () => t('chat.sessionSettings.open'),
+      onClick: () => {
         this.host.openConversationSessionSettings();
       },
-    );
-    this.settingsBtnEl = this.buildActionButton(
-      actionsEl,
-      'settings',
-      () => t('chat.settings.open'),
-      () => {
+    });
+    this.settingsBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'settings',
+      iconName: 'settings',
+      getTooltipLabel: () => t('chat.settings.open'),
+      onClick: () => {
         this.host.openSettings();
       },
-    );
+    });
 
     this.applyLocaleTexts();
   }
@@ -183,27 +190,23 @@ export class ChatHeaderPresenter {
     }
 
     if (this.newConversationBtnEl) {
-      this.host.setTooltipLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'), 'bottom');
+      this.applyActionLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'));
     }
 
     if (this.newConversationCurrentTabBtnEl) {
-      this.host.setTooltipLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'), 'bottom');
+      this.applyActionLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'));
     }
 
     if (this.historyBtnEl) {
-      this.host.setTooltipLabel(this.historyBtnEl, t('chat.history.open'), 'bottom');
+      this.applyActionLabel(this.historyBtnEl, t('chat.history.open'));
     }
 
     if (this.conversationSessionSettingsBtnEl) {
-      this.host.setTooltipLabel(
-        this.conversationSessionSettingsBtnEl,
-        t('chat.sessionSettings.open'),
-        'bottom',
-      );
+      this.applyActionLabel(this.conversationSessionSettingsBtnEl, t('chat.sessionSettings.open'));
     }
 
     if (this.settingsBtnEl) {
-      this.host.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
+      this.applyActionLabel(this.settingsBtnEl, t('chat.settings.open'));
     }
 
     if (this.serverStatusTextEl) {
@@ -288,17 +291,28 @@ export class ChatHeaderPresenter {
 
   private buildActionButton(
     actionsEl: HTMLElement,
-    iconName: string,
-    getTooltipLabel: () => string,
-    onClick: (event: MouseEvent) => void,
+    config: HeaderActionButtonConfig,
   ): HTMLElement {
-    const buttonEl = actionsEl.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(buttonEl, iconName);
-    this.host.setTooltipLabel(buttonEl, getTooltipLabel(), 'bottom');
+    const label = config.getTooltipLabel();
+    const buttonEl = actionsEl.createEl('button', {
+      cls: 'opencodian-header-btn opencodian-tooltip-trigger',
+      attr: {
+        type: 'button',
+        'aria-label': label,
+        'data-action': config.actionId,
+      },
+    });
+    setIcon(buttonEl, config.iconName);
+    this.applyActionLabel(buttonEl, label);
     buttonEl.addEventListener('click', (event) => {
-      onClick(event);
+      config.onClick(event);
     });
     return buttonEl;
+  }
+
+  private applyActionLabel(buttonEl: HTMLElement, label: string): void {
+    this.host.setTooltipLabel(buttonEl, label, 'bottom');
+    buttonEl.setAttribute('aria-label', label);
   }
 
   async refreshServerStatusBadge(): Promise<void> {

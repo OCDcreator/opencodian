@@ -26,6 +26,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     const ids = SETTINGS_PRIMARY_TABS.map((t) => t.id);
     expect(ids).toEqual([
       'general',
+      'claude-code',
       'server',
       'model',
       'conversation',
@@ -89,7 +90,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     ]);
   });
 
-  it('marks OpenCode-only settings tabs with backend requirements', () => {
+  it('marks backend-owned settings tabs with backend requirements', () => {
     const opencodeOnlyPrimaryTabs = [
       'server',
       'model',
@@ -110,6 +111,16 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     const conversationTab = getPrimaryTabDefinition('conversation');
     expect(conversationTab?.secondaryTabs.filter((tab) => tab.backendRequired === 'opencode').map((tab) => tab.id))
       .toEqual(['compaction', 'sharing', 'questions']);
+    expect(getPrimaryTabDefinition('claude-code')?.backendRequired).toBe('claude-code');
+  });
+
+  it('exposes Claude Code as a Claude-owned configuration tab', () => {
+    const claudeTab = getPrimaryTabDefinition('claude-code');
+
+    expect(claudeTab).toBeDefined();
+    expect(claudeTab!.labelKey).toBe('settings.claudeCode.title');
+    expect(claudeTab!.defaultSecondaryTabId).toBe('runtime');
+    expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['runtime']);
   });
 
   it('splits formatter settings into formatter and language server secondary tabs', () => {

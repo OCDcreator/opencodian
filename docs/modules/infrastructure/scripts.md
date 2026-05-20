@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证、模块文档硬约束，以及新的 guarded thick-owner ownership gate。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs` 和 `tests/unit/infrastructure/owner-guard-lib.test.mjs`。
+项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、Claude Agent SDK runtime 复制、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证、模块文档硬约束，以及新的 guarded thick-owner ownership gate。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs`、`tests/unit/infrastructure/owner-guard-lib.test.mjs` 和 `tests/unit/infrastructure/claude-sdk-dist.test.mjs`。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`
@@ -26,8 +26,13 @@
 4. esbuild context 配置（entry: `src/main.ts`, format: `cjs`, target: `es2018`）
 5. `context.rebuild()` 执行构建
 6. 复制 `manifest.json`, `styles.css`, `assets/` 到 `dist/`
+7. 调用 `copyClaudeAgentSdkRuntime()` 移除旧的 SDK 主包副本，并只复制当前平台 optional binary package 到 `dist/node_modules/@anthropic-ai/`
 
 esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run doctor:esbuild:fix`。
+
+### claude-sdk-dist.mjs — Claude Agent SDK runtime 复制
+
+生产构建把 `@anthropic-ai/claude-agent-sdk` 主包打进 `main.js`，避免 Test Vault 运行时再从插件目录解析 SDK 主包。该脚本根据 `process.platform` / `process.arch` 解析当前平台 optional binary package，先删除 `dist/node_modules/@anthropic-ai/claude-agent-sdk` 的旧副本，再只复制平台包到 `dist/node_modules/@anthropic-ai/`。这样 bundled SDK 代码仍能通过 `createRequire(import.meta.url)` 找到对应 Claude Code executable，同时避免发布目录携带不必要的 SDK 主包副本。
 
 ### build-css.mjs — CSS 合并
 

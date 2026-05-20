@@ -13,6 +13,13 @@ function createMockOpenCodeService() {
     start: jest.fn(() => Promise.resolve()),
     stop: jest.fn(() => Promise.resolve()),
     dispose: jest.fn(),
+    createSession: jest.fn(() => Promise.resolve('session-1')),
+    deleteSession: jest.fn(() => Promise.resolve()),
+    updateSessionTitle: jest.fn(() => Promise.resolve()),
+    sendMessage: jest.fn(async function* () {
+      yield { type: 'text', content: 'hello' };
+    }),
+    cancelStream: jest.fn(),
     forkSession: jest.fn(() => Promise.resolve({ id: 'fork-1', title: 'Forked' })),
     revertSession: jest.fn(() => Promise.resolve(true)),
     unrevertSession: jest.fn(() => Promise.resolve(true)),
@@ -93,6 +100,53 @@ describe('OpenCodeAdapter', () => {
     const adapter = new OpenCodeAdapter(service);
     await adapter.stop();
     expect(service.stop).toHaveBeenCalled();
+  });
+
+  it('delegates createSession to OpenCodeService', async () => {
+    const service = createMockOpenCodeService();
+    const adapter = new OpenCodeAdapter(service);
+    const sessionId = await adapter.createSession('New chat', { setCurrent: false });
+    expect(service.createSession).toHaveBeenCalledWith('New chat', { setCurrent: false });
+    expect(sessionId).toBe('session-1');
+  });
+
+  it('delegates deleteSession to OpenCodeService', async () => {
+    const service = createMockOpenCodeService();
+    const adapter = new OpenCodeAdapter(service);
+    await adapter.deleteSession('session-1');
+    expect(service.deleteSession).toHaveBeenCalledWith('session-1');
+  });
+
+  it('delegates updateSessionTitle to OpenCodeService', async () => {
+    const service = createMockOpenCodeService();
+    const adapter = new OpenCodeAdapter(service);
+    await adapter.updateSessionTitle('session-1', 'Renamed');
+    expect(service.updateSessionTitle).toHaveBeenCalledWith('session-1', 'Renamed');
+  });
+
+  it('delegates sendMessage to OpenCodeService with a backend-neutral request object', async () => {
+    const service = createMockOpenCodeService();
+    const adapter = new OpenCodeAdapter(service);
+    const chunks = [];
+    for await (const chunk of adapter.sendMessage({
+      sessionId: 'session-1',
+      content: 'hello',
+      options: { model: 'model-a' },
+    })) {
+      chunks.push(chunk);
+    }
+    expect(service.sendMessage).toHaveBeenCalledWith('hello', {
+      sessionId: 'session-1',
+      model: 'model-a',
+    });
+    expect(chunks).toEqual([{ type: 'text', content: 'hello' }]);
+  });
+
+  it('delegates cancelStream to OpenCodeService', () => {
+    const service = createMockOpenCodeService();
+    const adapter = new OpenCodeAdapter(service);
+    adapter.cancelStream('session-1');
+    expect(service.cancelStream).toHaveBeenCalledWith('session-1');
   });
 
   it('dispose clears adapter state without disposing underlying service', () => {

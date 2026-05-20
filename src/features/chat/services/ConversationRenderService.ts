@@ -6,6 +6,7 @@ import type {
 import {
   type ChatMessage,
   type Conversation,
+  getConversationBackendSessionId,
 } from '../../../core/types';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
@@ -384,7 +385,8 @@ export class ConversationRenderService {
     conversation: Conversation,
     fallbackMessages?: ChatMessage[],
   ): ChatMessage[] {
-    const canonicalMessages = this.buildCanonicalRenderMessages(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    const canonicalMessages = sessionId ? this.buildCanonicalRenderMessages(sessionId) : [];
     return canonicalMessages.length > 0 ? canonicalMessages : (fallbackMessages ?? conversation.messages);
   }
 

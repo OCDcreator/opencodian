@@ -1,4 +1,10 @@
 /* eslint-disable max-lines */
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
+import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../src/core/agents/backend';
+import { AgentServiceRegistry } from '../../src/core/agents/backend/AgentServiceRegistry';
 import type { StorageService } from '../../src/core/storage';
 import { type Conversation, DEFAULT_SETTINGS } from '../../src/core/types';
 import { OpenCodianView } from '../../src/features/chat/OpenCodianView';
@@ -535,6 +541,49 @@ describe('OpenCodianPlugin.onload', () => {
   });
 });
 
+describe('OpenCodianPlugin backend bootstrap', () => {
+  it('registers Claude Code and restores it as the active backend from settings', async () => {
+    const vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-bootstrap-'));
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      app: {
+        vault: { adapter: { basePath: string } };
+        workspace: { getLeavesOfType: jest.Mock<unknown[], [string]> };
+      };
+      settings: typeof DEFAULT_SETTINGS;
+      storage: Pick<StorageService, 'saveManagedServerState' | 'listConversations'>;
+      loadConversations: jest.Mock<Promise<void>, []>;
+      configureVaultScopedServices: jest.Mock<void, []>;
+    };
+
+    plugin.app = {
+      vault: { adapter: { basePath: vaultPath } },
+      workspace: { getLeavesOfType: jest.fn().mockReturnValue([]) },
+    };
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'claude-code',
+    };
+    plugin.storage = {
+      saveManagedServerState: jest.fn().mockResolvedValue(undefined),
+      listConversations: jest.fn().mockResolvedValue([]),
+    } as Pick<StorageService, 'saveManagedServerState' | 'listConversations'>;
+    plugin.loadConversations = jest.fn().mockResolvedValue(undefined);
+    plugin.configureVaultScopedServices = jest.fn();
+
+    await (
+      plugin as unknown as {
+        handleBootstrapOpenCodeRuntime: (initialManagedServerState: null) => Promise<void>;
+      }
+    ).handleBootstrapOpenCodeRuntime(null);
+
+    expect(plugin.agentServiceRegistry.get('opencode')).toBeDefined();
+    expect(plugin.agentServiceRegistry.get('claude-code')).toBeDefined();
+    expect(plugin.agentServiceRegistry.getActiveKind()).toBe('claude-code');
+  });
+});
+
+// eslint-disable-next-line max-lines-per-function -- Deferred warmup cases share plugin bootstrap fixtures and backend-routing assertions.
 describe('OpenCodianPlugin deferred runtime warmup', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -727,6 +776,98 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
     expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
     expect(plugin.openCodeService.createSession).not.toHaveBeenCalled();
+  });
+
+  it('creates Claude conversations through the active session backend without OpenCode warmup', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      agentServiceRegistry: AgentServiceRegistry;
+      openCodeService: {
+        createSession: jest.Mock<Promise<string>, []>;
+      };
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+    const sdk: ClaudeCodeSdkFacade = {
+      query: jest.fn(() => (async function* () {})()),
+    };
+    const claudeAdapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: DEFAULT_SETTINGS.backendSettings.claudeCode,
+      sdk,
+    });
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      enabledBackends: ['claude-code'],
+      activeBackend: 'claude-code',
+    };
+    plugin.agentServiceRegistry = new AgentServiceRegistry();
+    plugin.agentServiceRegistry.register(claudeAdapter);
+    plugin.agentServiceRegistry.setEnabledBackends(['claude-code']);
+    plugin.openCodeService = {
+      createSession: jest.fn().mockResolvedValue('opencode-session'),
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    const conversation = await plugin.createConversation();
+
+    expect(plugin.openCodeService.createSession).not.toHaveBeenCalled();
+    expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
+    expect(conversation.backend).toBe('claude-code');
+    expect(conversation.openCodeSessionId).toBeUndefined();
+    expect(conversation.backendSessionId).toMatch(/^claude-code-/);
+    expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('deletes conversations through their owning session backend', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      agentServiceRegistry: AgentServiceRegistry;
+      openCodeService: {
+        deleteSession: jest.Mock<Promise<void>, [string]>;
+      };
+      conversations: Conversation[];
+      storage: { deleteConversation: jest.Mock<Promise<void>, [string]> };
+      conversationFullMessageCache: { forget: jest.Mock<void, [string]> };
+    };
+    const claudeAdapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: DEFAULT_SETTINGS.backendSettings.claudeCode,
+      sdk: { query: jest.fn(() => (async function* () {})()) },
+    });
+    const sessionId = await claudeAdapter.createSession();
+
+    plugin.agentServiceRegistry = new AgentServiceRegistry();
+    plugin.agentServiceRegistry.register(claudeAdapter);
+    plugin.agentServiceRegistry.setEnabledBackends(['claude-code']);
+    plugin.openCodeService = {
+      deleteSession: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.conversations = [createConversation('claude', {
+      backend: 'claude-code',
+      openCodeSessionId: undefined,
+      backendSessionId: sessionId,
+    })];
+    plugin.storage = {
+      deleteConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.conversationFullMessageCache = {
+      forget: jest.fn(),
+    };
+    const deleteSpy = jest.spyOn(claudeAdapter, 'deleteSession');
+
+    await plugin.deleteConversation('claude');
+
+    expect(deleteSpy).toHaveBeenCalledWith(sessionId);
+    expect(plugin.openCodeService.deleteSession).not.toHaveBeenCalled();
+    expect(plugin.storage.deleteConversation).toHaveBeenCalledWith('claude');
   });
 });
 

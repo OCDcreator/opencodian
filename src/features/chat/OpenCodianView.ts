@@ -13,6 +13,10 @@ import {
   hasCapability,
 } from '../../core/agents/AgentCapability';
 import {
+  getConversationChatBackendService,
+  getConversationSessionBackendService,
+} from '../../core/agents/backend/AgentBackendRouting';
+import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
 import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
@@ -23,12 +27,14 @@ import {
 import {
   type ChatMessage,
   type Conversation,
+  getConversationBackendSessionId,
   type PromptContextItem,
   type QuestionRequest,
   type QuestionResolution,
   type SessionTodo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
+import type { AgentBackendKind } from '../../core/types/chat';
 import type { PermissionMode } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -462,6 +468,8 @@ export class OpenCodianView extends ItemView {
 
   // Event refs for cleanup
   private eventRefs: EventRef[] = [];
+  private backendActiveChangeDisposable: { dispose(): void } | null = null;
+  private backendSurfaceSwitchPromise: Promise<void> | null = null;
 
   private headerTabBarSlotEl: HTMLElement | null = null;
   private belowHeaderTabBarSlotEl: HTMLElement | null = null;
@@ -582,14 +590,17 @@ export class OpenCodianView extends ItemView {
       && enabledBackends.includes(this.plugin.settings.activeBackend ?? 'opencode');
   }
 
+  private isActiveBackendOpenCode(): boolean {
+    return (this.plugin.settings.activeBackend ?? 'opencode') === 'opencode';
+  }
+
   private async canSyncConversationWithServer(): Promise<boolean> {
     const availability = await this.getServerAvailability();
     return availability === 'running' || availability === 'external';
   }
 
   private shouldStartConversationSessionSignalRuntime(): boolean {
-    return Array.isArray(this.plugin.settings.enabledBackends)
-      && this.plugin.settings.enabledBackends.includes('opencode');
+    return this.isOpenCodeBackendActive();
   }
 
   private createChatHeaderPresenterHost(): ChatHeaderPresenterHost {
@@ -1206,7 +1217,7 @@ export class OpenCodianView extends ItemView {
     }
 
     if (tabId === this.getActiveTabId()) {
-      return this.currentConversation?.openCodeSessionId ?? null;
+      return this.getOpenCodeSessionIdForConversation(this.currentConversation);
     }
 
     const tab = this.tabManager?.getTab(tabId);
@@ -1215,9 +1226,17 @@ export class OpenCodianView extends ItemView {
     }
 
     const conversation = this.plugin.getConversations().find((item) => item.id === tab.conversationId);
-    return conversation?.openCodeSessionId
+    return this.getOpenCodeSessionIdForConversation(conversation)
       ?? this.getTabRuntimeState(tabId)?.sessionTodoSessionId
       ?? null;
+  }
+
+  private getOpenCodeSessionIdForConversation(
+    conversation: Pick<Conversation, 'backend' | 'openCodeSessionId'> | null | undefined,
+  ): string | null {
+    return (conversation?.backend ?? 'opencode') === 'opencode'
+      ? conversation?.openCodeSessionId ?? null
+      : null;
   }
 
   private getConversationForTab(tabId: TabId | null = this.getActiveTabId()): Conversation | null {
@@ -1711,6 +1730,7 @@ export class OpenCodianView extends ItemView {
         persistTabState: (options) => { this.persistTabState(options); },
         loadConversations: () => this.plugin.loadConversations(),
         getConversations: () => this.plugin.getConversations(),
+        getActiveBackend: () => this.plugin.settings.activeBackend,
         createConversation: () => this.plugin.createConversation(),
         app: this.app,
         revertSession: (sessionId, messageId) =>
@@ -2141,8 +2161,13 @@ export class OpenCodianView extends ItemView {
           this.contextRing?.update(state);
         }
       },
-      getSessionContextUsageSnapshot: (sessionId) =>
-        this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId),
+      getSessionContextUsageSnapshot: (sessionId) => {
+        const conversation = this.currentConversation;
+        if (conversation && (conversation.backend ?? 'opencode') !== 'opencode') {
+          return Promise.resolve(null);
+        }
+        return this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId);
+      },
       hasTab: (tabId) => Boolean(this.tabManager?.getTab(tabId)),
       getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
       setTabContextUsage: (tabId, contextUsage) => {
@@ -2543,15 +2568,38 @@ export class OpenCodianView extends ItemView {
       transitionTabSessionLifecycle: (tabId, phase, reason) =>
         this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      sendStreamMessage: (content, options) => this.plugin.openCodeService.sendMessage(content, options),
+      sendStreamMessage: (conversation, content, options) => {
+        const backend = getConversationChatBackendService(this.plugin.agentServiceRegistry, conversation);
+        if (!backend) {
+          throw new Error(`Backend ${conversation.backend ?? 'opencode'} does not support chat`);
+        }
+        return backend.sendMessage({
+          sessionId: options.sessionId ?? '',
+          content,
+          options: { ...options },
+        });
+      },
       detachStream: (sessionId) => {
         if (sessionId) {
-          this.plugin.openCodeService.detachStream(sessionId);
+          const conversation = this.currentConversation;
+          const backend = conversation
+            ? getConversationChatBackendService(this.plugin.agentServiceRegistry, conversation)
+            : undefined;
+          const conversationBackend = conversation?.backend ?? 'opencode';
+          if (backend && conversationBackend !== 'opencode') {
+            backend.cancelStream(sessionId);
+          } else {
+            this.plugin.openCodeService.detachStream(sessionId);
+          }
         }
       },
       syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
         this.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
       beginTabContextUsageStream: (tabId) => {
+        const conversation = this.getConversationForTab(tabId);
+        if (conversation && (conversation.backend ?? 'opencode') !== 'opencode') {
+          return;
+        }
         this.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId);
       },
       completeTabContextUsageStream: (tabId) => {
@@ -2722,6 +2770,9 @@ export class OpenCodianView extends ItemView {
     await measureStep('wireEventHandlers', () => {
       this.wireEventHandlers();
     });
+    await measureStep('wireBackendSurfaceSwitch', () => {
+      this.wireBackendSurfaceSwitch();
+    });
     await measureStep('startConversationSessionSignalRuntime', () => {
       if (this.shouldStartConversationSessionSignalRuntime()) {
         this.conversationSessionSignalRuntime.start();
@@ -2762,6 +2813,8 @@ export class OpenCodianView extends ItemView {
     this.modifiedFilesSidebarCoordinator.destroy();
     this.chatVisualDemoCoordinator.destroyAll();
     this.permissionInlineCardRenderer.clearSessionApprovals();
+    this.backendActiveChangeDisposable?.dispose();
+    this.backendActiveChangeDisposable = null;
 
     // Cleanup navigation sidebar
     this.conversationTabRuntimeCoordinator.destroyTabSystem();
@@ -3076,10 +3129,15 @@ export class OpenCodianView extends ItemView {
       return 'disabled';
     }
 
-    // If OpenCode backend is disabled, report disabled-like state instead of probing OpenCode.
-    if (!Array.isArray(this.plugin.settings.enabledBackends) || !this.plugin.settings.enabledBackends.includes('opencode')) {
+    if (!this.hasBackendConnection()) {
       this.lastResolvedServerAvailability = 'disabled';
       return 'disabled';
+    }
+
+    // Non-OpenCode backends do not depend on the OpenCode server health path.
+    if (!this.isActiveBackendOpenCode()) {
+      this.lastResolvedServerAvailability = 'running';
+      return 'running';
     }
 
     const isHealthy = await this.plugin.openCodeService.checkHealth();
@@ -3118,7 +3176,7 @@ export class OpenCodianView extends ItemView {
       };
     }
 
-    if (!Array.isArray(this.plugin.settings.enabledBackends) || !this.plugin.settings.enabledBackends.includes('opencode')) {
+    if (!this.hasBackendConnection()) {
       return {
         kind: 'backend-offline',
         title: t('chat.empty.backendOffline.title'),
@@ -3238,9 +3296,70 @@ export class OpenCodianView extends ItemView {
     id: string,
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
   ): Promise<void> {
+    const conversation = await this.plugin.getConversationById(id, { preferCache: true });
+    const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+    if (conversation && (conversation.backend ?? 'opencode') !== activeBackend) {
+      logger.warn('Blocked cross-backend conversation load', {
+        conversationId: id,
+        conversationBackend: conversation.backend ?? 'opencode',
+        activeBackend,
+      });
+      await this.ensureActiveBackendConversationSurface(activeBackend);
+      return;
+    }
+
     await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
     this.refreshModifiedFilesSidebar();
     await this.childSessionGraphCoordinator.refreshGraph();
+  }
+
+  private wireBackendSurfaceSwitch(): void {
+    this.backendActiveChangeDisposable?.dispose();
+    this.backendActiveChangeDisposable = this.plugin.agentServiceRegistry?.onActiveChange((backend) => {
+      void this.ensureActiveBackendConversationSurface(backend ?? undefined);
+    }) ?? null;
+  }
+
+  private async ensureActiveBackendConversationSurface(
+    activeBackend = this.plugin.settings.activeBackend,
+  ): Promise<void> {
+    if (!activeBackend) {
+      return;
+    }
+
+    if (this.backendSurfaceSwitchPromise) {
+      await this.backendSurfaceSwitchPromise;
+      return;
+    }
+
+    this.backendSurfaceSwitchPromise = this.applyActiveBackendConversationSurface(activeBackend)
+      .finally(() => {
+        this.backendSurfaceSwitchPromise = null;
+      });
+    await this.backendSurfaceSwitchPromise;
+  }
+
+  private async applyActiveBackendConversationSurface(activeBackend: AgentBackendKind): Promise<void> {
+    if ((this.currentConversation?.backend ?? 'opencode') === activeBackend) {
+      return;
+    }
+
+    if (this.isActiveTabStreaming()) {
+      new Notice(t('chat.tab.streamingBlocked'));
+      return;
+    }
+
+    await this.plugin.loadConversations();
+    const targetConversation = this.plugin.getConversations().find(
+      (conversation) => (conversation.backend ?? 'opencode') === activeBackend,
+    );
+
+    if (targetConversation) {
+      await this.loadConversation(targetConversation.id);
+      return;
+    }
+
+    await this.createConversationInCurrentTab();
   }
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
@@ -3254,10 +3373,13 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    // Call service to abort the SSE connection
-    logger.debug('Calling openCodeService.cancelStream()...');
-    if (this.currentConversation?.openCodeSessionId) {
-      this.plugin.openCodeService.cancelStream(this.currentConversation.openCodeSessionId);
+    const currentConversation = this.currentConversation;
+    const backendSessionId = currentConversation
+      ? getConversationBackendSessionId(currentConversation)
+      : null;
+    if (currentConversation && backendSessionId) {
+      const backend = getConversationChatBackendService(this.plugin.agentServiceRegistry, currentConversation);
+      backend?.cancelStream(backendSessionId);
     }
 
     // Update local state
@@ -3443,6 +3565,9 @@ export class OpenCodianView extends ItemView {
     if (this.currentConversation?.id !== conversation.id || this.getActiveTabId() !== tabId) {
       return;
     }
+    if ((conversation.backend ?? 'opencode') !== 'opencode') {
+      return;
+    }
 
     await this.activeTabContextUsageCoordinator.refreshFromServer();
   }
@@ -3523,10 +3648,16 @@ export class OpenCodianView extends ItemView {
 
     if (typeof update.title === 'string') {
       this.tabManager?.syncConversationTitle(conversationId, conversation.title);
-      try {
-        await this.plugin.openCodeService.updateSessionTitle(conversation.openCodeSessionId, conversation.title);
-      } catch (error) {
-        logger.warn('Failed to sync conversation title to server:', error);
+      const backendSessionId = getConversationBackendSessionId(conversation);
+      const backend = this.plugin.agentServiceRegistry
+        ? getConversationSessionBackendService(this.plugin.agentServiceRegistry, conversation)
+        : null;
+      if (backendSessionId && backend) {
+        try {
+          await backend.updateSessionTitle(backendSessionId, conversation.title);
+        } catch (error) {
+          logger.warn('Failed to sync conversation title to server:', error);
+        }
       }
     }
   }

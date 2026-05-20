@@ -101,6 +101,7 @@ export function executeCompactSession(...): Promise<boolean>;
   - 如果返回 `false`，再继续普通 `prepareMessageSend()` + streaming pipeline
 - markdown command 会通过 `runMdFileCommandAsMessage()` 重新进入 send pipeline，并设置 skip-slash 标志避免 template 以 `/` 开头时再次递归拦截
 - slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
+- dispatch runtime/project command 前会用 `getConversationBackendSessionId()` 解析 session identity；没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
 - `/compact` 不属于普通 slash command runtime：`executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
 - `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda

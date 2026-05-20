@@ -68,6 +68,7 @@ function createHost(conversation: Conversation): MockedHost {
     finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
     openPluginSettingsAtServerSection: jest.fn(),
     startServer: jest.fn().mockResolvedValue(undefined),
+    shouldUseModelCatalog: jest.fn().mockReturnValue(true),
     hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
     loadAvailableModels: jest.fn().mockResolvedValue(undefined),
     getSendMessageOptions: jest.fn().mockReturnValue({

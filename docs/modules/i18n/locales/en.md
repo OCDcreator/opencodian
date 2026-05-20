@@ -63,9 +63,11 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮维护 `settings.model.providerDirectory.*` 键，为 settings/model 目录中的 provider directory 诊断提供英文 summary 与 badge 文案。它只表达 `provider.list()` 的 connected / listed 辅助状态，并把 listed outside catalog 作为诊断计数呈现，不改变 `config.providers()` 驱动的服务器目录或可选模型。
 
-本轮新增 `settings.general.tab.backend` 与 `settings.backend.*` 键，为 Phase 0 Backend Management 面板提供英文标题、默认 backend 下拉、enabled backend 列表、Coming Soon 描述和启用状态标签。
+本轮更新 `settings.general.tab.backend` 与 `settings.backend.*` 键，为 Backend Management 面板提供英文标题、默认 backend 下拉、enabled backend 列表、Claude Code 可启用说明和启用状态标签；未来 backend 仍保留 Coming Soon 描述。
 
 本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，用于聊天区区分“没有任何 enabled backend”与“backend 已启用但当前离线”两类状态，不再把两者都压成 generic offline wording。
+
+本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1 配置基础面板提供英文文案，包括 section 标题/描述、executable path、authentication/environment hint、setting sources、permission mode、model/fallback model、thinking/effort、additional directories 和 runtime diagnostics；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。
 
 ## 导入关系
 

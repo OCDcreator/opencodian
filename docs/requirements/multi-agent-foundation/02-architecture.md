@@ -1,11 +1,65 @@
 # 多 Agent 架构设计
 
 > **状态**: `[DRAFT]`
-> **最后更新**: 2026-05-18
+> **最后更新**: 2026-05-20
 
 ## 概述
 
 采用 **Core + Capability Pattern**：定义一个最小核心接口（会话、流式、消息），加上一系列可选能力接口（工具、MCP、权限、分支等）。每个 adapter 声明自己支持哪些能力，视图层根据能力动态展示/隐藏功能。
+
+## 0. 当前实现状态和 Claude 接入修正
+
+2026-05-20 复核当前 worktree 后，架构文档需要区分“目标架构”和“已经落地的 Phase 0 状态”：
+
+| 区域 | 当前状态 | Claude 前置要求 |
+|---|---|---|
+| Registry | `AgentServiceRegistry` 已存在，能注册/启用/选择 backend。 | 保留为统一入口。 |
+| OpenCode adapter | `OpenCodeAdapter` 已存在，广泛委托 `OpenCodeService`。 | 作为 OpenCode regression reference。 |
+| Implemented gate | `IMPLEMENTED_AGENT_BACKENDS` 当前只包含 `opencode`。 | Claude runtime smoke 通过前不得加入。 |
+| Core contract | 当前 `AgentService` 主要是 lifecycle/status/capability，尚未包含 backend-neutral chat/session。 | 需要补 `AgentChatCapability` / `AgentSessionCapability` 或等价 core methods。 |
+| Conversation schema | `Conversation.backend` 已存在，但 `openCodeSessionId` 仍 required。 | 需要 `backendSessionId`，旧数据 fallback 到 `openCodeSessionId`。 |
+| Send pipeline | Runtime 已抽出 port，但实际仍传 `openCodeSessionId` 并调用 `openCodeService.sendMessage()`。 | 必须改成 active backend routing。 |
+| Settings | Backend section 有未来选项，但过滤到已实现 backend。 | 继续 gate；Claude settings 单独 owner。 |
+
+Claude 不能被设计成“OpenCodeService 的另一个 provider”。它是另一个 backend runtime，具有自己的 executable、settings source、permission mode、session JSONL、skills、hooks、agents、MCP 语义。
+
+### 0.1 Capability 拆分规则
+
+OpenCodian UI 只应依赖共性 capability：
+
+- `chat`
+- `sessions`
+- `models`
+- `tools`
+- `permissions`
+- `mcp`
+- `context`
+- `branching`
+
+Claude 专属能力必须保留专属 namespace 或专属 settings owner：
+
+- `claude.executable`
+- `claude.settingSources`
+- `claude.permissionMode`
+- `claude.thinking`
+- `claude.hooks`
+- `claude.skills`
+- `claude.agents`
+- `claude.sessionJsonl`
+- `claude.additionalDirectories`
+
+这样既能实现“Claude 全部功能接入”，也不会把 Claude 的能力硬塞成 OpenCode-only 的 provider/config/tool settings。
+
+### 0.2 2026-05-20 Council 修正
+
+Council review 选择 **direct registry routing + capability narrowing** 作为 Phase 0d/Claude Phase 1 的实施策略。旧版 Proxy 委托方案只保留为历史备选，不再作为当前计划。
+
+修正点：
+
+- `AgentCapability` 必须新增 `Chat` / `Sessions`，因为 chat/session 是 backend 接入的核心能力。
+- `AgentChatCapability.sendMessage` 统一为一个 request object：`sendMessage({ sessionId, content, options })`，避免 architecture doc 和 implementation plan 的参数顺序冲突。
+- `Conversation.openCodeSessionId` 必须改为可选，非 OpenCode 会话用 `backendSessionId`；现有 `acpSessionId` 应泛化/迁移为 `backendSessionId`，避免新增并行 session 字段。
+- create/delete/title/cancel/send/finalization 等生命周期路径都必须 backend-aware；不能只迁移 send path。
 
 ## 1. 架构总览
 
@@ -85,7 +139,7 @@ interface AgentService {
   // ---- 消息与流式（核心） ----
   // ⚠️ 返回 StreamChunk（src/core/types/chat.ts 已定义的传输无关类型）
   // 每个 adapter 负责将自己的 SDK 事件翻译为 StreamChunk
-  sendMessage(sessionId: string, content: string, options?: ChatSendOptions): AsyncGenerator<StreamChunk>;
+  sendMessage(request: { sessionId: string; content: string; options?: ChatSendOptions }): AsyncGenerator<StreamChunk>;
   cancelStream(sessionId: string): Promise<void>;
 
   // ---- 事件订阅（核心） ----
@@ -108,6 +162,8 @@ type AgentConnectionStatus =
   | 'error';
 
 type AgentCapability =
+  | 'chat'           // 消息发送和流式响应
+  | 'sessions'       // 会话创建、删除、标题更新、resume
   | 'tools'          // 工具调用
   | 'mcp'            // MCP 集成
   | 'permissions'    // 权限管理
@@ -511,31 +567,21 @@ sendStreamMessage: (content, options) =>
 
 #### Phase 0d-2：会话管理（32 次调用，OpenCodianView.ts + 4 services 文件）
 
-**Owner Guard 安全方案**：不在 `OpenCodianView.ts`（181 边）中直接替换 47 处引用。
+**当前实施策略**：使用 direct registry routing + capability narrowing，不使用 Proxy 委托。
 
-改用 **Proxy 委托模式**：
 ```typescript
-// main.ts 中创建代理
-const agentServiceProxy = new Proxy(this.openCodeService, {
-  get(target, prop) {
-    // 如果 AgentService 接口有该方法，路由到 active adapter
-    const active = registry.getActive();
-    if (prop in active && typeof (active as any)[prop] === 'function') {
-      return (active as any)[prop].bind(active);
-    }
-    // 否则 fallback 到 OpenCodeService（向后兼容）
-    return (target as any)[prop].bind(target);
-  }
-});
-// OpenCodianView 继续用 this.plugin.openCodeService，
-// 但实际调用已被代理到 active adapter
+const adapter = registry.get(conversation.backend ?? 'opencode');
+if (!adapter?.hasCapability(AgentCapability.Sessions)) {
+  throw new AgentBackendUnavailableError(conversation.backend);
+}
 ```
 
-**好处**：
-- OpenCodianView 代码不变 → Owner Guard 不触发
-- 新 agent 的方法通过 proxy 路由
-- OpenCode 特有的方法 fallback 到原 service
-- 图边数净减少（Proxy 中间层吸收了直接引用）
+选择 direct routing 的原因：
+
+- Proxy 会让 Claude 会话在缺方法时静默 fallback 到 `OpenCodeService`，这是多 backend 场景中最危险的失败模式。
+- Direct routing 能在 create/delete/title/cancel/send/finalization 路径上明确区分 backend-owned session。
+- Owner Guard 风险通过分阶段小切片和 focused tests 控制，而不是通过隐式代理隐藏。
+- OpenCode-only 方法保留显式 `conversation.backend === 'opencode'` 或 capability gate。
 
 #### Phase 0d-3：MCP / Config / Model / 事件订阅（34 次调用，~15 个 settings 文件）
 
@@ -1242,7 +1288,7 @@ docs/modules/core/agents/
 | ❌ `AgentMessage` → ✅ 复用 `ChatMessage` | ✅ 已修复 | §2.3 注释 |
 | ❌ `plugin` 泄露 → ✅ 窄类型 `AgentAdapterContext` | ✅ 已修复 | §5 |
 | ❌ 迁移 39 处 → ✅ 128 次/53 方法/3 子阶段 | ✅ 已修复 | §10.1 |
-| ❌ Owner Guard 侵犯 → ✅ Proxy 委托模式 | ✅ 已修复 | §10.1 |
+| ❌ Owner Guard 侵犯 → ✅ Direct registry routing + capability narrowing | ✅ 已修复 | §10.1 |
 | ❌ module-doc 缺失 → ✅ 已存在 7 个文件 | ✅ 已修复 | §18.12 |
 | ❌ `SurfaceAgent.mode` 歧义 → ✅ 非 OpenCode 用 null | ✅ 已修复 | §18.1 |
 | ❌ `openCodeSessionId` 必填 → ✅ 改为可选 | ✅ 已修复 | §18.6 |

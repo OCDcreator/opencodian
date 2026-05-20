@@ -775,20 +775,19 @@ describe('OpenCodianSettingTab layout shell', () => {
       Array.from(tab.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual(['General']);
+    ).toEqual(['General', 'Claude Code']);
+    const generalBlock = tab.containerEl.querySelector<HTMLElement>('.opencodian-settings-general-merged-block');
+    expect(generalBlock).not.toBeNull();
     expect(
-      Array.from(tab.containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
+      Array.from(generalBlock!.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
         (element) => element.textContent?.trim(),
       ),
     ).toEqual([]);
-
-    const generalBlocks = Array.from(tab.containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-block'));
-    expect(generalBlocks).toHaveLength(1);
-    expect(generalBlocks[0]?.classList.contains('opencodian-settings-section')).toBe(true);
-    expect(generalBlocks[0]?.dataset.settingsSurface).toBe('section');
-    expect(generalBlocks[0]?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
-    expect(generalBlocks[0]?.querySelector('.layout-mode-setting')).not.toBeNull();
-    expect(generalBlocks[0]?.querySelector('.language-setting')).not.toBeNull();
+    expect(generalBlock?.classList.contains('opencodian-settings-section')).toBe(true);
+    expect(generalBlock?.dataset.settingsSurface).toBe('section');
+    expect(generalBlock?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
+    expect(generalBlock?.querySelector('.layout-mode-setting')).not.toBeNull();
+    expect(generalBlock?.querySelector('.language-setting')).not.toBeNull();
   });
 
   it('keeps ordinary setting rows scoped under marked classic settings sections', () => {

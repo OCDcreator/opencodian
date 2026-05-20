@@ -11,7 +11,7 @@
  * See docs/requirements/multi-agent-foundation/02-architecture.md §2–3.
  */
 
-import type { AgentBackendKind } from '../../types/chat';
+import type { AgentBackendKind, StreamChunk } from '../../types/chat';
 import type { SessionDiffEntry } from '../../types/chat';
 import type { AgentCapability, BackendCapabilities } from '../AgentCapability';
 
@@ -86,6 +86,30 @@ export interface AgentService {
 
   /** Subscribe to connection status changes. */
   onStatusChange(handler: StatusChangeHandler): Disposable;
+}
+
+// ---------------------------------------------------------------------------
+// Core runtime capability interfaces
+// ---------------------------------------------------------------------------
+
+/** Request object for backend-neutral chat sends. */
+export interface AgentChatSendRequest {
+  readonly sessionId: string;
+  readonly content: string;
+  readonly options?: Record<string, unknown>;
+}
+
+/** Chat: send a message and cancel active streams. */
+export interface AgentChatCapability extends AgentService {
+  sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk>;
+  cancelStream(sessionId: string): Promise<void> | void;
+}
+
+/** Sessions: create, delete, and retitle backend-owned sessions. */
+export interface AgentSessionCapability extends AgentService {
+  createSession(title?: string, options?: Record<string, unknown>): Promise<string>;
+  deleteSession(sessionId: string): Promise<void>;
+  updateSessionTitle(sessionId: string, title: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

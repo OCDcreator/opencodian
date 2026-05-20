@@ -1,18 +1,48 @@
 # Agent 生态调研
 
 > **状态**: `[DRAFT]`
-> **最后更新**: 2026-05-18
+> **最后更新**: 2026-05-20
 
 ## 概述
 
 对 Claude Code、Codex、Copilot、Pi 四个 coding agent 的 SDK 能力进行全面对比，为 adapter 设计提供依据。重点关注 SDK/CLI 通信模式、会话与流式能力、工具与 MCP 扩展、权限模型、进程管理成本，以及它们对 OpenCodian 后续 `AgentService`/adapter 抽象的影响。
+
+## 0. 2026-05-20 Claude Code 调研修正
+
+本轮针对 Claude Code 做了官方文档和本地 `claudian` 源码复核。Claude Code 相关结论以 `docs/status/claude-code-full-capability-research-2026-05-20.md` 和 `docs/requirements/multi-agent-foundation/04-claude-code-adapter.md` 为准。
+
+关键修正：
+
+| 原先容易误读的点 | 修正后结论 |
+|---|---|
+| Claude adapter 可以简单等价于 CLI wrapper | 不对。主路径应使用官方 TypeScript Agent SDK `query()`；CLI/executable path 是 SDK subprocess 的打包/路径兜底。 |
+| SDK sessions V2 可以直接作为 Phase 1 基础 | 暂不采用。官方文档对 TS V2 session API 状态存在冲突，Phase 1 使用稳定的 `query()` streaming。 |
+| `settingSources` 可依赖默认值 | 不可依赖。官方文档对默认值表述冲突，OpenCodian 必须显式设置。 |
+| `allowedTools` 是安全沙箱 | 不对。官方文档将它定义为预批准工具；真正阻断需要 `disallowedTools` / permissions / `canUseTool`。 |
+| `claudian` 的历史/会话能力都是 SDK 原生 | 不对。SDK 提供 JSONL/resume/fork 基础；`claudian` 自己补了 metadata、history rebuild、branch filter、subagent sidecar parsing。 |
+
+### 0.1 Claude Code 能力边界快照
+
+| 能力 | 2026-05-20 状态 | OpenCodian 影响 |
+|---|---|---|
+| query / persistent query | 官方确认 | 可以作为第二 backend 的核心协议。 |
+| stream handling | 官方确认 | 需要 adapter 私有 normalizer 到现有 `StreamChunk`。 |
+| model / effort / thinking | 官方确认 | 需要 Claude 专属设置与 model catalog，不应套用 OpenCode provider merge。 |
+| permissions / `canUseTool` | 官方确认 | 可桥接现有 permission/question UI。 |
+| MCP | 官方确认 | Phase 1 可 runtime pass-through；authoring 后置。 |
+| hooks | 官方确认 | 先内部使用，完整 UI 后置。 |
+| subagents / agents | 官方确认但需运行时验证 | 先验证 Agent tool 和 SDK init；文件 agent 管理后置。 |
+| session resume/fork/history | 官方确认基础能力 | 需要 `backendSessionId` 和本地 metadata；完整 JSONL import 后置。 |
+| CLAUDE.md / skills / settings | 官方确认，默认值有冲突 | 必须显式 `settingSources`，技能 authoring 后置。 |
+| additional directories | 官方确认 | 适合外部上下文；变更应 restart query。 |
+| bundled executable | 官方确认 | 仍需 external executable fallback 和 Electron smoke。 |
 
 ## 1. Agent 总览表
 
 | 维度 | Claude Code | Codex | Copilot | Pi |
 |------|-------------|-------|---------|-----|
 | npm 包 | `@anthropic-ai/claude-agent-sdk` | `@openai/codex-sdk` | `@github/copilot-sdk` | `@mariozechner/pi-coding-agent` |
-| 版本/成熟度 | Stable v0.2.x | Stable v0.130.x | Preview v1.0.0-beta.3 | Beta v0.73.x |
+| 版本/成熟度 | Stable v0.3.x (2026-05-20 latest: 0.3.145) | Stable v0.130.x | Preview v1.0.0-beta.3 | Beta v0.73.x |
 | 开源 | CLI 不开源 | Apache-2.0 | CLI 不开源 | MIT |
 | 通信模式 | Stdio/JSONL 子进程 | Stdio/JSONL 子进程 | JSON-RPC stdio/TCP | In-process 直接调用 |
 | 需要外部 CLI | 是（bundled） | 是（需安装） | 是（bundled） | 否（纯 TS 库） |

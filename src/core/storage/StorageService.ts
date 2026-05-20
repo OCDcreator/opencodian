@@ -14,6 +14,7 @@ import type { ManagedServerState } from '../opencode/types';
 import {
   type Conversation,
   type ConversationMeta,
+  getConversationBackendSessionId,
   normalizeConversationSessionSettings,
   type OpenCodianSettings,
 } from '../types';
@@ -199,6 +200,8 @@ export class StorageService {
       titleGenerationStatus: persistedConversation.titleGenerationStatus,
       messageCount: persistedConversation.messages.length,
       openCodeSessionId: persistedConversation.openCodeSessionId,
+      backendSessionId: getConversationBackendSessionId(persistedConversation),
+      backendAgentId: persistedConversation.backendAgentId ?? persistedConversation.acpAgentId,
       backend: persistedConversation.backend ?? 'opencode',
       currentNote: persistedConversation.currentNote,
       externalContextPaths: persistedConversation.externalContextPaths,
@@ -221,6 +224,8 @@ export class StorageService {
         titleGenerationStatus: conversation.titleGenerationStatus,
         messageCount: persistedConversation.messages.length,
         openCodeSessionId: conversation.openCodeSessionId,
+        backendSessionId: getConversationBackendSessionId(conversation),
+        backendAgentId: conversation.backendAgentId ?? conversation.acpAgentId,
         backend: conversation.backend ?? 'opencode',
       },
       'saveConversation',
@@ -241,6 +246,12 @@ export class StorageService {
       }
       if (!data.backend) {
         data.backend = 'opencode';
+      }
+      if (!data.backendSessionId) {
+        data.backendSessionId = getConversationBackendSessionId(data);
+      }
+      if (!data.backendAgentId && data.acpAgentId) {
+        data.backendAgentId = data.acpAgentId;
       }
       data.sessionSettings = normalizeConversationSessionSettings(data.sessionSettings);
       const elapsedMs = getPerformanceTimestampMs() - startedAt;

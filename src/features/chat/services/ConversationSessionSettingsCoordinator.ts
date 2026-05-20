@@ -7,6 +7,7 @@ import type {
   OpencodeShareMode,
 } from '../../../core/types';
 import {
+  getConversationBackendSessionId,
   normalizeConversationSessionSettings,
 } from '../../../core/types';
 import { t } from '../../../i18n';
@@ -53,7 +54,8 @@ export class ConversationSessionSettingsCoordinator {
     const showSharing = this.host.supportsSessionSharing?.() === true;
     const showCompaction = this.host.supportsCompaction?.() === true;
 
-    const shareUrl = showSharing ? await this.getCurrentShareUrl(conversation.openCodeSessionId) : undefined;
+    const sessionId = getConversationBackendSessionId(conversation);
+    const shareUrl = showSharing && sessionId ? await this.getCurrentShareUrl(sessionId) : undefined;
     const shareMode = showSharing ? await this.getProjectShareMode() : undefined;
 
     new ConversationSessionSettingsModal(this.host.app, {
@@ -170,9 +172,13 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private async shareCurrentConversation(conversation: Conversation): Promise<void> {
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) {
+      throw new Error(t('chat.sessionSharing.shareFailed'));
+    }
     let session: Session;
     try {
-      session = await this.shareSession(conversation.openCodeSessionId);
+      session = await this.shareSession(sessionId);
     } catch (error) {
       throw new Error(this.getShareFailureMessage(error));
     }
@@ -187,7 +193,11 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private async unshareCurrentConversation(conversation: Conversation): Promise<void> {
-    await this.unshareSession(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) {
+      throw new Error(t('chat.sessionSharing.serviceUnavailable'));
+    }
+    await this.unshareSession(sessionId);
     this.host.showNotice(t('chat.sessionSharing.unshared'));
   }
 

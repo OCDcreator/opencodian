@@ -6,7 +6,15 @@ import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
+import {
+  getActiveSessionBackendService,
+  getConversationSessionBackendService,
+  hasSessionCapability,
+} from './core/agents/backend/AgentBackendRouting';
 import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
+import { ClaudeCodeAdapter } from './core/agents/backend/ClaudeCodeAdapter';
+import { createClaudeCodePermissionBridge } from './core/agents/backend/ClaudeCodePermissionBridge';
+import { loadClaudeCodeSdk } from './core/agents/backend/ClaudeCodeSdkLoader';
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
@@ -22,6 +30,7 @@ import type {
   ThemePresetId,
 } from './core/types';
 import {
+  getConversationBackendSessionId,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
   getServerBaseUrl,
@@ -201,7 +210,20 @@ export default class OpenCodianPlugin extends Plugin {
       this.agentServiceRegistry = new AgentServiceRegistry();
       const openCodeAdapter = new OpenCodeAdapter(this.openCodeService);
       this.agentServiceRegistry.register(openCodeAdapter);
+      const vaultPath = getVaultBasePath(this.app);
+      if (vaultPath) {
+        this.agentServiceRegistry.register(new ClaudeCodeAdapter({
+          vaultPath,
+          settings: this.settings.backendSettings.claudeCode,
+          pathToClaudeCodeExecutable: this.getBundledClaudeCodeExecutablePath(vaultPath),
+          sdkLoader: loadClaudeCodeSdk,
+          permissionBridge: createClaudeCodePermissionBridge(),
+        }));
+      }
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
+      if (this.settings.activeBackend) {
+        this.agentServiceRegistry.setActive(this.settings.activeBackend);
+      }
       setAgentServiceRegistry(this.agentServiceRegistry);
     });
 
@@ -210,6 +232,36 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     await this.startupCoordinator.measureStartupStep('loadConversations', () => this.loadConversations());
+  }
+
+  private getBundledClaudeCodeExecutablePath(vaultPath: string): string {
+    const pluginId = this.manifest.id?.trim() || 'opencodian';
+    const pluginDir = this.manifest.dir?.trim()
+      ? this.manifest.dir
+      : path.join((this.app.vault as { configDir?: string }).configDir ?? '.obsidian', 'plugins', pluginId);
+    const platformPackage = this.getClaudeAgentSdkPlatformPackageName();
+    const binaryName = process.platform === 'win32' ? 'claude.exe' : 'claude';
+    return path.join(
+      vaultPath,
+      pluginDir,
+      'node_modules',
+      '@anthropic-ai',
+      platformPackage,
+      binaryName,
+    );
+  }
+
+  private getClaudeAgentSdkPlatformPackageName(): string {
+    const key = `${process.platform}-${process.arch}`;
+    const packages: Record<string, string> = {
+      'darwin-arm64': 'claude-agent-sdk-darwin-arm64',
+      'darwin-x64': 'claude-agent-sdk-darwin-x64',
+      'linux-arm64': 'claude-agent-sdk-linux-arm64',
+      'linux-x64': 'claude-agent-sdk-linux-x64',
+      'win32-arm64': 'claude-agent-sdk-win32-arm64',
+      'win32-x64': 'claude-agent-sdk-win32-x64',
+    };
+    return packages[key] ?? `claude-agent-sdk-${process.platform}-${process.arch}`;
   }
 
   private configureVaultScopedServices(): void {
@@ -665,6 +717,8 @@ export default class OpenCodianPlugin extends Plugin {
           titleGenerationStatus: meta.titleGenerationStatus,
           backend: meta.backend,
           openCodeSessionId: meta.openCodeSessionId ?? meta.id,
+          backendSessionId: meta.backendSessionId ?? meta.openCodeSessionId ?? meta.id,
+          backendAgentId: meta.backendAgentId,
           messages: [],
         })),
         { detail: () => `${metas.length} conversations` },
@@ -681,23 +735,44 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Create a new conversation */
   async createConversation(): Promise<Conversation> {
-    // Guard: do not bootstrap an OpenCode session when the opencode backend is disabled.
-    if (!Array.isArray(this.settings.enabledBackends) || !this.settings.enabledBackends.includes('opencode')) {
-      throw new Error('Cannot create conversation: opencode backend is not enabled');
+    const openCodeFallback = Array.isArray(this.settings.enabledBackends) && this.settings.enabledBackends.includes('opencode')
+      ? this.agentServiceRegistry?.get('opencode')
+      : null;
+    const sessionBackend = getActiveSessionBackendService(this.agentServiceRegistry)
+      ?? (hasSessionCapability(openCodeFallback) ? openCodeFallback : null);
+    if (!sessionBackend && (this.settings.activeBackend === undefined || this.settings.activeBackend === 'opencode')) {
+      if (!Array.isArray(this.settings.enabledBackends) || !this.settings.enabledBackends.includes('opencode')) {
+        throw new Error('Cannot create conversation: opencode backend is not enabled');
+      }
+
+      await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
+      const sessionId = await this.openCodeService.createSession();
+      return this.createConversationRecord('opencode', sessionId);
+    }
+    if (!sessionBackend) {
+      throw new Error('Cannot create conversation: active backend does not support sessions');
+    }
+    if (sessionBackend.kind === 'opencode') {
+      await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
     }
 
-    await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
+    const sessionId = await sessionBackend.createSession();
 
-    // Create session in OpenCode
-    const sessionId = await this.openCodeService.createSession();
+    return this.createConversationRecord(sessionBackend.kind, sessionId);
+  }
 
+  private async createConversationRecord(
+    backend: AgentBackendKind,
+    sessionId: string,
+  ): Promise<Conversation> {
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       title: this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      backend: this.settings.activeBackend,
-      openCodeSessionId: sessionId,
+      backend,
+      ...(backend === 'opencode' ? { openCodeSessionId: sessionId } : {}),
+      backendSessionId: sessionId,
       messages: [],
     };
 
@@ -710,7 +785,7 @@ export default class OpenCodianPlugin extends Plugin {
 
   async createConversationFromSession(
     sessionId: string,
-    initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId'>>,
+    initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId' | 'backendSessionId'>>,
   ): Promise<Conversation> {
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
@@ -719,6 +794,7 @@ export default class OpenCodianPlugin extends Plugin {
       updatedAt: Date.now(),
       backend: this.settings.activeBackend,
       openCodeSessionId: sessionId,
+      backendSessionId: sessionId,
       messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
       currentNote: initial?.currentNote,
       externalContextPaths: initial?.externalContextPaths ? [...initial.externalContextPaths] : undefined,
@@ -810,11 +886,14 @@ export default class OpenCodianPlugin extends Plugin {
     this.conversations.splice(index, 1);
     this.conversationFullMessageCache.forget(id);
 
-    // Delete from OpenCode
-    try {
-      await this.openCodeService.deleteSession(conversation.openCodeSessionId);
-    } catch {
-      // Ignore errors
+    const backendSessionId = getConversationBackendSessionId(conversation);
+    const sessionBackend = getConversationSessionBackendService(this.agentServiceRegistry, conversation);
+    if (backendSessionId && sessionBackend) {
+      try {
+        await sessionBackend.deleteSession(backendSessionId);
+      } catch {
+        // Ignore errors
+      }
     }
 
     // Delete from storage

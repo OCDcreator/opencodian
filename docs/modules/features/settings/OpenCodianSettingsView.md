@@ -38,7 +38,7 @@ export class OpenCodianSettingsView extends ItemView
 
 `renderSettings()` 根据 `settingsLayoutMode` 分发到 classic 或 tabbed 布局：
 
-- classic 模式按 General、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User、Skills、Tools、ACP 顺序挂载 section
+- classic 模式按 General、Claude Code、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User、Skills、Tools、ACP 顺序挂载 section
 - tabbed 模式通过 `SettingsTabbedRenderer` 路由一级 / 二级标签内容
 - General 面板额外承载设置布局模式、语言，以及“在编辑区打开设置”的开关
 
@@ -84,6 +84,7 @@ main.ts callback
 - `SettingsSectionCoordinator`: 负责 classic 布局的 heading、quick-nav 与 editor-area 内部滚动生命周期
 - `SettingsPanelChrome`: 提供标题、block、inline code、help button、语言设置等共享设置页壳层
 - 各 `Settings*Section`: 继续拥有具体设置项与业务生命周期，避免该 view 复制 settings tab 的业务逻辑
+- `SettingsClaudeCodeSection`: 提供 Claude Code Phase 1 配置基础与 runtime diagnostics；editor-area view 只负责装配，backend enablement 由 General / Backend 的 `SettingsBackendSection` 管理
 
 ## 配置项
 

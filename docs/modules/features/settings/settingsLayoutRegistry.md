@@ -16,11 +16,12 @@
 
 ## 一级/二级标签结构
 
-当前涵盖 17 个一级标签：
+当前涵盖 18 个一级标签：
 
 | 一级标签 | 二级标签 |
 |---------|---------|
 | `general` | `basic`, `backend` |
+| `claude-code` | `runtime` |
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
 | `conversation` | `title`, `compaction`, `sharing`, `display`, `questions` |
@@ -47,4 +48,4 @@
 
 ## 模式集成
 
-`settingsLayoutMode` 为 `'classic'` 时不使用本 registry。为 `'tabbed'` 时，`SettingsTabbedRenderer` 读取本 registry 构建标签栏并路由内容面板。带 `backendRequired` 的 OpenCode-only 标签会在对应 backend 被禁用时隐藏。
+`settingsLayoutMode` 为 `'classic'` 时不使用本 registry。为 `'tabbed'` 时，`SettingsTabbedRenderer` 读取本 registry 构建标签栏并路由内容面板。带 `backendRequired` 的标签只在对应 backend 是当前 `activeBackend` 时显示，而不是只要该 backend 出现在 `enabledBackends` 就显示。OpenCode 专属标签因此不会在 Claude Code active 时露出，`claude-code` 标签也不会在 OpenCode active 时露出。

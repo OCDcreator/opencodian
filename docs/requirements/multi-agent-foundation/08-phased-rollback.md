@@ -1,11 +1,33 @@
 # 分阶段实施计划和回滚策略
 
 > **状态**: `[DRAFT]`
-> **最后更新**: 2026-05-18
+> **最后更新**: 2026-05-20
 
 ## 概述
 
 多 agent 基座采用渐进式实施策略。每个阶段都是自包含的，可以独立验证和回滚。
+
+## 0. 2026-05-20 Claude Code 分阶段修正
+
+当前 Phase 0 worktree 已有 `AgentServiceRegistry`、`OpenCodeAdapter`、backend settings gate 和 OpenCode disable/availability 防线，但 chat/session 路径仍没有完全 backend-neutral。因此 Claude Code 不能直接进入生产实现，必须先完成 Phase 0 的剩余抽象和 OpenCode 回归验证。
+
+新的 Claude rollout 原则：
+
+1. Phase 0 先保证 backend abstraction 和 OpenCode 不回归。
+2. Phase 1 做 Claude 最小可落地闭环，但闭环必须包含 persistent query、stream/tool/permission/question/session resume，而不是单次 prompt demo。
+3. Phase 2-5 逐步覆盖“全部能力”：models/thinking/MCP/settings source/additional dirs、history/fork/subagents、skills/hooks/agents authoring、最终 cross-backend polish。
+4. Claude runtime UI 只有在 smoke 通过后才加入 `IMPLEMENTED_AGENT_BACKENDS`。
+
+### 0.1 Claude-specific phase gates
+
+| Phase | 目标 | 退出条件 | 回滚 |
+|---|---|---|---|
+| Phase 0 | 完成 chat/session backend contract；OpenCode 通过 focused tests 和 `npm run verify`。 | OpenCode new session/send/history/settings 均不回归；Claude 仍不暴露。 | 删除/回退 contract slice，保留 OpenCode 直接路径。 |
+| Phase 1 | Claude SDK persistent query 最小闭环。 | Obsidian Electron runtime 证明 SDK executable starts、streams、permissions/questions、MCP pass-through、session resume；OpenCode disabled/enabled smoke 通过。 | 从 registry/gate 移除 Claude，保留 docs/disabled code 或直接删除 adapter。 |
+| Phase 2 | Claude runtime settings completeness。 | model/thinking/effort/settingSources/additionalDirectories/executable diagnostics 可操作。 | 隐藏 Claude settings section，保留 adapter core。 |
+| Phase 3 | Claude session/history/fork completeness。 | JSONL import/resume/fork/resume-at tests + runtime sample 通过。 | 禁用 history/fork capability，保留 chat。 |
+| Phase 4 | Skills/hooks/agents/MCP authoring。 | 文件写入兼容 Claude Code 官方格式，runtime discovery 可见。 | 回退 authoring UI，只读 runtime discovery。 |
+| Phase 5 | Full capability polish。 | Capability dashboard、diagnostics export、cross-backend UX 完成。 | 保持 backend core，关闭高级 panels。 |
 
 ## 1. 阶段总览
 
@@ -98,7 +120,7 @@ Phase 4: Agent 选择器 + UI 完善
 
 **关键任务**:
 1. Phase 0d-1: Server lifecycle（62 次调用，约 7 个文件）
-2. Phase 0d-2: Session management（32 次调用，OpenCodianView + 4 个服务），使用 Proxy delegation pattern 避免 Owner Guard violation
+2. Phase 0d-2: Session management（32 次调用，OpenCodianView + 4 个服务），使用 direct registry routing + capability narrowing 避免隐式 OpenCode fallback
 3. Phase 0d-3: MCP/Config/Model/Events（34 次调用，约 15 个 settings 文件）
 4. 使用 `hasCapability()` 做条件渲染
 
@@ -181,7 +203,7 @@ Phase 4: Agent 选择器 + UI 完善
 ```json
 {
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.x",  // Phase 1
+    "@anthropic-ai/claude-agent-sdk": "^0.3.x",  // Phase 1; 2026-05-20 latest verified as 0.3.145
     "@openai/codex-sdk": "^0.130.x",              // Phase 2
     "@github/copilot-sdk": "^1.0.0-beta.3",        // Phase 2
     "@mariozechner/pi-coding-agent": "^0.73.x"     // Phase 3

@@ -1,3 +1,4 @@
+import { getConversationBackendSessionId } from '../../../core/types';
 import { buildLocalStreamOutcome } from './buildLocalStreamOutcome';
 import { persistLocalStreamOutcome } from './LocalStreamMessagePersistence';
 import type {
@@ -48,7 +49,7 @@ export class StreamLocalFinalizer {
   }
 
   private getSessionRetryMessage(): string | null {
-    const sessionId = this.options.preparedSend.conversation.openCodeSessionId;
+    const sessionId = getConversationBackendSessionId(this.options.preparedSend.conversation);
     const runtime = this.options.runtime;
     if (sessionId && runtime.sessionStatusSessionId && runtime.sessionStatusSessionId !== sessionId) {
       return null;

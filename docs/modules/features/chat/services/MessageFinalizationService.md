@@ -112,7 +112,7 @@ export class MessageFinalizationService {
 ### 收尾时序
 
 - 只有 should-sync 分支才执行最终 canonical/server sync、background indicator 刷新与 turn diff notice
-- 不论是否 should-sync，都会继续刷新 session todos、写最终 save、清空 pending edited files
+- 不论是否 should-sync，都会继续写最终 save、清空 pending edited files；session todos 只在 OpenCode-owned conversation 上刷新，非 OpenCode backend 先跳过 OpenCode-only todo refresh
 - 如果用户在 finalization 期间切走 tab，则不做 foreground patch/rerender 与 active-tab context usage 刷新，而是改为给原 tab 打 attention
 - sync lock 会在 service 自己的 `finally` 中释放，避免 send finalization 途中遗漏解锁
 

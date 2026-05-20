@@ -81,6 +81,7 @@ export interface SendPipelineViewPort {
 
 export interface SendPipelineTransportPort {
   sendStreamMessage(
+    conversation: Conversation,
     content: string,
     options: SendMessageModelOptions & {
       sessionId?: string;

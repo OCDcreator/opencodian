@@ -60,6 +60,7 @@ export class ConversationNoticeCoordinator {
 
 - `createStreamErrorNotice()` 复用 `AssistantNoticeRenderer.buildStreamErrorNotice()`，统一补上当前模型 id
 - `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → no response，其余 → send failed + 原文
+- Claude Code backend 的 SDK/stream 错误保留 Claude Code 标签，不再被映射成 OpenCode server connection failure，避免用户在 Claude 后端失败时被引导去排查 OpenCode 本地服务。
 
 ### turn diff notice
 

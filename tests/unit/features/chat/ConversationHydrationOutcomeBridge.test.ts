@@ -30,6 +30,18 @@ function createConversation(id: string): Conversation {
   };
 }
 
+function createClaudeConversation(id: string): Conversation {
+  return {
+    id,
+    title: `Claude ${id}`,
+    createdAt: 1,
+    updatedAt: 1,
+    backend: 'claude-code',
+    backendSessionId: `${id}-claude-session`,
+    messages: [],
+  };
+}
+
 function createMessages(): ChatMessage[] {
   return [
     {
@@ -108,5 +120,27 @@ describe('ConversationHydrationOutcomeBridge', () => {
       'applyLoadedConversationPostRenderOutcome',
       'commitConversationSyncBaseline',
     ]);
+  });
+
+  it('skips OpenCode activation refresh when hydrating a Claude Code conversation', async () => {
+    const callOrder: string[] = [];
+    const conversation = createClaudeConversation('loaded-claude-conversation');
+    const messages = createMessages();
+    const host = createHost(callOrder);
+    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
+    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
+    const bridge = new ConversationHydrationOutcomeBridge(
+      host,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+    );
+
+    await bridge.applyLoadedConversationOutcome('tab-1', conversation, messages);
+
+    expect(tabViewActivationBridge.applyLoadedConversationPostRenderOutcome).toHaveBeenCalledWith(
+      'tab-1',
+      null,
+    );
+    expect(tabConversationStateBridge.commitConversationSyncBaseline).toHaveBeenCalledWith(messages);
   });
 });

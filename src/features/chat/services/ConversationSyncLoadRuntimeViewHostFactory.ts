@@ -1,5 +1,9 @@
 import type { ChatMessage } from '../../../core/types';
 import {
+  type Conversation,
+  getConversationBackendSessionId,
+} from '../../../core/types';
+import {
   type ConversationSyncLoadRuntimeHostAdapterHost,
   type ConversationSyncLoadRuntimeHosts,
   createConversationSyncLoadRuntimeHosts,
@@ -33,6 +37,11 @@ export interface ConversationSyncLoadRuntimeViewHost extends
   hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean;
 }
 
+function shouldUseOpenCodeServerSync(conversation: Conversation): boolean {
+  return (conversation.backend ?? 'opencode') === 'opencode'
+    && Boolean(getConversationBackendSessionId(conversation));
+}
+
 export function createConversationSyncLoadRuntimeViewHosts(
   host: ConversationSyncLoadRuntimeViewHost,
 ): ConversationSyncLoadRuntimeHosts {
@@ -45,6 +54,9 @@ export function createConversationSyncLoadRuntimeViewHosts(
     loadConversations: () => host.loadConversations(),
     getConversationById: (id) => host.getConversationById(id),
     shouldSyncConversationFromServer: (conversation, options) => {
+      if (!shouldUseOpenCodeServerSync(conversation)) {
+        return false;
+      }
       const shouldSyncInterrupted = !host.hasInterruptedLocalAssistantTail(conversation.messages)
         && conversation.messages.some((message) =>
           message.displayStyle !== 'notice'

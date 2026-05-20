@@ -1,4 +1,7 @@
-import type { StreamChunk as CoreStreamChunk } from '../../../core/types';
+import {
+  getConversationBackendSessionId,
+  type StreamChunk as CoreStreamChunk,
+} from '../../../core/types';
 import type { StreamChunk as StreamingChunk } from '../../../utils/streaming';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import type {
@@ -31,7 +34,7 @@ export class SendPipelineTrace {
   private lastProgressLoggedTextLength = 0;
 
   constructor(private readonly options: SendPipelineTraceOptions) {
-    this.traceId = `${options.preparedSend.conversation.openCodeSessionId}:${options.preparedSend.userMessage.id}:${Date.now()}`;
+    this.traceId = `${getConversationBackendSessionId(options.preparedSend.conversation) ?? 'no-backend-session'}:${options.preparedSend.userMessage.id}:${Date.now()}`;
   }
 
   noteRawChunk(chunk: CoreStreamChunk): void {
@@ -100,7 +103,7 @@ export class SendPipelineTrace {
       traceId: this.traceId,
       tabId: this.options.preparedSend.tabId,
       conversationId: this.options.preparedSend.conversation.id,
-      sessionId: this.options.preparedSend.conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(this.options.preparedSend.conversation),
       userMessageId: this.options.preparedSend.userMessage.id,
       streamCompleted: state.streamCompleted,
       streamInterrupted: state.streamInterrupted,

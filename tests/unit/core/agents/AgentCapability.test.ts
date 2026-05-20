@@ -8,21 +8,22 @@ import {
 } from '../../../../src/core/agents/AgentCapability';
 
 describe('AgentCapability', () => {
-  it('should define all 19 capabilities', () => {
+  it('should define all backend capabilities', () => {
     const expected: string[] = [
+      'chat', 'sessions',
       'tools', 'mcp', 'permissions', 'branching', 'todos', 'questions',
       'models', 'subagents', 'context', 'providers', 'compaction',
       'cost-tracking', 'thinking', 'hooks', 'config', 'file-ops', 'shell',
       'sharing', 'export',
     ];
-    expect(Object.values(AgentCapability)).toHaveLength(19);
+    expect(Object.values(AgentCapability)).toHaveLength(expected.length);
     for (const cap of expected) {
       expect(Object.values(AgentCapability)).toContain(cap);
     }
   });
 
   it('OPENCODE_FULL_CAPABILITIES should include all capabilities', () => {
-    expect(OPENCODE_FULL_CAPABILITIES.size).toBe(19);
+    expect(OPENCODE_FULL_CAPABILITIES.size).toBe(Object.values(AgentCapability).length);
   });
 
   it('getActiveBackendCapabilities returns full set for default opencode', () => {

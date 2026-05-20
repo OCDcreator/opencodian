@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: send pipeline host wiring initialization order
+> **最近更新**: Claude Code active-backend routing and OpenCode-only guardrails
 
 ## 概述
 
@@ -105,6 +105,8 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动
 - `SessionPermissionTracker`：记录“本次会话允许”的临时权限批准；view 在权限卡片返回 `session` 时保存当前 `sessionID` 的 scope，同一会话再次请求相同 scope 时自动回复，并通过 service 边界发送 OpenCode 支持的 `always`
+- send/cancel/title 相关 runtime bridge 现在会通过 `AgentServiceRegistry` 按 conversation owner 解析 chat/session backend；OpenCode conversation 继续走 OpenCode adapter，非 OpenCode conversation 不再静默落回 `openCodeService`。cancel/detach 同样按当前 conversation backend 分流，Claude Code 等非 OpenCode backend 不会再调用 `openCodeService.detachStream()`。
+- active backend 切换由 `AgentServiceRegistry.onActiveChange()` 驱动：view 会阻止加载不属于当前 active backend 的 conversation，并自动切到该 backend 最新 conversation；没有则在当前 tab 创建该 backend 的新 conversation。这样设置页切到 Claude Code 后，当前聊天表面、历史入口和恢复的 tab 都不会继续显示 OpenCode 会话。
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及共享 composer catalog 加载入口
 - `SlashCommandMenuCatalogCache` / `SlashCommandExecutionService` 的 host seam：缓存 runtime commands + skills、项目级 command/agent 配置与 `.opencode/commands/**/*.md` markdown commands 合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效。view 还为 synthetic `/compact` command 提供 manual compaction seam，解析当前 session/provider/model 后调用 `OpenCodeService.summarizeSession(..., false)` 并显示 Obsidian notice。
 - slash command catalog 的后台 warm preload 现在也受 chat-surface availability guard 约束：当 header/composer 已把状态解释为 `disabled` 或 `offline` 时，view 不再提前 `warm()` runtime slash catalog，避免 backend 不可用时额外制造一次预热拒连日志。
@@ -123,8 +125,9 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 3. `chatHeaderPresenter.startServerStatusLoop()` 与 `lspStatusRefreshCoordinator.start()` 分别启动 server 和 LSP connection summary 刷新
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
-6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新；当 `enabledBackends` 不包含 `opencode` 时，这一步会跳过启动，避免“全部智能体禁用”场景继续建立 OpenCode-only signal 订阅并制造离线噪音
-7. `initializeFirstTab()`：恢复持久化 tabs、加载首个对话；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
+6. `wireBackendSurfaceSwitch()` 注册 active-backend change 监听，确保设置页或 agent switcher 切换 backend 后，聊天表面同步切到该 backend 自己的 conversation
+7. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新；只有当前 active backend 确实是启用中的 OpenCode 时才启动，避免 Claude Code-only / 非 OpenCode active 场景继续建立 OpenCode-only signal 订阅并制造离线噪音
+8. `initializeFirstTab()`：只恢复当前 active backend 的持久化 tabs、加载该 backend 的首个对话；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
 
 结束时会输出一条 `[view-open]` 汇总日志，包含各阶段耗时拆分。
 
@@ -177,7 +180,7 @@ header DOM、server status badge、title logo/wordmark、new/current-tab、histo
 - tooltip 标签、plugin asset URL、css-change 注册和 layout/color sync 回调
 - header tab bar slot 写回给 tab bar layout
 
-server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。Phase 0/1 backend-capability 收尾还在这个 seam 上补了一层 surface 语义：当 `enabledBackends` 为空，或当前 active backend 并不是一个真正启用中的 OpenCode surface 时，header 会把状态解释为 `disabled`，并阻止 chat header / LSP 继续做 OpenCode-only 轮询。
+server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。Phase 0/1 backend-capability 收尾还在这个 seam 上补了一层 surface 语义：当 `enabledBackends` 为空，header 会把状态解释为 `disabled`；当当前 active backend 是 Claude Code 等非 OpenCode backend 时，聊天 composer 不再探测 OpenCode server health，而是把 backend 视为可发送，由对应 adapter/auth/query 路径返回真实错误或流式结果。
 
 ### Conversation history / actions ownership
 
@@ -201,7 +204,7 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 
 稳定聊天视图当前明确只启用 prompt 输入模式：`getComposerInputMode()` 固定返回 `prompt`，意外进入的 shell submission 会被记录并忽略，不会走本地-only shell 状态。后续如果要开启 shell parity，入口必须通过 `OpenCodeService.runSessionShell()` / `session.shell`，并复用 canonical session/message/part projection，而不是在 view 内新增 shell 消息状态。
 
-Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增了一层高阶 composer availability state：`OpenCodianView` 负责把“没有任何 enabled backend”和“backend 已启用但当前运行时不可连接”聚合成统一 surface 状态，再交给 `ComposerInputShellCoordinator` 渲染禁用壳层；具体 textarea/button 禁用与说明块 DOM 不回流到 view。
+Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增了一层高阶 composer availability state：`OpenCodianView` 负责把“没有任何 enabled backend”和“OpenCode active 但运行时不可连接”聚合成统一 surface 状态，再交给 `ComposerInputShellCoordinator` 渲染禁用壳层；Claude Code 等非 OpenCode active backend 不再因为 OpenCode server 离线而禁用 composer。具体 textarea/button 禁用与说明块 DOM 不回流到 view。
 
 这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；toolbar 里的 selector 区域也已经进一步交给专门 owner，input shell 只保留 slot 级挂载职责。
 
@@ -235,7 +238,7 @@ Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增�
 - 在切换对话时取消旧对话的标题生成
 - 首条消息后的标题链路仍由 view 发起并接收回调；实际官方标题优先、本地兜底、以及首次 provisional server 写入抑制分别由 `TitleGenerationService` 和 `OpenCodeSessionLifecycleCoordinator` 承接，view 只负责更新本地 conversation/title status 与 tab 标题
 - 清空当前消息区并重置 turn 状态
-- 把 `openCodeSessionId` 交给 `openCodeService`
+- 把 legacy `openCodeSessionId` 交给 `openCodeService`；发送和 tab runtime 的通用 session identity 逐步迁到 `backendSessionId` / `getConversationBackendSessionId()`，但标题同步、取消流、child session 等 OpenCode-only surface 仍按 backend/capability 分阶段保留 guard
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 在 load 完成与 authoritative sync 完成后额外调用 `ChildSessionGraphCoordinator.refreshGraph()`，让 child-session tree 跟随当前可见对话的 persisted/live child-session 数据刷新
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级

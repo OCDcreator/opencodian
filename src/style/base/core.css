@@ -517,9 +517,13 @@ body[data-opencodian-provider-icon-mode="color"] {
   justify-content: center;
   width: 28px;
   height: 28px;
+  padding: 0;
+  border: 0;
   border-radius: 4px;
+  background: transparent;
   cursor: pointer;
   color: var(--text-muted);
+  font: inherit;
   transition: all 0.2s ease;
 }
 

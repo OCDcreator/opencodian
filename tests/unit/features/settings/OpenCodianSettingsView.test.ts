@@ -235,6 +235,7 @@ describe('OpenCodianSettingsView classic layout', () => {
       heading.textContent,
     )).toEqual([
       'General',
+      'Claude Code',
       'Server',
       'Model',
       'Conversation',

@@ -1,6 +1,7 @@
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import {
   createEmptyTabContextState,
+  getConversationBackendSessionId,
   type StreamChunk,
   type TabContextState,
 } from '../../../core/types';
@@ -24,7 +25,8 @@ const logger = createLogger('ActiveTabContextUsageCoordinator');
 
 interface ActiveTabContextUsageConversation {
   id: string;
-  openCodeSessionId: string | null | undefined;
+  backendSessionId?: string;
+  openCodeSessionId?: string | null;
   title: string;
   createdAt: number;
   updatedAt: number;
@@ -78,7 +80,7 @@ export class ActiveTabContextUsageCoordinator {
         contextWindow: modelInfo?.contextWindow ?? resolution.contextWindow,
       },
       {
-        sessionId: conversation?.openCodeSessionId ?? null,
+        sessionId: conversation ? getConversationBackendSessionId(conversation) ?? null : null,
         sessionTitle: conversation?.title ?? null,
         createdAt: conversation?.createdAt ?? null,
         updatedAt: conversation?.updatedAt ?? null,
@@ -91,7 +93,7 @@ export class ActiveTabContextUsageCoordinator {
   async refreshFromServer(): Promise<void> {
     const conversation = this.host.getCurrentConversation();
     const expectedConversationId = conversation?.id ?? null;
-    const expectedSessionId = conversation?.openCodeSessionId ?? null;
+    const expectedSessionId = conversation ? getConversationBackendSessionId(conversation) ?? null : null;
     const startedAt = getPerformanceTimestampMs();
     let requestElapsedMs: number | null = null;
     let outcome = 'skipped';
@@ -115,7 +117,7 @@ export class ActiveTabContextUsageCoordinator {
     if (
       !snapshot
       || currentConversation?.id !== expectedConversationId
-      || currentConversation?.openCodeSessionId !== expectedSessionId
+      || (currentConversation ? getConversationBackendSessionId(currentConversation) ?? null : null) !== expectedSessionId
       || !this.host.hasActiveTab()
     ) {
       outcome = snapshot ? 'stale' : 'empty';

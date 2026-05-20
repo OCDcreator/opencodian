@@ -10,6 +10,8 @@
 import type { AgentServiceRegistry } from './backend/AgentServiceRegistry';
 
 export const AgentCapability = {
+  Chat: 'chat',
+  Sessions: 'sessions',
   Tools: 'tools',
   Mcp: 'mcp',
   Permissions: 'permissions',

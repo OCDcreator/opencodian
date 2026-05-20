@@ -67,6 +67,27 @@ describe('MessageSendPreparationService follow-up queue', () => {
     expect(host.queueFollowUpSend).not.toHaveBeenCalled();
   });
 
+  it('does not queue or seed canonical state when a conversation has no backend session id', async () => {
+    const conversation = createConversation();
+    delete conversation.openCodeSessionId;
+    delete conversation.backendSessionId;
+    const host = createHost(conversation, [], {
+      queueFollowUpSend: jest.fn().mockReturnValue(true),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'No backend session yet' });
+
+    expect(result).toBeNull();
+    expect(host.queueFollowUpSend).not.toHaveBeenCalled();
+    expect(host.seedCanonicalUserMessage).not.toHaveBeenCalled();
+    expect(host.transitionTabSessionLifecycle).toHaveBeenCalledWith(
+      'tab-1',
+      'idle',
+      'send-preflight-aborted',
+    );
+  });
+
   it('abandons pinned follow-up preparation if the original tab is no longer active', async () => {
     const host = createHost(createConversation(), [], {
       getActiveTabId: jest.fn().mockReturnValue('tab-2'),

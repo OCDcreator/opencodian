@@ -56,7 +56,12 @@ export interface MutableConversationListDiagnostics {
 }
 
 export function buildConversationMetaFromStoredRecord(
-  data: Partial<ConversationMeta> & { messages?: ChatMessage[] | null; messageCount?: number | null },
+  data: Partial<ConversationMeta> & {
+    acpAgentId?: string | null;
+    acpSessionId?: string | null;
+    messages?: ChatMessage[] | null;
+    messageCount?: number | null;
+  },
 ): ConversationMeta | null {
   if (
     typeof data.id !== 'string'
@@ -88,6 +93,18 @@ export function buildConversationMetaFromStoredRecord(
     titleGenerationStatus,
     messageCount,
     openCodeSessionId: typeof data.openCodeSessionId === 'string' ? data.openCodeSessionId : undefined,
+    backendSessionId: typeof data.backendSessionId === 'string'
+      ? data.backendSessionId
+      : typeof data.openCodeSessionId === 'string'
+        ? data.openCodeSessionId
+        : typeof data.acpSessionId === 'string'
+          ? data.acpSessionId
+          : undefined,
+    backendAgentId: typeof data.backendAgentId === 'string'
+      ? data.backendAgentId
+      : typeof data.acpAgentId === 'string'
+        ? data.acpAgentId
+        : undefined,
     backend: data.backend ?? 'opencode',
   };
 }

@@ -3,6 +3,7 @@ import type {
   Conversation,
   SessionTodo,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { TabId } from '../tabs';
@@ -288,8 +289,12 @@ export class MessageFinalizationService {
         });
       }
 
-      await this.host.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-      logStage('session-todos-refreshed');
+      if (conversation.backend === undefined || conversation.backend === 'opencode') {
+        await this.host.refreshTabSessionTodos(tabId, getConversationBackendSessionId(conversation), { suppressErrors: true });
+        logStage('session-todos-refreshed');
+      } else {
+        logStage('session-todos-skipped', { backend: conversation.backend });
+      }
 
       const finalWriteTicket = this.host.createConversationWriteTicket(conversation.id);
       const finalWriteApplied = await this.host.commitConversationWrite(

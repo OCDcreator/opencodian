@@ -49,12 +49,12 @@ export class ConversationSessionSettingsCoordinator {
 
 ## 关键行为
 
-- `openCurrentConversationSettings()` 只对当前会话开放；没有 active conversation 时直接给出 notice。打开前会读取 `listSessions()` 中当前 session 的 `share.url`，并读取项目级 `share` 模式，把已分享/未分享/禁用状态传给 modal
+- `openCurrentConversationSettings()` 只对当前会话开放；没有 active conversation 时直接给出 notice。打开前会用 `getConversationBackendSessionId()` 解析当前 session，再读取 `listSessions()` 中当前 session 的 `share.url`，并读取项目级 `share` 模式，把已分享/未分享/禁用状态传给 modal
 - `resolveEffectiveSettings()` 使用 plugin-level defaults 作为 base，再让 `Conversation.sessionSettings` 中的 `number / null` 覆盖或显式继承
 - `applyConversationVisualState()` 只负责把 effective `chatFontSizePx` 写到 `--opencodian-chat-font-size`
 - modal 输入期间会调用 preview path 临时应用 `chatFontSizePx`，不修改 `Conversation.sessionSettings` 也不触发 save；取消或关闭弹窗时重新应用真实 conversation state
 - `saveConversationOverrides()` 会先归一化并持久化 `Conversation.sessionSettings`，全为 `null` 时会折叠回 `undefined`，避免存储纯"继承"空壳
-- `shareCurrentConversation()` 调用 `OpenCodeService.shareSession()`，从返回的 `session.share.url` 提取公开链接并复制到剪贴板；如果 OpenCode 将分享失败映射成 HTTP 500，coordinator 会把 SDK 原始错误归一化为用户可理解的分享失败说明
+- `shareCurrentConversation()` 调用 `OpenCodeService.shareSession()`，从返回的 `session.share.url` 提取公开链接并复制到剪贴板；如果 OpenCode 将分享失败映射成 HTTP 500，coordinator 会把 SDK 原始错误归一化为用户可理解的分享失败说明。分享本身仍是 OpenCode-only 能力，非 OpenCode backend 后续需要 capability gate 后再暴露。
 - `unshareCurrentConversation()` 调用 `OpenCodeService.unshareSession()`，用于取消当前会话的公开分享
 
 ## 与 `OpenCodianView` 的边界

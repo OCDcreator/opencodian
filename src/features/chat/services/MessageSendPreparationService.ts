@@ -19,6 +19,7 @@ import type {
   Conversation,
   PromptContextItem,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { buildContextAttachment, createLogger } from '../../../shared';
 import { getPromptContextTargetKey } from '../composerContext';
@@ -148,6 +149,7 @@ export interface MessageSendPreparationHost {
   loadAvailableModels(): Promise<void>;
   getSendMessageOptions(): SendMessageModelOptions;
   formatModelId(model: Partial<SendMessageModelOptions> | null | undefined): string | undefined;
+  shouldUseModelCatalog(conversation: Conversation): boolean;
   ensureSelectedModelAvailable(provider: string | undefined, model: string | undefined): Promise<boolean>;
   appendModelUnavailableNoticeMessage(): Promise<void>;
   buildStructuredPromptSendPayload(
@@ -311,6 +313,11 @@ export class MessageSendPreparationService {
     }
     const conversation = await this.host.ensureConversationReady();
     if (!conversation) return null;
+    const backendSessionId = getConversationBackendSessionId(conversation);
+    if (!backendSessionId) {
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
     if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) return null;
     if (this.host.isTabForegroundBusy(tabId)) {
       if (!this.queueFollowUpSend(tabId, options)) this.host.notifyForegroundBusy();
@@ -326,15 +333,12 @@ export class MessageSendPreparationService {
         return null;
       }
     }
-    if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
-    const modelOptions = this.host.getSendMessageOptions();
-    const activeModelId = this.host.formatModelId(modelOptions);
-    const modelAvailable = await this.host.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model);
-    if (!modelAvailable) {
-      await this.host.appendModelUnavailableNoticeMessage();
-      this.resetPreparingLifecycle(tabId);
+    const usesModelCatalog = this.host.shouldUseModelCatalog(conversation);
+    const modelOptions = usesModelCatalog ? await this.prepareModelOptions(tabId) : {};
+    if (!modelOptions) {
       return null;
     }
+    const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
     const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
@@ -370,7 +374,7 @@ export class MessageSendPreparationService {
     }
 
     this.host.seedCanonicalUserMessage({
-      sessionID: conversation.openCodeSessionId, messageID: structuredSend.messageID,
+      sessionID: backendSessionId, messageID: structuredSend.messageID,
       parts: structuredSend.optimisticUserParts, timestamp: userMessage.timestamp,
     });
     this.host.resetBackgroundTaskIndicator(tabId);
@@ -426,6 +430,21 @@ export class MessageSendPreparationService {
 
   private isFirstUserMessage(conversation: Conversation): boolean {
     return conversation.messages.filter((message) => message.role === 'user').length === 1;
+  }
+
+  private async prepareModelOptions(tabId: TabId): Promise<SendMessageModelOptions | null> {
+    if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
+    const modelOptions = this.host.getSendMessageOptions();
+    const modelAvailable = await this.host.ensureSelectedModelAvailable(
+      modelOptions.provider,
+      modelOptions.model,
+    );
+    if (!modelAvailable) {
+      await this.host.appendModelUnavailableNoticeMessage();
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
+    return modelOptions;
   }
 
   private mergeContextItems(
@@ -595,6 +614,7 @@ export function createMessageSendPreparationHost(
     loadAvailableModels: () => deps.reloadModelCatalog(),
     getSendMessageOptions: () => deps.getSendMessageOptions(),
     formatModelId: (model) => selectionCtrl.formatModelId(model),
+    shouldUseModelCatalog: (conversation) => (conversation.backend ?? 'opencode') === 'opencode',
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
     buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),

@@ -16,6 +16,7 @@ import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsBackendSection } from './SettingsBackendSection';
+import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
@@ -89,9 +90,10 @@ export class SettingsTabbedRenderer {
 
   renderDisplay(containerEl: HTMLElement): void {
     containerEl.classList.add('opencodian-settings-tabbed');
+    const activeBackend = this.getActiveBackend();
     const visibleTabs = SETTINGS_PRIMARY_TABS.filter((tab) => {
       if (!tab.backendRequired) return true;
-      return this.deps.plugin.settings.enabledBackends.includes(tab.backendRequired);
+      return tab.backendRequired === activeBackend;
     });
     let activePrimaryId = resolvePrimaryTabId(
       this.deps.plugin.settings.settingsTabbedPrimaryTab,
@@ -103,7 +105,7 @@ export class SettingsTabbedRenderer {
     const primaryDef = visibleTabs.find((pt) => pt.id === activePrimaryId);
     const visibleSecondaryTabs = (primaryDef?.secondaryTabs ?? []).filter((tab) => {
       if (!tab.backendRequired) return true;
-      return this.deps.plugin.settings.enabledBackends.includes(tab.backendRequired);
+      return tab.backendRequired === activeBackend;
     });
     let activeSecondaryId = getActiveSecondaryTabId(
       activePrimaryId,
@@ -200,6 +202,7 @@ export class SettingsTabbedRenderer {
     );
 
     this.deps.plugin.settings.activeBackend = agent;
+    this.deps.plugin.agentServiceRegistry?.setActive(agent);
     this.deps.plugin.settings.settingsTabbedPrimaryTab = resolvedPrimary;
     this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary = {
       ...this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
@@ -214,12 +217,19 @@ export class SettingsTabbedRenderer {
   }
 
   private getSelectedAgent(enabledAgents: AgentBackendKind[]): AgentBackendKind | undefined {
-    const activeBackend = this.deps.plugin.settings.activeBackend;
+    const activeBackend = this.getActiveBackend();
     if (activeBackend && enabledAgents.includes(activeBackend)) {
       return activeBackend;
     }
 
     return enabledAgents[0];
+  }
+
+  private getActiveBackend(): AgentBackendKind | undefined {
+    const activeBackend = this.deps.plugin.settings.activeBackend;
+    return activeBackend && this.deps.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.deps.plugin.settings.enabledBackends[0];
   }
 
   private switchSecondaryTab(primaryTabId: string, secondaryTabId: string): void {
@@ -243,6 +253,9 @@ export class SettingsTabbedRenderer {
         break;
       case 'server':
         this.renderServerContent(containerEl, secondaryTabId);
+        break;
+      case 'claude-code':
+        this.renderClaudeCodeContent(containerEl, secondaryTabId);
         break;
       case 'model':
         this.renderModelContent(containerEl, secondaryTabId);
@@ -347,6 +360,14 @@ export class SettingsTabbedRenderer {
     });
     this.deps.setServerSection(serverSection);
     serverSection.attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private renderClaudeCodeContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const claudeCodeSection = new SettingsClaudeCodeSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    });
+    claudeCodeSection.attachTabbed(containerEl, secondaryTabId);
   }
 
   private renderModelContent(containerEl: HTMLElement, secondaryTabId: string): void {

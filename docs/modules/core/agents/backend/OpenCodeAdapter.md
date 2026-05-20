@@ -12,7 +12,9 @@
 - 暴露 `OpenCodeAdapter` 类，并声明 backend kind 为 `opencode`
 - 将 `OpenCodeService.getServerStatus()` 映射为通用 `AgentConnectionStatus`
 - 声明 `OPENCODE_FULL_CAPABILITIES`，让 OpenCode 在 Phase 0 支持完整 capability 集合
-- 实现所有可选 capability interface，并把 session、todo、question、permission、model、MCP、config、tool、auth 调用委托给 `OpenCodeService`
+- 实现所有可选 capability interface，并把 chat、session、todo、question、permission、model、MCP、config、tool、auth 调用委托给 `OpenCodeService`
+- 通过 `AgentChatCapability.sendMessage()` 将 backend-neutral `{ sessionId, content, options }` 映射为既有 `OpenCodeService.sendMessage(content, { ...options, sessionId })`
+- 通过 `AgentSessionCapability` 委托 `createSession()`、`deleteSession()`、`updateSessionTitle()`，并通过 `cancelStream(sessionId)` 保持现有取消流行为
 - 提供 adapter 级 `onStatusChange()` 订阅与 `notifyStatusChange()` 通知入口
 - 保留 `underlying` 过渡访问口，供尚未迁移到统一接口的 OpenCode 专有调用路径复用
 
@@ -29,3 +31,4 @@
 - `dispose()` 只清理 adapter 自身订阅，底层 `OpenCodeService` 由插件生命周期单独释放
 - 新增 OpenCode 能力时需要同时更新 `AgentService.ts` capability interface、`OPENCODE_FULL_CAPABILITIES` 和本 adapter 的委托方法
 - 保持 `underlying` 作为过渡访问口，避免在 Phase 0 一次性重写所有 OpenCode 特有调用路径
+- adapter 只做形状转换和委托，不改变 OpenCode session id、stream chunk 或历史同步语义

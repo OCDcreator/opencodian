@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Authoritative reload owner keeps reload, merge, render, and recovery orchestration together. */
 import type {
   OpenCodeCanonicalSessionState,
 } from '../../../core/opencode';
@@ -5,6 +6,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import {
@@ -156,7 +158,12 @@ export class ConversationAuthoritativeReloadCoordinator {
     reason = 'sync-event',
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationAuthoritativeSyncResult | null> {
-    const canonicalMessages = this.host.getCanonicalSessionMessages(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) {
+      return null;
+    }
+
+    const canonicalMessages = this.host.getCanonicalSessionMessages(sessionId);
     if (!canonicalMessages) {
       return null;
     }
@@ -171,7 +178,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     const snapshot: ConversationServerSyncSnapshot = {
       serverMessages: canonicalMessages,
       convertedServerMessages: this.projectCanonicalRenderMessages(
-        conversation.openCodeSessionId,
+        sessionId,
         canonicalMessages,
       ),
       revertState: this.getConversationCanonicalSyncRevertState(conversation, canonicalMessages),
@@ -222,13 +229,22 @@ export class ConversationAuthoritativeReloadCoordinator {
   private async getConversationServerSyncSnapshot(
     conversation: Conversation,
   ): Promise<ConversationServerSyncSnapshot> {
-    const serverMessages = await this.host.getSessionMessages(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) {
+      return {
+        serverMessages: [],
+        convertedServerMessages: [],
+        revertState: null,
+      };
+    }
+
+    const serverMessages = await this.host.getSessionMessages(sessionId);
     const revertState = await this.getConversationServerSyncRevertState(
       conversation,
       serverMessages,
     );
     const convertedServerMessages = this.projectCanonicalRenderMessages(
-      conversation.openCodeSessionId,
+      sessionId,
       serverMessages,
     );
 
@@ -275,7 +291,8 @@ export class ConversationAuthoritativeReloadCoordinator {
       return null;
     }
 
-    return this.host.getSessionRevertState(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    return sessionId ? this.host.getSessionRevertState(sessionId) : null;
   }
 
   private getConversationCanonicalSyncRevertState(

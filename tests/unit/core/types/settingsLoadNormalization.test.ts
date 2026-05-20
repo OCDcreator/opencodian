@@ -47,4 +47,101 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
     expect(state.settings.enabledBackends).toEqual(['opencode']);
     expect(state.settings.activeBackend).toBe('opencode');
   });
+
+  it('normalizes Claude Code backend settings and preserves enabled Claude once implemented', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          enabledBackends: ['claude-code', 'opencode'],
+          activeBackend: 'claude-code',
+          backendSettings: {
+            claudeCode: {
+              executablePath: ' ~/bin/claude ',
+              settingSources: ['project', 'bogus', 'project', 'user'],
+              permissionMode: 'bypassPermissions',
+              thinking: { type: 'fixed', budgetTokens: 1234.8 },
+              effort: 'max',
+              additionalDirectories: [' /tmp/context ', '', '/tmp/context'],
+              model: ' claude-opus-4-6 ',
+              fallbackModel: ' claude-sonnet-4-5 ',
+            },
+          },
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(state.settings.enabledBackends).toEqual(['claude-code', 'opencode']);
+    expect(state.settings.activeBackend).toBe('claude-code');
+    expect(state.settings.backendSettings.claudeCode).toEqual({
+      executablePath: '~/bin/claude',
+      settingSources: ['project', 'user'],
+      permissionMode: 'bypassPermissions',
+      thinking: { type: 'fixed', budgetTokens: 1234 },
+      effort: 'max',
+      additionalDirectories: ['/tmp/context'],
+      model: 'claude-opus-4-6',
+      fallbackModel: 'claude-sonnet-4-5',
+    });
+  });
+
+  it('defaults Claude settingSources to project but preserves an explicit empty list', () => {
+    const missing = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          backendSettings: {
+            claudeCode: {
+              settingSources: 'invalid',
+            },
+          },
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+    const explicitNone = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          backendSettings: {
+            claudeCode: {
+              settingSources: [],
+            },
+          },
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(missing.settings.backendSettings.claudeCode.settingSources).toEqual(['project']);
+    expect(explicitNone.settings.backendSettings.claudeCode.settingSources).toEqual([]);
+  });
 });

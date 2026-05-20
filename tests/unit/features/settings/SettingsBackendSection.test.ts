@@ -1,3 +1,5 @@
+import { Setting } from 'obsidian';
+
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import {
   BACKEND_OPTIONS,
@@ -15,12 +17,17 @@ describe('SettingsBackendSection', () => {
     jest.restoreAllMocks();
   });
 
-  it('exposes only implemented backends in Phase 0', () => {
-    expect(BACKEND_OPTIONS.map((option) => option.id)).toEqual(['opencode']);
+  it('exposes implemented backends without exposing future placeholders', () => {
+    expect(BACKEND_OPTIONS.map((option) => option.id)).toEqual(['opencode', 'claude-code']);
   });
 
-  it('attaches without rendering future backend options', () => {
+  it('attaches implemented backend options without rendering future backend placeholders', () => {
     const containerEl = document.createElement('div');
+    const names: string[] = [];
+    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
+      names.push(name);
+      return this;
+    });
     const section = new SettingsBackendSection({
       plugin: {
         settings: { ...DEFAULT_SETTINGS },
@@ -33,7 +40,7 @@ describe('SettingsBackendSection', () => {
 
     section.attach(containerEl);
 
-    expect(containerEl.textContent).not.toContain('Claude Code');
-    expect(containerEl.textContent).not.toContain('Codex');
+    expect(names).toContain('Claude Code');
+    expect(names).not.toContain('Codex');
   });
 });

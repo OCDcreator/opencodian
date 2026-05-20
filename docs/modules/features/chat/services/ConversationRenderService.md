@@ -18,7 +18,7 @@
 
 它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 persisted assistant shell / pseudo-stream footer / streaming-shell state 收尾由嵌套的 `ConversationAssistantShellRenderPort` 提供，assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾则进一步收束在 `ConversationAssistantTailRenderPort`。canonical session graph 的读取与 OpenCode message hydration 则通过可选的 `ConversationCanonicalRenderSource` 注入，避免 render host 继续扩大。
 
-基础 render contract、消息/伪流式 assistant 渲染 delegate 与 synced append apply delegate 已拆到 `ConversationRenderRuntime`；尾部 assistant patch 的 tab/container、rendered sequence、signature 与 DOM target preflight 已拆到 `ConversationTrailingAssistantPatchPlanner`。canonical turn 组装与 canonical render input 投影都由 `ConversationTurnViewModelBuilder` 承接，`ConversationRenderService` 本身因此只保留 full rerender、synced update 输入选择与 trailing-assistant patch execution/logging 这些高层控制流。
+基础 render contract、消息/伪流式 assistant 渲染 delegate 与 synced append apply delegate 已拆到 `ConversationRenderRuntime`；尾部 assistant patch 的 tab/container、rendered sequence、signature 与 DOM target preflight 已拆到 `ConversationTrailingAssistantPatchPlanner`。canonical turn 组装与 canonical render input 投影都由 `ConversationTurnViewModelBuilder` 承接，`ConversationRenderService` 本身因此只保留 full rerender、synced update 输入选择与 trailing-assistant patch execution/logging 这些高层控制流。full rerender 的 canonical source lookup 现在通过 `getConversationBackendSessionId()` 解析 session id；缺失 backend session 时回退 persisted `Conversation.messages`。
 
 ## 公开接口
 

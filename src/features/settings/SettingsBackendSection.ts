@@ -72,6 +72,7 @@ export class SettingsBackendSection {
               // Sync registry active backend
               this.plugin.agentServiceRegistry?.setActive(value as AgentBackendKind);
               await this.plugin.saveSettings();
+              this.requestDisplayRefresh();
             }
           });
       });

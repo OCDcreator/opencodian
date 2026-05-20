@@ -143,6 +143,35 @@ describe('MessageSendPreparationService', () => {
     expect(host.renderMessage).not.toHaveBeenCalled();
     expect(conversation.messages).toHaveLength(0);
   });
+
+  it('skips OpenCode model catalog validation for Claude Code conversations', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-code-session';
+    delete conversation.openCodeSessionId;
+    const host = createHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn().mockReturnValue(false),
+      hasLoadedModelCatalog: jest.fn().mockReturnValue(false),
+      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(false),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'Hello Claude' });
+
+    expect(result).not.toBeNull();
+    expect(host.loadAvailableModels).not.toHaveBeenCalled();
+    expect(host.getSendMessageOptions).not.toHaveBeenCalled();
+    expect(host.ensureSelectedModelAvailable).not.toHaveBeenCalled();
+    expect(host.appendModelUnavailableNoticeMessage).not.toHaveBeenCalled();
+    expect(result?.modelOptions).toEqual({});
+    expect(result?.activeModelId).toBeUndefined();
+    expect(host.seedCanonicalUserMessage).toHaveBeenCalledWith({
+      sessionID: 'claude-code-session',
+      messageID: 'message-1',
+      parts: [{ id: 'part-1', type: 'text', text: 'Hello Claude' }],
+      timestamp: result?.userMessage.timestamp,
+    });
+  });
 });
 
 describe('MessageSendPreparationService optimistic preparation', () => {

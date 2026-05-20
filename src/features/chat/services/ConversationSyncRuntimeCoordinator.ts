@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type {
@@ -29,7 +30,8 @@ export interface ConversationSyncRuntimeCoordinatorHost {
 export interface ConversationSyncTimeoutDiagnostic {
   readonly tabId: TabId;
   readonly conversationId: string;
-  readonly openCodeSessionId: string;
+  readonly openCodeSessionId?: string;
+  readonly backendSessionId?: string;
   readonly ageMs: number;
   readonly phase: string;
   readonly reason: string | null;
@@ -125,7 +127,7 @@ export class ConversationSyncRuntimeCoordinator {
       runtime: ConversationSyncRuntime;
     }) => Promise<void>,
   ): Promise<boolean> {
-    if (!tabId || !conversation?.openCodeSessionId) {
+    if (!tabId || !conversation || !getConversationBackendSessionId(conversation)) {
       return false;
     }
 
@@ -164,6 +166,7 @@ export class ConversationSyncRuntimeCoordinator {
       tabId,
       conversationId: conversation.id,
       openCodeSessionId: conversation.openCodeSessionId,
+      backendSessionId: getConversationBackendSessionId(conversation),
       ageMs: this.now() - startedAt,
       phase: runtime.tabSessionLifecycle.phase,
       reason: runtime.tabSessionLifecycle.reason,

@@ -14,6 +14,7 @@ function createFixture() {
   const host: jest.Mocked<ChatHeaderPresenterHost> = {
     setTooltipLabel: jest.fn((element, label, position) => {
       element.setAttribute('data-tooltip', label);
+      element.removeAttribute('aria-label');
       if (position) {
         element.setAttribute('data-tooltip-position', position);
       }
@@ -101,6 +102,29 @@ describe('ChatHeaderPresenter', () => {
     expect(fixture.host.showConversationHistory).toHaveBeenCalledTimes(1);
     expect(fixture.host.openConversationSessionSettings).toHaveBeenCalledTimes(1);
     expect(fixture.host.openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes stable accessible header action locators', () => {
+    const fixture = createFixture();
+
+    const expectedActions = [
+      ['new-tab', t('chat.tab.newTooltip')],
+      ['new-current-tab', t('chat.tab.newCurrentTooltip')],
+      ['history', t('chat.history.open')],
+      ['session-settings', t('chat.sessionSettings.open')],
+      ['settings', t('chat.settings.open')],
+    ];
+
+    for (const [action, label] of expectedActions) {
+      const buttonEl = fixture.headerEl.querySelector<HTMLButtonElement>(
+        `.opencodian-header-btn[data-action="${action}"]`,
+      );
+      expect(buttonEl).not.toBeNull();
+      expect(buttonEl?.tagName).toBe('BUTTON');
+      expect(buttonEl?.getAttribute('type')).toBe('button');
+      expect(buttonEl?.getAttribute('aria-label')).toBe(label);
+      expect(buttonEl?.getAttribute('data-tooltip')).toBe(label);
+    }
   });
 
   it('marks the new-tab action for tab-disabled container CSS', () => {

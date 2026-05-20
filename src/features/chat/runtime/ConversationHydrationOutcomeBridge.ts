@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { TabConversationStateBridge } from './TabConversationStateBridge';
 import type { TabViewActivationBridge } from './TabViewActivationBridge';
@@ -15,6 +16,14 @@ type TabViewActivationPort = Pick<
   TabViewActivationBridge,
   'applyLoadedConversationPostRenderOutcome'
 >;
+
+function getOpenCodeActivationSessionId(conversation: Conversation): string | null {
+  if ((conversation.backend ?? 'opencode') !== 'opencode') {
+    return null;
+  }
+
+  return getConversationBackendSessionId(conversation) ?? null;
+}
 
 export interface ConversationHydrationOutcomeBridgeHost {
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
@@ -47,7 +56,7 @@ export class ConversationHydrationOutcomeBridge implements ConversationHydration
     await this.host.renderMessages(messages);
     await this.tabViewActivationBridge.applyLoadedConversationPostRenderOutcome(
       tabId,
-      conversation.openCodeSessionId,
+      getOpenCodeActivationSessionId(conversation),
     );
     this.tabConversationStateBridge.commitConversationSyncBaseline(messages);
   }

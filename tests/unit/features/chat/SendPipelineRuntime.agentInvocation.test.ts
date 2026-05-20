@@ -219,7 +219,7 @@ describe('SendPipelineRuntime agent invocation', () => {
 
     expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith(input);
     expect(host.sendStreamMessage).toHaveBeenCalledTimes(1);
-    expect(host.sendStreamMessage).toHaveBeenCalledWith('Hello', {
+    expect(host.sendStreamMessage).toHaveBeenCalledWith(preparedSend.conversation, 'Hello', {
       sessionId: 'session-1',
       provider: 'openai',
       model: 'gpt-5.4',

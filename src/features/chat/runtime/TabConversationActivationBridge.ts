@@ -1,4 +1,7 @@
-import type { Conversation } from '../../../core/types';
+import {
+  type Conversation,
+  getConversationBackendSessionId,
+} from '../../../core/types';
 import type { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../services/QuestionTodoBackgroundTaskActivationHostAdapter';
@@ -27,6 +30,11 @@ type BackgroundTaskActivationIndicatorPort = Pick<
   | 'syncOpenConversationState'
   | 'renderOpenConversationIndicator'
 >;
+
+function supportsOpenCodeActivationRefresh(conversation: Conversation): boolean {
+  return (conversation.backend ?? 'opencode') === 'opencode'
+    && Boolean(getConversationBackendSessionId(conversation));
+}
 
 type TabViewActivationPort = Pick<
   TabViewActivationBridge,
@@ -89,7 +97,9 @@ export class TabConversationActivationBridge {
     this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.tabViewActivationBridge.applyStreamingActivationOutcome(
       tabId,
-      conversation.openCodeSessionId,
+      supportsOpenCodeActivationRefresh(conversation)
+        ? getConversationBackendSessionId(conversation) ?? null
+        : null,
     );
   }
 
@@ -117,10 +127,12 @@ export class TabConversationActivationBridge {
       conversation,
       activeTabId,
     );
-    this.questionTodoActivationRefreshCoordinator.applyConversationActivation(
-      activeTabId,
-      conversation.openCodeSessionId,
-    );
+    if (supportsOpenCodeActivationRefresh(conversation)) {
+      this.questionTodoActivationRefreshCoordinator.applyConversationActivation(
+        activeTabId,
+        getConversationBackendSessionId(conversation) ?? null,
+      );
+    }
     this.backgroundTaskActivationIndicatorCoordinator.renderOpenConversationIndicator(activeTabId);
     void this.activeTabContextUsageCoordinator.refreshFromServer();
     this.host.scheduleSettledScrollToBottom(activeTabId);
