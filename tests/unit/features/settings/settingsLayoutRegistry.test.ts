@@ -120,7 +120,15 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(claudeTab).toBeDefined();
     expect(claudeTab!.labelKey).toBe('settings.claudeCode.title');
     expect(claudeTab!.defaultSecondaryTabId).toBe('runtime');
-    expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['runtime', 'model-thinking', 'permissions', 'context-sources', 'mcp-advanced']);
+    expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'runtime',
+      'model-thinking',
+      'permissions',
+      'context-sources',
+      'tools',
+      'limits',
+      'sdk-foundations',
+    ]);
   });
 
   it('splits formatter settings into formatter and language server secondary tabs', () => {
@@ -174,6 +182,7 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('general', 'backend')).toBe('agents');
     expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
     expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
+    expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('tools');
   });
 
   it('falls back to the first primary for unknown primary ids', () => {

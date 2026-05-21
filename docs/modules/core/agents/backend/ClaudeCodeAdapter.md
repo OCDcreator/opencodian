@@ -29,6 +29,7 @@
 - 在首次 `sendMessage()` 时 lazy-load 官方 SDK；单测仍可注入 fake facade，启动路径不会直接 import SDK
 - 对已经持久化到 OpenCodian conversation metadata 的 Claude SDK session id 进行轻量恢复，避免 Obsidian reload 后同一个 `backendSessionId` 因 adapter 内存 Map 清空而在发送前失败；恢复后的第一次 `query()` 会传入 `options.resume`
 - 通过 SDK facade 暴露 `listSessions()`、`getSession()`、`renameSession()` 与 `forkSession()` 的基础委托；fork 成功后以 SDK session id 建立新的本地 session state
+- 对活跃、checkpoint-enabled 的 SDK `Query` 暴露后端级 `rewindFiles(sessionId, userMessageId, { dryRun? })` 委托；当前没有接入稳定聊天按钮，调用方必须先完成 dry-run/确认设计
 
 ## 维护约束
 
@@ -36,5 +37,6 @@
 - OpenCode 仍是默认 backend；Claude Code 必须通过设置显式启用，认证失败会以 Claude Code error chunk 暴露，而不是回落到 OpenCode。
 - `spawnClaudeCodeProcess` 不要把 SDK 传入的 `signal` 继续传给 Node `spawn()` options；它需要手动监听 abort 并 kill 子进程，保持 Obsidian renderer 兼容。
 - 本地 handle 与 SDK `session_id` 是两层身份：首次发送前只有本地 handle，SDK 输出 `session_id` 后才把 conversation `backendSessionId` 收敛为真实可 resume 的 Claude session id；如果 reload 后传入的 `backendSessionId` 已经是 Claude SDK session id，adapter 会直接恢复 `sdkSessionId` 并 resume。
-- 持久 `Query` 关闭或 adapter reload 后，下一次发送会重新启动 SDK query，并在已捕获真实 SDK `session_id` 时继续通过 `resume` 恢复；OpenCodian 本地生成的 `claude-code-*` conversation handle 不会被误传给 SDK `resume`。JSONL replay 和完整 history browser 仍属于后续 full-capability phase。
+- 持久 `Query` 关闭或 adapter reload 后，下一次发送会重新启动 SDK query，并在已捕获真实 SDK `session_id` 时继续通过 `resume` 恢复；OpenCodian 本地生成的 `claude-code-*` conversation handle 不会被误传给 SDK `resume`。JSONL replay、完整 history browser、hook/agent/skill authoring UI 和 stable rewind UI 仍属于后续 full-capability phase。
+- Claude Code 目前不注册 `Hooks` / `Subagents` UI capability，避免误打开 OpenCode-only 子代理或 hooks surface；SDK hook/subagent 事件先以 diagnostic `backend_event` 进入发送调试链路。
 - crash recovery 当前只做错误 chunk；异常后的 prompt replay、冷启动 fallback 和多 view 并发同 session 仲裁属于后续 full-capability phase。

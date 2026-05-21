@@ -47,6 +47,8 @@
 | `getLogPreview(text, maxLength)` | 归一化空白并截断文本，用于日志预览 |
 | `stringifyLogPayload(payload)` | 安全的 JSON.stringify，失败时返回 `'[unserializable]'` |
 
+`summarizeCoreStreamChunkForDebug()` 现在识别 `backend_event`，把 Claude Code hook、subagent、tool progress、structured output 等诊断事件压缩为 source/event/status/id/name/contentLength/metadataKeys。它不泄露完整 structured output payload 到日志摘要，也不把这些事件当成可渲染 transcript。
+
 ## 设计约束
 
 - 所有函数均为纯函数，不依赖外部状态

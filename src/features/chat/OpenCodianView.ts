@@ -3992,6 +3992,7 @@ export class OpenCodianView extends ItemView {
       case 'message_stop':
       case 'message_metadata':
       case 'usage':
+      case 'backend_event':
       case 'content_block_start':
       case 'content_block_stop':
         // These chunks don't need to be converted for rendering

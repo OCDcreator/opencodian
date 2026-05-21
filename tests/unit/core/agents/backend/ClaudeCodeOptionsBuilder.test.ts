@@ -26,6 +26,8 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(options).toEqual({
       cwd: '/vault/project',
       includePartialMessages: true,
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
+      tools: { type: 'preset', preset: 'claude_code' },
       settingSources: ['project', 'user'],
       permissionMode: 'plan',
       thinking: { type: 'enabled', budgetTokens: 8192 },
@@ -53,6 +55,8 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(options).toEqual({
       cwd: '/vault/project',
       includePartialMessages: true,
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
+      tools: { type: 'preset', preset: 'claude_code' },
       settingSources: [],
       permissionMode: 'default',
       thinking: { type: 'adaptive' },
@@ -73,6 +77,34 @@ describe('ClaudeCodeOptionsBuilder', () => {
     });
 
     expect(options.pathToClaudeCodeExecutable).toBe('/resolved/claude');
+  });
+
+  it('enables Claude Code preset prompt and default tools for real coding sessions', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options.systemPrompt).toEqual({ type: 'preset', preset: 'claude_code' });
+    expect(options.tools).toEqual({ type: 'preset', preset: 'claude_code' });
+  });
+
+  it('sets the SDK-required explicit bypass acknowledgement only for bypass permission mode', () => {
+    const defaultOptions = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+    const bypassOptions = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        permissionMode: 'bypassPermissions',
+      },
+    });
+
+    expect(defaultOptions).not.toHaveProperty('allowDangerouslySkipPermissions');
+    expect(bypassOptions.permissionMode).toBe('bypassPermissions');
+    expect(bypassOptions.allowDangerouslySkipPermissions).toBe(true);
   });
 
   it('maps a captured SDK session id to resume options for later sends', () => {
@@ -155,5 +187,31 @@ describe('ClaudeCodeOptionsBuilder', () => {
     });
 
     expect(options.env).toEqual({ CLAUDE_AGENT_SDK_CLIENT_APP: 'opencodian/1.0.0' });
+  });
+
+  it('passes verified Claude Code SDK capability toggles only when enabled', () => {
+    const defaultOptions = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+    const enabledOptions = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableFileCheckpointing: true,
+        includeHookEvents: true,
+        forwardSubagentText: true,
+        agentProgressSummaries: true,
+      },
+    });
+
+    expect(defaultOptions).not.toHaveProperty('enableFileCheckpointing');
+    expect(defaultOptions).not.toHaveProperty('includeHookEvents');
+    expect(defaultOptions).not.toHaveProperty('forwardSubagentText');
+    expect(defaultOptions).not.toHaveProperty('agentProgressSummaries');
+    expect(enabledOptions.enableFileCheckpointing).toBe(true);
+    expect(enabledOptions.includeHookEvents).toBe(true);
+    expect(enabledOptions.forwardSubagentText).toBe(true);
+    expect(enabledOptions.agentProgressSummaries).toBe(true);
   });
 });

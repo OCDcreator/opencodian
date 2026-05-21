@@ -1,6 +1,8 @@
 import { getToolIdentity } from '../../../shared';
 import type { StreamChunk } from '../../types';
 
+/* eslint-disable max-lines -- Claude Code stream normalization keeps SDK event fixtures in one audited compatibility boundary. */
+
 type JsonRecord = Record<string, unknown>;
 type StreamToolKind = Extract<StreamChunk, { type: 'tool_use' }>['kind'];
 
@@ -54,9 +56,23 @@ function readArray(value: unknown): unknown[] {
 }
 
 function readUsage(record: JsonRecord): JsonRecord | null {
-  return readRecord(record.usage)
+  const usage = readRecord(record.usage)
     ?? readRecord(record.total_usage)
     ?? readRecord(readRecord(record.message)?.usage);
+  if (!usage) {
+    return null;
+  }
+  const hasTokenCounters = [
+    usage.input_tokens,
+    usage.inputTokens,
+    usage.input,
+    usage.output_tokens,
+    usage.outputTokens,
+    usage.output,
+    usage.reasoning_tokens,
+    usage.reasoningTokens,
+  ].some((value) => typeof value === 'number');
+  return hasTokenCounters ? usage : null;
 }
 
 function readInputTokenCount(usage: JsonRecord): number {
@@ -107,6 +123,15 @@ function stringifyContent(value: unknown): string {
       ?? JSON.stringify(value);
   }
   return String(value);
+}
+
+function readJsonRecord(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? { ...value } : undefined;
+}
+
+function stringifyOptionalContent(value: unknown): string | undefined {
+  const content = stringifyContent(value).trim();
+  return content.length > 0 ? content : undefined;
 }
 
 function normalizeToolInput(value: unknown): Record<string, unknown> {
@@ -296,6 +321,7 @@ export class ClaudeCodeStreamNormalizer {
     return chunks;
   }
 
+  // eslint-disable-next-line complexity -- SDK system lifecycle events intentionally converge at this compatibility boundary.
   private appendLifecycleChunks(
     record: JsonRecord,
     chunks: StreamChunk[],
@@ -303,19 +329,71 @@ export class ClaudeCodeStreamNormalizer {
   ): void {
     const type = readString(record.type);
     const subtype = readString(record.subtype);
-    if (type !== 'system' || (subtype !== 'session_init' && subtype !== 'init')) {
+    if (type !== 'system') {
       return;
     }
 
-    const modelId = readNonEmptyString(record.model)
-      ?? readNonEmptyString(readRecord(record.message)?.model);
-    chunks.push({
-      type: 'message_metadata',
-      messageId: sessionId ?? 'claude-session',
-      timestamp: Date.now(),
-      ...(modelId ? { modelId } : {}),
-      ...(sessionId ? { sessionId } : {}),
-    });
+    if (subtype === 'session_init' || subtype === 'init') {
+      const modelId = readNonEmptyString(record.model)
+        ?? readNonEmptyString(readRecord(record.message)?.model);
+      chunks.push({
+        type: 'message_metadata',
+        messageId: sessionId ?? 'claude-session',
+        timestamp: Date.now(),
+        ...(modelId ? { modelId } : {}),
+        ...(sessionId ? { sessionId } : {}),
+      });
+      return;
+    }
+
+    if (subtype === 'hook_started' || subtype === 'hook_progress' || subtype === 'hook_response') {
+      chunks.push({
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'hook',
+        status: subtype.replace(/^hook_/, ''),
+        id: readNonEmptyString(record.hook_id),
+        name: readNonEmptyString(record.hook_name),
+        content: stringifyOptionalContent(record.output),
+        metadata: {
+          hookEvent: readNonEmptyString(record.hook_event) ?? null,
+          stdout: stringifyOptionalContent(record.stdout) ?? null,
+          stderr: stringifyOptionalContent(record.stderr) ?? null,
+          exitCode: readNumber(record.exit_code) ?? null,
+          outcome: readNonEmptyString(record.outcome) ?? null,
+        },
+        ...(sessionId ? { sessionId } : {}),
+      });
+      return;
+    }
+
+    if (subtype === 'task_started' || subtype === 'task_progress' || subtype === 'task_notification' || subtype === 'task_updated') {
+      chunks.push({
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'subagent',
+        status: subtype.replace(/^task_/, ''),
+        id: readNonEmptyString(record.task_id),
+        name: readNonEmptyString(record.subagent_type)
+          ?? readNonEmptyString(record.workflow_name)
+          ?? readNonEmptyString(record.task_type),
+        content: readNonEmptyString(record.summary)
+          ?? readNonEmptyString(record.description)
+          ?? readNonEmptyString(record.prompt)
+          ?? readNonEmptyString(record.output_file),
+        metadata: {
+          toolUseId: readNonEmptyString(record.tool_use_id) ?? null,
+          taskType: readNonEmptyString(record.task_type) ?? null,
+          workflowName: readNonEmptyString(record.workflow_name) ?? null,
+          skipTranscript: readBoolean(record.skip_transcript) ?? false,
+          outputFile: readNonEmptyString(record.output_file) ?? null,
+          usage: readJsonRecord(record.usage) ?? null,
+          patch: readJsonRecord(record.patch) ?? null,
+        },
+        ...(sessionId ? { sessionId } : {}),
+      });
+      return;
+    }
   }
 
   private appendDeltaChunk(record: JsonRecord, chunks: StreamChunk[]): void {
@@ -453,8 +531,39 @@ export class ClaudeCodeStreamNormalizer {
     record: JsonRecord,
     chunks: StreamChunk[],
   ): void {
+    if (readString(record.type) === 'tool_progress') {
+      chunks.push({
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'tool_progress',
+        status: 'progress',
+        id: readNonEmptyString(record.tool_use_id),
+        name: readNonEmptyString(record.tool_name),
+        metadata: {
+          parentToolUseId: readNonEmptyString(record.parent_tool_use_id) ?? null,
+          elapsedTimeSeconds: readNumber(record.elapsed_time_seconds) ?? null,
+          taskId: readNonEmptyString(record.task_id) ?? null,
+        },
+      });
+      return;
+    }
+
     if (readString(record.type) !== 'result') {
       return;
+    }
+
+    if (record.structured_output !== undefined) {
+      chunks.push({
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'structured_output',
+        status: 'received',
+        content: stringifyOptionalContent(record.structured_output),
+        metadata: {
+          structuredOutput: record.structured_output,
+          deferredToolUse: record.deferred_tool_use ?? null,
+        },
+      });
     }
 
     const subtype = readString(record.subtype);

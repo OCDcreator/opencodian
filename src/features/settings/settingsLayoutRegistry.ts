@@ -48,7 +48,9 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'model-thinking', labelKey: 'settings.claudeCode.tab.modelThinking' },
       { id: 'permissions', labelKey: 'settings.claudeCode.tab.permissions' },
       { id: 'context-sources', labelKey: 'settings.claudeCode.tab.contextSources' },
-      { id: 'mcp-advanced', labelKey: 'settings.claudeCode.tab.mcpAdvanced' },
+      { id: 'tools', labelKey: 'settings.claudeCode.tab.tools' },
+      { id: 'limits', labelKey: 'settings.claudeCode.tab.limits' },
+      { id: 'sdk-foundations', labelKey: 'settings.claudeCode.tab.sdkFoundations' },
     ],
   },
   {
@@ -253,6 +255,10 @@ const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
   },
   conversation: {
     rendering: 'display',
+  },
+  'claude-code': {
+    'mcp-advanced': 'tools',
+    mcpAdvanced: 'tools',
   },
   security: {
     permissions: 'config',

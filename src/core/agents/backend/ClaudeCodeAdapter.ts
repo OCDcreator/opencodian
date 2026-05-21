@@ -290,6 +290,19 @@ export class ClaudeCodeAdapter
     return { id: result.sessionId, title: forkedState.title };
   }
 
+  async rewindFiles(
+    sessionId: string,
+    userMessageId: string,
+    options?: { dryRun?: boolean },
+  ): Promise<unknown> {
+    const session = this.getOrRestoreSession(sessionId);
+    const rewindFiles = session.runtime?.query?.rewindFiles;
+    if (!rewindFiles) {
+      throw new Error('Claude Code rewindFiles is unavailable. Start a checkpoint-enabled runtime first.');
+    }
+    return await rewindFiles(userMessageId, options);
+  }
+
   async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const session = this.getOrRestoreSession(request.sessionId);
     this.cancelledSessions.delete(request.sessionId);

@@ -5,6 +5,8 @@ import type {
   ClaudeCodeSettingSource,
 } from '../../types';
 
+/* eslint-disable complexity -- This module is the single audited mapping boundary for Claude Code SDK options. */
+
 export interface ClaudeCodeSpawnRequest {
   command: string;
   args: string[];
@@ -48,8 +50,11 @@ export interface ClaudeCodeOptionsBuilderInput {
 export interface ClaudeCodeSdkOptionsShape {
   cwd: string;
   includePartialMessages: true;
+  systemPrompt: { type: 'preset'; preset: 'claude_code' };
+  tools: { type: 'preset'; preset: 'claude_code' };
   settingSources: ClaudeCodeSettingSource[];
   permissionMode?: ClaudeCodePermissionMode;
+  allowDangerouslySkipPermissions?: boolean;
   thinking?: ClaudeCodeSdkThinking;
   effort?: ClaudeCodeEffort;
   model?: string;
@@ -67,6 +72,10 @@ export interface ClaudeCodeSdkOptionsShape {
   maxTurns?: number;
   maxBudgetUsd?: number;
   env?: Record<string, string | undefined>;
+  enableFileCheckpointing?: boolean;
+  includeHookEvents?: boolean;
+  forwardSubagentText?: boolean;
+  agentProgressSummaries?: boolean;
 }
 
 function cloneSettingSources(sources: readonly ClaudeCodeSettingSource[]): ClaudeCodeSettingSource[] {
@@ -98,11 +107,16 @@ export function buildClaudeCodeOptions(
   const options: ClaudeCodeSdkOptionsShape = {
     cwd: input.vaultPath,
     includePartialMessages: true,
+    systemPrompt: { type: 'preset', preset: 'claude_code' },
+    tools: { type: 'preset', preset: 'claude_code' },
     settingSources: cloneSettingSources(input.settings.settingSources),
     permissionMode: input.settings.permissionMode,
     thinking: mapThinkingForSdk(input.settings),
     effort: input.settings.effort,
   };
+  if (input.settings.permissionMode === 'bypassPermissions') {
+    options.allowDangerouslySkipPermissions = true;
+  }
 
   const model = trimOptionalString(input.settings.model);
   if (model) {
@@ -151,6 +165,18 @@ export function buildClaudeCodeOptions(
   }
   if (Object.keys(input.settings.env).length > 0) {
     options.env = input.settings.env;
+  }
+  if (input.settings.enableFileCheckpointing) {
+    options.enableFileCheckpointing = true;
+  }
+  if (input.settings.includeHookEvents) {
+    options.includeHookEvents = true;
+  }
+  if (input.settings.forwardSubagentText) {
+    options.forwardSubagentText = true;
+  }
+  if (input.settings.agentProgressSummaries) {
+    options.agentProgressSummaries = true;
   }
 
   return options;

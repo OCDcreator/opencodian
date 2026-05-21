@@ -6,10 +6,14 @@
  *   - Model & Thinking: model, fallback model, thinking type/budget, effort
  *   - Permissions: permission mode
  *   - Context & Sources: setting sources, additional directories
+ *   - Tools: allowed/disallowed tool names
+ *   - Limits: max turns, budget
+ *   - SDK Foundations: checkpointing and diagnostic stream switches
  *
  * Only controls backed by real adapter wiring and focused tests are exposed
  * as editable. Unverified capabilities remain hidden or read-only.
  */
+/* eslint-disable max-lines -- Claude Code settings keeps cross-layout tab rendering and persistence controls co-located for auditability. */
 
 import { Setting } from 'obsidian';
 
@@ -70,7 +74,9 @@ const CLAUDE_CLASSIC_TABS = [
   'model-thinking',
   'permissions',
   'context-sources',
-  'mcp-advanced',
+  'tools',
+  'limits',
+  'sdk-foundations',
 ] as const;
 
 const CLAUDE_TAB_LABEL_KEYS: Record<typeof CLAUDE_CLASSIC_TABS[number], TranslationKey> = {
@@ -78,7 +84,9 @@ const CLAUDE_TAB_LABEL_KEYS: Record<typeof CLAUDE_CLASSIC_TABS[number], Translat
   'model-thinking': 'settings.claudeCode.tab.modelThinking',
   permissions: 'settings.claudeCode.tab.permissions',
   'context-sources': 'settings.claudeCode.tab.contextSources',
-  'mcp-advanced': 'settings.claudeCode.tab.mcpAdvanced',
+  tools: 'settings.claudeCode.tab.tools',
+  limits: 'settings.claudeCode.tab.limits',
+  'sdk-foundations': 'settings.claudeCode.tab.sdkFoundations',
 };
 
 export class SettingsClaudeCodeSection {
@@ -144,8 +152,14 @@ export class SettingsClaudeCodeSection {
       case 'context-sources':
         this.renderContextSourcesTab(bodyEl);
         break;
-      case 'mcp-advanced':
-        this.renderMcpAdvancedTab(bodyEl);
+      case 'tools':
+        this.renderToolsTab(bodyEl);
+        break;
+      case 'limits':
+        this.renderLimitsTab(bodyEl);
+        break;
+      case 'sdk-foundations':
+        this.renderSdkFoundationsTab(bodyEl);
         break;
       default:
         this.renderRuntimeTab(bodyEl);
@@ -159,6 +173,7 @@ export class SettingsClaudeCodeSection {
     this.renderExecutableSetting(containerEl);
     this.renderEnvironmentHint(containerEl);
     this.renderDiagnostics(containerEl);
+    this.renderEnvironmentVariablesSetting(containerEl);
   }
 
   private renderExecutableSetting(containerEl: HTMLElement): void {
@@ -179,7 +194,12 @@ export class SettingsClaudeCodeSection {
   private renderEnvironmentHint(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.claudeCode.environment.name'))
-      .setDesc(t('settings.claudeCode.environment.desc'));
+      .setDesc(t('settings.claudeCode.environment.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.environment.status'))
+          .setDisabled(true);
+      });
   }
 
   private renderDiagnostics(containerEl: HTMLElement): void {
@@ -406,14 +426,24 @@ export class SettingsClaudeCodeSection {
       });
   }
 
-  // ─── MCP / Advanced tab ──────────────────────────────────────────
+  // ─── Tools tab ───────────────────────────────────────────────────
 
-  private renderMcpAdvancedTab(containerEl: HTMLElement): void {
+  private renderToolsTab(containerEl: HTMLElement): void {
     this.renderAllowedToolsSetting(containerEl);
     this.renderDisallowedToolsSetting(containerEl);
+  }
+
+  // ─── Limits tab ──────────────────────────────────────────────────
+
+  private renderLimitsTab(containerEl: HTMLElement): void {
     this.renderMaxTurnsSetting(containerEl);
     this.renderMaxBudgetSetting(containerEl);
-    this.renderEnvironmentVariablesSetting(containerEl);
+  }
+
+  // ─── SDK Foundations tab ─────────────────────────────────────────
+
+  private renderSdkFoundationsTab(containerEl: HTMLElement): void {
+    this.renderSdkFoundationOptions(containerEl);
   }
 
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {
@@ -471,6 +501,56 @@ export class SettingsClaudeCodeSection {
           .setValue(this.settings.maxBudgetUsd === null ? '' : String(this.settings.maxBudgetUsd))
           .onChange(async (value) => {
             this.settings.maxBudgetUsd = this.parseNullablePositiveNumber(value);
+            await this.saveSettings();
+          });
+      });
+  }
+
+  private renderSdkFoundationOptions(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.enableFileCheckpointing.name'))
+      .setDesc(t('settings.claudeCode.enableFileCheckpointing.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.enableFileCheckpointing)
+          .onChange(async (value) => {
+            this.settings.enableFileCheckpointing = value;
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.includeHookEvents.name'))
+      .setDesc(t('settings.claudeCode.includeHookEvents.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.includeHookEvents)
+          .onChange(async (value) => {
+            this.settings.includeHookEvents = value;
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.forwardSubagentText.name'))
+      .setDesc(t('settings.claudeCode.forwardSubagentText.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.forwardSubagentText)
+          .onChange(async (value) => {
+            this.settings.forwardSubagentText = value;
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.agentProgressSummaries.name'))
+      .setDesc(t('settings.claudeCode.agentProgressSummaries.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.agentProgressSummaries)
+          .onChange(async (value) => {
+            this.settings.agentProgressSummaries = value;
             await this.saveSettings();
           });
       });

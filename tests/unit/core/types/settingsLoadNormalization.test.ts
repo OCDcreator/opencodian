@@ -97,6 +97,10 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       maxTurns: null,
       maxBudgetUsd: null,
       env: {},
+      enableFileCheckpointing: false,
+      includeHookEvents: false,
+      forwardSubagentText: false,
+      agentProgressSummaries: false,
     });
   });
 

@@ -1,5 +1,7 @@
 import { createClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend';
 
+/* eslint-disable max-lines-per-function -- The normalizer fixture suite keeps SDK event shape regressions in one place. */
+
 function assistantMessage(id: string, content: unknown[]) {
   return {
     type: 'assistant',
@@ -201,6 +203,122 @@ describe('ClaudeCodeStreamNormalizer', () => {
       inputTokens: 7,
       outputTokens: 2,
       sessionId: 'claude-session-3',
+    }]);
+  });
+
+  it('surfaces Claude Code hook lifecycle events as backend diagnostic events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'hook_response',
+      hook_id: 'hook-1',
+      hook_name: 'lint-on-stop',
+      hook_event: 'Stop',
+      output: 'ok',
+      stdout: 'done',
+      stderr: '',
+      exit_code: 0,
+      outcome: 'success',
+      session_id: 'claude-session-hook',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'hook',
+      status: 'response',
+      id: 'hook-1',
+      name: 'lint-on-stop',
+      content: 'ok',
+      metadata: {
+        hookEvent: 'Stop',
+        stdout: 'done',
+        stderr: null,
+        exitCode: 0,
+        outcome: 'success',
+      },
+      sessionId: 'claude-session-hook',
+    }]);
+  });
+
+  it('surfaces Claude Code subagent progress and result structured output as backend events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'task_progress',
+      task_id: 'task-1',
+      tool_use_id: 'tool-task-1',
+      description: 'Reviewing tests',
+      subagent_type: 'reviewer',
+      summary: 'Checking focused tests',
+      usage: { total_tokens: 1200, tool_uses: 2, duration_ms: 30000 },
+      session_id: 'claude-session-task',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'subagent',
+      status: 'progress',
+      id: 'task-1',
+      name: 'reviewer',
+      content: 'Checking focused tests',
+      metadata: {
+        toolUseId: 'tool-task-1',
+        taskType: null,
+        workflowName: null,
+        skipTranscript: false,
+        outputFile: null,
+        usage: { total_tokens: 1200, tool_uses: 2, duration_ms: 30000 },
+        patch: null,
+      },
+      sessionId: 'claude-session-task',
+    }]);
+
+    const structuredOutputNormalizer = createClaudeCodeStreamNormalizer();
+    expect(structuredOutputNormalizer.transformSDKMessage({
+      type: 'result',
+      session_id: 'claude-session-structured-output',
+      structured_output: { status: 'ok' },
+      total_usage: { input_tokens: 1, output_tokens: 2 },
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'structured_output',
+      status: 'received',
+      content: '{"status":"ok"}',
+      metadata: {
+        structuredOutput: { status: 'ok' },
+        deferredToolUse: null,
+      },
+    }, {
+      type: 'usage',
+      inputTokens: 1,
+      outputTokens: 2,
+      sessionId: 'claude-session-structured-output',
+    }]);
+  });
+
+  it('surfaces Claude Code tool progress as backend diagnostic events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'tool_progress',
+      tool_use_id: 'tool-1',
+      tool_name: 'Bash',
+      parent_tool_use_id: 'parent-1',
+      elapsed_time_seconds: 3.5,
+      task_id: 'task-1',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'tool_progress',
+      status: 'progress',
+      id: 'tool-1',
+      name: 'Bash',
+      metadata: {
+        parentToolUseId: 'parent-1',
+        elapsedTimeSeconds: 3.5,
+        taskId: 'task-1',
+      },
     }]);
   });
 

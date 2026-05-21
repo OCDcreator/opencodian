@@ -33,5 +33,5 @@
 
 - 队列在关闭后不再接受新消息，已排队的等待者会收到 `done: true`。
 - `ClaudeCodeSessionRuntime.effort` 记录创建当前 SDK query 时使用的 Claude Code effort；adapter 用它判断 composer effort 变化时是否需要重启 resumed query。
-- `ClaudeCodeSessionRuntime.query` 是 Claude SDK `Query` 的窄类型，只列出 adapter 会用到的控制方法：`interrupt`、`setModel`、`setPermissionMode`、`setMcpServers`、`supportedModels` 和 `close`。`setMcpServers` 返回值按 SDK 的结果对象处理为 `Promise<unknown>`，调用方不假设它是 `void`。
+- `ClaudeCodeSessionRuntime.query` 是 Claude SDK `Query` 的窄类型，只列出 adapter 会用到的控制方法：`interrupt`、`setModel`、`setPermissionMode`、`setMcpServers`、`rewindFiles`、`supportedModels` 和 `close`。`setMcpServers` 与 `rewindFiles` 返回值按 SDK 的结果对象处理为 `Promise<unknown>`，调用方不假设具体结构。
 - 从 `ClaudeCodeAdapter` 提取以控制文件行数，不影响公共 API。

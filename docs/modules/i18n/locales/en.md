@@ -67,7 +67,7 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，用于聊天区区分“没有任何 enabled backend”与“backend 已启用但当前离线”两类状态，不再把两者都压成 generic offline wording。
 
-本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1/2 配置面板提供英文文案，包括 section 标题/描述、二级标签（Runtime、Model & Thinking、Permissions、Context & Sources、MCP / Advanced）、executable path、authentication/environment hint、setting sources、permission mode、model/fallback model、thinking/effort（含 `Extra high`）、additional directories、allowed/disallowed tools、max turns、max budget、env 和 runtime diagnostics；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。另新增 `chat.serverStatus.backendConnected` 和 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 状态文案与 settings tooltip，避免复用 OpenCode server/remote copy。
+本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1/2 配置面板提供英文文案，包括 section 标题/描述、二级标签（Runtime、Model & Thinking、Permissions、Context & Sources、Tools、Limits、SDK Foundations）、executable path、authentication/environment hint、setting sources、permission mode、model/fallback model、thinking/effort（含 `Extra high`）、additional directories、allowed/disallowed tools、max turns、max budget、env 和 runtime diagnostics；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。另新增 `chat.serverStatus.backendConnected` 和 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 状态文案与 settings tooltip，避免复用 OpenCode server/remote copy。
 
 本轮还将 `chat.question.title` 调整为 backend-neutral 的 “Question from agent”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。
 
@@ -289,3 +289,11 @@ Plugin settings locale keys now cover the install section plus per-entry enable/
 ## 2026-05-17 Command catalog card UI
 
 Added `settings.commands.catalog.*` keys for the card-based command catalog: `searchPlaceholder`, filter pills (`filterAll/filterSkills/filterCommands/filterEnabled/filterDisabled`), source/status chips (`chip.skill/chip.command/chip.project/chip.md-command/chip.subtask/chip.hidden/chip.unavailable`), multi-select batch actions (`selectedCount/batchEnable/batchDisable`), visibility / selection aria labels (`visibility.toggle` / `selection.toggle`), and `noResults` empty state.
+
+## 2026-05-21 Claude Code environment status
+
+Added `settings.claudeCode.environment.status` so the Claude Code Runtime tab can show the authentication/environment row as an explicit read-only SDK environment state instead of an empty setting row.
+
+Added `settings.claudeCode.enableFileCheckpointing.*`, `settings.claudeCode.includeHookEvents.*`, `settings.claudeCode.forwardSubagentText.*`, and `settings.claudeCode.agentProgressSummaries.*` for Claude Code SDK foundation switches. The copy explicitly says these are SDK wiring / diagnostic foundations and that stable rewind, hook authoring, and full subagent transcript UI are not complete.
+
+Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` label. Its dense advanced controls are split into `settings.claudeCode.tab.tools`, `settings.claudeCode.tab.limits`, and `settings.claudeCode.tab.sdkFoundations`.

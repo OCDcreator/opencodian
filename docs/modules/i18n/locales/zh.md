@@ -296,4 +296,8 @@ New Chinese keys added for the tabbed settings layout:
 
 ## 2026-05-21 Claude Code 设置与状态文案
 
-`settings.claudeCode.*` 现在覆盖 Runtime、Model & Thinking、Permissions、Context & Sources、MCP / Advanced 五组 Claude Code 设置文案，包括 allowed/disallowed tools、max turns、max budget、env 等 SDK options UI。新增 `chat.serverStatus.backendConnected`，用于 Claude Code 等非 OpenCode backend 的 header 状态文案，避免继续复用 OpenCode server/remote wording。
+`settings.claudeCode.*` 现在覆盖 Runtime、Model & Thinking、Permissions、Context & Sources、Tools、Limits、SDK Foundations 七组 Claude Code 设置文案，包括 allowed/disallowed tools、max turns、max budget、env 等 SDK options UI。新增 `settings.claudeCode.environment.status`，让 Runtime 标签里的认证/环境行显示明确的只读 SDK 环境状态，而不是空设置行；新增 `chat.serverStatus.backendConnected`，用于 Claude Code 等非 OpenCode backend 的 header 状态文案，避免继续复用 OpenCode server/remote wording。
+
+新增 `settings.claudeCode.enableFileCheckpointing.*`、`settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*` 和 `settings.claudeCode.agentProgressSummaries.*`，用于 Claude Code SDK foundation 开关。文案明确这些只是 SDK wiring / diagnostic foundation，不把 stable rewind、hook authoring 或完整 subagent transcript UI 包装成已完成。
+
+Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签；高级项拆分为 `settings.claudeCode.tab.tools`、`settings.claudeCode.tab.limits` 和 `settings.claudeCode.tab.sdkFoundations`。

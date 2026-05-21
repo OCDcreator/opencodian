@@ -46,6 +46,14 @@ export interface ClaudeCodeBackendSettings {
   maxBudgetUsd: number | null;
   /** Environment variables to pass to the Claude Code process. */
   env: Record<string, string>;
+  /** Enable Claude Code SDK file checkpoint tracking for later rewind operations. */
+  enableFileCheckpointing: boolean;
+  /** Ask the SDK to include hook lifecycle events in the stream. */
+  includeHookEvents: boolean;
+  /** Forward subagent text/thinking blocks into the parent stream. */
+  forwardSubagentText: boolean;
+  /** Ask the SDK to emit periodic subagent progress summaries. */
+  agentProgressSummaries: boolean;
 }
 
 export interface BackendSettings {
@@ -82,6 +90,10 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     maxTurns: null,
     maxBudgetUsd: null,
     env: {},
+    enableFileCheckpointing: false,
+    includeHookEvents: false,
+    forwardSubagentText: false,
+    agentProgressSummaries: false,
   };
 }
 
@@ -233,6 +245,10 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     maxTurns: normalizeClaudeCodeNullablePositiveInt(candidate.maxTurns),
     maxBudgetUsd: normalizeClaudeCodeNullablePositiveNumber(candidate.maxBudgetUsd),
     env: normalizeClaudeCodeEnv(candidate.env),
+    enableFileCheckpointing: candidate.enableFileCheckpointing === true,
+    includeHookEvents: candidate.includeHookEvents === true,
+    forwardSubagentText: candidate.forwardSubagentText === true,
+    agentProgressSummaries: candidate.agentProgressSummaries === true,
   };
 }
 

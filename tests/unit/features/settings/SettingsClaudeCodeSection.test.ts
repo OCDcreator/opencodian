@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Claude Code settings coverage keeps tabbed/classic layout, diagnostics, thinking, and persistence fixtures together. */
+/* eslint-disable max-lines, max-lines-per-function -- Claude Code settings coverage keeps tabbed/classic layout, diagnostics, thinking, and persistence fixtures together. */
 import { Setting } from 'obsidian';
 
 import {
@@ -30,6 +30,7 @@ interface MockToggleControl {
 
 interface MockButtonControl {
   setButtonText: jest.MockedFunction<(value: string) => MockButtonControl>;
+  setDisabled: jest.MockedFunction<(value: boolean) => MockButtonControl>;
   onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
 }
 
@@ -114,9 +115,11 @@ function createToggleControl(): MockToggleControl {
 function createButtonControl(): MockButtonControl {
   const control: MockButtonControl = {
     setButtonText: jest.fn(),
+    setDisabled: jest.fn(),
     onClick: jest.fn(),
   };
   control.setButtonText.mockReturnValue(control);
+  control.setDisabled.mockReturnValue(control);
   control.onClick.mockReturnValue(control);
   return control;
 }
@@ -281,6 +284,8 @@ describe('SettingsClaudeCodeSection', () => {
     expect(containerEl.textContent).toContain(t('settings.claudeCode.title'));
     expect(findText(t('settings.claudeCode.executablePath.name')).control.setValue)
       .toHaveBeenCalledWith('/opt/homebrew/bin/claude');
+    expect(findButton(t('settings.claudeCode.environment.status')).control.setDisabled)
+      .toHaveBeenCalledWith(true);
     expect(findButton(t('settings.claudeCode.diagnostics.button'))).toBeDefined();
 
     expect(findText(t('settings.claudeCode.model.name'))).toBeDefined();
@@ -292,7 +297,9 @@ describe('SettingsClaudeCodeSection', () => {
     expect(containerEl.querySelector('[data-claude-code-section="model-thinking"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="permissions"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="context-sources"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="mcp-advanced"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="tools"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="limits"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="sdk-foundations"]')).toBeDefined();
 
     const renderedNamesLower = [
       ...textRecords,
@@ -530,27 +537,19 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
   });
 
-  describe('mcp-advanced tab', () => {
-    it('renders MCP and advanced runtime controls', async () => {
+  describe('runtime tab', () => {
+    it('renders environment variables with runtime process settings', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'mcp-advanced');
+      section.attachTabbed(containerEl, 'runtime');
 
-      expect(findTextArea(t('settings.claudeCode.allowedTools.name'))).toBeDefined();
-      expect(findTextArea(t('settings.claudeCode.disallowedTools.name'))).toBeDefined();
-      expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
-      expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
       expect(findTextArea(t('settings.claudeCode.env.name'))).toBeDefined();
-
-      await findTextArea(t('settings.claudeCode.allowedTools.name')).onChange?.('Read\nGrep\nRead' as never);
-      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12' as never);
       await findTextArea(t('settings.claudeCode.env.name')).onChange?.('CLAUDE_AGENT_SDK_CLIENT_APP=opencodian' as never);
-      expect(plugin.settings.backendSettings.claudeCode.allowedTools).toEqual(['Read', 'Grep']);
-      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(12);
+
       expect(plugin.settings.backendSettings.claudeCode.env).toEqual({
         CLAUDE_AGENT_SDK_CLIENT_APP: 'opencodian',
       });
@@ -558,10 +557,75 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
   });
 
+  describe('tools tab', () => {
+    it('renders and persists tool allow/block lists', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      expect(findTextArea(t('settings.claudeCode.allowedTools.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.disallowedTools.name'))).toBeDefined();
+
+      await findTextArea(t('settings.claudeCode.allowedTools.name')).onChange?.('Read\nGrep\nRead' as never);
+      expect(plugin.settings.backendSettings.claudeCode.allowedTools).toEqual(['Read', 'Grep']);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('limits tab', () => {
+    it('renders and persists turn and budget limits', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'limits');
+
+      expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
+      expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
+
+      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12' as never);
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(12);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('sdk-foundations tab', () => {
+    it('renders SDK foundation toggles without stable authoring UI', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'sdk-foundations');
+
+      expect(findToggle(t('settings.claudeCode.enableFileCheckpointing.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.includeHookEvents.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.forwardSubagentText.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.agentProgressSummaries.name'))).toBeDefined();
+
+      await findToggle(t('settings.claudeCode.enableFileCheckpointing.name')).onChange?.(true as never);
+      await findToggle(t('settings.claudeCode.includeHookEvents.name')).onChange?.(true as never);
+      await findToggle(t('settings.claudeCode.forwardSubagentText.name')).onChange?.(true as never);
+      await findToggle(t('settings.claudeCode.agentProgressSummaries.name')).onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.enableFileCheckpointing).toBe(true);
+      expect(plugin.settings.backendSettings.claudeCode.includeHookEvents).toBe(true);
+      expect(plugin.settings.backendSettings.claudeCode.forwardSubagentText).toBe(true);
+      expect(plugin.settings.backendSettings.claudeCode.agentProgressSummaries).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+  });
+
   describe('advanced capability gating', () => {
     it('does not render advanced Claude capabilities that lack runtime proof', () => {
       const plugin = createPlugin();
-      const allTabs = ['runtime', 'model-thinking', 'permissions', 'context-sources', 'mcp-advanced'] as const;
+      const allTabs = ['runtime', 'model-thinking', 'permissions', 'context-sources', 'tools', 'limits', 'sdk-foundations'] as const;
 
       for (const tab of allTabs) {
         const containerEl = document.createElement('div');
@@ -578,7 +642,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
           ...toggleRecords,
           ...buttonRecords,
         ].map((r) => r.name.toLowerCase()).join('\n');
-        expect(renderedNames).not.toContain('hooks');
+        expect(renderedNames).not.toContain('hook authoring');
         expect(renderedNames).not.toContain('skills');
         expect(renderedNames).not.toContain('agents');
         expect(renderedNames).not.toContain('sessionstore');

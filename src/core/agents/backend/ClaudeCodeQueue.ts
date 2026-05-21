@@ -20,6 +20,7 @@ export interface ClaudeCodeSessionRuntime {
     setModel?: (model?: string) => Promise<void>;
     setPermissionMode?: (mode: string) => Promise<void>;
     setMcpServers?: (servers: Record<string, unknown>) => Promise<unknown>;
+    rewindFiles?: (userMessageId: string, options?: { dryRun?: boolean }) => Promise<unknown>;
     supportedModels?: () => Promise<Array<{
       id?: string;
       name?: string;

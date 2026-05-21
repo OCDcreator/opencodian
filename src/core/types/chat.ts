@@ -320,6 +320,17 @@ export type StreamChunk =
       sessionId?: string;
     }
   | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
+  | {
+      type: 'backend_event';
+      source: AgentBackendKind;
+      event: 'hook' | 'subagent' | 'tool_progress' | 'structured_output';
+      status?: string;
+      id?: string;
+      name?: string;
+      content?: string;
+      metadata?: Record<string, unknown>;
+      sessionId?: string;
+    }
   | { type: 'error'; content: string; errorClass?: import('../opencode/sdkErrorClassification').SdkErrorClass }
   | { type: 'message_start' }
   | { type: 'message_stop' }
