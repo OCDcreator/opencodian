@@ -191,12 +191,12 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     id: 'debug',
     labelKey: 'settings.debug.title',
     icon: 'bug',
-    defaultSecondaryTabId: 'general',
+    defaultSecondaryTabId: 'plugin',
     secondaryTabs: [
-      { id: 'general', labelKey: 'settings.debug.tab.general' },
-      { id: 'modules', labelKey: 'settings.debug.tab.modules' },
-      { id: 'logs', labelKey: 'settings.debug.tab.logs' },
-      { id: 'actions', labelKey: 'settings.debug.tab.actions' },
+      { id: 'plugin', labelKey: 'settings.debug.tab.plugin' },
+      { id: 'opencode', labelKey: 'settings.debug.tab.opencode' },
+      { id: 'claude-code', labelKey: 'settings.debug.tab.claudeCode' },
+      { id: 'export', labelKey: 'settings.debug.tab.export' },
     ],
   },
   {
@@ -262,6 +262,12 @@ const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
   },
   security: {
     permissions: 'config',
+  },
+  debug: {
+    general: 'plugin',
+    modules: 'plugin',
+    logs: 'export',
+    actions: 'export',
   },
 };
 for (const tab of SETTINGS_PRIMARY_TABS) {

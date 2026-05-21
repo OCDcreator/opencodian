@@ -1,4 +1,11 @@
 import { createClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend';
+import {
+  clearRecentLogs,
+  getRecentLogEntries,
+  resetLogEmissionThrottleState,
+  setDebugLoggingEnabled,
+  setDebugModuleEnabled,
+} from '../../../../../src/shared';
 
 /* eslint-disable max-lines-per-function -- The normalizer fixture suite keeps SDK event shape regressions in one place. */
 
@@ -13,6 +20,21 @@ function assistantMessage(id: string, content: unknown[]) {
 }
 
 describe('ClaudeCodeStreamNormalizer', () => {
+  beforeEach(() => {
+    clearRecentLogs();
+    resetLogEmissionThrottleState();
+    setDebugLoggingEnabled(true);
+    setDebugModuleEnabled('claudeCode', true);
+  });
+
+  afterEach(() => {
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('claudeCode', false);
+    clearRecentLogs();
+    resetLogEmissionThrottleState();
+    jest.restoreAllMocks();
+  });
+
   it('emits session metadata for session_init system messages', () => {
     jest.spyOn(Date, 'now').mockReturnValue(1710000000000);
     const normalizer = createClaudeCodeStreamNormalizer();
@@ -347,5 +369,81 @@ describe('ClaudeCodeStreamNormalizer', () => {
 
     normalizer.reset();
     expect(normalizer.transformSDKMessage(message)).toEqual([{ type: 'text', content: 'Hello' }]);
+  });
+
+  it('writes claudeCode summary logs without leaking raw text or tool input', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'claude-session-logs' });
+
+    normalizer.transformSDKMessage({
+      type: 'assistant',
+      session_id: 'claude-session-logs',
+      message: {
+        id: 'msg-log',
+        content: [{
+          type: 'text',
+          text: 'secret raw response text',
+        }, {
+          type: 'tool_use',
+          id: 'tool-log',
+          name: 'Bash',
+          input: { command: 'echo secret-token' },
+        }],
+      },
+      usage: { input_tokens: 2, output_tokens: 3 },
+    });
+
+    const entries = getRecentLogEntries().filter((entry) => entry.scope === 'ClaudeCodeStreamNormalizer');
+    const logText = entries.map((entry) => entry.message).join('\n');
+
+    expect(entries.length).toBeGreaterThanOrEqual(2);
+    expect(entries.every((entry) => entry.moduleKey === 'claudeCode')).toBe(true);
+    expect(logText).toContain('sdk message');
+    expect(logText).toContain('chunks');
+    expect(logText).toContain('contentLength');
+    expect(logText).toContain('inputKeyCount');
+    expect(logText).not.toContain('secret raw response text');
+    expect(logText).not.toContain('echo secret-token');
+  });
+
+  it('does not include model ids in message_metadata chunk logs', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1710000000000);
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'session_init',
+      session_id: 'claude-session-model-log',
+      model: 'claude-secret-model',
+    });
+
+    const logText = getRecentLogEntries()
+      .filter((entry) => entry.scope === 'ClaudeCodeStreamNormalizer')
+      .map((entry) => entry.message)
+      .join('\n');
+
+    expect(logText).toContain('message_metadata');
+    expect(logText).not.toContain('modelId');
+    expect(logText).not.toContain('claude-secret-model');
+  });
+
+  it('bounds content delta logs while keeping a representative chunk summary', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'claude-session-delta-logs' });
+
+    for (let index = 0; index < 40; index += 1) {
+      normalizer.transformSDKMessage({
+        type: 'content_block_delta',
+        session_id: 'claude-session-delta-logs',
+        delta: { type: 'text_delta', text: `secret delta ${index}` },
+      });
+    }
+
+    const entries = getRecentLogEntries().filter((entry) => entry.scope === 'ClaudeCodeStreamNormalizer');
+    const logText = entries.map((entry) => entry.message).join('\n');
+
+    expect(entries.length).toBeLessThanOrEqual(4);
+    expect(logText).toContain('chunks');
+    expect(logText).toContain('"type":"text"');
+    expect(logText).toContain('contentLength');
+    expect(logText).not.toContain('secret delta');
   });
 });

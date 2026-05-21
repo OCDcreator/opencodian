@@ -1,3 +1,5 @@
+/* eslint-disable max-lines-per-function -- Debug settings tests share Obsidian Setting mocks and tab/classic grouping regressions. */
+
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
@@ -155,6 +157,21 @@ function createSection(plugin = createPlugin()) {
   };
 }
 
+function createTabbedSection(secondaryTabId: string, plugin = createPlugin()) {
+  const section = new SettingsDebugSection({
+    plugin: plugin as unknown as OpenCodianPlugin,
+    createSectionHeading,
+  });
+  const containerEl = document.createElement('div');
+  document.body.appendChild(containerEl);
+  section.attachTabbed(containerEl, secondaryTabId);
+  return {
+    containerEl,
+    plugin,
+    section,
+  };
+}
+
 function findToggle(name: string): ToggleRecord | undefined {
   return toggleRecords.find((record) => record.name === name);
 }
@@ -286,6 +303,34 @@ describe('SettingsDebugSection', () => {
 
     expect(plugin.settings.debugModuleSettings.contextUsage).toBe(true);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders tabbed debug groups by diagnostic source', () => {
+    const { containerEl } = createTabbedSection('opencode');
+    const blockDisplays = Array.from(containerEl.querySelectorAll('[data-section-block]'))
+      .map((blockEl) => [
+        (blockEl as HTMLElement).dataset.sectionBlock,
+        (blockEl as HTMLElement).style.display,
+      ]);
+
+    expect(blockDisplays).toEqual([
+      ['plugin', 'none'],
+      ['opencode', ''],
+      ['claude-code', 'none'],
+      ['export', 'none'],
+    ]);
+    expect(containerEl.querySelector('[data-section-block="plugin"] h4')?.textContent).toBe(
+      t('settings.debug.modules.plugin.title'),
+    );
+    expect(containerEl.querySelector('[data-section-block="opencode"] h4')?.textContent).toBe(
+      t('settings.debug.modules.opencode.title'),
+    );
+    expect(containerEl.querySelector('[data-section-block="claude-code"] h4')?.textContent).toBe(
+      t('settings.debug.modules.claudeCode.title'),
+    );
+    expect(containerEl.querySelector('[data-section-block="export"] h4')?.textContent).toBe(
+      t('settings.debug.export.title'),
+    );
   });
 
   it('persists the debug refresh interval from the settings panel', async () => {

@@ -1,10 +1,12 @@
-import { getToolIdentity } from '../../../shared';
+import { createLogger, getToolIdentity, shouldEmitLogFingerprint } from '../../../shared';
 import type { StreamChunk } from '../../types';
 
 /* eslint-disable max-lines -- Claude Code stream normalization keeps SDK event fixtures in one audited compatibility boundary. */
 
 type JsonRecord = Record<string, unknown>;
 type StreamToolKind = Extract<StreamChunk, { type: 'tool_use' }>['kind'];
+
+const logger = createLogger('ClaudeCodeStreamNormalizer', { moduleKey: 'claudeCode' });
 
 export interface ClaudeCodeStreamNormalizerOptions {
   sessionId?: string;
@@ -276,6 +278,144 @@ function appendUsageChunk(record: JsonRecord, chunks: StreamChunk[], sessionId?:
   });
 }
 
+function summarizeMetadataKeys(value: unknown): string[] {
+  return isRecord(value) ? Object.keys(value).sort() : [];
+}
+
+function summarizeSdkMessage(record: JsonRecord): Record<string, unknown> {
+  const blocks = resolveContentBlocks(record);
+  return {
+    type: readString(record.type) ?? 'unknown',
+    subtype: readString(record.subtype),
+    sessionId: resolveSessionId(record),
+    messageId: resolveMessageId(record),
+    contentBlockCount: blocks.length,
+    metadataKeys: Object.keys(record).sort(),
+  };
+}
+
+function summarizeChunk(chunk: StreamChunk): Record<string, unknown> {
+  switch (chunk.type) {
+    case 'text':
+    case 'thinking':
+    case 'error':
+      return {
+        type: chunk.type,
+        contentLength: chunk.content.length,
+        ...('partId' in chunk && chunk.partId ? { partId: chunk.partId } : {}),
+      };
+    case 'tool_use':
+      return {
+        type: chunk.type,
+        id: chunk.id,
+        name: chunk.name,
+        kind: chunk.kind,
+        inputKeyCount: Object.keys(chunk.input).length,
+        metadataKeys: summarizeMetadataKeys(chunk.toolMetadata),
+      };
+    case 'tool_result':
+      return {
+        type: chunk.type,
+        toolUseId: chunk.toolUseId,
+        contentLength: chunk.content.length,
+        isError: chunk.isError,
+      };
+    case 'backend_event':
+      return {
+        type: chunk.type,
+        event: chunk.event,
+        status: chunk.status,
+        id: chunk.id,
+        name: chunk.name,
+        contentLength: chunk.content?.length ?? 0,
+        metadataKeys: summarizeMetadataKeys(chunk.metadata),
+        ...('sessionId' in chunk && chunk.sessionId ? { sessionId: chunk.sessionId } : {}),
+      };
+    case 'usage':
+      return {
+        type: chunk.type,
+        inputTokens: chunk.inputTokens,
+        outputTokens: chunk.outputTokens,
+        ...('sessionId' in chunk && chunk.sessionId ? { sessionId: chunk.sessionId } : {}),
+      };
+    case 'message_metadata':
+      return {
+        type: chunk.type,
+        messageId: chunk.messageId,
+        sessionId: chunk.sessionId,
+      };
+    default:
+      return {
+        type: chunk.type,
+      };
+  }
+}
+
+function summarizeChunkFingerprint(chunk: StreamChunk): Record<string, unknown> {
+  switch (chunk.type) {
+    case 'text':
+    case 'thinking':
+    case 'error':
+      return {
+        type: chunk.type,
+        partId: 'partId' in chunk && chunk.partId ? chunk.partId : undefined,
+      };
+    case 'tool_use':
+      return {
+        type: chunk.type,
+        name: chunk.name,
+        kind: chunk.kind,
+        inputKeyCount: Object.keys(chunk.input).length,
+      };
+    case 'tool_result':
+      return {
+        type: chunk.type,
+        isError: chunk.isError,
+      };
+    case 'backend_event':
+      return {
+        type: chunk.type,
+        event: chunk.event,
+        status: chunk.status,
+        name: chunk.name,
+      };
+    case 'usage':
+      return {
+        type: chunk.type,
+      };
+    case 'message_metadata':
+      return {
+        type: chunk.type,
+      };
+    default:
+      return {
+        type: chunk.type,
+      };
+  }
+}
+
+function logSummaries(record: JsonRecord, chunks: readonly StreamChunk[], sessionId: string | undefined): void {
+  if (chunks.length === 0) {
+    return;
+  }
+
+  const chunkFingerprints = chunks.map(summarizeChunkFingerprint);
+  const fingerprint = {
+    message: summarizeSdkMessage(record),
+    chunks: chunkFingerprints,
+  };
+  if (!shouldEmitLogFingerprint('claude-code-stream-normalizer', fingerprint)) {
+    return;
+  }
+
+  logger.debug('sdk message', summarizeSdkMessage(record));
+  logger.debug('chunks', {
+    sessionId,
+    count: chunks.length,
+    chunks: chunks.map(summarizeChunk),
+  });
+}
+
 export class ClaudeCodeStreamNormalizer {
   private readonly state: ClaudeCodeStreamNormalizerState;
 
@@ -313,11 +453,13 @@ export class ClaudeCodeStreamNormalizer {
     this.appendDeltaChunk(record, chunks);
     if (this.appendMessageErrorChunk(record, chunks)) {
       appendUsageChunk(record, chunks, sessionId);
+      logSummaries(record, chunks, sessionId);
       return chunks;
     }
     this.appendAssistantContentChunks(record, chunks, sessionId);
     this.appendResultChunks(record, chunks);
     appendUsageChunk(record, chunks, sessionId);
+    logSummaries(record, chunks, sessionId);
     return chunks;
   }
 

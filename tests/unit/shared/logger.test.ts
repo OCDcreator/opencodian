@@ -3,6 +3,7 @@ import {
   createLogger,
   getRecentLogEntries,
   resetLogEmissionThrottleState,
+  resolveLoggerDebugModuleKey,
   setDebugLoggingEnabled,
   setDebugModuleEnabled,
   setDebugRefreshIntervalMs,
@@ -89,6 +90,12 @@ describe('logger debug argument formatting', () => {
       expect.stringContaining('[ActiveTabContextUsageCoordinator] visible info'),
       expect.stringContaining('[ActiveTabContextUsageCoordinator] visible debug'),
     ]);
+  });
+
+  it('routes Claude Code scopes to the Claude Code debug module', () => {
+    expect(resolveLoggerDebugModuleKey('ClaudeCodeAdapter')).toBe('claudeCode');
+    expect(resolveLoggerDebugModuleKey('claude-code-session')).toBe('claudeCode');
+    expect(resolveLoggerDebugModuleKey('Claude Code Stream')).toBe('claudeCode');
   });
 
   it('emits always/warn/error even when optional module logs are disabled', () => {

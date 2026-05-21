@@ -2,6 +2,7 @@
 import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
+import { createLogger } from '../../../shared';
 import type { AgentBackendKind, StreamChunk } from '../../types/chat';
 import type { ClaudeCodeBackendSettings, ClaudeCodeEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
@@ -32,6 +33,8 @@ import {
   isTurnBoundaryMessage,
 } from './ClaudeCodeQueue';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
+
+const logger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode' });
 
 export interface ClaudeCodeSdkQueryInput {
   prompt: string | AsyncIterable<unknown>;
@@ -108,6 +111,40 @@ function resolveSendOptionOverrides(options: Record<string, unknown> | undefined
   };
 }
 
+function summarizeError(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const errorName = error instanceof Error && error.name.trim()
+    ? error.name.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 48)
+    : typeof error;
+  const lowerMessage = rawMessage.toLowerCase();
+  const category =
+    lowerMessage.includes('abort') ? 'abort'
+      : lowerMessage.includes('timeout') || lowerMessage.includes('timed out') ? 'timeout'
+        : lowerMessage.includes('eacces') || lowerMessage.includes('permission') || lowerMessage.includes('denied') ? 'permission'
+          : lowerMessage.includes('enoent') || lowerMessage.includes('not found') ? 'not-found'
+            : lowerMessage.includes('network') || lowerMessage.includes('connection') || lowerMessage.includes('econn') ? 'network'
+              : 'generic';
+  return `${errorName}(category=${category}, messageLength=${rawMessage.length})`;
+}
+
+function summarizeSendOptions(options: Record<string, unknown> | undefined): Record<string, unknown> {
+  const overrides = resolveSendOptionOverrides(options);
+  return {
+    optionKeyCount: Object.keys(options ?? {}).length,
+    hasModelOverride: Boolean(overrides.model),
+    effort: overrides.effort,
+  };
+}
+
+function summarizeSession(session: ClaudeCodeSessionState): Record<string, unknown> {
+  return {
+    sessionId: session.id,
+    sdkSessionId: session.sdkSessionId,
+    messageCount: session.messages.length,
+    hasRuntime: Boolean(session.runtime && !session.runtime.closed),
+  };
+}
+
 const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>([
     AgentCapability.Chat,
@@ -176,11 +213,13 @@ export class ClaudeCodeAdapter
   }
 
   async start(): Promise<void> {
+    logger.debug('start', { vaultPath: this.options.vaultPath });
     await this.loadMcpConfig();
     this.setStatus('connected');
   }
 
   async stop(): Promise<void> {
+    logger.debug('stop', { sessionCount: this.sessions.size });
     this.cancelledSessions.clear();
     for (const session of this.sessions.values()) {
       this.closeRuntime(session);
@@ -189,6 +228,7 @@ export class ClaudeCodeAdapter
   }
 
   dispose(): void {
+    logger.debug('dispose', { sessionCount: this.sessions.size });
     this.cancelledSessions.clear();
     for (const sessionId of this.sessions.keys()) {
       this.invalidatedSessions.add(sessionId);
@@ -214,10 +254,12 @@ export class ClaudeCodeAdapter
       title,
       messages: [],
     });
+    logger.debug('create session', { sessionId: id, titleLength: title.length });
     return id;
   }
 
   async deleteSession(sessionId: string): Promise<void> {
+    logger.debug('delete session', { sessionId, existed: this.sessions.has(sessionId) });
     this.cancelledSessions.add(sessionId);
     this.invalidatedSessions.add(sessionId);
     const session = this.sessions.get(sessionId);
@@ -230,6 +272,11 @@ export class ClaudeCodeAdapter
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
     const session = this.requireSession(sessionId);
     session.title = title;
+    logger.debug('update session', {
+      sessionId,
+      sdkSessionId: session.sdkSessionId,
+      titleLength: title.length,
+    });
     if (session.sdkSessionId) {
       const sdk = await this.getSdk();
       await sdk.renameSession?.(session.sdkSessionId, title, { dir: this.options.vaultPath });
@@ -237,8 +284,11 @@ export class ClaudeCodeAdapter
   }
 
   async listSessions(): Promise<ClaudeCodeSdkSessionInfo[]> {
+    logger.debug('list session', { vaultPath: this.options.vaultPath });
     const sdk = await this.getSdk();
-    return sdk.listSessions?.({ dir: this.options.vaultPath }) ?? [];
+    const sessions = await sdk.listSessions?.({ dir: this.options.vaultPath }) ?? [];
+    logger.debug('list session complete', { count: sessions.length });
+    return sessions;
   }
 
   async supportedModels(): Promise<Array<{ id: string; name: string; provider: string }>> {
@@ -246,7 +296,7 @@ export class ClaudeCodeAdapter
     try {
       query = await this.getModelCatalogQuery();
       const models = await query.supportedModels();
-      return models.map((rawModel) => {
+      const normalizedModels = models.map((rawModel) => {
         const model = rawModel as ClaudeCodeSdkModelInfo;
         return {
           id: model.id ?? model.value ?? '',
@@ -254,7 +304,10 @@ export class ClaudeCodeAdapter
           provider: model.provider ?? 'claude',
         };
       }).filter((model) => model.id.length > 0);
-    } catch {
+      logger.debug('supportedModels count', { count: normalizedModels.length });
+      return normalizedModels;
+    } catch (error) {
+      logger.debug('supportedModels error', { error: summarizeError(error) });
       return [];
     } finally {
       query?.close?.();
@@ -262,16 +315,24 @@ export class ClaudeCodeAdapter
   }
 
   async getSession(sessionId: string): Promise<ClaudeCodeSdkSessionInfo | null> {
+    logger.debug('get session', { sessionId });
     const sdk = await this.getSdk();
     const state = this.sessions.get(sessionId);
     const sdkSessionId = state?.sdkSessionId ?? sessionId;
-    return await sdk.getSessionInfo?.(sdkSessionId, { dir: this.options.vaultPath }) ?? null;
+    const session = await sdk.getSessionInfo?.(sdkSessionId, { dir: this.options.vaultPath }) ?? null;
+    logger.debug('get session complete', {
+      sessionId,
+      sdkSessionId,
+      found: Boolean(session),
+    });
+    return session;
   }
 
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
     const sdk = await this.getSdk();
     const state = this.getOrRestoreSession(sessionId);
     const sourceSessionId = state.sdkSessionId ?? sessionId;
+    logger.debug('fork session', { sessionId, sourceSessionId, upToMessageId: messageID });
     if (!sdk.forkSession) {
       throw new Error('Claude Code forkSession is unavailable in this SDK.');
     }
@@ -287,6 +348,7 @@ export class ClaudeCodeAdapter
       sdkSessionId: result.sessionId,
     };
     this.sessions.set(result.sessionId, forkedState);
+    logger.debug('fork session complete', { sessionId, forkedSessionId: result.sessionId });
     return { id: result.sessionId, title: forkedState.title };
   }
 
@@ -296,6 +358,7 @@ export class ClaudeCodeAdapter
     options?: { dryRun?: boolean },
   ): Promise<unknown> {
     const session = this.getOrRestoreSession(sessionId);
+    logger.debug('rewind session', { sessionId, userMessageId, dryRun: options?.dryRun === true });
     const rewindFiles = session.runtime?.query?.rewindFiles;
     if (!rewindFiles) {
       throw new Error('Claude Code rewindFiles is unavailable. Start a checkpoint-enabled runtime first.');
@@ -305,14 +368,25 @@ export class ClaudeCodeAdapter
 
   async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const session = this.getOrRestoreSession(request.sessionId);
+    logger.debug('sendMessage start', {
+      sessionId: request.sessionId,
+      contentLength: request.content.length,
+      ...summarizeSendOptions(request.options),
+    });
     this.cancelledSessions.delete(request.sessionId);
     const prompt = createUserPrompt(request.content);
     session.messages.push(prompt);
     let runtime: ClaudeCodeSessionRuntime;
     try {
       runtime = await this.getOrStartRuntime(session, request.options);
+      logger.debug('sendMessage runtime-ready', summarizeSession(session));
     } catch (error) {
       this.setStatus('error');
+      logger.debug('sendMessage error', {
+        sessionId: request.sessionId,
+        phase: 'runtime-ready',
+        error: summarizeError(error),
+      });
       yield {
         type: 'error',
         content: `Claude Code SDK unavailable: ${error instanceof Error ? error.message : String(error)}`,
@@ -329,6 +403,11 @@ export class ClaudeCodeAdapter
           return;
         }
         if (item.type === 'error') {
+          logger.debug('sendMessage error', {
+            sessionId: request.sessionId,
+            phase: 'runtime-output',
+            error: summarizeError(item.error),
+          });
           yield {
             type: 'error',
             content: `Claude Code stream failed: ${item.error instanceof Error ? item.error.message : String(item.error)}`,
@@ -343,19 +422,35 @@ export class ClaudeCodeAdapter
           yield chunk;
         }
         if (isTurnBoundaryMessage(item.message)) {
+          logger.debug('sendMessage complete', {
+            sessionId: request.sessionId,
+            sawChunk,
+            boundary: true,
+          });
           return;
         }
       }
     } catch (error) {
+      logger.debug('sendMessage error', {
+        sessionId: request.sessionId,
+        phase: 'stream',
+        error: summarizeError(error),
+      });
       yield {
         type: 'error',
         content: `Claude Code stream failed: ${error instanceof Error ? error.message : String(error)}`,
       };
       if (!sawChunk) { return; }
     }
+    logger.debug('sendMessage complete', {
+      sessionId: request.sessionId,
+      sawChunk,
+      boundary: false,
+    });
   }
 
   cancelStream(sessionId: string): void {
+    logger.debug('close runtime', { sessionId, reason: 'cancelStream' });
     this.cancelledSessions.add(sessionId);
     const session = this.sessions.get(sessionId);
     void session?.runtime?.query?.interrupt?.();
@@ -373,6 +468,7 @@ export class ClaudeCodeAdapter
   }
 
   async reloadMcpServers(): Promise<void> {
+    logger.debug('MCP config reload', { hadCachedConfig: this.cachedMcpServers !== undefined });
     this.refreshMcpConfig();
     await this.loadMcpConfig();
     await this.applyToActiveQueries((runtime) =>
@@ -416,23 +512,41 @@ export class ClaudeCodeAdapter
    */
   async loadMcpConfig(): Promise<void> {
     if (this.options.mcpServers) {
+      logger.debug('MCP config load', {
+        source: 'static',
+        serverCount: Object.keys(this.options.mcpServers).length,
+      });
       return;
     }
     if (this.cachedMcpServers !== undefined) {
+      logger.debug('MCP config load', {
+        source: 'cache',
+        serverCount: Object.keys(this.cachedMcpServers).length,
+      });
       return;
     }
     if (!this.options.mcpConfigLoader) {
+      logger.debug('MCP config load', { source: 'none', serverCount: 0 });
       return;
     }
     try {
       this.cachedMcpServers = await this.options.mcpConfigLoader();
-    } catch {
+      logger.debug('MCP config load', {
+        source: 'loader',
+        serverCount: Object.keys(this.cachedMcpServers).length,
+      });
+    } catch (error) {
       this.cachedMcpServers = undefined;
+      logger.debug('MCP config load', {
+        source: 'loader',
+        error: summarizeError(error),
+      });
     }
   }
 
   /** Invalidate the cached MCP config so the next loadMcpConfig reloads it. */
   refreshMcpConfig(): void {
+    logger.debug('MCP config reload', { action: 'refresh-cache' });
     this.cachedMcpServers = undefined;
   }
 
@@ -475,11 +589,23 @@ export class ClaudeCodeAdapter
     if (session.runtime && !session.runtime.closed) {
       const nextEffort = overrides.effort ?? this.options.settings.effort;
       if (nextEffort !== session.runtime.effort) {
+        logger.debug('runtime close', {
+          sessionId: session.id,
+          reason: 'effort-change',
+          previousEffort: session.runtime.effort,
+          nextEffort,
+        });
         this.closeRuntime(session);
       } else {
         if (overrides.model) {
           await session.runtime.query?.setModel?.(overrides.model);
         }
+        logger.debug('runtime reuse', {
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+          effort: session.runtime.effort,
+          hasModelOverride: Boolean(overrides.model),
+        });
         return session.runtime;
       }
     }
@@ -497,6 +623,17 @@ export class ClaudeCodeAdapter
       effort: overrides.effort ?? this.options.settings.effort,
       closed: false,
     };
+    logger.debug('runtime create', {
+      sessionId: session.id,
+      sdkSessionId: session.sdkSessionId,
+      effort: runtime.effort,
+    });
+    logger.debug('SDK query creation', {
+      sessionId: session.id,
+      sdkSessionId: session.sdkSessionId,
+      cwd: this.options.vaultPath,
+      ...summarizeSendOptions(sendOptions),
+    });
     runtime.query = sdk.query({
       prompt: runtime.input,
       options: this.buildSdkOptions(abortController, session, sendOptions),
@@ -510,6 +647,11 @@ export class ClaudeCodeAdapter
     for (const session of this.sessions.values()) {
       const query = session.runtime?.query;
       if (query?.supportedModels) {
+        logger.debug('SDK query creation', {
+          source: 'runtime-reuse',
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+        });
         return {
           supportedModels: query.supportedModels,
           close: query.close,
@@ -519,14 +661,14 @@ export class ClaudeCodeAdapter
 
     await this.ensureReadyForQuery();
     const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    logger.debug('SDK query creation', {
+      source: 'model-catalog',
+      cwd: this.options.vaultPath,
+    });
     return sdk.query({
       prompt: new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>(),
-      options: buildClaudeCodeOptions({
-        vaultPath: this.options.vaultPath,
-        settings: this.options.settings,
-        pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
-        mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
-      }),
+      options: this.buildSdkOptions(abortController),
     });
   }
 
@@ -544,6 +686,11 @@ export class ClaudeCodeAdapter
         runtime.output.push({ type: 'message', message });
       }
     } catch (error) {
+      logger.debug('sendMessage error', {
+        sessionId: session.id,
+        phase: 'runtime-pump',
+        error: summarizeError(error),
+      });
       runtime.output.push({ type: 'error', error });
     } finally {
       runtime.closed = true;
@@ -552,6 +699,11 @@ export class ClaudeCodeAdapter
       if (session.runtime === runtime) {
         delete session.runtime;
       }
+      logger.debug('runtime close', {
+        sessionId: session.id,
+        sdkSessionId: session.sdkSessionId,
+        reason: 'pump-finally',
+      });
     }
   }
 
@@ -560,6 +712,11 @@ export class ClaudeCodeAdapter
     if (!runtime) {
       return;
     }
+    logger.debug('runtime close', {
+      sessionId: session.id,
+      sdkSessionId: session.sdkSessionId,
+      reason: 'closeRuntime',
+    });
     runtime.closed = true;
     runtime.abortController.abort();
     runtime.input.close();
@@ -569,6 +726,12 @@ export class ClaudeCodeAdapter
   }
 
   private readonly spawnClaudeCodeProcess = (request: ClaudeCodeSpawnRequest) => {
+    logger.debug('spawn command', {
+      command: request.command,
+      cwd: request.cwd,
+      argCount: request.args.length,
+      envKeyCount: Object.keys(request.env ?? {}).length,
+    });
     const child = spawn(request.command, request.args, {
       cwd: request.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -581,6 +744,22 @@ export class ClaudeCodeAdapter
         child.kill('SIGTERM');
       }
     }, { once: true });
+
+    child.on('exit', (code, signal) => {
+      logger.debug('spawn exit', {
+        command: request.command,
+        cwd: request.cwd,
+        code,
+        signal,
+      });
+    });
+    child.on('error', (error) => {
+      logger.debug('spawn error', {
+        command: request.command,
+        cwd: request.cwd,
+        error: summarizeError(error),
+      });
+    });
 
     return {
       stdin: child.stdin,
@@ -600,12 +779,19 @@ export class ClaudeCodeAdapter
 
   private getSdk(): Promise<ClaudeCodeSdkFacade> {
     if (this.options.sdk) {
+      logger.debug('SDK load', { source: 'injected' });
       return Promise.resolve(this.options.sdk);
     }
     if (!this.options.sdkLoader) {
+      logger.debug('SDK load', { source: 'missing-loader' });
       return Promise.reject(new Error('No Claude Code SDK loader configured'));
     }
-    this.sdkLoadPromise ??= this.options.sdkLoader();
+    if (!this.sdkLoadPromise) {
+      logger.debug('SDK load', { source: 'loader' });
+      this.sdkLoadPromise = this.options.sdkLoader();
+    } else {
+      logger.debug('SDK load', { source: 'cache' });
+    }
     return this.sdkLoadPromise;
   }
 
@@ -633,6 +819,11 @@ export class ClaudeCodeAdapter
       ...(isOpenCodianLocalClaudeSessionId(sessionId) ? {} : { sdkSessionId: sessionId }),
     };
     this.sessions.set(sessionId, restoredSession);
+    logger.debug('get session', {
+      sessionId,
+      restored: true,
+      sdkSessionId: restoredSession.sdkSessionId,
+    });
     return restoredSession;
   }
 
@@ -640,6 +831,10 @@ export class ClaudeCodeAdapter
     if (this.statusValue === status) {
       return;
     }
+    logger.debug('status change', {
+      from: this.statusValue,
+      to: status,
+    });
     this.statusValue = status;
     for (const handler of this.statusChangeHandlers) {
       handler(status);

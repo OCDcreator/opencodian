@@ -26,6 +26,7 @@ type DebugModuleKey =
   | 'chat'
   | 'contextUsage'
   | 'streaming'
+  | 'claudeCode'
   | 'tasks'
   | 'storage'
   | 'providerIcons'
@@ -57,6 +58,7 @@ type DebugModuleSettings = Record<DebugModuleKey, boolean>;
 
 - `ActiveTabContextUsageCoordinator` → `contextUsage`
 - `Stream*` / `Streaming*` → `streaming`
+- `ClaudeCode*` / `claude-code*` / `Claude Code*` → `claudeCode`
 - `Question*` / `Todo*` / `BackgroundTask*` → `tasks`
 - `OpenCode*` / `ServerManager` → `server`
 - `Settings*` / `*Modal` / `*Editor` → `settings`
@@ -71,5 +73,6 @@ type DebugModuleSettings = Record<DebugModuleKey, boolean>;
 
 ## 注意事项
 
-- 新增可选 debug 日志子系统时，优先先改这个注册表，再改具体 logger scope。
+- 新增可选 debug 日志子系统时，优先先改这个注册表，再改具体 logger scope，并同步 `SettingsDebugSection` 的来源分组。
+- `claudeCode` 默认启用，用于 Claude Code SDK query/session/stream/permission/hook/subagent 摘要日志；它是诊断开关，不表示 Claude Code full runtime proof 已完成。
 - `resolveDebugModuleKey()` 只做粗粒度归类；如果某个 scope 需要更明确归类，优先在 `createLogger(scope, { moduleKey })` 里显式指定。

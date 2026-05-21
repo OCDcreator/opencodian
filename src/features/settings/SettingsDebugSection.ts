@@ -9,12 +9,29 @@ import type OpenCodianPlugin from '../../main';
 import { clearRecentLogs, createLogger } from '../../shared';
 import {
   DEBUG_MODULE_REGISTRY,
+  type DebugModuleKey,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
 
 const logger = createLogger('SettingsDebugSection');
 
 type DebugPlatformKey = 'unix' | 'windows';
+type DebugSectionBlockId = 'plugin' | 'opencode' | 'claude-code' | 'export';
+
+const DEBUG_MODULE_GROUPS: Record<Exclude<DebugSectionBlockId, 'export'>, readonly DebugModuleKey[]> = {
+  plugin: [
+    'app',
+    'settings',
+    'chat',
+    'contextUsage',
+    'tasks',
+    'storage',
+    'providerIcons',
+    'visuals',
+  ],
+  opencode: ['server', 'models', 'streaming'],
+  'claude-code': ['claudeCode'],
+};
 
 interface SettingsDebugSectionOptions {
   plugin: OpenCodianPlugin;
@@ -87,13 +104,10 @@ export class SettingsDebugSection {
     );
     const platformKey = getCurrentPlatformKey();
 
-    this.addDebugLoggingSetting(containerEl);
-    this.addDebugModuleSettings(containerEl);
-    this.addDebugRefreshIntervalSetting(containerEl);
-    this.addInlineSerializedArgsSetting(containerEl);
-    const logPathText = this.addLogPathSetting(containerEl, platformKey);
-    this.addDiagnosticActionsSetting(containerEl, logPathText);
-    this.addConsoleHelpBlock(containerEl);
+    this.addPluginDebugSettings(containerEl);
+    this.addOpenCodeDebugSettings(containerEl);
+    this.addClaudeCodeDebugSettings(containerEl);
+    this.addExportDebugSettings(containerEl, platformKey);
 
     return headingEl;
   }
@@ -101,22 +115,71 @@ export class SettingsDebugSection {
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
     const platformKey = getCurrentPlatformKey();
 
-    const generalBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'general' } });
-    this.addDebugLoggingSetting(generalBlockEl);
+    const pluginBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'plugin' } });
+    this.addPluginDebugSettings(pluginBlockEl);
 
-    const modulesBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'modules' } });
-    this.addDebugModuleSettings(modulesBlockEl);
+    const opencodeBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'opencode' } });
+    this.addOpenCodeDebugSettings(opencodeBlockEl);
 
-    const logsBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'logs' } });
-    this.addDebugRefreshIntervalSetting(logsBlockEl);
-    this.addInlineSerializedArgsSetting(logsBlockEl);
-    const logPathText = this.addLogPathSetting(logsBlockEl, platformKey);
+    const claudeCodeBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'claude-code' } });
+    this.addClaudeCodeDebugSettings(claudeCodeBlockEl);
 
-    const actionsBlockEl = containerEl.createDiv({ cls: 'opencodian-debug-actions', attr: { 'data-section-block': 'actions' } });
-    this.addDiagnosticActionsSetting(actionsBlockEl, logPathText);
-    this.addConsoleHelpBlock(actionsBlockEl);
+    const exportBlockEl = containerEl.createDiv({
+      cls: 'opencodian-debug-actions',
+      attr: { 'data-section-block': 'export' },
+    });
+    this.addExportDebugSettings(exportBlockEl, platformKey);
 
     this.showActiveBlock(containerEl, secondaryTabId);
+  }
+
+  private addPluginDebugSettings(containerEl: HTMLElement): void {
+    this.addDebugLoggingSetting(containerEl);
+    this.addDebugModuleSettings(
+      containerEl,
+      DEBUG_MODULE_GROUPS.plugin,
+      'settings.debug.modules.plugin.title',
+      'settings.debug.modules.plugin.desc',
+    );
+  }
+
+  private addOpenCodeDebugSettings(containerEl: HTMLElement): void {
+    this.addDebugModuleSettings(
+      containerEl,
+      DEBUG_MODULE_GROUPS.opencode,
+      'settings.debug.modules.opencode.title',
+      'settings.debug.modules.opencode.desc',
+    );
+  }
+
+  private addClaudeCodeDebugSettings(containerEl: HTMLElement): void {
+    this.addDebugModuleSettings(
+      containerEl,
+      DEBUG_MODULE_GROUPS['claude-code'],
+      'settings.debug.modules.claudeCode.title',
+      'settings.debug.modules.claudeCode.groupDesc',
+    );
+  }
+
+  private addExportDebugSettings(
+    containerEl: HTMLElement,
+    platformKey: DebugPlatformKey,
+  ): void {
+    const exportEl = containerEl.createDiv({ cls: 'opencodian-debug-export' });
+    exportEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading',
+      text: t('settings.debug.export.title'),
+    });
+    exportEl.createDiv({
+      cls: 'opencodian-settings-block-desc',
+      text: t('settings.debug.export.desc'),
+    });
+
+    this.addDebugRefreshIntervalSetting(exportEl);
+    this.addInlineSerializedArgsSetting(exportEl);
+    const logPathText = this.addLogPathSetting(exportEl, platformKey);
+    this.addDiagnosticActionsSetting(exportEl, logPathText);
+    this.addConsoleHelpBlock(exportEl);
   }
 
   private addDebugLoggingSetting(containerEl: HTMLElement): void {
@@ -150,18 +213,27 @@ export class SettingsDebugSection {
       );
   }
 
-  private addDebugModuleSettings(containerEl: HTMLElement): void {
+  private addDebugModuleSettings(
+    containerEl: HTMLElement,
+    moduleKeys: readonly DebugModuleKey[],
+    titleKey: Parameters<typeof t>[0],
+    descriptionKey: Parameters<typeof t>[0],
+  ): void {
     const modulesEl = containerEl.createDiv({ cls: 'opencodian-debug-modules' });
     modulesEl.createEl('h4', {
       cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.debug.modules.title'),
+      text: t(titleKey),
     });
     modulesEl.createDiv({
       cls: 'opencodian-settings-block-desc',
-      text: t('settings.debug.modules.desc'),
+      text: t(descriptionKey),
     });
 
+    const visibleModuleKeys = new Set<DebugModuleKey>(moduleKeys);
     for (const debugModule of DEBUG_MODULE_REGISTRY) {
+      if (!visibleModuleKeys.has(debugModule.key)) {
+        continue;
+      }
       new Setting(modulesEl)
         .setName(t(debugModule.labelKey as never))
         .setDesc(t(debugModule.descriptionKey as never))

@@ -140,6 +140,18 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'lsp',
     ]);
   });
+
+  it('splits debug settings by diagnostic source', () => {
+    const debugTab = getPrimaryTabDefinition('debug');
+
+    expect(debugTab!.defaultSecondaryTabId).toBe('plugin');
+    expect(debugTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'plugin',
+      'opencode',
+      'claude-code',
+      'export',
+    ]);
+  });
 });
 
 describe('resolvePrimaryTabId', () => {
@@ -183,6 +195,10 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
     expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
     expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('tools');
+    expect(resolveSecondaryTabId('debug', 'general')).toBe('plugin');
+    expect(resolveSecondaryTabId('debug', 'modules')).toBe('plugin');
+    expect(resolveSecondaryTabId('debug', 'logs')).toBe('export');
+    expect(resolveSecondaryTabId('debug', 'actions')).toBe('export');
   });
 
   it('falls back to the first primary for unknown primary ids', () => {

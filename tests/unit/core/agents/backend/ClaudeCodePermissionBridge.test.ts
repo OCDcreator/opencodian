@@ -1,9 +1,29 @@
+/* eslint-disable max-lines-per-function -- Permission bridge coverage keeps approval, question, and logging privacy regressions together. */
+
 import {
   type ClaudeCodePermissionBridgeHost,
   createClaudeCodePermissionBridge,
 } from '../../../../../src/core/agents/backend';
+import {
+  clearRecentLogs,
+  getRecentLogEntries,
+  setDebugLoggingEnabled,
+  setDebugModuleEnabled,
+} from '../../../../../src/shared';
 
 describe('ClaudeCodePermissionBridge', () => {
+  beforeEach(() => {
+    clearRecentLogs();
+    setDebugLoggingEnabled(true);
+    setDebugModuleEnabled('claudeCode', true);
+  });
+
+  afterEach(() => {
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('claudeCode', false);
+    clearRecentLogs();
+  });
+
   it('allows a tool once and returns updated input', async () => {
     const collectToolApproval = jest.fn(async () => ({
       reply: 'once' as const,
@@ -202,5 +222,81 @@ describe('ClaudeCodePermissionBridge', () => {
       message: 'Claude Code asked an invalid question.',
       toolUseID: 'question-invalid',
     });
+  });
+
+  it('logs permission and question decisions without leaking user answers', async () => {
+    const bridge = createClaudeCodePermissionBridge({
+      collectToolApproval: jest.fn(async () => 'session' as const),
+      collectQuestionAnswers: jest.fn(async () => ({
+        answers: [['secret answer']],
+        updatedInput: { redacted: true },
+      })),
+    }, { sessionId: 'claude-session-log' });
+
+    await bridge.canUseTool('Bash', { command: 'echo secret-command' }, {
+      toolUseID: 'tool-log',
+      suggestions: [{ destination: 'session', rule: 'allow bash' }],
+    });
+    await bridge.canUseTool('AskUserQuestion', {
+      questions: [{
+        question: 'Continue?',
+        options: [{ label: 'Yes', description: 'Proceed' }],
+      }],
+    }, { toolUseID: 'question-log' });
+
+    const entries = getRecentLogEntries().filter((entry) => entry.scope === 'ClaudeCodePermissionBridge');
+    const logText = entries.map((entry) => entry.message).join('\n');
+
+    expect(entries.length).toBeGreaterThanOrEqual(4);
+    expect(entries.every((entry) => entry.moduleKey === 'claudeCode')).toBe(true);
+    expect(logText).toContain('canUseTool request');
+    expect(logText).toContain('canUseTool decision');
+    expect(logText).toContain('AskUserQuestion request');
+    expect(logText).toContain('AskUserQuestion decision');
+    expect(logText).toContain('updatedPermissionsCount');
+    [
+      'agentID',
+      'hasSignal',
+      'aborted',
+      'suggestionCount',
+      'hasBlockedPath',
+      'hasDecisionReason',
+      'inputKeyCount',
+      'updatedInputKeyCount',
+      'interrupt',
+      'sessionId',
+      'optionCount',
+      'answerGroupCount',
+      'selectedCount',
+    ].forEach((forbiddenField) => {
+      expect(logText).not.toContain(forbiddenField);
+    });
+    expect(logText).not.toContain('secret answer');
+    expect(logText).not.toContain('echo secret-command');
+  });
+
+  it('logs AskUserQuestion errors without error keys or raw error messages', async () => {
+    const bridge = createClaudeCodePermissionBridge({
+      collectQuestionAnswers: jest.fn(async () => {
+        throw new Error('secret raw question failure');
+      }),
+    }, { sessionId: 'claude-session-error-log' });
+
+    await expect(bridge.canUseTool('AskUserQuestion', {
+      questions: [{
+        question: 'Continue?',
+        options: [{ label: 'Yes', description: 'Proceed' }],
+      }],
+    }, { toolUseID: 'question-error-log' })).rejects.toThrow('secret raw question failure');
+
+    const logText = getRecentLogEntries()
+      .filter((entry) => entry.scope === 'ClaudeCodePermissionBridge')
+      .map((entry) => entry.message)
+      .join('\n');
+
+    expect(logText).toContain('AskUserQuestion error');
+    expect(logText).toContain('toolUseID');
+    expect(logText).not.toContain('"error"');
+    expect(logText).not.toContain('secret raw question failure');
   });
 });

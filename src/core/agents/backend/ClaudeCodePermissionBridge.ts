@@ -1,3 +1,4 @@
+import { createLogger } from '../../../shared';
 import type {
   PermissionReply,
   QuestionRequest,
@@ -5,6 +6,8 @@ import type {
 } from '../../types';
 
 type PermissionRequestChunk = Extract<StreamChunk, { type: 'permission_request' }>;
+
+const logger = createLogger('ClaudeCodePermissionBridge', { moduleKey: 'claudeCode' });
 
 export type ClaudeCodePermissionUpdate = Record<string, unknown>;
 
@@ -288,6 +291,33 @@ function buildAskUserQuestionInput(
   };
 }
 
+function summarizePermissionRequest(
+  toolName: string,
+  context: ClaudeCodeCanUseToolContext,
+  patternCount: number,
+): Record<string, unknown> {
+  return {
+    toolName,
+    toolUseID: getToolUseID(context),
+    patternCount,
+  };
+}
+
+function summarizePermissionResult(result: ClaudeCodePermissionResult): Record<string, unknown> {
+  return {
+    behavior: result.behavior,
+    toolUseID: result.toolUseID,
+    updatedPermissionsCount: result.behavior === 'allow' ? result.updatedPermissions?.length ?? 0 : 0,
+  };
+}
+
+function summarizeQuestionRequest(request: QuestionRequest): Record<string, unknown> {
+  return {
+    toolUseID: request.id,
+    questionCount: request.questions.length,
+  };
+}
+
 export class ClaudeCodePermissionBridge {
   private host: ClaudeCodePermissionBridgeHost;
 
@@ -311,8 +341,15 @@ export class ClaudeCodePermissionBridge {
     input: Record<string, unknown>,
     context: ClaudeCodeCanUseToolContext = {},
   ): Promise<ClaudeCodePermissionResult> {
+    const patternCount = permissionPatternsFromInput(input, context).length;
+    logger.debug('canUseTool request', {
+      ...summarizePermissionRequest(toolName, context, patternCount),
+    });
+
     if (context.signal?.aborted) {
-      return createDenyResult('Claude Code permission request was interrupted.', context, true);
+      const result = createDenyResult('Claude Code permission request was interrupted.', context, true);
+      logger.debug('canUseTool decision', summarizePermissionResult(result));
+      return result;
     }
 
     if (isAskUserQuestion(toolName)) {
@@ -320,30 +357,44 @@ export class ClaudeCodePermissionBridge {
     }
 
     if (!this.host.collectToolApproval) {
-      return createDenyResult('No Claude Code permission handler is available.', context);
+      const result = createDenyResult('No Claude Code permission handler is available.', context);
+      logger.debug('canUseTool decision', summarizePermissionResult(result));
+      return result;
     }
 
     const request = this.createPermissionRequest(toolName, input, context);
     const rawDecision = await this.host.collectToolApproval(request, context);
     if (!rawDecision) {
-      return createDenyResult('Claude Code permission request was cancelled.', context, true);
+      const result = createDenyResult('Claude Code permission request was cancelled.', context, true);
+      logger.debug('canUseTool decision', summarizePermissionResult(result));
+      return result;
     }
 
     const decision = normalizeApprovalDecision(rawDecision);
     if (decision.reply === 'reject') {
-      return createDenyResult(
+      const result = createDenyResult(
         decision.message ?? 'User denied this Claude Code tool request.',
         context,
         decision.interrupt,
       );
+      logger.debug('canUseTool decision', {
+        reply: decision.reply,
+        ...summarizePermissionResult(result),
+      });
+      return result;
     }
 
     const updatedPermissions = permissionUpdatesForReply(decision.reply, context.suggestions);
-    return createAllowResult(
+    const result = createAllowResult(
       decision.updatedInput ?? cloneInput(input),
       context,
       updatedPermissions,
     );
+    logger.debug('canUseTool decision', {
+      reply: decision.reply,
+      ...summarizePermissionResult(result),
+    });
+    return result;
   }
 
   createPermissionRequest(
@@ -381,24 +432,45 @@ export class ClaudeCodePermissionBridge {
     context: ClaudeCodeCanUseToolContext,
   ): Promise<ClaudeCodePermissionResult> {
     if (!this.host.collectQuestionAnswers) {
-      return createDenyResult('No Claude Code question handler is available.', context);
+      const result = createDenyResult('No Claude Code question handler is available.', context);
+      logger.debug('AskUserQuestion decision', summarizePermissionResult(result));
+      return result;
     }
 
     const request = this.createQuestionRequest(input, context);
     if (!request) {
-      return createDenyResult('Claude Code asked an invalid question.', context);
+      const result = createDenyResult('Claude Code asked an invalid question.', context);
+      logger.debug('AskUserQuestion decision', summarizePermissionResult(result));
+      return result;
     }
+    logger.debug('AskUserQuestion request', summarizeQuestionRequest(request));
 
-    const rawDecision = await this.host.collectQuestionAnswers(request, context);
+    let rawDecision: ClaudeCodeQuestionDecision | string[][] | null;
+    try {
+      rawDecision = await this.host.collectQuestionAnswers(request, context);
+    } catch (error) {
+      logger.debug('AskUserQuestion error', {
+        toolUseID: getToolUseID(context),
+      });
+      throw error;
+    }
     if (!rawDecision) {
-      return createDenyResult('Claude Code question was cancelled.', context, true);
+      const result = createDenyResult('Claude Code question was cancelled.', context, true);
+      logger.debug('AskUserQuestion cancel', summarizePermissionResult(result));
+      logger.debug('AskUserQuestion decision', summarizePermissionResult(result));
+      return result;
     }
 
     const decision = normalizeQuestionDecision(rawDecision);
-    return createAllowResult(
+    const result = createAllowResult(
       buildAskUserQuestionInput(input, request, decision.answers, decision.updatedInput),
       context,
     );
+    logger.debug('AskUserQuestion decision', {
+      ...summarizePermissionResult(result),
+      reply: 'answered',
+    });
+    return result;
   }
 }
 

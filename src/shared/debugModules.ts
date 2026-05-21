@@ -46,6 +46,12 @@ export const DEBUG_MODULE_REGISTRY = [
     defaultEnabled: true,
   },
   {
+    key: 'claudeCode',
+    labelKey: 'settings.debug.modules.claudeCode.name',
+    descriptionKey: 'settings.debug.modules.claudeCode.desc',
+    defaultEnabled: true,
+  },
+  {
     key: 'tasks',
     labelKey: 'settings.debug.modules.tasks.name',
     descriptionKey: 'settings.debug.modules.tasks.desc',
@@ -82,6 +88,10 @@ const DEBUG_MODULE_SCOPE_PATTERNS: Array<{
   key: DebugModuleKey;
   matches: string[];
 }> = [
+  {
+    key: 'claudeCode',
+    matches: ['ClaudeCode', 'Claude Code', 'claude-code'],
+  },
   {
     key: 'contextUsage',
     matches: ['ContextUsage', 'ContextUsageCoordinator'],
@@ -174,8 +184,11 @@ export function resolveDebugModuleKey(scope: string, explicitModuleKey?: DebugMo
     return explicitModuleKey;
   }
 
+  const normalizedScope = scope.toLowerCase();
   for (const candidate of DEBUG_MODULE_SCOPE_PATTERNS) {
-    if (candidate.matches.some((pattern) => scope.includes(pattern))) {
+    if (candidate.matches.some((pattern) => (
+      scope.includes(pattern) || normalizedScope.includes(pattern.toLowerCase())
+    ))) {
       return candidate.key;
     }
   }

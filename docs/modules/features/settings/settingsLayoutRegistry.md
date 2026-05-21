@@ -5,7 +5,7 @@
 
 ## 概述
 
-`settingsLayoutRegistry.ts` 定义设置页多级标签分类模式的标签结构。它是一个纯数据 registry，不包含任何设置保存逻辑，但现在也负责把旧的 `language` 一级标签记忆兼容到新的 `general`，并把旧的 `Server > MCP` 停留位置迁移到新的一级 `MCP` 类目。
+`settingsLayoutRegistry.ts` 定义设置页多级标签分类模式的标签结构。它是一个纯数据 registry，不包含任何设置保存逻辑，但现在也负责把旧的 `language` 一级标签记忆兼容到新的 `general`，并维护二级标签 legacy id 映射，避免用户停留在已重组的设置页时落到空白或错误默认页。
 
 registry 里的 `backendRequired` 是设置 surface 的后端边界声明：OpenCode 专属 tab 只在当前 active backend 是 `opencode` 时出现，Claude Code 专属 tab 只在 active backend 是 `claude-code` 时出现。不要把 `enabledBackends` 里的存在性当作展示条件，否则会把另一个后端尚未接入的能力泄漏到当前 UI。
 
@@ -35,7 +35,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 | `security` | `config`, `permissions`, `safety` |
 | `ui` | `general` |
 | `style` | `presets`, `background`, `layout`, `user`, `assistant`, `input`, `scrollbar`, `advanced` |
-| `debug` | `general`, `modules`, `logs`, `actions` |
+| `debug` | `plugin`, `opencode`, `claude-code`, `export` |
 | `user` | `profile`, `prompt`, `tags` |
 | `skills` | `project`, `external` |
 | `tools` | `builtin`, `custom` |
@@ -55,3 +55,5 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 Claude Code 的二级标签现在拆成 `runtime`、`model-thinking`、`permissions`、`context-sources`、`tools`、`limits`、`sdk-foundations`，分别承载运行时/环境变量、模型与思考配置、权限模式、上下文来源与额外目录、工具 allow/block、轮数/预算限制、以及 SDK foundation 诊断开关。旧的 `mcp-advanced` 二级标签会迁移到 `tools`，避免用户停留在已移除标签时回到空白或默认页；新增二级标签时需要同步 `SettingsClaudeCodeSection.renderTabContent()` 与 locale key。
 
 Conversation 的默认二级标签是 `display`，因为聊天字号和用户消息渲染属于后端无关的显示设置；`title`、`compaction`、`sharing`、`questions` 目前都依赖 OpenCode SDK / `.opencode/opencode.json` / OpenCode session API，必须继续标记为 `backendRequired: 'opencode'`，直到对应 Claude Code 能力真实接入。
+
+Debug 的默认二级标签是 `plugin`，因为总开关和插件内部模块开关是最通用入口。旧的 `debug/general`、`debug/modules` 会迁移到 `plugin`，旧的 `debug/logs`、`debug/actions` 会迁移到 `export`；`opencode` 与 `claude-code` 是新的来源分区，分别承载 OpenCode 后端诊断和 Claude Code SDK 诊断。

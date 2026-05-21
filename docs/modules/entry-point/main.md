@@ -176,7 +176,8 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
   - 维护 data URL 缓存
   - 在保存失败时回滚外观并删除新导入的资源
 - 诊断导出：
-  - `buildDiagnosticReport()` 汇总 server 状态、关键设置、debug module 开关、debug refresh interval、最近一次 startup perf trace、自动 startup analysis 与最近日志
+  - `buildDiagnosticReport()` 汇总 OpenCode server 状态、Claude Code SDK 诊断状态、关键设置、debug module 开关、debug refresh interval、最近一次 startup perf trace、自动 startup analysis 与最近日志
+  - Claude Code 诊断区块只写摘要计数与开关状态，例如 model/effort、setting sources、MCP/env/additional directory 数量、checkpoint/hook/subagent 诊断开关，不导出环境变量值或 prompt 内容
   - `writeDiagnosticLogFile()` 把报告写到指定目录
   - `getDebugBuildIdentityText()` 提供设置页“复制版本 / BUILD_ID”动作使用的稳定文本
 

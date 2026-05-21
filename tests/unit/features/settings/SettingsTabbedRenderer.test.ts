@@ -311,7 +311,7 @@ describe('SettingsTabbedRenderer', () => {
       security: 'config',
       ui: 'general',
       style: 'presets',
-      debug: 'general',
+      debug: 'plugin',
       user: 'profile',
     };
     let renderedShellCount = 0;

@@ -7,6 +7,12 @@ import {
   createClaudeCodePermissionBridge,
 } from '../../../../../src/core/agents/backend';
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
+import {
+  clearRecentLogs,
+  getRecentLogEntries,
+  setDebugLoggingEnabled,
+  setDebugModuleEnabled,
+} from '../../../../../src/shared';
 
 async function collectAsync<T>(iterable: AsyncIterable<T>): Promise<T[]> {
   const values: T[] = [];
@@ -99,6 +105,18 @@ function createSdk(messages: unknown[]): ClaudeCodeSdkFacade & {
 
 // eslint-disable-next-line max-lines-per-function -- Adapter behavior cases share small SDK/session fixtures.
 describe('ClaudeCodeAdapter', () => {
+  beforeEach(() => {
+    clearRecentLogs();
+    setDebugLoggingEnabled(true);
+    setDebugModuleEnabled('claudeCode', true);
+  });
+
+  afterEach(() => {
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('claudeCode', false);
+    clearRecentLogs();
+  });
+
   it('starts and stops without spawning a real Claude process', async () => {
     const sdk = createSdk([]);
     const adapter = new ClaudeCodeAdapter({
@@ -165,6 +183,8 @@ describe('ClaudeCodeAdapter', () => {
     }]);
     expect(supportedModels).toHaveBeenCalledTimes(1);
     expect(sdk.query.mock.results[0].value.close).toHaveBeenCalledTimes(1);
+    expect(sdk.query.mock.calls[0][0].options.spawnClaudeCodeProcess).toEqual(expect.any(Function));
+    expect(sdk.query.mock.calls[0][0].options.abortController).toEqual(expect.any(Object));
   });
 
   it('returns an empty supported model list when the SDK throws', async () => {
@@ -697,14 +717,15 @@ describe('ClaudeCodeAdapter', () => {
     expect(query.interrupt).toHaveBeenCalledTimes(1);
   });
 
-  it('surfaces SDK query failures as backend-labelled error chunks', async () => {
+  it('surfaces SDK query failures as backend-labelled error chunks without raw error logs', async () => {
     const shouldYield = (): boolean => false;
+    const rawError = 'token=abc123 prompt=hello secret command=/bin/private';
     const sdk: ClaudeCodeSdkFacade & { query: jest.Mock } = {
       query: jest.fn(() => (async function* () {
         if (shouldYield()) {
           yield undefined;
         }
-        throw new Error('boom');
+        throw new Error(rawError);
       })()),
     };
     const adapter = new ClaudeCodeAdapter({
@@ -717,8 +738,21 @@ describe('ClaudeCodeAdapter', () => {
     await expect(collectAsync(adapter.sendMessage({ sessionId, content: 'hello' })))
       .resolves.toEqual([{
         type: 'error',
-        content: 'Claude Code stream failed: boom',
+        content: `Claude Code stream failed: ${rawError}`,
       }]);
+
+    const entries = getRecentLogEntries().filter((entry) => entry.scope === 'ClaudeCodeAdapter');
+    const logText = entries.map((entry) => entry.message).join('\n');
+
+    expect(entries.some((entry) => entry.moduleKey === 'claudeCode')).toBe(true);
+    expect(logText).toContain('sendMessage start');
+    expect(logText).toContain('runtime create');
+    expect(logText).toContain('SDK query creation');
+    expect(logText).toContain('sendMessage error');
+    expect(logText).not.toContain('hello');
+    expect(logText).not.toContain('abc123');
+    expect(logText).not.toContain('/bin/private');
+    expect(logText).toContain('messageLength');
   });
 
   it('dispose clears state and subscribers', async () => {
