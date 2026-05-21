@@ -61,6 +61,7 @@ const CLAUDE_EFFORT_LEVELS: Array<{ id: ClaudeCodeEffort; labelKey: TranslationK
   { id: 'low', labelKey: 'settings.claudeCode.effort.low' },
   { id: 'medium', labelKey: 'settings.claudeCode.effort.medium' },
   { id: 'high', labelKey: 'settings.claudeCode.effort.high' },
+  { id: 'xhigh', labelKey: 'settings.claudeCode.effort.xhigh' },
   { id: 'max', labelKey: 'settings.claudeCode.effort.max' },
 ];
 

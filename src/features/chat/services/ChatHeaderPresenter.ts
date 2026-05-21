@@ -183,7 +183,7 @@ export class ChatHeaderPresenter {
 
   applyLocaleTexts(): void {
     if (this.serverStatusBadgeEl) {
-      this.host.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
+      this.host.setTooltipLabel(this.serverStatusBadgeEl, this.getStatusSettingsTooltip(), 'bottom');
     }
 
     if (this.newConversationBtnEl) {
@@ -356,12 +356,18 @@ export class ChatHeaderPresenter {
       this.serverStatusBadgeEl.removeClass(...SERVER_STATUS_CLASS_NAMES);
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability));
-      this.host.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
+      this.host.setTooltipLabel(this.serverStatusBadgeEl, this.getStatusSettingsTooltip(), 'bottom');
       this.host.refreshContextUsageIndicator();
       this.host.onServerAvailabilityRefreshed?.();
     } finally {
       this.isRefreshingServerStatus = false;
     }
+  }
+
+  private getStatusSettingsTooltip(): string {
+    return this.host.isOpenCodeBackend()
+      ? t('chat.serverStatus.openSettings')
+      : t('chat.serverStatus.openBackendSettings');
   }
 
   private getServerStatusLabel(availability: ChatServerAvailability): string {

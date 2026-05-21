@@ -210,6 +210,20 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.container.querySelector('.opencodian-input-toolbar')).toBeNull();
   });
 
+  it('remounts toolbar controls when backend capabilities change', () => {
+    const fixture = createFixture();
+
+    expect(fixture.container.querySelector('.opencodian-agent-selector')).not.toBeNull();
+
+    fixture.host.shouldMountAgentSelector.mockReturnValue(false);
+    fixture.coordinator.refreshToolbarControls();
+
+    expect(fixture.container.querySelector('.opencodian-agent-selector')).toBeNull();
+    expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(2);
+    expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(2);
+    expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);
+  });
+
   it('renders a disabled composer shell when no backend is enabled', () => {
     const fixture = createFixture({
       shouldMountAgentSelector: false,

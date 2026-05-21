@@ -30,7 +30,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `OpenCodianSettings` 现在包含 backend 管理字段：`activeBackend` 表示新会话默认 backend，`enabledBackends` 表示设置页当前启用的 backend 集合。Phase 0 默认值固定为 `opencode` / `['opencode']`，非 OpenCode backend 只作为 UI 可见性和后续迁移占位。
 
-`backendSettings.claudeCode` 是 Claude Code 专属设置对象。它包含 executable path、显式 `settingSources`、Claude permission mode、thinking、effort、additional directories、model/fallback model、`allowedTools`/`disallowedTools`（工具策略）、`maxTurns`/`maxBudgetUsd`（限制项）、`env`（环境变量）。默认 `settingSources` 是 `['project']`，但保存的空数组表示显式 none，不能被归一化回默认值。新增字段（`allowedTools`、`disallowedTools`、`maxTurns`、`maxBudgetUsd`、`env`）全部有后端 wiring 但无 UI 暴露。
+`backendSettings.claudeCode` 是 Claude Code 专属设置对象。它包含 executable path、显式 `settingSources`、Claude permission mode、thinking、effort、additional directories、model/fallback model、`allowedTools`/`disallowedTools`（工具策略）、`maxTurns`/`maxBudgetUsd`（限制项）、`env`（环境变量）。`ClaudeCodeEffort` 跟随官方 CLI/SDK effort 值：`low` / `medium` / `high` / `xhigh` / `max`。默认 `settingSources` 是 `['project']`，但保存的空数组表示显式 none，不能被归一化回默认值。新增字段（`allowedTools`、`disallowedTools`、`maxTurns`、`maxBudgetUsd`、`env`）全部有后端 wiring 但无 UI 暴露。
 
 ### 服务器与安全
 

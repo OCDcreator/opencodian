@@ -83,6 +83,20 @@ async function collectChunks(iterable: AsyncIterable<StreamChunk>): Promise<Stre
   return chunks;
 }
 
+async function waitForExpect(assertion: () => void, attempts = 10): Promise<void> {
+  let lastError: unknown;
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
 function createAsyncQueue<T>(): AsyncIterable<T> & {
   push(value: T): void;
   close(): void;
@@ -352,7 +366,7 @@ describe('ClaudeCode smoke harness', () => {
 
     const stream = adapter.sendMessage({ sessionId, content: 'hello' });
     const next = stream.next();
-    await Promise.resolve();
+    await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
     await adapter.setModel('claude-opus-4-6');
     await adapter.setPermissionMode('plan');
     await adapter.reloadMcpServers();

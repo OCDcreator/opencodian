@@ -36,6 +36,7 @@ export interface MessageFinalizationHostDependencies {
   conversationTabRuntimeCoordinator: {
     updateConversationSyncRuntime(tabId, update: { inFlight?: boolean; fingerprint?: string | null }): void;
     clearPendingEditedFiles(tabId: TabId | null): void;
+    transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   };
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
   tabConversationStateBridge: { syncActiveTabConversation(conversation: Conversation): void };
@@ -115,6 +116,7 @@ export class MessageFinalizationService {
 - 不论是否 should-sync，都会继续写最终 save、清空 pending edited files；session todos 只在 OpenCode-owned conversation 上刷新，非 OpenCode backend 先跳过 OpenCode-only todo refresh
 - 如果用户在 finalization 期间切走 tab，则不做 foreground patch/rerender 与 active-tab context usage 刷新，而是改为给原 tab 打 attention
 - sync lock 会在 service 自己的 `finally` 中释放，避免 send finalization 途中遗漏解锁
+- tab session lifecycle 也会在同一个 `finally` 中收口到 `idle`，避免本地流或非 server-sync backend 结束后停在 `finalizing` 而阻塞下一次发送
 
 ## 与 `OpenCodianView` 的边界
 
@@ -160,6 +162,7 @@ export class MessageFinalizationService {
 - `setConversationSyncInFlight(tabId, value)` → `deps.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, { inFlight: value })`
 - `setLastConversationSyncFingerprint(tabId, fingerprint)` → `deps.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, { fingerprint })`
 - `clearPendingEditedFiles(tabId)` → `deps.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId)`
+- `transitionTabSessionLifecycle(tabId, phase, reason)` → `deps.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason)`
 - `setActiveTabConversation(conversation)` → `deps.tabConversationStateBridge.syncActiveTabConversation(conversation)`
 - `syncActiveTabContextUsageIdentity()` → `deps.activeTabContextUsageCoordinator.syncIdentity()`
 - `refreshActiveTabContextUsageFromServer()` → `deps.activeTabContextUsageCoordinator.refreshFromServer()`

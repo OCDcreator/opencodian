@@ -17,6 +17,11 @@ import {
   getConversationSessionBackendService,
 } from '../../core/agents/backend/AgentBackendRouting';
 import {
+  buildClaudeCodeModelSelectorProviders,
+  CLAUDE_CODE_EFFORT_VARIANTS,
+  CLAUDE_CODE_PROVIDER_ID,
+} from '../../core/agents/backend/ClaudeCodeModelCatalog';
+import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
 import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
@@ -632,7 +637,7 @@ export class OpenCodianView extends ItemView {
         this.updateComposerAvailabilityUi();
       },
       openServerSettings: () => {
-        this.openPluginSettingsAtServerSection();
+        this.openPluginSettingsAtActiveBackendRuntimeSection();
       },
       createConversationInNewTab: () => this.createNewConversation(),
       createConversationInCurrentTab: () => this.createNewConversationInCurrentTab(),
@@ -790,24 +795,29 @@ export class OpenCodianView extends ItemView {
         this.effortContainerEl = container;
         this.effortSelector = new EffortSelector(container, {
           getVariants: () => {
+            if (this.isClaudeCodeConversationActive()) {
+              return [...CLAUDE_CODE_EFFORT_VARIANTS];
+            }
             const current = this.getCurrentSessionModel();
             if (!current) return [];
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const modelRef = `${current.provider}/${current.model}`;
             return this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
           },
-          getVariant: () => this.currentVariant,
+          getVariant: () => this.getCurrentEffortVariant(),
           onVariantChange: async (variant: string | undefined) => {
-            this.currentVariant = variant;
             const current = this.getCurrentSessionModel();
+            this.currentVariant = this.normalizeEffortVariantForCurrentBackend(variant);
             if (current) {
-              this.variantStore[`${current.provider}/${current.model}`] = variant;
+              this.variantStore[`${current.provider}/${current.model}`] = this.currentVariant;
             }
           },
           getCurrentModel: () => {
             const current = this.getCurrentSessionModel();
             return current ? `${current.provider}/${current.model}` : '';
           },
+          allowDefaultOption: () => !this.isClaudeCodeConversationActive(),
+          getDefaultOptionLabel: () => t('chat.effort.disabled'),
         });
         this.effortSelector.updateDisplay();
       },
@@ -957,6 +967,18 @@ export class OpenCodianView extends ItemView {
         this.scope?.register([], 'Escape', handler);
       },
       loadModelCatalogData: async () => {
+        if (this.isClaudeCodeConversationActive()) {
+          const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+            supportedModels?: () => Promise<Array<{ id: string; name: string; provider?: string }>>;
+          } | undefined;
+          const supportedModels = adapter?.supportedModels
+            ? await adapter.supportedModels()
+            : [];
+          return {
+            catalogBundle: null,
+            providers: buildClaudeCodeModelSelectorProviders(supportedModels),
+          };
+        }
         const catalogBundle = this.plugin.modelConfigService
           ? await this.plugin.modelConfigService.getCatalogs(
               this.plugin.settings.modelSourceMode,
@@ -971,7 +993,7 @@ export class OpenCodianView extends ItemView {
           providers,
         };
       },
-      getActiveTabModelOverride: () => this.tabManager?.getActiveTabModelOverride() ?? null,
+      getActiveTabModelOverride: () => this.getBackendScopedActiveTabModelOverride(),
       setActiveTabModelOverride: (selection) => {
         if (!this.tabManager?.getActiveTab()) {
           return false;
@@ -981,6 +1003,13 @@ export class OpenCodianView extends ItemView {
         return true;
       },
       getDefaultModelSelection: () => {
+        if (this.isClaudeCodeConversationActive()) {
+          const model = this.plugin.settings.backendSettings.claudeCode.model.trim() || 'default';
+          return {
+            provider: CLAUDE_CODE_PROVIDER_ID,
+            model,
+          };
+        }
         if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
           return null;
         }
@@ -994,11 +1023,14 @@ export class OpenCodianView extends ItemView {
         this.activeTabContextUsageCoordinator.syncIdentity();
       },
       getModelSourceMode: () => this.plugin.settings.modelSourceMode,
-      isModelAvailableOnServer: async (provider, model) => (
-        this.plugin.modelConfigService
+      isModelAvailableOnServer: async (provider, model) => {
+        if (this.isClaudeCodeConversationActive()) {
+          return Boolean(provider && model);
+        }
+        return this.plugin.modelConfigService
           ? this.plugin.modelConfigService.isModelAvailableOnServer(provider, model)
-          : true
-      ),
+          : true;
+      },
       resolveProviderIconUrl: (providerId) =>
         ProviderIconService.resolveIconUrl(
           this.app,
@@ -1006,6 +1038,18 @@ export class OpenCodianView extends ItemView {
           this.plugin.settings.providerIconLibrary,
         ),
       updateEffortSelectorDisplay: () => {
+        if (this.isClaudeCodeConversationActive()) {
+          const current = this.getCurrentSessionModel();
+          if (current) {
+            const modelRef = `${current.provider}/${current.model}`;
+            const saved = this.variantStore[modelRef];
+            this.currentVariant = this.normalizeEffortVariantForCurrentBackend(saved);
+          } else {
+            this.currentVariant = undefined;
+          }
+          this.effortSelector?.updateDisplay();
+          return;
+        }
         const current = this.getCurrentSessionModel();
         if (current) {
           const modelRef = `${current.provider}/${current.model}`;
@@ -1514,28 +1558,36 @@ export class OpenCodianView extends ItemView {
     this.plugin.claudeCodePermissionHostContext.permissionCardRenderer = this.permissionInlineCardRenderer;
     this.plugin.claudeCodePermissionHostContext.questionCardRenderer = {
       collectResponse: async (request, tabId) => {
-        const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
-          request,
-          tabId,
-          { applyResolution: false },
-        );
-        return result.status === 'answered' ? result.answers : null;
+        try {
+          const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+            request,
+            tabId,
+            { applyResolution: false, forceInline: true },
+          );
+          return result.status === 'answered' ? result.answers : null;
+        } finally {
+          this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
+        }
       },
     };
     this.plugin.claudeCodePermissionHostContext.elicitationCardRenderer = {
       collectResponse: async (request, tabId) => {
-        const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
-          request,
-          tabId,
-          { applyResolution: false },
-        );
-        if (result.status === 'rejected') {
-          return { action: 'decline' };
+        try {
+          const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+            request,
+            tabId,
+            { applyResolution: false, forceInline: true },
+          );
+          if (result.status === 'rejected') {
+            return { action: 'decline' };
+          }
+          if (result.status !== 'answered') {
+            return { action: 'cancel' };
+          }
+          return { action: 'accept', answers: result.answers };
+        } finally {
+          this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
         }
-        if (result.status !== 'answered') {
-          return { action: 'cancel' };
-        }
-        return { action: 'accept', answers: result.answers };
       },
     };
   }
@@ -3164,6 +3216,18 @@ export class OpenCodianView extends ItemView {
     settings.openTabById('opencodian');
   }
 
+  private openPluginSettingsAtActiveBackendRuntimeSection(): void {
+    if (this.isActiveBackendOpenCode()) {
+      this.openPluginSettingsAtServerSection();
+      return;
+    }
+
+    this.plugin.settingsTab?.prepareScrollToClaudeCodeOnNextOpen();
+    const settings = this.appSettings();
+    settings.open();
+    settings.openTabById('opencodian');
+  }
+
   private async getServerAvailability(): Promise<ChatServerAvailability> {
     if (!this.hasAnyEnabledBackend()) {
       this.lastResolvedServerAvailability = 'disabled';
@@ -3383,6 +3447,7 @@ export class OpenCodianView extends ItemView {
   private async applyActiveBackendConversationSurface(activeBackend: AgentBackendKind): Promise<void> {
     this.chatHeaderPresenter.refreshBackendChrome();
     this.chatHeaderPresenter.applyLocaleTexts();
+    this.refreshComposerToolbarForActiveBackend();
     void this.chatHeaderPresenter.refreshServerStatusBadge();
 
     if ((this.currentConversation?.backend ?? 'opencode') === activeBackend) {
@@ -3405,6 +3470,17 @@ export class OpenCodianView extends ItemView {
     }
 
     await this.createConversationInCurrentTab();
+  }
+
+  private refreshComposerToolbarForActiveBackend(): void {
+    this.contextRing?.destroy();
+    this.contextRing = null;
+    this.contextRingContainerEl = null;
+    this.effortSelector?.destroy();
+    this.effortSelector = null;
+    this.effortContainerEl = null;
+    this.chatSelectionControlsCoordinator.destroy();
+    this.composerInputShellCoordinator.refreshToolbarControls();
   }
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
@@ -3796,6 +3872,42 @@ export class OpenCodianView extends ItemView {
     return this.chatSelectionControlsCoordinator.formatModelId(model);
   }
 
+  private isClaudeCodeConversationActive(): boolean {
+    return (
+      this.plugin.settings.activeBackend
+      ?? this.currentConversation?.backend
+      ?? 'opencode'
+    ) === 'claude-code';
+  }
+
+  private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {
+    const override = this.tabManager?.getActiveTabModelOverride() ?? null;
+    if (!override || !this.isClaudeCodeConversationActive()) {
+      return override;
+    }
+
+    return this.isClaudeCodeModelProvider(override.provider) ? override : null;
+  }
+
+  private isClaudeCodeModelProvider(provider: string | undefined): boolean {
+    return provider === CLAUDE_CODE_PROVIDER_ID
+      || provider === 'anthropic'
+      || provider === 'claude';
+  }
+
+  private normalizeEffortVariantForCurrentBackend(variant: string | undefined): string | undefined {
+    if (!this.isClaudeCodeConversationActive()) {
+      return variant;
+    }
+    return variant && CLAUDE_CODE_EFFORT_VARIANTS.some((candidate) => candidate === variant)
+      ? variant
+      : this.plugin.settings.backendSettings.claudeCode.effort;
+  }
+
+  private getCurrentEffortVariant(): string | undefined {
+    return this.normalizeEffortVariantForCurrentBackend(this.currentVariant);
+  }
+
   /** Get model options for sendMessage */
   private getSendMessageOptions(): { provider?: string; model?: string; variant?: string } {
     const current = this.getCurrentSessionModel();
@@ -3806,7 +3918,7 @@ export class OpenCodianView extends ItemView {
     return {
       provider: current.provider,
       model: current.model,
-      variant: this.currentVariant,
+      variant: this.getCurrentEffortVariant(),
     };
   }
 

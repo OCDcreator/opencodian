@@ -18,9 +18,10 @@
 - 对每个 Claude session 维护一个持久 streaming SDK `Query`：首次发送启动 `query({ prompt: AsyncIterable<SDKUserMessage>, options })`，后续发送把 user prompt 推入同一个 input channel；`sendMessage()` 仍按 OpenCodian 现有 contract 返回 per-turn `StreamChunk` async generator，并在 SDK `result` 消息边界结束本轮输出
 - 将 SDK message/event 通过 `ClaudeCodeStreamNormalizer` 转换为 `StreamChunk`
 - 将 `ClaudeCodePermissionBridge.canUseTool` 注入 SDK options
-- 将已适配的 Claude `mcpServers` 配置透传到 SDK options，用于 MCP smoke/运行时配置接线验证
+- 首次 SDK query 前会加载动态 MCP 配置缓存，即使调用方没有显式 `start()` adapter，也会把项目 `.opencode` 转换后的 Claude `mcpServers` 透传到 SDK options，用于 MCP stdio/runtime 配置接线验证
 - 对活跃持久 `Query` 暴露后端 live control：`setModel()`、`setPermissionMode()` 和 `reloadMcpServers()` 会分别委托 SDK `Query.setModel()`、`Query.setPermissionMode()` 和 `Query.setMcpServers()`；没有活跃 query 时保持无害 no-op，MCP reload 会先刷新 adapter 缓存
 - 从真实 SDK `Query.supportedModels()` 读取模型目录；本地 facade 兼容官方 `ModelInfo.value/displayName` 与旧 fixture `id/name` 形状，避免把 `supportedModels()` 误挂到顶层 SDK module
+- 接收 composer per-send `options.model` 与 `options.variant`，在 SDK query options 中映射为 Claude Code `model` 与 `effort`；若同一持久 query 仍活跃且仅 model 变化，model 会通过 `Query.setModel()` 尝试 live 更新；若 effort 变化，则关闭旧 query 并用已捕获的 SDK session id 重新启动 resumed query，确保下一轮发送应用新的 effort
 - 将 SDK `onElicitation` callback 注入 options，生产 host 会把 elicitation 转成 OpenCodian question flow 的统一交互入口
 - 将自定义 `abortController` 和 `spawnClaudeCodeProcess` 注入 SDK options，绕开 Obsidian/Electron renderer 对 `child_process.spawn({ signal })` 的 `AbortSignal` 兼容问题
 - 支持 `cancelStream()`、`stop()`、`dispose()` 的本地取消和资源清理
@@ -35,5 +36,5 @@
 - OpenCode 仍是默认 backend；Claude Code 必须通过设置显式启用，认证失败会以 Claude Code error chunk 暴露，而不是回落到 OpenCode。
 - `spawnClaudeCodeProcess` 不要把 SDK 传入的 `signal` 继续传给 Node `spawn()` options；它需要手动监听 abort 并 kill 子进程，保持 Obsidian renderer 兼容。
 - 本地 handle 与 SDK `session_id` 是两层身份：首次发送前只有本地 handle，SDK 输出 `session_id` 后才把 conversation `backendSessionId` 收敛为真实可 resume 的 Claude session id；如果 reload 后传入的 `backendSessionId` 已经是 Claude SDK session id，adapter 会直接恢复 `sdkSessionId` 并 resume。
-- 持久 `Query` 关闭或 adapter reload 后，下一次发送会重新启动 SDK query，并在已捕获 `session_id` 时继续通过 `resume` 恢复；JSONL replay 和完整 history browser 仍属于后续 full-capability phase。
+- 持久 `Query` 关闭或 adapter reload 后，下一次发送会重新启动 SDK query，并在已捕获真实 SDK `session_id` 时继续通过 `resume` 恢复；OpenCodian 本地生成的 `claude-code-*` conversation handle 不会被误传给 SDK `resume`。JSONL replay 和完整 history browser 仍属于后续 full-capability phase。
 - crash recovery 当前只做错误 chunk；异常后的 prompt replay、冷启动 fallback 和多 view 并发同 session 仲裁属于后续 full-capability phase。

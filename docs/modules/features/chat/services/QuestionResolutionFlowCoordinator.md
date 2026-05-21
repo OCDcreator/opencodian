@@ -23,13 +23,18 @@ export interface QuestionResolutionFlowCoordinatorPorts {
 }
 
 export class QuestionResolutionFlowCoordinator {
-  showQuestionDialog(request: QuestionRequest, tabId?: TabId | null): Promise<QuestionResolutionFlowResult>;
+  showQuestionDialog(
+    request: QuestionRequest,
+    tabId?: TabId | null,
+    options?: { applyResolution?: boolean; forceInline?: boolean },
+  ): Promise<QuestionResolutionFlowResult>;
 }
 ```
 
 ## 关键行为
 
 - `showQuestionDialog()` 先调用 dock handoff；如果当前 request 已被上方 dock 接管，就返回 `answered` 结果并且不重复触发 inline fallback
+- `forceInline` 会跳过上方 dock，直接收集 inline card 的答案；这用于 Claude Code `AskUserQuestion` / MCP `onElicitation` 这类 SDK callback，因为它们需要把答案同步返回给 SDK，而不是只把 resolution 写回 OpenCode question API
 - 只有 dock 未接管时才会调用 inline action source；grouped/sequential 选择与 reply/reject action-shape 组装仍留在 `QuestionInlineResolutionActionFacade`
 - inline fallback 成功后直接调用 `QuestionResolutionExecutionFacade.executeAndApply()`，不再让 flow coordinator 为了 post-resolution lifecycle 回跳 dock owner
 - 返回值区分 `answered` / `rejected` / `cancelled`，供 Claude Code `AskUserQuestion` 和 MCP `onElicitation` 这类非 OpenCode SDK callback 把统一 question UX 的结果转换回各自 SDK 的 answer shape；send pipeline 只消费 Promise completion，不读取该结果

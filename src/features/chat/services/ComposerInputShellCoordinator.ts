@@ -220,6 +220,23 @@ export class ComposerInputShellCoordinator {
     this.updateSendButtonState();
     this.updateComposerAvailabilityState();
 
+    this.mountToolbarControls();
+
+    this.initializeLayoutMetrics();
+  }
+
+  refreshToolbarControls(): void {
+    this.mountToolbarControls();
+  }
+
+  private mountToolbarControls(): void {
+    if (!this.composerShellEl) {
+      return;
+    }
+
+    this.agentSelectionController.destroy();
+    this.composerShellEl.querySelector(':scope > .opencodian-input-toolbar')?.remove();
+
     const toolbarEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
     if (this.host.shouldMountAgentSelector?.() !== false) {
       this.agentSelectionController.mount(toolbarEl.createDiv({ cls: 'opencodian-agent-selector' }));
@@ -231,8 +248,6 @@ export class ComposerInputShellCoordinator {
     this.host.mountContextUsageIndicator(toolbarEl.createDiv({ cls: 'opencodian-context-usage-slot' }));
     this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
     this.pruneEmptyToolbar(toolbarEl);
-
-    this.initializeLayoutMetrics();
   }
 
   getTabBarSlotEl(): HTMLElement | null {

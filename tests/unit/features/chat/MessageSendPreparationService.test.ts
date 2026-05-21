@@ -144,27 +144,34 @@ describe('MessageSendPreparationService', () => {
     expect(conversation.messages).toHaveLength(0);
   });
 
-  it('skips OpenCode model catalog validation for Claude Code conversations', async () => {
+  it('uses Claude Code model catalog options for Claude Code conversations', async () => {
     const conversation = createConversation();
     conversation.backend = 'claude-code';
     conversation.backendSessionId = 'claude-code-session';
     delete conversation.openCodeSessionId;
     const host = createHost(conversation, [], {
-      shouldUseModelCatalog: jest.fn().mockReturnValue(false),
       hasLoadedModelCatalog: jest.fn().mockReturnValue(false),
-      ensureSelectedModelAvailable: jest.fn().mockResolvedValue(false),
+      getSendMessageOptions: jest.fn().mockReturnValue({
+        provider: 'claude-code',
+        model: 'opus',
+        variant: 'xhigh',
+      }),
     });
     const service = new MessageSendPreparationService(host, createComposerSendContext());
 
     const result = await service.prepareMessageSend({ content: 'Hello Claude' });
 
     expect(result).not.toBeNull();
-    expect(host.loadAvailableModels).not.toHaveBeenCalled();
-    expect(host.getSendMessageOptions).not.toHaveBeenCalled();
-    expect(host.ensureSelectedModelAvailable).not.toHaveBeenCalled();
+    expect(host.loadAvailableModels).toHaveBeenCalledTimes(1);
+    expect(host.getSendMessageOptions).toHaveBeenCalledTimes(1);
+    expect(host.ensureSelectedModelAvailable).toHaveBeenCalledWith('claude-code', 'opus');
     expect(host.appendModelUnavailableNoticeMessage).not.toHaveBeenCalled();
-    expect(result?.modelOptions).toEqual({});
-    expect(result?.activeModelId).toBeUndefined();
+    expect(result?.modelOptions).toEqual({
+      provider: 'claude-code',
+      model: 'opus',
+      variant: 'xhigh',
+    });
+    expect(result?.activeModelId).toBe('claude-code/opus');
     expect(host.seedCanonicalUserMessage).toHaveBeenCalledWith({
       sessionID: 'claude-code-session',
       messageID: 'message-1',

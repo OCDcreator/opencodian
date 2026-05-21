@@ -10,7 +10,7 @@
 ## 职责
 
 - 在 Runtime 标签渲染 Claude Code executable path、认证/环境提示和 runtime diagnostics
-- 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown
+- 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown；effort 选项与官方 Claude Code CLI/SDK 对齐为 low / medium / high / xhigh / max
 - adaptive / disabled thinking 下不渲染 thinking budget，避免显示不会生效的空编辑控件；fixed thinking 下保留用户已有 budget
 - 在 Permissions 标签渲染 permission mode dropdown
 - 在 Context & Sources 标签渲染 setting sources toggles（user/project/local）和 additional directories textarea

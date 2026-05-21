@@ -54,6 +54,7 @@ docs/modules/
 │   │   └── backend/
 │   │       ├── index.md
 │   │       ├── AgentService.md
+│   │       ├── ClaudeCodeModelCatalog.md
 │   │       ├── OpenCodeAdapter.md
 │   │       └── AgentServiceRegistry.md
 │   ├── config/

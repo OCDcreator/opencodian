@@ -105,6 +105,21 @@ describe('ChatHeaderPresenter', () => {
     expect(fixture.host.openSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('uses backend settings language for the status badge outside OpenCode mode', async () => {
+    const fixture = createFixture();
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('running');
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendConnected', {
+      backend: 'Claude Code',
+    }));
+    expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openBackendSettings'));
+  });
+
   it('exposes stable accessible header action locators', () => {
     const fixture = createFixture();
 

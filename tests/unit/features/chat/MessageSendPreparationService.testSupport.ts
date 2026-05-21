@@ -101,7 +101,8 @@ export function createHost(
     formatModelId: jest.fn().mockImplementation((model: Partial<{ provider: string; model: string }> | null | undefined) =>
       model?.provider && model?.model ? `${model.provider}/${model.model}` : undefined),
     shouldUseModelCatalog: jest.fn().mockImplementation((targetConversation: Conversation) =>
-      (targetConversation.backend ?? 'opencode') === 'opencode'),
+      (targetConversation.backend ?? 'opencode') === 'opencode'
+      || (targetConversation.backend ?? 'opencode') === 'claude-code'),
     ensureSelectedModelAvailable: jest.fn().mockImplementation(async () => { callOrder.push('ensureSelectedModelAvailable'); return true; }),
     appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
     buildStructuredPromptSendPayload: jest.fn().mockImplementation((content: string) =>

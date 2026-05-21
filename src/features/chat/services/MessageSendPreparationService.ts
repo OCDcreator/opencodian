@@ -614,7 +614,10 @@ export function createMessageSendPreparationHost(
     loadAvailableModels: () => deps.reloadModelCatalog(),
     getSendMessageOptions: () => deps.getSendMessageOptions(),
     formatModelId: (model) => selectionCtrl.formatModelId(model),
-    shouldUseModelCatalog: (conversation) => (conversation.backend ?? 'opencode') === 'opencode',
+    shouldUseModelCatalog: (conversation) => {
+      const backend = conversation.backend ?? 'opencode';
+      return backend === 'opencode' || backend === 'claude-code';
+    },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
     buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),

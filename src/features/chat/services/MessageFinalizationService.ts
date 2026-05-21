@@ -8,6 +8,7 @@ import { t } from '../../../i18n';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { TabId } from '../tabs';
 import type { ConversationWriteTicket } from './ConversationWriteSerializationService';
+import type { WritableTabSessionPhase } from './TabSessionPhase';
 
 export interface ShouldSyncAfterStreamOptions {
   streamCompleted: boolean;
@@ -108,6 +109,7 @@ export interface MessageFinalizationHost {
   renderStreamError(options: AssistantErrorRenderOptions): void;
   formatCurrentSessionModelId(): string | undefined;
   updateConversationSyncRuntime(tabId: TabId | null, update: { fingerprint?: string | null }): void;
+  transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   scrollToBottom(options: { enableAutoScroll: boolean }): void;
 }
 
@@ -163,6 +165,7 @@ export interface MessageFinalizationHostDependencies {
       update: { inFlight?: boolean; fingerprint?: string | null },
     ): void;
     clearPendingEditedFiles(tabId: TabId | null): void;
+    transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   };
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
   tabConversationStateBridge: {
@@ -224,6 +227,8 @@ export function createMessageFinalizationHost(
     formatCurrentSessionModelId: () => deps.formatCurrentSessionModelId(),
     updateConversationSyncRuntime: (tabId, update) =>
       tabRuntime.updateConversationSyncRuntime(tabId, update),
+    transitionTabSessionLifecycle: (tabId, phase, reason) =>
+      tabRuntime.transitionTabSessionLifecycle(tabId, phase, reason),
     scrollToBottom: (options) => deps.scrollToBottom(options),
   };
 }
@@ -344,6 +349,12 @@ export class MessageFinalizationService {
         this.host.setConversationSyncInFlight(tabId, false);
         logStage('conversation-sync-lock-cleared');
       }
+      this.host.transitionTabSessionLifecycle(
+        tabId,
+        'idle',
+        'send-finalization-complete',
+      );
+      logStage('tab-session-lifecycle-idle');
     }
   }
 

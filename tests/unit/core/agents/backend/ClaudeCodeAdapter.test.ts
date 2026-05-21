@@ -60,6 +60,20 @@ async function nextFrom<T>(iterable: AsyncIterable<T>): Promise<IteratorResult<T
   return await iterable[Symbol.asyncIterator]().next();
 }
 
+async function waitForExpect(assertion: () => void, attempts = 10): Promise<void> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
 function createSdk(messages: unknown[]): ClaudeCodeSdkFacade & {
   query: jest.Mock;
   listSessions: jest.Mock;
@@ -259,6 +273,120 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdk.query.mock.calls[1][0].options.resume).toBe('sdk-session-1');
   });
 
+  it('passes composer model and effort overrides into the Claude Code SDK query options', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-model-effort',
+        content: [{ type: 'text', text: 'Override accepted' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'hello',
+      options: {
+        provider: 'claude-code',
+        model: 'opus',
+        variant: 'xhigh',
+      },
+    }));
+
+    expect(sdk.query.mock.calls[0][0].options).toEqual(expect.objectContaining({
+      model: 'opus',
+      effort: 'xhigh',
+    }));
+  });
+
+  it('starts a fresh resumed SDK query when composer effort changes', async () => {
+    const sdkOutputs = [
+      createAsyncQueue<unknown>(),
+      createAsyncQueue<unknown>(),
+    ];
+    const prompts: AsyncIterable<unknown>[] = [];
+    const sdk: ClaudeCodeSdkFacade & { query: jest.Mock } = {
+      query: jest.fn((input) => {
+        prompts.push(input.prompt as AsyncIterable<unknown>);
+        return Object.assign(sdkOutputs[prompts.length - 1], {
+          supportedModels: jest.fn().mockResolvedValue([]),
+          close: jest.fn(),
+        });
+      }),
+    };
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+
+    const first = collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'first',
+      options: { provider: 'claude-code', model: 'sonnet', variant: 'low' },
+    }));
+    await waitForExpect(() => expect(prompts[0]).toBeDefined());
+    await expect(nextFrom(prompts[0])).resolves.toEqual({
+      value: {
+        type: 'user',
+        message: { role: 'user', content: 'first' },
+      },
+      done: false,
+    });
+    sdkOutputs[0].push({
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-effort-session',
+    });
+    sdkOutputs[0].push({
+      type: 'assistant',
+      message: {
+        id: 'msg-effort-1',
+        content: [{ type: 'text', text: 'First response' }],
+      },
+    });
+    sdkOutputs[0].push({ type: 'result', subtype: 'success' });
+    await expect(first).resolves.toContainEqual({ type: 'text', content: 'First response' });
+
+    const second = collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'second',
+      options: { provider: 'claude-code', model: 'sonnet', variant: 'max' },
+    }));
+    await waitForExpect(() => expect(prompts[1]).toBeDefined());
+    await expect(nextFrom(prompts[1])).resolves.toEqual({
+      value: {
+        type: 'user',
+        message: { role: 'user', content: 'second' },
+      },
+      done: false,
+    });
+    sdkOutputs[1].push({
+      type: 'assistant',
+      message: {
+        id: 'msg-effort-2',
+        content: [{ type: 'text', text: 'Second response' }],
+      },
+    });
+    sdkOutputs[1].push({ type: 'result', subtype: 'success' });
+    await expect(second).resolves.toContainEqual({ type: 'text', content: 'Second response' });
+
+    expect(sdk.query).toHaveBeenCalledTimes(2);
+    expect(sdk.query.mock.calls[0][0].options).toEqual(expect.objectContaining({
+      effort: 'low',
+    }));
+    expect(sdk.query.mock.calls[1][0].options).toEqual(expect.objectContaining({
+      effort: 'max',
+      resume: 'sdk-effort-session',
+    }));
+  });
+
   it('keeps one streaming SDK query alive for sequential sends on the same session', async () => {
     const sdkOutput = createAsyncQueue<unknown>();
     const prompts: AsyncIterable<unknown>[] = [];
@@ -276,7 +404,7 @@ describe('ClaudeCodeAdapter', () => {
     const sessionId = await adapter.createSession();
 
     const first = collectAsync(adapter.sendMessage({ sessionId, content: 'first' }));
-    await Promise.resolve();
+    await waitForExpect(() => expect(prompts[0]).toBeDefined());
     await expect(nextFrom(prompts[0])).resolves.toEqual({
       value: {
         type: 'user',
@@ -315,6 +443,39 @@ describe('ClaudeCodeAdapter', () => {
 
     await expect(second).resolves.toEqual([{ type: 'text', content: 'Second response' }]);
     expect(sdk.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads dynamic MCP config before the first SDK query even when start was not called', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-mcp',
+        content: [{ type: 'text', text: 'MCP ready' }],
+      },
+    }]);
+    const mcpServers = {
+      runtimeSmoke: { type: 'stdio' as const, command: 'node', args: ['server.js'] },
+    };
+    const mcpConfigLoader = jest.fn().mockResolvedValue(mcpServers);
+    const statuses: string[] = [];
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+      mcpConfigLoader,
+    });
+    adapter.onStatusChange((status) => statuses.push(status));
+    const sessionId = await adapter.createSession();
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'use mcp',
+    }))).resolves.toEqual([{ type: 'text', content: 'MCP ready' }]);
+
+    expect(mcpConfigLoader).toHaveBeenCalledTimes(1);
+    expect(sdk.query.mock.calls[0][0].options.mcpServers).toEqual(mcpServers);
+    expect(adapter.status).toBe('connected');
+    expect(statuses).toEqual(['connected']);
   });
 
   it('uses SDK session APIs for list, lookup, rename, and fork after capture', async () => {
@@ -391,6 +552,7 @@ describe('ClaudeCodeAdapter', () => {
     }]);
 
     expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.query.mock.calls[0][0].options.resume).toBeUndefined();
   });
 
   it('resumes a persisted Claude SDK session id after adapter restart', async () => {
@@ -528,8 +690,7 @@ describe('ClaudeCodeAdapter', () => {
     const stream = adapter.sendMessage({ sessionId, content: 'hello' });
 
     const next = stream.next();
-    await Promise.resolve();
-    expect(sdk.query).toHaveBeenCalledTimes(1);
+    await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
     adapter.cancelStream(sessionId);
     await expect(next).resolves.toEqual({ value: undefined, done: true });
 

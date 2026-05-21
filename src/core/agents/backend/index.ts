@@ -54,6 +54,14 @@ export {
   type ClaudeCodeMcpStdioConfig,
 } from './ClaudeCodeMcpConfigAdapter';
 export {
+  buildClaudeCodeModelSelectorProviders,
+  CLAUDE_CODE_EFFORT_VARIANTS,
+  CLAUDE_CODE_PROVIDER_ID,
+  CLAUDE_CODE_PROVIDER_NAME,
+  type ClaudeCodeModelCatalogEntry,
+  type ClaudeCodeModelSelectorProvider,
+} from './ClaudeCodeModelCatalog';
+export {
   buildClaudeCodeOptions,
   type ClaudeCodeOptionsBuilderInput,
   type ClaudeCodeSdkOptionsShape,

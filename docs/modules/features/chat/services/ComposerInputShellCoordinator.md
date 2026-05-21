@@ -20,6 +20,7 @@
 - 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort/modified-files toggle 这些既有子控件挂到稳定的 toolbar slot
+- 暴露 `refreshToolbarControls()`，允许 backend/capability 切换后只重挂 toolbar 子控件，而不重建 textarea、context row 或 footer
 
 ## 公开接口
 
@@ -55,6 +56,7 @@ export interface ComposerInputShellCoordinatorHost {
 
 export class ComposerInputShellCoordinator {
   build(container: HTMLElement): void;
+  refreshToolbarControls(): void;
   getTabBarSlotEl(): HTMLElement | null;
   getComposerShellEl(): HTMLElement | null;
   getInputWrapperEl(): HTMLElement | null;
@@ -70,7 +72,8 @@ export class ComposerInputShellCoordinator {
 
 - `build()` 一次性组装输入区 shell，并把 toolbar 子控件初始化交回 host seam；textarea 被 `opencodian-input-highlight-container` 包裹，内含 `opencodian-input-highlight-backdrop` 和 textarea 两个同级元素
 - `build()` 之后会立即根据 host 的 composer availability state 同步输入壳层；当没有 enabled backend，或当前 backend 虽已启用但运行时不可连接时，textarea / add-context / send 会被禁用，并在 input wrapper 内渲染一条紧凑的 disabled-state 说明块，避免留下意义不明的输入空白
-- `build()` 在挂载 toolbar 子控件后会清理空 slot；当当前 backend 没有 agent/model/permission/context/effort 控件可显示时，整个 `opencodian-input-toolbar` 会被移除，避免空壳 toolbar 把 add/send 按钮悬在半空
+- `build()` / `refreshToolbarControls()` 在挂载 toolbar 子控件后会清理空 slot；当当前 backend 没有 agent/model/permission/context/effort 控件可显示时，整个 `opencodian-input-toolbar` 会被移除，避免空壳 toolbar 把 add/send 按钮悬在半空
+- `refreshToolbarControls()` 会先销毁旧的 `ChatAgentSelectionCoordinator` DOM，再按最新 host capability gates 重建 agent selector、model/permission controls、context usage 和 effort slot；用于 Claude Code / OpenCode 切换时避免 OpenCode-only agent selector 残留
 - `build()` 设置 textarea 的 scroll 事件监听器，同步 backdrop 的 scrollTop 以保持滚动一致
 - `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionPillSpans()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内，并写入 agent pill metadata；slash 高亮则先依赖已加载的 `slashCommandMenuCatalogItems` 做精确判定，只把 catalog 中真实存在的 `/command`、direct `/skill`，以及 prefixed mode 下存在的 `/skills skill-name` 包裹为高亮 span。普通命令使用 `opencodian-input-highlight-command`，直接或 prefixed skill 使用 `opencodian-input-highlight-skill`，裸 `/skills` 入口仍按 command 语义显示；拼错的 `/using-superpowert` 这类未知 token 不会上色
 - `syncTextareaHeight()` 在调整 textarea 高度的同时同步 backdrop 高度

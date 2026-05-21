@@ -3,7 +3,7 @@ import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai
 import { spawn } from 'child_process';
 
 import type { AgentBackendKind, StreamChunk } from '../../types/chat';
-import type { ClaudeCodeBackendSettings } from '../../types/settings';
+import type { ClaudeCodeBackendSettings, ClaudeCodeEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
 import type {
   AgentChatCapability,
@@ -87,6 +87,27 @@ export interface ClaudeCodeAdapterOptions {
   mcpConfigLoader?: ClaudeCodeMcpConfigLoader;
 }
 
+const CLAUDE_CODE_EFFORT_VALUES = new Set<ClaudeCodeEffort>(['low', 'medium', 'high', 'xhigh', 'max']);
+
+function trimOptionalOptionString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function resolveSendOptionOverrides(options: Record<string, unknown> | undefined): {
+  model?: string;
+  effort?: ClaudeCodeEffort;
+} {
+  const model = trimOptionalOptionString(options?.model);
+  const variant = trimOptionalOptionString(options?.variant);
+  const effort = variant && CLAUDE_CODE_EFFORT_VALUES.has(variant as ClaudeCodeEffort)
+    ? variant as ClaudeCodeEffort
+    : undefined;
+  return {
+    ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
+  };
+}
+
 const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>([
     AgentCapability.Chat,
@@ -97,6 +118,10 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     AgentCapability.Shell,
   ]),
 );
+
+function isOpenCodianLocalClaudeSessionId(sessionId: string): boolean {
+  return sessionId.startsWith('claude-code-');
+}
 
 interface ClaudeCodeSessionState {
   id: string;
@@ -272,8 +297,9 @@ export class ClaudeCodeAdapter
     session.messages.push(prompt);
     let runtime: ClaudeCodeSessionRuntime;
     try {
-      runtime = await this.getOrStartRuntime(session);
+      runtime = await this.getOrStartRuntime(session, request.options);
     } catch (error) {
+      this.setStatus('error');
       yield {
         type: 'error',
         content: `Claude Code SDK unavailable: ${error instanceof Error ? error.message : String(error)}`,
@@ -345,10 +371,16 @@ export class ClaudeCodeAdapter
   private buildSdkOptions(
     abortController?: AbortController,
     session?: ClaudeCodeSessionState,
+    sendOptions?: Record<string, unknown>,
   ): ClaudeCodeSdkOptionsShape {
+    const overrides = resolveSendOptionOverrides(sendOptions);
     return buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
-      settings: this.options.settings,
+      settings: {
+        ...this.options.settings,
+        ...(overrides.model ? { model: overrides.model } : {}),
+        ...(overrides.effort ? { effort: overrides.effort } : {}),
+      },
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
@@ -371,6 +403,9 @@ export class ClaudeCodeAdapter
    */
   async loadMcpConfig(): Promise<void> {
     if (this.options.mcpServers) {
+      return;
+    }
+    if (this.cachedMcpServers !== undefined) {
       return;
     }
     if (!this.options.mcpConfigLoader) {
@@ -421,11 +456,22 @@ export class ClaudeCodeAdapter
 
   private async getOrStartRuntime(
     session: ClaudeCodeSessionState,
+    sendOptions?: Record<string, unknown>,
   ): Promise<ClaudeCodeSessionRuntime> {
+    const overrides = resolveSendOptionOverrides(sendOptions);
     if (session.runtime && !session.runtime.closed) {
-      return session.runtime;
+      const nextEffort = overrides.effort ?? this.options.settings.effort;
+      if (nextEffort !== session.runtime.effort) {
+        this.closeRuntime(session);
+      } else {
+        if (overrides.model) {
+          await session.runtime.query?.setModel?.(overrides.model);
+        }
+        return session.runtime;
+      }
     }
 
+    await this.ensureReadyForQuery();
     const sdk = await this.getSdk();
     const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
     const runtime: ClaudeCodeSessionRuntime = {
@@ -435,11 +481,12 @@ export class ClaudeCodeAdapter
         sessionId: session.sdkSessionId ?? session.id,
       }),
       abortController,
+      effort: overrides.effort ?? this.options.settings.effort,
       closed: false,
     };
     runtime.query = sdk.query({
       prompt: runtime.input,
-      options: this.buildSdkOptions(abortController, session),
+      options: this.buildSdkOptions(abortController, session, sendOptions),
     });
     session.runtime = runtime;
     void this.pumpRuntimeOutput(session, runtime);
@@ -457,6 +504,7 @@ export class ClaudeCodeAdapter
       }
     }
 
+    await this.ensureReadyForQuery();
     const sdk = await this.getSdk();
     return sdk.query({
       prompt: new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>(),
@@ -467,6 +515,11 @@ export class ClaudeCodeAdapter
         mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
       }),
     });
+  }
+
+  private async ensureReadyForQuery(): Promise<void> {
+    await this.loadMcpConfig();
+    this.setStatus('connected');
   }
 
   private async pumpRuntimeOutput(
@@ -564,7 +617,7 @@ export class ClaudeCodeAdapter
       id: sessionId,
       title: 'Restored Claude Code chat',
       messages: [],
-      sdkSessionId: sessionId,
+      ...(isOpenCodianLocalClaudeSessionId(sessionId) ? {} : { sdkSessionId: sessionId }),
     };
     this.sessions.set(sessionId, restoredSession);
     return restoredSession;

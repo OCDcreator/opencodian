@@ -95,6 +95,12 @@ export function createMessageSendPreparationHost(
 - 是否启动 AI title generation 仍由 view 当前设置决定
 - 这条路径当前只属于 `conversation.backend === 'opencode'`（缺省旧会话也按 OpenCode 处理）。Claude Code conversation 不会调用 `applyFallbackConversationTitle()` 或 `startAiConversationTitleGeneration()`，避免在 Claude Code 尚未接入标题机制时触发 OpenCode 专用逻辑。
 
+### backend model options
+
+- OpenCode 与 Claude Code conversation 都会走 model catalog preparation，确保 composer 选择的 model / effort 在 stream transport 前成为 `PreparedMessageSend.modelOptions`
+- Claude Code 的 `modelOptions.variant` 表示 Claude Code effort，不再依赖 OpenCode provider model variants
+- 其他未接入 model capability 的 backend 仍可通过 host `shouldUseModelCatalog()` 保持跳过
+
 ### stream 进入点
 
 - `enterStreamingState()` 只负责：

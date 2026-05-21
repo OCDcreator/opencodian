@@ -16,6 +16,8 @@
 
 classic 和 tabbed 两种布局都必须按当前 active backend 过滤后端专属 section：OpenCode active 时显示 Server / Model / Agents / Commands / MCP / Formatter / Plugins / Security / Skills / Tools / ACP 等 OpenCode-owned 分区；Claude Code active 时只显示 Claude Code 自身分区以及 Conversation / UI / Style / Debug / User 等通用分区。不要仅因为某个 backend 在 `enabledBackends` 中就显示它的专属设置。
 
+聊天 header 和其他 runtime 入口可以通过 settings tab 的 scroll-prep 方法跳到对应 backend owner：OpenCode 跳 Server / connection，Claude Code 跳 Claude Code / runtime；classic 布局滚动到 section 标题，tabbed 布局切换 primary / secondary tab。
+
 ## Settings Layout Contract
 
 标准 settings tab 的根设置容器会暴露稳定布局契约标记：`data-settings-surface="page"` 和 `data-settings-layout-mode="classic|tabbed"`。CSS 与测试应优先使用这些 data marker 做页面 surface / layout mode 的契约检查，而不是只从 `.opencodian-settings--classic` 或 `.opencodian-settings--tabbed` 等视觉 class 推断当前模式。

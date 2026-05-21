@@ -32,6 +32,7 @@ export interface QuestionResolutionFlowCoordinatorPorts {
 
 export interface QuestionResolutionFlowOptions {
   applyResolution?: boolean;
+  forceInline?: boolean;
 }
 
 export type QuestionResolutionFlowResult =
@@ -57,7 +58,10 @@ export class QuestionResolutionFlowCoordinator {
     tabId: TabId | null = this.host.getActiveTabId(),
     options: QuestionResolutionFlowOptions = {},
   ): Promise<QuestionResolutionFlowResult> {
-    if (await this.ports.dockCoordinator.waitForDockResolutionIfEnabled(request, tabId)) {
+    if (
+      !options.forceInline
+      && await this.ports.dockCoordinator.waitForDockResolutionIfEnabled(request, tabId)
+    ) {
       return { status: 'answered', answers: [] };
     }
 

@@ -326,7 +326,7 @@ describe('QuestionDock collapse interaction', () => {
 
     expect(rootEl.classList.contains('is-collapsed')).toBe(true);
     expect(collapseToggle(rootEl).getAttribute('aria-expanded')).toBe('false');
-    expect(rootEl.querySelector('.opencodian-question-dock-title')?.textContent).toBe('Question from OpenCode');
+    expect(rootEl.querySelector('.opencodian-question-dock-title')?.textContent).toBe('Question from agent');
     expect(rootEl.querySelector('.opencodian-question-dock-progress')?.textContent).toBe('Question 1 of 2');
     expect(rootEl.querySelector('.opencodian-question-dock-summary')?.textContent).toBe('0 of 2 answered');
     expect(rootEl.querySelector('.opencodian-question-dock-body')).toBeNull();

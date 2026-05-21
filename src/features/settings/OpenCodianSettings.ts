@@ -193,6 +193,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.server.title'));
   }
 
+  prepareScrollToClaudeCodeOnNextOpen(): void {
+    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
+      this.getOrCreateTabbedRenderer().switchToPrimaryTab('claude-code', 'runtime');
+      return;
+    }
+
+    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.claudeCode.title'));
+  }
+
   prepareScrollToLspOnNextOpen(): void {
     if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
       this.getOrCreateTabbedRenderer().switchToPrimaryTab('formatter', 'lsp');

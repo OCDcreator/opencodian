@@ -21,7 +21,7 @@ export type ThinkingBudget = 0 | 1024 | 4096 | 8192 | 16384;
 
 export type ClaudeCodeSettingSource = 'user' | 'project' | 'local';
 export type ClaudeCodePermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
-export type ClaudeCodeEffort = 'low' | 'medium' | 'high' | 'max';
+export type ClaudeCodeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type ClaudeCodeThinking =
   | { type: 'adaptive' }
   | { type: 'disabled' }
@@ -129,12 +129,11 @@ export function normalizeClaudeCodeEffort(value: unknown): ClaudeCodeEffort {
     case 'low':
     case 'medium':
     case 'high':
+    case 'xhigh':
     case 'max':
       return value;
     case 'minimal':
       return 'low';
-    case 'xhigh':
-      return 'max';
     default:
       return 'medium';
   }

@@ -14,6 +14,7 @@ export interface ClaudeCodeSessionRuntime {
   output: ClaudeCodeAsyncQueue<ClaudeCodeRuntimeOutput>;
   normalizer: import('./ClaudeCodeStreamNormalizer').ClaudeCodeStreamNormalizer;
   abortController: AbortController;
+  effort?: string;
   query?: AsyncIterable<unknown> & {
     interrupt?: () => Promise<void>;
     setModel?: (model?: string) => Promise<void>;

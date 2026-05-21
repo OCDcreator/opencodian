@@ -146,6 +146,40 @@ describe('QuestionResolutionFlowCoordinator', () => {
     expect(ports.resolutionExecution.executeAndApply).not.toHaveBeenCalled();
   });
 
+  it('can force inline collection even when the above-input dock is enabled', async () => {
+    const request = createQuestionRequest();
+    const inlineAction = {
+      type: 'reply' as const,
+      request,
+      answers: [['TypeScript']],
+      resolution: {
+        request,
+        status: 'answered' as const,
+        answers: [['TypeScript']],
+      },
+    };
+    const { coordinator, ports } = createCoordinator({
+      dockResolves: true,
+      action: inlineAction,
+    });
+
+    await expect(coordinator.showQuestionDialog(
+      request,
+      'tab-active',
+      { applyResolution: false, forceInline: true },
+    )).resolves.toEqual({
+      status: 'answered',
+      answers: [['TypeScript']],
+    });
+
+    expect(ports.dockCoordinator.waitForDockResolutionIfEnabled).not.toHaveBeenCalled();
+    expect(ports.inlineResolutionAction.collectResolutionAction).toHaveBeenCalledWith(
+      request,
+      'tab-active',
+    );
+    expect(ports.resolutionExecution.executeAndApply).not.toHaveBeenCalled();
+  });
+
   it('replays inline reject actions through the dock lifecycle owner', async () => {
     const request = createQuestionRequest();
     const inlineAction = {
