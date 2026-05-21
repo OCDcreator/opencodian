@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import { mapStreamingContentBlocksToMessageContentBlocks } from './sendPipelineContent';
@@ -33,6 +34,12 @@ export async function persistLocalStreamOutcome(options: {
       runtime,
     );
     if (!shouldPersistAssistantMessage) {
+      await persistBackendSessionIdentityIfNeeded({
+        host,
+        preparedSend,
+        outcome,
+        logAssistantFinalizationStage,
+      });
       logAssistantFinalizationStage('local-assistant-cache-deferred', {
         finalizedAssistantMessageId: outcome.finalizedAssistantMessageId ?? null,
         reason: 'canonical-sync-pending',
@@ -91,6 +98,12 @@ export async function persistLocalStreamOutcome(options: {
   }
 
   if (!persistLocalMessage) {
+    await persistBackendSessionIdentityIfNeeded({
+      host,
+      preparedSend,
+      outcome,
+      logAssistantFinalizationStage,
+    });
     return;
   }
 
@@ -100,6 +113,9 @@ export async function persistLocalStreamOutcome(options: {
     writeTicket,
     'local-stream-finalization',
     () => {
+      if (outcome.finalizedBackendSessionId) {
+        preparedSend.conversation.backendSessionId = outcome.finalizedBackendSessionId;
+      }
       persistLocalMessage?.();
       preparedSend.conversation.updatedAt = outcome.finalizedTimestamp;
       preparedSend.conversation.lastResponseAt = outcome.finalizedTimestamp;
@@ -118,6 +134,34 @@ export async function persistLocalStreamOutcome(options: {
     lastResponseAt: preparedSend.conversation.lastResponseAt ?? null,
     messageCount: preparedSend.conversation.messages.length,
   });
+}
+
+async function persistBackendSessionIdentityIfNeeded(options: {
+  host: LocalStreamPersistenceHost;
+  preparedSend: PreparedMessageSend;
+  outcome: LocalStreamOutcome;
+  logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
+}): Promise<void> {
+  const sessionId = options.outcome.finalizedBackendSessionId;
+  if (!sessionId || getConversationBackendSessionId(options.preparedSend.conversation) === sessionId) {
+    return;
+  }
+
+  const writeTicket = options.host.createConversationWriteTicket(options.preparedSend.conversation.id);
+  const writeApplied = await options.host.commitConversationWrite(
+    options.preparedSend.conversation,
+    writeTicket,
+    'backend-session-id-finalization',
+    () => {
+      options.preparedSend.conversation.backendSessionId = sessionId;
+    },
+  );
+  options.logAssistantFinalizationStage(
+    writeApplied ? 'backend-session-id-finalized' : 'backend-session-id-finalization-skipped',
+    {
+      backendSessionId: sessionId,
+    },
+  );
 }
 
 function shouldPersistLocalAssistantMessage(

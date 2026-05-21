@@ -9,7 +9,7 @@ export type ToolIdentityKind =
   | 'unknown';
 
 export interface ToolIdentityOptions {
-  source?: 'generic' | 'opencode' | 'claudian' | 'codex';
+  source?: 'generic' | 'opencode' | 'claudian' | 'codex' | 'claude-code';
   knownMcpTools?: Iterable<string>;
   registryTools?: Iterable<string>;
   observedExternalTools?: Iterable<string>;
@@ -168,6 +168,15 @@ export function getToolIdentity(name: string, options: ToolIdentityOptions = {})
       normalizedName: rawName,
       kind: 'mcp',
       icon: MCP_TOOL_ICON_ID,
+    });
+  }
+
+  if (options.source === 'claude-code') {
+    return createIdentity({
+      rawName,
+      normalizedName: rawName,
+      kind: 'unknown',
+      icon: 'wrench',
     });
   }
 

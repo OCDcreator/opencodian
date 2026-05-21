@@ -13,7 +13,7 @@
 - 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型、chat/session 请求类型和可选 capability interface
 - 导出 `OpenCodeAdapter` 作为当前 OpenCode backend 的 adapter 实现
 - 导出 backend routing helper，供入口、聊天视图和发送管线按 conversation owner / active backend 做 capability narrowing
-- 导出 Claude Code adapter、SDK loader、options builder、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
+- 导出 Claude Code adapter、SDK loader、options builder、MCP config adapter、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
 - 导出 `AgentServiceRegistry` 作为 adapter 注册与 active backend 解析 owner
 - 保持 type-only 导出与 value 导出分层，避免 barrel 额外引入运行时副作用
 
@@ -24,7 +24,7 @@
 - `getConversationChatBackendService` / `getConversationSessionBackendService` / `getActiveSessionBackendService`: backend routing helper。
 - `OpenCodeAdapter`: OpenCode backend 的 `AgentService` adapter 实现。
 - `ClaudeCodeAdapter`: Claude Code official Agent SDK adapter，生产 runtime 通过 `ClaudeCodeSdkLoader` lazy-load 官方 SDK。
-- `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、process、stream 转换与 permission/question bridge helper。
+- `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `adaptMcpConfigForClaude` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、MCP config adapter、process、stream 转换与 permission/question bridge helper。
 - `AgentService` / `AgentServiceInfo` / `AgentConnectionStatus` / `Disposable` / `StatusChangeHandler`: backend 抽象层核心契约与共享类型。
 - `AgentChatSendRequest`: backend-neutral chat 发送请求类型。
 - `AgentChatCapability` / `AgentSessionCapability` / `AgentAuthCapability` / `AgentBranchCapability` / `AgentConfigCapability` / `AgentMcpCapability` / `AgentModelCapability` / `AgentPermissionCapability` / `AgentQuestionCapability` / `AgentTodoCapability` / `AgentToolCapability`: 可选 capability interface。
@@ -38,6 +38,7 @@
 - `src/core/agents/backend/ClaudeCodeAdapter.ts`：Claude Code adapter
 - `src/core/agents/backend/ClaudeCodeSdkLoader.ts`：官方 Claude Agent SDK dynamic import facade
 - `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`：Claude SDK options 形状 builder
+- `src/core/agents/backend/ClaudeCodeMcpConfigAdapter.ts`：OpenCodian MCP config 到 Claude SDK `mcpServers` 的配置桥接 helper
 - `src/core/agents/backend/ClaudeCodeProcessResolver.ts`：Claude process/executable 解析 helper
 - `src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
 - `src/core/agents/backend/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper

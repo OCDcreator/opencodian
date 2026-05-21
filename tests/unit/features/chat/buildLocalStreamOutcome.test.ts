@@ -63,6 +63,7 @@ function createRoutedStream(
     streamTimedOut: false,
     latestErrorMessage: null,
     finalizedAssistantMetadata: null,
+    finalizedBackendSessionId: null,
     logAssistantFinalizationStage: jest.fn(),
     resetStreamingState: jest.fn(),
     cleanupPendingIndicator: jest.fn(),
@@ -91,7 +92,9 @@ describe('buildLocalStreamOutcome', () => {
         messageId: 'assistant-1',
         timestamp: 42,
         modelId: 'openai/gpt-5.5',
+        sessionId: 'sdk-session-1',
       },
+      finalizedBackendSessionId: 'sdk-session-1',
     });
     const outcome = buildLocalStreamOutcome({
       preparedSend,
@@ -103,6 +106,7 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.finalizedTimestamp).toBe(42);
     expect(outcome.finalizedModelId).toBe('openai/gpt-5.5');
     expect(outcome.finalizedAssistantMessageId).toBe('assistant-1');
+    expect(outcome.finalizedBackendSessionId).toBe('sdk-session-1');
     expect(outcome.streamedTextContent).toBe('Hello world');
     expect(outcome.hasStreamContentBlocks).toBe(true);
     expect(outcome.shouldPersistInterruptedState).toBe(false);

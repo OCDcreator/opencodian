@@ -81,6 +81,7 @@ function createOutcome(overrides: Partial<LocalStreamOutcome> = {}): LocalStream
     finalizedTimestamp: 42,
     finalizedModelId: 'openai/gpt-5.4',
     finalizedAssistantMessageId: 'assistant-1',
+    finalizedBackendSessionId: undefined,
     finalizedStreamingMessageEl: document.createElement('div'),
     streamContentBlocks: [{ type: 'text', content: 'Canonical soon' }],
     streamedTextContent: 'Canonical soon',
@@ -123,6 +124,39 @@ describe('persistLocalStreamOutcome canonical cache boundary', () => {
     expect(logStage).toHaveBeenCalledWith('local-assistant-cache-deferred', {
       finalizedAssistantMessageId: 'assistant-1',
       reason: 'canonical-sync-pending',
+    });
+  });
+
+  it('persists captured backend session identity even when assistant cache writes are deferred', async () => {
+    const conversation = createConversation([
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Hello',
+        timestamp: 1,
+      },
+    ]);
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-code-local';
+    delete conversation.openCodeSessionId;
+    const host = createHost();
+    const logStage = jest.fn();
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime(),
+      outcome: createOutcome({
+        finalizedBackendSessionId: 'sdk-session-1',
+      }),
+      logAssistantFinalizationStage: logStage,
+    });
+
+    expect(conversation.messages).toHaveLength(1);
+    expect(conversation.backendSessionId).toBe('sdk-session-1');
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+    expect(logStage).toHaveBeenCalledWith('backend-session-id-finalized', {
+      backendSessionId: 'sdk-session-1',
     });
   });
 

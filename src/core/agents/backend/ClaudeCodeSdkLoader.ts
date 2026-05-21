@@ -6,6 +6,10 @@ import type { ClaudeCodeSdkFacade } from './ClaudeCodeAdapter';
 
 export interface ClaudeAgentSdkModule {
   query: ClaudeCodeSdkFacade['query'];
+  listSessions?: NonNullable<ClaudeCodeSdkFacade['listSessions']>;
+  getSessionInfo?: NonNullable<ClaudeCodeSdkFacade['getSessionInfo']>;
+  forkSession?: NonNullable<ClaudeCodeSdkFacade['forkSession']>;
+  renameSession?: NonNullable<ClaudeCodeSdkFacade['renameSession']>;
 }
 
 export type ClaudeAgentSdkImporter = () => Promise<ClaudeAgentSdkModule>;
@@ -31,5 +35,9 @@ export async function loadClaudeCodeSdk(
       prompt: input.prompt,
       options: input.options,
     }),
+    ...(sdk.listSessions ? { listSessions: sdk.listSessions } : {}),
+    ...(sdk.getSessionInfo ? { getSessionInfo: sdk.getSessionInfo } : {}),
+    ...(sdk.forkSession ? { forkSession: sdk.forkSession } : {}),
+    ...(sdk.renameSession ? { renameSession: sdk.renameSession } : {}),
   };
 }

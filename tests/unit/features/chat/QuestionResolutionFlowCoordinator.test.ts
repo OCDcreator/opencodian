@@ -116,6 +116,36 @@ describe('QuestionResolutionFlowCoordinator', () => {
     );
   });
 
+  it('can collect an inline answer without applying it to the backend question API', async () => {
+    const request = createQuestionRequest();
+    const inlineAction = {
+      type: 'reply' as const,
+      request,
+      answers: [['TypeScript']],
+      resolution: {
+        request,
+        status: 'answered' as const,
+        answers: [['TypeScript']],
+      },
+    };
+    const { coordinator, ports } = createCoordinator({ action: inlineAction });
+
+    await expect(coordinator.showQuestionDialog(
+      request,
+      'tab-active',
+      { applyResolution: false },
+    )).resolves.toEqual({
+      status: 'answered',
+      answers: [['TypeScript']],
+    });
+
+    expect(ports.inlineResolutionAction.collectResolutionAction).toHaveBeenCalledWith(
+      request,
+      'tab-active',
+    );
+    expect(ports.resolutionExecution.executeAndApply).not.toHaveBeenCalled();
+  });
+
   it('replays inline reject actions through the dock lifecycle owner', async () => {
     const request = createQuestionRequest();
     const inlineAction = {

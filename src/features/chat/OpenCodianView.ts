@@ -621,6 +621,10 @@ export class OpenCodianView extends ItemView {
       resolveServerAvailability: () => this.getServerAvailability(),
       isLocalServerMode: () => this.plugin.settings.server.mode === 'local',
       isOpenCodeBackend: () => this.isOpenCodeBackendActive(),
+      getActiveBackendDisplayName: () => {
+        const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+        return this.plugin.agentServiceRegistry?.get(activeBackend)?.displayName ?? activeBackend;
+      },
       refreshContextUsageIndicator: () => {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
@@ -1498,6 +1502,42 @@ export class OpenCodianView extends ItemView {
     this.permissionInlineCardRenderer = interactionRuntime.permissionInlineCardRenderer;
     this.questionRuntimeServices = interactionRuntime.questionRuntimeServices;
     this.sendPipelineRuntime = interactionRuntime.sendPipelineRuntime;
+    this.installClaudeCodePermissionHostContext();
+  }
+
+  private installClaudeCodePermissionHostContext(): void {
+    if (!this.plugin.claudeCodePermissionHostContext) {
+      return;
+    }
+
+    this.plugin.claudeCodePermissionHostContext.getActiveTabId = () => this.getActiveTabId();
+    this.plugin.claudeCodePermissionHostContext.permissionCardRenderer = this.permissionInlineCardRenderer;
+    this.plugin.claudeCodePermissionHostContext.questionCardRenderer = {
+      collectResponse: async (request, tabId) => {
+        const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+          request,
+          tabId,
+          { applyResolution: false },
+        );
+        return result.status === 'answered' ? result.answers : null;
+      },
+    };
+    this.plugin.claudeCodePermissionHostContext.elicitationCardRenderer = {
+      collectResponse: async (request, tabId) => {
+        const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+          request,
+          tabId,
+          { applyResolution: false },
+        );
+        if (result.status === 'rejected') {
+          return { action: 'decline' };
+        }
+        if (result.status !== 'answered') {
+          return { action: 'cancel' };
+        }
+        return { action: 'accept', answers: result.answers };
+      },
+    };
   }
 
   private createSurfaceRuntimeWiring(): OpenCodianViewSurfaceRuntimeWiring {
@@ -2609,8 +2649,9 @@ export class OpenCodianView extends ItemView {
         this.activeTabContextUsageCoordinator.applyUsageChunkToTab(tabId, chunk);
       },
       showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
-      showQuestionDialog: (request, tabId) =>
-        this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId),
+      showQuestionDialog: async (request, tabId) => {
+        await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId);
+      },
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
       getFriendlyStreamErrorMessage: (rawMessage) => this.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage),
       createSendPipelineShellPort: () => this.assistantShellViewHostAdapter.createSendPipelineShellPort(),
@@ -3340,6 +3381,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private async applyActiveBackendConversationSurface(activeBackend: AgentBackendKind): Promise<void> {
+    this.chatHeaderPresenter.refreshBackendChrome();
+    this.chatHeaderPresenter.applyLocaleTexts();
+    void this.chatHeaderPresenter.refreshServerStatusBadge();
+
     if ((this.currentConversation?.backend ?? 'opencode') === activeBackend) {
       return;
     }

@@ -224,6 +224,7 @@ export interface SendPipelineTraceState {
   streamTimedOut: boolean;
   latestErrorMessage: string | null;
   finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null;
+  finalizedBackendSessionId: string | null;
 }
 
 export interface StreamChunkRouterOptions {
@@ -245,6 +246,7 @@ export interface LocalStreamOutcome {
   finalizedTimestamp: number;
   finalizedModelId: string | undefined;
   finalizedAssistantMessageId: string | undefined;
+  finalizedBackendSessionId: string | undefined;
   finalizedStreamingMessageEl: HTMLElement | null;
   streamContentBlocks: StreamingContentBlock[] | undefined;
   streamedTextContent: string;

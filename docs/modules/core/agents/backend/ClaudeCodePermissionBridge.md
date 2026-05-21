@@ -15,6 +15,7 @@
 - 根据 Claude `suggestions` 筛选 `updatedPermissions`，只在用户选择 always/session 时返回对应持久或会话更新
 - 将 `AskUserQuestion` 的 `questions` 输入转换为 `QuestionRequest`，并把答案写回 `updatedInput.answers`
 - 保持 SDK result 类型为本地兼容形状，避免在 Phase 0 引入官方 SDK 依赖
+- 提供 `setHost(host)` 方法，允许运行时更新 host callbacks（例如在 chat view 激活时注入 UI 上下文）
 
 ## 维护约束
 
@@ -22,3 +23,4 @@
 - 不把 Claude permission mode 混入 OpenCode permission 设置；这里只处理单次 `canUseTool` 决策。
 - `AskUserQuestion` 交互当前只生成可被 OpenCodian question UI 消费的请求；真实 SDK wiring 和超时/取消语义在 adapter 集成时补验证。
 - 引入官方 SDK 类型后，优先用类型测试收窄 `ClaudeCodePermissionResult`，但保留 OpenCodian host 边界。
+- `setHost` 允许 chat view 层在流式 UI 上下文可用时更新 host callbacks；不改变 bridge 的拒绝/允许逻辑。

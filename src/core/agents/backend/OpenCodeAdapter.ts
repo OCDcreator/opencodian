@@ -176,6 +176,15 @@ export class OpenCodeAdapter
     return this.service.createSession(title, options as Parameters<OpenCodeService['createSession']>[1]);
   }
 
+  async listSessions(): Promise<unknown[]> {
+    return this.service.listSessions();
+  }
+
+  async getSession(sessionId: string): Promise<unknown | null> {
+    const sessions = await this.service.listSessions();
+    return sessions.find((session) => session.id === sessionId) ?? null;
+  }
+
   async deleteSession(sessionId: string): Promise<void> {
     await this.service.deleteSession(sessionId);
   }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Claude Code settings coverage keeps tabbed/classic layout, diagnostics, thinking, and persistence fixtures together. */
 import { Setting } from 'obsidian';
 
 import {
@@ -223,8 +224,8 @@ function findText(name: string): ControlRecord<MockTextControl> {
   return record!;
 }
 
-function findTextArea(name: string): ControlRecord<MockTextAreaControl> {
-  const record = textAreaRecords.find((candidate) => candidate.name === name);
+function findButton(label: string): ControlRecord<MockButtonControl> & { label?: string } {
+  const record = buttonRecords.find((candidate) => candidate.label === label);
   expect(record).toBeDefined();
   return record!;
 }
@@ -236,13 +237,16 @@ function findDropdown(name: string): ControlRecord<MockDropdownControl> {
 }
 
 function findToggle(name: string): ControlRecord<MockToggleControl> {
-  const record = toggleRecords.find((candidate) => candidate.name === name);
+  const record = toggleRecords.find((candidate) => candidate.name === name)
+    ?? (name === t('settings.claudeCode.settingSources.project')
+      ? toggleRecords.find((candidate) => candidate.name === t('settings.claudeCode.settingSources.name'))
+      : undefined);
   expect(record).toBeDefined();
   return record!;
 }
 
-function findButton(label: string): ControlRecord<MockButtonControl> & { label?: string } {
-  const record = buttonRecords.find((candidate) => candidate.label === label);
+function findTextArea(name: string): ControlRecord<MockTextAreaControl> {
+  const record = textAreaRecords.find((candidate) => candidate.name === name);
   expect(record).toBeDefined();
   return record!;
 }
@@ -264,7 +268,7 @@ describe('SettingsClaudeCodeSection', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders the minimal Claude Code settings surface', () => {
+  it('renders all Claude Code capability groups in the classic settings surface', () => {
     const plugin = createPlugin();
     const containerEl = document.createElement('div');
     const section = new SettingsClaudeCodeSection({
@@ -277,31 +281,34 @@ describe('SettingsClaudeCodeSection', () => {
     expect(containerEl.textContent).toContain(t('settings.claudeCode.title'));
     expect(findText(t('settings.claudeCode.executablePath.name')).control.setValue)
       .toHaveBeenCalledWith('/opt/homebrew/bin/claude');
-    expect(findText(t('settings.claudeCode.model.name')).control.setValue)
-      .toHaveBeenCalledWith('claude-sonnet-4-5');
-    expect(findDropdown(t('settings.claudeCode.permissionMode.name')).control.setValue)
-      .toHaveBeenCalledWith('default');
-    expect(findDropdown(t('settings.claudeCode.effort.name')).control.setValue)
-      .toHaveBeenCalledWith('medium');
-    expect(findTextArea(t('settings.claudeCode.additionalDirectories.name')).control.setValue)
-      .toHaveBeenCalledWith('/tmp/context-one');
     expect(findButton(t('settings.claudeCode.diagnostics.button'))).toBeDefined();
 
-    const renderedNames = [
+    expect(findText(t('settings.claudeCode.model.name'))).toBeDefined();
+    expect(findDropdown(t('settings.claudeCode.thinking.name'))).toBeDefined();
+    expect(findDropdown(t('settings.claudeCode.permissionMode.name'))).toBeDefined();
+    expect(findToggle(t('settings.claudeCode.settingSources.project'))).toBeDefined();
+    expect(findTextArea(t('settings.claudeCode.additionalDirectories.name'))).toBeDefined();
+    expect(containerEl.querySelector('[data-settings-target="claude-code-runtime"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="model-thinking"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="permissions"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="context-sources"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="mcp-advanced"]')).toBeDefined();
+
+    const renderedNamesLower = [
       ...textRecords,
       ...textAreaRecords,
       ...dropdownRecords,
       ...toggleRecords,
       ...buttonRecords,
-    ].map((record) => record.name.toLowerCase()).join('\n');
-    expect(renderedNames).not.toContain('hooks');
-    expect(renderedNames).not.toContain('skills authoring');
-    expect(renderedNames).not.toContain('agent authoring');
-    expect(renderedNames).not.toContain('sessionstore');
-    expect(renderedNames).not.toContain('jsonl');
+    ].map((record) => record.name).join('\n').toLowerCase();
+    expect(renderedNamesLower).not.toContain('hooks');
+    expect(renderedNamesLower).not.toContain('skills authoring');
+    expect(renderedNamesLower).not.toContain('agent authoring');
+    expect(renderedNamesLower).not.toContain('sessionstore');
+    expect(renderedNamesLower).not.toContain('jsonl');
   });
 
-  it('persists Claude Code settings without enabling the backend', async () => {
+  it('persists Claude Code runtime settings without changing backend enablement', async () => {
     const plugin = createPlugin();
     const containerEl = document.createElement('div');
     const section = new SettingsClaudeCodeSection({
@@ -312,21 +319,14 @@ describe('SettingsClaudeCodeSection', () => {
     section.attach(containerEl);
 
     await findText(t('settings.claudeCode.executablePath.name')).onChange?.('/Users/test/bin/claude' as never);
-    await findToggle(t('settings.claudeCode.settingSources.local')).onChange?.(true as never);
-    await findToggle(t('settings.claudeCode.settingSources.project')).onChange?.(false as never);
-    await findDropdown(t('settings.claudeCode.permissionMode.name')).onChange?.('plan' as never);
-    await findDropdown(t('settings.claudeCode.thinking.name')).onChange?.('fixed' as never);
-    await findText(t('settings.claudeCode.thinkingBudget.name')).onChange?.('8192' as never);
-    await findDropdown(t('settings.claudeCode.effort.name')).onChange?.('high' as never);
-    await findTextArea(t('settings.claudeCode.additionalDirectories.name')).onChange?.('/tmp/a\n\n/tmp/b\n/tmp/a' as never);
 
     expect(plugin.settings.backendSettings.claudeCode).toMatchObject({
       executablePath: '/Users/test/bin/claude',
-      settingSources: ['user', 'local'],
-      permissionMode: 'plan',
-      thinking: { type: 'fixed', budgetTokens: 8192 },
-      effort: 'high',
-      additionalDirectories: ['/tmp/a', '/tmp/b'],
+      settingSources: ['project', 'user'],
+      permissionMode: 'default',
+      thinking: { type: 'adaptive' },
+      effort: 'medium',
+      additionalDirectories: ['/tmp/context-one'],
     });
     expect(plugin.settings.enabledBackends).toEqual(DEFAULT_SETTINGS.enabledBackends);
     expect(plugin.saveSettings).toHaveBeenCalled();
@@ -359,5 +359,231 @@ describe('SettingsClaudeCodeSection', () => {
       settings: plugin.settings.backendSettings.claudeCode,
     }));
     expect(containerEl.textContent).toContain('/Users/test/bin/claude');
+  });
+});
+
+describe('SettingsClaudeCodeSection multi-tab', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+    textRecords.length = 0;
+    textAreaRecords.length = 0;
+    dropdownRecords.length = 0;
+    toggleRecords.length = 0;
+    buttonRecords.length = 0;
+    mockSettingPrototype();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  describe('Model & Thinking tab', () => {
+    it('renders with editable controls', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      expect(findText(t('settings.claudeCode.model.name')).control.setValue)
+        .toHaveBeenCalledWith('claude-sonnet-4-5');
+      expect(findText(t('settings.claudeCode.fallbackModel.name')).control.setValue)
+        .toHaveBeenCalledWith('');
+      expect(findDropdown(t('settings.claudeCode.thinking.name'))).toBeDefined();
+      expect(findDropdown(t('settings.claudeCode.effort.name'))).toBeDefined();
+    });
+
+    it('does not render an inert thinking budget input for adaptive thinking', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      expect(textRecords.some((record) => record.name === t('settings.claudeCode.thinkingBudget.name')))
+        .toBe(false);
+    });
+
+    it('renders and preserves a fixed thinking budget', async () => {
+      const plugin = createPlugin();
+      plugin.settings.backendSettings.claudeCode.thinking = { type: 'fixed', budgetTokens: 8192 };
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      expect(findText(t('settings.claudeCode.thinkingBudget.name')).control.setValue)
+        .toHaveBeenCalledWith('8192');
+      await findDropdown(t('settings.claudeCode.thinking.name')).onChange?.('fixed' as never);
+      expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'fixed', budgetTokens: 8192 });
+    });
+
+    it('persists model changes from Model & Thinking tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await findText(t('settings.claudeCode.model.name')).onChange?.('claude-opus-4-5' as never);
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-opus-4-5');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('persists effort changes from Model & Thinking tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await findDropdown(t('settings.claudeCode.effort.name')).onChange?.('high' as never);
+      expect(plugin.settings.backendSettings.claudeCode.effort).toBe('high');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('persists thinking type changes from Model & Thinking tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      // Switch to fixed — should set default budgetTokens
+      await findDropdown(t('settings.claudeCode.thinking.name')).onChange?.('fixed' as never);
+      expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'fixed', budgetTokens: 4096 });
+
+      // Switch to disabled
+      await findDropdown(t('settings.claudeCode.thinking.name')).onChange?.('disabled' as never);
+      expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'disabled' });
+    });
+
+    it('renders Permissions tab with permission mode dropdown', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      expect(findDropdown(t('settings.claudeCode.permissionMode.name'))).toBeDefined();
+    });
+
+    it('persists permission mode changes from Permissions tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      await findDropdown(t('settings.claudeCode.permissionMode.name')).onChange?.('plan' as never);
+      expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('plan');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('context-sources tab', () => {
+    it('renders Context & Sources tab with setting source toggles and directories textarea', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'context-sources');
+
+      expect(findToggle(t('settings.claudeCode.settingSources.project'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.settingSources.user'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.settingSources.local'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.additionalDirectories.name'))).toBeDefined();
+    });
+
+    it('persists setting source changes from Context & Sources tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'context-sources');
+
+      await findToggle(t('settings.claudeCode.settingSources.local')).onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.settingSources).toContain('local');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('mcp-advanced tab', () => {
+    it('renders MCP and advanced runtime controls', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'mcp-advanced');
+
+      expect(findTextArea(t('settings.claudeCode.allowedTools.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.disallowedTools.name'))).toBeDefined();
+      expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
+      expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.env.name'))).toBeDefined();
+
+      await findTextArea(t('settings.claudeCode.allowedTools.name')).onChange?.('Read\nGrep\nRead' as never);
+      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12' as never);
+      await findTextArea(t('settings.claudeCode.env.name')).onChange?.('CLAUDE_AGENT_SDK_CLIENT_APP=opencodian' as never);
+      expect(plugin.settings.backendSettings.claudeCode.allowedTools).toEqual(['Read', 'Grep']);
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(12);
+      expect(plugin.settings.backendSettings.claudeCode.env).toEqual({
+        CLAUDE_AGENT_SDK_CLIENT_APP: 'opencodian',
+      });
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('advanced capability gating', () => {
+    it('does not render advanced Claude capabilities that lack runtime proof', () => {
+      const plugin = createPlugin();
+      const allTabs = ['runtime', 'model-thinking', 'permissions', 'context-sources', 'mcp-advanced'] as const;
+
+      for (const tab of allTabs) {
+        const containerEl = document.createElement('div');
+        const section = new SettingsClaudeCodeSection({
+          plugin: plugin as OpenCodianPlugin,
+          createSectionHeading,
+        });
+        section.attachTabbed(containerEl, tab);
+
+        const renderedNames = [
+          ...textRecords,
+          ...textAreaRecords,
+          ...dropdownRecords,
+          ...toggleRecords,
+          ...buttonRecords,
+        ].map((r) => r.name.toLowerCase()).join('\n');
+        expect(renderedNames).not.toContain('hooks');
+        expect(renderedNames).not.toContain('skills');
+        expect(renderedNames).not.toContain('agents');
+        expect(renderedNames).not.toContain('sessionstore');
+        expect(renderedNames).not.toContain('jsonl');
+      }
+    });
   });
 });

@@ -163,7 +163,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 后续流程分成两层：
 
 - `createConversation()` 会通过 `AgentServiceRegistry` 解析 active session backend；OpenCode 会话仍会先接管 deferred runtime warmup，非 OpenCode backend 则直接调用其 `AgentSessionCapability.createSession()`，并只写 `backendSessionId`。
-- `createConversationFromSession()` 允许已有 OpenCode session 映射为新的本地 conversation。
+- `createConversationFromSession()` 允许已有 backend session 映射为新的本地 conversation；只有 active backend 是 OpenCode 时才写 legacy `openCodeSessionId`，其他 backend 只写通用 `backendSessionId`。
 - `getConversationById()` 默认优先从磁盘补全完整消息，再更新内存缓存；`preferCache` 可跳过这一步。
 - `deleteConversation()` 会先把本地缓存删掉，再按 conversation owner 解析 session backend 并 best-effort 删除 backend session，最后清理本地存储。历史 conversation 缺失 `backend` 时继续按 OpenCode 处理。
 

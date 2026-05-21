@@ -20,6 +20,7 @@ export function buildLocalStreamOutcome(options: {
   const finalizedModelId = options.routedStream.finalizedAssistantMetadata?.modelId
     ?? options.preparedSend.activeModelId;
   const finalizedAssistantMessageId = options.routedStream.finalizedAssistantMetadata?.messageId;
+  const finalizedBackendSessionId = options.routedStream.finalizedBackendSessionId ?? undefined;
   const streamContentBlocks = options.streamController?.getContentBlocks();
   const streamedTextContent = getStreamedTextContent(streamContentBlocks);
   const hasStreamContentBlocks = Boolean(streamContentBlocks && streamContentBlocks.length > 0);
@@ -50,6 +51,7 @@ export function buildLocalStreamOutcome(options: {
     finalizedTimestamp,
     finalizedModelId,
     finalizedAssistantMessageId,
+    finalizedBackendSessionId,
     finalizedStreamingMessageEl: options.runtime.streamingMessageEl,
     streamContentBlocks,
     streamedTextContent,

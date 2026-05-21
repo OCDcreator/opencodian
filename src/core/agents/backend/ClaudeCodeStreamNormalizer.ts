@@ -167,12 +167,13 @@ function normalizeErrorContent(record: JsonRecord): string {
   const errorRecord = readRecord(error);
   return readString(errorRecord?.message)
     ?? readString(record.message)
+    ?? stringifyContent(record.errors)
     ?? readString(record.result)
     ?? 'Claude Code stream returned an error.';
 }
 
 function resolveToolKind(name: string): StreamToolKind {
-  return getToolIdentity(name, { source: 'generic' }).kind;
+  return getToolIdentity(name, { source: 'claude-code' }).kind;
 }
 
 function resolveToolMetadata(
@@ -313,6 +314,7 @@ export class ClaudeCodeStreamNormalizer {
       messageId: sessionId ?? 'claude-session',
       timestamp: Date.now(),
       ...(modelId ? { modelId } : {}),
+      ...(sessionId ? { sessionId } : {}),
     });
   }
 

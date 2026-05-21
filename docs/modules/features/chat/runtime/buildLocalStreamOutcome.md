@@ -15,7 +15,7 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 
 ## 推导内容
 
-- `finalizedTimestamp` / `finalizedModelId` / `finalizedAssistantMessageId`
+- `finalizedTimestamp` / `finalizedModelId` / `finalizedAssistantMessageId` / `finalizedBackendSessionId`
 - `streamContentBlocks` 与拼接后的 `streamedTextContent`
 - `hasStreamContentBlocks`
 - `shouldPersistInterruptedState`
@@ -25,6 +25,7 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 ## 关键规则
 
 - metadata 优先使用服务端 `message_metadata`，没有时才回退到本地时间和 active model
+- `message_metadata.sessionId` 会被提升为 `finalizedBackendSessionId`，供本地持久化层在 canonical sync 延迟写 assistant body 时仍能更新 conversation identity
 - 只有“中断、未完成、且没有真实 error/retry message”时才保留 interrupted state
 - 只有“没有 block 且有 error”时才通过 `AssistantNoticeRenderer.buildStreamErrorNotice()` 构建 error notice
 - silent interrupted stream（无可见内容）如果遇到 session retry message，会复用 error notice path 展示服务端 retry 原因，而不是落到通用 interrupted notice；有部分可见内容时不触发此路径

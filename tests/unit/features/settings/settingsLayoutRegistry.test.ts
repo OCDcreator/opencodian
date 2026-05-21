@@ -120,7 +120,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(claudeTab).toBeDefined();
     expect(claudeTab!.labelKey).toBe('settings.claudeCode.title');
     expect(claudeTab!.defaultSecondaryTabId).toBe('runtime');
-    expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['runtime']);
+    expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['runtime', 'model-thinking', 'permissions', 'context-sources', 'mcp-advanced']);
   });
 
   it('splits formatter settings into formatter and language server secondary tabs', () => {

@@ -289,10 +289,22 @@ function buildAskUserQuestionInput(
 }
 
 export class ClaudeCodePermissionBridge {
+  private host: ClaudeCodePermissionBridgeHost;
+
   constructor(
-    private readonly host: ClaudeCodePermissionBridgeHost = {},
+    host: ClaudeCodePermissionBridgeHost = {},
     private readonly options: ClaudeCodePermissionBridgeOptions = {},
-  ) {}
+  ) {
+    this.host = host;
+  }
+
+  /**
+   * Update the host callbacks at runtime.
+   * Called by the chat view layer when streaming UI context becomes available.
+   */
+  setHost(host: ClaudeCodePermissionBridgeHost): void {
+    this.host = host;
+  }
 
   async canUseTool(
     toolName: string,

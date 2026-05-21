@@ -35,6 +35,7 @@ function createFixture() {
     openConversationSessionSettings: jest.fn(),
     openSettings: jest.fn(),
     isOpenCodeBackend: jest.fn(() => openCodeBackend),
+    getActiveBackendDisplayName: jest.fn(() => openCodeBackend ? 'OpenCode' : 'Claude Code'),
   };
 
   const headerEl = document.createElement('div');
@@ -167,6 +168,26 @@ describe('ChatHeaderPresenter', () => {
 
     expect(statusBadgeEl?.classList.contains('is-disabled')).toBe(true);
     expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.disabled'));
+  });
+
+  it('uses backend-shaped status copy and refreshes OpenCode-only chrome when backend changes', async () => {
+    const fixture = createFixture();
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status')).not.toBeNull();
+
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('running');
+    fixture.presenter.refreshBackendChrome();
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status')).toBeNull();
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendConnected', { backend: 'Claude Code' }));
+
+    fixture.setOpenCodeBackend(true);
+    fixture.presenter.refreshBackendChrome();
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status')).not.toBeNull();
   });
 
   it('ignores late server status results after destroy clears header DOM refs', async () => {

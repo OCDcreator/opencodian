@@ -37,6 +37,7 @@ export class StreamChunkRouter {
 - `streamTimedOut`
 - `latestErrorMessage`
 - `finalizedAssistantMetadata`
+- `finalizedBackendSessionId`
 - `logAssistantFinalizationStage()`
 - `resetStreamingState()`
 - `cleanupPendingIndicator()`
@@ -47,7 +48,7 @@ export class StreamChunkRouter {
 
 - `message_start`：触发最新 user message authoritative sync，并开始 context usage stream
 - `usage`：更新 tab context usage
-- `message_metadata`：记录最终 assistant message id / timestamp / model id
+- `message_metadata`：记录最终 assistant message id / timestamp / model id，并把可选 `sessionId` 暴露为 backend-neutral finalized session identity
 - `message_stop`：标记 stream 正常完成，并结束 context usage stream
 - `file_edited`：追加到 tab runtime 的 `pendingEditedFiles`
 

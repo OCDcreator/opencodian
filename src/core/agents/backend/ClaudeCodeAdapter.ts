@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Claude Code adapter owns SDK query lifecycle, session identity, permissions, MCP refresh, and model catalog wiring for the same backend boundary. */
+import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
 import type { AgentBackendKind, StreamChunk } from '../../types/chat';
@@ -13,12 +15,22 @@ import type {
   Disposable,
   StatusChangeHandler,
 } from './AgentService';
+import type { ClaudeCodeMcpServersMap } from './ClaudeCodeMcpConfigAdapter';
 import {
   buildClaudeCodeOptions,
   type ClaudeCodeSdkOptionsShape,
   type ClaudeCodeSpawnRequest,
 } from './ClaudeCodeOptionsBuilder';
 import { ClaudeCodePermissionBridge } from './ClaudeCodePermissionBridge';
+import {
+  ClaudeCodeAsyncQueue,
+  type ClaudeCodeQueuedPrompt,
+  type ClaudeCodeRuntimeOutput,
+  type ClaudeCodeSessionRuntime,
+  createSessionId,
+  createUserPrompt,
+  isTurnBoundaryMessage,
+} from './ClaudeCodeQueue';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
 
 export interface ClaudeCodeSdkQueryInput {
@@ -26,11 +38,41 @@ export interface ClaudeCodeSdkQueryInput {
   options: ClaudeCodeSdkOptionsShape;
 }
 
+type ClaudeCodeQueryHandle = Query & {
+  supportedModels(): Promise<ClaudeCodeSdkModelInfo[]>;
+};
+
+type ClaudeCodeModelCatalogQuery = {
+  supportedModels(): Promise<ClaudeCodeSdkModelInfo[]>;
+  close?: () => void;
+};
+
 export interface ClaudeCodeSdkFacade {
-  query(input: ClaudeCodeSdkQueryInput): AsyncIterable<unknown>;
+  query(input: ClaudeCodeSdkQueryInput): ClaudeCodeQueryHandle;
+  listSessions?(options?: { dir?: string; limit?: number; offset?: number }): Promise<ClaudeCodeSdkSessionInfo[]>;
+  getSessionInfo?(sessionId: string, options?: { dir?: string }): Promise<ClaudeCodeSdkSessionInfo | undefined>;
+  forkSession?(sessionId: string, options?: { dir?: string; upToMessageId?: string; title?: string }): Promise<{ sessionId: string }>;
+  renameSession?(sessionId: string, title: string, options?: { dir?: string }): Promise<void>;
+}
+
+export type ClaudeCodeSdkModelInfo = {
+  id?: string;
+  name?: string;
+  provider?: string;
+  value?: string;
+  displayName?: string;
+};
+
+export interface ClaudeCodeSdkSessionInfo {
+  sessionId: string;
+  summary: string;
+  lastModified: number;
+  createdAt?: number;
 }
 
 export type ClaudeCodeSdkLoader = () => Promise<ClaudeCodeSdkFacade>;
+
+export type ClaudeCodeMcpConfigLoader = () => Promise<ClaudeCodeMcpServersMap>;
 
 export interface ClaudeCodeAdapterOptions {
   vaultPath: string;
@@ -39,15 +81,17 @@ export interface ClaudeCodeAdapterOptions {
   sdk?: ClaudeCodeSdkFacade;
   sdkLoader?: ClaudeCodeSdkLoader;
   permissionBridge?: ClaudeCodePermissionBridge;
+  onElicitation?: (request: ElicitationRequest, options: { signal: AbortSignal }) => Promise<ElicitationResult>;
+  mcpServers?: ClaudeCodeMcpServersMap;
+  /** Dynamic MCP config loader — called at runtime when building SDK options. */
+  mcpConfigLoader?: ClaudeCodeMcpConfigLoader;
 }
 
 const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>([
     AgentCapability.Chat,
     AgentCapability.Sessions,
-    AgentCapability.Tools,
-    AgentCapability.Mcp,
-    AgentCapability.Permissions,
+    AgentCapability.Models,
     AgentCapability.Thinking,
     AgentCapability.FileOps,
     AgentCapability.Shell,
@@ -58,34 +102,17 @@ interface ClaudeCodeSessionState {
   id: string;
   title: string;
   messages: ClaudeCodeQueuedPrompt[];
+  sdkSessionId?: string;
+  runtime?: ClaudeCodeSessionRuntime;
 }
 
-interface ClaudeCodeQueuedPrompt {
-  type: 'user';
-  message: { role: 'user'; content: string };
-}
-
-class ClaudeCodeRuntimeAbortController {
+export class ClaudeCodeRuntimeAbortController {
   private readonly controller = new AbortController();
   readonly signal = this.controller.signal;
 
   abort(reason?: unknown): void {
     this.controller.abort(reason);
   }
-}
-
-function createSessionId(): string {
-  return `claude-code-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-async function* singlePrompt(prompt: string): AsyncGenerator<ClaudeCodeQueuedPrompt> {
-  yield {
-    type: 'user',
-    message: {
-      role: 'user',
-      content: prompt,
-    },
-  };
 }
 
 export class ClaudeCodeAdapter
@@ -124,11 +151,15 @@ export class ClaudeCodeAdapter
   }
 
   async start(): Promise<void> {
+    await this.loadMcpConfig();
     this.setStatus('connected');
   }
 
   async stop(): Promise<void> {
     this.cancelledSessions.clear();
+    for (const session of this.sessions.values()) {
+      this.closeRuntime(session);
+    }
     this.setStatus('disconnected');
   }
 
@@ -136,6 +167,9 @@ export class ClaudeCodeAdapter
     this.cancelledSessions.clear();
     for (const sessionId of this.sessions.keys()) {
       this.invalidatedSessions.add(sessionId);
+    }
+    for (const session of this.sessions.values()) {
+      this.closeRuntime(session);
     }
     this.sessions.clear();
     this.statusChangeHandlers.clear();
@@ -161,34 +195,84 @@ export class ClaudeCodeAdapter
   async deleteSession(sessionId: string): Promise<void> {
     this.cancelledSessions.add(sessionId);
     this.invalidatedSessions.add(sessionId);
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      this.closeRuntime(session);
+    }
     this.sessions.delete(sessionId);
   }
 
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
     const session = this.requireSession(sessionId);
     session.title = title;
+    if (session.sdkSessionId) {
+      const sdk = await this.getSdk();
+      await sdk.renameSession?.(session.sdkSessionId, title, { dir: this.options.vaultPath });
+    }
+  }
+
+  async listSessions(): Promise<ClaudeCodeSdkSessionInfo[]> {
+    const sdk = await this.getSdk();
+    return sdk.listSessions?.({ dir: this.options.vaultPath }) ?? [];
+  }
+
+  async supportedModels(): Promise<Array<{ id: string; name: string; provider: string }>> {
+    let query: ClaudeCodeModelCatalogQuery | undefined;
+    try {
+      query = await this.getModelCatalogQuery();
+      const models = await query.supportedModels();
+      return models.map((rawModel) => {
+        const model = rawModel as ClaudeCodeSdkModelInfo;
+        return {
+          id: model.id ?? model.value ?? '',
+          name: model.name ?? model.displayName ?? model.id ?? model.value ?? '',
+          provider: model.provider ?? 'claude',
+        };
+      }).filter((model) => model.id.length > 0);
+    } catch {
+      return [];
+    } finally {
+      query?.close?.();
+    }
+  }
+
+  async getSession(sessionId: string): Promise<ClaudeCodeSdkSessionInfo | null> {
+    const sdk = await this.getSdk();
+    const state = this.sessions.get(sessionId);
+    const sdkSessionId = state?.sdkSessionId ?? sessionId;
+    return await sdk.getSessionInfo?.(sdkSessionId, { dir: this.options.vaultPath }) ?? null;
+  }
+
+  async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
+    const sdk = await this.getSdk();
+    const state = this.getOrRestoreSession(sessionId);
+    const sourceSessionId = state.sdkSessionId ?? sessionId;
+    if (!sdk.forkSession) {
+      throw new Error('Claude Code forkSession is unavailable in this SDK.');
+    }
+    const result = await sdk.forkSession(sourceSessionId, {
+      dir: this.options.vaultPath,
+      ...(messageID ? { upToMessageId: messageID } : {}),
+      title: `${state.title} (fork)`,
+    });
+    const forkedState: ClaudeCodeSessionState = {
+      id: result.sessionId,
+      title: `${state.title} (fork)`,
+      messages: [],
+      sdkSessionId: result.sessionId,
+    };
+    this.sessions.set(result.sessionId, forkedState);
+    return { id: result.sessionId, title: forkedState.title };
   }
 
   async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const session = this.getOrRestoreSession(request.sessionId);
     this.cancelledSessions.delete(request.sessionId);
-    const prompt = {
-      type: 'user' as const,
-      message: {
-        role: 'user' as const,
-        content: request.content,
-      },
-    };
+    const prompt = createUserPrompt(request.content);
     session.messages.push(prompt);
-
-    const normalizer = new ClaudeCodeStreamNormalizer({
-      sessionId: request.sessionId,
-    });
-    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
-    const options = this.buildSdkOptions(abortController);
-    let sdk: ClaudeCodeSdkFacade;
+    let runtime: ClaudeCodeSessionRuntime;
     try {
-      sdk = await this.getSdk();
+      runtime = await this.getOrStartRuntime(session);
     } catch (error) {
       yield {
         type: 'error',
@@ -197,21 +281,30 @@ export class ClaudeCodeAdapter
       return;
     }
 
-    const source = sdk.query({
-      prompt: singlePrompt(request.content),
-      options,
-    });
+    runtime.input.push(prompt);
 
     let sawChunk = false;
     try {
-      for await (const message of source) {
+      for await (const item of runtime.output) {
         if (this.cancelledSessions.has(request.sessionId)) {
           return;
         }
-        const chunks = normalizer.transformSDKMessage(message);
+        if (item.type === 'error') {
+          yield {
+            type: 'error',
+            content: `Claude Code stream failed: ${item.error instanceof Error ? item.error.message : String(item.error)}`,
+          };
+          return;
+        }
+
+        const chunks = runtime.normalizer.transformSDKMessage(item.message);
+        this.captureSdkSessionId(session, chunks);
         for (const chunk of chunks) {
           sawChunk = true;
           yield chunk;
+        }
+        if (isTurnBoundaryMessage(item.message)) {
+          return;
         }
       }
     } catch (error) {
@@ -219,17 +312,40 @@ export class ClaudeCodeAdapter
         type: 'error',
         content: `Claude Code stream failed: ${error instanceof Error ? error.message : String(error)}`,
       };
-      if (!sawChunk) {
-        return;
-      }
+      if (!sawChunk) { return; }
     }
   }
 
   cancelStream(sessionId: string): void {
     this.cancelledSessions.add(sessionId);
+    const session = this.sessions.get(sessionId);
+    void session?.runtime?.query?.interrupt?.();
+    if (session) {
+      this.closeRuntime(session);
+    }
   }
 
-  private buildSdkOptions(abortController?: AbortController): ClaudeCodeSdkOptionsShape {
+  async setModel(model?: string): Promise<void> {
+    await this.applyToActiveQueries((runtime) => runtime.query?.setModel?.(model));
+  }
+
+  async setPermissionMode(mode: ClaudeCodeBackendSettings['permissionMode']): Promise<void> {
+    await this.applyToActiveQueries((runtime) => runtime.query?.setPermissionMode?.(mode));
+  }
+
+  async reloadMcpServers(): Promise<void> {
+    this.refreshMcpConfig();
+    await this.loadMcpConfig();
+    await this.applyToActiveQueries((runtime) =>
+      runtime.query?.setMcpServers?.(this.options.mcpServers ?? this.cachedMcpServers ?? {}));
+  }
+
+  private cachedMcpServers: ClaudeCodeMcpServersMap | undefined;
+
+  private buildSdkOptions(
+    abortController?: AbortController,
+    session?: ClaudeCodeSessionState,
+  ): ClaudeCodeSdkOptionsShape {
     return buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
       settings: this.options.settings,
@@ -239,7 +355,151 @@ export class ClaudeCodeAdapter
       canUseTool: this.options.permissionBridge
         ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
         : undefined,
+      onElicitation: this.options.onElicitation
+        ? async (request: ElicitationRequest, context: { signal: AbortSignal }) =>
+          await this.options.onElicitation!(request, context)
+        : undefined,
+      mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
+      resumeSessionId: session?.sdkSessionId,
     });
+  }
+
+  /**
+   * Load MCP server config from the loader callback and cache it for
+   * subsequent SDK query calls. Call this before the first send or after
+   * MCP settings change. Safe to call multiple times.
+   */
+  async loadMcpConfig(): Promise<void> {
+    if (this.options.mcpServers) {
+      return;
+    }
+    if (!this.options.mcpConfigLoader) {
+      return;
+    }
+    try {
+      this.cachedMcpServers = await this.options.mcpConfigLoader();
+    } catch {
+      this.cachedMcpServers = undefined;
+    }
+  }
+
+  /** Invalidate the cached MCP config so the next loadMcpConfig reloads it. */
+  refreshMcpConfig(): void {
+    this.cachedMcpServers = undefined;
+  }
+
+  private async applyToActiveQueries(
+    apply: (runtime: ClaudeCodeSessionRuntime) => Promise<unknown> | void | undefined,
+  ): Promise<void> {
+    const updates: Array<Promise<unknown>> = [];
+    for (const session of this.sessions.values()) {
+      const runtime = session.runtime;
+      if (!runtime || runtime.closed) {
+        continue;
+      }
+      const result = apply(runtime);
+      if (result) {
+        updates.push(result);
+      }
+    }
+    await Promise.all(updates);
+  }
+
+  private captureSdkSessionId(
+    session: ClaudeCodeSessionState,
+    chunks: readonly StreamChunk[],
+  ): void {
+    const metadata = chunks.find((chunk): chunk is Extract<StreamChunk, { type: 'message_metadata' }> =>
+      chunk.type === 'message_metadata' && typeof chunk.sessionId === 'string' && chunk.sessionId.length > 0);
+    const sdkSessionId = metadata?.sessionId;
+    if (!sdkSessionId || sdkSessionId === session.sdkSessionId) {
+      return;
+    }
+    session.sdkSessionId = sdkSessionId;
+    this.sessions.set(sdkSessionId, session);
+  }
+
+  private async getOrStartRuntime(
+    session: ClaudeCodeSessionState,
+  ): Promise<ClaudeCodeSessionRuntime> {
+    if (session.runtime && !session.runtime.closed) {
+      return session.runtime;
+    }
+
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const runtime: ClaudeCodeSessionRuntime = {
+      input: new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>(),
+      output: new ClaudeCodeAsyncQueue<ClaudeCodeRuntimeOutput>(),
+      normalizer: new ClaudeCodeStreamNormalizer({
+        sessionId: session.sdkSessionId ?? session.id,
+      }),
+      abortController,
+      closed: false,
+    };
+    runtime.query = sdk.query({
+      prompt: runtime.input,
+      options: this.buildSdkOptions(abortController, session),
+    });
+    session.runtime = runtime;
+    void this.pumpRuntimeOutput(session, runtime);
+    return runtime;
+  }
+
+  private async getModelCatalogQuery(): Promise<ClaudeCodeModelCatalogQuery> {
+    for (const session of this.sessions.values()) {
+      const query = session.runtime?.query;
+      if (query?.supportedModels) {
+        return {
+          supportedModels: query.supportedModels,
+          close: query.close,
+        };
+      }
+    }
+
+    const sdk = await this.getSdk();
+    return sdk.query({
+      prompt: new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>(),
+      options: buildClaudeCodeOptions({
+        vaultPath: this.options.vaultPath,
+        settings: this.options.settings,
+        pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+        mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
+      }),
+    });
+  }
+
+  private async pumpRuntimeOutput(
+    session: ClaudeCodeSessionState,
+    runtime: ClaudeCodeSessionRuntime,
+  ): Promise<void> {
+    try {
+      for await (const message of runtime.query ?? []) {
+        runtime.output.push({ type: 'message', message });
+      }
+    } catch (error) {
+      runtime.output.push({ type: 'error', error });
+    } finally {
+      runtime.closed = true;
+      runtime.input.close();
+      runtime.output.close();
+      if (session.runtime === runtime) {
+        delete session.runtime;
+      }
+    }
+  }
+
+  private closeRuntime(session: ClaudeCodeSessionState): void {
+    const runtime = session.runtime;
+    if (!runtime) {
+      return;
+    }
+    runtime.closed = true;
+    runtime.abortController.abort();
+    runtime.input.close();
+    runtime.output.close();
+    runtime.query?.close?.();
+    delete session.runtime;
   }
 
   private readonly spawnClaudeCodeProcess = (request: ClaudeCodeSpawnRequest) => {
@@ -304,6 +564,7 @@ export class ClaudeCodeAdapter
       id: sessionId,
       title: 'Restored Claude Code chat',
       messages: [],
+      sdkSessionId: sessionId,
     };
     this.sessions.set(sessionId, restoredSession);
     return restoredSession;

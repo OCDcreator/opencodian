@@ -580,6 +580,9 @@ describe('OpenCodianPlugin backend bootstrap', () => {
     expect(plugin.agentServiceRegistry.get('opencode')).toBeDefined();
     expect(plugin.agentServiceRegistry.get('claude-code')).toBeDefined();
     expect(plugin.agentServiceRegistry.getActiveKind()).toBe('claude-code');
+    expect(plugin.claudeCodePermissionBridge).toBeDefined();
+    expect(plugin.claudeCodePermissionHostContext).toBeDefined();
+    expect(typeof plugin.claudeCodePermissionHostContext.getActiveTabId).toBe('function');
   });
 });
 
@@ -824,6 +827,34 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(conversation.backend).toBe('claude-code');
     expect(conversation.openCodeSessionId).toBeUndefined();
     expect(conversation.backendSessionId).toMatch(/^claude-code-/);
+    expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('does not write openCodeSessionId when creating a conversation from a Claude session', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      touchConversationFullMessageCache: jest.Mock<void, [string]>;
+      trimConversationFullMessageCache: jest.Mock<void, []>;
+    };
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      activeBackend: 'claude-code',
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.touchConversationFullMessageCache = jest.fn();
+    plugin.trimConversationFullMessageCache = jest.fn();
+
+    const conversation = await plugin.createConversationFromSession('claude-sdk-session');
+
+    expect(conversation.backend).toBe('claude-code');
+    expect(conversation.openCodeSessionId).toBeUndefined();
+    expect(conversation.backendSessionId).toBe('claude-sdk-session');
     expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
   });
 

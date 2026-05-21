@@ -17,8 +17,9 @@
 - `SendPipelineHostDependencies`（定义在 `SendPipelineRuntime.ts`）：扁平依赖接口，让 `OpenCodianView` 只需提供原始回调而不负责 port 分组；`createSendPipelineRuntimeHost()` 工厂函数消费此接口并组合成 `SendPipelineHost`
 - `SendPipelineExecutionHost` / `StreamChunkRouterHost` / `StreamLocalFinalizerHost`：runtime、router 与本地收尾各自真正依赖的 host 子集
 - `SendPipelineTraceState`：chunk router 汇总出来的流状态快照
+- `SendPipelineTraceState.finalizedBackendSessionId`：从最终 `message_metadata.sessionId` 捕获的 backend-neutral session identity，允许 Claude Code 等 backend 将本地临时 handle 收敛为真实 SDK session id
 - `StreamChunkRouterOptions` / `StreamChunkRouterResult`：stream 消费阶段输入输出
-- `LocalStreamOutcome` / `StreamLocalFinalizerOptions` / `StreamLocalFinalizerResult`：本地收尾阶段输入输出
+- `LocalStreamOutcome` / `StreamLocalFinalizerOptions` / `StreamLocalFinalizerResult`：本地收尾阶段输入输出，其中 `LocalStreamOutcome.finalizedBackendSessionId` 负责把 router 捕获的 backend session id 交给持久化层
 
 ## 设计目的
 

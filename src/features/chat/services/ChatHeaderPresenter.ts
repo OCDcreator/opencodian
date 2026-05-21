@@ -68,6 +68,7 @@ export interface ChatHeaderPresenterHost {
   resolveServerAvailability(): Promise<ChatServerAvailability>;
   isLocalServerMode(): boolean;
   isOpenCodeBackend(): boolean;
+  getActiveBackendDisplayName?(): string;
   refreshContextUsageIndicator(): void;
   onServerAvailabilityRefreshed?(): void;
   openServerSettings(): void;
@@ -85,6 +86,7 @@ export class ChatHeaderPresenter {
   private titleWordmarkEl: HTMLImageElement | null = null;
   private serverStatusBadgeEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
+  private headerActionsEl: HTMLElement | null = null;
   private lspStatusIndicator: LspStatusIndicator | null = null;
   private newConversationBtnEl: HTMLElement | null = null;
   private newConversationCurrentTabBtnEl: HTMLElement | null = null;
@@ -127,14 +129,9 @@ export class ChatHeaderPresenter {
     }
 
     const actionsEl = headerEl.createDiv({ cls: 'opencodian-header-actions' });
+    this.headerActionsEl = actionsEl;
     this.buildStatusBadge(actionsEl);
-    if (this.host.isOpenCodeBackend()) {
-      this.lspStatusIndicator = new LspStatusIndicator(actionsEl, {
-        onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
-        setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
-      });
-      this.lspStatusIndicator.load();
-    }
+    this.refreshBackendChrome();
     this.newConversationBtnEl = this.buildActionButton(actionsEl, {
       actionId: 'new-tab',
       iconName: 'opencodian-circle-plus',
@@ -265,6 +262,7 @@ export class ChatHeaderPresenter {
     this.titleWordmarkEl = null;
     this.serverStatusBadgeEl = null;
     this.serverStatusTextEl = null;
+    this.headerActionsEl = null;
     this.lspStatusIndicator?.unload();
     this.lspStatusIndicator = null;
     this.newConversationBtnEl = null;
@@ -274,6 +272,30 @@ export class ChatHeaderPresenter {
     this.settingsBtnEl = null;
     this.isRefreshingServerStatus = false;
     this.lastServerAvailability = null;
+  }
+
+  refreshBackendChrome(): void {
+    if (!this.headerActionsEl) {
+      return;
+    }
+
+    if (!this.host.isOpenCodeBackend()) {
+      this.lspStatusRefreshCoordinator?.stop();
+      this.lspStatusRefreshCoordinator = null;
+      this.openLspSettingsCallback = null;
+      this.lspStatusIndicator?.unload();
+      this.lspStatusIndicator = null;
+      this.headerActionsEl.querySelector('.opencodian-lsp-status')?.remove();
+      return;
+    }
+
+    if (!this.lspStatusIndicator) {
+      this.lspStatusIndicator = new LspStatusIndicator(this.headerActionsEl, {
+        onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
+        setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
+      });
+      this.lspStatusIndicator.load();
+    }
   }
 
   private buildStatusBadge(actionsEl: HTMLElement): void {
@@ -343,6 +365,15 @@ export class ChatHeaderPresenter {
   }
 
   private getServerStatusLabel(availability: ChatServerAvailability): string {
+    if (!this.host.isOpenCodeBackend()) {
+      if (availability === 'running' || availability === 'external') {
+        return t('chat.serverStatus.backendConnected', {
+          backend: this.host.getActiveBackendDisplayName?.() ?? 'Backend',
+        });
+      }
+      return t(SERVER_STATUS_KEY_BY_AVAILABILITY[availability]);
+    }
+
     if (this.host.isLocalServerMode()) {
       if (availability === 'running') {
         return t('chat.serverStatus.localManaged');

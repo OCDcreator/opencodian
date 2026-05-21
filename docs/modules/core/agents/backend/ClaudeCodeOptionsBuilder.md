@@ -15,6 +15,7 @@
 - 映射 Claude 专属 `permissionMode`、`thinking`、`effort`
 - 将 OpenCodian UI 中的 `thinking.type === 'fixed'` 映射为官方 SDK `thinking: { type: 'enabled', budgetTokens }`
 - 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`pathToClaudeCodeExecutable`、`canUseTool`、`mcpServers`
+- 只在 adapter 已捕获真实 Claude SDK session id 时写入 `resume`，让后续 per-send `query()` 续接同一个 Claude session
 - 只在 runtime 提供时写入 `abortController` 和 `spawnClaudeCodeProcess`，用于 Obsidian/Electron 下的流取消和进程启动兼容层
 
 ## 维护约束
@@ -22,4 +23,5 @@
 - 这是 SDK options 形状的本地边界；若官方 SDK option 命名变化，应优先在这里收口映射。
 - 不要把 OpenCode 的 `permissionMode`、`effortLevel`、`thinkingBudget` 直接复用到这里；Claude 语义由 `backendSettings.claudeCode` 独立表达。
 - `settingSources: []` 是显式 none，不能被默认成 `['project']`。
+- `resume` 不是用户设置；它来自 runtime 捕获到的 SDK `session_id`，不能写入 settings。
 - `abortController` / `spawnClaudeCodeProcess` 是 runtime 注入，不应保存进用户设置。

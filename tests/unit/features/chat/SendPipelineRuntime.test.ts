@@ -343,7 +343,7 @@ describe('SendPipelineRuntime', () => {
         { type: 'usage', inputTokens: 12, outputTokens: 34, sessionId: 'session-1' },
         { type: 'file_edited', file: 'notes.md' },
         { type: 'text', content: 'Hi there' },
-        { type: 'message_metadata', messageId: 'assistant-1', timestamp: 42, modelId: 'openai/gpt-5.4' },
+        { type: 'message_metadata', messageId: 'assistant-1', timestamp: 42, modelId: 'openai/gpt-5.4', sessionId: 'session-1' },
         { type: 'message_stop' },
       ])),
     });

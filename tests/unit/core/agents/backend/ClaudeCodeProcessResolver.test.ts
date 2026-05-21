@@ -41,6 +41,26 @@ describe('ClaudeCodeProcessResolver', () => {
     expect(resolution.diagnostics.configuredPath).toBe('~/bin/claude');
   });
 
+  it('falls back to SDK bundled mode when a configured executable does not exist', () => {
+    const resolution = resolveClaudeCodeProcess({
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        executablePath: '/missing/claude',
+      },
+      platform: 'darwin',
+      env: {
+        PATH: '/usr/bin',
+        HOME: '/Users/test',
+      },
+      existsSync: () => false,
+    });
+
+    expect(resolution.mode).toBe('sdk-bundled');
+    expect(resolution.pathToClaudeCodeExecutable).toBeUndefined();
+    expect(resolution.diagnostics.configuredPath).toBe('/missing/claude');
+    expect(resolution.diagnostics.resolvedExternalPath).toBeNull();
+  });
+
   it('resolves a Windows command from augmented PATH and uses shell for cmd files', () => {
     const resolution = resolveClaudeCodeProcess({
       settings: {

@@ -108,6 +108,8 @@ export interface AgentChatCapability extends AgentService {
 /** Sessions: create, delete, and retitle backend-owned sessions. */
 export interface AgentSessionCapability extends AgentService {
   createSession(title?: string, options?: Record<string, unknown>): Promise<string>;
+  listSessions?(): Promise<unknown[]>;
+  getSession?(sessionId: string): Promise<unknown | null>;
   deleteSession(sessionId: string): Promise<void>;
   updateSessionTitle(sessionId: string, title: string): Promise<void>;
 }

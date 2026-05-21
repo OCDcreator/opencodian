@@ -25,6 +25,7 @@ persistLocalStreamOutcome(options): Promise<void>
   - 记录本地持久化阶段的 debug 日志
 - 只要本地实际追加了 message / notice，就更新 `updatedAt`、`lastResponseAt` 并执行第一次本地保存
 - 正常 completed assistant 在 canonical sync pending 时只做 cache-deferred 日志，不把 stale body 当作本地 truth 落盘
+- 若 stream metadata 捕获到新的 backend session id，即使 assistant body 延后给 canonical sync，也会单独通过 serialized write 更新 conversation `backendSessionId`
 
 ## 协作模块
 
@@ -35,5 +36,6 @@ persistLocalStreamOutcome(options): Promise<void>
 ## 注意事项
 
 - 这里是“本地第一次保存”，不是最终 authoritative sync。
+- backend session identity 更新比较的是 `getConversationBackendSessionId()` 的有效值，避免只有 legacy `openCodeSessionId` 的 OpenCode 会话被误判为需要额外写盘。
 - interrupted notice 与 interrupted assistant message 是两条不同保底路径：前者用于“没有可见内容”，后者用于“已有部分内容但流被中断”。
 - question resolution 是明确的 client-only decoration，允许随本地 recovery 写回，但不会把 assistant body 重新定义成本地 truth。

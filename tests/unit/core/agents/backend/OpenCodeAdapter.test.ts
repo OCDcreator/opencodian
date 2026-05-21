@@ -14,6 +14,7 @@ function createMockOpenCodeService() {
     stop: jest.fn(() => Promise.resolve()),
     dispose: jest.fn(),
     createSession: jest.fn(() => Promise.resolve('session-1')),
+    listSessions: jest.fn(() => Promise.resolve([{ id: 'session-1', title: 'Session 1' }])),
     deleteSession: jest.fn(() => Promise.resolve()),
     updateSessionTitle: jest.fn(() => Promise.resolve()),
     sendMessage: jest.fn(async function* () {
@@ -108,6 +109,16 @@ describe('OpenCodeAdapter', () => {
     const sessionId = await adapter.createSession('New chat', { setCurrent: false });
     expect(service.createSession).toHaveBeenCalledWith('New chat', { setCurrent: false });
     expect(sessionId).toBe('session-1');
+  });
+
+  it('delegates session list and lookup to OpenCodeService', async () => {
+    const service = createMockOpenCodeService();
+    const adapter = new OpenCodeAdapter(service);
+
+    await expect(adapter.listSessions()).resolves.toEqual([{ id: 'session-1', title: 'Session 1' }]);
+    await expect(adapter.getSession('session-1')).resolves.toEqual({ id: 'session-1', title: 'Session 1' });
+    await expect(adapter.getSession('missing')).resolves.toBeNull();
+    expect(service.listSessions).toHaveBeenCalledTimes(3);
   });
 
   it('delegates deleteSession to OpenCodeService', async () => {

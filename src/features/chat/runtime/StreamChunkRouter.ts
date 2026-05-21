@@ -348,6 +348,7 @@ export class StreamChunkRouter {
       streamTimedOut: this.streamTimedOut,
       latestErrorMessage: this.latestErrorMessage,
       finalizedAssistantMetadata: this.finalizedAssistantMetadata,
+      finalizedBackendSessionId: this.finalizedAssistantMetadata?.sessionId ?? null,
     };
   }
 }

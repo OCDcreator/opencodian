@@ -312,7 +312,13 @@ export type StreamChunk =
     }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
   | { type: 'file_edited'; file: string }
-  | { type: 'message_metadata'; messageId: string; timestamp: number; modelId?: string }
+  | {
+      type: 'message_metadata';
+      messageId: string;
+      timestamp: number;
+      modelId?: string;
+      sessionId?: string;
+    }
   | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
   | { type: 'error'; content: string; errorClass?: import('../opencode/sdkErrorClassification').SdkErrorClass }
   | { type: 'message_start' }

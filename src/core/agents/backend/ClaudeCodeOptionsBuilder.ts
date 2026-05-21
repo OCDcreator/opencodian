@@ -38,9 +38,11 @@ export interface ClaudeCodeOptionsBuilderInput {
   settings: ClaudeCodeBackendSettings;
   pathToClaudeCodeExecutable?: string;
   canUseTool?: unknown;
+  onElicitation?: unknown;
   mcpServers?: Record<string, unknown>;
   abortController?: AbortController;
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
+  resumeSessionId?: string;
 }
 
 export interface ClaudeCodeSdkOptionsShape {
@@ -55,9 +57,16 @@ export interface ClaudeCodeSdkOptionsShape {
   additionalDirectories?: string[];
   pathToClaudeCodeExecutable?: string;
   canUseTool?: unknown;
+  onElicitation?: unknown;
   mcpServers?: Record<string, unknown>;
   abortController?: AbortController;
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
+  resume?: string;
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  maxTurns?: number;
+  maxBudgetUsd?: number;
+  env?: Record<string, string | undefined>;
 }
 
 function cloneSettingSources(sources: readonly ClaudeCodeSettingSource[]): ClaudeCodeSettingSource[] {
@@ -112,6 +121,9 @@ export function buildClaudeCodeOptions(
   if (input.canUseTool) {
     options.canUseTool = input.canUseTool;
   }
+  if (input.onElicitation) {
+    options.onElicitation = input.onElicitation;
+  }
   if (input.mcpServers && Object.keys(input.mcpServers).length > 0) {
     options.mcpServers = input.mcpServers;
   }
@@ -120,6 +132,25 @@ export function buildClaudeCodeOptions(
   }
   if (input.spawnClaudeCodeProcess) {
     options.spawnClaudeCodeProcess = input.spawnClaudeCodeProcess;
+  }
+  const resumeSessionId = trimOptionalString(input.resumeSessionId);
+  if (resumeSessionId) {
+    options.resume = resumeSessionId;
+  }
+  if (input.settings.allowedTools.length > 0) {
+    options.allowedTools = [...input.settings.allowedTools];
+  }
+  if (input.settings.disallowedTools.length > 0) {
+    options.disallowedTools = [...input.settings.disallowedTools];
+  }
+  if (input.settings.maxTurns !== null) {
+    options.maxTurns = input.settings.maxTurns;
+  }
+  if (input.settings.maxBudgetUsd !== null) {
+    options.maxBudgetUsd = input.settings.maxBudgetUsd;
+  }
+  if (Object.keys(input.settings.env).length > 0) {
+    options.env = input.settings.env;
   }
 
   return options;

@@ -25,6 +25,7 @@ describe('ClaudeCodeStreamNormalizer', () => {
       messageId: 'claude-session-1',
       timestamp: 1710000000000,
       modelId: 'claude-sonnet-4-5',
+      sessionId: 'claude-session-1',
     }]);
 
     jest.restoreAllMocks();

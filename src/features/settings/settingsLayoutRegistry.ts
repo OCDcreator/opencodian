@@ -45,6 +45,10 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     backendRequired: 'claude-code',
     secondaryTabs: [
       { id: 'runtime', labelKey: 'settings.claudeCode.tab.runtime' },
+      { id: 'model-thinking', labelKey: 'settings.claudeCode.tab.modelThinking' },
+      { id: 'permissions', labelKey: 'settings.claudeCode.tab.permissions' },
+      { id: 'context-sources', labelKey: 'settings.claudeCode.tab.contextSources' },
+      { id: 'mcp-advanced', labelKey: 'settings.claudeCode.tab.mcpAdvanced' },
     ],
   },
   {

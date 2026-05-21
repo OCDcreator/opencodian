@@ -74,4 +74,86 @@ describe('ClaudeCodeOptionsBuilder', () => {
 
     expect(options.pathToClaudeCodeExecutable).toBe('/resolved/claude');
   });
+
+  it('maps a captured SDK session id to resume options for later sends', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      resumeSessionId: 'sdk-session-1',
+    });
+
+    expect(options.resume).toBe('sdk-session-1');
+  });
+
+  it('omits allowedTools/disallowedTools when empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('allowedTools');
+    expect(options).not.toHaveProperty('disallowedTools');
+  });
+
+  it('passes allowedTools and disallowedTools when set', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      allowedTools: ['Read', 'Grep', 'Glob'],
+      disallowedTools: ['Bash'],
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.allowedTools).toEqual(['Read', 'Grep', 'Glob']);
+    expect(options.disallowedTools).toEqual(['Bash']);
+  });
+
+  it('omits maxTurns/maxBudgetUsd when null', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('maxTurns');
+    expect(options).not.toHaveProperty('maxBudgetUsd');
+  });
+
+  it('passes maxTurns and maxBudgetUsd when set', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      maxTurns: 50,
+      maxBudgetUsd: 5.0,
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.maxTurns).toBe(50);
+    expect(options.maxBudgetUsd).toBe(5.0);
+  });
+
+  it('omits env when empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('env');
+  });
+
+  it('passes env when set', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      env: { CLAUDE_AGENT_SDK_CLIENT_APP: 'opencodian/1.0.0' },
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.env).toEqual({ CLAUDE_AGENT_SDK_CLIENT_APP: 'opencodian/1.0.0' });
+  });
 });

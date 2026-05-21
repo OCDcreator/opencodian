@@ -36,6 +36,16 @@ export interface ClaudeCodeBackendSettings {
   additionalDirectories: string[];
   model: string;
   fallbackModel: string;
+  /** Tool names that are auto-allowed without prompting. Not a sandbox. */
+  allowedTools: string[];
+  /** Tool names that are removed from context entirely. */
+  disallowedTools: string[];
+  /** Maximum conversation turns before the query stops. null = unlimited (SDK default). */
+  maxTurns: number | null;
+  /** Maximum budget in USD before the query stops. null = unlimited (SDK default). */
+  maxBudgetUsd: number | null;
+  /** Environment variables to pass to the Claude Code process. */
+  env: Record<string, string>;
 }
 
 export interface BackendSettings {
@@ -67,6 +77,11 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     additionalDirectories: [],
     model: '',
     fallbackModel: '',
+    allowedTools: [],
+    disallowedTools: [],
+    maxTurns: null,
+    maxBudgetUsd: null,
+    env: {},
   };
 }
 
@@ -157,6 +172,45 @@ export function normalizeClaudeCodeAdditionalDirectories(value: unknown): string
   )];
 }
 
+export function normalizeClaudeCodeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0),
+  )];
+}
+
+export function normalizeClaudeCodeNullablePositiveInt(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  return null;
+}
+
+export function normalizeClaudeCodeNullablePositiveNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  return null;
+}
+
+export function normalizeClaudeCodeEnv(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof val === 'string') {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
 export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBackendSettings {
   const defaults = getDefaultClaudeCodeBackendSettings();
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -175,6 +229,11 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     additionalDirectories: normalizeClaudeCodeAdditionalDirectories(candidate.additionalDirectories),
     model: typeof candidate.model === 'string' ? candidate.model.trim() : defaults.model,
     fallbackModel: typeof candidate.fallbackModel === 'string' ? candidate.fallbackModel.trim() : defaults.fallbackModel,
+    allowedTools: normalizeClaudeCodeStringArray(candidate.allowedTools),
+    disallowedTools: normalizeClaudeCodeStringArray(candidate.disallowedTools),
+    maxTurns: normalizeClaudeCodeNullablePositiveInt(candidate.maxTurns),
+    maxBudgetUsd: normalizeClaudeCodeNullablePositiveNumber(candidate.maxBudgetUsd),
+    env: normalizeClaudeCodeEnv(candidate.env),
   };
 }
 

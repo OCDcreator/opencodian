@@ -25,6 +25,7 @@ describe('StreamLocalFinalizer', () => {
       finalizedTimestamp: 123,
       finalizedModelId: 'openai/gpt-5',
       finalizedAssistantMessageId: 'assistant-1',
+      finalizedBackendSessionId: undefined,
       finalizedStreamingMessageEl: null,
       streamContentBlocks: [],
       streamedTextContent: 'done',

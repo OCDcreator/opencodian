@@ -5,7 +5,7 @@
 
 ## 概述
 
-统一归一化工具身份。它把内置工具、Claudian/Codex 风格 MCP（`mcp__server__tool`）和 OpenCode 风格外部工具（如 `server_tool`）收敛成一个结构化结果，供 `OpenCodeService`、`ToolCallRenderer` 和工具状态辅助逻辑共用。
+统一归一化工具身份。它把内置工具、Claude Code / Claudian / Codex 风格 MCP（`mcp__server__tool`）和 OpenCode 风格外部工具（如 `server_tool`）收敛成一个结构化结果，供 `OpenCodeService`、`ClaudeCodeStreamNormalizer`、`ToolCallRenderer` 和工具状态辅助逻辑共用。
 
 ## 导入关系
 
@@ -26,7 +26,7 @@ type ToolIdentityKind =
   | 'unknown';
 
 interface ToolIdentityOptions {
-  source?: 'generic' | 'opencode' | 'claudian' | 'codex';
+  source?: 'generic' | 'opencode' | 'claude-code' | 'claudian' | 'codex';
   knownMcpTools?: Iterable<string>;
 }
 

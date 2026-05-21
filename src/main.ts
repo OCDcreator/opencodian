@@ -1,5 +1,6 @@
 /* eslint-disable simple-import-sort/imports -- Entry-point bootstrap imports stay manually clustered by startup seam so owner-guarded wiring changes do not create unrelated reorder churn. */
 import * as fs from 'fs';
+import type { ElicitationRequest, ElicitationResult } from '@anthropic-ai/claude-agent-sdk';
 import type { Editor, MarkdownView } from 'obsidian';
 import { addIcon, Notice, Plugin } from 'obsidian';
 import * as path from 'path';
@@ -13,7 +14,9 @@ import {
 } from './core/agents/backend/AgentBackendRouting';
 import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
 import { ClaudeCodeAdapter } from './core/agents/backend/ClaudeCodeAdapter';
-import { createClaudeCodePermissionBridge } from './core/agents/backend/ClaudeCodePermissionBridge';
+import { adaptMcpConfigForClaude } from './core/agents/backend/ClaudeCodeMcpConfigAdapter';
+import { type ClaudeCodePermissionBridgeHostContext, createClaudeCodePermissionBridgeHost } from './core/agents/backend/ClaudeCodeDefaultPermissionHost';
+import { ClaudeCodePermissionBridge, createClaudeCodePermissionBridge } from './core/agents/backend/ClaudeCodePermissionBridge';
 import { loadClaudeCodeSdk } from './core/agents/backend/ClaudeCodeSdkLoader';
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
@@ -26,6 +29,7 @@ import type {
   ChatAppearanceSettings,
   Conversation,
   OpenCodianSettings,
+  QuestionRequest,
   ThemePresetDefinition,
   ThemePresetId,
 } from './core/types';
@@ -80,6 +84,8 @@ export default class OpenCodianPlugin extends Plugin {
   storage: StorageService;
   openCodeService: OpenCodeService;
   agentServiceRegistry: AgentServiceRegistry;
+  claudeCodePermissionBridge: ClaudeCodePermissionBridge | null = null;
+  claudeCodePermissionHostContext: ClaudeCodePermissionBridgeHostContext = { getActiveTabId: () => null };
   opencodeConfigManager: OpencodeConfigManager | null = null;
   modelConfigService: ModelConfigService | null = null;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
@@ -212,12 +218,28 @@ export default class OpenCodianPlugin extends Plugin {
       this.agentServiceRegistry.register(openCodeAdapter);
       const vaultPath = getVaultBasePath(this.app);
       if (vaultPath) {
+        const permissionHost = createClaudeCodePermissionBridgeHost(() => this.claudeCodePermissionHostContext);
+        this.claudeCodePermissionBridge = createClaudeCodePermissionBridge(permissionHost);
         this.agentServiceRegistry.register(new ClaudeCodeAdapter({
           vaultPath,
           settings: this.settings.backendSettings.claudeCode,
           pathToClaudeCodeExecutable: this.getBundledClaudeCodeExecutablePath(vaultPath),
           sdkLoader: loadClaudeCodeSdk,
-          permissionBridge: createClaudeCodePermissionBridge(),
+          permissionBridge: this.claudeCodePermissionBridge,
+          onElicitation: (request, options) => this.handleClaudeCodeElicitation(request, options),
+          mcpConfigLoader: async () => {
+            if (!this.opencodeConfigManager) {
+              return {};
+            }
+            try {
+              const { McpConfigService } = await import('./core/config/McpConfigService');
+              const mcpConfigService = new McpConfigService(this.opencodeConfigManager);
+              const servers = await mcpConfigService.readProjectServers();
+              return adaptMcpConfigForClaude(servers);
+            } catch {
+              return {};
+            }
+          },
         }));
       }
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
@@ -249,6 +271,128 @@ export default class OpenCodianPlugin extends Plugin {
       platformPackage,
       binaryName,
     );
+  }
+
+  private async handleClaudeCodeElicitation(
+    request: ElicitationRequest,
+    options: { signal: AbortSignal },
+  ): Promise<ElicitationResult> {
+    if (options.signal.aborted) {
+      return { action: 'cancel' };
+    }
+
+    const ctx = this.claudeCodePermissionHostContext;
+    const renderer = ctx.elicitationCardRenderer;
+    if (!renderer) {
+      return { action: 'cancel' };
+    }
+
+    const questionRequest = this.createClaudeCodeElicitationQuestionRequest(request);
+    const response = await renderer.collectResponse(questionRequest, ctx.getActiveTabId());
+    if (!response) {
+      return { action: 'cancel' };
+    }
+    if (response.action !== 'accept') {
+      return { action: response.action };
+    }
+    if (
+      questionRequest.questions.length === 1
+      && questionRequest.questions[0].options.some((option) => option.label === 'Decline')
+      && response.answers?.[0]?.[0] === 'Decline'
+    ) {
+      return { action: 'decline' };
+    }
+
+    return {
+      action: 'accept',
+      content: this.normalizeClaudeCodeElicitationContent(response.content)
+        ?? this.createClaudeCodeElicitationContent(questionRequest, response.answers ?? []),
+    };
+  }
+
+  private createClaudeCodeElicitationQuestionRequest(
+    request: ElicitationRequest,
+  ): QuestionRequest {
+    const schemaProperties = this.getClaudeCodeElicitationSchemaProperties(request.requestedSchema);
+    const schemaQuestions = Object.entries(schemaProperties).flatMap(([key, property]) => {
+      const options = Array.isArray(property.enum)
+        ? property.enum
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+            .map((value) => ({ label: value, description: '' }))
+        : [];
+      if (options.length === 0) {
+        return [];
+      }
+      return [{
+        question: key,
+        header: typeof property.title === 'string' ? property.title : request.title ?? request.displayName ?? request.serverName,
+        options,
+        multiple: property.type === 'array',
+        custom: true,
+      }];
+    });
+
+    return {
+      id: request.elicitationId ?? `claude-elicitation-${Date.now()}`,
+      sessionId: 'claude-code',
+      questions: schemaQuestions.length > 0
+        ? schemaQuestions
+        : [{
+            question: request.message,
+            header: request.title ?? request.displayName ?? request.serverName,
+            options: [
+              { label: 'Accept', description: request.description ?? '' },
+              { label: 'Decline', description: '' },
+            ],
+            multiple: false,
+            custom: true,
+          }],
+    };
+  }
+
+  private getClaudeCodeElicitationSchemaProperties(
+    schema: Record<string, unknown> | undefined,
+  ): Record<string, { enum?: unknown; title?: unknown; type?: unknown }> {
+    const properties = schema?.properties;
+    if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+      return {};
+    }
+    return properties as Record<string, { enum?: unknown; title?: unknown; type?: unknown }>;
+  }
+
+  private createClaudeCodeElicitationContent(
+    request: QuestionRequest,
+    answers: readonly string[][],
+  ): Record<string, string | string[]> {
+    const content: Record<string, string | string[]> = {};
+    request.questions.forEach((question, index) => {
+      const selected = answers[index] ?? [];
+      if (question.question === request.questions[0]?.question && selected[0] === 'Decline') {
+        return;
+      }
+      content[question.question] = question.multiple ? [...selected] : selected[0] ?? '';
+    });
+    return content;
+  }
+
+  private normalizeClaudeCodeElicitationContent(
+    content: Record<string, unknown> | undefined,
+  ): Record<string, string | number | boolean | string[]> | undefined {
+    if (!content) {
+      return undefined;
+    }
+    const normalized: Record<string, string | number | boolean | string[]> = {};
+    for (const [key, value] of Object.entries(content)) {
+      if (
+        typeof value === 'string'
+        || typeof value === 'number'
+        || typeof value === 'boolean'
+        || (Array.isArray(value) && value.every((item): item is string => typeof item === 'string'))
+      ) {
+        normalized[key] = value;
+      }
+    }
+    return normalized;
   }
 
   private getClaudeAgentSdkPlatformPackageName(): string {
@@ -787,13 +931,14 @@ export default class OpenCodianPlugin extends Plugin {
     sessionId: string,
     initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId' | 'backendSessionId'>>,
   ): Promise<Conversation> {
+    const backend = this.settings.activeBackend ?? 'opencode';
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       title: initial?.title || this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      backend: this.settings.activeBackend,
-      openCodeSessionId: sessionId,
+      backend,
+      ...(backend === 'opencode' ? { openCodeSessionId: sessionId } : {}),
       backendSessionId: sessionId,
       messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
       currentNote: initial?.currentNote,

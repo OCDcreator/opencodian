@@ -92,6 +92,11 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       additionalDirectories: ['/tmp/context'],
       model: 'claude-opus-4-6',
       fallbackModel: 'claude-sonnet-4-5',
+      allowedTools: [],
+      disallowedTools: [],
+      maxTurns: null,
+      maxBudgetUsd: null,
+      env: {},
     });
   });
 

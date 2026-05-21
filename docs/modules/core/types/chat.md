@@ -50,7 +50,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `StreamChunk` | 联合类型，15 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `error` 可带 `errorClass?` 字段标识错误类型，`tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用） |
+| `StreamChunk` | 联合类型，15 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `message_metadata.sessionId?` 可携带 backend 真实 session identity，`error` 可带 `errorClass?` 字段标识错误类型，`tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用） |
 
 ### OMO 兼容
 
@@ -117,7 +117,7 @@
 `StreamChunk` 联合类型覆盖了从 `message_start` 到 `message_stop` 的完整事件链：
 1. 生命周期：`message_start` → ... → `message_stop`
 2. 内容事件：`text`, `thinking`, `tool_use`, `tool_result`
-3. 元数据：`message_metadata`, `usage`, `file_edited`
+3. 元数据：`message_metadata`, `usage`, `file_edited`；Claude Code 等 backend 可通过 `message_metadata.sessionId` 把 stream 中首次出现的真实 backend session id 回传给发送持久化层
 4. 交互事件：`permission_request`, `question_request`
 5. 结构事件：`content_block_start`, `content_block_stop`
 6. 错误：`error`

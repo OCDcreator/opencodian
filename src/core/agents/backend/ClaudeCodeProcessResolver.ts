@@ -100,7 +100,7 @@ function resolveExecutableCandidate(
   }
 
   if (path.isAbsolute(candidate)) {
-    return options.existsSync(candidate) ? candidate : candidate;
+    return options.existsSync(candidate) ? candidate : null;
   }
 
   const delimiter = getPathDelimiter(options.platform);
@@ -121,7 +121,7 @@ function resolveExecutableCandidate(
     }
   }
 
-  return candidate;
+  return null;
 }
 
 export function resolveClaudeCodeProcess(

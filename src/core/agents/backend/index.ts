@@ -46,6 +46,14 @@ export {
   type ClaudeCodeSdkQueryInput,
 } from './ClaudeCodeAdapter';
 export {
+  adaptMcpConfigForClaude,
+  type ClaudeCodeMcpHttpConfig,
+  type ClaudeCodeMcpServerConfig,
+  type ClaudeCodeMcpServersMap,
+  type ClaudeCodeMcpSseConfig,
+  type ClaudeCodeMcpStdioConfig,
+} from './ClaudeCodeMcpConfigAdapter';
+export {
   buildClaudeCodeOptions,
   type ClaudeCodeOptionsBuilderInput,
   type ClaudeCodeSdkOptionsShape,

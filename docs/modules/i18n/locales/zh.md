@@ -67,7 +67,7 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，让聊天区可以明确区分“尚未启用任何 backend”和“backend 已启用但当前离线”两类状态，而不是继续共用笼统的离线文案。
 
-本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1 配置基础面板提供中文文案，包括 section 标题/描述、可执行文件路径、认证与环境提示、设置来源、权限模式、模型/备用模型、thinking/effort、额外目录和运行时诊断；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。
+本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1 配置基础面板提供中文文案，包括 section 标题/描述、二级标签（运行时、模型与思考、权限、上下文与来源）、可执行文件路径、认证与环境提示、设置来源、权限模式、模型/备用模型、thinking/effort、额外目录和运行时诊断；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。
 
 ## 导入关系
 
@@ -291,3 +291,7 @@ New Chinese keys added for the tabbed settings layout:
 ## 2026-05-18 模型可用性批量按钮文案
 
 `settings.model.availability.enableAllProviders` / `disableAllProviders` 的中文文案去掉“一键”，改为更短的“启用所有提供商 / 禁用所有提供商”，配合模型可用性工具行的同排布局。
+
+## 2026-05-21 Claude Code 设置与状态文案
+
+`settings.claudeCode.*` 现在覆盖 Runtime、Model & Thinking、Permissions、Context & Sources、MCP / Advanced 五组 Claude Code 设置文案，包括 allowed/disallowed tools、max turns、max budget、env 等 SDK options UI。新增 `chat.serverStatus.backendConnected`，用于 Claude Code 等非 OpenCode backend 的 header 状态文案，避免继续复用 OpenCode server/remote wording。
