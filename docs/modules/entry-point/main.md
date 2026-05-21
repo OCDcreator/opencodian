@@ -78,7 +78,7 @@
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
 13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
 14. 启动结束时输出一行汇总日志；这条汇总同样走 `always`。若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
-15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。
+15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。诊断报告也会输出 Claude Code backend 设置摘要、debug module 状态和 debug channel 配置，但不会把 Claude Code 能力包装成 full runtime proof。
 16. `onload()` 返回后再后台调度 deferred runtime warmup：本地 sidecar 自启动与首个 server snapshot 不再阻塞插件注册和视图恢复；真正需要新 session 的路径（当前主要是 `createConversation()`）才会显式接管并等待这次 warmup，避免首次建会话撞上未就绪 server，同时不拖慢已有会话的视图首开。
 17. 这条 warmup 现在还会先看当前是否真的启用了 `opencode` backend。若用户把所有 backend 都禁用，`main.ts` 只向 `PluginRuntimeCoordinator` 暴露 enabled-backend truth，不再触发启动期的 runtime warmup / snapshot 探测，避免聊天界面已明确显示“已禁用”时后台仍做无意义的本地服务离线探测并产生日志噪音。
 

@@ -7,6 +7,7 @@ import {
 import {
   clearRecentLogs,
   getRecentLogEntries,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleEnabled,
 } from '../../../../../src/shared';
@@ -16,11 +17,13 @@ describe('ClaudeCodePermissionBridge', () => {
     clearRecentLogs();
     setDebugLoggingEnabled(true);
     setDebugModuleEnabled('claudeCode', true);
+    setClaudeCodeDebugChannelSettings(undefined);
   });
 
   afterEach(() => {
     setDebugLoggingEnabled(false);
     setDebugModuleEnabled('claudeCode', false);
+    setClaudeCodeDebugChannelSettings(undefined);
     clearRecentLogs();
   });
 
@@ -249,6 +252,7 @@ describe('ClaudeCodePermissionBridge', () => {
 
     expect(entries.length).toBeGreaterThanOrEqual(4);
     expect(entries.every((entry) => entry.moduleKey === 'claudeCode')).toBe(true);
+    expect(entries.every((entry) => entry.channel === 'permissions')).toBe(true);
     expect(logText).toContain('canUseTool request');
     expect(logText).toContain('canUseTool decision');
     expect(logText).toContain('AskUserQuestion request');

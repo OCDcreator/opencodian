@@ -101,6 +101,14 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       includeHookEvents: false,
       forwardSubagentText: false,
       agentProgressSummaries: false,
+      debugChannels: {
+        runtime: true,
+        sessions: true,
+        stream: true,
+        permissions: true,
+        mcp: true,
+        experimental: false,
+      },
     });
   });
 

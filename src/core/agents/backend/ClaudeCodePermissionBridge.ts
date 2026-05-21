@@ -7,7 +7,7 @@ import type {
 
 type PermissionRequestChunk = Extract<StreamChunk, { type: 'permission_request' }>;
 
-const logger = createLogger('ClaudeCodePermissionBridge', { moduleKey: 'claudeCode' });
+const logger = createLogger('ClaudeCodePermissionBridge', { moduleKey: 'claudeCode', channel: 'permissions' });
 
 export type ClaudeCodePermissionUpdate = Record<string, unknown>;
 

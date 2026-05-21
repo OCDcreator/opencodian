@@ -745,6 +745,10 @@ describe('ClaudeCodeAdapter', () => {
     const logText = entries.map((entry) => entry.message).join('\n');
 
     expect(entries.some((entry) => entry.moduleKey === 'claudeCode')).toBe(true);
+    expect(entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ channel: 'runtime' }),
+      expect.objectContaining({ channel: 'sessions' }),
+    ]));
     expect(logText).toContain('sendMessage start');
     expect(logText).toContain('runtime create');
     expect(logText).toContain('SDK query creation');

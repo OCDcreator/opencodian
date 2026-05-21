@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function -- Debug settings tests share Obsidian Setting mocks and tab/classic grouping regressions. */
+/* eslint-disable max-lines, max-lines-per-function -- Debug settings tests share Obsidian Setting mocks and tab/classic grouping regressions. */
 
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
@@ -7,7 +7,8 @@ import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/ty
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
-import { DEBUG_MODULE_REGISTRY } from '../../../../src/shared/debugModules';
+import { clearRecentLogs, createLogger, setDebugLoggingEnabled, setDebugModuleEnabled } from '../../../../src/shared';
+import { CLAUDE_CODE_DEBUG_CHANNEL_IDS, DEBUG_MODULE_REGISTRY } from '../../../../src/shared/debugModules';
 
 interface MockToggleControl {
   setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>;
@@ -124,6 +125,18 @@ function createPlugin(overrides: Partial<DebugSectionPlugin['settings']> = {}): 
       debugLogPaths: {
         ...DEFAULT_SETTINGS.debugLogPaths,
         ...overrides.debugLogPaths,
+      },
+      backendSettings: {
+        ...DEFAULT_SETTINGS.backendSettings,
+        ...overrides.backendSettings,
+        claudeCode: {
+          ...DEFAULT_SETTINGS.backendSettings.claudeCode,
+          ...overrides.backendSettings?.claudeCode,
+          debugChannels: {
+            ...DEFAULT_SETTINGS.backendSettings.claudeCode.debugChannels,
+            ...overrides.backendSettings?.claudeCode?.debugChannels,
+          },
+        },
       },
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
@@ -242,12 +255,20 @@ describe('SettingsDebugSection', () => {
     toggleRecords.length = 0;
     textRecords.length = 0;
     buttonRecords.length = 0;
+    clearRecentLogs();
+    setDebugLoggingEnabled(true);
+    setDebugModuleEnabled('claudeCode', true);
+    setDebugModuleEnabled('settings', true);
     mockClipboard();
     mockSettingPrototype();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('claudeCode', false);
+    setDebugModuleEnabled('settings', false);
+    clearRecentLogs();
     document.body.innerHTML = '';
 
     const globalWithRequire = globalThis as typeof globalThis & {
@@ -331,6 +352,80 @@ describe('SettingsDebugSection', () => {
     expect(containerEl.querySelector('[data-section-block="export"] h4')?.textContent).toBe(
       t('settings.debug.export.title'),
     );
+  });
+
+  it('renders a Claude Code debug workbench with channel controls and filtered logs', async () => {
+    const runtimeLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' });
+    const streamLogger = createLogger('ClaudeCodeStreamNormalizer', { moduleKey: 'claudeCode', channel: 'stream' });
+    const appLogger = createLogger('SettingsDebugSection', { moduleKey: 'settings' });
+    runtimeLogger.debug('runtime visible');
+    streamLogger.debug('stream hidden');
+    appLogger.debug('settings hidden');
+    const plugin = createPlugin({
+      activeBackend: 'claude-code',
+      enableDebugLogging: true,
+      backendSettings: {
+        ...DEFAULT_SETTINGS.backendSettings,
+        claudeCode: {
+          ...DEFAULT_SETTINGS.backendSettings.claudeCode,
+          debugChannels: {
+            ...DEFAULT_SETTINGS.backendSettings.claudeCode.debugChannels,
+            stream: false,
+          },
+        },
+      },
+    });
+
+    const { containerEl } = createTabbedSection('claude-code', plugin);
+
+    expect(containerEl.querySelector('.opencodian-debug-status-strip')?.textContent).toContain(
+      t('settings.debug.claude.status.backendActive'),
+    );
+    expect(containerEl.querySelector('.opencodian-debug-privacy-note')?.textContent).toContain(
+      t('settings.debug.claude.privacy.title'),
+    );
+    expect(containerEl.querySelector('[data-claude-code-log-preview="true"]')?.textContent).toContain('runtime visible');
+    expect(containerEl.querySelector('[data-claude-code-log-preview="true"]')?.textContent).not.toContain('stream hidden');
+    expect(containerEl.querySelector('[data-claude-code-log-preview="true"]')?.textContent).not.toContain('settings hidden');
+    for (const channelId of CLAUDE_CODE_DEBUG_CHANNEL_IDS) {
+      expect(findToggle(t(`settings.debug.claude.channel.${channelId}.name` as never))).toBeDefined();
+    }
+
+    const streamToggle = findToggle(t('settings.debug.claude.channel.stream.name' as never));
+    expect(streamToggle?.control.setValue).toHaveBeenCalledWith(false);
+    await streamToggle?.onChange?.(true);
+
+    expect(plugin.settings.backendSettings.claudeCode.debugChannels.stream).toBe(true);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(containerEl.querySelector('[data-claude-code-log-preview="true"]')?.textContent).toContain('stream hidden');
+  });
+
+  it('copies visible Claude Code logs and diagnostic reports from the workbench', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const clipboardSpy = jest
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue(undefined);
+    createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' }).debug('copy me');
+    const plugin = createPlugin();
+
+    createTabbedSection('claude-code', plugin);
+
+    const copyVisibleButton = Array.from(document.querySelectorAll('button'))
+      .find((button) => button.textContent === t('settings.debug.claude.logs.copyVisible'));
+    const copyDiagnosticsButton = Array.from(document.querySelectorAll('button'))
+      .find((button) => button.textContent === t('settings.debug.claude.logs.copyDiagnostics'));
+
+    copyVisibleButton?.click();
+    await Promise.resolve();
+    copyDiagnosticsButton?.click();
+    await Promise.resolve();
+
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('copy me'));
+    expect(plugin.buildDiagnosticReport).not.toHaveBeenCalled();
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('# OpenCodian Claude Code Diagnostic Report'));
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('Enabled debug channels:'));
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('copy me'));
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.debug.claude.logs.copyVisibleSuccess'));
   });
 
   it('persists the debug refresh interval from the settings panel', async () => {

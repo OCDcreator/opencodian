@@ -3,8 +3,14 @@
  */
 
 import {
+  CLAUDE_CODE_DEBUG_CHANNEL_IDS,
+  type ClaudeCodeDebugChannelId,
+  type ClaudeCodeDebugChannelSettings,
   type DebugModuleSettings,
+  getDefaultClaudeCodeDebugChannelSettings,
   getDefaultDebugModuleSettings,
+  getEnabledClaudeCodeDebugChannels,
+  normalizeClaudeCodeDebugChannelSettings,
   normalizeDebugModuleSettings,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
@@ -26,6 +32,14 @@ export type ClaudeCodeThinking =
   | { type: 'adaptive' }
   | { type: 'disabled' }
   | { type: 'fixed'; budgetTokens: number };
+export {
+  CLAUDE_CODE_DEBUG_CHANNEL_IDS,
+  type ClaudeCodeDebugChannelId,
+  type ClaudeCodeDebugChannelSettings,
+  getDefaultClaudeCodeDebugChannelSettings,
+  getEnabledClaudeCodeDebugChannels,
+  normalizeClaudeCodeDebugChannelSettings,
+};
 
 export interface ClaudeCodeBackendSettings {
   executablePath: string;
@@ -54,6 +68,8 @@ export interface ClaudeCodeBackendSettings {
   forwardSubagentText: boolean;
   /** Ask the SDK to emit periodic subagent progress summaries. */
   agentProgressSummaries: boolean;
+  /** Product workbench debug channels for future Claude Code logging routes. */
+  debugChannels: ClaudeCodeDebugChannelSettings;
 }
 
 export interface BackendSettings {
@@ -94,6 +110,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     includeHookEvents: false,
     forwardSubagentText: false,
     agentProgressSummaries: false,
+    debugChannels: getDefaultClaudeCodeDebugChannelSettings(),
   };
 }
 
@@ -249,6 +266,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     includeHookEvents: candidate.includeHookEvents === true,
     forwardSubagentText: candidate.forwardSubagentText === true,
     agentProgressSummaries: candidate.agentProgressSummaries === true,
+    debugChannels: normalizeClaudeCodeDebugChannelSettings(candidate.debugChannels),
   };
 }
 

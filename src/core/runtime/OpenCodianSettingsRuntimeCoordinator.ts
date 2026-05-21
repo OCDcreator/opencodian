@@ -2,6 +2,7 @@ import type { WorkspaceLeaf } from 'obsidian';
 
 import {
   createLogger,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleSettings,
   setDebugRefreshIntervalMs,
@@ -327,6 +328,7 @@ export class OpenCodianSettingsRuntimeCoordinator {
     const settings = this.host.getSettings();
     setDebugLoggingEnabled(settings.enableDebugLogging);
     setDebugModuleSettings(settings.debugModuleSettings);
+    setClaudeCodeDebugChannelSettings(settings.backendSettings.claudeCode.debugChannels);
     setDebugRefreshIntervalMs(settings.debugRefreshIntervalMs);
     setInlineSerializedDebugLogArgsEnabled(settings.inlineSerializedDebugLogArgs);
   }

@@ -397,6 +397,7 @@ describe('ClaudeCodeStreamNormalizer', () => {
 
     expect(entries.length).toBeGreaterThanOrEqual(2);
     expect(entries.every((entry) => entry.moduleKey === 'claudeCode')).toBe(true);
+    expect(entries.every((entry) => entry.channel === 'stream')).toBe(true);
     expect(logText).toContain('sdk message');
     expect(logText).toContain('chunks');
     expect(logText).toContain('contentLength');

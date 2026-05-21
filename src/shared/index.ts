@@ -2,16 +2,18 @@
  * Shared module
  */
 
-export type { Logger } from './logger';
+export type { LogChannel, LogEntry, Logger } from './logger';
 export { createLogger } from './logger';
-export { clearRecentLogs, getRecentLogEntries, getRecentLogText } from './logger';
+export { clearRecentLogs, getRecentLogEntries, getRecentLogText, getRecentLogTextForEntries } from './logger';
 export { formatDurationMs, getPerformanceTimestampMs } from './logger';
 export {
+  getClaudeCodeDebugChannelSettings,
   getDebugModuleSettings,
   getDebugRefreshIntervalMs,
   isDebugModuleEnabled,
   resetLogEmissionThrottleState,
   resolveLoggerDebugModuleKey,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleEnabled,
   setDebugModuleSettings,

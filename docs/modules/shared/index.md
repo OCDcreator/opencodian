@@ -17,15 +17,18 @@
 ## 核心类型 / 接口
 
 ```typescript
-export type { Logger } from './logger';
+export type { LogChannel, LogEntry, Logger } from './logger';
 export {
   clearRecentLogs,
   createLogger,
   getDebugModuleSettings,
   getDebugRefreshIntervalMs,
+  getClaudeCodeDebugChannelSettings,
   getRecentLogEntries,
   getRecentLogText,
+  getRecentLogTextForEntries,
   resetLogEmissionThrottleState,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleEnabled,
   setDebugModuleSettings,
@@ -69,9 +72,10 @@ export { getVaultBasePath } from './vault';
 | `createLogger()` | 生成带前缀日志器 |
 | `clearRecentLogs()` | 清空最近诊断日志缓存 |
 | `getDebugModuleSettings()` / `setDebugModuleSettings()` | 读取/写入模块级调试开关 |
+| `getClaudeCodeDebugChannelSettings()` / `setClaudeCodeDebugChannelSettings()` | 读取/写入 Claude Code 细分调试通道 |
 | `setDebugModuleEnabled()` | 切换单个 debug module 开关 |
 | `getDebugRefreshIntervalMs()` / `setDebugRefreshIntervalMs()` | 读取/写入高频日志刷新间隔 |
-| `getRecentLogEntries()` / `getRecentLogText()` | 获取最近日志条目或格式化文本 |
+| `getRecentLogEntries()` / `getRecentLogText()` / `getRecentLogTextForEntries()` | 获取最近日志条目或格式化全部/已过滤日志文本 |
 | `resetLogEmissionThrottleState()` / `shouldEmitLogFingerprint()` | 共享高频日志指纹去重与节流 |
 | `setDebugLoggingEnabled()` | 启用/禁用 debug 级别日志 |
 | `setInlineSerializedDebugLogArgsEnabled()` | 控制 debug 日志是否把对象参数内联序列化 |

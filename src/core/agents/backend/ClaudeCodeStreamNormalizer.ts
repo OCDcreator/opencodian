@@ -6,7 +6,7 @@ import type { StreamChunk } from '../../types';
 type JsonRecord = Record<string, unknown>;
 type StreamToolKind = Extract<StreamChunk, { type: 'tool_use' }>['kind'];
 
-const logger = createLogger('ClaudeCodeStreamNormalizer', { moduleKey: 'claudeCode' });
+const logger = createLogger('ClaudeCodeStreamNormalizer', { moduleKey: 'claudeCode', channel: 'stream' });
 
 export interface ClaudeCodeStreamNormalizerOptions {
   sessionId?: string;

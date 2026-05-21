@@ -1,6 +1,9 @@
 import {
+  CLAUDE_CODE_DEBUG_CHANNEL_IDS,
   getDefaultClaudeCodeBackendSettings,
+  getEnabledClaudeCodeDebugChannels,
   normalizeClaudeCodeBackendSettings,
+  normalizeClaudeCodeDebugChannelSettings,
   normalizeClaudeCodeEnv,
   normalizeClaudeCodeNullablePositiveInt,
   normalizeClaudeCodeNullablePositiveNumber,
@@ -107,6 +110,14 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     expect(defaults.maxTurns).toBeNull();
     expect(defaults.maxBudgetUsd).toBeNull();
     expect(defaults.env).toEqual({});
+    expect(defaults.debugChannels).toEqual({
+      runtime: true,
+      sessions: true,
+      stream: true,
+      permissions: true,
+      mcp: true,
+      experimental: false,
+    });
   });
 
   it('returns defaults for null input', () => {
@@ -116,6 +127,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     expect(result.maxTurns).toBeNull();
     expect(result.maxBudgetUsd).toBeNull();
     expect(result.env).toEqual({});
+    expect(result.debugChannels).toEqual(getDefaultClaudeCodeBackendSettings().debugChannels);
   });
 
   it('normalizes all new fields from valid input', () => {
@@ -125,12 +137,28 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
       maxTurns: 100,
       maxBudgetUsd: 10.5,
       env: { API_KEY: 'test', DEBUG: 'true' },
+      debugChannels: {
+        runtime: false,
+        sessions: false,
+        stream: true,
+        permissions: false,
+        mcp: true,
+        experimental: true,
+      },
     });
     expect(result.allowedTools).toEqual(['Read', 'Bash']);
     expect(result.disallowedTools).toEqual(['Write']);
     expect(result.maxTurns).toBe(100);
     expect(result.maxBudgetUsd).toBe(10.5);
     expect(result.env).toEqual({ API_KEY: 'test', DEBUG: 'true' });
+    expect(result.debugChannels).toEqual({
+      runtime: false,
+      sessions: false,
+      stream: true,
+      permissions: false,
+      mcp: true,
+      experimental: true,
+    });
   });
 
   it('normalizes invalid new fields to defaults', () => {
@@ -140,11 +168,63 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
       maxTurns: -5,
       maxBudgetUsd: 'free',
       env: 'nope',
+      debugChannels: {
+        runtime: 'yes',
+        stream: false,
+        unknown: true,
+      },
     });
     expect(result.allowedTools).toEqual([]);
     expect(result.disallowedTools).toEqual([]);
     expect(result.maxTurns).toBeNull();
     expect(result.maxBudgetUsd).toBeNull();
     expect(result.env).toEqual({});
+    expect(result.debugChannels).toEqual({
+      runtime: true,
+      sessions: true,
+      stream: false,
+      permissions: true,
+      mcp: true,
+      experimental: false,
+    });
+  });
+});
+
+describe('normalizeClaudeCodeDebugChannelSettings', () => {
+  it('defines the product debug workbench channel ids in stable order', () => {
+    expect(CLAUDE_CODE_DEBUG_CHANNEL_IDS).toEqual([
+      'runtime',
+      'sessions',
+      'stream',
+      'permissions',
+      'mcp',
+      'experimental',
+    ]);
+  });
+
+  it('normalizes partial persisted channel settings over defaults', () => {
+    expect(normalizeClaudeCodeDebugChannelSettings({
+      runtime: false,
+      experimental: true,
+      stale: false,
+    })).toEqual({
+      runtime: false,
+      sessions: true,
+      stream: true,
+      permissions: true,
+      mcp: true,
+      experimental: true,
+    });
+  });
+
+  it('returns enabled channel ids for logging callers', () => {
+    expect(getEnabledClaudeCodeDebugChannels({
+      runtime: true,
+      sessions: false,
+      stream: true,
+      permissions: false,
+      mcp: true,
+      experimental: false,
+    })).toEqual(['runtime', 'stream', 'mcp']);
   });
 });

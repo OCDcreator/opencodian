@@ -52,6 +52,7 @@ import {
   createLogger,
   getRecentLogText,
   getVaultBasePath,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleSettings,
   setDebugRefreshIntervalMs,
@@ -642,6 +643,7 @@ export default class OpenCodianPlugin extends Plugin {
     const settings = this.settings;
     setDebugLoggingEnabled(settings.enableDebugLogging);
     setDebugModuleSettings(settings.debugModuleSettings);
+    setClaudeCodeDebugChannelSettings(settings.backendSettings.claudeCode.debugChannels);
     setDebugRefreshIntervalMs(settings.debugRefreshIntervalMs);
     setInlineSerializedDebugLogArgsEnabled(settings.inlineSerializedDebugLogArgs);
   }

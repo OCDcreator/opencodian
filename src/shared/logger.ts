@@ -1,9 +1,14 @@
 import {
+  CLAUDE_CODE_DEBUG_CHANNEL_IDS,
+  type ClaudeCodeDebugChannelId,
+  type ClaudeCodeDebugChannelSettings,
   type DebugModuleKey,
   type DebugModuleSettings,
   DEFAULT_DEBUG_REFRESH_INTERVAL_MS,
+  getDefaultClaudeCodeDebugChannelSettings,
   getDefaultDebugModuleSettings,
   isDebugModuleKey,
+  normalizeClaudeCodeDebugChannelSettings,
   normalizeDebugModuleSettings,
   normalizeDebugRefreshIntervalMs,
   resolveDebugModuleKey,
@@ -11,12 +16,14 @@ import {
 
 type LogLevel = 'always' | 'info' | 'debug' | 'warn' | 'error';
 type LogMethod = 'log' | 'warn' | 'error';
+export type LogChannel = string;
 
 const DEBUG_STORAGE_KEY = 'opencodian:debug';
 const DEBUG_FLAG_KEY = '__OPENCODIAN_DEBUG__';
 const INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY = '__OPENCODIAN_INLINE_SERIALIZED_DEBUG_ARGS__';
 const DEBUG_MODULE_SETTINGS_FLAG_KEY = '__OPENCODIAN_DEBUG_MODULE_SETTINGS__';
 const DEBUG_REFRESH_INTERVAL_FLAG_KEY = '__OPENCODIAN_DEBUG_REFRESH_INTERVAL_MS__';
+const CLAUDE_CODE_DEBUG_CHANNEL_SETTINGS_FLAG_KEY = '__OPENCODIAN_CLAUDE_CODE_DEBUG_CHANNEL_SETTINGS__';
 const MAX_LOG_ENTRIES = 500;
 
 type LoggerGlobalState = {
@@ -24,6 +31,7 @@ type LoggerGlobalState = {
   [INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY]?: boolean;
   [DEBUG_MODULE_SETTINGS_FLAG_KEY]?: DebugModuleSettings;
   [DEBUG_REFRESH_INTERVAL_FLAG_KEY]?: number;
+  [CLAUDE_CODE_DEBUG_CHANNEL_SETTINGS_FLAG_KEY]?: ClaudeCodeDebugChannelSettings;
 };
 
 export interface LogEntry {
@@ -32,11 +40,13 @@ export interface LogEntry {
   method: LogMethod;
   scope: string;
   moduleKey: DebugModuleKey;
+  channel?: LogChannel;
   message: string;
 }
 
 interface LoggerOptions {
   moduleKey?: DebugModuleKey;
+  channel?: LogChannel;
 }
 
 interface LogFingerprintState {
@@ -49,6 +59,7 @@ interface EmitContext {
   method: LogMethod;
   scope: string;
   moduleKey: DebugModuleKey;
+  channel?: LogChannel;
 }
 
 const recentLogEntries: LogEntry[] = [];
@@ -205,6 +216,38 @@ function isOptionalLogEnabled(moduleKey: DebugModuleKey): boolean {
   return isDebugEnabled() && isDebugModuleEnabled(moduleKey);
 }
 
+export function setClaudeCodeDebugChannelSettings(settings: unknown): void {
+  getLoggerGlobalState()[CLAUDE_CODE_DEBUG_CHANNEL_SETTINGS_FLAG_KEY] =
+    normalizeClaudeCodeDebugChannelSettings(settings);
+}
+
+export function getClaudeCodeDebugChannelSettings(): ClaudeCodeDebugChannelSettings {
+  return normalizeClaudeCodeDebugChannelSettings(
+    getLoggerGlobalState()[CLAUDE_CODE_DEBUG_CHANNEL_SETTINGS_FLAG_KEY]
+    ?? getDefaultClaudeCodeDebugChannelSettings(),
+  );
+}
+
+function isClaudeCodeLogChannel(value: unknown): value is ClaudeCodeDebugChannelId {
+  return typeof value === 'string'
+    && (CLAUDE_CODE_DEBUG_CHANNEL_IDS as readonly string[]).includes(value);
+}
+
+function isLogChannelEnabled(moduleKey: DebugModuleKey, channel: LogChannel | undefined): boolean {
+  if (moduleKey !== 'claudeCode' || !channel || !isClaudeCodeLogChannel(channel)) {
+    return true;
+  }
+  return getClaudeCodeDebugChannelSettings()[channel] !== false;
+}
+
+function normalizeLogChannel(channel: unknown): LogChannel | undefined {
+  if (typeof channel !== 'string') {
+    return undefined;
+  }
+  const normalized = channel.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function pushRecentLog(context: EmitContext, args: unknown[]): void {
   const parts = args.map((arg) => stringifyArg(arg)).filter(Boolean);
   recentLogEntries.push({
@@ -213,6 +256,7 @@ function pushRecentLog(context: EmitContext, args: unknown[]): void {
     method: context.method,
     scope: context.scope,
     moduleKey: context.moduleKey,
+    ...(context.channel ? { channel: context.channel } : {}),
     message: parts.join(' '),
   });
 
@@ -250,37 +294,38 @@ function emit(
 
 function createLoggerCall(scope: string, options: LoggerOptions | undefined, level: LogLevel): (...args: unknown[]) => void {
   const moduleKey = resolveDebugModuleKey(scope, options?.moduleKey);
+  const channel = normalizeLogChannel(options?.channel);
 
   switch (level) {
     case 'always':
       return (...args: unknown[]) => {
-        emit({ level: 'always', method: 'log', scope, moduleKey }, args);
+        emit({ level: 'always', method: 'log', scope, moduleKey, channel }, args);
       };
     case 'info':
       return (...args: unknown[]) => {
-        if (!isOptionalLogEnabled(moduleKey)) {
+        if (!isOptionalLogEnabled(moduleKey) || !isLogChannelEnabled(moduleKey, channel)) {
           return;
         }
-        emit({ level: 'info', method: 'log', scope, moduleKey }, args);
+        emit({ level: 'info', method: 'log', scope, moduleKey, channel }, args);
       };
     case 'debug':
       return (...args: unknown[]) => {
-        if (!isOptionalLogEnabled(moduleKey)) {
+        if (!isOptionalLogEnabled(moduleKey) || !isLogChannelEnabled(moduleKey, channel)) {
           return;
         }
 
-        emit({ level: 'debug', method: 'log', scope, moduleKey }, args, {
+        emit({ level: 'debug', method: 'log', scope, moduleKey, channel }, args, {
           inlineSerializeNonStringArgs: isInlineSerializedDebugArgsEnabled(),
         });
       };
     case 'warn':
       return (...args: unknown[]) => {
-        emit({ level: 'warn', method: 'warn', scope, moduleKey }, args);
+        emit({ level: 'warn', method: 'warn', scope, moduleKey, channel }, args);
       };
     case 'error':
     default:
       return (...args: unknown[]) => {
-        emit({ level: 'error', method: 'error', scope, moduleKey }, args);
+        emit({ level: 'error', method: 'error', scope, moduleKey, channel }, args);
       };
   }
 }
@@ -301,7 +346,19 @@ export function getRecentLogEntries(): LogEntry[] {
 
 export function getRecentLogText(): string {
   return recentLogEntries
-    .map((entry) => `${entry.timestamp} [${entry.level.toUpperCase()}] [${entry.moduleKey}] [${entry.scope}] ${entry.message}`)
+    .map((entry) => {
+      const channelSegment = entry.channel ? ` [${entry.channel}]` : '';
+      return `${entry.timestamp} [${entry.level.toUpperCase()}] [${entry.moduleKey}]${channelSegment} [${entry.scope}] ${entry.message}`;
+    })
+    .join('\n');
+}
+
+export function getRecentLogTextForEntries(entries: readonly LogEntry[]): string {
+  return entries
+    .map((entry) => {
+      const channelSegment = entry.channel ? ` [${entry.channel}]` : '';
+      return `${entry.timestamp} [${entry.level.toUpperCase()}] [${entry.moduleKey}]${channelSegment} [${entry.scope}] ${entry.message}`;
+    })
     .join('\n');
 }
 

@@ -61,6 +61,8 @@ export interface OpenCodianSettingsRuntimeCoordinatorHost {
 7. 同步 `.opencode` 权限配置
 8. 当设置已经回到 `enabledBackends` 包含 `opencode` 且 `server.mode=local`、`autoStart=true` 时，调度一次 deferred runtime warmup，让从 disabled/remote/offline 恢复到本地托管时能自动拉起服务，而不是等到下次 reload 或会话 bootstrap
 
+日志设置同步现在包括 Claude Code debug channel 设置。`backendSettings.claudeCode.debugChannels` 会被写入 shared logger 的全局 runtime state，让 Claude Code adapter / stream normalizer / permission bridge 的可选日志按通道实时放行或静默。
+
 ### 主题/外观变更
 
 提供主题预设选择、外观更新、回退到基线等操作。所有变更都通过 `setEffectiveChatAppearance` 计算 `customAppearanceOverrides`。

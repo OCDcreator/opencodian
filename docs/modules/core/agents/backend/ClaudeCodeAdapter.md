@@ -30,12 +30,12 @@
 - 对已经持久化到 OpenCodian conversation metadata 的 Claude SDK session id 进行轻量恢复，避免 Obsidian reload 后同一个 `backendSessionId` 因 adapter 内存 Map 清空而在发送前失败；恢复后的第一次 `query()` 会传入 `options.resume`
 - 通过 SDK facade 暴露 `listSessions()`、`getSession()`、`renameSession()` 与 `forkSession()` 的基础委托；fork 成功后以 SDK session id 建立新的本地 session state
 - 对活跃、checkpoint-enabled 的 SDK `Query` 暴露后端级 `rewindFiles(sessionId, userMessageId, { dryRun? })` 委托；当前没有接入稳定聊天按钮，调用方必须先完成 dry-run/确认设计
-- 通过 `createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode' })` 写入摘要级诊断日志，覆盖 start/stop/dispose/status change、session create/delete/update/list/get/fork/rewind、sendMessage start/runtime-ready/error/complete、runtime create/reuse/close、SDK load/query creation、MCP config load/reload、supportedModels count、spawn command/exit/error；日志只记录 id、cwd、count、length、状态和错误摘要，不记录 prompt、tool input、secret 或完整 env
+- 通过 `createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel })` 写入摘要级诊断日志：`runtime` 覆盖 start/stop/dispose/status change、sendMessage、runtime create/reuse/close、SDK load/query creation、supportedModels、spawn command/exit/error；`sessions` 覆盖 create/delete/update/list/get/fork/rewind/restore；`mcp` 覆盖 MCP config load/reload。日志只记录 id、cwd、count、length、状态和错误摘要，不记录 prompt、tool input、secret 或完整 env
 
 ## 维护约束
 
 - 不直接静态 import 官方 SDK；真实 SDK 只能通过 `ClaudeCodeSdkLoader` 动态加载，方便测试继续使用 fake facade，并避免 Jest/Obsidian 启动期 ESM 解析问题。
-- adapter 的 `debug` / `info` 诊断日志必须继续受全局 `enableDebugLogging` 和 `claudeCode` debug module 双重控制；`warn` / `error` 可沿用 shared logger 默认行为。
+- adapter 的 `debug` / `info` 诊断日志必须继续受全局 `enableDebugLogging`、`claudeCode` debug module 和 Claude Code channel 设置控制；`warn` / `error` 可沿用 shared logger 默认行为。
 - OpenCode 仍是默认 backend；Claude Code 必须通过设置显式启用，认证失败会以 Claude Code error chunk 暴露，而不是回落到 OpenCode。
 - `spawnClaudeCodeProcess` 不要把 SDK 传入的 `signal` 继续传给 Node `spawn()` options；它需要手动监听 abort 并 kill 子进程，保持 Obsidian renderer 兼容。
 - 本地 handle 与 SDK `session_id` 是两层身份：首次发送前只有本地 handle，SDK 输出 `session_id` 后才把 conversation `backendSessionId` 收敛为真实可 resume 的 Claude session id；如果 reload 后传入的 `backendSessionId` 已经是 Claude SDK session id，adapter 会直接恢复 `sdkSessionId` 并 resume。
