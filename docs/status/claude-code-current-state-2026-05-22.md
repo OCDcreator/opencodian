@@ -16,12 +16,13 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `e012ef6b3fa9be4cde26f38deb501d1be3aea0d7`
-- Commit subject: `feat: backend-aware session history productization`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605222102`
+- Snapshot commit: `719c43fb052d3aafade48dd48ad0878fdd61b292`
+- Commit subject: `feat: route settings session history reads through backend routing`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605222254`
 - Recent continuity commits in this lane:
   - `d96841f71898b6434aafdaf19b0a9687539e69ff` — `feat: fork-only capability + backend-aware session/history routing`
   - `e012ef6b3fa9be4cde26f38deb501d1be3aea0d7` — `feat: backend-aware session history productization`
+  - `719c43fb052d3aafade48dd48ad0878fdd61b292` — `feat: route settings session history reads through backend routing`
 
 ## Source Of Truth Order
 
@@ -100,6 +101,7 @@ Recent runs focused on two connected lanes:
 - ~~`forkSession` is wired in `ClaudeCodeAdapter` but not exposed as stable~~ **RESOLVED**: `AgentCapability.Fork` and `AgentForkCapability` have been added; Claude Code now declares `Fork` and routes fork through the registry layer.
 - `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired; `listSessions` is now backend-aware in `TitleGenerationService`. `getSessionMessages` is now on the shared `AgentSessionCapability` interface and both OpenCode and Claude adapters implement it; `getConversationSessionHistoryService()` routing helper exists in `AgentBackendRouting`. The context usage detail modal now routes through this helper with backend-aware message normalization. `getSession()` itself is still mostly foundation and not yet productized into a higher-level shared owner.
 - Backend-aware history normalization for non-OpenCode backends is currently best-effort foundation (`loadBackendSessionMessages()`); it is good enough for raw inspection surfaces, not yet a stable cross-backend history product contract.
+- `SettingsConversationSection` now uses backend-aware read routing for session list + preview reads, but the preview renderer still consumes OpenCode-shaped `SessionMessage` data. Treat the shared-session manager as a real shared read-surface migration, not as proof that backend-neutral preview rendering is already a stable finished contract.
 - Runtime smoke for Claude fork/resume-at is not yet recorded.
 - The `AgentBranchCapability` interface still requires ALL of fork/revert/unrevert/diff/getSessionRevertState; Claude only has fork. `AgentForkCapability` is the separate partial interface for fork-only backends.
 
@@ -260,6 +262,11 @@ Do not use `claudian` as evidence that Claude-specific semantics should be flatt
 At the current snapshot, local runtime evidence exists under `.obsidian-debug/`, especially:
 
 - `.obsidian-debug/session-history-productization-runtime.png`
+- `.obsidian-debug/session-history-settings-productization-runtime-2026-05-22.png`
+- `.obsidian-debug/session-history-settings-productization-runtime-assertion-2026-05-22.json`
+- `.obsidian-debug/session-history-settings-productization-dom-2026-05-22.html`
+- `.obsidian-debug/session-history-settings-productization-console-2026-05-22.txt`
+- `.obsidian-debug/session-history-settings-productization-errors-2026-05-22.txt`
 - `.obsidian-debug/claude-session-history-control-console.txt`
 - `.obsidian-debug/claude-session-history-control-errors.txt`
 - `.obsidian-debug/claude-session-history-control-runtime.png`
@@ -273,6 +280,7 @@ Treat those as local evidence for:
 - deployed build identity;
 - Test Vault reload success;
 - backend-aware session/history surface presence;
+- settings shared-session list/preview read routing presence in the conversation sharing block;
 - Claude `fork=true` + `branching=false` runtime gating;
 - hook and structured-output backend-event activity in runtime logs where the older capability-lab artifacts are still referenced.
 
@@ -282,7 +290,7 @@ Note: older capability-lab artifacts still matter for hook / structured-output p
 
 If you need one sentence:
 
-> OpenCodian's Claude Code SDK lane has passed Phase 1 backend viability, has meaningful Phase 2 wiring, and has begun Phase 3/4-style Claude-native capability integration through diagnostic-first surfaces. Session/history/control seams are now backend-aware where semantics match: fork routes through the registry layer, official-title polling and raw history inspection can route through backend-aware session owners, rewind/unrevert/diff remain gated as OpenCode-only, and session identity uses `getConversationBackendSessionId()` across the service layer. Several advanced capabilities (hooks, session store, structured output authoring) are intentionally runtime-proved without yet being stable product features.
+> OpenCodian's Claude Code SDK lane has passed Phase 1 backend viability, has meaningful Phase 2 wiring, and has begun Phase 3/4-style Claude-native capability integration through diagnostic-first surfaces. Session/history/control seams are now backend-aware where semantics match: fork routes through the registry layer, official-title polling, raw history inspection, and the settings shared-session read surfaces can route through backend-aware session owners, rewind/unrevert/diff remain gated as OpenCode-only, and session identity uses `getConversationBackendSessionId()` across the service layer. Several advanced capabilities (hooks, session store, structured output authoring) are intentionally runtime-proved without yet being stable product features.
 
 ## Recommended Next-Step Mindset
 
@@ -294,6 +302,12 @@ When continuing this lane, choose one of these modes explicitly:
 - improve multi-backend abstraction so future backends can expose their own native ecosystems cleanly.
 
 Do not mix these modes casually in one slice.
+
+For the current session/history lane, the next high-value slice is:
+
+- continue auditing session list/detail/history preview surfaces that still read directly from `openCodeService`;
+- migrate only the reads that have real shared semantics;
+- keep share writes, rewind, diff, authoritative sync, and child-session graph explicitly gated unless new official basis plus runtime proof says otherwise.
 
 ## Hard Guardrails
 
