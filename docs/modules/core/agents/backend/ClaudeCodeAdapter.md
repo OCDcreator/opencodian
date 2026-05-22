@@ -31,6 +31,8 @@
 - 对已经持久化到 OpenCodian conversation metadata 的 Claude SDK session id 进行轻量恢复，避免 Obsidian reload 后同一个 `backendSessionId` 因 adapter 内存 Map 清空而在发送前失败；恢复后的第一次 `query()` 会传入 `options.resume`
 - 通过 SDK facade 暴露 `listSessions()`、`getSession()`、`renameSession()` 与 `forkSession()` 的基础委托；fork 成功后以 SDK session id 建立新的本地 session state
 - 通过诊断级方法委托官方 SDK JSONL history/subagent transcript/sessionStore import 入口：`getSessionMessages()`、`listSubagents()`、`getSubagentMessages()` 和 `importSessionToStore()`；这些方法复用已捕获的 SDK session id 和 vault-scoped `dir`，当 SDK 不支持对应 API 或本地 session 已删除时显式报错，避免把缺能力或无效 session 误判为空历史
+- `listSessions()` 现在允许 runtime-only `sessionStore` / pagination 选项，Capability Lab 可以在本地 JSONL 与插件内存里的 diagnostic store 之间切换 session 列表来源
+- 提供 `runDiagnosticPrompt()`：用 runtime-only `hooks`、`sessionStore`、`outputFormat`、`includeHookEvents`、`persistSession` 覆盖启动一次隔离的诊断 query，返回原始 SDK 消息与经 `ClaudeCodeStreamNormalizer` 归一化后的 `StreamChunk[]`，专供 Capability Lab 做 structured output / hook / session-store runtime proof，不进入普通 chat path
 - 对活跃、checkpoint-enabled 的 SDK `Query` 暴露后端级 `rewindFiles(sessionId, userMessageId, { dryRun? })` 委托；当前没有接入稳定聊天按钮，调用方必须先完成 dry-run/确认设计
 - 通过 `createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel })` 写入摘要级诊断日志：`runtime` 覆盖 start/stop/dispose/status change、sendMessage、runtime create/reuse/close、SDK load/query creation、supportedModels、spawn command/exit/error；`sessions` 覆盖 create/delete/update/list/get/fork/rewind/restore；`mcp` 覆盖 MCP config load/reload。日志只记录 id、cwd、count、length、状态和错误摘要，不记录 prompt、tool input、secret 或完整 env
 
@@ -42,5 +44,7 @@
 - `spawnClaudeCodeProcess` 不要把 SDK 传入的 `signal` 继续传给 Node `spawn()` options；它需要手动监听 abort 并 kill 子进程，保持 Obsidian renderer 兼容。
 - 本地 handle 与 SDK `session_id` 是两层身份：首次发送前只有本地 handle，SDK 输出 `session_id` 后才把 conversation `backendSessionId` 收敛为真实可 resume 的 Claude session id；如果 reload 后传入的 `backendSessionId` 已经是 Claude SDK session id，adapter 会直接恢复 `sdkSessionId` 并 resume。
 - 持久 `Query` 关闭或 adapter reload 后，下一次发送会重新启动 SDK query，并在已捕获真实 SDK `session_id` 时继续通过 `resume` 恢复；OpenCodian 本地生成的 `claude-code-*` conversation handle 不会被误传给 SDK `resume`。JSONL message/subagent/sessionStore 方法当前只是后端 foundation，完整 history browser/import UI、hook/agent/skill authoring UI 和 stable rewind UI 仍属于后续 full-capability phase。
+- `runDiagnosticPrompt()` 属于 Capability Lab 的 runtime-only side channel：它可以选择 `persistSession: false` 做无痕诊断，也可以附带 `sessionStore` 做 mirror/import proof；无论哪种都不能修改稳定 chat runtime owner、settings 持久化或 user-facing capability gating。
+- 当 `runDiagnosticPrompt()` 附带 `sessionStore` 时，会显式关闭 `enableFileCheckpointing` runtime override；这是为了遵守官方 SDK 对该组合的限制，避免 sessionStore 诊断 probe 因 checkpoint blob 不镜像而直接失败。
 - Claude Code 目前不注册 `Hooks` / `Subagents` UI capability，避免误打开 OpenCode-only 子代理或 hooks surface；SDK hook/subagent 事件先以 diagnostic `backend_event` 进入发送调试链路。
 - crash recovery 当前只做错误 chunk；异常后的 prompt replay、冷启动 fallback 和多 view 并发同 session 仲裁属于后续 full-capability phase。

@@ -3,7 +3,7 @@
  * Capability Lab — diagnostic / experimental workbench for Claude Code SDK parity.
  *
  * All UI surfaces in this file are intentionally:
- *   - Read-only or dry-run only
+ *   - Read-only, dry-run, or isolated diagnostic-store writes only
  *   - Labelled ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE
  *   - NOT connected to stable settings persistence
  *
@@ -40,6 +40,72 @@ interface MatrixRow {
   userSurface: 'settings' | 'diagnostic' | 'hidden';
 }
 
+interface CapabilityLabSessionStoreEntry {
+  type: string;
+  uuid?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+interface CapabilityLabSessionStoreKey {
+  projectKey: string;
+  sessionId: string;
+  subpath?: string;
+}
+
+interface CapabilityLabPluginState {
+  sessionStore: CapabilityLabSessionStore;
+}
+
+class CapabilityLabSessionStore {
+  private readonly entries = new Map<string, CapabilityLabSessionStoreEntry[]>();
+  private readonly mtimes = new Map<string, number>();
+
+  private toEntryKey(key: CapabilityLabSessionStoreKey): string {
+    return `${key.projectKey}::${key.sessionId}::${key.subpath ?? ''}`;
+  }
+
+  private toSessionKey(projectKey: string, sessionId: string): string {
+    return `${projectKey}::${sessionId}`;
+  }
+
+  async append(
+    key: CapabilityLabSessionStoreKey,
+    newEntries: CapabilityLabSessionStoreEntry[],
+  ): Promise<void> {
+    const entryKey = this.toEntryKey(key);
+    const existing = this.entries.get(entryKey) ?? [];
+    existing.push(...newEntries.map((entry) => ({ ...entry })));
+    this.entries.set(entryKey, existing);
+    this.mtimes.set(this.toSessionKey(key.projectKey, key.sessionId), Date.now());
+  }
+
+  async load(key: CapabilityLabSessionStoreKey): Promise<CapabilityLabSessionStoreEntry[] | null> {
+    const existing = this.entries.get(this.toEntryKey(key));
+    return existing ? existing.map((entry) => ({ ...entry })) : null;
+  }
+
+  async listSessions(projectKey: string): Promise<Array<{ sessionId: string; mtime: number }>> {
+    const prefix = `${projectKey}::`;
+    return Array.from(this.mtimes.entries())
+      .filter(([sessionKey]) => sessionKey.startsWith(prefix))
+      .map(([sessionKey, mtime]) => ({
+        sessionId: sessionKey.slice(prefix.length),
+        mtime,
+      }));
+  }
+
+  async listSubkeys(key: { projectKey: string; sessionId: string }): Promise<string[]> {
+    const prefix = `${key.projectKey}::${key.sessionId}::`;
+    return Array.from(this.entries.keys())
+      .filter((entryKey) => entryKey.startsWith(prefix))
+      .map((entryKey) => entryKey.slice(prefix.length))
+      .filter((subpath) => subpath.length > 0);
+  }
+}
+
+const capabilityLabStateByPlugin = new WeakMap<OpenCodianPlugin, CapabilityLabPluginState>();
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -53,6 +119,17 @@ function getClaudeCodeAdapter(plugin: OpenCodianPlugin): ClaudeCodeAdapter | nul
   return adapter as unknown as ClaudeCodeAdapter;
 }
 
+function getCapabilityLabState(plugin: OpenCodianPlugin): CapabilityLabPluginState {
+  let state = capabilityLabStateByPlugin.get(plugin);
+  if (!state) {
+    state = {
+      sessionStore: new CapabilityLabSessionStore(),
+    };
+    capabilityLabStateByPlugin.set(plugin, state);
+  }
+  return state;
+}
+
 function experimentalBanner(containerEl: HTMLElement): void {
   const banner = containerEl.createDiv({
     cls: 'opencodian-capability-lab-banner',
@@ -62,7 +139,7 @@ function experimentalBanner(containerEl: HTMLElement): void {
   banner.createEl('br');
   banner.createSpan({
     text: 'This panel exposes unverified SDK capabilities for diagnostic inspection only. ' +
-      'Nothing here changes plugin behavior or persists settings. Do not rely on these features.',
+      'Some probes may mirror data into an isolated diagnostic store, but nothing here changes stable plugin behavior or persists settings. Do not rely on these features.',
   });
 }
 
@@ -75,7 +152,7 @@ function createDiagnosticSummary(containerEl: HTMLElement): void {
   const items = [
     ['Boundary', 'Diagnostic only'],
     ['Runtime proof', 'Per-action, not persisted'],
-    ['Writes', 'Read-only or dry-run'],
+    ['Writes', 'Isolated diagnostic only'],
   ] as const;
 
   for (const [label, value] of items) {
@@ -116,6 +193,78 @@ function formatJsonPreview(obj: unknown): string {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+function readMessagePreview(message: unknown): { label: string; preview: string; id?: string } {
+  if (typeof message !== 'object' || message === null || Array.isArray(message)) {
+    return {
+      label: 'entry',
+      preview: truncate(String(message), 160),
+    };
+  }
+  const record = message as {
+    type?: unknown;
+    uuid?: unknown;
+    id?: unknown;
+    role?: unknown;
+    content?: unknown;
+    text?: unknown;
+    result?: unknown;
+    summary?: unknown;
+  };
+  const previewParts = [
+    record.content,
+    record.text,
+    record.result,
+    record.summary,
+  ].filter((value) => value !== undefined);
+  const preview = truncate(
+    previewParts.length > 0 ? formatJsonPreview(previewParts[0]).replace(/\s+/g, ' ').trim() : formatJsonPreview(record),
+    220,
+  );
+  const labelCandidate = [record.type, record.role].find((value) => typeof value === 'string' && value.trim().length > 0);
+  const idCandidate = [record.uuid, record.id].find((value) => typeof value === 'string' && value.trim().length > 0);
+  return {
+    label: typeof labelCandidate === 'string' ? labelCandidate : 'entry',
+    preview,
+    id: typeof idCandidate === 'string' ? idCandidate : undefined,
+  };
+}
+
+function renderMessagePreviewList(
+  outputEl: HTMLElement,
+  heading: string,
+  messages: unknown[],
+): void {
+  outputEl.createEl('h5', { text: heading });
+  const previewList = outputEl.createDiv({
+    cls: 'opencodian-capability-lab-preview-list',
+    attr: { 'data-diagnostic': 'true' },
+  });
+  for (const message of messages.slice(0, 12)) {
+    const { label, preview, id } = readMessagePreview(message);
+    const row = previewList.createDiv({ cls: 'opencodian-capability-lab-preview-row' });
+    row.createSpan({
+      cls: 'opencodian-capability-lab-chip opencodian-capability-lab-chip-active',
+      text: label,
+    });
+    if (id) {
+      row.createSpan({
+        cls: 'opencodian-capability-lab-preview-meta',
+        text: truncate(id, 18),
+      });
+    }
+    row.createSpan({
+      cls: 'opencodian-capability-lab-preview-text',
+      text: preview,
+    });
+  }
+  if (messages.length > 12) {
+    outputEl.createEl('p', {
+      cls: 'opencodian-capability-lab-hint',
+      text: `Showing the first 12 of ${messages.length} entries.`,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -355,16 +504,38 @@ export class SettingsCapabilityLabSection {
       return;
     }
 
-    // Session selector
+    const state = getCapabilityLabState(this.plugin);
     const controlsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+    const sourceSelect = controlsEl.createEl('select', {
+      cls: 'opencodian-capability-lab-select',
+      attr: {
+        'data-diagnostic': 'true',
+        'data-diagnostic-source': 'history',
+      },
+    });
+    sourceSelect.createEl('option', { text: 'Local JSONL', attr: { value: 'local' } });
+    sourceSelect.createEl('option', { text: 'Diagnostic Store', attr: { value: 'store' } });
     const sessionSelect = controlsEl.createEl('select', {
       cls: 'opencodian-capability-lab-select',
-      attr: { 'data-diagnostic': 'true' },
+      attr: {
+        'data-diagnostic': 'true',
+        'data-diagnostic-session-select': 'history',
+      },
     });
-    sessionSelect.createEl('option', { text: '— Select a session —', value: '' });
+    sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
 
     const refreshBtn = controlsEl.createEl('button', {
       text: 'Refresh Sessions',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const importBtn = controlsEl.createEl('button', {
+      text: 'Import Selected Session',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const mirrorBtn = controlsEl.createEl('button', {
+      text: 'Run Store Mirror Probe',
       cls: 'opencodian-capability-lab-button',
       attr: { 'data-diagnostic': 'true' },
     });
@@ -378,17 +549,23 @@ export class SettingsCapabilityLabSection {
     const loadSessions = async (): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
-        sessionSelect.createEl('option', { text: '— Select a session —', value: '' });
-        const sessions = await adapter.listSessions();
+        sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
+        const useStore = sourceSelect.value === 'store';
+        const sessions = await adapter.listSessions(
+          useStore ? { sessionStore: state.sessionStore } : undefined,
+        );
         for (const session of sessions) {
           const opt = sessionSelect.createEl('option', {
-            value: session.sessionId,
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
+            attr: { value: session.sessionId },
           });
+          opt.value = session.sessionId;
           opt.title = `Session: ${session.sessionId}\nSummary: ${session.summary}\nModified: ${new Date(session.lastModified).toISOString()}`;
         }
         outputEl.empty();
-        outputEl.createEl('p', { text: `Loaded ${sessions.length} sessions.` });
+        outputEl.createEl('p', {
+          text: `Loaded ${sessions.length} ${useStore ? 'store' : 'local'} session(s).`,
+        });
       } catch (err) {
         outputEl.empty();
         outputEl.createEl('p', {
@@ -399,6 +576,28 @@ export class SettingsCapabilityLabSection {
     };
 
     refreshBtn.addEventListener('click', () => { void loadSessions(); });
+    sourceSelect.addEventListener('change', () => { void loadSessions(); });
+    importBtn.addEventListener('click', () => {
+      const firstAvailableSessionId = Array.from(sessionSelect.options).find((option) => (
+        option.value.length > 0 && !option.text.startsWith('—')
+      ))?.value;
+      const sessionId = sessionSelect.value || firstAvailableSessionId || '';
+      if (!sessionId) {
+        new Notice('Select a local session to import first.');
+        return;
+      }
+      void this.importHistorySession(adapter, sessionId, state.sessionStore, outputEl);
+    });
+    mirrorBtn.addEventListener('click', () => {
+      void this.runHistoryStoreMirrorProbe({
+        adapter,
+        sessionStore: state.sessionStore,
+        sourceSelect,
+        sessionSelect,
+        outputEl,
+        reloadSessions: loadSessions,
+      });
+    });
 
     // Load messages on selection
     sessionSelect.addEventListener('change', () => {
@@ -407,7 +606,12 @@ export class SettingsCapabilityLabSection {
         outputEl.empty();
         return;
       }
-      void this.loadSessionMessages(adapter, sessionId, outputEl);
+      void this.loadSessionMessages(
+        adapter,
+        sessionId,
+        outputEl,
+        sourceSelect.value === 'store' ? state.sessionStore : undefined,
+      );
     });
 
     // Auto-load on first render
@@ -418,6 +622,7 @@ export class SettingsCapabilityLabSection {
     adapter: ClaudeCodeAdapter,
     sessionId: string,
     outputEl: HTMLElement,
+    sessionStore?: unknown,
   ): Promise<void> {
     outputEl.empty();
     outputEl.createEl('p', { text: 'Loading messages…' });
@@ -426,18 +631,20 @@ export class SettingsCapabilityLabSection {
       const messages = await adapter.getSessionMessages(sessionId, {
         limit: 50,
         includeSystemMessages: false,
+        ...(sessionStore ? { sessionStore } : {}),
       });
 
       outputEl.empty();
-      outputEl.createEl('h5', {
-        text: `Session ${sessionId.slice(0, 12)}… — ${messages.length} messages (max 50)`,
-      });
-
       if (messages.length === 0) {
         outputEl.createEl('p', { text: 'No messages found.' });
         return;
       }
 
+      renderMessagePreviewList(
+        outputEl,
+        `Session ${sessionId.slice(0, 12)}… — ${messages.length} message(s)`,
+        messages,
+      );
       outputEl.createEl('pre', {
         cls: 'opencodian-capability-lab-json-preview',
         text: truncate(formatJsonPreview(messages), 8000),
@@ -453,6 +660,78 @@ export class SettingsCapabilityLabSection {
         text: `Error: ${msg}`,
       });
       this.updateRuntimeProof('JSONL History Browser', 'fail', outputEl);
+    }
+  }
+
+  private async importHistorySession(
+    adapter: ClaudeCodeAdapter,
+    sessionId: string,
+    sessionStore: CapabilityLabSessionStore,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Importing local session into the diagnostic store…' });
+    try {
+      await adapter.importSessionToStore(sessionId, sessionStore, {
+        includeSubagents: true,
+        batchSize: 250,
+      });
+      outputEl.empty();
+      outputEl.createEl('p', {
+        text: `Imported ${sessionId.slice(0, 12)}… into the diagnostic session store.`,
+      });
+      this.updateRuntimeProof('Session Store', 'pass', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Import failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Session Store', 'fail', outputEl);
+    }
+  }
+
+  private async runHistoryStoreMirrorProbe({
+    adapter,
+    sessionStore,
+    sourceSelect,
+    sessionSelect,
+    outputEl,
+    reloadSessions,
+  }: {
+    adapter: ClaudeCodeAdapter;
+    sessionStore: CapabilityLabSessionStore;
+    sourceSelect: HTMLSelectElement;
+    sessionSelect: HTMLSelectElement;
+    outputEl: HTMLElement;
+    reloadSessions: () => Promise<void>;
+  }): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running a diagnostic mirror probe into the session store…' });
+    try {
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Reply with a brief confirmation that the diagnostic session-store mirror probe is active.',
+        sessionStore,
+        sessionStoreFlush: 'eager',
+        includeHookEvents: true,
+      });
+      sourceSelect.value = 'store';
+      await reloadSessions();
+      if (result.sessionId) {
+        sessionSelect.value = result.sessionId;
+      }
+      outputEl.empty();
+      outputEl.createEl('p', {
+        text: `Mirrored session ${result.sessionId?.slice(0, 12) ?? 'unknown'}… into the diagnostic store.`,
+      });
+      this.updateRuntimeProof('Session Store', 'pass', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Mirror probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Session Store', 'fail', outputEl);
     }
   }
 
@@ -482,7 +761,7 @@ export class SettingsCapabilityLabSection {
       cls: 'opencodian-capability-lab-select',
       attr: { 'data-diagnostic': 'true' },
     });
-    sessionSelect.createEl('option', { text: '— Select a session —', value: '' });
+    sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
 
     const refreshBtn = controlsEl.createEl('button', {
       text: 'Refresh Sessions',
@@ -509,13 +788,14 @@ export class SettingsCapabilityLabSection {
     const loadSessions = async (): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
-        sessionSelect.createEl('option', { text: '— Select a session —', value: '' });
+        sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const sessions = await adapter.listSessions();
         for (const session of sessions) {
-          sessionSelect.createEl('option', {
-            value: session.sessionId,
+          const option = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
+            attr: { value: session.sessionId },
           });
+          option.value = session.sessionId;
         }
         subagentListEl.empty();
         subagentOutputEl.empty();
@@ -650,7 +930,7 @@ export class SettingsCapabilityLabSection {
       cls: 'opencodian-capability-lab-select',
       attr: { 'data-diagnostic': 'true' },
     });
-    sessionSelect.createEl('option', { text: '— Select a session —', value: '' });
+    sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
 
     const msgInput = controlsEl.createEl('input', {
       cls: 'opencodian-capability-lab-input',
@@ -677,13 +957,14 @@ export class SettingsCapabilityLabSection {
     const loadSessions = async (): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
-        sessionSelect.createEl('option', { text: '— Select a session —', value: '' });
+        sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const sessions = await adapter.listSessions();
         for (const session of sessions) {
-          sessionSelect.createEl('option', {
-            value: session.sessionId,
+          const option = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
+            attr: { value: session.sessionId },
           });
+          option.value = session.sessionId;
         }
       } catch (err) {
         outputEl.createEl('p', {
@@ -778,9 +1059,8 @@ export class SettingsCapabilityLabSection {
         'runtime via adapter options, not through user-facing settings.',
     });
 
-    // Attempt to probe structured output from recent messages
     const probeBtn = containerEl.createEl('button', {
-      text: '🔍 Probe Recent Session for Structured Data',
+      text: 'Run Structured Output Probe',
       cls: 'opencodian-capability-lab-button',
       attr: { 'data-diagnostic': 'true' },
     });
@@ -791,59 +1071,77 @@ export class SettingsCapabilityLabSection {
     });
 
     probeBtn.addEventListener('click', () => {
-      void this.probeStructuredOutput(adapter, outputEl);
+      void this.runStructuredOutputProbe(adapter, outputEl);
     });
   }
 
-  private async probeStructuredOutput(
+  private async runStructuredOutputProbe(
     adapter: ClaudeCodeAdapter,
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Probing recent sessions for structured output data…' });
+    outputEl.createEl('p', { text: 'Running a runtime-only structured output diagnostic…' });
 
     try {
-      const sessions = await adapter.listSessions();
-      if (sessions.length === 0) {
-        outputEl.createEl('p', { text: 'No sessions found.' });
-        return;
-      }
-
-      // Check the most recent session
-      const recent = sessions[0];
-      const messages = await adapter.getSessionMessages(recent.sessionId, { limit: 20 });
+      const schema = {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+          surface: { type: 'string' },
+        },
+        required: ['status', 'surface'],
+      };
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Return structured output with status="ok" and surface="diagnostic".',
+        outputFormat: {
+          type: 'json_schema',
+          schema,
+        },
+        includeHookEvents: true,
+        persistSession: false,
+      });
+      const structuredChunk = result.chunks.find((chunk) => (
+        chunk.type === 'backend_event' && chunk.event === 'structured_output'
+      ));
 
       outputEl.empty();
       outputEl.createEl('h5', {
-        text: `Probed ${recent.sessionId.slice(0, 12)}… (${messages.length} messages)`,
+        text: `Structured output diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
       });
-
-      // Look for any structured content in messages
-      const structuredCount = messages.filter((msg: unknown) => {
-        const m = msg as Record<string, unknown>;
-        return m.structured_output !== undefined || m.structuredOutput !== undefined;
-      }).length;
-
-      if (structuredCount > 0) {
+      if (result.sessionId) {
         outputEl.createEl('p', {
-          text: `Found ${structuredCount} message(s) with structured output data.`,
-        });
-      } else {
-        outputEl.createEl('p', {
-          text: 'No structured output data found in recent messages. ' +
-            'This may indicate structured output was not requested, ' +
-            'or that structured output data is carried in backend_event chunks ' +
-            'which are not persisted in the JSONL history.',
+          cls: 'opencodian-capability-lab-hint',
+          text: `Session ID: ${result.sessionId}`,
         });
       }
+      if (structuredChunk && structuredChunk.type === 'backend_event') {
+        outputEl.createEl('p', {
+          text: 'Structured output was captured from the backend_event diagnostic channel.',
+        });
+        outputEl.createEl('pre', {
+          cls: 'opencodian-capability-lab-json-preview',
+          text: structuredChunk.content ?? formatJsonPreview(structuredChunk.metadata),
+        });
+        this.updateRuntimeProof('Structured Output', 'pass', outputEl);
+        return;
+      }
 
-      this.updateRuntimeProof('Structured Output', structuredCount > 0 ? 'pass' : 'untested', outputEl);
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'The diagnostic run completed, but no structured_output backend_event was captured.',
+      });
+      outputEl.createEl('pre', {
+        cls: 'opencodian-capability-lab-json-preview',
+        text: truncate(formatJsonPreview(result.rawMessages), 8000),
+      });
+      this.updateRuntimeProof('Structured Output', 'fail', outputEl);
     } catch (err) {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
         text: `Error: ${err instanceof Error ? err.message : String(err)}`,
       });
+      this.updateRuntimeProof('Structured Output', 'fail', outputEl);
     }
   }
 
@@ -892,6 +1190,22 @@ export class SettingsCapabilityLabSection {
     // Import/Delete/Restore
     this.addDiscoveryRow(tbody, 'Import/Delete/Restore', false, 'Adapter methods exist but no UI. Deliberately not exposed in this lab (read-only focus).');
 
+    if (adapter) {
+      const proofControls = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+      const hookProofBtn = proofControls.createEl('button', {
+        text: 'Run Hook Proof',
+        cls: 'opencodian-capability-lab-button',
+        attr: { 'data-diagnostic': 'true' },
+      });
+      const hookOutputEl = containerEl.createDiv({
+        cls: 'opencodian-capability-lab-output',
+        attr: { 'data-diagnostic': 'true' },
+      });
+      hookProofBtn.addEventListener('click', () => {
+        void this.runHookProof(adapter, hookOutputEl);
+      });
+    }
+
     // Show adapter declared capabilities
     if (caps) {
       containerEl.createEl('h5', { text: 'Declared Backend Capabilities:' });
@@ -925,6 +1239,74 @@ export class SettingsCapabilityLabSection {
       text: hasStableUI ? 'Exposed' : 'Discovery Only',
     });
     tr.createEl('td', { text: notes });
+  }
+
+  private async runHookProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running a SessionStart hook proof…' });
+    try {
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Reply with the words hook proof.',
+        hooks: {
+          SessionStart: [{
+            hooks: [async () => ({
+              continue: true,
+              hookSpecificOutput: {
+                hookEventName: 'SessionStart',
+                additionalContext: 'Capability Lab SessionStart proof',
+              },
+            })],
+          }],
+        },
+        includeHookEvents: true,
+        persistSession: false,
+      });
+      const hookChunk = result.chunks.find((chunk) => (
+        chunk.type === 'backend_event'
+        && chunk.event === 'hook'
+        && chunk.metadata?.hookEvent === 'SessionStart'
+      ));
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `Hook diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
+      });
+      if (result.sessionId) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Session ID: ${result.sessionId}`,
+        });
+      }
+      if (hookChunk && hookChunk.type === 'backend_event') {
+        outputEl.createEl('p', {
+          text: 'SessionStart hook events were captured from the diagnostic backend_event stream.',
+        });
+        outputEl.createEl('pre', {
+          cls: 'opencodian-capability-lab-json-preview',
+          text: truncate(formatJsonPreview(hookChunk), 4000),
+        });
+        this.updateRuntimeProof('Hooks', 'pass', outputEl);
+        return;
+      }
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'The diagnostic run completed, but no SessionStart hook event was captured.',
+      });
+      outputEl.createEl('pre', {
+        cls: 'opencodian-capability-lab-json-preview',
+        text: truncate(formatJsonPreview(result.rawMessages), 8000),
+      });
+      this.updateRuntimeProof('Hooks', 'fail', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Hook proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Hooks', 'fail', outputEl);
+    }
   }
 
   // =======================================================================

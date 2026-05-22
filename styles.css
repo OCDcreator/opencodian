@@ -8947,6 +8947,38 @@ img.opencodian-model-provider-header-icon {
   word-break: break-word;
 }
 
+.opencodian-settings .opencodian-capability-lab-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-settings .opencodian-capability-lab-preview-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: color-mix(in srgb, var(--background-primary) 88%, var(--background-secondary));
+}
+
+.opencodian-settings .opencodian-capability-lab-preview-meta {
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-capability-lab-preview-text {
+  min-width: 0;
+  color: var(--text-normal);
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .opencodian-settings .opencodian-capability-lab-error {
   color: var(--opencodian-status-error);
 }
@@ -8996,6 +9028,10 @@ img.opencodian-model-provider-header-icon {
   .opencodian-settings .opencodian-capability-lab-select,
   .opencodian-settings .opencodian-capability-lab-button {
     width: 100%;
+  }
+
+  .opencodian-settings .opencodian-capability-lab-preview-row {
+    grid-template-columns: 1fr;
   }
 }
 

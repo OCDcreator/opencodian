@@ -19,6 +19,13 @@ function createHeadingStub(): jest.Mock {
   });
 }
 
+async function flushUi(): Promise<void> {
+  for (let index = 0; index < 5; index += 1) {
+    await Promise.resolve();
+  }
+}
+
+// eslint-disable-next-line max-lines-per-function -- Capability Lab DOM coverage intentionally exercises one dense diagnostic surface end to end.
 describe('SettingsCapabilityLabSection', () => {
   beforeEach(() => {
     setLocale('en');
@@ -93,7 +100,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(summary).toBeTruthy();
     expect(summary!.getAttribute('data-diagnostic')).toBe('true');
     expect(summary!.textContent).toContain('Diagnostic only');
-    expect(summary!.textContent).toContain('Read-only or dry-run');
+    expect(summary!.textContent).toContain('Isolated diagnostic only');
   });
 
   it('shows unavailable message when adapter is not present', () => {
@@ -234,5 +241,174 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('settings');
     expect(surfaces).toContain('diagnostic');
     expect(surfaces).toContain('hidden');
+  });
+
+  it('runs the structured output diagnostic probe through the adapter runtime', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-structured-1',
+        rawMessages: [],
+        chunks: [{
+          type: 'backend_event',
+          source: 'claude-code',
+          event: 'structured_output',
+          status: 'received',
+          content: '{"status":"ok"}',
+          metadata: {
+            structuredOutput: { status: 'ok' },
+          },
+        }],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Structured Output Probe')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      includeHookEvents: true,
+      persistSession: false,
+      outputFormat: expect.objectContaining({
+        type: 'json_schema',
+      }),
+    }));
+    expect(containerEl.textContent).toContain('diag-structured-1');
+    expect(containerEl.textContent).toContain('"status":"ok"');
+  });
+
+  it('runs the SessionStart hook proof from the discovery panel', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-hook-1',
+        rawMessages: [],
+        chunks: [{
+          type: 'backend_event',
+          source: 'claude-code',
+          event: 'hook',
+          status: 'response',
+          id: 'hook-1',
+          name: 'capability-lab-session-start',
+          content: 'hook ok',
+          metadata: {
+            hookEvent: 'SessionStart',
+          },
+          sessionId: 'diag-hook-1',
+        }],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Hook Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      includeHookEvents: true,
+      hooks: expect.objectContaining({
+        SessionStart: expect.any(Array),
+      }),
+      persistSession: false,
+    }));
+    expect(containerEl.textContent).toContain('SessionStart');
+    expect(containerEl.textContent).toContain('diag-hook-1');
+  });
+
+  it('renders session store controls and imports the selected session into the diagnostic store', async () => {
+    const listSessions = jest.fn().mockImplementation((options?: { sessionStore?: unknown }) => {
+      if (options?.sessionStore) {
+        return Promise.resolve([{
+          sessionId: 'store-session-1',
+          summary: 'Mirrored store session',
+          lastModified: 2,
+        }]);
+      }
+      return Promise.resolve([{
+        sessionId: 'local-session-1',
+        summary: 'Local session',
+        lastModified: 1,
+      }]);
+    });
+    const adapter = {
+      listSessions,
+      getSessionMessages: jest.fn().mockResolvedValue([]),
+      importSessionToStore: jest.fn().mockResolvedValue(undefined),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'store-session-1',
+        rawMessages: [],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const historyBlock = containerEl.querySelector('[data-section-block="history"]') as HTMLElement | null;
+    const sourceSelect = containerEl.querySelector('[data-diagnostic-source="history"]') as HTMLSelectElement | null;
+    const sessionSelect = containerEl.querySelector('[data-diagnostic-session-select="history"]') as HTMLSelectElement | null;
+    const refreshButton = Array.from(historyBlock?.querySelectorAll('button') ?? []).find((el) => (
+      el.textContent?.includes('Refresh Sessions')
+    )) as HTMLButtonElement | undefined;
+    const importButton = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Import Selected Session')
+    )) as HTMLButtonElement | undefined;
+    const mirrorButton = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Store Mirror Probe')
+    )) as HTMLButtonElement | undefined;
+
+    expect(sourceSelect).toBeTruthy();
+    expect(importButton).toBeTruthy();
+    expect(mirrorButton).toBeTruthy();
+    expect(sessionSelect).toBeTruthy();
+    expect(refreshButton).toBeTruthy();
+
+    refreshButton!.click();
+    await flushUi();
+
+    sessionSelect!.value = 'local-session-1';
+    importButton!.click();
+    await flushUi();
+
+    expect(adapter.importSessionToStore).toHaveBeenCalledWith(
+      'local-session-1',
+      expect.any(Object),
+      expect.objectContaining({
+        includeSubagents: true,
+      }),
+    );
+
+    mirrorButton!.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      sessionStore: expect.any(Object),
+      sessionStoreFlush: 'eager',
+    }));
   });
 });

@@ -5,20 +5,20 @@
 
 ## 概述
 
-`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供六个只读诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。
+`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供六个诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。大多数交互仍是只读或 dry-run；新增的 sessionStore proof 只会写入插件内存里的 diagnostic store，不会改稳定设置或普通 chat UI。
 
-设计原则：不把未验证能力包装成稳定 UI。所有交互都是只读或 dry-run，不提供导入/删除/恢复按钮。
+设计原则：不把未验证能力包装成稳定 UI。允许最小的 diagnostic-only runtime proof，但不能把 hooks / structured output / sessionStore 伪装成 stable/completed。
 
 ## 诊断面板
 
 | 面板 | 功能 | 数据来源 |
 |------|------|----------|
 | Capability Matrix | 静态 SDK 能力对等矩阵 | 代码检查 + `getClaudeCodeAdapter()` |
-| JSONL History Browser | 浏览会话消息历史 | `adapter.getSessionMessages()` |
+| JSONL History Browser | 浏览本地 JSONL 或 diagnostic store 会话历史，支持 import / mirror proof | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` / `runDiagnosticPrompt()` |
 | Subagent Browser | 列出/检查子代理转录 | `adapter.listSubagents()` / `getSubagentMessages()` |
 | Rewind Dry-Run Preview | 预览文件检查点回退（不执行） | `adapter.rewindFiles(dryRun: true)` |
-| Structured Output Playground | 探测结构化输出数据 | `adapter.getSessionMessages()` 检查 structured_output |
-| Discovery & Status | hooks/plugins/skills/agents 状态概览 | `hasCapability()` + adapter.capabilities |
+| Structured Output Playground | 启动 runtime-only outputFormat probe 并展示 `backend_event` | `adapter.runDiagnosticPrompt()` |
+| Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
 
 ## 依赖注入
 
@@ -36,6 +36,10 @@
 ### Runtime Proof 更新
 
 `updateRuntimeProof()` 在诊断面板执行后更新页面内嵌标记。不跨标签持久化——矩阵行是静态的，运行时证明反馈只在浏览器区域展示。
+
+### Diagnostic Session Store
+
+文件内部持有一个 plugin-scoped `CapabilityLabSessionStore`，实现 SDK `SessionStore` 所需的 `append` / `load` / `listSessions` / `listSubkeys`，用于 Capability Lab 的 mirror/import/list/load proof。它是内存态、plugin-owned 的诊断 adapter，不是稳定数据层。
 
 ### Adapter 获取
 
@@ -79,13 +83,14 @@
 - `.opencodian-capability-lab-chip` — 状态芯片
 - `.opencodian-capability-lab-controls` — 控件容器
 - `.opencodian-capability-lab-output` — 输出区域
+- `.opencodian-capability-lab-preview-list` / `.opencodian-capability-lab-preview-row` — 只读消息预览列表，避免 history browser 退化成整块 JSON 墙
 - `.opencodian-capability-lab-error` — 错误提示
 - `.opencodian-capability-lab-proof-marker` — 运行时证明标记
 
 ## 注意事项
 
-- 此面板不提供任何写入操作（导入、删除、恢复按钮均故意省略）
+- sessionStore import / mirror proof 会写入隔离的 diagnostic store；这不属于稳定插件状态，也不等于开放正式 import/restore UI
 - `buildMatrixRows()` 的评估基于代码检查，不是运行时探测
-- Structured Output 面板说明 `backend_event` chunks 当前在 OpenCodianView 的 chunk 转换管道中被丢弃
+- Structured Output 与 Hooks proof 都通过 `runDiagnosticPrompt()` 直接观察 backend_event；普通 `OpenCodianView` 仍不会把这些事件渲染进稳定 transcript
 - Discovery 面板使用 `hasCapability()` 检查 adapter 声明的能力
 - 文件使用 `eslint-disable max-lines` 注释，因为六个诊断面板共享同一诊断边界

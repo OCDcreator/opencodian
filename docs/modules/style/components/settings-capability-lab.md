@@ -5,7 +5,7 @@
 
 ## 职责
 
-定义 Debug > Capability Lab 诊断页的局部样式。该文件只负责实验能力面板的视觉层级、能力矩阵、诊断摘要、状态芯片、只读输出和 dry-run 控件，不承担通用 settings layout token 的定义。
+定义 Debug > Capability Lab 诊断页的局部样式。该文件只负责实验能力面板的视觉层级、能力矩阵、诊断摘要、状态芯片、只读输出、sessionStore/structured-output/hooks runtime proof 控件，以及只读消息预览列表，不承担通用 settings layout token 的定义。
 
 ## 关键类名
 
@@ -15,6 +15,7 @@
 - `.opencodian-capability-lab-matrix`: 能力矩阵表格，最后一列为 `User Surface`，以 `Settings` / `Diagnostic` / `Hidden` 区分用户可见程度。
 - `.opencodian-capability-lab-chip`: SDK、adapter、runtime proof、surface 等状态芯片的共享基线。
 - `.opencodian-capability-lab-output`, `.opencodian-capability-lab-status`, `.opencodian-capability-lab-subagent-list`: 诊断输出和只读列表 surface。
+- `.opencodian-capability-lab-preview-list`, `.opencodian-capability-lab-preview-row`, `.opencodian-capability-lab-preview-meta`, `.opencodian-capability-lab-preview-text`: history browser 的紧凑消息预览行，避免 Capability Lab 退化成整块 JSON dump。
 - `.opencodian-capability-lab-json-preview`: JSONL / runtime proof 预览区，使用 monospace、内部滚动和自动换行。
 
 ## 设计约束
@@ -22,6 +23,7 @@
 - 复用 `settings-layout-contract.css` 提供的 `--opencodian-settings-*` token，不重新定义设置页全局半径、边框、背景或间距。
 - 视觉必须保持 Obsidian-native、dense but not crowded；不使用营销式 hero、重 dashboard 卡片、渐变文字或装饰性玻璃。
 - `Diagnostic`、`Hidden`、`Untested` 等状态不能被弱化成完成态；未验证能力不得通过样式看起来像稳定功能。
+- sessionStore import / mirror proof 虽然是诊断性写入，但视觉上仍必须强调它们是 isolated diagnostic actions，而不是 stable restore/import UI。
 - 横向滚动只用于矩阵和发现表，其他控件在窄屏换行或占满宽度。
 
 ## 修改注意点

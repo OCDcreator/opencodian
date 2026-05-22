@@ -618,6 +618,161 @@ describe('ClaudeCodeAdapter', () => {
     });
   });
 
+  it('can list sessions from a diagnostic sessionStore source', async () => {
+    const sdk = createSdk([]);
+    sdk.listSessions.mockResolvedValue([{
+      sessionId: 'store-session-1',
+      summary: 'Mirrored diagnostic session',
+      lastModified: 456,
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionStore = {
+      append: jest.fn(),
+      load: jest.fn(),
+      listSessions: jest.fn(),
+    };
+
+    await expect(adapter.listSessions({
+      limit: 5,
+      offset: 1,
+      sessionStore,
+    })).resolves.toEqual([{
+      sessionId: 'store-session-1',
+      summary: 'Mirrored diagnostic session',
+      lastModified: 456,
+    }]);
+
+    expect(sdk.listSessions).toHaveBeenCalledWith({
+      dir: '/vault',
+      limit: 5,
+      offset: 1,
+      sessionStore,
+    });
+  });
+
+  it('runs diagnostic queries with runtime-only structured output and hook overrides', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'hook_response',
+      hook_id: 'hook-1',
+      hook_name: 'capability-lab-session-start',
+      hook_event: 'SessionStart',
+      output: 'hook ok',
+      stdout: 'hook stdout',
+      stderr: '',
+      exit_code: 0,
+      outcome: 'success',
+      session_id: 'diag-session-1',
+    }, {
+      type: 'result',
+      subtype: 'success',
+      session_id: 'diag-session-1',
+      structured_output: { status: 'ok' },
+      total_usage: { input_tokens: 1, output_tokens: 2 },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const hooks = {
+      SessionStart: [{
+        hooks: [jest.fn().mockResolvedValue({
+          continue: true,
+          hookSpecificOutput: {
+            hookEventName: 'SessionStart',
+            additionalContext: 'Capability Lab hook proof',
+          },
+        })],
+      }],
+    };
+    const outputFormat = {
+      type: 'json_schema',
+      schema: {
+        type: 'object',
+        properties: { status: { type: 'string' } },
+        required: ['status'],
+      },
+    };
+
+    const result = await adapter.runDiagnosticPrompt({
+      prompt: 'Return status ok.',
+      hooks,
+      outputFormat,
+      includeHookEvents: true,
+      persistSession: false,
+    });
+
+    expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'Return status ok.',
+      options: expect.objectContaining({
+        hooks,
+        outputFormat,
+        includeHookEvents: true,
+        persistSession: false,
+      }),
+    }));
+    expect(result.sessionId).toBe('diag-session-1');
+    expect(result.rawMessages).toHaveLength(2);
+    expect(result.chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'backend_event',
+        event: 'hook',
+        status: 'response',
+        name: 'capability-lab-session-start',
+      }),
+      expect.objectContaining({
+        type: 'backend_event',
+        event: 'structured_output',
+        status: 'received',
+        metadata: expect.objectContaining({
+          structuredOutput: { status: 'ok' },
+        }),
+      }),
+    ]));
+  });
+
+  it('disables file checkpointing automatically for diagnostic sessionStore probes', async () => {
+    const sdk = createSdk([{
+      type: 'result',
+      subtype: 'success',
+      session_id: 'diag-store-1',
+      result: 'STORE_OK',
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableFileCheckpointing: true,
+      },
+      sdk,
+    });
+    const sessionStore = {
+      append: jest.fn(),
+      load: jest.fn(),
+      listSessions: jest.fn(),
+    };
+
+    await adapter.runDiagnosticPrompt({
+      prompt: 'Reply with exactly STORE_OK.',
+      sessionStore,
+      sessionStoreFlush: 'eager',
+      includeHookEvents: true,
+    });
+
+    expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        sessionStore,
+        sessionStoreFlush: 'eager',
+      }),
+    }));
+    expect(sdk.query.mock.calls[0][0].options.enableFileCheckpointing).toBeUndefined();
+  });
+
   it('passes runtime-injected Claude SDK foundation options into query creation', async () => {
     const sdk = createSdk([]);
     const hooks = { SessionStart: [{ hooks: [jest.fn()] }] };

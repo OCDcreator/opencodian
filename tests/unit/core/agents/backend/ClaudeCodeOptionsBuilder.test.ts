@@ -266,4 +266,27 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
 
     expect(options.skills).toBe('all');
   });
+
+  it('supports diagnostic runtime overrides without adding saved settings fields', () => {
+    const outputFormat = {
+      type: 'json_schema',
+      schema: { type: 'object', properties: { status: { type: 'string' } } },
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableFileCheckpointing: true,
+      },
+      outputFormat,
+      persistSession: false,
+      enableFileCheckpointing: false,
+      includeHookEvents: true,
+    });
+
+    expect(options.outputFormat).toBe(outputFormat);
+    expect(options.persistSession).toBe(false);
+    expect(options.includeHookEvents).toBe(true);
+    expect(options.enableFileCheckpointing).toBeUndefined();
+  });
 });

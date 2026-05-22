@@ -46,6 +46,9 @@ export interface ClaudeCodeOptionsBuilderInput {
   sessionStore?: unknown;
   sessionStoreFlush?: 'batched' | 'eager';
   outputFormat?: Record<string, unknown>;
+  persistSession?: boolean;
+  enableFileCheckpointing?: boolean;
+  includeHookEvents?: boolean;
   plugins?: unknown[];
   skills?: string[] | 'all';
   agent?: string;
@@ -76,6 +79,7 @@ export interface ClaudeCodeSdkOptionsShape {
   sessionStore?: unknown;
   sessionStoreFlush?: 'batched' | 'eager';
   outputFormat?: Record<string, unknown>;
+  persistSession?: boolean;
   plugins?: unknown[];
   skills?: string[] | 'all';
   agent?: string;
@@ -169,6 +173,9 @@ export function buildClaudeCodeOptions(
   if (input.outputFormat && Object.keys(input.outputFormat).length > 0) {
     options.outputFormat = input.outputFormat;
   }
+  if (input.persistSession !== undefined) {
+    options.persistSession = input.persistSession;
+  }
   if (input.plugins && input.plugins.length > 0) {
     options.plugins = [...input.plugins];
   }
@@ -209,10 +216,12 @@ export function buildClaudeCodeOptions(
   if (Object.keys(input.settings.env).length > 0) {
     options.env = input.settings.env;
   }
-  if (input.settings.enableFileCheckpointing) {
+  const shouldEnableFileCheckpointing = input.enableFileCheckpointing === true
+    || (input.enableFileCheckpointing !== false && input.settings.enableFileCheckpointing);
+  if (shouldEnableFileCheckpointing) {
     options.enableFileCheckpointing = true;
   }
-  if (input.settings.includeHookEvents) {
+  if (input.includeHookEvents || input.settings.includeHookEvents) {
     options.includeHookEvents = true;
   }
   if (input.settings.forwardSubagentText) {

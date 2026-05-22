@@ -55,7 +55,7 @@ type ClaudeCodeModelCatalogQuery = {
 
 export interface ClaudeCodeSdkFacade {
   query(input: ClaudeCodeSdkQueryInput): ClaudeCodeQueryHandle;
-  listSessions?(options?: { dir?: string; limit?: number; offset?: number }): Promise<ClaudeCodeSdkSessionInfo[]>;
+  listSessions?(options?: { dir?: string; limit?: number; offset?: number; sessionStore?: unknown }): Promise<ClaudeCodeSdkSessionInfo[]>;
   getSessionInfo?(sessionId: string, options?: { dir?: string }): Promise<ClaudeCodeSdkSessionInfo | undefined>;
   getSessionMessages?(sessionId: string, options?: { dir?: string; limit?: number; offset?: number; includeSystemMessages?: boolean; sessionStore?: unknown }): Promise<unknown[]>;
   listSubagents?(sessionId: string, options?: { dir?: string; sessionStore?: unknown }): Promise<string[]>;
@@ -78,6 +78,23 @@ export interface ClaudeCodeSdkSessionInfo {
   summary: string;
   lastModified: number;
   createdAt?: number;
+}
+
+export interface ClaudeCodeDiagnosticPromptRequest {
+  prompt: string;
+  hooks?: ClaudeCodeOptionsBuilderInput['hooks'];
+  sessionStore?: ClaudeCodeOptionsBuilderInput['sessionStore'];
+  sessionStoreFlush?: ClaudeCodeOptionsBuilderInput['sessionStoreFlush'];
+  outputFormat?: ClaudeCodeOptionsBuilderInput['outputFormat'];
+  enableFileCheckpointing?: boolean;
+  includeHookEvents?: boolean;
+  persistSession?: boolean;
+}
+
+export interface ClaudeCodeDiagnosticPromptResult {
+  sessionId?: string;
+  rawMessages: unknown[];
+  chunks: StreamChunk[];
 }
 
 export type ClaudeCodeSdkLoader = () => Promise<ClaudeCodeSdkFacade>;
@@ -165,6 +182,36 @@ function summarizeSession(session: ClaudeCodeSessionState): Record<string, unkno
     messageCount: session.messages.length,
     hasRuntime: Boolean(session.runtime && !session.runtime.closed),
   };
+}
+
+function resolveDiagnosticSessionId(message: unknown, chunks: readonly StreamChunk[]): string | undefined {
+  for (const chunk of chunks) {
+    if (chunk.type === 'message_metadata' && chunk.sessionId) {
+      return chunk.sessionId;
+    }
+    if (chunk.type === 'usage' && chunk.sessionId) {
+      return chunk.sessionId;
+    }
+    if (chunk.type === 'backend_event' && chunk.sessionId) {
+      return chunk.sessionId;
+    }
+  }
+  if (typeof message !== 'object' || message === null || Array.isArray(message)) {
+    return undefined;
+  }
+  const record = message as {
+    session_id?: unknown;
+    sessionId?: unknown;
+    message?: { session_id?: unknown; sessionId?: unknown };
+  };
+  const candidates = [
+    record.session_id,
+    record.sessionId,
+    record.message?.session_id,
+    record.message?.sessionId,
+  ];
+  const resolved = candidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+  return typeof resolved === 'string' ? resolved : undefined;
 }
 
 const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
@@ -305,10 +352,20 @@ export class ClaudeCodeAdapter
     }
   }
 
-  async listSessions(): Promise<ClaudeCodeSdkSessionInfo[]> {
-    sessionLogger.debug('list session', { vaultPath: this.options.vaultPath });
+  async listSessions(options?: { limit?: number; offset?: number; sessionStore?: unknown }): Promise<ClaudeCodeSdkSessionInfo[]> {
+    sessionLogger.debug('list session', {
+      vaultPath: this.options.vaultPath,
+      limit: options?.limit,
+      offset: options?.offset,
+      hasSessionStore: Boolean(options?.sessionStore),
+    });
     const sdk = await this.getSdk();
-    const sessions = await sdk.listSessions?.({ dir: this.options.vaultPath }) ?? [];
+    const sessions = await sdk.listSessions?.({
+      dir: this.options.vaultPath,
+      ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options?.offset !== undefined ? { offset: options.offset } : {}),
+      ...(options?.sessionStore ? { sessionStore: options.sessionStore } : {}),
+    }) ?? [];
     sessionLogger.debug('list session complete', { count: sessions.length });
     return sessions;
   }
@@ -484,6 +541,44 @@ export class ClaudeCodeAdapter
     return await rewindFiles(userMessageId, options);
   }
 
+  async runDiagnosticPrompt(
+    request: ClaudeCodeDiagnosticPromptRequest,
+  ): Promise<ClaudeCodeDiagnosticPromptResult> {
+    if (request.sessionStore && request.enableFileCheckpointing === true) {
+      throw new Error('Claude Code sessionStore diagnostics cannot enable file checkpointing.');
+    }
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const query = sdk.query({
+      prompt: request.prompt,
+      options: this.buildDiagnosticSdkOptions(abortController, request),
+    });
+    const normalizer = new ClaudeCodeStreamNormalizer();
+    const rawMessages: unknown[] = [];
+    const chunks: StreamChunk[] = [];
+    let sessionId: string | undefined;
+
+    try {
+      for await (const message of query ?? []) {
+        rawMessages.push(message);
+        const nextChunks = normalizer.transformSDKMessage(message);
+        if (!sessionId) {
+          sessionId = resolveDiagnosticSessionId(message, nextChunks);
+        }
+        chunks.push(...nextChunks);
+      }
+    } finally {
+      query.close?.();
+    }
+
+    return {
+      sessionId,
+      rawMessages,
+      chunks,
+    };
+  }
+
   async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const session = this.getOrRestoreSession(request.sessionId);
     runtimeLogger.debug('sendMessage start', {
@@ -628,6 +723,34 @@ export class ClaudeCodeAdapter
       agent: this.options.agent,
       agents: this.options.agents,
       resumeSessionId: session?.sdkSessionId,
+    });
+  }
+
+  private buildDiagnosticSdkOptions(
+    abortController: AbortController | undefined,
+    request: ClaudeCodeDiagnosticPromptRequest,
+  ): ClaudeCodeSdkOptionsShape {
+    return buildClaudeCodeOptions({
+      vaultPath: this.options.vaultPath,
+      settings: this.options.settings,
+      pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      abortController,
+      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+      canUseTool: this.options.permissionBridge
+        ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
+        : undefined,
+      onElicitation: this.options.onElicitation
+        ? async (promptRequest: ElicitationRequest, context: { signal: AbortSignal }) =>
+          await this.options.onElicitation!(promptRequest, context)
+        : undefined,
+      mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
+      hooks: request.hooks ?? this.options.hooks,
+      sessionStore: request.sessionStore ?? this.options.sessionStore,
+      sessionStoreFlush: request.sessionStoreFlush ?? this.options.sessionStoreFlush,
+      outputFormat: request.outputFormat ?? this.options.outputFormat,
+      enableFileCheckpointing: request.sessionStore ? false : request.enableFileCheckpointing,
+      includeHookEvents: request.includeHookEvents,
+      persistSession: request.persistSession,
     });
   }
 
