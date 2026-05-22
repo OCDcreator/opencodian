@@ -65,6 +65,7 @@ export class ConversationNoticeCoordinator {
 ### turn diff notice
 
 - `appendTurnDiffNoticeIfNeeded()` 先查当前 session 的 live diff，再回退 cached diff，最后回退 edited file 列表
+- **OpenCode-only diff gate**: `backend !== 'opencode'` 时直接返回。`getSessionDiff` 与 `getCachedSessionDiffEntries` 是 OpenCode-specific API，暂无 backend-neutral 等价物。Claude 等 backend 的 diff surface 未稳定完成前不伪造 diff notice。
 - `formatDiffNoticeMarkdown()` 输出 vault 链接、diff stats 与 status
 - 只有 active tab 才会补发 background task indicator
 

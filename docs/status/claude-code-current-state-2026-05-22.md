@@ -51,6 +51,47 @@ The most important framing for future work:
 - OpenCodian is trying to preserve a multi-backend shell while still letting each backend eventually expose its native ecosystem.
 - For Claude, advanced capabilities are being integrated with a diagnostic-first policy before stable promotion.
 
+## Backend-Aware Session/History/Control Migration (2026-05-22)
+
+This run focused on backend-aware session/control seams and gating OpenCode-only semantics:
+
+### What Became Backend-Aware
+
+| Owner | Change |
+|---|---|
+| `OpenCodianView.ts` | `revertSession`/`unrevertSession`/`forkSession` now route through `AgentServiceRegistry` to backends with `AgentCapability.Branching`; OpenCode fallback is explicit and backend-gated. `getCurrentConversationSessionId` uses `getConversationBackendSessionId()`. |
+| `ConversationLoadRecoveryCoordinator.ts` | `handleRewindRequest`/`handleRestoreRewindRequest`/`handleForkRequest` use `getConversationBackendSessionId()` and gate revert/unrevert by backend kind. |
+| `ConversationAuthoritativeSyncCoordinator.ts` | Uses `getConversationBackendSessionId()`; skips sync for non-OpenCode backends (OpenCode-only by design). |
+| `ConversationAuthoritativeReloadCoordinator.ts` | Uses `getConversationBackendSessionId()` in all debug logs; skips server sync for non-OpenCode backends. |
+| `ConversationNoticeCoordinator.ts` | `appendTurnDiffNoticeIfNeeded` gated to OpenCode-only. |
+| `SlashCommandExecutionService.ts` | `/undo` and `/redo` gated to OpenCode-only; uses `getConversationBackendSessionId()`. |
+| `ChildSessionGraphCoordinator.ts` | `refreshGraph` gated to OpenCode-only. |
+| `LocalStreamMessagePersistence.ts` | Debug logs use `getConversationBackendSessionId()`. |
+| `ConversationRenderService.ts` | Debug logs use `getConversationBackendSessionId()`. |
+| `ConversationSyncRuntimeCoordinator.ts` | Sync timeout payload uses both `openCodeSessionId` and `backendSessionId`. |
+| `BackgroundTaskNoticeStateService.ts` | Session matching uses `getConversationBackendSessionId()`. |
+| `BackgroundTaskTimelineService.ts` | Debug logs use `getConversationBackendSessionId()`. |
+| `ConversationIdentityRuntime.ts` | Sync fingerprint uses `getConversationBackendSessionId()`. |
+| `SessionTodoStateService.ts` | Session matching uses `getConversationBackendSessionId()`. |
+
+### What Remains OpenCode-Only (Intentionally Gated)
+
+| Capability | Reason |
+|---|---|
+| Authoritative server sync | OpenCode-specific message shape (`info`/`parts`), hydration path, and canonical state. |
+| Revert / unrevert | Claude SDK has `rewindFiles` but semantics differ; no stable-complete runtime proof. |
+| Session diff (`getSessionDiff`) | OpenCode-specific API; no backend-neutral equivalent. |
+| Child session graph | OpenCode-specific `getSessionChildren` API. |
+| Session todo/status live signals | Deeply tied to OpenCode server events. |
+| Background task timeline | Assumes OpenCode task tool metadata shape. |
+
+### What Claude Still Needs To Verify/Deploy
+
+- `forkSession` is wired in `ClaudeCodeAdapter` but not exposed as stable (no `AgentCapability.Branching` in `CLAUDE_CODE_PHASE1_CAPABILITIES`).
+- `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired but not yet productized through the sync/history UI.
+- Runtime smoke for Claude fork/resume-at is not yet recorded.
+- The `AgentBranchCapability` interface requires ALL of fork/revert/unrevert/diff/getSessionRevertState; Claude only has fork. A separate "fork-only" capability or partial interface may be needed if fork is to be promoted before the other branch operations.
+
 ## What Is Definitely Complete
 
 These items are implemented enough to treat as real delivered backend capability, not speculative design:
@@ -89,6 +130,7 @@ Future models should use this language:
 - `wired`: the SDK option or adapter seam exists.
 - `runtime-proved`: there is local runtime evidence that the seam actually executes.
 - `stable`: the capability is intentionally exposed as part of the product surface for end users.
+- `backend-aware`: the service seams route through the registry/routing layer using `getConversationBackendSessionId()` and capability checks rather than hard-wiring `openCodeService`.
 
 For several Claude-native capabilities, OpenCodian is currently at:
 
@@ -103,10 +145,45 @@ Structured output is now at `wired + runtime-proved + stable transcript renderin
 
 Do not collapse this to either:
 
-- “not implemented”, or
-- “fully complete”
+- "not implemented", or
+- "fully complete"
 
 Both would be wrong.
+
+### Backend-Aware Session/History/Control Seams (as of this run)
+
+The following service seams now route session identity through `getConversationBackendSessionId()` and are gated by backend kind checks:
+
+| Seam | Backend-aware? | Notes |
+|---|---|---|
+| Conversation load/recovery (fork) | **Yes** | Fork routes through registry `AgentBranchCapability` for capable backends; OpenCode fallback preserved |
+| Conversation load/recovery (rewind/unrevert) | **Gated** | Explicitly OpenCode-only: backend check `backend !== 'opencode'` → unavailable for Claude |
+| Authoritative sync (user message hydration) | **Gated** | OpenCode-only: entire hydration pipeline uses OpenCode-typed messages |
+| Authoritative reload (log identity) | **Yes** | All log `sessionId` fields use `getConversationBackendSessionId()` |
+| Context usage detail modal | **Gated** | OpenCode-only: raw message loader calls `openCodeService.getSessionMessages` |
+| Modified files sidebar (diff) | **Gated** | OpenCode-only: diff is not stable for Claude |
+| Session todos (identity) | **Yes** | `SessionTodoStateService` uses `getConversationBackendSessionId()` |
+| Background task timeline/notice (identity) | **Yes** | Both services use `getConversationBackendSessionId()` |
+| Conversation identity runtime (log fingerprint) | **Yes** | Uses `getConversationBackendSessionId()` |
+| Slash command undo (revert) | **Gated** | OpenCode-only: backend check |
+| Slash command redo (unrevert) | **Gated** | OpenCode-only: backend check |
+| Diff notice on turn completion | **Gated** | OpenCode-only: backend check |
+| Child session graph | **Gated** | OpenCode-only: `getSessionChildren` has no backend-neutral equivalent |
+| Stream message persistence (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
+| Conversation render service (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
+| Conversation sync runtime coordinator (diagnostic) | **Yes** | Includes both `openCodeSessionId` and `backendSessionId` |
+
+**Services remaining hard-wired to OpenCode** (no migration justified until backend-neutral equivalents exist):
+
+| Service | Reason it stays OpenCode-only |
+|---|---|
+| ConversationSyncBridge | Subscribes to `SessionSyncEventUpdate` from `core/opencode` |
+| ConversationSessionTabResolver | Only reachable through OpenCode sync event subscription |
+| TitleGenerationService | Calls `openCodeService.listSessions()` |
+| PostSyncQuestionTodoRefreshPlanBuilder | Feeds into question/todo refresh chain using OpenCode APIs |
+| PostSyncQuestionTodoRefreshHostAdapter | Adapter for question/todo chain using `openCodeService` |
+| ConversationSyncVisiblePostSyncRouter | Routes post-sync question/todo updates through OpenCode APIs |
+| ConversationSyncOrchestrationService | Drives OpenCode-specific sync loop |
 
 ## Capability Lab Status
 
@@ -185,7 +262,7 @@ Note: one backend runtime artifact timed out while trying to do too much in one 
 
 If you need one sentence:
 
-> OpenCodian's Claude Code SDK lane has passed Phase 1 backend viability, has meaningful Phase 2 wiring, and has begun Phase 3/4-style Claude-native capability integration through diagnostic-first surfaces, but several advanced capabilities are intentionally runtime-proved without yet being stable product features.
+> OpenCodian's Claude Code SDK lane has passed Phase 1 backend viability, has meaningful Phase 2 wiring, and has begun Phase 3/4-style Claude-native capability integration through diagnostic-first surfaces. Session/history/control seams are now backend-aware where semantics match: fork routes through the registry layer, rewind/unrevert/diff are gated as OpenCode-only, and session identity uses `getConversationBackendSessionId()` across the service layer. Several advanced capabilities (hooks, session store, structured output authoring) are intentionally runtime-proved without yet being stable product features.
 
 ## Recommended Next-Step Mindset
 

@@ -165,7 +165,7 @@ export class ConversationSyncRuntimeCoordinator {
     this.onSyncTimeout({
       tabId,
       conversationId: conversation.id,
-      openCodeSessionId: conversation.openCodeSessionId,
+      openCodeSessionId: conversation.openCodeSessionId ?? undefined,
       backendSessionId: getConversationBackendSessionId(conversation),
       ageMs: this.now() - startedAt,
       phase: runtime.tabSessionLifecycle.phase,

@@ -238,7 +238,7 @@ export class ConversationRenderService {
 
     this.host.logAssistantFinalizationDebug('rerender-conversation-messages-start', {
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       messageCount: resolvedMessages.length,
       tailAssistant: this.host.summarizeChatMessageForDebug(
         [...resolvedMessages].reverse().find((message) => message.role === 'assistant'),
@@ -284,7 +284,7 @@ export class ConversationRenderService {
 
     this.host.logAssistantFinalizationDebug('rerender-conversation-messages-complete', {
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       shouldStickToBottom,
       previousScrollTop,
     });

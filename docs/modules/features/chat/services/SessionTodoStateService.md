@@ -49,6 +49,7 @@ export class SessionTodoStateService {
 - `setTabSessionTodos()` 统一维护 normalized todo snapshot、fingerprint 与 suppression 恢复
 - `setTabSessionStatus()` 统一维护 session status fingerprint，并在会话重新变成 live 时清除旧的 stale todo suppression
 - `getTabSessionTodos()` / `getTabSessionStatus()` 继续保留按 sessionId 过滤，避免 tab runtime 误读到旧会话状态
+- **Backend-aware session identity**: 在将 tab 的 session id 与 conversation 匹配时，使用 `getConversationBackendSessionId()` 而不是直接比较 `conversation.openCodeSessionId`，以兼容非 OpenCode backend。
 
 ### stale todo 降级
 

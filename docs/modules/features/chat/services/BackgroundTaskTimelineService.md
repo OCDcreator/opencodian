@@ -82,8 +82,9 @@ export function createBackgroundTaskViewHost(
 
 ### inline copy
 
-- `shouldRenderInlineSegment()` 继续负责 all-complete / pending launch 的基础判定；普通 user anchor 只有在 native task launch 出现后才渲染 inline panel，零 launch 的 OMO-mode preparing 占位仍要求 runtime 跟踪该 active anchor，避免普通聊天消息误显示成“后台任务准备中”。
+- `shouldRenderInlineSegment()` 继续负责 all-complete / pending launch 的基础判定；普通 user anchor 只有在 native task launch 出现后才渲染 inline panel，零 launch 的 OMO-mode preparing 占位仍要求 runtime 跟踪该 active anchor，避免普通聊天消息误显示成"后台任务准备中"。
 - `getInlineCopy()` 和 `buildTasksMarkdown()` 仍留在 facade 内，保证 inline panel 与 completion queue 使用同一份可读文案。
+- **Backend-aware session identity**: OMO background task completion 日志中的 `sessionId` 字段现在通过 `getConversationBackendSessionId()` 解析，不再直接读取 `conversation.openCodeSessionId`。
 
 ## 与相邻模块的边界
 

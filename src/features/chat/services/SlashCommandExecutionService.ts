@@ -5,12 +5,12 @@ import type {
   SessionCommandInput,
   SessionCommandTemplateContext,
 } from '../../../core/opencode/OpenCodeSessionControlOrchestrator';
-import type {
-  Conversation,
-  OpencodeCommandConfigRecord,
-  SlashCommandSkillMode,
+import {
+  type Conversation,
+  getConversationBackendSessionId,
+  type OpencodeCommandConfigRecord,
+  type SlashCommandSkillMode,
 } from '../../../core/types';
-import { getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { FocusContextPreview } from '../composerContext';
@@ -21,18 +21,9 @@ import { loadCommandsFromConfigDir } from './CommandMdFileLoader';
 import type { SendPreparationServerAvailability } from './MessageSendPreparationService';
 
 const logger = createLogger('SlashCommandExecutionService');
-
 export type SlashCommandServerAvailability = SendPreparationServerAvailability;
-
-export interface SlashCommandRuntimeCatalogEntry {
-  name?: string;
-  source?: string;
-}
-
-export interface SlashCommandRuntimeSkillEntry {
-  name?: string;
-}
-
+export interface SlashCommandRuntimeCatalogEntry { name?: string; source?: string }
+export interface SlashCommandRuntimeSkillEntry { name?: string }
 export interface CompactSessionOpenCodeService {
   getSessionContextUsageSnapshot(sessionId: string): Promise<{
     providerId?: string | null;
@@ -156,7 +147,6 @@ function parseSlashCommandInput(content: string): ParsedSlashCommandInput | null
   const trimmedContent = content.trim();
   if (!trimmedContent || trimmedContent.startsWith('//')) return null;
 
-  // Strategy 1: /command at start of text
   if (trimmedContent.startsWith('/')) {
     const commandBody = trimmedContent.slice(1);
     if (!commandBody || /^\s/.test(commandBody)) return null;
@@ -168,13 +158,11 @@ function parseSlashCommandInput(content: string): ParsedSlashCommandInput | null
     return { command, arguments: cleanedArguments, agent };
   }
 
-  // Strategy 2: /command after whitespace (mid-text) — take LAST match
   const midRegex = /\s\/(\S+)/g;
   let lastMidMatch: RegExpExecArray | null = null;
   let currentMatch: RegExpExecArray | null;
   while ((currentMatch = midRegex.exec(trimmedContent)) !== null) lastMidMatch = currentMatch;
   if (!lastMidMatch?.[1]) return null;
-  // Reject //
   if (lastMidMatch.index > 0 && trimmedContent[lastMidMatch.index] === '/') return null;
   const commandName = lastMidMatch[1].trim();
   if (!commandName) return null;
@@ -417,12 +405,15 @@ export class SlashCommandExecutionService {
 
   private async handleUndoCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
-    if (!conversation?.openCodeSessionId) { new Notice(t('slashCommand.undo.noSession')); return true; }
+    if (!conversation) { return true; }
+    const backend = conversation?.backend ?? 'opencode';
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.undo.noSession')); return true; }
     const lastUserMsg = [...conversation.messages].reverse()
       .find((m) => m.role === 'user' && m.sourceMessageId);
     if (!lastUserMsg?.sourceMessageId) { new Notice(t('slashCommand.undo.noUserMessage')); return true; }
     try {
-      const ok = await this.host.revertSession(conversation.openCodeSessionId, lastUserMsg.sourceMessageId);
+      const ok = await this.host.revertSession(sessionId, lastUserMsg.sourceMessageId);
       new Notice(t(ok ? 'slashCommand.undo.success' : 'slashCommand.undo.failed'));
       if (ok) await this.host.syncVisibleConversationInBackground();
     } catch { new Notice(t('slashCommand.undo.failed')); }
@@ -431,8 +422,9 @@ export class SlashCommandExecutionService {
 
   private async handleRedoCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
+    const backend = conversation?.backend ?? 'opencode';
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
-    if (!sessionId) { new Notice(t('slashCommand.redo.noSession')); return true; }
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.redo.noSession')); return true; }
     try {
       const ok = await this.host.unrevertSession(sessionId);
       new Notice(t(ok ? 'slashCommand.redo.success' : 'slashCommand.redo.failed'));

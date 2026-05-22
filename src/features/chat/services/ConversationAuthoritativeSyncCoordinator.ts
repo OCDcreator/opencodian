@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import { ConversationAuthoritativeMessageMergeCoordinator } from './ConversationAuthoritativeMessageMergeCoordinator';
@@ -144,7 +145,13 @@ export class ConversationAuthoritativeSyncCoordinator {
     optimisticMessageId: string,
     tabId: TabId | null,
   ): Promise<void> {
-    const sessionId = conversation.openCodeSessionId;
+    // Authoritative server sync is OpenCode-specific: the message shape,
+    // hydration path, and canonical state all assume OpenCode semantics.
+    // Skip for other backends until a backend-neutral sync contract exists.
+    if (conversation.backend && conversation.backend !== 'opencode') {
+      return;
+    }
+    const sessionId = getConversationBackendSessionId(conversation);
     if (!sessionId) {
       return;
     }

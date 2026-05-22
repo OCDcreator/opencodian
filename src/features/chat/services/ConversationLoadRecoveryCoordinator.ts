@@ -5,7 +5,7 @@ import type {
   Conversation,
   PersistedTabState,
 } from '../../../core/types';
-import { getDefaultPersistedTabState } from '../../../core/types';
+import { getConversationBackendSessionId, getDefaultPersistedTabState } from '../../../core/types';
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import {
@@ -298,10 +298,21 @@ export class ConversationLoadRecoveryCoordinator {
     }
 
     const currentConversation = this.host.getCurrentConversation();
-    if (!currentConversation?.openCodeSessionId || !message.sourceMessageId) {
-      logger.debug('Rewind unavailable due to missing identifiers', {
-        conversationId: currentConversation?.id ?? null,
-        sessionId: currentConversation?.openCodeSessionId ?? null,
+    if (!currentConversation) {
+      this.host.showNotice(t('chat.rewind.unavailable'));
+      return;
+    }
+
+    const sessionId = getConversationBackendSessionId(currentConversation);
+    const backend = currentConversation.backend ?? 'opencode';
+
+    // Revert is OpenCode-only until Claude runtime proof justifies it.
+    // See docs/status/claude-code-current-state-2026-05-22.md §"What Exists But Must Not Be Described As Stable Completion".
+    if (!sessionId || !message.sourceMessageId || backend !== 'opencode') {
+      logger.debug('Rewind unavailable due to missing identifiers or unsupported backend', {
+        conversationId: currentConversation.id,
+        sessionId,
+        backend,
         messageId: message.id,
         sourceMessageId: message.sourceMessageId ?? null,
       });
@@ -316,20 +327,21 @@ export class ConversationLoadRecoveryCoordinator {
     try {
       logger.debug('Attempting rewind', {
         conversationId: currentConversation.id,
-        sessionId: currentConversation.openCodeSessionId,
+        sessionId,
+        backend,
         messageId: message.id,
         sourceMessageId: message.sourceMessageId,
         messagePreview: message.content.slice(0, 120),
       });
 
       const reverted = await this.host.revertSession(
-        currentConversation.openCodeSessionId,
+        sessionId,
         message.sourceMessageId,
       );
 
       logger.debug('Rewind API result', {
         conversationId: currentConversation.id,
-        sessionId: currentConversation.openCodeSessionId,
+        sessionId,
         sourceMessageId: message.sourceMessageId,
         reverted,
       });
@@ -337,7 +349,7 @@ export class ConversationLoadRecoveryCoordinator {
       if (!reverted) {
         logger.warn('Rewind API returned false', {
           conversationId: currentConversation.id,
-          sessionId: currentConversation.openCodeSessionId,
+          sessionId,
           sourceMessageId: message.sourceMessageId,
         });
         this.host.showNotice(t('chat.rewind.failed'));
@@ -348,7 +360,7 @@ export class ConversationLoadRecoveryCoordinator {
       const loadedConversation = this.host.getCurrentConversation() ?? currentConversation;
       logger.debug('Rewind reload complete', {
         conversationId: loadedConversation.id,
-        sessionId: loadedConversation.openCodeSessionId,
+        sessionId: getConversationBackendSessionId(loadedConversation),
         messagesAfterReload: loadedConversation.messages.length,
       });
       this.host.showNotice(t('chat.rewind.success'));
@@ -365,13 +377,22 @@ export class ConversationLoadRecoveryCoordinator {
     }
 
     const currentConversation = this.host.getCurrentConversation();
-    if (!currentConversation?.openCodeSessionId) {
+    if (!currentConversation) {
+      this.host.showNotice(t('chat.rewind.restoreFailed'));
+      return;
+    }
+
+    const sessionId = getConversationBackendSessionId(currentConversation);
+    const backend = currentConversation.backend ?? 'opencode';
+
+    // Unrevert is OpenCode-only until Claude runtime proof justifies it.
+    if (!sessionId || backend !== 'opencode') {
       this.host.showNotice(t('chat.rewind.restoreFailed'));
       return;
     }
 
     try {
-      const restored = await this.host.unrevertSession(currentConversation.openCodeSessionId);
+      const restored = await this.host.unrevertSession(sessionId);
       if (!restored) {
         this.host.showNotice(t('chat.rewind.restoreFailed'));
         return;
@@ -393,7 +414,12 @@ export class ConversationLoadRecoveryCoordinator {
 
     const currentConversation = this.host.getCurrentConversation();
     const tabManager = this.host.getTabManager();
-    if (!currentConversation?.openCodeSessionId || !message.sourceMessageId || !tabManager) {
+    if (!currentConversation || !message.sourceMessageId || !tabManager) {
+      this.host.showNotice(t('chat.fork.unavailable'));
+      return;
+    }
+    const sessionId = getConversationBackendSessionId(currentConversation);
+    if (!sessionId) {
       this.host.showNotice(t('chat.fork.unavailable'));
       return;
     }
@@ -406,7 +432,7 @@ export class ConversationLoadRecoveryCoordinator {
     try {
       const activeModelOverride = tabManager.getActiveTabModelOverride();
       const forkedSession = await this.host.forkSession(
-        currentConversation.openCodeSessionId,
+        sessionId,
         message.sourceMessageId,
       );
       const forkConversation = await this.createForkConversation(

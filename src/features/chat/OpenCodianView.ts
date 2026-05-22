@@ -1825,12 +1825,9 @@ export class OpenCodianView extends ItemView {
         getActiveBackend: () => this.plugin.settings.activeBackend,
         createConversation: () => this.plugin.createConversation(),
         app: this.app,
-        revertSession: (sessionId, messageId) =>
-          this.plugin.openCodeService.revertSession(sessionId, messageId),
-        unrevertSession: (sessionId) =>
-          this.plugin.openCodeService.unrevertSession(sessionId),
-        forkSession: (sessionId, messageId) =>
-          this.plugin.openCodeService.forkSession(sessionId, messageId),
+        revertSession: (sessionId, messageId) => this.routeConversationRevertSession(sessionId, messageId),
+        unrevertSession: (sessionId) => this.routeConversationUnrevertSession(sessionId),
+        forkSession: (sessionId, messageId) => this.routeConversationForkSession(sessionId, messageId),
         createConversationFromSession: (sessionId, initial) =>
           this.plugin.createConversationFromSession(sessionId, initial),
         deleteConversation: (conversationId) =>
@@ -1880,6 +1877,55 @@ export class OpenCodianView extends ItemView {
       conversationLoadRecoveryCoordinator,
       conversationTabRuntimeCoordinator,
     };
+  }
+
+  private getCurrentConversationBranchService():
+    import('../../core/agents/backend/AgentService').AgentBranchCapability | null {
+    const conversation = this.currentConversation;
+    const service = getConversationSessionBackendService(
+      this.plugin.agentServiceRegistry,
+      conversation,
+    );
+    if (!service?.hasCapability(AgentCapability.Branching)) {
+      return null;
+    }
+    return service as unknown as import('../../core/agents/backend/AgentService').AgentBranchCapability;
+  }
+
+  private routeConversationRevertSession(sessionId: string, messageId: string): Promise<boolean> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const branchService = this.getCurrentConversationBranchService();
+    if (branchService) {
+      return branchService.revertSession(sessionId, messageId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.revertSession(sessionId, messageId);
+    }
+    throw new Error(`Rewind not available for backend "${backend}"`);
+  }
+
+  private routeConversationUnrevertSession(sessionId: string): Promise<boolean> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const branchService = this.getCurrentConversationBranchService();
+    if (branchService) {
+      return branchService.unrevertSession(sessionId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.unrevertSession(sessionId);
+    }
+    throw new Error(`Restore rewind not available for backend "${backend}"`);
+  }
+
+  private routeConversationForkSession(sessionId: string, messageId: string): Promise<{ id: string; title: string }> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const branchService = this.getCurrentConversationBranchService();
+    if (branchService) {
+      return branchService.forkSession(sessionId, messageId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.forkSession(sessionId, messageId);
+    }
+    throw new Error(`Fork not available for backend "${backend}"`);
   }
 
   private createInteractionRuntimeWiring(
@@ -2127,7 +2173,7 @@ export class OpenCodianView extends ItemView {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getActiveTabId: () => this.getActiveTabId(),
-      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId ?? null,
+      getCurrentConversationSessionId: () => this.currentConversation ? getConversationBackendSessionId(this.currentConversation) : null,
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       getConversationForTab: (tabId: TabId | null) => this.getConversationForTab(tabId),
       hasMatchingPersistentAssistantNoticeMessage: (
@@ -2272,8 +2318,10 @@ export class OpenCodianView extends ItemView {
           contextState,
           systemPrompt: this.plugin.settings.systemPrompt,
           rawMessageLoader: async () => {
-            const sessionId = this.currentConversation?.openCodeSessionId;
-            if (!sessionId) {
+            const conversation = this.currentConversation;
+            const backend = conversation?.backend ?? 'opencode';
+            const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
+            if (!sessionId || backend !== 'opencode') {
               return [];
             }
 
@@ -2793,7 +2841,7 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
-      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
+      getCurrentConversationSessionId: () => this.currentConversation ? getConversationBackendSessionId(this.currentConversation) : null,
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
@@ -3043,7 +3091,13 @@ export class OpenCodianView extends ItemView {
   }
 
   private refreshModifiedFilesSidebar(): void {
-    const sessionId = this.currentConversation?.openCodeSessionId ?? null;
+    const conversation = this.currentConversation;
+    const backend = conversation?.backend ?? 'opencode';
+    // Session diff is OpenCode-only.  Claude's rewind/diff surface is not
+    // stable-complete — see status doc §"What Exists But Must Not Be Described As Stable Completion".
+    const sessionId = backend === 'opencode' && conversation
+      ? (conversation.openCodeSessionId ?? null)
+      : null;
     this.modifiedFilesSidebarCoordinator.setVisible(
       this.plugin.settings.showModifiedFilesSidebar
       && hasCapability(this.caps, AgentCapability.Context),

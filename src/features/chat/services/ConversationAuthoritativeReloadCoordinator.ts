@@ -102,6 +102,18 @@ export class ConversationAuthoritativeReloadCoordinator {
     reason = 'unspecified',
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationAuthoritativeSyncResult> {
+    // Authoritative server sync is OpenCode-specific: the message shape,
+    // hydration path, and canonical state all assume OpenCode semantics.
+    // Skip for other backends until a backend-neutral sync contract exists.
+    if (conversation.backend && conversation.backend !== 'opencode') {
+      const fingerprint = this.host.getConversationSyncFingerprint(conversation.messages);
+      return {
+        messages: conversation.messages,
+        changed: false,
+        fingerprint,
+        revertState: null,
+      };
+    }
     const verbose = !options?.suppressVerboseLogs;
     try {
       const ticket = this.host.createConversationWriteTicket(conversation.id);
@@ -138,7 +150,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       this.host.logAssistantFinalizationDebug('server-sync-failed', {
         reason,
         conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
+        sessionId: getConversationBackendSessionId(conversation),
         tabId,
         errorMessage: error instanceof Error ? error.message : String(error),
       });
@@ -218,7 +230,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-begin', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       existingMessageCount: conversation.messages.length,
       localTailAssistant: this.host.summarizeChatMessageForDebug(
@@ -319,7 +331,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-fetched', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       serverMessageCount: snapshot.serverMessages.length,
       convertedMessageCount: snapshot.convertedServerMessages.length,
@@ -470,7 +482,7 @@ export class ConversationAuthoritativeReloadCoordinator {
 
     logger.debug(`Preserving local interrupted assistant message(s) during conversation sync: ${this.host.stringifyLogPayload({
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       count: preservedInterruptedMessages.length,
       messages: preservedInterruptedMessages.map((message) => ({
         id: message.id,
@@ -494,7 +506,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-merged', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       mergedMessageCount: merged.length,
       preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
@@ -540,7 +552,7 @@ export class ConversationAuthoritativeReloadCoordinator {
 
     logger.debug('Conversation sync complete', {
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       reason,
       serverMessageCount: snapshot.serverMessages.length,
       mergedMessageCount: syncMerge.merged.length,
@@ -565,7 +577,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-finished', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       changed: syncMerge.changed,
       cacheWritebackChanged: syncMerge.cacheWritebackChanged,

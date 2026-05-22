@@ -214,7 +214,7 @@ function logInterruptedAssistantPersistence(
   logger.debug(`Persisting interrupted assistant message after stream cancellation: ${host.stringifyLogPayload({
     tabId: preparedSend.tabId,
     conversationId: preparedSend.conversation.id,
-    sessionId: preparedSend.conversation.openCodeSessionId,
+    sessionId: getConversationBackendSessionId(preparedSend.conversation),
     messageId: message.id,
     sourceMessageId: message.sourceMessageId ?? null,
     contentPreview: host.getLogPreview(message.content, 160),
@@ -230,7 +230,7 @@ function logInterruptedNoticePersistence(
   logger.debug(`Persisting interrupted assistant notice because no visible assistant content survived cancellation: ${host.stringifyLogPayload({
     tabId: preparedSend.tabId,
     conversationId: preparedSend.conversation.id,
-    sessionId: preparedSend.conversation.openCodeSessionId,
+    sessionId: getConversationBackendSessionId(preparedSend.conversation),
     noticeId: message.id,
   })}`);
 }

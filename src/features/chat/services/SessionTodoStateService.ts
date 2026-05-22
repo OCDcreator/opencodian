@@ -1,5 +1,5 @@
 import type { SessionActivityStatus } from '../../../core/opencode';
-import type { ChatMessage, Conversation, SessionTodo } from '../../../core/types';
+import { type ChatMessage, type Conversation, getConversationBackendSessionId, type SessionTodo } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
@@ -537,7 +537,7 @@ export class SessionTodoStateService {
     }
 
     const conversation = this.host.getConversationForTab(tabId);
-    if (!conversation || sessionId !== conversation.openCodeSessionId) {
+    if (!conversation || sessionId !== getConversationBackendSessionId(conversation)) {
       return null;
     }
 

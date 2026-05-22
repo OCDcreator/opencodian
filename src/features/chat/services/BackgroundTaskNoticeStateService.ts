@@ -1,4 +1,4 @@
-import type { ChatMessage, Conversation } from '../../../core/types';
+import { type ChatMessage, type Conversation,getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
@@ -241,7 +241,7 @@ export class BackgroundTaskNoticeStateService {
     }
 
     const sessionId = this.host.getSessionIdForTab(tabId);
-    if (!sessionId || sessionId !== conversation.openCodeSessionId) {
+    if (!sessionId || sessionId !== getConversationBackendSessionId(conversation)) {
       return;
     }
 

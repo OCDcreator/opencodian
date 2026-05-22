@@ -101,7 +101,11 @@ export class ConversationNoticeCoordinator {
     editedFiles: string[],
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<void> {
-    if (!conversation.openCodeSessionId || editedFiles.length === 0) {
+    // Diff notices are OpenCode-only.  The getSessionDiff and
+    // getCachedSessionDiffEntries APIs are OpenCode-specific and do not
+    // have a backend-neutral equivalent yet.
+    const backend = conversation.backend ?? 'opencode';
+    if (!conversation.openCodeSessionId || editedFiles.length === 0 || backend !== 'opencode') {
       return;
     }
 

@@ -123,12 +123,15 @@ export class ConversationLoadRecoveryCoordinator {
 
 - streaming 中仍保持阻塞，并继续复用原有 notice 文案
 - 缺失 session 或 source message id 时仍直接走 unavailable / failed 分支
+- **Backend-aware session identity**: 使用 `getConversationBackendSessionId()` 解析会话标识，不再直接读取 `conversation.openCodeSessionId`。
+- **OpenCode-only revert gate**: `handleRewindRequest()` 与 `handleRestoreRewindRequest()` 在 `backend !== 'opencode'` 时直接走 unavailable / failed 分支。revert / unrevert 目前仍是 OpenCode-only 能力，Claude 等 backend 即使底层 SDK 存在类似语义，也暂不提供稳定支持。
 - rewind / unrevert 成功后，继续统一走 `loadConversation(..., { forceServerSync: true })`
 - 既有 debug/error log 与 notice 语义保持不变
 
 ### fork
 
 - fork target 选择、fork-session 创建、fork 前消息克隆，以及 fork conversation 持久化现在统一在 coordinator 内编排
+- **Backend-aware session identity**: `handleForkRequest()` 使用 `getConversationBackendSessionId()` 解析会话标识，不再直接读取 `conversation.openCodeSessionId`。fork 的实际调用通过 `host.forkSession()` 路由到对应 backend；`OpenCodianView` 负责把 fork 请求路由到拥有 `AgentCapability.Branching` 的 backend adapter（当前 OpenCode 已支持，Claude 在 adapter 层已 wiring 但未作为稳定能力暴露）。
 - `new-tab` 分支仍保留 max-tabs guard、必要时删除新建 fork conversation、激活新 tab 后复制 active model override
 - `current-tab` 分支仍先写回 active-tab conversation，再走 `loadConversation(..., { forceServerSync: false })`
 - 当 `TabManager.areTabsEnabled()` 为 false，即使 fork target 选择了 `new-tab`，也会降级为 current-tab 打开 fork conversation；这样禁用标签只影响打开入口，不会阻断 fork 会话、历史记录或标题保存

@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import {
   buildMessageRenderGroups,
   injectLiveCompactionDivider,
@@ -58,7 +59,7 @@ export class ConversationIdentityRuntime {
   ): string {
     return JSON.stringify({
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       messages: messages.map((message) => ({
         id: message.id,
         sourceMessageId: message.sourceMessageId ?? null,

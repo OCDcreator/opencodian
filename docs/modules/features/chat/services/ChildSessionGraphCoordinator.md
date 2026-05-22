@@ -46,6 +46,7 @@ export class ChildSessionGraphCoordinator {
 ### Graph 重建
 
 - `refreshGraph()` 在没有活动对话或对话缺少 `openCodeSessionId` 时直接清空内部 snapshot 并返回 `null`
+- **OpenCode-only gate**: `backend !== 'opencode'` 时同样清空并返回 `null`。Child session graph 是 OpenCode-specific 能力；Claude 等 backend 的 subagent graph surface 未稳定完成前不尝试拉取。
 - `getSessionChildren()` 失败不会中断 graph reconstruction；coordinator 会退回只用 persisted task metadata 重建图
 - `getGraph()` 只返回最近一次 refresh 的结果，不会隐式触发任何 I/O
 - `clearGraph()` 只清理内部 graph 状态，方便 view 在 empty-tab / close 路径上复位 UI
