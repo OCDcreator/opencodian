@@ -106,6 +106,10 @@ export interface ClaudeCodeAdapterOptions {
   plugins?: ClaudeCodeOptionsBuilderInput['plugins'];
   /** Runtime-only Claude skills allowlist. Stable authoring UI remains hidden. */
   skills?: ClaudeCodeOptionsBuilderInput['skills'];
+  /** Runtime-only main-thread agent selector. Stable authoring UI remains hidden. */
+  agent?: ClaudeCodeOptionsBuilderInput['agent'];
+  /** Runtime-only Claude agent definitions. Stable authoring UI remains hidden. */
+  agents?: ClaudeCodeOptionsBuilderInput['agents'];
 }
 
 const CLAUDE_CODE_EFFORT_VALUES = new Set<ClaudeCodeEffort>(['low', 'medium', 'high', 'xhigh', 'max']);
@@ -621,6 +625,8 @@ export class ClaudeCodeAdapter
       outputFormat: this.options.outputFormat,
       plugins: this.options.plugins,
       skills: this.options.skills,
+      agent: this.options.agent,
+      agents: this.options.agents,
       resumeSessionId: session?.sdkSessionId,
     });
   }

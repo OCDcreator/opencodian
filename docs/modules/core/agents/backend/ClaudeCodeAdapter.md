@@ -23,7 +23,7 @@
 - 从真实 SDK `Query.supportedModels()` 读取模型目录；本地 facade 兼容官方 `ModelInfo.value/displayName` 与旧 fixture `id/name` 形状，避免把 `supportedModels()` 误挂到顶层 SDK module
 - 接收 composer per-send `options.model` 与 `options.variant`，在 SDK query options 中映射为 Claude Code `model` 与 `effort`；若同一持久 query 仍活跃且仅 model 变化，model 会通过 `Query.setModel()` 尝试 live 更新；若 effort 变化，则关闭旧 query 并用已捕获的 SDK session id 重新启动 resumed query，确保下一轮发送应用新的 effort
 - 将 SDK `onElicitation` callback 注入 options，生产 host 会把 elicitation 转成 OpenCodian question flow 的统一交互入口
-- 将 runtime-only `hooks`、`sessionStore` / `sessionStoreFlush`、`outputFormat`、`plugins` 和 `skills` 注入 options builder；这些字段只允许由 backend runtime/诊断 owner 传入，不会保存到用户设置，也不会让 settings UI 宣称 hooks/skills/agent authoring 已完成
+- 将 runtime-only `hooks`、`sessionStore` / `sessionStoreFlush`、`outputFormat`、`plugins`、`skills`、`agent` 和 `agents` 注入 options builder；这些字段只允许由 backend runtime/诊断 owner 传入，不会保存到用户设置，也不会让 settings UI 宣称 hooks/skills/agent authoring 已完成
 - 将自定义 `abortController` 和 `spawnClaudeCodeProcess` 注入 SDK options，绕开 Obsidian/Electron renderer 对 `child_process.spawn({ signal })` 的 `AbortSignal` 兼容问题
 - 支持 `cancelStream()`、`stop()`、`dispose()` 的本地取消和资源清理
 - 将 SDK stream 异常转换为 backend-labelled error chunk，避免发送管线无响应

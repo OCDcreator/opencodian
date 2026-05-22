@@ -624,6 +624,12 @@ describe('ClaudeCodeAdapter', () => {
     const sessionStore = { append: jest.fn(), load: jest.fn() };
     const outputFormat = { type: 'json_schema', schema: { type: 'object' } };
     const plugins = [{ type: 'local', path: './claude-plugin' }];
+    const agents = {
+      reviewer: {
+        description: 'Reviews current changes',
+        prompt: 'Review the code.',
+      },
+    };
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -634,6 +640,8 @@ describe('ClaudeCodeAdapter', () => {
       outputFormat,
       plugins,
       skills: 'all',
+      agent: 'reviewer',
+      agents,
     });
     const sessionId = await adapter.createSession('Claude chat');
 
@@ -646,6 +654,9 @@ describe('ClaudeCodeAdapter', () => {
     expect(options.outputFormat).toBe(outputFormat);
     expect(options.plugins).toEqual(plugins);
     expect(options.skills).toBe('all');
+    expect(options.agent).toBe('reviewer');
+    expect(options.agents).toEqual(agents);
+    expect(options.agents).not.toBe(agents);
   });
 
   it('surfaces unavailable SDK history APIs instead of returning empty data', async () => {

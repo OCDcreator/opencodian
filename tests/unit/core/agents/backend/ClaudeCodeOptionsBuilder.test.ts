@@ -226,6 +226,12 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
       schema: { type: 'object', properties: { result: { type: 'string' } } },
     };
     const plugins = [{ type: 'local', path: './claude-plugin' }];
+    const agents = {
+      reviewer: {
+        description: 'Reviews current changes',
+        prompt: 'Review the code.',
+      },
+    };
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -235,6 +241,8 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
       outputFormat,
       plugins,
       skills: ['review'],
+      agent: 'reviewer',
+      agents,
     });
 
     expect(options.hooks).toBe(hooks);
@@ -244,6 +252,9 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
     expect(options.plugins).toEqual(plugins);
     expect(options.plugins).not.toBe(plugins);
     expect(options.skills).toEqual(['review']);
+    expect(options.agent).toBe('reviewer');
+    expect(options.agents).toEqual(agents);
+    expect(options.agents).not.toBe(agents);
   });
 
   it('passes the SDK all-skills sentinel', () => {

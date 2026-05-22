@@ -48,6 +48,8 @@ export interface ClaudeCodeOptionsBuilderInput {
   outputFormat?: Record<string, unknown>;
   plugins?: unknown[];
   skills?: string[] | 'all';
+  agent?: string;
+  agents?: Record<string, unknown>;
   abortController?: AbortController;
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
   resumeSessionId?: string;
@@ -76,6 +78,8 @@ export interface ClaudeCodeSdkOptionsShape {
   outputFormat?: Record<string, unknown>;
   plugins?: unknown[];
   skills?: string[] | 'all';
+  agent?: string;
+  agents?: Record<string, unknown>;
   abortController?: AbortController;
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
   resume?: string;
@@ -172,6 +176,13 @@ export function buildClaudeCodeOptions(
     options.skills = 'all';
   } else if (input.skills && input.skills.length > 0) {
     options.skills = [...input.skills];
+  }
+  const agent = trimOptionalString(input.agent);
+  if (agent) {
+    options.agent = agent;
+  }
+  if (input.agents && Object.keys(input.agents).length > 0) {
+    options.agents = { ...input.agents };
   }
   if (input.abortController) {
     options.abortController = input.abortController;

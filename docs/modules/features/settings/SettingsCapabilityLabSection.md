@@ -31,7 +31,7 @@
 
 ### Capability Matrix
 
-`buildMatrixRows()` 静态评估 12 项 Claude Code SDK 能力（Hooks、File Checkpoint、JSONL History、Session Store、Skills、Plugins、Agents、Structured Output、Subagent Transcript、Include Hook Events、Import Session、Fork Session），每项包含 SDK Exposed、Adapter Wired、Runtime Proof 和 Stable UI 四个维度。Runtime Proof 默认为 `untested`，在对应诊断面板执行实时调用后更新为 `pass` 或 `fail`。
+`buildMatrixRows()` 静态评估 13 项 Claude Code SDK 能力（Hooks、File Checkpoint、JSONL History、Session Store、Skills、Plugins、Agents、Agent Definitions、Structured Output、Subagent Transcript、Include Hook Events、Import Session、Fork Session），每项包含 SDK Exposed、Adapter Wired、Runtime Proof 和 Stable UI 四个维度。Runtime Proof 默认为 `untested`，在对应诊断面板执行实时调用后更新为 `pass` 或 `fail`。`Agent Definitions` 只表示 SDK `agent` / `agents` runtime-only 透传已接线，仍是 Hidden/Untested，不代表 agent authoring UI 已完成。
 
 ### Runtime Proof 更新
 

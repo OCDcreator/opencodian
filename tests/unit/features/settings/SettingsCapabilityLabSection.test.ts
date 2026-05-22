@@ -189,7 +189,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(diagnosticElements.length).toBeGreaterThan(0);
   });
 
-  it('buildMatrixRows returns all 12 expected capabilities', () => {
+  it('buildMatrixRows returns all 13 expected capabilities', () => {
     // We test this indirectly by counting matrix table rows
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -201,7 +201,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(12);
+    expect(rows.length).toBe(13);
   });
 
   it('renders status chips with correct active/inactive classes', () => {

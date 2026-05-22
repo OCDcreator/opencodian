@@ -291,6 +291,13 @@ export class SettingsCapabilityLabSection {
         userSurface: 'diagnostic', // Not in CLAUDE_CODE_PHASE1_CAPABILITIES
       },
       {
+        capability: 'Agent Definitions',
+        sdkExposed: true, // SDK options accept agent and agents
+        adapterWired: true, // buildSdkOptions wires runtime-only agent definitions
+        runtimeProof: 'untested',
+        userSurface: 'hidden', // No stable authoring UI
+      },
+      {
         capability: 'Structured Output',
         sdkExposed: true, // outputFormat option in SDK
         adapterWired: true, // buildSdkOptions wires outputFormat
@@ -871,6 +878,8 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(tbody, 'Plugins', false, 'No authoring UI. buildSdkOptions wires plugins from adapter options.');
     // Skills
     this.addDiscoveryRow(tbody, 'Skills', false, 'No authoring UI. buildSdkOptions wires skills (string[]|\'all\') from adapter options.');
+    // Agent definitions
+    this.addDiscoveryRow(tbody, 'Agent Definitions', false, 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options.');
     // Agents / Subagents
     this.addDiscoveryRow(
       tbody,
