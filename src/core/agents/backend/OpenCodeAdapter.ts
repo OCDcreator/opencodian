@@ -193,6 +193,10 @@ export class OpenCodeAdapter
     await this.service.updateSessionTitle(sessionId, title);
   }
 
+  async getSessionMessages(sessionId: string): Promise<unknown[]> {
+    return this.service.getSessionMessages(sessionId);
+  }
+
   // -------------------------------------------------------------------------
   // AgentBranchCapability
   // -------------------------------------------------------------------------

@@ -88,7 +88,7 @@ This run focused on backend-aware session/control seams and gating OpenCode-only
 ### What Claude Still Needs To Verify/Deploy
 
 - ~~`forkSession` is wired in `ClaudeCodeAdapter` but not exposed as stable~~ **RESOLVED**: `AgentCapability.Fork` and `AgentForkCapability` have been added; Claude Code now declares `Fork` and routes fork through the registry layer.
-- `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired; `listSessions` is now backend-aware in `TitleGenerationService`. Full history/session browser UI productization remains pending.
+- `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired; `listSessions` is now backend-aware in `TitleGenerationService`. `getSessionMessages` is now on the shared `AgentSessionCapability` interface and both OpenCode and Claude adapters implement it; `getConversationSessionHistoryService()` routing helper exists in `AgentBackendRouting`. The context usage detail modal now routes through this helper with backend-aware message normalization. Full session/history browser UI productization (e.g. a shared history sidebar) remains pending.
 - Runtime smoke for Claude fork/resume-at is not yet recorded.
 - The `AgentBranchCapability` interface still requires ALL of fork/revert/unrevert/diff/getSessionRevertState; Claude only has fork. `AgentForkCapability` is the separate partial interface for fork-only backends.
 
@@ -160,7 +160,7 @@ The following service seams now route session identity through `getConversationB
 | Conversation load/recovery (rewind/unrevert) | **Gated** | Explicitly OpenCode-only: backend check `backend !== 'opencode'` → unavailable for Claude |
 | Authoritative sync (user message hydration) | **Gated** | OpenCode-only: entire hydration pipeline uses OpenCode-typed messages |
 | Authoritative reload (log identity) | **Yes** | All log `sessionId` fields use `getConversationBackendSessionId()` |
-| Context usage detail modal | **Gated** | OpenCode-only: raw message loader calls `openCodeService.getSessionMessages` |
+| Context usage detail modal | **Backend-aware** | Routes through `getConversationSessionHistoryService()` with backend-aware message normalization; OpenCode uses `{info, parts}` shape, Claude uses generic SDK message shape. Context usage snapshots remain OpenCode-only. |
 | Modified files sidebar (diff) | **Gated** | OpenCode-only: diff is not stable for Claude |
 | Session todos (identity) | **Yes** | `SessionTodoStateService` uses `getConversationBackendSessionId()` |
 | Background task timeline/notice (identity) | **Yes** | Both services use `getConversationBackendSessionId()` |

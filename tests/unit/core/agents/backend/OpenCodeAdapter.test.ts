@@ -58,6 +58,10 @@ function createMockOpenCodeService() {
     getProviderAuthMethods: jest.fn(() => Promise.resolve({})),
     authorizeProviderOAuth: jest.fn(() => Promise.resolve({})),
     completeProviderOAuth: jest.fn(() => Promise.resolve({})),
+    getSessionMessages: jest.fn(() => Promise.resolve([
+      { info: { id: 'msg-1', role: 'user', time: { created: 1000 } }, parts: [] },
+      { info: { id: 'msg-2', role: 'assistant', time: { created: 2000 } }, parts: [] },
+    ])),
   } as unknown as import('../../../../../src/core/opencode/OpenCodeService').OpenCodeService;
 }
 
@@ -133,6 +137,15 @@ describe('OpenCodeAdapter', () => {
     const adapter = new OpenCodeAdapter(service);
     await adapter.updateSessionTitle('session-1', 'Renamed');
     expect(service.updateSessionTitle).toHaveBeenCalledWith('session-1', 'Renamed');
+  });
+
+  it('delegates getSessionMessages to OpenCodeService', async () => {
+    const service = createMockOpenCodeService();
+    const adapter = new OpenCodeAdapter(service);
+    const messages = await adapter.getSessionMessages('session-1');
+    expect(service.getSessionMessages).toHaveBeenCalledWith('session-1');
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toEqual({ info: { id: 'msg-1', role: 'user', time: { created: 1000 } }, parts: [] });
   });
 
   it('delegates sendMessage to OpenCodeService with a backend-neutral request object', async () => {

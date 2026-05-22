@@ -524,7 +524,7 @@ session todo 这条子链路现在的边界是：
 - `SessionTodoDockCoordinator`：session todo dock 的 slot 生命周期，以及 active/background tab 的 session→dock 渲染选择
 - `QuestionTodoActivationRefreshCoordinator`：activation/open 侧的 question dock render、session todo dock writeback 与 supplemental refresh 编排
 - `QuestionTodoBackgroundTaskActivationHostAdapter` 内联的 background-task activation port：activation/open 侧的 background-task indicator reset、conversation-derived runtime rebuild 与 render trigger 编排
-- `ActiveTabContextUsageCoordinator`：activation/open 侧的 active-tab context usage identity / snapshot writeback 编排，以及 per-tab stream lifecycle、indicator 刷新和详情弹窗打开
+- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback 编排，以及 per-tab stream lifecycle、indicator 刷新和详情弹窗打开；context usage detail modal 的 rawMessageLoader 现通过 `loadBackendSessionMessages()` 路由到 backend-aware session history service
 - `QuestionRuntimeViewHostFactory`：question runtime 相邻的 dock/API/attention late-bound host 派生，以及完整的 runtime bundle 装配（`createQuestionRuntimeBundle`）；`OpenCodianView` 不再直接调用 `createQuestionRuntimeViewHost`、`createQuestionPostResolutionRuntimeHostAdapter` 或 `createQuestionRuntimeServices`
 - `QuestionTodoBackgroundTaskRefreshHostAdapter`：`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncCoordinator` 与 `BackgroundConversationPostSyncHandoffCoordinator` 共用的 refresh-side host factory 与 service bundle 装配
 - `QuestionTodoBackgroundTaskRuntimeServiceBundle`：question/todo/background-task 共享的 host assembly 与 service instantiation 顺序；`OpenCodianView` 不再内联组装 `assembleQuestionTodoBackgroundTaskRuntimeHost()`，改为构造 `QuestionTodoBackgroundTaskRuntimeSeam` 直接传给本模块的 `createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam()` 工厂
@@ -595,7 +595,7 @@ effort selector 的 variant 列表继续直接按当前 provider/model 查询 `f
 - `TabConversationActivationBridge`：当前活动 tab 的 empty-state activation / current-tab 新建会话打开路径 shell orchestration 与后续 UI refresh 编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回与 streaming / empty-tab activation outcome UI 刷新
 - `TabActivationRuntimeViewHostFactory`：tab activation bridge 全套实例化已通过 `createTabActivationRuntimeAssembly(deps)` 工厂集中到该模块；`OpenCodianView` 不再直接实例化 `TabConversationStateBridge`、`TabViewActivationBridge`、`TabConversationActivationBridge` 或 `TabRuntimeStateBridge`，改为从 assembly 结果中取出 bridge 实例
-- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback，以及 per-tab stream lifecycle（begin/complete/apply-chunk）、indicator 刷新和详情弹窗打开
+- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback，以及 per-tab stream lifecycle（begin/complete/apply-chunk）、indicator 刷新和详情弹窗打开；context usage detail modal 的 rawMessageLoader 现通过 `loadBackendSessionMessages()` 路由到 backend-aware session history service
 - `ConversationTransitionBridge`：loaded-conversation 的 preflight cleanup、消息区 shell 与 hydration lifecycle bridge
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit
 - `ConversationHydrationRenderBridge`：loaded-conversation hydration 的消息容器 scroll/class shell 与 pane metrics 回写

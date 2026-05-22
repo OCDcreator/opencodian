@@ -13,6 +13,7 @@
 - 从 `AgentServiceRegistry` 解析 conversation-owned backend adapter
 - 提供 `hasChatCapability()` / `hasSessionCapability()` 类型收窄
 - 提供 active session backend 与 conversation session/chat backend helper
+- 提供 `getConversationSessionHistoryService()` 用于 session 消息读取路由，仅返回同时实现了 `getSessionMessages()` 的 session backend
 
 ## 维护约束
 

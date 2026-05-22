@@ -105,13 +105,19 @@ export interface AgentChatCapability extends AgentService {
   cancelStream(sessionId: string): Promise<void> | void;
 }
 
-/** Sessions: create, delete, and retitle backend-owned sessions. */
+/** Sessions: create, delete, retitle, and read backend-owned sessions. */
 export interface AgentSessionCapability extends AgentService {
   createSession(title?: string, options?: Record<string, unknown>): Promise<string>;
   listSessions?(): Promise<unknown[]>;
   getSession?(sessionId: string): Promise<unknown | null>;
   deleteSession(sessionId: string): Promise<void>;
   updateSessionTitle(sessionId: string, title: string): Promise<void>;
+  /**
+   * Read messages from a backend session.
+   * Returns backend-specific raw message objects — callers must normalize
+   * per backend kind. Optional because not all backends expose message history.
+   */
+  getSessionMessages?(sessionId: string, options?: Record<string, unknown>): Promise<unknown[]>;
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import {
 import {
   getConversationChatBackendService,
   getConversationSessionBackendService,
+  loadBackendSessionMessages,
 } from '../../core/agents/backend/AgentBackendRouting';
 import {
   buildClaudeCodeModelSelectorProviders,
@@ -2343,6 +2344,9 @@ export class OpenCodianView extends ItemView {
         }
       },
       getSessionContextUsageSnapshot: (sessionId) => {
+        // Context usage snapshots are OpenCode-specific — no backend-neutral
+        // equivalent exists yet.  Claude context usage is tracked through
+        // usage events, not a session snapshot API.
         const conversation = this.currentConversation;
         if (conversation && (conversation.backend ?? 'opencode') !== 'opencode') {
           return Promise.resolve(null);
@@ -2355,29 +2359,19 @@ export class OpenCodianView extends ItemView {
         this.tabManager?.setTabContextUsage(tabId, contextUsage);
       },
       getActiveTabId: () => this.getActiveTabId(),
-      openContextUsageDetailsModal: (contextState) => {
+        openContextUsageDetailsModal: (contextState) => {
         new ContextDetailModal(this.app, {
           conversation: this.currentConversation,
           contextState,
           systemPrompt: this.plugin.settings.systemPrompt,
-          rawMessageLoader: async () => {
+          rawMessageLoader: () => {
             const conversation = this.currentConversation;
-            const backend = conversation?.backend ?? 'opencode';
-            const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
-            if (!sessionId || backend !== 'opencode') {
-              return [];
-            }
-
-            const messages = await this.plugin.openCodeService.getSessionMessages(sessionId);
-            return messages.map(({ info, parts }) => ({
-              id: info.id,
-              role: info.role,
-              createdAt: info.time.created ?? null,
-              payload: JSON.stringify({
-                message: info,
-                parts,
-              }, null, 2),
-            }));
+            const sessionId = conversation ? getConversationBackendSessionId(conversation) ?? null : null;
+            return loadBackendSessionMessages(
+              this.plugin.agentServiceRegistry,
+              conversation,
+              sessionId,
+            );
           },
         }).open();
       },
