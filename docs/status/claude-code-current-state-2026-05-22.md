@@ -80,8 +80,8 @@ Recent runs focused on two connected lanes:
 | `BackgroundTaskTimelineService.ts` | Debug logs use `getConversationBackendSessionId()`. |
 | `ConversationIdentityRuntime.ts` | Sync fingerprint uses `getConversationBackendSessionId()`. |
 | `SessionTodoStateService.ts` | Session matching uses `getConversationBackendSessionId()`. |
-| `AgentBackendRouting.ts` | Adds `getConversationSessionHistoryService()`, `loadBackendSessionMessages()`, and `getActiveSessionHistoryService()` so shared owners can read raw session history without hard-binding to `openCodeService`. |
-| `TitleGenerationService.ts` | `readOfficialSessionTitle()` now resolves backend + `backendSessionId` and routes `listSessions()` through the active backend where supported. |
+| `AgentBackendRouting.ts` | Adds `getConversationSessionHistoryService()`, `loadBackendSessionMessages()`, `getActiveSessionHistoryService()`, and `readBackendSessionTitle()` so shared owners can read raw session history and session titles without hard-binding to `openCodeService`. |
+| `TitleGenerationService.ts` | `readOfficialSessionTitle()` now routes through `readBackendSessionTitle()` in `AgentBackendRouting` — calls `getSession(sessionId)` on the backend adapter instead of `listSessions()` + client-side filtering. Both OpenCode and Claude paths are unified through the registry. AI title generation (temp session create/delete/send via `openCodeService`) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
 | Context usage detail modal | Raw message loading now routes through `getConversationSessionHistoryService()` with backend-aware normalization; snapshots themselves remain OpenCode-only. |
 | `SettingsConversationSection.ts` | Shared sessions list now routes `listSessions()` through `getActiveSessionBackendService()` and session message preview routes through `getActiveSessionHistoryService()` instead of directly calling `openCodeService`. `unshareSession()` remains a direct `openCodeService` call (OpenCode-specific write). |
 
@@ -99,7 +99,7 @@ Recent runs focused on two connected lanes:
 ### What Claude Still Needs To Verify/Deploy
 
 - ~~`forkSession` is wired in `ClaudeCodeAdapter` but not exposed as stable~~ **RESOLVED**: `AgentCapability.Fork` and `AgentForkCapability` have been added; Claude Code now declares `Fork` and routes fork through the registry layer.
-- `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired; `listSessions` is now backend-aware in `TitleGenerationService`. `getSessionMessages` is now on the shared `AgentSessionCapability` interface and both OpenCode and Claude adapters implement it; `getConversationSessionHistoryService()` routing helper exists in `AgentBackendRouting`. The context usage detail modal now routes through this helper with backend-aware message normalization. `getSession()` itself is still mostly foundation and not yet productized into a higher-level shared owner.
+- `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired. `getSessionMessages` is now on the shared `AgentSessionCapability` interface and both OpenCode and Claude adapters implement it; `getConversationSessionHistoryService()` routing helper exists in `AgentBackendRouting`. The context usage detail modal now routes through this helper with backend-aware message normalization. `getSession()` is now productized narrowly for the shared official-title read seam via `readBackendSessionTitle()`; the helper maps only the currently validated backends (`opencode.title`, `claude-code.summary`) and must not be described as a generic stable cross-backend session-detail object contract yet.
 - Backend-aware history normalization for non-OpenCode backends is currently best-effort foundation (`loadBackendSessionMessages()`); it is good enough for raw inspection surfaces, not yet a stable cross-backend history product contract.
 - `SettingsConversationSection` now uses backend-aware read routing for session list + preview reads, but the preview renderer still consumes OpenCode-shaped `SessionMessage` data. Treat the shared-session manager as a real shared read-surface migration, not as proof that backend-neutral preview rendering is already a stable finished contract.
 - Runtime smoke for Claude fork/resume-at is not yet recorded.
@@ -188,6 +188,7 @@ The following service seams now route session identity through `getConversationB
 | Settings shared sessions list (`listSessions`) | **Backend-aware** | Routes through `getActiveSessionBackendService()` instead of `openCodeService.listSessions()`. Section remains OpenCode-gated because share URLs are OpenCode-specific, but the read surface is backend-aware. |
 | Settings shared session preview (`getSessionMessages`) | **Backend-aware** | Routes through `getActiveSessionHistoryService()` instead of `openCodeService.getSessionMessages()`. Rendering remains OpenCode-specific `{info, parts}` shape. |
 | Settings shared session unshare (`unshareSession`) | **OpenCode-only** | Direct `openCodeService.unshareSession()` call; no backend-neutral equivalent for share URL write operations. |
+| TitleGenerationService official-title read | **Backend-aware** | Routes through `readBackendSessionTitle()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode path uses `.title`; Claude path uses `.summary`. Unified for both backends. |
 
 **Services remaining hard-wired to OpenCode** (no migration justified until backend-neutral equivalents exist):
 
@@ -195,7 +196,7 @@ The following service seams now route session identity through `getConversationB
 |---|---|
 | ConversationSyncBridge | Subscribes to `SessionSyncEventUpdate` from `core/opencode` |
 | ConversationSessionTabResolver | Only reachable through OpenCode sync event subscription |
-| TitleGenerationService | ~~Calls `openCodeService.listSessions()`~~ **PARTIALLY MIGRATED**: `readOfficialSessionTitle` now routes `listSessions` through `agentServiceRegistry` for non-OpenCode backends; AI title generation (temp session create/delete/send) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
+| TitleGenerationService | ~~Calls `openCodeService.listSessions()`~~ **FULLY ROUTED for title reads**: `readOfficialSessionTitle` now uses `readBackendSessionTitle()` routing helper → `getSession(sessionId)` on the backend adapter. AI title generation (temp session create/delete/send) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
 | PostSyncQuestionTodoRefreshPlanBuilder | Feeds into question/todo refresh chain using OpenCode APIs |
 | PostSyncQuestionTodoRefreshHostAdapter | Adapter for question/todo chain using `openCodeService` |
 | ConversationSyncVisiblePostSyncRouter | Routes post-sync question/todo updates through OpenCode APIs |

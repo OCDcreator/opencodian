@@ -85,6 +85,58 @@ export function getActiveSessionHistoryService(
 }
 
 // ---------------------------------------------------------------------------
+// Backend-aware session title read
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the display title of a backend session through the routing layer.
+ *
+ * Routes through the registry and calls `getSession(sessionId)` on the
+ * backend adapter, then extracts the backend-specific title field for
+ * the currently productized backends:
+ * - OpenCode: `.title`
+ * - Claude Code: `.summary`
+ *
+ * Returns `null` when no session service is available, `getSession` is not
+ * implemented, the session is not found, the backend has not been mapped
+ * yet, or the mapped title field is empty.
+ */
+export async function readBackendSessionTitle(
+  registry: AgentServiceRegistry | null | undefined,
+  conversation: Pick<Conversation, 'backend'> | null,
+  sessionId: string | null,
+): Promise<string | null> {
+  if (!sessionId) {
+    return null;
+  }
+
+  const sessionService = getConversationSessionBackendService(registry, conversation);
+  if (!sessionService || typeof sessionService.getSession !== 'function') {
+    return null;
+  }
+
+  const backend = resolveConversationBackendKind(conversation);
+  const session = await sessionService.getSession(sessionId);
+  if (!session || typeof session !== 'object') {
+    return null;
+  }
+
+  const record = session as Record<string, unknown>;
+
+  if (backend === 'opencode') {
+    const title = record.title;
+    return typeof title === 'string' && title.trim() ? title.trim() : null;
+  }
+
+  if (backend === 'claude-code') {
+    const summary = record.summary;
+    return typeof summary === 'string' && summary.trim() ? summary.trim() : null;
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Backend-aware session message normalization
 // ---------------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-import { AgentCapability } from '../../../core/agents/AgentCapability';
+import { readBackendSessionTitle } from '../../../core/agents/backend/AgentBackendRouting';
 import { parseModelReference, resolveModelSelection } from '../../../core/config/modelConfig';
 import type { LocalOutputFormat } from '../../../core/opencode/types';
 import {
@@ -167,29 +167,12 @@ export class TitleGenerationService {
     sessionId: string,
     backend: AgentBackendKind,
   ): Promise<string | null> {
-    if (backend === 'opencode') {
-      const sessions = await this.plugin.openCodeService.listSessions();
-      const session = sessions.find((item) => item.id === sessionId);
-      return typeof session?.title === 'string'
-        ? this.normalizeOfficialTitle(session.title)
-        : null;
-    }
-
-    // Backend-aware routing for non-OpenCode backends
-    const registry = this.plugin.agentServiceRegistry;
-    const adapter = registry.get(backend);
-    if (!adapter?.hasCapability(AgentCapability.Sessions)) {
-      return null;
-    }
-
-    const sessionAdapter = adapter as import('../../../core/agents/backend/AgentService').AgentSessionCapability;
-    const sessions = await sessionAdapter.listSessions?.() ?? [];
-    const session = (sessions as Array<{ sessionId?: string; summary?: string }>).find(
-      (item) => item.sessionId === sessionId,
+    const rawTitle = await readBackendSessionTitle(
+      this.plugin.agentServiceRegistry,
+      { backend },
+      sessionId,
     );
-    return typeof session?.summary === 'string'
-      ? this.normalizeOfficialTitle(session.summary)
-      : null;
+    return rawTitle ? this.normalizeOfficialTitle(rawTitle) : null;
   }
 
   private async resolveConversationSessionId(conversationId: string): Promise<string | null> {

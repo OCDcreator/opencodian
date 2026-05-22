@@ -6,6 +6,7 @@ import {
   getConversationSessionBackendService,
   getConversationSessionHistoryService,
   loadBackendSessionMessages,
+  readBackendSessionTitle,
 } from '../../../../../src/core/agents/backend/AgentBackendRouting';
 import type {
   AgentService,
@@ -54,8 +55,7 @@ function createMockRegistry(adapters: Map<AgentBackendKind, AgentService>) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('AgentBackendRouting', () => {
-  describe('getConversationSessionBackendService', () => {
+describe('getConversationSessionBackendService', () => {
     it('returns session-capable adapter for opencode conversation', () => {
       const adapter = createMockSessionAdapter('opencode');
       const registry = createMockRegistry(new Map([['opencode', adapter]]));
@@ -77,7 +77,7 @@ describe('AgentBackendRouting', () => {
     });
   });
 
-  describe('getConversationSessionHistoryService', () => {
+describe('getConversationSessionHistoryService', () => {
     it('returns null when adapter lacks getSessionMessages', () => {
       const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
         // No getSessionMessages
@@ -126,7 +126,7 @@ describe('AgentBackendRouting', () => {
     });
   });
 
-  describe('getActiveSessionHistoryService', () => {
+describe('getActiveSessionHistoryService', () => {
     it('returns null when registry is null', () => {
       const result = getActiveSessionHistoryService(null);
       expect(result).toBeNull();
@@ -161,7 +161,7 @@ describe('AgentBackendRouting', () => {
     });
   });
 
-  describe('loadBackendSessionMessages', () => {
+describe('loadBackendSessionMessages', () => {
     it('returns empty array when sessionId is null', async () => {
       const result = await loadBackendSessionMessages(null, null, null);
       expect(result).toEqual([]);
@@ -213,4 +213,83 @@ describe('AgentBackendRouting', () => {
       expect(result[1].role).toBe('assistant');
     });
   });
+
+describe('readBackendSessionTitle', () => {
+    it('returns null when sessionId is null', async () => {
+      const result = await readBackendSessionTitle(null, null, null);
+      expect(result).toBeNull();
+    });
+
+    it('returns null when registry is null', async () => {
+      const result = await readBackendSessionTitle(null, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when adapter lacks getSession', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES);
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns OpenCode title from .title field', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => ({ id: 'ses-1', title: 'My OpenCode Session' }),
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBe('My OpenCode Session');
+    });
+
+    it('returns Claude title from .summary field', async () => {
+      const adapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Chat,
+        AgentCapability.Sessions,
+        AgentCapability.Fork,
+      ]), {
+        getSession: async () => ({ sessionId: 'ses-1', summary: 'Claude Chat Topic' }),
+      });
+      const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'claude-code' }, 'ses-1');
+      expect(result).toBe('Claude Chat Topic');
+    });
+
+    it('returns null when session is not found', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => null,
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when title is empty string', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => ({ id: 'ses-1', title: '   ' }),
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns trimmed title', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => ({ id: 'ses-1', title: '  Hello World  ' }),
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBe('Hello World');
+    });
+
+    it('returns null for backends without an explicit title mapping', async () => {
+      const adapter = createMockSessionAdapter('codex', new Set([
+        AgentCapability.Chat,
+        AgentCapability.Sessions,
+      ]), {
+        getSession: async () => ({ id: 'ses-1', title: 'Codex Session' }),
+      });
+      const registry = createMockRegistry(new Map([['codex', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'codex' }, 'ses-1');
+      expect(result).toBeNull();
+    });
 });

@@ -7,15 +7,22 @@ describe('TitleGenerationService', () => {
   function createMockPlugin(overrides: Partial<{
     backend: AgentBackendKind;
     openCodeSessionId: string | null;
-    registryHasSessions: boolean;
+    registerAdapter: boolean;
+    getSessionResult: Record<string, unknown> | null;
     listSessionsResult: Array<{ sessionId?: string; summary?: string }>;
   }> = {}) {
     const {
       backend = 'opencode',
       openCodeSessionId = 'oc-session-1',
-      registryHasSessions = false,
+      registerAdapter = true,
+      getSessionResult,
       listSessionsResult = [],
     } = overrides;
+
+    const opencodeSessions = [
+      { id: 'oc-session-1', title: 'OpenCode Session Title' },
+      { id: 'oc-session-2', title: 'Another Session' },
+    ];
 
     const mockAdapter: AgentService & Partial<AgentSessionCapability> = {
       kind: backend,
@@ -30,12 +37,20 @@ describe('TitleGenerationService', () => {
       stop: jest.fn(),
       dispose: jest.fn(),
       onStatusChange: jest.fn(() => ({ dispose: jest.fn() })),
-      listSessions: jest.fn().mockResolvedValue(listSessionsResult),
+      getSession: jest.fn().mockImplementation(async (sessionId: string) => {
+        if (getSessionResult !== undefined) {
+          return getSessionResult;
+        }
+        if (backend === 'opencode') {
+          return opencodeSessions.find((s) => s.id === sessionId) ?? null;
+        }
+        return listSessionsResult.find((s) => s.sessionId === sessionId) ?? null;
+      }),
     };
 
     const mockRegistry = {
       get: jest.fn().mockImplementation((kind: AgentBackendKind) => {
-        if (kind === backend && registryHasSessions) {
+        if (kind === backend && registerAdapter) {
           return mockAdapter;
         }
         return undefined;
@@ -43,10 +58,7 @@ describe('TitleGenerationService', () => {
     };
 
     const mockOpenCodeService = {
-      listSessions: jest.fn().mockResolvedValue([
-        { id: 'oc-session-1', title: 'OpenCode Session Title' },
-        { id: 'oc-session-2', title: 'Another Session' },
-      ]),
+      listSessions: jest.fn().mockResolvedValue(opencodeSessions),
       createSession: jest.fn().mockResolvedValue('temp-session'),
       deleteSession: jest.fn().mockResolvedValue(undefined),
       requestAssistantResponse: jest.fn(),
@@ -74,7 +86,7 @@ describe('TitleGenerationService', () => {
   }
 
   describe('readOfficialSessionTitle', () => {
-    it('reads official title from OpenCode backend via openCodeService.listSessions', async () => {
+    it('reads official title from OpenCode backend via registry routing', async () => {
       const plugin = createMockPlugin({ backend: 'opencode', openCodeSessionId: 'oc-session-1' });
       const service = new TitleGenerationService(plugin);
 
@@ -85,17 +97,15 @@ describe('TitleGenerationService', () => {
 
       const title = await readOfficialSessionTitle('oc-session-1', 'opencode');
       expect(title).toBe('OpenCode Session Title');
-      expect(plugin.openCodeService.listSessions).toHaveBeenCalled();
+      expect(plugin.agentServiceRegistry.get).toHaveBeenCalledWith('opencode');
     });
 
     it('returns null for OpenCode session with default title pattern', async () => {
       const plugin = createMockPlugin({
         backend: 'opencode',
         openCodeSessionId: 'oc-session-1',
+        getSessionResult: { id: 'oc-session-1', title: 'New session - 2026-01-01T00:00:00.000Z' },
       });
-      plugin.openCodeService.listSessions = jest.fn().mockResolvedValue([
-        { id: 'oc-session-1', title: 'New session - 2026-01-01T00:00:00.000Z' },
-      ]);
       const service = new TitleGenerationService(plugin);
 
       const readOfficialSessionTitle = ((service as unknown as Record<string, unknown>)
@@ -106,12 +116,11 @@ describe('TitleGenerationService', () => {
       expect(title).toBeNull();
     });
 
-    it('reads official title from non-OpenCode backend via registry adapter listSessions', async () => {
+    it('reads official title from non-OpenCode backend via registry routing', async () => {
       const plugin = createMockPlugin({
         backend: 'claude-code',
         openCodeSessionId: null,
-        registryHasSessions: true,
-        listSessionsResult: [{ sessionId: 'claude-session-1', summary: 'Claude Session Title' }],
+        getSessionResult: { sessionId: 'claude-session-1', summary: 'Claude Session Title' },
       });
       const service = new TitleGenerationService(plugin);
 
@@ -128,7 +137,7 @@ describe('TitleGenerationService', () => {
       const plugin = createMockPlugin({
         backend: 'claude-code',
         openCodeSessionId: null,
-        registryHasSessions: false,
+        registerAdapter: false,
       });
       const service = new TitleGenerationService(plugin);
 
@@ -138,14 +147,12 @@ describe('TitleGenerationService', () => {
 
       const title = await readOfficialSessionTitle('claude-session-1', 'claude-code');
       expect(title).toBeNull();
-      expect(plugin.openCodeService.listSessions).not.toHaveBeenCalled();
     });
 
     it('returns null when session is not found in backend list', async () => {
       const plugin = createMockPlugin({
         backend: 'claude-code',
-        registryHasSessions: true,
-        listSessionsResult: [{ sessionId: 'other-session', summary: 'Other' }],
+        getSessionResult: null,
       });
       const service = new TitleGenerationService(plugin);
 

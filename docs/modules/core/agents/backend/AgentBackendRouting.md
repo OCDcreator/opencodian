@@ -15,6 +15,7 @@
 - 提供 active session backend 与 conversation session/chat backend helper
 - 提供 `getConversationSessionHistoryService()` 用于 session 消息读取路由，仅返回同时实现了 `getSessionMessages()` 的 session backend
 - 提供 `getActiveSessionHistoryService()` 用于 active backend 的 session 消息读取路由，供无 conversation context 的消费方（如 settings inspection surface）使用
+- 提供 `readBackendSessionTitle()` 用于 backend-aware session 标题读取路由，通过 `getSession(sessionId)` 获取 session 详情并按已 productize 的 backend kind 提取标题字段（OpenCode: `.title`，Claude Code: `.summary`）；未来 backend 在明确字段语义前返回 `null`
 
 ## 维护约束
 

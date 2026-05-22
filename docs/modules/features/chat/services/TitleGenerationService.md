@@ -46,7 +46,7 @@ private readonly activeGenerations = new Map<string, AbortController>();
 
 1. 取消同一 conversation 已存在的标题任务
 2. 建立新的 `AbortController`
-3. 通过 `conversationId` 解析 backend 和 `backendSessionId`；对 OpenCode 直接轮询 `openCodeService.listSessions()`，对非 OpenCode backend 则通过 `agentServiceRegistry` 路由到 adapter 的 `listSessions()`；等待官方后台 `ensureTitle()` 把默认标题改成真实标题
+3. 通过 `conversationId` 解析 backend 和 `backendSessionId`；调用 `readBackendSessionTitle()` 路由 helper，通过 registry 获取 backend adapter 的 `getSession(sessionId)` 读取官方标题；等待官方后台 `ensureTitle()` 把默认标题改成真实标题
 4. 如果拿到非默认官方标题，直接回调成功，不创建本地临时 session
 5. 官方标题仍是默认值、读取失败或超时后，才进入本地兜底：通过 `resolveModel()` 解析标题模型
 6. 按 locale 构建标题 prompt 与 system prompt
@@ -96,7 +96,8 @@ private readonly activeGenerations = new Map<string, AbortController>();
 ## 与其他模块的交互
 
 - `OpenCodianView`: 发起标题生成并接收结果回调
-- `OpenCodeService`: 读取真实 session title；官方标题失败后创建临时 session、发送非流式请求、删除临时 session
+- `AgentBackendRouting.readBackendSessionTitle()`: backend-aware session 标题读取路由，通过 `getSession()` 获取 session 详情并提取标题
+- `OpenCodeService`: 官方标题失败后创建临时 session、发送非流式请求、删除临时 session（AI 标题生成路径保持 OpenCode-only）
 - `core/prompts/titleGeneration.ts`: 提供 locale-aware prompt 和 system prompt
 - `ModelConfigService`: 用于 availability-aware 标题模型解析
 
