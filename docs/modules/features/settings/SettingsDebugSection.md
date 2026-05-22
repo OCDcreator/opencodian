@@ -42,6 +42,8 @@ Claude Code block 不再只是单个 toggle。它现在渲染：
 - 最近 20 条 Claude Code 日志预览，按 module + enabled channel 过滤
 - 复制当前 Claude 日志、复制 Claude 专属 summary-only 诊断报告、清空最近日志动作
 
+工作台视觉结构跟随 `Formatter & Language Servers > Formatters` 子标签的设置模式：状态摘要使用紧凑 pill 元信息，通道开关和日志预览使用 object panel + row list，而不是 dashboard metric cards。复制类动作保持 CTA 权重，清空日志降为普通按钮，避免破坏调试页的信息层级。
+
 `experimental` 通道默认关闭，只为 hooks、subagent summary、checkpoint、history 等后续 runtime-proof 诊断预留，不代表这些能力已经进入 stable UI。
 
 ### 高频日志刷新间隔

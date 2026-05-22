@@ -322,7 +322,7 @@ export class SettingsDebugSection {
       clearRecentLogs();
       this.refreshClaudeCodeWorkbench(containerEl);
       new Notice(t('settings.debug.actions.clearLogsSuccess'));
-    });
+    }, false);
 
     const previewEl = logsEl.createEl('pre', {
       cls: 'opencodian-debug-log-preview',
@@ -331,9 +331,14 @@ export class SettingsDebugSection {
     previewEl.textContent = this.getVisibleClaudeCodeLogText();
   }
 
-  private addActionButton(containerEl: HTMLElement, label: string, onClick: () => void | Promise<void>): HTMLButtonElement {
+  private addActionButton(
+    containerEl: HTMLElement,
+    label: string,
+    onClick: () => void | Promise<void>,
+    cta = true,
+  ): HTMLButtonElement {
     const buttonEl = containerEl.createEl('button', {
-      cls: 'mod-cta opencodian-debug-action-button',
+      cls: cta ? 'mod-cta opencodian-debug-action-button' : 'opencodian-debug-action-button',
       text: label,
       attr: { type: 'button' },
     });
