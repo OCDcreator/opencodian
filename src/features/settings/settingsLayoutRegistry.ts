@@ -197,6 +197,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'opencode', labelKey: 'settings.debug.tab.opencode' },
       { id: 'claude-code', labelKey: 'settings.debug.tab.claudeCode' },
       { id: 'export', labelKey: 'settings.debug.tab.export' },
+      { id: 'capability-lab', labelKey: 'settings.debug.tab.capabilityLab' },
     ],
   },
   {

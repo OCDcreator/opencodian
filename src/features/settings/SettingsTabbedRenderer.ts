@@ -16,6 +16,7 @@ import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsBackendSection } from './SettingsBackendSection';
+import { SettingsCapabilityLabSection } from './SettingsCapabilityLabSection';
 import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
@@ -477,6 +478,14 @@ export class SettingsTabbedRenderer {
   }
 
   private renderDebugContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    if (secondaryTabId === 'capability-lab') {
+      const capabilityLabSection = new SettingsCapabilityLabSection({
+        plugin: this.deps.plugin,
+        createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+      });
+      capabilityLabSection.attachTabbed(containerEl, secondaryTabId);
+      return;
+    }
     const debugSection = new SettingsDebugSection({
       plugin: this.deps.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),

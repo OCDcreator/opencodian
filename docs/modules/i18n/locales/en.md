@@ -299,3 +299,7 @@ Added `settings.claudeCode.environment.status` so the Claude Code Runtime tab ca
 Added `settings.claudeCode.enableFileCheckpointing.*`, `settings.claudeCode.includeHookEvents.*`, `settings.claudeCode.forwardSubagentText.*`, and `settings.claudeCode.agentProgressSummaries.*` for Claude Code SDK foundation switches. The copy explicitly says these are SDK wiring / diagnostic foundations and that stable rewind, hook authoring, and full subagent transcript UI are not complete.
 
 Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` label. Its dense advanced controls are split into `settings.claudeCode.tab.tools`, `settings.claudeCode.tab.limits`, and `settings.claudeCode.tab.sdkFoundations`.
+
+## 2026-05-22 Capability Lab diagnostic panel
+
+新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的 Capability Lab 二级标签提供英文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场和发现状态六个诊断面板。所有面板标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。

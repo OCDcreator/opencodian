@@ -150,6 +150,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'opencode',
       'claude-code',
       'export',
+      'capability-lab',
     ]);
   });
 });

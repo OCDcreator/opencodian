@@ -35,7 +35,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 | `security` | `config`, `permissions`, `safety` |
 | `ui` | `general` |
 | `style` | `presets`, `background`, `layout`, `user`, `assistant`, `input`, `scrollbar`, `advanced` |
-| `debug` | `plugin`, `opencode`, `claude-code`, `export` |
+| `debug` | `plugin`, `opencode`, `claude-code`, `export`, `capability-lab` |
 | `user` | `profile`, `prompt`, `tags` |
 | `skills` | `project`, `external` |
 | `tools` | `builtin`, `custom` |
@@ -56,4 +56,4 @@ Claude Code 的二级标签现在拆成 `runtime`、`model-thinking`、`permissi
 
 Conversation 的默认二级标签是 `display`，因为聊天字号和用户消息渲染属于后端无关的显示设置；`title`、`compaction`、`sharing`、`questions` 目前都依赖 OpenCode SDK / `.opencode/opencode.json` / OpenCode session API，必须继续标记为 `backendRequired: 'opencode'`，直到对应 Claude Code 能力真实接入。
 
-Debug 的默认二级标签是 `plugin`，因为总开关和插件内部模块开关是最通用入口。旧的 `debug/general`、`debug/modules` 会迁移到 `plugin`，旧的 `debug/logs`、`debug/actions` 会迁移到 `export`；`opencode` 与 `claude-code` 是新的来源分区，分别承载 OpenCode 后端诊断和 Claude Code SDK 诊断。
+Debug 的默认二级标签是 `plugin`，因为总开关和插件内部模块开关是最通用入口。旧的 `debug/general`、`debug/modules` 会迁移到 `plugin`，旧的 `debug/logs`、`debug/actions` 会迁移到 `export`；`opencode` 与 `claude-code` 是新的来源分区，分别承载 OpenCode 后端诊断和 Claude Code SDK 诊断。`capability-lab` 是诊断/实验面板，提供 SDK 能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场和发现状态，均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。

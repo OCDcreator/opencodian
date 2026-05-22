@@ -303,3 +303,7 @@ New Chinese keys added for the tabbed settings layout:
 新增 `settings.claudeCode.enableFileCheckpointing.*`、`settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*` 和 `settings.claudeCode.agentProgressSummaries.*`，用于 Claude Code SDK foundation 开关。文案明确这些只是 SDK wiring / diagnostic foundation，不把 stable rewind、hook authoring 或完整 subagent transcript UI 包装成已完成。
 
 Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签；高级项拆分为 `settings.claudeCode.tab.tools`、`settings.claudeCode.tab.limits` 和 `settings.claudeCode.tab.sdkFoundations`。
+
+## 2026-05-22 Capability Lab 诊断面板
+
+新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的"能力实验室"二级标签提供中文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、回退 dry-run 预览、结构化输出实验场和发现状态六个诊断面板。所有面板标记为 ⚠️ 诊断 / 实验 / 非稳定，不连接稳定设置持久化。
