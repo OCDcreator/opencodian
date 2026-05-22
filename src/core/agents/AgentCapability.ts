@@ -15,6 +15,7 @@ export const AgentCapability = {
   Tools: 'tools',
   Mcp: 'mcp',
   Permissions: 'permissions',
+  Fork: 'fork',
   Branching: 'branching',
   Todos: 'todos',
   Questions: 'questions',

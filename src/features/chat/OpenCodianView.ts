@@ -1909,6 +1909,19 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private getCurrentConversationForkService():
+    import('../../core/agents/backend/AgentService').AgentForkCapability | null {
+    const conversation = this.currentConversation;
+    const service = getConversationSessionBackendService(
+      this.plugin.agentServiceRegistry,
+      conversation,
+    );
+    if (!service?.hasCapability(AgentCapability.Fork)) {
+      return null;
+    }
+    return service as unknown as import('../../core/agents/backend/AgentService').AgentForkCapability;
+  }
+
   private getCurrentConversationBranchService():
     import('../../core/agents/backend/AgentService').AgentBranchCapability | null {
     const conversation = this.currentConversation;
@@ -1948,9 +1961,9 @@ export class OpenCodianView extends ItemView {
 
   private routeConversationForkSession(sessionId: string, messageId: string): Promise<{ id: string; title: string }> {
     const backend = this.currentConversation?.backend ?? 'opencode';
-    const branchService = this.getCurrentConversationBranchService();
-    if (branchService) {
-      return branchService.forkSession(sessionId, messageId);
+    const forkService = this.getCurrentConversationForkService();
+    if (forkService) {
+      return forkService.forkSession(sessionId, messageId);
     }
     if (backend === 'opencode') {
       return this.plugin.openCodeService.forkSession(sessionId, messageId);
@@ -2822,7 +2835,9 @@ export class OpenCodianView extends ItemView {
   private createUserMessageFooterRendererHost(): UserMessageFooterRendererHost {
     return {
       isStreaming: () => this.isActiveTabStreaming(),
-      hasBranchingCapability: () =>
+      hasForkCapability: () =>
+        hasCapability(getActiveBackendCapabilities(), AgentCapability.Fork),
+      hasRewindCapability: () =>
         hasCapability(getActiveBackendCapabilities(), AgentCapability.Branching),
       handleRewindRequest: (message) => this.handleRewindRequest(message),
       handleForkRequest: (message) => this.handleForkRequest(message),

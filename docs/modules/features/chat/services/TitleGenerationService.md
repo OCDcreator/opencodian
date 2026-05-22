@@ -46,7 +46,7 @@ private readonly activeGenerations = new Map<string, AbortController>();
 
 1. 取消同一 conversation 已存在的标题任务
 2. 建立新的 `AbortController`
-3. 如果调用方传入真实 OpenCode `sessionId`，或能通过 `conversationId` 解析到 `openCodeSessionId`，轮询公开的 `listSessions()` 结果，等待官方后台 `ensureTitle()` 把 `"New session - <ISO>"` 改成真实标题
+3. 通过 `conversationId` 解析 backend 和 `backendSessionId`；对 OpenCode 直接轮询 `openCodeService.listSessions()`，对非 OpenCode backend 则通过 `agentServiceRegistry` 路由到 adapter 的 `listSessions()`；等待官方后台 `ensureTitle()` 把默认标题改成真实标题
 4. 如果拿到非默认官方标题，直接回调成功，不创建本地临时 session
 5. 官方标题仍是默认值、读取失败或超时后，才进入本地兜底：通过 `resolveModel()` 解析标题模型
 6. 按 locale 构建标题 prompt 与 system prompt

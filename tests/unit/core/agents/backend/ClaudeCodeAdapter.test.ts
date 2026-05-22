@@ -153,6 +153,8 @@ describe('ClaudeCodeAdapter', () => {
     expect(adapter.kind).toBe('claude-code');
     expect(adapter.hasCapability(AgentCapability.Chat)).toBe(true);
     expect(adapter.hasCapability(AgentCapability.Sessions)).toBe(true);
+    expect(adapter.hasCapability(AgentCapability.Fork)).toBe(true);
+    expect(adapter.hasCapability(AgentCapability.Branching)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Tools)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Mcp)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Permissions)).toBe(false);

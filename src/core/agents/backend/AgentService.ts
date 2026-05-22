@@ -125,6 +125,11 @@ export interface AgentSessionCapability extends AgentService {
 //   }
 // ---------------------------------------------------------------------------
 
+/** Fork: session forking without full branching semantics. */
+export interface AgentForkCapability extends AgentService {
+  forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }>;
+}
+
 /** Branching: fork, revert, unrevert, diff. */
 export interface AgentBranchCapability extends AgentService {
   forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }>;

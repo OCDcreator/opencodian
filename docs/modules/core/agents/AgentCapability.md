@@ -9,7 +9,7 @@
 
 ## 职责
 
-- 暴露 `AgentCapability` 常量对象，集中列出 chat、sessions、tools、MCP、permissions、branching、questions、models、subagents 等能力标识
+- 暴露 `AgentCapability` 常量对象，集中列出 chat、sessions、tools、MCP、permissions、fork、branching、questions、models、subagents 等能力标识
 - 定义 `BackendCapabilities` 作为只读能力集合
 - 暴露 `OPENCODE_FULL_CAPABILITIES`，表示 OpenCode 在 Phase 0 支持全部能力
 - 暴露 `getActiveBackendCapabilities()` 和 `hasCapability()`，供 UI 以 capability 而不是 backend 名称做条件渲染

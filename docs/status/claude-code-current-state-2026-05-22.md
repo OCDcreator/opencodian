@@ -87,10 +87,10 @@ This run focused on backend-aware session/control seams and gating OpenCode-only
 
 ### What Claude Still Needs To Verify/Deploy
 
-- `forkSession` is wired in `ClaudeCodeAdapter` but not exposed as stable (no `AgentCapability.Branching` in `CLAUDE_CODE_PHASE1_CAPABILITIES`).
-- `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired but not yet productized through the sync/history UI.
+- ~~`forkSession` is wired in `ClaudeCodeAdapter` but not exposed as stable~~ **RESOLVED**: `AgentCapability.Fork` and `AgentForkCapability` have been added; Claude Code now declares `Fork` and routes fork through the registry layer.
+- `ClaudeCodeAdapter` has `listSessions`, `getSession`, `getSessionMessages`, `deleteSession`, `updateSessionTitle` — these are adapter-wired; `listSessions` is now backend-aware in `TitleGenerationService`. Full history/session browser UI productization remains pending.
 - Runtime smoke for Claude fork/resume-at is not yet recorded.
-- The `AgentBranchCapability` interface requires ALL of fork/revert/unrevert/diff/getSessionRevertState; Claude only has fork. A separate "fork-only" capability or partial interface may be needed if fork is to be promoted before the other branch operations.
+- The `AgentBranchCapability` interface still requires ALL of fork/revert/unrevert/diff/getSessionRevertState; Claude only has fork. `AgentForkCapability` is the separate partial interface for fork-only backends.
 
 ## What Is Definitely Complete
 
@@ -156,7 +156,7 @@ The following service seams now route session identity through `getConversationB
 
 | Seam | Backend-aware? | Notes |
 |---|---|---|
-| Conversation load/recovery (fork) | **Yes** | Fork routes through registry `AgentBranchCapability` for capable backends; OpenCode fallback preserved |
+| Conversation load/recovery (fork) | **Yes** | Fork routes through registry `AgentForkCapability` for capable backends; OpenCode fallback preserved |
 | Conversation load/recovery (rewind/unrevert) | **Gated** | Explicitly OpenCode-only: backend check `backend !== 'opencode'` → unavailable for Claude |
 | Authoritative sync (user message hydration) | **Gated** | OpenCode-only: entire hydration pipeline uses OpenCode-typed messages |
 | Authoritative reload (log identity) | **Yes** | All log `sessionId` fields use `getConversationBackendSessionId()` |
@@ -179,7 +179,7 @@ The following service seams now route session identity through `getConversationB
 |---|---|
 | ConversationSyncBridge | Subscribes to `SessionSyncEventUpdate` from `core/opencode` |
 | ConversationSessionTabResolver | Only reachable through OpenCode sync event subscription |
-| TitleGenerationService | Calls `openCodeService.listSessions()` |
+| TitleGenerationService | ~~Calls `openCodeService.listSessions()`~~ **PARTIALLY MIGRATED**: `readOfficialSessionTitle` now routes `listSessions` through `agentServiceRegistry` for non-OpenCode backends; AI title generation (temp session create/delete/send) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
 | PostSyncQuestionTodoRefreshPlanBuilder | Feeds into question/todo refresh chain using OpenCode APIs |
 | PostSyncQuestionTodoRefreshHostAdapter | Adapter for question/todo chain using `openCodeService` |
 | ConversationSyncVisiblePostSyncRouter | Routes post-sync question/todo updates through OpenCode APIs |

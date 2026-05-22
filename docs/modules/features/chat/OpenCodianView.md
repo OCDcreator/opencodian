@@ -243,7 +243,7 @@ Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增�
 - OpenCode 首条消息后的标题链路仍由 view 发起并接收回调；实际官方标题优先、本地兜底、以及首次 provisional server 写入抑制分别由 `TitleGenerationService` 和 `OpenCodeSessionLifecycleCoordinator` 承接，view 只负责更新本地 conversation/title status 与 tab 标题。Claude Code 当前未接入标题生成，发送准备阶段不会触发 OpenCode title fallback 或 AI title kickoff。
 - 清空当前消息区并重置 turn 状态
 - 把 legacy `openCodeSessionId` 交给 `openCodeService`；发送和 tab runtime 的通用 session identity 逐步迁到 `backendSessionId` / `getConversationBackendSessionId()`，但标题同步、取消流、child session 等 OpenCode-only surface 仍按 backend/capability 分阶段保留 guard
-- revert / unrevert / fork 的 session control 调用现在通过 `AgentServiceRegistry` 路由到拥有 `AgentCapability.Branching` 的 backend adapter；OpenCode 仍走 `openCodeService` 作为 fallback，Claude 等 backend 在未声明 Branching 能力时直接抛错，避免把 Claude session ID 误传入 OpenCode-only 路径
+- revert / unrevert 的 session control 调用现在通过 `AgentServiceRegistry` 路由到拥有 `AgentCapability.Branching` 的 backend adapter；fork 则通过 `AgentCapability.Fork` 路由到 `AgentForkCapability` adapter；OpenCode 仍走 `openCodeService` 作为 fallback，Claude 等 backend 在未声明对应能力时直接抛错，避免把 Claude session ID 误传入 OpenCode-only 路径
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 在 load 完成与 authoritative sync 完成后额外调用 `ChildSessionGraphCoordinator.refreshGraph()`，让 child-session tree 跟随当前可见对话的 persisted/live child-session 数据刷新
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级

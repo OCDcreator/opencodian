@@ -1,3 +1,4 @@
+import { AgentCapability } from '../../../core/agents/AgentCapability';
 import { parseModelReference, resolveModelSelection } from '../../../core/config/modelConfig';
 import type { LocalOutputFormat } from '../../../core/opencode/types';
 import {
@@ -6,6 +7,8 @@ import {
   normalizeTitleGenerationLocale,
 } from '../../../core/prompts/titleGeneration';
 import type { ChatMessage } from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
+import { getConversationBackendSessionId } from '../../../core/types/chat';
 import type OpenCodianPlugin from '../../../main';
 
 const TITLE_MODEL_UNAVAILABLE_ERROR = 'Configured AI title model is unavailable';
@@ -133,6 +136,8 @@ export class TitleGenerationService {
       return null;
     }
 
+    const backend = await this.resolveConversationBackend(conversationId);
+
     const attempts = Math.max(1, options.officialPollAttempts ?? OFFICIAL_TITLE_POLL_ATTEMPTS);
     const intervalMs = Math.max(0, options.officialPollIntervalMs ?? OFFICIAL_TITLE_POLL_INTERVAL_MS);
 
@@ -142,7 +147,7 @@ export class TitleGenerationService {
       }
 
       try {
-        const title = await this.readOfficialSessionTitle(sessionId);
+        const title = await this.readOfficialSessionTitle(sessionId, backend);
         if (title) {
           return title;
         }
@@ -158,11 +163,32 @@ export class TitleGenerationService {
     return null;
   }
 
-  private async readOfficialSessionTitle(sessionId: string): Promise<string | null> {
-    const sessions = await this.plugin.openCodeService.listSessions();
-    const session = sessions.find((item) => item.id === sessionId);
-    return typeof session?.title === 'string'
-      ? this.normalizeOfficialTitle(session.title)
+  private async readOfficialSessionTitle(
+    sessionId: string,
+    backend: AgentBackendKind,
+  ): Promise<string | null> {
+    if (backend === 'opencode') {
+      const sessions = await this.plugin.openCodeService.listSessions();
+      const session = sessions.find((item) => item.id === sessionId);
+      return typeof session?.title === 'string'
+        ? this.normalizeOfficialTitle(session.title)
+        : null;
+    }
+
+    // Backend-aware routing for non-OpenCode backends
+    const registry = this.plugin.agentServiceRegistry;
+    const adapter = registry.get(backend);
+    if (!adapter?.hasCapability(AgentCapability.Sessions)) {
+      return null;
+    }
+
+    const sessionAdapter = adapter as import('../../../core/agents/backend/AgentService').AgentSessionCapability;
+    const sessions = await sessionAdapter.listSessions?.() ?? [];
+    const session = (sessions as Array<{ sessionId?: string; summary?: string }>).find(
+      (item) => item.sessionId === sessionId,
+    );
+    return typeof session?.summary === 'string'
+      ? this.normalizeOfficialTitle(session.summary)
       : null;
   }
 
@@ -171,9 +197,20 @@ export class TitleGenerationService {
       const conversation = await this.plugin.getConversationById(conversationId, {
         preferCache: true,
       });
-      return conversation?.openCodeSessionId ?? null;
+      return conversation ? getConversationBackendSessionId(conversation) ?? null : null;
     } catch {
       return null;
+    }
+  }
+
+  private async resolveConversationBackend(conversationId: string): Promise<AgentBackendKind> {
+    try {
+      const conversation = await this.plugin.getConversationById(conversationId, {
+        preferCache: true,
+      });
+      return conversation?.backend ?? 'opencode';
+    } catch {
+      return 'opencode';
     }
   }
 

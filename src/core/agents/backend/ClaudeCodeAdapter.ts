@@ -218,6 +218,7 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>([
     AgentCapability.Chat,
     AgentCapability.Sessions,
+    AgentCapability.Fork,
     AgentCapability.Models,
     AgentCapability.Thinking,
     AgentCapability.FileOps,

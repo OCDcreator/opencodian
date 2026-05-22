@@ -11,7 +11,7 @@
 
 ## 职责
 
-- 声明 Claude Code backend kind、显示名、状态和 Phase 1 capability 集合
+- 声明 Claude Code backend kind、显示名、状态和 Phase 1 capability 集合；包含 `Fork` capability，支持 `forkSession()`，但不声明 `Branching`（revert/unrevert/diff 仍保持 OpenCode-only）
 - 维护本地 session handle，用于后续 OpenCodian conversation 到 Claude SDK 会话的映射基础
 - 捕获 Claude SDK stream 中的真实 `session_id`，把本地 handle alias 到 SDK session id，并在后续发送中通过 `options.resume` 恢复同一 Claude session
 - 在 `sendMessage()` 中构造 SDK `query({ prompt, options })` 输入
