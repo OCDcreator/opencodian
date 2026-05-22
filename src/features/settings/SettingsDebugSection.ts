@@ -245,7 +245,7 @@ export class SettingsDebugSection {
   }
 
   private addClaudeCodePrivacyNote(containerEl: HTMLElement): void {
-    const noteEl = containerEl.createDiv({ cls: 'opencodian-debug-privacy-note' });
+    const noteEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-privacy-note' });
     noteEl.createDiv({
       cls: 'opencodian-debug-privacy-title',
       text: t('settings.debug.claude.privacy.title'),
@@ -257,7 +257,7 @@ export class SettingsDebugSection {
   }
 
   private addClaudeCodeChannelSettings(containerEl: HTMLElement): void {
-    const channelsEl = containerEl.createDiv({ cls: 'opencodian-debug-channel-panel' });
+    const channelsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-channel-panel' });
     channelsEl.createEl('h4', {
       cls: 'opencodian-settings-subsection-heading',
       text: t('settings.debug.claude.channels.title'),
@@ -288,13 +288,12 @@ export class SettingsDebugSection {
   }
 
   private addClaudeCodeLogPreview(containerEl: HTMLElement): void {
-    const logsEl = containerEl.createDiv({ cls: 'opencodian-debug-log-panel' });
-    const headerEl = logsEl.createDiv({ cls: 'opencodian-debug-log-header' });
-    headerEl.createEl('h4', {
+    const logsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-log-panel' });
+    logsEl.createEl('h4', {
       cls: 'opencodian-settings-subsection-heading',
       text: t('settings.debug.claude.logs.title'),
     });
-    headerEl.createDiv({
+    logsEl.createDiv({
       cls: 'opencodian-settings-block-desc',
       text: t('settings.debug.claude.logs.desc'),
     });

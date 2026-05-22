@@ -7097,13 +7097,21 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings .opencodian-debug-workbench {
   display: flex;
   flex-direction: column;
-  gap: var(--opencodian-settings-space-xl);
+  gap: var(--opencodian-settings-space-lg);
 }
 
 .opencodian-settings .opencodian-debug-status-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--opencodian-settings-space-md);
+  margin-top: 0;
+}
+
+.opencodian-settings .opencodian-debug-status-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--opencodian-settings-space-sm);
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--opencodian-settings-object-border);
   border-radius: var(--opencodian-settings-radius-row);
@@ -7111,38 +7119,29 @@ img.opencodian-model-provider-header-icon {
   box-shadow: none;
 }
 
-.opencodian-settings .opencodian-debug-status-item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--opencodian-settings-space-sm);
-  min-height: 24px;
-  min-width: 0;
-  padding: 3px 8px;
-  border: 1px solid var(--opencodian-settings-inline-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--opencodian-settings-inline-bg) 64%, transparent);
-}
-
 .opencodian-settings .opencodian-debug-status-label {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
   line-height: 1.3;
+  text-transform: uppercase;
 }
 
 .opencodian-settings .opencodian-debug-status-value {
-  margin-top: 0;
   color: var(--text-normal);
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1.3;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .opencodian-settings .opencodian-debug-privacy-note {
-  padding: 10px 12px;
-  border: 1px solid var(--opencodian-settings-row-border);
-  border-radius: var(--opencodian-settings-radius-inline);
-  background: var(--opencodian-settings-row-bg);
+  margin-top: 0;
+  padding: 14px 16px 16px;
 }
 
 .opencodian-settings .opencodian-debug-privacy-title {
@@ -7160,64 +7159,81 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-settings .opencodian-debug-channel-panel,
 .opencodian-settings .opencodian-debug-log-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--opencodian-settings-space-md);
+  margin-top: 0;
+}
+
+.opencodian-settings .opencodian-debug-workbench .opencodian-debug-modules {
+  margin: 0;
   overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-secondary);
+}
+
+.opencodian-settings .opencodian-debug-workbench .opencodian-debug-modules > .opencodian-settings-subsection-heading {
+  padding: 14px 16px 0;
+}
+
+.opencodian-settings .opencodian-debug-workbench .opencodian-debug-modules > .opencodian-settings-block-desc {
+  margin-top: 4px;
+  padding: 0 16px;
+}
+
+.opencodian-settings .opencodian-debug-workbench .opencodian-settings-block > .opencodian-settings-subsection-heading {
+  padding: 14px 16px 0;
+}
+
+.opencodian-settings .opencodian-debug-workbench .opencodian-settings-block > .opencodian-settings-block-desc {
+  margin-top: 4px;
+  padding: 0 16px;
+}
+
+.opencodian-settings .opencodian-debug-modules > .setting-item {
+  margin: 12px 16px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+  gap: var(--opencodian-settings-space-lg);
+  align-items: center;
+  padding: 10px 12px;
   border: 1px solid var(--opencodian-settings-object-border);
   border-radius: var(--opencodian-settings-radius-row);
   background: var(--opencodian-settings-object-bg);
   box-shadow: none;
 }
 
-.opencodian-settings .opencodian-debug-channel-panel > .opencodian-settings-subsection-heading,
-.opencodian-settings .opencodian-debug-log-panel > .opencodian-debug-log-header,
-.opencodian-settings .opencodian-debug-channel-panel > .opencodian-settings-block-desc {
-  padding-right: 14px;
-  padding-left: 14px;
-}
-
-.opencodian-settings .opencodian-debug-channel-panel > .opencodian-settings-subsection-heading,
-.opencodian-settings .opencodian-debug-log-header {
-  padding-top: 12px;
-}
-
-.opencodian-settings .opencodian-debug-channel-panel > .opencodian-settings-block-desc {
-  margin-top: calc(-1 * var(--opencodian-settings-space-sm));
+.opencodian-settings .opencodian-debug-channel-list .setting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+  gap: var(--opencodian-settings-space-lg);
+  align-items: center;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  box-shadow: none;
 }
 
 .opencodian-settings .opencodian-debug-channel-list {
   display: flex;
   flex-direction: column;
-  gap: var(--opencodian-settings-space-sm);
-  padding: 0 14px 14px;
+  gap: var(--opencodian-settings-space-md);
+  margin-top: 12px;
+  padding: 0 16px 16px;
 }
 
-.opencodian-settings .opencodian-debug-channel-list .setting-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  gap: var(--opencodian-settings-space-lg);
-  align-items: center;
-  padding: 10px 12px;
-  border-color: var(--opencodian-settings-object-border);
-  background: color-mix(in srgb, var(--opencodian-settings-row-bg) 88%, var(--opencodian-settings-object-bg));
-}
-
+.opencodian-settings .opencodian-debug-modules > .setting-item .setting-item-control,
 .opencodian-settings .opencodian-debug-channel-list .setting-item-control {
   justify-content: flex-end;
-}
-
-.opencodian-settings .opencodian-debug-log-header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  width: 260px;
 }
 
 .opencodian-settings .opencodian-debug-log-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--opencodian-settings-space-sm);
-  padding: 0 14px;
+  margin-top: 12px;
+  padding: 0 16px;
 }
 
 .opencodian-settings .opencodian-debug-action-button {
@@ -7229,9 +7245,9 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-settings .opencodian-debug-log-preview {
   box-sizing: border-box;
-  width: 100%;
+  width: calc(100% - 32px);
   max-height: 240px;
-  margin: 0 14px 14px;
+  margin: 8px 16px 16px;
   padding: 10px 12px;
   overflow: auto;
   border: 1px solid var(--opencodian-settings-row-border);
@@ -7601,19 +7617,18 @@ img.opencodian-model-provider-header-icon {
 
 @media (max-width: 720px) {
   .opencodian-settings .opencodian-debug-status-strip {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .opencodian-settings .opencodian-debug-status-item {
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
-  }
-
+  .opencodian-settings .opencodian-debug-modules > .setting-item,
   .opencodian-settings .opencodian-debug-channel-list .setting-item {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
+  }
+
+  .opencodian-settings .opencodian-debug-channel-list .setting-item-control {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .opencodian-settings .opencodian-settings-section .setting-item {
