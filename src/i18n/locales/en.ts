@@ -1824,6 +1824,7 @@ export const enTranslations = {
   'chat.empty.noBackend.description': 'Enable at least one backend in agent settings before starting a chat.',
   'chat.empty.backendOffline.title': 'Backend unavailable',
   'chat.empty.backendOffline.description': 'The current backend is enabled, but it is not connected right now. Check backend or server settings and try again.',
+  'chat.structuredOutput.label': 'Structured Output',
   'chat.loading': 'Loading...',
   'chat.serverStatus.checking': 'Checking',
   'chat.serverStatus.disabled': 'Disabled',

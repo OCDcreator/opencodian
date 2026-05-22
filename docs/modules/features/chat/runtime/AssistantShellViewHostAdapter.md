@@ -17,7 +17,7 @@ body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodyS
 - `setStreamingAssistantMessageVisibility()`：切换 assistant 消息元素的可见性，变化时通过可选回调通知调用方记录调试日志
 - `addTimestampWithCopyButton()`：透传 footer timestamp / copy button 收尾
 - `renderPersistedAssistantMessage()`：通过内部 shell + body render + footer renderer，一次性完成普通 persisted assistant message 的壳层、正文与 footer 组装；notice message 也会在这里统一分派到 notice 渲染路径
-- `renderMessageBody()`：公开入口，渲染 assistant message 正文（structured content blocks 或 plain text fallback），供 `ConversationAssistantTailRenderPort` 直接调用
+- `renderMessageBody()`：公开入口，渲染 assistant message 正文（structured content blocks 或 plain text fallback），并在 `message.structured` 存在时渲染可折叠的结构化输出 JSON 块，供 `ConversationAssistantTailRenderPort` 直接调用
 - `getAssistantBodySignature()`：公开入口，为 body 内容生成可序列化的比较指纹，供 render pipeline 判断是否需要重渲染
 - `renderPersistedAssistantNoticeMessage()`：通过内部 shell + notice host 一次性完成 persisted assistant notice 的 shell、card 与 footer 编排
 - `renderAssistantPlaceholderAsNotice()`：通过内部 notice host 把已有 shell 改写成 notice card

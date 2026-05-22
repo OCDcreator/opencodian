@@ -78,6 +78,7 @@ export interface ConversationAuthoritativeReloadCoordinatorDependencies {
     existingMessages: ChatMessage[],
     syncedMessages: ChatMessage[],
     verbose: boolean,
+    backend?: string,
   ): ChatMessage[];
 }
 
@@ -337,6 +338,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       conversation.messages,
       snapshot.convertedServerMessages,
       verbose,
+      conversation.backend,
     );
     const preservedClientOnlyMessages = this.getClientOnlyMessagesToPreserveOnSync(
       conversation.messages,

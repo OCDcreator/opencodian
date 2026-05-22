@@ -451,7 +451,7 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // outputFormat option in SDK
         adapterWired: true, // buildSdkOptions wires outputFormat
         runtimeProof: 'untested',
-        userSurface: 'diagnostic', // backend_event chunks dropped in OpenCodianView
+        userSurface: 'diagnostic', // authoring/triggering remains diagnostic; transcript rendering is stable
       },
       {
         capability: 'Subagent Transcript / Progress',
@@ -1047,15 +1047,15 @@ export class SettingsCapabilityLabSection {
     });
 
     statusEl.createEl('p', {
-      text: 'Structured output is wired through outputFormat in buildSdkOptions, ' +
-        'but backend_event chunks (which carry structured_output data) are ' +
-        'currently dropped in OpenCodianView\'s chunk conversion pipeline.',
+      text: 'Structured output is wired through outputFormat in buildSdkOptions. ' +
+        'backend_event structured_output chunks are now captured in the send pipeline, ' +
+        'persisted to message.structured, and rendered in the normal chat transcript.',
     });
 
     statusEl.createEl('p', {
       cls: 'opencodian-capability-lab-hint',
-      text: '⚠️ This is a diagnostic surface. Structured output is NOT integrated ' +
-        'into the normal chat UI. The outputFormat option can only be set at ' +
+      text: '⚠️ Transcript rendering is stable. Structured-output authoring/triggering ' +
+        '(the outputFormat option) remains diagnostic-only and can only be set at ' +
         'runtime via adapter options, not through user-facing settings.',
     });
 

@@ -65,5 +65,6 @@ export function buildLocalStreamOutcome(options: {
       streamInterrupted: options.routedStream.streamInterrupted,
       latestErrorMessage: options.routedStream.latestErrorMessage,
     }),
+    structuredOutput: options.routedStream.structuredOutput,
   };
 }

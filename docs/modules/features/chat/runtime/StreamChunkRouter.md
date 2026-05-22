@@ -51,6 +51,7 @@ export class StreamChunkRouter {
 - `message_metadata`：记录最终 assistant message id / timestamp / model id，并把可选 `sessionId` 暴露为 backend-neutral finalized session identity
 - `message_stop`：标记 stream 正常完成，并结束 context usage stream
 - `file_edited`：追加到 tab runtime 的 `pendingEditedFiles`
+- `backend_event` + `structured_output`：捕获 `metadata.structuredOutput` 到 router result，供下游持久化与渲染使用
 
 ### 交互 chunk
 

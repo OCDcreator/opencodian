@@ -28,6 +28,7 @@ export class StreamChunkRouter {
   private finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null = null;
   private receivedMeaningfulChunk = false;
   private receivedFirstVisibleContent = false;
+  private structuredOutput: unknown | undefined;
 
   constructor(private readonly options: StreamChunkRouterOptions) {
     this.pendingIndicator = new PendingIndicatorController(
@@ -86,6 +87,7 @@ export class StreamChunkRouter {
       cleanupPendingIndicator: () => {
         this.pendingIndicator.clear();
       },
+      structuredOutput: this.structuredOutput,
     };
   }
 
@@ -162,6 +164,14 @@ export class StreamChunkRouter {
       this.trace.logStage('file-edited-recorded', {
         file: chunk.file,
         pendingEditedFileCount: this.options.runtime.pendingEditedFiles.size,
+      });
+      return true;
+    }
+
+    if (chunk.type === 'backend_event' && chunk.event === 'structured_output') {
+      this.structuredOutput = chunk.metadata?.structuredOutput;
+      this.trace.logStage('structured-output-received', {
+        hasPayload: chunk.metadata?.structuredOutput !== undefined,
       });
       return true;
     }

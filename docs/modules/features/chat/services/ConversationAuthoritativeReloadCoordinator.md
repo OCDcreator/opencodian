@@ -39,6 +39,6 @@ export class ConversationAuthoritativeReloadCoordinator {
 ## 与相邻模块的边界
 
 - `ConversationAuthoritativeSyncCoordinator`：保留 public facade 与 latest-user hydration owner，并把 conversation reload/auth-sync 委托给本模块
-- `ConversationAuthoritativeMessageMergeCoordinator`：提供受限的 client-only metadata / modelId merge 规则，本模块只消费其 merge 输出
+- `ConversationAuthoritativeMessageMergeCoordinator`：提供受限的 client-only metadata / modelId merge 规则，本模块在调用 `mergeSyncedConversationMessages()` 时传入 `conversation.backend`，让 merge coordinator 能只为 `claude-code` 之类已验证的 backend 保留 `structured` 字段
 - `ConversationSyncBridge`：继续负责 visible/signal/background sync transport，不感知本次内部 owner 拆分
 - `OpenCodianView`：仍只暴露 server query、runtime fingerprint、context usage refresh 与 render host seam

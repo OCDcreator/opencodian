@@ -4,6 +4,7 @@
 > **最后更新**: 2026-05-20
 > **优先级**: P1 — 第一个非 OpenCode backend
 > **证据文档**: `docs/status/claude-code-full-capability-research-2026-05-20.md`
+> **当前状态快照**: `docs/status/claude-code-current-state-2026-05-22.md`
 > **专项 spec**: `docs/superpowers/specs/2026-05-20-claude-code-full-capability-design.md`
 > **实施计划**: `docs/superpowers/plans/2026-05-20-claude-code-full-capability-implementation.md`
 

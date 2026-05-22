@@ -18,7 +18,7 @@ persistLocalStreamOutcome(options): Promise<void>
 - 有 content blocks 时：
   - 若本轮只需要 canonical 后续收敛，正常 completed assistant 会先把本地 cache 写回延后给 canonical finalization
   - 只有 interrupted / error / questionResolution 等 client-only 边界需要保留时，才构建并落库 assistant `ChatMessage`
-  - 需要本地落库时，把 `streamState: 'interrupted'`、`contentBlocks`、`questionResolution` 一并写入
+  - 需要本地落库时，把 `streamState: 'interrupted'`、`contentBlocks`、`questionResolution`、`structured` 一并写入
   - 需要本地落库时，回填 streaming shell 的 `data-message-id` / `data-source-message-id`
 - 只有 error notice 或 interrupted notice 时：
   - 追加对应 notice message

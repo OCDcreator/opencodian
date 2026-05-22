@@ -11618,6 +11618,46 @@ img.opencodian-model-provider-header-icon {
   color: color-mix(in srgb, var(--text-normal) 88%, var(--text-muted));
 }
 
+/* Structured output transcript rendering */
+.opencodian-structured-output-details {
+  margin-top: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.opencodian-structured-output-summary {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  list-style: none;
+  user-select: none;
+}
+
+.opencodian-structured-output-summary::-webkit-details-marker {
+  display: none;
+}
+
+.opencodian-structured-output-body {
+  padding: 8px 10px;
+  background: var(--background-primary);
+}
+
+.opencodian-structured-output-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8em;
+}
+
+.opencodian-structured-output-code {
+  font-family: var(--font-monospace);
+  color: var(--text-normal);
+}
+
 
 /* modals/delete-confirm-dialog.css */
 /* ============================================================

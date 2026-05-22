@@ -227,6 +227,10 @@ export class AssistantShellViewHostAdapter {
         questionResolutionRenderPlan,
       });
     }
+
+    if (message.structured !== undefined) {
+      this.renderStructuredOutput(content, message.structured);
+    }
   }
 
   getAssistantBodySignature(message: ChatMessage): string {
@@ -320,6 +324,24 @@ export class AssistantShellViewHostAdapter {
       storedStatus: block.toolStatus,
       result: block.toolResult,
     });
+  }
+
+  private renderStructuredOutput(container: HTMLElement, structured: unknown): void {
+    const detailsEl = container.createEl('details', {
+      cls: 'opencodian-structured-output-details',
+    });
+    const summaryEl = detailsEl.createEl('summary', {
+      cls: 'opencodian-structured-output-summary',
+    });
+    summaryEl.setText(t('chat.structuredOutput.label'));
+    const bodyEl = detailsEl.createDiv({ cls: 'opencodian-structured-output-body' });
+    const preEl = bodyEl.createEl('pre', { cls: 'opencodian-structured-output-pre' });
+    const codeEl = preEl.createEl('code', { cls: 'opencodian-structured-output-code' });
+    try {
+      codeEl.setText(JSON.stringify(structured, null, 2));
+    } catch {
+      codeEl.setText(String(structured));
+    }
   }
 
   createAssistantShellContainer(

@@ -115,11 +115,12 @@ export class ConversationAuthoritativeSyncCoordinator {
     this.messageMergeCoordinator = new ConversationAuthoritativeMessageMergeCoordinator(host);
     this.reloadCoordinator = new ConversationAuthoritativeReloadCoordinator({
       host,
-      mergeSyncedConversationMessages: (existingMessages, syncedMessages, verbose) =>
+      mergeSyncedConversationMessages: (existingMessages, syncedMessages, verbose, backend) =>
         this.messageMergeCoordinator.mergeSyncedConversationMessages(
           existingMessages,
           syncedMessages,
           verbose,
+          backend,
         ),
     });
   }
@@ -128,11 +129,13 @@ export class ConversationAuthoritativeSyncCoordinator {
     existingMessage: ChatMessage,
     syncedMessage: ChatMessage,
     verbose = true,
+    backend?: string,
   ): ChatMessage {
     return this.messageMergeCoordinator.mergeClientOnlyMessageFields(
       existingMessage,
       syncedMessage,
       verbose,
+      backend,
     );
   }
 

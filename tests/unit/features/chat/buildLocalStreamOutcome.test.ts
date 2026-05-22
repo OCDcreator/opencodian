@@ -197,6 +197,32 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.streamErrorNoticeMessage).toBeNull();
   });
 
+  it('passes structuredOutput from the routed stream into the local outcome', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Hello' },
+      ]),
+    };
+    const structuredPayload = { result: 'success' };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: structuredPayload,
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.structuredOutput).toEqual(structuredPayload);
+  });
+
   it('uses the session retry message as an error notice for silent interrupted streams', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(700);
     const preparedSend = createPreparedSend();

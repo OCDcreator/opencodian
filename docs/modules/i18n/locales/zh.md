@@ -307,3 +307,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## 2026-05-22 Capability Lab 诊断面板
 
 新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的"能力实验室"二级标签提供中文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、回退 dry-run 预览、结构化输出实验场和发现状态六个诊断面板。所有面板标记为 ⚠️ 诊断 / 实验 / 非稳定，不连接稳定设置持久化。
+
+## 2026-05-22 Structured output 会话渲染
+
+新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。

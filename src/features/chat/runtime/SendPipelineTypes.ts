@@ -240,6 +240,7 @@ export interface StreamChunkRouterResult extends SendPipelineTraceState {
   logAssistantFinalizationStage(stage: string, payload?: Record<string, unknown>): void;
   resetStreamingState(): void;
   cleanupPendingIndicator(): void;
+  structuredOutput?: unknown;
 }
 
 export interface LocalStreamOutcome {
@@ -255,6 +256,7 @@ export interface LocalStreamOutcome {
   streamErrorNoticeMessage: ChatMessage | null;
   interruptedNoticeMessage: ChatMessage | null;
   shouldSyncFromServer: boolean;
+  structuredOutput?: unknown;
 }
 
 export interface StreamLocalFinalizerOptions {

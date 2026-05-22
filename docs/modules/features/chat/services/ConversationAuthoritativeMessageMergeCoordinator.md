@@ -25,7 +25,7 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
 
 ## 关键行为
 
-- `mergeClientOnlyMessageFields()` 现在只保留显式 client-only decoration：`questionResolution` 仍可在 synced message 缺失时沿用，而 `contextAttachments` 只会对 canonical 仍然存在的 attachment 保留匹配项上的展示元数据；如果 authoritative snapshot 已经没有 attachment，就不会再把本地 attachment 列表整条补回去。
+- `mergeClientOnlyMessageFields()` 现在只保留显式 client-only decoration：`questionResolution` 仍可在 synced message 缺失时沿用，`structured` 只会在 `claude-code` backend 且 synced message 缺失时保留，而 `contextAttachments` 只会对 canonical 仍然存在的 attachment 保留匹配项上的展示元数据；如果 authoritative snapshot 已经没有 attachment，就不会再把本地 attachment 列表整条补回去。
 - `mergeSyncedConversationMessages()` 会把 source-message 对齐的 assistant modelId 回填到 synced messages，并在 sourceMessageId 缺失时回退到内容匹配。
 - 只有真的保留了 metadata 时，才会继续通过 `logAssistantFinalizationDebug()` 输出 preservation debug payload。
 

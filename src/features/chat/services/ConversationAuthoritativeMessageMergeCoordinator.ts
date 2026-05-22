@@ -15,12 +15,14 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
     existingMessage: ChatMessage,
     syncedMessage: ChatMessage,
     verbose = true,
+    backend?: string,
   ): ChatMessage {
     const contextAttachments = this.mergeSyncedMessageContextAttachments(existingMessage, syncedMessage);
     const preservedFlags = this.getClientOnlyMessagePreservationFlags(
       existingMessage,
       syncedMessage,
       { contextAttachments },
+      backend,
     );
     this.logClientOnlyMessageFieldPreservation(
       existingMessage,
@@ -29,10 +31,15 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
       verbose,
     );
 
+    const shouldPreserveStructured = backend === 'claude-code'
+      && existingMessage.structured !== undefined
+      && syncedMessage.structured === undefined;
+
     return {
       ...syncedMessage,
       contextAttachments,
       questionResolution: syncedMessage.questionResolution ?? existingMessage.questionResolution,
+      structured: shouldPreserveStructured ? existingMessage.structured : syncedMessage.structured,
     };
   }
 
@@ -40,6 +47,7 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
     existingMessages: ChatMessage[],
     syncedMessages: ChatMessage[],
     verbose = true,
+    backend?: string,
   ): ChatMessage[] {
     const modelIdBySourceMessageId = new Map<string, string>();
     const messageBySourceMessageId = new Map<string, ChatMessage>();
@@ -64,7 +72,7 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
         ? messageBySourceMessageId.get(message.sourceMessageId)
         : undefined;
       const mergedMessage = existingMessage
-        ? this.mergeClientOnlyMessageFields(existingMessage, message, verbose)
+        ? this.mergeClientOnlyMessageFields(existingMessage, message, verbose, backend)
         : message;
 
       if (mergedMessage.role !== 'assistant') {
@@ -160,6 +168,7 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
     existingMessage: ChatMessage,
     syncedMessage: ChatMessage,
     mergedFields: Pick<ChatMessage, 'contextAttachments'>,
+    backend?: string,
   ): Record<string, boolean> {
     return {
       preservedExistingContextAttachments:
@@ -168,6 +177,10 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
       preservedExistingQuestionResolution:
         syncedMessage.questionResolution === undefined
         && existingMessage.questionResolution !== undefined,
+      preservedExistingStructured:
+        backend === 'claude-code'
+        && existingMessage.structured !== undefined
+        && syncedMessage.structured === undefined,
     };
   }
 

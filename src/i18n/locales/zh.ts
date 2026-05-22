@@ -1824,6 +1824,7 @@ export const zhTranslations = {
   'chat.empty.noBackend.description': '请先到智能体设置中启用至少一个 backend，再开始聊天。',
   'chat.empty.backendOffline.title': '当前 backend 不可用',
   'chat.empty.backendOffline.description': '当前 backend 已启用，但运行时暂时无法连接。请检查 backend 或服务器设置后重试。',
+  'chat.structuredOutput.label': '结构化输出',
   'chat.loading': '加载中...',
   'chat.serverStatus.checking': '检查中',
   'chat.serverStatus.disabled': '已禁用',

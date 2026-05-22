@@ -57,6 +57,7 @@ export async function persistLocalStreamOutcome(options: {
       streamState: outcome.shouldPersistInterruptedState ? 'interrupted' : undefined,
       contentBlocks: mapStreamingContentBlocksToMessageContentBlocks(outcome.streamContentBlocks),
       questionResolution: runtime.pendingQuestionResolution ?? undefined,
+      structured: outcome.structuredOutput,
     };
     logAssistantFinalizationStage('local-assistant-message-built', {
       message: host.summarizeChatMessageForDebug(assistantMessage),

@@ -18,8 +18,8 @@
 - `SendPipelineExecutionHost` / `StreamChunkRouterHost` / `StreamLocalFinalizerHost`：runtime、router 与本地收尾各自真正依赖的 host 子集
 - `SendPipelineTraceState`：chunk router 汇总出来的流状态快照
 - `SendPipelineTraceState.finalizedBackendSessionId`：从最终 `message_metadata.sessionId` 捕获的 backend-neutral session identity，允许 Claude Code 等 backend 将本地临时 handle 收敛为真实 SDK session id
-- `StreamChunkRouterOptions` / `StreamChunkRouterResult`：stream 消费阶段输入输出
-- `LocalStreamOutcome` / `StreamLocalFinalizerOptions` / `StreamLocalFinalizerResult`：本地收尾阶段输入输出，其中 `LocalStreamOutcome.finalizedBackendSessionId` 负责把 router 捕获的 backend session id 交给持久化层
+- `StreamChunkRouterOptions` / `StreamChunkRouterResult`：stream 消费阶段输入输出；`StreamChunkRouterResult.structuredOutput` 承载从 `backend_event` 捕获的 Claude 结构化输出 payload
+- `LocalStreamOutcome` / `StreamLocalFinalizerOptions` / `StreamLocalFinalizerResult`：本地收尾阶段输入输出，其中 `LocalStreamOutcome.finalizedBackendSessionId` 负责把 router 捕获的 backend session id 交给持久化层，`LocalStreamOutcome.structuredOutput` 负责把结构化输出 payload 交给持久化层
 
 ## 设计目的
 

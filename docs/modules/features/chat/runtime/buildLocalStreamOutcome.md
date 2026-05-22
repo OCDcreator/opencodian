@@ -21,6 +21,7 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 - `shouldPersistInterruptedState`
 - `streamErrorNoticeMessage`
 - `shouldSyncFromServer`
+- `structuredOutput`：透传 `StreamChunkRouterResult` 捕获的结构化输出 payload
 
 ## 关键规则
 

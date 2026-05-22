@@ -219,6 +219,26 @@ describe('persistLocalStreamOutcome canonical cache boundary', () => {
     );
   });
 
+  it('persists structured output on the assistant message when provided', async () => {
+    const conversation = createConversation();
+    const host = createHost();
+    const structuredPayload = { status: 'ok' };
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime(),
+      outcome: createOutcome({
+        shouldSyncFromServer: false,
+        structuredOutput: structuredPayload,
+      }),
+      logAssistantFinalizationStage: jest.fn(),
+    });
+
+    expect(conversation.messages).toHaveLength(1);
+    expect(conversation.messages[0]?.structured).toEqual(structuredPayload);
+  });
+
   it('persists question resolution decoration so authoritative merge can preserve it', async () => {
     const conversation = createConversation();
     const host = createHost();

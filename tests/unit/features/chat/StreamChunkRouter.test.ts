@@ -55,6 +55,93 @@ function createPreparedSend(): PreparedMessageSend {
   } as PreparedMessageSend;
 }
 
+describe('StreamChunkRouter structured output capture', () => {
+  it('captures structured_output backend_event into the result', async () => {
+    const host = createHost();
+    const runtime: SendPipelineTabRuntime = {
+      isStreaming: true,
+      streamingMessageEl: null,
+      streamingContentEl: null,
+      pendingEditedFiles: new Set(),
+      pendingQuestionResolution: null,
+      isConversationSyncInFlight: false,
+    };
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn().mockResolvedValue(undefined),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn(() => []),
+    };
+    const structuredPayload = { status: 'ok', items: [1, 2, 3] };
+
+    async function* stream() {
+      yield { type: 'message_start' } as const;
+      yield {
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'structured_output',
+        status: 'received',
+        metadata: { structuredOutput: structuredPayload },
+      } as const;
+      yield { type: 'message_stop' } as const;
+    }
+
+    const router = new StreamChunkRouter({
+      host,
+      preparedSend: createPreparedSend(),
+      runtime,
+      stream: stream(),
+      streamController,
+      contentEl: document.body.createDiv(),
+    });
+
+    const result = await router.consume();
+    expect(result.structuredOutput).toEqual(structuredPayload);
+  });
+
+  it('ignores non-structured_output backend_events', async () => {
+    const host = createHost();
+    const runtime: SendPipelineTabRuntime = {
+      isStreaming: true,
+      streamingMessageEl: null,
+      streamingContentEl: null,
+      pendingEditedFiles: new Set(),
+      pendingQuestionResolution: null,
+      isConversationSyncInFlight: false,
+    };
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn().mockResolvedValue(undefined),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn(() => []),
+    };
+
+    async function* stream() {
+      yield { type: 'message_start' } as const;
+      yield {
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'hook',
+        status: 'received',
+        metadata: {},
+      } as const;
+      yield { type: 'message_stop' } as const;
+    }
+
+    const router = new StreamChunkRouter({
+      host,
+      preparedSend: createPreparedSend(),
+      runtime,
+      stream: stream(),
+      streamController,
+      contentEl: document.body.createDiv(),
+    });
+
+    const result = await router.consume();
+    expect(result.structuredOutput).toBeUndefined();
+  });
+});
+
 describe('StreamChunkRouter timeout handling', () => {
   beforeEach(() => {
     jest.useFakeTimers();
