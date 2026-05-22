@@ -20,6 +20,7 @@
 - 只在用户显式开启时写入 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`；这些是 SDK 诊断/后续能力 foundation，不等同于稳定 JSONL browser、hook authoring 或 rewind UI
 - 只在 adapter 已捕获真实 Claude SDK session id 时写入 `resume`，让后续 per-send `query()` 续接同一个 Claude session
 - 只在 runtime 提供时写入 `abortController` 和 `spawnClaudeCodeProcess`，用于 Obsidian/Electron 下的流取消和进程启动兼容层
+- 只在 runtime 明确注入时透传 `hooks`、`sessionStore` / `sessionStoreFlush`、`outputFormat`、`plugins` 和 `skills`（包含 SDK 的 `'all'` skills sentinel），为后续 Claude Code authoring、structured output 和 JSONL mirror/import 诊断保留官方 SDK 通道；这些字段不来自用户设置，也不等同于稳定 UI 已完成
 
 ## 维护约束
 
@@ -29,4 +30,5 @@
 - `resume` 不是用户设置；它来自 runtime 捕获到的 SDK `session_id`，不能写入 settings。
 - `enableFileCheckpointing` 只启用 SDK checkpoint 跟踪；实际 rewind 操作必须经由独立 dry-run/确认 UI 后才能暴露。
 - `includeHookEvents` / `forwardSubagentText` / `agentProgressSummaries` 只允许进入诊断 stream 或后续实验 UI；不能据此声明 hooks、subagent transcript 或 authoring UI 已完整完成。
+- `hooks`、`sessionStore`、`outputFormat`、`plugins` 和 `skills` 是 runtime-injected foundation，只能由后续已验证 runtime owner 传入；不要把它们直接保存到 `backendSettings.claudeCode` 或稳定 settings 控件。
 - `abortController` / `spawnClaudeCodeProcess` 是 runtime 注入，不应保存进用户设置。

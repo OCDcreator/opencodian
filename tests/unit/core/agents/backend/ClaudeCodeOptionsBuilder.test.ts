@@ -214,4 +214,45 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(enabledOptions.forwardSubagentText).toBe(true);
     expect(enabledOptions.agentProgressSummaries).toBe(true);
   });
+
+});
+
+describe('ClaudeCodeOptionsBuilder runtime injections', () => {
+  it('passes experimental SDK options without adding settings fields', () => {
+    const hooks = { SessionStart: [{ hooks: [jest.fn()] }] };
+    const sessionStore = { append: jest.fn(), load: jest.fn() };
+    const outputFormat = {
+      type: 'json_schema',
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+    };
+    const plugins = [{ type: 'local', path: './claude-plugin' }];
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      hooks,
+      sessionStore,
+      sessionStoreFlush: 'eager',
+      outputFormat,
+      plugins,
+      skills: ['review'],
+    });
+
+    expect(options.hooks).toBe(hooks);
+    expect(options.sessionStore).toBe(sessionStore);
+    expect(options.sessionStoreFlush).toBe('eager');
+    expect(options.outputFormat).toBe(outputFormat);
+    expect(options.plugins).toEqual(plugins);
+    expect(options.plugins).not.toBe(plugins);
+    expect(options.skills).toEqual(['review']);
+  });
+
+  it('passes the SDK all-skills sentinel', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      skills: 'all',
+    });
+
+    expect(options.skills).toBe('all');
+  });
 });

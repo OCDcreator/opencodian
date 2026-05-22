@@ -10,7 +10,7 @@
 ## 职责
 
 - 通过 literal dynamic `import('@anthropic-ai/claude-agent-sdk')` 加载官方 SDK，让生产 bundle 能解析并打包 SDK 主包
-- 暴露 `query({ prompt, options })`，并在当前 SDK 提供时透传 `listSessions()`、`getSessionInfo()`、`forkSession()`、`renameSession()`
+- 暴露 `query({ prompt, options })`，并在当前 SDK 提供时透传 `listSessions()`、`getSessionInfo()`、`getSessionMessages()`、`listSubagents()`、`getSubagentMessages()`、`importSessionToStore()`、`forkSession()`、`renameSession()`
 - 避免 `ClaudeCodeAdapter` 直接依赖第三方 SDK 模块形状，保留测试注入 seam
 
 ## 公共导出
@@ -24,6 +24,7 @@
 
 ## 维护约束
 
-- 不在本模块中保存 session 状态或做 OpenCodian stream normalizing；session API 只做 facade 透传，身份映射责任属于 `ClaudeCodeAdapter`
+- 不在本模块中保存 session 状态或做 OpenCodian stream normalizing；session/history/subagent API 只做 facade 透传，身份映射责任属于 `ClaudeCodeAdapter`
+- JSONL history、subagent transcript 和 sessionStore import 入口只是 SDK foundation 暴露；稳定 browser/import UI 仍需要运行期证明后再打开。
 - 官方 SDK API 变动时优先在本 loader 与 `ClaudeCodeOptionsBuilder` 收口兼容
 - 不要把 SDK import specifier 改成变量拼接；那会让 esbuild 失去静态解析能力，Obsidian/Test Vault 产物可能再次出现 SDK 找不到或 `import.meta.url` 运行时错误。

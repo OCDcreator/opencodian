@@ -42,6 +42,12 @@ export interface ClaudeCodeOptionsBuilderInput {
   canUseTool?: unknown;
   onElicitation?: unknown;
   mcpServers?: Record<string, unknown>;
+  hooks?: Record<string, unknown>;
+  sessionStore?: unknown;
+  sessionStoreFlush?: 'batched' | 'eager';
+  outputFormat?: Record<string, unknown>;
+  plugins?: unknown[];
+  skills?: string[] | 'all';
   abortController?: AbortController;
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
   resumeSessionId?: string;
@@ -64,6 +70,12 @@ export interface ClaudeCodeSdkOptionsShape {
   canUseTool?: unknown;
   onElicitation?: unknown;
   mcpServers?: Record<string, unknown>;
+  hooks?: Record<string, unknown>;
+  sessionStore?: unknown;
+  sessionStoreFlush?: 'batched' | 'eager';
+  outputFormat?: Record<string, unknown>;
+  plugins?: unknown[];
+  skills?: string[] | 'all';
   abortController?: AbortController;
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
   resume?: string;
@@ -140,6 +152,26 @@ export function buildClaudeCodeOptions(
   }
   if (input.mcpServers && Object.keys(input.mcpServers).length > 0) {
     options.mcpServers = input.mcpServers;
+  }
+  if (input.hooks && Object.keys(input.hooks).length > 0) {
+    options.hooks = input.hooks;
+  }
+  if (input.sessionStore) {
+    options.sessionStore = input.sessionStore;
+    if (input.sessionStoreFlush) {
+      options.sessionStoreFlush = input.sessionStoreFlush;
+    }
+  }
+  if (input.outputFormat && Object.keys(input.outputFormat).length > 0) {
+    options.outputFormat = input.outputFormat;
+  }
+  if (input.plugins && input.plugins.length > 0) {
+    options.plugins = [...input.plugins];
+  }
+  if (input.skills === 'all') {
+    options.skills = 'all';
+  } else if (input.skills && input.skills.length > 0) {
+    options.skills = [...input.skills];
   }
   if (input.abortController) {
     options.abortController = input.abortController;

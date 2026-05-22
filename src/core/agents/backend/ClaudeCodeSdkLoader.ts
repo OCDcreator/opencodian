@@ -8,6 +8,10 @@ export interface ClaudeAgentSdkModule {
   query: ClaudeCodeSdkFacade['query'];
   listSessions?: NonNullable<ClaudeCodeSdkFacade['listSessions']>;
   getSessionInfo?: NonNullable<ClaudeCodeSdkFacade['getSessionInfo']>;
+  getSessionMessages?: NonNullable<ClaudeCodeSdkFacade['getSessionMessages']>;
+  listSubagents?: NonNullable<ClaudeCodeSdkFacade['listSubagents']>;
+  getSubagentMessages?: NonNullable<ClaudeCodeSdkFacade['getSubagentMessages']>;
+  importSessionToStore?: NonNullable<ClaudeCodeSdkFacade['importSessionToStore']>;
   forkSession?: NonNullable<ClaudeCodeSdkFacade['forkSession']>;
   renameSession?: NonNullable<ClaudeCodeSdkFacade['renameSession']>;
 }
@@ -37,6 +41,10 @@ export async function loadClaudeCodeSdk(
     }),
     ...(sdk.listSessions ? { listSessions: sdk.listSessions } : {}),
     ...(sdk.getSessionInfo ? { getSessionInfo: sdk.getSessionInfo } : {}),
+    ...(sdk.getSessionMessages ? { getSessionMessages: sdk.getSessionMessages } : {}),
+    ...(sdk.listSubagents ? { listSubagents: sdk.listSubagents } : {}),
+    ...(sdk.getSubagentMessages ? { getSubagentMessages: sdk.getSubagentMessages } : {}),
+    ...(sdk.importSessionToStore ? { importSessionToStore: sdk.importSessionToStore } : {}),
     ...(sdk.forkSession ? { forkSession: sdk.forkSession } : {}),
     ...(sdk.renameSession ? { renameSession: sdk.renameSession } : {}),
   };

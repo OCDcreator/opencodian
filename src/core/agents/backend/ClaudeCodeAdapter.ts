@@ -19,6 +19,7 @@ import type {
 import type { ClaudeCodeMcpServersMap } from './ClaudeCodeMcpConfigAdapter';
 import {
   buildClaudeCodeOptions,
+  type ClaudeCodeOptionsBuilderInput,
   type ClaudeCodeSdkOptionsShape,
   type ClaudeCodeSpawnRequest,
 } from './ClaudeCodeOptionsBuilder';
@@ -56,6 +57,10 @@ export interface ClaudeCodeSdkFacade {
   query(input: ClaudeCodeSdkQueryInput): ClaudeCodeQueryHandle;
   listSessions?(options?: { dir?: string; limit?: number; offset?: number }): Promise<ClaudeCodeSdkSessionInfo[]>;
   getSessionInfo?(sessionId: string, options?: { dir?: string }): Promise<ClaudeCodeSdkSessionInfo | undefined>;
+  getSessionMessages?(sessionId: string, options?: { dir?: string; limit?: number; offset?: number; includeSystemMessages?: boolean; sessionStore?: unknown }): Promise<unknown[]>;
+  listSubagents?(sessionId: string, options?: { dir?: string; sessionStore?: unknown }): Promise<string[]>;
+  getSubagentMessages?(sessionId: string, agentId: string, options?: { dir?: string; limit?: number; offset?: number; sessionStore?: unknown }): Promise<unknown[]>;
+  importSessionToStore?(sessionId: string, store: unknown, options?: { dir?: string; includeSubagents?: boolean; batchSize?: number }): Promise<void>;
   forkSession?(sessionId: string, options?: { dir?: string; upToMessageId?: string; title?: string }): Promise<{ sessionId: string }>;
   renameSession?(sessionId: string, title: string, options?: { dir?: string }): Promise<void>;
 }
@@ -90,6 +95,17 @@ export interface ClaudeCodeAdapterOptions {
   mcpServers?: ClaudeCodeMcpServersMap;
   /** Dynamic MCP config loader — called at runtime when building SDK options. */
   mcpConfigLoader?: ClaudeCodeMcpConfigLoader;
+  /** Runtime-only Claude SDK callbacks. Not persisted to user settings. */
+  hooks?: ClaudeCodeOptionsBuilderInput['hooks'];
+  /** Runtime-only transcript mirror adapter. Not persisted to user settings. */
+  sessionStore?: ClaudeCodeOptionsBuilderInput['sessionStore'];
+  sessionStoreFlush?: ClaudeCodeOptionsBuilderInput['sessionStoreFlush'];
+  /** Runtime-only structured output request shape for diagnostic/experimental callers. */
+  outputFormat?: ClaudeCodeOptionsBuilderInput['outputFormat'];
+  /** Runtime-only Claude plugin declarations. Stable authoring UI remains hidden. */
+  plugins?: ClaudeCodeOptionsBuilderInput['plugins'];
+  /** Runtime-only Claude skills allowlist. Stable authoring UI remains hidden. */
+  skills?: ClaudeCodeOptionsBuilderInput['skills'];
 }
 
 const CLAUDE_CODE_EFFORT_VALUES = new Set<ClaudeCodeEffort>(['low', 'medium', 'high', 'xhigh', 'max']);
@@ -330,6 +346,102 @@ export class ClaudeCodeAdapter
     return session;
   }
 
+  async getSessionMessages(
+    sessionId: string,
+    options?: { limit?: number; offset?: number; includeSystemMessages?: boolean; sessionStore?: unknown },
+  ): Promise<unknown[]> {
+    this.assertSessionNotInvalidated(sessionId);
+    const sdk = await this.getSdk();
+    if (!sdk.getSessionMessages) {
+      throw new Error('Claude Code getSessionMessages is unavailable in this SDK.');
+    }
+    const state = this.sessions.get(sessionId);
+    const sdkSessionId = state?.sdkSessionId ?? sessionId;
+    sessionLogger.debug('get session messages', {
+      sessionId,
+      sdkSessionId,
+      includeSystemMessages: options?.includeSystemMessages === true,
+      hasSessionStore: Boolean(options?.sessionStore),
+    });
+    return await sdk.getSessionMessages(sdkSessionId, {
+      dir: this.options.vaultPath,
+      ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options?.offset !== undefined ? { offset: options.offset } : {}),
+      ...(options?.includeSystemMessages !== undefined ? { includeSystemMessages: options.includeSystemMessages } : {}),
+      ...(options?.sessionStore ? { sessionStore: options.sessionStore } : {}),
+    });
+  }
+
+  async listSubagents(sessionId: string, options?: { sessionStore?: unknown }): Promise<string[]> {
+    this.assertSessionNotInvalidated(sessionId);
+    const sdk = await this.getSdk();
+    if (!sdk.listSubagents) {
+      throw new Error('Claude Code listSubagents is unavailable in this SDK.');
+    }
+    const state = this.sessions.get(sessionId);
+    const sdkSessionId = state?.sdkSessionId ?? sessionId;
+    sessionLogger.debug('list subagents', {
+      sessionId,
+      sdkSessionId,
+      hasSessionStore: Boolean(options?.sessionStore),
+    });
+    return await sdk.listSubagents(sdkSessionId, {
+      dir: this.options.vaultPath,
+      ...(options?.sessionStore ? { sessionStore: options.sessionStore } : {}),
+    });
+  }
+
+  async getSubagentMessages(
+    sessionId: string,
+    agentId: string,
+    options?: { limit?: number; offset?: number; sessionStore?: unknown },
+  ): Promise<unknown[]> {
+    this.assertSessionNotInvalidated(sessionId);
+    const sdk = await this.getSdk();
+    if (!sdk.getSubagentMessages) {
+      throw new Error('Claude Code getSubagentMessages is unavailable in this SDK.');
+    }
+    const state = this.sessions.get(sessionId);
+    const sdkSessionId = state?.sdkSessionId ?? sessionId;
+    sessionLogger.debug('get subagent messages', {
+      sessionId,
+      sdkSessionId,
+      agentId,
+      hasSessionStore: Boolean(options?.sessionStore),
+    });
+    return await sdk.getSubagentMessages(sdkSessionId, agentId, {
+      dir: this.options.vaultPath,
+      ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options?.offset !== undefined ? { offset: options.offset } : {}),
+      ...(options?.sessionStore ? { sessionStore: options.sessionStore } : {}),
+    });
+  }
+
+  async importSessionToStore(
+    sessionId: string,
+    store: unknown,
+    options?: { includeSubagents?: boolean; batchSize?: number },
+  ): Promise<void> {
+    this.assertSessionNotInvalidated(sessionId);
+    const sdk = await this.getSdk();
+    if (!sdk.importSessionToStore) {
+      throw new Error('Claude Code importSessionToStore is unavailable in this SDK.');
+    }
+    const state = this.sessions.get(sessionId);
+    const sdkSessionId = state?.sdkSessionId ?? sessionId;
+    sessionLogger.debug('import session to store', {
+      sessionId,
+      sdkSessionId,
+      includeSubagents: options?.includeSubagents !== false,
+      batchSize: options?.batchSize,
+    });
+    await sdk.importSessionToStore(sdkSessionId, store, {
+      dir: this.options.vaultPath,
+      ...(options?.includeSubagents !== undefined ? { includeSubagents: options.includeSubagents } : {}),
+      ...(options?.batchSize !== undefined ? { batchSize: options.batchSize } : {}),
+    });
+  }
+
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
     const sdk = await this.getSdk();
     const state = this.getOrRestoreSession(sessionId);
@@ -503,6 +615,12 @@ export class ClaudeCodeAdapter
           await this.options.onElicitation!(request, context)
         : undefined,
       mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
+      hooks: this.options.hooks,
+      sessionStore: this.options.sessionStore,
+      sessionStoreFlush: this.options.sessionStoreFlush,
+      outputFormat: this.options.outputFormat,
+      plugins: this.options.plugins,
+      skills: this.options.skills,
       resumeSessionId: session?.sdkSessionId,
     });
   }
@@ -806,12 +924,10 @@ export class ClaudeCodeAdapter
   }
 
   private getOrRestoreSession(sessionId: string): ClaudeCodeSessionState {
+    this.assertSessionNotInvalidated(sessionId);
     const session = this.sessions.get(sessionId);
     if (session) {
       return session;
-    }
-    if (this.invalidatedSessions.has(sessionId)) {
-      throw new Error(`Claude Code session not found: ${sessionId}`);
     }
 
     const restoredSession: ClaudeCodeSessionState = {
@@ -827,6 +943,12 @@ export class ClaudeCodeAdapter
       sdkSessionId: restoredSession.sdkSessionId,
     });
     return restoredSession;
+  }
+
+  private assertSessionNotInvalidated(sessionId: string): void {
+    if (this.invalidatedSessions.has(sessionId)) {
+      throw new Error(`Claude Code session not found: ${sessionId}`);
+    }
   }
 
   private setStatus(status: AgentConnectionStatus): void {

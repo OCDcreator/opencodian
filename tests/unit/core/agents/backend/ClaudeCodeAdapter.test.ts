@@ -84,6 +84,10 @@ function createSdk(messages: unknown[]): ClaudeCodeSdkFacade & {
   query: jest.Mock;
   listSessions: jest.Mock;
   getSessionInfo: jest.Mock;
+  getSessionMessages: jest.Mock;
+  listSubagents: jest.Mock;
+  getSubagentMessages: jest.Mock;
+  importSessionToStore: jest.Mock;
   forkSession: jest.Mock;
   renameSession: jest.Mock;
 } {
@@ -98,6 +102,10 @@ function createSdk(messages: unknown[]): ClaudeCodeSdkFacade & {
     })),
     listSessions: jest.fn().mockResolvedValue([]),
     getSessionInfo: jest.fn().mockResolvedValue(undefined),
+    getSessionMessages: jest.fn().mockResolvedValue([]),
+    listSubagents: jest.fn().mockResolvedValue([]),
+    getSubagentMessages: jest.fn().mockResolvedValue([]),
+    importSessionToStore: jest.fn().mockResolvedValue(undefined),
     forkSession: jest.fn().mockResolvedValue({ sessionId: 'sdk-fork-session' }),
     renameSession: jest.fn().mockResolvedValue(undefined),
   };
@@ -547,6 +555,131 @@ describe('ClaudeCodeAdapter', () => {
       upToMessageId: 'message-1',
       title: 'Renamed (fork)',
     });
+  });
+
+  it('delegates Claude JSONL history and subagent transcript APIs behind diagnostic-only methods', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-session-history',
+    }]);
+    sdk.getSessionMessages.mockResolvedValue([{ type: 'user', uuid: 'u1' }]);
+    sdk.listSubagents.mockResolvedValue(['agent-1']);
+    sdk.getSubagentMessages.mockResolvedValue([{ type: 'assistant', uuid: 'a1' }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const localSessionId = await adapter.createSession('Claude chat');
+    await collectAsync(adapter.sendMessage({ sessionId: localSessionId, content: 'hello' }));
+    const sessionStore = { append: jest.fn(), load: jest.fn() };
+    const mirrorStore = { append: jest.fn(), load: jest.fn() };
+
+    await expect(adapter.getSessionMessages(localSessionId, {
+      limit: 20,
+      offset: 2,
+      includeSystemMessages: true,
+      sessionStore,
+    })).resolves.toEqual([{ type: 'user', uuid: 'u1' }]);
+    await expect(adapter.listSubagents(localSessionId, { sessionStore }))
+      .resolves.toEqual(['agent-1']);
+    await expect(adapter.getSubagentMessages(localSessionId, 'agent-1', {
+      limit: 5,
+      offset: 1,
+      sessionStore,
+    })).resolves.toEqual([{ type: 'assistant', uuid: 'a1' }]);
+    await expect(adapter.importSessionToStore(localSessionId, mirrorStore, {
+      includeSubagents: true,
+      batchSize: 250,
+    })).resolves.toBeUndefined();
+
+    expect(sdk.getSessionMessages).toHaveBeenCalledWith('sdk-session-history', {
+      dir: '/vault',
+      limit: 20,
+      offset: 2,
+      includeSystemMessages: true,
+      sessionStore,
+    });
+    expect(sdk.listSubagents).toHaveBeenCalledWith('sdk-session-history', {
+      dir: '/vault',
+      sessionStore,
+    });
+    expect(sdk.getSubagentMessages).toHaveBeenCalledWith('sdk-session-history', 'agent-1', {
+      dir: '/vault',
+      limit: 5,
+      offset: 1,
+      sessionStore,
+    });
+    expect(sdk.importSessionToStore).toHaveBeenCalledWith('sdk-session-history', mirrorStore, {
+      dir: '/vault',
+      includeSubagents: true,
+      batchSize: 250,
+    });
+  });
+
+  it('passes runtime-injected Claude SDK foundation options into query creation', async () => {
+    const sdk = createSdk([]);
+    const hooks = { SessionStart: [{ hooks: [jest.fn()] }] };
+    const sessionStore = { append: jest.fn(), load: jest.fn() };
+    const outputFormat = { type: 'json_schema', schema: { type: 'object' } };
+    const plugins = [{ type: 'local', path: './claude-plugin' }];
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+      hooks,
+      sessionStore,
+      sessionStoreFlush: 'eager',
+      outputFormat,
+      plugins,
+      skills: 'all',
+    });
+    const sessionId = await adapter.createSession('Claude chat');
+
+    await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+
+    const options = sdk.query.mock.calls[0][0].options;
+    expect(options.hooks).toBe(hooks);
+    expect(options.sessionStore).toBe(sessionStore);
+    expect(options.sessionStoreFlush).toBe('eager');
+    expect(options.outputFormat).toBe(outputFormat);
+    expect(options.plugins).toEqual(plugins);
+    expect(options.skills).toBe('all');
+  });
+
+  it('surfaces unavailable SDK history APIs instead of returning empty data', async () => {
+    const sdk = createSdk([]);
+    delete sdk.getSessionMessages;
+    delete sdk.listSubagents;
+    delete sdk.getSubagentMessages;
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getSessionMessages('sdk-session')).rejects.toThrow('getSessionMessages is unavailable');
+    await expect(adapter.listSubagents('sdk-session')).rejects.toThrow('listSubagents is unavailable');
+    await expect(adapter.getSubagentMessages('sdk-session', 'agent-1'))
+      .rejects.toThrow('getSubagentMessages is unavailable');
+  });
+
+  it('blocks diagnostic history operations for deleted local sessions', async () => {
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession('Claude chat');
+    await adapter.deleteSession(sessionId);
+
+    await expect(adapter.getSessionMessages(sessionId)).rejects.toThrow('session not found');
+    await expect(adapter.importSessionToStore(sessionId, { append: jest.fn(), load: jest.fn() }))
+      .rejects.toThrow('session not found');
+    expect(sdk.getSessionMessages).not.toHaveBeenCalled();
+    expect(sdk.importSessionToStore).not.toHaveBeenCalled();
   });
 
   it('recovers a persisted local session handle before sending after adapter restart', async () => {
