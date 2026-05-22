@@ -68,6 +68,22 @@ export function getConversationSessionHistoryService(
   return service as AgentSessionCapability & Pick<Required<AgentSessionCapability>, 'getSessionMessages'>;
 }
 
+/**
+ * Returns the **active** backend's session service ONLY if it also implements
+ * `getSessionMessages`.  Convenience wrapper for consumers that need to read
+ * session messages from the active backend without a specific conversation
+ * context (e.g. settings inspection surfaces).
+ */
+export function getActiveSessionHistoryService(
+  registry: AgentServiceRegistry | null | undefined,
+): (AgentSessionCapability & Pick<Required<AgentSessionCapability>, 'getSessionMessages'>) | null {
+  const service = getActiveSessionBackendService(registry);
+  if (!service || typeof service.getSessionMessages !== 'function') {
+    return null;
+  }
+  return service as AgentSessionCapability & Pick<Required<AgentSessionCapability>, 'getSessionMessages'>;
+}
+
 // ---------------------------------------------------------------------------
 // Backend-aware session message normalization
 // ---------------------------------------------------------------------------

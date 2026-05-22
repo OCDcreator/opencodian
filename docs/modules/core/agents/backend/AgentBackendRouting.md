@@ -14,6 +14,7 @@
 - 提供 `hasChatCapability()` / `hasSessionCapability()` 类型收窄
 - 提供 active session backend 与 conversation session/chat backend helper
 - 提供 `getConversationSessionHistoryService()` 用于 session 消息读取路由，仅返回同时实现了 `getSessionMessages()` 的 session backend
+- 提供 `getActiveSessionHistoryService()` 用于 active backend 的 session 消息读取路由，供无 conversation context 的消费方（如 settings inspection surface）使用
 
 ## 维护约束
 

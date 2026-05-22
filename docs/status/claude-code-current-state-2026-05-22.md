@@ -79,9 +79,10 @@ Recent runs focused on two connected lanes:
 | `BackgroundTaskTimelineService.ts` | Debug logs use `getConversationBackendSessionId()`. |
 | `ConversationIdentityRuntime.ts` | Sync fingerprint uses `getConversationBackendSessionId()`. |
 | `SessionTodoStateService.ts` | Session matching uses `getConversationBackendSessionId()`. |
-| `AgentBackendRouting.ts` | Adds `getConversationSessionHistoryService()` and `loadBackendSessionMessages()` so shared owners can read raw session history without hard-binding to `openCodeService`. |
+| `AgentBackendRouting.ts` | Adds `getConversationSessionHistoryService()`, `loadBackendSessionMessages()`, and `getActiveSessionHistoryService()` so shared owners can read raw session history without hard-binding to `openCodeService`. |
 | `TitleGenerationService.ts` | `readOfficialSessionTitle()` now resolves backend + `backendSessionId` and routes `listSessions()` through the active backend where supported. |
 | Context usage detail modal | Raw message loading now routes through `getConversationSessionHistoryService()` with backend-aware normalization; snapshots themselves remain OpenCode-only. |
+| `SettingsConversationSection.ts` | Shared sessions list now routes `listSessions()` through `getActiveSessionBackendService()` and session message preview routes through `getActiveSessionHistoryService()` instead of directly calling `openCodeService`. `unshareSession()` remains a direct `openCodeService` call (OpenCode-specific write). |
 
 ### What Remains OpenCode-Only (Intentionally Gated)
 
@@ -182,6 +183,9 @@ The following service seams now route session identity through `getConversationB
 | Stream message persistence (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Conversation render service (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Conversation sync runtime coordinator (diagnostic) | **Yes** | Includes both `openCodeSessionId` and `backendSessionId` |
+| Settings shared sessions list (`listSessions`) | **Backend-aware** | Routes through `getActiveSessionBackendService()` instead of `openCodeService.listSessions()`. Section remains OpenCode-gated because share URLs are OpenCode-specific, but the read surface is backend-aware. |
+| Settings shared session preview (`getSessionMessages`) | **Backend-aware** | Routes through `getActiveSessionHistoryService()` instead of `openCodeService.getSessionMessages()`. Rendering remains OpenCode-specific `{info, parts}` shape. |
+| Settings shared session unshare (`unshareSession`) | **OpenCode-only** | Direct `openCodeService.unshareSession()` call; no backend-neutral equivalent for share URL write operations. |
 
 **Services remaining hard-wired to OpenCode** (no migration justified until backend-neutral equivalents exist):
 
@@ -194,6 +198,8 @@ The following service seams now route session identity through `getConversationB
 | PostSyncQuestionTodoRefreshHostAdapter | Adapter for question/todo chain using `openCodeService` |
 | ConversationSyncVisiblePostSyncRouter | Routes post-sync question/todo updates through OpenCode APIs |
 | ConversationSyncOrchestrationService | Drives OpenCode-specific sync loop |
+| SettingsConversationSection (`unshareSession`) | Share URL write is OpenCode-specific; `listSessions` and `getSessionMessages` are now backend-aware |
+| OpenCodianView sync host (`getSessionMessages`) | Authoritative sync host is OpenCode-only by design; routes through `openCodeService` directly |
 
 ## Capability Lab Status
 

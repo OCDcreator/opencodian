@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { AgentCapability, OPENCODE_FULL_CAPABILITIES } from '../../../../../src/core/agents/AgentCapability';
 import {
+  getActiveSessionHistoryService,
   getConversationSessionBackendService,
   getConversationSessionHistoryService,
   loadBackendSessionMessages,
@@ -122,6 +123,41 @@ describe('AgentBackendRouting', () => {
       expect(result).not.toBeNull();
       const messages = await result!.getSessionMessages('session-1');
       expect(messages).toEqual(claudeMessages);
+    });
+  });
+
+  describe('getActiveSessionHistoryService', () => {
+    it('returns null when registry is null', () => {
+      const result = getActiveSessionHistoryService(null);
+      expect(result).toBeNull();
+    });
+
+    it('returns null when active adapter lacks getSessionMessages', () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        // No getSessionMessages
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = getActiveSessionHistoryService(registry);
+      expect(result).toBeNull();
+    });
+
+    it('returns history service when active adapter has getSessionMessages', async () => {
+      const mockMessages = [{ id: 'msg-1', role: 'user' }];
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSessionMessages: async () => mockMessages,
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = getActiveSessionHistoryService(registry);
+      expect(result).not.toBeNull();
+      expect(typeof result!.getSessionMessages).toBe('function');
+      const messages = await result!.getSessionMessages('session-1');
+      expect(messages).toEqual(mockMessages);
+    });
+
+    it('returns null when no active backend exists', () => {
+      const registry = createMockRegistry(new Map());
+      const result = getActiveSessionHistoryService(registry);
+      expect(result).toBeNull();
     });
   });
 

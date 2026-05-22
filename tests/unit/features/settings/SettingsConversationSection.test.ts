@@ -72,6 +72,7 @@ type ConversationSectionPlugin = Pick<
   | 'reapplyConversationSessionDefaults'
   | 'opencodeConfigManager'
   | 'openCodeService'
+  | 'agentServiceRegistry'
 >;
 
 const dropdownRecords: DropdownRecord[] = [];
@@ -174,6 +175,20 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
   const getSessionMessages = jest.fn().mockResolvedValue([]);
   const unshareSession = jest.fn().mockResolvedValue({ id: 'session-1', title: 'Unshared', time: { created: 1, updated: 2 } });
 
+  // Mock OpenCode adapter that the registry returns.  listSessions and
+  // getSessionMessages point to the SAME jest fns as openCodeService so
+  // existing assertions remain valid while the code routes through the
+  // backend-aware registry layer.
+  const mockOpenCodeAdapter = {
+    hasCapability: jest.fn().mockReturnValue(true),
+    listSessions,
+    getSessionMessages,
+  };
+  const mockRegistry = {
+    getActive: jest.fn().mockReturnValue(mockOpenCodeAdapter),
+    get: jest.fn().mockReturnValue(mockOpenCodeAdapter),
+  };
+
   return {
     settings: {
       ...DEFAULT_SETTINGS,
@@ -199,6 +214,7 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
       getSessionMessages,
       unshareSession,
     } as never,
+    agentServiceRegistry: mockRegistry as never,
   } as unknown as ConversationSectionPlugin;
 }
 
@@ -483,6 +499,127 @@ describe('SettingsConversationSection', () => {
     rowEl?.querySelector<HTMLButtonElement>('[data-action="unshare-shared-session"]')?.click();
     await Promise.resolve();
     expect((plugin.openCodeService as { unshareSession: jest.Mock }).unshareSession).toHaveBeenCalledWith('session-1');
+  });
+
+  it('routes shared sessions list through the backend-aware registry layer', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const registry = plugin.agentServiceRegistry as { getActive: jest.Mock };
+    const adapter = registry.getActive();
+
+    // Override the shared listSessions mock with session data
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'Registry-routed session',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The registry was consulted for the active backend
+    expect(registry.getActive).toHaveBeenCalled();
+
+    // The adapter's listSessions was called (routing through the registry)
+    expect((adapter as { listSessions: jest.Mock }).listSessions).toHaveBeenCalled();
+
+    // The session data appears in the DOM
+    expect(containerEl.textContent).toContain('Registry-routed session');
+  });
+
+  it('shows empty state when active backend lacks session listing capability', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // Remove listSessions from the adapter to simulate a backend without listing support
+    delete (adapter as Record<string, unknown>).listSessions;
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Should show the empty state, not crash
+    expect(containerEl.querySelector('.opencodian-shared-sessions-empty')).toBeTruthy();
+  });
+
+  it('shows preview failure when active backend lacks session history capability', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // Adapter has listSessions but NOT getSessionMessages
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'No-preview session',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    delete (adapter as Record<string, unknown>).getSessionMessages;
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-1"]');
+
+    // Click preview button
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Should show preview failed message, not crash
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-1"]');
+    expect(previewEl?.textContent).toBeTruthy(); // preview was rendered
+  });
+
+  it('routes session message preview through the backend-aware history service', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'History-routed session',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      {
+        info: { id: 'm1', sessionID: 'session-1', role: 'user', time: { created: 1 } },
+        parts: [{ id: 'p1', sessionID: 'session-1', messageID: 'm1', type: 'text', text: 'routed message' }],
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-1"]');
+
+    // Click preview
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The adapter's getSessionMessages was called through the routing layer
+    expect((adapter as { getSessionMessages: jest.Mock }).getSessionMessages).toHaveBeenCalledWith('session-1');
+
+    // The preview shows the message content
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-1"]');
+    expect(previewEl?.textContent).toContain('routed message');
   });
 
   it('checks share diagnostics from the sharing block', async () => {

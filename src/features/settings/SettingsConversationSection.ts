@@ -2,6 +2,10 @@ import type { App, ButtonComponent, ExtraButtonComponent } from 'obsidian';
 import { Notice, requestUrl, Setting } from 'obsidian';
 
 import {
+  getActiveSessionBackendService,
+  getActiveSessionHistoryService,
+} from '../../core/agents/backend/AgentBackendRouting';
+import {
   parseModelReference,
   resolveModelSelection,
 } from '../../core/config/modelConfig';
@@ -790,7 +794,17 @@ export class SettingsConversationSection {
     });
 
     try {
-      const sessions = await this.plugin.openCodeService.listSessions();
+      const sessionService = getActiveSessionBackendService(
+        this.plugin.agentServiceRegistry,
+      );
+      if (!sessionService?.listSessions) {
+        containerEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.empty'),
+        });
+        return;
+      }
+      const sessions = (await sessionService.listSessions()) as Session[];
       const sharedSessions = sessions
         .map((session) => ({ session, url: this.getSessionShareUrl(session) }))
         .filter((entry): entry is { session: Session; url: string } => Boolean(entry.url));
@@ -901,7 +915,18 @@ export class SettingsConversationSection {
     });
 
     try {
-      const messages = await this.plugin.openCodeService.getSessionMessages(sessionId);
+      const historyService = getActiveSessionHistoryService(
+        this.plugin.agentServiceRegistry,
+      );
+      if (!historyService) {
+        previewEl.empty();
+        previewEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.previewFailed'),
+        });
+        return;
+      }
+      const messages = (await historyService.getSessionMessages(sessionId)) as SessionMessage[];
       previewEl.empty();
       for (const message of messages) {
         this.renderSharedSessionMessage(previewEl, message);
