@@ -33,16 +33,12 @@ export interface SlashCommandExecutionHostDependencies { /* flat view deps */ }
 export class SlashCommandExecutionService {
   tryRunSlashCommand(content: string): Promise<boolean>;
 }
-
-export function createSlashCommandExecutionHost(
-  deps: SlashCommandExecutionHostDependencies,
-): SlashCommandExecutionHost;
-
-export function executeCompactSession(...): Promise<boolean>;
 ```
 
 - 返回 `true`：当前输入已经被当作 slash command 消费（包括 ready/busy/error path）
 - 返回 `false`：当前输入不属于已知 slash command，调用方继续走普通 chat send pipeline
+
+> `createSlashCommandExecutionHost` 与 `executeCompactSession` 已提取到 `SlashCommandExecutionHostFactory.ts`。
 
 ## 关键行为
 
@@ -69,7 +65,7 @@ export function executeCompactSession(...): Promise<boolean>;
   - `/new`：调用 `createNewConversation()` 创建新会话
   - `/share`：调用 `shareSession()` 分享，成功后将 URL 复制到剪贴板
   - `/unshare`：调用 `unshareSession()` 取消分享
-- 所有 synthetic builtin 的 host 方法在 `createSlashCommandExecutionHost()` 工厂中从 `deps.openCodeService` 直接映射，不需要 `OpenCodianView` 提供额外辅助方法
+- 所有 synthetic builtin 的 host 方法在 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂中从 `deps.openCodeService` 直接映射，不需要 `OpenCodianView` 提供额外辅助方法
 
 ### 执行前 gate
 
@@ -103,7 +99,7 @@ export function executeCompactSession(...): Promise<boolean>;
 - slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
 - dispatch runtime/project command 前会用 `getConversationBackendSessionId()` 解析 session identity；没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
 - **OpenCode-only undo/redo gate**: `/undo` 与 `/redo` 在 `backend !== 'opencode'` 时直接返回 no-session notice。revert / unrevert 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
-- `/compact` 不属于普通 slash command runtime：`executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
+- `/compact` 不属于普通 slash command runtime：`SlashCommandExecutionHostFactory.executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
-- `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda
+- `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda
 - synthetic builtin commands（`/compact`、`/undo`、`/redo`、`/new`、`/share`、`/unshare`）的 host 方法（`revertSession`、`unrevertSession`、`shareSession`、`unshareSession`、`createNewConversation`）直接从 `deps.openCodeService` 和 `deps.createNewConversation` 映射，不经过 view 层新增方法

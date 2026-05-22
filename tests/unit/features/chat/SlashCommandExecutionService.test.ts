@@ -5,6 +5,8 @@ import type {
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
 import {
   createSlashCommandExecutionHost,
+} from '../../../../src/features/chat/services/SlashCommandExecutionHostFactory';
+import {
   type SlashCommandExecutionHost,
   SlashCommandExecutionService,
 } from '../../../../src/features/chat/services/SlashCommandExecutionService';

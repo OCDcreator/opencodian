@@ -284,6 +284,8 @@ import {
 import {
   createSlashCommandExecutionHost,
   executeCompactSession,
+} from './services/SlashCommandExecutionHostFactory';
+import {
   SlashCommandExecutionService,
 } from './services/SlashCommandExecutionService';
 import { SlashCommandMenuCatalogCache } from './services/SlashCommandMenuCatalogCache';
@@ -1766,39 +1768,14 @@ export class OpenCodianView extends ItemView {
       this.createConversationSessionSignalRuntimeHost(),
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
     );
-    const backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
-      this.createBackgroundTaskCompletionNoticeServiceHost(),
-    );
-    const backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
-      backgroundTaskRuntime.backgroundTaskTimelineService,
-      this.createBackgroundTaskInlinePanelRendererHost(),
-    );
-    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator({
-      inlinePanelRenderer: backgroundTaskInlinePanelRenderer,
-      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
-      completionNoticeService: backgroundTaskCompletionNoticeService,
-      liveSignalCoordinator: backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-      tabRuntimeStateBridge,
-      host: this.createBackgroundTaskIndicatorCoordinatorHost(),
-    });
-    const backgroundTaskIndicatorRenderPort = {
-      renderIfNeeded: (tabId?: TabId | null) => {
-        if (hasCapability(this.caps, AgentCapability.Subagents)) {
-          return backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
-        }
-        return Promise.resolve();
-      },
-    };
-    this.backgroundTaskHost = createBackgroundTaskViewHost({
-      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
-      indicatorRenderPort: backgroundTaskIndicatorRenderPort,
-    });
-    const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
-      backgroundTaskIndicatorRenderPort,
-      backgroundTaskRuntime.backgroundTaskTimelineService,
-      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-      backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
-    );
+    const {
+      backgroundTaskCompletionNoticeService,
+      backgroundTaskInlinePanelRenderer,
+      backgroundTaskIndicatorCoordinator,
+      backgroundTaskStreamTriggerCoordinator,
+      backgroundTaskHost,
+    } = this.createBackgroundTaskInfrastructure(backgroundTaskRuntime, tabRuntimeStateBridge);
+    this.backgroundTaskHost = backgroundTaskHost;
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
       conversationSyncRuntime.conversationLoadRuntimeBridgeHost,
     );
@@ -1876,6 +1853,59 @@ export class OpenCodianView extends ItemView {
       backgroundTaskStreamTriggerCoordinator,
       conversationLoadRecoveryCoordinator,
       conversationTabRuntimeCoordinator,
+    };
+  }
+
+  private createBackgroundTaskInfrastructure(
+    backgroundTaskRuntime: OpenCodianViewBackgroundTaskRuntimeWiring,
+    tabRuntimeStateBridge: TabRuntimeStateBridge,
+  ): {
+    backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
+    backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
+    backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
+    backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
+    backgroundTaskHost: BackgroundTaskViewHost;
+  } {
+    const backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
+      this.createBackgroundTaskCompletionNoticeServiceHost(),
+    );
+    const backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
+      backgroundTaskRuntime.backgroundTaskTimelineService,
+      this.createBackgroundTaskInlinePanelRendererHost(),
+    );
+    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator({
+      inlinePanelRenderer: backgroundTaskInlinePanelRenderer,
+      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
+      completionNoticeService: backgroundTaskCompletionNoticeService,
+      liveSignalCoordinator: backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
+      tabRuntimeStateBridge,
+      host: this.createBackgroundTaskIndicatorCoordinatorHost(),
+    });
+    const backgroundTaskIndicatorRenderPort = {
+      renderIfNeeded: (tabId?: TabId | null) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
+    };
+    const backgroundTaskHost = createBackgroundTaskViewHost({
+      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
+      indicatorRenderPort: backgroundTaskIndicatorRenderPort,
+    });
+    const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
+      backgroundTaskIndicatorRenderPort,
+      backgroundTaskRuntime.backgroundTaskTimelineService,
+      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
+      backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
+    );
+
+    return {
+      backgroundTaskCompletionNoticeService,
+      backgroundTaskInlinePanelRenderer,
+      backgroundTaskIndicatorCoordinator,
+      backgroundTaskStreamTriggerCoordinator,
+      backgroundTaskHost,
     };
   }
 

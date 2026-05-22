@@ -602,6 +602,7 @@ effort selector 的 variant 列表继续直接按当前 provider/model 查询 `f
 - `ConversationHydrationRuntimeViewHostFactory`：通过 `assembleConversationHydrationRuntime` 拥有完整的 hydration bridge assembly 生命周期，view 不再直接调用底层 bridge 构造函数
 - `ConversationLoadRecoveryCoordinator`：通过 `assembleConversationLoadRecovery(deps)` 把 `ConversationViewStateService`、`ConversationTabOpenCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationLoadRecoveryCoordinator` 的组装收束到该模块；`OpenCodianView` 的 `createConversationRuntimeWiring` 不再直接实例化这四个服务
 - `ConversationTabRuntimeCoordinator`：通过 `assembleConversationTabRuntime(deps)` 作为 `createConversationTabRuntimeCoordinator` 的同义导出，供 view 调用；`OpenCodianView` 的 `createConversationRuntimeWiring` 不再直接调用 `createConversationTabRuntimeCoordinator`
+- `createBackgroundTaskInfrastructure`：从 `createConversationRuntimeWiring` 中提取的背景任务基础设施（indicator、render port、stream trigger、view host）装配私有方法，减少 `createConversationRuntimeWiring` 的行数并保持背景任务创建逻辑内聚
 - `SendPipelineRuntime`：发送子系统总入口，负责真实 stream 调用、runtime 内部模块装配，以及向 `MessageFinalizationService` 交接
 - `StreamChunkRouter`：发送子系统内部的 stream loop / pending / timeout / chunk router
 - `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
