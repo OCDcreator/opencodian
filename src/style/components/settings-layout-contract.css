@@ -223,15 +223,16 @@
   gap: var(--opencodian-settings-space-lg);
 }
 
-.opencodian-settings .opencodian-debug-workbench-header > .opencodian-settings-subsection-heading {
+.opencodian-settings .opencodian-debug-workbench-header.opencodian-settings-block {
   margin: 0;
-  padding: 0;
 }
 
 .opencodian-settings .opencodian-debug-workbench-header > .opencodian-settings-block-desc {
-  margin-top: 4px;
-  padding: 0;
   max-width: 78ch;
+}
+
+.opencodian-settings .opencodian-debug-workbench-header > .opencodian-debug-status-strip {
+  margin: 12px 16px 16px;
 }
 
 .opencodian-settings .opencodian-debug-status-strip {

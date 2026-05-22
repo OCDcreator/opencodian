@@ -35,7 +35,7 @@ section 通过 `DEBUG_MODULE_REGISTRY` 动态生成模块 toggles，并在本 ow
 
 Claude Code block 不再只是单个 toggle。它现在渲染：
 
-- backend/logging/channel/recent-log 状态条
+- SDK 诊断标题、说明和 backend/logging/channel/recent-log 状态条组成一个顶部设置块
 - summary-only 隐私说明，明确不展示 prompt、tool input、用户答案、env 值或 secret
 - `claudeCode` module 总开关
 - `runtime` / `sessions` / `stream` / `permissions` / `mcp` / `experimental` 通道开关，持久化到 `backendSettings.claudeCode.debugChannels`

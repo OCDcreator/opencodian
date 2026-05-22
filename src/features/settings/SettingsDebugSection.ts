@@ -171,7 +171,9 @@ export class SettingsDebugSection {
       attr: { 'data-debug-workbench': 'claude-code' },
     });
 
-    const headerEl = workbenchEl.createDiv({ cls: 'opencodian-debug-workbench-header' });
+    const headerEl = workbenchEl.createDiv({
+      cls: 'opencodian-debug-workbench-header opencodian-settings-block',
+    });
     headerEl.createEl('h4', {
       cls: 'opencodian-settings-subsection-heading',
       text: t('settings.debug.modules.claudeCode.title'),
@@ -181,7 +183,7 @@ export class SettingsDebugSection {
       text: t('settings.debug.modules.claudeCode.groupDesc'),
     });
 
-    this.addClaudeCodeStatusStrip(workbenchEl);
+    this.addClaudeCodeStatusStrip(headerEl);
     this.addClaudeCodePrivacyNote(workbenchEl);
     this.addDebugModuleSettings(
       workbenchEl,
