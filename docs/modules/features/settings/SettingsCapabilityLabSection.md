@@ -70,10 +70,12 @@
 
 ## CSS 类命名
 
-使用 `opencodian-capability-lab-*` 前缀：
+样式由 `src/style/components/settings-capability-lab.css` 持有，使用 `opencodian-capability-lab-*` 前缀：
 
 - `.opencodian-capability-lab-banner` — 顶部实验性警告横幅
-- `.opencodian-capability-lab-matrix` — 能力矩阵表格
+- `.opencodian-capability-lab-summary` — 诊断边界摘要条，明确只读、dry-run 与运行时证明不持久化
+- `.opencodian-capability-lab-table-shell` — 能力矩阵横向滚动容器
+- `.opencodian-capability-lab-matrix` — 能力矩阵表格；最后一列使用 `User Surface` 标记 `Settings` / `Diagnostic` / `Hidden`，避免把未验证能力包装成稳定 UI
 - `.opencodian-capability-lab-chip` — 状态芯片
 - `.opencodian-capability-lab-controls` — 控件容器
 - `.opencodian-capability-lab-output` — 输出区域

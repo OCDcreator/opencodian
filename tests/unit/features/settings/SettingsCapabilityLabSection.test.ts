@@ -77,7 +77,23 @@ describe('SettingsCapabilityLabSection', () => {
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     expect(table).toBeTruthy();
     const headers = Array.from(table!.querySelectorAll('th')).map((th) => th.textContent);
-    expect(headers).toEqual(['Capability', 'SDK Exposed', 'Adapter Wired', 'Runtime Proof', 'Stable UI']);
+    expect(headers).toEqual(['Capability', 'SDK', 'Adapter', 'Runtime Proof', 'User Surface']);
+  });
+
+  it('renders a diagnostic summary strip above the matrix', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const summary = containerEl.querySelector('.opencodian-capability-lab-summary');
+    expect(summary).toBeTruthy();
+    expect(summary!.getAttribute('data-diagnostic')).toBe('true');
+    expect(summary!.textContent).toContain('Diagnostic only');
+    expect(summary!.textContent).toContain('Read-only or dry-run');
   });
 
   it('shows unavailable message when adapter is not present', () => {
@@ -201,5 +217,22 @@ describe('SettingsCapabilityLabSection', () => {
     const inactiveChips = containerEl.querySelectorAll('.opencodian-capability-lab-chip:not(.opencodian-capability-lab-chip-active)');
     expect(activeChips.length).toBeGreaterThan(0);
     expect(inactiveChips.length).toBeGreaterThan(0);
+  });
+
+  it('labels user-facing surfaces without claiming all are stable', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const surfaces = Array.from(containerEl.querySelectorAll('[data-surface]')).map((el) => (
+      (el as HTMLElement).dataset.surface
+    ));
+    expect(surfaces).toContain('settings');
+    expect(surfaces).toContain('diagnostic');
+    expect(surfaces).toContain('hidden');
   });
 });

@@ -37,7 +37,7 @@ interface MatrixRow {
   sdkExposed: boolean;
   adapterWired: boolean;
   runtimeProof: 'untested' | 'pass' | 'fail';
-  stableUI: boolean;
+  userSurface: 'settings' | 'diagnostic' | 'hidden';
 }
 
 // ---------------------------------------------------------------------------
@@ -66,12 +66,44 @@ function experimentalBanner(containerEl: HTMLElement): void {
   });
 }
 
+function createDiagnosticSummary(containerEl: HTMLElement): void {
+  const summaryEl = containerEl.createDiv({
+    cls: 'opencodian-capability-lab-summary',
+    attr: { 'data-diagnostic': 'true' },
+  });
+
+  const items = [
+    ['Boundary', 'Diagnostic only'],
+    ['Runtime proof', 'Per-action, not persisted'],
+    ['Writes', 'Read-only or dry-run'],
+  ] as const;
+
+  for (const [label, value] of items) {
+    const itemEl = summaryEl.createDiv({ cls: 'opencodian-capability-lab-summary-item' });
+    itemEl.createSpan({ cls: 'opencodian-capability-lab-summary-label', text: label });
+    itemEl.createSpan({ cls: 'opencodian-capability-lab-summary-value', text: value });
+  }
+}
+
 function createStatusChip(containerEl: HTMLElement, label: string, active: boolean): void {
   const chip = containerEl.createSpan({
     cls: `opencodian-capability-lab-chip${active ? ' opencodian-capability-lab-chip-active' : ''}`,
     text: active ? `✓ ${label}` : `✗ ${label}`,
   });
   chip.dataset.status = active ? 'active' : 'inactive';
+}
+
+function createSurfaceChip(containerEl: HTMLElement, surface: MatrixRow['userSurface']): void {
+  const labels: Record<MatrixRow['userSurface'], string> = {
+    settings: 'Settings',
+    diagnostic: 'Diagnostic',
+    hidden: 'Hidden',
+  };
+  const chip = containerEl.createSpan({
+    cls: `opencodian-capability-lab-chip opencodian-capability-lab-chip-surface-${surface}`,
+    text: labels[surface],
+  });
+  chip.dataset.surface = surface;
 }
 
 function formatJsonPreview(obj: unknown): string {
@@ -108,6 +140,7 @@ export class SettingsCapabilityLabSection {
     );
 
     experimentalBanner(containerEl);
+    createDiagnosticSummary(containerEl);
 
     // ── Capability Matrix ──────────────────────────────────────────────
     const matrixBlock = containerEl.createDiv({
@@ -164,7 +197,11 @@ export class SettingsCapabilityLabSection {
     });
 
     const adapter = getClaudeCodeAdapter(this.plugin);
-    const table = containerEl.createEl('table', {
+    const shellEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-table-shell',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const table = shellEl.createEl('table', {
       cls: 'opencodian-capability-lab-matrix',
     });
 
@@ -172,17 +209,17 @@ export class SettingsCapabilityLabSection {
     const thead = table.createEl('thead');
     const headerRow = thead.createEl('tr');
     headerRow.createEl('th', { text: 'Capability' });
-    headerRow.createEl('th', { text: 'SDK Exposed' });
-    headerRow.createEl('th', { text: 'Adapter Wired' });
+    headerRow.createEl('th', { text: 'SDK' });
+    headerRow.createEl('th', { text: 'Adapter' });
     headerRow.createEl('th', { text: 'Runtime Proof' });
-    headerRow.createEl('th', { text: 'Stable UI' });
+    headerRow.createEl('th', { text: 'User Surface' });
 
     // Build rows
     const rows = this.buildMatrixRows(adapter);
     const tbody = table.createEl('tbody');
     for (const row of rows) {
       const tr = tbody.createEl('tr');
-      tr.createEl('td', { text: row.capability });
+      tr.createEl('td', { cls: 'opencodian-capability-lab-capability-cell', text: row.capability });
       const sdkCell = tr.createEl('td');
       createStatusChip(sdkCell, 'SDK', row.sdkExposed);
       const adapterCell = tr.createEl('td');
@@ -196,7 +233,7 @@ export class SettingsCapabilityLabSection {
         text: proofLabel,
       });
       const uiCell = tr.createEl('td');
-      createStatusChip(uiCell, 'UI', row.stableUI);
+      createSurfaceChip(uiCell, row.userSurface);
     }
   }
 
@@ -209,84 +246,84 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // SDK options accept hooks
         adapterWired: true, // buildSdkOptions wires hooks
         runtimeProof: 'untested', // Requires diagnostic call
-        stableUI: false, // No authoring UI
+        userSurface: 'hidden', // No authoring UI
       },
       {
         capability: 'File Checkpoint / Rewind',
         sdkExposed: true, // enableFileCheckpointing option + rewindFiles on query
         adapterWired: true, // adapter.rewindFiles() exists
         runtimeProof: 'untested',
-        stableUI: true, // SDK Foundations toggle exists
+        userSurface: 'settings', // SDK Foundations toggle exists
       },
       {
         capability: 'JSONL History Browser',
         sdkExposed: !!adapter, // getSessionMessages on SDK facade
         adapterWired: !!adapter, // adapter.getSessionMessages()
         runtimeProof: 'untested',
-        stableUI: false, // Only this diagnostic panel
+        userSurface: 'diagnostic', // Only this diagnostic panel
       },
       {
         capability: 'Session Store',
         sdkExposed: true, // sessionStore option in SDK
         adapterWired: true, // buildSdkOptions wires sessionStore
         runtimeProof: 'untested',
-        stableUI: false,
+        userSurface: 'hidden',
       },
       {
         capability: 'Skills',
         sdkExposed: true, // skills option in SDK
         adapterWired: true, // buildSdkOptions wires skills
         runtimeProof: 'untested',
-        stableUI: false,
+        userSurface: 'hidden',
       },
       {
         capability: 'Plugins',
         sdkExposed: true, // plugins option in SDK
         adapterWired: true, // buildSdkOptions wires plugins
         runtimeProof: 'untested',
-        stableUI: false,
+        userSurface: 'hidden',
       },
       {
         capability: 'Agents (Subagents)',
         sdkExposed: !!adapter, // listSubagents, getSubagentMessages
         adapterWired: !!adapter, // adapter methods exist
         runtimeProof: 'untested',
-        stableUI: false, // Not in CLAUDE_CODE_PHASE1_CAPABILITIES
+        userSurface: 'diagnostic', // Not in CLAUDE_CODE_PHASE1_CAPABILITIES
       },
       {
         capability: 'Structured Output',
         sdkExposed: true, // outputFormat option in SDK
         adapterWired: true, // buildSdkOptions wires outputFormat
         runtimeProof: 'untested',
-        stableUI: false, // backend_event chunks dropped in OpenCodianView
+        userSurface: 'diagnostic', // backend_event chunks dropped in OpenCodianView
       },
       {
         capability: 'Subagent Transcript / Progress',
         sdkExposed: true, // forwardSubagentText + agentProgressSummaries options
         adapterWired: true, // buildSdkOptions wires both
         runtimeProof: 'untested',
-        stableUI: true, // SDK Foundations toggles exist
+        userSurface: 'settings', // SDK Foundations toggles exist
       },
       {
         capability: 'Include Hook Events',
         sdkExposed: true, // includeHookEvents option
         adapterWired: true, // buildSdkOptions wires it
         runtimeProof: 'untested',
-        stableUI: true, // SDK Foundations toggle exists
+        userSurface: 'settings', // SDK Foundations toggle exists
       },
       {
         capability: 'Import Session to Store',
         sdkExposed: !!adapter, // importSessionToStore on SDK facade
         adapterWired: !!adapter, // adapter.importSessionToStore()
         runtimeProof: 'untested',
-        stableUI: false,
+        userSurface: 'hidden',
       },
       {
         capability: 'Fork Session',
         sdkExposed: !!adapter, // forkSession on SDK facade
         adapterWired: !!adapter, // adapter.forkSession()
         runtimeProof: 'untested',
-        stableUI: false,
+        userSurface: 'hidden',
       },
     ];
   }

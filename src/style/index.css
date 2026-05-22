@@ -14,6 +14,7 @@
 @import 'components/lsp-status-indicator.css';
 @import 'components/settings-dropdown.css';
 @import 'components/settings-layout-contract.css';
+@import 'components/settings-capability-lab.css';
 @import 'features/chat-user.css';
 @import 'features/chat-assistant.css';
 @import 'modals/delete-confirm-dialog.css';
