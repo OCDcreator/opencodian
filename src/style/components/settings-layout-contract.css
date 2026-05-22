@@ -223,6 +223,17 @@
   gap: var(--opencodian-settings-space-lg);
 }
 
+.opencodian-settings .opencodian-debug-workbench-header > .opencodian-settings-subsection-heading {
+  margin: 0;
+  padding: 0;
+}
+
+.opencodian-settings .opencodian-debug-workbench-header > .opencodian-settings-block-desc {
+  margin-top: 4px;
+  padding: 0;
+  max-width: 78ch;
+}
+
 .opencodian-settings .opencodian-debug-status-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -294,6 +305,7 @@
 }
 
 .opencodian-settings .opencodian-debug-workbench .opencodian-debug-modules > .opencodian-settings-subsection-heading {
+  margin: 0;
   padding: 14px 16px 0;
 }
 
