@@ -82,3 +82,5 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 - `export` — renders refresh interval, inline args, log path, diagnostic actions, and console help
 
 The classic `attach()` method remains single-page, but it follows the same source order.
+
+All four source tabs now render as formatter-style settings blocks: the Plugin global logging switch is wrapped in its own block, Plugin/OpenCode module groups use the shared debug module block, Claude Code keeps its workbench blocks, and Export wraps refresh/path/action/help controls in one block with object-row controls.

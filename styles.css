@@ -7094,6 +7094,20 @@ img.opencodian-model-provider-header-icon {
   flex-wrap: wrap;
 }
 
+.opencodian-settings [data-section-block="plugin"],
+.opencodian-settings [data-section-block="opencode"],
+.opencodian-settings [data-section-block="export"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings .opencodian-debug-global-panel,
+.opencodian-settings .opencodian-debug-modules.opencodian-settings-block,
+.opencodian-settings .opencodian-debug-export.opencodian-settings-block {
+  margin: 0;
+}
+
 .opencodian-settings .opencodian-debug-workbench {
   display: flex;
   flex-direction: column;
@@ -7174,20 +7188,14 @@ img.opencodian-model-provider-header-icon {
   margin-top: 0;
 }
 
-.opencodian-settings .opencodian-debug-workbench .opencodian-debug-modules {
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 14px;
-  background: var(--background-secondary);
-}
-
-.opencodian-settings .opencodian-debug-workbench .opencodian-debug-modules > .opencodian-settings-subsection-heading {
+.opencodian-settings .opencodian-debug-modules > .opencodian-settings-subsection-heading,
+.opencodian-settings .opencodian-debug-export > .opencodian-settings-subsection-heading {
   margin: 0;
   padding: 14px 16px 0;
 }
 
-.opencodian-settings .opencodian-debug-workbench .opencodian-debug-modules > .opencodian-settings-block-desc {
+.opencodian-settings .opencodian-debug-modules > .opencodian-settings-block-desc,
+.opencodian-settings .opencodian-debug-export > .opencodian-settings-block-desc {
   margin-top: 4px;
   padding: 0 16px;
 }
@@ -7201,7 +7209,9 @@ img.opencodian-model-provider-header-icon {
   padding: 0 16px;
 }
 
-.opencodian-settings .opencodian-debug-modules > .setting-item {
+.opencodian-settings .opencodian-debug-global-panel > .setting-item,
+.opencodian-settings .opencodian-debug-modules > .setting-item,
+.opencodian-settings .opencodian-debug-export > .setting-item {
   margin: 12px 16px 16px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
@@ -7236,9 +7246,26 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings .opencodian-debug-modules > .setting-item .setting-item-control,
+.opencodian-settings .opencodian-debug-global-panel > .setting-item .setting-item-control,
+.opencodian-settings .opencodian-debug-export > .setting-item .setting-item-control,
 .opencodian-settings .opencodian-debug-channel-list .setting-item-control {
   justify-content: flex-end;
   width: 260px;
+}
+
+.opencodian-settings .opencodian-debug-export > .opencodian-wide-text-setting.setting-item {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, clamp(320px, 42vw, 520px));
+}
+
+.opencodian-settings .opencodian-debug-export > .opencodian-wide-text-setting .setting-item-control {
+  width: 100%;
+}
+
+.opencodian-settings .opencodian-debug-export > .opencodian-debug-help {
+  margin: 12px 16px 16px;
+  padding: 10px 12px;
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-row-bg);
 }
 
 .opencodian-settings .opencodian-debug-log-actions {
@@ -7633,12 +7660,18 @@ img.opencodian-model-provider-header-icon {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .opencodian-settings .opencodian-debug-global-panel > .setting-item,
   .opencodian-settings .opencodian-debug-modules > .setting-item,
+  .opencodian-settings .opencodian-debug-export > .setting-item,
+  .opencodian-settings .opencodian-debug-export > .opencodian-wide-text-setting.setting-item,
   .opencodian-settings .opencodian-debug-channel-list .setting-item {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
   }
 
+  .opencodian-settings .opencodian-debug-global-panel > .setting-item .setting-item-control,
+  .opencodian-settings .opencodian-debug-modules > .setting-item .setting-item-control,
+  .opencodian-settings .opencodian-debug-export > .setting-item .setting-item-control,
   .opencodian-settings .opencodian-debug-channel-list .setting-item-control {
     width: 100%;
     justify-content: flex-start;

@@ -16,7 +16,8 @@
 - `.opencodian-settings-section-body` / `.opencodian-settings-block-body`：section 内部纵向 rhythm，普通设置行在这里按 row-card 规则排列。
 - `.opencodian-settings-section .setting-item`：普通设置项的轻量 row-card 样式，和 object-card 等更重实体 surface 区分。
 - `.opencodian-wide-text-setting`：给路径、URL、访问令牌等长文本设置项使用的宽字段 row。它只放宽明确标记的输入，控制列在桌面端限制在 `clamp(320px, 42vw, 520px)`，窄屏退为单列，避免把 host/port/数字类短输入一起拉长。
-- `.opencodian-debug-workbench` / `.opencodian-debug-status-strip` / `.opencodian-debug-channel-list` / `.opencodian-debug-log-preview`：Claude Code 调试工作台布局。它跟随格式化器子标签的 block + object-row 语法，SDK 诊断标题、说明和状态摘要收在同一个 `.opencodian-settings-block` 里；总开关、日志通道和日志预览保持同宽 block、统一标题/说明/content 内边距和 `12px` 说明到内容 rhythm。状态摘要只保留轻量 object tiles，不再把 Claude Debug 渲染成单个空 toggle，也不使用 dashboard 式指标卡或嵌套重卡片。
+- `.opencodian-debug-global-panel` / `.opencodian-debug-modules` / `.opencodian-debug-export` / `.opencodian-debug-workbench`：调试页四个来源子标签统一跟随格式化器子标签的 block + object-row 语法。Plugin 的全局日志开关、Plugin/OpenCode 的模块开关、Claude Code 的 SDK 诊断块、Export 的路径/动作/控制台帮助都使用同宽 `.opencodian-settings-block`，标题到说明保持 `4px`，说明到内容保持 `12px`，不再混用裸 setting row、裸标题说明和局部卡片。
+- `.opencodian-debug-status-strip` / `.opencodian-debug-channel-list` / `.opencodian-debug-log-preview`：Claude Code 调试工作台内部布局。SDK 诊断标题、说明和状态摘要收在同一个 `.opencodian-settings-block` 里；状态摘要只保留轻量 object tiles，不再把 Claude Debug 渲染成单个空 toggle，也不使用 dashboard 式指标卡或嵌套重卡片。
 - `.opencodian-theme-style-card` / `.opencodian-style-input-lock-note` / `.opencodian-debug-help-item`：在本轮只映射到 object token weight，不把样式设置、debug help 等复杂区域完整迁移成统一 object-card。
 
 ## Mode-Aware Hierarchy Taxonomy

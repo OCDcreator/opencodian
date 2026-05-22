@@ -353,7 +353,7 @@ export class SettingsDebugSection {
     containerEl: HTMLElement,
     platformKey: DebugPlatformKey,
   ): void {
-    const exportEl = containerEl.createDiv({ cls: 'opencodian-debug-export' });
+    const exportEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-export' });
     exportEl.createEl('h4', {
       cls: 'opencodian-settings-subsection-heading',
       text: t('settings.debug.export.title'),
@@ -371,7 +371,10 @@ export class SettingsDebugSection {
   }
 
   private addDebugLoggingSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const loggingEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-debug-global-panel',
+    });
+    new Setting(loggingEl)
       .setName(t('settings.debug.logging.name'))
       .setDesc(t('settings.debug.logging.desc'))
       .addToggle((toggle) =>
@@ -407,7 +410,7 @@ export class SettingsDebugSection {
     titleKey: Parameters<typeof t>[0],
     descriptionKey: Parameters<typeof t>[0],
   ): void {
-    const modulesEl = containerEl.createDiv({ cls: 'opencodian-debug-modules' });
+    const modulesEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-modules' });
     modulesEl.createEl('h4', {
       cls: 'opencodian-settings-subsection-heading',
       text: t(titleKey),
