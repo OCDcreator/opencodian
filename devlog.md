@@ -31,16 +31,17 @@ Completed a focused audit of remaining session detail / history inspection / pre
 
 ### Enhancement: Backend Routing Probe registry layer verification
 
-The probe now exercises both:
+The probe now exercises three paths:
 1. **Provider-owned adapter path**: `adapter.listSessions()` + `adapter.getSession()`
 2. **Registry routing layer (productized seams)**: `listBackendSessions()` + `getBackendSessionPreview()`
+3. **Narrow read seams**: `readBackendSessionTitle()` + `readBackendSessionShareUrl()` through registry with mock conversation
 
 This verifies that the backend-aware routing infrastructure works end-to-end, not just the adapter implementation.
 
 ### Files changed
 
-- `src/features/settings/SettingsCapabilityLabSection.ts` — added registry routing imports; `runBackendRoutingProbe` now tests `listBackendSessions()` and `getBackendSessionPreview()`
-- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — added test for registry routing layer; updated `createMockPlugin` to return adapter from `getActive()` for registry routing
+- `src/features/settings/SettingsCapabilityLabSection.ts` — added registry routing imports (`listBackendSessions`, `getBackendSessionPreview`, `readBackendSessionTitle`, `readBackendSessionShareUrl`); `runBackendRoutingProbe` now tests all productized narrow seams
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — added test for registry routing layer including narrow read seams; updated `createMockPlugin` to return adapter from `getActive()` for registry routing
 - `docs/status/claude-code-current-state-2026-05-22.md` — updated snapshot commit, added Capability Lab audit section, added remaining OpenCode-shaped payload assumptions table, updated Backend Routing Probe description
 - `docs/modules/features/settings/SettingsCapabilityLabSection.md` — documented registry routing layer verification in Backend Routing Probe
 

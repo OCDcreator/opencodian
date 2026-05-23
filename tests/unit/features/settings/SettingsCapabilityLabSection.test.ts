@@ -1101,6 +1101,7 @@ describe('SettingsCapabilityLabSection', () => {
 
   it('exercises registry routing layer in backend routing probe', async () => {
     const adapter = {
+      kind: 'claude-code',
       listSessions: jest.fn().mockResolvedValue([
         { sessionId: 'routing-session-1', summary: 'Routing test', lastModified: Date.now() },
       ]),
@@ -1130,6 +1131,7 @@ describe('SettingsCapabilityLabSection', () => {
     )) as HTMLButtonElement;
     probeButton.click();
     await flushUi();
+    await flushUi(); // Extra flush for async readBackendSessionTitle / readBackendSessionShareUrl
 
     // Verify adapter path was exercised
     expect(adapter.listSessions).toHaveBeenCalled();

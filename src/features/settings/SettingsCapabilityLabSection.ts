@@ -15,8 +15,11 @@ import { hasCapability } from '../../core/agents/AgentCapability';
 import {
   getBackendSessionPreview,
   listBackendSessions,
+  readBackendSessionShareUrl,
+  readBackendSessionTitle,
 } from '../../core/agents/backend/AgentBackendRouting';
 import type { ClaudeCodeAdapter } from '../../core/agents/backend/ClaudeCodeAdapter';
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -1628,6 +1631,24 @@ export class SettingsCapabilityLabSection {
           outputEl.createEl('p', {
             cls: 'opencodian-capability-lab-hint',
             text: 'getBackendSessionPreview() via registry: returned null (history service unavailable or session not found).',
+          });
+        }
+
+        // Test 3b: verify narrow read seams (readBackendSessionTitle / readBackendSessionShareUrl)
+        if (sessions.length > 0) {
+          const firstSessionId = sessions[0].sessionId;
+          const mockConversation = { backend: adapter.kind as AgentBackendKind };
+
+          const title = await readBackendSessionTitle(registry, mockConversation, firstSessionId);
+          outputEl.createEl('p', {
+            cls: 'opencodian-capability-lab-hint',
+            text: `readBackendSessionTitle() via registry: ${title ? `"${truncate(title, 40)}"` : 'returned null (no title or backend not mapped)'}`,
+          });
+
+          const shareUrl = await readBackendSessionShareUrl(registry, mockConversation, firstSessionId);
+          outputEl.createEl('p', {
+            cls: 'opencodian-capability-lab-hint',
+            text: `readBackendSessionShareUrl() via registry: ${shareUrl ? `"${truncate(shareUrl, 60)}"` : 'returned null (no share URL or backend not mapped)'}`,
           });
         }
       }
