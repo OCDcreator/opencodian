@@ -27,4 +27,5 @@
 - 这里只做 registry lookup 和 capability narrowing，不做 fallback 业务逻辑。
 - 不在这里启用或注册 backend；可见 backend 仍由 `IMPLEMENTED_AGENT_BACKENDS` 和 settings normalization 控制。
 - 新增 backend capability 路由时优先扩展此 helper，避免在 UI owner 中散落 `as AgentXCapability` 类型断言。
-- 2026-05-23 的边界测试补强覆盖了 `listBackendSessions()` 非数组返回、`getBackendSessionPreview()` 非数组返回、`loadBackendSessionMessages()` 非数组返回以及 Claude content block 的 malformed / primitive 防御路径；这些用例只是在加固已有 backend-aware seams 的鲁棒性，没有新增任何共享 `getSession()` consumer。
+- 2026-05-23 的边界测试补强覆盖了 `listBackendSessions()` 非数组返回、`getBackendSessionPreview()` 非数组返回、`loadBackendSessionMessages()` 非数组返回以及 Claude content block 的 malformed / primitive 防御路径；这些用例只是在加固已有 backend-aware seams 的鲁棒性，没有新增任何共享 `getSession()` consumer
+- 2026-05-23 第二轮 runtime-safety 加固为 `listBackendSessions()`、`getBackendSessionPreview()`、`loadBackendSessionMessages()` 的 `.map()` 回调增加了 null item 过滤，防止 backend 返回的数组中包含 `null` 或 primitive 元素时 destructuring / property access 抛出异常；同时为 `readBackendSessionTitle()` 和 `readBackendSessionShareUrl()` 的 `getSession()` 调用增加了 try/catch，使这两个已 productize 的 narrow read seam 在 adapter 抛异常时返回 `null` 而不是将错误抛给调用方

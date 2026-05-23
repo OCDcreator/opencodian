@@ -116,7 +116,12 @@ export async function readBackendSessionTitle(
   }
 
   const backend = resolveConversationBackendKind(conversation);
-  const session = await sessionService.getSession(sessionId);
+  let session: unknown;
+  try {
+    session = await sessionService.getSession(sessionId);
+  } catch {
+    return null;
+  }
   if (!session || typeof session !== 'object') {
     return null;
   }
@@ -171,7 +176,12 @@ export async function readBackendSessionShareUrl(
   }
 
   const backend = resolveConversationBackendKind(conversation);
-  const session = await sessionService.getSession(sessionId);
+  let session: unknown;
+  try {
+    session = await sessionService.getSession(sessionId);
+  } catch {
+    return null;
+  }
   if (!session || typeof session !== 'object') {
     return null;
   }
@@ -253,9 +263,7 @@ export async function listBackendSessions(
     return [];
   }
 
-  return rawSessions.map((session: unknown, idx: number) => {
-    const record = session as Record<string, unknown>;
-
+  return rawSessions.filter((s): s is Record<string, unknown> => s !== null && typeof s === 'object').map((record, idx) => {
     // Extract share URL if present
     let shareUrl: string | null = null;
     const share = record.share;
@@ -306,9 +314,7 @@ export async function getBackendSessionPreview(
     return null;
   }
 
-  return rawMessages.map((msg: unknown): NormalizedSessionPreviewMessage => {
-    const record = msg as Record<string, unknown>;
-
+  return rawMessages.filter((msg): msg is Record<string, unknown> => msg !== null && typeof msg === 'object').map((record): NormalizedSessionPreviewMessage => {
     // Detect OpenCode {info, parts} shape
     if (record.info && typeof record.info === 'object' && Array.isArray(record.parts)) {
       const info = record.info as Record<string, unknown>;
@@ -384,8 +390,10 @@ export async function loadBackendSessionMessages(
     return [];
   }
 
+  const safeMessages = rawMessages.filter((msg): msg is Record<string, unknown> => msg !== null && typeof msg === 'object');
+
   if (backend === 'opencode') {
-    return (rawMessages as Array<{
+    return (safeMessages as Array<{
       info: { id: string; role: string; time: { created?: number } };
       parts: unknown;
     }>).map(({ info, parts }) => ({
@@ -397,13 +405,10 @@ export async function loadBackendSessionMessages(
   }
 
   // Generic normalization for Claude / other backends.
-  return rawMessages.map((msg: unknown, idx: number) => {
-    const record = msg as Record<string, unknown>;
-    return {
-      id: (record.id ?? record.message_id ?? `msg-${idx}`) as string,
-      role: (record.role ?? record.type ?? 'unknown') as string,
-      createdAt: typeof record.created_at === 'number' ? record.created_at : null,
-      payload: JSON.stringify(record, null, 2),
-    };
-  });
+  return safeMessages.map((record, idx) => ({
+    id: (record.id ?? record.message_id ?? `msg-${idx}`) as string,
+    role: (record.role ?? record.type ?? 'unknown') as string,
+    createdAt: typeof record.created_at === 'number' ? record.created_at : null,
+    payload: JSON.stringify(record, null, 2),
+  }));
 }

@@ -248,6 +248,40 @@ describe('loadBackendSessionMessages', () => {
       const result = await loadBackendSessionMessages(registry, { backend: 'claude-code' }, 'ses-1');
       expect(result).toEqual([]);
     });
+
+    it('skips null items in the OpenCode messages array without crashing', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSessionMessages: async () => [
+          { info: { id: 'msg-1', role: 'user', time: { created: 1000 } }, parts: [] },
+          null,
+          { info: { id: 'msg-2', role: 'assistant', time: {} }, parts: [] },
+        ] as unknown as Array<unknown>,
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await loadBackendSessionMessages(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('msg-1');
+      expect(result[1].id).toBe('msg-2');
+    });
+
+    it('skips null items in the Claude messages array without crashing', async () => {
+      const adapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Chat,
+        AgentCapability.Sessions,
+        AgentCapability.Fork,
+      ]), {
+        getSessionMessages: async () => [
+          { id: 'claude-msg-1', role: 'user', created_at: 3000 },
+          null,
+          { id: 'claude-msg-2', role: 'assistant' },
+        ] as unknown as Array<unknown>,
+      });
+      const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+      const result = await loadBackendSessionMessages(registry, { backend: 'claude-code' }, 'ses-1');
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('claude-msg-1');
+      expect(result[1].id).toBe('claude-msg-2');
+    });
   });
 
 describe('readBackendSessionTitle', () => {
@@ -326,6 +360,15 @@ describe('readBackendSessionTitle', () => {
       });
       const registry = createMockRegistry(new Map([['codex', adapter]]));
       const result = await readBackendSessionTitle(registry, { backend: 'codex' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when getSession throws an error', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => { throw new Error('network failure'); },
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionTitle(registry, { backend: 'opencode' }, 'ses-1');
       expect(result).toBeNull();
     });
 });
@@ -413,6 +456,15 @@ describe('readBackendSessionShareUrl', () => {
       });
       const registry = createMockRegistry(new Map([['codex', adapter]]));
       const result = await readBackendSessionShareUrl(registry, { backend: 'codex' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when getSession throws an error', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => { throw new Error('network failure'); },
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'opencode' }, 'ses-1');
       expect(result).toBeNull();
     });
 });
@@ -518,6 +570,21 @@ describe('listBackendSessions', () => {
     const registry = createMockRegistry(new Map([['opencode', adapter]]));
     const result = await listBackendSessions(registry);
     expect(result).toEqual([]);
+  });
+
+  it('skips null items in the sessions array without crashing', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      listSessions: async () => [
+        { id: 'ses-1', title: 'Valid' },
+        null,
+        { id: 'ses-2', title: 'Also Valid' },
+      ] as unknown as Array<unknown>,
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await listBackendSessions(registry);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('ses-1');
+    expect(result[1].id).toBe('ses-2');
   });
 });
 
@@ -653,5 +720,20 @@ describe('getBackendSessionPreview', () => {
     // Non-object entries (null, 'string', 123) are skipped; only valid blocks produce parts
     expect(result[0].parts).toHaveLength(1);
     expect(result[0].parts[0]).toEqual({ type: 'text', text: 'valid' });
+  });
+
+  it('skips null items in the messages array without crashing', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      getSessionMessages: async () => [
+        { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'hello' }] },
+        null,
+        { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'reply' }] },
+      ] as unknown as Array<unknown>,
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toHaveLength(2);
+    expect(result![0].role).toBe('user');
+    expect(result![1].role).toBe('assistant');
   });
 });

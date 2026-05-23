@@ -508,6 +508,32 @@ Verification for this hardening round:
 - Build completed with `BUILD_ID feature-phase0-capability.202605231536`
 - No new shared `getSession()` consumers were added; gated OpenCode-only reads remain gated
 
+## Null-Item and Adapter-Error Runtime Safety Round (2026-05-23)
+
+A third-pass runtime-safety audit of the shared backend-aware routing layer found two gaps in malformed-payload handling:
+
+1. **Null items in adapter-returned arrays could crash `.map()` callbacks**: `listBackendSessions()`, `getBackendSessionPreview()`, and `loadBackendSessionMessages()` all call `.map()` on arrays returned by backend adapters. If an adapter returned `[null]` or `[{...}, null, {...}]`, the destructuring or property access inside the `.map()` callback would throw a runtime TypeError. This is a realistic malformed-backend-payload scenario.
+
+2. **Unhandled adapter errors in productized narrow read seams**: `readBackendSessionTitle()` and `readBackendSessionShareUrl()` are productized seams used by `TitleGenerationService` and `ConversationSessionSettingsCoordinator`. If the underlying `getSession()` call threw (network error, process disconnect, etc.), the error would propagate uncaught to the consumer.
+
+### Fix Applied
+
+- Added `.filter((s) => s !== null && typeof s === 'object')` before `.map()` in `listBackendSessions()`, `getBackendSessionPreview()`, and `loadBackendSessionMessages()`. Null or primitive array items are silently skipped rather than crashing the normalization loop.
+- Added `try/catch` around `sessionService.getSession(sessionId)` in `readBackendSessionTitle()` and `readBackendSessionShareUrl()`. Adapter errors now return `null` instead of propagating, matching the existing "not found" semantics.
+- Added six unit tests:
+  - `listBackendSessions`: skips null items in sessions array
+  - `getBackendSessionPreview`: skips null items in messages array
+  - `loadBackendSessionMessages`: skips null items in OpenCode messages array
+  - `loadBackendSessionMessages`: skips null items in Claude messages array
+  - `readBackendSessionTitle`: returns null when `getSession` throws
+  - `readBackendSessionShareUrl`: returns null when `getSession` throws
+
+### Verification
+
+- `npm run verify` passed with `431` suites / `3057` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231604`
+- No new shared `getSession()` consumers were added; this is a defensive hardening of existing backend-aware seams
+
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.
