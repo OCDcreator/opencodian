@@ -129,6 +129,26 @@ describe('SettingsCapabilityLabSection', () => {
     }
   });
 
+  it('keeps runtime-proved diagnostic capabilities from being marked complete in the matrix', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
+
+    for (const cap of ['Hooks', 'Session Store', 'Rewind', 'Agent Definitions']) {
+      const row = getRow(cap);
+      expect(row).not.toBeNull();
+      expect(row?.textContent).not.toContain('Complete');
+      expect(row?.textContent).toContain('Untested');
+    }
+  });
+
   it('renders MCP Servers row in capability matrix with diagnostic surface', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({

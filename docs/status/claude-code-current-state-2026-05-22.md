@@ -755,11 +755,11 @@ What changed is the **test coverage depth** — the adapter-level `rewindFiles()
 
 | Capability | Adapter tests | Coordinator tests | CapLab probe tests | Total coverage |
 |---|---|---|---|---|
-| Fork | ✅ | ✅ | ✅ | Complete |
-| Structured output | ✅ | ✅ | ✅ | Complete |
-| Hooks | ✅ | N/A | ✅ | Complete |
-| Session store | ✅ | N/A | ✅ | Complete |
-| **Rewind** | ✅ **(new)** | ✅ **(new)** | ✅ **(new)** | **Complete** |
+| Fork | ✅ | ✅ | ✅ | runtime-proved but not stable |
+| Structured output | ✅ | ✅ | ✅ | stable transcript rendering, authoring remains diagnostic |
+| Hooks | ✅ | N/A | ✅ | runtime-proved but not stable |
+| Session store | ✅ | N/A | ✅ | diagnostic store proof only |
+| **Rewind** | ✅ **(new)** | ✅ **(new)** | ✅ **(new)** | runtime-proved but not stable |
 | Agent definitions | ⚠️ wiring only | N/A | N/A | Must remain Hidden/Untested |
 
 ## Stream Normalizer + Runtime Control Test Hardening Round (2026-05-23)
@@ -819,15 +819,15 @@ This hardening pass does **not** promote any capability to stable. All touched c
 
 | Capability | Adapter tests | Coordinator tests | CapLab probe tests | Normalizer coverage | Total coverage |
 |---|---|---|---|---|---|
-| Fork | ✅ | ✅ | ✅ | N/A | Complete |
-| Structured output | ✅ | ✅ | ✅ | ✅ | Complete |
-| Hooks | ✅ | N/A | ✅ | ✅ **(complete lifecycle)** | Complete |
-| Session store | ✅ **(getSession fixed)** | N/A | ✅ | N/A | Complete |
-| Rewind | ✅ | ✅ | ✅ | N/A | Complete |
-| Subagent events | N/A | N/A | N/A | ✅ **(complete lifecycle)** | Complete |
-| Runtime controls | ✅ **(new)** | N/A | N/A | N/A | Complete |
-| Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ **(new)** | Complete |
-| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | N/A | Complete |
+| Fork | ✅ | ✅ | ✅ | N/A | runtime-proved but not stable |
+| Structured output | ✅ | ✅ | ✅ | ✅ | stable transcript rendering, authoring remains diagnostic |
+| Hooks | ✅ | N/A | ✅ | ✅ **(complete lifecycle)** | runtime-proved but not stable |
+| Session store | ✅ **(getSession fixed)** | N/A | ✅ | N/A | diagnostic store proof only |
+| Rewind | ✅ | ✅ | ✅ | N/A | runtime-proved but not stable |
+| Subagent events | N/A | N/A | N/A | ✅ **(complete lifecycle)** | runtime-proved but not stable |
+| Runtime controls | ✅ **(new)** | N/A | N/A | N/A | runtime-proved but not stable |
+| Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ **(new)** | runtime-proved but not stable |
+| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | N/A | runtime-proved but not stable |
 | SDK error propagation (import/messages) | ✅ **(new)** | N/A | N/A | N/A | Complete |
 | Agent definitions | ⚠️ wiring only | N/A | N/A | N/A | Must remain Hidden/Untested |
 
@@ -861,16 +861,16 @@ This hardening pass does **not** promote any capability to stable. All touched c
 
 | Capability | Adapter tests | Coordinator tests | CapLab probe tests | Normalizer coverage | Total coverage |
 |---|---|---|---|---|---|
-| Fork | ✅ | ✅ | ✅ | N/A | Complete |
-| Structured output | ✅ | ✅ | ✅ | ✅ | Complete |
-| Hooks | ✅ | N/A | ✅ | ✅ | Complete |
-| Session store | ✅ | N/A | ✅ | N/A | Complete |
-| Rewind | ✅ | ✅ | ✅ | N/A | Complete |
-| Subagent events | N/A | N/A | N/A | ✅ | Complete |
-| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | N/A | Complete |
-| SDK error propagation | ✅ **(new)** | N/A | N/A | N/A | Complete |
-| Runtime controls | ✅ | N/A | N/A | N/A | Complete |
-| Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ | Complete |
+| Fork | ✅ | ✅ | ✅ | N/A | runtime-proved but not stable |
+| Structured output | ✅ | ✅ | ✅ | ✅ | stable transcript rendering, authoring remains diagnostic |
+| Hooks | ✅ | N/A | ✅ | ✅ | runtime-proved but not stable |
+| Session store | ✅ | N/A | ✅ | N/A | diagnostic store proof only |
+| Rewind | ✅ | ✅ | ✅ | N/A | runtime-proved but not stable |
+| Subagent events | N/A | N/A | N/A | ✅ | runtime-proved but not stable |
+| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | N/A | runtime-proved but not stable |
+| SDK error propagation | ✅ **(new)** | N/A | N/A | N/A | runtime-proof helper only |
+| Runtime controls | ✅ | N/A | N/A | N/A | runtime-proved but not stable |
+| Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ | runtime-proved but not stable |
 | Agent definitions | ⚠️ wiring only | N/A | N/A | N/A | Must remain Hidden/Untested |
 
 ## Claude Rewind No-Data-Loss Guard Round (2026-05-23)
@@ -941,16 +941,16 @@ The existing `listSubagents()` / `getSubagentMessages()` diagnostic UI and tests
 
 | Capability | Adapter tests | Coordinator tests | CapLab probe tests | Total coverage |
 |---|---|---|---|---|
-| Fork | ✅ | ✅ | ✅ | Complete |
-| Structured output | ✅ | ✅ | ✅ | Complete |
-| Hooks | ✅ | N/A | ✅ | Complete |
-| Session store | ✅ | N/A | ✅ | Complete |
-| Rewind | ✅ | ✅ | ✅ | Complete |
-| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | Complete |
+| Fork | ✅ | ✅ | ✅ | runtime-proved but not stable |
+| Structured output | ✅ | ✅ | ✅ | stable transcript rendering, authoring remains diagnostic |
+| Hooks | ✅ | N/A | ✅ | runtime-proved but not stable |
+| Session store | ✅ | N/A | ✅ | diagnostic store proof only |
+| Rewind | ✅ | ✅ | ✅ | runtime-proved but not stable |
+| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | runtime-proved but not stable |
 | **Skills introspection** | ✅ **(count + list)** | N/A | ✅ **(count + name-list rendering)** | Foundation / diagnostic only |
 | **Plugins introspection** | ✅ **(count + list)** | N/A | ✅ **(count + name-list rendering)** | Foundation / diagnostic only |
-| MCP server detection | ✅ | N/A | ✅ | Complete |
-| Runtime controls | ✅ | N/A | N/A | Complete |
+| MCP server detection | ✅ | N/A | ✅ | detection-only |
+| Runtime controls | ✅ | N/A | N/A | runtime-proved but not stable |
 | Agent definitions | ⚠️ wiring only | N/A | N/A | Must remain Hidden/Untested |
 
 ## Hard Guardrails

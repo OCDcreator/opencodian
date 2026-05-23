@@ -144,8 +144,7 @@
 
 仍未系统消费的事件主要是：
 
-- `message.part.removed`
-- `message.updated`
+- `message.part.removed` / `message.updated`：已在 sync 订阅路径（`OpenCodeSyncEventRuntimeCoordinator`）中系统消费并带 16ms 合并去重和屏障隔离；但在流式事件路径（`OpenCodeStreamEventTransformer`）中尚未注册处理器，仍走 sync 轮询兜底
 - 更丰富的 worktree / pty / session 事件
 - 更广泛的未知事件日志采样
 
