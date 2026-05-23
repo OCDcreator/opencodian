@@ -333,6 +333,13 @@ export class SettingsCapabilityLabSection {
     });
     this.renderForkProbe(forkBlock);
 
+    // ── Resume Session Diagnostic (provider-owned, diagnostic only) ───
+    const resumeBlock = containerEl.createDiv({
+      cls: 'opencodian-settings-block',
+      attr: { 'data-section-block': 'resume' },
+    });
+    this.renderResumeProbe(resumeBlock);
+
     // ── Discovery / Status ─────────────────────────────────────────────
     const discoveryBlock = containerEl.createDiv({
       cls: 'opencodian-settings-block',
@@ -487,6 +494,13 @@ export class SettingsCapabilityLabSection {
         adapterWired: !!adapter, // adapter.forkSession()
         runtimeProof: 'untested',
         userSurface: 'diagnostic', // Capability Lab fork probe only
+      },
+      {
+        capability: 'Resume Session',
+        sdkExposed: true, // resume option in SDK
+        adapterWired: true, // buildSdkOptions wires resumeSessionId
+        runtimeProof: 'untested',
+        userSurface: 'diagnostic', // Capability Lab resume probe only — not stable resume-at productization
       },
     ];
   }
@@ -1139,6 +1153,135 @@ export class SettingsCapabilityLabSection {
         text: 'Hint: forkSession requires a Claude Code runtime with the fork capability available.',
       });
       this.updateRuntimeProof('Fork Session', 'fail', outputEl);
+    }
+  }
+
+  // =======================================================================
+  // Resume Session Diagnostic Probe (provider-owned, diagnostic only)
+  // =======================================================================
+
+  private renderResumeProbe(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', { text: t('settings.capabilityLab.resume.title') });
+    containerEl.createEl('p', {
+      cls: 'opencodian-capability-lab-description',
+      text: t('settings.capabilityLab.resume.description'),
+    });
+
+    const adapter = getClaudeCodeAdapter(this.plugin);
+    if (!adapter) {
+      containerEl.createEl('p', {
+        cls: 'opencodian-capability-lab-unavailable',
+        text: 'Claude Code adapter not available. Enable the Claude Code backend first.',
+      });
+      return;
+    }
+
+    const controlsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+
+    const sessionSelect = controlsEl.createEl('select', {
+      cls: 'opencodian-capability-lab-select',
+      attr: {
+        'data-diagnostic': 'true',
+        'data-diagnostic-session-select': 'resume',
+      },
+    });
+    sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
+
+    const resumeBtn = controlsEl.createEl('button', {
+      text: 'Run Resume Diagnostic',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    const outputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    const loadSessions = async (): Promise<void> => {
+      try {
+        sessionSelect.innerHTML = '';
+        sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
+        const sessions = await adapter.listSessions();
+        for (const session of sessions) {
+          const option = sessionSelect.createEl('option', {
+            text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
+            attr: { value: session.sessionId },
+          });
+          option.value = session.sessionId;
+        }
+      } catch (err) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    };
+
+    resumeBtn.addEventListener('click', () => {
+      const sessionId = sessionSelect.value;
+      if (!sessionId) {
+        new Notice('Select a session to resume from first.');
+        return;
+      }
+      void this.runResumeDiagnostic(adapter, sessionId, outputEl);
+    });
+
+    void loadSessions();
+  }
+
+  private async runResumeDiagnostic(
+    adapter: ClaudeCodeAdapter,
+    sessionId: string,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running resume diagnostic…' });
+
+    try {
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Continue the conversation. Reply with exactly one short sentence.',
+        resumeSessionId: sessionId,
+        persistSession: false,
+      });
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `Resumed from ${sessionId.slice(0, 12)}…`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Resulting session ID: ${result.sessionId ?? '(none)'}`,
+      });
+      // Show a short output preview from the first text chunk
+      const textChunks = result.chunks.filter((c) => c.type === 'text');
+      if (textChunks.length > 0) {
+        const preview = String((textChunks[0] as { content?: string }).content ?? '').slice(0, 200);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Output preview: ${preview}`,
+        });
+      }
+      outputEl.createEl('pre', {
+        cls: 'opencodian-capability-lab-json-preview',
+        text: formatJsonPreview({
+          resumedFrom: sessionId,
+          resultingSessionId: result.sessionId,
+          textChunkCount: textChunks.length,
+          totalChunks: result.chunks.length,
+        }),
+      });
+      this.updateRuntimeProof('Resume Session', 'pass', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Resume diagnostic failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Hint: resumeSessionId requires a valid Claude Code session id and a running SDK runtime.',
+      });
+      this.updateRuntimeProof('Resume Session', 'fail', outputEl);
     }
   }
 

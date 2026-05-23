@@ -306,7 +306,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 ## 2026-05-22 Capability Lab 诊断面板
 
-新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的"能力实验室"二级标签提供中文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、回退 dry-run 预览、结构化输出实验场、会话分叉诊断探针和发现状态七个诊断面板。新增 `settings.capabilityLab.fork.title` / `.description`，明确把 Claude `forkSession()` 暴露成 provider-owned 的诊断探针，而不是稳定的跨后端 fork UI。所有面板标记为 ⚠️ 诊断 / 实验 / 非稳定，不连接稳定设置持久化。
+新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的"能力实验室"二级标签提供中文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、回退 dry-run 预览、结构化输出实验场、会话分叉诊断探针、会话恢复诊断探针和发现状态八个诊断面板。新增 `settings.capabilityLab.fork.*` 与 `settings.capabilityLab.resume.*`，明确把 Claude `forkSession()` 和 SDK `resume` 仅作为 provider-owned 的诊断探针暴露，而不是稳定的跨后端 fork / resume-at UI。所有面板标记为 ⚠️ 诊断 / 实验 / 非稳定，不连接稳定设置持久化。
 
 ## 2026-05-22 Structured output 会话渲染
 

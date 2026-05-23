@@ -2592,6 +2592,8 @@ export const enTranslations = {
   'settings.capabilityLab.structured.description': 'Diagnostic surface for structured output. Not integrated into the normal chat UI. Probes recent sessions for structured output data.',
   'settings.capabilityLab.fork.title': 'Fork Session Diagnostic (Diagnostic)',
   'settings.capabilityLab.fork.description': 'Provider-owned diagnostic probe for Claude Code forkSession(). Select a session and fork it. The forked session id and title are shown as diagnostic output. Not a stable product surface.',
+  'settings.capabilityLab.resume.title': 'Resume Session Diagnostic (Diagnostic)',
+  'settings.capabilityLab.resume.description': 'Provider-owned diagnostic probe for Claude Code SDK resume. Select a session and run a diagnostic prompt resumed from that session. The resulting session id and a short output preview are shown as diagnostic output. Not stable resume-at productization.',
   'settings.capabilityLab.discovery.title': 'Discovery & Status',
   'settings.capabilityLab.discovery.description': 'Status overview for hooks, plugins, skills, agents, and other SDK features. No authoring UI — discovery/status only.',
   'settings.user.tab.profile': 'Profile',

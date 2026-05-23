@@ -107,7 +107,7 @@ Recent runs focused on two connected lanes:
 - The `TitleGenerationService` official-title read seam now has Test Vault runtime proof through deployed plugin code: both OpenCode and Claude paths route through registry `getSession(sessionId)`, and the OpenCode read path no longer falls back to `openCodeService.listSessions()` for that seam. This proves the narrow shared session-detail read, not a broader backend-neutral session object contract.
 - Backend-aware history normalization for non-OpenCode backends is currently best-effort foundation (`loadBackendSessionMessages()`); it is good enough for raw inspection surfaces, not yet a stable cross-backend history product contract.
 - `SettingsConversationSection` now uses backend-aware normalized routing for session list + preview reads through `listBackendSessions()` and `getBackendSessionPreview()`. The preview renderer consumes `NormalizedSessionPreviewMessage` (not OpenCode `SessionMessage`), so it handles both OpenCode `{info, parts}` shape and generic/Claude `{role, content}` shape without crashing. `getBackendSessionPreview()` now distinguishes unavailable preview capability (`null` → failure copy) from legitimate empty history (`[]` → neutral empty-preview copy). `unshareSession()` remains OpenCode-only. Treat the shared-session manager as a real backend-aware inspection surface, not as a generic stable cross-backend session-detail contract.
-- Runtime smoke for Claude fork/resume-at is not yet recorded.
+- Runtime smoke for Claude fork/resume-at is not yet recorded. Capability Lab now owns provider-owned diagnostic probes for both fork and resume, but those probes only validate wiring/runtime behavior and do not by themselves promote the capabilities to stable product surfaces.
 - The `AgentBranchCapability` interface still requires ALL of fork/revert/unrevert/diff/getSessionRevertState; Claude only has fork. `AgentForkCapability` is the separate partial interface for fork-only backends.
 
 ## What Is Definitely Complete
@@ -225,6 +225,7 @@ It currently serves as:
 - a structured-output runtime probe;
 - a hook runtime proof surface;
 - a provider-owned fork session diagnostic probe (select a Claude session, run `adapter.forkSession()`, see forked session id/title). This probe is diagnostic-only and does NOT represent stable fork productization.
+- a provider-owned resume session diagnostic probe (select a Claude session, run `adapter.runDiagnosticPrompt({ resumeSessionId })`, see resulting session id/output preview). This probe is diagnostic-only and does NOT represent stable resume-at productization.
 
 Important policy:
 

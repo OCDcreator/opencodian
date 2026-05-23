@@ -54,7 +54,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('NOT STABLE');
   });
 
-  it('renders all seven diagnostic panels including fork probe', () => {
+  it('renders all eight diagnostic panels including fork and resume probes', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -70,6 +70,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(blockIds).toContain('subagents');
     expect(blockIds).toContain('rewind');
     expect(blockIds).toContain('fork');
+    expect(blockIds).toContain('resume');
     expect(blockIds).toContain('structured');
     expect(blockIds).toContain('discovery');
   });
@@ -198,7 +199,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(diagnosticElements.length).toBeGreaterThan(0);
   });
 
-  it('buildMatrixRows returns all 13 expected capabilities', () => {
+  it('buildMatrixRows returns all 14 expected capabilities', () => {
     // We test this indirectly by counting matrix table rows
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -210,7 +211,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(13);
+    expect(rows.length).toBe(14);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -615,5 +616,221 @@ describe('SettingsCapabilityLabSection', () => {
       sessionStore: expect.any(Object),
       sessionStoreFlush: 'eager',
     }));
+  });
+
+  // =======================================================================
+  // Resume Session Diagnostic Probe
+  // =======================================================================
+
+  it('renders resume probe section with session selector and resume button when adapter is available', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-resume-1', summary: 'Resume test', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    expect(resumeBlock).toBeTruthy();
+
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement | undefined;
+    expect(resumeButton).toBeTruthy();
+
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement | null;
+    expect(sessionSelect).toBeTruthy();
+  });
+
+  it('shows unavailable message in resume probe when adapter is not present', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    expect(resumeBlock).toBeTruthy();
+    const unavailableMsg = resumeBlock!.querySelector('.opencodian-capability-lab-unavailable');
+    expect(unavailableMsg).toBeTruthy();
+    expect(unavailableMsg!.textContent).toContain('Claude Code adapter not available');
+  });
+
+  it('calls runDiagnosticPrompt with resumeSessionId and shows resulting session id and output preview', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-resume-source', summary: 'Source session for resume', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-resume-result-session',
+        rawMessages: [],
+        chunks: [
+          { type: 'text', content: 'Resumed session says hello' },
+        ],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement;
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-resume-source';
+    resumeButton.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      resumeSessionId: 'session-resume-source',
+      prompt: expect.any(String),
+    }));
+    expect(containerEl.textContent).toContain('diag-resume-result-session');
+    expect(containerEl.textContent).toContain('Resumed session says hello');
+  });
+
+  it('shows diagnostic error and hint when resume diagnostic fails', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-resume-bad', summary: 'Bad resume source', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('Claude Code resume is unavailable in this SDK configuration.')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement;
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-resume-bad';
+    resumeButton.click();
+    await flushUi();
+
+    const errorEl = resumeBlock!.querySelector('.opencodian-capability-lab-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl!.textContent).toContain('resume is unavailable');
+    const hintEl = resumeBlock!.querySelector('.opencodian-capability-lab-hint');
+    expect(hintEl).toBeTruthy();
+  });
+
+  it('updates Resume Session runtime proof to pass on success', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-rt-resume', summary: 'RT resume session', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-resume-rt-pass',
+        rawMessages: [],
+        chunks: [{ type: 'text', content: 'Resume proof pass' }],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement;
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-rt-resume';
+    resumeButton.click();
+    await flushUi();
+
+    const proofMarker = resumeBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+  });
+
+  it('updates Resume Session runtime proof to fail on error', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-rt-resume-fail', summary: 'RT resume fail', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('SDK unavailable')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement;
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-rt-resume-fail';
+    resumeButton.click();
+    await flushUi();
+
+    const proofMarker = resumeBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('marks Resume Session as a diagnostic surface in the capability matrix', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const row = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr')).find((el) => (
+      el.textContent?.includes('Resume Session')
+    )) as HTMLElement | undefined;
+    expect(row).toBeTruthy();
+    const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
+    expect(surfaceChip?.dataset.surface).toBe('diagnostic');
+    expect(surfaceChip?.textContent).toBe('Diagnostic');
+  });
+
+  it('renders i18n keys for resume probe panel', () => {
+    setLocale('en');
+    expect(t('settings.capabilityLab.resume.title')).toBeTruthy();
+    expect(t('settings.capabilityLab.resume.description')).toBeTruthy();
   });
 });

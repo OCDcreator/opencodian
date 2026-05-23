@@ -89,6 +89,8 @@ export interface ClaudeCodeDiagnosticPromptRequest {
   enableFileCheckpointing?: boolean;
   includeHookEvents?: boolean;
   persistSession?: boolean;
+  /** Provider-owned diagnostic resume: when set, the diagnostic prompt resumes from this SDK session id. Diagnostic-only, not stable resume-at productization. */
+  resumeSessionId?: string;
 }
 
 export interface ClaudeCodeDiagnosticPromptResult {
@@ -752,6 +754,7 @@ export class ClaudeCodeAdapter
       enableFileCheckpointing: request.sessionStore ? false : request.enableFileCheckpointing,
       includeHookEvents: request.includeHookEvents,
       persistSession: request.persistSession,
+      resumeSessionId: request.resumeSessionId,
     });
   }
 

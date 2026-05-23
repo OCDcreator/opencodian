@@ -775,6 +775,44 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdk.query.mock.calls[0][0].options.enableFileCheckpointing).toBeUndefined();
   });
 
+  it('passes resumeSessionId through diagnostic prompt to SDK query options', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'diag-resume-session',
+    }, {
+      type: 'assistant',
+      message: {
+        id: 'msg-resume-1',
+        content: [{ type: 'text', text: 'Resumed diagnostic output' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runDiagnosticPrompt({
+      prompt: 'Continue from where we left off.',
+      resumeSessionId: 'existing-sdk-session-42',
+    });
+
+    expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'Continue from where we left off.',
+      options: expect.objectContaining({
+        resume: 'existing-sdk-session-42',
+      }),
+    }));
+    expect(result.sessionId).toBe('diag-resume-session');
+    expect(result.chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'text',
+        content: 'Resumed diagnostic output',
+      }),
+    ]));
+  });
+
   it('passes runtime-injected Claude SDK foundation options into query creation', async () => {
     const sdk = createSdk([]);
     const hooks = { SessionStart: [{ hooks: [jest.fn()] }] };
