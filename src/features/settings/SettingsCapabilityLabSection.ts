@@ -64,7 +64,7 @@ interface CapabilityLabPluginState {
   sessionStore: CapabilityLabSessionStore;
 }
 
-class CapabilityLabSessionStore {
+export class CapabilityLabSessionStore {
   private readonly entries = new Map<string, CapabilityLabSessionStoreEntry[]>();
   private readonly mtimes = new Map<string, number>();
 

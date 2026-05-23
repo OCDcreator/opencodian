@@ -44,6 +44,7 @@
 ### Diagnostic Session Store
 
 文件内部持有一个 plugin-scoped `CapabilityLabSessionStore`，实现 SDK `SessionStore` 所需的 `append` / `load` / `listSessions` / `listSubkeys`，用于 Capability Lab 的 mirror/import/list/load proof。它是内存态、plugin-owned 的诊断 adapter，不是稳定数据层。
+该内存 store 现在也有直接单测，覆盖 append/load 往返、重复 append、listSessions mtime、listSubkeys、空 store 隔离和 projectKey 隔离，但这些测试只证明诊断 store 行为，不把它升级成正式存储产品。
 
 ### Adapter 获取
 
