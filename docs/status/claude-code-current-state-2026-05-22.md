@@ -375,14 +375,33 @@ Future sessions should follow these rules unless the user overrides them again:
 
 ## Remaining Phase 3 Backlog (Work Through In Multi-Round Sessions)
 
-The remaining Phase 3 foundation/productization work should be treated as one continuing backlog rather than isolated single-slice sessions:
+The remaining Phase 3 foundation/productization work should be treated as one continuing backlog rather than isolated single-slice sessions.
 
-- continue auditing the remaining session detail / history inspection / session list-detail reads that still bind directly to `openCodeService` or still assume OpenCode-shaped payloads;
-- where semantics truly match, keep promoting narrow shared read seams like the official-title and share-URL reads, but do not widen `getSession()` into a generic stable session-detail contract;
-- identify whether another inspection/detail surface can be productized through backend-aware `getSession()` or `getSessionMessages()` without flattening Claude payloads;
-- if a read surface cannot be safely generalized, keep it explicitly OpenCode-only or diagnostic and document that boundary instead of forcing abstraction;
-- deepen runtime proof for the currently productized backend-aware session/history reads as adjacent rounds justify deployment validation;
-- keep `revert / unrevert / diff / child-session graph / authoritative sync` gated unless a later round provides both official basis and accepted runtime proof.
+### ✅ Completed: Backend-Aware Session/History Read Seam Runtime-Proof (2026-05-23)
+
+- ~~Audit remaining session detail / history inspection / session list-detail reads for runtime-safety gaps~~ — **DONE**. Four audit rounds completed: non-array guards, null-item filtering at array level, adapter-error try/catch, inner null-item filtering inside OpenCode parts arrays. No remaining safe gaps.
+- ~~Deepen runtime proof for productized backend-aware session/history reads~~ — **DONE**. Unit test coverage at 3060 tests including edge cases for all five productized seams.
+
+### 🔄 Next Immediate Phase 3 Backlog (Outside This Seam)
+
+Choose one of these modes for the next multi-round session:
+
+1. **Promote a diagnostic Claude capability to stable UI** — The most mature diagnostic capabilities with runtime proof are:
+   - **Structured output** (`wired + runtime-proved + stable transcript rendering`, authoring remains diagnostic)
+   - **Hooks** (`wired + runtime-proved`, not stable)
+   - **Session store** (`diagnostic store proof only`, not stable storage product)
+   - **Rewind** (`adapter-level rewindFiles() exists`, not stable-complete until no-data-loss guard)
+
+2. **Improve multi-backend abstraction for future backends** — Identify shared seams that would help a third backend (not OpenCode, not Claude) integrate cleanly, and extract them without forcing OpenCode semantics.
+
+3. **Expand Claude-native ecosystem ownership** — History browsing, skills, agents, plugins, or MCP authoring surfaces that are native to Claude's ecosystem and should not be flattened into OpenCode-shaped settings.
+
+4. **Deploy-validation round** — Run Test Vault runtime proof against the latest build to verify the productized backend-aware seams function correctly in the deployed plugin context. This is lower priority since the seams are well-covered by unit tests, but a fresh deployment validation would provide additional confidence before moving to a different mode.
+
+Hard constraints that remain:
+- keep `revert / unrevert / diff / child-session graph / authoritative sync` gated unless new official basis plus accepted runtime proof says otherwise;
+- do not widen `getSession()` into a generic stable cross-backend session-detail contract;
+- do not regress OpenCode while promoting Claude.
 
 ## Session Detail / History Inspection Audit (2026-05-23)
 
@@ -498,6 +517,8 @@ A second-pass audit was executed across `OpenCodianView.ts`, `ConversationSessio
 ### Conclusion
 
 No new shared read seams can be safely promoted. All remaining direct `openCodeService` session/history/detail reads are in explicitly gated OpenCode-only paths. The productized backend-aware seams (`readBackendSessionTitle`, `readBackendSessionShareUrl`, `listBackendSessions`, `getBackendSessionPreview`, `loadBackendSessionMessages`) cover all surfaces where narrow, verifiable cross-backend semantics genuinely match.
+
+**Runtime-proof-complete declaration (2026-05-23)**: After four consecutive runtime-safety audit rounds (non-array guards, null-item filtering at array level, adapter-error try/catch, inner null-item filtering inside OpenCode parts arrays), all productized backend-aware session/history read seams now have consistent defensive handling for malformed backend payloads. No additional safe gaps remain in this lane. The remaining Phase 3 backlog should move outside this seam.
 
 ### 2026-05-23 Routing Boundary Test Hardening
 
