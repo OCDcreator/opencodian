@@ -1,3 +1,4 @@
+import { resolveConversationBackendKind } from '../../../core/agents/backend/AgentBackendRouting';
 import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   Conversation,
@@ -55,6 +56,8 @@ export function createPostSyncQuestionTodoRefreshHosts(
     questionTodoStatusRefreshHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       hasIncompleteTodos: (todos: readonly SessionTodo[]) => viewHost.hasIncompleteTodos(todos),
+      getCurrentConversationBackend: () =>
+        resolveConversationBackendKind(viewHost.getCurrentConversation()),
       refreshPendingQuestionsForTab: (
         tabId: TabId | null,
         sessionId: string | null | undefined,

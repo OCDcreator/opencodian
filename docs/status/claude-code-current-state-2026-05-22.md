@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Snapshot commit: `c884b8ee`
 - Commit subject: `refactor: remove openCodeService.listSessions fallback from ConversationSessionSettingsCoordinator`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231348`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231408`
 - Recent continuity commits in this lane:
 - `c884b8ee` — `refactor: remove openCodeService.listSessions fallback from ConversationSessionSettingsCoordinator`
 - `9b2f27e6` — `feat: expose getSessionInfo on OpenCodeService, fix adapter O(n) workaround`
@@ -203,6 +203,7 @@ The following service seams now route session identity through `getConversationB
 | Conversation sync runtime coordinator (diagnostic) | **Yes** | Includes both `openCodeSessionId` and `backendSessionId` |
 | Post-sync question/todo refresh (plan builder) | **Explicitly gated** | Background plan methods return `null` for non-OpenCode conversations. `createVisibleConversationPlan` is unblocked because the visible-path gate is at the router. Uses `getConversationBackendSessionId()` for identity. |
 | Post-sync question/todo refresh (host adapter) | **Backend-aware identity** | `getCurrentConversationSessionId()` uses `getConversationBackendSessionId()` instead of direct `openCodeSessionId` access |
+| Post-sync question/todo refresh (pending-questions REST poll) | **Explicitly gated** | `QuestionTodoStatusRefreshCoordinator` now checks `getCurrentConversationBackend()` and skips `refreshPendingQuestionsForTab()` for non-OpenCode conversations. Previously relied solely on upstream callers (TabConversationActivationBridge, ConversationSyncVisiblePostSyncRouter, BackgroundConversationPostSyncRefreshExecutor). |
 | Post-sync question/todo refresh (visible router) | **Explicitly gated** | `ConversationSyncVisiblePostSyncRouter` skips question/todo refresh and applies sync update directly for non-OpenCode conversations. Uses `getConversationBackendSessionId()` for identity. |
 | Post-sync question/todo refresh (background executor) | **Null-safe** | `BackgroundConversationPostSyncRefreshExecutor` handles null plan (non-OpenCode) by skipping question/todo coordinator but still flushing background-task writeback |
 | Settings shared sessions list (`listSessions`) | **Backend-aware** | Routes through `listBackendSessions()` instead of `openCodeService.listSessions()`. Returns `NormalizedSessionRow[]` (backend-neutral shape). Section remains OpenCode-gated because share URLs are OpenCode-specific, but the read surface is backend-aware. |
@@ -222,7 +223,7 @@ The following service seams now route session identity through `getConversationB
 | TitleGenerationService | ~~Calls `openCodeService.listSessions()`~~ **FULLY ROUTED for title reads**: `readOfficialSessionTitle` now uses `readBackendSessionTitle()` routing helper → `getSession(sessionId)` on the backend adapter. AI title generation (temp session create/delete/send) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
 | ConversationSessionSettingsCoordinator | **FULLY ROUTED for session reads**: share-URL reads use `readBackendSessionShareUrl()` via registry; the `openCodeService.listSessions()` fallback has been removed. When no registry and no `host.listSessions` is available, returns `null` instead of reaching through to openCodeService. Share/unshare writes remain OpenCode-only via `resolveOpenCodeService()` (only `shareSession`/`unshareSession`, no `listSessions`). **Session-import-free**: coordinator uses `ShareInspectionEntry` instead of OpenCode `Session` type. |
 | PostSyncQuestionTodoRefreshPlanBuilder | **Explicitly gated** — background plan methods return `null` for non-OpenCode conversations; session identity uses `getConversationBackendSessionId()`. Question/todo APIs are OpenCode-only and are not abstracted as cross-backend contracts. |
-| PostSyncQuestionTodoRefreshHostAdapter | **Backend-aware identity** — `getCurrentConversationSessionId()` uses `getConversationBackendSessionId()` instead of direct `openCodeSessionId` access |
+| PostSyncQuestionTodoRefreshHostAdapter | **Backend-aware identity + gated pending-questions** — `getCurrentConversationSessionId()` uses `getConversationBackendSessionId()` instead of direct `openCodeSessionId` access. `QuestionTodoStatusRefreshCoordinator` now gates `refreshPendingQuestionsForTab()` for non-OpenCode conversations via `getCurrentConversationBackend()` |
 | ConversationSyncVisiblePostSyncRouter | **Explicitly gated** — skips question/todo refresh for non-OpenCode conversations, applies sync update directly. Session identity uses `getConversationBackendSessionId()`. |
 | ConversationSyncOrchestrationService | Drives OpenCode-specific sync loop |
 | SettingsConversationSection (`unshareSession`) | Share URL write is OpenCode-specific; `listSessions` and `getSessionMessages` are now backend-aware |
@@ -374,6 +375,44 @@ The remaining Phase 3 foundation/productization work should be treated as one co
 - if a read surface cannot be safely generalized, keep it explicitly OpenCode-only or diagnostic and document that boundary instead of forcing abstraction;
 - deepen runtime proof for the currently productized backend-aware session/history reads as adjacent rounds justify deployment validation;
 - keep `revert / unrevert / diff / child-session graph / authoritative sync` gated unless a later round provides both official basis and accepted runtime proof.
+
+## Session Detail / History Inspection Audit (2026-05-23)
+
+A full audit of all remaining `openCodeService` session/history/detail read points in `OpenCodianView.ts` has been completed. Findings:
+
+### All Consumer-Level Guards Confirmed
+
+Every remaining direct `openCodeService` session read in `OpenCodianView.ts` host wiring is gated at the **consumer** level. The host wiring itself is unconditional, but no ungated REST call can leak for non-OpenCode backends:
+
+| Host method | Consumer | Guard |
+|---|---|---|
+| `getSessionChildren` | `ChildSessionGraphCoordinator.refreshGraph()` | `backend !== 'opencode'` early return |
+| `getCanonicalSessionState` / `hydrateOpenCodeMessage` | `ConversationRenderService.resolveConversationRenderMessages()` | `backend !== 'opencode'` fallback |
+| `getSessionDiff` / `getCachedSessionDiffEntries` | `ConversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded()` | `backend !== 'opencode'` early return |
+| `getSessionTodos` / `getSessionStatuses` | `SessionTodoCoordinator.refreshTabSessionTodos/Status()` | `backend !== 'opencode'` early return |
+| `getSessionMessages` / `getCanonicalSessionMessages` / `getSessionRevertState` / `hydrateOpenCodeMessage` | `ConversationAuthoritativeSyncCoordinator` | `conversation.backend !== 'opencode'` early return |
+| Event subscriptions (`subscribeToSessionSyncEvents` etc.) | `ConversationSessionSignalRuntime.start()` | `shouldStartConversationSessionSignalRuntime()` → `isOpenCodeBackendActive()` |
+| `getCachedSessionDiffEntries` (sidebar) | `refreshModifiedFilesSidebar()` | `backend === 'opencode'` guard at L3147 |
+| `getSessionContextUsageSnapshot` | Context ring sync handler | `conversation.backend !== 'opencode'` early return |
+
+### Previously Ungated Gap (Now Fixed)
+
+| Gap | Fix |
+|---|---|
+| `refreshPendingQuestionsForTab()` in `QuestionDockCoordinator` → called `openCodeService.getPendingQuestions()` without any backend guard | Added `getCurrentConversationBackend()` to `QuestionTodoStatusRefreshCoordinatorHost`; coordinator now skips `refreshPendingQuestionsForTab` for non-OpenCode conversations in both `refreshAfterActivation()` and `refreshAfterPostSync()`. Previously relied solely on upstream callers (TabConversationActivationBridge, ConversationSyncVisiblePostSyncRouter, BackgroundConversationPostSyncRefreshExecutor). |
+
+### No New Shared Read Seams
+
+No new `getSession()` consumers can be safely promoted. All remaining reads are OpenCode-specific (session children, canonical state, diff, revert state, todos, event subscriptions). None has a narrow, verifiable cross-backend semantic like the official-title or share-URL reads.
+
+### Four Named Coordinators Status
+
+| Coordinator | Status |
+|---|---|
+| `QuestionRuntimeViewHostFactory` | **Clean** — pure DI factory, no session reads |
+| `QuestionRuntimeHostAdapter` | **Clean** — pure DI adapter, no session reads |
+| `QuestionTodoActivationRefreshCoordinator` | **Clean** — delegates to host and `QuestionTodoStatusRefreshCoordinator`, which now gates pending-questions REST poll |
+| `VisibleConversationPostSyncCoordinator` | **Clean** — delegates to `PostSyncQuestionTodoRefreshFacade` and state coordinator; gated at the `ConversationSyncVisiblePostSyncRouter` level |
 
 For the next multi-round continuation, the immediate high-value targets are:
 

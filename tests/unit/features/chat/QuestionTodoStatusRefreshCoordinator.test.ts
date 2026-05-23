@@ -37,11 +37,13 @@ function createHost(options: {
   runtime?: QuestionTodoStatusRefreshRuntime | null;
   hasIncompleteTodos?: boolean;
   callOrder?: string[];
+  backend?: string;
 } = {}): MockedQuestionTodoStatusRefreshHost {
   const callOrder = options.callOrder;
   return {
     getTabRuntimeState: jest.fn().mockReturnValue(options.runtime ?? createRuntime()),
     hasIncompleteTodos: jest.fn().mockReturnValue(options.hasIncompleteTodos ?? false),
+    getCurrentConversationBackend: jest.fn().mockReturnValue(options.backend ?? 'opencode'),
     refreshPendingQuestionsForTab: jest.fn(() => {
       callOrder?.push('pending-question');
       return Promise.resolve([] as QuestionRequest[]);
@@ -80,7 +82,7 @@ describe('QuestionTodoStatusRefreshCoordinator', () => {
       'session-1',
       { suppressErrors: true },
     );
-    expect(callOrder).toEqual(['status', 'pending-question', 'todo']);
+    expect(callOrder).toEqual(['pending-question', 'status', 'todo']);
   });
 
   it('runs post-sync pending questions before background reconciliation and todo/status refresh', async () => {
@@ -189,5 +191,51 @@ describe('QuestionTodoStatusRefreshCoordinator', () => {
       { suppressErrors: true },
     );
     expect(callOrder).toEqual(['pending-question', 'status', 'todo']);
+  });
+
+  describe('non-OpenCode backend guard', () => {
+    it('skips pending-questions REST poll for non-OpenCode activation', async () => {
+      const host = createHost({ backend: 'claude-code' });
+      const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+
+      await coordinator.refreshAfterActivation('tab-1', 'session-1');
+
+      expect(host.refreshPendingQuestionsForTab).not.toHaveBeenCalled();
+      // status and todo still refresh (they gate internally)
+      expect(host.refreshTabSessionStatus).toHaveBeenCalledWith(
+        'tab-1', 'session-1', { suppressErrors: true },
+      );
+      expect(host.refreshTabSessionTodos).toHaveBeenCalledWith(
+        'tab-1', 'session-1', { suppressErrors: true },
+      );
+    });
+
+    it('skips pending-questions REST poll for non-OpenCode post-sync', async () => {
+      const host = createHost({ backend: 'claude-code' });
+      const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+
+      await coordinator.refreshAfterPostSync({
+        tabId: 'tab-1',
+        questionSessionId: 'session-1',
+        todoStatusSessionId: 'session-1',
+      });
+
+      expect(host.refreshPendingQuestionsForTab).not.toHaveBeenCalled();
+    });
+
+    it('still runs afterPendingQuestionRefresh callback for non-OpenCode post-sync', async () => {
+      const host = createHost({ backend: 'claude-code' });
+      const afterRefresh = jest.fn();
+      const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+
+      await coordinator.refreshAfterPostSync({
+        tabId: 'tab-1',
+        questionSessionId: 'session-1',
+        todoStatusSessionId: 'session-1',
+        afterPendingQuestionRefresh: afterRefresh,
+      });
+
+      expect(afterRefresh).toHaveBeenCalled();
+    });
   });
 });

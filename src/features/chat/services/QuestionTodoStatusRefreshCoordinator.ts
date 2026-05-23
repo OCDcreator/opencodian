@@ -11,6 +11,7 @@ export interface QuestionTodoStatusRefreshRuntime {
 export interface QuestionTodoStatusRefreshCoordinatorHost {
   getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
   hasIncompleteTodos(todos: readonly SessionTodo[]): boolean;
+  getCurrentConversationBackend(): string;
   refreshPendingQuestionsForTab(
     tabId: TabId | null,
     sessionId: string | null | undefined,
@@ -42,9 +43,17 @@ export class QuestionTodoStatusRefreshCoordinator {
     tabId: TabId | null,
     sessionId: string | null | undefined,
   ): Promise<void> {
+    const backend = this.host.getCurrentConversationBackend();
+    // Pending-questions REST polling is OpenCode-only.
+    // For non-OpenCode backends, questions arrive through SDK callbacks,
+    // not REST polling. Skip the REST call to avoid leaking.
+    const pendingQuestionsPromise = backend === 'opencode'
+      ? this.host.refreshPendingQuestionsForTab(tabId, sessionId)
+      : Promise.resolve([] as QuestionRequest[]);
+
     await Promise.allSettled([
       this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true }),
-      this.host.refreshPendingQuestionsForTab(tabId, sessionId),
+      pendingQuestionsPromise,
       this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true }),
     ]);
   }
@@ -52,7 +61,11 @@ export class QuestionTodoStatusRefreshCoordinator {
   async refreshAfterPostSync(
     options: PostSyncQuestionTodoStatusRefreshOptions,
   ): Promise<void> {
-    await this.host.refreshPendingQuestionsForTab(options.tabId, options.questionSessionId);
+    const backend = this.host.getCurrentConversationBackend();
+    // Pending-questions REST polling is OpenCode-only (see refreshAfterActivation).
+    if (backend === 'opencode') {
+      await this.host.refreshPendingQuestionsForTab(options.tabId, options.questionSessionId);
+    }
     await options.afterPendingQuestionRefresh?.();
 
     if (!this.shouldRefreshTodoStatus(options.tabId, options.forceTodoStatusRefresh ?? false)) {
