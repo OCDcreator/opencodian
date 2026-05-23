@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供六个诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。大多数交互仍是只读或 dry-run；新增的 sessionStore proof 只会写入插件内存里的 diagnostic store，不会改稳定设置或普通 chat UI。
+`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供七个诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。大多数交互仍是只读或 dry-run；新增的 sessionStore proof 只会写入插件内存里的 diagnostic store，不会改稳定设置或普通 chat UI。
 
 设计原则：不把未验证能力包装成稳定 UI。允许最小的 diagnostic-only runtime proof，但不能把 hooks / sessionStore 伪装成 stable/completed。structured output 的 transcript 渲染与持久化已稳定，但 authoring/triggering 仍为 diagnostic-only。
 
@@ -18,6 +18,7 @@
 | Subagent Browser | 列出/检查子代理转录 | `adapter.listSubagents()` / `getSubagentMessages()` |
 | Rewind Dry-Run Preview | 预览文件检查点回退（不执行） | `adapter.rewindFiles(dryRun: true)` |
 | Structured Output Playground | 启动 runtime-only outputFormat probe 并展示 `backend_event` | `adapter.runDiagnosticPrompt()` |
+| Fork Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并执行 fork，输出分叉后的 session ID 和标题 | `adapter.listSessions()` / `adapter.forkSession()` |
 | Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
 
 ## 依赖注入
@@ -66,6 +67,7 @@
 | `renderSubagentBrowser()` | 渲染子代理浏览器 |
 | `renderRewindDryRun()` | 渲染 rewind dry-run 预览 |
 | `renderStructuredOutputPlayground()` | 渲染结构化输出实验场 |
+| `renderForkProbe()` | 渲染 Fork Session 诊断探针（provider-owned, diagnostic only） |
 | `renderDiscoveryStatus()` | 渲染发现/状态面板 |
 
 ## 数据属性标记
@@ -93,4 +95,5 @@
 - `buildMatrixRows()` 的评估基于代码检查，不是运行时探测
 - Structured Output 与 Hooks proof 都通过 `runDiagnosticPrompt()` 直接观察 backend_event；普通 `OpenCodianView` 仍不会把这些事件渲染进稳定 transcript
 - Discovery 面板使用 `hasCapability()` 检查 adapter 声明的能力
-- 文件使用 `eslint-disable max-lines` 注释，因为六个诊断面板共享同一诊断边界
+- 文件使用 `eslint-disable max-lines` 注释，因为七个诊断面板共享同一诊断边界
+- Fork Session 诊断探针是 provider-owned 的诊断界面，不是稳定的跨后端 fork UI。它只直接调用 Claude Code adapter 的 `forkSession()`，不触碰权威同步、diff、子会话图或通用 `getSession` 语义

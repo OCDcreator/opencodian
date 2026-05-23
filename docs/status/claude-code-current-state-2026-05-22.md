@@ -223,7 +223,8 @@ It currently serves as:
 - a diagnostic session-store mirror/import/list/load surface;
 - a rewind dry-run preview surface;
 - a structured-output runtime probe;
-- a hook runtime proof surface.
+- a hook runtime proof surface;
+- a provider-owned fork session diagnostic probe (select a Claude session, run `adapter.forkSession()`, see forked session id/title). This probe is diagnostic-only and does NOT represent stable fork productization.
 
 Important policy:
 

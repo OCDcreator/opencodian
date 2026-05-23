@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Capability Lab tests intentionally keep the full diagnostic surface matrix, history, rewind, structured, and fork probe behavior together. */
 import { SettingsCapabilityLabSection } from '../../../../src/features/settings/SettingsCapabilityLabSection';
 import { setLocale, t } from '../../../../src/i18n';
 
@@ -53,7 +54,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('NOT STABLE');
   });
 
-  it('renders all six diagnostic panels', () => {
+  it('renders all seven diagnostic panels including fork probe', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -68,6 +69,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(blockIds).toContain('history');
     expect(blockIds).toContain('subagents');
     expect(blockIds).toContain('rewind');
+    expect(blockIds).toContain('fork');
     expect(blockIds).toContain('structured');
     expect(blockIds).toContain('discovery');
   });
@@ -333,6 +335,209 @@ describe('SettingsCapabilityLabSection', () => {
     }));
     expect(containerEl.textContent).toContain('SessionStart');
     expect(containerEl.textContent).toContain('diag-hook-1');
+  });
+
+  // =======================================================================
+  // Fork Session Diagnostic Probe
+  // =======================================================================
+
+  it('renders fork probe section with session selector and fork button when adapter is available', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-abc-123', summary: 'Test session', lastModified: 1 },
+      ]),
+      forkSession: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    expect(forkBlock).toBeTruthy();
+
+    const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fork Diagnostic')
+    )) as HTMLButtonElement | undefined;
+    expect(forkButton).toBeTruthy();
+
+    const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement | null;
+    expect(sessionSelect).toBeTruthy();
+  });
+
+  it('shows unavailable message in fork probe when adapter is not present', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    expect(forkBlock).toBeTruthy();
+    const unavailableMsg = forkBlock!.querySelector('.opencodian-capability-lab-unavailable');
+    expect(unavailableMsg).toBeTruthy();
+    expect(unavailableMsg!.textContent).toContain('Claude Code adapter not available');
+  });
+
+  it('calls forkSession on the adapter and shows the forked session id and title', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-source-1', summary: 'Source session', lastModified: 1 },
+      ]),
+      forkSession: jest.fn().mockResolvedValue({
+        id: 'forked-session-999',
+        title: 'Source session (fork)',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement;
+    const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fork Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-source-1';
+    forkButton.click();
+    await flushUi();
+
+    expect(adapter.forkSession).toHaveBeenCalledWith('session-source-1');
+    expect(containerEl.textContent).toContain('forked-session-999');
+    expect(containerEl.textContent).toContain('Source session (fork)');
+  });
+
+  it('shows diagnostic error and hint when forkSession fails', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-bad-1', summary: 'Bad session', lastModified: 1 },
+      ]),
+      forkSession: jest.fn().mockRejectedValue(new Error('Claude Code forkSession is unavailable in this SDK.')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement;
+    const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fork Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-bad-1';
+    forkButton.click();
+    await flushUi();
+
+    const errorEl = forkBlock!.querySelector('.opencodian-capability-lab-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl!.textContent).toContain('forkSession is unavailable');
+    const hintEl = forkBlock!.querySelector('.opencodian-capability-lab-hint');
+    expect(hintEl).toBeTruthy();
+  });
+
+  it('updates Fork Session runtime proof to pass on success', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-rt-1', summary: 'RT session', lastModified: 1 },
+      ]),
+      forkSession: jest.fn().mockResolvedValue({
+        id: 'forked-rt-1',
+        title: 'RT session (fork)',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement;
+    const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fork Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-rt-1';
+    forkButton.click();
+    await flushUi();
+
+    const proofMarker = forkBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+  });
+
+  it('updates Fork Session runtime proof to fail on error', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-fail-1', summary: 'Fail session', lastModified: 1 },
+      ]),
+      forkSession: jest.fn().mockRejectedValue(new Error('SDK unavailable')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement;
+    const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fork Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-fail-1';
+    forkButton.click();
+    await flushUi();
+
+    const proofMarker = forkBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('marks Fork Session as a diagnostic surface in the capability matrix', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      forkSession: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const row = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr')).find((el) => (
+      el.textContent?.includes('Fork Session')
+    )) as HTMLElement | undefined;
+    expect(row).toBeTruthy();
+    const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
+    expect(surfaceChip?.dataset.surface).toBe('diagnostic');
+    expect(surfaceChip?.textContent).toBe('Diagnostic');
   });
 
   it('renders session store controls and imports the selected session into the diagnostic store', async () => {

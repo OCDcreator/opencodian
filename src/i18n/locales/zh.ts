@@ -2590,6 +2590,8 @@ export const zhTranslations = {
   'settings.capabilityLab.rewind.description': '预览文件检查点回退将执行的操作。仅 dry-run — 不提供实际文件恢复按钮。需要活跃的启用检查点的运行时。',
   'settings.capabilityLab.structured.title': '结构化输出实验场（诊断用）',
   'settings.capabilityLab.structured.description': '结构化输出的诊断面板。未集成到普通聊天 UI。探测最近会话的结构化输出数据。',
+  'settings.capabilityLab.fork.title': '会话分叉诊断（诊断用）',
+  'settings.capabilityLab.fork.description': 'Claude Code forkSession() 的供应商级诊断探针。选择一个会话并执行分叉。分叉后的会话 ID 和标题将作为诊断输出显示。非稳定产品界面。',
   'settings.capabilityLab.discovery.title': '发现与状态',
   'settings.capabilityLab.discovery.description': 'hooks、插件、技能、代理和其他 SDK 功能的状态概览。无创作 UI — 仅发现/状态。',
   'settings.user.tab.profile': '个人资料',

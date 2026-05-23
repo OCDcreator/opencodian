@@ -2590,6 +2590,8 @@ export const enTranslations = {
   'settings.capabilityLab.rewind.description': 'Preview what file checkpoint rewind would do. Dry-run only — no actual file restore button is provided. Requires an active checkpoint-enabled runtime.',
   'settings.capabilityLab.structured.title': 'Structured Output Playground (Diagnostic)',
   'settings.capabilityLab.structured.description': 'Diagnostic surface for structured output. Not integrated into the normal chat UI. Probes recent sessions for structured output data.',
+  'settings.capabilityLab.fork.title': 'Fork Session Diagnostic (Diagnostic)',
+  'settings.capabilityLab.fork.description': 'Provider-owned diagnostic probe for Claude Code forkSession(). Select a session and fork it. The forked session id and title are shown as diagnostic output. Not a stable product surface.',
   'settings.capabilityLab.discovery.title': 'Discovery & Status',
   'settings.capabilityLab.discovery.description': 'Status overview for hooks, plugins, skills, agents, and other SDK features. No authoring UI — discovery/status only.',
   'settings.user.tab.profile': 'Profile',

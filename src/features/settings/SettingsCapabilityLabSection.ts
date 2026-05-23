@@ -326,6 +326,13 @@ export class SettingsCapabilityLabSection {
     });
     this.renderStructuredOutputPlayground(structuredBlock);
 
+    // ── Fork Session Diagnostic (provider-owned, diagnostic only) ─────
+    const forkBlock = containerEl.createDiv({
+      cls: 'opencodian-settings-block',
+      attr: { 'data-section-block': 'fork' },
+    });
+    this.renderForkProbe(forkBlock);
+
     // ── Discovery / Status ─────────────────────────────────────────────
     const discoveryBlock = containerEl.createDiv({
       cls: 'opencodian-settings-block',
@@ -479,7 +486,7 @@ export class SettingsCapabilityLabSection {
         sdkExposed: !!adapter, // forkSession on SDK facade
         adapterWired: !!adapter, // adapter.forkSession()
         runtimeProof: 'untested',
-        userSurface: 'hidden',
+        userSurface: 'diagnostic', // Capability Lab fork probe only
       },
     ];
   }
@@ -1017,6 +1024,121 @@ export class SettingsCapabilityLabSection {
         text: 'Hint: rewindFiles requires an active runtime with checkpointing enabled.',
       });
       this.updateRuntimeProof('File Checkpoint / Rewind', 'fail', outputEl);
+    }
+  }
+
+  // =======================================================================
+  // Fork Session Diagnostic Probe (provider-owned, diagnostic only)
+  // =======================================================================
+
+  private renderForkProbe(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', { text: t('settings.capabilityLab.fork.title') });
+    containerEl.createEl('p', {
+      cls: 'opencodian-capability-lab-description',
+      text: t('settings.capabilityLab.fork.description'),
+    });
+
+    const adapter = getClaudeCodeAdapter(this.plugin);
+    if (!adapter) {
+      containerEl.createEl('p', {
+        cls: 'opencodian-capability-lab-unavailable',
+        text: 'Claude Code adapter not available. Enable the Claude Code backend first.',
+      });
+      return;
+    }
+
+    const controlsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+
+    const sessionSelect = controlsEl.createEl('select', {
+      cls: 'opencodian-capability-lab-select',
+      attr: {
+        'data-diagnostic': 'true',
+        'data-diagnostic-session-select': 'fork',
+      },
+    });
+    sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
+
+    const forkBtn = controlsEl.createEl('button', {
+      text: 'Run Fork Diagnostic',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    const outputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    const loadSessions = async (): Promise<void> => {
+      try {
+        sessionSelect.innerHTML = '';
+        sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
+        const sessions = await adapter.listSessions();
+        for (const session of sessions) {
+          const option = sessionSelect.createEl('option', {
+            text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
+            attr: { value: session.sessionId },
+          });
+          option.value = session.sessionId;
+        }
+      } catch (err) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    };
+
+    forkBtn.addEventListener('click', () => {
+      const sessionId = sessionSelect.value;
+      if (!sessionId) {
+        new Notice('Select a session to fork first.');
+        return;
+      }
+      void this.runForkDiagnostic(adapter, sessionId, outputEl);
+    });
+
+    void loadSessions();
+  }
+
+  private async runForkDiagnostic(
+    adapter: ClaudeCodeAdapter,
+    sessionId: string,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running fork diagnostic…' });
+
+    try {
+      const result = await adapter.forkSession(sessionId);
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `Forked from ${sessionId.slice(0, 12)}…`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Forked session ID: ${result.id}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Forked session title: ${result.title}`,
+      });
+      outputEl.createEl('pre', {
+        cls: 'opencodian-capability-lab-json-preview',
+        text: formatJsonPreview(result),
+      });
+      this.updateRuntimeProof('Fork Session', 'pass', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Fork failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Hint: forkSession requires a Claude Code runtime with the fork capability available.',
+      });
+      this.updateRuntimeProof('Fork Session', 'fail', outputEl);
     }
   }
 
