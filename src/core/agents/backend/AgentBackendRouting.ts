@@ -380,6 +380,9 @@ export async function loadBackendSessionMessages(
 
   const backend = resolveConversationBackendKind(conversation);
   const rawMessages = await historyService.getSessionMessages(sessionId);
+  if (!Array.isArray(rawMessages)) {
+    return [];
+  }
 
   if (backend === 'opencode') {
     return (rawMessages as Array<{

@@ -457,6 +457,21 @@ For the next multi-round continuation, the immediate high-value targets are:
 - keep share writes, rewind, diff, authoritative sync, and child-session graph explicitly gated unless new official basis plus runtime proof says otherwise;
 - if one round finishes cleanly and more backlog remains, do not hand off immediately to a fresh human/Codex session; update docs, commit, and launch the next `opencode run` round in the same session.
 
+## loadBackendSessionMessages Runtime Safety Round (2026-05-23)
+
+A focused runtime-safety audit of the backend-aware history normalization layer found one inconsistency: `loadBackendSessionMessages()` did not validate that `getSessionMessages()` returned an array before calling `.map()` on the result. Both `listBackendSessions()` and `getBackendSessionPreview()` already had `Array.isArray` guards, but `loadBackendSessionMessages()` assumed the array shape unconditionally for both the OpenCode `{info, parts}` path and the generic Claude path. This could crash at runtime if a backend adapter returned an unexpected non-array payload.
+
+### Fix Applied
+
+- Added `Array.isArray(rawMessages)` guard in `loadBackendSessionMessages()` immediately after `await historyService.getSessionMessages(sessionId)`. Returns `[]` for non-array responses, matching the behavior of `listBackendSessions()` and `getBackendSessionPreview()`.
+- Added two unit tests: one for OpenCode backend returning a non-array, one for Claude Code backend returning a non-array.
+
+### Verification
+
+- `npm run verify` passed with `431` suites / `3051` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231550`
+- No new shared `getSession()` consumers were added; this is a defensive hardening of an existing backend-aware seam
+
 ## Session Detail / History Inspection Round (2026-05-23)
 
 A second-pass audit was executed across `OpenCodianView.ts`, `ConversationSessionSettingsCoordinator.ts`, `SettingsConversationSection.ts`, and adjacent inspection surfaces (`ActiveTabContextUsageCoordinator`, `ContextDetailModal`, `ChildSessionGraphCoordinator`).

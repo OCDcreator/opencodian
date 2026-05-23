@@ -226,6 +226,28 @@ describe('loadBackendSessionMessages', () => {
         loadBackendSessionMessages(registry, { backend: 'opencode' }, 'ses-1'),
       ).rejects.toThrow('backend error');
     });
+
+    it('returns empty array when getSessionMessages returns a non-array for OpenCode', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSessionMessages: async () => ({ messages: [] }) as unknown as Array<unknown>,
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await loadBackendSessionMessages(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when getSessionMessages returns a non-array for Claude', async () => {
+      const adapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Chat,
+        AgentCapability.Sessions,
+        AgentCapability.Fork,
+      ]), {
+        getSessionMessages: async () => ({ items: [] }) as unknown as Array<unknown>,
+      });
+      const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+      const result = await loadBackendSessionMessages(registry, { backend: 'claude-code' }, 'ses-1');
+      expect(result).toEqual([]);
+    });
   });
 
 describe('readBackendSessionTitle', () => {

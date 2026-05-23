@@ -19,6 +19,7 @@
 - 提供 `readBackendSessionShareUrl()` 用于 backend-aware session 分享链接读取路由，通过 `getSession(sessionId)` 获取 session 详情并按已 productize 的 backend kind 提取分享 URL（OpenCode: `session.share.url`；Claude Code 及其他 backend 目前无分享概念，返回 `null`）。这是一个**窄的 backend-aware session-detail read seam**，仅用于分享链接读取，不作为 generic stable cross-backend session-detail object contract
 - 提供 `listBackendSessions()` 用于 active backend 的 session 列表路由，调用 `listSessions()` 并将原始结果归一化为 `NormalizedSessionRow[]`（`id`/`title`/`shareUrl`/`updatedAt`），使 settings inspection surface 不再直接依赖 OpenCode `Session` 类型
 - 提供 `getBackendSessionPreview()` 用于 active backend 的 session 消息预览路由，调用 `getSessionMessages()` 并将原始结果归一化为 `NormalizedSessionPreviewMessage[]`（`role`/`parts[]`），使 settings 预览不再假设 OpenCode `{info, parts}` 消息形状；当 backend 不支持该读取时返回 `null`，当 backend 支持但没有消息时返回空数组
+- 提供 `loadBackendSessionMessages()` 用于从 backend 加载并归一化原始 session 消息。OpenCode 消息按 `{info, parts}` 形状解析，Claude / 其他 backend 使用 best-effort 通用归一化。当没有 session history service 或 `getSessionMessages` 返回非数组时返回 `[]`，避免在 OpenCode path 上直接对非数组值调用 `.map` 导致 runtime crash
 - 提供 `NormalizedSessionRow`、`NormalizedSessionPreviewMessage`、`NormalizedSessionPreviewPart` 轻量类型，仅供 inspection surface 消费，不作为 stable cross-backend session contract
 
 ## 维护约束
@@ -26,4 +27,4 @@
 - 这里只做 registry lookup 和 capability narrowing，不做 fallback 业务逻辑。
 - 不在这里启用或注册 backend；可见 backend 仍由 `IMPLEMENTED_AGENT_BACKENDS` 和 settings normalization 控制。
 - 新增 backend capability 路由时优先扩展此 helper，避免在 UI owner 中散落 `as AgentXCapability` 类型断言。
-- 2026-05-23 的边界测试补强覆盖了 `listBackendSessions()` 非数组返回、`getBackendSessionPreview()` 非数组返回以及 Claude content block 的 malformed / primitive 防御路径；这些用例只是在加固已有 backend-aware seams 的鲁棒性，没有新增任何共享 `getSession()` consumer。
+- 2026-05-23 的边界测试补强覆盖了 `listBackendSessions()` 非数组返回、`getBackendSessionPreview()` 非数组返回、`loadBackendSessionMessages()` 非数组返回以及 Claude content block 的 malformed / primitive 防御路径；这些用例只是在加固已有 backend-aware seams 的鲁棒性，没有新增任何共享 `getSession()` consumer。

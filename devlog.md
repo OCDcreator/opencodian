@@ -12,6 +12,24 @@
 
 ---
 
+## 2026-05-23 Phase 3 — loadBackendSessionMessages non-array guard + runtime safety hardening
+
+### Summary
+
+Runtime-safety audit of backend-aware history normalization found one inconsistency: `loadBackendSessionMessages()` lacked the `Array.isArray` guard that both `listBackendSessions()` and `getBackendSessionPreview()` already had. Added the guard and two unit tests (OpenCode + Claude Code non-array returns).
+
+### Changes
+
+- `src/core/agents/backend/AgentBackendRouting.ts`: Added `Array.isArray(rawMessages)` guard after `getSessionMessages()` in `loadBackendSessionMessages()`, returning `[]` for non-array responses
+- `tests/unit/core/agents/backend/AgentBackendRouting.test.ts`: Added two tests covering non-array `getSessionMessages` returns for both OpenCode and Claude Code backends
+- `docs/modules/core/agents/backend/AgentBackendRouting.md`: Updated module doc to mention `loadBackendSessionMessages` and the non-array guard
+
+### Verification
+
+- `npm run verify` passed: `431` suites / `3051` tests
+- Build: `feature-phase0-capability.202605231550`
+- No new shared `getSession()` consumers added; purely defensive hardening of existing seam
+
 ## 2026-05-23 Phase 3 — Capability Lab audit + Backend Routing Probe registry verification
 
 ### Summary
