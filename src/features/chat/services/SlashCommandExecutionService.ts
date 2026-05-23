@@ -397,8 +397,9 @@ export class SlashCommandExecutionService {
 
   private async handleRedoCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
-    const backend = conversation?.backend ?? 'opencode';
-    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
+    if (!conversation) { return true; }
+    const backend = conversation.backend ?? 'opencode';
+    const sessionId = getConversationBackendSessionId(conversation);
     if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.redo.noSession')); return true; }
     try {
       const ok = await this.host.unrevertSession(sessionId);
