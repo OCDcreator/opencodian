@@ -691,6 +691,61 @@ describe('SettingsConversationSection', () => {
     expect(previewEl?.textContent).toContain('hi there');
   });
 
+  it('renders Claude content blocks through the normalized preview seam without assuming info/parts', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // Adapter returns messages in Claude content-block shape (array of {type, text})
+    // instead of OpenCode {info, parts}. The normalized seam must handle both.
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-claude-blocks',
+        title: 'Claude Blocks Session',
+        share: { url: 'https://example.com/s/session-claude-blocks' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      {
+        role: 'user',
+        content: 'hello with blocks',
+      },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'first block' },
+          { type: 'tool_use', text: 'tool call' },
+          { type: 'text', text: 'second block' },
+        ],
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-claude-blocks"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-claude-blocks"]');
+    // Preview element should exist and show user message text
+    expect(previewEl).toBeTruthy();
+    expect(previewEl?.textContent).toContain('hello with blocks');
+    // Text blocks from the content array should render
+    expect(previewEl?.textContent).toContain('first block');
+    expect(previewEl?.textContent).toContain('second block');
+    // Non-text blocks (tool_use) should render inside a collapsed <details>
+    expect(previewEl?.querySelector('details')?.textContent).toContain('tool_use');
+    // getSessionMessages was called through the routing layer with the session id
+    expect((adapter as { getSessionMessages: jest.Mock }).getSessionMessages).toHaveBeenCalledWith('session-claude-blocks');
+  });
+
   it('renders non-user preview roles verbatim through the normalized seam', async () => {
     const plugin = createPlugin();
     const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
