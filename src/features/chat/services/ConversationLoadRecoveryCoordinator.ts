@@ -61,6 +61,7 @@ interface ForkConversationInitialState {
   messages: ChatMessage[];
   currentNote?: string;
   externalContextPaths?: string[];
+  backend?: AgentBackendKind;
 }
 
 export interface ConversationLoadRecoveryHost {
@@ -467,6 +468,7 @@ export class ConversationLoadRecoveryCoordinator {
       messages: cloneMessagesBeforeForkTarget(currentConversation.messages, targetMessage),
       currentNote: currentConversation.currentNote,
       externalContextPaths: currentConversation.externalContextPaths,
+      backend: currentConversation.backend,
     });
   }
 

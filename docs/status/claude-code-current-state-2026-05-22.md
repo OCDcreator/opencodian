@@ -71,7 +71,7 @@ Recent runs focused on two connected lanes:
 | Owner | Change |
 |---|---|
 | `OpenCodianView.ts` | `revertSession`/`unrevertSession` route through `AgentCapability.Branching`; `forkSession` routes separately through `AgentCapability.Fork` / `AgentForkCapability`. OpenCode fallback is explicit and backend-gated. `getCurrentConversationSessionId` uses `getConversationBackendSessionId()`. |
-| `ConversationLoadRecoveryCoordinator.ts` | `handleRewindRequest`/`handleRestoreRewindRequest`/`handleForkRequest` use `getConversationBackendSessionId()` and gate revert/unrevert by backend kind. |
+| `ConversationLoadRecoveryCoordinator.ts` | `handleRewindRequest`/`handleRestoreRewindRequest`/`handleForkRequest` use `getConversationBackendSessionId()` and gate revert/unrevert by backend kind. Fork preserves source conversation `backend` identity through `createConversationFromSession()` instead of using `settings.activeBackend`. |
 | `ConversationAuthoritativeSyncCoordinator.ts` | Uses `getConversationBackendSessionId()`; skips sync for non-OpenCode backends (OpenCode-only by design). |
 | `ConversationAuthoritativeReloadCoordinator.ts` | Uses `getConversationBackendSessionId()` in all debug logs; skips server sync for non-OpenCode backends. |
 | `ConversationNoticeCoordinator.ts` | `appendTurnDiffNoticeIfNeeded` gated to OpenCode-only. |
@@ -174,7 +174,7 @@ The following service seams now route session identity through `getConversationB
 
 | Seam | Backend-aware? | Notes |
 |---|---|---|
-| Conversation load/recovery (fork) | **Yes** | Fork routes through registry `AgentForkCapability` for capable backends; OpenCode fallback preserved |
+| Conversation load/recovery (fork) | **Yes** | Fork routes through registry `AgentForkCapability` for capable backends; OpenCode fallback preserved. Forked conversation preserves source `backend` identity. |
 | Conversation load/recovery (rewind/unrevert) | **Gated** | Explicitly OpenCode-only: backend check `backend !== 'opencode'` → unavailable for Claude |
 | Authoritative sync (user message hydration) | **Gated** | OpenCode-only: entire hydration pipeline uses OpenCode-typed messages |
 | Authoritative reload (log identity) | **Yes** | All log `sessionId` fields use `getConversationBackendSessionId()` |
@@ -187,6 +187,7 @@ The following service seams now route session identity through `getConversationB
 | Slash command redo (unrevert) | **Gated** | OpenCode-only: backend check |
 | Diff notice on turn completion | **Gated** | OpenCode-only: backend check |
 | Child session graph | **Gated** | OpenCode-only: `getSessionChildren` has no backend-neutral equivalent |
+| Task tool session open (backend identity) | **Yes** | `openTaskToolSession()` accepts parent `backend` parameter; `createConversationFromSession()` in `main.ts` prefers explicit `initial.backend` over `settings.activeBackend` |
 | Stream message persistence (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Conversation render service (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Conversation sync runtime coordinator (diagnostic) | **Yes** | Includes both `openCodeSessionId` and `backendSessionId` |

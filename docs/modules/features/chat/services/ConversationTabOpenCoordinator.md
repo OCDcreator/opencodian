@@ -24,7 +24,7 @@ export interface ConversationTabOpenHost {
   createConversation(): Promise<Conversation>;
   createConversationFromSession(
     sessionId: string,
-    initial?: Pick<Conversation, 'title'>,
+    initial?: Pick<Conversation, 'title' | 'backend'>,
   ): Promise<Conversation>;
   deleteConversation(conversationId: string): Promise<void>;
   showNotice(message: string): void;
@@ -41,7 +41,7 @@ export class ConversationTabOpenCoordinator {
   createConversationInNewTab(): Promise<void>;
   createConversationInCurrentTab(): Promise<void>;
   buildTaskToolSessionTitle(sessionId: string, toolCall?: Pick<ToolCallInfo, 'input'> | null): string;
-  openTaskToolSession(sessionId: string, toolCall?: Pick<ToolCallInfo, 'input'> | null): Promise<void>;
+  openTaskToolSession(sessionId: string, toolCall?: Pick<ToolCallInfo, 'input'> | null, backend?: AgentBackendKind): Promise<void>;
 }
 ```
 
@@ -54,7 +54,7 @@ export class ConversationTabOpenCoordinator {
 - current-tab 路径创建 conversation 后，继续复用 `TabConversationActivationBridge.openConversation()` 完成 active-pane shell reset 和 activation outcome
 - 两条入口共享同一套错误消息归一化与 success notice 决策
 - `buildTaskToolSessionTitle()` 从 tool call input 提取 description / subagent_type 生成子会话标题，优先 description，其次 subagent_type，最后回退 sessionId
-- `openTaskToolSession()` 承接 assistant shell 和 child session tree 的 "Open" 按钮入口：只要存在内部 `TabManager`，就通过 `createConversationFromSession()` 创建 conversation，并用当前 active tab 作为 `parentTabId` 创建 child tab 并 activate；子会话始终用 `ignoreMaxTabs` 跳过可见标签上限，因此无论标签 UI 启用或禁用，`maxTabs` 都不会阻断子会话/子代理导航。禁用标签时父会话仍可在后台继续 streaming，用户也能进入子会话，只是不会显示标签列表。只有完全没有 tab manager 的兜底路径才会复用 current-tab streaming guard，空闲时回退到 `syncActiveTabConversation()` + `loadConversation()`；child tab 创建失败会删除刚创建的 conversation，并统一显示 `chat.tab.childOpenFailed`，避免把防御性失败误报成 max-tabs 限制
+- `openTaskToolSession()` 承接 assistant shell 和 child session tree 的 "Open" 按钮入口：只要存在内部 `TabManager`，就通过 `createConversationFromSession()` 创建 conversation，并用当前 active tab 作为 `parentTabId` 创建 child tab 并 activate。可选的 `backend` 参数允许调用方显式传入父会话的 backend identity，确保子会话保持与父会话相同的 backend 而非使用 settings 中的 activeBackend。子会话始终用 `ignoreMaxTabs` 跳过可见标签上限，因此无论标签 UI 启用或禁用，`maxTabs` 都不会阻断子会话/子代理导航。禁用标签时父会话仍可在后台继续 streaming，用户也能进入子会话，只是不会显示标签列表。只有完全没有 tab manager 的兜底路径才会复用 current-tab streaming guard，空闲时回退到 `syncActiveTabConversation()` + `loadConversation()`；child tab 创建失败会删除刚创建的 conversation，并统一显示 `chat.tab.childOpenFailed`，避免把防御性失败误报成 max-tabs 限制
 
 ## 与 `OpenCodianView` 的边界
 

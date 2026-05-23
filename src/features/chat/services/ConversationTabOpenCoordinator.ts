@@ -1,5 +1,6 @@
 import type { ToolCallInfo } from '../../../core/types';
 import type { Conversation } from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import type { TabData, TabId } from '../tabs';
 
@@ -20,7 +21,7 @@ export interface ConversationTabOpenHost {
   createConversation(): Promise<Conversation>;
   createConversationFromSession(
     sessionId: string,
-    initial?: Pick<Conversation, 'title'>,
+    initial?: Pick<Conversation, 'title' | 'backend'>,
   ): Promise<Conversation>;
   deleteConversation(conversationId: string): Promise<void>;
   showNotice(message: string): void;
@@ -104,6 +105,7 @@ export class ConversationTabOpenCoordinator {
   async openTaskToolSession(
     sessionId: string,
     toolCall?: Pick<ToolCallInfo, 'input'> | null,
+    backend?: AgentBackendKind,
   ): Promise<void> {
     const normalizedSessionId = sessionId.trim();
     if (!normalizedSessionId) {
@@ -119,9 +121,13 @@ export class ConversationTabOpenCoordinator {
     }
 
     try {
-      const conversation = await this.host.createConversationFromSession(normalizedSessionId, {
+      const initial: Pick<Conversation, 'title' | 'backend'> = {
         title: this.buildTaskToolSessionTitle(normalizedSessionId, toolCall),
-      });
+      };
+      if (backend) {
+        initial.backend = backend;
+      }
+      const conversation = await this.host.createConversationFromSession(normalizedSessionId, initial);
 
       if (tabManager) {
         const parentTab = tabManager.getActiveTab();

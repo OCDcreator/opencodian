@@ -494,6 +494,42 @@ describe('ConversationLoadRecoveryCoordinator forking', () => {
       t('chat.fork.maxTabsReached', { count: '1' }),
     );
   });
+
+  it('preserves the source conversation backend when forking a claude-code conversation', async () => {
+    const claudeConversation = createBackendConversation('claude-source', 'claude-code', 'Claude Chat');
+    const beforeMessage = createMessage('msg-before', {
+      content: 'Before fork',
+      sourceMessageId: 'before-source',
+    });
+    const targetMessage = createMessage('msg-target', {
+      content: 'Fork target',
+      sourceMessageId: 'target-source',
+    });
+    claudeConversation.messages = [beforeMessage, targetMessage];
+    claudeConversation.currentNote = 'Daily.md';
+    const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+    tabManager.createTab(claudeConversation);
+    const forkConversation = createBackendConversation('forked-claude', 'claude-code', 'Forked');
+    const host = createHost(claudeConversation, {
+      getTabManager: jest.fn(() => tabManager),
+      createConversationFromSession: jest.fn().mockResolvedValue(forkConversation),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleForkRequest(targetMessage);
+
+    expect(host.forkSession).toHaveBeenCalledWith(
+      'claude-source-claude-code-session',
+      'target-source',
+    );
+    expect(host.createConversationFromSession).toHaveBeenCalledWith('fork-session', {
+      title: 'Fork: Claude Chat',
+      messages: [beforeMessage],
+      currentNote: 'Daily.md',
+      backend: 'claude-code',
+    });
+  });
 });
 
 describe('createConversationLoadRecoveryHost factory', () => {

@@ -267,13 +267,13 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 `ChildSessionGraphCoordinator` 现在 owns child-session tree 的完整生命周期，包括 graph 重建和 DOM 渲染：
 
 - coordinator 的 `render()` 负责在消息区底部创建/复用 `.opencodian-session-tree` 容器，并渲染 `complete`/`partial` graph 的折叠区；`empty` graph 直接隐藏整块
-- 普通 edge 行显示状态点、title/description 与 `Open` 按钮；按钮通过构造函数传入的 `onOpenTaskToolSession` 回调触发，该回调绑定到 `ConversationTabOpenCoordinator.openTaskToolSession`
+- 普通 edge 行显示状态点、title/description 与 `Open` 按钮；按钮通过构造函数传入的 `onOpenTaskToolSession` 回调触发。该回调现在会把 `currentConversation?.backend` 一并透传给 `ConversationTabOpenCoordinator.openTaskToolSession`，确保 child/task session conversation 保留父会话的 backend identity。
 - orphaned session 行固定显示 `Unknown task`，同时标记 partial graph badge，并在 graph 为 `partial` 时显示提醒文案
 - graph state 不落进 `TabRuntimeState`；view 只在 active pane 切换时通过 `coordinator.clearContainer()` / `coordinator.render()` 重建，真正的 graph snapshot 仍留在 coordinator 内部
 - `SESSION_TREE_BASE_CSS` 由 coordinator 导出，view 在 `applyChatAppearanceSettings()` 中注入
 
 `OpenCodianView` 只保留：
-- `createChildSessionGraphCoordinatorHost()` 提供 host seam（`getMessagesContainerEl`）；`onOpenTaskToolSession` 在 coordinator 构造时直接绑定到 `ConversationTabOpenCoordinator.openTaskToolSession`，不再通过 host 接口传递
+- `createChildSessionGraphCoordinatorHost()` 提供 host seam（`getMessagesContainerEl`）；`onOpenTaskToolSession` 在 coordinator 构造时通过 view-local lambda 调用 `ConversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall, currentConversation?.backend)`，而不是无参 bind，因此 child session graph 和 assistant shell 打开的子会话都不会再盲跟 `settings.activeBackend`
 - 在 conversation load / sync 完成后调用 `coordinator.refreshGraph()`
 - 在 pane 切换时调用 `coordinator.clearContainer()` 和 `coordinator.render(currentGraph)`
 - 在 close / empty-tab 路径上调用 `coordinator.hide()` 和 `coordinator.clearGraph()`

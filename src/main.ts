@@ -949,7 +949,7 @@ export default class OpenCodianPlugin extends Plugin {
     sessionId: string,
     initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId' | 'backendSessionId'>>,
   ): Promise<Conversation> {
-    const backend = this.settings.activeBackend ?? 'opencode';
+    const backend = initial?.backend ?? this.settings.activeBackend ?? 'opencode';
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       title: initial?.title || this.getEmptyConversationTitle(),

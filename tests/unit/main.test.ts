@@ -858,6 +858,67 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
   });
 
+  it('prefers explicit backend from initial over settings.activeBackend', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      touchConversationFullMessageCache: jest.Mock<void, [string]>;
+      trimConversationFullMessageCache: jest.Mock<void, []>;
+    };
+
+    // activeBackend is opencode, but the session actually belongs to claude-code
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      activeBackend: 'opencode',
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.touchConversationFullMessageCache = jest.fn();
+    plugin.trimConversationFullMessageCache = jest.fn();
+
+    const conversation = await plugin.createConversationFromSession('claude-forked-session', {
+      backend: 'claude-code',
+      title: 'Forked from Claude',
+    });
+
+    expect(conversation.backend).toBe('claude-code');
+    expect(conversation.backendSessionId).toBe('claude-forked-session');
+    expect(conversation.openCodeSessionId).toBeUndefined();
+    expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('uses explicit opencode backend from initial even when activeBackend is claude-code', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      touchConversationFullMessageCache: jest.Mock<void, [string]>;
+      trimConversationFullMessageCache: jest.Mock<void, []>;
+    };
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      activeBackend: 'claude-code',
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.touchConversationFullMessageCache = jest.fn();
+    plugin.trimConversationFullMessageCache = jest.fn();
+
+    const conversation = await plugin.createConversationFromSession('opencode-forked-session', {
+      backend: 'opencode',
+    });
+
+    expect(conversation.backend).toBe('opencode');
+    expect(conversation.backendSessionId).toBe('opencode-forked-session');
+    expect(conversation.openCodeSessionId).toBe('opencode-forked-session');
+  });
+
   it('deletes conversations through their owning session backend', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       agentServiceRegistry: AgentServiceRegistry;

@@ -1211,9 +1211,12 @@ export class OpenCodianView extends ItemView {
           }
         },
       }, {
-        onOpenToolSession: this.conversationTabOpenCoordinator.openTaskToolSession.bind(
-          this.conversationTabOpenCoordinator,
-        ),
+        onOpenToolSession: (sessionId, toolCall) =>
+          this.conversationTabOpenCoordinator.openTaskToolSession(
+            sessionId,
+            toolCall,
+            this.currentConversation?.backend,
+          ),
       });
       paneState.runtime.streamController.setCallbacks({
         onToolCallStart: (toolCall) => {
@@ -1655,14 +1658,22 @@ export class OpenCodianView extends ItemView {
       childSessionGraphCoordinator: new ChildSessionGraphCoordinator(
         this.createChildSessionGraphCoordinatorHost(),
         (sessionId) => {
-          void this.conversationTabOpenCoordinator.openTaskToolSession(sessionId);
+          void this.conversationTabOpenCoordinator.openTaskToolSession(
+            sessionId,
+            null,
+            this.currentConversation?.backend,
+          );
         },
       ),
       questionDockSlotCoordinator,
       assistantShellViewHostAdapter: new AssistantShellViewHostAdapter(
         this.createAssistantShellViewHostAdapterHost(),
         (sessionId, toolCall) =>
-          this.conversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall),
+          this.conversationTabOpenCoordinator.openTaskToolSession(
+            sessionId,
+            toolCall,
+            this.currentConversation?.backend,
+          ),
       ),
     };
   }
