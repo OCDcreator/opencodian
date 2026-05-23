@@ -131,11 +131,15 @@ export class ConversationSessionSettingsCoordinator {
       if (registry) {
         return await readBackendSessionShareUrl(registry, conversation, sessionId);
       }
-      // Legacy fallback: host.listSessions or openCodeService.listSessions.
-      const sessions = this.host.listSessions
-        ? await this.host.listSessions()
-        : await this.resolveOpenCodeService().listSessions?.() ?? [];
-      return this.getShareUrl(sessions.find((session) => session.id === sessionId) ?? null);
+      // Legacy fallback: host.listSessions. No longer falls through to
+      // openCodeService.listSessions — the coordinator should not read session
+      // detail by binding directly to openCodeService. If no host method is
+      // available, return null (no share URL).
+      if (this.host.listSessions) {
+        const sessions = await this.host.listSessions();
+        return this.getShareUrl(sessions.find((session) => session.id === sessionId) ?? null);
+      }
+      return null;
     } catch {
       return null;
     }
@@ -271,7 +275,6 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private resolveOpenCodeService(): {
-    listSessions?(): Promise<ShareInspectionEntry[]>;
     shareSession(sessionId: string): Promise<ShareInspectionEntry>;
     unshareSession(sessionId: string): Promise<ShareInspectionEntry>;
   } {
@@ -289,7 +292,6 @@ export class ConversationSessionSettingsCoordinator {
       getShareConfig?(): Promise<OpencodeShareMode | undefined>;
     };
     openCodeService?: {
-      listSessions?(): Promise<ShareInspectionEntry[]>;
       shareSession(sessionId: string): Promise<ShareInspectionEntry>;
       unshareSession(sessionId: string): Promise<ShareInspectionEntry>;
     };

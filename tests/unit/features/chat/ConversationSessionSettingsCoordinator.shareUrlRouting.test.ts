@@ -117,6 +117,36 @@ describe('ConversationSessionSettingsCoordinator share URL routing', () => {
     expect(modalOptions.shareUrl).toBe('https://opencode.ai/s/session-1');
   });
 
+  it('returns null shareUrl when no registry and no host.listSessions', async () => {
+    // After removing the openCodeService.listSessions fallback, the
+    // coordinator should return null rather than reaching through to
+    // openCodeService for session reads.
+    const conversation = createConversation();
+    const host = {
+      app: {} as never,
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      getSessionSettingsDefaults: jest.fn().mockReturnValue({ chatFontSizePx: 13 }),
+      getChatContainerEl: jest.fn().mockReturnValue(document.createElement('div')),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      showNotice: jest.fn(),
+      shareSession: jest.fn().mockResolvedValue({ share: { url: 'https://opencode.ai/s/session-1' } }),
+      unshareSession: jest.fn().mockResolvedValue({ share: undefined }),
+      // No listSessions — coordinator must not fall through to openCodeService.
+      copyText: jest.fn().mockResolvedValue(undefined),
+      getProjectShareMode: jest.fn().mockResolvedValue(undefined),
+      supportsSessionSharing: jest.fn().mockReturnValue(true),
+      supportsCompaction: jest.fn().mockReturnValue(false),
+      // No agentServiceRegistry, no listSessions.
+    } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
+
+    const coordinator = new ConversationSessionSettingsCoordinator(host);
+    await coordinator.openCurrentConversationSettings();
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    expect(modalOptions.shareUrl).toBeNull();
+  });
+
   it('returns null shareUrl when registry read returns null', async () => {
     const conversation = createConversation();
     const mockRegistry = { get: jest.fn(), getActive: jest.fn() } as never;
