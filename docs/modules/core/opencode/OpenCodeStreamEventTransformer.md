@@ -70,6 +70,18 @@
 - 其余 `session.next.*` 不产出 chunks、不产出 mutations、不触发 stop；未知 `session.next.*` 也保持 observe-only fallback，避免干扰 interleaved `message.part.*` 主路径
 - `session.next.*` debug 日志只记录安全 metadata：eventType、sessionId、callID、reasoningID、hasText、hasInput、已知 numeric token counts、finish、agent、cost；禁止记录 text、prompt.text、tool input/output、reason 或 token 子对象里的未知内容字段
 
+### Structured output 处理
+
+OpenCode SDK v2 的 structured output 通过 `message.info.structured` 在 message normalization 阶段处理（`OpenCodeMessageNormalizationMapper`），而非流式事件。因此 transformer 本身不直接产出 structured output chunks。
+
+但 transformer 在 tool 路径中对 internal `StructuredOutput` 工具做统一过滤，确保它不会以普通 tool 形式出现在流式 transcript 中：
+
+- `resolveToolPartClassification()` 对 `structured_output` / `StructuredOutput` 工具名返回 `null`，阻止其被分类为可渲染 tool chunk
+- `observeRuntimeToolNames()` 在注册 runtime tool 前通过 `isInternalStructuredOutputTool()` 过滤，避免 internal structured output 混入 catalog
+- 这种过滤与 `OpenCodeStreamingFinalizationCoordinator`、`OpenCodeMessageNormalizationMapper` 以及 chat view 层的过滤保持一致，形成多层防御
+
+Claude Code backend 的 structured output 则走完全不同的路径：由 `ClaudeCodeStreamNormalizer` 将 SDK `record.structured_output` 转为 `backend_event` chunk，再经 `StreamChunkRouter` 捕获到 `ChatMessage.structured`。transformer 不介入该路径。
+
 ### `parseSSEEvents()`
 
 负责把 `connectSSE()` 读到的 buffer 切成完整事件：

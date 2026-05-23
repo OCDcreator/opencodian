@@ -157,6 +157,62 @@ These capabilities are no longer “not wired”, but they are also not stable c
 | Agent definitions | Runtime-only `agent` / `agents` option wiring exists. | Must remain `Hidden / Untested`. |
 | Skills / plugins / agent authoring | Some runtime-only channels exist or are planned, but no stable Claude-native authoring surface is complete in OpenCodian. | Not complete. |
 
+## Structured Output Deep-Dive Assessment (2026-05-23)
+
+### Current Real State
+
+Structured output is **not a single capability** but a pipeline with multiple maturity levels. The current state per layer:
+
+| Layer | Status | Evidence |
+|---|---|---|
+| **Type definitions** | Stable | `LocalOutputFormat` / `SdkOutputFormat` in `src/core/opencode/types.ts`; `ChatMessage.structured` in `src/core/types/chat.ts` |
+| **Request building** | Stable | `OpenCodePromptRequestBuilder` converts `json_schema` → SDK format for both SDK v2 and legacy HTTP paths |
+| **OpenCode SDK v2 ingestion** | Stable | `OpenCodeMessageNormalizationMapper` reads `info.structured` and assigns to `ChatMessage.structured`; filters internal `structured_output` tool parts |
+| **Claude Code stream ingestion** | Stable | `ClaudeCodeStreamNormalizer` converts `record.structured_output` → `backend_event` chunk; `StreamChunkRouter` captures it into `structuredOutput` |
+| **Pipeline transfer** | Stable | `StreamChunkRouterResult.structuredOutput` → `buildLocalStreamOutcome()` → `LocalStreamOutcome.structuredOutput` |
+| **Persistence** | Stable | `LocalStreamMessagePersistence` writes to `ChatMessage.structured`; conversation sync merge preserves it for Claude Code backend |
+| **Rendering** | Stable | `AssistantShellViewHostAdapter.renderStructuredOutput()` renders collapsible JSON `<details>`; CSS classes defined in `chat-assistant.css` |
+| **Internal tool filtering** | Stable | `isInternalStructuredOutputTool()` used in 10+ files across stream transformer, finalization coordinator, normalization mapper, chat view, and stream controller |
+| **Production consumer** | Stable | `TitleGenerationService` uses `json_schema` structured output for title generation (real traffic) |
+| **Diagnostic surface** | Stable | Capability Lab Structured Output Playground probes backend support via `runDiagnosticPrompt()` |
+| **User-facing authoring** | **Not exposed** | No UI to select output format; no per-message format option in chat input; settings have no structured output preferences |
+
+### Dual-Backend Architecture (Not "Claude Pressed Into OpenCode Shape")
+
+Both backends produce `ChatMessage.structured`, but via **different, native mechanisms**:
+
+- **OpenCode SDK v2**: backend returns `Message.info.structured` → `OpenCodeMessageNormalizationMapper` extracts it during message normalization (not stream event processing). The internal `structured_output` tool is filtered from `part` rendering but the payload is preserved.
+- **Claude Code**: backend returns `record.structured_output` during streaming → `ClaudeCodeStreamNormalizer` converts to `backend_event` chunk → `StreamChunkRouter` captures from `metadata.structuredOutput` → persisted via the same pipeline as OpenCode.
+
+Both paths converge at `ChatMessage.structured`, which is **intentional abstraction**, not shape-forcing. The rendering layer (`AssistantShellViewHostAdapter`) is backend-agnostic.
+
+### Why Product Surface Is Not Ready
+
+The pipeline is stable, but **user-facing structured output authoring** would require:
+
+1. **Schema input UI**: how does a user define or select a JSON schema? Textarea? Preset dropdown? File attachment?
+2. **Per-message vs per-session format selection**: should format be a message-level toggle or session-level setting?
+3. **Backend compatibility surface**: not all models/providers support `json_schema`; need availability detection and graceful fallback
+4. **Error UX**: what happens when schema validation fails? Retry? Plain text fallback? User notification?
+5. **Settings persistence**: schema preferences, recent schemas, default format — all need settings design
+
+These are **product design questions**, not narrow engineering gaps. The underlying plumbing is ready.
+
+### Recommended Next Step
+
+If the user asks to "promote structured output to product surface":
+
+1. **Do not** start by adding a settings toggle or chat UI button
+2. **Do** start with a design doc or prototype that answers the 5 questions above
+3. **Do** consider whether the first productized form should be **preset schemas** (e.g., "Summarize as JSON", "Extract tasks") rather than freeform schema authoring
+4. **Do** ensure backend availability detection is in place before exposing the feature
+
+If the user asks to "deepen structured output stability":
+
+1. Add end-to-end test for Claude Code path: adapter `outputFormat` → `backend_event` → persistence → rendering
+2. Verify OpenCode SDK v2 `info.structured` behavior matches Claude Code `backend_event` semantics for edge cases (null, empty object, nested arrays)
+3. The 17 existing test files already cover most layers; focus on cross-backend consistency tests
+
 ## Current Capability-Layer Interpretation
 
 Future models should use this language:
