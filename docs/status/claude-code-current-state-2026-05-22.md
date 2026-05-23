@@ -16,10 +16,12 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `d0a1e216080be2ad201624c538216e8024484952`
-- Commit subject: `feat: route title session reads through backend getSession`
+- Snapshot commit: `9ab7b6a62b0b31410a7c444a7329933bc72af1f9`
+- Commit subject: `feat: route share-url read through backend getSession`
 - Latest validated build at this snapshot: `feature-phase0-capability.202605230949`
 - Recent continuity commits in this lane:
+  - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
+  - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
   - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
   - `5013c0b7ad14c161a9d28ad8d6eb5ec1ac28544a` — `docs: refresh Claude continuity after settings history routing`
   - `d96841f71898b6434aafdaf19b0a9687539e69ff` — `feat: fork-only capability + backend-aware session/history routing`
@@ -284,6 +286,10 @@ At the current snapshot, local runtime evidence exists under `.obsidian-debug/`,
 - `.obsidian-debug/title-generation-official-read-runtime-console-2026-05-22.txt`
 - `.obsidian-debug/title-generation-official-read-runtime-errors-2026-05-22.txt`
 - `.obsidian-debug/title-generation-official-read-runtime-screenshot-2026-05-22.png`
+- `.obsidian-debug/share-url-read-runtime-assertion-2026-05-23.json`
+- `.obsidian-debug/share-url-read-runtime-console-2026-05-23.txt`
+- `.obsidian-debug/share-url-read-runtime-errors-2026-05-23.txt`
+- `.obsidian-debug/share-url-read-runtime-screenshot-2026-05-23.png`
 
 Treat those as local evidence for:
 
@@ -293,6 +299,7 @@ Treat those as local evidence for:
 - settings shared-session list/preview read routing presence in the conversation sharing block;
 - Claude `fork=true` + `branching=false` runtime gating;
 - `TitleGenerationService.readOfficialSessionTitle()` routing through registry `getSession()` for both OpenCode and Claude, with the OpenCode title-read seam no longer using `openCodeService.listSessions()`;
+- `ConversationSessionSettingsCoordinator.getCurrentShareUrl()` routing through registry `getSession()` in the OpenCodianView-wired runtime path, with `getSession` hit and `openCodeService.listSessions()` not hit during the runtime assertion;
 - hook and structured-output backend-event activity in runtime logs where the older capability-lab artifacts are still referenced.
 
 Note: older capability-lab artifacts still matter for hook / structured-output proof, but newer lane-specific evidence should be preferred when the question is specifically about fork-only capability gating or backend-aware session/history reads.
@@ -314,11 +321,45 @@ When continuing this lane, choose one of these modes explicitly:
 
 Do not mix these modes casually in one slice.
 
-For the current session/history lane, the next high-value slice is:
+For the current session/history lane, do **not** stop after one small slice per session anymore. The expected execution mode is now multi-round Phase 3 delivery inside one Codex session.
+
+## Execution Mode For Continuation (2026-05-23 User Instruction)
+
+Future sessions should follow these rules unless the user overrides them again:
+
+- use `opencode run --dir "/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability" "<task>"` as the default OpenCode delegation path;
+- do **not** use A2A for this lane unless the user explicitly re-enables it;
+- one Codex session should cover multiple consecutive rounds inside this phase, not a single small slice;
+- after each completed round:
+  - update this continuity document and any mapped module docs;
+  - review OpenCode's implementation result;
+  - run the required validation stack for the touched surface;
+  - commit the verified round;
+  - then immediately continue by sending the next round to `opencode run` while Phase 3 backlog still remains;
+- Codex still stays in the same role split:
+  - read/align docs and current code;
+  - delegate the main implementation to OpenCode;
+  - review the implementation;
+  - run verify/build/deploy/runtime proof;
+  - update docs and summarize.
+
+## Remaining Phase 3 Backlog (Work Through In Multi-Round Sessions)
+
+The remaining Phase 3 foundation/productization work should be treated as one continuing backlog rather than isolated single-slice sessions:
+
+- continue auditing the remaining session detail / history inspection / session list-detail reads that still bind directly to `openCodeService` or still assume OpenCode-shaped payloads;
+- where semantics truly match, keep promoting narrow shared read seams like the official-title and share-URL reads, but do not widen `getSession()` into a generic stable session-detail contract;
+- identify whether another inspection/detail surface can be productized through backend-aware `getSession()` or `getSessionMessages()` without flattening Claude payloads;
+- if a read surface cannot be safely generalized, keep it explicitly OpenCode-only or diagnostic and document that boundary instead of forcing abstraction;
+- deepen runtime proof for the currently productized backend-aware session/history reads as adjacent rounds justify deployment validation;
+- keep `revert / unrevert / diff / child-session graph / authoritative sync` gated unless a later round provides both official basis and accepted runtime proof.
+
+For the next multi-round continuation, the immediate high-value targets are:
 
 - continue auditing remaining session detail/history inspection surfaces that still read directly from `openCodeService` or still assume OpenCode-shaped payloads after the title-read and share-URL read seams landed;
 - only promote another shared `getSession()` consumer when the shared semantic is as narrow and provable as the official-title or share-URL read seams;
-- keep share writes, rewind, diff, authoritative sync, and child-session graph explicitly gated unless new official basis plus runtime proof says otherwise.
+- keep share writes, rewind, diff, authoritative sync, and child-session graph explicitly gated unless new official basis plus runtime proof says otherwise;
+- if one round finishes cleanly and more backlog remains, do not hand off immediately to a fresh human/Codex session; update docs, commit, and launch the next `opencode run` round in the same session.
 
 ## Hard Guardrails
 
