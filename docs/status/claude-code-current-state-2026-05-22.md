@@ -757,6 +757,73 @@ What changed is the **test coverage depth** — the adapter-level `rewindFiles()
 | **Rewind** | ✅ **(new)** | ✅ **(new)** | ✅ **(new)** | **Complete** |
 | Agent definitions | ⚠️ wiring only | N/A | N/A | Must remain Hidden/Untested |
 
+## Stream Normalizer + Runtime Control Test Hardening Round (2026-05-23)
+
+A focused test hardening pass addressed gaps in stream normalizer lifecycle event coverage and adapter runtime control method coverage. One minimal implementation fix was also applied.
+
+### Implementation Fix: `getSession()` sessionStore Asymmetry
+
+`ClaudeCodeAdapter.getSession()` did not accept or forward `sessionStore` to the SDK, while `listSessions()`, `getSessionMessages()`, `listSubagents()`, `getSubagentMessages()`, and `importSessionToStore()` all accept and forward `sessionStore`. This meant the Capability Lab session detail probe could not read session data from the diagnostic store.
+
+**Fix**: Added `options?: { sessionStore?: unknown }` parameter to `getSession()`, forwarding to `sdk.getSessionInfo()` alongside the existing `dir` option. This brings `getSession()` into symmetry with the other sessionStore-aware methods.
+
+### Stream Normalizer Test Coverage
+
+Eight recognized event/block types had zero test coverage despite being handled by the normalizer:
+
+| Event/block type | Status before | Status after |
+|---|---|---|
+| `init` system subtype | ❌ untested | ✅ tested |
+| `hook_started` lifecycle event | ❌ untested | ✅ tested |
+| `hook_progress` lifecycle event | ❌ untested | ✅ tested |
+| `task_started` lifecycle event | ❌ untested | ✅ tested |
+| `task_notification` lifecycle event | ❌ untested | ✅ tested |
+| `task_updated` lifecycle event | ❌ untested | ✅ tested |
+| `redacted_thinking` content block | ❌ untested | ✅ tested |
+| `server_tool_use` content block | ❌ untested | ✅ tested |
+
+Previously tested (unchanged): `session_init`, `hook_response`, `task_progress`, `text`, `thinking`, `tool_use`, `tool_result`, `text_delta`, `thinking_delta`.
+
+### Adapter Runtime Control Test Coverage
+
+Three public methods had zero test coverage:
+
+| Method | Status before | Status after |
+|---|---|---|
+| `setModel()` | ❌ untested | ✅ tested |
+| `setPermissionMode()` | ❌ untested | ✅ tested |
+| `reloadMcpServers()` | ❌ untested | ✅ tested |
+| `getSession()` with sessionStore | ❌ untested (asymmetric) | ✅ tested (fixed) |
+
+### Verification
+
+- `npm run verify` passed with `431` suites / `3092` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231841`
+- Net test increase: +12 tests (3080 → 3092)
+
+### Impact on Capability Maturity
+
+This hardening pass does **not** promote any capability to stable. All touched capabilities remain at their current maturity:
+
+- **Hooks**: `wired + runtime-proved`, not stable. Hook lifecycle coverage is now complete: `hook_started` → `hook_progress` → `hook_response` all have explicit test coverage.
+- **Subagent events**: Now complete lifecycle coverage: `task_started` → `task_progress` → `task_notification` → `task_updated`.
+- **Session store**: `diagnostic store proof only`, not stable. `getSession()` now correctly forwards `sessionStore`, fixing a real asymmetry in store-backed session detail lookups.
+- **Stream normalizer**: All recognized SDK event types and content block types now have explicit test coverage. No recognized type remains untested.
+
+### Updated Capability Test Coverage Summary
+
+| Capability | Adapter tests | Coordinator tests | CapLab probe tests | Normalizer coverage | Total coverage |
+|---|---|---|---|---|---|
+| Fork | ✅ | ✅ | ✅ | N/A | Complete |
+| Structured output | ✅ | ✅ | ✅ | ✅ | Complete |
+| Hooks | ✅ | N/A | ✅ | ✅ **(complete lifecycle)** | Complete |
+| Session store | ✅ **(getSession fixed)** | N/A | ✅ | N/A | Complete |
+| Rewind | ✅ | ✅ | ✅ | N/A | Complete |
+| Subagent events | N/A | N/A | N/A | ✅ **(complete lifecycle)** | Complete |
+| Runtime controls | ✅ **(new)** | N/A | N/A | N/A | Complete |
+| Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ **(new)** | Complete |
+| Agent definitions | ⚠️ wiring only | N/A | N/A | N/A | Must remain Hidden/Untested |
+
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.

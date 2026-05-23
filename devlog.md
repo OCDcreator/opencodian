@@ -12,7 +12,45 @@
 
 ---
 
-## 2026-05-23 Phase 3 — Rewind test hardening: adapter + coordinator + CapLab probe
+## 2026-05-23 Phase 3 — Stream normalizer lifecycle + adapter runtime control test hardening
+
+### 目标
+
+在 hooks/sessionStore/Claude-native history browsing 边界中找到仍未完成、能窄切验证的真实缺口。不触碰 session/history/shared-session seam，不重复 rewind 测试硬化，不做 user-facing authoring UI，Agent Definitions 保持 Hidden/Untested。
+
+### 发现
+
+三个真实缺口：
+
+1. **Stream normalizer lifecycle 事件覆盖不完整**：`init`、`hook_started`、`hook_progress`、`task_started`、`task_notification`、`task_updated` 六个 SDK 系统事件子类型被正常化器识别并处理，但没有任何单元测试。`redacted_thinking` 和 `server_tool_use` 两个内容块类型同理。
+2. **Adapter 运行时控制方法零覆盖**：`setModel()`、`setPermissionMode()`、`reloadMcpServers()` 三个公共方法通过 `applyToActiveQueries()` 扇出到活跃运行时，但完全没有单元测试。
+3. **`getSession()` sessionStore 不对称**：`listSessions()`、`getSessionMessages()` 等方法都接受并转发 `sessionStore`，但 `getSession()` 不接受此参数，导致 Capability Lab session detail probe 无法从 diagnostic store 读取会话数据。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 实现修复 | `getSession()` 新增 `options?: { sessionStore?: unknown }` 参数并转发到 SDK |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | +4 测试 | `setModel`、`setPermissionMode`、`reloadMcpServers`、`getSession` with sessionStore |
+| `tests/unit/core/agents/backend/ClaudeCodeStreamNormalizer.test.ts` | +8 测试 | `init`、`hook_started`、`hook_progress`、`task_started`、`task_notification`、`task_updated`、`redacted_thinking`、`server_tool_use` |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 文档更新 | 记录 `getSession()` sessionStore 透传 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮硬化内容和覆盖矩阵 |
+| `graphify-out/` | 图谱刷新 | `src` 变更后自动刷新 |
+
+### 验证
+
+- `npm run verify` 通过：`431` suites / `3092` tests（+12 tests）
+- Build: `BUILD_ID feature-phase0-capability.202605231841`
+- Lint: 0 errors / 0 warnings
+- 未触及 session/history/shared-session seam
+- 未提升任何能力到 stable
+
+### 剩余边界
+
+- 所有 Claude Code diagnostic capability 的 adapter + normalizer 测试现已全覆盖
+- 唯一保持 `Hidden/Untested` 的是 Agent Definitions（按设计不测试）
+- Stream normalizer 现在对所有已识别的 SDK 事件类型和内容块类型都有显式测试
+- 下一步可以转向 deploy-validation round 或 multi-backend abstraction 改善
 
 ### 目标
 

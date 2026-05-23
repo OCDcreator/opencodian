@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Stream normalizer coverage keeps lifecycle events, block types, delta types, and diagnostic logging fixtures together for one normalizer contract. */
 import { createClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend';
 import {
   clearRecentLogs,
@@ -446,5 +447,211 @@ describe('ClaudeCodeStreamNormalizer', () => {
     expect(logText).toContain('"type":"text"');
     expect(logText).toContain('contentLength');
     expect(logText).not.toContain('secret delta');
+  });
+
+  it('emits session metadata for init system messages', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1710000000000);
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'init',
+      model: 'claude-sonnet',
+      session_id: 'sess-init',
+    })).toEqual([{
+      type: 'message_metadata',
+      messageId: 'sess-init',
+      timestamp: 1710000000000,
+      modelId: 'claude-sonnet',
+      sessionId: 'sess-init',
+    }]);
+  });
+
+  it('surfaces Claude Code hook_started lifecycle events as started backend events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'hook_started',
+      hook_id: 'hook-2',
+      hook_name: 'pre-send',
+      hook_event: 'PreToolUse',
+      session_id: 'sess-hook',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'hook',
+      status: 'started',
+      id: 'hook-2',
+      name: 'pre-send',
+      content: undefined,
+      metadata: {
+        hookEvent: 'PreToolUse',
+        stdout: null,
+        stderr: null,
+        exitCode: null,
+        outcome: null,
+      },
+      sessionId: 'sess-hook',
+    }]);
+  });
+
+  it('surfaces Claude Code hook_progress lifecycle events as progress backend events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'hook_progress',
+      hook_id: 'hook-2',
+      hook_name: 'pre-send',
+      output: 'working...',
+      session_id: 'sess-hook',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'hook',
+      status: 'progress',
+      id: 'hook-2',
+      name: 'pre-send',
+      content: 'working...',
+      metadata: {
+        hookEvent: null,
+        stdout: null,
+        stderr: null,
+        exitCode: null,
+        outcome: null,
+      },
+      sessionId: 'sess-hook',
+    }]);
+  });
+
+  it('surfaces Claude Code task_started lifecycle events as started backend events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'task_started',
+      task_id: 'task-2',
+      tool_use_id: 'tool-2',
+      description: 'Starting review',
+      subagent_type: 'reviewer',
+      session_id: 'sess-task',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'subagent',
+      status: 'started',
+      id: 'task-2',
+      name: 'reviewer',
+      content: 'Starting review',
+      metadata: {
+        toolUseId: 'tool-2',
+        taskType: null,
+        workflowName: null,
+        skipTranscript: false,
+        outputFile: null,
+        usage: null,
+        patch: null,
+      },
+      sessionId: 'sess-task',
+    }]);
+  });
+
+  it('surfaces Claude Code task_notification lifecycle events as notification backend events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'task_notification',
+      task_id: 'task-2',
+      summary: 'Note from agent',
+      session_id: 'sess-task',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'subagent',
+      status: 'notification',
+      id: 'task-2',
+      name: undefined,
+      content: 'Note from agent',
+      metadata: {
+        toolUseId: null,
+        taskType: null,
+        workflowName: null,
+        skipTranscript: false,
+        outputFile: null,
+        usage: null,
+        patch: null,
+      },
+      sessionId: 'sess-task',
+    }]);
+  });
+
+  it('surfaces Claude Code task_updated lifecycle events as updated backend events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'task_updated',
+      task_id: 'task-2',
+      description: 'Updated task',
+      subagent_type: 'worker',
+      patch: { file: 'a.ts', additions: 3 },
+      session_id: 'sess-task',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'subagent',
+      status: 'updated',
+      id: 'task-2',
+      name: 'worker',
+      content: 'Updated task',
+      metadata: {
+        toolUseId: null,
+        taskType: null,
+        workflowName: null,
+        skipTranscript: false,
+        outputFile: null,
+        usage: null,
+        patch: { file: 'a.ts', additions: 3 },
+      },
+      sessionId: 'sess-task',
+    }]);
+  });
+
+  it('normalizes assistant redacted_thinking blocks as thinking chunks', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage(
+      assistantMessage('msg-redacted-thinking', [{
+        id: 'redacted-1',
+        type: 'redacted_thinking',
+        thinking: 'secret thoughts',
+      }]),
+    )).toEqual([{ type: 'thinking', content: 'secret thoughts', partId: 'redacted-1' }]);
+  });
+
+  it('normalizes assistant server_tool_use blocks as tool_use chunks', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'sess-server-tool' });
+
+    expect(normalizer.transformSDKMessage(
+      assistantMessage('msg-server-tool', [{
+        type: 'server_tool_use',
+        id: 'stu-1',
+        name: 'web_search',
+        input: { query: 'test' },
+      }]),
+    )).toEqual([{
+      type: 'tool_use',
+      id: 'stu-1',
+      name: 'web_search',
+      kind: 'builtin',
+      input: { query: 'test' },
+      toolMetadata: {
+        source: 'claude-code',
+        toolUseId: 'stu-1',
+        sessionId: 'sess-server-tool',
+      },
+    }]);
   });
 });

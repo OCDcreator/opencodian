@@ -1250,4 +1250,172 @@ describe('ClaudeCodeAdapter', () => {
         .rejects.toThrow(`Claude Code session not found: ${sessionId}`);
     });
   });
+
+  describe('ClaudeCodeAdapter runtime controls and diagnostic session lookup', () => {
+    function createRuntimeControlQuery(overrides: {
+      setModel?: jest.Mock;
+      setPermissionMode?: jest.Mock;
+      setMcpServers?: jest.Mock;
+    } = {}) {
+      const queue = createAsyncQueue<unknown>();
+      const closeQueue = queue.close;
+      return Object.assign(queue, {
+        supportedModels: jest.fn().mockResolvedValue([]),
+        close: jest.fn(() => closeQueue()),
+        ...overrides,
+      });
+    }
+
+    async function startRuntime(adapter: ClaudeCodeAdapter, sessionId: string) {
+      const stream = adapter.sendMessage({ sessionId, content: 'hello' });
+      const next = stream.next();
+      await waitForExpect(() => expect(next).toBeDefined());
+      return { stream, next };
+    }
+
+    it('applies setModel to active runtimes, skips closed runtimes, and no-ops without active sessions', async () => {
+      const activeSetModel = jest.fn().mockResolvedValue(undefined);
+      const closedSetModel = jest.fn().mockResolvedValue(undefined);
+      const activeQuery = createRuntimeControlQuery({ setModel: activeSetModel });
+      const closedQuery = createRuntimeControlQuery({ setModel: closedSetModel });
+      const sdk = createSdk([]);
+      sdk.query
+        .mockReturnValueOnce(activeQuery)
+        .mockReturnValueOnce(closedQuery);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const activeSessionId = await adapter.createSession();
+      const closedSessionId = await adapter.createSession();
+      const activeRuntime = await startRuntime(adapter, activeSessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      const closedRuntime = await startRuntime(adapter, closedSessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(2));
+
+      try {
+        adapter.cancelStream(closedSessionId);
+        await closedRuntime.next;
+
+        await expect(adapter.setModel('claude-opus')).resolves.toBeUndefined();
+        expect(activeSetModel).toHaveBeenCalledWith('claude-opus');
+        expect(closedSetModel).not.toHaveBeenCalled();
+
+        const idleAdapter = new ClaudeCodeAdapter({
+          vaultPath: '/vault',
+          settings: getDefaultClaudeCodeBackendSettings(),
+          sdk: createSdk([]),
+        });
+        await expect(idleAdapter.setModel('claude-sonnet')).resolves.toBeUndefined();
+      } finally {
+        activeQuery.close();
+        await activeRuntime.next;
+      }
+    });
+
+    it('applies setPermissionMode to active runtimes, skips closed runtimes, and no-ops without active sessions', async () => {
+      const activeSetPermissionMode = jest.fn().mockResolvedValue(undefined);
+      const closedSetPermissionMode = jest.fn().mockResolvedValue(undefined);
+      const activeQuery = createRuntimeControlQuery({ setPermissionMode: activeSetPermissionMode });
+      const closedQuery = createRuntimeControlQuery({ setPermissionMode: closedSetPermissionMode });
+      const sdk = createSdk([]);
+      sdk.query
+        .mockReturnValueOnce(activeQuery)
+        .mockReturnValueOnce(closedQuery);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const activeSessionId = await adapter.createSession();
+      const closedSessionId = await adapter.createSession();
+      const activeRuntime = await startRuntime(adapter, activeSessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      const closedRuntime = await startRuntime(adapter, closedSessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(2));
+
+      try {
+        adapter.cancelStream(closedSessionId);
+        await closedRuntime.next;
+
+        await expect(adapter.setPermissionMode('acceptEdits')).resolves.toBeUndefined();
+        expect(activeSetPermissionMode).toHaveBeenCalledWith('acceptEdits');
+        expect(closedSetPermissionMode).not.toHaveBeenCalled();
+
+        const idleAdapter = new ClaudeCodeAdapter({
+          vaultPath: '/vault',
+          settings: getDefaultClaudeCodeBackendSettings(),
+          sdk: createSdk([]),
+        });
+        await expect(idleAdapter.setPermissionMode('default')).resolves.toBeUndefined();
+      } finally {
+        activeQuery.close();
+        await activeRuntime.next;
+      }
+    });
+
+    it('reloads MCP config and pushes updated servers to active runtimes', async () => {
+      const setMcpServers = jest.fn().mockResolvedValue(undefined);
+      const query = createRuntimeControlQuery({ setMcpServers });
+      const sdk = createSdk([]);
+      sdk.query.mockReturnValue(query);
+      const initialMcpServers = {
+        oldServer: { type: 'stdio' as const, command: 'node', args: ['old.js'] },
+      };
+      const reloadedMcpServers = {
+        newServer: { type: 'stdio' as const, command: 'node', args: ['new.js'] },
+      };
+      const mcpConfigLoader = jest.fn()
+        .mockResolvedValueOnce(initialMcpServers)
+        .mockResolvedValueOnce(reloadedMcpServers);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+        mcpConfigLoader,
+      });
+      const sessionId = await adapter.createSession();
+      const runtime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+
+      try {
+        expect(sdk.query.mock.calls[0][0].options.mcpServers).toEqual(initialMcpServers);
+
+        await expect(adapter.reloadMcpServers()).resolves.toBeUndefined();
+
+        expect(mcpConfigLoader).toHaveBeenCalledTimes(2);
+        expect(setMcpServers).toHaveBeenCalledWith(reloadedMcpServers);
+      } finally {
+        query.close();
+        await runtime.next;
+      }
+    });
+
+    it('passes diagnostic sessionStore through getSession to the SDK', async () => {
+      const sdk = createSdk([]);
+      sdk.getSessionInfo.mockResolvedValue({
+        sessionId: 'store-session',
+        summary: 'Diagnostic store session',
+        lastModified: 789,
+      });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionStore = { append: jest.fn(), load: jest.fn(), listSessions: jest.fn() };
+
+      await expect(adapter.getSession('store-session', { sessionStore })).resolves.toEqual({
+        sessionId: 'store-session',
+        summary: 'Diagnostic store session',
+        lastModified: 789,
+      });
+
+      expect(sdk.getSessionInfo).toHaveBeenCalledWith('store-session', {
+        dir: '/vault',
+        sessionStore,
+      });
+    });
+  });
 });

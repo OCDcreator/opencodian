@@ -56,7 +56,7 @@ type ClaudeCodeModelCatalogQuery = {
 export interface ClaudeCodeSdkFacade {
   query(input: ClaudeCodeSdkQueryInput): ClaudeCodeQueryHandle;
   listSessions?(options?: { dir?: string; limit?: number; offset?: number; sessionStore?: unknown }): Promise<ClaudeCodeSdkSessionInfo[]>;
-  getSessionInfo?(sessionId: string, options?: { dir?: string }): Promise<ClaudeCodeSdkSessionInfo | undefined>;
+  getSessionInfo?(sessionId: string, options?: { dir?: string; sessionStore?: unknown }): Promise<ClaudeCodeSdkSessionInfo | undefined>;
   getSessionMessages?(sessionId: string, options?: { dir?: string; limit?: number; offset?: number; includeSystemMessages?: boolean; sessionStore?: unknown }): Promise<unknown[]>;
   listSubagents?(sessionId: string, options?: { dir?: string; sessionStore?: unknown }): Promise<string[]>;
   getSubagentMessages?(sessionId: string, agentId: string, options?: { dir?: string; limit?: number; offset?: number; sessionStore?: unknown }): Promise<unknown[]>;
@@ -396,12 +396,15 @@ export class ClaudeCodeAdapter
     }
   }
 
-  async getSession(sessionId: string): Promise<ClaudeCodeSdkSessionInfo | null> {
-    sessionLogger.debug('get session', { sessionId });
+  async getSession(sessionId: string, options?: { sessionStore?: unknown }): Promise<ClaudeCodeSdkSessionInfo | null> {
+    sessionLogger.debug('get session', { sessionId, hasSessionStore: Boolean(options?.sessionStore) });
     const sdk = await this.getSdk();
     const state = this.sessions.get(sessionId);
     const sdkSessionId = state?.sdkSessionId ?? sessionId;
-    const session = await sdk.getSessionInfo?.(sdkSessionId, { dir: this.options.vaultPath }) ?? null;
+    const session = await sdk.getSessionInfo?.(sdkSessionId, {
+      dir: this.options.vaultPath,
+      ...(options?.sessionStore ? { sessionStore: options.sessionStore } : {}),
+    }) ?? null;
     sessionLogger.debug('get session complete', {
       sessionId,
       sdkSessionId,

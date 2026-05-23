@@ -29,7 +29,7 @@
 - 将 SDK stream 异常转换为 backend-labelled error chunk，避免发送管线无响应
 - 在首次 `sendMessage()` 时 lazy-load 官方 SDK；单测仍可注入 fake facade，启动路径不会直接 import SDK
 - 对已经持久化到 OpenCodian conversation metadata 的 Claude SDK session id 进行轻量恢复，避免 Obsidian reload 后同一个 `backendSessionId` 因 adapter 内存 Map 清空而在发送前失败；恢复后的第一次 `query()` 会传入 `options.resume`
-- 通过 SDK facade 暴露 `listSessions()`、`getSession()`、`renameSession()` 与 `forkSession()` 的基础委托；fork 成功后以 SDK session id 建立新的本地 session state
+- 通过 SDK facade 暴露 `listSessions()`、`getSession()`、`renameSession()` 与 `forkSession()` 的基础委托；fork 成功后以 SDK session id 建立新的本地 session state；`getSession()` 现在接受 `sessionStore` 选项并转发到 SDK，与 `listSessions()` / `getSessionMessages()` 等方法的 sessionStore 透传行为保持一致，允许 Capability Lab session detail probe 从 diagnostic store 读取会话数据
 - 通过诊断级方法委托官方 SDK JSONL history/subagent transcript/sessionStore import 入口：`getSessionMessages()`、`listSubagents()`、`getSubagentMessages()` 和 `importSessionToStore()`；这些方法复用已捕获的 SDK session id 和 vault-scoped `dir`，当 SDK 不支持对应 API 或本地 session 已删除时显式报错，避免把缺能力或无效 session 误判为空历史
 - `listSessions()` 现在允许 runtime-only `sessionStore` / pagination 选项，Capability Lab 可以在本地 JSONL 与插件内存里的 diagnostic store 之间切换 session 列表来源
 - 提供 `runDiagnosticPrompt()`：用 runtime-only `hooks`、`sessionStore`、`outputFormat`、`includeHookEvents`、`persistSession`、`resumeSessionId` 覆盖启动一次隔离的诊断 query，返回原始 SDK 消息与经 `ClaudeCodeStreamNormalizer` 归一化后的 `StreamChunk[]`，专供 Capability Lab 做 structured output / hook / session-store / resume runtime proof，不进入普通 chat path
