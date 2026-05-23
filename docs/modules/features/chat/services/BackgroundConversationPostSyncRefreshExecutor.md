@@ -35,6 +35,11 @@ export class BackgroundConversationPostSyncRefreshExecutor {
 - 两个入口都会落到同一条 background execution seam：pending-question refresh → rebuild runtime state → conditional todo/status refresh → post-sync writeback
 - rebuild hook 仍挂在 `QuestionTodoStatusRefreshCoordinator.refreshAfterPostSync()` 的 `afterPendingQuestionRefresh` 上，确保 background-task state 与 question refresh 保持旧顺序
 
+## Backend-aware routing
+
+- 当 `PostSyncQuestionTodoRefreshPlanBuilder` 返回 `null` plan（非 OpenCode conversation）时，`refreshBackgroundConversation()` 跳过 question/todo refresh coordinator 调用，但仍执行 `flushBackgroundTaskPostSyncWriteback()`
+- 这确保 background-task writeback 不被后端类型阻断，而 question/todo 这类 OpenCode-only feature 完全跳过
+
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 不直接接触本模块；它通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 间接提供 background-task rebuild / writeback host

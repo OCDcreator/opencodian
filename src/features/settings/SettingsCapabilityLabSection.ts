@@ -1488,9 +1488,7 @@ export class SettingsCapabilityLabSection {
 
     // Show registered adapters
     const registeredKinds = registry
-      ? Array.from(
-          (registry as unknown as { adapters: Map<string, unknown> }).adapters.keys(),
-        )
+      ? registry.listAll().map((adapter) => adapter.kind)
       : [];
     if (registeredKinds.length > 0) {
       statusEl.createEl('p', {

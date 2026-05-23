@@ -34,6 +34,7 @@ export function createPostSyncQuestionTodoRefreshServices(...): PostSyncQuestion
 - `createPostSyncQuestionTodoRefreshHosts()` 把 runtime gate、pending-question refresh、todo/status refresh 与当前 conversation session 读取收束到单独的 post-sync host 层
 - `createPostSyncQuestionTodoRefreshServices()` 固定装配 `QuestionTodoStatusRefreshCoordinator` → `PostSyncQuestionTodoRefreshPlanBuilder` → `PostSyncQuestionTodoRefreshFacade`
 - visible source 继续通过当前 live conversation session 生成 plan；signal/background-tab source 则复用同一组 coordinator/builder，再由 background refresh executor 持有 source-specific follow-up
+- `getCurrentConversationSessionId()` 现在使用 `getConversationBackendSessionId()` 解析 session identity，而非直接访问 `openCodeSessionId`
 
 ## 与 `OpenCodianView` 的边界
 

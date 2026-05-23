@@ -66,17 +66,21 @@ export class BackgroundConversationPostSyncRefreshExecutor {
   private async refreshBackgroundConversation(
     tabId: TabId,
     conversation: Conversation,
-    refreshPlan: PostSyncQuestionTodoStatusRefreshOptions,
+    refreshPlan: PostSyncQuestionTodoStatusRefreshOptions | null,
   ): Promise<void> {
-    await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
-      ...refreshPlan,
-      afterPendingQuestionRefresh: () => {
-        this.backgroundTaskPostSyncRefresh.syncBackgroundTaskStateFromConversation(
-          conversation,
-          tabId,
-        );
-      },
-    });
+    // Backend gate: when the plan builder returns null (non-OpenCode conversation),
+    // skip question/todo refresh but still flush background-task writeback.
+    if (refreshPlan) {
+      await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
+        ...refreshPlan,
+        afterPendingQuestionRefresh: () => {
+          this.backgroundTaskPostSyncRefresh.syncBackgroundTaskStateFromConversation(
+            conversation,
+            tabId,
+          );
+        },
+      });
+    }
 
     await this.backgroundTaskPostSyncRefresh.flushBackgroundTaskPostSyncWriteback(
       tabId,

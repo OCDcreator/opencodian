@@ -12,12 +12,14 @@ function createMockPlugin(adapter: unknown = null): never {
         get: jest.fn().mockReturnValue(adapter),
         getActive: jest.fn().mockReturnValue(null),
         getActiveKind: jest.fn().mockReturnValue(null),
+        listAll: jest.fn().mockReturnValue([{ kind: 'claude-code' }]),
         adapters: new Map(),
       }
     : {
         get: jest.fn().mockReturnValue(null),
         getActive: jest.fn().mockReturnValue(null),
         getActiveKind: jest.fn().mockReturnValue(null),
+        listAll: jest.fn().mockReturnValue([]),
         adapters: new Map(),
       };
   return {

@@ -16,17 +16,20 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `9ab7b6a62b0b31410a7c444a7329933bc72af1f9`
-- Commit subject: `feat: route share-url read through backend getSession`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605230949`
+- Snapshot commit: `40dbf471`
+- Commit subject: `feat: add SessionTodoCoordinator backend gates and Backend Routing diagnostic probe`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231236`
 - Recent continuity commits in this lane:
+- `40dbf471` — `feat: add SessionTodoCoordinator backend gates and Backend Routing diagnostic probe`
+- `5cbde267` — `feat: add Claude session detail diagnostic probe`
+- `0dec5483` — `feat: add claude resume diagnostic probe`
+- `6eb12087` — `feat: add claude fork diagnostic probe`
+- `9e122746` — `fix: preserve backend identity for session restores`
+- `2d16f936` — `refactor: narrow legacy share session inspection types`
+- `91d3d8ca` — `feat: normalize shared session inspection preview`
   - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
   - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
-  - `5013c0b7ad14c161a9d28ad8d6eb5ec1ac28544a` — `docs: refresh Claude continuity after settings history routing`
-  - `d96841f71898b6434aafdaf19b0a9687539e69ff` — `feat: fork-only capability + backend-aware session/history routing`
-  - `e012ef6b3fa9be4cde26f38deb501d1be3aea0d7` — `feat: backend-aware session history productization`
-  - `719c43fb052d3aafade48dd48ad0878fdd61b292` — `feat: route settings session history reads through backend routing`
 
 ## Source Of Truth Order
 
@@ -194,6 +197,10 @@ The following service seams now route session identity through `getConversationB
 | Conversation render service (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Conversation render service (canonical render) | **Explicitly gated** | `resolveConversationRenderMessages()` checks `backend !== 'opencode'` and skips canonical state path entirely for non-OpenCode conversations |
 | Conversation sync runtime coordinator (diagnostic) | **Yes** | Includes both `openCodeSessionId` and `backendSessionId` |
+| Post-sync question/todo refresh (plan builder) | **Explicitly gated** | Background plan methods return `null` for non-OpenCode conversations. `createVisibleConversationPlan` is unblocked because the visible-path gate is at the router. Uses `getConversationBackendSessionId()` for identity. |
+| Post-sync question/todo refresh (host adapter) | **Backend-aware identity** | `getCurrentConversationSessionId()` uses `getConversationBackendSessionId()` instead of direct `openCodeSessionId` access |
+| Post-sync question/todo refresh (visible router) | **Explicitly gated** | `ConversationSyncVisiblePostSyncRouter` skips question/todo refresh and applies sync update directly for non-OpenCode conversations. Uses `getConversationBackendSessionId()` for identity. |
+| Post-sync question/todo refresh (background executor) | **Null-safe** | `BackgroundConversationPostSyncRefreshExecutor` handles null plan (non-OpenCode) by skipping question/todo coordinator but still flushing background-task writeback |
 | Settings shared sessions list (`listSessions`) | **Backend-aware** | Routes through `listBackendSessions()` instead of `openCodeService.listSessions()`. Returns `NormalizedSessionRow[]` (backend-neutral shape). Section remains OpenCode-gated because share URLs are OpenCode-specific, but the read surface is backend-aware. |
 | Settings shared session preview (`getSessionMessages`) | **Backend-aware** | Routes through `getBackendSessionPreview()` instead of `openCodeService.getSessionMessages()`. Returns `NormalizedSessionPreviewMessage[]` (backend-neutral shape with `role`/`parts[]`). Handles both OpenCode `{info, parts}` and generic/Claude `{role, content}` message shapes. |
 | Settings shared session unshare (`unshareSession`) | **OpenCode-only** | Direct `openCodeService.unshareSession()` call; no backend-neutral equivalent for share URL write operations. |
@@ -210,9 +217,9 @@ The following service seams now route session identity through `getConversationB
 | ConversationSessionTabResolver | Only reachable through OpenCode sync event subscription |
 | TitleGenerationService | ~~Calls `openCodeService.listSessions()`~~ **FULLY ROUTED for title reads**: `readOfficialSessionTitle` now uses `readBackendSessionTitle()` routing helper → `getSession(sessionId)` on the backend adapter. AI title generation (temp session create/delete/send) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
 | ConversationSessionSettingsCoordinator | ~~Falls back to `openCodeService.listSessions()` for share-URL reads~~ **PRODUCTION PATH ROUTED for share-URL reads**: in the OpenCodianView-wired runtime path, `getCurrentShareUrl` now uses `readBackendSessionShareUrl()` → backend `getSession(sessionId)`. Legacy host-less fallback remains only when no registry is provided. Share/unshare writes remain OpenCode-only. **Session-import-free**: coordinator uses `ShareInspectionEntry` instead of OpenCode `Session` type. |
-| PostSyncQuestionTodoRefreshPlanBuilder | Feeds into question/todo refresh chain using OpenCode APIs |
-| PostSyncQuestionTodoRefreshHostAdapter | Adapter for question/todo chain using `openCodeService` |
-| ConversationSyncVisiblePostSyncRouter | Routes post-sync question/todo updates through OpenCode APIs |
+| PostSyncQuestionTodoRefreshPlanBuilder | **Explicitly gated** — background plan methods return `null` for non-OpenCode conversations; session identity uses `getConversationBackendSessionId()`. Question/todo APIs are OpenCode-only and are not abstracted as cross-backend contracts. |
+| PostSyncQuestionTodoRefreshHostAdapter | **Backend-aware identity** — `getCurrentConversationSessionId()` uses `getConversationBackendSessionId()` instead of direct `openCodeSessionId` access |
+| ConversationSyncVisiblePostSyncRouter | **Explicitly gated** — skips question/todo refresh for non-OpenCode conversations, applies sync update directly. Session identity uses `getConversationBackendSessionId()`. |
 | ConversationSyncOrchestrationService | Drives OpenCode-specific sync loop |
 | SettingsConversationSection (`unshareSession`) | Share URL write is OpenCode-specific; `listSessions` and `getSessionMessages` are now backend-aware |
 | OpenCodianView sync host (`getSessionMessages`) | Authoritative sync host is OpenCode-only by design; routes through `openCodeService` directly |

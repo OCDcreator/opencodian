@@ -78,4 +78,47 @@ describe('PostSyncQuestionTodoRefreshPlanBuilder', () => {
       forceTodoStatusRefresh: true,
     });
   });
+
+  it('returns null signal-synced plan for non-OpenCode conversations', () => {
+    const builder = new PostSyncQuestionTodoRefreshPlanBuilder(createHost());
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-session-1';
+
+    expect(builder.createSignalSyncedBackgroundConversationPlan({
+      tabId: 'tab-bg',
+      conversation,
+      tabHasBackgroundTask: true,
+    })).toBeNull();
+  });
+
+  it('returns null background-tab plan for non-OpenCode conversations', () => {
+    const builder = new PostSyncQuestionTodoRefreshPlanBuilder(createHost());
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+
+    expect(builder.createBackgroundTabConversationPlan({
+      tabId: 'tab-bg',
+      conversation,
+    })).toBeNull();
+  });
+
+  it('uses getConversationBackendSessionId for identity resolution', () => {
+    const builder = new PostSyncQuestionTodoRefreshPlanBuilder(createHost());
+    const conversation = createConversation();
+    // No backendSessionId set, so getConversationBackendSessionId falls through to openCodeSessionId
+    expect(builder.createBackgroundTabConversationPlan({
+      tabId: 'tab-bg',
+      conversation,
+    })?.questionSessionId).toBe('session-1');
+
+    // With backendSessionId, identity resolution prefers it
+    conversation.backendSessionId = 'backend-session-override';
+    const plan = builder.createBackgroundTabConversationPlan({
+      tabId: 'tab-bg',
+      conversation,
+    });
+    expect(plan?.questionSessionId).toBe('backend-session-override');
+    expect(plan?.todoStatusSessionId).toBe('backend-session-override');
+  });
 });

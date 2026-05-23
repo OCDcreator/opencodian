@@ -151,4 +151,33 @@ describe('BackgroundConversationPostSyncRefreshExecutor', () => {
       afterPendingQuestionRefresh: expect.any(Function),
     });
   });
+
+  it('skips question/todo refresh but still flushes writeback when plan builder returns null', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+    const callOrder: string[] = [];
+    const planBuilder: jest.Mocked<BackgroundConversationRefreshPlanPort> = {
+      createSignalSyncedBackgroundConversationPlan: jest.fn().mockReturnValue(null),
+      createBackgroundTabConversationPlan: jest.fn().mockReturnValue(null),
+    };
+    const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const writebackPort = createWritebackPort(callOrder);
+    const executor = new BackgroundConversationPostSyncRefreshExecutor(
+      planBuilder,
+      refreshCoordinator,
+      writebackPort,
+    );
+
+    await executor.refreshBackgroundTabConversation({
+      tabId: 'tab-bg',
+      conversation,
+    });
+
+    expect(refreshCoordinator.refreshAfterPostSync).not.toHaveBeenCalled();
+    expect(writebackPort.flushBackgroundTaskPostSyncWriteback).toHaveBeenCalledWith(
+      'tab-bg',
+      conversation,
+    );
+    expect(callOrder).toEqual(['writeback']);
+  });
 });
