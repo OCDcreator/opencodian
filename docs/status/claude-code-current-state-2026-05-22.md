@@ -822,6 +822,50 @@ This hardening pass does **not** promote any capability to stable. All touched c
 | Subagent events | N/A | N/A | N/A | ✅ **(complete lifecycle)** | Complete |
 | Runtime controls | ✅ **(new)** | N/A | N/A | N/A | Complete |
 | Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ **(new)** | Complete |
+| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | N/A | Complete |
+| SDK error propagation (import/messages) | ✅ **(new)** | N/A | N/A | N/A | Complete |
+| Agent definitions | ⚠️ wiring only | N/A | N/A | N/A | Must remain Hidden/Untested |
+
+## Subagent Sidecar and JSONL Import Test Hardening Round (2026-05-23)
+
+A focused test hardening pass addressed the weakest remaining test coverage gaps in the subagent sidecar browser and JSONL import/session history paths.
+
+### Changes Applied
+
+| Test file | Tests added | Coverage |
+|---|---|---|
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 8 | Subagent browser: session refresh, session select → listSubagents, empty subagents, listSubagents error, agent button → getSubagentMessages, getSubagentMessages error, listSessions error on refresh, runtime proof pass |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 4 | `importSessionToStore` SDK-unavailable, `listSubagents`/`getSubagentMessages` stale-session guard, `importSessionToStore` SDK error propagation, `getSessionMessages` SDK error propagation |
+
+### Verification
+
+- `npm run verify` passed with `431` suites / `3104` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231854`
+- Net test increase: +12 tests (3092 → 3104)
+- No `src/` changes; no graphify refresh needed
+
+### Impact on Capability Maturity
+
+This hardening pass does **not** promote any capability to stable. All touched capabilities remain at their current maturity:
+
+- **Subagent browser**: `wired + runtime-proved`, not stable. The CapLab UI now has full test coverage for all interaction paths (session loading, subagent listing, message loading, and error states).
+- **JSONL import/session store**: `diagnostic store proof only`, not stable. The `importSessionToStore` path now has SDK-unavailable and SDK-error-propagation coverage.
+- **Subagent sidecar**: The adapter-level `listSubagents`/`getSubagentMessages` methods now have stale-session and SDK-error coverage consistent with `getSessionMessages` and `importSessionToStore`.
+
+### Updated Capability Test Coverage Summary
+
+| Capability | Adapter tests | Coordinator tests | CapLab probe tests | Normalizer coverage | Total coverage |
+|---|---|---|---|---|---|
+| Fork | ✅ | ✅ | ✅ | N/A | Complete |
+| Structured output | ✅ | ✅ | ✅ | ✅ | Complete |
+| Hooks | ✅ | N/A | ✅ | ✅ | Complete |
+| Session store | ✅ | N/A | ✅ | N/A | Complete |
+| Rewind | ✅ | ✅ | ✅ | N/A | Complete |
+| Subagent events | N/A | N/A | N/A | ✅ | Complete |
+| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | N/A | Complete |
+| SDK error propagation | ✅ **(new)** | N/A | N/A | N/A | Complete |
+| Runtime controls | ✅ | N/A | N/A | N/A | Complete |
+| Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ | Complete |
 | Agent definitions | ⚠️ wiring only | N/A | N/A | N/A | Must remain Hidden/Untested |
 
 ## Hard Guardrails

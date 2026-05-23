@@ -12,6 +12,46 @@
 
 ---
 
+## 2026-05-23 Phase 3 — Subagent sidecar + JSONL import test hardening
+
+### 目标
+
+在 subagent sidecar / JSONL history import / resume-fork / Claude-native history browsing 里找到仍未完成、能窄切验证的真实缺口。不触碰 session/history/shared-session seam，不重复 rewind/stream normalizer/runtime controls/sessionStore 已收口项。不做 user-facing authoring UI，Agent Definitions 保持 Hidden/Untested。
+
+### 发现
+
+两个 P0 级缺口：
+
+1. **CapLab Subagent Browser UI 零测试覆盖**：`loadSubagents()`、`loadSubagentMessages()`、session 刷新、错误状态等 6 个方法引用完全没有任何 UI 测试。如果 `listSubagents` 或 `getSubagentMessages` 在运行时失败，该功能会以损坏状态呈现且无任何测试警告。
+2. **`importSessionToStore` SDK-unavailable 测试缺失**：现有的 SDK-unavailable 测试（line 857）只删除了 3 个方法（`getSessionMessages`、`listSubagents`、`getSubagentMessages`），故意遗漏了 `importSessionToStore`。此外 `listSubagents`/`getSubagentMessages` 的 stale-session 路径和 `importSessionToStore`/`getSessionMessages` 的 SDK 错误传播路径也缺少覆盖。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | +8 测试 | Subagent browser: 会话刷新、子代理列表渲染、空列表处理、列表加载失败、子代理消息加载、消息加载失败、运行时证明 pass/fail |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | +4 测试 | `importSessionToStore` SDK-unavailable、`listSubagents`/`getSubagentMessages` stale-session guard、`importSessionToStore` SDK 错误传播、`getSessionMessages` SDK 错误传播 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮硬化内容和覆盖矩阵 |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 文档更新 | 记录 subagent browser 测试覆盖 |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 文档更新 | 记录 import/subagent 错误路径测试覆盖 |
+
+### 验证
+
+- `npm run verify` 通过：`431` suites / `3104` tests
+- Build ID：`feature-phase0-capability.202605231854`
+- 净增测试：+12（3092 → 3104）
+- 无 `src/` 变更，不需要 `graphify:update:src`
+
+### 影响评估
+
+本轮不提升任何能力到 stable。所有涉及能力保持现有成熟度：
+
+- **Subagent browser**：`wired + runtime-proved`，非 stable。CapLab UI 现有全路径测试覆盖。
+- **JSONL import/session store**：`diagnostic store proof only`，非 stable。`importSessionToStore` 现有 SDK-unavailable 和 SDK 错误传播覆盖。
+- **Subagent sidecar**：adapter-level `listSubagents`/`getSubagentMessages` 现有 stale-session 和 SDK-error 覆盖。
+
+---
+
 ## 2026-05-23 Phase 3 — Stream normalizer lifecycle + adapter runtime control test hardening
 
 ### 目标

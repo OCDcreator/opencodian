@@ -1274,4 +1274,240 @@ describe('SettingsCapabilityLabSection', () => {
     expect(outputEl.textContent).toContain('No active runtime');
     expect(outputEl.textContent).toContain('Hint: rewindFiles requires an active runtime with checkpointing enabled.');
   });
+
+  // =======================================================================
+  // Subagent Browser
+  // =======================================================================
+
+  it('renders subagent browser section with session selector and refresh button when adapter is available', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'sa-session-1', summary: 'Subagent test', lastModified: 1 },
+      ]),
+      listSubagents: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    expect(subagentBlock).toBeTruthy();
+    expect(subagentBlock!.querySelector('select')).toBeTruthy();
+
+    const refreshButton = Array.from(subagentBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Refresh Sessions')
+    )) as HTMLButtonElement | undefined;
+    expect(refreshButton).toBeTruthy();
+  });
+
+  it('loads sessions and populates the session select on refresh', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'sa-session-1', summary: 'Subagent test', lastModified: 1 },
+      ]),
+      listSubagents: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    const sessionSelect = subagentBlock!.querySelector('select') as HTMLSelectElement;
+    const refreshButton = Array.from(subagentBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Refresh Sessions')
+    )) as HTMLButtonElement;
+
+    refreshButton.click();
+    await flushUi();
+
+    expect(adapter.listSessions).toHaveBeenCalled();
+    const option = Array.from(sessionSelect.options).find((el) => el.value === 'sa-session-1');
+    expect(option).toBeTruthy();
+  });
+
+  it('loads subagents when a session is selected and renders agent buttons', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'sa-session-1', summary: 'Subagent test', lastModified: 1 },
+      ]),
+      listSubagents: jest.fn().mockResolvedValue(['agent-alpha', 'agent-beta']),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    const sessionSelect = subagentBlock!.querySelector('select') as HTMLSelectElement;
+    sessionSelect.value = 'sa-session-1';
+    sessionSelect.dispatchEvent(new Event('change'));
+    await flushUi();
+
+    expect(adapter.listSubagents).toHaveBeenCalledWith('sa-session-1');
+    expect(subagentBlock!.textContent).toContain('2 subagent(s)');
+    expect(subagentBlock!.textContent).toContain('Agent: agent-alpha');
+    expect(subagentBlock!.textContent).toContain('Agent: agent-beta');
+  });
+
+  it('shows no subagents message when listSubagents returns empty', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'sa-session-1', summary: 'Subagent test', lastModified: 1 },
+      ]),
+      listSubagents: jest.fn().mockResolvedValue([]),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    const sessionSelect = subagentBlock!.querySelector('select') as HTMLSelectElement;
+    sessionSelect.value = 'sa-session-1';
+    sessionSelect.dispatchEvent(new Event('change'));
+    await flushUi();
+
+    expect(subagentBlock!.textContent).toContain('No subagents found for this session.');
+  });
+
+  it('shows error when listSubagents fails', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'sa-session-1', summary: 'Subagent test', lastModified: 1 },
+      ]),
+      listSubagents: jest.fn().mockRejectedValue(new Error('SDK subagent listing failed')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    const sessionSelect = subagentBlock!.querySelector('select') as HTMLSelectElement;
+    sessionSelect.value = 'sa-session-1';
+    sessionSelect.dispatchEvent(new Event('change'));
+    await flushUi();
+
+    const errorEl = subagentBlock!.querySelector('.opencodian-capability-lab-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl!.textContent).toContain('SDK subagent listing failed');
+  });
+
+  it('loads subagent messages when an agent button is clicked', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'sa-session-1', summary: 'Subagent test', lastModified: 1 },
+      ]),
+      listSubagents: jest.fn().mockResolvedValue(['agent-msg']),
+      getSubagentMessages: jest.fn().mockResolvedValue([
+        { role: 'assistant', content: 'Subagent response' },
+      ]),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    const sessionSelect = subagentBlock!.querySelector('select') as HTMLSelectElement;
+    sessionSelect.value = 'sa-session-1';
+    sessionSelect.dispatchEvent(new Event('change'));
+    await flushUi();
+
+    const agentButton = Array.from(subagentBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Agent: agent-msg')
+    )) as HTMLButtonElement;
+    agentButton.click();
+    await flushUi();
+
+    expect(adapter.getSubagentMessages).toHaveBeenCalledWith('sa-session-1', 'agent-msg', { limit: 50 });
+    expect(subagentBlock!.textContent).toContain('1 messages');
+    expect(subagentBlock!.textContent).toContain('Subagent response');
+  });
+
+  it('shows error when getSubagentMessages fails', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'sa-session-1', summary: 'Subagent test', lastModified: 1 },
+      ]),
+      listSubagents: jest.fn().mockResolvedValue(['agent-err']),
+      getSubagentMessages: jest.fn().mockRejectedValue(new Error('SDK message read failed')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    const sessionSelect = subagentBlock!.querySelector('select') as HTMLSelectElement;
+    sessionSelect.value = 'sa-session-1';
+    sessionSelect.dispatchEvent(new Event('change'));
+    await flushUi();
+
+    const agentButton = Array.from(subagentBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Agent: agent-err')
+    )) as HTMLButtonElement;
+    agentButton.click();
+    await flushUi();
+
+    const errorEl = subagentBlock!.querySelector('.opencodian-capability-lab-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl!.textContent).toContain('SDK message read failed');
+  });
+
+  it('shows error when listSessions fails on refresh', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockRejectedValue(new Error('SDK session list failed')),
+      listSubagents: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const subagentBlock = containerEl.querySelector('[data-section-block="subagents"]') as HTMLElement | null;
+    const refreshButton = Array.from(subagentBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Refresh Sessions')
+    )) as HTMLButtonElement;
+    refreshButton.click();
+    await flushUi();
+
+    const errorEl = subagentBlock!.querySelector('.opencodian-capability-lab-output .opencodian-capability-lab-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl!.textContent).toContain('SDK session list failed');
+  });
 });

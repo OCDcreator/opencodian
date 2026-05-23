@@ -1418,4 +1418,76 @@ describe('ClaudeCodeAdapter', () => {
       });
     });
   });
+
+  it('importSessionToStore is unavailable when SDK method is missing', async () => {
+    const sdk = createSdk([]);
+    delete (sdk as Partial<typeof sdk>).importSessionToStore;
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.importSessionToStore('sdk-session', { append: jest.fn(), load: jest.fn() }))
+      .rejects.toThrow('importSessionToStore is unavailable');
+  });
+
+  it('listSubagents and getSubagentMessages block for deleted local sessions', async () => {
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession('Claude chat');
+    await adapter.deleteSession(sessionId);
+
+    await expect(adapter.listSubagents(sessionId)).rejects.toThrow('session not found');
+    await expect(adapter.getSubagentMessages(sessionId, 'agent-1')).rejects.toThrow('session not found');
+    expect(sdk.listSubagents).not.toHaveBeenCalled();
+    expect(sdk.getSubagentMessages).not.toHaveBeenCalled();
+  });
+
+  it('importSessionToStore propagates SDK errors', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-session-import-error',
+    }]);
+    sdk.importSessionToStore.mockRejectedValue(new Error('SDK store import failed'));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const localSessionId = await adapter.createSession('Claude chat');
+    await collectAsync(adapter.sendMessage({ sessionId: localSessionId, content: 'hello' }));
+
+    await expect(adapter.importSessionToStore(localSessionId, { append: jest.fn(), load: jest.fn() }))
+      .rejects.toThrow('SDK store import failed');
+    expect(sdk.importSessionToStore).toHaveBeenCalledWith('sdk-session-import-error', expect.any(Object), {
+      dir: '/vault',
+    });
+  });
+
+  it('getSessionMessages propagates SDK errors', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-session-message-error',
+    }]);
+    sdk.getSessionMessages.mockRejectedValue(new Error('SDK message read failed'));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const localSessionId = await adapter.createSession('Claude chat');
+    await collectAsync(adapter.sendMessage({ sessionId: localSessionId, content: 'hello' }));
+
+    await expect(adapter.getSessionMessages(localSessionId)).rejects.toThrow('SDK message read failed');
+    expect(sdk.getSessionMessages).toHaveBeenCalledWith('sdk-session-message-error', {
+      dir: '/vault',
+    });
+  });
 });
