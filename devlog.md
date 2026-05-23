@@ -12,6 +12,41 @@
 
 ---
 
+## 2026-05-23 Phase 3 - Claude rewind no-data-loss guard
+
+### 目标
+
+继续推进 Phase 3 foundation / productization，但避开已收口的 session/history/shared-session seam。选择 `rewind` 作为窄切方向，只补诊断能力的无数据损失防线，不把 Claude rewind 提升为 stable UI。
+
+### 发现
+
+`ClaudeCodeAdapter.rewindFiles()` 已有 dry-run 诊断入口和测试覆盖，但 adapter 本身没有强制安全默认：
+
+1. 不传 options 会把 `undefined` 直接传给 SDK，未来新调用方可能触发真实 rewind。
+2. 空 `userMessageId` 会被透传到 SDK。
+3. 显式 `{ dryRun: false }` 没有审计日志。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 安全防护 | `rewindFiles()` 默认强制 `{ dryRun: true }`，拒绝空白 `userMessageId`，并对显式 `dryRun:false` 记录 warn 日志 |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | +5 测试 | 覆盖默认 dry-run、空 options、显式真实 rewind 日志、空/空白 message id |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 文档更新 | 记录 rewind adapter 级无数据损失防护和仍为诊断态的边界 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 rewind safety guard hardening |
+
+### 验证
+
+- Focused rewind tests: `10` passed
+- Module docs check: OK
+- 完整验证结果见本轮提交前命令输出
+
+### 影响评估
+
+本轮不提升 Claude rewind 为 stable。它仍是 `wired + runtime-proved + diagnostic-only`：Capability Lab 只保留 dry-run preview，普通聊天 rewind/revert 仍显式 gated 为 OpenCode-only。
+
+---
+
 ## 2026-05-23 Phase 3 — Subagent sidecar + JSONL import test hardening
 
 ### 目标

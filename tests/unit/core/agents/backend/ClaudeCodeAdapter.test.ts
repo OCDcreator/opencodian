@@ -1119,30 +1119,30 @@ describe('ClaudeCodeAdapter', () => {
     }))).rejects.toThrow(`Claude Code session not found: ${sessionId}`);
   });
 
-  describe('ClaudeCodeAdapter rewindFiles', () => {
-    function createSdkWithActiveRuntime(
-      rewindFilesMock: jest.Mock,
-    ): ClaudeCodeSdkFacade & { query: jest.Mock } {
-      const queue = createAsyncQueue<unknown>();
-      const closeQueue = queue.close;
-      const queryWithRewind = Object.assign(queue, {
-        rewindFiles: rewindFilesMock,
-        supportedModels: jest.fn().mockResolvedValue([]),
-        close: jest.fn(() => closeQueue()),
-      });
-      return {
-        query: jest.fn(() => queryWithRewind) as unknown as ClaudeCodeSdkFacade['query'] & jest.Mock,
-        listSessions: jest.fn().mockResolvedValue([]),
-        getSessionInfo: jest.fn().mockResolvedValue(undefined),
-        getSessionMessages: jest.fn().mockResolvedValue([]),
-        listSubagents: jest.fn().mockResolvedValue([]),
-        getSubagentMessages: jest.fn().mockResolvedValue([]),
-        importSessionToStore: jest.fn().mockResolvedValue(undefined),
-        forkSession: jest.fn().mockResolvedValue({ sessionId: 'sdk-fork-session' }),
-        renameSession: jest.fn().mockResolvedValue(undefined),
-      };
-    }
+  function createSdkWithActiveRewindRuntime(
+    rewindFilesMock: jest.Mock,
+  ): ClaudeCodeSdkFacade & { query: jest.Mock } {
+    const queue = createAsyncQueue<unknown>();
+    const closeQueue = queue.close;
+    const queryWithRewind = Object.assign(queue, {
+      rewindFiles: rewindFilesMock,
+      supportedModels: jest.fn().mockResolvedValue([]),
+      close: jest.fn(() => closeQueue()),
+    });
+    return {
+      query: jest.fn(() => queryWithRewind) as unknown as ClaudeCodeSdkFacade['query'] & jest.Mock,
+      listSessions: jest.fn().mockResolvedValue([]),
+      getSessionInfo: jest.fn().mockResolvedValue(undefined),
+      getSessionMessages: jest.fn().mockResolvedValue([]),
+      listSubagents: jest.fn().mockResolvedValue([]),
+      getSubagentMessages: jest.fn().mockResolvedValue([]),
+      importSessionToStore: jest.fn().mockResolvedValue(undefined),
+      forkSession: jest.fn().mockResolvedValue({ sessionId: 'sdk-fork-session' }),
+      renameSession: jest.fn().mockResolvedValue(undefined),
+    };
+  }
 
+  describe('ClaudeCodeAdapter rewindFiles', () => {
     it('throws when no runtime is available', async () => {
       const adapter = new ClaudeCodeAdapter({
         vaultPath: '/vault',
@@ -1157,7 +1157,7 @@ describe('ClaudeCodeAdapter', () => {
     it('delegates to query.rewindFiles when runtime is active', async () => {
       const result = { rewound: true };
       const rewindFiles = jest.fn().mockResolvedValue(result);
-      const sdk = createSdkWithActiveRuntime(rewindFiles);
+      const sdk = createSdkWithActiveRewindRuntime(rewindFiles);
       const adapter = new ClaudeCodeAdapter({
         vaultPath: '/vault',
         settings: getDefaultClaudeCodeBackendSettings(),
@@ -1175,7 +1175,7 @@ describe('ClaudeCodeAdapter', () => {
         await firstChunk;
 
         await expect(adapter.rewindFiles(sessionId, 'msg-1')).resolves.toBe(result);
-        expect(rewindFiles).toHaveBeenCalledWith('msg-1', undefined);
+        expect(rewindFiles).toHaveBeenCalledWith('msg-1', { dryRun: true });
       } finally {
         query.close();
         await collectAsync(stream);
@@ -1184,7 +1184,7 @@ describe('ClaudeCodeAdapter', () => {
 
     it('passes dryRun option to query.rewindFiles', async () => {
       const rewindFiles = jest.fn().mockResolvedValue({ dryRun: true });
-      const sdk = createSdkWithActiveRuntime(rewindFiles);
+      const sdk = createSdkWithActiveRewindRuntime(rewindFiles);
       const adapter = new ClaudeCodeAdapter({
         vaultPath: '/vault',
         settings: getDefaultClaudeCodeBackendSettings(),
@@ -1212,7 +1212,7 @@ describe('ClaudeCodeAdapter', () => {
     it('propagates errors from query.rewindFiles', async () => {
       const error = new Error('rewind failed');
       const rewindFiles = jest.fn().mockRejectedValue(error);
-      const sdk = createSdkWithActiveRuntime(rewindFiles);
+      const sdk = createSdkWithActiveRewindRuntime(rewindFiles);
       const adapter = new ClaudeCodeAdapter({
         vaultPath: '/vault',
         settings: getDefaultClaudeCodeBackendSettings(),
@@ -1248,6 +1248,116 @@ describe('ClaudeCodeAdapter', () => {
 
       await expect(adapter.rewindFiles(sessionId, 'msg-1'))
         .rejects.toThrow(`Claude Code session not found: ${sessionId}`);
+    });
+  });
+
+  describe('ClaudeCodeAdapter rewindFiles safety guards', () => {
+    it('defaults to dryRun=true when no options are provided', async () => {
+      const rewindFiles = jest.fn().mockResolvedValue({ dryRun: true });
+      const sdk = createSdkWithActiveRewindRuntime(rewindFiles);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const stream = adapter.sendMessage({ sessionId, content: 'hello' });
+      const firstChunk = nextFrom(stream);
+
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      const query = sdk.query.mock.results[0].value;
+
+      try {
+        query.push({ type: 'system', subtype: 'init', session_id: 'sdk-rewind-session' });
+        await firstChunk;
+
+        await adapter.rewindFiles(sessionId, 'msg-1');
+        expect(rewindFiles).toHaveBeenCalledWith('msg-1', { dryRun: true });
+      } finally {
+        query.close();
+        await collectAsync(stream);
+      }
+    });
+
+    it('defaults to dryRun=true when options is an empty object', async () => {
+      const rewindFiles = jest.fn().mockResolvedValue({ dryRun: true });
+      const sdk = createSdkWithActiveRewindRuntime(rewindFiles);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const stream = adapter.sendMessage({ sessionId, content: 'hello' });
+      const firstChunk = nextFrom(stream);
+
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      const query = sdk.query.mock.results[0].value;
+
+      try {
+        query.push({ type: 'system', subtype: 'init', session_id: 'sdk-rewind-session' });
+        await firstChunk;
+
+        await adapter.rewindFiles(sessionId, 'msg-2', {});
+        expect(rewindFiles).toHaveBeenCalledWith('msg-2', { dryRun: true });
+      } finally {
+        query.close();
+        await collectAsync(stream);
+      }
+    });
+
+    it('logs a warning when dryRun is explicitly false', async () => {
+      const rewindFiles = jest.fn().mockResolvedValue({ rewound: true });
+      const sdk = createSdkWithActiveRewindRuntime(rewindFiles);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const stream = adapter.sendMessage({ sessionId, content: 'hello' });
+      const firstChunk = nextFrom(stream);
+
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      const query = sdk.query.mock.results[0].value;
+
+      try {
+        query.push({ type: 'system', subtype: 'init', session_id: 'sdk-rewind-session' });
+        await firstChunk;
+
+        clearRecentLogs();
+        await adapter.rewindFiles(sessionId, 'msg-3', { dryRun: false });
+        expect(rewindFiles).toHaveBeenCalledWith('msg-3', { dryRun: false });
+
+        const entries = getRecentLogEntries().filter((entry) => entry.scope === 'ClaudeCodeAdapter');
+        const warnings = entries.filter((entry) => entry.level === 'warn');
+        expect(warnings.some((entry) => entry.message.includes('dryRun=false'))).toBe(true);
+      } finally {
+        query.close();
+        await collectAsync(stream);
+      }
+    });
+
+    it('throws when userMessageId is empty', async () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk: createSdk([]),
+      });
+
+      await expect(adapter.rewindFiles('any-session', ''))
+        .rejects.toThrow('requires a non-empty userMessageId');
+    });
+
+    it('throws when userMessageId is whitespace-only', async () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk: createSdk([]),
+      });
+
+      await expect(adapter.rewindFiles('any-session', '   '))
+        .rejects.toThrow('requires a non-empty userMessageId');
     });
   });
 

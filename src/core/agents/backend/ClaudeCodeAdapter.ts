@@ -538,13 +538,23 @@ export class ClaudeCodeAdapter
     userMessageId: string,
     options?: { dryRun?: boolean },
   ): Promise<unknown> {
+    if (!userMessageId.trim()) {
+      throw new Error('Claude Code rewindFiles requires a non-empty userMessageId.');
+    }
     const session = this.getOrRestoreSession(sessionId);
-    sessionLogger.debug('rewind session', { sessionId, userMessageId, dryRun: options?.dryRun === true });
+    const effectiveDryRun = options?.dryRun !== false;
+    if (!effectiveDryRun) {
+      sessionLogger.warn('rewind called with dryRun=false - this is a real rewind, not a preview', {
+        sessionId,
+        userMessageId,
+      });
+    }
+    sessionLogger.debug('rewind session', { sessionId, userMessageId, dryRun: effectiveDryRun });
     const rewindFiles = session.runtime?.query?.rewindFiles;
     if (!rewindFiles) {
       throw new Error('Claude Code rewindFiles is unavailable. Start a checkpoint-enabled runtime first.');
     }
-    return await rewindFiles(userMessageId, options);
+    return await rewindFiles(userMessageId, { ...options, dryRun: effectiveDryRun });
   }
 
   async runDiagnosticPrompt(

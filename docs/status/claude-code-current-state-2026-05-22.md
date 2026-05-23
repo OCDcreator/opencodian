@@ -868,6 +868,36 @@ This hardening pass does **not** promote any capability to stable. All touched c
 | Stream blocks (redacted_thinking, server_tool_use) | N/A | N/A | N/A | ✅ | Complete |
 | Agent definitions | ⚠️ wiring only | N/A | N/A | N/A | Must remain Hidden/Untested |
 
+## Claude Rewind No-Data-Loss Guard Round (2026-05-23)
+
+A focused Phase 3 rewind audit found a real adapter-level safety gap outside the already completed session/history/shared-session seam.
+
+### Gap Found
+
+`ClaudeCodeAdapter.rewindFiles()` delegated to the active SDK query with caller-provided `options` as-is. The Capability Lab dry-run preview always passed `{ dryRun: true }`, but the adapter itself had no safety default. A future caller could omit options and accidentally invoke a real rewind. The method also accepted empty `userMessageId` values and did not leave a warning-level audit trail for explicit real rewind calls.
+
+### Fix Applied
+
+- `rewindFiles()` now rejects empty or whitespace-only `userMessageId` before touching the runtime.
+- `rewindFiles()` now treats omitted options or `{}` as `{ dryRun: true }`.
+- Explicit `{ dryRun: false }` remains possible only as an intentional low-level adapter call and emits a `warn` log entry.
+- The Capability Lab surface remains dry-run only; no real rewind button was added.
+
+### Verification
+
+- Focused rewind tests passed: `10` tests in `ClaudeCodeAdapter.test.ts`.
+- `npm run check:module-docs -- --range HEAD` passed.
+- This round changes `src/`, so `npm run graphify:update:src`, full `OWNER_GUARD_APPROVED=1 npm run verify`, and `npm run build` are required before commit.
+
+### Impact on Capability Maturity
+
+This hardening pass does **not** promote rewind to stable. Rewind remains:
+
+- `wired + runtime-proved + diagnostic-only`
+- adapter-level dry-run guarded by default
+- not connected to stable chat rewind/revert UI
+- still blocked from `AgentCapability.Branching` for Claude Code
+
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.
