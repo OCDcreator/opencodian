@@ -26,3 +26,4 @@
 - 这里只做 registry lookup 和 capability narrowing，不做 fallback 业务逻辑。
 - 不在这里启用或注册 backend；可见 backend 仍由 `IMPLEMENTED_AGENT_BACKENDS` 和 settings normalization 控制。
 - 新增 backend capability 路由时优先扩展此 helper，避免在 UI owner 中散落 `as AgentXCapability` 类型断言。
+- 2026-05-23 的边界测试补强覆盖了 `listBackendSessions()` 非数组返回、`getBackendSessionPreview()` 非数组返回以及 Claude content block 的 malformed / primitive 防御路径；这些用例只是在加固已有 backend-aware seams 的鲁棒性，没有新增任何共享 `getSession()` consumer。

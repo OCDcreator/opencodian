@@ -216,6 +216,16 @@ describe('loadBackendSessionMessages', () => {
       expect(result[1].id).toBe('msg-1'); // fallback index
       expect(result[1].role).toBe('assistant');
     });
+
+    it('propagates error when getSessionMessages throws', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSessionMessages: async () => { throw new Error('backend error'); },
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      await expect(
+        loadBackendSessionMessages(registry, { backend: 'opencode' }, 'ses-1'),
+      ).rejects.toThrow('backend error');
+    });
   });
 
 describe('readBackendSessionTitle', () => {
@@ -478,6 +488,15 @@ describe('listBackendSessions', () => {
     expect(result[0].title).toBe('');
     expect(result[1].id).toMatch(/^session-/); // generated fallback
   });
+
+  it('returns empty array when listSessions returns a non-array', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      listSessions: async () => ({ sessions: [] }) as unknown as Array<unknown>,
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await listBackendSessions(registry);
+    expect(result).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -584,5 +603,33 @@ describe('getBackendSessionPreview', () => {
     expect(result[0].parts).toHaveLength(1);
     expect(result[0].parts[0].type).toBe('json');
     expect(result[0].parts[0].text).toContain('"metadata"');
+  });
+
+  it('returns null when getSessionMessages returns a non-array', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      getSessionMessages: async () => ({ messages: [] }) as unknown as Array<unknown>,
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toBeNull();
+  });
+
+  it('handles Claude content blocks with non-object entries gracefully', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+    ]), {
+      getSessionMessages: async () => [
+        { role: 'assistant', content: [{ type: 'text', text: 'valid' }, null, 'string', 123] },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toHaveLength(1);
+    expect(result[0].role).toBe('assistant');
+    // Non-object entries (null, 'string', 123) are skipped; only valid blocks produce parts
+    expect(result[0].parts).toHaveLength(1);
+    expect(result[0].parts[0]).toEqual({ type: 'text', text: 'valid' });
   });
 });

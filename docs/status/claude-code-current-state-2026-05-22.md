@@ -479,6 +479,20 @@ A second-pass audit was executed across `OpenCodianView.ts`, `ConversationSessio
 
 No new shared read seams can be safely promoted. All remaining direct `openCodeService` session/history/detail reads are in explicitly gated OpenCode-only paths. The productized backend-aware seams (`readBackendSessionTitle`, `readBackendSessionShareUrl`, `listBackendSessions`, `getBackendSessionPreview`, `loadBackendSessionMessages`) cover all surfaces where narrow, verifiable cross-backend semantics genuinely match.
 
+### 2026-05-23 Routing Boundary Test Hardening
+
+The shared routing layer received extra edge-case coverage without changing any product boundary:
+
+- `listBackendSessions()` now has a non-array guard test
+- `getBackendSessionPreview()` now has a non-array guard test and malformed Claude content-block guard test
+- `loadBackendSessionMessages()` now has explicit error-propagation coverage
+
+Verification for this hardening round:
+
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `431` suites / `3049` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231536`
+- No new shared `getSession()` consumers were added; gated OpenCode-only reads remain gated
+
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.
