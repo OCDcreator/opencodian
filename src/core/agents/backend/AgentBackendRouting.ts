@@ -328,7 +328,9 @@ export async function getBackendSessionPreview(
     // Detect OpenCode {info, parts} shape
     if (record.info && typeof record.info === 'object' && Array.isArray(record.parts)) {
       const info = record.info as Record<string, unknown>;
-      const parts = record.parts as Array<Record<string, unknown>>;
+      const parts = (record.parts as unknown[]).filter(
+        (p): p is Record<string, unknown> => p !== null && typeof p === 'object',
+      );
       return {
         role: String(info.role ?? 'unknown'),
         parts: parts.map((part) => ({

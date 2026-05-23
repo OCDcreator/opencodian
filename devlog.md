@@ -12,6 +12,27 @@
 
 ---
 
+## 2026-05-23 Phase 3 — getBackendSessionPreview OpenCode parts inner null-item guard
+
+### Summary
+
+Fourth-pass runtime-safety audit of the shared backend-aware routing layer found a remaining gap: `getBackendSessionPreview()`'s OpenCode `{info, parts}` normalization path filtered null items at the messages-array level but not inside individual `parts` arrays. If a backend returned `parts: [{type: 'text'}, null, 'string', 123]`, the `.map()` callback would crash on `part.type` when `part` is `null`. The generic / Claude content-block path already handled this correctly.
+
+### Changes
+
+- `src/core/agents/backend/AgentBackendRouting.ts`: Added `.filter((p) => p !== null && typeof p === 'object')` to the `parts` array in the OpenCode normalization branch of `getBackendSessionPreview()`, before the `.map()` that accesses `part.type` and `part.text`
+- `tests/unit/core/agents/backend/AgentBackendRouting.test.ts`: Added one test covering null / primitive items inside an OpenCode `parts` array
+- `docs/modules/core/agents/backend/AgentBackendRouting.md`: Updated module doc to document the fourth runtime-safety round
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added "OpenCode Parts Array Inner Null-Item Runtime Safety Round" section
+
+### Verification
+
+- `npm run verify` passed: `431` suites / `3060` tests
+- Build: `feature-phase0-capability.202605231623`
+- No new shared `getSession()` consumers added; purely defensive hardening of existing seam
+
+---
+
 ## 2026-05-23 Phase 3 — loadBackendSessionMessages non-array guard + runtime safety hardening
 
 ### Summary

@@ -554,6 +554,25 @@ A follow-up audit found that `listBackendSessions()` and `getBackendSessionPrevi
   - `capability-lab-backend-routing-assertion.js` returned `ok: true`
   - `obsidian dev:errors vault=testvault` returned `No errors captured.`
 
+## OpenCode Parts Array Inner Null-Item Runtime Safety Round (2026-05-23)
+
+A fourth-pass runtime-safety audit of the shared backend-aware routing layer found one remaining gap in malformed-payload handling within `getBackendSessionPreview()`.
+
+**The gap**: The OpenCode `{info, parts}` normalization path checked `Array.isArray(record.parts)` but then called `.map()` directly on the array without filtering inner items. If a backend adapter returned a `parts` array containing `null` or primitive values (e.g., `[{type: 'text'}, null, 'string', 123]`), the `.map()` callback would attempt property access (`part.type`) on `null`, throwing an uncaught `TypeError`. This is consistent with the previously fixed null-item scenario but at one nesting level deeper inside the message shape.
+
+The generic / Claude content-block path already handled this correctly by checking `typeof block === 'object' && block !== null` before accessing properties.
+
+### Fix Applied
+
+- Added `.filter((p) => p !== null && typeof p === 'object')` to the `parts` array inside the OpenCode normalization branch of `getBackendSessionPreview()`, before the `.map()` callback that accesses `part.type` and `part.text`.
+- Added one unit test: `getBackendSessionPreview`: skips null items inside OpenCode `parts` array without crashing.
+
+### Verification
+
+- `npm run verify` passed with `431` suites / `3060` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231623`
+- No new shared `getSession()` consumers were added; this is a defensive hardening of an existing backend-aware seam
+
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.

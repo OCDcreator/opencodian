@@ -746,6 +746,32 @@ describe('getBackendSessionPreview', () => {
     expect(result![1].role).toBe('assistant');
   });
 
+  it('skips null items inside OpenCode parts array without crashing', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      getSessionMessages: async () => [
+        {
+          info: { id: 'm1', role: 'assistant' },
+          parts: [
+            { type: 'text', text: 'first' },
+            null,
+            'string',
+            123,
+            { type: 'tool', text: 'tool output' },
+          ],
+        },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toHaveLength(1);
+    expect(result![0].role).toBe('assistant');
+    // Null, string, and number entries inside parts are skipped;
+    // only valid object parts produce normalized entries.
+    expect(result![0].parts).toHaveLength(2);
+    expect(result![0].parts[0]).toEqual({ type: 'text', text: 'first' });
+    expect(result![0].parts[1]).toEqual({ type: 'tool', text: 'tool output' });
+  });
+
   it('returns null when getSessionMessages throws an error', async () => {
     const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
       getSessionMessages: async () => { throw new Error('backend failure'); },
