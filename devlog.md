@@ -12,6 +12,42 @@
 
 ---
 
+## 2026-05-23 Phase 3 — Efficient adapter getSession + session-read fallback cleanup
+
+### Summary
+
+Continued Phase 3 backend-aware session read routing by fixing the `OpenCodeAdapter.getSession()` O(n) workaround and removing the last direct `openCodeService.listSessions()` fallback in `ConversationSessionSettingsCoordinator`.
+
+### Fix: OpenCodeAdapter.getSession() efficient path
+
+`OpenCodeAdapter.getSession()` was using `listSessions()` + `.find()`, an O(n) scan over all sessions. The efficient single-session SDK `session.get()` path already existed on `OpenCodeSessionLifecycleCoordinator.getSessionInfo()` but was not exposed as a public method on `OpenCodeService`.
+
+Exposed `getSessionInfo(sessionId)` as a public method on `OpenCodeService` and updated the adapter to use it directly. The adapter still returns `unknown | null` — no new cross-backend session-detail contract is created.
+
+### Cleanup: ConversationSessionSettingsCoordinator listSessions fallback
+
+The coordinator's `getCurrentShareUrl()` had a fallback chain: registry → `host.listSessions` → `openCodeService.listSessions()`. The last hop was the only remaining direct `openCodeService` binding for session list reads in the settings coordinator.
+
+Removed the `openCodeService.listSessions()` fallback. When no registry and no `host.listSessions` is provided, the coordinator now returns `null` (no share URL) instead of reaching through to openCodeService. The `resolveOpenCodeService()` method now only provides `shareSession`/`unshareSession` (OpenCode-only writes), not `listSessions`.
+
+### Files changed
+
+- `src/core/opencode/OpenCodeService.ts` — added public `getSessionInfo(sessionId)` method
+- `src/core/agents/backend/OpenCodeAdapter.ts` — `getSession()` now uses `service.getSessionInfo()` instead of `listSessions().find()`
+- `src/features/chat/services/ConversationSessionSettingsCoordinator.ts` — removed `openCodeService.listSessions` fallback from `getCurrentShareUrl()`; removed `listSessions` from `resolveOpenCodeService()` and `resolveOpenCodianPlugin()` return types
+- `tests/unit/core/agents/backend/OpenCodeAdapter.test.ts` — updated mock with `getSessionInfo`; test now verifies `listSessions` called once + `getSessionInfo` called per `getSession` invocation
+- `tests/unit/features/chat/ConversationSessionSettingsCoordinator.shareUrlRouting.test.ts` — added test for no-registry-no-listSessions → returns null behavior
+- `docs/modules/core/opencode/OpenCodeService.md` — documented `getSessionInfo()` public delegation
+- `docs/modules/core/agents/backend/OpenCodeAdapter.md` — documented efficient `getSession` path
+- `docs/modules/features/chat/services/ConversationSessionSettingsCoordinator.md` — updated fallback documentation
+- `docs/status/claude-code-current-state-2026-05-22.md` — updated anchor commit + session-read audit entries
+
+### Verification
+
+- 3035 tests pass (431 suites)
+- `npm run verify` green (lint, typecheck, test, build, module-docs, graphify)
+- Owner-guard note: OpenCodeService change is a one-line delegation to existing lifecycle coordinator; no new behavior
+
 ## 2026-05-23 Phase 3 — SessionTodoCoordinator backend gates + Backend Routing diagnostic probe
 
 ### Summary

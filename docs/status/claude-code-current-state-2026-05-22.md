@@ -16,10 +16,12 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `6b656e55`
-- Commit subject: `feat: gate post-sync question todo refresh to opencode`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231255`
+- Snapshot commit: `c884b8ee`
+- Commit subject: `refactor: remove openCodeService.listSessions fallback from ConversationSessionSettingsCoordinator`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231348`
 - Recent continuity commits in this lane:
+- `c884b8ee` — `refactor: remove openCodeService.listSessions fallback from ConversationSessionSettingsCoordinator`
+- `9b2f27e6` — `feat: expose getSessionInfo on OpenCodeService, fix adapter O(n) workaround`
 - `6b656e55` — `feat: gate post-sync question todo refresh to opencode`
 - `40dbf471` — `feat: add SessionTodoCoordinator backend gates and Backend Routing diagnostic probe`
 - `5cbde267` — `feat: add Claude session detail diagnostic probe`
@@ -92,6 +94,7 @@ Recent runs focused on two connected lanes:
 | `TitleGenerationService.ts` | `readOfficialSessionTitle()` now routes through `readBackendSessionTitle()` in `AgentBackendRouting` — calls `getSession(sessionId)` on the backend adapter instead of `listSessions()` + client-side filtering. Both OpenCode and Claude paths are unified through the registry. AI title generation (temp session create/delete/send via `openCodeService`) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
 | Context usage detail modal | Raw message loading now routes through `getConversationSessionHistoryService()` with backend-aware normalization; snapshots themselves remain OpenCode-only. |
 | `SettingsConversationSection.ts` | Shared sessions list now routes through `listBackendSessions()` and session message preview routes through `getBackendSessionPreview()` instead of directly calling backend `listSessions()` / `getSessionMessages()` and casting to OpenCode `Session` / `SessionMessage`. The rendering uses `NormalizedSessionRow` and `NormalizedSessionPreviewMessage` types. `unshareSession()` remains a direct `openCodeService` call (OpenCode-specific write). |
+| `OpenCodeAdapter.ts` | `getSession()` now uses the efficient `OpenCodeService.getSessionInfo()` single-session SDK `session.get()` call instead of the O(n) `listSessions()` + `.find()` workaround. The adapter return type remains `unknown | null` — no new cross-backend session contract. |
 
 ### What Remains OpenCode-Only (Intentionally Gated)
 
@@ -217,7 +220,7 @@ The following service seams now route session identity through `getConversationB
 | ConversationSyncBridge | Subscribes to `SessionSyncEventUpdate` from `core/opencode` |
 | ConversationSessionTabResolver | Only reachable through OpenCode sync event subscription |
 | TitleGenerationService | ~~Calls `openCodeService.listSessions()`~~ **FULLY ROUTED for title reads**: `readOfficialSessionTitle` now uses `readBackendSessionTitle()` routing helper → `getSession(sessionId)` on the backend adapter. AI title generation (temp session create/delete/send) remains OpenCode-only until backend-neutral chat contract supports non-streaming single-shot response. |
-| ConversationSessionSettingsCoordinator | ~~Falls back to `openCodeService.listSessions()` for share-URL reads~~ **PRODUCTION PATH ROUTED for share-URL reads**: in the OpenCodianView-wired runtime path, `getCurrentShareUrl` now uses `readBackendSessionShareUrl()` → backend `getSession(sessionId)`. Legacy host-less fallback remains only when no registry is provided. Share/unshare writes remain OpenCode-only. **Session-import-free**: coordinator uses `ShareInspectionEntry` instead of OpenCode `Session` type. |
+| ConversationSessionSettingsCoordinator | **FULLY ROUTED for session reads**: share-URL reads use `readBackendSessionShareUrl()` via registry; the `openCodeService.listSessions()` fallback has been removed. When no registry and no `host.listSessions` is available, returns `null` instead of reaching through to openCodeService. Share/unshare writes remain OpenCode-only via `resolveOpenCodeService()` (only `shareSession`/`unshareSession`, no `listSessions`). **Session-import-free**: coordinator uses `ShareInspectionEntry` instead of OpenCode `Session` type. |
 | PostSyncQuestionTodoRefreshPlanBuilder | **Explicitly gated** — background plan methods return `null` for non-OpenCode conversations; session identity uses `getConversationBackendSessionId()`. Question/todo APIs are OpenCode-only and are not abstracted as cross-backend contracts. |
 | PostSyncQuestionTodoRefreshHostAdapter | **Backend-aware identity** — `getCurrentConversationSessionId()` uses `getConversationBackendSessionId()` instead of direct `openCodeSessionId` access |
 | ConversationSyncVisiblePostSyncRouter | **Explicitly gated** — skips question/todo refresh for non-OpenCode conversations, applies sync update directly. Session identity uses `getConversationBackendSessionId()`. |
