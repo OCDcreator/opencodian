@@ -144,6 +144,7 @@ These items are implemented enough to treat as real delivered backend capability
 | Model / effort / thinking basics | Core Claude settings and options mapping are implemented. |
 | MCP runtime pass-through | MCP servers can be passed through and refreshed at runtime. |
 | MCP Capability Lab detection | MCP is now tracked in the Capability Lab matrix and discovery table as detection-only read status; the surface reports loaded server count when the Claude adapter is available, but does not provide MCP authoring. |
+| Skills / Plugins Capability Lab detection | Runtime-only `skills` and `plugins` option channels are now tracked in the Capability Lab discovery table as detection-only read status; the surface reports loaded plugin count, loaded skill count, and the `skills: "all"` sentinel when the Claude adapter is available, but does not provide authoring. |
 | OpenCode coexistence | OpenCode remains alive as a backend and is not meant to be regressed by Claude work. |
 
 ## What Exists But Must Not Be Described As Stable Completion
@@ -159,7 +160,7 @@ These capabilities are no longer “not wired”, but they are also not stable c
 | Session detail inspection | Capability Lab can inspect raw `getSession()` output per backend session. | `Diagnostic probe only`, not a stable cross-backend session-detail contract. |
 | Rewind | Adapter-level `rewindFiles()` exists, dry-run surface exists, adapter + coordinator + CapLab probe tests now cover all paths. | Not stable-complete until no-data-loss guard and stronger runtime proof are accepted; test hardening does not promote to stable. |
 | Agent definitions | Runtime-only `agent` / `agents` option wiring exists. | Must remain `Hidden / Untested`. |
-| Skills / plugins / agent authoring | Some runtime-only channels exist or are planned, but no stable Claude-native authoring surface is complete in OpenCodian. | Not complete. |
+| Skills / plugins / agent authoring | Runtime-only `skills` and `plugins` channels are wired and have Capability Lab read-only detection counts; no stable Claude-native authoring surface is complete in OpenCodian. | Detection-only, not authoring-complete. |
 
 ## Structured Output Deep-Dive Assessment (2026-05-23)
 
@@ -316,6 +317,7 @@ It currently serves as:
 - a provider-owned session detail diagnostic probe (select a Claude session, run `adapter.getSession(sessionId)`, inspect raw session fields). This probe is diagnostic-only and does NOT represent a stable cross-backend session-detail object contract.
 - a provider-owned backend routing diagnostic probe (shows active backend, registered adapters, conversation backend distribution, and verifies `listSessions()` + `getSession()` through the provider-owned routing path). This probe is diagnostic-only and does NOT represent a stable backend routing product surface.
 - a detection-only MCP Servers row in the capability matrix and discovery table; it reads `adapter.getMcpServerCount()` when available and reports loaded server count without exposing MCP authoring controls.
+- detection-only Plugins and Skills rows in the discovery table; they read `adapter.getPluginCount()` and `adapter.getSkillCount()` when available, report loaded plugin/skill counts or the `skills: "all"` sentinel, and do not expose plugin/skill authoring controls.
 
 Important policy:
 
@@ -458,7 +460,7 @@ Choose one of these modes for the next multi-round session:
 2. **Improve multi-backend abstraction for future backends** — Identify shared seams that would help a third backend (not OpenCode, not Claude) integrate cleanly, and extract them without forcing OpenCode semantics.
 
 3. **Expand Claude-native ecosystem ownership** — History browsing, skills, agents, plugins, or MCP authoring surfaces that are native to Claude's ecosystem and should not be flattened into OpenCode-shaped settings.
-   MCP detection has started in Capability Lab: the matrix/discovery surfaces now report read-only loaded server count through the Claude adapter, while MCP authoring remains future work.
+   MCP / skills / plugins detection has started in Capability Lab: the matrix/discovery surfaces now report read-only loaded server/plugin/skill counts through the Claude adapter, while MCP/skills/plugins authoring remains future work.
 
 4. **Deploy-validation round** — Run Test Vault runtime proof against the latest build to verify the productized backend-aware seams function correctly in the deployed plugin context. This is lower priority since the seams are well-covered by unit tests, but a fresh deployment validation would provide additional confidence before moving to a different mode.
 

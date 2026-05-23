@@ -826,6 +826,27 @@ export class ClaudeCodeAdapter
     return servers ? Object.keys(servers).length : 0;
   }
 
+  /**
+   * Return the number of plugins currently wired into the adapter.
+   * Returns 0 if no plugins have been configured.
+   */
+  getPluginCount(): number {
+    return this.options.plugins?.length ?? 0;
+  }
+
+  /**
+   * Return the number of skills currently wired into the adapter.
+   * Returns 0 if no skills have been configured.
+   * Returns -1 to indicate "all skills" when `skills` is set to `'all'`.
+   */
+  getSkillCount(): number {
+    const skills = this.options.skills;
+    if (skills === 'all') {
+      return -1;
+    }
+    return skills?.length ?? 0;
+  }
+
   private async applyToActiveQueries(
     apply: (runtime: ClaudeCodeSessionRuntime) => Promise<unknown> | void | undefined,
   ): Promise<void> {

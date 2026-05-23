@@ -1501,7 +1501,9 @@ describe('ClaudeCodeAdapter', () => {
         await runtime.next;
       }
     });
+  });
 
+  describe('ClaudeCodeAdapter introspection counts', () => {
     it('getMcpServerCount returns 0 when no MCP config is loaded', () => {
       const adapter = new ClaudeCodeAdapter({
         vaultPath: '/vault',
@@ -1540,6 +1542,69 @@ describe('ClaudeCodeAdapter', () => {
       expect(adapter.getMcpServerCount()).toBe(3);
     });
 
+    it('getPluginCount returns 0 when no plugins configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      expect(adapter.getPluginCount()).toBe(0);
+    });
+
+    it('getPluginCount returns count from plugins option', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        plugins: ['plugin-a', 'plugin-b', 'plugin-c'],
+      });
+      expect(adapter.getPluginCount()).toBe(3);
+    });
+
+    it('getPluginCount returns 0 for empty plugins array', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        plugins: [],
+      });
+      expect(adapter.getPluginCount()).toBe(0);
+    });
+
+    it('getSkillCount returns 0 when no skills configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      expect(adapter.getSkillCount()).toBe(0);
+    });
+
+    it('getSkillCount returns count from skills array option', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        skills: ['skill-a', 'skill-b'],
+      });
+      expect(adapter.getSkillCount()).toBe(2);
+    });
+
+    it('getSkillCount returns 0 for empty skills array', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        skills: [],
+      });
+      expect(adapter.getSkillCount()).toBe(0);
+    });
+
+    it('getSkillCount returns -1 when skills is all', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        skills: 'all',
+      });
+      expect(adapter.getSkillCount()).toBe(-1);
+    });
+  });
+
+  describe('ClaudeCodeAdapter diagnostic session lookup', () => {
     it('passes diagnostic sessionStore through getSession to the SDK', async () => {
       const sdk = createSdk([]);
       sdk.getSessionInfo.mockResolvedValue({

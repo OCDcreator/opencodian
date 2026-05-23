@@ -22,8 +22,10 @@
 | Resume Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并以 `resumeSessionId` 运行诊断 prompt，输出 resulting session id 与文本预览 | `adapter.listSessions()` / `adapter.runDiagnosticPrompt({ resumeSessionId })` |
 | Session Detail Inspection | Provider-owned 诊断探针：选择一个 Claude 会话并调用 `getSession()`，输出 raw session 字段（sessionId, summary, lastModified, messageCount 等）| `adapter.listSessions()` / `adapter.getSession()` |
 | Backend Routing Verification | Provider-owned 诊断探针：显示活跃后端、已注册适配器、会话后端分布，验证 `listSessions()` + `getSession()` 通过 provider-owned 路由路径工作，并额外验证 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 通过 registry 路由层工作 | `AgentServiceRegistry` / `adapter.listSessions()` / `adapter.getSession()` / `listBackendSessions()` / `getBackendSessionPreview()` / `readBackendSessionTitle()` / `readBackendSessionShareUrl()` |
-| Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
+| Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof；Plugins 和 Skills 现在使用 `getPluginCount()` / `getSkillCount()` 显示运行时加载计数 | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
 | MCP Servers Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 MCP server 数量，不提供 authoring | `adapter.getMcpServerCount()` |
+| Plugins Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 plugin 数量，不提供 authoring | `adapter.getPluginCount()` |
+| Skills Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 skill 数量（`-1` 表示全量启用），不提供 authoring | `adapter.getSkillCount()` |
 
 ## 依赖注入
 
@@ -53,7 +55,7 @@
 
 `getClaudeCodeAdapter()` 从 `plugin.agentServiceRegistry` 获取 `'claude-code'` 注册的 adapter 并窄化类型为 `ClaudeCodeAdapter`。如果 adapter 不可用，相关面板显示 "not available" 提示。
 
-Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()` 显示当前已加载 MCP server 数量；adapter 不可用时显示 detection unavailable。该检测为只读，不写入设置，也不创建/编辑 MCP 配置。
+Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`adapter.getPluginCount()` 和 `adapter.getSkillCount()` 显示当前已加载 MCP server / plugin / skill 数量；adapter 不可用时显示 detection unavailable。这些检测均为只读，不写入设置，也不创建/编辑对应配置。Skills 的 `getSkillCount()` 在 `skills` 选项为 `'all'` 时返回 `-1`，面板会显示 "All skills enabled" 而非具体数量。
 
 ## 导入关系
 
@@ -115,5 +117,7 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()` 显示
 - Backend Routing 诊断探针读取已注册适配器时使用 `AgentServiceRegistry.listAll()` 公开接口，不再依赖 registry 私有 `adapters` map 的实现细节
 - Rewind Dry-Run 预览的 `runRewindDryRun()` 方法调用 `adapter.rewindFiles(sessionId, userMessageId, { dryRun: true })` 并渲染结果或错误+提示；该调用路径已有单元测试覆盖（成功渲染 + 失败错误提示），不改变 rewind 仅诊断、非稳定产品的事实
 - Subagent Browser 的 `loadSubagents()` 和 `loadSubagentMessages()` 方法已有完整单元测试覆盖：会话刷新、子代理列表渲染、空列表处理、列表加载失败、子代理消息加载、消息加载失败、运行时证明 pass/fail，共 8 个测试用例
-- Discovery 面板里的 Hooks / Plugins / Skills / Agent Definitions / Session Store 条目都保持 `Discovery Only`，只表示诊断观察，不是稳定产品面；Hook proof 现在会同时展示 SessionStart 事件和 hook event timeline，但仍只属于诊断验证
+- Discovery 面板里的 Hooks / Agent Definitions / Session Store 条目保持 `Discovery Only`，只表示诊断观察，不是稳定产品面；Hook proof 现在会同时展示 SessionStart 事件和 hook event timeline，但仍只属于诊断验证
+- Discovery 面板里的 Plugins 条目现在使用 `adapter.getPluginCount()` 动态显示加载状态：有 plugins 时显示 "Exposed" + 计数，无 plugins 时显示 "Discovery Only"；该检测为只读，不提供 plugin authoring
+- Discovery 面板里的 Skills 条目现在使用 `adapter.getSkillCount()` 动态显示加载状态：有 skills 时显示 "Exposed" + 计数，`skills: 'all'` 时显示 "All skills enabled"，无 skills 时显示 "Discovery Only"；该检测为只读，不提供 skill authoring
 - Discovery 面板里的 MCP Servers 条目同样保持 detection-only：只读取 adapter 的 MCP server count，用于确认静态 options 或动态缓存配置是否已加载，不提供 MCP authoring 或稳定设置入口
