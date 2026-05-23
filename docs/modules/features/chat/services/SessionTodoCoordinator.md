@@ -52,7 +52,7 @@ export class SessionTodoCoordinator {
 
 ## 关键行为
 
-- `refreshTabSessionTodos()` / `refreshTabSessionStatus()` 继续拥有 request-id stale guard，并在 refresh 成功后触发 foreground background-task reconcile
+- `refreshTabSessionTodos()` / `refreshTabSessionStatus()` 继续拥有 request-id stale guard，并在 refresh 成功后触发 foreground background-task reconcile。这两个方法现在有显式 backend gate：如果 `conversation.backend` 不是 `'opencode'`，则跳过 OpenCode-only 的 `getSessionTodos` / `getSessionStatuses` 调用并提前返回空结果
 - `applySessionTodoUpdate()` / `applySessionStatusUpdate()`、`applyStreamingTodoSnapshotFromTool()` 与 tab reset 入口都统一回落到同一套 state write path，避免 live refresh / stream snapshot / activation reset 各走一套 helper
 - `attach()` / `render()` / `updateForTab()` / `destroy()` 继续复用 `SessionTodoDockCoordinator` 的 active-vs-runtime session 选择，不把 dock DOM 细节重新塞回 view
 

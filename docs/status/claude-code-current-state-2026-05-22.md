@@ -182,6 +182,7 @@ The following service seams now route session identity through `getConversationB
 | Context usage detail modal | **Backend-aware** | Routes through `getConversationSessionHistoryService()` with backend-aware message normalization; OpenCode uses `{info, parts}` shape, Claude uses generic SDK message shape. Context usage snapshots remain OpenCode-only. |
 | Modified files sidebar (diff) | **Gated** | OpenCode-only: diff is not stable for Claude |
 | Session todos (identity) | **Yes** | `SessionTodoStateService` uses `getConversationBackendSessionId()` |
+| Session todos (live refresh) | **Explicitly gated** | `SessionTodoCoordinator.refreshTabSessionTodos()` and `refreshTabSessionStatus()` now have explicit `backend !== 'opencode'` guards — non-OpenCode sessions skip `getSessionTodos`/`getSessionStatuses` calls entirely |
 | Background task timeline/notice (identity) | **Yes** | Both services use `getConversationBackendSessionId()` |
 | Conversation identity runtime (log fingerprint) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Slash command undo (revert) | **Gated** | OpenCode-only: backend check |
@@ -199,6 +200,7 @@ The following service seams now route session identity through `getConversationB
 | TitleGenerationService official-title read | **Backend-aware** | Routes through `readBackendSessionTitle()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode path uses `.title`; Claude path uses `.summary`. Unified for both backends. |
 | ConversationSessionSettingsCoordinator share-URL read | **Backend-aware** | Routes through `readBackendSessionShareUrl()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode extracts `session.share.url`; Claude Code returns `null` (no share URL concept). Replaces the previous `listSessions()` + client-side filtering path. Share/unshare writes remain OpenCode-only. **Session-import-free**: coordinator no longer imports OpenCode `Session` type; uses local `ShareInspectionEntry` (`{ id?, share? }`) for all session-related reads and writes. |
 | Capability Lab session detail probe (`getSession`) | **Provider-owned diagnostic** | Routes through `adapter.getSession(sessionId)` on the Claude Code adapter. Shows raw session fields (sessionId, summary, lastModified, messageCount, etc.) as diagnostic output. Not a stable cross-backend session-detail contract. |
+| Capability Lab backend routing probe | **Provider-owned diagnostic** | Verifies the backend routing infrastructure by exercising `listSessions()` + `getSession()` through the provider-owned adapter path. Shows active backend, registered adapters, and conversation backend distribution. Not a stable product surface. |
 
 **Services remaining hard-wired to OpenCode** (no migration justified until backend-neutral equivalents exist):
 
@@ -230,6 +232,7 @@ It currently serves as:
 - a provider-owned fork session diagnostic probe (select a Claude session, run `adapter.forkSession()`, see forked session id/title). This probe is diagnostic-only and does NOT represent stable fork productization.
 - a provider-owned resume session diagnostic probe (select a Claude session, run `adapter.runDiagnosticPrompt({ resumeSessionId })`, see resulting session id/output preview). This probe is diagnostic-only and does NOT represent stable resume-at productization.
 - a provider-owned session detail diagnostic probe (select a Claude session, run `adapter.getSession(sessionId)`, inspect raw session fields). This probe is diagnostic-only and does NOT represent a stable cross-backend session-detail object contract.
+- a provider-owned backend routing diagnostic probe (shows active backend, registered adapters, conversation backend distribution, and verifies `listSessions()` + `getSession()` through the provider-owned routing path). This probe is diagnostic-only and does NOT represent a stable backend routing product surface.
 
 Important policy:
 

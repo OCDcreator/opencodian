@@ -7,10 +7,22 @@ import { setLocale, t } from '../../../../src/i18n';
  * agentServiceRegistry is the only accessed property via getClaudeCodeAdapter().
  */
 function createMockPlugin(adapter: unknown = null): never {
+  const registry = adapter
+    ? {
+        get: jest.fn().mockReturnValue(adapter),
+        getActive: jest.fn().mockReturnValue(null),
+        getActiveKind: jest.fn().mockReturnValue(null),
+        adapters: new Map(),
+      }
+    : {
+        get: jest.fn().mockReturnValue(null),
+        getActive: jest.fn().mockReturnValue(null),
+        getActiveKind: jest.fn().mockReturnValue(null),
+        adapters: new Map(),
+      };
   return {
-    agentServiceRegistry: adapter
-      ? { get: jest.fn().mockReturnValue(adapter) }
-      : undefined,
+    agentServiceRegistry: registry,
+    getConversations: jest.fn().mockReturnValue([]),
   } as never;
 }
 
@@ -54,7 +66,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('NOT STABLE');
   });
 
-  it('renders all nine diagnostic panels including fork, resume, and session detail probes', () => {
+  it('renders all ten diagnostic panels including fork, resume, session detail, and backend routing probes', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -72,6 +84,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(blockIds).toContain('fork');
     expect(blockIds).toContain('resume');
     expect(blockIds).toContain('session-detail');
+    expect(blockIds).toContain('backend-routing');
     expect(blockIds).toContain('structured');
     expect(blockIds).toContain('discovery');
   });
@@ -200,7 +213,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(diagnosticElements.length).toBeGreaterThan(0);
   });
 
-  it('buildMatrixRows returns all 15 expected capabilities', () => {
+  it('buildMatrixRows returns all 16 expected capabilities', () => {
     // We test this indirectly by counting matrix table rows
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -212,7 +225,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(15);
+    expect(rows.length).toBe(16);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1041,6 +1054,65 @@ describe('SettingsCapabilityLabSection', () => {
 
     const row = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr')).find((el) => (
       el.textContent?.includes('Session Detail')
+    )) as HTMLElement | undefined;
+    expect(row).toBeTruthy();
+    const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
+    expect(surfaceChip?.dataset.surface).toBe('diagnostic');
+    expect(surfaceChip?.textContent).toBe('Diagnostic');
+  });
+
+  it('renders backend-routing probe section with routing status display', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const routingBlock = containerEl.querySelector('[data-section-block="backend-routing"]') as HTMLElement | null;
+    expect(routingBlock).toBeTruthy();
+    // Should show active backend status even without adapter
+    expect(routingBlock!.textContent).toContain('Active backend');
+  });
+
+  it('renders backend-routing probe with probe button when adapter is available', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      getSession: jest.fn(),
+      capabilities: new Set(['chat']),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const routingBlock = containerEl.querySelector('[data-section-block="backend-routing"]') as HTMLElement | null;
+    expect(routingBlock).toBeTruthy();
+    const probeButton = routingBlock!.querySelector('button[data-diagnostic]');
+    expect(probeButton).toBeTruthy();
+  });
+
+  it('marks Backend Routing as a diagnostic surface in the capability matrix', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      getSession: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const row = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr')).find((el) => (
+      el.textContent?.includes('Backend Routing')
     )) as HTMLElement | undefined;
     expect(row).toBeTruthy();
     const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;

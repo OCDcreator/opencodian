@@ -310,6 +310,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 新增 `settings.capabilityLab.sessionDetail.*`，为会话详情检查诊断探针提供中文文案。该探针展示 `adapter.getSession()` 返回的原始 session 字段，是 provider-owned 诊断，不代表稳定的跨后端 session-detail 对象契约。
 
+新增 `settings.capabilityLab.backendRouting.*`，为后端路由验证诊断探针提供中文文案。该探针验证后端路由基础设施工作正常，显示活跃后端、已注册适配器和会话后端分布，是 provider-owned 诊断，不代表稳定的后端路由产品界面。
+
 ## 2026-05-22 Structured output 会话渲染
 
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。

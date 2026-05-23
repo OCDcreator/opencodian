@@ -2596,6 +2596,8 @@ export const enTranslations = {
   'settings.capabilityLab.resume.description': 'Provider-owned diagnostic probe for Claude Code SDK resume. Select a session and run a diagnostic prompt resumed from that session. The resulting session id and a short output preview are shown as diagnostic output. Not stable resume-at productization.',
   'settings.capabilityLab.sessionDetail.title': 'Session Detail Inspection (Diagnostic)',
   'settings.capabilityLab.sessionDetail.description': 'Provider-owned diagnostic probe for getSession(). Select a session and inspect its raw detail. Shows sessionId, summary, lastModified, and other available fields as diagnostic output. Not a stable product surface — does not represent a cross-backend session object contract.',
+  'settings.capabilityLab.backendRouting.title': 'Backend Routing Verification (Diagnostic)',
+  'settings.capabilityLab.backendRouting.description': 'Verifies the backend routing infrastructure. Shows the active backend, registered adapters, and conversation backend distribution. Exercises listSessions() and getSession() through the provider-owned routing path.',
   'settings.capabilityLab.discovery.title': 'Discovery & Status',
   'settings.capabilityLab.discovery.description': 'Status overview for hooks, plugins, skills, agents, and other SDK features. No authoring UI — discovery/status only.',
   'settings.user.tab.profile': 'Profile',

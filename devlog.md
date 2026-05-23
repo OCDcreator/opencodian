@@ -12,6 +12,47 @@
 
 ---
 
+## 2026-05-23 Phase 3 — SessionTodoCoordinator backend gates + Backend Routing diagnostic probe
+
+### Summary
+
+Continued Phase 3 backend-aware session read routing by closing the last two ungated production paths and adding a new provider-owned diagnostic probe to the Capability Lab.
+
+### Production fix: SessionTodoCoordinator backend gates
+
+`SessionTodoCoordinator.refreshTabSessionTodos()` and `refreshTabSessionStatus()` were the last two production code paths that called `openCodeService.getSessionTodos()` / `openCodeService.getSessionStatuses()` without an explicit `backend !== 'opencode'` guard. For non-OpenCode sessions, these would silently attempt OpenCode-only API calls.
+
+Added explicit backend gates to both methods: they now check `conversation.backend ?? 'opencode'` via the existing `getConversationForTab()` host method and return early (empty todos / null status) for non-OpenCode sessions, matching the gating pattern used by `ConversationAuthoritativeReloadCoordinator`, `ConversationNoticeCoordinator`, `ChildSessionGraphCoordinator`, and others.
+
+### Diagnostic probe: Backend Routing Verification
+
+Added a new "Backend Routing" diagnostic probe (block ID `backend-routing`) to `SettingsCapabilityLabSection`:
+- Matrix row #16: "Backend Routing" — SDK Exposed ✓, Adapter Wired ✓, Runtime Proof: untested → pass/fail via probe
+- Shows active backend type, registered adapters, and conversation backend distribution (OpenCode vs other)
+- When Claude Code adapter is available, provides a "Run Backend Routing Probe" button that exercises `listSessions()` + `getSession()` through the provider-owned adapter path
+- When only OpenCode is available, shows informational status about the routing infrastructure
+
+### Files changed
+
+- `src/features/chat/services/SessionTodoCoordinator.ts` — backend gates on `refreshTabSessionTodos()` and `refreshTabSessionStatus()`
+- `src/features/settings/SettingsCapabilityLabSection.ts` — Backend Routing matrix row + render/run probe methods
+- `src/i18n/locales/en.ts` — `settings.capabilityLab.backendRouting.*` keys
+- `src/i18n/locales/zh.ts` — `settings.capabilityLab.backendRouting.*` keys
+- `tests/unit/features/chat/SessionTodoCoordinator.test.ts` — 5 new backend gate tests
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — matrix count 15→16, block count 9→10, 3 new backend routing tests
+- `docs/modules/features/chat/services/SessionTodoCoordinator.md` — backend gate documentation
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — new probe documentation
+- `docs/modules/i18n/locales/en.md` + `zh.md` — i18n change log
+- `docs/status/claude-code-current-state-2026-05-22.md` — session todo gate + backend routing probe entries
+- `graphify-out/` — refreshed
+
+### Verification
+
+- 3029 tests pass (431 suites)
+- `npm run verify` green (lint, typecheck, test, build, module-docs, graphify)
+- Test Vault deployed with BUILD_ID `feature-phase0-capability.202605231236`
+- Runtime: plugin reload clean, no errors, backend-routing block renders correctly with Active backend: opencode, Registered adapters: opencode/claude-code, 208 conversations (186 OpenCode, 22 other)
+
 ## 2026-05-20 Phase 0 capability finish
 
 - Completed the Phase 0/1 chat capability finish for backend-aware UX without moving new runtime ownership back into `main.ts`.

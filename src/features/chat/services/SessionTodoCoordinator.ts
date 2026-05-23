@@ -137,6 +137,15 @@ export class SessionTodoCoordinator {
       return [];
     }
 
+    // Backend gate: todos are an OpenCode-only feature.
+    // Non-OpenCode sessions should not trigger getSessionTodos calls.
+    const conversation = this.host.getConversationForTab(tabId);
+    const backend = conversation?.backend ?? 'opencode';
+    if (backend !== 'opencode') {
+      this.render(tabId);
+      return [];
+    }
+
     const requestId = runtime.todoRequestId + 1;
     runtime.todoRequestId = requestId;
 
@@ -167,6 +176,15 @@ export class SessionTodoCoordinator {
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime || !sessionId) {
       this.writeSessionStatus(tabId, sessionId ?? null, null);
+      return null;
+    }
+
+    // Backend gate: session statuses are an OpenCode-only feature.
+    // Non-OpenCode sessions should not trigger getSessionStatuses calls.
+    const conversation = this.host.getConversationForTab(tabId);
+    const backend = conversation?.backend ?? 'opencode';
+    if (backend !== 'opencode') {
+      this.writeSessionStatus(tabId, sessionId, null);
       return null;
     }
 

@@ -2596,6 +2596,8 @@ export const zhTranslations = {
   'settings.capabilityLab.resume.description': 'Claude Code SDK resume 的供应商级诊断探针。选择一个会话并从该会话恢复运行诊断提示。恢复后的会话 ID 和简短输出预览将作为诊断输出显示。非稳定的 resume-at 产品化。',
   'settings.capabilityLab.sessionDetail.title': '会话详情检查（诊断用）',
   'settings.capabilityLab.sessionDetail.description': 'getSession() 的供应商级诊断探针。选择一个会话并检查其原始详情。显示 sessionId、摘要、最后修改时间和其它可用字段作为诊断输出。非稳定产品界面——不代表跨后端会话对象契约。',
+  'settings.capabilityLab.backendRouting.title': '后端路由验证（诊断用）',
+  'settings.capabilityLab.backendRouting.description': '验证后端路由基础设施。显示活跃后端、已注册适配器和会话后端分布。通过供应商级路由路径执行 listSessions() 和 getSession()。',
   'settings.capabilityLab.discovery.title': '发现与状态',
   'settings.capabilityLab.discovery.description': 'hooks、插件、技能、代理和其他 SDK 功能的状态概览。无创作 UI — 仅发现/状态。',
   'settings.user.tab.profile': '个人资料',

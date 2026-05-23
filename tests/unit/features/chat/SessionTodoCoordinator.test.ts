@@ -219,4 +219,64 @@ describe('SessionTodoCoordinator', () => {
     expect(runtime.sessionStatusSessionId).toBeNull();
     expect(host.getSessionStatuses).not.toHaveBeenCalled();
   });
+
+  // ── Backend gate tests ──────────────────────────────────────────────
+  // Non-OpenCode sessions must not trigger getSessionTodos / getSessionStatuses.
+
+  it('skips getSessionTodos for non-OpenCode backend sessions', async () => {
+    const { coordinator, host } = createFixture();
+    host.getConversationForTab.mockReturnValue({ backend: 'claude-code' } as Conversation);
+
+    const result = await coordinator.refreshTabSessionTodos('tab-1', 'session-1');
+
+    expect(result).toEqual([]);
+    expect(host.getSessionTodos).not.toHaveBeenCalled();
+  });
+
+  it('skips getSessionStatuses for non-OpenCode backend sessions', async () => {
+    const { coordinator, host } = createFixture();
+    host.getConversationForTab.mockReturnValue({ backend: 'claude-code' } as Conversation);
+
+    const result = await coordinator.refreshTabSessionStatus('tab-1', 'session-1');
+
+    expect(result).toBeNull();
+    expect(host.getSessionStatuses).not.toHaveBeenCalled();
+  });
+
+  it('proceeds with getSessionTodos for OpenCode backend sessions', async () => {
+    const { coordinator, host } = createFixture();
+    const todos = [createTodo('todo-1')];
+    host.getConversationForTab.mockReturnValue({ backend: 'opencode' } as Conversation);
+    host.getSessionTodos.mockResolvedValue(todos);
+
+    const result = await coordinator.refreshTabSessionTodos('tab-1', 'session-1');
+
+    expect(result).toEqual(todos);
+    expect(host.getSessionTodos).toHaveBeenCalledWith('session-1');
+  });
+
+  it('proceeds with getSessionStatuses for OpenCode backend sessions', async () => {
+    const { coordinator, host, runtime } = createFixture();
+    const status = { type: 'busy' as const };
+    host.getConversationForTab.mockReturnValue({ backend: 'opencode' } as Conversation);
+    host.getSessionStatuses.mockResolvedValue({ 'session-1': status });
+
+    const result = await coordinator.refreshTabSessionStatus('tab-1', 'session-1');
+
+    expect(result).toEqual(status);
+    expect(host.getSessionStatuses).toHaveBeenCalled();
+    expect(runtime?.sessionStatus).toEqual(status);
+  });
+
+  it('treats missing backend field as opencode and proceeds with getSessionTodos', async () => {
+    const { coordinator, host } = createFixture();
+    const todos = [createTodo('todo-1')];
+    host.getConversationForTab.mockReturnValue({} as Conversation);
+    host.getSessionTodos.mockResolvedValue(todos);
+
+    const result = await coordinator.refreshTabSessionTodos('tab-1', 'session-1');
+
+    expect(result).toEqual(todos);
+    expect(host.getSessionTodos).toHaveBeenCalledWith('session-1');
+  });
 });

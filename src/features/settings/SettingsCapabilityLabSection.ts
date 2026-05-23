@@ -347,6 +347,13 @@ export class SettingsCapabilityLabSection {
     });
     this.renderSessionDetailProbe(sessionDetailBlock);
 
+    // ── Backend Routing Diagnostic (provider-owned, diagnostic only) ──
+    const backendRoutingBlock = containerEl.createDiv({
+      cls: 'opencodian-settings-block',
+      attr: { 'data-section-block': 'backend-routing' },
+    });
+    this.renderBackendRoutingProbe(backendRoutingBlock);
+
     // ── Discovery / Status ─────────────────────────────────────────────
     const discoveryBlock = containerEl.createDiv({
       cls: 'opencodian-settings-block',
@@ -515,6 +522,13 @@ export class SettingsCapabilityLabSection {
         adapterWired: !!adapter, // adapter.getSession()
         runtimeProof: 'untested',
         userSurface: 'diagnostic', // Capability Lab session detail probe only
+      },
+      {
+        capability: 'Backend Routing',
+        sdkExposed: true, // AgentServiceRegistry provides routing
+        adapterWired: true, // registry.getActive() resolves adapter
+        runtimeProof: 'untested',
+        userSurface: 'diagnostic', // Capability Lab backend routing probe only
       },
     ];
   }
@@ -1444,6 +1458,169 @@ export class SettingsCapabilityLabSection {
         text: 'Hint: getSession() requires a valid session id and a running Claude Code SDK runtime.',
       });
       this.updateRuntimeProof('Session Detail', 'fail', outputEl);
+    }
+  }
+
+  // =======================================================================
+  // Backend Routing Diagnostic Probe (provider-owned, diagnostic only)
+  // =======================================================================
+
+  private renderBackendRoutingProbe(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', { text: t('settings.capabilityLab.backendRouting.title') });
+    containerEl.createEl('p', {
+      cls: 'opencodian-capability-lab-description',
+      text: t('settings.capabilityLab.backendRouting.description'),
+    });
+
+    const registry = this.plugin.agentServiceRegistry;
+    const activeKind = registry?.getActiveKind() ?? null;
+
+    // Show current routing state
+    const statusEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-status',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    statusEl.createEl('p', {
+      cls: 'opencodian-capability-lab-hint',
+      text: `Active backend: ${activeKind ?? '(none)'}`,
+    });
+
+    // Show registered adapters
+    const registeredKinds = registry
+      ? Array.from(
+          (registry as unknown as { adapters: Map<string, unknown> }).adapters.keys(),
+        )
+      : [];
+    if (registeredKinds.length > 0) {
+      statusEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Registered adapters: ${registeredKinds.join(', ')}`,
+      });
+    } else {
+      statusEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'No adapters registered.',
+      });
+    }
+
+    // Show backend gate verification for loaded conversations
+    const conversations = this.plugin.getConversations?.() ?? [];
+    const openCodeCount = conversations.filter(
+      (c: { backend?: string }) => (c.backend ?? 'opencode') === 'opencode',
+    ).length;
+    const nonOpenCodeCount = conversations.length - openCodeCount;
+
+    if (conversations.length > 0) {
+      statusEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Conversations: ${conversations.length} total (${openCodeCount} OpenCode, ${nonOpenCodeCount} other)`,
+      });
+    }
+
+    // Probe button - verify routing works through the adapter
+    const adapter = getClaudeCodeAdapter(this.plugin);
+    if (!adapter) {
+      statusEl.createEl('p', {
+        cls: 'opencodian-capability-lab-unavailable',
+        text: 'Claude Code adapter not available. Backend routing probe requires an active adapter.',
+      });
+      containerEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '⚠️ OpenCode-only mode: the registry routes through openCodeService directly. ' +
+          'Backend gates on coordinator paths prevent OpenCode-only API calls for non-OpenCode sessions.',
+      });
+      return;
+    }
+
+    const probeBtn = containerEl.createEl('button', {
+      text: 'Run Backend Routing Probe',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    const outputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    probeBtn.addEventListener('click', () => {
+      void this.runBackendRoutingProbe(adapter, outputEl);
+    });
+  }
+
+  private async runBackendRoutingProbe(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running backend routing probe…' });
+
+    try {
+      // Test 1: listSessions through adapter (provider-owned path)
+      const sessions = await adapter.listSessions();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Backend Routing Probe Results' });
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `listSessions() via adapter: ${sessions.length} session(s) returned.`,
+      });
+
+      if (sessions.length > 0) {
+        // Test 2: getSession through adapter for the first session
+        const firstSession = sessions[0];
+        const sessionId = firstSession.sessionId;
+
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Testing getSession() for session ${sessionId.slice(0, 12)}…`,
+        });
+
+        const session = await adapter.getSession(sessionId);
+        if (session) {
+          outputEl.createEl('p', {
+            cls: 'opencodian-capability-lab-hint',
+            text: `getSession() returned: ${String((session as unknown as Record<string, unknown>).sessionId ?? (session as unknown as Record<string, unknown>).id ?? '(no id)')}`,
+          });
+          outputEl.createEl('pre', {
+            cls: 'opencodian-capability-lab-json-preview',
+            text: truncate(formatJsonPreview(session), 4000),
+          });
+        } else {
+          outputEl.createEl('p', {
+            cls: 'opencodian-capability-lab-hint',
+            text: 'getSession() returned null.',
+          });
+        }
+      }
+
+      // Test 3: verify capabilities
+      const caps = adapter.capabilities;
+      if (caps) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Declared capabilities: ${Array.from(caps).join(', ') || '(none)'}`,
+        });
+      }
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '✓ Backend routing probe completed successfully. Adapter-provided session reads are functional.',
+      });
+      this.updateRuntimeProof('Backend Routing', 'pass', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Backend routing probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Hint: The probe requires a running Claude Code SDK runtime and a valid adapter.',
+      });
+      this.updateRuntimeProof('Backend Routing', 'fail', outputEl);
     }
   }
 
