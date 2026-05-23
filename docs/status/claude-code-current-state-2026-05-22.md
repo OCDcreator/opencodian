@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `4ca7364c`
-- Commit subject: `fix: add null-item filtering and adapter-error guards to backend-aware routing helpers`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231604`
+- Snapshot commit: `df7c48d2`
+- Commit subject: `fix: add try/catch around listSessions and getSessionMessages in productized seams`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231609`
 - Recent continuity commits in this lane:
+- `df7c48d2` — `fix: add try/catch around listSessions and getSessionMessages in productized seams`
 - `4ca7364c` — `fix: add null-item filtering and adapter-error guards to backend-aware routing helpers`
 - `260049ac` — `fix: add Array.isArray guard to loadBackendSessionMessages for runtime safety`
 - `831170b7` — `test: harden backend routing edge cases and record proof`
@@ -545,8 +546,13 @@ A follow-up audit found that `listBackendSessions()` and `getBackendSessionPrevi
 ### Verification
 
 - `npm run verify` passed with `431` suites / `3059` tests
-- Build completed with `BUILD_ID feature-phase0-capability.202605231608`
+- Build completed with `BUILD_ID feature-phase0-capability.202605231609`
 - No new shared `getSession()` consumers were added; this is a defensive hardening of existing backend-aware seams
+- Test Vault runtime proof with the latest deployed build still passes the provider-owned Capability Lab backend-routing assertion:
+  - deployed `main.js` contains `BUILD_ID=feature-phase0-capability.202605231609`
+  - `obsidian plugin:reload id=opencodian vault=testvault` succeeded
+  - `capability-lab-backend-routing-assertion.js` returned `ok: true`
+  - `obsidian dev:errors vault=testvault` returned `No errors captured.`
 
 ## Hard Guardrails
 
