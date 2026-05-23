@@ -16,6 +16,7 @@
 - 提供 `getConversationSessionHistoryService()` 用于 session 消息读取路由，仅返回同时实现了 `getSessionMessages()` 的 session backend
 - 提供 `getActiveSessionHistoryService()` 用于 active backend 的 session 消息读取路由，供无 conversation context 的消费方（如 settings inspection surface）使用
 - 提供 `readBackendSessionTitle()` 用于 backend-aware session 标题读取路由，通过 `getSession(sessionId)` 获取 session 详情并按已 productize 的 backend kind 提取标题字段（OpenCode: `.title`，Claude Code: `.summary`）；未来 backend 在明确字段语义前返回 `null`
+- 提供 `readBackendSessionShareUrl()` 用于 backend-aware session 分享链接读取路由，通过 `getSession(sessionId)` 获取 session 详情并按已 productize 的 backend kind 提取分享 URL（OpenCode: `session.share.url`；Claude Code 及其他 backend 目前无分享概念，返回 `null`）。这是一个**窄的 backend-aware session-detail read seam**，仅用于分享链接读取，不作为 generic stable cross-backend session-detail object contract
 
 ## 维护约束
 

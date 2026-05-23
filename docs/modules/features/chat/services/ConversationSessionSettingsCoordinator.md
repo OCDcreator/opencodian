@@ -40,6 +40,7 @@ export interface ConversationSessionSettingsCoordinatorHost {
   supportsTitleGeneration?(): boolean;
   supportsCompaction?(): boolean;
   supportsQuestions?(): boolean;
+  agentServiceRegistry?: AgentServiceRegistry;
 }
 
 export class ConversationSessionSettingsCoordinator {
@@ -55,7 +56,7 @@ export class ConversationSessionSettingsCoordinator {
 
 ## 关键行为
 
-- `openCurrentConversationSettings()` 只对当前会话开放；没有 active conversation 时直接给出 notice。打开前会用 `getConversationBackendSessionId()` 解析当前 session，再读取 `listSessions()` 中当前 session 的 `share.url`，并读取项目级 `share` 模式，把已分享/未分享/禁用状态传给 modal
+- `openCurrentConversationSettings()` 只对当前会话开放；没有 active conversation 时直接给出 notice。打开前会用 `getConversationBackendSessionId()` 解析当前 session，再通过 `readBackendSessionShareUrl()` 路由读取当前 session 的分享链接（通过 registry `getSession(sessionId)` 而不是列出所有 sessions）；如果 host 未提供 `agentServiceRegistry`，则退回 `host.listSessions()` 或 `openCodeService.listSessions()` 兜底路径。同时读取项目级 `share` 模式，把已分享/未分享/禁用状态传给 modal
 - `resolveEffectiveSettings()` 使用 plugin-level defaults 作为 base，再让 `Conversation.sessionSettings` 中的 `number / null` 覆盖或显式继承
 - `applyConversationVisualState()` 只负责把 effective `chatFontSizePx` 写到 `--opencodian-chat-font-size`
 - modal 输入期间会调用 preview path 临时应用 `chatFontSizePx`，不修改 `Conversation.sessionSettings` 也不触发 save；取消或关闭弹窗时重新应用真实 conversation state
@@ -67,7 +68,7 @@ export class ConversationSessionSettingsCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 只负责装配 host seam，并在 header action、tab activation state bridge、hydration outcome 与 appearance refresh 处调用 coordinator
-- coordinator 优先使用 host seam 提供的 list/share/unshare/copyText 回调；未提供时从 `app.plugins.plugins.opencodian.openCodeService` 解析 OpenCode session wrappers，并直接使用 `navigator.clipboard.writeText()`
+- coordinator 优先使用 host seam 提供的 `agentServiceRegistry` 通过 `readBackendSessionShareUrl()` 进行 backend-aware 分享链接读取；未提供 registry 时优先使用 host seam 提供的 list/share/unshare/copyText 回调；都未提供时从 `app.plugins.plugins.opencodian.openCodeService` 解析 OpenCode session wrappers，并直接使用 `navigator.clipboard.writeText()`
 - modal 具体 DOM 与校验留在 `ui/ConversationSessionSettingsModal.ts`
 
 ## 注意事项

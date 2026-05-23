@@ -1,5 +1,7 @@
 import type { App } from 'obsidian';
 
+import { readBackendSessionShareUrl } from '../../../core/agents/backend/AgentBackendRouting';
+import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
 import type { Session } from '../../../core/opencode/OpenCodeSessionLifecycleCoordinator';
 import type {
   Conversation,
@@ -39,6 +41,12 @@ export interface ConversationSessionSettingsCoordinatorHost {
   supportsCompaction?(): boolean;
   /** Whether to show question-card summary rows. OpenCode conversations default to true. */
   supportsQuestions?(): boolean;
+  /**
+   * Optional registry for backend-aware session detail reads.
+   * When provided, share-URL reads route through the registry instead of
+   * falling back to `openCodeService.listSessions()`.
+   */
+  agentServiceRegistry?: AgentServiceRegistry;
 }
 
 export class ConversationSessionSettingsCoordinator {
@@ -59,7 +67,7 @@ export class ConversationSessionSettingsCoordinator {
     const showCompaction = this.host.supportsCompaction?.() === true;
 
     const sessionId = getConversationBackendSessionId(conversation);
-    const shareUrl = showSharing && sessionId ? await this.getCurrentShareUrl(sessionId) : undefined;
+    const shareUrl = showSharing && sessionId ? await this.getCurrentShareUrl(conversation, sessionId) : undefined;
     const shareMode = showSharing ? await this.getProjectShareMode() : undefined;
 
     new ConversationSessionSettingsModal(this.host.app, {
@@ -105,8 +113,14 @@ export class ConversationSessionSettingsCoordinator {
     return (conversation.backend ?? 'opencode') === 'opencode';
   }
 
-  private async getCurrentShareUrl(sessionId: string): Promise<string | null> {
+  private async getCurrentShareUrl(conversation: Conversation, sessionId: string): Promise<string | null> {
     try {
+      // Prefer registry routing (backend-aware getSession) over listing all sessions.
+      const registry = this.host.agentServiceRegistry;
+      if (registry) {
+        return await readBackendSessionShareUrl(registry, conversation, sessionId);
+      }
+      // Legacy fallback: host.listSessions or openCodeService.listSessions.
       const sessions = this.host.listSessions
         ? await this.host.listSessions()
         : await this.resolveOpenCodeService().listSessions?.() ?? [];

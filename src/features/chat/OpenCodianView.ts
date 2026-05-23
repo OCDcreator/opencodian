@@ -692,6 +692,7 @@ export class OpenCodianView extends ItemView {
       },
       supportsSessionSharing: () => hasCapability(this.caps, AgentCapability.Sharing),
       supportsCompaction: () => hasCapability(this.caps, AgentCapability.Compaction),
+      agentServiceRegistry: this.plugin.agentServiceRegistry,
     };
   }
 

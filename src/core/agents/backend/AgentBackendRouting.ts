@@ -137,6 +137,61 @@ export async function readBackendSessionTitle(
 }
 
 // ---------------------------------------------------------------------------
+// Backend-aware session share-URL read
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the share URL of a backend session through the routing layer.
+ *
+ * Routes through the registry and calls `getSession(sessionId)` on the
+ * backend adapter, then extracts the backend-specific share URL field:
+ * - OpenCode: `session.share.url`
+ * - Claude Code and other backends: no share URL equivalent → `null`
+ *
+ * This is a **narrow backend-aware session-detail read seam** for share-URL
+ * inspection only.  It must not be described as a generic stable
+ * cross-backend session-detail object contract.
+ *
+ * Returns `null` when no session service is available, `getSession` is not
+ * implemented, the session is not found, the backend has no share URL
+ * concept, or the share URL is empty.
+ */
+export async function readBackendSessionShareUrl(
+  registry: AgentServiceRegistry | null | undefined,
+  conversation: Pick<Conversation, 'backend'> | null,
+  sessionId: string | null,
+): Promise<string | null> {
+  if (!sessionId) {
+    return null;
+  }
+
+  const sessionService = getConversationSessionBackendService(registry, conversation);
+  if (!sessionService || typeof sessionService.getSession !== 'function') {
+    return null;
+  }
+
+  const backend = resolveConversationBackendKind(conversation);
+  const session = await sessionService.getSession(sessionId);
+  if (!session || typeof session !== 'object') {
+    return null;
+  }
+
+  const record = session as Record<string, unknown>;
+
+  if (backend === 'opencode') {
+    const share = record.share;
+    if (!share || typeof share !== 'object') {
+      return null;
+    }
+    const url = (share as Record<string, unknown>).url;
+    return typeof url === 'string' && url.trim().length > 0 ? url : null;
+  }
+
+  // Claude Code and other backends: no share URL concept at this time.
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Backend-aware session message normalization
 // ---------------------------------------------------------------------------
 

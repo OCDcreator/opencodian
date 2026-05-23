@@ -6,6 +6,7 @@ import {
   getConversationSessionBackendService,
   getConversationSessionHistoryService,
   loadBackendSessionMessages,
+  readBackendSessionShareUrl,
   readBackendSessionTitle,
 } from '../../../../../src/core/agents/backend/AgentBackendRouting';
 import type {
@@ -290,6 +291,93 @@ describe('readBackendSessionTitle', () => {
       });
       const registry = createMockRegistry(new Map([['codex', adapter]]));
       const result = await readBackendSessionTitle(registry, { backend: 'codex' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+});
+
+describe('readBackendSessionShareUrl', () => {
+    it('returns null when sessionId is null', async () => {
+      const result = await readBackendSessionShareUrl(null, null, null);
+      expect(result).toBeNull();
+    });
+
+    it('returns null when registry is null', async () => {
+      const result = await readBackendSessionShareUrl(null, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when adapter lacks getSession', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES);
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns OpenCode share URL from session.share.url', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => ({
+          id: 'ses-1',
+          title: 'My Session',
+          share: { url: 'https://opencode.ai/s/ses-1' },
+        }),
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBe('https://opencode.ai/s/ses-1');
+    });
+
+    it('returns null when OpenCode session has no share object', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => ({ id: 'ses-1', title: 'My Session' }),
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when share.url is empty string', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => ({
+          id: 'ses-1',
+          share: { url: '   ' },
+        }),
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when session is not found', async () => {
+      const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+        getSession: async () => null,
+      });
+      const registry = createMockRegistry(new Map([['opencode', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'opencode' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for Claude Code backend (no share URL concept)', async () => {
+      const adapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Chat,
+        AgentCapability.Sessions,
+        AgentCapability.Fork,
+      ]), {
+        getSession: async () => ({ sessionId: 'ses-1', summary: 'Claude Chat' }),
+      });
+      const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'claude-code' }, 'ses-1');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for unmapped backend kind', async () => {
+      const adapter = createMockSessionAdapter('codex', new Set([
+        AgentCapability.Chat,
+        AgentCapability.Sessions,
+      ]), {
+        getSession: async () => ({ id: 'ses-1', share: { url: 'https://example.com/s/ses-1' } }),
+      });
+      const registry = createMockRegistry(new Map([['codex', adapter]]));
+      const result = await readBackendSessionShareUrl(registry, { backend: 'codex' }, 'ses-1');
       expect(result).toBeNull();
     });
 });
