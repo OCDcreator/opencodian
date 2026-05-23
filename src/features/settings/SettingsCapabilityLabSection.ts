@@ -1880,7 +1880,7 @@ export class SettingsCapabilityLabSection {
       'MCP Servers',
       mcpStatus,
       mcpStatus
-        ? `${mcpServerCount} server(s) loaded. Runtime passthrough via ClaudeCodeMcpConfigAdapter. No Claude Code settings tab.`
+        ? `${mcpServerCount} server(s) loaded. Runtime passthrough via ClaudeCodeMcpConfigAdapter. Claude Code settings Tools tab can refresh runtime config.`
         : 'Runtime passthrough via ClaudeCodeMcpConfigAdapter. No servers loaded or adapter not started.',
     );
     // Agent definitions

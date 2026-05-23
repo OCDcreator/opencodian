@@ -758,6 +758,49 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('sdk-foundations tab', () => {
+    it('shows read-only runtime plugins and skills status from the active Claude adapter', () => {
+      const claudeAdapter = {
+        getPluginCount: jest.fn().mockReturnValue(2),
+        getPluginsList: jest.fn().mockReturnValue(['plugin-a', 'plugin-b']),
+        getSkillCount: jest.fn().mockReturnValue(3),
+        getSkillsList: jest.fn().mockReturnValue(['skill-a', 'skill-b', 'skill-c']),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'sdk-foundations');
+
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.name'));
+      expect(containerEl.textContent).toContain(
+        t('settings.claudeCode.runtimeEcosystem.plugins.loaded', { count: 2, names: 'plugin-a, plugin-b' }),
+      );
+      expect(containerEl.textContent).toContain(
+        t('settings.claudeCode.runtimeEcosystem.skills.loaded', { count: 3, names: 'skill-a, skill-b, skill-c' }),
+      );
+    });
+
+    it('shows all-skills sentinel in the runtime ecosystem summary', () => {
+      const claudeAdapter = {
+        getPluginCount: jest.fn().mockReturnValue(0),
+        getPluginsList: jest.fn().mockReturnValue([]),
+        getSkillCount: jest.fn().mockReturnValue(-1),
+        getSkillsList: jest.fn().mockReturnValue('all'),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'sdk-foundations');
+
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.plugins.empty'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.skills.all'));
+    });
+
     it('renders SDK foundation toggles without stable authoring UI', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

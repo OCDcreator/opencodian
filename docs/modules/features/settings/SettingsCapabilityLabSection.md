@@ -55,7 +55,7 @@
 
 `getClaudeCodeAdapter()` 从 `plugin.agentServiceRegistry` 获取 `'claude-code'` 注册的 adapter 并窄化类型为 `ClaudeCodeAdapter`。如果 adapter 不可用，相关面板显示 "not available" 提示。
 
-Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`adapter.getPluginCount()` 和 `adapter.getSkillCount()` 显示当前已加载 MCP server / plugin / skill 数量，并通过 `getPluginsList()` / `getSkillsList()` 在 notes 中显示配置名称列表；adapter 不可用时显示 detection unavailable。这些检测均为只读，不写入设置，也不创建/编辑对应配置。Skills 的 `getSkillCount()` 在 `skills` 选项为 `'all'` 时返回 `-1`，面板会显示 "All skills enabled" 而非具体数量。Capability matrix 中 Skills 和 Plugins 仍保持 `runtimeProof: 'untested'` 与 `userSurface: 'hidden'`；当前名称列表只是配置摘要诊断，不是 runtime proof，也不是 authoring UI。
+Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`adapter.getPluginCount()` 和 `adapter.getSkillCount()` 显示当前已加载 MCP server / plugin / skill 数量，并通过 `getPluginsList()` / `getSkillsList()` 在 notes 中显示配置名称列表；adapter 不可用时显示 detection unavailable。这些检测均为只读，不写入设置，也不创建/编辑对应配置。Skills 的 `getSkillCount()` 在 `skills` 选项为 `'all'` 时返回 `-1`，面板会显示 "All skills enabled" 而非具体数量。MCP notes 现在指向 Claude Code settings 的 Tools tab runtime refresh 控件；Skills / Plugins 的可见只读摘要在 Claude Code settings 的 SDK Foundations tab 中显示。Capability matrix 中 Skills 和 Plugins 仍保持 `runtimeProof: 'untested'` 与 `userSurface: 'hidden'`；当前名称列表只是配置摘要诊断，不是 runtime proof，也不是 authoring UI。
 
 ## 导入关系
 

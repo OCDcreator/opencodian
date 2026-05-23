@@ -107,6 +107,37 @@ This round productizes a small, honest MCP runtime control in the Claude Code To
   - settings runtime text: `当前 Claude Code adapter 没有加载 MCP 服务器。`
   - refresh button present: `刷新 MCP 运行时`
 
+## 2026-05-23 Phase 2 runtime ecosystem read-only settings summary
+
+This round moves a small part of Claude-native ecosystem visibility from Capability Lab into the regular Claude Code settings surface, without adding authoring.
+
+### What Changed
+
+- The Claude Code SDK Foundations tab now shows a read-only Runtime ecosystem summary
+- The summary reports currently wired runtime plugins via `getPluginCount()` / `getPluginsList()`
+- The summary reports currently wired runtime skills via `getSkillCount()` / `getSkillsList()`, including the `skills: "all"` sentinel
+- Capability Lab MCP discovery text now points to the Claude Code settings Tools tab runtime refresh control instead of claiming there is no Claude settings tab
+
+### What This Does Not Change
+
+- No skills/plugins authoring UI is exposed
+- No Claude skill/plugin config files are written
+- Capability Lab Skills and Plugins remain diagnostic / detection-only; this is a read-only status promotion, not stable ecosystem authoring
+
+### Verification
+
+- Focused settings tests cover plugin names, skill names, and the all-skills sentinel in SDK Foundations
+- Focused Capability Lab tests cover the updated MCP discovery text
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `435` suites / `3210` tests and production build
+- `npm run build` passed again with `BUILD_ID: feature-phase0-capability.202605232319`
+- Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/`
+- Test Vault `main.js` contains `feature-phase0-capability.202605232319`, and the deployed Claude SDK binary checksum matches `dist`
+- Fresh Obsidian runtime proof:
+  - screenshot: `.obsidian-debug/claude-runtime-ecosystem-proof-sdk-foundations.png`
+  - DOM assertion: `data-claude-code-runtime-ecosystem` contains the read-only runtime ecosystem summary with no translation-key leakage
+  - console: `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605232319` and `supportedModels count {"count":5}` recorded
+  - `dev:errors`: no errors captured
+
 ## Source Of Truth Order
 
 Read these in order when continuing Claude work:

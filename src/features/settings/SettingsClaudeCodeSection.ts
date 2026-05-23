@@ -546,7 +546,20 @@ export class SettingsClaudeCodeSection {
   // ─── SDK Foundations tab ─────────────────────────────────────────
 
   private renderSdkFoundationsTab(containerEl: HTMLElement): void {
+    this.renderRuntimeEcosystemStatus(containerEl);
     this.renderSdkFoundationOptions(containerEl);
+  }
+
+  private renderRuntimeEcosystemStatus(containerEl: HTMLElement): void {
+    const statusEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-ecosystem',
+      attr: { 'data-claude-code-runtime-ecosystem': 'true' },
+    });
+    statusEl.createEl('strong', { text: t('settings.claudeCode.runtimeEcosystem.name') });
+    statusEl.createEl('p', { text: t('settings.claudeCode.runtimeEcosystem.desc') });
+    const listEl = statusEl.createEl('ul');
+    listEl.createEl('li', { text: this.describeRuntimePlugins() });
+    listEl.createEl('li', { text: this.describeRuntimeSkills() });
   }
 
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {
@@ -724,6 +737,43 @@ export class SettingsClaudeCodeSection {
       reloadMcpServers?: () => Promise<void> | void;
     } | null;
     await adapter?.reloadMcpServers?.();
+  }
+
+  private describeRuntimePlugins(): string {
+    const adapter = this.getClaudeAdapter() as {
+      getPluginCount?: () => number;
+      getPluginsList?: () => string[];
+    } | null;
+    const count = adapter?.getPluginCount?.() ?? 0;
+    if (count <= 0) {
+      return t('settings.claudeCode.runtimeEcosystem.plugins.empty');
+    }
+    const names = adapter?.getPluginsList?.() ?? [];
+    return t('settings.claudeCode.runtimeEcosystem.plugins.loaded', {
+      count,
+      names: names.length > 0 ? names.join(', ') : t('settings.claudeCode.runtimeEcosystem.unnamed'),
+    });
+  }
+
+  private describeRuntimeSkills(): string {
+    const adapter = this.getClaudeAdapter() as {
+      getSkillCount?: () => number;
+      getSkillsList?: () => string[] | 'all';
+    } | null;
+    const count = adapter?.getSkillCount?.() ?? 0;
+    if (count === -1) {
+      return t('settings.claudeCode.runtimeEcosystem.skills.all');
+    }
+    if (count <= 0) {
+      return t('settings.claudeCode.runtimeEcosystem.skills.empty');
+    }
+    const names = adapter?.getSkillsList?.() ?? [];
+    return t('settings.claudeCode.runtimeEcosystem.skills.loaded', {
+      count,
+      names: Array.isArray(names) && names.length > 0
+        ? names.join(', ')
+        : t('settings.claudeCode.runtimeEcosystem.unnamed'),
+    });
   }
 
   private isKnownClaudeTabId(tabId: string): tabId is typeof CLAUDE_CLASSIC_TABS[number] {

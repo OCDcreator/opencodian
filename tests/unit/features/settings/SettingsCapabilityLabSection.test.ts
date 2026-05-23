@@ -204,6 +204,8 @@ describe('SettingsCapabilityLabSection', () => {
     expect(mcpRow).not.toBeNull();
     expect(mcpRow?.textContent).toContain('Exposed');
     expect(mcpRow?.textContent).toContain('3 server(s) loaded');
+    expect(mcpRow?.textContent).toContain('Claude Code settings Tools tab');
+    expect(mcpRow?.textContent).not.toContain('No Claude Code settings tab');
   });
 
   it('renders Plugins in discovery table as Discovery Only when no adapter', () => {
