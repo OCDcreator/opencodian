@@ -16,10 +16,13 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `df7c48d2`
-- Commit subject: `fix: add try/catch around listSessions and getSessionMessages in productized seams`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231609`
+- Snapshot commit: `9a3daf89`
+- Commit subject: `docs: assess structured output capability maturity`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231721`
 - Recent continuity commits in this lane:
+- `9a3daf89` — `docs: assess structured output capability maturity`
+- `b55f46b9` — `docs: record shared sessions backend-switch follow-up audit`
+- `4f85f022` — `fix: guard shared session unshare when backend switches`
 - `df7c48d2` — `fix: add try/catch around listSessions and getSessionMessages in productized seams`
 - `4ca7364c` — `fix: add null-item filtering and adapter-error guards to backend-aware routing helpers`
 - `260049ac` — `fix: add Array.isArray guard to loadBackendSessionMessages for runtime safety`
