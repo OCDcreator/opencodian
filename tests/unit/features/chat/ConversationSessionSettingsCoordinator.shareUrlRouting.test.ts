@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { readBackendSessionShareUrl } from '../../../../src/core/agents/backend/AgentBackendRouting';
 import type {
   Conversation,
@@ -156,5 +159,88 @@ describe('ConversationSessionSettingsCoordinator share URL routing', () => {
       'claude-session',
     );
     expect(modalOptions.shareUrl).toBeNull();
+  });
+});
+
+describe('ConversationSessionSettingsCoordinator Session-import audit', () => {
+  const coordinatorPath = path.resolve(
+    __dirname,
+    '../../../../src/features/chat/services/ConversationSessionSettingsCoordinator.ts',
+  );
+  let source: string;
+
+  beforeAll(() => {
+    source = fs.readFileSync(coordinatorPath, 'utf-8');
+  });
+
+  it('does not import Session from OpenCodeSessionLifecycleCoordinator', () => {
+    // The coordinator should not carry a typed dependency on the OpenCode Session
+    // shape just for share-URL reads.  The productionized read path uses
+    // readBackendSessionShareUrl (which is already Session-free) and the legacy
+    // fallback should use a minimal inspection-only local type.
+    expect(source).not.toMatch(
+      /import\s+.*\{[^}]*Session[^}]*\}\s+from\s+['"].*OpenCodeSessionLifecycleCoordinator/,
+    );
+  });
+
+  it('does not reference Session as a typed parameter or return in the read path', () => {
+    // listSessions host method and getShareUrl should not mention Session type.
+    // They should use a minimal inspection-only shape or `unknown`.
+    const lines = source.split('\n');
+    const listSessionsLine = lines.findIndex((l) => l.includes('listSessions?'));
+    expect(listSessionsLine).toBeGreaterThanOrEqual(0);
+    expect(lines[listSessionsLine]).not.toContain(': Promise<Session[]');
+    const getShareUrlLine = lines.findIndex((l) =>
+      l.includes('getShareUrl(') && l.includes('Session'),
+    );
+    expect(getShareUrlLine).toBe(-1);
+  });
+
+  it('legacy fallback listSessions returns a minimal inspection-only shape', async () => {
+    // When no registry is provided, the legacy path calls host.listSessions()
+    // and reads only .id and .share.url — the host interface should express
+    // this with a minimal inspection type, not Session[].
+    const conversation = createConversation();
+    const { coordinator, host } = createCoordinator({
+      currentConversation: conversation,
+      supportsSessionSharing: true,
+    });
+
+    // Return minimal inspection objects — only id and share, no full Session fields
+    host.listSessions.mockResolvedValue([
+      { id: 'session-1', share: { url: 'https://opencode.ai/s/session-1' } },
+    ] as never);
+
+    await coordinator.openCurrentConversationSettings();
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    expect(host.listSessions).toHaveBeenCalled();
+    expect(modalOptions.shareUrl).toBe('https://opencode.ai/s/session-1');
+  });
+
+  it('share and unshare write paths return minimal inspection shapes without Session', async () => {
+    // share/unshare are OpenCode-only writes, but the coordinator should use
+    // a minimal inspection-only return type for extracting share.url, not the
+    // full OpenCode Session type.
+    const conversation = createConversation();
+    const { coordinator, host } = createCoordinator({
+      currentConversation: conversation,
+      supportsSessionSharing: true,
+    });
+
+    // shareSession returns a minimal object with share.url
+    (host.shareSession as jest.Mock).mockResolvedValue({
+      share: { url: 'https://opencode.ai/s/new-share' },
+    });
+
+    await coordinator.openCurrentConversationSettings();
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    await modalOptions.onShare();
+
+    expect(host.shareSession).toHaveBeenCalledWith('session-1');
+    expect(host.copyText).toHaveBeenCalledWith('https://opencode.ai/s/new-share');
   });
 });

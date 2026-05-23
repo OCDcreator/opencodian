@@ -2,7 +2,6 @@ import type { App } from 'obsidian';
 
 import { readBackendSessionShareUrl } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
-import type { Session } from '../../../core/opencode/OpenCodeSessionLifecycleCoordinator';
 import type {
   Conversation,
   ConversationSessionSettings,
@@ -17,6 +16,18 @@ import {
   ConversationSessionSettingsModal,
 } from '../ui/ConversationSessionSettingsModal';
 
+/**
+ * Minimal inspection-only shape for reading share URLs from session data.
+ *
+ * This is NOT a stable cross-backend session contract.  It is the narrowest
+ * type the coordinator needs to extract `id` and `share.url` from either
+ * host-provided listSessions results or OpenCode share/unshare responses.
+ */
+export interface ShareInspectionEntry {
+  id?: string;
+  share?: unknown;
+}
+
 export interface ResolvedConversationSessionSettings {
   chatFontSizePx: number;
 }
@@ -28,9 +39,9 @@ export interface ConversationSessionSettingsCoordinatorHost {
   getChatContainerEl(): HTMLElement | null;
   saveConversation(conversation: Conversation): Promise<void>;
   showNotice(message: string): void;
-  shareSession?(sessionId: string): Promise<Session>;
-  unshareSession?(sessionId: string): Promise<Session>;
-  listSessions?(): Promise<Session[]>;
+  shareSession?(sessionId: string): Promise<ShareInspectionEntry>;
+  unshareSession?(sessionId: string): Promise<ShareInspectionEntry>;
+  listSessions?(): Promise<ShareInspectionEntry[]>;
   copyText?(text: string): Promise<void>;
   getProjectShareMode?(): Promise<OpencodeShareMode | undefined>;
   /** Whether to show session sharing controls. Defaults to false. */
@@ -212,7 +223,7 @@ export class ConversationSessionSettingsCoordinator {
     if (!sessionId) {
       throw new Error(t('chat.sessionSharing.shareFailed'));
     }
-    let session: Session;
+    let session: ShareInspectionEntry;
     try {
       session = await this.shareSession(sessionId);
     } catch (error) {
@@ -237,14 +248,14 @@ export class ConversationSessionSettingsCoordinator {
     this.host.showNotice(t('chat.sessionSharing.unshared'));
   }
 
-  private async shareSession(sessionId: string): Promise<Session> {
+  private async shareSession(sessionId: string): Promise<ShareInspectionEntry> {
     if (this.host.shareSession) {
       return this.host.shareSession(sessionId);
     }
     return this.resolveOpenCodeService().shareSession(sessionId);
   }
 
-  private async unshareSession(sessionId: string): Promise<Session> {
+  private async unshareSession(sessionId: string): Promise<ShareInspectionEntry> {
     if (this.host.unshareSession) {
       return this.host.unshareSession(sessionId);
     }
@@ -260,9 +271,9 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private resolveOpenCodeService(): {
-    listSessions?(): Promise<Session[]>;
-    shareSession(sessionId: string): Promise<Session>;
-    unshareSession(sessionId: string): Promise<Session>;
+    listSessions?(): Promise<ShareInspectionEntry[]>;
+    shareSession(sessionId: string): Promise<ShareInspectionEntry>;
+    unshareSession(sessionId: string): Promise<ShareInspectionEntry>;
   } {
     const plugin = this.resolveOpenCodianPlugin();
 
@@ -278,9 +289,9 @@ export class ConversationSessionSettingsCoordinator {
       getShareConfig?(): Promise<OpencodeShareMode | undefined>;
     };
     openCodeService?: {
-      listSessions?(): Promise<Session[]>;
-      shareSession(sessionId: string): Promise<Session>;
-      unshareSession(sessionId: string): Promise<Session>;
+      listSessions?(): Promise<ShareInspectionEntry[]>;
+      shareSession(sessionId: string): Promise<ShareInspectionEntry>;
+      unshareSession(sessionId: string): Promise<ShareInspectionEntry>;
     };
   } | undefined {
     return (this.host.app as typeof this.host.app & {
@@ -293,15 +304,15 @@ export class ConversationSessionSettingsCoordinator {
           getShareConfig?(): Promise<OpencodeShareMode | undefined>;
         };
         openCodeService?: {
-          listSessions?(): Promise<Session[]>;
-          shareSession(sessionId: string): Promise<Session>;
-          unshareSession(sessionId: string): Promise<Session>;
+          listSessions?(): Promise<ShareInspectionEntry[]>;
+          shareSession(sessionId: string): Promise<ShareInspectionEntry>;
+          unshareSession(sessionId: string): Promise<ShareInspectionEntry>;
         };
       }
       | undefined;
   }
 
-  private getShareUrl(session: Session | null): string | null {
+  private getShareUrl(session: ShareInspectionEntry | null): string | null {
     const share = session?.share;
     if (!share || typeof share !== 'object') {
       return null;
