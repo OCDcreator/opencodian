@@ -143,6 +143,7 @@ These items are implemented enough to treat as real delivered backend capability
 | Permissions bridge | `canUseTool` and elicitation/question bridging are wired into the existing permission/question flows. |
 | Model / effort / thinking basics | Core Claude settings and options mapping are implemented. |
 | MCP runtime pass-through | MCP servers can be passed through and refreshed at runtime. |
+| MCP Capability Lab detection | MCP is now tracked in the Capability Lab matrix and discovery table as detection-only read status; the surface reports loaded server count when the Claude adapter is available, but does not provide MCP authoring. |
 | OpenCode coexistence | OpenCode remains alive as a backend and is not meant to be regressed by Claude work. |
 
 ## What Exists But Must Not Be Described As Stable Completion
@@ -314,6 +315,7 @@ It currently serves as:
 - a provider-owned resume session diagnostic probe (select a Claude session, run `adapter.runDiagnosticPrompt({ resumeSessionId })`, see resulting session id/output preview). This probe is diagnostic-only and does NOT represent stable resume-at productization.
 - a provider-owned session detail diagnostic probe (select a Claude session, run `adapter.getSession(sessionId)`, inspect raw session fields). This probe is diagnostic-only and does NOT represent a stable cross-backend session-detail object contract.
 - a provider-owned backend routing diagnostic probe (shows active backend, registered adapters, conversation backend distribution, and verifies `listSessions()` + `getSession()` through the provider-owned routing path). This probe is diagnostic-only and does NOT represent a stable backend routing product surface.
+- a detection-only MCP Servers row in the capability matrix and discovery table; it reads `adapter.getMcpServerCount()` when available and reports loaded server count without exposing MCP authoring controls.
 
 Important policy:
 
@@ -456,6 +458,7 @@ Choose one of these modes for the next multi-round session:
 2. **Improve multi-backend abstraction for future backends** — Identify shared seams that would help a third backend (not OpenCode, not Claude) integrate cleanly, and extract them without forcing OpenCode semantics.
 
 3. **Expand Claude-native ecosystem ownership** — History browsing, skills, agents, plugins, or MCP authoring surfaces that are native to Claude's ecosystem and should not be flattened into OpenCode-shaped settings.
+   MCP detection has started in Capability Lab: the matrix/discovery surfaces now report read-only loaded server count through the Claude adapter, while MCP authoring remains future work.
 
 4. **Deploy-validation round** — Run Test Vault runtime proof against the latest build to verify the productized backend-aware seams function correctly in the deployed plugin context. This is lower priority since the seams are well-covered by unit tests, but a fresh deployment validation would provide additional confidence before moving to a different mode.
 

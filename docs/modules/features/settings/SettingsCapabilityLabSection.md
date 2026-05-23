@@ -23,6 +23,7 @@
 | Session Detail Inspection | Provider-owned 诊断探针：选择一个 Claude 会话并调用 `getSession()`，输出 raw session 字段（sessionId, summary, lastModified, messageCount 等）| `adapter.listSessions()` / `adapter.getSession()` |
 | Backend Routing Verification | Provider-owned 诊断探针：显示活跃后端、已注册适配器、会话后端分布，验证 `listSessions()` + `getSession()` 通过 provider-owned 路由路径工作，并额外验证 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 通过 registry 路由层工作 | `AgentServiceRegistry` / `adapter.listSessions()` / `adapter.getSession()` / `listBackendSessions()` / `getBackendSessionPreview()` / `readBackendSessionTitle()` / `readBackendSessionShareUrl()` |
 | Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
+| MCP Servers Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 MCP server 数量，不提供 authoring | `adapter.getMcpServerCount()` |
 
 ## 依赖注入
 
@@ -37,6 +38,8 @@
 
 `buildMatrixRows()` 静态评估 16 项 Claude Code SDK 能力（Hooks、File Checkpoint、JSONL History、Session Store、Skills、Plugins、Agents、Agent Definitions、Structured Output、Subagent Transcript、Include Hook Events、Import Session、Fork Session、Resume Session、Session Detail、Backend Routing），每项包含 SDK Exposed、Adapter Wired、Runtime Proof 和 Stable UI 四个维度。Runtime Proof 默认为 `untested`，在对应诊断面板执行实时调用后更新为 `pass` 或 `fail`。`Agent Definitions` 只表示 SDK `agent` / `agents` runtime-only 透传已接线，仍是 Hidden/Untested，不代表 agent authoring UI 已完成；`Session Store` 也只是隔离的 diagnostic store proof，不是正式会话存储产品面。
 
+`buildMatrixRows()` 还包含 MCP Servers 行，标记为 SDK exposed + adapter wired、runtime proof `untested`、user surface `diagnostic`；该行只表示 Capability Lab 能检测 MCP 服务器加载状态，不表示 MCP authoring UI 已完成。
+
 ### Runtime Proof 更新
 
 `updateRuntimeProof()` 在诊断面板执行后更新页面内嵌标记。不跨标签持久化——矩阵行是静态的，运行时证明反馈只在浏览器区域展示。
@@ -49,6 +52,8 @@
 ### Adapter 获取
 
 `getClaudeCodeAdapter()` 从 `plugin.agentServiceRegistry` 获取 `'claude-code'` 注册的 adapter 并窄化类型为 `ClaudeCodeAdapter`。如果 adapter 不可用，相关面板显示 "not available" 提示。
+
+Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()` 显示当前已加载 MCP server 数量；adapter 不可用时显示 detection unavailable。该检测为只读，不写入设置，也不创建/编辑 MCP 配置。
 
 ## 导入关系
 
@@ -111,3 +116,4 @@
 - Rewind Dry-Run 预览的 `runRewindDryRun()` 方法调用 `adapter.rewindFiles(sessionId, userMessageId, { dryRun: true })` 并渲染结果或错误+提示；该调用路径已有单元测试覆盖（成功渲染 + 失败错误提示），不改变 rewind 仅诊断、非稳定产品的事实
 - Subagent Browser 的 `loadSubagents()` 和 `loadSubagentMessages()` 方法已有完整单元测试覆盖：会话刷新、子代理列表渲染、空列表处理、列表加载失败、子代理消息加载、消息加载失败、运行时证明 pass/fail，共 8 个测试用例
 - Discovery 面板里的 Hooks / Plugins / Skills / Agent Definitions / Session Store 条目都保持 `Discovery Only`，只表示诊断观察，不是稳定产品面；Hook proof 现在会同时展示 SessionStart 事件和 hook event timeline，但仍只属于诊断验证
+- Discovery 面板里的 MCP Servers 条目同样保持 detection-only：只读取 adapter 的 MCP server count，用于确认静态 options 或动态缓存配置是否已加载，不提供 MCP authoring 或稳定设置入口

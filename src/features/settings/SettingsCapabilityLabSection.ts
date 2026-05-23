@@ -474,6 +474,13 @@ export class SettingsCapabilityLabSection {
         userSurface: 'hidden',
       },
       {
+        capability: 'MCP Servers',
+        sdkExposed: true, // mcpServers option in SDK
+        adapterWired: true, // buildSdkOptions wires mcpServers + ClaudeCodeMcpConfigAdapter
+        runtimeProof: 'untested',
+        userSurface: 'diagnostic', // Runtime passthrough only; settings tab is OpenCode-gated
+      },
+      {
         capability: 'Agents (Subagents)',
         sdkExposed: !!adapter, // listSubagents, getSubagentMessages
         adapterWired: !!adapter, // adapter methods exist
@@ -1843,6 +1850,17 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(tbody, 'Plugins', false, 'No authoring UI. buildSdkOptions wires plugins from adapter options.');
     // Skills
     this.addDiscoveryRow(tbody, 'Skills', false, 'No authoring UI. buildSdkOptions wires skills (string[]|\'all\') from adapter options.');
+    // MCP Servers
+    const mcpServerCount = adapter?.getMcpServerCount?.() ?? 0;
+    const mcpStatus = mcpServerCount > 0;
+    this.addDiscoveryRow(
+      tbody,
+      'MCP Servers',
+      mcpStatus,
+      mcpStatus
+        ? `${mcpServerCount} server(s) loaded. Runtime passthrough via ClaudeCodeMcpConfigAdapter. No Claude Code settings tab.`
+        : 'Runtime passthrough via ClaudeCodeMcpConfigAdapter. No servers loaded or adapter not started.',
+    );
     // Agent definitions
     this.addDiscoveryRow(tbody, 'Agent Definitions', false, 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options.');
     // Agents / Subagents

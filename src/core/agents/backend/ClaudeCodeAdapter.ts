@@ -816,6 +816,16 @@ export class ClaudeCodeAdapter
     this.cachedMcpServers = undefined;
   }
 
+  /**
+   * Return the number of MCP servers currently loaded into the adapter.
+   * Returns 0 if no config has been loaded yet. Includes both static
+   * (options.mcpServers) and dynamically loaded (mcpConfigLoader) servers.
+   */
+  getMcpServerCount(): number {
+    const servers = this.options.mcpServers ?? this.cachedMcpServers;
+    return servers ? Object.keys(servers).length : 0;
+  }
+
   private async applyToActiveQueries(
     apply: (runtime: ClaudeCodeSessionRuntime) => Promise<unknown> | void | undefined,
   ): Promise<void> {

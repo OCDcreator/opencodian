@@ -129,6 +129,63 @@ describe('SettingsCapabilityLabSection', () => {
     }
   });
 
+  it('renders MCP Servers row in capability matrix with diagnostic surface', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const mcpRow = rows.find((row) => row.textContent?.includes('MCP Servers'));
+    expect(mcpRow).not.toBeNull();
+    // MCP is diagnostic (runtime passthrough), not hidden like skills/plugins/agents
+    expect(mcpRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
+    expect(mcpRow?.textContent).toContain('Untested');
+  });
+
+  it('renders MCP Servers in discovery table as Discovery Only when no adapter', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const discoveryTable = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    expect(discoveryTable).toBeTruthy();
+    const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
+    const mcpRow = rows.find((row) => row.textContent?.includes('MCP Servers'));
+    expect(mcpRow).not.toBeNull();
+    expect(mcpRow?.textContent).toContain('Discovery Only');
+    expect(mcpRow?.textContent).toContain('Runtime passthrough');
+  });
+
+  it('renders MCP Servers in discovery table as Exposed when adapter has servers', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getMcpServerCount: jest.fn().mockReturnValue(3),
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const discoveryTable = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    expect(discoveryTable).toBeTruthy();
+    const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
+    const mcpRow = rows.find((row) => row.textContent?.includes('MCP Servers'));
+    expect(mcpRow).not.toBeNull();
+    expect(mcpRow?.textContent).toContain('Exposed');
+    expect(mcpRow?.textContent).toContain('3 server(s) loaded');
+  });
+
   it('renders a diagnostic summary strip above the matrix', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -171,7 +228,7 @@ describe('SettingsCapabilityLabSection', () => {
     const discoveryTable = containerEl.querySelector('.opencodian-capability-lab-discovery');
     expect(discoveryTable).toBeTruthy();
     const rows = discoveryTable!.querySelectorAll('tbody tr');
-    expect(rows.length).toBeGreaterThanOrEqual(5); // Hooks, Plugins, Skills, Subagents, Session Store, Import/Delete/Restore
+    expect(rows.length).toBeGreaterThanOrEqual(6); // Hooks, Plugins, Skills, MCP Servers, Subagents, Session Store, Import/Delete/Restore
   });
 
   it('keeps discovery-only Claude ecosystem rows labeled as discovery only', () => {
@@ -274,7 +331,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(16);
+    expect(rows.length).toBe(17);
   });
 
   it('renders status chips with correct active/inactive classes', () => {

@@ -1502,6 +1502,44 @@ describe('ClaudeCodeAdapter', () => {
       }
     });
 
+    it('getMcpServerCount returns 0 when no MCP config is loaded', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      expect(adapter.getMcpServerCount()).toBe(0);
+    });
+
+    it('getMcpServerCount returns count from static mcpServers option', () => {
+      const mcpServers = {
+        server1: { type: 'stdio' as const, command: 'node', args: ['s1.js'] },
+        server2: { type: 'stdio' as const, command: 'node', args: ['s2.js'] },
+      };
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        mcpServers,
+      });
+      expect(adapter.getMcpServerCount()).toBe(2);
+    });
+
+    it('getMcpServerCount returns count from dynamically loaded MCP config', async () => {
+      const mcpServers = {
+        dynamic1: { type: 'stdio' as const, command: 'node', args: ['d1.js'] },
+        dynamic2: { type: 'stdio' as const, command: 'node', args: ['d2.js'] },
+        dynamic3: { type: 'stdio' as const, command: 'node', args: ['d3.js'] },
+      };
+      const mcpConfigLoader = jest.fn().mockResolvedValue(mcpServers);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        mcpConfigLoader,
+      });
+      expect(adapter.getMcpServerCount()).toBe(0);
+      await adapter.loadMcpConfig();
+      expect(adapter.getMcpServerCount()).toBe(3);
+    });
+
     it('passes diagnostic sessionStore through getSession to the SDK', async () => {
       const sdk = createSdk([]);
       sdk.getSessionInfo.mockResolvedValue({
