@@ -60,11 +60,17 @@ describe('OpenCodianView composer availability state', () => {
     ).resolves.toBe(false);
   });
 
-  it('treats enabled Claude Code as composer-ready without probing OpenCode server health', async () => {
+  it('treats enabled Claude Code as backend-offline when its adapter is disconnected without probing OpenCode server health', async () => {
     const settings = {
       ...DEFAULT_SETTINGS,
       enabledBackends: ['claude-code'],
       activeBackend: 'claude-code' as const,
+    };
+    const agentServiceRegistry = {
+      get: jest.fn().mockReturnValue({
+        status: 'disconnected',
+        displayName: 'Claude Code',
+      }),
     };
     const openCodeService = {
       checkHealth: jest.fn().mockResolvedValue(false),
@@ -74,18 +80,20 @@ describe('OpenCodianView composer availability state', () => {
     const view = new OpenCodianView(new WorkspaceLeaf(), {
       settings,
       openCodeService,
+      agentServiceRegistry,
       storage: {},
     } as never);
 
     await expect(
       (view as unknown as { getServerAvailability: () => Promise<string> }).getServerAvailability(),
-    ).resolves.toBe('running');
+    ).resolves.toBe('offline');
+    expect(agentServiceRegistry.get).toHaveBeenCalledWith('claude-code');
     expect(openCodeService.checkHealth).not.toHaveBeenCalled();
     expect(
       (view as unknown as {
         getComposerAvailabilityState: () => { kind: string };
       }).getComposerAvailabilityState().kind,
-    ).toBe('ready');
+    ).toBe('backend-offline');
   });
 
   it('does not start the conversation session signal runtime when no backend is enabled', () => {

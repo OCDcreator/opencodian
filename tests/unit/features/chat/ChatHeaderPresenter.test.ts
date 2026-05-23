@@ -120,6 +120,19 @@ describe('ChatHeaderPresenter', () => {
     expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openBackendSettings'));
   });
 
+  it('shows offline instead of connected when a non-OpenCode backend is disconnected', async () => {
+    const fixture = createFixture();
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('offline');
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.offline'));
+    expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openBackendSettings'));
+  });
+
   it('exposes stable accessible header action locators', () => {
     const fixture = createFixture();
 

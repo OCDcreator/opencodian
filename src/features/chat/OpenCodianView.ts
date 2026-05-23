@@ -17,6 +17,7 @@ import {
   getConversationSessionBackendService,
   loadBackendSessionMessages,
 } from '../../core/agents/backend/AgentBackendRouting';
+import type { AgentConnectionStatus } from '../../core/agents/backend/AgentService';
 import {
   buildClaudeCodeModelSelectorProviders,
   CLAUDE_CODE_EFFORT_VARIANTS,
@@ -600,6 +601,21 @@ export class OpenCodianView extends ItemView {
 
   private isActiveBackendOpenCode(): boolean {
     return (this.plugin.settings.activeBackend ?? 'opencode') === 'opencode';
+  }
+
+  private mapAgentConnectionStatusToServerAvailability(
+    status: AgentConnectionStatus,
+  ): ChatServerAvailability {
+    switch (status) {
+      case 'connected':
+        return 'running';
+      case 'connecting':
+        return 'starting';
+      case 'disconnected':
+      case 'error':
+      default:
+        return 'offline';
+    }
   }
 
   private async canSyncConversationWithServer(): Promise<boolean> {
@@ -3344,10 +3360,14 @@ export class OpenCodianView extends ItemView {
       return 'disabled';
     }
 
-    // Non-OpenCode backends do not depend on the OpenCode server health path.
     if (!this.isActiveBackendOpenCode()) {
-      this.lastResolvedServerAvailability = 'running';
-      return 'running';
+      const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+      const adapterStatus = this.plugin.agentServiceRegistry?.get(activeBackend)?.status;
+      const availability = adapterStatus
+        ? this.mapAgentConnectionStatusToServerAvailability(adapterStatus)
+        : 'offline';
+      this.lastResolvedServerAvailability = availability;
+      return availability;
     }
 
     const isHealthy = await this.plugin.openCodeService.checkHealth();

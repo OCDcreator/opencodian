@@ -64,6 +64,26 @@ This round tightened the Claude settings surface so it is honest about runtime b
 - This does not promote any new Claude capability to stable product surface
 - The restart action only closes active persistent queries, it does not delete the underlying local session handles
 
+## 2026-05-23 Non-OpenCode availability honesty fix
+
+This quick follow-up makes the chat surface stop pretending a non-OpenCode backend is online when its adapter is actually disconnected.
+
+### What Changed
+
+- `OpenCodianView.getServerAvailability()` now maps the active adapter's real `status` for non-OpenCode backends instead of returning `running` by default
+- `ChatHeaderPresenter` now treats disconnected non-OpenCode backends as `offline` in the header instead of showing a connected label
+- Focused regression tests now cover the Claude Code disconnected path
+
+### Why It Matters
+
+- Claude Code should only look connected when its adapter is actually connected
+- The composer and header now agree on the real backend state
+- OpenCode health-check behavior is unchanged
+
+### Verification
+
+- Focused chat tests passed for composer availability, header rendering, and server readiness
+
 ### Verification
 
 - Focused settings and adapter tests passed
