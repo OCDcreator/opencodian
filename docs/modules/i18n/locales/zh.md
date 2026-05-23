@@ -67,7 +67,7 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，让聊天区可以明确区分“尚未启用任何 backend”和“backend 已启用但当前离线”两类状态，而不是继续共用笼统的离线文案。
 
-本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1 配置基础面板提供中文文案，包括 section 标题/描述、二级标签（运行时、模型与思考、权限、上下文与来源）、可执行文件路径、认证与环境提示、设置来源、权限模式、模型/备用模型、thinking/effort（含“特高”）、额外目录和运行时诊断；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。本轮还补充 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 状态 tooltip，避免继续写成“打开服务器设置”。
+本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1/2 配置面板提供中文文案，包括 section 标题/描述、二级标签（运行时、模型与思考、权限、上下文与来源、工具、限制、SDK Foundations）、可执行文件路径、认证与环境提示、设置来源、项目来源文件可见性、下一次 query / 重启边界、权限模式、模型/备用模型、thinking/effort（含“特高”）、额外目录、allowed/disallowed tools、max turns、max budget、env 和运行时诊断；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。本轮还补充 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 状态 tooltip，避免继续写成“打开服务器设置”。
 
 本轮还将 `chat.question.title` 调整为后端无关的“Agent 提问”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。
 

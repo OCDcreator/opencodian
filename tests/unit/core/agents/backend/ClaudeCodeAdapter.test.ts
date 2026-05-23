@@ -1501,6 +1501,48 @@ describe('ClaudeCodeAdapter', () => {
         await runtime.next;
       }
     });
+
+    it('restarts all active persistent runtimes for restart-sensitive settings changes', async () => {
+      const firstQuery = createRuntimeControlQuery();
+      const secondQuery = createRuntimeControlQuery();
+      const sdk = createSdk([]);
+      sdk.query
+        .mockReturnValueOnce(firstQuery)
+        .mockReturnValueOnce(secondQuery);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const firstRuntime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      firstQuery.push({
+        type: 'system',
+        subtype: 'init',
+        session_id: 'sdk-restart-session',
+      });
+      await expect(firstRuntime.next).resolves.toEqual(expect.objectContaining({
+        value: expect.objectContaining({ sessionId: 'sdk-restart-session' }),
+      }));
+
+      await expect(adapter.restartPersistentQueries('settings-change')).resolves.toBeUndefined();
+
+      expect(firstQuery.close).toHaveBeenCalledTimes(1);
+      await firstRuntime.next;
+
+      const secondRuntime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(2));
+
+      try {
+        expect(sdk.query.mock.calls[1][0].options).toEqual(expect.objectContaining({
+          resume: 'sdk-restart-session',
+        }));
+      } finally {
+        secondQuery.close();
+        await secondRuntime.next;
+      }
+    });
   });
 
   describe('ClaudeCodeAdapter introspection counts', () => {

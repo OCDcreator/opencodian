@@ -34,6 +34,8 @@ esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run docto
 
 生产构建把 `@anthropic-ai/claude-agent-sdk` 主包打进 `main.js`，避免 Test Vault 运行时再从插件目录解析 SDK 主包。该脚本根据 `process.platform` / `process.arch` 解析当前平台 optional binary package，先删除 `dist/node_modules/@anthropic-ai/claude-agent-sdk` 的旧副本，再只复制平台包到 `dist/node_modules/@anthropic-ai/`。这样 bundled SDK 代码仍能通过 `createRequire(import.meta.url)` 找到对应 Claude Code executable，同时避免发布目录携带不必要的 SDK 主包副本。
 
+这个 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/` 目录是生产 runtime 的一部分。Test Vault 部署、发布打包或人工复制产物时必须包含它；否则 Obsidian 内的 bundled SDK 会尝试从插件目录解析平台 binary，并在 Claude Code runtime/model probes 中报 `not-found`。
+
 ### build-css.mjs — CSS 合并
 
 读取 `src/style/index.css` 的 `@import` 列表，按声明顺序合并 CSS 到根目录 `styles.css`。每个片段添加 `/* filename */` 注释标记。

@@ -69,6 +69,12 @@ const CLAUDE_EFFORT_LEVELS: Array<{ id: ClaudeCodeEffort; labelKey: TranslationK
   { id: 'max', labelKey: 'settings.claudeCode.effort.max' },
 ];
 
+const CLAUDE_PROJECT_SOURCE_FILES = [
+  'CLAUDE.md',
+  '.claude/settings.json',
+  '.claude/settings.local.json',
+] as const;
+
 const CLAUDE_CLASSIC_TABS = [
   'runtime',
   'model-thinking',
@@ -242,7 +248,9 @@ export class SettingsClaudeCodeSection {
           .setPlaceholder(t('settings.claudeCode.model.placeholder'))
           .setValue(this.settings.model)
           .onChange(async (value) => {
-            this.settings.model = value.trim();
+            const model = value.trim();
+            this.settings.model = model;
+            await this.applyClaudeModel(model || undefined).catch(() => undefined);
             await this.saveSettings();
           });
       });
@@ -347,6 +355,7 @@ export class SettingsClaudeCodeSection {
           .setValue(this.settings.permissionMode)
           .onChange(async (value) => {
             this.settings.permissionMode = value as ClaudeCodePermissionMode;
+            await this.applyClaudePermissionMode(this.settings.permissionMode).catch(() => undefined);
             await this.saveSettings();
           });
       });
@@ -355,8 +364,27 @@ export class SettingsClaudeCodeSection {
   // ─── Context & Sources tab ────────────────────────────────────────
 
   private renderContextSourcesTab(containerEl: HTMLElement): void {
+    this.renderRuntimeBoundaryNotice(containerEl);
     this.renderSettingSources(containerEl);
+    this.renderProjectSourceStatus(containerEl);
     this.renderAdditionalDirectories(containerEl);
+  }
+
+  private renderRuntimeBoundaryNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-boundary',
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.runtimeBoundary.nextQuery') });
+    new Setting(noticeEl)
+      .setName(t('settings.claudeCode.runtimeBoundary.restartName'))
+      .setDesc(t('settings.claudeCode.runtimeBoundary.restartDesc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.runtimeBoundary.restartButton'))
+          .onClick(async () => {
+            await this.restartClaudePersistentQueries('settings-change');
+          });
+      });
   }
 
   private renderSettingSources(containerEl: HTMLElement): void {
@@ -406,6 +434,46 @@ export class SettingsClaudeCodeSection {
     this.settings.settingSources = CLAUDE_SETTING_SOURCES
       .map((s) => s.id)
       .filter((id) => current.has(id));
+  }
+
+  private renderProjectSourceStatus(containerEl: HTMLElement): void {
+    const statusEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-sources',
+      attr: { 'data-claude-code-project-sources': 'true' },
+    });
+    statusEl.createEl('strong', { text: t('settings.claudeCode.projectSources.title') });
+    const listEl = statusEl.createEl('ul');
+    for (const file of CLAUDE_PROJECT_SOURCE_FILES) {
+      listEl.createEl('li', {
+        text: t('settings.claudeCode.projectSources.checking', { file }),
+      });
+    }
+    void this.refreshProjectSourceStatus(listEl);
+  }
+
+  private async refreshProjectSourceStatus(listEl: HTMLElement): Promise<void> {
+    const adapter = this.plugin.app?.vault?.adapter;
+    const exists = typeof adapter?.exists === 'function'
+      ? adapter.exists.bind(adapter)
+      : null;
+    const results = await Promise.all(CLAUDE_PROJECT_SOURCE_FILES.map(async (file) => {
+      if (!exists) {
+        return { file, present: false };
+      }
+      try {
+        return { file, present: await exists(file) };
+      } catch {
+        return { file, present: false };
+      }
+    }));
+    listEl.empty();
+    for (const result of results) {
+      listEl.createEl('li', {
+        text: result.present
+          ? t('settings.claudeCode.projectSources.present', { file: result.file })
+          : t('settings.claudeCode.projectSources.missing', { file: result.file }),
+      });
+    }
   }
 
   private renderAdditionalDirectories(containerEl: HTMLElement): void {
@@ -591,6 +659,29 @@ export class SettingsClaudeCodeSection {
 
   private async saveSettings(): Promise<void> {
     await this.plugin.saveSettings();
+  }
+
+  private getClaudeAdapter(): unknown {
+    return this.plugin.agentServiceRegistry?.get('claude-code') ?? null;
+  }
+
+  private async applyClaudeModel(model: string | undefined): Promise<void> {
+    const adapter = this.getClaudeAdapter() as { setModel?: (model?: string) => Promise<void> | void } | null;
+    await adapter?.setModel?.(model);
+  }
+
+  private async applyClaudePermissionMode(mode: ClaudeCodePermissionMode): Promise<void> {
+    const adapter = this.getClaudeAdapter() as {
+      setPermissionMode?: (mode: ClaudeCodePermissionMode) => Promise<void> | void;
+    } | null;
+    await adapter?.setPermissionMode?.(mode);
+  }
+
+  private async restartClaudePersistentQueries(reason: string): Promise<void> {
+    const adapter = this.getClaudeAdapter() as {
+      restartPersistentQueries?: (reason?: string) => Promise<void> | void;
+    } | null;
+    await adapter?.restartPersistentQueries?.(reason);
   }
 
   private isKnownClaudeTabId(tabId: string): tabId is typeof CLAUDE_CLASSIC_TABS[number] {

@@ -704,6 +704,23 @@ export class ClaudeCodeAdapter
       runtime.query?.setMcpServers?.(this.options.mcpServers ?? this.cachedMcpServers ?? {}));
   }
 
+  async restartPersistentQueries(reason = 'manual'): Promise<void> {
+    runtimeLogger.debug('runtime restart requested', {
+      reason,
+      sessionCount: this.sessions.size,
+    });
+    for (const session of this.sessions.values()) {
+      if (session.runtime && !session.runtime.closed) {
+        runtimeLogger.debug('runtime close', {
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+          reason: `restart:${reason}`,
+        });
+        this.closeRuntime(session);
+      }
+    }
+  }
+
   private cachedMcpServers: ClaudeCodeMcpServersMap | undefined;
 
   private buildSdkOptions(

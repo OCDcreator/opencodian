@@ -49,7 +49,11 @@ const dropdownRecords: Array<ControlRecord<MockDropdownControl>> = [];
 const toggleRecords: Array<ControlRecord<MockToggleControl>> = [];
 const buttonRecords: Array<ControlRecord<MockButtonControl> & { label?: string }> = [];
 
-function createPlugin(): TestPlugin {
+function createPlugin(options: {
+  existingFiles?: string[];
+  claudeAdapter?: unknown;
+} = {}): TestPlugin {
+  const existingFiles = new Set(options.existingFiles ?? []);
   return {
     settings: {
       ...DEFAULT_SETTINGS,
@@ -68,6 +72,16 @@ function createPlugin(): TestPlugin {
       },
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
+    app: {
+      vault: {
+        adapter: {
+          exists: jest.fn(async (targetPath: string) => existingFiles.has(targetPath)),
+        },
+      },
+    },
+    agentServiceRegistry: {
+      get: jest.fn((backend: string) => backend === 'claude-code' ? options.claudeAdapter : null),
+    },
   } as unknown as TestPlugin;
 }
 
@@ -254,6 +268,12 @@ function findTextArea(name: string): ControlRecord<MockTextAreaControl> {
   return record!;
 }
 
+async function flushProjectSourceStatus(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 describe('SettingsClaudeCodeSection', () => {
   beforeEach(() => {
     setLocale('en');
@@ -434,7 +454,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
 
     it('persists model changes from Model & Thinking tab', async () => {
-      const plugin = createPlugin();
+      const claudeAdapter = { setModel: jest.fn().mockResolvedValue(undefined) };
+      const plugin = createPlugin({ claudeAdapter });
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
@@ -444,6 +465,24 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await findText(t('settings.claudeCode.model.name')).onChange?.('claude-opus-4-5' as never);
       expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-opus-4-5');
+      expect(claudeAdapter.setModel).toHaveBeenCalledWith('claude-opus-4-5');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('still persists model changes when live adapter model update fails', async () => {
+      const claudeAdapter = { setModel: jest.fn().mockRejectedValue(new Error('sdk busy')) };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await findText(t('settings.claudeCode.model.name')).onChange?.('claude-opus-4-5' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-opus-4-5');
+      expect(claudeAdapter.setModel).toHaveBeenCalledWith('claude-opus-4-5');
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
@@ -492,7 +531,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
 
     it('persists permission mode changes from Permissions tab', async () => {
-      const plugin = createPlugin();
+      const claudeAdapter = { setPermissionMode: jest.fn().mockResolvedValue(undefined) };
+      const plugin = createPlugin({ claudeAdapter });
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
@@ -502,6 +542,24 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await findDropdown(t('settings.claudeCode.permissionMode.name')).onChange?.('plan' as never);
       expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('plan');
+      expect(claudeAdapter.setPermissionMode).toHaveBeenCalledWith('plan');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('still persists permission mode when live adapter permission update fails', async () => {
+      const claudeAdapter = { setPermissionMode: jest.fn().mockRejectedValue(new Error('sdk busy')) };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      await findDropdown(t('settings.claudeCode.permissionMode.name')).onChange?.('plan' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('plan');
+      expect(claudeAdapter.setPermissionMode).toHaveBeenCalledWith('plan');
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
   });
@@ -520,6 +578,61 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(findToggle(t('settings.claudeCode.settingSources.user'))).toBeDefined();
       expect(findToggle(t('settings.claudeCode.settingSources.local'))).toBeDefined();
       expect(findTextArea(t('settings.claudeCode.additionalDirectories.name'))).toBeDefined();
+    });
+
+    it('surfaces project source file visibility for Claude Code project settings', async () => {
+      const plugin = createPlugin({
+        existingFiles: ['CLAUDE.md', '.claude/settings.local.json'],
+      });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'context-sources');
+
+      await flushProjectSourceStatus();
+
+      const adapter = (plugin as unknown as {
+        app: { vault: { adapter: { exists: jest.Mock } } };
+      }).app.vault.adapter;
+      expect(adapter.exists).toHaveBeenCalledWith('CLAUDE.md');
+      expect(adapter.exists).toHaveBeenCalledWith('.claude/settings.json');
+      expect(adapter.exists).toHaveBeenCalledWith('.claude/settings.local.json');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.projectSources.title'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.projectSources.present', { file: 'CLAUDE.md' }));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.projectSources.missing', { file: '.claude/settings.json' }));
+      expect(containerEl.textContent).toContain(
+        t('settings.claudeCode.projectSources.present', { file: '.claude/settings.local.json' }),
+      );
+    });
+
+    it('shows the next-query boundary for source and directory settings', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'context-sources');
+
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
+      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
+    });
+
+    it('can manually restart active Claude Code persistent sessions after restart-sensitive changes', async () => {
+      const claudeAdapter = { restartPersistentQueries: jest.fn().mockResolvedValue(undefined) };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'context-sources');
+
+      await findButton(t('settings.claudeCode.runtimeBoundary.restartButton')).onClick?.();
+
+      expect(claudeAdapter.restartPersistentQueries).toHaveBeenCalledWith('settings-change');
     });
 
     it('persists setting source changes from Context & Sources tab', async () => {

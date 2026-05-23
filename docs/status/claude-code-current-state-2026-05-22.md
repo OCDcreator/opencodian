@@ -43,7 +43,39 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `91d3d8ca` — `feat: normalize shared session inspection preview`
   - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
-  - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+- `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-23 Phase 2 settings/runtime boundary hardening
+
+This round tightened the Claude settings surface so it is honest about runtime boundaries instead of implying every Claude Code option live-updates a persistent query.
+
+### What Changed
+
+- `SettingsClaudeCodeSection` now shows project source file visibility for `CLAUDE.md`, `.claude/settings.json`, and `.claude/settings.local.json`
+- The Context & Sources tab now shows a next-query / restarted-session boundary notice
+- The same tab now offers a restart action that calls `ClaudeCodeAdapter.restartPersistentQueries('settings-change')`
+- Model changes now try to update the active Claude adapter via `setModel()` before saving
+- Permission mode changes now try to update the active Claude adapter via `setPermissionMode()` before saving
+- Live adapter control failures no longer block settings persistence, they are best-effort only
+
+### What This Does Not Change
+
+- Setting sources, additional directories, env, tools, and limits still require a new Claude query or restarted persistent session to take effect
+- This does not promote any new Claude capability to stable product surface
+- The restart action only closes active persistent queries, it does not delete the underlying local session handles
+
+### Verification
+
+- Focused settings and adapter tests passed
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed, including `435` suites / `3206` tests and production build
+- Final build/deploy used `BUILD_ID: feature-phase0-capability.202605232242`
+- Test Vault `main.js` contains `feature-phase0-capability.202605232242`
+- Fresh Obsidian runtime proof opened OpenCodian settings to `claude-code/context-sources`, confirmed the runtime-boundary notice, project source status rows, restart button, and no translation-key leakage:
+  - `.obsidian-debug/phase2-settings-runtime-final-clean-assertion-2026-05-23.json`
+  - `.obsidian-debug/phase2-settings-runtime-final-clean-2026-05-23.png`
+  - `.obsidian-debug/phase2-settings-runtime-final-clean-console-2026-05-23.txt`
+  - `.obsidian-debug/phase2-settings-runtime-final-clean-errors-2026-05-23.txt`
+- Runtime deploy initially exposed a missing Claude Agent SDK platform binary because only `main.js`, `manifest.json`, and `styles.css` had been copied. The final Test Vault deploy now also includes `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/`, with the deployed `claude` binary checksum matching `dist`. After that copy, Obsidian console showed `supportedModels count {"count":5}`, `dev:errors` remained empty, and OpenCode sidecar recovered to `running` / `ready=true`.
 
 ## Source Of Truth Order
 

@@ -86,6 +86,8 @@ esbuild 配置：
 4. `copyDirectoryIfExists('assets', 'dist/assets')`
 5. `copyClaudeAgentSdkRuntime()` 移除旧的 SDK 主包副本，并只复制当前平台 optional binary package 到 `dist/node_modules/@anthropic-ai/`
 
+部署到 Test Vault 时，`dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/` 属于 Claude Code backend 的运行时产物，必须和 `dist/main.js` 一起复制。只复制 `main.js` / `manifest.json` / `styles.css` 会让 bundled SDK 在 Obsidian runtime 里解析到插件目录下缺失的平台 binary，并导致 Claude Code model/runtime probes 报 `not-found`。
+
 ### CSS 构建 (`scripts/build-css.mjs`)
 
 读取 `src/style/index.css` 的 `@import` 顺序，将引用到的 CSS 片段合并到根目录 `styles.css`，每个片段添加注释标记。
