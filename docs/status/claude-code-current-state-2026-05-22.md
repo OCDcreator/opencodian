@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `1a5c1f59`
-- Commit subject: `feat: gate pending-questions REST poll to OpenCode in QuestionTodoStatusRefreshCoordinator`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231408`
+- Snapshot commit: `39550a6e`
+- Commit subject: `docs: add 2026-05-23 session detail/history inspection audit round to Claude continuity`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231510`
 - Recent continuity commits in this lane:
+- `39550a6e` — `docs: add 2026-05-23 session detail/history inspection audit round to Claude continuity`
 - `1a5c1f59` — `feat: gate pending-questions REST poll to OpenCode in QuestionTodoStatusRefreshCoordinator`
 - `9b307a38` — `docs: update status doc and devlog for Phase 3 session-read audit round`
 - `c884b8ee` — `refactor: remove openCodeService.listSessions fallback from ConversationSessionSettingsCoordinator`
@@ -455,6 +456,28 @@ For the next multi-round continuation, the immediate high-value targets are:
 - only promote another shared `getSession()` consumer when the shared semantic is as narrow and provable as the official-title or share-URL read seams;
 - keep share writes, rewind, diff, authoritative sync, and child-session graph explicitly gated unless new official basis plus runtime proof says otherwise;
 - if one round finishes cleanly and more backlog remains, do not hand off immediately to a fresh human/Codex session; update docs, commit, and launch the next `opencode run` round in the same session.
+
+## Session Detail / History Inspection Round (2026-05-23)
+
+A second-pass audit was executed across `OpenCodianView.ts`, `ConversationSessionSettingsCoordinator.ts`, `SettingsConversationSection.ts`, and adjacent inspection surfaces (`ActiveTabContextUsageCoordinator`, `ContextDetailModal`, `ChildSessionGraphCoordinator`).
+
+### Findings
+
+| Surface | Status | Detail |
+|---|---|---|
+| `OpenCodianView.ts` — all `openCodeService` session reads | **Gated / OpenCode-only** | `getSessionChildren`, `getCanonicalSessionState`, `hydrateOpenCodeMessage`, `getSessionDiff`, `getCachedSessionDiffEntries`, `getSessionTodos`, `getSessionStatuses`, `getSessionContextUsageSnapshot`, `getSessionMessages`, `getCanonicalSessionMessages`, `getSessionRevertState`, `subscribeToSessionSyncEvents` — all have explicit `backend !== 'opencode'` guards at consumer or host level |
+| `ConversationSessionSettingsCoordinator.ts` — share-URL read | **Backend-aware** | Routes through `readBackendSessionShareUrl()` via registry; no direct `openCodeService.listSessions()` fallback |
+| `ConversationSessionSettingsCoordinator.ts` — share/unshare writes | **OpenCode-only** | Intentionally falls back to `resolveOpenCodeService()`; no backend-neutral share contract exists |
+| `SettingsConversationSection.ts` — session list | **Backend-aware** | Uses `listBackendSessions()` returning `NormalizedSessionRow[]` |
+| `SettingsConversationSection.ts` — session preview | **Backend-aware** | Uses `getBackendSessionPreview()` returning `NormalizedSessionPreviewMessage[]` |
+| `SettingsConversationSection.ts` — unshare write | **OpenCode-only** | Direct `openCodeService.unshareSession()` call; no backend-neutral equivalent |
+| `ActiveTabContextUsageCoordinator` — context usage snapshot | **Gated** | Host `getSessionContextUsageSnapshot` returns `null` for non-OpenCode conversations |
+| `ContextDetailModal` — raw message loader | **Backend-aware** | Uses `loadBackendSessionMessages()` with backend-aware normalization |
+| `ChildSessionGraphCoordinator` — child session graph | **Gated** | `refreshGraph` returns `null` for non-OpenCode conversations |
+
+### Conclusion
+
+No new shared read seams can be safely promoted. All remaining direct `openCodeService` session/history/detail reads are in explicitly gated OpenCode-only paths. The productized backend-aware seams (`readBackendSessionTitle`, `readBackendSessionShareUrl`, `listBackendSessions`, `getBackendSessionPreview`, `loadBackendSessionMessages`) cover all surfaces where narrow, verifiable cross-backend semantics genuinely match.
 
 ## Hard Guardrails
 
