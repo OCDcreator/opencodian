@@ -12,6 +12,45 @@
 
 ---
 
+## 2026-05-23 Phase 3 — Capability Lab audit + Backend Routing Probe registry verification
+
+### Summary
+
+Completed a focused audit of remaining session detail / history inspection / preview surfaces, especially in `SettingsCapabilityLabSection`. No new OpenCode-shaped payload assumptions were found in diagnostic or product surfaces. Enhanced the Backend Routing Probe to also verify the registry routing layer (`listBackendSessions()` + `getBackendSessionPreview()`), ensuring the productized narrow seams are exercised in diagnostic context.
+
+### Audit Findings
+
+**Capability Lab probes**: All 8 probes (History Browser, Subagent Browser, Session Detail, Backend Routing, Fork, Resume, Structured Output, Hook Proof) are provider-owned diagnostic and do NOT assume OpenCode-shaped payloads. They use adapter-specific methods directly.
+
+**Remaining OpenCode-shaped payload assumptions**: All remaining `.info`/`.parts` accesses outside `core/opencode/` are in explicitly gated OpenCode-only paths:
+- `ConversationAuthoritativeSyncCoordinator` — gated by `conversation.backend !== 'opencode'`
+- `ConversationAuthoritativeReloadCoordinator` — OpenCode-only by design
+- `ConversationRenderService` — gated by `backend !== 'opencode'`
+
+**No new shared read seams promoted**: All remaining session reads (children, canonical state, diff, revert state, todos, event subscriptions) are OpenCode-specific and lack narrow, verifiable cross-backend semantics.
+
+### Enhancement: Backend Routing Probe registry layer verification
+
+The probe now exercises both:
+1. **Provider-owned adapter path**: `adapter.listSessions()` + `adapter.getSession()`
+2. **Registry routing layer (productized seams)**: `listBackendSessions()` + `getBackendSessionPreview()`
+
+This verifies that the backend-aware routing infrastructure works end-to-end, not just the adapter implementation.
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` — added registry routing imports; `runBackendRoutingProbe` now tests `listBackendSessions()` and `getBackendSessionPreview()`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — added test for registry routing layer; updated `createMockPlugin` to return adapter from `getActive()` for registry routing
+- `docs/status/claude-code-current-state-2026-05-22.md` — updated snapshot commit, added Capability Lab audit section, added remaining OpenCode-shaped payload assumptions table, updated Backend Routing Probe description
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — documented registry routing layer verification in Backend Routing Probe
+
+### Verification
+
+- `npm test -- --testPathPatterns="SettingsCapabilityLabSection"` — 45 passed
+- `npm test -- --testPathPatterns="AgentBackendRouting"` — 46 passed
+- `OWNER_GUARD_APPROVED=1 npm run verify` — all green
+- `npm run graphify:update:src` — graph refreshed
+
 ## 2026-05-23 Phase 3 — Efficient adapter getSession + session-read fallback cleanup
 
 ### Summary

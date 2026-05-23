@@ -10,8 +10,8 @@ function createMockPlugin(adapter: unknown = null): never {
   const registry = adapter
     ? {
         get: jest.fn().mockReturnValue(adapter),
-        getActive: jest.fn().mockReturnValue(null),
-        getActiveKind: jest.fn().mockReturnValue(null),
+        getActive: jest.fn().mockReturnValue(adapter),
+        getActiveKind: jest.fn().mockReturnValue('claude-code'),
         listAll: jest.fn().mockReturnValue([{ kind: 'claude-code' }]),
         adapters: new Map(),
       }
@@ -1097,6 +1097,53 @@ describe('SettingsCapabilityLabSection', () => {
     expect(routingBlock).toBeTruthy();
     const probeButton = routingBlock!.querySelector('button[data-diagnostic]');
     expect(probeButton).toBeTruthy();
+  });
+
+  it('exercises registry routing layer in backend routing probe', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'routing-session-1', summary: 'Routing test', lastModified: Date.now() },
+      ]),
+      getSession: jest.fn().mockResolvedValue({
+        sessionId: 'routing-session-1',
+        summary: 'Routing test',
+        lastModified: Date.now(),
+      }),
+      getSessionMessages: jest.fn().mockResolvedValue([
+        { role: 'user', content: 'Hello' },
+      ]),
+      hasCapability: jest.fn().mockReturnValue(true),
+      capabilities: new Set(['chat', 'sessions']),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const routingBlock = containerEl.querySelector('[data-section-block="backend-routing"]') as HTMLElement | null;
+    const probeButton = Array.from(routingBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Backend Routing Probe')
+    )) as HTMLButtonElement;
+    probeButton.click();
+    await flushUi();
+
+    // Verify adapter path was exercised
+    expect(adapter.listSessions).toHaveBeenCalled();
+    expect(adapter.getSession).toHaveBeenCalledWith('routing-session-1');
+
+    // Verify registry routing layer results are rendered
+    const outputEl = routingBlock!.querySelector('.opencodian-capability-lab-output') as HTMLElement;
+    expect(outputEl.textContent).toContain('listSessions() via adapter');
+    expect(outputEl.textContent).toContain('listBackendSessions() via registry');
+    expect(outputEl.textContent).toContain('getBackendSessionPreview() via registry');
+
+    const proofMarker = routingBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
   });
 
   it('marks Backend Routing as a diagnostic surface in the capability matrix', async () => {

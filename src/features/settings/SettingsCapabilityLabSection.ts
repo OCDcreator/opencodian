@@ -12,6 +12,10 @@
 import { Notice } from 'obsidian';
 
 import { hasCapability } from '../../core/agents/AgentCapability';
+import {
+  getBackendSessionPreview,
+  listBackendSessions,
+} from '../../core/agents/backend/AgentBackendRouting';
 import type { ClaudeCodeAdapter } from '../../core/agents/backend/ClaudeCodeAdapter';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -1594,7 +1598,41 @@ export class SettingsCapabilityLabSection {
         }
       }
 
-      // Test 3: verify capabilities
+      // Test 3: verify registry routing layer (productized narrow seams)
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Testing registry routing layer (productized seams)...',
+      });
+
+      const registry = this.plugin.agentServiceRegistry;
+      const normalizedRows = await listBackendSessions(registry);
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `listBackendSessions() via registry: ${normalizedRows.length} session(s) returned.`,
+      });
+
+      if (normalizedRows.length > 0) {
+        const firstRow = normalizedRows[0];
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `First normalized row: id=${firstRow.id.slice(0, 12)}…, title="${truncate(firstRow.title, 40)}"`,
+        });
+
+        const previewMessages = await getBackendSessionPreview(registry, firstRow.id);
+        if (previewMessages !== null) {
+          outputEl.createEl('p', {
+            cls: 'opencodian-capability-lab-hint',
+            text: `getBackendSessionPreview() via registry: ${previewMessages.length} preview message(s).`,
+          });
+        } else {
+          outputEl.createEl('p', {
+            cls: 'opencodian-capability-lab-hint',
+            text: 'getBackendSessionPreview() via registry: returned null (history service unavailable or session not found).',
+          });
+        }
+      }
+
+      // Test 4: verify capabilities
       const caps = adapter.capabilities;
       if (caps) {
         outputEl.createEl('p', {
@@ -1605,7 +1643,7 @@ export class SettingsCapabilityLabSection {
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '✓ Backend routing probe completed successfully. Adapter-provided session reads are functional.',
+        text: '✓ Backend routing probe completed successfully. Adapter-provided session reads and registry routing layer are functional.',
       });
       this.updateRuntimeProof('Backend Routing', 'pass', outputEl);
     } catch (err) {

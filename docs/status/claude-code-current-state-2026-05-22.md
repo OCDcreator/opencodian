@@ -16,10 +16,12 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `c884b8ee`
-- Commit subject: `refactor: remove openCodeService.listSessions fallback from ConversationSessionSettingsCoordinator`
+- Snapshot commit: `1a5c1f59`
+- Commit subject: `feat: gate pending-questions REST poll to OpenCode in QuestionTodoStatusRefreshCoordinator`
 - Latest validated build at this snapshot: `feature-phase0-capability.202605231408`
 - Recent continuity commits in this lane:
+- `1a5c1f59` — `feat: gate pending-questions REST poll to OpenCode in QuestionTodoStatusRefreshCoordinator`
+- `9b307a38` — `docs: update status doc and devlog for Phase 3 session-read audit round`
 - `c884b8ee` — `refactor: remove openCodeService.listSessions fallback from ConversationSessionSettingsCoordinator`
 - `9b2f27e6` — `feat: expose getSessionInfo on OpenCodeService, fix adapter O(n) workaround`
 - `6b656e55` — `feat: gate post-sync question todo refresh to opencode`
@@ -212,7 +214,7 @@ The following service seams now route session identity through `getConversationB
 | TitleGenerationService official-title read | **Backend-aware** | Routes through `readBackendSessionTitle()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode path uses `.title`; Claude path uses `.summary`. Unified for both backends. |
 | ConversationSessionSettingsCoordinator share-URL read | **Backend-aware** | Routes through `readBackendSessionShareUrl()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode extracts `session.share.url`; Claude Code returns `null` (no share URL concept). Replaces the previous `listSessions()` + client-side filtering path. Share/unshare writes remain OpenCode-only. **Session-import-free**: coordinator no longer imports OpenCode `Session` type; uses local `ShareInspectionEntry` (`{ id?, share? }`) for all session-related reads and writes. |
 | Capability Lab session detail probe (`getSession`) | **Provider-owned diagnostic** | Routes through `adapter.getSession(sessionId)` on the Claude Code adapter. Shows raw session fields (sessionId, summary, lastModified, messageCount, etc.) as diagnostic output. Not a stable cross-backend session-detail contract. |
-| Capability Lab backend routing probe | **Provider-owned diagnostic** | Verifies the backend routing infrastructure by exercising `listSessions()` + `getSession()` through the provider-owned adapter path. Shows active backend, registered adapters, and conversation backend distribution. Not a stable product surface. |
+| Capability Lab backend routing probe | **Provider-owned diagnostic** | Verifies the backend routing infrastructure by exercising `listSessions()` + `getSession()` through the provider-owned adapter path, AND `listBackendSessions()` + `getBackendSessionPreview()` through the registry routing layer (productized narrow seams). Shows active backend, registered adapters, and conversation backend distribution. Not a stable product surface. |
 
 **Services remaining hard-wired to OpenCode** (no migration justified until backend-neutral equivalents exist):
 
@@ -413,6 +415,39 @@ No new `getSession()` consumers can be safely promoted. All remaining reads are 
 | `QuestionRuntimeHostAdapter` | **Clean** — pure DI adapter, no session reads |
 | `QuestionTodoActivationRefreshCoordinator` | **Clean** — delegates to host and `QuestionTodoStatusRefreshCoordinator`, which now gates pending-questions REST poll |
 | `VisibleConversationPostSyncCoordinator` | **Clean** — delegates to `PostSyncQuestionTodoRefreshFacade` and state coordinator; gated at the `ConversationSyncVisiblePostSyncRouter` level |
+
+### Capability Lab Audit (2026-05-23 Round)
+
+A focused audit of `SettingsCapabilityLabSection.ts` and all Capability Lab diagnostic probes found **no OpenCode-shaped payload assumptions**:
+
+| Probe | Uses Adapter Directly? | Assumes OpenCode Shape? |
+|---|---|---|
+| JSONL History Browser | Yes (`adapter.listSessions`, `adapter.getSessionMessages`) | No — `readMessagePreview` is generic |
+| Subagent Browser | Yes (`adapter.listSubagents`, `adapter.getSubagentMessages`) | No — Claude-specific methods |
+| Session Detail Probe | Yes (`adapter.getSession`) | No — extracts generic fields (`sessionId`, `summary`, `lastModified`, `messageCount`) |
+| Backend Routing Probe | Yes (`adapter.listSessions`, `adapter.getSession`) | No — tests adapter capabilities directly |
+| Fork Probe | Yes (`adapter.forkSession`) | N/A |
+| Resume Probe | Yes (`adapter.runDiagnosticPrompt`) | N/A |
+| Structured Output Probe | Yes (`adapter.runDiagnosticPrompt`) | N/A |
+| Hook Proof | Yes (`adapter.runDiagnosticPrompt`) | N/A |
+
+All probes are **provider-owned diagnostic** and correctly use the Claude Code adapter directly rather than assuming OpenCode semantics.
+
+### Remaining OpenCode-Shaped Payload Assumptions (Non-Diagnostic)
+
+All remaining `.info`/`.parts` accesses outside `core/opencode/` are in **explicitly gated OpenCode-only paths**:
+
+| File | Access Pattern | Guard |
+|---|---|---|
+| `ConversationAuthoritativeSyncCoordinator.ts` | `message.info.role`, `latestServerUser.parts` | `conversation.backend !== 'opencode'` early return |
+| `ConversationAuthoritativeReloadCoordinator.ts` | `message.info.id`, `message.parts` | Reload coordinator is OpenCode-only by design |
+| `ConversationRenderService.ts` | `getCanonicalSessionState`, `hydrateOpenCodeMessage` | `backend !== 'opencode'` fallback |
+| `OpenCodeService.ts` | `message.info.role`, `message.parts.some(...)` | Core OpenCode module |
+| `OpenCodeStreamingFinalizationCoordinator.ts` | `item.info.role`, `assistantTail.info.time.created` | Core OpenCode module |
+| `OpenCodeSessionControlOrchestrator.ts` | `message.info.role`, `message.info.cost` | Core OpenCode module |
+| `OpenCodeSessionStateStore.ts` | `info.time` | Core OpenCode module |
+
+No new shared read seams can be safely promoted. All remaining reads are OpenCode-specific and lack narrow, verifiable cross-backend semantics.
 
 For the next multi-round continuation, the immediate high-value targets are:
 
