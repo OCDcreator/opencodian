@@ -258,7 +258,12 @@ export async function listBackendSessions(
     return [];
   }
 
-  const rawSessions = await active.listSessions();
+  let rawSessions: unknown;
+  try {
+    rawSessions = await active.listSessions();
+  } catch {
+    return [];
+  }
   if (!Array.isArray(rawSessions)) {
     return [];
   }
@@ -309,7 +314,12 @@ export async function getBackendSessionPreview(
     return null;
   }
 
-  const rawMessages = await historyService.getSessionMessages(sessionId);
+  let rawMessages: unknown;
+  try {
+    rawMessages = await historyService.getSessionMessages(sessionId);
+  } catch {
+    return null;
+  }
   if (!Array.isArray(rawMessages)) {
     return null;
   }

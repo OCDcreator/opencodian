@@ -586,6 +586,15 @@ describe('listBackendSessions', () => {
     expect(result[0].id).toBe('ses-1');
     expect(result[1].id).toBe('ses-2');
   });
+
+  it('returns empty array when listSessions throws an error', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      listSessions: async () => { throw new Error('backend failure'); },
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await listBackendSessions(registry);
+    expect(result).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -735,5 +744,14 @@ describe('getBackendSessionPreview', () => {
     expect(result).toHaveLength(2);
     expect(result![0].role).toBe('user');
     expect(result![1].role).toBe('assistant');
+  });
+
+  it('returns null when getSessionMessages throws an error', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      getSessionMessages: async () => { throw new Error('backend failure'); },
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toBeNull();
   });
 });

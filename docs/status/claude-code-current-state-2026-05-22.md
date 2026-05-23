@@ -16,10 +16,14 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `39550a6e`
-- Commit subject: `docs: add 2026-05-23 session detail/history inspection audit round to Claude continuity`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231510`
+- Snapshot commit: `4ca7364c`
+- Commit subject: `fix: add null-item filtering and adapter-error guards to backend-aware routing helpers`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231604`
 - Recent continuity commits in this lane:
+- `4ca7364c` — `fix: add null-item filtering and adapter-error guards to backend-aware routing helpers`
+- `260049ac` — `fix: add Array.isArray guard to loadBackendSessionMessages for runtime safety`
+- `831170b7` — `test: harden backend routing edge cases and record proof`
+- `4a1ac16a` — `test: cover backend-aware context detail and shared preview rendering`
 - `39550a6e` — `docs: add 2026-05-23 session detail/history inspection audit round to Claude continuity`
 - `1a5c1f59` — `feat: gate pending-questions REST poll to OpenCode in QuestionTodoStatusRefreshCoordinator`
 - `9b307a38` — `docs: update status doc and devlog for Phase 3 session-read audit round`
@@ -516,7 +520,7 @@ A third-pass runtime-safety audit of the shared backend-aware routing layer foun
 
 2. **Unhandled adapter errors in productized narrow read seams**: `readBackendSessionTitle()` and `readBackendSessionShareUrl()` are productized seams used by `TitleGenerationService` and `ConversationSessionSettingsCoordinator`. If the underlying `getSession()` call threw (network error, process disconnect, etc.), the error would propagate uncaught to the consumer.
 
-### Fix Applied
+### Fix Applied (Round 1 — null items + getSession error handling)
 
 - Added `.filter((s) => s !== null && typeof s === 'object')` before `.map()` in `listBackendSessions()`, `getBackendSessionPreview()`, and `loadBackendSessionMessages()`. Null or primitive array items are silently skipped rather than crashing the normalization loop.
 - Added `try/catch` around `sessionService.getSession(sessionId)` in `readBackendSessionTitle()` and `readBackendSessionShareUrl()`. Adapter errors now return `null` instead of propagating, matching the existing "not found" semantics.
@@ -528,10 +532,20 @@ A third-pass runtime-safety audit of the shared backend-aware routing layer foun
   - `readBackendSessionTitle`: returns null when `getSession` throws
   - `readBackendSessionShareUrl`: returns null when `getSession` throws
 
+### Fix Applied (Round 2 — listSessions / getSessionMessages error handling)
+
+A follow-up audit found that `listBackendSessions()` and `getBackendSessionPreview()` also lacked try/catch around their respective adapter calls (`listSessions()` and `getSessionMessages()`). These are productized seams used by the settings UI; uncaught errors would break the settings surface.
+
+- Added `try/catch` around `active.listSessions()` in `listBackendSessions()`. Adapter errors return `[]`.
+- Added `try/catch` around `historyService.getSessionMessages(sessionId)` in `getBackendSessionPreview()`. Adapter errors return `null`.
+- Added two unit tests:
+  - `listBackendSessions`: returns empty array when `listSessions` throws
+  - `getBackendSessionPreview`: returns null when `getSessionMessages` throws
+
 ### Verification
 
-- `npm run verify` passed with `431` suites / `3057` tests
-- Build completed with `BUILD_ID feature-phase0-capability.202605231604`
+- `npm run verify` passed with `431` suites / `3059` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231608`
 - No new shared `getSession()` consumers were added; this is a defensive hardening of existing backend-aware seams
 
 ## Hard Guardrails
