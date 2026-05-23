@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `40dbf471`
-- Commit subject: `feat: add SessionTodoCoordinator backend gates and Backend Routing diagnostic probe`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231236`
+- Snapshot commit: `6b656e55`
+- Commit subject: `feat: gate post-sync question todo refresh to opencode`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605231255`
 - Recent continuity commits in this lane:
+- `6b656e55` — `feat: gate post-sync question todo refresh to opencode`
 - `40dbf471` — `feat: add SessionTodoCoordinator backend gates and Backend Routing diagnostic probe`
 - `5cbde267` — `feat: add Claude session detail diagnostic probe`
 - `0dec5483` — `feat: add claude resume diagnostic probe`
