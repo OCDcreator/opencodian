@@ -85,8 +85,8 @@ The sharing block edits OpenCode's top-level `share` field:
 - This is a project config setting, not a per-conversation session override
 - After saving, local managed OpenCode services are restarted when currently running so the running server rereads `share`; remote mode shows the standard remote-management Notice instead of pretending the plugin can reload it
 - The share setting is rendered inside a dedicated share-policy panel with a current-mode chip, a help button backed by `OpenCodeProjectConfigHelpModal`, and a diagnostics action that checks project mode, `OpenCodeService.checkHealth()`, and public share host reachability
-- The sharing block also renders a shared-session manager: it routes `listSessions()` through `getActiveSessionBackendService()` and `getSessionMessages()` through `getActiveSessionHistoryService()` (backend-aware routing layer), filtering sessions with `session.share.url`, showing a public-session count and refresh action, showing the public URL, supporting copy/unshare, and opening a full message preview. `unshareSession()` remains a direct `openCodeService` call because it is an OpenCode-specific write operation.
-- Shared-session previews render all messages; non-text parts and text longer than 800 characters are placed in closed `<details>` blocks so tool calls and long output are present but folded by default
+- The sharing block also renders a shared-session manager: it routes session listing through `listBackendSessions()` and message preview through `getBackendSessionPreview()` (backend-aware normalization helpers in `AgentBackendRouting`), using `NormalizedSessionRow` and `NormalizedSessionPreviewMessage` types instead of casting to OpenCode `Session` / `SessionMessage`. Sessions are filtered by `shareUrl`, showing a public-session count and refresh action, showing the public URL, supporting copy/unshare, and opening a full message preview. `unshareSession()` remains a direct `openCodeService` call because it is an OpenCode-specific write operation.
+- Shared-session previews render all messages; non-text parts and text longer than 800 characters are placed in closed `<details>` blocks so tool calls and long output are present but folded by default. If the backend cannot supply preview messages, the section shows the existing preview-failed text; if the backend responds with an empty history, the section shows a neutral empty-preview message instead of treating it as an error.
 
 ### chat font size (global session default)
 
@@ -109,7 +109,7 @@ The sharing block edits OpenCode's top-level `share` field:
 - `main.ts`: 提供 `reapplyConversationSessionDefaults()`，把 settings 保存后的默认值变化桥接到当前聊天视图运行时
 - `OpencodeConfigManager.ts`: 提供 `getCompactionConfig()` / `updateCompactionConfig()` 与 `getShareConfig()` / `updateShareConfig()` 读写项目 `.opencode/opencode.json` 中的 conversation 相关项目配置
 - `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置，以及 shared-session unshare 所需的 `unshareSession()`
-- `AgentBackendRouting.ts`: 提供 `getActiveSessionBackendService()` 和 `getActiveSessionHistoryService()` 用于 shared-session 列表和消息预览的后端感知路由
+- `AgentBackendRouting.ts`: 提供 `listBackendSessions()` 和 `getBackendSessionPreview()` 用于 shared-session 列表和消息预览的 backend-aware 归一化路由，返回 `NormalizedSessionRow` / `NormalizedSessionPreviewMessage` 类型而非 OpenCode `Session` / `SessionMessage`
 - `ProjectConfigFileWatcher.ts`: 监听当前 vault 的 `.opencode/opencode.json` 外部文件变更并触发项目 conversation 控件回读
 - `ModelConfigService.ts`: 提供 AI 标题模型使用的有效模型目录
 - `modelPicker.ts`: 构建并解析 AI 标题模型 picker group / 选项

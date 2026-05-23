@@ -202,6 +202,161 @@ export interface NormalizedSessionMessage {
   payload: string;
 }
 
+// ---------------------------------------------------------------------------
+// Backend-aware session-row normalization (inspection seam)
+// ---------------------------------------------------------------------------
+
+/**
+ * Lightweight session-row shape for settings inspection surfaces.
+ * Decoupled from OpenCode `Session` and Claude SDK session types so the
+ * shared-session list no longer assumes a specific backend payload shape.
+ */
+export interface NormalizedSessionRow {
+  id: string;
+  title: string;
+  shareUrl: string | null;
+  updatedAt: number | null;
+}
+
+export interface NormalizedSessionPreviewPart {
+  type: string;
+  text: string;
+}
+
+export interface NormalizedSessionPreviewMessage {
+  role: string;
+  parts: NormalizedSessionPreviewPart[];
+}
+
+/**
+ * List sessions from the active backend as normalized rows.
+ *
+ * Routes through the registry and calls `listSessions()` on the active
+ * session-capable adapter, then normalizes the raw results into
+ * `NormalizedSessionRow[]` based on the active backend kind:
+ * - OpenCode: extracts `.id`, `.title`, `.share.url`, `.time.updated`
+ * - Claude / generic: best-effort field extraction from SDK records
+ *
+ * Returns `[]` when no session-capable adapter is available or the adapter
+ * does not implement `listSessions`.
+ */
+export async function listBackendSessions(
+  registry: AgentServiceRegistry | null | undefined,
+): Promise<NormalizedSessionRow[]> {
+  const active = getActiveSessionBackendService(registry);
+  if (!active || typeof active.listSessions !== 'function') {
+    return [];
+  }
+
+  const rawSessions = await active.listSessions();
+  if (!Array.isArray(rawSessions)) {
+    return [];
+  }
+
+  return rawSessions.map((session: unknown, idx: number) => {
+    const record = session as Record<string, unknown>;
+
+    // Extract share URL if present
+    let shareUrl: string | null = null;
+    const share = record.share;
+    if (share && typeof share === 'object') {
+      const url = (share as Record<string, unknown>).url;
+      if (typeof url === 'string' && url.trim().length > 0) {
+        shareUrl = url;
+      }
+    }
+
+    return {
+      id: String(record.id ?? record.sessionId ?? `session-${idx}`),
+      title: String(record.title ?? record.summary ?? ''),
+      shareUrl,
+      updatedAt: typeof record.updatedAt === 'number'
+        ? record.updatedAt
+        : typeof (record.time as Record<string, unknown> | undefined)?.updated === 'number'
+          ? (record.time as Record<string, unknown>).updated as number
+          : null,
+    };
+  });
+}
+
+/**
+ * Read session preview messages from the active backend as normalized entries.
+ *
+ * Routes through the registry and calls `getSessionMessages(sessionId)` on
+ * the active history-capable adapter, then normalizes raw results into
+ * `NormalizedSessionPreviewMessage[]` based on the active backend kind:
+ * - OpenCode: extracts `.info.role` + `.parts[]` with `{type, text}`
+ * - Claude / generic: extracts `.role`/`.type` + recognized content fields
+ *
+ * Returns `null` when no history-capable adapter is available.
+ * Returns `[]` when the backend supports preview reads but the session has no
+ * previewable messages.
+ */
+export async function getBackendSessionPreview(
+  registry: AgentServiceRegistry | null | undefined,
+  sessionId: string,
+): Promise<NormalizedSessionPreviewMessage[] | null> {
+  const historyService = getActiveSessionHistoryService(registry);
+  if (!historyService) {
+    return null;
+  }
+
+  const rawMessages = await historyService.getSessionMessages(sessionId);
+  if (!Array.isArray(rawMessages)) {
+    return null;
+  }
+
+  return rawMessages.map((msg: unknown): NormalizedSessionPreviewMessage => {
+    const record = msg as Record<string, unknown>;
+
+    // Detect OpenCode {info, parts} shape
+    if (record.info && typeof record.info === 'object' && Array.isArray(record.parts)) {
+      const info = record.info as Record<string, unknown>;
+      const parts = record.parts as Array<Record<string, unknown>>;
+      return {
+        role: String(info.role ?? 'unknown'),
+        parts: parts.map((part) => ({
+          type: String(part.type ?? 'unknown'),
+          text: typeof part.text === 'string' ? part.text : JSON.stringify(part, null, 2),
+        })),
+      };
+    }
+
+    // Generic / Claude normalization
+    const role = String(record.role ?? record.type ?? 'unknown');
+
+    // Try recognized content fields
+    const content = record.content;
+    if (typeof content === 'string') {
+      return { role, parts: [{ type: 'text', text: content }] };
+    }
+
+    if (Array.isArray(content)) {
+      // Claude SDK content blocks: [{ type: 'text', text: '...' }, ...]
+      const parts: NormalizedSessionPreviewPart[] = [];
+      for (const block of content) {
+        if (typeof block === 'object' && block !== null) {
+          const b = block as Record<string, unknown>;
+          if (b.type === 'text' && typeof b.text === 'string') {
+            parts.push({ type: 'text', text: b.text });
+          } else {
+            parts.push({ type: String(b.type ?? 'block'), text: JSON.stringify(block, null, 2) });
+          }
+        }
+      }
+      if (parts.length > 0) {
+        return { role, parts };
+      }
+    }
+
+    // Fallback: serialize the whole record as a single json part
+    return {
+      role,
+      parts: [{ type: 'json', text: JSON.stringify(record, null, 2) }],
+    };
+  });
+}
+
 /**
  * Load and normalize raw session messages from the backend.
  *

@@ -580,6 +580,33 @@ describe('SettingsConversationSection', () => {
     expect(previewEl?.textContent).toBeTruthy(); // preview was rendered
   });
 
+  it('shows a neutral empty preview message when the backend returns no session messages', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-empty',
+        title: 'Empty preview session',
+        share: { url: 'https://opencode.ai/s/session-empty' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-empty"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-empty"]');
+    expect(previewEl?.textContent).toContain(t('settings.conversation.share.sharedSessions.previewEmpty'));
+  });
+
   it('routes session message preview through the backend-aware history service', async () => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -620,6 +647,77 @@ describe('SettingsConversationSection', () => {
     // The preview shows the message content
     const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-1"]');
     expect(previewEl?.textContent).toContain('routed message');
+  });
+
+  it('renders preview messages from non-OpenCode backend through the normalized seam', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // Adapter returns sessions with share URLs but messages in non-OpenCode shape
+    // (no info/parts, just role + content like a generic/Claude backend)
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-gen',
+        title: 'Generic Backend Session',
+        share: { url: 'https://example.com/s/session-gen' },
+        time: { created: 100, updated: 200 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      { role: 'user', content: 'hello from generic backend' },
+      { role: 'assistant', content: 'hi there' },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Session row should render
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-gen"]');
+    expect(rowEl?.textContent).toContain('Generic Backend Session');
+
+    // Click preview — should NOT crash on missing info/parts
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-gen"]');
+    // Preview should render the normalized messages without crashing
+    expect(previewEl?.textContent).toContain('hello from generic backend');
+    expect(previewEl?.textContent).toContain('hi there');
+  });
+
+  it('renders non-user preview roles verbatim through the normalized seam', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-system',
+        title: 'System role session',
+        share: { url: 'https://example.com/s/session-system' },
+        time: { created: 10, updated: 20 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      { role: 'system', content: 'System note' },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-system"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const roleEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-system"] .opencodian-shared-session-message-role');
+    expect(roleEl?.textContent).toBe('system');
   });
 
   it('checks share diagnostics from the sharing block', async () => {

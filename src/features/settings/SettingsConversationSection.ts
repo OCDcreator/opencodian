@@ -2,19 +2,16 @@ import type { App, ButtonComponent, ExtraButtonComponent } from 'obsidian';
 import { Notice, requestUrl, Setting } from 'obsidian';
 
 import {
-  getActiveSessionBackendService,
-  getActiveSessionHistoryService,
+  getBackendSessionPreview,
+  listBackendSessions,
+  type NormalizedSessionPreviewMessage,
+  type NormalizedSessionPreviewPart,
+  type NormalizedSessionRow,
 } from '../../core/agents/backend/AgentBackendRouting';
 import {
   parseModelReference,
   resolveModelSelection,
 } from '../../core/config/modelConfig';
-import type {
-  Message,
-  Part,
-  Session,
-  SessionMessage,
-} from '../../core/opencode/OpenCodeSessionLifecycleCoordinator';
 import type {
   OpencodeCompactionConfig,
   OpencodeShareMode,
@@ -794,20 +791,10 @@ export class SettingsConversationSection {
     });
 
     try {
-      const sessionService = getActiveSessionBackendService(
+      const sessions = await listBackendSessions(
         this.plugin.agentServiceRegistry,
       );
-      if (!sessionService?.listSessions) {
-        containerEl.createDiv({
-          cls: 'opencodian-shared-sessions-empty',
-          text: t('settings.conversation.share.sharedSessions.empty'),
-        });
-        return;
-      }
-      const sessions = (await sessionService.listSessions()) as Session[];
-      const sharedSessions = sessions
-        .map((session) => ({ session, url: this.getSessionShareUrl(session) }))
-        .filter((entry): entry is { session: Session; url: string } => Boolean(entry.url));
+      const sharedSessions = sessions.filter((row) => Boolean(row.shareUrl));
       countEl.setText(t('settings.conversation.share.sharedSessions.count', {
         count: String(sharedSessions.length),
       }));
@@ -823,8 +810,8 @@ export class SettingsConversationSection {
       const listEl = containerEl.createDiv({
         cls: 'opencodian-shared-sessions-list',
       });
-      for (const entry of sharedSessions) {
-        this.renderSharedSessionRow(listEl, entry.session, entry.url);
+      for (const row of sharedSessions) {
+        this.renderSharedSessionRow(listEl, row, row.shareUrl!);
       }
     } catch (error) {
       logger.warn('Failed to load shared sessions:', error);
@@ -835,22 +822,22 @@ export class SettingsConversationSection {
     }
   }
 
-  private renderSharedSessionRow(containerEl: HTMLElement, session: Session, shareUrl: string): void {
+  private renderSharedSessionRow(containerEl: HTMLElement, row: NormalizedSessionRow, shareUrl: string): void {
     const rowEl = containerEl.createDiv({
       cls: 'opencodian-shared-session-row',
-      attr: { 'data-shared-session-id': session.id },
+      attr: { 'data-shared-session-id': row.id },
     });
     const mainEl = rowEl.createDiv({
       cls: 'opencodian-shared-session-main',
     });
     mainEl.createDiv({
       cls: 'opencodian-shared-session-title',
-      text: session.title || t('chat.history.untitled'),
+      text: row.title || t('chat.history.untitled'),
     });
     mainEl.createDiv({
       cls: 'opencodian-shared-session-meta',
       text: t('settings.conversation.share.sharedSessions.updated', {
-        value: this.formatTimestamp(session.time?.updated),
+        value: this.formatTimestamp(row.updatedAt ?? undefined),
       }),
     });
     mainEl.createDiv({
@@ -866,10 +853,10 @@ export class SettingsConversationSection {
       new Notice(t('settings.conversation.share.sharedSessions.copySuccess'));
     });
     this.createSharedSessionButton(actionsEl, 'preview-shared-session', t('settings.conversation.share.sharedSessions.preview'), async () => {
-      await this.toggleSharedSessionPreview(rowEl, session.id);
+      await this.toggleSharedSessionPreview(rowEl, row.id);
     });
     this.createSharedSessionButton(actionsEl, 'unshare-shared-session', t('settings.conversation.share.sharedSessions.unshare'), async () => {
-      await this.plugin.openCodeService.unshareSession(session.id);
+      await this.plugin.openCodeService.unshareSession(row.id);
       new Notice(t('settings.conversation.share.sharedSessions.unshared'));
       await this.renderSharedSessionsList();
     });
@@ -915,19 +902,25 @@ export class SettingsConversationSection {
     });
 
     try {
-      const historyService = getActiveSessionHistoryService(
+      const messages = await getBackendSessionPreview(
         this.plugin.agentServiceRegistry,
+        sessionId,
       );
-      if (!historyService) {
-        previewEl.empty();
+      previewEl.empty();
+      if (messages === null) {
         previewEl.createDiv({
           cls: 'opencodian-shared-sessions-empty',
           text: t('settings.conversation.share.sharedSessions.previewFailed'),
         });
         return;
       }
-      const messages = (await historyService.getSessionMessages(sessionId)) as SessionMessage[];
-      previewEl.empty();
+      if (messages.length === 0) {
+        previewEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.previewEmpty'),
+        });
+        return;
+      }
       for (const message of messages) {
         this.renderSharedSessionMessage(previewEl, message);
       }
@@ -941,13 +934,13 @@ export class SettingsConversationSection {
     }
   }
 
-  private renderSharedSessionMessage(containerEl: HTMLElement, message: SessionMessage): void {
+  private renderSharedSessionMessage(containerEl: HTMLElement, message: NormalizedSessionPreviewMessage): void {
     const messageEl = containerEl.createDiv({
       cls: 'opencodian-shared-session-message',
     });
     messageEl.createDiv({
       cls: 'opencodian-shared-session-message-role',
-      text: this.getMessageRoleLabel(message.info),
+      text: this.getNormalizedMessageRoleLabel(message.role),
     });
     const partsEl = messageEl.createDiv({
       cls: 'opencodian-shared-session-message-parts',
@@ -957,7 +950,7 @@ export class SettingsConversationSection {
     }
   }
 
-  private renderSharedSessionPart(containerEl: HTMLElement, part: Part): void {
+  private renderSharedSessionPart(containerEl: HTMLElement, part: NormalizedSessionPreviewPart): void {
     const text = typeof part.text === 'string' ? part.text : JSON.stringify(part, null, 2);
     const shouldCollapse = part.type !== 'text' || text.length > 800;
     if (shouldCollapse) {
@@ -981,13 +974,14 @@ export class SettingsConversationSection {
     });
   }
 
-  private getSessionShareUrl(session: Session): string | null {
-    const share = session.share;
-    if (!share || typeof share !== 'object') {
-      return null;
+  private getNormalizedMessageRoleLabel(role: string): string {
+    if (role === 'assistant') {
+      return t('settings.conversation.share.sharedSessions.assistant');
     }
-    const url = (share as { url?: unknown }).url;
-    return typeof url === 'string' && url.trim().length > 0 ? url : null;
+    if (role === 'user') {
+      return t('settings.conversation.share.sharedSessions.user');
+    }
+    return role.trim() || 'unknown';
   }
 
   private getShareModeLabel(mode: OpencodeShareMode): string {
@@ -1000,12 +994,6 @@ export class SettingsConversationSection {
       default:
         return t('settings.conversation.share.mode.manual');
     }
-  }
-
-  private getMessageRoleLabel(message: Message): string {
-    return message.role === 'assistant'
-      ? t('settings.conversation.share.sharedSessions.assistant')
-      : t('settings.conversation.share.sharedSessions.user');
   }
 
   private formatTimestamp(value: number | undefined): string {

@@ -754,6 +754,7 @@ export const zhTranslations = {
   'settings.conversation.share.sharedSessions.preview': '预览',
   'settings.conversation.share.sharedSessions.previewLoading': '正在加载完整会话预览...',
   'settings.conversation.share.sharedSessions.previewFailed': '无法加载这个分享会话的预览。',
+  'settings.conversation.share.sharedSessions.previewEmpty': '这个分享会话暂时还没有可预览的消息。',
   'settings.conversation.share.sharedSessions.unshare': '取消分享',
   'settings.conversation.share.sharedSessions.unshared': '已取消会话分享',
   'settings.conversation.share.sharedSessions.collapsedPart': '已折叠 {type} 输出',

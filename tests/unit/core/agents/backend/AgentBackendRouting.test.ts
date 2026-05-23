@@ -1,10 +1,13 @@
+/* eslint-disable max-lines -- AgentBackendRouting tests keep the shared backend-aware seam matrix in one file so routing behaviors stay reviewable together. */
 import { describe, expect, it } from '@jest/globals';
 
 import { AgentCapability, OPENCODE_FULL_CAPABILITIES } from '../../../../../src/core/agents/AgentCapability';
 import {
   getActiveSessionHistoryService,
+  getBackendSessionPreview,
   getConversationSessionBackendService,
   getConversationSessionHistoryService,
+  listBackendSessions,
   loadBackendSessionMessages,
   readBackendSessionShareUrl,
   readBackendSessionTitle,
@@ -380,4 +383,206 @@ describe('readBackendSessionShareUrl', () => {
       const result = await readBackendSessionShareUrl(registry, { backend: 'codex' }, 'ses-1');
       expect(result).toBeNull();
     });
+});
+
+// ---------------------------------------------------------------------------
+// listBackendSessions
+// ---------------------------------------------------------------------------
+
+describe('listBackendSessions', () => {
+  it('returns empty array when registry is null', async () => {
+    const result = await listBackendSessions(null);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when active adapter lacks listSessions', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      // No listSessions
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await listBackendSessions(registry);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when no active backend exists', async () => {
+    const registry = createMockRegistry(new Map());
+    const result = await listBackendSessions(registry);
+    expect(result).toEqual([]);
+  });
+
+  it('normalizes OpenCode sessions with id/title/share/time shape', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      listSessions: async () => [
+        { id: 'ses-1', title: 'Research', share: { url: 'https://opencode.ai/s/ses-1' }, time: { created: 100, updated: 200 } },
+        { id: 'ses-2', title: 'Draft', time: { created: 300 } },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await listBackendSessions(registry);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      id: 'ses-1',
+      title: 'Research',
+      shareUrl: 'https://opencode.ai/s/ses-1',
+      updatedAt: 200,
+    });
+    expect(result[1]).toEqual({
+      id: 'ses-2',
+      title: 'Draft',
+      shareUrl: null,
+      updatedAt: null,
+    });
+  });
+
+  it('normalizes Claude sessions with id/summary generic shape', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+    ]), {
+      listSessions: async () => [
+        { sessionId: 'claude-1', summary: 'Claude Topic', updatedAt: 500 },
+        { id: 'claude-2', title: 'Claude Title' },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await listBackendSessions(registry);
+    expect(result).toHaveLength(2);
+    // First: sessionId field as id, summary as title, no share URL
+    expect(result[0]).toEqual({
+      id: 'claude-1',
+      title: 'Claude Topic',
+      shareUrl: null,
+      updatedAt: 500,
+    });
+    // Second: id field, title field, no share URL
+    expect(result[1]).toEqual({
+      id: 'claude-2',
+      title: 'Claude Title',
+      shareUrl: null,
+      updatedAt: null,
+    });
+  });
+
+  it('falls back gracefully for records missing most fields', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      listSessions: async () => [
+        { id: 'ses-minimal' },
+        { title: 'No ID session' },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await listBackendSessions(registry);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('ses-minimal');
+    expect(result[0].title).toBe('');
+    expect(result[1].id).toMatch(/^session-/); // generated fallback
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getBackendSessionPreview
+// ---------------------------------------------------------------------------
+
+describe('getBackendSessionPreview', () => {
+  it('returns null when registry is null', async () => {
+    const result = await getBackendSessionPreview(null, 'ses-1');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when active adapter lacks getSessionMessages', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      // No getSessionMessages
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toBeNull();
+  });
+
+  it('returns empty array when the active backend has no preview messages', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      getSessionMessages: async () => [],
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toEqual([]);
+  });
+
+  it('normalizes OpenCode messages with info/parts shape into preview entries', async () => {
+    const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
+      getSessionMessages: async () => [
+        {
+          info: { id: 'm1', role: 'user' },
+          parts: [
+            { type: 'text', text: 'hello' },
+          ],
+        },
+        {
+          info: { id: 'm2', role: 'assistant' },
+          parts: [
+            { type: 'tool', text: 'tool output' },
+            { type: 'text', text: 'reply' },
+          ],
+        },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      role: 'user',
+      parts: [{ type: 'text', text: 'hello' }],
+    });
+    expect(result[1]).toEqual({
+      role: 'assistant',
+      parts: [
+        { type: 'tool', text: 'tool output' },
+        { type: 'text', text: 'reply' },
+      ],
+    });
+  });
+
+  it('normalizes Claude messages with generic role/content shape', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+    ]), {
+      getSessionMessages: async () => [
+        { id: 'cm1', role: 'user', content: 'hello claude' },
+        { type: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      role: 'user',
+      parts: [{ type: 'text', text: 'hello claude' }],
+    });
+    expect(result[1]).toEqual({
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'hi there' }],
+    });
+  });
+
+  it('handles generic messages without content by serializing the whole record', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+    ]), {
+      getSessionMessages: async () => [
+        { role: 'system', metadata: { key: 'val' } },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+    expect(result).toHaveLength(1);
+    expect(result[0].role).toBe('system');
+    // When no recognized content field exists, falls back to JSON serialization
+    expect(result[0].parts).toHaveLength(1);
+    expect(result[0].parts[0].type).toBe('json');
+    expect(result[0].parts[0].text).toContain('"metadata"');
+  });
 });

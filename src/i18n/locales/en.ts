@@ -754,6 +754,7 @@ export const enTranslations = {
   'settings.conversation.share.sharedSessions.preview': 'Preview',
   'settings.conversation.share.sharedSessions.previewLoading': 'Loading full conversation preview...',
   'settings.conversation.share.sharedSessions.previewFailed': 'Could not load this shared session preview.',
+  'settings.conversation.share.sharedSessions.previewEmpty': 'This shared session does not have any previewable messages yet.',
   'settings.conversation.share.sharedSessions.unshare': 'Cancel sharing',
   'settings.conversation.share.sharedSessions.unshared': 'Session sharing canceled',
   'settings.conversation.share.sharedSessions.collapsedPart': 'Collapsed {type} output',
