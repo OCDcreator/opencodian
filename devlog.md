@@ -12,6 +12,28 @@
 
 ---
 
+## 2026-05-23 Phase 3 — Final session/history inspection audit + unshare runtime guard
+
+### Summary
+
+Completed a comprehensive real-code audit of all remaining session detail / history inspection / session list-detail read surfaces to verify the lane is runtime-proof-complete. The audit confirmed all productized backend-aware seams are properly defended, all remaining direct `openCodeService` bindings are in explicitly gated OpenCode-only paths, and no outdated docs claims exist about shared preview consuming OpenCode-shaped payloads.
+
+One defensive hardening was applied: `SettingsConversationSection.ts`'s unshare callback now has an explicit inner runtime guard that blocks the `openCodeService.unshareSession()` call if the active backend has switched away from OpenCode while the settings page is open.
+
+### Changes
+
+- `src/features/settings/SettingsConversationSection.ts`: Added `isOpenCodeActive()` guard inside the unshare callback with user-facing notice when the backend is no longer OpenCode
+- `src/i18n/locales/en.ts` / `zh.ts`: Added `settings.conversation.share.sharedSessions.unshareUnavailable` locale string
+- `tests/unit/features/settings/SettingsConversationSection.test.ts`: Added `blocks unshare when the active backend is no longer OpenCode` test
+- `docs/modules/features/settings/SettingsConversationSection.md`: Updated to document the unshare runtime guard
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added "Final Session/History Inspection Audit Round" section with complete findings table and conclusion
+
+### Verification
+
+- `npm run verify` passed: `431` suites / `3061` tests
+
+---
+
 ## 2026-05-23 Phase 3 — getBackendSessionPreview OpenCode parts inner null-item guard
 
 ### Summary

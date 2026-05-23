@@ -757,6 +757,7 @@ export const zhTranslations = {
   'settings.conversation.share.sharedSessions.previewEmpty': '这个分享会话暂时还没有可预览的消息。',
   'settings.conversation.share.sharedSessions.unshare': '取消分享',
   'settings.conversation.share.sharedSessions.unshared': '已取消会话分享',
+  'settings.conversation.share.sharedSessions.unshareUnavailable': '取消分享仅在 OpenCode 为活跃后端时可用。',
   'settings.conversation.share.sharedSessions.collapsedPart': '已折叠 {type} 输出',
   'settings.conversation.share.sharedSessions.user': '用户',
   'settings.conversation.share.sharedSessions.assistant': '助手',

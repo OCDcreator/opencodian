@@ -757,6 +757,7 @@ export const enTranslations = {
   'settings.conversation.share.sharedSessions.previewEmpty': 'This shared session does not have any previewable messages yet.',
   'settings.conversation.share.sharedSessions.unshare': 'Cancel sharing',
   'settings.conversation.share.sharedSessions.unshared': 'Session sharing canceled',
+  'settings.conversation.share.sharedSessions.unshareUnavailable': 'Unsharing is only available when OpenCode is the active backend.',
   'settings.conversation.share.sharedSessions.collapsedPart': 'Collapsed {type} output',
   'settings.conversation.share.sharedSessions.user': 'User',
   'settings.conversation.share.sharedSessions.assistant': 'Assistant',

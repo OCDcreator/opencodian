@@ -501,6 +501,33 @@ describe('SettingsConversationSection', () => {
     expect((plugin.openCodeService as { unshareSession: jest.Mock }).unshareSession).toHaveBeenCalledWith('session-1');
   });
 
+  it('blocks unshare when the active backend is no longer OpenCode', async () => {
+    const plugin = createPlugin();
+    (plugin.openCodeService as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'Shared research',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Simulate backend switch while settings page is open
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-1"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="unshare-shared-session"]')?.click();
+    await Promise.resolve();
+
+    // unshareSession should NOT be called because OpenCode is no longer active
+    expect((plugin.openCodeService as { unshareSession: jest.Mock }).unshareSession).not.toHaveBeenCalled();
+  });
+
   it('routes shared sessions list through the backend-aware registry layer', async () => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,

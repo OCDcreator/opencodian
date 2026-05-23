@@ -216,7 +216,7 @@ The following service seams now route session identity through `getConversationB
 | Post-sync question/todo refresh (background executor) | **Null-safe** | `BackgroundConversationPostSyncRefreshExecutor` handles null plan (non-OpenCode) by skipping question/todo coordinator but still flushing background-task writeback |
 | Settings shared sessions list (`listSessions`) | **Backend-aware** | Routes through `listBackendSessions()` instead of `openCodeService.listSessions()`. Returns `NormalizedSessionRow[]` (backend-neutral shape). Section remains OpenCode-gated because share URLs are OpenCode-specific, but the read surface is backend-aware. |
 | Settings shared session preview (`getSessionMessages`) | **Backend-aware** | Routes through `getBackendSessionPreview()` instead of `openCodeService.getSessionMessages()`. Returns `NormalizedSessionPreviewMessage[]` (backend-neutral shape with `role`/`parts[]`). Handles both OpenCode `{info, parts}` and generic/Claude `{role, content}` message shapes. |
-| Settings shared session unshare (`unshareSession`) | **OpenCode-only** | Direct `openCodeService.unshareSession()` call; no backend-neutral equivalent for share URL write operations. |
+| Settings shared session unshare (`unshareSession`) | **OpenCode-only** | Direct `openCodeService.unshareSession()` call; no backend-neutral equivalent for share URL write operations. Inner runtime guard (`isOpenCodeActive()`) blocks the call if the backend switches away from OpenCode while settings is open. |
 | TitleGenerationService official-title read | **Backend-aware** | Routes through `readBackendSessionTitle()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode path uses `.title`; Claude path uses `.summary`. Unified for both backends. |
 | ConversationSessionSettingsCoordinator share-URL read | **Backend-aware** | Routes through `readBackendSessionShareUrl()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode extracts `session.share.url`; Claude Code returns `null` (no share URL concept). Replaces the previous `listSessions()` + client-side filtering path. Share/unshare writes remain OpenCode-only. **Session-import-free**: coordinator no longer imports OpenCode `Session` type; uses local `ShareInspectionEntry` (`{ id?, share? }`) for all session-related reads and writes. |
 | Capability Lab session detail probe (`getSession`) | **Provider-owned diagnostic** | Routes through `adapter.getSession(sessionId)` on the Claude Code adapter. Shows raw session fields (sessionId, summary, lastModified, messageCount, etc.) as diagnostic output. Not a stable cross-backend session-detail contract. |
@@ -593,6 +593,42 @@ The generic / Claude content-block path already handled this correctly by checki
 - `npm run verify` passed with `431` suites / `3060` tests
 - Build completed with `BUILD_ID feature-phase0-capability.202605231623`
 - No new shared `getSession()` consumers were added; this is a defensive hardening of an existing backend-aware seam
+
+## Final Session/History Inspection Audit Round (2026-05-23)
+
+A comprehensive real-code audit of all remaining session detail / history inspection / session list-detail read surfaces confirmed the lane is runtime-proof-complete with one defensive hardening applied.
+
+### Audit Scope
+
+Files inspected:
+- `src/features/settings/SettingsConversationSection.ts` — shared sessions list, preview, unshare
+- `src/features/chat/OpenCodianView.ts` — all `openCodeService` session read bindings in sync host wiring
+- `src/features/chat/services/ConversationSessionSettingsCoordinator.ts` — share-URL read, share/unshare writes
+- `src/features/settings/SettingsCapabilityLabSection.ts` — all diagnostic probes
+- `src/core/agents/backend/AgentBackendRouting.ts` — all normalized routing helpers
+- `src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts` — `.info`/`.parts` usage
+- `src/features/chat/services/ConversationAuthoritativeReloadCoordinator.ts` — `.info`/`.parts` usage
+- `src/features/chat/services/ConversationRenderService.ts` — canonical state path
+
+### Findings
+
+| Surface | Finding | Action |
+|---|---|---|
+| `SettingsConversationSection.ts` unshare | Direct `openCodeService.unshareSession()` binding inside backend-aware shared sessions list; outer gate (`isOpenCodeActive()`) handles normal case but no inner runtime guard | **Fixed**: added explicit `isOpenCodeActive()` guard inside unshare callback with user-facing notice |
+| `OpenCodianView.ts` sync host | `getSessionMessages`, `getCanonicalSessionMessages`, `getSessionRevertState`, `hydrateOpenCodeMessage` directly wired to `openCodeService` | **Confirmed safe**: all consumers have explicit `backend !== 'opencode'` guards |
+| Capability Lab probes | `adapter.getSession()`, `adapter.getSessionMessages()`, `adapter.listSessions()` used directly | **Confirmed safe**: all probes are provider-owned diagnostic and do not assume OpenCode shapes |
+| `.info`/`.parts` outside `core/opencode/` | Found in `ConversationAuthoritativeSyncCoordinator`, `ConversationAuthoritativeReloadCoordinator`, `ConversationRenderService` | **Confirmed safe**: all in explicitly gated OpenCode-only paths |
+| Docs drift | Checked for outdated claims about shared preview consuming `OpenCode-shaped SessionMessage` | **None found**: docs correctly describe `NormalizedSessionPreviewMessage` |
+
+### Defensive Hardening Applied
+
+- `SettingsConversationSection.ts` unshare callback now checks `isOpenCodeActive()` before calling `openCodeService.unshareSession()`. If the active backend has switched away from OpenCode while the settings page is open, it shows a notice (`settings.conversation.share.sharedSessions.unshareUnavailable`) and skips the call.
+- Added locale strings for the guard message in both `en.ts` and `zh.ts`.
+- Added unit test `blocks unshare when the active backend is no longer OpenCode` in `SettingsConversationSection.test.ts`.
+
+### Conclusion
+
+This lane is **runtime-proof-complete**. All productized backend-aware session/history read seams have consistent defensive handling. All remaining direct `openCodeService` session bindings are in explicitly gated OpenCode-only paths. No additional safe gaps remain.
 
 ## Hard Guardrails
 

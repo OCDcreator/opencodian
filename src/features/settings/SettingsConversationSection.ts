@@ -856,6 +856,13 @@ export class SettingsConversationSection {
       await this.toggleSharedSessionPreview(rowEl, row.id);
     });
     this.createSharedSessionButton(actionsEl, 'unshare-shared-session', t('settings.conversation.share.sharedSessions.unshare'), async () => {
+      // Defensive guard: sharing/unsharing is an OpenCode-specific write operation.
+      // The entire sharing block is already gated by isOpenCodeActive(), but this
+      // inner guard protects against backend switches while the settings page is open.
+      if (!this.isOpenCodeActive()) {
+        new Notice(t('settings.conversation.share.sharedSessions.unshareUnavailable'));
+        return;
+      }
       await this.plugin.openCodeService.unshareSession(row.id);
       new Notice(t('settings.conversation.share.sharedSessions.unshared'));
       await this.renderSharedSessionsList();
