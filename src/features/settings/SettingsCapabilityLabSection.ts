@@ -340,6 +340,13 @@ export class SettingsCapabilityLabSection {
     });
     this.renderResumeProbe(resumeBlock);
 
+    // ── Session Detail Diagnostic (provider-owned, diagnostic only) ──
+    const sessionDetailBlock = containerEl.createDiv({
+      cls: 'opencodian-settings-block',
+      attr: { 'data-section-block': 'session-detail' },
+    });
+    this.renderSessionDetailProbe(sessionDetailBlock);
+
     // ── Discovery / Status ─────────────────────────────────────────────
     const discoveryBlock = containerEl.createDiv({
       cls: 'opencodian-settings-block',
@@ -501,6 +508,13 @@ export class SettingsCapabilityLabSection {
         adapterWired: true, // buildSdkOptions wires resumeSessionId
         runtimeProof: 'untested',
         userSurface: 'diagnostic', // Capability Lab resume probe only — not stable resume-at productization
+      },
+      {
+        capability: 'Session Detail',
+        sdkExposed: !!adapter, // getSession on SDK facade
+        adapterWired: !!adapter, // adapter.getSession()
+        runtimeProof: 'untested',
+        userSurface: 'diagnostic', // Capability Lab session detail probe only
       },
     ];
   }
@@ -1282,6 +1296,154 @@ export class SettingsCapabilityLabSection {
         text: 'Hint: resumeSessionId requires a valid Claude Code session id and a running SDK runtime.',
       });
       this.updateRuntimeProof('Resume Session', 'fail', outputEl);
+    }
+  }
+
+  // =======================================================================
+  // Session Detail Diagnostic Probe (provider-owned, diagnostic only)
+  // =======================================================================
+
+  private renderSessionDetailProbe(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', { text: t('settings.capabilityLab.sessionDetail.title') });
+    containerEl.createEl('p', {
+      cls: 'opencodian-capability-lab-description',
+      text: t('settings.capabilityLab.sessionDetail.description'),
+    });
+
+    const adapter = getClaudeCodeAdapter(this.plugin);
+    if (!adapter) {
+      containerEl.createEl('p', {
+        cls: 'opencodian-capability-lab-unavailable',
+        text: 'Claude Code adapter not available. Enable the Claude Code backend first.',
+      });
+      return;
+    }
+
+    const controlsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+
+    const sessionSelect = controlsEl.createEl('select', {
+      cls: 'opencodian-capability-lab-select',
+      attr: {
+        'data-diagnostic': 'true',
+        'data-diagnostic-session-select': 'session-detail',
+      },
+    });
+    sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
+
+    const detailBtn = controlsEl.createEl('button', {
+      text: 'Inspect Session Detail',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    const outputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    const loadSessions = async (): Promise<void> => {
+      try {
+        sessionSelect.innerHTML = '';
+        sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
+        const sessions = await adapter.listSessions();
+        for (const session of sessions) {
+          const option = sessionSelect.createEl('option', {
+            text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
+            attr: { value: session.sessionId },
+          });
+          option.value = session.sessionId;
+        }
+      } catch (err) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    };
+
+    detailBtn.addEventListener('click', () => {
+      const sessionId = sessionSelect.value;
+      if (!sessionId) {
+        new Notice('Select a session to inspect first.');
+        return;
+      }
+      void this.runSessionDetailDiagnostic(adapter, sessionId, outputEl);
+    });
+
+    void loadSessions();
+  }
+
+  private async runSessionDetailDiagnostic(
+    adapter: ClaudeCodeAdapter,
+    sessionId: string,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Inspecting session detail…' });
+
+    try {
+      const session = await adapter.getSession(sessionId);
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `Session ${sessionId.slice(0, 12)}…`,
+      });
+
+      // Extract backend-specific fields for diagnostic display
+      const record = session as Record<string, unknown> | null;
+      if (!record || typeof record !== 'object') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'getSession() returned null or non-object.',
+        });
+        this.updateRuntimeProof('Session Detail', 'fail', outputEl);
+        return;
+      }
+
+      // Show selected fields
+      const fields: Record<string, unknown> = {};
+      for (const key of Object.keys(record)) {
+        const value = record[key];
+        if (typeof value === 'function') continue;
+        fields[key] = value;
+      }
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Session ID: ${String(fields.sessionId ?? fields.id ?? '(none)')}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Summary: ${String(fields.summary ?? fields.title ?? '(none)')}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Last Modified: ${fields.lastModified
+          ? new Date(fields.lastModified as number | string).toISOString()
+          : '(unknown)'}`,
+      });
+      if (fields.messageCount !== undefined) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Message Count: ${String(fields.messageCount)}`,
+        });
+      }
+
+      outputEl.createEl('pre', {
+        cls: 'opencodian-capability-lab-json-preview',
+        text: formatJsonPreview(fields),
+      });
+      this.updateRuntimeProof('Session Detail', 'pass', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Session detail probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Hint: getSession() requires a valid session id and a running Claude Code SDK runtime.',
+      });
+      this.updateRuntimeProof('Session Detail', 'fail', outputEl);
     }
   }
 

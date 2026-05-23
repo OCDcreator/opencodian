@@ -78,7 +78,7 @@ Recent runs focused on two connected lanes:
 | `SlashCommandExecutionService.ts` | `/undo` and `/redo` gated to OpenCode-only; uses `getConversationBackendSessionId()`. |
 | `ChildSessionGraphCoordinator.ts` | `refreshGraph` gated to OpenCode-only. |
 | `LocalStreamMessagePersistence.ts` | Debug logs use `getConversationBackendSessionId()`. |
-| `ConversationRenderService.ts` | Debug logs use `getConversationBackendSessionId()`. |
+| `ConversationRenderService.ts` | Debug logs use `getConversationBackendSessionId()`. `resolveConversationRenderMessages()` has an explicit `backend !== 'opencode'` guard so the canonical session state path (OpenCode-specific `getCanonicalSessionState` / `hydrateOpenCodeMessage`) is never entered for non-OpenCode conversations — hardening what was previously only an implicit null-safe fallback. |
 | `ConversationSyncRuntimeCoordinator.ts` | Sync timeout payload uses both `openCodeSessionId` and `backendSessionId`. |
 | `BackgroundTaskNoticeStateService.ts` | Session matching uses `getConversationBackendSessionId()`. |
 | `BackgroundTaskTimelineService.ts` | Debug logs use `getConversationBackendSessionId()`. |
@@ -137,6 +137,7 @@ These capabilities are no longer “not wired”, but they are also not stable c
 | Hooks | Runtime-only hook injection exists, hook events are normalized, SessionStart runtime proof exists in Capability Lab. | `Hidden` or `Diagnostic`, not authoring-complete. |
 | Session store | Runtime-only SDK `sessionStore` path exists, plugin-owned diagnostic store adapter exists, import/mirror/list/load proof exists in Capability Lab. | `Diagnostic store proof only`, not stable storage product. |
 | JSONL history browser | Capability Lab can browse history read-only and preview messages. | `Diagnostic browser`, not full history productization. |
+| Session detail inspection | Capability Lab can inspect raw `getSession()` output per backend session. | `Diagnostic probe only`, not a stable cross-backend session-detail contract. |
 | Rewind | Adapter-level `rewindFiles()` exists and dry-run surface exists. | Not stable-complete until no-data-loss guard and stronger runtime proof are accepted. |
 | Agent definitions | Runtime-only `agent` / `agents` option wiring exists. | Must remain `Hidden / Untested`. |
 | Skills / plugins / agent authoring | Some runtime-only channels exist or are planned, but no stable Claude-native authoring surface is complete in OpenCodian. | Not complete. |
@@ -190,12 +191,14 @@ The following service seams now route session identity through `getConversationB
 | Task tool session open (backend identity) | **Yes** | `openTaskToolSession()` accepts parent `backend` parameter; `createConversationFromSession()` in `main.ts` prefers explicit `initial.backend` over `settings.activeBackend` |
 | Stream message persistence (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Conversation render service (log identity) | **Yes** | Uses `getConversationBackendSessionId()` |
+| Conversation render service (canonical render) | **Explicitly gated** | `resolveConversationRenderMessages()` checks `backend !== 'opencode'` and skips canonical state path entirely for non-OpenCode conversations |
 | Conversation sync runtime coordinator (diagnostic) | **Yes** | Includes both `openCodeSessionId` and `backendSessionId` |
 | Settings shared sessions list (`listSessions`) | **Backend-aware** | Routes through `listBackendSessions()` instead of `openCodeService.listSessions()`. Returns `NormalizedSessionRow[]` (backend-neutral shape). Section remains OpenCode-gated because share URLs are OpenCode-specific, but the read surface is backend-aware. |
 | Settings shared session preview (`getSessionMessages`) | **Backend-aware** | Routes through `getBackendSessionPreview()` instead of `openCodeService.getSessionMessages()`. Returns `NormalizedSessionPreviewMessage[]` (backend-neutral shape with `role`/`parts[]`). Handles both OpenCode `{info, parts}` and generic/Claude `{role, content}` message shapes. |
 | Settings shared session unshare (`unshareSession`) | **OpenCode-only** | Direct `openCodeService.unshareSession()` call; no backend-neutral equivalent for share URL write operations. |
 | TitleGenerationService official-title read | **Backend-aware** | Routes through `readBackendSessionTitle()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode path uses `.title`; Claude path uses `.summary`. Unified for both backends. |
 | ConversationSessionSettingsCoordinator share-URL read | **Backend-aware** | Routes through `readBackendSessionShareUrl()` → `getSession(sessionId)` on the backend adapter via registry. OpenCode extracts `session.share.url`; Claude Code returns `null` (no share URL concept). Replaces the previous `listSessions()` + client-side filtering path. Share/unshare writes remain OpenCode-only. **Session-import-free**: coordinator no longer imports OpenCode `Session` type; uses local `ShareInspectionEntry` (`{ id?, share? }`) for all session-related reads and writes. |
+| Capability Lab session detail probe (`getSession`) | **Provider-owned diagnostic** | Routes through `adapter.getSession(sessionId)` on the Claude Code adapter. Shows raw session fields (sessionId, summary, lastModified, messageCount, etc.) as diagnostic output. Not a stable cross-backend session-detail contract. |
 
 **Services remaining hard-wired to OpenCode** (no migration justified until backend-neutral equivalents exist):
 
@@ -226,6 +229,7 @@ It currently serves as:
 - a hook runtime proof surface;
 - a provider-owned fork session diagnostic probe (select a Claude session, run `adapter.forkSession()`, see forked session id/title). This probe is diagnostic-only and does NOT represent stable fork productization.
 - a provider-owned resume session diagnostic probe (select a Claude session, run `adapter.runDiagnosticPrompt({ resumeSessionId })`, see resulting session id/output preview). This probe is diagnostic-only and does NOT represent stable resume-at productization.
+- a provider-owned session detail diagnostic probe (select a Claude session, run `adapter.getSession(sessionId)`, inspect raw session fields). This probe is diagnostic-only and does NOT represent a stable cross-backend session-detail object contract.
 
 Important policy:
 

@@ -133,6 +133,34 @@ describe('ConversationRenderService canonical read-path migration', () => {
       );
       expect(renderedIds).toEqual(['fb-user']);
     });
+
+    it('skips canonical session state lookup for non-OpenCode conversations', async () => {
+      const fallbackMessages = [
+        createMessage({ id: 'claude-user', role: 'user', content: 'claude fallback' }),
+      ];
+      const conversation = createConversation(fallbackMessages);
+      conversation.backend = 'claude-code';
+      conversation.backendSessionId = 'claude-session-1';
+
+      const canonicalSource = {
+        getCanonicalSessionState: jest.fn(),
+        hydrateOpenCodeMessage: jest.fn(),
+      };
+      const host = createHost({
+        getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      });
+      const service = new ConversationRenderService(host, canonicalSource);
+
+      await service.rerenderConversationMessages(conversation);
+
+      expect(canonicalSource.getCanonicalSessionState).not.toHaveBeenCalled();
+      expect(canonicalSource.hydrateOpenCodeMessage).not.toHaveBeenCalled();
+
+      const renderedIds = [...host.messagesEl.children].map(
+        (el) => (el as HTMLElement).dataset.messageId,
+      );
+      expect(renderedIds).toEqual(['claude-user']);
+    });
   });
 
   describe('R-2: diagnostic logging uses resolved messages', () => {

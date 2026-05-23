@@ -302,7 +302,9 @@ Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` 
 
 ## 2026-05-22 Capability Lab diagnostic panel
 
-新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的 Capability Lab 二级标签提供英文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场、会话分叉诊断探针、会话恢复诊断探针和发现状态八个诊断面板。新增 `settings.capabilityLab.fork.*` 与 `settings.capabilityLab.resume.*`，明确把 Claude `forkSession()` 和 SDK `resume` 仅作为 provider-owned diagnostic probes 暴露，而不是稳定的跨后端 fork / resume-at UI。所有面板标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。
+新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的 Capability Lab 二级标签提供英文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场、会话分叉诊断探针、会话恢复诊断探针、会话详情检查和发现状态九个诊断面板。新增 `settings.capabilityLab.fork.*` 与 `settings.capabilityLab.resume.*`，明确把 Claude `forkSession()` 和 SDK `resume` 仅作为 provider-owned diagnostic probes 暴露，而不是稳定的跨后端 fork / resume-at UI。所有面板标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。
+
+新增 `settings.capabilityLab.sessionDetail.*`，为 Session Detail Inspection 诊断探针提供英文文案。该探针展示 `adapter.getSession()` 返回的 raw session 字段，是 provider-owned diagnostic，不代表稳定的跨后端 session-detail object contract。
 
 ## 2026-05-22 Structured output transcript rendering
 

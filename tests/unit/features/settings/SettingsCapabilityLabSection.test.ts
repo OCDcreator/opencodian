@@ -54,7 +54,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('NOT STABLE');
   });
 
-  it('renders all eight diagnostic panels including fork and resume probes', () => {
+  it('renders all nine diagnostic panels including fork, resume, and session detail probes', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -71,6 +71,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(blockIds).toContain('rewind');
     expect(blockIds).toContain('fork');
     expect(blockIds).toContain('resume');
+    expect(blockIds).toContain('session-detail');
     expect(blockIds).toContain('structured');
     expect(blockIds).toContain('discovery');
   });
@@ -199,7 +200,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(diagnosticElements.length).toBeGreaterThan(0);
   });
 
-  it('buildMatrixRows returns all 14 expected capabilities', () => {
+  it('buildMatrixRows returns all 15 expected capabilities', () => {
     // We test this indirectly by counting matrix table rows
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -211,7 +212,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(14);
+    expect(rows.length).toBe(15);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -832,5 +833,218 @@ describe('SettingsCapabilityLabSection', () => {
     setLocale('en');
     expect(t('settings.capabilityLab.resume.title')).toBeTruthy();
     expect(t('settings.capabilityLab.resume.description')).toBeTruthy();
+  });
+
+  it('renders i18n keys for session detail probe panel', () => {
+    setLocale('en');
+    expect(t('settings.capabilityLab.sessionDetail.title')).toBeTruthy();
+    expect(t('settings.capabilityLab.sessionDetail.description')).toBeTruthy();
+  });
+
+  // =======================================================================
+  // Session Detail Diagnostic Probe
+  // =======================================================================
+
+  it('renders session-detail probe section with session selector and inspect button when adapter is available', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-detail-1', summary: 'Detail test', lastModified: 1 },
+      ]),
+      getSession: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const detailBlock = containerEl.querySelector('[data-section-block="session-detail"]') as HTMLElement | null;
+    expect(detailBlock).toBeTruthy();
+
+    const detailButton = Array.from(detailBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Inspect Session Detail')
+    )) as HTMLButtonElement | undefined;
+    expect(detailButton).toBeTruthy();
+
+    const sessionSelect = detailBlock!.querySelector('[data-diagnostic-session-select="session-detail"]') as HTMLSelectElement | null;
+    expect(sessionSelect).toBeTruthy();
+  });
+
+  it('shows unavailable message in session-detail probe when adapter is not present', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const detailBlock = containerEl.querySelector('[data-section-block="session-detail"]') as HTMLElement | null;
+    expect(detailBlock).toBeTruthy();
+    const unavailableMsg = detailBlock!.querySelector('.opencodian-capability-lab-unavailable');
+    expect(unavailableMsg).toBeTruthy();
+    expect(unavailableMsg!.textContent).toContain('Claude Code adapter not available');
+  });
+
+  it('calls getSession on the adapter and shows session detail fields', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-inspect-1', summary: 'Inspect source', lastModified: 1000 },
+      ]),
+      getSession: jest.fn().mockResolvedValue({
+        sessionId: 'session-inspect-1',
+        summary: 'Inspect source',
+        lastModified: 1000,
+        messageCount: 5,
+        customField: 'hello',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const detailBlock = containerEl.querySelector('[data-section-block="session-detail"]') as HTMLElement | null;
+    const sessionSelect = detailBlock!.querySelector('[data-diagnostic-session-select="session-detail"]') as HTMLSelectElement;
+    const detailButton = Array.from(detailBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Inspect Session Detail')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-inspect-1';
+    detailButton.click();
+    await flushUi();
+
+    expect(adapter.getSession).toHaveBeenCalledWith('session-inspect-1');
+    expect(containerEl.textContent).toContain('session-inspect-1');
+    expect(containerEl.textContent).toContain('Inspect source');
+    expect(containerEl.textContent).toContain('5');
+  });
+
+  it('shows diagnostic error and hint when getSession fails', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-bad-detail', summary: 'Bad detail', lastModified: 1 },
+      ]),
+      getSession: jest.fn().mockRejectedValue(new Error('Claude Code getSession is unavailable.')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const detailBlock = containerEl.querySelector('[data-section-block="session-detail"]') as HTMLElement | null;
+    const sessionSelect = detailBlock!.querySelector('[data-diagnostic-session-select="session-detail"]') as HTMLSelectElement;
+    const detailButton = Array.from(detailBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Inspect Session Detail')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-bad-detail';
+    detailButton.click();
+    await flushUi();
+
+    const errorEl = detailBlock!.querySelector('.opencodian-capability-lab-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl!.textContent).toContain('getSession is unavailable');
+    const hintEl = detailBlock!.querySelector('.opencodian-capability-lab-hint');
+    expect(hintEl).toBeTruthy();
+  });
+
+  it('updates Session Detail runtime proof to pass on success', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-rt-detail', summary: 'RT detail session', lastModified: 1 },
+      ]),
+      getSession: jest.fn().mockResolvedValue({
+        sessionId: 'session-rt-detail',
+        summary: 'RT detail session',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const detailBlock = containerEl.querySelector('[data-section-block="session-detail"]') as HTMLElement | null;
+    const sessionSelect = detailBlock!.querySelector('[data-diagnostic-session-select="session-detail"]') as HTMLSelectElement;
+    const detailButton = Array.from(detailBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Inspect Session Detail')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-rt-detail';
+    detailButton.click();
+    await flushUi();
+
+    const proofMarker = detailBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+  });
+
+  it('updates Session Detail runtime proof to fail when getSession returns null', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-null-detail', summary: 'Null detail', lastModified: 1 },
+      ]),
+      getSession: jest.fn().mockResolvedValue(null),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const detailBlock = containerEl.querySelector('[data-section-block="session-detail"]') as HTMLElement | null;
+    const sessionSelect = detailBlock!.querySelector('[data-diagnostic-session-select="session-detail"]') as HTMLSelectElement;
+    const detailButton = Array.from(detailBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Inspect Session Detail')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-null-detail';
+    detailButton.click();
+    await flushUi();
+
+    const proofMarker = detailBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('marks Session Detail as a diagnostic surface in the capability matrix', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      getSession: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const row = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr')).find((el) => (
+      el.textContent?.includes('Session Detail')
+    )) as HTMLElement | undefined;
+    expect(row).toBeTruthy();
+    const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
+    expect(surfaceChip?.dataset.surface).toBe('diagnostic');
+    expect(surfaceChip?.textContent).toBe('Diagnostic');
   });
 });

@@ -385,6 +385,14 @@ export class ConversationRenderService {
     conversation: Conversation,
     fallbackMessages?: ChatMessage[],
   ): ChatMessage[] {
+    // Canonical session state is an OpenCode-specific concept (getCanonicalSessionState
+    // returns null for non-OpenCode backends). Gate explicitly so the intent is clear
+    // even though buildCanonicalRenderMessages handles the null case implicitly.
+    const backend = conversation.backend ?? 'opencode';
+    if (backend !== 'opencode') {
+      return fallbackMessages ?? conversation.messages;
+    }
+
     const sessionId = getConversationBackendSessionId(conversation);
     const canonicalMessages = sessionId ? this.buildCanonicalRenderMessages(sessionId) : [];
     return canonicalMessages.length > 0 ? canonicalMessages : (fallbackMessages ?? conversation.messages);
