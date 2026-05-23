@@ -12,6 +12,25 @@
 
 ---
 
+## 2026-05-23 Phase 3 — Shared sessions backend-switch follow-up audit
+
+### Summary
+
+Ran a second audit round after `4f85f022` to confirm whether `SettingsConversationSection` still needed extra backend-switch guards beyond `unshareSession()`. Real-code inspection showed that shared session preview, refresh/count, stale block visibility, and copy-link behavior already have safe degradation or full-section re-render paths, so no additional production changes were justified.
+
+### Findings
+
+- `getBackendSessionPreview()` already degrades to `null` when the active backend loses session-history capability, and the UI shows the existing preview-failed state
+- `listBackendSessions()` already degrades to `[]` when the active backend loses session-list capability, and the UI naturally re-renders to `0` + empty state
+- Shared-session copy is backend-agnostic local clipboard behavior
+- Standard settings backend switches fully re-render the conversation section, removing the sharing block rather than leaving it live
+
+### Verification
+
+- Real-code follow-up audit only; no `src/**` changes were made in this round
+
+---
+
 ## 2026-05-23 Phase 3 — Final session/history inspection audit + unshare runtime guard
 
 ### Summary

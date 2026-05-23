@@ -630,6 +630,34 @@ Files inspected:
 
 This lane is **runtime-proof-complete**. All productized backend-aware session/history read seams have consistent defensive handling. All remaining direct `openCodeService` session bindings are in explicitly gated OpenCode-only paths. No additional safe gaps remain.
 
+## Shared Sessions Backend-Switch Follow-Up Audit (2026-05-23)
+
+After commit `4f85f022` (`fix: guard shared session unshare when backend switches`), a second real-code audit checked whether the rest of `SettingsConversationSection`'s shared sessions surface still needed extra backend-switch guards.
+
+### Surfaces Rechecked
+
+- `SettingsConversationSection.ts` shared session preview
+- `SettingsConversationSection.ts` shared session refresh/count rendering
+- `SettingsConversationSection.ts` stale sharing block visibility after backend switch
+- `SettingsConversationSection.ts` shared session copy-link action
+
+### Result
+
+No additional production changes were justified.
+
+| Surface | Backend-switch behavior | Why no further fix was added |
+|---|---|---|
+| Shared session preview | `getBackendSessionPreview()` returns `null` when the active backend no longer exposes session history; the UI already renders the existing preview-failed copy | Routing helper already provides safe degradation |
+| Shared session refresh/count | `listBackendSessions()` returns `[]` when the active backend no longer exposes session listing; the UI naturally re-renders to `0` + empty state | Routing helper already provides safe degradation |
+| Shared session copy link | Copies already-rendered `shareUrl` text only; no backend read/write call occurs | Pure local action, no backend safety risk |
+| Stale sharing block visibility | Standard settings backend switch path re-renders the entire conversation section, removing the sharing block. Non-standard stale clicks still fall back to the safe preview/refresh degradation or the explicit `unshare` guard | No functional risk remained |
+
+### Interpretation
+
+This follow-up audit did **not** reveal a new backend-neutral seam and did **not** justify more inner guards in `SettingsConversationSection.ts`.
+
+The only shared-session action that required an extra runtime fence was `unshareSession()` because it is an OpenCode-specific write. Preview/refresh/list/count already degrade safely through `AgentBackendRouting`, and copy-link is backend-agnostic local UI behavior.
+
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.
