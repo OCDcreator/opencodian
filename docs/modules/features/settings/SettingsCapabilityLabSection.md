@@ -109,3 +109,4 @@
 - Backend Routing 诊断探针读取已注册适配器时使用 `AgentServiceRegistry.listAll()` 公开接口，不再依赖 registry 私有 `adapters` map 的实现细节
 - Rewind Dry-Run 预览的 `runRewindDryRun()` 方法调用 `adapter.rewindFiles(sessionId, userMessageId, { dryRun: true })` 并渲染结果或错误+提示；该调用路径已有单元测试覆盖（成功渲染 + 失败错误提示），不改变 rewind 仅诊断、非稳定产品的事实
 - Subagent Browser 的 `loadSubagents()` 和 `loadSubagentMessages()` 方法已有完整单元测试覆盖：会话刷新、子代理列表渲染、空列表处理、列表加载失败、子代理消息加载、消息加载失败、运行时证明 pass/fail，共 8 个测试用例
+- Discovery 面板里的 Hooks / Plugins / Skills / Agent Definitions / Session Store 条目都保持 `Discovery Only`，只表示诊断观察，不是稳定产品面

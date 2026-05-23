@@ -174,6 +174,30 @@ describe('SettingsCapabilityLabSection', () => {
     expect(rows.length).toBeGreaterThanOrEqual(5); // Hooks, Plugins, Skills, Subagents, Session Store, Import/Delete/Restore
   });
 
+  it('keeps discovery-only Claude ecosystem rows labeled as discovery only', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin({
+        capabilities: new Set(['subagents']),
+      }),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const discoveryTable = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    expect(discoveryTable).toBeTruthy();
+
+    const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
+    const getRow = (feature: string) => rows.find((row) => row.textContent?.includes(feature));
+
+    for (const feature of ['Hooks', 'Plugins', 'Skills', 'Agent Definitions', 'Session Store']) {
+      const row = getRow(feature);
+      expect(row).toBeTruthy();
+      expect(row?.textContent).toContain('Discovery Only');
+    }
+  });
+
   it('uses i18n keys for section title', () => {
     setLocale('en');
     const title = t('settings.capabilityLab.title');
