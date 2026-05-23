@@ -22,6 +22,8 @@
 - 暴露 `getMcpServerCount()` 供 Capability Lab 做只读 MCP 检测；该方法统计静态 `options.mcpServers` 或动态加载缓存中的 MCP server 数量，未加载时返回 0，不提供 MCP authoring 能力
 - 暴露 `getPluginCount()` 供 Capability Lab 做只读 plugin 检测；该方法返回 `options.plugins?.length ?? 0`，未配置时返回 0，不提供 plugin authoring 能力
 - 暴露 `getSkillCount()` 供 Capability Lab 做只读 skill 检测；该方法返回 `options.skills` 的计数（数组长度），`skills` 为 `'all'` 时返回 `-1` 表示"全量启用"，未配置时返回 0，不提供 skill authoring 能力
+- 暴露 `getSkillsList()` 供 Capability Lab 做只读 skill 名称列表诊断；该方法返回 `options.skills` 的防御性拷贝（`string[]`），`skills` 为 `'all'` 时返回 `'all'` sentinel，未配置时返回空数组，不提供 skill authoring 能力
+- 暴露 `getPluginsList()` 供 Capability Lab 做只读 plugin 名称列表诊断；该方法返回 `options.plugins` 的字符串化拷贝（处理 `unknown[]` 类型：字符串直接返回，对象 JSON 序列化），未配置时返回空数组，不提供 plugin authoring 能力
 - 对活跃持久 `Query` 暴露后端 live control：`setModel()`、`setPermissionMode()` 和 `reloadMcpServers()` 会分别委托 SDK `Query.setModel()`、`Query.setPermissionMode()` 和 `Query.setMcpServers()`；没有活跃 query 时保持无害 no-op，MCP reload 会先刷新 adapter 缓存
 - 从真实 SDK `Query.supportedModels()` 读取模型目录；本地 facade 兼容官方 `ModelInfo.value/displayName` 与旧 fixture `id/name` 形状，避免把 `supportedModels()` 误挂到顶层 SDK module
 - 接收 composer per-send `options.model` 与 `options.variant`，在 SDK query options 中映射为 Claude Code `model` 与 `effort`；若同一持久 query 仍活跃且仅 model 变化，model 会通过 `Query.setModel()` 尝试 live 更新；若 effort 变化，则关闭旧 query 并用已捕获的 SDK session id 重新启动 resumed query，确保下一轮发送应用新的 effort

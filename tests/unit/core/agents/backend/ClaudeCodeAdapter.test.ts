@@ -1602,6 +1602,105 @@ describe('ClaudeCodeAdapter', () => {
       });
       expect(adapter.getSkillCount()).toBe(-1);
     });
+
+    it('getSkillsList returns empty array when no skills configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      const result = adapter.getSkillsList();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([]);
+    });
+
+    it('getSkillsList returns skill names from skills array option', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        skills: ['skill-a', 'skill-b', 'skill-c'],
+      });
+      expect(adapter.getSkillsList()).toEqual(['skill-a', 'skill-b', 'skill-c']);
+    });
+
+    it('getSkillsList returns all when skills is all', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        skills: 'all',
+      });
+      expect(adapter.getSkillsList()).toBe('all');
+    });
+
+    it('getSkillsList returns empty array for empty skills array', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        skills: [],
+      });
+      expect(adapter.getSkillsList()).toEqual([]);
+    });
+
+    it('getSkillsList returns a defensive copy of the skills array', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        skills: ['skill-x', 'skill-y'],
+      });
+      const list = adapter.getSkillsList();
+      expect(list).toEqual(['skill-x', 'skill-y']);
+      // Mutating the returned array must not affect the adapter
+      (list as string[]).push('skill-z');
+      expect(adapter.getSkillsList()).toEqual(['skill-x', 'skill-y']);
+    });
+
+    it('getPluginsList returns empty array when no plugins configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      expect(adapter.getPluginsList()).toEqual([]);
+    });
+
+    it('getPluginsList returns plugin names from plugins option', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        plugins: ['plugin-a', 'plugin-b'],
+      });
+      expect(adapter.getPluginsList()).toEqual(['plugin-a', 'plugin-b']);
+    });
+
+    it('getPluginsList returns empty array for empty plugins array', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        plugins: [],
+      });
+      expect(adapter.getPluginsList()).toEqual([]);
+    });
+
+    it('getPluginsList stringifies non-string plugin items', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        plugins: ['plugin-a', { name: 'plugin-b' } as unknown],
+      });
+      const list = adapter.getPluginsList();
+      expect(list).toHaveLength(2);
+      expect(list[0]).toBe('plugin-a');
+      expect(list[1]).toBe('{"name":"plugin-b"}');
+    });
+
+    it('getPluginsList returns a defensive copy of the plugin array', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        plugins: ['plugin-a'],
+      });
+      const list = adapter.getPluginsList();
+      list.push('plugin-b');
+      expect(adapter.getPluginsList()).toEqual(['plugin-a']);
+    });
   });
 
   describe('ClaudeCodeAdapter diagnostic session lookup', () => {

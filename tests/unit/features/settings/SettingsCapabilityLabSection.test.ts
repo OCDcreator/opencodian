@@ -118,7 +118,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    // All runtime-only capabilities must stay hidden and untested until explicitly promoted
+    // All runtime-only capabilities must stay hidden and untested until explicitly promoted.
     const hiddenCapabilities = ['Session Store', 'Agent Definitions', 'Plugins', 'Skills', 'Hooks'];
 
     for (const cap of hiddenCapabilities) {
@@ -210,6 +210,7 @@ describe('SettingsCapabilityLabSection', () => {
       capabilities: new Set(['chat']),
       getMcpServerCount: jest.fn().mockReturnValue(0),
       getPluginCount: jest.fn().mockReturnValue(2),
+      getPluginsList: jest.fn().mockReturnValue(['plugin-a', 'plugin-b']),
       getSkillCount: jest.fn().mockReturnValue(0),
     };
     const section = new SettingsCapabilityLabSection({
@@ -225,7 +226,7 @@ describe('SettingsCapabilityLabSection', () => {
     const pluginsRow = rows.find((row) => row.textContent?.includes('Plugins'));
     expect(pluginsRow).not.toBeNull();
     expect(pluginsRow?.textContent).toContain('Exposed');
-    expect(pluginsRow?.textContent).toContain('2 plugin(s) loaded');
+    expect(pluginsRow?.textContent).toContain('2 plugin(s): plugin-a, plugin-b');
   });
 
   it('renders Skills in discovery table as Discovery Only when no adapter', () => {
@@ -253,6 +254,7 @@ describe('SettingsCapabilityLabSection', () => {
       getMcpServerCount: jest.fn().mockReturnValue(0),
       getPluginCount: jest.fn().mockReturnValue(0),
       getSkillCount: jest.fn().mockReturnValue(3),
+      getSkillsList: jest.fn().mockReturnValue(['skill-a', 'skill-b', 'skill-c']),
     };
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(adapter),
@@ -267,7 +269,7 @@ describe('SettingsCapabilityLabSection', () => {
     const skillsRow = rows.find((row) => row.textContent?.includes('Skills'));
     expect(skillsRow).not.toBeNull();
     expect(skillsRow?.textContent).toContain('Exposed');
-    expect(skillsRow?.textContent).toContain('3 skill(s) loaded');
+    expect(skillsRow?.textContent).toContain('3 skill(s): skill-a, skill-b, skill-c');
   });
 
   it('renders Skills in discovery table as Exposed when skills set to all', () => {
@@ -292,6 +294,76 @@ describe('SettingsCapabilityLabSection', () => {
     expect(skillsRow).not.toBeNull();
     expect(skillsRow?.textContent).toContain('Exposed');
     expect(skillsRow?.textContent).toContain('All skills enabled');
+  });
+
+  it('renders Plugins discovery row with plugin names in notes', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getPluginCount: jest.fn().mockReturnValue(2),
+      getPluginsList: jest.fn().mockReturnValue(['my-plugin', 'other-plugin']),
+      getMcpServerCount: jest.fn().mockReturnValue(0),
+      getSkillCount: jest.fn().mockReturnValue(0),
+      getSkillsList: jest.fn().mockReturnValue([]),
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const pluginsRow = rows.find((row) => row.textContent?.includes('Plugins'));
+    expect(pluginsRow?.textContent).toContain('my-plugin');
+    expect(pluginsRow?.textContent).toContain('other-plugin');
+  });
+
+  it('renders Skills discovery row with skill names in notes', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getPluginCount: jest.fn().mockReturnValue(0),
+      getPluginsList: jest.fn().mockReturnValue([]),
+      getMcpServerCount: jest.fn().mockReturnValue(0),
+      getSkillCount: jest.fn().mockReturnValue(2),
+      getSkillsList: jest.fn().mockReturnValue(['my-skill', 'cool-skill']),
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const skillsRow = rows.find((row) => row.textContent?.includes('Skills'));
+    expect(skillsRow?.textContent).toContain('my-skill');
+    expect(skillsRow?.textContent).toContain('cool-skill');
+  });
+
+  it('renders Skills discovery row without names when adapter has no getSkillsList', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getPluginCount: jest.fn().mockReturnValue(0),
+      getMcpServerCount: jest.fn().mockReturnValue(0),
+      getSkillCount: jest.fn().mockReturnValue(1),
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const skillsRow = rows.find((row) => row.textContent?.includes('Skills'));
+    expect(skillsRow?.textContent).toContain('1 skill(s)');
+    expect(skillsRow?.textContent).toContain('Exposed');
   });
 
   it('renders a diagnostic summary strip above the matrix', () => {

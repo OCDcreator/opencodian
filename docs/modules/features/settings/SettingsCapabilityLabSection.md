@@ -22,10 +22,10 @@
 | Resume Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并以 `resumeSessionId` 运行诊断 prompt，输出 resulting session id 与文本预览 | `adapter.listSessions()` / `adapter.runDiagnosticPrompt({ resumeSessionId })` |
 | Session Detail Inspection | Provider-owned 诊断探针：选择一个 Claude 会话并调用 `getSession()`，输出 raw session 字段（sessionId, summary, lastModified, messageCount 等）| `adapter.listSessions()` / `adapter.getSession()` |
 | Backend Routing Verification | Provider-owned 诊断探针：显示活跃后端、已注册适配器、会话后端分布，验证 `listSessions()` + `getSession()` 通过 provider-owned 路由路径工作，并额外验证 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 通过 registry 路由层工作 | `AgentServiceRegistry` / `adapter.listSessions()` / `adapter.getSession()` / `listBackendSessions()` / `getBackendSessionPreview()` / `readBackendSessionTitle()` / `readBackendSessionShareUrl()` |
-| Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof；Plugins 和 Skills 现在使用 `getPluginCount()` / `getSkillCount()` 显示运行时加载计数 | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
+| Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof；Plugins 和 Skills 现在使用 `getPluginCount()` / `getSkillCount()` 显示运行时加载计数，并通过 `getPluginsList()` / `getSkillsList()` 在 notes 中显示配置名称列表 | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
 | MCP Servers Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 MCP server 数量，不提供 authoring | `adapter.getMcpServerCount()` |
-| Plugins Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 plugin 数量，不提供 authoring | `adapter.getPluginCount()` |
-| Skills Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 skill 数量（`-1` 表示全量启用），不提供 authoring | `adapter.getSkillCount()` |
+| Plugins Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 plugin 数量及名称列表（如 `2 plugin(s): my-plugin, other-plugin`），不提供 authoring | `adapter.getPluginCount()` + `adapter.getPluginsList()` |
+| Skills Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 skill 数量及名称列表（如 `3 skill(s): skill-a, skill-b`），`skills: 'all'` 时显示 "All skills enabled"，不提供 authoring | `adapter.getSkillCount()` + `adapter.getSkillsList()` |
 
 ## 依赖注入
 
@@ -55,7 +55,7 @@
 
 `getClaudeCodeAdapter()` 从 `plugin.agentServiceRegistry` 获取 `'claude-code'` 注册的 adapter 并窄化类型为 `ClaudeCodeAdapter`。如果 adapter 不可用，相关面板显示 "not available" 提示。
 
-Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`adapter.getPluginCount()` 和 `adapter.getSkillCount()` 显示当前已加载 MCP server / plugin / skill 数量；adapter 不可用时显示 detection unavailable。这些检测均为只读，不写入设置，也不创建/编辑对应配置。Skills 的 `getSkillCount()` 在 `skills` 选项为 `'all'` 时返回 `-1`，面板会显示 "All skills enabled" 而非具体数量。
+Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`adapter.getPluginCount()` 和 `adapter.getSkillCount()` 显示当前已加载 MCP server / plugin / skill 数量，并通过 `getPluginsList()` / `getSkillsList()` 在 notes 中显示配置名称列表；adapter 不可用时显示 detection unavailable。这些检测均为只读，不写入设置，也不创建/编辑对应配置。Skills 的 `getSkillCount()` 在 `skills` 选项为 `'all'` 时返回 `-1`，面板会显示 "All skills enabled" 而非具体数量。Capability matrix 中 Skills 和 Plugins 仍保持 `runtimeProof: 'untested'` 与 `userSurface: 'hidden'`；当前名称列表只是配置摘要诊断，不是 runtime proof，也不是 authoring UI。
 
 ## 导入关系
 

@@ -847,6 +847,32 @@ export class ClaudeCodeAdapter
     return skills?.length ?? 0;
   }
 
+  /**
+   * Return the list of skill names currently wired into the adapter.
+   * Returns `'all'` when all skills are enabled.
+   * Returns a copy of the names array, or an empty array if none configured.
+   * Diagnostic read-only surface — no authoring UI.
+   */
+  getSkillsList(): string[] | 'all' {
+    const skills = this.options.skills;
+    if (skills === 'all') {
+      return 'all';
+    }
+    return skills ? [...skills] : [];
+  }
+
+  /**
+   * Return the list of plugin identifiers currently wired into the adapter.
+   * Returns stringified identifiers (plugin items may be strings or objects).
+   * Returns an empty array if none configured.
+   * Diagnostic read-only surface — no authoring UI.
+   */
+  getPluginsList(): string[] {
+    return this.options.plugins
+      ? this.options.plugins.map(p => typeof p === 'string' ? p : JSON.stringify(p))
+      : [];
+  }
+
   private async applyToActiveQueries(
     apply: (runtime: ClaudeCodeSessionRuntime) => Promise<unknown> | void | undefined,
   ): Promise<void> {

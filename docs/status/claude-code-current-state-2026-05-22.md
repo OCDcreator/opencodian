@@ -160,7 +160,7 @@ These capabilities are no longer “not wired”, but they are also not stable c
 | Session detail inspection | Capability Lab can inspect raw `getSession()` output per backend session. | `Diagnostic probe only`, not a stable cross-backend session-detail contract. |
 | Rewind | Adapter-level `rewindFiles()` exists, dry-run surface exists, adapter + coordinator + CapLab probe tests now cover all paths. | Not stable-complete until no-data-loss guard and stronger runtime proof are accepted; test hardening does not promote to stable. |
 | Agent definitions | Runtime-only `agent` / `agents` option wiring exists. | Must remain `Hidden / Untested`. |
-| Skills / plugins / agent authoring | Runtime-only `skills` and `plugins` channels are wired and have Capability Lab read-only detection counts; no stable Claude-native authoring surface is complete in OpenCodian. | Detection-only, not authoring-complete. |
+| Skills / plugins / agent authoring | Runtime-only `skills` and `plugins` channels are wired and have Capability Lab read-only detection counts plus diagnostic name-list summaries (`getSkillsList()` / `getPluginsList()`); no stable Claude-native authoring surface is complete in OpenCodian. | Detection-only with name-list diagnostic, not authoring-complete. |
 
 ## Structured Output Deep-Dive Assessment (2026-05-23)
 
@@ -902,6 +902,56 @@ This hardening pass does **not** promote rewind to stable. Rewind remains:
 - adapter-level dry-run guarded by default
 - not connected to stable chat rewind/revert UI
 - still blocked from `AgentCapability.Branching` for Claude Code
+
+## Skills and Plugins Read-Only Diagnostic Catalog (2026-05-23)
+
+A focused Phase 3 pass implemented the smallest read-only diagnostic summary for configured runtime skills and plugins in Capability Lab. The Claude Code SDK does not expose a skills catalog method — skills are only passed as options (`string[] | 'all'`). This round adds diagnostic name-list display on top of the existing count-based detection.
+
+### What Changed
+
+**Adapter methods** (`ClaudeCodeAdapter.ts`):
+- `getSkillsList()`: returns `string[]` copy of configured skill names, or `'all'` sentinel. Defensive copy prevents mutation of adapter state.
+- `getPluginsList()`: returns `string[]` of stringified plugin identifiers (handles `unknown[]` type via `typeof === 'string' ? p : JSON.stringify(p)`). Defensive copy.
+
+**Capability Lab discovery rows** (`SettingsCapabilityLabSection.ts`):
+- Plugins row notes now include plugin names: `"2 plugin(s): my-plugin, other-plugin. Runtime passthrough..."`.
+- Skills row notes now include skill names: `"3 skill(s): skill-a, skill-b, skill-c. Runtime passthrough..."`.
+- 'All skills' case unchanged: `"All skills enabled. Runtime passthrough..."`.
+- Capability matrix keeps Skills and Plugins at `runtimeProof: 'untested'` and `userSurface: 'hidden'`; adapter + UI tests prove the diagnostic summary rendering only, not live runtime behavior.
+
+### Tests Added
+
+- Adapter: 10 new tests — `getSkillsList()` (5: empty, array, 'all', empty array, defensive copy) + `getPluginsList()` (5: empty, strings, empty array, non-string stringify, defensive copy).
+- Capability Lab: 3 new tests — plugin names in notes, skill names in notes, fallback when adapter lacks `getSkillsList`. Updated 3 existing tests for new notes text format.
+
+### Impact on Capability Maturity
+
+This pass does **not** promote skills or plugins to stable. They remain:
+
+- `detection-only with name-list diagnostic`, not authoring-complete
+- `userSurface: 'hidden'` in the capability matrix
+- clearly labeled "No authoring UI" in the discovery table
+- the read-only diagnostic is intentionally minimal: array names or 'all' sentinel, no catalog browsing, no detail inspection
+
+### Subagent Browser Verification
+
+The existing `listSubagents()` / `getSubagentMessages()` diagnostic UI and tests were confirmed complete (adapter 4 tests + UI 8 tests). No duplication was needed.
+
+### Updated Capability Test Coverage Summary
+
+| Capability | Adapter tests | Coordinator tests | CapLab probe tests | Total coverage |
+|---|---|---|---|---|
+| Fork | ✅ | ✅ | ✅ | Complete |
+| Structured output | ✅ | ✅ | ✅ | Complete |
+| Hooks | ✅ | N/A | ✅ | Complete |
+| Session store | ✅ | N/A | ✅ | Complete |
+| Rewind | ✅ | ✅ | ✅ | Complete |
+| Subagent browser | ✅ | N/A | ✅ **(8 UI tests)** | Complete |
+| **Skills introspection** | ✅ **(count + list)** | N/A | ✅ **(count + name-list rendering)** | Foundation / diagnostic only |
+| **Plugins introspection** | ✅ **(count + list)** | N/A | ✅ **(count + name-list rendering)** | Foundation / diagnostic only |
+| MCP server detection | ✅ | N/A | ✅ | Complete |
+| Runtime controls | ✅ | N/A | N/A | Complete |
+| Agent definitions | ⚠️ wiring only | N/A | N/A | Must remain Hidden/Untested |
 
 ## Hard Guardrails
 

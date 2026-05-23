@@ -1848,17 +1848,19 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(tbody, 'Hooks', false, 'No authoring UI. buildSdkOptions wires hooks from adapter options.');
     // Plugins
     const pluginCount = adapter?.getPluginCount?.() ?? 0;
+    const pluginsList = adapter?.getPluginsList?.() ?? [];
     const pluginStatus = pluginCount > 0;
     this.addDiscoveryRow(
       tbody,
       'Plugins',
       pluginStatus,
       pluginStatus
-        ? `${pluginCount} plugin(s) loaded. Runtime passthrough via buildSdkOptions. No authoring UI.`
+        ? `${pluginCount} plugin(s): ${pluginsList.join(', ')}. Runtime passthrough via buildSdkOptions. No authoring UI.`
         : 'No authoring UI. buildSdkOptions wires plugins from adapter options. No plugins loaded or adapter not started.',
     );
     // Skills
     const skillCount = adapter?.getSkillCount?.() ?? 0;
+    const skillsList = adapter?.getSkillsList?.() ?? [];
     const skillStatus = skillCount !== 0;
     this.addDiscoveryRow(
       tbody,
@@ -1867,7 +1869,7 @@ export class SettingsCapabilityLabSection {
       skillStatus
         ? skillCount === -1
           ? 'All skills enabled. Runtime passthrough via buildSdkOptions. No authoring UI.'
-          : `${skillCount} skill(s) loaded. Runtime passthrough via buildSdkOptions. No authoring UI.`
+          : `${skillCount} skill(s): ${Array.isArray(skillsList) ? skillsList.join(', ') : skillsList}. Runtime passthrough via buildSdkOptions. No authoring UI.`
         : 'No authoring UI. buildSdkOptions wires skills (string[]|\'all\') from adapter options. No skills loaded or adapter not started.',
     );
     // MCP Servers
