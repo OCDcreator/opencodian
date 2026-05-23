@@ -181,8 +181,11 @@ export class OpenCodeAdapter
   }
 
   async getSession(sessionId: string): Promise<unknown | null> {
-    const sessions = await this.service.listSessions();
-    return sessions.find((session) => session.id === sessionId) ?? null;
+    try {
+      return await this.service.getSessionInfo(sessionId);
+    } catch {
+      return null;
+    }
   }
 
   async deleteSession(sessionId: string): Promise<void> {
