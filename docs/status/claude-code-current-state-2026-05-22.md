@@ -902,6 +902,6 @@ This hardening pass does **not** promote rewind to stable. Rewind remains:
 
 - Do not regress OpenCode while promoting Claude.
 - Do not claim `Agent Definitions` complete unless both official basis and runtime product proof justify it.
-- Do not mark hooks, session store, structured output, or rewind as stable merely because the adapter seam exists.
+- Do not mark hooks, session store, structured output, or rewind as stable merely because the adapter seam exists; hooks now have diagnostic event-timeline proof in Capability Lab, but that is still not stable UI.
 - Do not remove legacy compatibility fields that older OpenCode conversations still rely on without an explicit migration plan.
 - Do not flatten Claude-native semantics into generic settings when the design docs say they are backend-specific.

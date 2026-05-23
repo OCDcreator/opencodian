@@ -397,6 +397,7 @@ describe('SettingsCapabilityLabSection', () => {
       }),
       persistSession: false,
     }));
+    expect(containerEl.textContent).toContain('Captured 1 hook event');
     expect(containerEl.textContent).toContain('SessionStart');
     expect(containerEl.textContent).toContain('diag-hook-1');
   });

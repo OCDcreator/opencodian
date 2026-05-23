@@ -238,6 +238,12 @@ function readMessagePreview(message: unknown): { label: string; preview: string;
   };
 }
 
+function isHookBackendEventChunk(
+  chunk: import('../../core/types/chat').StreamChunk,
+): chunk is Extract<import('../../core/types/chat').StreamChunk, { type: 'backend_event' }> & { event: 'hook' } {
+  return chunk.type === 'backend_event' && chunk.event === 'hook';
+}
+
 function renderMessagePreviewList(
   outputEl: HTMLElement,
   heading: string,
@@ -1925,11 +1931,8 @@ export class SettingsCapabilityLabSection {
         includeHookEvents: true,
         persistSession: false,
       });
-      const hookChunk = result.chunks.find((chunk) => (
-        chunk.type === 'backend_event'
-        && chunk.event === 'hook'
-        && chunk.metadata?.hookEvent === 'SessionStart'
-      ));
+      const hookChunks = result.chunks.filter(isHookBackendEventChunk);
+      const sessionStartHookChunk = hookChunks.find((chunk) => chunk.metadata?.hookEvent === 'SessionStart');
       outputEl.empty();
       outputEl.createEl('h5', {
         text: `Hook diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
@@ -1940,14 +1943,31 @@ export class SettingsCapabilityLabSection {
           text: `Session ID: ${result.sessionId}`,
         });
       }
-      if (hookChunk && hookChunk.type === 'backend_event') {
+      if (hookChunks.length > 0) {
         outputEl.createEl('p', {
-          text: 'SessionStart hook events were captured from the diagnostic backend_event stream.',
+          text: `Captured ${hookChunks.length} hook event(s) from the diagnostic backend_event stream.`,
         });
-        outputEl.createEl('pre', {
-          cls: 'opencodian-capability-lab-json-preview',
-          text: truncate(formatJsonPreview(hookChunk), 4000),
-        });
+        if (sessionStartHookChunk && sessionStartHookChunk.type === 'backend_event') {
+          outputEl.createEl('p', {
+            cls: 'opencodian-capability-lab-hint',
+            text: 'SessionStart hook event was captured explicitly.',
+          });
+          outputEl.createEl('pre', {
+            cls: 'opencodian-capability-lab-json-preview',
+            text: truncate(formatJsonPreview(sessionStartHookChunk), 4000),
+          });
+        }
+        if (hookChunks.length > 1) {
+          renderMessagePreviewList(
+            outputEl,
+            'Hook event timeline',
+            hookChunks.map((chunk) => ({
+              type: chunk.metadata?.hookEvent ?? chunk.event,
+              id: chunk.id ?? chunk.metadata?.hookEvent,
+              content: chunk.content ?? chunk.metadata,
+            })),
+          );
+        }
         this.updateRuntimeProof('Hooks', 'pass', outputEl);
         return;
       }
