@@ -104,6 +104,7 @@ private readonly activeGenerations = new Map<string, AbortController>();
 ## 注意事项
 
 - `cancelConversation()` / `cancelAll()` 仍然只是本地忽略结果，不会强制中断服务端请求；官方标题轮询会在 abort 后停止等待。
+- 官方标题读取虽然已经走共享 `readBackendSessionTitle()` seam，并且对 `opencode.title` / `claude-code.summary` 有 runtime proof，但这不等于 `getSession()` 已经成为稳定的通用 backend-neutral session detail contract。
 - 结构化输出不是唯一来源；如果模型没返回 `structured.title`，仍会回退到纯文本解析。
 - 设置页会保留不可用的 `aiTitleModel` 并显示警告按钮，提醒用户该功能当前不会生效。
 - 只有在“无法读取可用性信息”这类解析异常时，才会回退到当前会话模型。
