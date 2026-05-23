@@ -351,6 +351,150 @@ describe('ConversationLoadRecoveryCoordinator rewind and restore', () => {
     });
     expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreSuccess'));
   });
+
+  it('shows streamingBlocked notice when tab is streaming', async () => {
+    const conversation = createConversation('rewind-streaming');
+    const host = createHost(conversation, {
+      isActiveTabStreaming: jest.fn(() => true),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.streamingBlocked'));
+    expect(host.revertSession).not.toHaveBeenCalled();
+  });
+
+  it('shows unavailable notice when no current conversation', async () => {
+    const conversation = createConversation('rewind-missing-conversation');
+    const host = createHost(conversation, {
+      getCurrentConversation: jest.fn(() => null),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.unavailable'));
+  });
+
+  it('shows unavailable notice for non-OpenCode backend', async () => {
+    const conversation = createBackendConversation('claude-conv', 'claude-code');
+    const host = createHost(conversation);
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.unavailable'));
+    expect(host.revertSession).not.toHaveBeenCalled();
+  });
+
+  it('shows unavailable notice when message has no sourceMessageId', async () => {
+    const conversation = createConversation('rewind-missing-source');
+    const message = createMessage('message-without-source', {
+      sourceMessageId: undefined,
+    });
+    const host = createHost(conversation);
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(message);
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.unavailable'));
+  });
+
+  it('does nothing when user cancels the rewind confirmation', async () => {
+    const conversation = createConversation('rewind-cancelled');
+    const host = createHost(conversation, {
+      confirmRewind: jest.fn(() => false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.revertSession).not.toHaveBeenCalled();
+    expect(host.showNotice).not.toHaveBeenCalled();
+  });
+
+  it('shows failed notice when revertSession returns false', async () => {
+    const conversation = createConversation('rewind-revert-false');
+    const host = createHost(conversation, {
+      revertSession: jest.fn().mockResolvedValue(false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.failed'));
+    expect(port.loadConversation).not.toHaveBeenCalled();
+  });
+
+  it('shows failed notice when revertSession throws', async () => {
+    const conversation = createConversation('rewind-revert-throws');
+    const host = createHost(conversation, {
+      revertSession: jest.fn().mockRejectedValue(new Error('server error')),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.failed'));
+  });
+
+  it('shows streamingBlocked notice when tab is streaming during restore', async () => {
+    const conversation = createConversation('restore-streaming');
+    const host = createHost(conversation, {
+      isActiveTabStreaming: jest.fn(() => true),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.streamingBlocked'));
+  });
+
+  it('shows restoreFailed for non-OpenCode backend during restore', async () => {
+    const conversation = createBackendConversation('claude-restore', 'claude-code');
+    const host = createHost(conversation);
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreFailed'));
+  });
+
+  it('shows restoreFailed when unrevertSession returns false', async () => {
+    const conversation = createConversation('restore-unrevert-false');
+    const host = createHost(conversation, {
+      unrevertSession: jest.fn().mockResolvedValue(false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreFailed'));
+  });
+
+  it('shows restoreFailed when unrevertSession throws', async () => {
+    const conversation = createConversation('restore-unrevert-throws');
+    const host = createHost(conversation, {
+      unrevertSession: jest.fn().mockRejectedValue(new Error('restore error')),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreFailed'));
+  });
 });
 
 describe('ConversationLoadRecoveryCoordinator forking', () => {
@@ -551,6 +695,7 @@ describe('createConversationLoadRecoveryHost factory', () => {
       persistTabState: jest.fn(),
       loadConversations: jest.fn().mockResolvedValue(undefined),
       getConversations: jest.fn().mockReturnValue([]),
+      getActiveBackend: jest.fn(() => 'opencode'),
       createConversation: jest.fn().mockResolvedValue(createConversation('created')),
       app: mockApp,
       revertSession: jest.fn().mockResolvedValue(true),

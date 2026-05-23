@@ -106,6 +106,29 @@ describe('SettingsCapabilityLabSection', () => {
     expect(headers).toEqual(['Capability', 'SDK', 'Adapter', 'Runtime Proof', 'User Surface']);
   });
 
+  it('keeps Agent Definitions and Session Store locked to hidden diagnostic states', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
+
+    const sessionStoreRow = getRow('Session Store');
+    const agentDefinitionsRow = getRow('Agent Definitions');
+
+    expect(sessionStoreRow).toBeTruthy();
+    expect(agentDefinitionsRow).toBeTruthy();
+    expect(sessionStoreRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
+    expect(agentDefinitionsRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
+    expect(sessionStoreRow?.textContent).toContain('Untested');
+    expect(agentDefinitionsRow?.textContent).toContain('Untested');
+  });
+
   it('renders a diagnostic summary strip above the matrix', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -1169,5 +1192,86 @@ describe('SettingsCapabilityLabSection', () => {
     const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
     expect(surfaceChip?.dataset.surface).toBe('diagnostic');
     expect(surfaceChip?.textContent).toBe('Diagnostic');
+  });
+
+  it('runs the rewind dry-run probe through the adapter and renders the result', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'rewind-session-1', summary: 'Test session for rewind', lastModified: 1 },
+      ]),
+      rewindFiles: jest.fn().mockResolvedValue({
+        dryRun: true,
+        filesAffected: ['src/main.ts', 'src/utils.ts'],
+        description: 'Would revert changes from message msg-rewind-target',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const rewindBlock = containerEl.querySelector('[data-section-block="rewind"]') as HTMLElement | null;
+    expect(rewindBlock).toBeTruthy();
+
+    const sessionSelect = rewindBlock!.querySelector('select') as HTMLSelectElement;
+    const msgInput = rewindBlock!.querySelector('input[type="text"]') as HTMLInputElement;
+    const dryRunBtn = Array.from(rewindBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Dry-Run Preview')
+    )) as HTMLButtonElement | undefined;
+    expect(dryRunBtn).toBeTruthy();
+
+    sessionSelect.value = 'rewind-session-1';
+    sessionSelect.dispatchEvent(new Event('change'));
+    msgInput.value = 'msg-rewind-target';
+    dryRunBtn!.click();
+    await flushUi();
+
+    expect(adapter.rewindFiles).toHaveBeenCalledWith('rewind-session-1', 'msg-rewind-target', { dryRun: true });
+    const outputEl = rewindBlock!.querySelector('.opencodian-capability-lab-output') as HTMLElement;
+    expect(outputEl.textContent).toContain('Dry-Run Rewind Preview');
+    expect(outputEl.textContent).toContain('src/main.ts');
+  });
+
+  it('renders error output when rewind dry-run probe fails', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'rewind-session-err', summary: 'Error session', lastModified: 1 },
+      ]),
+      rewindFiles: jest.fn().mockRejectedValue(new Error('No active runtime')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const rewindBlock = containerEl.querySelector('[data-section-block="rewind"]') as HTMLElement | null;
+    expect(rewindBlock).toBeTruthy();
+
+    const sessionSelect = rewindBlock!.querySelector('select') as HTMLSelectElement;
+    const msgInput = rewindBlock!.querySelector('input[type="text"]') as HTMLInputElement;
+    const dryRunBtn = Array.from(rewindBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Dry-Run Preview')
+    )) as HTMLButtonElement | undefined;
+    expect(dryRunBtn).toBeTruthy();
+
+    sessionSelect.value = 'rewind-session-err';
+    sessionSelect.dispatchEvent(new Event('change'));
+    msgInput.value = 'msg-rewind-target';
+    dryRunBtn!.click();
+    await flushUi();
+
+    expect(adapter.rewindFiles).toHaveBeenCalledWith('rewind-session-err', 'msg-rewind-target', { dryRun: true });
+    const outputEl = rewindBlock!.querySelector('.opencodian-capability-lab-output') as HTMLElement;
+    expect(outputEl.textContent).toContain('Error:');
+    expect(outputEl.textContent).toContain('No active runtime');
+    expect(outputEl.textContent).toContain('Hint: rewindFiles requires an active runtime with checkpointing enabled.');
   });
 });

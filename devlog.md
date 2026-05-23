@@ -12,6 +12,49 @@
 
 ---
 
+## 2026-05-23 Phase 3 — Rewind test hardening: adapter + coordinator + CapLab probe
+
+### 目标
+
+在 hooks/sessionStore/rewind/Claude-native history browsing 中找到测试覆盖最弱的窄切片并加固。不触碰 session/history seam，不提升任何能力到 stable。
+
+### 发现
+
+`ClaudeCodeAdapter.rewindFiles()` 是整个 rewind 能力中测试覆盖为零的最高风险缺口：
+- 适配器层：`rewindFiles()` 无直接单元测试（5 个测试场景全部缺失）
+- Coordinator 层：`handleRewindRequest` / `handleRestoreRewindRequest` 仅有 2 个 happy-path 测试，11 个错误路径完全未覆盖
+- Capability Lab：rewind dry-run 探针仅测试按钮渲染，未测试实际 `adapter.rewindFiles()` 调用
+
+### 实施内容
+
+| 文件 | 新增测试数 | 覆盖 |
+|------|-----------|------|
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 5 | rewindFiles 不可用/正常委托/dryRun选项/错误传播/失效session |
+| `tests/unit/features/chat/ConversationLoadRecoveryCoordinator.test.ts` | 11 | handleRewindRequest 7个错误路径 + handleRestoreRewindRequest 4个错误路径 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 2 | dry-run 成功渲染 + 失败错误提示 |
+
+### 技术要点
+
+- 适配器测试使用 `createAsyncQueue` 创建可控 SDK query mock，在 runtime 存活期间调用 `rewindFiles`
+- Coordinator 测试覆盖所有 guard 分支：streaming/无会话/非OpenCode/无sourceMessageId/用户取消/false返回/异常
+- CapLab 测试验证 `adapter.rewindFiles(id, msgId, { dryRun: true })` 调用及结果/错误渲染
+
+### 验证
+
+- `npm run verify`: 431 suites / 3080 tests passed (+20 tests)
+- Build: `feature-phase0-capability.202605231831`
+- 未修改任何产品代码，仅新增测试
+- 未提升 rewind 到 stable，生产路径仍 gated 为 OpenCode-only
+
+### 文档更新
+
+- `docs/status/claude-code-current-state-2026-05-22.md`: 新增 Rewind Test Hardening Round 节
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: 更新 rewindFiles 说明
+- `docs/modules/features/chat/services/ConversationLoadRecoveryCoordinator.md`: 补充错误路径测试说明
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: 补充 dry-run probe 测试说明
+
+---
+
 ## 2026-05-23 Phase 3 — Shared sessions backend-switch follow-up audit
 
 ### Summary

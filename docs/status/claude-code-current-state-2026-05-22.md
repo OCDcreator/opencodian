@@ -156,7 +156,7 @@ These capabilities are no longer “not wired”, but they are also not stable c
 | Session store | Runtime-only SDK `sessionStore` path exists, plugin-owned diagnostic store adapter exists, import/mirror/list/load proof exists in Capability Lab. | `Diagnostic store proof only`, not stable storage product. |
 | JSONL history browser | Capability Lab can browse history read-only and preview messages. | `Diagnostic browser`, not full history productization. |
 | Session detail inspection | Capability Lab can inspect raw `getSession()` output per backend session. | `Diagnostic probe only`, not a stable cross-backend session-detail contract. |
-| Rewind | Adapter-level `rewindFiles()` exists and dry-run surface exists. | Not stable-complete until no-data-loss guard and stronger runtime proof are accepted. |
+| Rewind | Adapter-level `rewindFiles()` exists, dry-run surface exists, adapter + coordinator + CapLab probe tests now cover all paths. | Not stable-complete until no-data-loss guard and stronger runtime proof are accepted; test hardening does not promote to stable. |
 | Agent definitions | Runtime-only `agent` / `agents` option wiring exists. | Must remain `Hidden / Untested`. |
 | Skills / plugins / agent authoring | Some runtime-only channels exist or are planned, but no stable Claude-native authoring surface is complete in OpenCodian. | Not complete. |
 
@@ -179,6 +179,8 @@ Structured output is **not a single capability** but a pipeline with multiple ma
 | **Production consumer** | Stable | `TitleGenerationService` uses `json_schema` structured output for title generation (real traffic) |
 | **Diagnostic surface** | Stable | Capability Lab Structured Output Playground probes backend support via `runDiagnosticPrompt()` |
 | **User-facing authoring** | **Not exposed** | No UI to select output format; no per-message format option in chat input; settings have no structured output preferences |
+
+The structured-output chain is now regression-covered end to end in unit tests: `outputFormat` wiring, `backend_event` capture, persistence into `message.structured`, and assistant-shell rendering all have explicit coverage. That does not change the product boundary: authoring/triggering remains diagnostic-only, and the Capability Lab continues to present it that way.
 
 ### Dual-Backend Architecture (Not "Claude Pressed Into OpenCode Shape")
 
@@ -234,7 +236,7 @@ That is the correct reading for:
 - hooks
 - diagnostic session store
 
-Structured output is now at `wired + runtime-proved + stable transcript rendering`, with authoring/triggering remaining diagnostic-only.
+Structured output is now at `wired + runtime-proved + stable transcript rendering`, with authoring/triggering remaining diagnostic-only and regression-covered end to end.
 
 Do not collapse this to either:
 
@@ -716,6 +718,44 @@ No additional production changes were justified.
 This follow-up audit did **not** reveal a new backend-neutral seam and did **not** justify more inner guards in `SettingsConversationSection.ts`.
 
 The only shared-session action that required an extra runtime fence was `unshareSession()` because it is an OpenCode-specific write. Preview/refresh/list/count already degrade safely through `AgentBackendRouting`, and copy-link is backend-agnostic local UI behavior.
+
+## Rewind Test Hardening Round (2026-05-23)
+
+A focused test hardening pass addressed the weakest test coverage gap among Claude Code diagnostic capabilities: `ClaudeCodeAdapter.rewindFiles()` had zero direct unit tests, `ConversationLoadRecoveryCoordinator` rewind/restore error paths were untested, and the Capability Lab rewind dry-run probe had no adapter-call test.
+
+### Changes Applied
+
+| Test file | Tests added | Coverage |
+|---|---|---|
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 5 | `rewindFiles` unavailable (no runtime), delegation with active runtime, dryRun option forwarding, error propagation from SDK, invalidated session |
+| `tests/unit/features/chat/ConversationLoadRecoveryCoordinator.test.ts` | 11 | handleRewindRequest: streaming blocked, no conversation, non-OpenCode backend, no sourceMessageId, user cancel, revertSession false, revertSession throws. handleRestoreRewindRequest: streaming blocked, non-OpenCode backend, unrevertSession false, unrevertSession throws |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 2 | Rewind dry-run probe success (adapter called with dryRun:true, result rendered), dry-run probe failure (error + hint rendered) |
+
+### Verification
+
+- `npm run verify` passed with `431` suites / `3080` tests
+- Build completed with `BUILD_ID feature-phase0-capability.202605231831`
+- Net test increase: +20 tests (3060 → 3080)
+
+### Impact on Capability Maturity
+
+This hardening pass does **not** promote rewind to stable. Rewind remains:
+- `wired + runtime-proved + not stable` for the adapter seam
+- Explicitly gated as `backend !== 'opencode'` in production chat paths
+- Only exercisable through the Capability Lab dry-run probe
+
+What changed is the **test coverage depth** — the adapter-level `rewindFiles()` seam now has the same test rigor as fork, structured output, and hooks, making future promotion work safer.
+
+### Updated Capability Test Coverage Summary
+
+| Capability | Adapter tests | Coordinator tests | CapLab probe tests | Total coverage |
+|---|---|---|---|---|
+| Fork | ✅ | ✅ | ✅ | Complete |
+| Structured output | ✅ | ✅ | ✅ | Complete |
+| Hooks | ✅ | N/A | ✅ | Complete |
+| Session store | ✅ | N/A | ✅ | Complete |
+| **Rewind** | ✅ **(new)** | ✅ **(new)** | ✅ **(new)** | **Complete** |
+| Agent definitions | ⚠️ wiring only | N/A | N/A | Must remain Hidden/Untested |
 
 ## Hard Guardrails
 

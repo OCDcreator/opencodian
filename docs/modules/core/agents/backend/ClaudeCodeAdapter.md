@@ -33,7 +33,7 @@
 - 通过诊断级方法委托官方 SDK JSONL history/subagent transcript/sessionStore import 入口：`getSessionMessages()`、`listSubagents()`、`getSubagentMessages()` 和 `importSessionToStore()`；这些方法复用已捕获的 SDK session id 和 vault-scoped `dir`，当 SDK 不支持对应 API 或本地 session 已删除时显式报错，避免把缺能力或无效 session 误判为空历史
 - `listSessions()` 现在允许 runtime-only `sessionStore` / pagination 选项，Capability Lab 可以在本地 JSONL 与插件内存里的 diagnostic store 之间切换 session 列表来源
 - 提供 `runDiagnosticPrompt()`：用 runtime-only `hooks`、`sessionStore`、`outputFormat`、`includeHookEvents`、`persistSession`、`resumeSessionId` 覆盖启动一次隔离的诊断 query，返回原始 SDK 消息与经 `ClaudeCodeStreamNormalizer` 归一化后的 `StreamChunk[]`，专供 Capability Lab 做 structured output / hook / session-store / resume runtime proof，不进入普通 chat path
-- 对活跃、checkpoint-enabled 的 SDK `Query` 暴露后端级 `rewindFiles(sessionId, userMessageId, { dryRun? })` 委托；当前没有接入稳定聊天按钮，调用方必须先完成 dry-run/确认设计
+- 对活跃、checkpoint-enabled 的 SDK `Query` 暴露后端级 `rewindFiles(sessionId, userMessageId, { dryRun? })` 委托；当前没有接入稳定聊天按钮，调用方必须先完成 dry-run/确认设计。适配器层 `rewindFiles` 已有完整单元测试覆盖（不可用/正常委托/dryRun选项/错误传播/失效session），但生产聊天路径仍显式 gated 为 OpenCode-only
 - 通过 `createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel })` 写入摘要级诊断日志：`runtime` 覆盖 start/stop/dispose/status change、sendMessage、runtime create/reuse/close、SDK load/query creation、supportedModels、spawn command/exit/error；`sessions` 覆盖 create/delete/update/list/get/fork/rewind/restore；`mcp` 覆盖 MCP config load/reload。日志只记录 id、cwd、count、length、状态和错误摘要，不记录 prompt、tool input、secret 或完整 env
 
 ## 维护约束

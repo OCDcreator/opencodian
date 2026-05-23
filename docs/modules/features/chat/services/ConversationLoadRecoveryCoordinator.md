@@ -126,6 +126,7 @@ export class ConversationLoadRecoveryCoordinator {
 - **Backend-aware session identity**: 使用 `getConversationBackendSessionId()` 解析会话标识，不再直接读取 `conversation.openCodeSessionId`。
 - **OpenCode-only revert gate**: `handleRewindRequest()` 与 `handleRestoreRewindRequest()` 在 `backend !== 'opencode'` 时直接走 unavailable / failed 分支。revert / unrevert 目前仍是 OpenCode-only 能力，Claude 等 backend 即使底层 SDK 存在类似语义，也暂不提供稳定支持。
 - rewind / unrevert 成功后，继续统一走 `loadConversation(..., { forceServerSync: true })`
+- rewind / restore-rewind 所有错误路径（streaming blocked、无会话、非 OpenCode backend、无 sourceMessageId、用户取消、revert 返回 false、revert 抛出异常）均有完整单元测试覆盖
 - 既有 debug/error log 与 notice 语义保持不变
 
 ### fork
