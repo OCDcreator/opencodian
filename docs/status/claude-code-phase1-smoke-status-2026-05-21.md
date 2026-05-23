@@ -1,5 +1,7 @@
 # Claude Code Phase 1+ Smoke Status — 2026-05-21
 
+> ⚠️ **Partially outdated.** This file predates runtime wiring for hooks, session store, structured output, skills, plugins, and agent options. Prefer `docs/status/claude-code-current-state-2026-05-22.md` for present-state judgments. Kept for historical reference.
+
 ## Summary
 
 Real runtime smoke executed against `@anthropic-ai/claude-agent-sdk@0.3.145` on macOS arm64 with Node v25.9.0.

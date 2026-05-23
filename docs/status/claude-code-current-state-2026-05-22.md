@@ -139,7 +139,7 @@ These items are implemented enough to treat as real delivered backend capability
 | Persistent query runtime | Claude owns a persistent `query()` runtime and can stream across turns. |
 | Session identity | Claude uses backend-owned session identity via `backendSessionId`-style flow, rather than pretending to be OpenCode. |
 | Resume | Claude session resume is wired and runtime-smoked. |
-| Stream normalization | Text, thinking, tool use, tool result, usage, message metadata, hook events, subagent progress, and structured output backend events are normalized. |
+| Stream normalization | Text, thinking, tool use, tool result, usage, and message metadata are normalized at product level. Hook events, subagent progress, and structured output backend events are also normalized but currently consumed only in diagnostic contexts (see "What Exists But Must Not Be Described As Stable Completion" below). |
 | Permissions bridge | `canUseTool` and elicitation/question bridging are wired into the existing permission/question flows. |
 | Model / effort / thinking basics | Core Claude settings and options mapping are implemented. |
 | MCP runtime pass-through | MCP servers can be passed through and refreshed at runtime. |

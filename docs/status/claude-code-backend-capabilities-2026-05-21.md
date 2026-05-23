@@ -1,5 +1,7 @@
 # Claude Code Backend Capabilities — 2026-05-21
 
+> ⚠️ **Partially outdated.** This file predates runtime wiring for hooks, session store, structured output, skills, plugins, and agent options. Prefer `docs/status/claude-code-current-state-2026-05-22.md` for present-state judgments. Kept for historical reference.
+
 ## Status
 This document catalogs Claude Agent SDK capabilities that have backend wiring
 or planned integration points but are NOT exposed as editable UI. Each capability

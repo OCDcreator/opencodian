@@ -106,7 +106,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(headers).toEqual(['Capability', 'SDK', 'Adapter', 'Runtime Proof', 'User Surface']);
   });
 
-  it('keeps Agent Definitions and Session Store locked to hidden diagnostic states', () => {
+  it('keeps runtime-only capabilities locked to hidden/Untested in capability matrix', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -118,15 +118,15 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    const sessionStoreRow = getRow('Session Store');
-    const agentDefinitionsRow = getRow('Agent Definitions');
+    // All runtime-only capabilities must stay hidden and untested until explicitly promoted
+    const hiddenCapabilities = ['Session Store', 'Agent Definitions', 'Plugins', 'Skills', 'Hooks'];
 
-    expect(sessionStoreRow).toBeTruthy();
-    expect(agentDefinitionsRow).toBeTruthy();
-    expect(sessionStoreRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
-    expect(agentDefinitionsRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
-    expect(sessionStoreRow?.textContent).toContain('Untested');
-    expect(agentDefinitionsRow?.textContent).toContain('Untested');
+    for (const cap of hiddenCapabilities) {
+      const row = getRow(cap);
+      expect(row).not.toBeNull(); // ${cap} row must exist
+      expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
+      expect(row?.textContent).toContain('Untested');
+    }
   });
 
   it('renders a diagnostic summary strip above the matrix', () => {
