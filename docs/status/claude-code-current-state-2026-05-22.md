@@ -77,6 +77,36 @@ This round tightened the Claude settings surface so it is honest about runtime b
   - `.obsidian-debug/phase2-settings-runtime-final-clean-errors-2026-05-23.txt`
 - Runtime deploy initially exposed a missing Claude Agent SDK platform binary because only `main.js`, `manifest.json`, and `styles.css` had been copied. The final Test Vault deploy now also includes `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/`, with the deployed `claude` binary checksum matching `dist`. After that copy, Obsidian console showed `supportedModels count {"count":5}`, `dev:errors` remained empty, and OpenCode sidecar recovered to `running` / `ready=true`.
 
+## 2026-05-23 Phase 2 MCP runtime controls in Claude settings
+
+This round productizes a small, honest MCP runtime control in the Claude Code Tools settings tab. It does not add MCP authoring.
+
+### What Changed
+
+- `SettingsClaudeCodeSection` now shows the active Claude adapter MCP server count on the Tools tab via `getMcpServerCount()`
+- The same tab now offers a "Refresh MCP runtime" action that calls `ClaudeCodeAdapter.reloadMcpServers()`
+- Successful refreshes re-read and display the updated runtime server count
+- Failed refreshes leave a visible failure status instead of immediately overwriting it with the previous count
+
+### What This Does Not Change
+
+- OpenCodian still does not author `.claude/mcp.json`
+- Capability Lab MCP rows remain detection-only
+- This does not promote MCP authoring, skill/plugin authoring, or agent authoring to a stable product surface
+
+### Verification
+
+- Focused settings test covers loaded count, refresh, and refresh failure visibility
+- Focused adapter test still covers `reloadMcpServers()` and `getMcpServerCount()` runtime seams
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `435` suites / `3208` tests and production build
+- `npm run build` passed again with `BUILD_ID: feature-phase0-capability.202605232303`
+- Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/`
+- Fresh Obsidian runtime proof:
+  - screenshot: `.obsidian-debug/claude-tools-final-proof.png`
+  - console: no new errors; `supportedModels count {"count":5}` recorded
+  - settings runtime text: `当前 Claude Code adapter 没有加载 MCP 服务器。`
+  - refresh button present: `刷新 MCP 运行时`
+
 ## Source Of Truth Order
 
 Read these in order when continuing Claude work:

@@ -304,6 +304,8 @@ New Chinese keys added for the tabbed settings layout:
 
 Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签；高级项拆分为 `settings.claudeCode.tab.tools`、`settings.claudeCode.tab.limits` 和 `settings.claudeCode.tab.sdkFoundations`。
 
+2026-05-23 继续新增 `settings.claudeCode.mcpRuntime.*` 键，用于 Claude Code Tools 标签里的 MCP runtime 状态和刷新按钮。文案明确该操作只从当前 OpenCodian MCP adapter 重新加载 Claude runtime config，不写入 `.claude/mcp.json`。
+
 ## 2026-05-22 Capability Lab 诊断面板
 
 新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的"能力实验室"二级标签提供中文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、回退 dry-run 预览、结构化输出实验场、会话分叉诊断探针、会话恢复诊断探针、会话详情检查和发现状态九个诊断面板。新增 `settings.capabilityLab.fork.*` 与 `settings.capabilityLab.resume.*`，明确把 Claude `forkSession()` 和 SDK `resume` 仅作为 provider-owned 的诊断探针暴露，而不是稳定的跨后端 fork / resume-at UI。所有面板标记为 ⚠️ 诊断 / 实验 / 非稳定，不连接稳定设置持久化。

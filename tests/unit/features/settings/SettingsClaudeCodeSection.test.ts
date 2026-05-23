@@ -687,6 +687,55 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.allowedTools).toEqual(['Read', 'Grep']);
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
+
+    it('shows MCP runtime status and refreshes the active Claude adapter config', async () => {
+      const claudeAdapter = {
+        getMcpServerCount: jest.fn()
+          .mockReturnValueOnce(2)
+          .mockReturnValueOnce(3),
+        reloadMcpServers: jest.fn().mockResolvedValue(undefined),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      expect(containerEl.textContent).toContain(
+        t('settings.claudeCode.mcpRuntime.loaded', { count: 2 }),
+      );
+
+      await findButton(t('settings.claudeCode.mcpRuntime.refreshButton')).onClick?.();
+
+      expect(claudeAdapter.reloadMcpServers).toHaveBeenCalledTimes(1);
+      expect(containerEl.textContent).toContain(
+        t('settings.claudeCode.mcpRuntime.loaded', { count: 3 }),
+      );
+    });
+
+    it('keeps the MCP runtime refresh failure visible', async () => {
+      const claudeAdapter = {
+        getMcpServerCount: jest.fn().mockReturnValue(2),
+        reloadMcpServers: jest.fn().mockRejectedValue(new Error('reload failed')),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      await findButton(t('settings.claudeCode.mcpRuntime.refreshButton')).onClick?.();
+
+      expect(claudeAdapter.reloadMcpServers).toHaveBeenCalledTimes(1);
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.mcpRuntime.refreshFailed'));
+      expect(containerEl.textContent).not.toContain(
+        t('settings.claudeCode.mcpRuntime.loaded', { count: 2 }),
+      );
+    });
   });
 
   describe('limits tab', () => {

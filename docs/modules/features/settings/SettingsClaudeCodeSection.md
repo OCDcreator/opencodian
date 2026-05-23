@@ -16,7 +16,8 @@
 - 在 Permissions 标签渲染 permission mode dropdown；保存时会通过 Claude adapter 调用 `setPermissionMode()` 尝试更新活跃 query
 - 在 Context & Sources 标签渲染 setting sources toggles（user/project/local）、项目来源文件可见性（`CLAUDE.md`、`.claude/settings.json`、`.claude/settings.local.json`）、restart-sensitive runtime boundary notice 和 additional directories textarea
 - Context & Sources 标签提供 “Restart sessions” 操作，调用 Claude adapter 的 `restartPersistentQueries('settings-change')`，只关闭活跃持久 query，不删除 session；下一次发送会用最新 source/directory/env/tool/limit options 重新启动并在可能时 resume
-- 在 Tools 标签渲染 allowed/disallowed tools；在 Limits 标签渲染 max turns 和 max budget USD；在 SDK Foundations 标签渲染 file checkpoint、hook event stream、subagent transcript/progress 开关。这些字段只进入 SDK options / diagnostic stream，不宣称 hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
+- 在 Tools 标签渲染 MCP runtime 只读状态与刷新按钮，以及 allowed/disallowed tools；MCP 控制只调用当前 Claude adapter 的 `getMcpServerCount()` / `reloadMcpServers()`，不写入 `.claude/mcp.json`，刷新失败会保留明确错误状态
+- 在 Limits 标签渲染 max turns 和 max budget USD；在 SDK Foundations 标签渲染 file checkpoint、hook event stream、subagent transcript/progress 开关。这些字段只进入 SDK options / diagnostic stream，不宣称 MCP authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
 - 将多标签设置输入写入 `settings.backendSettings.claudeCode`
 - 通过 `ClaudeCodeProcessResolver` 做本地进程解析诊断，帮助检查 bundled/default resolution 与外部 CLI path
 - 保持 hook authoring、skills authoring、agent authoring、external SessionStore、JSONL import/browser 等未完成能力不在 UI 中暴露，直到对应 phase 有端到端 runtime proof

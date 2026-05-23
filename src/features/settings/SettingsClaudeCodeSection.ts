@@ -497,8 +497,43 @@ export class SettingsClaudeCodeSection {
   // ─── Tools tab ───────────────────────────────────────────────────
 
   private renderToolsTab(containerEl: HTMLElement): void {
+    this.renderMcpRuntimeControls(containerEl);
     this.renderAllowedToolsSetting(containerEl);
     this.renderDisallowedToolsSetting(containerEl);
+  }
+
+  private renderMcpRuntimeControls(containerEl: HTMLElement): void {
+    const statusEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-mcp-runtime',
+      attr: { 'data-claude-code-mcp-runtime': 'true' },
+    });
+    this.updateMcpRuntimeStatus(statusEl);
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.mcpRuntime.name'))
+      .setDesc(t('settings.claudeCode.mcpRuntime.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.mcpRuntime.refreshButton'))
+          .onClick(async () => {
+            try {
+              await this.reloadClaudeMcpServers();
+              this.updateMcpRuntimeStatus(statusEl);
+            } catch {
+              statusEl.setText(t('settings.claudeCode.mcpRuntime.refreshFailed'));
+            }
+          });
+      });
+  }
+
+  private updateMcpRuntimeStatus(statusEl: HTMLElement): void {
+    const adapter = this.getClaudeAdapter() as { getMcpServerCount?: () => number } | null;
+    const count = adapter?.getMcpServerCount?.() ?? 0;
+    statusEl.setText(
+      count > 0
+        ? t('settings.claudeCode.mcpRuntime.loaded', { count })
+        : t('settings.claudeCode.mcpRuntime.empty'),
+    );
   }
 
   // ─── Limits tab ──────────────────────────────────────────────────
@@ -682,6 +717,13 @@ export class SettingsClaudeCodeSection {
       restartPersistentQueries?: (reason?: string) => Promise<void> | void;
     } | null;
     await adapter?.restartPersistentQueries?.(reason);
+  }
+
+  private async reloadClaudeMcpServers(): Promise<void> {
+    const adapter = this.getClaudeAdapter() as {
+      reloadMcpServers?: () => Promise<void> | void;
+    } | null;
+    await adapter?.reloadMcpServers?.();
   }
 
   private isKnownClaudeTabId(tabId: string): tabId is typeof CLAUDE_CLASSIC_TABS[number] {
