@@ -52,6 +52,7 @@ import {
   createLogger,
   getRecentLogText,
   getVaultBasePath,
+  sanitizeDiagnosticReport,
   setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleSettings,
@@ -769,7 +770,7 @@ export default class OpenCodianPlugin extends Plugin {
     const managedProcess = this.openCodeService.isServerProcessRunning();
     const diagnostics = this.openCodeService.getServerDiagnostics();
 
-    return [
+    const raw = [
       '# OpenCodian Diagnostic Report',
       '',
       `Generated: ${new Date().toISOString()}`,
@@ -832,6 +833,8 @@ export default class OpenCodianPlugin extends Plugin {
       getRecentLogText() || '(no logs captured yet)',
       '',
     ].join('\n');
+
+    return sanitizeDiagnosticReport(raw);
   }
 
   async writeDiagnosticLogFile(targetDirectory: string, source = 'manual'): Promise<string> {

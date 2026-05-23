@@ -2,6 +2,7 @@
  * Shared module
  */
 
+export { sanitizeDiagnosticReport } from './diagnosticSecretSanitizer';
 export type { LogChannel, LogEntry, Logger } from './logger';
 export { createLogger } from './logger';
 export { clearRecentLogs, getRecentLogEntries, getRecentLogText, getRecentLogTextForEntries } from './logger';

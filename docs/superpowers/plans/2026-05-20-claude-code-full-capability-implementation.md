@@ -664,7 +664,7 @@ Actual: PASS with `OWNER_GUARD_APPROVED` because `src/main.ts` and chat owner ro
 ### Phase 5: Full Capability Polish
 
 - [ ] Add cross-backend capability dashboard.
-- [ ] Add Claude diagnostics export without secrets.
+- [x] Add Claude diagnostics export without secrets.
 - [ ] Add runtime docs and troubleshooting for bundled binary, external CLI, PATH, Node, and Electron spawn.
 
 ## Final Gates

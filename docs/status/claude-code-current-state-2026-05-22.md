@@ -960,3 +960,28 @@ The existing `listSubagents()` / `getSubagentMessages()` diagnostic UI and tests
 - Do not mark hooks, session store, structured output, or rewind as stable merely because the adapter seam exists; hooks now have diagnostic event-timeline proof in Capability Lab, but that is still not stable UI.
 - Do not remove legacy compatibility fields that older OpenCode conversations still rely on without an explicit migration plan.
 - Do not flatten Claude-native semantics into generic settings when the design docs say they are backend-specific.
+
+## Diagnostics Export Secret Sanitization (2026-05-23)
+
+A focused Phase 5-foundation pass addressed the missing secret sanitization in diagnostic report exports.
+
+### Gap Found
+
+Both `buildDiagnosticReport()` (general plugin diagnostics) and `buildClaudeCodeDiagnosticReport()` (Claude-specific diagnostics) exported raw text without any secret redaction. A privacy note claimed "secrets are kept out," but no runtime enforcement existed.
+
+### What Changed
+
+**New utility**: `src/shared/diagnosticSecretSanitizer.ts`
+- `sanitizeDiagnosticReport(text: string): string` — applies ordered regex-based redaction patterns to diagnostic text
+- `DIAGNOSTIC_REDACTION_PATTERNS` — exported readonly pattern array for test access
+- Covers: Bearer tokens, API key/token/secret/password assignments, CLI flags, URL-embedded passwords, query-string secret params, environment variables, Anthropic `sk-ant-api03-` prefixes, generic 20+ char tokens, PEM private key blocks
+
+**Integration**:
+- `main.ts` `buildDiagnosticReport()`: now calls `sanitizeDiagnosticReport()` on the raw report before returning
+- `SettingsDebugSection.ts` `buildClaudeCodeDiagnosticReport()`: now calls `sanitizeDiagnosticReport()` on the raw report before returning
+
+**Tests**: 34 new tests in `tests/unit/shared/diagnosticSecretSanitizer.test.ts` covering all pattern families and edge cases.
+
+### Impact on Capability Maturity
+
+This pass promotes the diagnostics export from "no secret protection" to "best-effort regex-based sanitization." It does not change any diagnostic capability maturity — diagnostics remain diagnostic-only surfaces. The sanitization is a safety net, not a guarantee; users should still review exports before sharing.

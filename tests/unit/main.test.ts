@@ -9,6 +9,7 @@ import type { StorageService } from '../../src/core/storage';
 import { type Conversation, DEFAULT_SETTINGS } from '../../src/core/types';
 import { OpenCodianView } from '../../src/features/chat/OpenCodianView';
 import OpenCodianPlugin from '../../src/main';
+import { sanitizeDiagnosticReport } from '../../src/shared';
 
 jest.mock('@opencode-ai/sdk/v2/client', () => ({
   createOpencodeClient: jest.fn(() => ({ client: 'mock-sdk-client' })),
@@ -828,6 +829,61 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(conversation.openCodeSessionId).toBeUndefined();
     expect(conversation.backendSessionId).toMatch(/^claude-code-/);
     expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('sanitizes diagnostic reports before export', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      app: typeof OpenCodianPlugin.prototype.app;
+      openCodeService: {
+        checkHealth: jest.Mock<Promise<boolean>, []>;
+        getServerStatus: jest.Mock<string, []>;
+        isServerProcessRunning: jest.Mock<boolean, []>;
+        getServerDiagnostics: jest.Mock<Record<string, unknown>, []>;
+      };
+      startupCoordinator: { getStartupPerfSummaryLines: jest.Mock<string[], []>; getStartupPerformanceDiagnosisLines: jest.Mock<string[], []> };
+      manifest: { name: string; id: string; version: string };
+    };
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      backendSettings: {
+        ...DEFAULT_SETTINGS.backendSettings,
+        claudeCode: {
+          ...DEFAULT_SETTINGS.backendSettings.claudeCode,
+          debugChannels: {
+            ...DEFAULT_SETTINGS.backendSettings.claudeCode.debugChannels,
+            runtime: true,
+          },
+        },
+      },
+    };
+    plugin.app = {
+      vault: {
+        adapter: {
+          basePath: '/vault',
+        },
+      },
+    } as typeof OpenCodianPlugin.prototype.app;
+    plugin.openCodeService = {
+      checkHealth: jest.fn().mockResolvedValue(true),
+      getServerStatus: jest.fn().mockReturnValue('running'),
+      isServerProcessRunning: jest.fn().mockReturnValue(true),
+      getServerDiagnostics: jest.fn().mockReturnValue({ authHeader: 'Bearer secret-token' }),
+    };
+    plugin.startupCoordinator = {
+      getStartupPerfSummaryLines: jest.fn().mockReturnValue([]),
+      getStartupPerformanceDiagnosisLines: jest.fn().mockReturnValue([]),
+    } as unknown as typeof plugin.startupCoordinator;
+    plugin.manifest = { name: 'OpenCodian', id: 'opencodian', version: '1.0.0' };
+
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-05-23T00:00:00.000Z');
+    const report = await plugin.buildDiagnosticReport('copy-diagnostics');
+
+    expect(report).toContain('# OpenCodian Diagnostic Report');
+    expect(report).not.toContain('Bearer secret-token');
+    expect(report).toContain('[REDACTED]');
+    expect(report).toContain(sanitizeDiagnosticReport('Bearer secret-token'));
   });
 
   it('does not write openCodeSessionId when creating a conversation from a Claude session', async () => {

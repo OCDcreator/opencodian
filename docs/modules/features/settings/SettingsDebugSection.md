@@ -57,12 +57,13 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 - `Clear recent logs`：清空 logger 最近缓存
 - `Copy version / BUILD_ID`：复制 `OpenCodian <version> BUILD_ID=<id>`
 - 日志导出路径输入标记 `.opencodian-wide-text-setting`，复用设置页长文本字段布局，让 macOS/Windows 路径 placeholder 不再挤在默认短控制列里
-- Claude Code workbench 的 `Copy Claude diagnostics` 不调用全局 `buildDiagnosticReport()`，而是在本 section 内生成仅包含 Claude Code 设置摘要和 channel-filtered Claude logs 的报告，避免把 OpenCode 或插件内部日志混入 Claude 专属隐私边界。
+- Claude Code workbench 的 `Copy Claude diagnostics` 不调用全局 `buildDiagnosticReport()`，而是在本 section 内生成仅包含 Claude Code 设置摘要和 channel-filtered Claude logs 的报告，避免把 OpenCode 或插件内部日志混入 Claude 专属隐私边界。导出前通过 `sanitizeDiagnosticReport()` 对全文执行密钥/令牌/密码净化。
 
 ## 与其他模块的交互
 
 - `src/main.ts`: 提供 `saveSettings()`、`logServerStatusSnapshot()`、`buildDiagnosticReport()`、`writeDiagnosticLogFile()` 和 build identity 文本
 - `src/shared/debugModules.ts`: 提供模块注册表和刷新间隔归一化
+- `src/shared/diagnosticSecretSanitizer.ts`: 提供 `sanitizeDiagnosticReport()` 用于导出前密钥净化
 - `src/shared/logger.ts`: 提供 `clearRecentLogs()` 和底层日志开关能力
 - `src/core/types/settings.ts`: 持久化 `debugModuleSettings`、`debugRefreshIntervalMs` 和 `debugLogPaths`
 

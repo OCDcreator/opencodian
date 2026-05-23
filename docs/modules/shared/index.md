@@ -63,7 +63,7 @@ export { getVaultBasePath } from './vault';
 
 ### 横切能力聚合
 
-该 barrel 收口多类通用工具，避免业务层分别深入 `shared/logger`、`shared/obsidianContext` 等路径。虽然聚合面较宽，但导出内容都偏底层辅助能力，不包含 feature-specific 逻辑。
+该 barrel 收口多类通用工具，避免业务层分别深入 `shared/logger`、`shared/obsidianContext` 等路径。虽然聚合面较宽，但导出内容都偏底层辅助能力，不包含 feature-specific 逻辑。诊断密钥净化器（`diagnosticSecretSanitizer`）独立于 Obsidian API，被导出路径复用。
 
 ## 关键方法
 
@@ -97,6 +97,7 @@ export { getVaultBasePath } from './vault';
 | `getNormalizedToolName()` | 获取工具规范名 |
 | `isBuiltinToolName()` | 判断是否属于内置/特殊内建工具 |
 | `getVaultBasePath()` | 解析当前 vault 根路径 |
+| `sanitizeDiagnosticReport()` | 诊断报告导出前的密钥/令牌/密码净化 |
 
 ## 数据流
 
@@ -105,7 +106,7 @@ export { getVaultBasePath } from './vault';
 ## 与其他模块的交互
 
 - 被聊天、设置和主入口广泛依赖
-- 各具体实现文档见 [debugModules.md](debugModules.md)、[logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
+- 各具体实现文档见 [debugModules.md](debugModules.md)、[diagnosticSecretSanitizer.md](diagnosticSecretSanitizer.md)、[logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
 
 ## 配置项
 

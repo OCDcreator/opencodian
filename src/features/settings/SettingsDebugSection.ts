@@ -13,6 +13,7 @@ import {
   getRecentLogEntries,
   getRecentLogTextForEntries,
   type LogEntry,
+  sanitizeDiagnosticReport,
 } from '../../shared';
 import {
   CLAUDE_CODE_DEBUG_CHANNEL_IDS,
@@ -480,7 +481,7 @@ export class SettingsDebugSection {
     const enabledChannels = CLAUDE_CODE_DEBUG_CHANNEL_IDS
       .filter((channelId) => claudeSettings.debugChannels[channelId] !== false)
       .join(', ');
-    return [
+    const raw = [
       '# OpenCodian Claude Code Diagnostic Report',
       '',
       `Generated: ${new Date().toISOString()}`,
@@ -509,6 +510,8 @@ export class SettingsDebugSection {
       this.getVisibleClaudeCodeLogText(),
       '',
     ].join('\n');
+
+    return sanitizeDiagnosticReport(raw);
   }
 
   private refreshClaudeCodeWorkbench(containerEl: HTMLElement): void {
