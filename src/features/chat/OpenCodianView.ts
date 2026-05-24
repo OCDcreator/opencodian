@@ -2859,12 +2859,27 @@ export class OpenCodianView extends ItemView {
   }
 
   private createUserMessageFooterRendererHost(): UserMessageFooterRendererHost {
+    const hasCurrentConversationCapability = (capability: AgentCapability): boolean => {
+      const conversation = this.currentConversation;
+      const service = getConversationSessionBackendService(
+        this.plugin.agentServiceRegistry,
+        conversation,
+      );
+      if (service) {
+        return service.hasCapability(capability);
+      }
+      if ((conversation?.backend ?? 'opencode') === 'opencode') {
+        return hasCapability(getActiveBackendCapabilities(), capability);
+      }
+      return false;
+    };
+
     return {
       isStreaming: () => this.isActiveTabStreaming(),
       hasForkCapability: () =>
-        hasCapability(getActiveBackendCapabilities(), AgentCapability.Fork),
+        hasCurrentConversationCapability(AgentCapability.Fork),
       hasRewindCapability: () =>
-        hasCapability(getActiveBackendCapabilities(), AgentCapability.Branching),
+        hasCurrentConversationCapability(AgentCapability.Branching),
       handleRewindRequest: (message) => this.handleRewindRequest(message),
       handleForkRequest: (message) => this.handleForkRequest(message),
     };

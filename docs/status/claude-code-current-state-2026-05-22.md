@@ -86,6 +86,32 @@ This slice closes a product-surface honesty gap after the positive resume proof:
 - Fresh Test Vault runtime proof `.obsidian-debug/permission-question-mcp-diagnostic-honesty-assertion-2026-05-24-result.json` returned `ok: true` against loaded runtime `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242127`. It confirmed the Permission Approval, AskUserQuestion / Elicitation, and MCP Servers matrix rows show `Verified` + `Diagnostic`; the Discovery rows show `Diagnostic Proof`; Diagnostic Proof chips use `opencodian-capability-lab-chip-surface-diagnostic` rather than `opencodian-capability-lab-chip-active`; no positive stable/full-capability completion claim is rendered; and the mounted settings root overflow is `0px`.
 - Runtime artifacts: `.obsidian-debug/permission-question-mcp-diagnostic-honesty-runtime-2026-05-24.png`, `.obsidian-debug/permission-question-mcp-diagnostic-honesty-console-2026-05-24.txt`, `.obsidian-debug/permission-question-mcp-diagnostic-honesty-errors-2026-05-24.txt`, and `.obsidian-debug/permission-question-mcp-diagnostic-honesty-launch-2026-05-24.json`; `dev:errors` reported `No errors captured.`
 
+## 2026-05-24 User-message footer rewind/fork backend-owner boundary
+
+This worker slice closes a product-surface honesty gap in the chat user-message footer: the footer host was deriving Rewind and Fork visibility from the globally active backend capabilities, while the actual rewind/fork handlers route by the current conversation backend.
+
+### What Changed
+
+- `OpenCodianView.createUserMessageFooterRendererHost()` now resolves Fork/Rewind visibility from the current conversation's backend service via `AgentServiceRegistry`.
+- Claude Code conversations no longer show the OpenCode Rewind button merely because OpenCode is the active/global backend and declares `AgentCapability.Branching`.
+- OpenCode conversations still show Rewind when their owner backend declares Branching, even if the active/global backend is temporarily Claude Code.
+- Claude Fork remains exposed only when the Claude conversation owner declares `AgentCapability.Fork`.
+
+### What This Does Not Change
+
+- This does not promote Claude Rewind, restore rewind, revert/unrevert, session diff, or modified-files sidebar support to stable.
+- Slash `/undo` and `/redo`, restore rewind, diff notices, child-session graph, and modified-files diff remain OpenCode-only/gated until separate runtime proof and product design exist.
+
+### Verification
+
+- Red first: `npm test -- --runInBand tests/unit/features/chat/OpenCodianView.userMessageFooterHost.test.ts` failed because a Claude conversation inherited OpenCode Branching from the active backend, and an OpenCode conversation lost Rewind when Claude was active.
+- Focused green: same command passed with `1` suite / `2` tests.
+- Adjacent focused green: `npm test -- --runInBand tests/unit/features/chat/OpenCodianView.userMessageFooterHost.test.ts tests/unit/features/chat/UserMessageFooterRenderer.test.ts tests/unit/features/chat/runtime/UserMessageFooterRenderer.test.ts tests/unit/features/chat/ConversationLoadRecoveryCoordinator.test.ts tests/unit/features/chat/SlashCommandExecutionService.undoRedo.test.ts` passed with `5` suites / `57` tests.
+- Guard gates passed: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+- `npm run build` produced `BUILD_ID: feature-phase0-capability.202605242149`; Test Vault `main.js` contains that id, and `dist/main.js` / deployed `main.js` SHA256 both equal `9c45b5810338426650ed0f1183a77da6fcc3e41c949a3ab9172f01c3427022c5`.
+- Fresh Test Vault runtime proof `.obsidian-debug/user-message-footer-backend-boundary-2026-05-24-result.json` returned `ok: true` after plugin reload replaced a stale `feature-phase0-capability.202605242127` runtime with `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242149`. It verified a Claude Code conversation with global active OpenCode+Branching shows Fork but hides Rewind, and an OpenCode conversation with global active Claude Code shows both Fork and Rewind. The visible proof fixture had `0px` horizontal/vertical overflow.
+- Runtime artifacts: `.obsidian-debug/user-message-footer-backend-boundary-runtime-2026-05-24.png`, `.obsidian-debug/user-message-footer-backend-boundary-console-2026-05-24.txt`, `.obsidian-debug/user-message-footer-backend-boundary-errors-2026-05-24.txt`, and `.obsidian-debug/user-message-footer-backend-boundary-2026-05-24.js`; `dev:errors` reported `No errors captured.`
+
 ## 2026-05-24 Capability Lab diagnostic sessionStore mirror readback
 
 This worker/reviewer slice closes a diagnostic proof gap in the Capability Lab JSONL History Browser: the mirror probe previously treated `runDiagnosticPrompt({ sessionStore })` returning a session id as enough proof, even though the user-facing proof needs the mirrored session to be listed and readable through the same diagnostic store.
@@ -724,7 +750,7 @@ Recent runs focused on two connected lanes:
 
 | Owner | Change |
 |---|---|
-| `OpenCodianView.ts` | `revertSession`/`unrevertSession` route through `AgentCapability.Branching`; `forkSession` routes separately through `AgentCapability.Fork` / `AgentForkCapability`. OpenCode fallback is explicit and backend-gated. `getCurrentConversationSessionId` uses `getConversationBackendSessionId()`. |
+| `OpenCodianView.ts` | `revertSession`/`unrevertSession` route through `AgentCapability.Branching`; `forkSession` routes separately through `AgentCapability.Fork` / `AgentForkCapability`. OpenCode fallback is explicit and backend-gated. User-message footer Rewind/Fork visibility now resolves from the current conversation's backend capabilities, not only the globally active backend. `getCurrentConversationSessionId` uses `getConversationBackendSessionId()`. |
 | `ConversationLoadRecoveryCoordinator.ts` | `handleRewindRequest`/`handleRestoreRewindRequest`/`handleForkRequest` use `getConversationBackendSessionId()` and gate revert/unrevert by backend kind. Fork preserves source conversation `backend` identity through `createConversationFromSession()` instead of using `settings.activeBackend`. |
 | `ConversationAuthoritativeSyncCoordinator.ts` | Uses `getConversationBackendSessionId()`; skips sync for non-OpenCode backends (OpenCode-only by design). |
 | `ConversationAuthoritativeReloadCoordinator.ts` | Uses `getConversationBackendSessionId()` in all debug logs; skips server sync for non-OpenCode backends. |
@@ -890,6 +916,7 @@ The following service seams now route session identity through `getConversationB
 
 | Seam | Backend-aware? | Notes |
 |---|---|---|
+| User-message footer Fork/Rewind buttons | **Backend-aware / gated** | Fork/Rewind visibility reads the current conversation backend capabilities. Claude can show Fork when declared, but Rewind stays hidden unless the conversation owner declares Branching. |
 | Conversation load/recovery (fork) | **Yes** | Fork routes through registry `AgentForkCapability` for capable backends; OpenCode fallback preserved. Forked conversation preserves source `backend` identity. |
 | Conversation load/recovery (rewind/unrevert) | **Gated** | Explicitly OpenCode-only: backend check `backend !== 'opencode'` → unavailable for Claude |
 | Authoritative sync (user message hydration) | **Gated** | OpenCode-only: entire hydration pipeline uses OpenCode-typed messages |

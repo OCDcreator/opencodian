@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-05-24 Phase 3 - User-message footer rewind/fork backend boundary
+
+### 目标
+
+修复聊天 user message footer 的能力曝光边界：当 active backend 是 OpenCode、当前 conversation 属于 Claude Code 时，不允许 footer 仅凭 OpenCode 的 Branching 能力显示 Claude 消息上的 Rewind 按钮；Fork 继续按 conversation owner 的能力声明显示。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/OpenCodianView.ts` | 能力路由修复 | `createUserMessageFooterRendererHost()` 改为按当前 conversation backend service 查询 `AgentCapability.Fork` / `AgentCapability.Branching`；只有 OpenCode conversation 在缺少 registry service 时保留既有 active-backend fallback |
+| `tests/unit/features/chat/OpenCodianView.userMessageFooterHost.test.ts` | TDD 回归测试 | 覆盖 Claude conversation 在 OpenCode active/Branching 时隐藏 Rewind 但保留 Fork，以及 OpenCode conversation 在 Claude active 时仍保留 OpenCode Rewind |
+| `docs/modules/features/chat/OpenCodianView.md` / `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 记录 user-message footer 按 conversation owner 暴露 fork/rewind，Claude rewind/revert/diff 仍不升级 stable |
+
+### 验证
+
+- Red: `npm test -- --runInBand tests/unit/features/chat/OpenCodianView.userMessageFooterHost.test.ts` 先失败，表现为 Claude conversation 继承 OpenCode Branching、OpenCode conversation 又受 Claude active backend 影响失去 Rewind
+- Focused green: 同一命令通过，`1` suite / `2` tests passed
+- Adjacent focused green: `npm test -- --runInBand tests/unit/features/chat/OpenCodianView.userMessageFooterHost.test.ts tests/unit/features/chat/UserMessageFooterRenderer.test.ts tests/unit/features/chat/runtime/UserMessageFooterRenderer.test.ts tests/unit/features/chat/ConversationLoadRecoveryCoordinator.test.ts tests/unit/features/chat/SlashCommandExecutionService.undoRedo.test.ts` 通过，`5` suites / `57` tests passed
+- Gate: `npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 均通过
+- Build/deploy: `npm run build` 生成 `BUILD_ID feature-phase0-capability.202605242149`；Test Vault `main.js` 与 `dist/main.js` SHA256 均为 `9c45b5810338426650ed0f1183a77da6fcc3e41c949a3ab9172f01c3427022c5`
+- Runtime proof: `.obsidian-debug/user-message-footer-backend-boundary-2026-05-24-result.json` 返回 `ok: true`，确认 Claude conversation 在全局 OpenCode+Branching 下隐藏 Rewind 但保留 Fork，OpenCode conversation 在全局 Claude 下保留 Fork/Rewind；`dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+本轮只修复 footer UI/product-surface honesty，不新增 Claude stable rewind、restore rewind、diff、modified-files sidebar 或 slash `/undo` / `/redo` 能力；这些仍按 OpenCode-only/gated 处理，直到后续有独立 runtime proof 和产品化设计。
+
 ## 2026-05-24 Phase 3 - Capability Lab permission/question/MCP proof honesty
 
 ### 目标
