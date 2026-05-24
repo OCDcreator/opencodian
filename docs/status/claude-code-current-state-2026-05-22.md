@@ -16,11 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit after the latest committed capability slice: `9f455f1b`
-- Commit subject after the latest committed capability slice: `fix: clarify claude advanced settings honesty`
+- Snapshot commit after the latest committed capability slice: `8a48502b`
+- Commit subject after the latest committed capability slice: `fix: restrict shared session links to opencode`
 - Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242237`
 - Recent continuity commits in this lane:
-- Uncommitted implementer slice — `listBackendSessions()` now treats `share.url` as OpenCode-only row data; Claude Code / generic session rows preserve title/summary/preview normalization but return `shareUrl: null` so they do not appear in the stable OpenCode shared-session settings list.
+- `8a48502b` — `fix: restrict shared session links to opencode`
 - `9f455f1b` — `fix: clarify claude advanced settings honesty`
 - `fc2659ff` — `docs: refresh claude footer boundary anchor`
 - `0c4ea502` — `fix: route footer rewind capability by conversation`
