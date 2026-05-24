@@ -16,10 +16,12 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit after the latest committed capability slice: `0c4ea502`
-- Commit subject after the latest committed capability slice: `fix: route footer rewind capability by conversation`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242149`
+- Snapshot commit after the latest committed capability slice: `9f455f1b`
+- Commit subject after the latest committed capability slice: `fix: clarify claude advanced settings honesty`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242219`
 - Recent continuity commits in this lane:
+- `9f455f1b` — `fix: clarify claude advanced settings honesty`
+- `fc2659ff` — `docs: refresh claude footer boundary anchor`
 - `0c4ea502` — `fix: route footer rewind capability by conversation`
 - `7747a9ab` — `fix: mark claude permission mcp proofs diagnostic`
 - `afd27c03` — `fix: prove claude diagnostic resume session identity`
