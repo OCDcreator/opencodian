@@ -63,6 +63,7 @@
 ## 注意事项
 
 - 这里的 owner seam 必须继续保留 permission writeback、auto-restart 条件、remote-manage 限制与平台 blocklist 语义
+- 该 section 当前是 OpenCode-owned 设置面板；permission template、config editor/apply restart、auto restart、blocklist、external access、export paths 和 blocked-command sync callback 都会在执行前重新检查 active backend。若页面在 OpenCode active 时挂载后切到 Claude Code，stale callback 只显示 Security OpenCode-only Notice，不写插件设置、不写 `.opencode/opencode.json`，也不调用 OpenCode restart/health API。
 - 如果只改 security section，优先扩展这个 owner；不要再把 config-status/restart/blocklist/export-path 细节塞回 `OpenCodianSettings`
 
 ## 2026-04-24 Tabbed layout support

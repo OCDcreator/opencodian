@@ -12,6 +12,49 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Tool / Formatter / Security settings stale backend guard
+
+### 目标
+
+收紧 Tool、Formatter/LSP、Security 三个 OpenCode-owned 设置面板的 stale callback 边界：这些页面或二级 modal 在 OpenCode active 时挂载后，如果 active backend 切到 Claude Code，旧 callback 不能继续写 `.opencode`、写插件 OpenCode 设置、同步 OpenCode permission，或调用 OpenCode runtime restart/health API。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsToolSection.ts` | 后端边界修复 | 在 project tool create/open/delete、全局默认工具权限、单工具权限，以及 tool catalog / permission 写入后的本地 OpenCode restart 路径前增加 active OpenCode guard |
+| `src/features/settings/SettingsToolDetailModal.ts` | 二级 modal guard | Save/Delete 执行前重新检查 active backend；modal 打开后切到 Claude Code 时只显示 Tools OpenCode-only Notice，不写入/删除 `.opencode/tools`，不触发父 section refresh/restart |
+| `src/features/settings/SettingsFormatterSection.ts` | 后端边界修复 | 在 formatter/LSP mode switch、builtin/custom visual save、advanced JSON save 和 formatter/LSP 项目配置写入后的 restart 路径前增加 active OpenCode guard |
+| `src/features/settings/SettingsSecuritySection.ts` | 后端边界修复 | 在 permission mode、auto restart、config editor/apply restart、blocklist/external access/export paths、blocked-command sync 和 restart helper 前增加 active OpenCode guard |
+| `src/features/settings/settingsBackendGuards.ts` | 共享 guard helper | 抽出 settings owner 共用的 `activeBackend` / `enabledBackends` fallback 判断，避免各 OpenCode-owned settings section 复制并漂移 |
+| `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts` | 文案新增 | 新增 Tools、Formatter/LSP、Security 各自的 OpenCode-only Notice 文案 |
+| `tests/unit/features/settings/SettingsToolSection.test.ts` | +2 TDD 回归测试 | 覆盖 stale tool permission callback 与 stale project tool authoring callback |
+| `tests/unit/features/settings/SettingsToolDetailModal.test.ts` | +1 TDD 回归测试 | 覆盖已打开 Tool detail modal 在切到 Claude Code 后的 Save/Delete stale callback |
+| `tests/unit/features/settings/SettingsFormatterSection.test.ts` | +2 TDD 回归测试 | 覆盖 stale formatter / LSP mode callback 不写 OpenCode config、不重启 OpenCode |
+| `tests/unit/features/settings/SettingsSecuritySection.test.ts` | +2 TDD 回归测试 | 覆盖 stale permission mode、restart apply 和 blocked-command sync callback |
+| `tests/unit/features/settings/settingsBackendGuards.test.ts` | +3 TDD 回归测试 | 覆盖 active backend 有效、active backend stale 时回退到第一个 enabled backend，以及旧 mock 缺 settings 时保持 OpenCode active |
+| `docs/modules/features/settings/*.md` | 文档更新 | 记录相关 owner / modal 的 OpenCode-owned callback 必须执行前二次检查 active backend |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮设置边界收紧范围、非目标和 TDD red/green evidence |
+
+### 验证
+
+- Red: focused tests 先失败，证明 stale Claude-active callback 会写 OpenCode tool permission、创建 `.opencode/tools`、写 formatter/LSP config、修改 Security permission mode、调用 OpenCode restart/health API，并让已打开的 Tool detail modal 写 `.opencode/tools/test-tool.ts`
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsToolDetailModal.test.ts` 通过，`1` suite / `1` test passed
+- Broader focused tests: `npm test -- --runInBand tests/unit/features/settings/settingsBackendGuards.test.ts tests/unit/features/settings/SettingsToolSection.test.ts tests/unit/features/settings/SettingsToolDetailModal.test.ts tests/unit/features/settings/SettingsFormatterSection.test.ts tests/unit/features/settings/SettingsSecuritySection.test.ts tests/unit/features/settings/SettingsServerSection.test.ts tests/unit/features/settings/SettingsMcpSection.actions.test.ts` 通过，`7` suites / `94` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`（`424` source files / `6135` nodes / `11622` edges / `217` communities）
+- `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 通过
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`438` suites / `3249` tests passed，verify build ID `feature-phase0-capability.202605241813`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241814`；并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241814`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-opencode-settings-stale-backend-gate-assertion-2026-05-24-result.json` 在重新加载到部署版 `feature-phase0-capability.202605241814` 后返回 outer `ok: true` 且 inner `ok: true`。脚本在真实 Test Vault settings editor-area DOM 中验证 Tools custom、Tool detail modal、Formatter、LSP、Security config/safety 控件挂载后切到 Claude Code，再触发 stale New Tool、Tool modal Save/Delete、Formatter/LSP mode、permission template、restart、blocklist、blocked-command callbacks；`saveSettings`、tool permission 写入、formatter/LSP config 写入、OpenCode bash deny sync、OpenCode health/start/stop、`.opencode/**` adapter write/remove、confirm 均保持 `0`，出现 OpenCode-only Notice，且 settings layout 无横向溢出
+- Runtime artifacts: `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian-debug/claude-opencode-settings-stale-backend-gate-runtime-2026-05-24.png`、`.obsidian-debug/claude-opencode-settings-stale-backend-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-opencode-settings-stale-backend-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧 OpenCode-owned settings 写操作在 Claude active backend 下的边界，不新增 Claude Tools / Formatter / Security authoring 或 runtime-control 能力，不宣称 Claude full capability 完成。OpenCode active 下原有设置行为保持不变。
+
+---
+
 ## 2026-05-24 Phase 3 - Server settings stale backend guard
 
 ### 目标

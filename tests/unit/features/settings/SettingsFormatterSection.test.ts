@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
@@ -272,6 +273,8 @@ function createPlugin(overrides?: {
   const plugin = {
     opencodeConfigManager: configManager,
     settings: {
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode', 'claude-code'],
       server: {
         mode: overrides?.serverMode ?? 'local',
       },
@@ -1094,6 +1097,32 @@ describe('SettingsFormatterSection LSP settings', () => {
     expect(updateLspConfig).not.toHaveBeenCalled();
   });
 
+  it('blocks stale LSP mode callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const { plugin, updateLspConfig } = createPlugin();
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const modeDropdown = findDropdown(t('settings.formatter.lsp.modeSwitch'));
+    (plugin.settings as unknown as { activeBackend: string }).activeBackend = 'claude-code';
+    await modeDropdown?.onChange?.('disabled');
+    await flushPromises();
+
+    expect(updateLspConfig).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.formatter.notice.openCodeOnly'));
+  });
+
 });
 
 describe('SettingsFormatterSection help buttons', () => {
@@ -1271,6 +1300,32 @@ describe('SettingsFormatterSection mode switching', () => {
 
     expect(displayRefresh).not.toHaveBeenCalled();
     expect(findDropdown(t('settings.formatter.config.modeSwitch'))).toBeDefined();
+  });
+
+  it('blocks stale formatter mode callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const { plugin, updateFormatterConfig } = createPlugin();
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const modeDropdown = findDropdown(t('settings.formatter.config.modeSwitch'));
+    (plugin.settings as unknown as { activeBackend: string }).activeBackend = 'claude-code';
+    await modeDropdown?.onChange?.('disabled');
+    await flushPromises();
+
+    expect(updateFormatterConfig).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.formatter.notice.openCodeOnly'));
   });
 });
 

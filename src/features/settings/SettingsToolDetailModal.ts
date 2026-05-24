@@ -2,6 +2,7 @@ import { Modal, Notice } from 'obsidian';
 
 import { t } from '../../i18n';
 import type { OpenCodianPlugin } from '../../main';
+import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 
 export type ToolFileSource = 'project' | 'global';
 
@@ -103,6 +104,9 @@ export class ToolDetailModal extends Modal {
   }
 
   private async save(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const result = validateToolSource(this.content, this.file.name);
     if (!result.valid) {
       new Notice(t('settings.tools.custom.validation.invalid'));
@@ -116,6 +120,9 @@ export class ToolDetailModal extends Modal {
   }
 
   private async delete(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (!window.confirm(t('settings.tools.custom.delete.confirm').replace('{name}', this.file.name))) {
       return;
     }
@@ -141,6 +148,18 @@ export class ToolDetailModal extends Modal {
       void onClick();
     });
     return buttonEl;
+  }
+
+  private isOpenCodeActive(): boolean {
+    return isOpenCodeSettingsBackendActive(this.plugin.settings);
+  }
+
+  private ensureOpenCodeActive(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.tools.notice.openCodeOnly'));
+    return false;
   }
 }
 

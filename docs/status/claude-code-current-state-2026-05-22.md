@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `510803fc`
-- Commit subject: `fix: guard mcp settings for claude backend`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605241714`
+- Snapshot commit entering the current worker slice: `a07d1518`
+- Commit subject entering the current worker slice: `fix: guard server settings for claude backend`
+- Latest validated build entering the current worker slice: `feature-phase0-capability.202605241714`
 - Recent continuity commits in this lane:
+- `a07d1518` — `fix: guard server settings for claude backend`
 - `510803fc` — `fix: guard mcp settings for claude backend`
 - `81228ce7` — `fix: guard project conversation settings for claude backend`
 - `080a1c76` — `fix: gate ordinary slash commands to opencode backend`
@@ -47,9 +48,41 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `9e122746` — `fix: preserve backend identity for session restores`
 - `2d16f936` — `refactor: narrow legacy share session inspection types`
 - `91d3d8ca` — `feat: normalize shared session inspection preview`
-  - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
-  - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
+- `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
+- `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-24 Tool / Formatter / Security settings stale backend guard
+
+This worker slice closes a related group of stale mounted OpenCode-only settings callbacks in `SettingsToolSection`, `SettingsToolDetailModal`, `SettingsFormatterSection`, and `SettingsSecuritySection`. These panes are only expected to be actionable while OpenCode is active, but callbacks and secondary modals can survive briefly after switching the active backend to Claude Code.
+
+### What Changed
+
+- `SettingsToolSection` now re-checks that OpenCode is still the active backend before project tool create/open/delete, global/default tool permission writes, per-tool permission writes, and local OpenCode restart paths after tool catalog or permission writes.
+- `SettingsToolDetailModal` now re-checks the active backend before project tool Save/Delete. If a project tool modal was opened while OpenCode was active and the user switches to Claude Code before clicking Save/Delete, the stale modal callback shows the Tools OpenCode-only notice and returns before writing or removing `.opencode/tools` files.
+- `SettingsFormatterSection` now re-checks the active backend before formatter/LSP mode switches, builtin/custom visual saves, advanced JSON saves, and the local OpenCode restart path after `.opencode/opencode.json` formatter/LSP writes.
+- `SettingsSecuritySection` now re-checks the active backend before permission mode writes, auto-restart toggle, config editor/apply restart, local restart, blocklist/external-access/export-path settings writes, and blocked-command sync into OpenCode bash permissions.
+- `settingsBackendGuards.ts` centralizes the shared settings-owner active-backend fallback so these OpenCode-owned sections resolve stale `activeBackend` values the same way.
+- Dedicated localized OpenCode-only notices were added for Tools, Formatter/LSP, and Security settings.
+
+### What This Does Not Change
+
+- This does not add Claude Code authoring/runtime-control support for OpenCode tools, formatter/LSP config, OpenCode permission templates, or OpenCode bash permission sync.
+- This does not mark Claude Code full capability as complete.
+- OpenCode-active settings behavior remains unchanged.
+
+### Verification
+
+- TDD red: focused tests first failed because stale Claude-active callbacks still wrote OpenCode tool permissions, created `.opencode/tools`, wrote formatter/LSP project config, changed Security permission mode, called OpenCode restart/health APIs, and let an already-open Tool detail modal write `.opencode/tools/test-tool.ts`.
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsToolDetailModal.test.ts` passed with `1` suite / `1` test before the broader focused settings run.
+- Broader focused tests: `npm test -- --runInBand tests/unit/features/settings/settingsBackendGuards.test.ts tests/unit/features/settings/SettingsToolSection.test.ts tests/unit/features/settings/SettingsToolDetailModal.test.ts tests/unit/features/settings/SettingsFormatterSection.test.ts tests/unit/features/settings/SettingsSecuritySection.test.ts tests/unit/features/settings/SettingsServerSection.test.ts tests/unit/features/settings/SettingsMcpSection.actions.test.ts` passed with `7` suites / `94` tests.
+- `npm run graphify:update:src` refreshed the committed `src` graph with `424` source files, `6135` nodes, `11622` edges, and `217` communities.
+- `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint` passed before the full gate.
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `438` suites / `3249` tests and produced `BUILD_ID: feature-phase0-capability.202605241813`.
+- `npm run build` passed with standalone `BUILD_ID: feature-phase0-capability.202605241814`; Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Test Vault `main.js` was verified to contain `feature-phase0-capability.202605241814`; the deployed Claude SDK binary checksum matched dist: `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Runtime proof: `.obsidian-debug/claude-opencode-settings-stale-backend-gate-assertion-2026-05-24-result.json` returned outer `ok: true` and inner `ok: true` against deployed build ID `feature-phase0-capability.202605241814` after reloading the Test Vault plugin to clear the stale `feature-phase0-capability.202605241714` runtime. The proof opened the real Test Vault settings editor-area DOM, mounted Tools custom plus Tool detail modal, Formatter, LSP, and Security config/safety controls while OpenCode was active, switched active backend and registry to Claude Code, then triggered stale New Tool, Tool modal Save/Delete, Formatter/LSP mode, permission template, restart, blocklist, and blocked-command callbacks. `saveSettings`, tool permission writes, formatter/LSP config writes, OpenCode bash deny sync, OpenCode health/start/stop, `.opencode/**` adapter writes/removes, and confirm stayed at `0`; OpenCode-only notices appeared; settings layouts had no horizontal overflow.
+- Runtime artifacts: `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian-debug/claude-opencode-settings-stale-backend-gate-runtime-2026-05-24.png`, `.obsidian-debug/claude-opencode-settings-stale-backend-gate-console-2026-05-24.txt`, `.obsidian-debug/claude-opencode-settings-stale-backend-gate-errors-2026-05-24.txt`; dev errors reported `No errors captured.`
 
 ## 2026-05-24 Server settings stale backend guard
 

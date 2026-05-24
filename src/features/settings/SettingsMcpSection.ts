@@ -18,6 +18,7 @@ import {
   redactMcpSensitiveText,
   summarizeCommand,
 } from './McpServerStatusModal';
+import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 
 const logger = createLogger('SettingsMcpSection');
 
@@ -602,23 +603,7 @@ export class SettingsMcpSection {
   }
 
   private isOpenCodeActive(): boolean {
-    const settings = (this.plugin as OpenCodianPlugin & {
-      settings?: {
-        activeBackend?: string;
-        enabledBackends?: unknown;
-      };
-    }).settings;
-    if (!settings) {
-      return true;
-    }
-    const activeBackend = settings.activeBackend;
-    const enabledBackends = Array.isArray(settings.enabledBackends)
-      ? settings.enabledBackends
-      : [];
-    const effectiveBackend = activeBackend && enabledBackends.includes(activeBackend)
-      ? activeBackend
-      : enabledBackends[0];
-    return effectiveBackend === 'opencode';
+    return isOpenCodeSettingsBackendActive(this.plugin.settings);
   }
 
   private ensureOpenCodeActive(): boolean {

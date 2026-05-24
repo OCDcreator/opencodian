@@ -5,6 +5,7 @@ import { Notice, Setting } from 'obsidian';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
+import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 
 type OpenCodeServerDiagnostics = ReturnType<OpenCodianPlugin['openCodeService']['getServerDiagnostics']>;
 type OpenCodeServerStatus = ReturnType<OpenCodianPlugin['openCodeService']['getServerStatus']>;
@@ -580,23 +581,7 @@ export class SettingsServerSection {
   }
 
   private isOpenCodeActive(): boolean {
-    const settings = (this.plugin as OpenCodianPlugin & {
-      settings?: {
-        activeBackend?: string;
-        enabledBackends?: unknown;
-      };
-    }).settings;
-    if (!settings) {
-      return true;
-    }
-    const activeBackend = settings.activeBackend;
-    const enabledBackends = Array.isArray(settings.enabledBackends)
-      ? settings.enabledBackends
-      : [];
-    const effectiveBackend = activeBackend && enabledBackends.includes(activeBackend)
-      ? activeBackend
-      : enabledBackends[0];
-    return effectiveBackend === 'opencode';
+    return isOpenCodeSettingsBackendActive(this.plugin.settings);
   }
 
   private ensureOpenCodeActive(): boolean {

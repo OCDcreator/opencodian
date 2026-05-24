@@ -1,8 +1,9 @@
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { SettingsToolSection } from '../../../../src/features/settings/SettingsToolSection';
-import { setLocale } from '../../../../src/i18n';
+import { setLocale, t } from '../../../../src/i18n';
 
 interface MockButtonControl {
   onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
@@ -274,5 +275,67 @@ describe('SettingsToolSection custom tool authoring', () => {
     );
     expect(plugin.openCodeService.stop).toHaveBeenCalledTimes(1);
     expect(plugin.openCodeService.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks stale OpenCode tool permission callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const plugin = createPlugin({ permission: { '*': 'ask', bash: 'deny' } });
+    plugin.settings.activeBackend = 'opencode';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    const containerEl = document.createElement('div');
+
+    await new SettingsToolSection(containerEl, plugin as never, 'builtin').render();
+    const defaultDropdown = containerEl.querySelector<HTMLSelectElement>('.opencodian-tool-default-select');
+    const bashDropdown = dropdownRecords.find((record) => record.name === 'Bash');
+    plugin.opencodeConfigManager.setToolPermission.mockClear();
+    plugin.opencodeConfigManager.clearToolPermission.mockClear();
+    plugin.saveSettings.mockClear();
+    plugin.openCodeService.checkHealth.mockClear();
+    plugin.openCodeService.stop.mockClear();
+    plugin.openCodeService.start.mockClear();
+    plugin.settings.activeBackend = 'claude-code';
+
+    defaultDropdown!.value = 'allow';
+    defaultDropdown!.dispatchEvent(new Event('change'));
+    await bashDropdown?.onChange?.('inherit');
+    await flushPromises();
+
+    expect(plugin.opencodeConfigManager.setToolPermission).not.toHaveBeenCalled();
+    expect(plugin.opencodeConfigManager.clearToolPermission).not.toHaveBeenCalled();
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.tools.notice.openCodeOnly'));
+  });
+
+  it('blocks stale project tool authoring callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const plugin = createPlugin();
+    plugin.settings.activeBackend = 'opencode';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    const adapter = plugin.app.vault.adapter;
+    adapter.exists.mockResolvedValue(false);
+    adapter.list.mockResolvedValue({ files: [], folders: [] });
+    const containerEl = document.createElement('div');
+
+    await new SettingsToolSection(containerEl, plugin as never, 'custom').render();
+    const newToolButton = buttonRecords.find((record) => record.text === 'New tool');
+    adapter.mkdir.mockClear();
+    adapter.write.mockClear();
+    plugin.openCodeService.checkHealth.mockClear();
+    plugin.openCodeService.stop.mockClear();
+    plugin.openCodeService.start.mockClear();
+    plugin.settings.activeBackend = 'claude-code';
+
+    await newToolButton?.onClick?.();
+    await flushPromises();
+
+    expect(adapter.mkdir).not.toHaveBeenCalled();
+    expect(adapter.write).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.tools.notice.openCodeOnly'));
   });
 });

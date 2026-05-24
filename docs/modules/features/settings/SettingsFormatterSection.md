@@ -21,6 +21,7 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
 - Custom LSP CRUD: add/edit/delete project-local language servers; custom entries require `extensions`
 - Advanced JSON editors: direct `formatter` and `lsp` subtree editing with format/reload/save; preserves unknown entry fields
 - Formatter/LSP project config writes restart the local OpenCode service after saving, so the server-side formatter and LSP instance state reloads the edited `.opencode/opencode.json`; remote server mode shows the standard remote-management notice instead.
+- Formatter/LSP project config writes are OpenCode-owned. Mode switches, builtin/custom visual edits, advanced JSON saves, and the restart path re-check the active backend at callback time; if the settings pane was mounted while OpenCode was active and the user switches to Claude Code before a stale callback fires, the callback shows the Formatter/LSP OpenCode-only notice and returns before writing `.opencode/opencode.json` or calling OpenCode runtime restart APIs.
 - Formatter/LSP config changes refresh only the active formatter subtree. The section renders the next subtree into a detached staging element, then swaps it into the visible container while preserving outer settings scroll and temporary min-height, so add/delete/mode-save actions do not clear the full settings page or flash the panel.
 
 ## Layout

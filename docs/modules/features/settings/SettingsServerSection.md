@@ -29,7 +29,7 @@
 - local OpenCode executable path / host / port 仍沿用原生 `change` / `blur` 事件提交与错误提示；可执行文件路径留空表示继续使用自动探测
 - remote URL、basic auth、bearer token 仍直接写回 plugin settings，并在 mode/auth 切换后请求 settings 面板整体重建
 - executable path、remote URL 和 bearer token 这些长文本字段会标记 `.opencodian-wide-text-setting`，让 inline hint/path 在设置布局中获得更宽但有上限的输入列；host/port/username/password 继续保持普通紧凑宽度
-- 所有这些配置写回 callback 执行前都必须重新确认 active backend 仍是 OpenCode。Server 一级设置页在 tabbed layout 里只会于 OpenCode active 时挂载，但旧 dropdown/text callback 可能在切到 Claude Code 后短暂存活；这种 stale callback 必须显示 OpenCode-only Notice，并且不能改写 server settings、调用 `saveSettings()` 或请求整页重绘。
+- 所有这些配置写回 callback 执行前都必须重新确认 active backend 仍是 OpenCode。Server 一级设置页在 tabbed layout 里只会于 OpenCode active 时挂载，但旧 dropdown/text callback 可能在切到 Claude Code 后短暂存活；这种 stale callback 必须显示 OpenCode-only Notice，并且不能改写 server settings、调用 `saveSettings()` 或请求整页重绘。active backend fallback 由 `settingsBackendGuards.ts` 统一解析，避免 Server 与其他 OpenCode-owned settings owner 的 stale guard 语义漂移。
 
 ### 状态与动作
 

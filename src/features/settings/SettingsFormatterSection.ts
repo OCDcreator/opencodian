@@ -12,6 +12,7 @@ import type {
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { OpenCodeProjectConfigHelpModal } from './OpenCodeProjectConfigHelpModal';
+import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 
 type FormatterMode = 'default' | 'disabled' | 'custom';
 type BuiltinEntryAction = 'default' | 'disable' | 'override';
@@ -336,6 +337,9 @@ export class SettingsFormatterSection {
   private async updateFormatterConfigAndReload(
     formatter: OpencodeFormatterConfig | null | undefined,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) return;
     await configManager.updateFormatterConfig(formatter);
@@ -345,6 +349,9 @@ export class SettingsFormatterSection {
   private async updateLspConfigAndReload(
     lsp: OpencodeLspConfig | null | undefined,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
     await configManager.updateLspConfig(lsp);
@@ -352,6 +359,9 @@ export class SettingsFormatterSection {
   }
 
   private async restartLocalServiceAfterProjectConfigWrite(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (this.plugin.settings.server.mode !== 'local') {
       new Notice(t('settings.server.remoteManageUnavailable'));
       return;
@@ -1294,6 +1304,9 @@ export class SettingsFormatterSection {
     name: string,
     action: BuiltinEntryAction,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) return;
 
@@ -1419,6 +1432,9 @@ export class SettingsFormatterSection {
     fieldsEl: HTMLElement,
     name: string,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) return;
 
@@ -1573,6 +1589,9 @@ export class SettingsFormatterSection {
     fieldsEl: HTMLElement,
     name: string,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) return;
 
@@ -1626,6 +1645,9 @@ export class SettingsFormatterSection {
   }
 
   private async deleteCustomFormatter(name: string): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) return;
 
@@ -1659,6 +1681,9 @@ export class SettingsFormatterSection {
         btn.setButtonText(t('settings.formatter.config.custom.addButton'))
           .setCta()
           .onClick(async () => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             if (!nameInput) return;
             const rawName = nameInput.value.trim();
             if (!rawName) {
@@ -1755,6 +1780,9 @@ export class SettingsFormatterSection {
   }
 
   private async saveJsonEditorContent(textareaEl: HTMLTextAreaElement): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) return;
 
@@ -1795,6 +1823,9 @@ export class SettingsFormatterSection {
   }
 
   private async handleModeSwitch(mode: FormatterMode): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) {
       new Notice(t('settings.formatter.notice.modeChangeFailed', { error: 'Config manager unavailable' }));
@@ -2287,6 +2318,9 @@ export class SettingsFormatterSection {
   }
 
   private async handleBuiltinLspActionChange(name: string, action: BuiltinEntryAction): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
 
@@ -2421,6 +2455,9 @@ export class SettingsFormatterSection {
     name: string,
     builtin: boolean,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
 
@@ -2540,6 +2577,9 @@ export class SettingsFormatterSection {
   }
 
   private async saveLspJsonEditorContent(textareaEl: HTMLTextAreaElement): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager || typeof configManager.updateLspConfig !== 'function') return;
 
@@ -2566,6 +2606,9 @@ export class SettingsFormatterSection {
   }
 
   private async handleLspModeSwitch(mode: FormatterMode): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager || typeof configManager.updateLspConfig !== 'function') {
       new Notice(t('settings.formatter.notice.modeChangeFailed', { error: 'Config manager unavailable' }));
@@ -2738,5 +2781,17 @@ export class SettingsFormatterSection {
       case 'custom':
         return t('settings.formatter.lsp.mode.customDesc');
     }
+  }
+
+  private isOpenCodeActive(): boolean {
+    return isOpenCodeSettingsBackendActive(this.plugin.settings);
+  }
+
+  private ensureOpenCodeActive(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.formatter.notice.openCodeOnly'));
+    return false;
   }
 }
