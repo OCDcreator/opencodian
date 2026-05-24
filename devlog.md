@@ -12,6 +12,39 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Claude title fallback backend boundary
+
+### 目标
+
+继续推进 Claude Code 会话闭环里的 backend ownership：标题生成可以读取 Claude 官方 summary，但不能在 Claude 没有官方 summary 时偷偷创建 OpenCode 临时标题会话。
+
+### 发现
+
+`TitleGenerationService` 的官方标题读取已经通过 `readBackendSessionTitle()` 按 backend 路由；但官方标题为空时，后续 AI fallback 无条件调用 `openCodeService.createSession('Title Generation')` 和 `requestAssistantResponse()`。这会让 Claude conversation 在后台借用 OpenCode 会话生成标题，违反 backend 归属边界，也可能在 OpenCode 不可用时把 Claude 标题状态错误标成失败。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/services/TitleGenerationService.ts` | 后端边界修复 | 非 OpenCode conversation 无官方标题时回调 first-message local title，不再进入 OpenCode AI fallback |
+| `tests/unit/features/chat/TitleGenerationService.test.ts` | +1 测试 | 覆盖 Claude conversation 无官方 summary 时调用 Claude `getSession()`，不调用 OpenCode 临时 session / request / delete API |
+| `docs/modules/features/chat/services/TitleGenerationService.md` | 文档更新 | 记录 AI fallback 只适用于 OpenCode，Claude/no-summary 保留本地标题 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 title fallback backend boundary |
+
+### 验证
+
+- Focused test 已完成 red-green：新增断言先失败，修复后 `npm test -- --runInBand tests/unit/features/chat/TitleGenerationService.test.ts` 通过，`9` tests passed
+- `npm run check:devlog-order`、`npm run check:module-docs`、`npm run graphify:update:src`、`npm run check:graphify` 均通过
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`435` suites / `3220` tests passed，production build 通过
+- Build/deploy: `npm run build` 产出部署 `BUILD_ID: feature-phase0-capability.202605241119`；已按顺序部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css`、`dist/assets/`、`dist/node_modules/` 到 Test Vault，并确认 Test Vault `main.js` 含该 BUILD_ID
+- Runtime proof: `.obsidian-debug/claude-title-fallback-boundary-assertion-2026-05-24.json` 通过，截图为 `.obsidian-debug/claude-title-fallback-boundary-2026-05-24.png`；运行时报告 Claude `getSession` 调用 `1` 次，OpenCode fallback `createSession` / `requestAssistantResponse` / `deleteSession` 均为 `0`，`dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+本轮不新增 Claude backend-neutral title agent，也不提升 Claude 标题生成能力；只是防止 Claude 会话误用 OpenCode fallback。OpenCode smart title fallback 行为保持不变。
+
+---
+
 ## 2026-05-24 Phase 3 - Claude settings runtime boundary coverage
 
 ### 目标

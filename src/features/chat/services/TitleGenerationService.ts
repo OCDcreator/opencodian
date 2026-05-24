@@ -82,6 +82,15 @@ export class TitleGenerationService {
         return;
       }
 
+      const backend = await this.resolveConversationBackend(conversationId);
+      if (backend !== 'opencode') {
+        await this.safeCallback(callback, conversationId, {
+          success: true,
+          title: this.plugin.generateDefaultTitle(userMessage),
+        });
+        return;
+      }
+
       const { provider, model } = await this.resolveModel(currentModel);
       tempSessionId = await this.plugin.openCodeService.createSession('Title Generation', { setCurrent: false });
       const response = await this.plugin.openCodeService.requestAssistantResponse(prompt, {

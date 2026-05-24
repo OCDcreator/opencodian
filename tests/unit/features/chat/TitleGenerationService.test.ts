@@ -22,10 +22,17 @@ describe('TitleGenerationService', () => {
         return openCodeSessions.get(sessionId) ?? null;
       }),
     };
+    const claudeAdapter = {
+      kind: 'claude-code' as const,
+      capabilities: new Set(['chat', 'sessions'] as const),
+      hasCapability(cap: string) { return this.capabilities.has(cap); },
+      getSession: jest.fn().mockResolvedValue(null),
+    };
 
     const agentServiceRegistry = {
       get: jest.fn().mockImplementation((kind: string) => {
         if (kind === 'opencode') return mockAdapter;
+        if (kind === 'claude-code') return claudeAdapter;
         return undefined;
       }),
     };
@@ -49,11 +56,12 @@ describe('TitleGenerationService', () => {
       agentServiceRegistry,
       modelConfigService,
       getConversationById: jest.fn().mockResolvedValue(null),
+      generateDefaultTitle: jest.fn((firstMessage: string) => firstMessage.substring(0, 50).trim()),
     };
     const service = new TitleGenerationService(plugin as unknown as OpenCodianPlugin);
     const callback = jest.fn().mockResolvedValue(undefined);
 
-    return { service, callback, openCodeService, modelConfigService, plugin, openCodeSessions, mockAdapter };
+    return { service, callback, openCodeService, modelConfigService, plugin, openCodeSessions, mockAdapter, claudeAdapter };
   };
 
   it('prefers structured title output and still normalizes punctuation and length', async () => {
@@ -129,6 +137,41 @@ describe('TitleGenerationService', () => {
     expect(callback).toHaveBeenCalledWith('conversation-local-fallback', {
       success: true,
       title: 'Local fallback title',
+    });
+  });
+
+  it('does not create an OpenCode fallback title session for Claude conversations without an official summary', async () => {
+    const { service, callback, openCodeService, plugin, claudeAdapter } = createHarness();
+    plugin.getConversationById.mockResolvedValue({
+      id: 'conversation-claude',
+      title: 'Local provisional',
+      createdAt: 1,
+      updatedAt: 2,
+      backend: 'claude-code',
+      backendSessionId: 'claude-session',
+      messages: [],
+    });
+    claudeAdapter.getSession.mockResolvedValue({
+      sessionId: 'claude-session',
+      summary: '',
+      lastModified: 1,
+    });
+
+    await service.generateTitle(
+      'conversation-claude',
+      'Help me keep Claude title routing honest',
+      { provider: 'anthropic', model: 'claude-sonnet-4-5' },
+      callback,
+      { officialPollAttempts: 1, officialPollIntervalMs: 0 },
+    );
+
+    expect(claudeAdapter.getSession).toHaveBeenCalledWith('claude-session');
+    expect(openCodeService.createSession).not.toHaveBeenCalled();
+    expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
+    expect(openCodeService.deleteSession).not.toHaveBeenCalled();
+    expect(callback).toHaveBeenCalledWith('conversation-claude', {
+      success: true,
+      title: 'Help me keep Claude title routing honest',
     });
   });
 
