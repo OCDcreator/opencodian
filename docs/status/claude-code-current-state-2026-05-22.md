@@ -76,6 +76,34 @@ This round tightened the chat chrome around active backend identity without prom
   - cleanup/final capture: `.obsidian-debug/backend-scope-header-history-screenshot-cleanup-2026-05-24.json`
   - result: deployed runtime reported `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241015`, header text `Claude Code 离线`, history scope `Claude Code 历史会话`, and `dev:errors` reported `No errors captured.`
 
+## 2026-05-24 Claude completed-stream local persistence gate
+
+This round fixed a backend-boundary bug in the send pipeline: completed Claude Code streams were eligible for the OpenCode authoritative-sync path even though authoritative sync is intentionally OpenCode-only for now.
+
+### What Changed
+
+- `buildLocalStreamOutcome()` now sets `shouldSyncFromServer` only for OpenCode/legacy conversations.
+- Completed Claude Code streams now stay on the local assistant persistence path, so streamed text and `backend_event` structured output can be saved into the local conversation.
+- Focused tests now cover both the pure outcome rule and the end-to-end send pipeline path for a Claude `structured_output` backend event.
+
+### What This Does Not Change
+
+- This does not promote structured output authoring into the normal chat UI.
+- This does not add a backend-neutral authoritative sync contract for Claude Code.
+- Rewind, diff, child-session graph, and OpenCode sync remain explicitly OpenCode-only unless a later slice adds separate official basis plus runtime proof.
+
+### Verification
+
+- Focused send pipeline tests passed for `buildLocalStreamOutcome` and `SendPipelineRuntime` (`16` tests).
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `435` suites / `3215` tests and production build.
+- `npm run build` passed with `BUILD_ID: feature-phase0-capability.202605241038`.
+- Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/`.
+- Test Vault `main.js` contains `feature-phase0-capability.202605241038`, and the deployed Claude SDK binary checksum matches `dist`.
+- Fresh Obsidian runtime proof:
+  - assertion: `.obsidian-debug/claude-local-persistence-runtime-assertion-2026-05-24.json`
+  - screenshot: `.obsidian-debug/claude-local-persistence-runtime-2026-05-24.png`
+  - result: deployed runtime reported `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241038`, active backend `claude-code`, enabled backends `opencode` + `claude-code`, deployed non-OpenCode sync gate present, deployed structured-output capture present, and `dev:errors` reported `No errors captured.`
+
 ## 2026-05-23 Phase 2 settings/runtime boundary hardening
 
 This round tightened the Claude settings surface so it is honest about runtime boundaries instead of implying every Claude Code option live-updates a persistent query.

@@ -98,6 +98,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
   - streaming shell 收尾
   - 本地 assistant message / error notice / interrupted notice 的构建与追加
   - 第一次本地 `saveConversation()`
+- 对 Claude Code 和其他非 OpenCode 后端，正常完成的 completed stream 也会走本地 assistant persistence；OpenCode authoritative sync 仍只适用于 OpenCode/legacy 会话，避免把 Claude 的 `backend_event`、structured output 或文本回复交给无效的 OpenCode sync 路径
 - 最后再把 `shouldSyncFromServer`、`editedFiles` 和调试 logger 一并交给 `MessageFinalizationService`
 - post-stream finalization 完成后，runtime 会消费同一 tab 的一个 queued follow-up；目标 tab 仍 active 时，该 follow-up 再次进入 slash/preparation/transport 的完整 send path，因此不会成为第三个消息真相来源。目标 tab 已不再 active 时，runtime 清掉这条一次性 intent，避免 orphan queue；preparation 层还会再次校验 `targetTabId`，防止 await 间隙中的 tab switch 把 intent 发错 conversation。
 

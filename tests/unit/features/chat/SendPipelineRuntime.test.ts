@@ -414,6 +414,71 @@ describe('SendPipelineRuntime', () => {
       sessionId: 'claude-session-1',
     }));
   });
+
+  it('persists completed Claude structured output locally instead of deferring to OpenCode sync', async () => {
+    const structuredPayload = {
+      status: 'ok',
+      items: [{ label: 'ready' }],
+    };
+    const preparedSend = createPreparedSend({
+      conversation: {
+        id: 'conversation-claude-structured',
+        title: 'Claude structured',
+        createdAt: 1,
+        updatedAt: 1,
+        backend: 'claude-code',
+        backendSessionId: 'claude-session-structured',
+        messages: [createUserMessage()],
+      },
+      activeModelId: 'claude-code/sonnet',
+      modelOptions: {
+        provider: 'claude-code',
+        model: 'sonnet',
+      },
+    });
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(preparedSend);
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController, [], {
+      sendStreamMessage: jest.fn().mockImplementation(() => createAsyncStream([
+        { type: 'message_start' },
+        {
+          type: 'message_metadata',
+          messageId: 'claude-assistant-1',
+          timestamp: 42,
+          modelId: 'claude-sonnet-4',
+          sessionId: 'claude-session-structured',
+        },
+        { type: 'text', content: 'Structured answer' },
+        {
+          type: 'backend_event',
+          source: 'claude-code',
+          event: 'structured_output',
+          status: 'received',
+          metadata: { structuredOutput: structuredPayload },
+        },
+        { type: 'message_stop' },
+      ])),
+    });
+    const runtime = new SendPipelineRuntime(host, preparationPort, finalizationPort);
+
+    await runtime.sendMessage('Return structured data');
+
+    expect(preparedSend.conversation.messages).toHaveLength(2);
+    expect(preparedSend.conversation.messages[1]).toMatchObject({
+      id: 'claude-assistant-1',
+      role: 'assistant',
+      content: 'Structured answer',
+      modelId: 'claude-sonnet-4',
+      sourceMessageId: 'claude-assistant-1',
+      structured: structuredPayload,
+    });
+    expect(host.saveConversation).toHaveBeenCalledWith(preparedSend.conversation);
+    expect(finalizationPort.finalizeAfterStream).toHaveBeenCalledWith(expect.objectContaining({
+      shouldSyncFromServer: false,
+    }));
+  });
 });
 
 describe('SendPipelineRuntime queued follow-up sends', () => {

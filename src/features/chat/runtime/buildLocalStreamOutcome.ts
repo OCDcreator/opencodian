@@ -46,6 +46,7 @@ export function buildLocalStreamOutcome(options: {
   const effectiveShouldPersistInterruptedState = retryErrorNoticeMessage
     ? false
     : shouldPersistInterruptedState;
+  const backend = options.preparedSend.conversation.backend ?? 'opencode';
 
   return {
     finalizedTimestamp,
@@ -59,12 +60,13 @@ export function buildLocalStreamOutcome(options: {
     shouldPersistInterruptedState: effectiveShouldPersistInterruptedState,
     streamErrorNoticeMessage: streamErrorNoticeMessage ?? retryErrorNoticeMessage,
     interruptedNoticeMessage: null,
-    shouldSyncFromServer: shouldSyncAfterStream({
-      streamCompleted: options.routedStream.streamCompleted,
-      streamTimedOut: options.routedStream.streamTimedOut,
-      streamInterrupted: options.routedStream.streamInterrupted,
-      latestErrorMessage: options.routedStream.latestErrorMessage,
-    }),
+    shouldSyncFromServer: backend === 'opencode'
+      && shouldSyncAfterStream({
+        streamCompleted: options.routedStream.streamCompleted,
+        streamTimedOut: options.routedStream.streamTimedOut,
+        streamInterrupted: options.routedStream.streamInterrupted,
+        latestErrorMessage: options.routedStream.latestErrorMessage,
+      }),
     structuredOutput: options.routedStream.structuredOutput,
   };
 }

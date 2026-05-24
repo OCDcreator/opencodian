@@ -253,3 +253,39 @@ describe('buildLocalStreamOutcome', () => {
     nowSpy.mockRestore();
   });
 });
+
+describe('buildLocalStreamOutcome backend sync routing', () => {
+  it('keeps completed non-OpenCode streams on the local persistence path', () => {
+    const preparedSend = createPreparedSend({
+      conversation: {
+        id: 'conversation-claude',
+        title: 'Claude',
+        createdAt: 1,
+        updatedAt: 1,
+        backend: 'claude-code',
+        backendSessionId: 'claude-session-1',
+        messages: [],
+      },
+    });
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Claude answer' },
+      ]),
+    };
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream: createRoutedStream({
+        streamCompleted: true,
+      }),
+    });
+
+    expect(outcome.shouldSyncFromServer).toBe(false);
+    expect(outcome.hasStreamContentBlocks).toBe(true);
+  });
+});

@@ -12,6 +12,40 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Claude completed-stream local persistence gate
+
+### 目标
+
+继续推进 Claude Code 可用闭环，优先修补已 runtime-proved 的 structured output 链路中仍可能丢失本地 transcript 的基础缺口，不把 structured output authoring 提升为 stable product surface。
+
+### 发现
+
+发送管线的 `buildLocalStreamOutcome()` 只根据 stream 是否正常完成来决定是否进入 authoritative sync。这个规则适合 OpenCode，但 Claude Code 的 authoritative sync 当前明确 gated 为 OpenCode-only，导致正常完成的 Claude stream 有机会跳过本地 assistant persistence，把 streamed text 和 `backend_event structured_output` 交给无效的 OpenCode sync 边界。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/runtime/buildLocalStreamOutcome.ts` | 后端边界修复 | `shouldSyncFromServer` 只对 OpenCode/legacy 会话启用，非 OpenCode completed stream 保持本地持久化路径 |
+| `tests/unit/features/chat/buildLocalStreamOutcome.test.ts` | +1 测试 | 覆盖 Claude/non-OpenCode completed stream 不进入 OpenCode sync |
+| `tests/unit/features/chat/SendPipelineRuntime.test.ts` | +1 测试 | 覆盖 Claude `structured_output` backend event 经发送管线落到 `ChatMessage.structured` |
+| `docs/modules/features/chat/runtime/buildLocalStreamOutcome.md` | 文档更新 | 记录 sync 判定只适用于 OpenCode |
+| `docs/modules/features/chat/runtime/SendPipelineRuntime.md` | 文档更新 | 记录非 OpenCode completed stream 的本地 persistence 边界 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 completed-stream local persistence gate |
+
+### 验证
+
+- Focused tests: `npm test -- --runInBand tests/unit/features/chat/buildLocalStreamOutcome.test.ts tests/unit/features/chat/SendPipelineRuntime.test.ts` 通过，`16` tests passed
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`435` suites / `3215` tests passed，production build 通过
+- Build/deploy: `npm run build` 产出 `BUILD_ID: feature-phase0-capability.202605241038`，已部署到 Test Vault
+- Runtime proof: `.obsidian-debug/claude-local-persistence-runtime-assertion-2026-05-24.json` 通过，截图为 `.obsidian-debug/claude-local-persistence-runtime-2026-05-24.png`；运行时报告 active backend `claude-code`、deployed non-OpenCode sync gate present、structured output capture present，`dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+这次只修补 Claude Code completed stream 的本地 transcript 持久化闭环。OpenCode 正常完成后 authoritative sync 的既有行为保持不变；structured output authoring 仍是 Capability Lab / diagnostic-only，普通聊天 UI 没有新增 schema authoring。
+
+---
+
 ## 2026-05-23 Phase 3 - Claude rewind no-data-loss guard
 
 ### 目标

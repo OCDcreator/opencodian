@@ -30,7 +30,7 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 - 只有“中断、未完成、且没有真实 error/retry message”时才保留 interrupted state
 - 只有“没有 block 且有 error”时才通过 `AssistantNoticeRenderer.buildStreamErrorNotice()` 构建 error notice
 - silent interrupted stream（无可见内容）如果遇到 session retry message，会复用 error notice path 展示服务端 retry 原因，而不是落到通用 interrupted notice；有部分可见内容时不触发此路径
-- `shouldSyncFromServer` 继续复用 `MessageFinalizationService.shouldSyncAfterStream()`
+- `shouldSyncFromServer` 只在 OpenCode/legacy 会话上复用 `MessageFinalizationService.shouldSyncAfterStream()`；Claude Code 和其他非 OpenCode 后端没有 authoritative OpenCode sync contract，正常完成的流必须保留在本地持久化路径
 
 ## 下游消费者
 
