@@ -18,27 +18,34 @@
 
 继续收紧 Claude Code 接入的 backend ownership：当当前 active backend 是 Claude，但 Claude session adapter 不可用或不具备 sessions 能力时，新建会话必须失败在 Claude 边界内，不能借 registry 默认 active 或 OpenCode fallback 偷偷创建 OpenCode 会话。
 
+本 follow-up 修正 reviewer gap patch 的过度收紧：`sessions` 声明仍然足以进入只读 session 路由；只有新建 conversation 的创建路径需要额外确认 adapter 真的能创建 session。
+
 ### 发现
 
 `OpenCodianPlugin.createConversation()` 先读取 `AgentServiceRegistry.getActive()`，而 registry 在只剩 OpenCode adapter session-capable 时会默认 active 到 OpenCode。这样 `settings.activeBackend = 'claude-code'` 且 OpenCode 仍启用时，active Claude 缺失会话能力的场景可能静默生成 `backend: "opencode"` conversation，并写入 `openCodeSessionId`。
+
+Reviewer gap follow-up 的根因是把 read/list/preview/title 等只读 session seam 和 `createConversation()` 的写入创建 seam 绑到了同一个 `hasSessionCapability()`。malformed sessions adapter 可能声明 capability 并提供 `getSession` / `listSessions` / `getSessionMessages`，但缺少创建用的 `createSession` 等方法；这种 adapter 不应参与新建会话，却仍应服务只读路由。
 
 ### 实施内容
 
 | 文件 | 变更类型 | 详情 |
 |---|---|---|
-| `src/main.ts` | 后端边界修复 | `createConversation()` 改为以 `settings.activeBackend` 查找同名 adapter；非 OpenCode active backend 缺少 session 能力时直接报错，不再回退到 OpenCode |
-| `tests/unit/main.test.ts` | +1 测试 | 覆盖 active Claude + OpenCode 可用 + Claude session service 缺失时不创建 OpenCode session、不 warmup、不写本地 conversation |
+| `src/core/agents/backend/AgentBackendRouting.ts` | 后端能力防护 | 恢复 `hasSessionCapability()` 的 broad read-routing 语义，并新增 `hasSessionCreationCapability()` 作为新建 conversation 的集中 guard |
+| `tests/unit/core/agents/backend/AgentBackendRouting.test.ts` | 测试调整 | 覆盖声明 sessions 但缺 `createSession` 的 adapter 仍可进入 read-routing lookup，同时会被 creation helper 拒绝 |
+| `src/main.ts` | 后端边界修复 | `createConversation()` 改为以 `settings.activeBackend` 查找同名 adapter，并用 `hasSessionCreationCapability()` 阻止 malformed active backend fallback 到 OpenCode |
+| `tests/unit/main.test.ts` | +1/+1 follow-up 测试 | 覆盖 active Claude + OpenCode 可用 + Claude session service 缺失时不创建 OpenCode session、不 warmup、不写本地 conversation；follow-up 覆盖 active Claude 已注册 malformed sessions adapter 但缺 `createSession` 时仍抛 active-backend unsupported，不 fallback、不 warmup、不写 storage、不 append conversation |
 | `docs/modules/entry-point/main.md` | 文档更新 | 记录新会话 owner 来自 `settings.activeBackend`，并说明非 OpenCode 不再 fallback 到 OpenCode |
-| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 new-conversation backend ownership boundary 与 runtime proof |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 new-conversation backend ownership boundary、runtime proof，以及 reviewer gap follow-up 的 focused evidence 边界 |
 
 ### 验证
 
 - Focused test 已完成 red-green：新增断言先失败并实际解析出 `backend: "opencode"` conversation；修复后 `npm test -- --runInBand tests/unit/main.test.ts` 通过，`34` tests passed
-- Reviewer 子代理检查本轮 uncommitted stage 后无 Critical / Important / Minor findings；仅记录“Claude adapter 存在但无 sessions 能力”可作为后续可选补测
-- `npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check` 均通过
-- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`435` suites / `3221` tests passed，production build 通过
-- Build/deploy: `npm run build` 产出部署 `BUILD_ID: feature-phase0-capability.202605241140`；已按顺序部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css`、`dist/assets/`、`dist/node_modules/` 到 Test Vault，并确认 Test Vault `main.js` 含该 BUILD_ID；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
-- Runtime proof: `.obsidian-debug/claude-create-conversation-boundary-assertion-2026-05-24.json` 通过，截图为 `.obsidian-debug/claude-create-conversation-boundary-2026-05-24.png`；运行时报告 active Claude / no Claude session adapter / OpenCode available 条件下 `createConversation()` 抛出 `Cannot create conversation: active backend does not support sessions`，OpenCode `createSession` attempts 为 `0`，storage writes 为 `0`，conversation count delta 为 `0`，`dev:errors` 为 `No errors captured.`
+- Correction focused tests 覆盖：malformed sessions adapter 仍可通过 `getConversationSessionBackendService()` 参与只读 session 路由；`hasSessionCreationCapability()` 会拒绝缺 `createSession` 的 adapter；`createConversation()` 覆盖 active Claude 已注册但缺 `createSession` 时抛 `Cannot create conversation: active backend does not support sessions`，且 OpenCode adapter / legacy `openCodeService` 不被调用，不 warmup，不写 storage，不 append conversation
+- Final gate: `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`435` suites / `3224` tests passed，production build 通过，`BUILD_ID: feature-phase0-capability.202605241213`
+- Standalone build: `npm run build` 通过，产出同一 `BUILD_ID: feature-phase0-capability.202605241213`
+- Deploy: 已按顺序部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css`、`dist/assets/`、`dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Deploy verification: Test Vault `main.js` 包含 `feature-phase0-capability.202605241213`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-malformed-session-creation-boundary-assertion-2026-05-24.json` 通过，截图为 `.obsidian-debug/claude-malformed-session-creation-boundary-2026-05-24.png`，console 为 `.obsidian-debug/claude-malformed-session-creation-boundary-console-2026-05-24.txt`，errors 为 `.obsidian-debug/claude-malformed-session-creation-boundary-errors-2026-05-24.txt`；运行时报告 `ok: true`、`OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241213`、registered malformed Claude adapter declared sessions but omitted `createSession`，`createConversation()` 抛出 `Cannot create conversation: active backend does not support sessions`，OpenCode adapter `createSession` 为 `0`，legacy `openCodeService.createSession` 为 `0`，storage `saveConversation` 为 `0`，conversation count delta 为 `0`，state restored，`dev:errors` 为 `No errors captured.`
 
 ### 影响评估
 

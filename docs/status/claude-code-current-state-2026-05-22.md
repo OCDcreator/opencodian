@@ -76,6 +76,21 @@ This round closed a backend ownership leak in plugin-level conversation creation
   - errors: `.obsidian-debug/claude-create-conversation-boundary-errors-2026-05-24.txt`
   - result: deployed runtime reported `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241140`; simulated active Claude with no Claude session adapter while OpenCode was available; `createConversation()` threw the expected active-backend unsupported error; OpenCode `createSession` attempts stayed at `0`; storage writes stayed at `0`; conversation count delta stayed at `0`; `dev:errors` reported `No errors captured.`
 
+### Reviewer Gap Follow-Up
+
+- Correction follow-up restores `hasSessionCapability()` to broad read-routing semantics: declared `AgentCapability.Sessions` is enough for read/list/preview/title seams.
+- New `hasSessionCreationCapability()` centralizes the creation-specific guard: a registered active Claude adapter that declares sessions but omits `createSession` is rejected by `OpenCodianPlugin.createConversation()` without falling back to the OpenCode adapter, legacy `openCodeService`, warmup, storage write, or conversation append path.
+- This remains a backend ownership boundary fix only. It does not mark Claude Code full capability complete.
+- Final gate passed: `OWNER_GUARD_APPROVED=1 npm run verify` completed with `435` suites / `3224` tests, including production build and `BUILD_ID: feature-phase0-capability.202605241213`.
+- Standalone `npm run build` also passed with the same `BUILD_ID`; Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deployed `main.js` contains `feature-phase0-capability.202605241213`, and the deployed Claude SDK binary checksum matches `dist` (`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`).
+- Fresh Obsidian runtime proof:
+  - assertion: `.obsidian-debug/claude-malformed-session-creation-boundary-assertion-2026-05-24.json`
+  - screenshot: `.obsidian-debug/claude-malformed-session-creation-boundary-2026-05-24.png`
+  - console: `.obsidian-debug/claude-malformed-session-creation-boundary-console-2026-05-24.txt`
+  - errors: `.obsidian-debug/claude-malformed-session-creation-boundary-errors-2026-05-24.txt`
+  - result: deployed runtime reported `ok: true` and `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241213`; the registered malformed Claude adapter declared sessions but omitted `createSession`; `createConversation()` threw `Cannot create conversation: active backend does not support sessions`; OpenCode adapter `createSession` attempts stayed at `0`; legacy `openCodeService.createSession` stayed at `0`; storage writes stayed at `0`; conversation count delta stayed at `0`; state restored successfully; `dev:errors` reported `No errors captured.`
+
 ## 2026-05-24 Chat backend chrome scope proof
 
 This round tightened the chat chrome around active backend identity without promoting any unverified Claude Code capability.

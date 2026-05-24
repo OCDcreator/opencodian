@@ -7,6 +7,7 @@ import {
   getBackendSessionPreview,
   getConversationSessionBackendService,
   getConversationSessionHistoryService,
+  hasSessionCreationCapability,
   listBackendSessions,
   loadBackendSessionMessages,
   readBackendSessionShareUrl,
@@ -78,6 +79,42 @@ describe('getConversationSessionBackendService', () => {
       const registry = createMockRegistry(new Map([['opencode', adapter]]));
       const result = getConversationSessionBackendService(registry, {});
       expect(result).not.toBeNull();
+    });
+
+    it('returns declared session adapter even when it only supports read seams', () => {
+      const malformedSessionAdapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Sessions,
+      ]), {
+        createSession: undefined,
+      } as unknown as Partial<AgentSessionCapability>);
+      const registry = createMockRegistry(new Map([['claude-code', malformedSessionAdapter]]));
+
+      const result = getConversationSessionBackendService(registry, { backend: 'claude-code' });
+
+      expect(result).toBe(malformedSessionAdapter);
+    });
+  });
+
+describe('hasSessionCreationCapability', () => {
+    it('rejects adapter that declares sessions but lacks createSession', () => {
+      const malformedSessionAdapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Sessions,
+      ]), {
+        createSession: undefined,
+        getSession: async () => ({ id: 'session-1', summary: 'read-only session' }),
+        listSessions: async () => [],
+        getSessionMessages: async () => [],
+      } as unknown as Partial<AgentSessionCapability>);
+
+      expect(hasSessionCreationCapability(malformedSessionAdapter)).toBe(false);
+    });
+
+    it('accepts adapter that declares sessions and can create sessions', () => {
+      const adapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Sessions,
+      ]));
+
+      expect(hasSessionCreationCapability(adapter)).toBe(true);
     });
   });
 

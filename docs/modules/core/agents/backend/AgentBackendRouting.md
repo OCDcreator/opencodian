@@ -11,7 +11,8 @@
 
 - 将缺失 `conversation.backend` 的历史会话视为 `opencode`
 - 从 `AgentServiceRegistry` 解析 conversation-owned backend adapter
-- 提供 `hasChatCapability()` / `hasSessionCapability()` 类型收窄
+- 提供 `hasChatCapability()` / `hasSessionCapability()` 类型收窄；`hasSessionCapability()` 保持 broad session routing 语义，adapter 声明 `sessions` 即可服务只读 session seams
+- 提供 `hasSessionCreationCapability()` 作为新建会话的集中 guard；它要求 adapter 声明 `sessions` 且实现 `createSession` / `deleteSession` / `updateSessionTitle`，供 `createConversation()` 等创建路径使用，避免把只读 session adapter 误当成可创建 backend
 - 提供 active session backend 与 conversation session/chat backend helper
 - 提供 `getConversationSessionHistoryService()` 用于 session 消息读取路由，仅返回同时实现了 `getSessionMessages()` 的 session backend
 - 提供 `getActiveSessionHistoryService()` 用于 active backend 的 session 消息读取路由，供无 conversation context 的消费方（如 settings inspection surface）使用

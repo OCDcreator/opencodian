@@ -9,7 +9,7 @@ import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
 import {
   getConversationSessionBackendService,
-  hasSessionCapability,
+  hasSessionCreationCapability,
 } from './core/agents/backend/AgentBackendRouting';
 import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
 import { ClaudeCodeAdapter } from './core/agents/backend/ClaudeCodeAdapter';
@@ -903,7 +903,7 @@ export default class OpenCodianPlugin extends Plugin {
     const activeBackendAdapter = Array.isArray(this.settings.enabledBackends) && this.settings.enabledBackends.includes(activeBackend)
       ? this.agentServiceRegistry?.get(activeBackend)
       : null;
-    const sessionBackend = hasSessionCapability(activeBackendAdapter) ? activeBackendAdapter : null;
+    const sessionBackend = hasSessionCreationCapability(activeBackendAdapter) ? activeBackendAdapter : null;
     if (!sessionBackend && activeBackend === 'opencode') {
       if (!Array.isArray(this.settings.enabledBackends) || !this.settings.enabledBackends.includes('opencode')) {
         throw new Error('Cannot create conversation: opencode backend is not enabled');

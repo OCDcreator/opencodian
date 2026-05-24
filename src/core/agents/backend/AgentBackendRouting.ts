@@ -21,6 +21,17 @@ export function hasSessionCapability(service: AgentService | null | undefined): 
   return Boolean(service?.hasCapability(AgentCapability.Sessions));
 }
 
+export function hasSessionCreationCapability(service: AgentService | null | undefined): service is AgentSessionCapability {
+  if (!service?.hasCapability(AgentCapability.Sessions)) {
+    return false;
+  }
+
+  const sessionService = service as Partial<AgentSessionCapability>;
+  return typeof sessionService.createSession === 'function'
+    && typeof sessionService.deleteSession === 'function'
+    && typeof sessionService.updateSessionTitle === 'function';
+}
+
 export function getConversationBackendService(
   registry: AgentServiceRegistry | null | undefined,
   conversation: Pick<Conversation, 'backend'> | null | undefined,

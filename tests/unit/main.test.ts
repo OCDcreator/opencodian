@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import { AgentCapability } from '../../src/core/agents/AgentCapability';
 import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../src/core/agents/backend';
 import { AgentServiceRegistry } from '../../src/core/agents/backend/AgentServiceRegistry';
 import type { StorageService } from '../../src/core/storage';
@@ -831,7 +832,7 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
   });
 
-  it('does not fall back to OpenCode when the active non-OpenCode backend lacks a session service', async () => {
+  it('does not fall back to OpenCode when the registered Claude backend lacks createSession', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       settings: typeof DEFAULT_SETTINGS;
       agentServiceRegistry: AgentServiceRegistry;
@@ -845,6 +846,20 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
       logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
     };
     const opencodeCreateSession = jest.fn().mockResolvedValue('opencode-session');
+    const malformedClaudeSessionAdapter = {
+      kind: 'claude-code' as const,
+      displayName: 'Claude Code',
+      description: 'Malformed Claude Code adapter without createSession',
+      status: 'connected' as const,
+      capabilities: new Set([AgentCapability.Sessions]),
+      hasCapability: jest.fn((cap: AgentCapability) => cap === AgentCapability.Sessions),
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      dispose: jest.fn(),
+      onStatusChange: jest.fn(() => ({ dispose: jest.fn() })),
+      deleteSession: jest.fn().mockResolvedValue(undefined),
+      updateSessionTitle: jest.fn().mockResolvedValue(undefined),
+    };
 
     plugin.settings = {
       ...DEFAULT_SETTINGS,
@@ -857,8 +872,8 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
       displayName: 'OpenCode',
       description: 'OpenCode test adapter',
       status: 'connected',
-      capabilities: new Set(['sessions']),
-      hasCapability: jest.fn((cap: string) => cap === 'sessions'),
+      capabilities: new Set([AgentCapability.Sessions]),
+      hasCapability: jest.fn((cap: AgentCapability) => cap === AgentCapability.Sessions),
       start: jest.fn().mockResolvedValue(undefined),
       stop: jest.fn().mockResolvedValue(undefined),
       dispose: jest.fn(),
@@ -867,6 +882,7 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
       deleteSession: jest.fn().mockResolvedValue(undefined),
       updateSessionTitle: jest.fn().mockResolvedValue(undefined),
     });
+    plugin.agentServiceRegistry.register(malformedClaudeSessionAdapter);
     plugin.agentServiceRegistry.setEnabledBackends(['opencode', 'claude-code']);
     plugin.openCodeService = {
       isReady: jest.fn().mockReturnValue(true),
@@ -887,6 +903,8 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(plugin.openCodeService.createSession).not.toHaveBeenCalled();
     expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
     expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
+    expect(plugin.storage.saveConversation).not.toHaveBeenCalled();
+    expect(plugin.conversations).toEqual([]);
   });
 
   it('sanitizes diagnostic reports before export', async () => {

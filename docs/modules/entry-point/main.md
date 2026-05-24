@@ -162,7 +162,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 
 后续流程分成两层：
 
-- `createConversation()` 会以 `settings.activeBackend` 作为新会话 owner，再从 `AgentServiceRegistry` 查找同名 adapter 与 `AgentSessionCapability`。OpenCode 会话仍会先接管 deferred runtime warmup，非 OpenCode backend 则直接调用其 `createSession()`，并只写 `backendSessionId`。如果当前 active backend 是 Claude/Codex 等非 OpenCode，但对应 adapter 没有 session 能力或不可用，入口会直接报错，不会回退去创建 OpenCode 会话。
+- `createConversation()` 会以 `settings.activeBackend` 作为新会话 owner，再从 `AgentServiceRegistry` 查找同名 adapter，并通过 `AgentBackendRouting.hasSessionCreationCapability()` 确认其声明 sessions 且实现 create/delete/title-update 这组会话创建所需方法。OpenCode 会话仍会先接管 deferred runtime warmup，非 OpenCode backend 则直接调用其 `createSession()`，并只写 `backendSessionId`。如果当前 active backend 是 Claude/Codex 等非 OpenCode，但对应 adapter 没有会话创建能力或不可用，入口会直接报错，不会回退去创建 OpenCode 会话。更宽的 session read/list/preview seam 仍由 `hasSessionCapability()` 判定。
 - `createConversationFromSession()` 允许已有 backend session 映射为新的本地 conversation。优先使用调用方传入的 `initial.backend`（如 fork 来源 conversation 的 backend），未指定时回退到 `settings.activeBackend`。只有最终 backend 是 OpenCode 时才写 legacy `openCodeSessionId`，其他 backend 只写通用 `backendSessionId`。
 - `getConversationById()` 默认优先从磁盘补全完整消息，再更新内存缓存；`preferCache` 可跳过这一步。
 - `deleteConversation()` 会先把本地缓存删掉，再按 conversation owner 解析 session backend 并 best-effort 删除 backend session，最后清理本地存储。历史 conversation 缺失 `backend` 时继续按 OpenCode 处理。
