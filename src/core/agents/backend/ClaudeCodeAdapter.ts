@@ -244,6 +244,7 @@ interface ClaudeCodeSessionState {
   title: string;
   messages: ClaudeCodeQueuedPrompt[];
   sdkSessionId?: string;
+  resumeValidationRequired?: boolean;
   runtime?: ClaudeCodeSessionRuntime;
 }
 
@@ -660,9 +661,12 @@ export class ClaudeCodeAdapter
         phase: 'runtime-ready',
         error: summarizeError(error),
       });
+      const errorMessage = error instanceof Error ? error.message : String(error);
       yield {
         type: 'error',
-        content: `Claude Code SDK unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        content: errorMessage.startsWith('Claude Code resume validation failed')
+          ? errorMessage
+          : `Claude Code SDK unavailable: ${errorMessage}`,
       };
       return;
     }
@@ -689,7 +693,7 @@ export class ClaudeCodeAdapter
         }
 
         const chunks = runtime.normalizer.transformSDKMessage(item.message);
-        this.captureSdkSessionId(session, chunks);
+        this.captureSdkSessionId(session, item.message, chunks);
         for (const chunk of chunks) {
           sawChunk = true;
           yield chunk;
@@ -953,16 +957,45 @@ export class ClaudeCodeAdapter
 
   private captureSdkSessionId(
     session: ClaudeCodeSessionState,
+    message: unknown,
     chunks: readonly StreamChunk[],
   ): void {
-    const metadata = chunks.find((chunk): chunk is Extract<StreamChunk, { type: 'message_metadata' }> =>
-      chunk.type === 'message_metadata' && typeof chunk.sessionId === 'string' && chunk.sessionId.length > 0);
-    const sdkSessionId = metadata?.sessionId;
+    const sdkSessionId = resolveDiagnosticSessionId(message, chunks);
     if (!sdkSessionId || sdkSessionId === session.sdkSessionId) {
       return;
     }
+    if (session.sdkSessionId) {
+      this.closeRuntime(session);
+      throw new Error(`Claude Code resume validation failed: resumed query returned session "${sdkSessionId}" for requested session "${session.sdkSessionId}".`);
+    }
     session.sdkSessionId = sdkSessionId;
     this.sessions.set(sdkSessionId, session);
+  }
+
+  private async validateUserResumeSession(
+    sdk: ClaudeCodeSdkFacade,
+    session: ClaudeCodeSessionState,
+  ): Promise<void> {
+    const sdkSessionId = session.sdkSessionId?.trim();
+    if (!sdkSessionId || !session.resumeValidationRequired) {
+      return;
+    }
+    if (!sdk.getSessionInfo) {
+      throw new Error('Claude Code resume validation failed: SDK session lookup is unavailable.');
+    }
+    const sessionInfo = await sdk.getSessionInfo(sdkSessionId, { dir: this.options.vaultPath });
+    if (!sessionInfo) {
+      throw new Error(`Claude Code resume validation failed: session "${sdkSessionId}" was not found in the Claude SDK session catalog.`);
+    }
+    const comparableSessionIds = resolveComparableSessionIds(sessionInfo);
+    if (comparableSessionIds.length === 0) {
+      throw new Error(`Claude Code resume validation failed: SDK session lookup returned no comparable identity for requested session "${sdkSessionId}".`);
+    }
+    const mismatchedSessionId = comparableSessionIds.find((sessionId) => sessionId !== sdkSessionId);
+    if (mismatchedSessionId) {
+      throw new Error(`Claude Code resume validation failed: SDK session lookup returned "${mismatchedSessionId}" for requested session "${sdkSessionId}".`);
+    }
+    session.resumeValidationRequired = false;
   }
 
   private async getOrStartRuntime(
@@ -996,6 +1029,7 @@ export class ClaudeCodeAdapter
 
     await this.ensureReadyForQuery();
     const sdk = await this.getSdk();
+    await this.validateUserResumeSession(sdk, session);
     const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
     const runtime: ClaudeCodeSessionRuntime = {
       input: new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>(),
@@ -1198,7 +1232,9 @@ export class ClaudeCodeAdapter
       id: sessionId,
       title: 'Restored Claude Code chat',
       messages: [],
-      ...(isOpenCodianLocalClaudeSessionId(sessionId) ? {} : { sdkSessionId: sessionId }),
+      ...(isOpenCodianLocalClaudeSessionId(sessionId)
+        ? {}
+        : { sdkSessionId: sessionId, resumeValidationRequired: true }),
     };
     this.sessions.set(sessionId, restoredSession);
     sessionLogger.debug('get session', {

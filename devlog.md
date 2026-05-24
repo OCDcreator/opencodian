@@ -12,6 +12,35 @@
 
 ---
 
+## 2026-05-25 Phase 3 - Ordinary Claude chat resume identity validation
+
+### 目标
+
+把上一轮已证明的 Claude diagnostic resume 身份边界推进到普通聊天发送路径：Obsidian reload 后恢复出来的真实 Claude SDK session id 必须先由 SDK session catalog 证明身份一致，才能进入 resumed `query()`。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 普通 chat resume 校验 | 非本地 `backendSessionId` 恢复为 SDK resume candidate 时设置一次性 validation flag；`getOrStartRuntime()` 在创建 SDK query 前调用 `getSessionInfo(sessionId, { dir: vaultPath })` 校验存在性和可比对身份 |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 身份错配 fail-close | catalog lookup 不可用、查无结果、无可比对 `sessionId`/`id`、或返回不同 id 都在 `sdk.query()` 前失败；stream 返回不同 SDK session id 时关闭 runtime 并返回 resume validation failure，避免静默重绑 |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | TDD 回归测试 | 覆盖 restored persisted SDK id 正向校验、缺失 lookup、无可比对身份、lookup 错配、metadata/raw result session id 错配、本地 `claude-code-*` handle 不误 resume、活跃持久 query follow-up 不重复 catalog lookup |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` / `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 记录 ordinary chat resume identity boundary，并明确这不是 resume-at、stable history UI、checkpoint rewind 或 full capability 完成 |
+
+### 验证
+
+- Red: implementer 先观察到 focused tests 失败，覆盖普通恢复未 pre-query lookup、lookup 缺失/错配仍进入 query、返回 session id 错配仍输出/重绑等缺口
+- Review fix red: 独立 reviewer 指出两项 Important 问题后，补充失败用例覆盖 generic SDK-unavailable 包装、lookup 无可比对 id fail-open、非 metadata `result.session_id` 错配未拒绝
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 通过，`1` suite / `81` tests passed
+- 门禁：`npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 均通过
+- 构建部署：`npm run build` 生成 `BUILD_ID=feature-phase0-capability.202605250010`；顺序部署到 Test Vault 后，`dist/main.js` 与 deployed `main.js` SHA256 同为 `12183062ded3009e590b6feec584172874a81fba696a2219d0becdcbefab37d7`，部署 Claude SDK `claude` binary hash 与 dist 同为 `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof：`.obsidian-debug/ordinary-chat-resume-identity-result-20260525.json` 返回 `ok: true`，普通聊天路径在 reload 后恢复 SDK-backed conversation，保持 `backendSessionId=2c9a66fd-7a56-4aec-a99c-7f994ecb977d` 不变，发送并渲染 marker `RESUME_AFTER_RELOAD_1779639261622`，消息数从 `4` 增至 `6`；截图在 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian-debug/ordinary-chat-resume-identity-runtime-20260525.png`，console/errors 在 `.obsidian-debug/ordinary-chat-resume-identity-console-20260525.txt` / `.obsidian-debug/ordinary-chat-resume-identity-errors-20260525.txt`，最终 `dev:errors` 为 `No errors captured.`
+- 残余记录：runtime console 在 smoke 结束后的模型刷新阶段有一条 `ModelSelectionRuntime` model load error，但未进入 `dev:errors`，本轮不把它解释成 full model-catalog 稳定性 proof
+
+### 影响评估
+
+本轮只收紧普通 Claude chat resume 的身份校验和错误语义，不改变 OpenCode 默认路径，不新增 Claude stable sharing/rewind/history/structured-output UI，也不声称 Claude Code full capability 完成。当前阶段完成后按用户要求提交并暂停，不继续下一批能力。
+
 ## 2026-05-24 Phase 3 - SDK Foundations hook/subagent stream honesty
 
 ### 目标

@@ -420,12 +420,14 @@ describe('ClaudeCodeAdapter', () => {
   it('keeps one streaming SDK query alive for sequential sends on the same session', async () => {
     const sdkOutput = createAsyncQueue<unknown>();
     const prompts: AsyncIterable<unknown>[] = [];
-    const sdk: ClaudeCodeSdkFacade & { query: jest.Mock } = {
-      query: jest.fn((input) => {
-        prompts.push(input.prompt as AsyncIterable<unknown>);
-        return sdkOutput;
-      }),
-    };
+    const sdk = createSdk([]);
+    sdk.query.mockImplementation((input) => {
+      prompts.push(input.prompt as AsyncIterable<unknown>);
+      return Object.assign(sdkOutput, {
+        supportedModels: jest.fn().mockResolvedValue([]),
+        close: jest.fn(),
+      });
+    });
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -443,7 +445,13 @@ describe('ClaudeCodeAdapter', () => {
       done: false,
     });
     sdkOutput.push({
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-streaming-session',
+    });
+    sdkOutput.push({
       type: 'assistant',
+      session_id: 'sdk-streaming-session',
       message: {
         id: 'msg-1',
         content: [{ type: 'text', text: 'First response' }],
@@ -451,7 +459,15 @@ describe('ClaudeCodeAdapter', () => {
     });
     sdkOutput.push({ type: 'result', subtype: 'success' });
 
-    await expect(first).resolves.toEqual([{ type: 'text', content: 'First response' }]);
+    await expect(first).resolves.toEqual([{
+      type: 'message_metadata',
+      messageId: 'sdk-streaming-session',
+      timestamp: expect.any(Number),
+      sessionId: 'sdk-streaming-session',
+    }, {
+      type: 'text',
+      content: 'First response',
+    }]);
 
     const second = collectAsync(adapter.sendMessage({ sessionId, content: 'second' }));
     await Promise.resolve();
@@ -473,6 +489,7 @@ describe('ClaudeCodeAdapter', () => {
 
     await expect(second).resolves.toEqual([{ type: 'text', content: 'Second response' }]);
     expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.getSessionInfo).not.toHaveBeenCalled();
   });
 
   it('loads dynamic MCP config before the first SDK query even when start was not called', async () => {
@@ -1130,6 +1147,11 @@ describe('ClaudeCodeAdapter', () => {
         content: [{ type: 'text', text: 'Resumed session' }],
       },
     }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-persisted-session',
+      summary: 'Persisted session',
+      lastModified: 123,
+    });
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -1145,7 +1167,194 @@ describe('ClaudeCodeAdapter', () => {
     }]);
 
     expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-persisted-session', { dir: '/vault' });
     expect(sdk.query.mock.calls[0][0].options.resume).toBe('sdk-persisted-session');
+  });
+
+  it('validates a restored persisted Claude SDK session id before starting a resumed query', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-1',
+        content: [{ type: 'text', text: 'Resumed session' }],
+      },
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-persisted-session',
+      summary: 'Persisted session',
+      lastModified: 123,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-persisted-session',
+      content: 'resume me',
+    }))).resolves.toContainEqual({
+      type: 'text',
+      content: 'Resumed session',
+    });
+
+    expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-persisted-session', { dir: '/vault' });
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.query.mock.calls[0][0].options.resume).toBe('sdk-persisted-session');
+  });
+
+  it('rejects a restored persisted Claude SDK session id when lookup is missing before query', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-1',
+        content: [{ type: 'text', text: 'Should not start' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-missing-session',
+      content: 'resume me',
+    }))).resolves.toEqual([{
+      type: 'error',
+      content: expect.stringMatching(/^Claude Code resume validation failed:/),
+    }]);
+
+    expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-missing-session', { dir: '/vault' });
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a restored persisted Claude SDK session id when lookup has no comparable identity before query', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-1',
+        content: [{ type: 'text', text: 'Should not start' }],
+      },
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      summary: 'Ambiguous session',
+      lastModified: 123,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-ambiguous-session',
+      content: 'resume me',
+    }))).resolves.toEqual([{
+      type: 'error',
+      content: expect.stringMatching(/^Claude Code resume validation failed:/),
+    }]);
+
+    expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-ambiguous-session', { dir: '/vault' });
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a restored persisted Claude SDK session id when lookup returns a different id before query', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-1',
+        content: [{ type: 'text', text: 'Should not start' }],
+      },
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-other-session',
+      summary: 'Different session',
+      lastModified: 123,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-persisted-session',
+      content: 'resume me',
+    }))).resolves.toEqual([{
+      type: 'error',
+      content: expect.stringMatching(/^Claude Code resume validation failed:/),
+    }]);
+
+    expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-persisted-session', { dir: '/vault' });
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a resumed user query when the SDK returns a different session id', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-other-session',
+    }, {
+      type: 'assistant',
+      session_id: 'sdk-other-session',
+      message: {
+        id: 'msg-1',
+        content: [{ type: 'text', text: 'Should not rebind' }],
+      },
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-persisted-session',
+      summary: 'Persisted session',
+      lastModified: 123,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-persisted-session',
+      content: 'resume me',
+    }))).resolves.toEqual([{
+      type: 'error',
+      content: expect.stringContaining('Claude Code resume validation failed'),
+    }]);
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.query.mock.calls[0][0].options.resume).toBe('sdk-persisted-session');
+    expect(sdk.getSessionInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a resumed user query when a non-metadata SDK message returns a different session id', async () => {
+    const sdk = createSdk([{
+      type: 'result',
+      subtype: 'success',
+      session_id: 'sdk-other-session',
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-persisted-session',
+      summary: 'Persisted session',
+      lastModified: 123,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-persisted-session',
+      content: 'resume me',
+    }))).resolves.toEqual([{
+      type: 'error',
+      content: expect.stringContaining('Claude Code resume validation failed'),
+    }]);
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.query.mock.calls[0][0].options.resume).toBe('sdk-persisted-session');
+    expect(sdk.getSessionInfo).toHaveBeenCalledTimes(1);
   });
 
   it('lazy-loads the official SDK facade on first send instead of plugin startup', async () => {

@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit after the latest committed capability slice: `8361ebe5`
-- Commit subject after the latest committed capability slice: `fix: mark claude stream settings diagnostic`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242303`
-- Recent continuity commits in this lane:
+- Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
+- Previous anchor subject: `docs: refresh claude stream settings anchor`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605250010`
+- Recent continuity commits in this lane before the 2026-05-25 slice:
+- `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
 - `8a48502b` — `fix: restrict shared session links to opencode`
 - `9f455f1b` — `fix: clarify claude advanced settings honesty`
@@ -63,6 +64,36 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-25 Ordinary chat resume identity validation
+
+This slice promotes one narrow resume boundary from diagnostic-only proof into the ordinary Claude chat send path: restored persisted Claude SDK session ids now need positive catalog identity validation before `sendMessage()` starts a resumed SDK query.
+
+### What Changed
+
+- `ClaudeCodeAdapter.getOrRestoreSession()` marks non-local restored session ids as SDK resume candidates requiring validation. OpenCodian-local `claude-code-*` handles remain local handles and are not passed to SDK `options.resume`.
+- `sendMessage()` now validates restored SDK ids through `sdk.getSessionInfo(sessionId, { dir: vaultPath })` before creating a resumed query. Missing lookup support, no catalog row, no comparable identity, or a different comparable id all fail before `sdk.query()`.
+- Once a restored id is validated and a persistent `Query` remains active, sequential follow-up sends reuse that runtime without repeated catalog lookup.
+- The ordinary stream path now rejects a resumed query if the SDK returns a different session id in normalized chunks or raw SDK messages, closing the runtime instead of silently rebinding the conversation to the returned id.
+- Resume-validation errors are surfaced as `Claude Code resume validation failed...` chunks rather than being wrapped as generic SDK-unavailable errors.
+
+### What This Does Not Change
+
+- This is ordinary chat resume identity hardening, not `resume-at`, checkpoint rewind, stable JSONL history browser, or full Claude Code capability completion.
+- This does not promote Capability Lab diagnostic resume/sessionStore/structured-output proof to a stable user-facing surface.
+- This does not change OpenCode default behavior or OpenCode-only gates for revert/unrevert/diff/shared links.
+
+### Verification
+
+- Implementer used TDD and first observed focused RED failures covering: missing pre-query lookup, missing/mismatched lookup still querying, returned-id mismatch silently rebinding/outputting, misleading SDK-unavailable wrapping, no-comparable lookup fail-open, and non-metadata `result.session_id` mismatch.
+- Independent reviewer reported two important issues in the first pass: ordinary resume failures were wrapped with the wrong prefix, and the stream mismatch guard only covered metadata-shaped ids. The implementer fixed both.
+- Main-thread local review covered `src/core/agents/backend/ClaudeCodeAdapter.ts` and `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` after the reviewer-fix loop because no additional subagent slot was available for a final independent pass.
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` passed with `1` suite / `81` tests.
+- Guard gates passed after the source/doc changes: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+- `npm run build` produced `BUILD_ID=feature-phase0-capability.202605250010`; deployment copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, and the Claude SDK binary to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: `dist/main.js` and Test Vault `main.js` SHA256 both equal `12183062ded3009e590b6feec584172874a81fba696a2219d0becdcbefab37d7`; the deployed Claude SDK `claude` binary hash matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Fresh Test Vault ordinary chat smoke `.obsidian-debug/ordinary-chat-resume-identity-result-20260525.json` returned `ok: true` against the deployed runtime. It loaded an existing Claude SDK-backed conversation, restored `backendSessionId=2c9a66fd-7a56-4aec-a99c-7f994ecb977d`, sent marker `RESUME_AFTER_RELOAD_1779639261622` through the ordinary chat send path, preserved the same non-local SDK session id, and advanced the message count from `4` to `6`.
+- Runtime artifacts: `.obsidian-debug/ordinary-chat-resume-identity-result-20260525.json`, `.obsidian-debug/ordinary-chat-resume-identity-console-20260525.txt`, `.obsidian-debug/ordinary-chat-resume-identity-errors-20260525.txt`, and `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian-debug/ordinary-chat-resume-identity-runtime-20260525.png`; `dev:errors` reported `No errors captured.` The console artifact still contains one non-blocking `ModelSelectionRuntime` model-refresh error after the smoke restored settings, so this slice treats that as a residual observation rather than proof of full model-catalog stability.
 
 ## 2026-05-24 Capability Lab advanced-settings honesty slice
 
