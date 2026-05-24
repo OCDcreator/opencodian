@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Capability Lab permission/question/MCP proof honesty
+
+### 目标
+
+把 Claude permission approval、AskUserQuestion / elicitation、MCP positive smoke proof 诚实地显露在 Capability Lab 诊断面，而不是继续缺行或用普通 Exposed/Untested 文案混淆；同时不把这些能力升级成稳定产品面。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | Capability Lab 诚实化 | 新增 Permission Approval、AskUserQuestion / Elicitation 矩阵行；MCP/permission/question proof 标记为 `Verified` + `Diagnostic`，Discovery 使用 `Diagnostic Proof` |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | TDD 回归测试 | 覆盖 permission/question 诊断 proof 行、MCP proof 文案，以及矩阵行数更新 |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | TDD 回归测试 | 覆盖 `runDiagnosticPrompt()` 会把 `permissionBridge.canUseTool`、`onElicitation`、`mcpServers` 注入 diagnostic SDK options |
+| `docs/modules/**` / `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 记录 proof 来源、diagnostic-only 边界和不升级 stable product surface 的限制 |
+
+### 验证
+
+- Red: focused suite 先失败于 Capability Lab 缺少 permission/question diagnostic proof 行与 proof label
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 通过，`2` suites / `152` tests passed
+- Gate: `npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 均通过
+- Build/deploy: `npm run build` 生成 `BUILD_ID feature-phase0-capability.202605242127`；Test Vault `main.js` 与 `dist/main.js` SHA256 均为 `561cc2e46337f2accf72c5c43916fde022c2bc311b9570dbb6d8e835d0d6f78d`；Claude SDK binary hash 为 `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/permission-question-mcp-diagnostic-honesty-assertion-2026-05-24-result.json` 返回 `ok: true`，确认三行 UI 为 `Verified` + `Diagnostic` / `Diagnostic Proof`，Diagnostic Proof 未使用 active/exposed chip 样式，设置根节点 horizontal overflow 为 `0px`，`dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+本轮只修正诊断面 honesty 与回归测试，不新增 MCP authoring、不新增 Claude permission template/settings、不复用 OpenCode question API，也不宣称 Claude Code full capability 完成。
+
 ## 2026-05-24 Phase 3 - Claude authenticated diagnostic resume positive proof
 
 ### 目标

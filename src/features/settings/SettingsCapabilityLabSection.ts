@@ -64,6 +64,12 @@ interface CapabilityLabPluginState {
   sessionStore: CapabilityLabSessionStore;
 }
 
+type DiscoveryRowStatus = 'discovery' | 'exposed' | 'diagnostic-proof';
+
+interface DiscoveryRowOptions {
+  status?: DiscoveryRowStatus;
+}
+
 export class CapabilityLabSessionStore {
   private readonly entries = new Map<string, CapabilityLabSessionStoreEntry[]>();
   private readonly mtimes = new Map<string, number>();
@@ -477,7 +483,21 @@ export class SettingsCapabilityLabSection {
         capability: 'MCP Servers',
         sdkExposed: true, // mcpServers option in SDK
         adapterWired: true, // buildSdkOptions wires mcpServers + ClaudeCodeMcpConfigAdapter
-        runtimeProof: 'untested',
+        runtimeProof: 'pass', // Direct SDK smoke artifact proves positive MCP passthrough; authoring remains unpromoted.
+        userSurface: 'diagnostic', // Runtime passthrough only; settings tab exposes refresh, not authoring
+      },
+      {
+        capability: 'Permission Approval',
+        sdkExposed: true, // canUseTool option in SDK
+        adapterWired: true, // ClaudeCodePermissionBridge is injected into diagnostic and chat SDK options
+        runtimeProof: 'pass', // Direct SDK smoke artifact proves allow/deny canUseTool behavior.
+        userSurface: 'diagnostic', // Existing approval UI is reused; no stable Claude permission authoring surface
+      },
+      {
+        capability: 'AskUserQuestion / Elicitation',
+        sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
+        adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
+        runtimeProof: 'pass', // Direct SDK smoke artifact proves elicitation/question callback behavior.
         userSurface: 'diagnostic', // Runtime passthrough only; settings tab is OpenCode-gated
       },
       {
@@ -1895,7 +1915,7 @@ export class SettingsCapabilityLabSection {
     const tbody = table.createEl('tbody');
 
     // Hooks
-    this.addDiscoveryRow(tbody, 'Hooks', false, 'No authoring UI. buildSdkOptions wires hooks from adapter options.');
+    this.addDiscoveryRow(tbody, 'Hooks', 'No authoring UI. buildSdkOptions wires hooks from adapter options.');
     // Plugins
     const pluginCount = adapter?.getPluginCount?.() ?? 0;
     const pluginsList = adapter?.getPluginsList?.() ?? [];
@@ -1903,10 +1923,10 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'Plugins',
-      pluginStatus,
       pluginStatus
         ? `${pluginCount} plugin(s): ${pluginsList.join(', ')}. Runtime passthrough via buildSdkOptions. No authoring UI.`
         : 'No authoring UI. buildSdkOptions wires plugins from adapter options. No plugins loaded or adapter not started.',
+      { status: pluginStatus ? 'exposed' : 'discovery' },
     );
     // Skills
     const skillCount = adapter?.getSkillCount?.() ?? 0;
@@ -1915,12 +1935,12 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'Skills',
-      skillStatus,
       skillStatus
         ? skillCount === -1
           ? 'All skills enabled. Runtime passthrough via buildSdkOptions. No authoring UI.'
           : `${skillCount} skill(s): ${Array.isArray(skillsList) ? skillsList.join(', ') : skillsList}. Runtime passthrough via buildSdkOptions. No authoring UI.`
         : 'No authoring UI. buildSdkOptions wires skills (string[]|\'all\') from adapter options. No skills loaded or adapter not started.',
+      { status: skillStatus ? 'exposed' : 'discovery' },
     );
     // MCP Servers
     const mcpServerCount = adapter?.getMcpServerCount?.() ?? 0;
@@ -1928,24 +1948,38 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'MCP Servers',
-      mcpStatus,
       mcpStatus
         ? `${mcpServerCount} server(s) loaded. Runtime passthrough via ClaudeCodeMcpConfigAdapter. Claude Code settings Tools tab can refresh runtime config.`
         : 'Runtime passthrough via ClaudeCodeMcpConfigAdapter. No servers loaded or adapter not started.',
+      { status: mcpStatus ? 'diagnostic-proof' : 'discovery' },
+    );
+    // Permission approval
+    this.addDiscoveryRow(
+      tbody,
+      'Permission Approval',
+      'Diagnostic proof only. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission UI shape; no stable Claude permission authoring surface is claimed.',
+      { status: 'diagnostic-proof' },
+    );
+    // AskUserQuestion / Elicitation
+    this.addDiscoveryRow(
+      tbody,
+      'AskUserQuestion / Elicitation',
+      'Diagnostic proof only. The question bridge returns AskUserQuestion answers through Claude canUseTool, and onElicitation is forwarded as a runtime SDK callback; OpenCode question APIs remain out of this path.',
+      { status: 'diagnostic-proof' },
     );
     // Agent definitions
-    this.addDiscoveryRow(tbody, 'Agent Definitions', false, 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options.');
+    this.addDiscoveryRow(tbody, 'Agent Definitions', 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options.');
     // Agents / Subagents
     this.addDiscoveryRow(
       tbody,
       'Subagents',
-      !!caps && hasCapability(caps, 'subagents'),
       'Capability not in CLAUDE_CODE_PHASE1_CAPABILITIES. Adapter methods exist but UI gating prevents display.',
+      { status: !!caps && hasCapability(caps, 'subagents') ? 'exposed' : 'discovery' },
     );
     // Session Store
-    this.addDiscoveryRow(tbody, 'Session Store', false, 'No UI. Wired as runtime-only option.');
+    this.addDiscoveryRow(tbody, 'Session Store', 'No UI. Wired as runtime-only option.');
     // Import/Delete/Restore
-    this.addDiscoveryRow(tbody, 'Import/Delete/Restore', false, 'Adapter methods exist but no UI. Deliberately not exposed in this lab (read-only focus).');
+    this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'Adapter methods exist but no UI. Deliberately not exposed in this lab (read-only focus).');
 
     if (adapter) {
       const proofControls = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
@@ -1985,15 +2019,27 @@ export class SettingsCapabilityLabSection {
   private addDiscoveryRow(
     tbody: HTMLTableSectionElement,
     feature: string,
-    hasStableUI: boolean,
     notes: string,
+    options: DiscoveryRowOptions = {},
   ): void {
+    const status = options.status ?? 'discovery';
+    const statusText = status === 'exposed'
+      ? 'Exposed'
+      : status === 'diagnostic-proof'
+        ? 'Diagnostic Proof'
+        : 'Discovery Only';
+    const statusClass = status === 'exposed'
+      ? ' opencodian-capability-lab-chip-active'
+      : status === 'diagnostic-proof'
+        ? ' opencodian-capability-lab-chip-surface-diagnostic'
+        : '';
+
     const tr = tbody.createEl('tr');
     tr.createEl('td', { text: feature });
     const statusCell = tr.createEl('td');
     statusCell.createSpan({
-      cls: `opencodian-capability-lab-chip${hasStableUI ? ' opencodian-capability-lab-chip-active' : ''}`,
-      text: hasStableUI ? 'Exposed' : 'Discovery Only',
+      cls: `opencodian-capability-lab-chip${statusClass}`,
+      text: statusText,
     });
     tr.createEl('td', { text: notes });
   }

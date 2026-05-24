@@ -163,7 +163,68 @@ describe('SettingsCapabilityLabSection', () => {
     expect(mcpRow).not.toBeNull();
     // MCP is diagnostic (runtime passthrough), not hidden like skills/plugins/agents
     expect(mcpRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
-    expect(mcpRow?.textContent).toContain('Untested');
+    expect(mcpRow?.textContent).toContain('Verified');
+  });
+
+  it('renders permission approval and AskUserQuestion rows as diagnostic runtime proof only', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const permissionRow = rows.find((row) => row.textContent?.includes('Permission Approval'));
+    const questionRow = rows.find((row) => row.textContent?.includes('AskUserQuestion / Elicitation'));
+
+    expect(permissionRow).not.toBeNull();
+    expect(permissionRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
+    expect(permissionRow?.textContent).toContain('Verified');
+
+    expect(questionRow).not.toBeNull();
+    expect(questionRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
+    expect(questionRow?.textContent).toContain('Verified');
+  });
+
+  it('renders diagnostic proof discovery rows for permission approval, AskUserQuestion, and MCP', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getMcpServerCount: jest.fn().mockReturnValue(2),
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const discoveryTable = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    expect(discoveryTable).toBeTruthy();
+    const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
+    const permissionRow = rows.find((row) => row.textContent?.includes('Permission Approval'));
+    const questionRow = rows.find((row) => row.textContent?.includes('AskUserQuestion / Elicitation'));
+    const mcpRow = rows.find((row) => row.textContent?.includes('MCP Servers'));
+
+    expect(permissionRow).not.toBeNull();
+    expect(permissionRow?.textContent).toContain('Diagnostic Proof');
+    expect(permissionRow?.textContent).toContain('canUseTool');
+    expect(permissionRow?.textContent).not.toContain('Stable');
+    expect(permissionRow?.querySelector('.opencodian-capability-lab-chip')?.classList.contains('opencodian-capability-lab-chip-active')).toBe(false);
+
+    expect(questionRow).not.toBeNull();
+    expect(questionRow?.textContent).toContain('Diagnostic Proof');
+    expect(questionRow?.textContent).toContain('question bridge');
+    expect(questionRow?.textContent).toContain('onElicitation');
+    expect(questionRow?.textContent).not.toContain('Stable');
+    expect(questionRow?.querySelector('.opencodian-capability-lab-chip')?.classList.contains('opencodian-capability-lab-chip-active')).toBe(false);
+
+    expect(mcpRow).not.toBeNull();
+    expect(mcpRow?.textContent).toContain('Diagnostic Proof');
+    expect(mcpRow?.textContent).toContain('2 server(s) loaded');
+    expect(mcpRow?.querySelector('.opencodian-capability-lab-chip')?.classList.contains('opencodian-capability-lab-chip-active')).toBe(false);
   });
 
   it('renders MCP Servers in discovery table as Discovery Only when no adapter', () => {
@@ -184,7 +245,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(mcpRow?.textContent).toContain('Runtime passthrough');
   });
 
-  it('renders MCP Servers in discovery table as Exposed when adapter has servers', () => {
+  it('renders MCP Servers in discovery table as diagnostic proof when adapter has servers', () => {
     const containerEl = document.createElement('div');
     const adapter = {
       capabilities: new Set(['chat']),
@@ -202,7 +263,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
     const mcpRow = rows.find((row) => row.textContent?.includes('MCP Servers'));
     expect(mcpRow).not.toBeNull();
-    expect(mcpRow?.textContent).toContain('Exposed');
+    expect(mcpRow?.textContent).toContain('Diagnostic Proof');
     expect(mcpRow?.textContent).toContain('3 server(s) loaded');
     expect(mcpRow?.textContent).toContain('Claude Code settings Tools tab');
     expect(mcpRow?.textContent).not.toContain('No Claude Code settings tab');
@@ -528,7 +589,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(diagnosticElements.length).toBeGreaterThan(0);
   });
 
-  it('buildMatrixRows returns all 16 expected capabilities', () => {
+  it('buildMatrixRows returns all expected capabilities', () => {
     // We test this indirectly by counting matrix table rows
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -540,7 +601,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(17);
+    expect(rows.length).toBe(19);
   });
 
   it('renders status chips with correct active/inactive classes', () => {

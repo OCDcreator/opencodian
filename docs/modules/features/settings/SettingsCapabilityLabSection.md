@@ -23,7 +23,9 @@
 | Session Detail Inspection | Provider-owned 诊断探针：选择一个 Claude 会话并调用 `getSession()`，输出 raw session 字段（sessionId, summary, lastModified, messageCount 等）| `adapter.listSessions()` / `adapter.getSession()` |
 | Backend Routing Verification | Provider-owned 诊断探针：显示活跃后端、已注册适配器、会话后端分布，验证 `listSessions()` + `getSession()` 通过 provider-owned 路由路径工作，并额外验证 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 通过 registry 路由层工作 | `AgentServiceRegistry` / `adapter.listSessions()` / `adapter.getSession()` / `listBackendSessions()` / `getBackendSessionPreview()` / `readBackendSessionTitle()` / `readBackendSessionShareUrl()` |
 | Discovery & Status | hooks/plugins/skills/agents 状态概览，附带 SessionStart hook runtime proof；Plugins 和 Skills 现在使用 `getPluginCount()` / `getSkillCount()` 显示运行时加载计数，并通过 `getPluginsList()` / `getSkillsList()` 在 notes 中显示配置名称列表 | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
-| MCP Servers Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 MCP server 数量，不提供 authoring | `adapter.getMcpServerCount()` |
+| Permission Approval Discovery | Discovery & Status 面板中的 diagnostic proof 行：记录 Claude `canUseTool` approval bridge 已有 runtime proof，但不提供稳定 Claude permission authoring | `ClaudeCodePermissionBridge.canUseTool()` via adapter SDK options |
+| AskUserQuestion / Elicitation Discovery | Discovery & Status 面板中的 diagnostic proof 行：记录 AskUserQuestion answer bridge 与 `onElicitation` callback 已有 runtime proof，但不使用 OpenCode question API | `ClaudeCodePermissionBridge` + adapter `onElicitation` SDK option |
+| MCP Servers Discovery | Discovery & Status 面板中的 diagnostic proof 行：显示 adapter 已加载 MCP server 数量，不提供 authoring | `adapter.getMcpServerCount()` |
 | Plugins Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 plugin 数量及名称列表（如 `2 plugin(s): my-plugin, other-plugin`），不提供 authoring | `adapter.getPluginCount()` + `adapter.getPluginsList()` |
 | Skills Discovery | Discovery & Status 面板中的 detection-only 行：显示 adapter 已加载 skill 数量及名称列表（如 `3 skill(s): skill-a, skill-b`），`skills: 'all'` 时显示 "All skills enabled"，不提供 authoring | `adapter.getSkillCount()` + `adapter.getSkillsList()` |
 
@@ -38,9 +40,9 @@
 
 ### Capability Matrix
 
-`buildMatrixRows()` 静态评估 16 项 Claude Code SDK 能力（Hooks、File Checkpoint、JSONL History、Session Store、Skills、Plugins、Agents、Agent Definitions、Structured Output、Subagent Transcript、Include Hook Events、Import Session、Fork Session、Resume Session、Session Detail、Backend Routing），每项包含 SDK Exposed、Adapter Wired、Runtime Proof 和 Stable UI 四个维度。Runtime Proof 默认为 `untested`，在对应诊断面板执行实时调用后更新为 `pass` 或 `fail`。`Agent Definitions` 只表示 SDK `agent` / `agents` runtime-only 透传已接线，仍是 Hidden/Untested，不代表 agent authoring UI 已完成；`Session Store` 也只是隔离的 diagnostic store proof，不是正式会话存储产品面。
+`buildMatrixRows()` 静态评估 19 项 Claude Code SDK 能力（Hooks、File Checkpoint、JSONL History、Session Store、Skills、Plugins、MCP Servers、Permission Approval、AskUserQuestion / Elicitation、Agents、Agent Definitions、Structured Output、Subagent Transcript、Include Hook Events、Import Session、Fork Session、Resume Session、Session Detail、Backend Routing），每项包含 SDK Exposed、Adapter Wired、Runtime Proof 和 Stable UI 四个维度。多数 Runtime Proof 默认为 `untested`，在对应诊断面板执行实时调用后更新为 `pass` 或 `fail`。Permission Approval、AskUserQuestion / Elicitation 和 MCP Servers 只引用已记录的 direct SDK smoke / adapter seam proof，仍标记为 `Diagnostic`，不代表稳定 product surface 或 authoring UI。`Agent Definitions` 只表示 SDK `agent` / `agents` runtime-only 透传已接线，仍是 Hidden/Untested，不代表 agent authoring UI 已完成；`Session Store` 也只是隔离的 diagnostic store proof，不是正式会话存储产品面。
 
-`buildMatrixRows()` 还包含 MCP Servers 行，标记为 SDK exposed + adapter wired、runtime proof `untested`、user surface `diagnostic`；该行只表示 Capability Lab 能检测 MCP 服务器加载状态，不表示 MCP authoring UI 已完成。
+`buildMatrixRows()` 还包含 MCP Servers 行，标记为 SDK exposed + adapter wired、runtime proof `pass`、user surface `diagnostic`；该行只表示 MCP runtime passthrough 已有正向 proof，Capability Lab/Claude settings 能检测或刷新已加载 runtime config，不表示 MCP authoring UI 已完成。
 
 ### Runtime Proof 更新
 
@@ -55,7 +57,7 @@
 
 `getClaudeCodeAdapter()` 从 `plugin.agentServiceRegistry` 获取 `'claude-code'` 注册的 adapter 并窄化类型为 `ClaudeCodeAdapter`。如果 adapter 不可用，相关面板显示 "not available" 提示。
 
-Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`adapter.getPluginCount()` 和 `adapter.getSkillCount()` 显示当前已加载 MCP server / plugin / skill 数量，并通过 `getPluginsList()` / `getSkillsList()` 在 notes 中显示配置名称列表；adapter 不可用时显示 detection unavailable。这些检测均为只读，不写入设置，也不创建/编辑对应配置。Skills 的 `getSkillCount()` 在 `skills` 选项为 `'all'` 时返回 `-1`，面板会显示 "All skills enabled" 而非具体数量。MCP notes 现在指向 Claude Code settings 的 Tools tab runtime refresh 控件；Skills / Plugins 的可见只读摘要在 Claude Code settings 的 SDK Foundations tab 中显示。Capability matrix 中 Skills 和 Plugins 仍保持 `runtimeProof: 'untested'` 与 `userSurface: 'hidden'`；当前名称列表只是配置摘要诊断，不是 runtime proof，也不是 authoring UI。
+Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`adapter.getPluginCount()` 和 `adapter.getSkillCount()` 显示当前已加载 MCP server / plugin / skill 数量，并通过 `getPluginsList()` / `getSkillsList()` 在 notes 中显示配置名称列表；adapter 不可用时显示 detection unavailable。这些检测均为只读，不写入设置，也不创建/编辑对应配置。Skills 的 `getSkillCount()` 在 `skills` 选项为 `'all'` 时返回 `-1`，面板会显示 "All skills enabled" 而非具体数量。MCP notes 现在指向 Claude Code settings 的 Tools tab runtime refresh 控件，并在已加载 server 时显示 `Diagnostic Proof` 而非 `Exposed`，且不复用 active/exposed chip 样式。Permission Approval 与 AskUserQuestion / Elicitation 也显示 `Diagnostic Proof`，用于标记 bridge/seam 已有 runtime proof，但不宣称稳定 Claude permission/question 设置产品化。Skills / Plugins 的可见只读摘要在 Claude Code settings 的 SDK Foundations tab 中显示。Capability matrix 中 Skills 和 Plugins 仍保持 `runtimeProof: 'untested'` 与 `userSurface: 'hidden'`；当前名称列表只是配置摘要诊断，不是 runtime proof，也不是 authoring UI。
 
 ## 导入关系
 
@@ -120,4 +122,4 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 - Discovery 面板里的 Hooks / Agent Definitions / Session Store 条目保持 `Discovery Only`，只表示诊断观察，不是稳定产品面；Hook proof 现在会同时展示 SessionStart 事件和 hook event timeline，但仍只属于诊断验证
 - Discovery 面板里的 Plugins 条目现在使用 `adapter.getPluginCount()` 动态显示加载状态：有 plugins 时显示 "Exposed" + 计数，无 plugins 时显示 "Discovery Only"；该检测为只读，不提供 plugin authoring
 - Discovery 面板里的 Skills 条目现在使用 `adapter.getSkillCount()` 动态显示加载状态：有 skills 时显示 "Exposed" + 计数，`skills: 'all'` 时显示 "All skills enabled"，无 skills 时显示 "Discovery Only"；该检测为只读，不提供 skill authoring
-- Discovery 面板里的 MCP Servers 条目同样保持 detection-only：只读取 adapter 的 MCP server count，用于确认静态 options 或动态缓存配置是否已加载，不提供 MCP authoring 或稳定设置入口
+- Discovery 面板里的 Permission Approval / AskUserQuestion / Elicitation / MCP Servers 条目显示为 `Diagnostic Proof`：它们只记录 SDK smoke 和 adapter seam 证据，不提供 Claude permission authoring、稳定 question 设置、MCP authoring 或稳定设置入口

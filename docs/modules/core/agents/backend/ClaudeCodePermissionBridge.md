@@ -23,6 +23,6 @@
 - 不在这里渲染 UI；host callback 由后续 Claude adapter/runtime 注入。
 - permission bridge 的 `debug` / `info` 日志必须继续受全局 `enableDebugLogging`、`claudeCode` module 和 `permissions` channel 控制；不要绕过 shared logger 或新增独立 buffer。
 - 不把 Claude permission mode 混入 OpenCode permission 设置；这里只处理单次 `canUseTool` 决策。
-- `AskUserQuestion` 交互当前只生成可被 OpenCodian question UI 消费的请求；真实 SDK wiring 和超时/取消语义在 adapter 集成时补验证。
+- `AskUserQuestion` 交互会生成可被 OpenCodian question UI 消费的请求，并通过 adapter-injected `canUseTool` 返回给 Claude SDK；direct SDK smoke 和 focused unit tests 已覆盖 allow/deny 与 answer mapping。该 proof 仍只属于 diagnostic/runtime bridge，不等于稳定 Claude question 设置或 OpenCode question API 复用。
 - 引入官方 SDK 类型后，优先用类型测试收窄 `ClaudeCodePermissionResult`，但保留 OpenCodian host 边界。
 - `setHost` 允许 chat view 层在流式 UI 上下文可用时更新 host callbacks；不改变 bridge 的拒绝/允许逻辑。

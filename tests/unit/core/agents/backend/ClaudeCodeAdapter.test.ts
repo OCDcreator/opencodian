@@ -1198,6 +1198,40 @@ describe('ClaudeCodeAdapter', () => {
     expect(typeof call.options.canUseTool).toBe('function');
   });
 
+  it('injects permission, elicitation, and MCP seams into diagnostic SDK options', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-diagnostic-proof',
+        content: [{ type: 'text', text: 'diagnostic ok' }],
+      },
+    }]);
+    const permissionBridge = createClaudeCodePermissionBridge();
+    const onElicitation = jest.fn();
+    const mcpServers = {
+      filesystem: { command: 'node', args: ['server.js'] },
+    };
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+      permissionBridge,
+      onElicitation,
+      mcpServers,
+    });
+
+    await adapter.runDiagnosticPrompt({
+      prompt: 'diagnose permission, question, and MCP seams',
+      persistSession: false,
+    });
+
+    const call = sdk.query.mock.calls[0][0];
+    expect(call.options.persistSession).toBe(false);
+    expect(typeof call.options.canUseTool).toBe('function');
+    expect(typeof call.options.onElicitation).toBe('function');
+    expect(call.options.mcpServers).toEqual(mcpServers);
+  });
+
   it('cancels active streams without yielding later chunks', async () => {
     async function* delayedMessages() {
       yield {

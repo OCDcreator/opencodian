@@ -58,6 +58,33 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Capability Lab permission/question/MCP proof honesty
+
+This slice closes a product-surface honesty gap after the positive resume proof: the adapter and bridge already had direct SDK smoke evidence for `canUseTool` allow/deny, `AskUserQuestion` / elicitation, and MCP stdio tool execution, but Capability Lab still left those surfaces either absent or labelled like ordinary exposure/untested discovery.
+
+### What Changed
+
+- `SettingsCapabilityLabSection` now adds explicit matrix rows for `Permission Approval` and `AskUserQuestion / Elicitation`.
+- MCP Servers, Permission Approval, and AskUserQuestion / Elicitation now show `Verified` + `Diagnostic` in the matrix and `Diagnostic Proof` in Discovery where proof exists.
+- `ClaudeCodeAdapter.runDiagnosticPrompt()` has focused coverage proving diagnostic SDK options still carry `permissionBridge.canUseTool`, `onElicitation`, and `mcpServers`.
+
+### What This Does Not Change
+
+- This does not promote Claude permission approval, question/elicitation, or MCP authoring to stable product surfaces.
+- This does not add MCP authoring, Claude permission templates/settings, or a stable question settings surface.
+- OpenCode-only question APIs and OpenCode MCP/settings authoring remain gated.
+
+### Verification
+
+- Red first: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` failed because Capability Lab lacked the diagnostic rows/proof labels.
+- Focused green after diagnostic-chip hardening: same command passed with `2` suites / `152` tests.
+- Direct SDK smoke remains the backend proof source: `.obsidian-debug/claude-code-smoke-2026-05-24-current.json` recorded `10/10` pass for SDK import, bundled executable, text, supported models, thinking, MCP stdio tool, `canUseTool` allow/deny, elicitation, and session resume.
+- Guard gates passed after the final source/docs changes: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+- `npm run build` produced `BUILD_ID: feature-phase0-capability.202605242127`, and Test Vault deployment copied the built runtime to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: Test Vault `main.js` contains `feature-phase0-capability.202605242127`; `dist/main.js` and deployed `main.js` SHA256 both equal `561cc2e46337f2accf72c5c43916fde022c2bc311b9570dbb6d8e835d0d6f78d`; the deployed Claude SDK binary checksum matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Fresh Test Vault runtime proof `.obsidian-debug/permission-question-mcp-diagnostic-honesty-assertion-2026-05-24-result.json` returned `ok: true` against loaded runtime `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242127`. It confirmed the Permission Approval, AskUserQuestion / Elicitation, and MCP Servers matrix rows show `Verified` + `Diagnostic`; the Discovery rows show `Diagnostic Proof`; Diagnostic Proof chips use `opencodian-capability-lab-chip-surface-diagnostic` rather than `opencodian-capability-lab-chip-active`; no positive stable/full-capability completion claim is rendered; and the mounted settings root overflow is `0px`.
+- Runtime artifacts: `.obsidian-debug/permission-question-mcp-diagnostic-honesty-runtime-2026-05-24.png`, `.obsidian-debug/permission-question-mcp-diagnostic-honesty-console-2026-05-24.txt`, `.obsidian-debug/permission-question-mcp-diagnostic-honesty-errors-2026-05-24.txt`, and `.obsidian-debug/permission-question-mcp-diagnostic-honesty-launch-2026-05-24.json`; `dev:errors` reported `No errors captured.`
+
 ## 2026-05-24 Capability Lab diagnostic sessionStore mirror readback
 
 This worker/reviewer slice closes a diagnostic proof gap in the Capability Lab JSONL History Browser: the mirror probe previously treated `runDiagnosticPrompt({ sessionStore })` returning a session id as enough proof, even though the user-facing proof needs the mirrored session to be listed and readable through the same diagnostic store.
