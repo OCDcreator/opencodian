@@ -896,6 +896,24 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.agentProgressSummaries).toBe(true);
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
+
+    it('shows a diagnostic boundary for hook and subagent stream options', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'sdk-foundations');
+
+      const noticeEl = containerEl.querySelector('[data-claude-code-sdk-stream-boundary="true"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.textContent).toContain(t('settings.claudeCode.sdkStreamBoundary.title'));
+      expect(noticeEl?.textContent).toContain(t('settings.claudeCode.sdkStreamBoundary.desc'));
+      expect(noticeEl?.textContent).toContain('diagnostic/experimental event streams');
+      expect(noticeEl?.textContent).toContain('do not enable stable hook authoring');
+      expect(noticeEl?.textContent).toContain('complete subagent transcript/progress UI');
+    });
   });
 
   describe('advanced capability gating', () => {

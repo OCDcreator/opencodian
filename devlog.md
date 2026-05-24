@@ -12,6 +12,34 @@
 
 ---
 
+## 2026-05-24 Phase 3 - SDK Foundations hook/subagent stream honesty
+
+### 目标
+
+修正 Claude SDK Foundations 中 hook/subagent stream 可编辑设置的成熟度表达：保留真实 SDK options wiring，但不得让设置入口被读成稳定 hook authoring 或完整 transcript/progress 产品能力。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | Capability Lab 诚实化 | `Subagent Transcript / Progress` 与 `Include Hook Events` 从普通 `Settings` surface 收紧为 `Diagnostic` + `Untested`，仍保留 SDK/Adapter wired 状态 |
+| `src/features/settings/SettingsClaudeCodeSection.ts` / `src/i18n/locales/{en,zh}.ts` | 设置可见边界提示 | SDK Foundations 在 hook/subagent stream 控件前显示双语 diagnostic boundary notice，明确这些 flags 只供诊断/实验事件流使用，不启用稳定 hook authoring 或完整 transcript/progress UI |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` / `SettingsClaudeCodeSection.test.ts` | TDD 回归测试 | 覆盖矩阵 surface 分类和 SDK Foundations 可见边界提示 |
+| `docs/modules/**` / `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 记录可编辑 options 与稳定产品能力之间的边界，不声称新的 runtime 产品化 |
+
+### 验证
+
+- Red: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` 先失败，表现为两个矩阵行仍渲染成 `Settings` 且 SDK Foundations 未显示 diagnostic boundary notice
+- Focused green: 同一命令通过，`2` suites / `112` tests passed
+- 独立只读 review：无 blocking findings；确认 UI 仍保留可配置 SDK flags，但不会误标为 stable hook authoring / complete subagent transcript-progress 产品面
+- 门禁：`npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 均通过
+- 构建部署：`npm run build` 生成 `BUILD_ID=feature-phase0-capability.202605242303`；顺序部署到 Test Vault 后，`dist/main.js` 与 deployed `main.js` SHA256 同为 `d404bc8d874ca589e6e9b340d8c6593d1faa681775ca09cc39629cbeca3c7bf0`，部署 Claude SDK `claude` binary hash 与 dist 同为 `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof：`.obsidian-debug/claude-settings-honesty-runtime-proof-20260524-result.json` 通过 `23` 条断言，覆盖 SDK Foundations diagnostic notice、Capability Lab 两个 `Diagnostic` + `Untested` 行、负向 stable/full capability claim 扫描、editor-area / 430px 窄布局无溢出与状态恢复；截图/console/errors 位于 `.obsidian-debug/claude-settings-honesty-runtime-proof-20260524.png`、`.obsidian-debug/claude-settings-honesty-runtime-proof-20260524-console.txt`、`.obsidian-debug/claude-settings-honesty-runtime-proof-20260524-errors.txt`，最终 `dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+本轮只校准 hook/subagent stream 的可见成熟度表达，不新增 stable hook authoring、不新增完整 subagent transcript/progress UI、不改变 SDK option wiring 或 OpenCode 行为。
+
 ## 2026-05-24 Phase 3 - Shared-session shareUrl backend boundary
 
 ### 目标

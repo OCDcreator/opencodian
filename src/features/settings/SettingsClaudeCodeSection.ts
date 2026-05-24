@@ -550,6 +550,7 @@ export class SettingsClaudeCodeSection {
 
   private renderSdkFoundationsTab(containerEl: HTMLElement): void {
     this.renderRuntimeEcosystemStatus(containerEl);
+    this.renderSdkStreamBoundaryNotice(containerEl);
     this.renderSdkFoundationOptions(containerEl);
   }
 
@@ -563,6 +564,15 @@ export class SettingsClaudeCodeSection {
     const listEl = statusEl.createEl('ul');
     listEl.createEl('li', { text: this.describeRuntimePlugins() });
     listEl.createEl('li', { text: this.describeRuntimeSkills() });
+  }
+
+  private renderSdkStreamBoundaryNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-sdk-stream-boundary',
+      attr: { 'data-claude-code-sdk-stream-boundary': 'true' },
+    });
+    noticeEl.createEl('strong', { text: t('settings.claudeCode.sdkStreamBoundary.title') });
+    noticeEl.createEl('p', { text: t('settings.claudeCode.sdkStreamBoundary.desc') });
   }
 
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {

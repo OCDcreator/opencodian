@@ -18,8 +18,9 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Snapshot commit after the latest committed capability slice: `8a48502b`
 - Commit subject after the latest committed capability slice: `fix: restrict shared session links to opencode`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242237`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242303`
 - Recent continuity commits in this lane:
+- Uncommitted implementer slice — Capability Lab classifies `Subagent Transcript / Progress` and `Include Hook Events` as `Diagnostic` + `Untested`, and SDK Foundations adds visible boundary copy explaining that its hook/subagent stream flags do not enable stable hook authoring or complete transcript/progress UI.
 - `8a48502b` — `fix: restrict shared session links to opencode`
 - `9f455f1b` — `fix: clarify claude advanced settings honesty`
 - `fc2659ff` — `docs: refresh claude footer boundary anchor`
@@ -111,6 +112,33 @@ This implementer slice closes a narrow settings honesty gap in the stable shared
 - Deploy freshness: `dist/main.js` and Test Vault `main.js` SHA256 both equal `475e59146319f659583320cd9e5909af84fb218d030c02317a474d72d1a2c5f4`; the deployed Claude SDK `claude` binary hash matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
 - Fresh Test Vault runtime proof `.obsidian-debug/claude-share-url-honesty-result-20260524224105.json` returned `ok: true` against loaded runtime `BUILD_ID=feature-phase0-capability.202605242237`. With Claude Code active, it injected a compatible Claude session row containing `share.url`, mounted the real settings surface, and verified no OpenCode shared-session row or public URL was rendered; it also found no stable/full-capability claim and no horizontal overflow in the 430px mobile-class fixture.
 - Runtime artifacts: `.obsidian-debug/claude-share-url-honesty-assertion-20260524224105.js`, `.obsidian-debug/claude-share-url-honesty-screenshot-20260524224105.png`, `.obsidian-debug/claude-share-url-honesty-console-20260524224105.log`, and `.obsidian-debug/claude-share-url-honesty-errors-20260524224105.log`; `dev:errors` reported `No errors captured.`
+
+## 2026-05-24 SDK Foundations hook/subagent stream honesty
+
+This implementer/reviewer slice corrects the visible maturity of two editable Claude SDK options. `includeHookEvents`, `forwardSubagentText`, and `agentProgressSummaries` remain wired options, but their settings presence must not look like stable hook authoring or complete subagent transcript/progress productization.
+
+### What Changed
+
+- Capability Lab now marks `Subagent Transcript / Progress` and `Include Hook Events` as `Diagnostic` + `Untested`, while retaining their SDK/Adapter wired status.
+- Claude Code SDK Foundations now shows a visible bilingual boundary notice before the hook/subagent stream toggles: the flags feed diagnostic/experimental event streams only, and do not enable stable hook authoring or complete transcript/progress UI.
+- The toggle behavior and SDK options wiring remain unchanged.
+
+### What This Does Not Change
+
+- This does not promote hooks, subagent transcript/progress, skills/plugins authoring, or agent-definition authoring to stable UI.
+- This does not claim new SDK runtime proof for hook/subagent event delivery or ordinary chat rendering.
+- This does not alter OpenCode behavior.
+
+### Verification
+
+- Red first: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` failed because the two matrix rows still rendered as `Settings` and SDK Foundations lacked the diagnostic boundary notice.
+- Focused green: the same command passed with `2` suites / `112` tests.
+- Independent read-only reviewer reported no blocking findings and confirmed that the two rows and visible bilingual notice preserve the diagnostic boundary.
+- Guard gates passed after source/docs changes: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+- `npm run build` produced `BUILD_ID: feature-phase0-capability.202605242303`; deployment sequentially copied the runtime artifacts and Claude SDK binary to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: `dist/main.js` and Test Vault `main.js` SHA256 both equal `d404bc8d874ca589e6e9b340d8c6593d1faa681775ca09cc39629cbeca3c7bf0`; the deployed Claude SDK `claude` binary hash matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Fresh Test Vault runtime proof `.obsidian-debug/claude-settings-honesty-runtime-proof-20260524-result.json` passed `23` assertions against loaded `BUILD_ID=feature-phase0-capability.202605242303`. It confirmed the visible SDK Foundations diagnostic boundary notice, `Subagent Transcript / Progress` and `Include Hook Events` as `SDK` + `Adapter` + `Untested` + `Diagnostic`, no positive stable/full-capability claim, restored state, and no overflow in editor-area settings or a 430px mobile-class fixture.
+- Runtime artifacts: `.obsidian-debug/claude-settings-honesty-runtime-proof-20260524.js`, `.obsidian-debug/claude-settings-honesty-runtime-proof-20260524.png`, `.obsidian-debug/claude-settings-honesty-runtime-proof-20260524-console.txt`, and `.obsidian-debug/claude-settings-honesty-runtime-proof-20260524-errors.txt`; `dev:errors` reported `No errors captured.`
 
 ## 2026-05-24 Capability Lab permission/question/MCP proof honesty
 

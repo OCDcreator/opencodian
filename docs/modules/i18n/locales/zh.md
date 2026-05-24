@@ -69,6 +69,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1/2 配置面板提供中文文案，包括 section 标题/描述、二级标签（运行时、模型与思考、权限、上下文与来源、工具、限制、SDK Foundations）、可执行文件路径、认证与环境提示、设置来源、项目来源文件可见性、下一次 query / 重启边界、权限模式、模型/备用模型、thinking/effort（含“特高”）、额外目录、allowed/disallowed tools、max turns、max budget、env 和运行时诊断；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。本轮还补充 `chat.serverStatus.backendOffline` 和 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 离线状态与 tooltip，避免继续写成 OpenCode server 文案。`chat.history.backendScope` 则用于 history dropdown 顶部显示当前 backend 的历史范围。
 
+2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/子代理 stream 开关前的诊断边界提示，明确这些设置只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整子代理 transcript/progress UI。
+
 本轮还将 `chat.question.title` 调整为后端无关的“Agent 提问”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。
 
 2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告。

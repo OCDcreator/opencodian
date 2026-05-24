@@ -18,7 +18,7 @@
 - Runtime 与 Context & Sources 标签都提供 “Restart sessions” 操作，调用 Claude adapter 的 `restartPersistentQueries('settings-change')`，只关闭活跃持久 query，不删除 session；下一次发送会用最新 source/directory/env/tool/limit options 重新启动并在可能时 resume
 - 在 Tools 标签渲染 restart-sensitive runtime boundary notice、MCP runtime 只读状态与刷新按钮，以及 allowed/disallowed tools；MCP 控制只调用当前 Claude adapter 的 `getMcpServerCount()` / `reloadMcpServers()`，不写入 `.claude/mcp.json`，刷新失败会保留明确错误状态
 - 在 Limits 标签渲染 restart-sensitive runtime boundary notice、max turns 和 max budget USD；输入必须是完整正数，`12abc` / `5usd` 这类部分数字会归一化为 unlimited/null，空白仍保持 unlimited/null
-- 在 SDK Foundations 标签渲染 runtime-only plugin / skill 只读摘要，以及 file checkpoint、hook event stream、subagent transcript/progress 开关。这些字段只进入 SDK options / diagnostic stream，不宣称 MCP authoring、skills/plugins authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
+- 在 SDK Foundations 标签渲染 runtime-only plugin / skill 只读摘要，以及 file checkpoint、hook event stream、subagent transcript/progress 开关；hook/subagent 控件前会显示可见的 diagnostic stream boundary notice。这些字段只进入 SDK options / diagnostic/experimental stream，不宣称 MCP authoring、skills/plugins authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
 - 将多标签设置输入写入 `settings.backendSettings.claudeCode`
 - 通过 `ClaudeCodeProcessResolver` 做本地进程解析诊断，帮助检查 bundled/default resolution 与外部 CLI path
 - 保持 hook authoring、skills authoring、agent authoring、external SessionStore、JSONL import/browser 等未完成能力不在 UI 中暴露，直到对应 phase 有端到端 runtime proof
@@ -38,6 +38,7 @@
 ## 维护约束
 
 - 该 section 是 Phase A 多标签设置 surface；不要把 SDK option builder 支持的字段等同于已经可以给用户操作的产品能力
+- SDK Foundations 中 hook/subagent stream 开关虽可配置，但必须伴随 diagnostic/experimental 边界提示；除非有新的稳定 E2E proof，不得把它们写成 hook authoring 或完整 transcript/progress 产品能力
 - 新增或调整 Claude Code 二级标签时，同步 `renderTabContent()` 路由、classic `attach()` 分组、settings layout registry、locale 文案、稳定 `data-settings-target` / `data-claude-code-section` 属性和测试覆盖
 - 该 section 不应直接依赖 `@anthropic-ai/claude-agent-sdk`；真实 SDK runtime 由 `ClaudeCodeAdapter` / `ClaudeCodeSdkLoader` 负责
 - 所有文案必须通过 locale key 获取

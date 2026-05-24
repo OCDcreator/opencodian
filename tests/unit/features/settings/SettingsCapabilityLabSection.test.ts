@@ -188,6 +188,30 @@ describe('SettingsCapabilityLabSection', () => {
     expect(questionRow?.textContent).toContain('Verified');
   });
 
+  it('keeps hook and subagent stream option rows diagnostic-facing while untested', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
+
+    for (const label of ['Subagent Transcript / Progress', 'Include Hook Events']) {
+      const row = getRow(label);
+      expect(row).not.toBeNull();
+      expect(row?.textContent).toContain('SDK');
+      expect(row?.textContent).toContain('Adapter');
+      expect(row?.textContent).toContain('Untested');
+      expect(row?.textContent).toContain('Diagnostic');
+      expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
+      expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).not.toBe('settings');
+    }
+  });
+
   it('renders diagnostic proof discovery rows for permission approval, AskUserQuestion, and MCP', () => {
     const containerEl = document.createElement('div');
     const adapter = {

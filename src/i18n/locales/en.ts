@@ -2277,6 +2277,8 @@ export const enTranslations = {
   'settings.claudeCode.runtimeEcosystem.skills.empty': 'No runtime skills are loaded in the active Claude Code adapter.',
   'settings.claudeCode.runtimeEcosystem.skills.loaded': '{count} runtime skill(s): {names}.',
   'settings.claudeCode.runtimeEcosystem.skills.all': 'All runtime skills are enabled in the active Claude Code adapter.',
+  'settings.claudeCode.sdkStreamBoundary.title': 'Diagnostic stream flags',
+  'settings.claudeCode.sdkStreamBoundary.desc': 'Hook and subagent stream flags feed diagnostic/experimental event streams. They do not enable stable hook authoring or complete subagent transcript/progress UI.',
   'settings.claudeCode.env.name': 'Environment variables',
   'settings.claudeCode.env.desc': 'One KEY=VALUE pair per line for Claude Code SDK process options.',
   'settings.claudeCode.env.placeholder': 'ANTHROPIC_API_KEY=...',

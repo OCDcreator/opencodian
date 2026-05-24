@@ -554,14 +554,14 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // forwardSubagentText + agentProgressSummaries options
         adapterWired: true, // buildSdkOptions wires both
         runtimeProof: 'untested',
-        userSurface: 'settings', // SDK Foundations toggles exist
+        userSurface: 'diagnostic', // SDK Foundations toggles feed diagnostic/experimental event streams only
       },
       {
         capability: 'Include Hook Events',
         sdkExposed: true, // includeHookEvents option
         adapterWired: true, // buildSdkOptions wires it
         runtimeProof: 'untested',
-        userSurface: 'settings', // SDK Foundations toggle exists
+        userSurface: 'diagnostic', // SDK Foundations toggle feeds diagnostic/experimental event streams only
       },
       {
         capability: 'Import Session to Store',
