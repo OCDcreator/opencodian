@@ -172,6 +172,14 @@ export class SettingsConversationSection {
     return this.getActiveBackend() === 'opencode';
   }
 
+  private canSaveOpenCodeProjectConversationConfig(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.conversation.projectConfig.openCodeOnly'));
+    return false;
+  }
+
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     this.resetState();
     this.setSharedCallbacks();
@@ -480,6 +488,10 @@ export class SettingsConversationSection {
         toggle
           .setValue(true)
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectCompactionAutoControl?.setValue(this.currentCompactionState.auto);
+              return;
+            }
             this.currentCompactionState.auto = value;
             await this.saveProjectCompactionConfig({ auto: value });
           });
@@ -494,6 +506,10 @@ export class SettingsConversationSection {
         toggle
           .setValue(true)
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectCompactionPruneControl?.setValue(this.currentCompactionState.prune);
+              return;
+            }
             this.currentCompactionState.prune = value;
             await this.saveProjectCompactionConfig({ prune: value });
           });
@@ -511,6 +527,10 @@ export class SettingsConversationSection {
           .setPlaceholder('2')
           .setValue('2')
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionTailTurnsInput();
+              return;
+            }
             const parsed = parseNonNegativeInteger(value.trim());
             if (parsed === null) {
               this.resetCompactionTailTurnsInput();
@@ -533,6 +553,10 @@ export class SettingsConversationSection {
           .setPlaceholder(t('settings.conversation.compaction.followDefault'))
           .setValue('')
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionPreserveRecentTokensInput();
+              return;
+            }
             const trimmed = value.trim();
             if (!trimmed) {
               this.currentCompactionState.preserveRecentTokens = undefined;
@@ -561,6 +585,10 @@ export class SettingsConversationSection {
           .setPlaceholder(t('settings.conversation.compaction.followDefault'))
           .setValue('')
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionReservedInput();
+              return;
+            }
             const trimmed = value.trim();
             if (!trimmed) {
               this.currentCompactionState.reserved = undefined;
@@ -615,6 +643,10 @@ export class SettingsConversationSection {
           .addOption('disabled', t('settings.conversation.share.mode.disabled'))
           .setValue(this.currentShareMode)
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectShareModeControl?.setValue(this.currentShareMode);
+              return;
+            }
             this.currentShareMode = value as OpencodeShareMode;
             policyStateEl.setText(this.getShareModeLabel(this.currentShareMode));
             if (this.shareModeDiagnosticValueEl) {
@@ -667,6 +699,9 @@ export class SettingsConversationSection {
     });
     checkButtonEl.addEventListener('click', () => {
       void (async () => {
+        if (!this.canSaveOpenCodeProjectConversationConfig()) {
+          return;
+        }
         checkButtonEl.disabled = true;
         this.setShareDiagnosticValue(modeValueEl, this.getShareModeDiagnosticText(), this.currentShareMode === 'disabled' ? 'error' : 'ok');
         this.setShareDiagnosticValue(serviceValueEl, t('settings.conversation.share.diagnostics.checking'), 'pending');

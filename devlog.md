@@ -12,6 +12,40 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Conversation settings project config stale backend guard
+
+### 目标
+
+收紧 Conversation settings 里 OpenCode-only 项目配置控件的 stale callback 边界：页面在 OpenCode active 时挂载后，如果 active backend 切到 Claude Code，旧的 compaction / share mode 控件不能继续写 `.opencode/opencode.json` 或重启 OpenCode。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsConversationSection.ts` | 后端边界修复 | 在项目级 compaction / share change callback 和 share diagnostics click handler 开头增加 active OpenCode guard；非 OpenCode active 时先恢复控件并跳过本地 state/chip/diagnostics 更新、`updateCompactionConfig()`、`reapplyCompactionConfigFromProjectConfig()`、`updateShareConfig()`、OpenCode restart、`checkHealth()` 和 public share-host probe |
+| `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts` | 文案新增 | 新增 generic `settings.conversation.projectConfig.openCodeOnly` notice，避免复用 unshare 专用文案 |
+| `tests/unit/features/settings/SettingsConversationSection.test.ts` | +3 TDD 回归测试 | 覆盖 OpenCode active 挂载后切到 Claude Code，再触发 stale compaction / share save 控件或 share diagnostics 按钮时不调用 OpenCode-only 写入/检查路径，也不突变 compaction local state、share policy chip 或 diagnostics UI |
+| `docs/modules/features/settings/SettingsConversationSection.md` | 文档更新 | 记录 compaction/share 项目配置 change callback 会在本地状态变化前重新检查 active backend |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 project config stale backend guard 与 focused test evidence |
+
+### 验证
+
+- Red: focused tests 先失败，证明 stale Claude-active callback 会先把 compaction local state 改成 `tailTurns: 5`，把可见 share policy chip 从 Manual 改成 Auto，并且 stale diagnostics click 仍会调用 `openCodeService.checkHealth()`
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsConversationSection.test.ts` 通过，`1` suite / `35` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`
+- `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check` 通过
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`436` suites / `3234` tests passed，verify build ID `feature-phase0-capability.202605241436`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241436`；并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241436`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-settings-project-config-gate-assertion-2026-05-24.json` 在部署版 `feature-phase0-capability.202605241436` 上返回 outer `ok: true` 且 inner `ok: true`。脚本在真实 settings editor-area DOM 中验证 stale compaction input、share dropdown、share diagnostics button；两段 `phaseCalls` 中 `updateCompactionConfig`、`reapplyCompactionConfigFromProjectConfig`、`updateShareConfig`、`checkHealth`、`stop`、`start`、`requestUrl` 均为 `0`，tail input / share policy chip / diagnostics UI 保持不变，按钮未被 disabled，并出现 generic OpenCode-only Notice
+- Runtime artifacts: `.obsidian-debug/claude-settings-project-config-gate-2026-05-24.png`、`.obsidian-debug/claude-settings-project-config-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-settings-project-config-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧 SettingsConversationSection 中 OpenCode-only 项目配置写入边界，不新增 Claude compaction/share mode 能力，不宣称 Claude full capability 完成。OpenCode active 下的项目级 compaction/share 现有行为保持不变。
+
+---
+
 ## 2026-05-24 Phase 3 - Ordinary slash command backend gate hardening
 
 ### 目标

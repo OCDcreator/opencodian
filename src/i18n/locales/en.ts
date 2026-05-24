@@ -696,6 +696,7 @@ export const enTranslations = {
   'settings.titleGeneration.groupDesc': 'Choose first-message titles or smart titles. Smart titles wait for the official OpenCode title first; the backup title model only runs when OpenCode does not produce one, and it is independent from OpenCode `small_model`.',
   'settings.conversation.compaction.projectNote': 'Context compaction (project)',
   'settings.conversation.compaction.projectNoteDesc': 'These settings are stored in the current project\u2019s .opencode/opencode.json and shared across all conversations in this vault.',
+  'settings.conversation.projectConfig.openCodeOnly': 'Project conversation config can only be changed when OpenCode is the active backend.',
   'settings.conversation.share.projectNote': 'Conversation sharing (project)',
   'settings.conversation.share.projectNoteDesc': 'Choose how OpenCode shares conversations for this project. This writes the `share` field in .opencode/opencode.json.',
   'settings.conversation.display.title': 'Reading and display',

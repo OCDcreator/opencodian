@@ -429,6 +429,37 @@ describe('SettingsConversationSection', () => {
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
 
+  it('blocks stale project compaction saves when the active backend is no longer OpenCode', async () => {
+    const plugin = createPlugin();
+    const { section } = createSection(plugin);
+    const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+    expect(tailTurnsText).toBeDefined();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+
+    await tailTurnsText?.onChange?.('5');
+
+    expect(
+      (section as unknown as { currentCompactionState: { tailTurns: number } }).currentCompactionState.tailTurns,
+    ).toBe(2);
+
+    plugin.settings.activeBackend = 'opencode';
+    tailTurnsText!.control.inputEl.value = 'bad';
+    await tailTurnsText?.onChange?.('bad');
+
+    expect(
+      (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig,
+    ).not.toHaveBeenCalled();
+    expect(
+      (plugin.openCodeService as { reapplyCompactionConfigFromProjectConfig: jest.Mock })
+        .reapplyCompactionConfigFromProjectConfig,
+    ).not.toHaveBeenCalled();
+    expect(tailTurnsText!.control.inputEl.value).toBe('2');
+  });
+
   it('saves project share mode through project config', async () => {
     const plugin = createPlugin();
     createSection(plugin);
@@ -441,6 +472,28 @@ describe('SettingsConversationSection', () => {
     const updateShareConfig = (plugin.opencodeConfigManager as { updateShareConfig: jest.Mock }).updateShareConfig;
     expect(updateShareConfig).toHaveBeenCalledWith('auto');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('blocks stale project share saves and OpenCode restart when the active backend is no longer OpenCode', async () => {
+    const plugin = createPlugin();
+    (plugin.openCodeService as { checkHealth: jest.Mock }).checkHealth.mockResolvedValue(false);
+    const { containerEl } = createSection(plugin);
+
+    const shareDropdown = findDropdown(t('settings.conversation.share.mode.name'));
+    expect(shareDropdown).toBeDefined();
+    const policyStateEl = containerEl.querySelector<HTMLElement>('.opencodian-share-policy-state');
+    expect(policyStateEl?.textContent).toBe(t('settings.conversation.share.mode.manual'));
+
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+
+    await shareDropdown?.onChange?.('auto');
+
+    expect((plugin.opencodeConfigManager as { updateShareConfig: jest.Mock }).updateShareConfig).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(policyStateEl?.textContent).toBe(t('settings.conversation.share.mode.manual'));
   });
 
   it('lists shared sessions in the project sharing block with copy, preview, and unshare actions', async () => {
@@ -827,6 +880,35 @@ describe('SettingsConversationSection', () => {
     }));
     expect(containerEl.textContent).toContain('Connected');
     expect(containerEl.textContent).toContain('Reachable');
+  });
+
+  it('blocks stale share diagnostics when the active backend is no longer OpenCode', async () => {
+    const requestUrl = obsidian.requestUrl as jest.Mock;
+    requestUrl.mockResolvedValue({ status: 200, text: '', json: null, headers: {}, arrayBuffer: new ArrayBuffer(0) });
+    const plugin = createPlugin();
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const checkButton = containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]');
+    expect(containerEl.textContent).toContain('Not checked');
+
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    requestUrl.mockClear();
+
+    checkButton?.click();
+    for (let i = 0; i < 6; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(requestUrl).not.toHaveBeenCalled();
+    expect(containerEl.textContent).toContain('Not checked');
+    expect(containerEl.textContent).not.toContain('Checking');
+    expect(containerEl.textContent).not.toContain('Connected');
+    expect(containerEl.textContent).not.toContain('Reachable');
+    expect(checkButton?.disabled).toBe(false);
   });
 
   it('shows route guidance when the share host connection closes during TLS', async () => {

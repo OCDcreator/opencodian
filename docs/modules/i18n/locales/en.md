@@ -316,6 +316,8 @@ Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` 
 
 新增 `settings.conversation.share.sharedSessions.unshareUnavailable` 键，用于当活跃后端已切换出 OpenCode 时，阻止设置页已分享会话列表中的取消分享操作，并给出用户可理解的提示。
 
+新增 `settings.conversation.projectConfig.openCodeOnly` 键，用于当活跃后端已切换出 OpenCode 时，阻止设置页项目级 compaction / share 配置控件和分享诊断按钮继续执行 OpenCode-only 写入或检查路径；这只是 stale-control 防护，不表示 Claude Code 支持这些项目级 OpenCode 配置。
+
 ## 2026-05-22 Structured output transcript rendering
 
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供标签文案。

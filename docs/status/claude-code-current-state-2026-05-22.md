@@ -45,6 +45,36 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Conversation settings project config stale backend guard
+
+This narrow worker slice closes stale mounted OpenCode-only project config controls in `SettingsConversationSection`: project compaction and project share mode controls are only mounted while OpenCode is active, but their callbacks can survive briefly after switching the active backend to Claude Code.
+
+### What Changed
+
+- `SettingsConversationSection` now re-checks that OpenCode is still the active backend at the start of project compaction change callbacks, before mutating section-local compaction state or saving project config.
+- The same early guard blocks stale project share-mode callbacks before updating the visible policy chip / diagnostics, `updateShareConfig()`, or the local OpenCode restart path.
+- Stale share diagnostics clicks are also blocked before diagnostics UI changes, `openCodeService.checkHealth()`, or the public share-host probe.
+- Blocked stale callbacks use the generic project-conversation-config OpenCode-only notice instead of the unshare-specific copy.
+- The existing shared-session unshare guard remains unchanged; this slice covers the project-level compaction/share save controls.
+
+### What This Does Not Change
+
+- This does not add Claude project compaction or share-mode support.
+- This does not mark Claude Code full capability as complete.
+- OpenCode-active project compaction/share settings keep their existing behavior.
+
+### Verification
+
+- TDD red: focused tests first failed because stale Claude-active callbacks mutated compaction local state to `tailTurns: 5` and changed the visible share policy chip from Manual to Auto before the late save guard.
+- Follow-up TDD red: stale diagnostics clicks still called `openCodeService.checkHealth()` after switching to Claude Code.
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsConversationSection.test.ts` passed with `1` suite / `35` tests.
+- Graph/docs gates: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check` passed.
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` passed with `436` suites / `3234` tests and verify build ID `feature-phase0-capability.202605241436`.
+- Build/deploy: standalone `npm run build` passed with build ID `feature-phase0-capability.202605241436`, then `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` were copied to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: both `dist/main.js` and Test Vault `main.js` contain `feature-phase0-capability.202605241436`; the deployed Claude SDK binary checksum matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Runtime proof: `.obsidian-debug/claude-settings-project-config-gate-assertion-2026-05-24.json` returned outer `ok: true` and inner `ok: true` against deployed build ID `feature-phase0-capability.202605241436` after fresh plugin reload. The proof used the real settings editor-area DOM and covered stale project compaction input, project share dropdown, and share diagnostics button after switching active backend to Claude Code; both compaction and sharing `phaseCalls` kept `updateCompactionConfig`, `reapplyCompactionConfigFromProjectConfig`, `updateShareConfig`, `checkHealth`, `stop`, `start`, and `requestUrl` at `0`, while tail input, share policy chip, diagnostics values, and button enabled state remained unchanged and the generic OpenCode-only notice appeared.
+- Runtime artifacts: `.obsidian-debug/claude-settings-project-config-gate-2026-05-24.png`, `.obsidian-debug/claude-settings-project-config-gate-console-2026-05-24.txt`, and `.obsidian-debug/claude-settings-project-config-gate-errors-2026-05-24.txt`; dev errors captured `No errors captured.`
+
 ## 2026-05-24 Ordinary slash command backend gate hardening
 
 This narrow worker slice closes the remaining slash-command dispatch leak: ordinary runtime/project commands and prefixed skill commands still route to OpenCode `session.command`, so Claude Code conversations must not use `backendSessionId` to enter that seam.

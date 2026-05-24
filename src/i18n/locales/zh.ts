@@ -696,6 +696,7 @@ export const zhTranslations = {
   'settings.titleGeneration.groupDesc': '选择使用首条消息标题或智能标题。智能标题会先等待 OpenCode 官方标题；只有 OpenCode 没有产出标题时才运行备用标题模型，并且它独立于 OpenCode `small_model`。',
   'settings.conversation.compaction.projectNote': '上下文压缩（项目级）',
   'settings.conversation.compaction.projectNoteDesc': '这些设置保存在当前项目的 .opencode/opencode.json 中，在此库的所有会话中共享。',
+  'settings.conversation.projectConfig.openCodeOnly': '只有 OpenCode 是活跃后端时，才能更改项目级会话配置。',
   'settings.conversation.share.projectNote': '会话分享（项目级）',
   'settings.conversation.share.projectNoteDesc': '选择 OpenCode 在此项目中如何分享会话。此设置会写入 .opencode/opencode.json 的 `share` 字段。',
   'settings.conversation.display.title': '阅读与显示',
