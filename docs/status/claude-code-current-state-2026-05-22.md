@@ -60,6 +60,28 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Capability Lab advanced-settings honesty slice
+
+This implementer slice closes a narrower Capability Lab honesty gap: configured Claude plugins/skills were still rendered as `Exposed` in Discovery when names/counts existed, even though the matrix correctly kept Skills and Plugins hidden/untested.
+
+### What Changed
+
+- Plugins and Skills Discovery rows now keep `Discovery Only` status even when counts, names, or `skills: 'all'` are present. Names/counts remain in notes as configuration summaries, and the rows no longer use the active/exposed chip styling.
+- Capability Lab now includes ordinary advanced-setting rows for Allowed Tools, Disallowed Tools, Turn/Budget Limits, and Environment Variables. Each is `SDK` + `Adapter` wired, `Untested`, and `Settings`, making clear these are SDK-option settings rather than live runtime proof.
+- Manual settings normalization now trims allowed/disallowed tool names before persisting/passing them onward.
+- UI parsing for max turns and max budget now requires complete positive numeric strings; partial numeric text such as `12abc` or `5usd` resolves to null/unlimited. Blank input still resolves to null/unlimited.
+
+### What This Does Not Change
+
+- This does not promote Skills, Plugins, tool allow/block lists, budget/turn limits, or env variables to verified runtime proof.
+- This does not expose skills/plugin authoring, MCP authoring, hook authoring, or stable Claude capability-complete claims.
+- Env normalization remains conservative and does not display or expose secret values beyond the existing settings textarea behavior.
+
+### Verification
+
+- Red first: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/features/settings/SettingsClaudeCodeSection.test.ts tests/unit/core/types/claudeCodeBackendSettingsNormalization.test.ts` failed with expected gaps: Skills/Plugins Discovery still said `Exposed`, the four matrix rows were missing, string-array normalization preserved whitespace, and UI parsing accepted `12abc`.
+- Focused green: the same command passed with `3` suites / `136` tests.
+
 ## 2026-05-24 Capability Lab permission/question/MCP proof honesty
 
 This slice closes a product-surface honesty gap after the positive resume proof: the adapter and bridge already had direct SDK smoke evidence for `canUseTool` allow/deny, `AskUserQuestion` / elicitation, and MCP stdio tool execution, but Capability Lab still left those surfaces either absent or labelled like ordinary exposure/untested discovery.

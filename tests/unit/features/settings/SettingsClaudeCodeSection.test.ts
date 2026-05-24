@@ -809,6 +809,23 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(12);
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
+
+    it('rejects partially numeric turn and budget limit input', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'limits');
+
+      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12abc' as never);
+      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('5usd' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
+      expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
   });
 
   describe('sdk-foundations tab', () => {

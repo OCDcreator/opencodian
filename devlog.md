@@ -12,6 +12,31 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Capability Lab advanced settings honesty
+
+### 目标
+
+修正 Capability Lab 对 Claude plugins / skills 配置发现的诚实表达，并把已经作为普通高级设置、已接入 SDK options 的 Claude settings 行显式列入矩阵，但不把它们误报为 runtime proof。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | Capability Lab 诚实化 | Plugins / Skills Discovery 即使有计数、名称或 `skills: all` 也保持 `Discovery Only`，不使用 active/exposed chip；矩阵新增 Allowed Tools、Disallowed Tools、Turn/Budget Limits、Environment Variables 四行，均为 `SDK` + `Adapter` wired、`Untested`、`Settings` |
+| `src/core/types/settings.ts` | 设置归一化 | `normalizeClaudeCodeStringArray()` 现在 trim 字符串项后再过滤和去重，避免 allowed/disallowed tool names 带空白传入 SDK |
+| `src/features/settings/SettingsClaudeCodeSection.ts` | UI 输入解析 | max turns / max budget USD 现在要求完整正数字符串，`12abc` / `5usd` 会归一化为 null/unlimited，空白仍保持 null/unlimited |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` / `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` / `tests/unit/core/types/claudeCodeBackendSettingsNormalization.test.ts` | TDD 回归测试 | 覆盖 Discovery 不再显示 Exposed、新矩阵行 Settings+Untested、工具名 trim、部分数字解析为 null |
+| `docs/modules/**` / `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 记录 plugins/skills 只是配置摘要，advanced settings 只是 SDK-option settings，不代表 live runtime proof |
+
+### 验证
+
+- Red: focused suite 先失败于 Plugins/Skills Discovery 仍为 `Exposed`、advanced settings 矩阵行缺失、工具名未 trim、`12abc` 仍被解析为 `12`
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/features/settings/SettingsClaudeCodeSection.test.ts tests/unit/core/types/claudeCodeBackendSettingsNormalization.test.ts` 通过，`3` suites / `136` tests passed
+
+### 影响评估
+
+本轮不新增 Claude skills/plugin authoring，不把 allowed/disallowed tools、turn/budget limits 或 env variables 宣称为 verified runtime proof，也不暴露 secrets；只修正 Capability Lab 与设置归一化的 honesty 边界。
+
 ## 2026-05-24 Phase 3 - User-message footer rewind/fork backend boundary
 
 ### 目标

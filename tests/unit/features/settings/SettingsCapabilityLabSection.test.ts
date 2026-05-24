@@ -287,7 +287,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(pluginsRow?.textContent).toContain('No plugins loaded');
   });
 
-  it('renders Plugins in discovery table as Exposed when adapter has plugins', () => {
+  it('renders Plugins in discovery table as Discovery Only when adapter has plugins', () => {
     const containerEl = document.createElement('div');
     const adapter = {
       capabilities: new Set(['chat']),
@@ -308,7 +308,9 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
     const pluginsRow = rows.find((row) => row.textContent?.includes('Plugins'));
     expect(pluginsRow).not.toBeNull();
-    expect(pluginsRow?.textContent).toContain('Exposed');
+    expect(pluginsRow?.textContent).toContain('Discovery Only');
+    expect(pluginsRow?.textContent).not.toContain('Exposed');
+    expect(pluginsRow?.querySelector('.opencodian-capability-lab-chip')?.classList.contains('opencodian-capability-lab-chip-active')).toBe(false);
     expect(pluginsRow?.textContent).toContain('2 plugin(s): plugin-a, plugin-b');
   });
 
@@ -330,7 +332,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(skillsRow?.textContent).toContain('No skills loaded');
   });
 
-  it('renders Skills in discovery table as Exposed when adapter has skills', () => {
+  it('renders Skills in discovery table as Discovery Only when adapter has skills', () => {
     const containerEl = document.createElement('div');
     const adapter = {
       capabilities: new Set(['chat']),
@@ -351,11 +353,13 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
     const skillsRow = rows.find((row) => row.textContent?.includes('Skills'));
     expect(skillsRow).not.toBeNull();
-    expect(skillsRow?.textContent).toContain('Exposed');
+    expect(skillsRow?.textContent).toContain('Discovery Only');
+    expect(skillsRow?.textContent).not.toContain('Exposed');
+    expect(skillsRow?.querySelector('.opencodian-capability-lab-chip')?.classList.contains('opencodian-capability-lab-chip-active')).toBe(false);
     expect(skillsRow?.textContent).toContain('3 skill(s): skill-a, skill-b, skill-c');
   });
 
-  it('renders Skills in discovery table as Exposed when skills set to all', () => {
+  it('renders Skills in discovery table as Discovery Only when skills set to all', () => {
     const containerEl = document.createElement('div');
     const adapter = {
       capabilities: new Set(['chat']),
@@ -375,7 +379,9 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
     const skillsRow = rows.find((row) => row.textContent?.includes('Skills'));
     expect(skillsRow).not.toBeNull();
-    expect(skillsRow?.textContent).toContain('Exposed');
+    expect(skillsRow?.textContent).toContain('Discovery Only');
+    expect(skillsRow?.textContent).not.toContain('Exposed');
+    expect(skillsRow?.querySelector('.opencodian-capability-lab-chip')?.classList.contains('opencodian-capability-lab-chip-active')).toBe(false);
     expect(skillsRow?.textContent).toContain('All skills enabled');
   });
 
@@ -446,7 +452,31 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(table?.querySelectorAll('tr') ?? []);
     const skillsRow = rows.find((row) => row.textContent?.includes('Skills'));
     expect(skillsRow?.textContent).toContain('1 skill(s)');
-    expect(skillsRow?.textContent).toContain('Exposed');
+    expect(skillsRow?.textContent).toContain('Discovery Only');
+    expect(skillsRow?.textContent).not.toContain('Exposed');
+  });
+
+  it('renders advanced Claude settings as settings-surface untested SDK option rows', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
+
+    for (const label of ['Allowed Tools', 'Disallowed Tools', 'Turn/Budget Limits', 'Environment Variables']) {
+      const row = getRow(label);
+      expect(row).not.toBeNull();
+      expect(row?.textContent).toContain('SDK');
+      expect(row?.textContent).toContain('Adapter');
+      expect(row?.textContent).toContain('Untested');
+      expect(row?.textContent).not.toContain('Verified');
+      expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
+    }
   });
 
   it('renders a diagnostic summary strip above the matrix', () => {
@@ -601,7 +631,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(19);
+    expect(rows.length).toBe(23);
   });
 
   it('renders status chips with correct active/inactive classes', () => {

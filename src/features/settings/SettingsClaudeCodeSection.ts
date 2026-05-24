@@ -795,6 +795,9 @@ export class SettingsClaudeCodeSection {
     if (!trimmed) {
       return null;
     }
+    if (!/^\d+$/.test(trimmed)) {
+      return null;
+    }
     const parsed = Number.parseInt(trimmed, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
@@ -802,6 +805,9 @@ export class SettingsClaudeCodeSection {
   private parseNullablePositiveNumber(value: string): number | null {
     const trimmed = value.trim();
     if (!trimmed) {
+      return null;
+    }
+    if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(trimmed)) {
       return null;
     }
     const parsed = Number.parseFloat(trimmed);

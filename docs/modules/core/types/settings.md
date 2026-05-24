@@ -134,7 +134,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `normalizeBackendSettings(value)` | 归一化 backend 专属设置对象，目前包含 Claude Code hidden foundation |
 | `normalizeClaudeCodeBackendSettings(value)` | 归一化 Claude Code executable、setting sources、permission/thinking/effort、additional directories、model、allowedTools/disallowedTools、maxTurns/maxBudgetUsd、env、file checkpoint、hook event、subagent transcript/progress 和 debug channel 开关字段 |
 | `normalizeClaudeCodeDebugChannelSettings(value)` | 归一化 Claude Code debug workbench channel record，未知 channel 丢弃，缺失 channel 回退默认值 |
-| `normalizeClaudeCodeStringArray(value)` | 归一化字符串数组，去重、过滤空字符串和非字符串条目 |
+| `normalizeClaudeCodeStringArray(value)` | 归一化字符串数组，trim 后去重、过滤空字符串和非字符串条目；用于 allowed/disallowed tools 时避免把带空白的工具名传入 SDK |
 | `normalizeClaudeCodeNullablePositiveInt(value)` | 归一化可为空的正整数（如 maxTurns），返回 `number | null` |
 | `normalizeClaudeCodeNullablePositiveNumber(value)` | 归一化可为空的正数（如 maxBudgetUsd），保留小数 |
 | `normalizeClaudeCodeEnv(value)` | 归一化环境变量对象，过滤非字符串值 |

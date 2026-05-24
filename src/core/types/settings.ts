@@ -207,7 +207,8 @@ export function normalizeClaudeCodeStringArray(value: unknown): string[] {
 
   return [...new Set(
     value
-      .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0),
+      .map((entry) => typeof entry === 'string' ? entry.trim() : '')
+      .filter((entry) => entry.length > 0),
   )];
 }
 

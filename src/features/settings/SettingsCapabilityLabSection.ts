@@ -487,6 +487,34 @@ export class SettingsCapabilityLabSection {
         userSurface: 'diagnostic', // Runtime passthrough only; settings tab exposes refresh, not authoring
       },
       {
+        capability: 'Allowed Tools',
+        sdkExposed: true, // allowedTools option in SDK
+        adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
+        runtimeProof: 'untested',
+        userSurface: 'settings',
+      },
+      {
+        capability: 'Disallowed Tools',
+        sdkExposed: true, // disallowedTools option in SDK
+        adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
+        runtimeProof: 'untested',
+        userSurface: 'settings',
+      },
+      {
+        capability: 'Turn/Budget Limits',
+        sdkExposed: true, // maxTurns and maxBudgetUsd options in SDK
+        adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
+        runtimeProof: 'untested',
+        userSurface: 'settings',
+      },
+      {
+        capability: 'Environment Variables',
+        sdkExposed: true, // env option for Claude Code process/query environment
+        adapterWired: true, // buildSdkOptions/process resolution carries normalized env settings
+        runtimeProof: 'untested',
+        userSurface: 'settings',
+      },
+      {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into diagnostic and chat SDK options
@@ -1924,9 +1952,9 @@ export class SettingsCapabilityLabSection {
       tbody,
       'Plugins',
       pluginStatus
-        ? `${pluginCount} plugin(s): ${pluginsList.join(', ')}. Runtime passthrough via buildSdkOptions. No authoring UI.`
+        ? `${pluginCount} plugin(s): ${pluginsList.join(', ')}. Configuration summary only; runtime passthrough is wired but not live-proofed here. No authoring UI.`
         : 'No authoring UI. buildSdkOptions wires plugins from adapter options. No plugins loaded or adapter not started.',
-      { status: pluginStatus ? 'exposed' : 'discovery' },
+      { status: 'discovery' },
     );
     // Skills
     const skillCount = adapter?.getSkillCount?.() ?? 0;
@@ -1937,10 +1965,10 @@ export class SettingsCapabilityLabSection {
       'Skills',
       skillStatus
         ? skillCount === -1
-          ? 'All skills enabled. Runtime passthrough via buildSdkOptions. No authoring UI.'
-          : `${skillCount} skill(s): ${Array.isArray(skillsList) ? skillsList.join(', ') : skillsList}. Runtime passthrough via buildSdkOptions. No authoring UI.`
+          ? 'All skills enabled. Configuration summary only; runtime passthrough is wired but not live-proofed here. No authoring UI.'
+          : `${skillCount} skill(s): ${Array.isArray(skillsList) ? skillsList.join(', ') : skillsList}. Configuration summary only; runtime passthrough is wired but not live-proofed here. No authoring UI.`
         : 'No authoring UI. buildSdkOptions wires skills (string[]|\'all\') from adapter options. No skills loaded or adapter not started.',
-      { status: skillStatus ? 'exposed' : 'discovery' },
+      { status: 'discovery' },
     );
     // MCP Servers
     const mcpServerCount = adapter?.getMcpServerCount?.() ?? 0;

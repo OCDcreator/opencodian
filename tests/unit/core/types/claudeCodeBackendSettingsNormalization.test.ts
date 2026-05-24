@@ -25,6 +25,10 @@ describe('normalizeClaudeCodeStringArray', () => {
     expect(normalizeClaudeCodeStringArray([1, '', 'valid', null, '  ', 'also-valid'])).toEqual(['valid', 'also-valid']);
   });
 
+  it('trims string entries before preserving tool names', () => {
+    expect(normalizeClaudeCodeStringArray([' Read ', '\tBash', 'Grep\n'])).toEqual(['Read', 'Bash', 'Grep']);
+  });
+
   it('deduplicates entries', () => {
     expect(normalizeClaudeCodeStringArray(['Read', 'Read', 'Bash'])).toEqual(['Read', 'Bash']);
   });
@@ -132,8 +136,8 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
 
   it('normalizes all new fields from valid input', () => {
     const result = normalizeClaudeCodeBackendSettings({
-      allowedTools: ['Read', 'Bash', 'Read'],
-      disallowedTools: ['Write'],
+      allowedTools: [' Read ', 'Bash', 'Read'],
+      disallowedTools: [' Write '],
       maxTurns: 100,
       maxBudgetUsd: 10.5,
       env: { API_KEY: 'test', DEBUG: 'true' },
