@@ -9,15 +9,15 @@
 
 ## 职责
 
-- 在 Runtime 标签渲染 Claude Code executable path、带只读状态标记的认证/环境提示、runtime diagnostics 和 env variables 输入
+- 在 Runtime 标签渲染 restart-sensitive runtime boundary notice、Claude Code executable path、带只读状态标记的认证/环境提示、runtime diagnostics 和 env variables 输入
 - 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown；effort 选项与官方 Claude Code CLI/SDK 对齐为 low / medium / high / xhigh / max
 - model 保存时会通过当前注册的 Claude adapter 调用 `setModel()`，让活跃持久 query 尽量 live 更新；没有活跃 query 或 adapter 不可用时仍只保存设置，下一次 query 会读取新值
 - adaptive / disabled thinking 下不渲染 thinking budget，避免显示不会生效的空编辑控件；fixed thinking 下保留用户已有 budget
 - 在 Permissions 标签渲染 permission mode dropdown；保存时会通过 Claude adapter 调用 `setPermissionMode()` 尝试更新活跃 query
 - 在 Context & Sources 标签渲染 setting sources toggles（user/project/local）、项目来源文件可见性（`CLAUDE.md`、`.claude/settings.json`、`.claude/settings.local.json`）、restart-sensitive runtime boundary notice 和 additional directories textarea
-- Context & Sources 标签提供 “Restart sessions” 操作，调用 Claude adapter 的 `restartPersistentQueries('settings-change')`，只关闭活跃持久 query，不删除 session；下一次发送会用最新 source/directory/env/tool/limit options 重新启动并在可能时 resume
-- 在 Tools 标签渲染 MCP runtime 只读状态与刷新按钮，以及 allowed/disallowed tools；MCP 控制只调用当前 Claude adapter 的 `getMcpServerCount()` / `reloadMcpServers()`，不写入 `.claude/mcp.json`，刷新失败会保留明确错误状态
-- 在 Limits 标签渲染 max turns 和 max budget USD；在 SDK Foundations 标签渲染 runtime-only plugin / skill 只读摘要，以及 file checkpoint、hook event stream、subagent transcript/progress 开关。这些字段只进入 SDK options / diagnostic stream，不宣称 MCP authoring、skills/plugins authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
+- Runtime 与 Context & Sources 标签都提供 “Restart sessions” 操作，调用 Claude adapter 的 `restartPersistentQueries('settings-change')`，只关闭活跃持久 query，不删除 session；下一次发送会用最新 source/directory/env/tool/limit options 重新启动并在可能时 resume
+- 在 Tools 标签渲染 restart-sensitive runtime boundary notice、MCP runtime 只读状态与刷新按钮，以及 allowed/disallowed tools；MCP 控制只调用当前 Claude adapter 的 `getMcpServerCount()` / `reloadMcpServers()`，不写入 `.claude/mcp.json`，刷新失败会保留明确错误状态
+- 在 Limits 标签渲染 restart-sensitive runtime boundary notice、max turns 和 max budget USD；在 SDK Foundations 标签渲染 runtime-only plugin / skill 只读摘要，以及 file checkpoint、hook event stream、subagent transcript/progress 开关。这些字段只进入 SDK options / diagnostic stream，不宣称 MCP authoring、skills/plugins authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
 - 将多标签设置输入写入 `settings.backendSettings.claudeCode`
 - 通过 `ClaudeCodeProcessResolver` 做本地进程解析诊断，帮助检查 bundled/default resolution 与外部 CLI path
 - 保持 hook authoring、skills authoring、agent authoring、external SessionStore、JSONL import/browser 等未完成能力不在 UI 中暴露，直到对应 phase 有端到端 runtime proof

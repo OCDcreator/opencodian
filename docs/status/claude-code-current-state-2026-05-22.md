@@ -104,6 +104,37 @@ This round fixed a backend-boundary bug in the send pipeline: completed Claude C
   - screenshot: `.obsidian-debug/claude-local-persistence-runtime-2026-05-24.png`
   - result: deployed runtime reported `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241038`, active backend `claude-code`, enabled backends `opencode` + `claude-code`, deployed non-OpenCode sync gate present, deployed structured-output capture present, and `dev:errors` reported `No errors captured.`
 
+## 2026-05-24 Claude settings runtime boundary coverage
+
+This round extended the existing Claude Code settings runtime-boundary affordance to the remaining restart-sensitive settings tabs.
+
+### What Changed
+
+- The Runtime tab now shows the next-query / restarted-session boundary notice before executable, diagnostics, and env variable settings.
+- The Tools tab now shows the same boundary notice before MCP runtime controls and allowed/disallowed tool lists.
+- The Limits tab now shows the same boundary notice before max turns and max budget settings.
+- All three tabs reuse the existing restart action that calls `ClaudeCodeAdapter.restartPersistentQueries('settings-change')`.
+
+### What This Does Not Change
+
+- This does not promote any hidden or diagnostic-only Claude capability to stable UI.
+- MCP authoring, skills/plugins authoring, hook authoring, stable rewind, structured-output UI, and full subagent transcript UI remain unpromoted.
+- Existing OpenCode settings and runtime behavior are unchanged.
+
+### Verification
+
+- Focused settings tests now cover Runtime, Tools, and Limits boundary notice rendering; Runtime also verifies the restart action calls `restartPersistentQueries('settings-change')`.
+- Focused settings test passed with `31` tests.
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `435` suites / `3219` tests and production build.
+- `npm run build` passed with `BUILD_ID: feature-phase0-capability.202605241052`.
+- Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/`.
+- Test Vault `main.js` contains `feature-phase0-capability.202605241052`, and the deployed Claude SDK binary checksum matches `dist`.
+- Fresh Obsidian runtime proof:
+  - assertion: `.obsidian-debug/claude-settings-runtime-boundary-assertion-2026-05-24.json`
+  - screenshot: `.obsidian-debug/claude-settings-runtime-boundary-2026-05-24.png`
+  - errors: `.obsidian-debug/claude-settings-runtime-boundary-errors-2026-05-24.txt`
+  - result: deployed runtime reported `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241052`; Runtime, Tools, and Limits tabs were mounted with boundary notice and restart button; no translation-key leakage; `dev:errors` reported `No errors captured.`
+
 ## 2026-05-23 Phase 2 settings/runtime boundary hardening
 
 This round tightened the Claude settings surface so it is honest about runtime boundaries instead of implying every Claude Code option live-updates a persistent query.
@@ -111,8 +142,8 @@ This round tightened the Claude settings surface so it is honest about runtime b
 ### What Changed
 
 - `SettingsClaudeCodeSection` now shows project source file visibility for `CLAUDE.md`, `.claude/settings.json`, and `.claude/settings.local.json`
-- The Context & Sources tab now shows a next-query / restarted-session boundary notice
-- The same tab now offers a restart action that calls `ClaudeCodeAdapter.restartPersistentQueries('settings-change')`
+- The restart-sensitive Runtime, Context & Sources, Tools, and Limits tabs now show a next-query / restarted-session boundary notice
+- Those tabs offer a restart action that calls `ClaudeCodeAdapter.restartPersistentQueries('settings-change')`
 - Model changes now try to update the active Claude adapter via `setModel()` before saving
 - Permission mode changes now try to update the active Claude adapter via `setPermissionMode()` before saving
 - Live adapter control failures no longer block settings persistence, they are best-effort only

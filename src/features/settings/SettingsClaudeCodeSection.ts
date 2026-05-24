@@ -176,6 +176,7 @@ export class SettingsClaudeCodeSection {
   // ─── Runtime tab ──────────────────────────────────────────────────
 
   private renderRuntimeTab(containerEl: HTMLElement): void {
+    this.renderRuntimeBoundaryNotice(containerEl);
     this.renderExecutableSetting(containerEl);
     this.renderEnvironmentHint(containerEl);
     this.renderDiagnostics(containerEl);
@@ -497,6 +498,7 @@ export class SettingsClaudeCodeSection {
   // ─── Tools tab ───────────────────────────────────────────────────
 
   private renderToolsTab(containerEl: HTMLElement): void {
+    this.renderRuntimeBoundaryNotice(containerEl);
     this.renderMcpRuntimeControls(containerEl);
     this.renderAllowedToolsSetting(containerEl);
     this.renderDisallowedToolsSetting(containerEl);
@@ -539,6 +541,7 @@ export class SettingsClaudeCodeSection {
   // ─── Limits tab ──────────────────────────────────────────────────
 
   private renderLimitsTab(containerEl: HTMLElement): void {
+    this.renderRuntimeBoundaryNotice(containerEl);
     this.renderMaxTurnsSetting(containerEl);
     this.renderMaxBudgetSetting(containerEl);
   }

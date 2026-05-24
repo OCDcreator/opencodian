@@ -651,6 +651,34 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('runtime tab', () => {
+    it('shows the next-query boundary for environment variables', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
+      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
+    });
+
+    it('can manually restart active Claude Code sessions from Runtime tab changes', async () => {
+      const claudeAdapter = { restartPersistentQueries: jest.fn().mockResolvedValue(undefined) };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.runtimeBoundary.restartButton')).onClick?.();
+
+      expect(claudeAdapter.restartPersistentQueries).toHaveBeenCalledWith('settings-change');
+    });
+
     it('renders environment variables with runtime process settings', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -671,6 +699,19 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('tools tab', () => {
+    it('shows the next-query boundary for tool and MCP settings', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
+      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
+    });
+
     it('renders and persists tool allow/block lists', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -739,6 +780,19 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('limits tab', () => {
+    it('shows the next-query boundary for turn and budget limits', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'limits');
+
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
+      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
+    });
+
     it('renders and persists turn and budget limits', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

@@ -12,6 +12,39 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Claude settings runtime boundary coverage
+
+### 目标
+
+继续推进 Claude Code 可用闭环里的设置面 honest exposure：让所有 restart-sensitive 的 Claude 设置 tab 都明确提示“下一次 query 或重启 persistent session 才生效”，避免 Runtime / Tools / Limits 看起来像会全部 live-update。
+
+### 发现
+
+前一轮已把 Context & Sources tab 接上 runtime boundary notice 和 `restartPersistentQueries('settings-change')` 操作，但 Runtime tab 的 env / executable、Tools tab 的 MCP/tools allow-block list、Limits tab 的 max turns / budget 也都会进入下一次 SDK query options。它们缺少同一提示与重启入口，容易让用户误以为 active persistent query 会立即应用这些设置。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 设置 UI 修正 | Runtime / Tools / Limits tab 复用现有 runtime boundary notice 和 restart action |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | +4 测试 | 覆盖 Runtime / Tools / Limits boundary notice；Runtime restart button 调用 `restartPersistentQueries('settings-change')` |
+| `docs/modules/features/settings/SettingsClaudeCodeSection.md` | 文档更新 | 记录 restart-sensitive boundary 已覆盖 Runtime / Context / Tools / Limits |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 settings runtime boundary coverage |
+
+### 验证
+
+- Focused settings test 已完成 red-green：新增断言先失败，修复后 `npm test -- --runInBand tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` 通过，`31` tests passed
+- `npm run check:devlog-order`、`npm run check:module-docs`、`npm run graphify:update:src`、`npm run check:graphify` 均通过
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`435` suites / `3219` tests passed，production build 通过
+- Build/deploy: `npm run build` 产出 `BUILD_ID: feature-phase0-capability.202605241052`；已按顺序部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css`、`dist/assets/`、`dist/node_modules/` 到 Test Vault，并确认 Test Vault `main.js` 含该 BUILD_ID
+- Runtime proof: `.obsidian-debug/claude-settings-runtime-boundary-assertion-2026-05-24.json` 通过，截图为 `.obsidian-debug/claude-settings-runtime-boundary-2026-05-24.png`；运行时报告 Runtime / Tools / Limits tabs 均 mounted、包含 boundary notice 和 `重启会话` 按钮、无 translation-key leakage，`dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+本轮只补 Claude settings 的 runtime-boundary 暴露，不新增 SDK capability、不提升 MCP authoring / skills/plugins authoring / hook authoring / structured-output UI / stable rewind。OpenCode backend 和已有 settings backend enablement 行为不变。
+
+---
+
 ## 2026-05-24 Phase 3 - Claude completed-stream local persistence gate
 
 ### 目标
