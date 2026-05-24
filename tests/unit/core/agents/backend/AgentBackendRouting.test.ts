@@ -562,8 +562,8 @@ describe('listBackendSessions', () => {
       AgentCapability.Fork,
     ]), {
       listSessions: async () => [
-        { sessionId: 'claude-1', summary: 'Claude Topic', updatedAt: 500 },
-        { id: 'claude-2', title: 'Claude Title' },
+        { sessionId: 'claude-1', summary: 'Claude Topic', share: { url: 'https://claude.example/s/claude-1' }, updatedAt: 500 },
+        { id: 'claude-2', title: 'Claude Title', share: { url: 'https://claude.example/s/claude-2' } },
       ],
     });
     const registry = createMockRegistry(new Map([['claude-code', adapter]]));
@@ -583,6 +583,28 @@ describe('listBackendSessions', () => {
       shareUrl: null,
       updatedAt: null,
     });
+  });
+
+  it('normalizes generic backend sessions without treating share.url as an OpenCode share link', async () => {
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      listSessions: async () => [
+        { id: 'codex-1', title: 'Codex Topic', share: { url: 'https://codex.example/s/codex-1' }, updatedAt: 700 },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+    const result = await listBackendSessions(registry);
+
+    expect(result).toEqual([
+      {
+        id: 'codex-1',
+        title: 'Codex Topic',
+        shareUrl: null,
+        updatedAt: 700,
+      },
+    ]);
   });
 
   it('falls back gracefully for records missing most fields', async () => {

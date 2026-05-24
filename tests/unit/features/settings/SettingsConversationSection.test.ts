@@ -180,6 +180,7 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
   // existing assertions remain valid while the code routes through the
   // backend-aware registry layer.
   const mockOpenCodeAdapter = {
+    kind: 'opencode',
     hasCapability: jest.fn().mockReturnValue(true),
     listSessions,
     getSessionMessages,
@@ -729,7 +730,7 @@ describe('SettingsConversationSection', () => {
     expect(previewEl?.textContent).toContain('routed message');
   });
 
-  it('renders preview messages from non-OpenCode backend through the normalized seam', async () => {
+  it('renders generic preview messages through the normalized seam for OpenCode shared rows', async () => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: jest.fn().mockResolvedValue(undefined) },
@@ -737,12 +738,12 @@ describe('SettingsConversationSection', () => {
     const plugin = createPlugin();
     const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
 
-    // Adapter returns sessions with share URLs but messages in non-OpenCode shape
-    // (no info/parts, just role + content like a generic/Claude backend)
+    // The shared-session surface is OpenCode-only, but the preview seam remains
+    // defensive enough to normalize compatible role/content messages.
     (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
       {
         id: 'session-gen',
-        title: 'Generic Backend Session',
+        title: 'Generic Preview Session',
         share: { url: 'https://example.com/s/session-gen' },
         time: { created: 100, updated: 200 },
       },
@@ -758,7 +759,7 @@ describe('SettingsConversationSection', () => {
 
     // Session row should render
     const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-gen"]');
-    expect(rowEl?.textContent).toContain('Generic Backend Session');
+    expect(rowEl?.textContent).toContain('Generic Preview Session');
 
     // Click preview — should NOT crash on missing info/parts
     rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
@@ -771,7 +772,7 @@ describe('SettingsConversationSection', () => {
     expect(previewEl?.textContent).toContain('hi there');
   });
 
-  it('renders Claude content blocks through the normalized preview seam without assuming info/parts', async () => {
+  it('renders Claude-shaped content blocks through the normalized preview seam for OpenCode shared rows', async () => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: jest.fn().mockResolvedValue(undefined) },
@@ -779,8 +780,8 @@ describe('SettingsConversationSection', () => {
     const plugin = createPlugin();
     const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
 
-    // Adapter returns messages in Claude content-block shape (array of {type, text})
-    // instead of OpenCode {info, parts}. The normalized seam must handle both.
+    // The row is still an OpenCode shared session; only the preview payload uses
+    // Claude content-block shape so this does not rely on non-OpenCode share URLs.
     (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
       {
         id: 'session-claude-blocks',

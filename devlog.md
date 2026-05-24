@@ -12,6 +12,34 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Shared-session shareUrl backend boundary
+
+### 目标
+
+修复 stable shared-session settings UI 的 backend 边界：非 OpenCode backend 即使返回兼容的 `share.url` 字段，也不能被当作 OpenCode 公开分享链接展示在共享会话列表中。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/AgentBackendRouting.ts` | 路由归一化修复 | `listBackendSessions()` 只有在 active backend kind 为 `opencode` 时才把 `record.share.url` 归一化为 `NormalizedSessionRow.shareUrl`；Claude Code / generic backend 保留 id、title/summary、updatedAt 等 preview/inspection 归一化，但 `shareUrl` 为 `null` |
+| `tests/unit/core/agents/backend/AgentBackendRouting.test.ts` | TDD 回归测试 | 覆盖 OpenCode list sessions 保留 `share.url`，Claude Code 与 generic backend 即使返回 `share.url` 也归一化为 `shareUrl: null` |
+| `tests/unit/features/settings/SettingsConversationSection.test.ts` | 测试边界调整 | settings preview 覆盖继续证明 generic/Claude-shaped preview payload 能被归一化，但通过 OpenCode shared row 进入预览，不再依赖非 OpenCode `share.url` 使 row 出现在 OpenCode-only sharing surface |
+| `docs/modules/core/agents/backend/AgentBackendRouting.md` / `docs/modules/features/settings/SettingsConversationSection.md` / `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 记录 `shareUrl` 是 OpenCode-only row 字段，非 OpenCode share object 不构成 stable shared-session link contract，也不代表 Claude stable sharing 已完成 |
+
+### 验证
+
+- Red: `npm test -- --runInBand tests/unit/core/agents/backend/AgentBackendRouting.test.ts tests/unit/features/settings/SettingsConversationSection.test.ts` 先失败，表现为 Claude row 的 `share.url` 被错误保留为 `shareUrl`
+- Focused green: 同一命令通过，`2` suites / `100` tests passed
+- 独立只读 review：无 blocking findings，复核 OpenCode 保留路径、Claude/generic null-share 归一化、settings 行过滤及 preview 覆盖
+- 门禁：`npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 均通过
+- 构建部署：`npm run build` 生成 `BUILD_ID=feature-phase0-capability.202605242237`；顺序部署到 Test Vault 后，`dist/main.js` 与 deployed `main.js` SHA256 同为 `475e59146319f659583320cd9e5909af84fb218d030c02317a474d72d1a2c5f4`，部署 Claude SDK `claude` binary hash 与 dist 同为 `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof：`.obsidian-debug/claude-share-url-honesty-result-20260524224105.json` 返回 `ok: true`，验证 Claude Code active 时兼容 `share.url` row 不渲染为 OpenCode shared-session link，430px 窄布局无横向溢出且没有 stable/full capability 声称；截图/console/errors 分别在 `.obsidian-debug/claude-share-url-honesty-screenshot-20260524224105.png`、`.obsidian-debug/claude-share-url-honesty-console-20260524224105.log`、`.obsidian-debug/claude-share-url-honesty-errors-20260524224105.log`，最终 `dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+本轮只修正 shared-session 列表的 OpenCode-only 分享链接边界，不新增 Claude Code stable sharing，不引入跨 backend share object contract，也不改变 `OpenCodeService.unshareSession()` 的 OpenCode-only 写操作归属。
+
 ## 2026-05-24 Phase 3 - Capability Lab advanced settings honesty
 
 ### 目标

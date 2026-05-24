@@ -18,8 +18,9 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Snapshot commit after the latest committed capability slice: `9f455f1b`
 - Commit subject after the latest committed capability slice: `fix: clarify claude advanced settings honesty`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242219`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242237`
 - Recent continuity commits in this lane:
+- Uncommitted implementer slice — `listBackendSessions()` now treats `share.url` as OpenCode-only row data; Claude Code / generic session rows preserve title/summary/preview normalization but return `shareUrl: null` so they do not appear in the stable OpenCode shared-session settings list.
 - `9f455f1b` — `fix: clarify claude advanced settings honesty`
 - `fc2659ff` — `docs: refresh claude footer boundary anchor`
 - `0c4ea502` — `fix: route footer rewind capability by conversation`
@@ -83,6 +84,33 @@ This implementer slice closes a narrower Capability Lab honesty gap: configured 
 
 - Red first: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/features/settings/SettingsClaudeCodeSection.test.ts tests/unit/core/types/claudeCodeBackendSettingsNormalization.test.ts` failed with expected gaps: Skills/Plugins Discovery still said `Exposed`, the four matrix rows were missing, string-array normalization preserved whitespace, and UI parsing accepted `12abc`.
 - Focused green: the same command passed with `3` suites / `136` tests.
+
+## 2026-05-24 Shared-session shareUrl backend boundary
+
+This implementer slice closes a narrow settings honesty gap in the stable shared-session manager: `readBackendSessionShareUrl()` already returned OpenCode share URLs only, but `listBackendSessions()` still copied `record.share.url` from any active backend row.
+
+### What Changed
+
+- `listBackendSessions()` now populates `NormalizedSessionRow.shareUrl` only when the active backend kind is `opencode`.
+- Claude Code and generic backend session rows still normalize `id`, `title` / `summary`, and `updatedAt`; only the OpenCode share-link interpretation is removed.
+- `SettingsConversationSection` preview tests now exercise generic/Claude-shaped preview payloads through OpenCode shared rows, so preview robustness is preserved without implying non-OpenCode share URLs belong in the OpenCode shared-session surface.
+
+### What This Does Not Change
+
+- This does not add Claude Code stable sharing.
+- This does not promote generic backend `share` objects to a cross-backend share contract.
+- This does not change OpenCode `unshareSession()` ownership or the OpenCode-only sharing block gate.
+
+### Verification
+
+- Red first: `npm test -- --runInBand tests/unit/core/agents/backend/AgentBackendRouting.test.ts tests/unit/features/settings/SettingsConversationSection.test.ts` failed because a Claude row with `share.url` returned that URL as `shareUrl`.
+- Focused green: the same command passed with `2` suites / `100` tests.
+- Independent read-only review reported no blocking findings after checking the OpenCode preserve path, Claude/generic null-share normalization, settings row filter, and preview-message coverage.
+- Guard gates passed: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+- `npm run build` produced `BUILD_ID: feature-phase0-capability.202605242237`; deployment copied built runtime and the Claude SDK binary to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: `dist/main.js` and Test Vault `main.js` SHA256 both equal `475e59146319f659583320cd9e5909af84fb218d030c02317a474d72d1a2c5f4`; the deployed Claude SDK `claude` binary hash matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Fresh Test Vault runtime proof `.obsidian-debug/claude-share-url-honesty-result-20260524224105.json` returned `ok: true` against loaded runtime `BUILD_ID=feature-phase0-capability.202605242237`. With Claude Code active, it injected a compatible Claude session row containing `share.url`, mounted the real settings surface, and verified no OpenCode shared-session row or public URL was rendered; it also found no stable/full-capability claim and no horizontal overflow in the 430px mobile-class fixture.
+- Runtime artifacts: `.obsidian-debug/claude-share-url-honesty-assertion-20260524224105.js`, `.obsidian-debug/claude-share-url-honesty-screenshot-20260524224105.png`, `.obsidian-debug/claude-share-url-honesty-console-20260524224105.log`, and `.obsidian-debug/claude-share-url-honesty-errors-20260524224105.log`; `dev:errors` reported `No errors captured.`
 
 ## 2026-05-24 Capability Lab permission/question/MCP proof honesty
 

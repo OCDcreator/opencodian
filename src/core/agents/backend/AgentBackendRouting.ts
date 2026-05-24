@@ -280,11 +280,12 @@ export async function listBackendSessions(
   }
 
   return rawSessions.filter((s): s is Record<string, unknown> => s !== null && typeof s === 'object').map((record, idx) => {
-    // Extract share URL if present
     let shareUrl: string | null = null;
-    const share = record.share;
-    if (share && typeof share === 'object') {
-      const url = (share as Record<string, unknown>).url;
+    const share = active.kind === 'opencode' && record.share && typeof record.share === 'object'
+      ? record.share as Record<string, unknown>
+      : null;
+    if (share) {
+      const url = share.url;
       if (typeof url === 'string' && url.trim().length > 0) {
         shareUrl = url;
       }
