@@ -45,6 +45,34 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Ordinary slash command backend gate hardening
+
+This narrow worker slice closes the remaining slash-command dispatch leak: ordinary runtime/project commands and prefixed skill commands still route to OpenCode `session.command`, so Claude Code conversations must not use `backendSessionId` to enter that seam.
+
+### What Changed
+
+- `SlashCommandExecutionService.tryRunSlashCommand()` now requires `(conversation.backend ?? 'opencode') === 'opencode'` before calling `host.runSessionCommand()` for ordinary runtime/project commands.
+- `/skills skill-id ...` prefixed skill dispatch uses the same OpenCode-only gate because it resolves to the same `runSessionCommand()` path.
+- Non-OpenCode conversations consume the recognized command and reuse the existing slash failure notifier without starting the OpenCode sync loop or visible background sync.
+
+### What This Does Not Change
+
+- This does not add Claude ordinary slash command execution.
+- This does not mark Claude Code full capability as complete.
+- OpenCode runtime/project command dispatch remains unchanged for OpenCode conversations.
+
+### Verification
+
+- TDD red: focused tests first failed because Claude `backendSessionId` was passed to `host.runSessionCommand('claude-session-1', ...)` for both `/build --fast` and `/skills skill-review note.md`.
+- Focused green: `npm test -- --runInBand tests/unit/features/chat/SlashCommandExecutionService.test.ts` passed with `1` suite / `19` tests.
+- Focused regression set: `npm test -- --runInBand tests/unit/features/chat/SlashCommandExecutionService.test.ts tests/unit/features/chat/SlashCommandExecutionService.undoRedo.test.ts tests/unit/features/chat/SlashCommandExecutionService.share.test.ts` passed with `3` suites / `35` tests.
+- Graph/docs gates: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check` passed.
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` passed with `436` suites / `3231` tests and verify build ID `feature-phase0-capability.202605241345`.
+- Build/deploy: standalone `npm run build` passed with build ID `feature-phase0-capability.202605241345`, then `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` were copied to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: both `dist/main.js` and Test Vault `main.js` contain `feature-phase0-capability.202605241345`; the deployed Claude SDK binary checksum matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Runtime proof: `.obsidian-debug/claude-slash-command-gate-assertion-2026-05-24.json` returned `ok: true` against deployed build ID `feature-phase0-capability.202605241345` after fresh plugin reload. The proof used the real DOM composer (`.opencodian-input` + `.opencodian-send-btn`) with a Claude conversation carrying `backendSessionId: 'claude-session-command-1'`; `/build --fast` and `/skills skill-review note.md` were recognized and consumed, `runSessionCommand` / `startConversationSyncLoop` / `syncVisibleConversationInBackground` stayed at `0`, `notifySlashCommandFailed` reported only `No OpenCode session available`, and no prompt messages were added.
+- Runtime artifacts: `.obsidian-debug/claude-slash-command-gate-2026-05-24.png`, `.obsidian-debug/claude-slash-command-gate-console-2026-05-24.txt`, and `.obsidian-debug/claude-slash-command-gate-errors-2026-05-24.txt`; dev errors captured `No errors captured.`
+
 ## 2026-05-24 Session settings modal share write backend gate
 
 This narrow worker slice closes the modal action equivalent of the slash share boundary: `ConversationSessionSettingsCoordinator` can still read share URLs through backend-aware routing, but share/unshare writes remain OpenCode-only.
@@ -450,7 +478,7 @@ Recent runs focused on two connected lanes:
 | `ConversationAuthoritativeSyncCoordinator.ts` | Uses `getConversationBackendSessionId()`; skips sync for non-OpenCode backends (OpenCode-only by design). |
 | `ConversationAuthoritativeReloadCoordinator.ts` | Uses `getConversationBackendSessionId()` in all debug logs; skips server sync for non-OpenCode backends. |
 | `ConversationNoticeCoordinator.ts` | `appendTurnDiffNoticeIfNeeded` gated to OpenCode-only. |
-| `SlashCommandExecutionService.ts` | `/compact`, `/undo`, `/redo`, `/share`, and `/unshare` gated to OpenCode-only; uses `getConversationBackendSessionId()`. |
+| `SlashCommandExecutionService.ts` | Ordinary runtime/project slash dispatch and `/skills skill-id ...` prefixed skill dispatch are gated to OpenCode-only before `session.command`; `/compact`, `/undo`, `/redo`, `/share`, and `/unshare` are also gated to OpenCode-only. Uses `getConversationBackendSessionId()` only after the relevant backend guard. |
 | `ChildSessionGraphCoordinator.ts` | `refreshGraph` gated to OpenCode-only. |
 | `LocalStreamMessagePersistence.ts` | Debug logs use `getConversationBackendSessionId()`. |
 | `ConversationRenderService.ts` | Debug logs use `getConversationBackendSessionId()`. `resolveConversationRenderMessages()` has an explicit `backend !== 'opencode'` guard so the canonical session state path (OpenCode-specific `getCanonicalSessionState` / `hydrateOpenCodeMessage`) is never entered for non-OpenCode conversations — hardening what was previously only an implicit null-safe fallback. |
@@ -626,6 +654,7 @@ The following service seams now route session identity through `getConversationB
 | Slash command compact (summarize) | **Gated** | OpenCode-only: backend check |
 | Slash command share | **Gated** | OpenCode-only: backend check |
 | Slash command unshare | **Gated** | OpenCode-only: backend check |
+| Ordinary runtime/project slash dispatch | **Gated** | OpenCode-only: `session.command` / `runSessionCommand()` is not used for Claude or other non-OpenCode conversations, including `/skills skill-id ...` prefixed skill dispatch |
 | Diff notice on turn completion | **Gated** | OpenCode-only: backend check |
 | Child session graph | **Gated** | OpenCode-only: `getSessionChildren` has no backend-neutral equivalent |
 | Task tool session open (backend identity) | **Yes** | `openTaskToolSession()` accepts parent `backend` parameter; `createConversationFromSession()` in `main.ts` prefers explicit `initial.backend` over `settings.activeBackend` |

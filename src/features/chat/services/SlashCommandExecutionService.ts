@@ -330,6 +330,9 @@ export class SlashCommandExecutionService {
       if (!conversation) {
         return true;
       }
+      if (!this.ensureOpenCodeConversationForCommand(conversation, executableCommand.command)) {
+        return true;
+      }
       const sessionId = getConversationBackendSessionId(conversation);
       if (!sessionId) {
         this.host.notifySlashCommandFailed(executableCommand.command, new Error('No backend session available'));
@@ -354,6 +357,13 @@ export class SlashCommandExecutionService {
       this.host.notifySlashCommandFailed(executableCommand.command, error);
       return true;
     }
+  }
+
+  private ensureOpenCodeConversationForCommand(conversation: Conversation, commandId: string): boolean {
+    const backend = conversation.backend ?? 'opencode';
+    if (backend === 'opencode') return true;
+    this.host.notifySlashCommandFailed(commandId, new Error('No OpenCode session available'));
+    return false;
   }
 
   private async handleSyntheticBuiltinCommand(commandId: string): Promise<boolean> {

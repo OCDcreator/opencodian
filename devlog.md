@@ -12,6 +12,39 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Ordinary slash command backend gate hardening
+
+### 目标
+
+收紧普通 runtime/project slash command 的 backend ownership：Claude conversation 即使带有 `backendSessionId`，也不能通过 `/build` 或 `/skills skill-id ...` 进入 OpenCode-only `session.command` 执行路径。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/services/SlashCommandExecutionService.ts` | 后端边界修复 | ordinary runtime/project command dispatch 在 `runSessionCommand()` 前增加 `backend === 'opencode'` gate；非 OpenCode conversation 消费命令并复用现有 slash failure notifier，不启动 OpenCode sync |
+| `tests/unit/features/chat/SlashCommandExecutionService.test.ts` | +2 TDD 回归测试 | 覆盖 Claude conversation + `backendSessionId` 下 `/build --fast` 与 `/skills skill-review note.md` 不调用 `runSessionCommand()` / sync |
+| `docs/modules/features/chat/services/SlashCommandExecutionService.md` | 文档更新 | 记录 ordinary runtime/project slash commands 与 prefixed skills 仍是 OpenCode-only dispatch |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 ordinary slash command backend gate 和 focused test evidence |
+
+### 验证
+
+- Red: focused tests 先失败，证明 Claude `backendSessionId` 会被错误传给 `host.runSessionCommand('claude-session-1', ...)`，覆盖 `/build --fast` 与 `/skills skill-review note.md`
+- Focused green: `npm test -- --runInBand tests/unit/features/chat/SlashCommandExecutionService.test.ts` 通过，`1` suite / `19` tests passed
+- Focused regression set: `npm test -- --runInBand tests/unit/features/chat/SlashCommandExecutionService.test.ts tests/unit/features/chat/SlashCommandExecutionService.undoRedo.test.ts tests/unit/features/chat/SlashCommandExecutionService.share.test.ts` 通过，`3` suites / `35` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`；`git diff --check`、`npm run check:devlog-order`、`npm run check:module-docs`、`npm run check:graphify` 通过
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`436` suites / `3231` tests passed，verify build ID `feature-phase0-capability.202605241345`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241345`；并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241345`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-slash-command-gate-assertion-2026-05-24.json` 在部署版 `feature-phase0-capability.202605241345` 上返回 `ok: true`。脚本走真实 DOM composer (`.opencodian-input` + `.opencodian-send-btn`)，Claude conversation 带 `backendSessionId: 'claude-session-command-1'`；`/build --fast` 与 `/skills skill-review note.md` 被识别并消费，但 `runSessionCommand`、`startConversationSyncLoop`、`syncVisibleConversationInBackground` 计数均为 `0`，slash failure notifier 只报告 `No OpenCode session available`
+- Runtime artifacts: `.obsidian-debug/claude-slash-command-gate-2026-05-24.png`、`.obsidian-debug/claude-slash-command-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-slash-command-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧 ordinary runtime/project slash command 与 prefixed skill dispatch 的 OpenCode-only 边界，不宣称 Claude full capability 完成，也不新增 Claude completed slash command execution capability。OpenCode conversation 的普通 command 执行保持不变。
+
+---
+
 ## 2026-05-24 Phase 3 - Session settings modal share backend gate
 
 ### 目标

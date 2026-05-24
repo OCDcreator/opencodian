@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，为当前 runtime 已注册的 backend slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。project config 仍会参与 override语义判断，但单独存在于 `.opencode/opencode.json` 的 command 不会在 runtime 注册前被当作可执行命令；`.opencode/commands/**/*.md` markdown command 则在没有同名 runtime/project command 时展开为普通 prompt 发送。
+`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，为当前 runtime 已注册的 OpenCode slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。project config 仍会参与 override语义判断，但单独存在于 `.opencode/opencode.json` 的 command 不会在 runtime 注册前被当作可执行命令；`.opencode/commands/**/*.md` markdown command 则在没有同名 runtime/project command 时展开为普通 prompt 发送。
 
 这层 owner 当前只覆盖：
 
@@ -71,6 +71,7 @@ export class SlashCommandExecutionService {
 
 - 先复用现有 server readiness / badge refresh seam，保证任何需要 runtime catalog truth 的 slash command 场景都能拉起服务
 - 再复用现有 conversation/tab/foreground busy gate，避免和前台 busy/retry 状态打架
+- 普通 runtime/project command 与 `/skills skill-id ...` prefixed skill dispatch 都是 OpenCode-only：如果当前 conversation 的 `backend !== 'opencode'`，即使存在 `backendSessionId`，也会消费命令、走现有 slash failure notifier，并且不会调用 `runSessionCommand()`、`startConversationSyncLoop()` 或 visible background sync
 - foreground busy 时只走现有 blocked notice，不会退回普通发送路径
 
 ### runtime placeholder context
@@ -96,8 +97,8 @@ export class SlashCommandExecutionService {
   - 先问 `SlashCommandExecutionService.tryRunSlashCommand()`
   - 如果返回 `false`，再继续普通 `prepareMessageSend()` + streaming pipeline
 - markdown command 会通过 `runMdFileCommandAsMessage()` 重新进入 send pipeline，并设置 skip-slash 标志避免 template 以 `/` 开头时再次递归拦截
-- slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
-- dispatch runtime/project command 前会用 `getConversationBackendSessionId()` 解析 session identity；没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
+- OpenCode conversation 的 runtime/project slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
+- dispatch runtime/project command 前会先确认 `conversation.backend ?? 'opencode'` 是 `opencode`，再用 `getConversationBackendSessionId()` 解析 session identity；没有 OpenCode backend 或没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
 - **OpenCode-only synthetic command gates**: `/compact`、`/undo`、`/redo`、`/share` 与 `/unshare` 在 `backend !== 'opencode'` 时直接返回 no-session notice。compact / summarize、revert / unrevert 与 share / unshare writes 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
 - `/compact` 不属于普通 slash command runtime：`SlashCommandExecutionHostFactory.executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
