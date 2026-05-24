@@ -67,8 +67,8 @@ export class ConversationSessionSettingsCoordinator {
 - modal 输入期间会调用 preview path 临时应用 `chatFontSizePx`，不修改 `Conversation.sessionSettings` 也不触发 save；取消或关闭弹窗时重新应用真实 conversation state
 - `saveConversationOverrides()` 会先归一化并持久化 `Conversation.sessionSettings`，全为 `null` 时会折叠回 `undefined`，避免存储纯"继承"空壳
 - `supportsTitleGeneration()` / `supportsQuestions()` / `supportsCompaction()` 控制 modal 中继承摘要行是否出现；它们只影响 UI 可见性，不改变 per-session `chatFontSizePx` 保存语义。标题/问答没有 host override 时，coordinator 会把 OpenCode conversation 视为支持、Claude Code conversation 视为不支持。
-- `shareCurrentConversation()` 调用 host 或 `OpenCodeService.shareSession()`，从返回的 `ShareInspectionEntry.share.url` 提取公开链接并复制到剪贴板；如果 OpenCode 将分享失败映射成 HTTP 500，coordinator 会把 SDK 原始错误归一化为用户可理解的分享失败说明。分享本身仍是 OpenCode-only 能力，非 OpenCode backend 后续需要 capability gate 后再暴露。
-- `unshareCurrentConversation()` 调用 host 或 `OpenCodeService.unshareSession()`，用于取消当前会话的公开分享
+- `shareCurrentConversation()` 只允许 `conversation.backend ?? 'opencode'` 为 `opencode` 时调用 host 或 `OpenCodeService.shareSession()`，从返回的 `ShareInspectionEntry.share.url` 提取公开链接并复制到剪贴板；如果 OpenCode 将分享失败映射成 HTTP 500，coordinator 会把 SDK 原始错误归一化为用户可理解的分享失败说明。分享写入本身仍是 OpenCode-only 能力，即使 modal 被错误/测试强制显示，Claude Code 的 `backendSessionId` 也不能进入 OpenCode write seam。
+- `unshareCurrentConversation()` 同样只允许 OpenCode conversation 调用 host 或 `OpenCodeService.unshareSession()`，用于取消当前会话的公开分享；非 OpenCode backend 复用现有 sharing unavailable 失败文案。
 
 ## 与 `OpenCodianView` 的边界
 
@@ -79,7 +79,7 @@ export class ConversationSessionSettingsCoordinator {
 ## 注意事项
 
 - runtime reapply 是会话级的 view-side effective state；它不会修改 plugin settings 自身的 global defaults
-- 分享、压缩、标题生成、问答卡片都必须经过 coordinator 的 capability/backend gate；不要因为 modal 能读到全局 settings 就默认在所有 backend 显示
+- 分享写入、压缩、标题生成、问答卡片都必须经过 coordinator 的 capability/backend gate；不要因为 modal 能读到全局 settings 或 `supportsSessionSharing()` 被强制为 true，就默认在所有 backend 调用 OpenCode-only 写路径。分享链接读取仍通过 backend-aware `readBackendSessionShareUrl()` 单独处理。
 - 当前 round 只覆盖 session settings owner/modal 与 activation/hydration runtime reapply，不包含 Agents / Commands UI
 
 ## 2026-04-23 Compaction config alignment

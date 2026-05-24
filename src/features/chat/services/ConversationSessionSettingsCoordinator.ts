@@ -223,6 +223,9 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private async shareCurrentConversation(conversation: Conversation): Promise<void> {
+    if ((conversation.backend ?? 'opencode') !== 'opencode') {
+      throw new Error(t('chat.sessionSharing.shareFailed'));
+    }
     const sessionId = getConversationBackendSessionId(conversation);
     if (!sessionId) {
       throw new Error(t('chat.sessionSharing.shareFailed'));
@@ -244,6 +247,9 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private async unshareCurrentConversation(conversation: Conversation): Promise<void> {
+    if ((conversation.backend ?? 'opencode') !== 'opencode') {
+      throw new Error(t('chat.sessionSharing.serviceUnavailable'));
+    }
     const sessionId = getConversationBackendSessionId(conversation);
     if (!sessionId) {
       throw new Error(t('chat.sessionSharing.serviceUnavailable'));

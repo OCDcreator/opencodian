@@ -12,6 +12,38 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Session settings modal share backend gate
+
+### 目标
+
+收紧会话设置弹窗里的 share / unshare backend ownership：Claude conversation 即使带有 `backendSessionId` 且 modal action 被强制暴露，也不能调用 OpenCode-only share / unshare write seam。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/services/ConversationSessionSettingsCoordinator.ts` | 后端边界修复 | `shareCurrentConversation()` / `unshareCurrentConversation()` 增加 `backend === 'opencode'` gate，复用现有分享失败/不可用文案并跳过 OpenCode-only 写入 |
+| `tests/unit/features/chat/ConversationSessionSettingsCoordinator.shareUrlRouting.test.ts` | +2 TDD 回归测试 | 覆盖 Claude conversation + `backendSessionId` + forced `supportsSessionSharing: true` 不调用 `shareSession()` / `unshareSession()` |
+| `docs/modules/features/chat/services/ConversationSessionSettingsCoordinator.md` | 文档更新 | 记录 modal 分享读取仍走 backend-aware read seam，但分享/取消分享写入是 OpenCode-only |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 modal share write backend gate 和 focused test evidence |
+
+### 验证
+
+- Red: focused test 先失败，证明 Claude `backendSessionId` 会被错误传给 `host.shareSession('claude-session-1')` / `host.unshareSession('claude-session-1')`
+- Focused green: `npm test -- --runInBand tests/unit/features/chat/ConversationSessionSettingsCoordinator.test.ts tests/unit/features/chat/ConversationSessionSettingsCoordinator.shareUrlRouting.test.ts` 通过，`2` suites / `22` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`436` suites / `3229` tests passed，verify build ID `feature-phase0-capability.202605241319`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241321`；并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241321`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-session-settings-share-gate-assertion-2026-05-24.json` 在部署版 `feature-phase0-capability.202605241321` 上返回 `ok: true`。脚本打开真实 session settings modal，强制显示 Claude conversation 的 share actions，并分别覆盖 known-unshared share 与 stale shared unshare 状态；OpenCode `shareSession` / `unshareSession` 与 clipboard write 计数均为 `0`
+- Runtime artifacts: `.obsidian-debug/claude-session-settings-share-gate-2026-05-24.png`、`.obsidian-debug/claude-session-settings-share-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-session-settings-share-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧会话设置 modal 的 OpenCode-only share / unshare write 边界，不宣称 Claude full capability 完成，不新增 Claude share URL 写入概念。`readBackendSessionShareUrl()` 的 backend-aware 读取路径保持不变。
+
+---
+
 ## 2026-05-24 Phase 3 - Slash compact backend gate hardening
 
 ### 目标

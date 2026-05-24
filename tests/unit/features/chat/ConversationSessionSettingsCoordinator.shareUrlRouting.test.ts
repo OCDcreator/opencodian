@@ -190,6 +190,63 @@ describe('ConversationSessionSettingsCoordinator share URL routing', () => {
     );
     expect(modalOptions.shareUrl).toBeNull();
   });
+
+  it('does not share a Claude Code backend session from modal actions even when sharing is forced visible', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-session-1';
+    delete conversation.openCodeSessionId;
+    const { coordinator, host } = createCoordinator({
+      currentConversation: conversation,
+      supportsSessionSharing: true,
+    });
+
+    await coordinator.openCurrentConversationSettings();
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    let caughtError: unknown;
+    try {
+      await modalOptions.onShare();
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(host.shareSession).not.toHaveBeenCalled();
+    expect(host.copyText).not.toHaveBeenCalled();
+    expect(caughtError).toEqual(expect.any(Error));
+    expect((caughtError as Error).message).toContain(
+      'OpenCode could not create a share link.',
+    );
+  });
+
+  it('does not unshare a Claude Code backend session from modal actions even when sharing is forced visible', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-session-1';
+    delete conversation.openCodeSessionId;
+    const { coordinator, host } = createCoordinator({
+      currentConversation: conversation,
+      supportsSessionSharing: true,
+    });
+
+    await coordinator.openCurrentConversationSettings();
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    let caughtError: unknown;
+    try {
+      await modalOptions.onUnshare();
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(host.unshareSession).not.toHaveBeenCalled();
+    expect(caughtError).toEqual(expect.any(Error));
+    expect((caughtError as Error).message).toContain(
+      'OpenCode session sharing is not available yet.',
+    );
+  });
 });
 
 describe('ConversationSessionSettingsCoordinator Session-import audit', () => {

@@ -45,6 +45,33 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Session settings modal share write backend gate
+
+This narrow worker slice closes the modal action equivalent of the slash share boundary: `ConversationSessionSettingsCoordinator` can still read share URLs through backend-aware routing, but share/unshare writes remain OpenCode-only.
+
+### What Changed
+
+- `ConversationSessionSettingsCoordinator.shareCurrentConversation()` now requires `(conversation.backend ?? 'opencode') === 'opencode'` before calling `shareSession()`.
+- `ConversationSessionSettingsCoordinator.unshareCurrentConversation()` now requires the same OpenCode backend guard before calling `unshareSession()`.
+- If a Claude Code conversation is forced into the sharing modal with `supportsSessionSharing: true`, modal share/unshare actions reuse existing OpenCode sharing failure/unavailable copy and do not call host/plugin OpenCode write seams.
+
+### What This Does Not Change
+
+- This does not add a Claude share/unshare write capability.
+- This does not mark Claude Code full capability as complete.
+- Backend-aware share URL reads through `readBackendSessionShareUrl()` remain separate from OpenCode-only share/unshare writes.
+
+### Verification
+
+- TDD red: focused tests first failed because Claude `backendSessionId` was passed to `host.shareSession('claude-session-1')` / `host.unshareSession('claude-session-1')` from modal actions.
+- Focused green: `npm test -- --runInBand tests/unit/features/chat/ConversationSessionSettingsCoordinator.test.ts tests/unit/features/chat/ConversationSessionSettingsCoordinator.shareUrlRouting.test.ts` passed with `2` suites / `22` tests.
+- Graph/docs gates: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check` passed.
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` passed with `436` suites / `3229` tests and verify build ID `feature-phase0-capability.202605241319`.
+- Build/deploy: standalone `npm run build` passed with build ID `feature-phase0-capability.202605241321`, then `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` were copied to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: both `dist/main.js` and Test Vault `main.js` contain `feature-phase0-capability.202605241321`; the deployed Claude SDK binary checksum matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Runtime proof: `.obsidian-debug/claude-session-settings-share-gate-assertion-2026-05-24.json` returned `ok: true` against deployed build ID `feature-phase0-capability.202605241321` after fresh plugin reload. The proof opened the real session settings modal with a forced-visible Claude conversation, covered known-unshared share plus stale shared unshare states, and kept `openCodeService.shareSession` / `unshareSession` and clipboard writes at `0`.
+- Runtime artifacts: `.obsidian-debug/claude-session-settings-share-gate-2026-05-24.png`, `.obsidian-debug/claude-session-settings-share-gate-console-2026-05-24.txt`, and `.obsidian-debug/claude-session-settings-share-gate-errors-2026-05-24.txt`; dev errors captured `No errors captured.`
+
 ## 2026-05-24 Slash compact backend gate hardening
 
 This round closed a narrow slash-command backend ownership leak: `/compact` could use a Claude `backendSessionId` and still call the OpenCode-only compact/summarize host.
