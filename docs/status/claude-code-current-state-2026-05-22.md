@@ -55,6 +55,38 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Capability Lab diagnostic sessionStore mirror readback
+
+This worker/reviewer slice closes a diagnostic proof gap in the Capability Lab JSONL History Browser: the mirror probe previously treated `runDiagnosticPrompt({ sessionStore })` returning a session id as enough proof, even though the user-facing proof needs the mirrored session to be listed and readable through the same diagnostic store.
+
+### What Changed
+
+- The Session Store mirror probe now calls `runDiagnosticPrompt({ sessionStore, sessionStoreFlush: 'eager', includeHookEvents: true })`, switches the browser source to Diagnostic Store, reloads sessions, requires the returned session id to appear in the store-backed list, selects it, and then calls `getSessionMessages(sessionId, { sessionStore, limit: 50, includeSystemMessages: false })`.
+- Empty store readback now fails the Session Store proof before any `pass` marker is rendered.
+- The proof marker now carries `data-capability`, making the active capability proof easier to assert without inferring from nearby text.
+- Async history-source reloads now use a request id guard so older `listSessions()` completions cannot overwrite the newer mirror/readback proof output or selection.
+- Locale copy for `settings.capabilityLab.history.description` now explicitly says the panel provides diagnostic-store-only import, mirror, and readback probes and does not provide stable delete or restore operations.
+
+### What This Does Not Change
+
+- This does not promote sessionStore, import, delete, restore, or full JSONL history management to a stable product surface.
+- This does not add a stable session-store data layer or wire diagnostic store data into ordinary chat/history UI.
+- This does not mark Claude Code full capability as complete.
+
+### Verification
+
+- Implementer subagent followed TDD on `SettingsCapabilityLabSection.test.ts`; focused tests first exposed gaps around proof attribution, empty readback, and stale async reload behavior, then passed after fixes.
+- Independent reviewer subagent reported no findings after the final locale/doc update. Residual reviewer risk was live SDK behavior, which was handled by the runtime proof below.
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` passed with `2` suites / `144` tests.
+- `npm run graphify:update:src` refreshed the committed `src` graph with `6138` nodes, `11631` edges, and `217` communities.
+- Guard gates passed: `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+- Direct SDK smoke artifact `.obsidian-debug/claude-code-smoke-2026-05-24-current.json` recorded `10/10` pass for SDK import, bundled executable, text, supported models, thinking, MCP stdio tool, `canUseTool` allow/deny, elicitation, and session resume. This is direct SDK proof, not a stable product-surface promotion.
+- `npm run build` passed with `BUILD_ID: feature-phase0-capability.202605242024`.
+- Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: Test Vault `main.js` contains `feature-phase0-capability.202605242024`; `dist/main.js` and deployed `main.js` SHA256 both equal `54ae1cf0aa52c451d6be024c6d53f5a71fdeb803f98ca01f7767d2bcbc305513`; the deployed Claude SDK binary checksum matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Live Test Vault runtime proof `.obsidian-debug/capability-lab-sessionstore-readback-assertion-2026-05-24-result.json` returned `ok: true` against loaded runtime `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242024`. It created diagnostic store session `501bfdd9-ea07-455c-88dc-bbc4d5db6be5`, confirmed `mirroredSessionCount: 1`, confirmed the mirrored id appeared in `listSessions({ sessionStore })`, and confirmed `getSessionMessages(..., { sessionStore, limit: 50, includeSystemMessages: false })` returned `messageCount: 3` with sample types `user`, `assistant`, `assistant`.
+- Runtime artifacts: `.obsidian-debug/capability-lab-sessionstore-readback-runtime-2026-05-24.png`, `.obsidian-debug/capability-lab-sessionstore-readback-console-2026-05-24.txt`, and `.obsidian-debug/capability-lab-sessionstore-readback-errors-2026-05-24.txt`; `dev:errors` reported `No errors captured.`
+
 ## 2026-05-24 Claude diagnostic resume validation boundary
 
 This related worker pair closes Capability Lab diagnostic resume leaks: `ClaudeCodeAdapter.runDiagnosticPrompt({ resumeSessionId })` must not pass arbitrary placeholder, OpenCode, OpenCodian-local handles, or SDK lookup results with explicit mismatching identity into the Claude SDK `resume` option.

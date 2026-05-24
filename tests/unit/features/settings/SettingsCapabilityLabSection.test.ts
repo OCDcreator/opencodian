@@ -498,6 +498,13 @@ describe('SettingsCapabilityLabSection', () => {
     expect(title).toContain('能力实验室');
     const tabLabel = t('settings.debug.tab.capabilityLab');
     expect(tabLabel).toBe('能力实验室');
+    const historyDescription = t('settings.capabilityLab.history.description');
+    expect(historyDescription).toContain('diagnostic store');
+    expect(historyDescription).toContain('导入');
+    expect(historyDescription).toContain('镜像');
+    expect(historyDescription).toContain('回读');
+    expect(historyDescription).toContain('不提供稳定的删除或恢复');
+    expect(historyDescription).not.toContain('不提供导入');
   });
 
   it('dispose does not throw', () => {
@@ -864,11 +871,31 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaceChip?.textContent).toBe('Diagnostic');
   });
 
-  it('renders session store controls and imports the selected session into the diagnostic store', async () => {
+  it('describes history import and mirror as diagnostic-store only without stable delete or restore', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const historyBlock = containerEl.querySelector('[data-section-block="history"]') as HTMLElement | null;
+    expect(historyBlock).toBeTruthy();
+    const description = historyBlock!.querySelector('.opencodian-capability-lab-description')?.textContent ?? '';
+    expect(description).toContain('diagnostic store');
+    expect(description).toContain('import');
+    expect(description).toContain('mirror');
+    expect(description).toContain('readback');
+    expect(description).toContain('No stable delete or restore');
+    expect(description).not.toContain('No import');
+  });
+
+  it('renders session store controls, imports sessions, and proves mirror readback from the diagnostic store', async () => {
     const listSessions = jest.fn().mockImplementation((options?: { sessionStore?: unknown }) => {
       if (options?.sessionStore) {
         return Promise.resolve([{
-          sessionId: 'store-session-1',
+          sessionId: 'diag-mirror-1',
           summary: 'Mirrored store session',
           lastModified: 2,
         }]);
@@ -879,12 +906,17 @@ describe('SettingsCapabilityLabSection', () => {
         lastModified: 1,
       }]);
     });
+    const getSessionMessages = jest.fn().mockResolvedValue([{
+      type: 'assistant',
+      uuid: 'mirror-message-1',
+      content: 'Diagnostic store readback proof from mirrored session.',
+    }]);
     const adapter = {
       listSessions,
-      getSessionMessages: jest.fn().mockResolvedValue([]),
+      getSessionMessages,
       importSessionToStore: jest.fn().mockResolvedValue(undefined),
       runDiagnosticPrompt: jest.fn().mockResolvedValue({
-        sessionId: 'store-session-1',
+        sessionId: 'diag-mirror-1',
         rawMessages: [],
         chunks: [],
       }),
@@ -939,6 +971,123 @@ describe('SettingsCapabilityLabSection', () => {
       sessionStore: expect.any(Object),
       sessionStoreFlush: 'eager',
     }));
+    expect(sourceSelect!.value).toBe('store');
+    expect(sessionSelect!.value).toBe('diag-mirror-1');
+    expect(getSessionMessages).toHaveBeenCalledWith('diag-mirror-1', expect.objectContaining({
+      sessionStore: expect.any(Object),
+      limit: 50,
+      includeSystemMessages: false,
+    }));
+    expect(containerEl.textContent).toContain('Diagnostic store readback');
+    expect(containerEl.textContent).toContain('diagnostic proof only');
+    expect(containerEl.textContent).toContain('Diagnostic store readback proof from mirrored session.');
+    const proofMarker = historyBlock!.querySelector('.opencodian-capability-lab-proof-marker') as HTMLElement | null;
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.dataset.capability).toBe('Session Store');
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+  });
+
+  it('fails the store mirror proof when diagnostic store readback returns no messages', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([{
+        sessionId: 'diag-empty-1',
+        summary: 'Empty mirrored store session',
+        lastModified: 2,
+      }]),
+      getSessionMessages: jest.fn().mockResolvedValue([]),
+      importSessionToStore: jest.fn(),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-empty-1',
+        rawMessages: [],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const historyBlock = containerEl.querySelector('[data-section-block="history"]') as HTMLElement | null;
+    const mirrorButton = Array.from(historyBlock?.querySelectorAll('button') ?? []).find((el) => (
+      el.textContent?.includes('Run Store Mirror Probe')
+    )) as HTMLButtonElement | undefined;
+
+    mirrorButton!.click();
+    await flushUi();
+
+    expect(adapter.getSessionMessages).toHaveBeenCalledWith('diag-empty-1', expect.objectContaining({
+      sessionStore: expect.any(Object),
+      limit: 50,
+      includeSystemMessages: false,
+    }));
+    expect(containerEl.textContent).toContain('Mirror probe failed');
+    expect(containerEl.textContent).toContain('did not return any messages');
+    const proofMarker = historyBlock!.querySelector('.opencodian-capability-lab-proof-marker') as HTMLElement | null;
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.dataset.capability).toBe('Session Store');
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('keeps stale async session reloads from overwriting mirror proof output', async () => {
+    let releaseInitialLoad: (() => void) | undefined;
+    const initialLoad = new Promise<Array<{ sessionId: string; summary: string; lastModified: number }>>((resolve) => {
+      releaseInitialLoad = () => resolve([{
+        sessionId: 'stale-local-1',
+        summary: 'Stale local session',
+        lastModified: 1,
+      }]);
+    });
+    const listSessions = jest.fn()
+      .mockReturnValueOnce(initialLoad)
+      .mockResolvedValue([{
+        sessionId: 'diag-race-1',
+        summary: 'Mirrored store session',
+        lastModified: 3,
+      }]);
+    const adapter = {
+      listSessions,
+      getSessionMessages: jest.fn().mockResolvedValue([{
+        type: 'assistant',
+        uuid: 'mirror-race-message-1',
+        content: 'Mirror proof survives stale reload.',
+      }]),
+      importSessionToStore: jest.fn(),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-race-1',
+        rawMessages: [],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const historyBlock = containerEl.querySelector('[data-section-block="history"]') as HTMLElement | null;
+    const sessionSelect = containerEl.querySelector('[data-diagnostic-session-select="history"]') as HTMLSelectElement | null;
+    const mirrorButton = Array.from(historyBlock?.querySelectorAll('button') ?? []).find((el) => (
+      el.textContent?.includes('Run Store Mirror Probe')
+    )) as HTMLButtonElement | undefined;
+
+    mirrorButton!.click();
+    await flushUi();
+    expect(containerEl.textContent).toContain('Mirror proof survives stale reload.');
+
+    releaseInitialLoad!();
+    await flushUi();
+
+    expect(sessionSelect!.value).toBe('diag-race-1');
+    expect(containerEl.textContent).toContain('Diagnostic store readback');
+    expect(containerEl.textContent).toContain('Mirror proof survives stale reload.');
+    expect(containerEl.textContent).not.toContain('Loaded 1 store session(s).');
   });
 
   // =======================================================================

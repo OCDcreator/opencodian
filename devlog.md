@@ -12,6 +12,40 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Capability Lab diagnostic sessionStore mirror readback
+
+### 目标
+
+把 Capability Lab 的 Session Store mirror proof 从“只看到 `runDiagnosticPrompt({ sessionStore })` 返回 session id”升级为真实 diagnostic-store 闭环：写入、切换 Diagnostic Store、重新列出、选中返回 session、再通过 `getSessionMessages(..., { sessionStore })` 回读到至少一条消息，避免把不可读的镜像误报为 runtime proof。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 诊断 proof 修复 | Mirror probe 改为 `sessionStoreFlush: 'eager'` 后切换到 Diagnostic Store、reload/list-check、select returned session，并通过 `getSessionMessages(sessionStore, limit: 50, includeSystemMessages: false)` 渲染 readback；空 readback 现在失败；history reload 加 request id guard 防止旧异步结果覆盖新 proof |
+| `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts` | 文案诚实化 | `settings.capabilityLab.history.description` 明确只提供 diagnostic store import / mirror / readback probes，不提供稳定 delete / restore 操作 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | TDD 回归测试 | 覆盖 history 描述、mirror readback 成功、空 readback 失败、stale reload 不覆盖 proof/selection、中文 locale 边界文案 |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 模块文档 | 记录 mirror proof 必须完成 Diagnostic Store list/select/readback 且读到消息才算通过 |
+| `docs/modules/i18n/locales/en.md` / `docs/modules/i18n/locales/zh.md` | 模块文档 | 记录 Capability Lab history description 的 diagnostic-store-only 边界 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 proof 边界、非目标、SDK smoke、deploy freshness 与 runtime artifacts |
+
+### 验证
+
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 通过，`2` suites / `144` tests passed
+- Independent reviewer subagent 复审无 findings；剩余风险限定为 live SDK runtime 行为，并由本轮 Test Vault proof 覆盖
+- `npm run graphify:update:src` 已刷新 `graphify-out/`（`6138` nodes / `11631` edges / `217` communities）
+- `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 通过
+- Direct SDK smoke: `.obsidian-debug/claude-code-smoke-2026-05-24-current.json` 记录 `10/10` pass（SDK import、bundled executable、text、supported models、thinking、MCP stdio tool、canUseTool allow/deny、elicitation、session resume）
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605242024`
+- Test Vault deploy：`main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 已部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Deploy freshness：Test Vault `main.js` 包含 `feature-phase0-capability.202605242024`；`dist/main.js` 与部署版 `main.js` SHA256 均为 `54ae1cf0aa52c451d6be024c6d53f5a71fdeb803f98ca01f7767d2bcbc305513`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/capability-lab-sessionstore-readback-assertion-2026-05-24-result.json` 返回 `ok: true`，loaded runtime 为 `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242024`；diagnostic store session `501bfdd9-ea07-455c-88dc-bbc4d5db6be5` 被 `listSessions({ sessionStore })` 列出，`getSessionMessages(..., { sessionStore, limit: 50, includeSystemMessages: false })` 回读 `messageCount: 3`
+- Runtime artifacts: `.obsidian-debug/capability-lab-sessionstore-readback-runtime-2026-05-24.png`、`.obsidian-debug/capability-lab-sessionstore-readback-console-2026-05-24.txt`、`.obsidian-debug/capability-lab-sessionstore-readback-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只加强 diagnostic sessionStore proof，不新增稳定历史管理、delete/restore、正式 sessionStore 数据层或普通 chat/history UI 接入；不宣称 Claude Code full capability 完成。
+
 ## 2026-05-24 Phase 3 - Claude diagnostic resume validation boundary
 
 ### 目标

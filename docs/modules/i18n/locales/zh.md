@@ -316,6 +316,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 新增 `settings.capabilityLab.backendRouting.*`，为后端路由验证诊断探针提供中文文案。该探针验证后端路由基础设施工作正常，显示活跃后端、已注册适配器和会话后端分布，是 provider-owned 诊断，不代表稳定的后端路由产品界面。
 
+2026-05-24 调整 `settings.capabilityLab.history.description`，明确 JSONL 历史浏览器只提供 diagnostic store 的导入、镜像和回读探针，不提供稳定的删除或恢复操作，避免把 Session Store 诊断证明误读成正式历史管理能力。
+
 ## 2026-05-23 取消分享后端守卫
 
 新增 `settings.conversation.share.sharedSessions.unshareUnavailable` 键，用于当活跃后端已切换出 OpenCode 时，阻止设置页已分享会话列表中的取消分享操作，并给出用户可理解的提示。

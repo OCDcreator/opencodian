@@ -2613,7 +2613,7 @@ export const zhTranslations = {
   'settings.capabilityLab.matrix.title': '能力矩阵',
   'settings.capabilityLab.matrix.description': '只读矩阵，显示各项 Claude Code SDK 能力的对等状态。运行期证明在执行实时诊断调用后更新。',
   'settings.capabilityLab.history.title': 'JSONL 历史浏览器（只读）',
-  'settings.capabilityLab.history.description': '浏览 Claude Code JSONL 历史中的会话消息。使用 getSessionMessages()。不提供导入、删除或恢复操作。',
+  'settings.capabilityLab.history.description': '浏览 Claude Code JSONL 消息，并运行仅限 diagnostic store 的导入、镜像和回读探针。不提供稳定的删除或恢复操作。',
   'settings.capabilityLab.subagents.title': '子代理浏览器（只读）',
   'settings.capabilityLab.subagents.description': '列出并检查子代理转录。使用 listSubagents() 和 getSubagentMessages()。只读 — 无写入操作。',
   'settings.capabilityLab.rewind.title': '回退预览（Dry-Run）',

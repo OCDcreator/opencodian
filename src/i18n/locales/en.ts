@@ -2613,7 +2613,7 @@ export const enTranslations = {
   'settings.capabilityLab.matrix.title': 'Capability Matrix',
   'settings.capabilityLab.matrix.description': 'Read-only matrix showing SDK parity status for each Claude Code capability. Runtime Proof updates after live diagnostic calls.',
   'settings.capabilityLab.history.title': 'JSONL History Browser (Read-Only)',
-  'settings.capabilityLab.history.description': 'Browse session messages from Claude Code JSONL history. Uses getSessionMessages(). No import, delete, or restore operations.',
+  'settings.capabilityLab.history.description': 'Browse Claude Code JSONL messages and run diagnostic store only import, mirror, and readback probes. No stable delete or restore operations are provided.',
   'settings.capabilityLab.subagents.title': 'Subagent Browser (Read-Only)',
   'settings.capabilityLab.subagents.description': 'List and inspect subagent transcripts. Uses listSubagents() and getSubagentMessages(). Read-only — no write operations.',
   'settings.capabilityLab.rewind.title': 'Rewind Dry-Run Preview',

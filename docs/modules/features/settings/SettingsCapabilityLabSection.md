@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供十个诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。大多数交互仍是只读或 dry-run；新增的 sessionStore proof 只会写入插件内存里的 diagnostic store，不会改稳定设置或普通 chat UI。
+`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供十个诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。大多数交互仍是只读或 dry-run；sessionStore proof 只会写入插件内存里的 diagnostic store，并通过 Diagnostic Store 列表和 readback 证明隔离路径可读，不会改稳定设置或普通 chat UI。
 
 设计原则：不把未验证能力包装成稳定 UI。允许最小的 diagnostic-only runtime proof，但不能把 hooks / sessionStore 伪装成 stable/completed。structured output 的 transcript 渲染与持久化已稳定，但 authoring/triggering 仍为 diagnostic-only；Capability Lab 只证明边界，不把诊断态升级成正式产品面。
 
@@ -48,7 +48,7 @@
 
 ### Diagnostic Session Store
 
-文件内部持有一个 plugin-scoped `CapabilityLabSessionStore`，实现 SDK `SessionStore` 所需的 `append` / `load` / `listSessions` / `listSubkeys`，用于 Capability Lab 的 mirror/import/list/load proof。它是内存态、plugin-owned 的诊断 adapter，不是稳定数据层。
+文件内部持有一个 plugin-scoped `CapabilityLabSessionStore`，实现 SDK `SessionStore` 所需的 `append` / `load` / `listSessions` / `listSubkeys`，用于 Capability Lab 的 mirror/import/list/load proof。Mirror probe 使用 `runDiagnosticPrompt({ sessionStore, sessionStoreFlush: 'eager' })` 写入后，会切到 Diagnostic Store、重新列出并选中返回的 session，再通过 `getSessionMessages(sessionId, { sessionStore, limit: 50, includeSystemMessages: false })` 渲染消息预览作为 readback proof；如果 readback 没有返回任何消息，则 Session Store proof 失败。它是内存态、plugin-owned 的诊断 adapter，不是稳定数据层。
 该内存 store 现在也有直接单测，覆盖 append/load 往返、重复 append、listSessions mtime、listSubkeys、空 store 隔离和 projectKey 隔离，但这些测试只证明诊断 store 行为，不把它升级成正式存储产品。
 
 ### Adapter 获取
@@ -105,7 +105,7 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 
 ## 注意事项
 
-- sessionStore import / mirror proof 会写入隔离的 diagnostic store；这不属于稳定插件状态，也不等于开放正式 import/restore UI
+- sessionStore import / mirror proof 会写入隔离的 diagnostic store；mirror proof 必须完成 Diagnostic Store list/select/readback 并读到至少一条消息才算通过。这不属于稳定插件状态，也不等于开放正式 import/restore UI
 - `buildMatrixRows()` 的评估基于代码检查，不是运行时探测
 - Structured Output 与 Hooks proof 都通过 `runDiagnosticPrompt()` 直接观察 backend_event；普通 `OpenCodianView` 仍不会把这些事件渲染进稳定 transcript。structured output 的 transcript 渲染已稳定，但 authoring/triggering 仍只在诊断面板里可见。
 - Discovery 面板使用 `hasCapability()` 检查 adapter 声明的能力

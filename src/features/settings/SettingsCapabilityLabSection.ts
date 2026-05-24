@@ -613,9 +613,12 @@ export class SettingsCapabilityLabSection {
       cls: 'opencodian-capability-lab-output',
       attr: { 'data-diagnostic': 'true' },
     });
+    let sessionLoadRequestId = 0;
 
     // Load sessions
     const loadSessions = async (): Promise<void> => {
+      const requestId = sessionLoadRequestId + 1;
+      sessionLoadRequestId = requestId;
       try {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
@@ -623,6 +626,9 @@ export class SettingsCapabilityLabSection {
         const sessions = await adapter.listSessions(
           useStore ? { sessionStore: state.sessionStore } : undefined,
         );
+        if (requestId !== sessionLoadRequestId) {
+          return;
+        }
         for (const session of sessions) {
           const opt = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
@@ -636,6 +642,9 @@ export class SettingsCapabilityLabSection {
           text: `Loaded ${sessions.length} ${useStore ? 'store' : 'local'} session(s).`,
         });
       } catch (err) {
+        if (requestId !== sessionLoadRequestId) {
+          return;
+        }
         outputEl.empty();
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
@@ -786,13 +795,17 @@ export class SettingsCapabilityLabSection {
       });
       sourceSelect.value = 'store';
       await reloadSessions();
-      if (result.sessionId) {
-        sessionSelect.value = result.sessionId;
+      if (!result.sessionId) {
+        throw new Error('Diagnostic mirror probe did not return a session id.');
       }
-      outputEl.empty();
-      outputEl.createEl('p', {
-        text: `Mirrored session ${result.sessionId?.slice(0, 12) ?? 'unknown'}… into the diagnostic store.`,
-      });
+      const mirroredSessionListed = Array.from(sessionSelect.options).some((option) => (
+        option.value === result.sessionId
+      ));
+      if (!mirroredSessionListed) {
+        throw new Error('Mirrored session was not listed by the diagnostic store after eager flush.');
+      }
+      sessionSelect.value = result.sessionId;
+      await this.loadStoreMirrorReadback(adapter, result.sessionId, outputEl, sessionStore);
       this.updateRuntimeProof('Session Store', 'pass', outputEl);
     } catch (err) {
       outputEl.empty();
@@ -802,6 +815,40 @@ export class SettingsCapabilityLabSection {
       });
       this.updateRuntimeProof('Session Store', 'fail', outputEl);
     }
+  }
+
+  private async loadStoreMirrorReadback(
+    adapter: ClaudeCodeAdapter,
+    sessionId: string,
+    outputEl: HTMLElement,
+    sessionStore: CapabilityLabSessionStore,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Loading diagnostic store readback…' });
+
+    const messages = await adapter.getSessionMessages(sessionId, {
+      sessionStore,
+      limit: 50,
+      includeSystemMessages: false,
+    });
+    if (messages.length === 0) {
+      throw new Error('Diagnostic store readback did not return any messages.');
+    }
+
+    outputEl.empty();
+    renderMessagePreviewList(
+      outputEl,
+      'Diagnostic store readback — diagnostic proof only',
+      messages,
+    );
+    outputEl.createEl('p', {
+      cls: 'opencodian-capability-lab-hint',
+      text: 'This readback proves only the isolated diagnostic sessionStore path; it does not enable stable session-store product behavior.',
+    });
+    outputEl.createEl('pre', {
+      cls: 'opencodian-capability-lab-json-preview',
+      text: truncate(formatJsonPreview(messages), 8000),
+    });
   }
 
   // =======================================================================
@@ -2045,7 +2092,10 @@ export class SettingsCapabilityLabSection {
 
     const marker = outputEl.createDiv({
       cls: `opencodian-capability-lab-proof-marker opencodian-capability-lab-proof-${_status}`,
-      attr: { 'data-diagnostic': 'true' },
+      attr: {
+        'data-capability': _capability,
+        'data-diagnostic': 'true',
+      },
     });
     const label = _status === 'pass' ? '✓ Runtime verified'
       : _status === 'fail' ? '✗ Runtime failed'
