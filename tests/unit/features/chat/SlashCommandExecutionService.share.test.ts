@@ -109,4 +109,20 @@ describe('SlashCommandExecutionService share/unshare backend gates', () => {
     expect(host.unshareSession).not.toHaveBeenCalled();
     expect(noticeSpy).toHaveBeenCalledWith(t('slashCommand.unshare.noSession'));
   });
+
+  it('compact reports no session for Claude conversations with a backend session id', async () => {
+    const conversation = createConversation({
+      backend: 'claude-code',
+      backendSessionId: 'claude-session-1',
+    });
+    const host = createHost({
+      ensureConversationReady: jest.fn().mockResolvedValue(conversation),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/compact')).resolves.toBe(true);
+
+    expect(host.runCompactSession).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(t('slashCommand.compact.noSession'));
+  });
 });

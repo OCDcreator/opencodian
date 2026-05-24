@@ -45,6 +45,32 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Slash compact backend gate hardening
+
+This round closed a narrow slash-command backend ownership leak: `/compact` could use a Claude `backendSessionId` and still call the OpenCode-only compact/summarize host.
+
+### What Changed
+
+- `SlashCommandExecutionService.handleCompactCommand()` now requires the current conversation backend to be `opencode` before calling `host.runCompactSession()`.
+- Non-OpenCode conversations reuse the existing compact no-session notice copy for this OpenCode-only summarize action.
+
+### What This Does Not Change
+
+- This does not add a Claude compact/summarize concept.
+- This does not mark Claude Code full capability as complete.
+- OpenCode manual compaction remains unchanged for OpenCode conversations.
+
+### Verification
+
+- TDD red: focused test first failed because Claude `backendSessionId` was passed to `host.runCompactSession('claude-session-1')`.
+- Focused green: `npm test -- --runInBand tests/unit/features/chat/SlashCommandExecutionService.test.ts tests/unit/features/chat/SlashCommandExecutionService.undoRedo.test.ts tests/unit/features/chat/SlashCommandExecutionService.share.test.ts` passed with `3` suites / `33` tests.
+- Graph/docs gates: `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check` passed.
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` passed with `436` suites / `3227` tests and build ID `feature-phase0-capability.202605241254`.
+- Build/deploy: standalone `npm run build` passed with build ID `feature-phase0-capability.202605241255`, then `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` were copied to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Deploy freshness: both `dist/main.js` and Test Vault `main.js` contain `feature-phase0-capability.202605241255`; the deployed Claude SDK binary checksum matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Runtime proof: `.obsidian-debug/claude-slash-compact-gate-assertion-2026-05-24.json` returned `ok: true` against deployed build ID `feature-phase0-capability.202605241255` after fresh plugin reload. The proof used the real DOM composer (`.opencodian-input` + `.opencodian-send-btn`) with a Claude conversation carrying `backendSessionId: 'claude-session-compact-1'`; `/compact` was consumed, `openCodeService.getSessionContextUsageSnapshot` / `summarizeSession` calls stayed `0`, and no prompt messages were added.
+- Runtime artifacts: `.obsidian-debug/claude-slash-compact-gate-2026-05-24.png`, `.obsidian-debug/claude-slash-compact-gate-console-2026-05-24.txt`, and `.obsidian-debug/claude-slash-compact-gate-errors-2026-05-24.txt`; dev errors captured `No errors captured.`
+
 ## 2026-05-24 Slash share backend gate hardening
 
 This round closed a narrow slash-command backend ownership leak: `/share` and `/unshare` could use a Claude `backendSessionId` and still call the OpenCode-only share/unshare host.
@@ -397,7 +423,7 @@ Recent runs focused on two connected lanes:
 | `ConversationAuthoritativeSyncCoordinator.ts` | Uses `getConversationBackendSessionId()`; skips sync for non-OpenCode backends (OpenCode-only by design). |
 | `ConversationAuthoritativeReloadCoordinator.ts` | Uses `getConversationBackendSessionId()` in all debug logs; skips server sync for non-OpenCode backends. |
 | `ConversationNoticeCoordinator.ts` | `appendTurnDiffNoticeIfNeeded` gated to OpenCode-only. |
-| `SlashCommandExecutionService.ts` | `/undo`, `/redo`, `/share`, and `/unshare` gated to OpenCode-only; uses `getConversationBackendSessionId()`. |
+| `SlashCommandExecutionService.ts` | `/compact`, `/undo`, `/redo`, `/share`, and `/unshare` gated to OpenCode-only; uses `getConversationBackendSessionId()`. |
 | `ChildSessionGraphCoordinator.ts` | `refreshGraph` gated to OpenCode-only. |
 | `LocalStreamMessagePersistence.ts` | Debug logs use `getConversationBackendSessionId()`. |
 | `ConversationRenderService.ts` | Debug logs use `getConversationBackendSessionId()`. `resolveConversationRenderMessages()` has an explicit `backend !== 'opencode'` guard so the canonical session state path (OpenCode-specific `getCanonicalSessionState` / `hydrateOpenCodeMessage`) is never entered for non-OpenCode conversations — hardening what was previously only an implicit null-safe fallback. |
@@ -570,6 +596,7 @@ The following service seams now route session identity through `getConversationB
 | Conversation identity runtime (log fingerprint) | **Yes** | Uses `getConversationBackendSessionId()` |
 | Slash command undo (revert) | **Gated** | OpenCode-only: backend check |
 | Slash command redo (unrevert) | **Gated** | OpenCode-only: backend check |
+| Slash command compact (summarize) | **Gated** | OpenCode-only: backend check |
 | Slash command share | **Gated** | OpenCode-only: backend check |
 | Slash command unshare | **Gated** | OpenCode-only: backend check |
 | Diff notice on turn completion | **Gated** | OpenCode-only: backend check |

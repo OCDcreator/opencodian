@@ -58,7 +58,7 @@ export class SlashCommandExecutionService {
 - `slashCommandSkillMode === 'direct'` 时，runtime `source === 'skill'` 可以直接用 `/skill-id arguments` 执行
 - `slashCommandSkillMode === 'skills-command'` 时，直接 `/skill-id` 不接管；只有 `/skills skill-id arguments` 会映射为真实 `session.command({ command: 'skill-id' })`
 - 如果某个 runtime command 同时也有 project override，direct `/command` 仍按该 runtime command 执行，不会被 `/skills` 前缀规则错误降级
-- `/compact` 是 synthetic command：只在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate，再用当前 OpenCode session 调用 view host 的 manual compaction seam；无 active session 时显示专用 notice
+- `/compact` 是 OpenCode-only synthetic command：只在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate，再用当前 OpenCode session 调用 view host 的 manual compaction seam；无 active OpenCode session 或非 OpenCode backend 时显示专用 no-session notice
 - `/undo`、`/redo`、`/new`、`/share`、`/unshare` 是额外的 synthetic builtin commands，与 `/compact` 共享同一条检测路径：只在没有同名 project override 且 runtime 未提供非内置条目时走插件内置逻辑
   - `/undo`：查找当前会话最后一条用户消息的 `sourceMessageId`，调用 `revertSession()` 撤销，成功后触发 background sync；无 conversation / 无 session / 非 opencode backend / 无 sourceMessageId 各路径均显示对应 notice 并提前返回
   - `/redo`：调用 `unrevertSession()` 重做，成功后触发 background sync；与 `/undo` 共享一致的 `!conversation` null guard、backend gate 和 error-catch notice 模式
@@ -98,8 +98,8 @@ export class SlashCommandExecutionService {
 - markdown command 会通过 `runMdFileCommandAsMessage()` 重新进入 send pipeline，并设置 skip-slash 标志避免 template 以 `/` 开头时再次递归拦截
 - slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
 - dispatch runtime/project command 前会用 `getConversationBackendSessionId()` 解析 session identity；没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
-- **OpenCode-only synthetic command gates**: `/undo`、`/redo`、`/share` 与 `/unshare` 在 `backend !== 'opencode'` 时直接返回 no-session notice。revert / unrevert 与 share / unshare writes 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
+- **OpenCode-only synthetic command gates**: `/compact`、`/undo`、`/redo`、`/share` 与 `/unshare` 在 `backend !== 'opencode'` 时直接返回 no-session notice。compact / summarize、revert / unrevert 与 share / unshare writes 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
 - `/compact` 不属于普通 slash command runtime：`SlashCommandExecutionHostFactory.executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
 - `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda
-- synthetic builtin commands（`/compact`、`/undo`、`/redo`、`/new`、`/share`、`/unshare`）的 host 方法（`revertSession`、`unrevertSession`、`shareSession`、`unshareSession`、`createNewConversation`）直接从 `deps.openCodeService` 和 `deps.createNewConversation` 映射，不经过 view 层新增方法
+- synthetic builtin commands 的 host seam 保持扁平：`/compact` 通过 `deps.runCompactSession` 进入 `executeCompactSession()`，`/undo`、`/redo`、`/share`、`/unshare` 与 `/new` 分别从 `deps.openCodeService` 和 `deps.createNewConversation` 映射，不经过 view 层新增方法

@@ -372,8 +372,9 @@ export class SlashCommandExecutionService {
 
   private async handleCompactCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
+    const backend = conversation?.backend ?? 'opencode';
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
-    if (!sessionId) { new Notice(t('slashCommand.compact.noSession')); return true; }
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.compact.noSession')); return true; }
     await this.host.runCompactSession(sessionId);
     return true;
   }

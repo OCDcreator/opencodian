@@ -12,6 +12,37 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Slash compact backend gate hardening
+
+### 目标
+
+收紧 slash `/compact` 的 backend ownership：Claude conversation 即使带有 `backendSessionId`，也不能调用 OpenCode-only compact / summarize host。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/services/SlashCommandExecutionService.ts` | 后端边界修复 | `/compact` 增加 `backend !== 'opencode'` gate，复用现有 compact no-session notice 并跳过 OpenCode-only host 调用 |
+| `tests/unit/features/chat/SlashCommandExecutionService.share.test.ts` | +1 TDD 回归测试 | 覆盖 Claude conversation + `backendSessionId` 不调用 `runCompactSession()` |
+| `docs/modules/features/chat/services/SlashCommandExecutionService.md` | 文档更新 | 记录 `/compact` 和 `/undo` / `/redo` / `/share` / `/unshare` 一样属于 OpenCode-only synthetic command gate |
+
+### 验证
+
+- Red: focused test 先失败，证明 Claude `backendSessionId` 会被错误传给 `host.runCompactSession('claude-session-1')`
+- Focused green: `npm test -- --runInBand tests/unit/features/chat/SlashCommandExecutionService.test.ts tests/unit/features/chat/SlashCommandExecutionService.undoRedo.test.ts tests/unit/features/chat/SlashCommandExecutionService.share.test.ts` 通过，`3` suites / `33` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`436` suites / `3227` tests passed，build ID `feature-phase0-capability.202605241254`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241255`；并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241255`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-slash-compact-gate-assertion-2026-05-24.json` 在部署版 `feature-phase0-capability.202605241255` 上返回 `ok: true`。脚本走真实 DOM composer (`.opencodian-input` + `.opencodian-send-btn`)，Claude conversation 带 `backendSessionId: 'claude-session-compact-1'`；`/compact` 被消费，但 OpenCode `getSessionContextUsageSnapshot` / `summarizeSession` 计数均为 `0`，消息数保持 `0`
+- Runtime artifacts: `.obsidian-debug/claude-slash-compact-gate-2026-05-24.png`、`.obsidian-debug/claude-slash-compact-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-slash-compact-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧 OpenCode-only compact / summarize 边界，不宣称 Claude full capability 完成，不新增 Claude compact 概念。
+
+---
+
 ## 2026-05-24 Phase 3 - Slash share backend gate hardening
 
 ### 目标
