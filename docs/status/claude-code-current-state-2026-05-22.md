@@ -16,10 +16,15 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `9a3daf89`
-- Commit subject: `docs: assess structured output capability maturity`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605231721`
+- Snapshot commit: `81228ce7`
+- Commit subject: `fix: guard project conversation settings for claude backend`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605241703`
 - Recent continuity commits in this lane:
+- `81228ce7` — `fix: guard project conversation settings for claude backend`
+- `080a1c76` — `fix: gate ordinary slash commands to opencode backend`
+- `0cc89c4d` — `fix: gate session settings sharing to opencode backend`
+- `d388559c` — `fix: gate slash compact to opencode backend`
+- `7aea3fd2` — `fix: gate slash sharing to opencode backend`
 - `9a3daf89` — `docs: assess structured output capability maturity`
 - `b55f46b9` — `docs: record shared sessions backend-switch follow-up audit`
 - `4f85f022` — `fix: guard shared session unshare when backend switches`
@@ -44,6 +49,34 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-24 MCP settings stale backend guard
+
+This narrow worker slice closes stale mounted OpenCode-only MCP settings callbacks in `SettingsMcpSection`. The dedicated MCP settings tab is only mounted while OpenCode is active, but toolbar and server-card callbacks can survive briefly after switching the active backend to Claude Code.
+
+### What Changed
+
+- `SettingsMcpSection` now re-checks that OpenCode is still the active backend before toolbar refresh, runtime connect/disconnect/auth actions, Add/Edit modal open, Add/Edit save callbacks, and project Delete.
+- Stale Claude-active callbacks show a dedicated MCP OpenCode-only notice and return before calling `refreshMcpServerStatus()`, connect/disconnect/auth, Add/Edit modal construction, Delete confirm, `McpConfigService.deleteServer()`, or project config writes.
+- The active-backend fallback matches the surrounding settings owners: if `activeBackend` is invalid, use the first enabled backend rather than silently assuming OpenCode.
+
+### What This Does Not Change
+
+- This does not add Claude MCP authoring or runtime-control support.
+- This does not mark Claude Code full capability as complete.
+- OpenCode-active MCP runtime and project config behavior remain unchanged.
+
+### Verification
+
+- TDD red: focused tests first failed because stale Claude-active callbacks called `connectMcpServer('disabled')`, `refreshMcpServerStatus()`, and opened Delete confirm after switching away from OpenCode.
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsMcpSection.actions.test.ts` passed with `1` suite / `9` tests.
+- `npm run graphify:update:src` refreshed the committed `src` graph with `6122` nodes, `11565` edges, and `217` communities.
+- `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint` passed.
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `436` suites / `3237` tests and produced verify `BUILD_ID: feature-phase0-capability.202605241702`.
+- `npm run build` passed with the same build ID; Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Test Vault `main.js` was verified to contain `feature-phase0-capability.202605241703`; the deployed Claude SDK binary checksum matched dist: `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Runtime proof: `.obsidian-debug/claude-mcp-settings-stale-backend-gate-assertion-2026-05-24-result.json` returned outer `ok: true` and inner `ok: true` against deployed build ID `feature-phase0-capability.202605241703`. The proof opened the real Test Vault settings editor-area MCP DOM, switched active backend to Claude Code after the MCP tab was mounted, clicked stale Refresh/Add/Connect/Disconnect/Delete controls, and kept `refreshMcpServerStatus`, connect/disconnect/auth, `addMcpServer`, project config reads/writes, and Delete confirm at `0`. It also confirmed the OpenCode-only MCP notice appeared, the Add/Edit modal did not open, and the settings root had no horizontal overflow (`rootScrollWidth: 1042`, `rootClientWidth: 1042`).
+- Runtime artifacts: `.obsidian-debug/claude-mcp-settings-stale-backend-gate-runtime-2026-05-24.png`, `.obsidian-debug/claude-mcp-settings-stale-backend-gate-console-2026-05-24.txt`, `.obsidian-debug/claude-mcp-settings-stale-backend-gate-errors-2026-05-24.txt`; dev errors reported `No errors captured.`
 
 ## 2026-05-24 Conversation settings project config stale backend guard
 

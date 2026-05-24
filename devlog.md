@@ -12,6 +12,40 @@
 
 ---
 
+## 2026-05-24 Phase 3 - MCP settings stale backend guard
+
+### 目标
+
+收紧 MCP settings 的 OpenCode-only stale callback 边界：页面在 OpenCode active 时挂载后，如果 active backend 切到 Claude Code，旧的 MCP toolbar / server-card callback 不能继续触发 OpenCode MCP runtime、弹出 Add/Edit modal、打开 Delete confirm 或写 `.opencode/opencode.json`。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsMcpSection.ts` | 后端边界修复 | 在 toolbar refresh、server card runtime actions、Add/Edit modal open、Add/Edit save callback、project Delete 开头增加 active OpenCode guard；非 OpenCode active 时显示 MCP OpenCode-only Notice 并跳过 `refreshMcpServerStatus()`、connect/disconnect/auth、modal construction、confirm、`McpConfigService.deleteServer()` 和 project config write |
+| `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts` | 文案新增 | 新增 `settings.server.mcp.notice.openCodeOnly`，明确 MCP runtime controls 只在 OpenCode active 时可用 |
+| `tests/unit/features/settings/SettingsMcpSection.actions.test.ts` | +3 TDD 回归测试 | 覆盖 OpenCode active 挂载后切到 Claude Code，再触发 stale connect/disconnect、toolbar refresh/add、project delete 时不调用 OpenCode-only runtime/config 路径 |
+| `docs/modules/features/settings/SettingsMcpSection.md` | 文档更新 | 记录 MCP settings callback 必须在执行前重新检查 active backend，避免 stale mounted UI 泄漏到 Claude active backend |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 MCP settings stale backend guard 与 focused test evidence |
+
+### 验证
+
+- Red: focused tests 先失败，证明 stale Claude-active callback 会调用 `connectMcpServer('disabled')`、`refreshMcpServerStatus()`，并在 Delete 前弹出 confirm
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsMcpSection.actions.test.ts` 通过，`1` suite / `9` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`（`6122` nodes / `11565` edges / `217` communities）
+- `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 通过
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`436` suites / `3237` tests passed，verify build ID `feature-phase0-capability.202605241702`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241703`；并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241703`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-mcp-settings-stale-backend-gate-assertion-2026-05-24-result.json` 在部署版 `feature-phase0-capability.202605241703` 上返回 outer `ok: true` 且 inner `ok: true`。脚本在真实 Test Vault settings editor-area MCP DOM 中验证 MCP tab 挂载后切到 Claude Code，再点击 stale Refresh/Add/Connect/Disconnect/Delete；`refreshMcpServerStatus`、connect/disconnect/auth、`addMcpServer`、project config read/write、Delete confirm 均保持 `0`，Add/Edit modal 未打开，出现 MCP OpenCode-only Notice，且 settings root 无横向溢出（`rootScrollWidth: 1042` / `rootClientWidth: 1042`）
+- Runtime artifacts: `.obsidian-debug/claude-mcp-settings-stale-backend-gate-runtime-2026-05-24.png`、`.obsidian-debug/claude-mcp-settings-stale-backend-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-mcp-settings-stale-backend-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧 SettingsMcpSection 中 OpenCode-only MCP runtime/project-config 操作边界，不新增 Claude MCP authoring 或 runtime-control 能力，不宣称 Claude full capability 完成。OpenCode active 下的 MCP 管理行为保持不变。
+
+---
+
 ## 2026-05-24 Phase 3 - Conversation settings project config stale backend guard
 
 ### 目标

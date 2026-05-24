@@ -322,6 +322,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 新增 `settings.conversation.projectConfig.openCodeOnly` 键，用于当活跃后端已切换出 OpenCode 时，阻止设置页项目级 compaction / share 配置控件和分享诊断按钮继续执行 OpenCode-only 写入或检查路径；这只是 stale-control 防护，不表示 Claude Code 支持这些项目级 OpenCode 配置。
 
+新增 `settings.server.mcp.notice.openCodeOnly` 键，用于当活跃后端已切换出 OpenCode 时，阻止 MCP settings 中旧 toolbar / server-card callback 继续执行 OpenCode-only runtime 或 project-config 操作；这只是 stale-control 防护，不表示 Claude Code 支持 MCP authoring 或 runtime controls。
+
 ## 2026-05-22 Structured output 会话渲染
 
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。

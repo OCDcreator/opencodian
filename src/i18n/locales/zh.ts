@@ -2567,6 +2567,7 @@ export const zhTranslations = {
   'settings.server.mcp.notice.actionFailed': '操作失败: {error}',
   'settings.server.mcp.notice.readOnly': '此 MCP 服务器仅来自运行时或继承配置，无法在当前项目中编辑/删除。',
   'settings.server.mcp.notice.configUnavailable': '项目 MCP 配置不可用。',
+  'settings.server.mcp.notice.openCodeOnly': '只有 OpenCode 是活跃后端时，才能使用 MCP 运行时控制。',
   'settings.model.tab.common': '通用',
   'settings.model.tab.projectConfig': '提供商和模型配置',
   'settings.model.tab.availability': '提供商和模型管理',

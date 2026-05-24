@@ -2567,6 +2567,7 @@ export const enTranslations = {
   'settings.server.mcp.notice.actionFailed': 'Action failed: {error}',
   'settings.server.mcp.notice.readOnly': 'This MCP server is runtime-only or inherited, so project edit/delete is unavailable.',
   'settings.server.mcp.notice.configUnavailable': 'Project MCP config is unavailable.',
+  'settings.server.mcp.notice.openCodeOnly': 'MCP runtime controls are only available when OpenCode is the active backend.',
   'settings.model.tab.common': 'General',
   'settings.model.tab.projectConfig': 'Provider & model config',
   'settings.model.tab.availability': 'Provider & model management',
