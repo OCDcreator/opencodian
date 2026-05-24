@@ -16,11 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit after the latest committed capability slice: `8a48502b`
-- Commit subject after the latest committed capability slice: `fix: restrict shared session links to opencode`
+- Snapshot commit after the latest committed capability slice: `8361ebe5`
+- Commit subject after the latest committed capability slice: `fix: mark claude stream settings diagnostic`
 - Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242303`
 - Recent continuity commits in this lane:
-- Uncommitted implementer slice — Capability Lab classifies `Subagent Transcript / Progress` and `Include Hook Events` as `Diagnostic` + `Untested`, and SDK Foundations adds visible boundary copy explaining that its hook/subagent stream flags do not enable stable hook authoring or complete transcript/progress UI.
+- `8361ebe5` — `fix: mark claude stream settings diagnostic`
 - `8a48502b` — `fix: restrict shared session links to opencode`
 - `9f455f1b` — `fix: clarify claude advanced settings honesty`
 - `fc2659ff` — `docs: refresh claude footer boundary anchor`
