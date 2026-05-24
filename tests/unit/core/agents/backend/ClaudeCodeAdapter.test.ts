@@ -787,6 +787,11 @@ describe('ClaudeCodeAdapter', () => {
         content: [{ type: 'text', text: 'Resumed diagnostic output' }],
       },
     }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'existing-sdk-session-42',
+      summary: 'Existing Claude session',
+      lastModified: 1700000000000,
+    });
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -811,6 +816,69 @@ describe('ClaudeCodeAdapter', () => {
         content: 'Resumed diagnostic output',
       }),
     ]));
+  });
+
+  it('rejects diagnostic resume when SDK session cannot be validated', async () => {
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.runDiagnosticPrompt({
+      prompt: 'Continue from where we left off.',
+      resumeSessionId: 'local-placeholder-session',
+    })).rejects.toThrow('Claude Code diagnostic resume validation failed');
+
+    expect(sdk.getSessionInfo).toHaveBeenCalledWith('local-placeholder-session', { dir: '/vault' });
+    expect(sdk.query).not.toHaveBeenCalled();
+
+    const unavailableSdk = createSdk([]);
+    unavailableSdk.getSessionInfo = undefined as unknown as jest.Mock;
+    const unavailableAdapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk: unavailableSdk,
+    });
+
+    await expect(unavailableAdapter.runDiagnosticPrompt({
+      prompt: 'Continue from where we left off.',
+      resumeSessionId: 'local-placeholder-session',
+    })).rejects.toThrow('Claude Code diagnostic resume validation failed');
+
+    expect(unavailableSdk.query).not.toHaveBeenCalled();
+  });
+
+  it('allows diagnostic resume only after resolving the Claude SDK session', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'diag-resume-session',
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'existing-sdk-session-42',
+      summary: 'Existing Claude session',
+      lastModified: 1700000000000,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await adapter.runDiagnosticPrompt({
+      prompt: 'Continue from where we left off.',
+      resumeSessionId: 'existing-sdk-session-42',
+    });
+
+    expect(sdk.getSessionInfo).toHaveBeenCalledWith('existing-sdk-session-42', { dir: '/vault' });
+    expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'Continue from where we left off.',
+      options: expect.objectContaining({
+        resume: 'existing-sdk-session-42',
+      }),
+    }));
   });
 
   it('passes runtime-injected Claude SDK foundation options into query creation', async () => {

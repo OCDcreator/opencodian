@@ -565,6 +565,7 @@ export class ClaudeCodeAdapter
     }
     await this.ensureReadyForQuery();
     const sdk = await this.getSdk();
+    await this.validateDiagnosticResumeSession(sdk, request.resumeSessionId);
     const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
     const query = sdk.query({
       prompt: request.prompt,
@@ -593,6 +594,23 @@ export class ClaudeCodeAdapter
       rawMessages,
       chunks,
     };
+  }
+
+  private async validateDiagnosticResumeSession(
+    sdk: ClaudeCodeSdkFacade,
+    resumeSessionId: string | undefined,
+  ): Promise<void> {
+    const trimmedResumeSessionId = resumeSessionId?.trim();
+    if (!trimmedResumeSessionId) {
+      return;
+    }
+    if (!sdk.getSessionInfo) {
+      throw new Error('Claude Code diagnostic resume validation failed: SDK session lookup is unavailable.');
+    }
+    const sessionInfo = await sdk.getSessionInfo(trimmedResumeSessionId, { dir: this.options.vaultPath });
+    if (!sessionInfo) {
+      throw new Error(`Claude Code diagnostic resume validation failed: session "${trimmedResumeSessionId}" was not found in the Claude SDK session catalog.`);
+    }
   }
 
   async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {

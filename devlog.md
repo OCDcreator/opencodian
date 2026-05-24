@@ -12,6 +12,35 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Claude diagnostic resume validation boundary
+
+### 目标
+
+收紧 Capability Lab 的 Claude diagnostic resume 边界：`runDiagnosticPrompt({ resumeSessionId })` 只能恢复 Claude SDK session catalog 中真实存在的会话，不能把 placeholder、OpenCode session id 或 OpenCodian 本地 handle 当作稳定 resume-at 能力传给 Claude SDK。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 后端边界修复 | 在 `runDiagnosticPrompt()` 创建 `sdk.query()` 前，通过 `sdk.getSessionInfo(resumeSessionId, { dir: vaultPath })` 验证诊断恢复目标；SDK lookup 不可用或返回空时抛出明确的 Claude diagnostic resume validation error |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | TDD 回归测试 | 覆盖无效 resume id 被拒绝且不创建 query、SDK lookup 不可用时被拒绝、真实 SDK session 验证后继续传递 `options.resume` |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 模块文档更新 | 记录 Capability Lab diagnostic resume 只接受 SDK catalog 可验证的 Claude session，不代表 stable resume-at productization |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 刷新当前 continuity anchor，并记录本 slice 的验证边界与非目标 |
+
+### 验证
+
+- Red: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 先失败，证明未修复前 `runDiagnosticPrompt()` 会接受未验证的 `resumeSessionId`，且不会调用 `sdk.getSessionInfo()`
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 通过，`2` suites / `138` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`（`424` source files / `6136` nodes / `11624` edges / `220` communities）
+- `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check` 通过
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`438` suites / `3251` tests passed，verify build ID `feature-phase0-capability.202605241854`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241855`
+- Independent reviewer subagent 对本 slice 无 findings；残余风险是未来官方 SDK 的 `getSessionInfo()` catalog 可见性可能与 `query({ options.resume })` 来源不一致，后续仍需要 Capability Lab runtime proof 覆盖真实 SDK 行为
+
+### 影响评估
+
+本轮只收紧 Capability Lab diagnostic resume side channel，不新增稳定聊天恢复 UI，不开放跨后端 resume，不宣称 Claude Code full capability 完成。OpenCode 路径未修改。
+
 ## 2026-05-24 Phase 3 - Tool / Formatter / Security settings stale backend guard
 
 ### 目标
