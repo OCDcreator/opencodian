@@ -779,7 +779,7 @@ describe('ClaudeCodeAdapter', () => {
     const sdk = createSdk([{
       type: 'system',
       subtype: 'init',
-      session_id: 'diag-resume-session',
+      session_id: 'existing-sdk-session-42',
     }, {
       type: 'assistant',
       message: {
@@ -809,7 +809,7 @@ describe('ClaudeCodeAdapter', () => {
         resume: 'existing-sdk-session-42',
       }),
     }));
-    expect(result.sessionId).toBe('diag-resume-session');
+    expect(result.sessionId).toBe('existing-sdk-session-42');
     expect(result.chunks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'text',
@@ -894,11 +894,77 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdk.query).not.toHaveBeenCalled();
   });
 
+  it('rejects diagnostic resume when the resumed query returns a different session id', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-session-2',
+    }, {
+      type: 'assistant',
+      message: {
+        id: 'msg-resume-mismatch',
+        content: [{ type: 'text', text: 'This should not be accepted as a resumed proof' }],
+      },
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-session-1',
+      summary: 'Existing Claude session',
+      lastModified: 1700000000000,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.runDiagnosticPrompt({
+      prompt: 'Continue from where we left off.',
+      resumeSessionId: 'sdk-session-1',
+    })).rejects.toThrow('Claude Code diagnostic resume validation failed');
+
+    expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        resume: 'sdk-session-1',
+      }),
+    }));
+  });
+
+  it('rejects diagnostic resume when the resumed query returns no session id', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-resume-missing-id',
+        content: [{ type: 'text', text: 'This output has no comparable resumed session id' }],
+      },
+    }]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-session-1',
+      summary: 'Existing Claude session',
+      lastModified: 1700000000000,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.runDiagnosticPrompt({
+      prompt: 'Continue from where we left off.',
+      resumeSessionId: 'sdk-session-1',
+    })).rejects.toThrow('Claude Code diagnostic resume validation failed');
+
+    expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        resume: 'sdk-session-1',
+      }),
+    }));
+  });
+
   it('allows diagnostic resume when SDK lookup succeeds without comparable id fields', async () => {
     const sdk = createSdk([{
       type: 'system',
       subtype: 'init',
-      session_id: 'diag-resume-session',
+      session_id: 'sdk-session-1',
     }]);
     sdk.getSessionInfo.mockResolvedValue({
       summary: 'Existing Claude session',
@@ -928,7 +994,7 @@ describe('ClaudeCodeAdapter', () => {
     const sdk = createSdk([{
       type: 'system',
       subtype: 'init',
-      session_id: 'diag-resume-session',
+      session_id: 'existing-sdk-session-42',
     }]);
     sdk.getSessionInfo.mockResolvedValue({
       sessionId: 'existing-sdk-session-42',

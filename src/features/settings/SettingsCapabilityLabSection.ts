@@ -1339,6 +1339,9 @@ export class SettingsCapabilityLabSection {
         resumeSessionId: sessionId,
         persistSession: false,
       });
+      if (result.sessionId !== sessionId) {
+        throw new Error(`Resume diagnostic returned a different session id: ${result.sessionId ?? '(none)'}`);
+      }
       outputEl.empty();
       outputEl.createEl('h5', {
         text: `Resumed from ${sessionId.slice(0, 12)}…`,

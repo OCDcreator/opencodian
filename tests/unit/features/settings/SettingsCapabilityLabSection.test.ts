@@ -6,12 +6,12 @@ import { setLocale, t } from '../../../../src/i18n';
  * Minimal mock plugin that satisfies CapabilityLabDeps.
  * agentServiceRegistry is the only accessed property via getClaudeCodeAdapter().
  */
-function createMockPlugin(adapter: unknown = null): never {
+function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claude-code' : null): never {
   const registry = adapter
     ? {
         get: jest.fn().mockReturnValue(adapter),
         getActive: jest.fn().mockReturnValue(adapter),
-        getActiveKind: jest.fn().mockReturnValue('claude-code'),
+        getActiveKind: jest.fn().mockReturnValue(activeKind),
         listAll: jest.fn().mockReturnValue([{ kind: 'claude-code' }]),
         adapters: new Map(),
       }
@@ -1144,7 +1144,7 @@ describe('SettingsCapabilityLabSection', () => {
         { sessionId: 'session-resume-source', summary: 'Source session for resume', lastModified: 1 },
       ]),
       runDiagnosticPrompt: jest.fn().mockResolvedValue({
-        sessionId: 'diag-resume-result-session',
+        sessionId: 'session-resume-source',
         rawMessages: [],
         chunks: [
           { type: 'text', content: 'Resumed session says hello' },
@@ -1174,7 +1174,7 @@ describe('SettingsCapabilityLabSection', () => {
       resumeSessionId: 'session-resume-source',
       prompt: expect.any(String),
     }));
-    expect(containerEl.textContent).toContain('diag-resume-result-session');
+    expect(containerEl.textContent).toContain('session-resume-source');
     expect(containerEl.textContent).toContain('Resumed session says hello');
   });
 
@@ -1217,7 +1217,7 @@ describe('SettingsCapabilityLabSection', () => {
         { sessionId: 'session-rt-resume', summary: 'RT resume session', lastModified: 1 },
       ]),
       runDiagnosticPrompt: jest.fn().mockResolvedValue({
-        sessionId: 'diag-resume-rt-pass',
+        sessionId: 'session-rt-resume',
         rawMessages: [],
         chunks: [{ type: 'text', content: 'Resume proof pass' }],
       }),
@@ -1241,6 +1241,115 @@ describe('SettingsCapabilityLabSection', () => {
     resumeButton.click();
     await flushUi();
 
+    const proofMarker = resumeBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+  });
+
+  it('marks Resume Session runtime proof as failed when result session id differs from requested resume id', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-rt-resume', summary: 'RT resume session', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'different-session',
+        rawMessages: [],
+        chunks: [{ type: 'text', content: 'This was not the requested session' }],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement;
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-rt-resume';
+    resumeButton.click();
+    await flushUi();
+
+    const proofMarker = resumeBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(resumeBlock!.textContent).toContain('different session id');
+  });
+
+  it('marks Resume Session runtime proof as failed when result session id is missing', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-rt-resume', summary: 'RT resume session', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        rawMessages: [],
+        chunks: [{ type: 'text', content: 'This response omitted the resumed session id' }],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement;
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-rt-resume';
+    resumeButton.click();
+    await flushUi();
+
+    const proofMarker = resumeBlock!.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(resumeBlock!.textContent).toContain('(none)');
+  });
+
+  it('uses the claude-code registry adapter for resume diagnostics even when OpenCode is active', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'session-rt-resume', summary: 'RT resume session', lastModified: 1 },
+      ]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'session-rt-resume',
+        rawMessages: [],
+        chunks: [{ type: 'text', content: 'Claude registry adapter proof' }],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter, 'opencode'),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
+    const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement;
+    const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Resume Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'session-rt-resume';
+    resumeButton.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      resumeSessionId: 'session-rt-resume',
+    }));
     const proofMarker = resumeBlock!.querySelector('.opencodian-capability-lab-proof-marker');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);

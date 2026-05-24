@@ -16,10 +16,13 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit after the latest validated capability slice: `56f6319f`
-- Commit subject after the latest validated capability slice: `fix: reject mismatched claude diagnostic resume ids`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605241910`
+- Snapshot commit after the latest committed capability slice: `39384313`
+- Commit subject after the latest committed capability slice: `fix: prove claude diagnostic resume session identity`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242047`
 - Recent continuity commits in this lane:
+- `39384313` — `fix: prove claude diagnostic resume session identity`
+- `63eb25a6` — `fix: require claude diagnostic store readback proof`
+- `f28c5b54` — `docs: record claude diagnostic resume runtime proof`
 - `56f6319f` — `fix: reject mismatched claude diagnostic resume ids`
 - `bbc019bf` — `fix: validate claude diagnostic resume sessions`
 - `528369fc` — `fix: guard opencode settings callbacks for claude backend`
@@ -86,6 +89,34 @@ This worker/reviewer slice closes a diagnostic proof gap in the Capability Lab J
 - Deploy freshness: Test Vault `main.js` contains `feature-phase0-capability.202605242024`; `dist/main.js` and deployed `main.js` SHA256 both equal `54ae1cf0aa52c451d6be024c6d53f5a71fdeb803f98ca01f7767d2bcbc305513`; the deployed Claude SDK binary checksum matches dist at `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
 - Live Test Vault runtime proof `.obsidian-debug/capability-lab-sessionstore-readback-assertion-2026-05-24-result.json` returned `ok: true` against loaded runtime `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242024`. It created diagnostic store session `501bfdd9-ea07-455c-88dc-bbc4d5db6be5`, confirmed `mirroredSessionCount: 1`, confirmed the mirrored id appeared in `listSessions({ sessionStore })`, and confirmed `getSessionMessages(..., { sessionStore, limit: 50, includeSystemMessages: false })` returned `messageCount: 3` with sample types `user`, `assistant`, `assistant`.
 - Runtime artifacts: `.obsidian-debug/capability-lab-sessionstore-readback-runtime-2026-05-24.png`, `.obsidian-debug/capability-lab-sessionstore-readback-console-2026-05-24.txt`, and `.obsidian-debug/capability-lab-sessionstore-readback-errors-2026-05-24.txt`; `dev:errors` reported `No errors captured.`
+
+## 2026-05-24 Claude authenticated diagnostic resume positive proof
+
+This worker/reviewer slice closes the positive-proof gap left by the diagnostic resume rejection boundary: Capability Lab diagnostic resume now requires the Claude SDK query result to return the same SDK session id that was requested, and the deployed Test Vault proof demonstrates a real authenticated two-turn resume that recalls a nonce from the first turn.
+
+### What Changed
+
+- `ClaudeCodeAdapter.runDiagnosticPrompt({ resumeSessionId })` now performs a second validation after `sdk.query()` returns: if a diagnostic resume request returns no session id or a different session id, it throws `Claude Code diagnostic resume validation failed...` instead of reporting success.
+- `SettingsCapabilityLabSection` mirrors that boundary in the Resume Session Diagnostic block, marking runtime proof failed when `result.sessionId` differs from the selected source session id.
+- The focused tests now cover a mismatched post-query resume result, missing post-query session id, and a Capability Lab OpenCode-active/Claude-registry-adapter boundary.
+
+### What This Does Not Change
+
+- This does not promote Capability Lab resume to a stable resume-at product surface.
+- This does not add cross-backend resume, resume-at message targeting, ordinary chat restore UI changes, or OpenCode session interoperability.
+- This does not mark Claude Code full capability as complete.
+
+### Verification
+
+- Implementer subagent followed TDD on the post-query resume-id mismatch: the new adapter test would have accepted a fresh-session result before the guard, and the new Capability Lab test would have marked a different returned id as a pass before the UI check.
+- Independent reviewer subagent reported no P0/P1 blockers and requested P3 test hardening for missing returned ids and the OpenCode-active registry boundary; those tests were added before commit.
+- Focused green after reviewer hardening: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` passed with `2` suites / `149` tests.
+- `npm run graphify:update:src` refreshed the committed `src` graph with `424` source files, `6139` nodes, `11633` edges, and `177` communities.
+- Guard gates from the implementer slice passed before handoff: `npm run check:graphify`, `npm run check:module-docs`, and `git diff --check`.
+- `npm run build` produced `BUILD_ID: feature-phase0-capability.202605242047`, and the Test Vault runtime proof loaded `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242047`.
+- Live Test Vault runtime proof `.obsidian-debug/positive-resume-authenticated-diagnostic-assertion-2026-05-24-result.json` returned `ok: true`: first diagnostic session `2d366fb9-6f34-4bbb-8f35-ac7a43ec5854` stored nonce `positive-resume-1779627004119-x82q2n4m`, `listSessions()` and `getSession()` saw that source session, the second diagnostic returned the same session id, and the second output recalled the nonce.
+- The same proof recorded `openCodeSessionApiCallCounts` all at `0`, `openCodeSessionApiUsed: false`, `stableResumeProductizationClaimed: false`, and restored the active backend state.
+- Runtime artifacts: `.obsidian-debug/positive-resume-authenticated-diagnostic-runtime-2026-05-24.png`, `.obsidian-debug/positive-resume-authenticated-diagnostic-console-2026-05-24.txt`, `.obsidian-debug/positive-resume-authenticated-diagnostic-errors-2026-05-24.txt`; `dev:errors` reported `No errors captured.`
 
 ## 2026-05-24 Claude diagnostic resume validation boundary
 
@@ -703,7 +734,7 @@ Recent runs focused on two connected lanes:
 - The `TitleGenerationService` official-title read seam now has Test Vault runtime proof through deployed plugin code: both OpenCode and Claude paths route through registry `getSession(sessionId)`, and the OpenCode read path no longer falls back to `openCodeService.listSessions()` for that seam. This proves the narrow shared session-detail read, not a broader backend-neutral session object contract.
 - Backend-aware history normalization for non-OpenCode backends is currently best-effort foundation (`loadBackendSessionMessages()`); it is good enough for raw inspection surfaces, not yet a stable cross-backend history product contract.
 - `SettingsConversationSection` now uses backend-aware normalized routing for session list + preview reads through `listBackendSessions()` and `getBackendSessionPreview()`. The preview renderer consumes `NormalizedSessionPreviewMessage` (not OpenCode `SessionMessage`), so it handles both OpenCode `{info, parts}` shape and generic/Claude `{role, content}` shape without crashing. `getBackendSessionPreview()` now distinguishes unavailable preview capability (`null` → failure copy) from legitimate empty history (`[]` → neutral empty-preview copy). `unshareSession()` remains OpenCode-only. Treat the shared-session manager as a real backend-aware inspection surface, not as a generic stable cross-backend session-detail contract.
-- Runtime smoke for stable Claude fork/resume-at product surfaces is not yet recorded. Capability Lab now owns provider-owned diagnostic probes for both fork and resume; the resume diagnostic now validates the selected id through the Claude SDK session catalog before `query({ options.resume })`, but these probes still do not promote either capability to a stable product surface.
+- Runtime smoke for stable Claude fork/resume-at product surfaces is not yet recorded. Capability Lab now owns provider-owned diagnostic probes for both fork and resume; the resume diagnostic now validates the selected id through the Claude SDK session catalog before `query({ options.resume })`, validates that the query returns the same SDK session id afterward, and has a deployed authenticated same-session nonce-recall proof. These probes still do not promote either capability to a stable product surface.
 - The `AgentBranchCapability` interface still requires ALL of fork/revert/unrevert/diff/getSessionRevertState; Claude only has fork. `AgentForkCapability` is the separate partial interface for fork-only backends.
 
 ## What Is Definitely Complete
@@ -716,7 +747,7 @@ These items are implemented enough to treat as real delivered backend capability
 | SDK import and executable handling | The adapter uses the official SDK path, plus process resolution and Electron-safe spawn handling. |
 | Persistent query runtime | Claude owns a persistent `query()` runtime and can stream across turns. |
 | Session identity | Claude uses backend-owned session identity via `backendSessionId`-style flow, rather than pretending to be OpenCode. |
-| Resume | Persistent chat query resume is wired for Claude-owned session identity. Capability Lab resume is diagnostic-only and now requires SDK catalog validation before `options.resume`; stable resume-at productization is not complete. |
+| Resume | Persistent chat query resume is wired for Claude-owned session identity. Capability Lab resume is diagnostic-only and now requires SDK catalog validation before `options.resume`, same-session result-id validation after query, and has positive authenticated nonce-recall proof. Stable resume-at productization is not complete. |
 | Stream normalization | Text, thinking, tool use, tool result, usage, and message metadata are normalized at product level. Hook events, subagent progress, and structured output backend events are also normalized but currently consumed only in diagnostic contexts (see "What Exists But Must Not Be Described As Stable Completion" below). |
 | Permissions bridge | `canUseTool` and elicitation/question bridging are wired into the existing permission/question flows. |
 | Model / effort / thinking basics | Core Claude settings and options mapping are implemented. |

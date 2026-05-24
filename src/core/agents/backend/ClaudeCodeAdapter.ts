@@ -597,7 +597,7 @@ export class ClaudeCodeAdapter
     }
 
     return {
-      sessionId,
+      sessionId: this.validateDiagnosticResumeResult(request.resumeSessionId, sessionId),
       rawMessages,
       chunks,
     };
@@ -623,6 +623,20 @@ export class ClaudeCodeAdapter
     if (mismatchedSessionId) {
       throw new Error(`Claude Code diagnostic resume validation failed: SDK session lookup returned "${mismatchedSessionId}" for requested session "${trimmedResumeSessionId}".`);
     }
+  }
+
+  private validateDiagnosticResumeResult(
+    resumeSessionId: string | undefined,
+    resultingSessionId: string | undefined,
+  ): string | undefined {
+    const trimmedResumeSessionId = resumeSessionId?.trim();
+    if (!trimmedResumeSessionId) {
+      return resultingSessionId;
+    }
+    if (resultingSessionId !== trimmedResumeSessionId) {
+      throw new Error(`Claude Code diagnostic resume validation failed: resumed query returned session "${resultingSessionId ?? '(none)'}" for requested session "${trimmedResumeSessionId}".`);
+    }
+    return resultingSessionId;
   }
 
   async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {

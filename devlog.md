@@ -12,6 +12,37 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Claude authenticated diagnostic resume positive proof
+
+### 目标
+
+把 Capability Lab 的 Claude diagnostic resume 从“拒绝错误 id”推进到真实 authenticated positive proof：先创建一个 Claude SDK 会话并写入 nonce，再用同一 session id 执行 `resumeSessionId` 诊断，要求返回同一 session id 且第二轮输出能召回首轮 nonce，避免把 fresh session 误报为 resume proof。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 后端 proof 边界 | `runDiagnosticPrompt({ resumeSessionId })` 在 SDK query 返回后校验 resulting `sessionId`，带 resume 请求时必须等于请求的 Claude SDK session id；不同或缺失则抛出 `Claude Code diagnostic resume validation failed` |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | Capability Lab proof 诚实化 | Resume Session Diagnostic 在 `result.sessionId` 与 selected source session id 不一致时标记 runtime fail，不再把 fresh session 的输出渲染成 pass |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | TDD 回归测试 | 覆盖 resumed query 返回不同 session id 或不返回 session id 时 adapter 拒绝，确保 wrong-ID / no-ID resume 不会被当成成功 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | TDD 回归测试 | 覆盖 Capability Lab Resume proof 对 returned id mismatch / missing id 标 fail，并覆盖 active backend 为 OpenCode 时仍只使用 `registry.get('claude-code')` 的诊断边界 |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` / `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 模块文档 | 记录 diagnostic resume 需要 query 后 same-session id 校验，仍不是 stable resume-at 产品面 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录正向 authenticated diagnostic resume proof、artifact、非目标与剩余边界 |
+
+### 验证
+
+- Independent reviewer subagent 报告无 P0/P1 阻塞；P3 建议补 missing returned id 与 OpenCode-active registry boundary 测试，已在提交前补齐
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 通过，`2` suites / `149` tests passed
+- Implementer slice 已运行并通过：`npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`git diff --check`
+- `npm run build` 产出 `BUILD_ID: feature-phase0-capability.202605242047`，并已部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Runtime proof: `.obsidian-debug/positive-resume-authenticated-diagnostic-assertion-2026-05-24-result.json` 返回 `ok: true`，loaded runtime 为 `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605242047`；首轮 session `2d366fb9-6f34-4bbb-8f35-ac7a43ec5854` 写入 nonce `positive-resume-1779627004119-x82q2n4m`，`listSessions()` / `getSession()` 可见该 source session，第二轮 resumed session id 仍为 `2d366fb9-6f34-4bbb-8f35-ac7a43ec5854`，且输出召回 nonce
+- OpenCode 边界 proof：runtime artifact 记录 `openCodeSessionApiCallCounts` 全部为 `0`、`openCodeSessionApiUsed=false`
+- Runtime artifacts: `.obsidian-debug/positive-resume-authenticated-diagnostic-runtime-2026-05-24.png`、`.obsidian-debug/positive-resume-authenticated-diagnostic-console-2026-05-24.txt`、`.obsidian-debug/positive-resume-authenticated-diagnostic-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只证明并收紧 Capability Lab diagnostic resume 的 same-session 正向链路；不新增稳定 resume-at UI、不做跨后端 resume、不宣称 Claude Code full capability 完成。普通聊天恢复、resume-at message targeting、fork/resume 产品化和 OpenCode-only diff/rewind/revert 边界仍按 gap ledger 继续推进。
+
 ## 2026-05-24 Phase 3 - Capability Lab diagnostic sessionStore mirror readback
 
 ### 目标
