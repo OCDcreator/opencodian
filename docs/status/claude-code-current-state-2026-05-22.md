@@ -45,6 +45,37 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Claude new-conversation backend ownership boundary
+
+This round closed a backend ownership leak in plugin-level conversation creation.
+
+### What Changed
+
+- `OpenCodianPlugin.createConversation()` now treats `settings.activeBackend` as the owner of a newly created conversation and looks up that exact adapter in `AgentServiceRegistry`.
+- If the active backend is non-OpenCode and no session-capable adapter is available, conversation creation now fails with `Cannot create conversation: active backend does not support sessions`.
+- OpenCode active/legacy creation remains unchanged: when active backend is OpenCode, it still waits for session-bootstrap warmup and writes legacy `openCodeSessionId` plus `backendSessionId`.
+
+### What This Does Not Change
+
+- This does not mark Claude Code full capability as complete.
+- This does not expose a new stable Claude session UI beyond the already wired session-creation path.
+- This does not change existing OpenCode conversation creation, server warmup, or history compatibility behavior.
+
+### Verification
+
+- Focused main test used red-green: before the fix, the new regression resolved to a `backend: "opencode"` conversation while `settings.activeBackend` was `claude-code`; after the fix `npm test -- --runInBand tests/unit/main.test.ts` passed with `34` tests.
+- Reviewer subagent reported no Critical, Important, or Minor findings; it noted a remaining optional test gap for a registered Claude adapter that exists but lacks `sessions`.
+- `npm run graphify:update:src`, `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check` passed.
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `435` suites / `3221` tests and production build.
+- `npm run build` passed with deployment `BUILD_ID: feature-phase0-capability.202605241140`.
+- Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/`; Test Vault `main.js` contains `feature-phase0-capability.202605241140`, and the deployed Claude SDK binary checksum matches `dist` (`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`).
+- Fresh Obsidian runtime proof:
+  - assertion: `.obsidian-debug/claude-create-conversation-boundary-assertion-2026-05-24.json`
+  - screenshot: `.obsidian-debug/claude-create-conversation-boundary-2026-05-24.png`
+  - console: `.obsidian-debug/claude-create-conversation-boundary-console-2026-05-24.txt`
+  - errors: `.obsidian-debug/claude-create-conversation-boundary-errors-2026-05-24.txt`
+  - result: deployed runtime reported `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241140`; simulated active Claude with no Claude session adapter while OpenCode was available; `createConversation()` threw the expected active-backend unsupported error; OpenCode `createSession` attempts stayed at `0`; storage writes stayed at `0`; conversation count delta stayed at `0`; `dev:errors` reported `No errors captured.`
+
 ## 2026-05-24 Chat backend chrome scope proof
 
 This round tightened the chat chrome around active backend identity without promoting any unverified Claude Code capability.

@@ -8,7 +8,6 @@ import * as path from 'path';
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
 import {
-  getActiveSessionBackendService,
   getConversationSessionBackendService,
   hasSessionCapability,
 } from './core/agents/backend/AgentBackendRouting';
@@ -900,12 +899,12 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Create a new conversation */
   async createConversation(): Promise<Conversation> {
-    const openCodeFallback = Array.isArray(this.settings.enabledBackends) && this.settings.enabledBackends.includes('opencode')
-      ? this.agentServiceRegistry?.get('opencode')
+    const activeBackend = this.settings.activeBackend ?? 'opencode';
+    const activeBackendAdapter = Array.isArray(this.settings.enabledBackends) && this.settings.enabledBackends.includes(activeBackend)
+      ? this.agentServiceRegistry?.get(activeBackend)
       : null;
-    const sessionBackend = getActiveSessionBackendService(this.agentServiceRegistry)
-      ?? (hasSessionCapability(openCodeFallback) ? openCodeFallback : null);
-    if (!sessionBackend && (this.settings.activeBackend === undefined || this.settings.activeBackend === 'opencode')) {
+    const sessionBackend = hasSessionCapability(activeBackendAdapter) ? activeBackendAdapter : null;
+    if (!sessionBackend && activeBackend === 'opencode') {
       if (!Array.isArray(this.settings.enabledBackends) || !this.settings.enabledBackends.includes('opencode')) {
         throw new Error('Cannot create conversation: opencode backend is not enabled');
       }

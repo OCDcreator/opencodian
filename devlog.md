@@ -12,6 +12,40 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Claude new-conversation backend ownership boundary
+
+### 目标
+
+继续收紧 Claude Code 接入的 backend ownership：当当前 active backend 是 Claude，但 Claude session adapter 不可用或不具备 sessions 能力时，新建会话必须失败在 Claude 边界内，不能借 registry 默认 active 或 OpenCode fallback 偷偷创建 OpenCode 会话。
+
+### 发现
+
+`OpenCodianPlugin.createConversation()` 先读取 `AgentServiceRegistry.getActive()`，而 registry 在只剩 OpenCode adapter session-capable 时会默认 active 到 OpenCode。这样 `settings.activeBackend = 'claude-code'` 且 OpenCode 仍启用时，active Claude 缺失会话能力的场景可能静默生成 `backend: "opencode"` conversation，并写入 `openCodeSessionId`。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/main.ts` | 后端边界修复 | `createConversation()` 改为以 `settings.activeBackend` 查找同名 adapter；非 OpenCode active backend 缺少 session 能力时直接报错，不再回退到 OpenCode |
+| `tests/unit/main.test.ts` | +1 测试 | 覆盖 active Claude + OpenCode 可用 + Claude session service 缺失时不创建 OpenCode session、不 warmup、不写本地 conversation |
+| `docs/modules/entry-point/main.md` | 文档更新 | 记录新会话 owner 来自 `settings.activeBackend`，并说明非 OpenCode 不再 fallback 到 OpenCode |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 new-conversation backend ownership boundary 与 runtime proof |
+
+### 验证
+
+- Focused test 已完成 red-green：新增断言先失败并实际解析出 `backend: "opencode"` conversation；修复后 `npm test -- --runInBand tests/unit/main.test.ts` 通过，`34` tests passed
+- Reviewer 子代理检查本轮 uncommitted stage 后无 Critical / Important / Minor findings；仅记录“Claude adapter 存在但无 sessions 能力”可作为后续可选补测
+- `npm run graphify:update:src`、`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check` 均通过
+- Full gate: `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`435` suites / `3221` tests passed，production build 通过
+- Build/deploy: `npm run build` 产出部署 `BUILD_ID: feature-phase0-capability.202605241140`；已按顺序部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css`、`dist/assets/`、`dist/node_modules/` 到 Test Vault，并确认 Test Vault `main.js` 含该 BUILD_ID；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-create-conversation-boundary-assertion-2026-05-24.json` 通过，截图为 `.obsidian-debug/claude-create-conversation-boundary-2026-05-24.png`；运行时报告 active Claude / no Claude session adapter / OpenCode available 条件下 `createConversation()` 抛出 `Cannot create conversation: active backend does not support sessions`，OpenCode `createSession` attempts 为 `0`，storage writes 为 `0`，conversation count delta 为 `0`，`dev:errors` 为 `No errors captured.`
+
+### 影响评估
+
+本轮只修复新建会话的 backend 归属边界，不宣称 Claude full capability 完成，也不新增稳定 Claude session UI。OpenCode active/legacy 新建会话仍保留 session-bootstrap warmup、`openCodeSessionId` 兼容写入和既有行为。
+
+---
+
 ## 2026-05-24 Phase 3 - Claude title fallback backend boundary
 
 ### 目标

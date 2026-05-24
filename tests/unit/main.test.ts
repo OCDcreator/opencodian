@@ -831,6 +831,64 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
   });
 
+  it('does not fall back to OpenCode when the active non-OpenCode backend lacks a session service', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      agentServiceRegistry: AgentServiceRegistry;
+      openCodeService: {
+        isReady: jest.Mock<boolean, []>;
+        createSession: jest.Mock<Promise<string>, []>;
+      };
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+    const opencodeCreateSession = jest.fn().mockResolvedValue('opencode-session');
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'claude-code',
+    };
+    plugin.agentServiceRegistry = new AgentServiceRegistry();
+    plugin.agentServiceRegistry.register({
+      kind: 'opencode',
+      displayName: 'OpenCode',
+      description: 'OpenCode test adapter',
+      status: 'connected',
+      capabilities: new Set(['sessions']),
+      hasCapability: jest.fn((cap: string) => cap === 'sessions'),
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      dispose: jest.fn(),
+      onStatusChange: jest.fn(() => ({ dispose: jest.fn() })),
+      createSession: opencodeCreateSession,
+      deleteSession: jest.fn().mockResolvedValue(undefined),
+      updateSessionTitle: jest.fn().mockResolvedValue(undefined),
+    });
+    plugin.agentServiceRegistry.setEnabledBackends(['opencode', 'claude-code']);
+    plugin.openCodeService = {
+      isReady: jest.fn().mockReturnValue(true),
+      createSession: jest.fn().mockResolvedValue('opencode-session'),
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    await expect(plugin.createConversation()).rejects.toThrow(
+      'Cannot create conversation: active backend does not support sessions',
+    );
+
+    expect(opencodeCreateSession).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.createSession).not.toHaveBeenCalled();
+    expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
+    expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
+  });
+
   it('sanitizes diagnostic reports before export', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       settings: typeof DEFAULT_SETTINGS;
