@@ -16,11 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit after the latest committed capability slice: `39384313`
+- Snapshot commit after the latest committed capability slice: `afd27c03`
 - Commit subject after the latest committed capability slice: `fix: prove claude diagnostic resume session identity`
 - Latest validated and Test Vault deployed build: `feature-phase0-capability.202605242047`
 - Recent continuity commits in this lane:
-- `39384313` — `fix: prove claude diagnostic resume session identity`
+- `afd27c03` — `fix: prove claude diagnostic resume session identity`
 - `63eb25a6` — `fix: require claude diagnostic store readback proof`
 - `f28c5b54` — `docs: record claude diagnostic resume runtime proof`
 - `56f6319f` — `fix: reject mismatched claude diagnostic resume ids`
