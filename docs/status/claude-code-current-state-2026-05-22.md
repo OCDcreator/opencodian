@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit: `81228ce7`
-- Commit subject: `fix: guard project conversation settings for claude backend`
-- Latest validated build at this snapshot: `feature-phase0-capability.202605241703`
+- Snapshot commit: `510803fc`
+- Commit subject: `fix: guard mcp settings for claude backend`
+- Latest validated build at this snapshot: `feature-phase0-capability.202605241714`
 - Recent continuity commits in this lane:
+- `510803fc` — `fix: guard mcp settings for claude backend`
 - `81228ce7` — `fix: guard project conversation settings for claude backend`
 - `080a1c76` — `fix: gate ordinary slash commands to opencode backend`
 - `0cc89c4d` — `fix: gate session settings sharing to opencode backend`
@@ -49,6 +50,34 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-24 Server settings stale backend guard
+
+This narrow worker slice closes stale mounted OpenCode-only server settings callbacks in `SettingsServerSection`. The Server primary tab is only mounted while OpenCode is active, but connection/auth/status callbacks can survive briefly after switching the active backend to Claude Code.
+
+### What Changed
+
+- `SettingsServerSection` now re-checks that OpenCode is still the active backend before server mode/auth/text setting writes and before status start/stop/test/manual-refresh actions.
+- Stale Claude-active callbacks show a dedicated Server OpenCode-only notice and return before mutating server settings, calling `saveSettings()`, requesting settings redisplay, or calling `openCodeService.start()`, `stop()`, or `checkHealth()`.
+- Background status polling uses the same active-backend check but returns silently, so a stale interval cannot keep probing OpenCode while Claude Code is active.
+
+### What This Does Not Change
+
+- This does not add Claude Code support for OpenCode sidecar server management.
+- This does not mark Claude Code full capability as complete.
+- OpenCode-active server settings and runtime behavior remain unchanged.
+
+### Verification
+
+- TDD red: focused tests first failed because stale Claude-active callbacks still called `openCodeService.start()` and changed server mode from `local` to `remote`.
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsServerSection.test.ts` passed with `1` suite / `6` tests.
+- `npm run graphify:update:src` refreshed the committed `src` graph with `6124` nodes, `11570` edges, and `221` communities.
+- `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint` passed.
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `436` suites / `3239` tests and produced `BUILD_ID: feature-phase0-capability.202605241714`.
+- `npm run build` passed with the same build ID; Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Test Vault `main.js` was verified to contain `feature-phase0-capability.202605241714`; the deployed Claude SDK binary checksum matched dist: `368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`.
+- Runtime proof: `.obsidian-debug/claude-server-settings-stale-backend-gate-assertion-2026-05-24-result.json` returned outer `ok: true` and inner `ok: true` against deployed build ID `feature-phase0-capability.202605241714`. The proof opened the real Test Vault settings editor-area Server DOM, mounted connection and status controls while OpenCode was active, switched active backend to Claude Code, then triggered stale mode/host/start/stop/refresh controls. `saveSettings`, `openCodeService.start`, `stop`, `checkHealth`, `getServerDiagnostics`, and `getServerStatus` stayed at `0`; server mode/host remained `local` / `127.0.0.1`; the Server OpenCode-only notice appeared; and the settings root had no horizontal overflow (`rootScrollWidth: 1042`, `rootClientWidth: 1042`).
+- Runtime artifacts: `.obsidian-debug/claude-server-settings-stale-backend-gate-runtime-2026-05-24.png`, `.obsidian-debug/claude-server-settings-stale-backend-gate-console-2026-05-24.txt`, `.obsidian-debug/claude-server-settings-stale-backend-gate-errors-2026-05-24.txt`; dev errors reported `No errors captured.`
 
 ## 2026-05-24 MCP settings stale backend guard
 

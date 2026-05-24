@@ -21,7 +21,7 @@
 
 - `attach()` 负责创建 section heading、按当前 mode 渲染 local 或 remote 子区块，并挂上 auth/status 区块
 - `dispose()` 清掉轮询、状态按钮引用与 unload listener，避免 settings 面板重建后旧 section 继续回写
-- `refreshStatus()` 会读取 `OpenCodeService` 的 health、diagnostics、internal status，再同步按钮可用态与描述文本
+- `refreshStatus()` 会读取 `OpenCodeService` 的 health、diagnostics、internal status，再同步按钮可用态与描述文本；如果当前 active backend 已经切出 OpenCode，旧轮询回调会静默返回，避免 Claude active backend 下继续探测 OpenCode server
 
 ### 配置写回
 
@@ -29,12 +29,14 @@
 - local OpenCode executable path / host / port 仍沿用原生 `change` / `blur` 事件提交与错误提示；可执行文件路径留空表示继续使用自动探测
 - remote URL、basic auth、bearer token 仍直接写回 plugin settings，并在 mode/auth 切换后请求 settings 面板整体重建
 - executable path、remote URL 和 bearer token 这些长文本字段会标记 `.opencodian-wide-text-setting`，让 inline hint/path 在设置布局中获得更宽但有上限的输入列；host/port/username/password 继续保持普通紧凑宽度
+- 所有这些配置写回 callback 执行前都必须重新确认 active backend 仍是 OpenCode。Server 一级设置页在 tabbed layout 里只会于 OpenCode active 时挂载，但旧 dropdown/text callback 可能在切到 Claude Code 后短暂存活；这种 stale callback 必须显示 OpenCode-only Notice，并且不能改写 server settings、调用 `saveSettings()` 或请求整页重绘。
 
 ### 状态与动作
 
 - status 文案继续区分 local managed / external / conflict / orphan restarted / remote connected 等状态
 - action 按钮继续保留 local `start` 与 remote `test` 的分叉行为
 - stop / refresh 按钮继续沿用原有禁用条件，并在每次刷新后通知模型分区同步 catalog refresh 按钮状态
+- start / stop / test / manual refresh 按钮执行前也会重新确认 active backend 仍是 OpenCode；如果已经切到 Claude Code，只显示 OpenCode-only Notice，不调用 `openCodeService.start()`、`stop()` 或 `checkHealth()`。
 
 ## 关键方法
 

@@ -463,6 +463,7 @@ export const zhTranslations = {
   'settings.server.testSuccess': '远程 OpenCode 服务器连接成功',
   'settings.server.testFailed': '远程 OpenCode 服务器连接失败',
   'settings.server.remoteManageUnavailable': '插件无法重启或管理远程 OpenCode 服务器，请在远程主机或网关侧更新。',
+  'settings.server.notice.openCodeOnly': '只有 OpenCode 是活跃后端时，才能使用 OpenCode 服务器设置。',
   'settings.server.help.openDoc': '打开此选项的填写说明',
   'settings.server.help.whatItMeans': '这是什么意思',
   'settings.server.help.howToFill': '应该怎么填',

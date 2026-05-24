@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Server settings owns OpenCode connection, auth, status actions, and stale backend guards together. */
 import type { App, ButtonComponent, TextComponent } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
@@ -121,6 +122,9 @@ export class SettingsServerSection {
     if (!this.statusSetting) {
       return;
     }
+    if (!this.isOpenCodeActive()) {
+      return;
+    }
 
     const refreshToken = ++this.statusRefreshToken;
     const isLocalMode = this.isLocalMode();
@@ -144,6 +148,9 @@ export class SettingsServerSection {
           .addOption('remote', t('settings.server.mode.remote'))
           .setValue(this.plugin.settings.server.mode)
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.server.mode = value as 'local' | 'remote';
             if (value === 'local' && this.plugin.settings.server.auth.type === 'bearer') {
               this.plugin.settings.server.auth.type = 'none';
@@ -166,6 +173,9 @@ export class SettingsServerSection {
         toggle
           .setValue(this.plugin.settings.server.local.autoStart)
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.server.local.autoStart = value;
             await this.plugin.saveSettings();
           })
@@ -177,6 +187,10 @@ export class SettingsServerSection {
       .setDesc(t('settings.server.executablePath.desc')).setClass('opencodian-wide-text-setting')
       .addText((text) => {
         const commitExecutablePathChange = async () => {
+          if (!this.ensureOpenCodeActive()) {
+            text.setValue(this.plugin.settings.server.local.executablePath);
+            return;
+          }
           const nextPath = text.inputEl.value.trim();
           if (nextPath !== this.plugin.settings.server.local.executablePath) {
             this.plugin.settings.server.local.executablePath = nextPath;
@@ -198,6 +212,10 @@ export class SettingsServerSection {
       .setDesc(t('settings.server.host.desc'))
       .addText((text) => {
         const commitHostChange = async () => {
+          if (!this.ensureOpenCodeActive()) {
+            text.setValue(this.plugin.settings.server.local.host);
+            return;
+          }
           const nextHost = text.inputEl.value.trim() || '127.0.0.1';
           if (nextHost === this.plugin.settings.server.local.host) {
             text.setValue(nextHost);
@@ -224,6 +242,10 @@ export class SettingsServerSection {
       .setDesc(t('settings.server.port.desc'))
       .addText((text) => {
         const commitPortChange = async () => {
+          if (!this.ensureOpenCodeActive()) {
+            text.setValue(String(this.plugin.settings.server.local.port));
+            return;
+          }
           const value = text.inputEl.value.trim();
           const port = parseInt(value, 10);
           if (Number.isNaN(port) || port <= 0 || port >= 65536) {
@@ -274,6 +296,9 @@ export class SettingsServerSection {
           .setPlaceholder('https://ai.example.com')
           .setValue(this.plugin.settings.server.remote.baseUrl)
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.server.remote.baseUrl = value.trim();
             await this.plugin.saveSettings();
           })
@@ -300,6 +325,9 @@ export class SettingsServerSection {
         dropdown
           .setValue(authType)
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.server.auth.type = value as 'none' | 'basic' | 'bearer';
             await this.plugin.saveSettings();
             this.requestDisplayRefresh();
@@ -316,6 +344,9 @@ export class SettingsServerSection {
             .setPlaceholder('opencode')
             .setValue(this.plugin.settings.server.auth.username)
             .onChange(async (value) => {
+              if (!this.ensureOpenCodeActive()) {
+                return;
+              }
               this.plugin.settings.server.auth.username = value.trim() || 'opencode';
               await this.plugin.saveSettings();
             })
@@ -330,6 +361,9 @@ export class SettingsServerSection {
             .setPlaceholder('••••••••')
             .setValue(this.plugin.settings.server.auth.password)
             .onChange(async (value) => {
+              if (!this.ensureOpenCodeActive()) {
+                return;
+              }
               this.plugin.settings.server.auth.password = value;
               await this.plugin.saveSettings();
             });
@@ -347,6 +381,9 @@ export class SettingsServerSection {
             .setPlaceholder('Bearer token')
             .setValue(this.plugin.settings.server.auth.token)
             .onChange(async (value) => {
+              if (!this.ensureOpenCodeActive()) {
+                return;
+              }
               this.plugin.settings.server.auth.token = value.trim();
               await this.plugin.saveSettings();
             });
@@ -370,6 +407,9 @@ export class SettingsServerSection {
           .setButtonText(isLocalMode ? t('settings.server.status.start') : t('settings.server.status.test'))
           .setCta()
           .onClick(async () => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             button.setDisabled(true);
             try {
               if (isLocalMode) {
@@ -393,6 +433,9 @@ export class SettingsServerSection {
         button
           .setButtonText(t('settings.server.status.stop'))
           .onClick(async () => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             button.setDisabled(true);
             await this.plugin.openCodeService.stop();
             new Notice(t('settings.server.stopped'));
@@ -404,6 +447,9 @@ export class SettingsServerSection {
         button
           .setButtonText(t('settings.server.status.refresh'))
           .onClick(async () => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             button.setDisabled(true);
             const isLocalModeNow = this.isLocalMode();
             const snapshot = await this.collectStatusSnapshot(isLocalModeNow);
@@ -531,6 +577,34 @@ export class SettingsServerSection {
 
   private isLocalMode(): boolean {
     return this.plugin.settings.server.mode === 'local';
+  }
+
+  private isOpenCodeActive(): boolean {
+    const settings = (this.plugin as OpenCodianPlugin & {
+      settings?: {
+        activeBackend?: string;
+        enabledBackends?: unknown;
+      };
+    }).settings;
+    if (!settings) {
+      return true;
+    }
+    const activeBackend = settings.activeBackend;
+    const enabledBackends = Array.isArray(settings.enabledBackends)
+      ? settings.enabledBackends
+      : [];
+    const effectiveBackend = activeBackend && enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : enabledBackends[0];
+    return effectiveBackend === 'opencode';
+  }
+
+  private ensureOpenCodeActive(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.server.notice.openCodeOnly'));
+    return false;
   }
 
   private isBusyStatus(status: OpenCodeServerStatus): boolean {

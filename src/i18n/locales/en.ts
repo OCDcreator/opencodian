@@ -463,6 +463,7 @@ export const enTranslations = {
   'settings.server.testSuccess': 'Remote OpenCode server connection succeeded',
   'settings.server.testFailed': 'Remote OpenCode server connection failed',
   'settings.server.remoteManageUnavailable': 'The plugin cannot restart or manage a remote OpenCode server. Update it on the remote host or gateway instead.',
+  'settings.server.notice.openCodeOnly': 'OpenCode server settings are only available when OpenCode is the active backend.',
   'settings.server.help.openDoc': 'Open help for this option',
   'settings.server.help.whatItMeans': 'What it means',
   'settings.server.help.howToFill': 'How to fill it',

@@ -1,5 +1,11 @@
+/* eslint-disable max-lines-per-function -- Server section coverage keeps shared Obsidian Setting mocks and stale backend regressions together. */
 import type { App } from 'obsidian';
-import { Setting } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
+
+jest.mock('obsidian', () => ({
+  ...jest.requireActual('obsidian'),
+  Notice: jest.fn(),
+}));
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { SettingsServerSection } from '../../../../src/features/settings/SettingsServerSection';
@@ -211,6 +217,7 @@ describe('SettingsServerSection', () => {
   beforeEach(() => {
     setLocale('en');
     document.body.innerHTML = '';
+    (Notice as unknown as jest.Mock).mockClear();
     dropdownRecords.length = 0;
     toggleRecords.length = 0;
     textRecords.length = 0;
@@ -405,5 +412,77 @@ describe('SettingsServerSection', () => {
 
     expect(plugin.settings.server.local.executablePath).toBe('/Users/example/.opencode/bin/opencode');
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks stale OpenCode server status actions after switching to Claude Code', async () => {
+    const plugin = createPlugin() as ServerSectionPlugin & {
+      settings: ServerSectionPlugin['settings'] & { activeBackend: string; enabledBackends: string[] };
+    };
+    plugin.settings.activeBackend = 'opencode';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    const section = new SettingsServerSection({
+      app: {} as App,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      notifyModelCatalogStatus: jest.fn(),
+      onServerStateChange: jest.fn(),
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'status');
+    await flushAsync();
+    (plugin.openCodeService.checkHealth as jest.Mock).mockClear();
+    plugin.settings.activeBackend = 'claude-code';
+
+    const statusButtons = buttonRecords.filter(
+      (record) => record.name === t('settings.server.status.name'),
+    );
+    for (const record of statusButtons) {
+      await record.onClick?.();
+      await flushAsync();
+    }
+
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(Notice).toHaveBeenLastCalledWith(t('settings.server.notice.openCodeOnly'));
+  });
+
+  it('blocks stale OpenCode server config callbacks after switching to Claude Code', async () => {
+    const plugin = createPlugin() as ServerSectionPlugin & {
+      settings: ServerSectionPlugin['settings'] & { activeBackend: string; enabledBackends: string[] };
+    };
+    plugin.settings.activeBackend = 'opencode';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    const requestDisplayRefresh = jest.fn();
+    const section = new SettingsServerSection({
+      app: {} as App,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      notifyModelCatalogStatus: jest.fn(),
+      onServerStateChange: jest.fn(),
+      requestDisplayRefresh,
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'connection');
+    plugin.settings.activeBackend = 'claude-code';
+    const modeRecord = dropdownRecords.find(
+      (record) => record.name === t('settings.server.mode.name'),
+    );
+    await modeRecord?.onChange?.('remote');
+    const hostRecord = textRecords.find(
+      (record) => record.name === t('settings.server.host.name'),
+    );
+    hostRecord?.control.setValue('0.0.0.0');
+    hostRecord?.control.inputEl.dispatchEvent(new Event('change'));
+    await flushAsync();
+
+    expect(plugin.settings.server.mode).toBe('local');
+    expect(plugin.settings.server.local.host).toBe(DEFAULT_SETTINGS.server.local.host);
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    expect(requestDisplayRefresh).not.toHaveBeenCalled();
+    expect(Notice).toHaveBeenLastCalledWith(t('settings.server.notice.openCodeOnly'));
   });
 });

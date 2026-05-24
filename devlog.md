@@ -12,6 +12,40 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Server settings stale backend guard
+
+### 目标
+
+收紧 Server settings 的 OpenCode-only stale callback 边界：页面在 OpenCode active 时挂载后，如果 active backend 切到 Claude Code，旧的 connection/auth/status callback 不能继续改写 OpenCode server settings 或调用 OpenCode server runtime。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsServerSection.ts` | 后端边界修复 | 在 server mode/auth/text setting 写回，以及 status start/stop/test/manual refresh 操作前增加 active OpenCode guard；非 OpenCode active 时显示 Server OpenCode-only Notice 并跳过 settings mutation、`saveSettings()`、settings redisplay、`openCodeService.start()`、`stop()`、`checkHealth()` |
+| `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts` | 文案新增 | 新增 `settings.server.notice.openCodeOnly`，明确 OpenCode server settings 只在 OpenCode active 时可用 |
+| `tests/unit/features/settings/SettingsServerSection.test.ts` | +2 TDD 回归测试 | 覆盖 OpenCode active 挂载后切到 Claude Code，再触发 stale status buttons 或 connection controls 时不调用 OpenCode runtime，也不写回 server settings |
+| `docs/modules/features/settings/SettingsServerSection.md` | 文档更新 | 记录 Server settings callback 和 status polling 必须重新检查 active backend，避免 stale mounted UI 泄漏到 Claude active backend |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 记录本轮 Server settings stale backend guard 与 focused test evidence |
+
+### 验证
+
+- Red: focused tests 先失败，证明 stale Claude-active callback 会调用 `openCodeService.start()`，并把 server mode 从 `local` 改成 `remote`
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsServerSection.test.ts` 通过，`1` suite / `6` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`（`6124` nodes / `11570` edges / `221` communities）
+- `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 通过
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`436` suites / `3239` tests passed，verify build ID `feature-phase0-capability.202605241714`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241714`；并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241714`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-server-settings-stale-backend-gate-assertion-2026-05-24-result.json` 在部署版 `feature-phase0-capability.202605241714` 上返回 outer `ok: true` 且 inner `ok: true`。脚本在真实 Test Vault settings editor-area Server DOM 中验证 connection/status controls 挂载后切到 Claude Code，再触发 stale mode/host/start/stop/refresh；`saveSettings`、`openCodeService.start`、`stop`、`checkHealth`、`getServerDiagnostics`、`getServerStatus` 均保持 `0`，server mode/host 保持 `local` / `127.0.0.1`，出现 Server OpenCode-only Notice，且 settings root 无横向溢出（`rootScrollWidth: 1042` / `rootClientWidth: 1042`）
+- Runtime artifacts: `.obsidian-debug/claude-server-settings-stale-backend-gate-runtime-2026-05-24.png`、`.obsidian-debug/claude-server-settings-stale-backend-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-server-settings-stale-backend-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧 SettingsServerSection 中 OpenCode-only server settings/runtime 操作边界，不新增 Claude Code sidecar 管理能力，不宣称 Claude full capability 完成。OpenCode active 下的 server 管理行为保持不变。
+
+---
+
 ## 2026-05-24 Phase 3 - MCP settings stale backend guard
 
 ### 目标
