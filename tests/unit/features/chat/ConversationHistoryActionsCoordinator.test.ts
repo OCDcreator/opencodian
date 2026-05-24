@@ -1,3 +1,4 @@
+import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import {
   ConversationHistoryActionsCoordinator,
   type ConversationHistoryActionsHost,
@@ -8,12 +9,14 @@ function createConversation(
   id: string,
   title = `Chat ${id}`,
   titleGenerationStatus: 'pending' | 'success' | 'failed' = 'success',
+  backend: AgentBackendKind = 'opencode',
 ) {
   return {
     id,
     title,
     createdAt: 1,
     updatedAt: 1,
+    backend,
     openCodeSessionId: `${id}-session`,
     titleGenerationStatus,
     messages: [],
@@ -35,6 +38,7 @@ function createHost(
     getConversations: jest.fn(() => conversations),
     getCurrentConversation: jest.fn(() => conversations[0] ?? null),
     isActiveTabStreaming: jest.fn(() => false),
+    getHistoryBackendDisplayName: jest.fn(() => 'OpenCode'),
     loadConversation: jest.fn().mockResolvedValue(undefined),
     getConversationById: jest.fn(async (conversationId: string) =>
       conversations.find((conversation) => conversation.id === conversationId) ?? null),
@@ -165,5 +169,29 @@ describe('ConversationHistoryActionsCoordinator', () => {
     ]);
 
     fixture.coordinator.destroy();
+  });
+
+  it('renders the active backend scope above the filtered history list', () => {
+    const conversations = [
+      createConversation('claude-1', 'Claude chat', 'success', 'claude-code'),
+    ];
+    const host = createHost(conversations, {
+      getHistoryBackendDisplayName: jest.fn(() => 'Claude Code'),
+    });
+    const coordinator = new ConversationHistoryActionsCoordinator(host);
+    const anchorEl = document.createElement('button');
+    Object.defineProperty(anchorEl, 'getBoundingClientRect', {
+      value: () => new DOMRect(32, 48, 24, 24),
+    });
+    document.body.appendChild(anchorEl);
+
+    coordinator.show(createHistoryEvent(anchorEl));
+
+    const scopeEl = document.body.querySelector<HTMLElement>('.opencodian-history-scope');
+    expect(scopeEl?.textContent).toBe(t('chat.history.backendScope', {
+      backend: 'Claude Code',
+    }));
+
+    coordinator.destroy();
   });
 });

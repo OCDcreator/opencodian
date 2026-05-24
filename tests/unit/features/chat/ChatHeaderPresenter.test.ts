@@ -120,7 +120,7 @@ describe('ChatHeaderPresenter', () => {
     expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openBackendSettings'));
   });
 
-  it('shows offline instead of connected when a non-OpenCode backend is disconnected', async () => {
+  it('shows backend-specific offline instead of connected when a non-OpenCode backend is disconnected', async () => {
     const fixture = createFixture();
     fixture.setOpenCodeBackend(false);
     fixture.setAvailability('offline');
@@ -129,8 +129,26 @@ describe('ChatHeaderPresenter', () => {
 
     const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
     const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
-    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.offline'));
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendOffline', {
+      backend: 'Claude Code',
+    }));
+    expect(statusTextEl?.textContent).not.toBe(t('chat.serverStatus.backendConnected', {
+      backend: 'Claude Code',
+    }));
     expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openBackendSettings'));
+  });
+
+  it('includes the backend name when a non-OpenCode backend is offline', async () => {
+    const fixture = createFixture();
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('offline');
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendOffline', {
+      backend: 'Claude Code',
+    }));
   });
 
   it('exposes stable accessible header action locators', () => {

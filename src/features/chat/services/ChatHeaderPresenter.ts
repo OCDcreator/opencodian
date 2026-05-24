@@ -372,9 +372,15 @@ export class ChatHeaderPresenter {
 
   private getServerStatusLabel(availability: ChatServerAvailability): string {
     if (!this.host.isOpenCodeBackend()) {
+      const backend = this.host.getActiveBackendDisplayName?.() ?? 'Backend';
       if (availability === 'running' || availability === 'external') {
         return t('chat.serverStatus.backendConnected', {
-          backend: this.host.getActiveBackendDisplayName?.() ?? 'Backend',
+          backend,
+        });
+      }
+      if (availability === 'offline') {
+        return t('chat.serverStatus.backendOffline', {
+          backend,
         });
       }
       return t(SERVER_STATUS_KEY_BY_AVAILABILITY[availability]);

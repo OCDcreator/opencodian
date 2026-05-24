@@ -19,6 +19,7 @@
 export interface ConversationHistoryActionsHost {
   getConversations(): Conversation[];
   getCurrentConversation(): Conversation | null;
+  getHistoryBackendDisplayName?(): string;
   isActiveTabStreaming(): boolean;
   loadConversation(conversationId: string): Promise<void>;
   getConversationById(conversationId: string): Promise<Conversation | null>;
@@ -38,6 +39,7 @@ export class ConversationHistoryActionsCoordinator {
 ## 关键行为
 
 - `show()` 会在没有 conversation 时直接显示 `chat.history.empty` notice
+- 当 host 提供 `getHistoryBackendDisplayName()` 时，dropdown 顶部会渲染当前 backend scope（例如 `Claude Code history`）。实际过滤仍由 host 的 `getConversations()` 负责；coordinator 只把这个已经过滤的集合说清楚，避免 Claude / OpenCode 历史在 UI 心智上混淆。
 - dropdown 仍保留 active conversation 高亮、title-generation status tag，以及批量选择后 delete-current → delete-selected 的文案切换
 - 点击 history item 时仍会先关闭 dropdown；若前台 tab 正在 streaming，则继续走 `chat.tab.streamingBlocked` notice 并阻止切换
 - rename flow 仍会先取消当前 conversation 的 title generation，再通过 `ConversationHistoryDialogService` 取得新标题并把 host 回调写回 view
@@ -46,6 +48,6 @@ export class ConversationHistoryActionsCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只保留 host 装配、title state writeback 与 delete recovery coordinator 的现有 owner
+- `OpenCodianView` 只保留 host 装配、active backend display name、title state writeback 与 delete recovery coordinator 的现有 owner
 - `ConversationHistoryActionsCoordinator` 统一承接 history dropdown、positioning、selection state 与 host action routing；rename/delete confirm UI 由 `ConversationHistoryDialogService` 承接
 - 这次切口推进 maintainability roadmap 的 `R42 - OpenCodianView conversation history/actions seam`，目标是让主 view 不再直接铺开这段 conversation-management UI 细节

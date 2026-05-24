@@ -743,6 +743,10 @@ export class OpenCodianView extends ItemView {
         (conversation) => (conversation.backend ?? 'opencode') === this.plugin.settings.activeBackend,
       ),
       getCurrentConversation: () => this.currentConversation,
+      getHistoryBackendDisplayName: () => {
+        const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+        return this.plugin.agentServiceRegistry?.get(activeBackend)?.displayName ?? activeBackend;
+      },
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       loadConversation: (conversationId) => this.loadConversation(conversationId),
       getConversationById: async (conversationId) =>

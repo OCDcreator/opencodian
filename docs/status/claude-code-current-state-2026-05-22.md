@@ -45,6 +45,37 @@ This is a status snapshot, not the long-term design or full implementation plan.
   - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-24 Chat backend chrome scope proof
+
+This round tightened the chat chrome around active backend identity without promoting any unverified Claude Code capability.
+
+### What Changed
+
+- `ChatHeaderPresenter` now renders backend-specific offline copy for non-OpenCode backends, for example `Claude Code offline` / `Claude Code 离线`, instead of falling back to generic `Offline`.
+- `ConversationHistoryActionsCoordinator` now renders the active backend scope at the top of the history dropdown, for example `Claude Code history` / `Claude Code 历史会话`.
+- `OpenCodianView` supplies the active backend display name to the history dropdown while keeping the history list filtered by `settings.activeBackend`.
+
+### What This Does Not Change
+
+- This does not mark Claude Code as full-capability complete.
+- The history dropdown remains local conversation history scoped by backend, not a claim that all Claude native session-history semantics are productized.
+- OpenCode server status wording and health checks are unchanged.
+
+### Verification
+
+- Focused chat tests passed for header status rendering and history dropdown scope rendering.
+- `npm run graphify:update:src` passed and refreshed root `graphify-out/`.
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `435` suites / `3213` tests and production build.
+- `npm run build` passed with `BUILD_ID: feature-phase0-capability.202605241015`.
+- Test Vault deploy copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/`.
+- Test Vault `main.js` contains `feature-phase0-capability.202605241015`, and the deployed Claude SDK binary checksum matches `dist`.
+- Fresh Obsidian runtime proof against Test Vault:
+  - assertion: `.obsidian-debug/backend-scope-header-history-assertion-2026-05-24.json`
+  - screenshot: `.obsidian-debug/backend-scope-header-history-screenshot-2026-05-24.png`
+  - screenshot setup: `.obsidian-debug/backend-scope-header-history-screenshot-setup-2026-05-24.json`
+  - cleanup/final capture: `.obsidian-debug/backend-scope-header-history-screenshot-cleanup-2026-05-24.json`
+  - result: deployed runtime reported `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202605241015`, header text `Claude Code 离线`, history scope `Claude Code 历史会话`, and `dev:errors` reported `No errors captured.`
+
 ## 2026-05-23 Phase 2 settings/runtime boundary hardening
 
 This round tightened the Claude settings surface so it is honest about runtime boundaries instead of implying every Claude Code option live-updates a persistent query.

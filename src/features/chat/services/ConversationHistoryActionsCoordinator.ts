@@ -10,6 +10,7 @@ const logger = createLogger('ConversationHistoryActionsCoordinator');
 export interface ConversationHistoryActionsHost {
   getConversations(): Conversation[];
   getCurrentConversation(): Conversation | null;
+  getHistoryBackendDisplayName?(): string;
   isActiveTabStreaming(): boolean;
   loadConversation(conversationId: string): Promise<void>;
   getConversationById(conversationId: string): Promise<Conversation | null>;
@@ -51,6 +52,14 @@ export class ConversationHistoryActionsCoordinator {
     const scrollContainer = this.historyDropdownEl.createDiv({
       cls: 'opencodian-history-scroll',
     });
+
+    const scopeLabel = this.host.getHistoryBackendDisplayName?.();
+    if (scopeLabel) {
+      scrollContainer.createDiv({
+        cls: 'opencodian-history-scope',
+        text: t('chat.history.backendScope', { backend: scopeLabel }),
+      });
+    }
 
     let updateDeleteActionText: (() => void) | null = null;
 

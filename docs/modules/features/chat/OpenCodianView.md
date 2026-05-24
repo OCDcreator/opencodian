@@ -185,17 +185,18 @@ header DOM、server status badge、title logo/wordmark、new/current-tab、histo
 - tooltip 标签、plugin asset URL、css-change 注册和 layout/color sync 回调
 - header tab bar slot 写回给 tab bar layout
 
-server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。Phase 0/1 backend-capability 收尾还在这个 seam 上补了一层 surface 语义：当 `enabledBackends` 为空，header 会把状态解释为 `disabled`；当当前 active backend 是 Claude Code 等非 OpenCode backend 时，聊天 composer 不再探测 OpenCode server health，而是把 backend 视为可发送，由对应 adapter/auth/query 路径返回真实错误或流式结果。
+server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。Phase 0/1 backend-capability 收尾还在这个 seam 上补了一层 surface 语义：当 `enabledBackends` 为空，header 会把状态解释为 `disabled`；当当前 active backend 是 Claude Code 等非 OpenCode backend 时，聊天 composer 不再探测 OpenCode server health，而是把 backend 视为可发送，由对应 adapter/auth/query 路径返回真实错误或流式结果。非 OpenCode backend 离线时，header badge 现在也使用 backend-specific offline label（例如 `Claude Code offline`），避免和 OpenCode server offline 混成同一个状态。
 
 ### Conversation history / actions ownership
 
 header 上 history 按钮触发的 conversation history dropdown、rename dialog、delete confirm countdown、dropdown 定位，以及 click-outside / destroy cleanup 现在由 `services/ConversationHistoryActionsCoordinator.ts` 承接。`OpenCodianView` 只保留 coordinator host seam：
 
-- conversation list、current conversation 与 foreground-busy 状态读取
+- conversation list、current conversation、active backend display name 与 foreground-busy 状态读取
 - `loadConversation()`、`updateConversationTitleState()` 与 `ConversationTabLifecycleRecoveryCoordinator` delete/reset 入口
 - title generation cancel 与 notice 回调
 
 因此 view 不再直接持有 history dropdown DOM/state、rename/delete confirm overlay 或 dropdown positioning RAF；delete fallback、rename title sync 到 session，以及 tab cleanup/reset 语义保持不变。
+History dropdown 的实际 conversation 过滤仍由 view host 根据 `settings.activeBackend` 完成；coordinator 只显示 host 提供的 backend scope label，让 Claude / OpenCode 历史过滤在 UI 上明确可见。
 
 ### Composer input shell 抽离
 

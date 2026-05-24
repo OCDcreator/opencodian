@@ -70,7 +70,7 @@ export class ChatHeaderPresenter {
 - `startServerStatusLoop()` 立即刷新一次 status badge，然后每 5 秒重新查询 host 的 server availability
 - `refreshServerStatusBadge()` 更新 `is-running` / `is-disabled` / `is-offline` 等状态 class，并根据 local/remote mode 选择 status 文案；如果 async availability 返回时 header 已销毁，会重新检查 DOM refs 并跳过写入，避免设置页/视图切换期间的空节点错误
 - `build()` / `startLspStatusLoop()` / `refreshBackendChrome()` 现在会先检查 `isOpenCodeBackend()`；当当前 active backend 不是一个真正启用中的 OpenCode surface 时，不再挂载或轮询 LSP 状态，避免 disabled-backend 场景继续打无意义运行时请求。后端切换时 view 会调用 `refreshBackendChrome()`，让 OpenCode-only LSP chrome 随 active backend 重新挂载或移除。
-- 非 OpenCode backend 的可用状态会先由 active adapter 的 `status` 映射；`connected` 才显示为 backend connected，`connecting` 显示为 starting，`disconnected` / `error` 显示为 offline。这样 Claude Code 断开时不会再被标题栏伪装成已连接。状态徽标 tooltip 也继续使用 backend settings copy，点击仍通过 host seam 进入对应 backend 的 runtime settings，而不是固定打开 OpenCode server section。
+- 非 OpenCode backend 的可用状态会先由 active adapter 的 `status` 映射；`connected` 才显示为 backend connected，`connecting` 显示为 starting，`disconnected` / `error` 显示为 offline。`offline` 现在也会带出 backend 名称（例如 `Claude Code offline`），这样 Claude Code 断开时不会再被标题栏伪装成无主的 generic offline。状态徽标 tooltip 也继续使用 backend settings copy，点击仍通过 host seam 进入对应 backend 的 runtime settings，而不是固定打开 OpenCode server section。
 - `applyLocaleTexts()` 刷新所有 header tooltip，并按最后一次 availability 立即重算 status label
 - `destroy()` 停止 polling 并释放 presenter 内部 DOM refs
 
