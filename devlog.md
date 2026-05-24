@@ -12,6 +12,37 @@
 
 ---
 
+## 2026-05-24 Phase 3 - Slash share backend gate hardening
+
+### 目标
+
+收紧 slash `/share` 与 `/unshare` 的 backend ownership：Claude conversation 即使带有 `backendSessionId`，也不能调用 OpenCode-only share / unshare host。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/services/SlashCommandExecutionService.ts` | 后端边界修复 | `/share` 与 `/unshare` 增加 `backend !== 'opencode'` gate，复用现有 no-session notice 并跳过 OpenCode-only host 调用 |
+| `tests/unit/features/chat/SlashCommandExecutionService.share.test.ts` | +2 TDD 回归测试 | 覆盖 Claude conversation + `backendSessionId` 不调用 `shareSession()` / `unshareSession()` |
+| `docs/modules/features/chat/services/SlashCommandExecutionService.md` | 文档更新 | 记录 `/share` / `/unshare` 和 `/undo` / `/redo` 一样属于 OpenCode-only synthetic command gate |
+
+### 验证
+
+- Red: focused test 先失败，证明 Claude `backendSessionId` 会被错误传给 `host.shareSession('claude-session-1')` / `host.unshareSession('claude-session-1')`
+- Focused green: `npm test -- --runInBand tests/unit/features/chat/SlashCommandExecutionService.test.ts tests/unit/features/chat/SlashCommandExecutionService.undoRedo.test.ts tests/unit/features/chat/SlashCommandExecutionService.share.test.ts` 通过，`3` suites / `32` tests passed
+- `npm run graphify:update:src` 已刷新 `graphify-out/`
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`436` suites / `3226` tests passed，build ID `feature-phase0-capability.202605241245`
+- `npm run build` 通过，并将 `main.js`、`manifest.json`、`styles.css`、`assets/`、`node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` 已验证包含 `feature-phase0-capability.202605241245`；Claude SDK binary checksum 与 dist 一致：`368dcd9709c85534f673071e7cc8eb5422bcff367fb9bdf5ce25d9619aab7ef5`
+- Runtime proof: `.obsidian-debug/claude-slash-share-unshare-gate-assertion-2026-05-24.json` 在部署版 `feature-phase0-capability.202605241245` 上返回 `ok: true`。脚本走真实 DOM composer (`.opencodian-input` + `.opencodian-send-btn`)，Claude conversation 带 `backendSessionId: 'claude-session-1'`；`/share` 与 `/unshare` 被消费，但 OpenCode `shareSession` / `unshareSession` 计数均为 `0`，clipboard write 为 `0`，消息数保持 `0`
+- Runtime artifacts: `.obsidian-debug/claude-slash-share-unshare-gate-2026-05-24.png`、`.obsidian-debug/claude-slash-share-unshare-gate-console-2026-05-24.txt`、`.obsidian-debug/claude-slash-share-unshare-gate-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+
+### 影响评估
+
+本轮只收紧 OpenCode-only share / unshare write 边界，不宣称 Claude full capability 完成，不新增 Claude share URL 概念。
+
+---
+
 ## 2026-05-24 Phase 3 - Claude new-conversation backend ownership boundary
 
 ### 目标

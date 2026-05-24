@@ -63,8 +63,8 @@ export class SlashCommandExecutionService {
   - `/undo`：查找当前会话最后一条用户消息的 `sourceMessageId`，调用 `revertSession()` 撤销，成功后触发 background sync；无 conversation / 无 session / 非 opencode backend / 无 sourceMessageId 各路径均显示对应 notice 并提前返回
   - `/redo`：调用 `unrevertSession()` 重做，成功后触发 background sync；与 `/undo` 共享一致的 `!conversation` null guard、backend gate 和 error-catch notice 模式
   - `/new`：调用 `createNewConversation()` 创建新会话
-  - `/share`：调用 `shareSession()` 分享，成功后将 URL 复制到剪贴板
-  - `/unshare`：调用 `unshareSession()` 取消分享
+  - `/share`：仅对 OpenCode conversation 调用 `shareSession()` 分享，成功后将 URL 复制到剪贴板；非 OpenCode backend 即使存在 `backendSessionId` 也显示 no-session notice 并提前返回
+  - `/unshare`：仅对 OpenCode conversation 调用 `unshareSession()` 取消分享；非 OpenCode backend 即使存在 `backendSessionId` 也显示 no-session notice 并提前返回
 - 所有 synthetic builtin 的 host 方法在 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂中从 `deps.openCodeService` 直接映射，不需要 `OpenCodianView` 提供额外辅助方法
 
 ### 执行前 gate
@@ -98,7 +98,7 @@ export class SlashCommandExecutionService {
 - markdown command 会通过 `runMdFileCommandAsMessage()` 重新进入 send pipeline，并设置 skip-slash 标志避免 template 以 `/` 开头时再次递归拦截
 - slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
 - dispatch runtime/project command 前会用 `getConversationBackendSessionId()` 解析 session identity；没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
-- **OpenCode-only undo/redo gate**: `/undo` 与 `/redo` 在 `backend !== 'opencode'` 时直接返回 no-session notice。revert / unrevert 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
+- **OpenCode-only synthetic command gates**: `/undo`、`/redo`、`/share` 与 `/unshare` 在 `backend !== 'opencode'` 时直接返回 no-session notice。revert / unrevert 与 share / unshare writes 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
 - `/compact` 不属于普通 slash command runtime：`SlashCommandExecutionHostFactory.executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
 - `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda

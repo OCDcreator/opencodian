@@ -416,8 +416,9 @@ export class SlashCommandExecutionService {
 
   private async handleShareCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
+    const backend = conversation?.backend ?? 'opencode';
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
-    if (!sessionId) { new Notice(t('slashCommand.share.noSession')); return true; }
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.share.noSession')); return true; }
     new Notice(t('slashCommand.share.starting'));
     const url = await this.host.shareSession(sessionId);
     if (url) { await navigator.clipboard.writeText(url); new Notice(t('slashCommand.share.success')); }
@@ -427,8 +428,9 @@ export class SlashCommandExecutionService {
 
   private async handleUnshareCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
+    const backend = conversation?.backend ?? 'opencode';
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
-    if (!sessionId) { new Notice(t('slashCommand.unshare.noSession')); return true; }
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.unshare.noSession')); return true; }
     const ok = await this.host.unshareSession(sessionId);
     new Notice(t(ok ? 'slashCommand.unshare.success' : 'slashCommand.unshare.failed'));
     return true;
