@@ -216,6 +216,13 @@ function resolveDiagnosticSessionId(message: unknown, chunks: readonly StreamChu
   return typeof resolved === 'string' ? resolved : undefined;
 }
 
+function resolveComparableSessionIds(sessionInfo: ClaudeCodeSdkSessionInfo): string[] {
+  const record = sessionInfo as ClaudeCodeSdkSessionInfo & { id?: unknown };
+  return [record.sessionId, record.id]
+    .filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)
+    .map((candidate) => candidate.trim());
+}
+
 const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>([
     AgentCapability.Chat,
@@ -610,6 +617,11 @@ export class ClaudeCodeAdapter
     const sessionInfo = await sdk.getSessionInfo(trimmedResumeSessionId, { dir: this.options.vaultPath });
     if (!sessionInfo) {
       throw new Error(`Claude Code diagnostic resume validation failed: session "${trimmedResumeSessionId}" was not found in the Claude SDK session catalog.`);
+    }
+    const comparableSessionIds = resolveComparableSessionIds(sessionInfo);
+    const mismatchedSessionId = comparableSessionIds.find((sessionId) => sessionId !== trimmedResumeSessionId);
+    if (mismatchedSessionId) {
+      throw new Error(`Claude Code diagnostic resume validation failed: SDK session lookup returned "${mismatchedSessionId}" for requested session "${trimmedResumeSessionId}".`);
     }
   }
 

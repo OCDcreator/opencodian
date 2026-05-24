@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit entering the current worker slice: `528369fc`
-- Commit subject entering the current worker slice: `fix: guard opencode settings callbacks for claude backend`
-- Latest validated build entering the current worker slice: `feature-phase0-capability.202605241814`
+- Snapshot commit entering the current worker slice: `bbc019bf`
+- Commit subject entering the current worker slice: `fix: validate claude diagnostic resume sessions`
+- Latest validated build entering the current worker slice: `feature-phase0-capability.202605241855`
 - Recent continuity commits in this lane:
+- `bbc019bf` — `fix: validate claude diagnostic resume sessions`
 - `528369fc` — `fix: guard opencode settings callbacks for claude backend`
 - `a07d1518` — `fix: guard server settings for claude backend`
 - `510803fc` — `fix: guard mcp settings for claude backend`
@@ -55,13 +56,14 @@ This is a status snapshot, not the long-term design or full implementation plan.
 
 ## 2026-05-24 Claude diagnostic resume validation boundary
 
-This narrow worker slice closes a Capability Lab diagnostic resume leak: `ClaudeCodeAdapter.runDiagnosticPrompt({ resumeSessionId })` must not pass arbitrary placeholder, OpenCode, or OpenCodian-local handles into the Claude SDK `resume` option.
+This related worker pair closes Capability Lab diagnostic resume leaks: `ClaudeCodeAdapter.runDiagnosticPrompt({ resumeSessionId })` must not pass arbitrary placeholder, OpenCode, OpenCodian-local handles, or SDK lookup results with explicit mismatching identity into the Claude SDK `resume` option.
 
 ### What Changed
 
 - `runDiagnosticPrompt()` now validates non-empty `resumeSessionId` values through `sdk.getSessionInfo(resumeSessionId, { dir: vaultPath })` before creating the diagnostic `sdk.query()`.
 - If the SDK facade does not expose `getSessionInfo()` or the lookup returns no session, the adapter throws `Claude Code diagnostic resume validation failed...` before query creation.
-- A verified Claude SDK session id still passes through to `options.resume`, preserving the diagnostic Capability Lab resume probe for provider-owned Claude sessions.
+- If a returned session object explicitly carries a nonblank `sessionId` or `id` that does not match the requested id, the adapter also rejects before query creation. Lookup responses without comparable id fields remain compatible.
+- A verified/nonconflicting Claude SDK session id still passes through to `options.resume`, preserving the diagnostic Capability Lab resume probe for provider-owned Claude sessions.
 
 ### What This Does Not Change
 
@@ -72,12 +74,14 @@ This narrow worker slice closes a Capability Lab diagnostic resume leak: `Claude
 ### Verification
 
 - Implementer subagent TDD red: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` first failed because `runDiagnosticPrompt()` resolved for an unvalidated `resumeSessionId` and never called `sdk.getSessionInfo()`.
-- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` passed with `2` suites / `138` tests.
-- `npm run graphify:update:src` refreshed the committed `src` graph with `424` source files, `6136` nodes, `11624` edges, and `220` communities.
+- Follow-up implementer subagent TDD red: the adapter test failed because a diagnostic request for `sdk-session-1` accepted a lookup result identifying `sdk-session-2`.
+- Focused green after review fix: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` passed with `1` suite / `72` tests, covering unvalidated ids, missing lookup, `sessionId` mismatch, `id` alias mismatch, no-id compatibility, and valid resume propagation.
+- Independent reviewer subagent initially identified the missing `id` alias / no-id compatibility tests; after they were added, the reviewer reported no findings. Residual risk remains live SDK behavior: if future `getSessionInfo()` catalog visibility differs from `query({ options.resume })`, a later Capability Lab runtime proof must catch it before any stable promotion.
+- `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` passed with `2` suites / `141` tests after integrating both related resume boundaries.
+- `npm run graphify:update:src` refreshed the committed `src` graph with `424` source files, `6137` nodes, `11626` edges, and `221` communities.
 - `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check` passed.
-- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `438` suites / `3251` tests and produced `BUILD_ID: feature-phase0-capability.202605241854`.
-- `npm run build` passed with standalone `BUILD_ID: feature-phase0-capability.202605241855`.
-- Independent reviewer subagent reported no findings. Residual risk remains live SDK behavior: if future `getSessionInfo()` catalog visibility differs from `query({ options.resume })`, a later Capability Lab runtime proof must catch it before any stable promotion.
+- `OWNER_GUARD_APPROVED=1 npm run verify` passed with `438` suites / `3254` tests and produced `BUILD_ID: feature-phase0-capability.202605241909`.
+- `npm run build` passed with standalone `BUILD_ID: feature-phase0-capability.202605241910`.
 
 ## 2026-05-24 Tool / Formatter / Security settings stale backend guard
 

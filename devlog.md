@@ -16,26 +16,28 @@
 
 ### 目标
 
-收紧 Capability Lab 的 Claude diagnostic resume 边界：`runDiagnosticPrompt({ resumeSessionId })` 只能恢复 Claude SDK session catalog 中真实存在的会话，不能把 placeholder、OpenCode session id 或 OpenCodian 本地 handle 当作稳定 resume-at 能力传给 Claude SDK。
+收紧 Capability Lab 的 Claude diagnostic resume 边界：`runDiagnosticPrompt({ resumeSessionId })` 只能恢复 Claude SDK session catalog 中真实存在且与请求 id 一致的会话，不能把 placeholder、OpenCode session id、OpenCodian 本地 handle 或交叉命中的 Claude session 当作稳定 resume-at 能力传给 Claude SDK。
 
 ### 实施内容
 
 | 文件 | 变更类型 | 详情 |
 |---|---|---|
-| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 后端边界修复 | 在 `runDiagnosticPrompt()` 创建 `sdk.query()` 前，通过 `sdk.getSessionInfo(resumeSessionId, { dir: vaultPath })` 验证诊断恢复目标；SDK lookup 不可用或返回空时抛出明确的 Claude diagnostic resume validation error |
-| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | TDD 回归测试 | 覆盖无效 resume id 被拒绝且不创建 query、SDK lookup 不可用时被拒绝、真实 SDK session 验证后继续传递 `options.resume` |
-| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 模块文档更新 | 记录 Capability Lab diagnostic resume 只接受 SDK catalog 可验证的 Claude session，不代表 stable resume-at productization |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 后端边界修复 | 在 `runDiagnosticPrompt()` 创建 `sdk.query()` 前，通过 `sdk.getSessionInfo(resumeSessionId, { dir: vaultPath })` 验证诊断恢复目标；SDK lookup 不可用、返回空，或返回对象显式携带不匹配的 `sessionId` / `id` 时抛出明确的 Claude diagnostic resume validation error |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | TDD 回归测试 | 覆盖无效 resume id 被拒绝且不创建 query、SDK lookup 不可用时被拒绝、`sessionId` mismatch 和 `id` alias mismatch 被拒绝、无可比 id 字段时保留兼容路径、真实 SDK session 验证后继续传递 `options.resume` |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 模块文档更新 | 记录 Capability Lab diagnostic resume 只接受 SDK catalog 可验证且显式 id 不冲突的 Claude session，不代表 stable resume-at productization |
 | `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 刷新当前 continuity anchor，并记录本 slice 的验证边界与非目标 |
 
 ### 验证
 
 - Red: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 先失败，证明未修复前 `runDiagnosticPrompt()` 会接受未验证的 `resumeSessionId`，且不会调用 `sdk.getSessionInfo()`
-- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 通过，`2` suites / `138` tests passed
-- `npm run graphify:update:src` 已刷新 `graphify-out/`（`424` source files / `6136` nodes / `11624` edges / `220` communities）
+- Follow-up Red: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 先失败于 `rejects diagnostic resume when SDK lookup returns a different session id`，证明上一版 guard 会接受 `sdk-session-1` 请求却返回 `sdk-session-2` 的交叉命中
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 通过，`1` suite / `72` tests passed；覆盖 `sessionId` mismatch、`id` alias mismatch、无可比 id 字段兼容，以及真实 SDK session resume
+- Independent reviewer subagent 首轮提出 P3 测试缺口；补齐 `id` alias mismatch 和 no-id compatibility 后复审无 findings
+- `npm run graphify:update:src` 已刷新 `graphify-out/`（`424` source files / `6137` nodes / `11626` edges / `221` communities）
 - `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check` 通过
-- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`438` suites / `3251` tests passed，verify build ID `feature-phase0-capability.202605241854`
-- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241855`
-- Independent reviewer subagent 对本 slice 无 findings；残余风险是未来官方 SDK 的 `getSessionInfo()` catalog 可见性可能与 `query({ options.resume })` 来源不一致，后续仍需要 Capability Lab runtime proof 覆盖真实 SDK 行为
+- `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`438` suites / `3254` tests passed，verify build ID `feature-phase0-capability.202605241909`
+- `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241910`
+- 残余风险是未来官方 SDK 的 `getSessionInfo()` catalog 可见性可能与 `query({ options.resume })` 来源不一致，后续仍需要 Capability Lab runtime proof 覆盖真实 SDK 行为
 
 ### 影响评估
 
