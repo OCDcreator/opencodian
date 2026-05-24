@@ -37,7 +37,10 @@
 - `npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check` 通过
 - `OWNER_GUARD_APPROVED=1 npm run verify` 通过，`438` suites / `3254` tests passed，verify build ID `feature-phase0-capability.202605241909`
 - `npm run build` 通过，standalone build ID `feature-phase0-capability.202605241910`
-- 残余风险是未来官方 SDK 的 `getSessionInfo()` catalog 可见性可能与 `query({ options.resume })` 来源不一致，后续仍需要 Capability Lab runtime proof 覆盖真实 SDK 行为
+- Test Vault runtime proof：将 build `feature-phase0-capability.202605241910` 部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/` 后，部署版 `main.js` 与 `dist/main.js` SHA256 一致（`4761f41484e0ec57741d183d41189575d7c52095772fc95bd889b12a408e1fcd`），loaded runtime 报告同一 BUILD_ID
+- `.obsidian-debug/diagnostic-resume-boundary-runtime-assertion-2026-05-24.json` 通过：在 deployed plugin runtime 中以 isolated fake SDK 验证 unknown resume id、mismatched `sessionId`、mismatched `id` alias 三类输入均调用一次 `getSessionInfo()`、保持 `queryCount=0`，并抛出 `Claude Code diagnostic resume validation failed`；`validAuthenticatedResumeAttempted=false`
+- Runtime artifacts：`.obsidian-debug/diagnostic-resume-boundary-runtime-screenshot-2026-05-24.png`、`.obsidian-debug/diagnostic-resume-boundary-runtime-console-2026-05-24.txt`、`.obsidian-debug/diagnostic-resume-boundary-runtime-errors-2026-05-24.txt`；dev errors 为 `No errors captured.`
+- 当前剩余风险不是拒绝边界，而是真实认证状态下 valid Claude resume 与 SDK catalog/query 可见性一致性的正向 proof；该项仍保持 diagnostic/gated
 
 ### 影响评估
 

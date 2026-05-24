@@ -16,10 +16,11 @@ This is a status snapshot, not the long-term design or full implementation plan.
 ## Current Anchor
 
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
-- Snapshot commit entering the current worker slice: `bbc019bf`
-- Commit subject entering the current worker slice: `fix: validate claude diagnostic resume sessions`
-- Latest validated build entering the current worker slice: `feature-phase0-capability.202605241855`
+- Snapshot commit after the latest validated capability slice: `56f6319f`
+- Commit subject after the latest validated capability slice: `fix: reject mismatched claude diagnostic resume ids`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605241910`
 - Recent continuity commits in this lane:
+- `56f6319f` — `fix: reject mismatched claude diagnostic resume ids`
 - `bbc019bf` — `fix: validate claude diagnostic resume sessions`
 - `528369fc` — `fix: guard opencode settings callbacks for claude backend`
 - `a07d1518` — `fix: guard server settings for claude backend`
@@ -82,6 +83,9 @@ This related worker pair closes Capability Lab diagnostic resume leaks: `ClaudeC
 - `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check` passed.
 - `OWNER_GUARD_APPROVED=1 npm run verify` passed with `438` suites / `3254` tests and produced `BUILD_ID: feature-phase0-capability.202605241909`.
 - `npm run build` passed with standalone `BUILD_ID: feature-phase0-capability.202605241910`.
+- Test Vault runtime proof deployed build `feature-phase0-capability.202605241910` and verified that deployed `main.js` matched `dist/main.js` by SHA256 (`4761f41484e0ec57741d183d41189575d7c52095772fc95bd889b12a408e1fcd`) and that the loaded plugin runtime reported the same BUILD_ID.
+- Deployed-runtime assertion `.obsidian-debug/diagnostic-resume-boundary-runtime-assertion-2026-05-24.json` passed through the live `claude-code` adapter constructor with an isolated fake SDK: unknown resume id, mismatched `sessionId`, and mismatched `id` alias each performed one lookup, created zero queries, and raised the diagnostic validation error. The assertion records `validAuthenticatedResumeAttempted: false`, so it proves the rejection boundary only, not positive authenticated resume completion.
+- Runtime artifacts: `.obsidian-debug/diagnostic-resume-boundary-runtime-screenshot-2026-05-24.png`, `.obsidian-debug/diagnostic-resume-boundary-runtime-console-2026-05-24.txt`, `.obsidian-debug/diagnostic-resume-boundary-runtime-errors-2026-05-24.txt`; `dev:errors` reported `No errors captured.`
 
 ## 2026-05-24 Tool / Formatter / Security settings stale backend guard
 
