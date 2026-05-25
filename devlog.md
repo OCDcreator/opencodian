@@ -22,21 +22,23 @@
 
 | 文件 | 变更类型 | 详情 |
 |---|---|---|
-| `.obsidian-debug/cap-2-settings-ia-runtime-proof-20260526-result.json` | 运行时证明 | 10 条断言全部通过：6 个二级标签（无 limits）、limits boundary 存在、maxTurns/maxBudget 在 model-thinking 中、restart button 存在、无孤立 limits section |
-| `.obsidian-debug/cap-2-model-thinking-tab-20260526.png` | 截图 | model-thinking 标签页截图 |
-| `.obsidian-debug/cap-2-console-20260526.txt` | 控制台 | reload 后无错误 |
-| `.obsidian-debug/cap-2-errors-20260526.txt` | 错误 | "No errors captured." |
-| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 添加 cap-3 运行时证明记录 |
+| `.obsidian-debug/cap-3-runtime-proof-20260526-result.json` | 运行时证明 | 12 条验证检查全部通过：6 个二级标签（无 limits）、limits boundary 存在、maxTurns/maxBudget 在 model-thinking 中、restart button 存在、无孤立 limits section、所有标签内容正确渲染 |
+| `.obsidian-debug/cap-3-claude-code-settings-20260526.png` | 截图 | Claude Code 设置页完整截图 |
+| `.obsidian-debug/cap-3-errors-20260526.txt` | 错误 | "No errors captured." |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 更新 cap-3 运行时证明记录（新 BUILD_ID + 完整 build/deploy 证据） |
 
 ### 验证结果
 
-- BUILD_ID: `task-cap-3.202605260025` (clean build with SDK platform artifacts) ✓
+- Build: `rm -rf dist && npm run build` exit code 0（无管道，直接捕获退出码） ✓
+- BUILD_ID: `task-cap-3.202605260030` ✓
+- Deployed to Test Vault and BUILD_ID verified in deployed main.js ✓
 - Secondary tabs: `runtime, model-thinking, permissions, context-sources, tools, sdk-foundations` (6 tabs, no limits) ✓
 - Limits boundary notice (`data-claude-code-limits-boundary="true"`) present in model-thinking tab ✓
 - Max Turns + Max Budget USD controls present in model-thinking tab ✓
 - Restart button present ✓
 - No orphaned `[data-claude-code-section="limits"]` element ✓
-- No console errors after reload ✓
+- All 6 tabs render with expected settings content ✓
+- No console errors after reload and full 6-tab traversal ✓
 
 ---
 
