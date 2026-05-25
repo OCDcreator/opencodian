@@ -655,7 +655,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(23);
+    expect(rows.length).toBe(24);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -690,7 +690,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('hidden');
   });
 
-  it('audits capability matrix for honest classifications across all 23 rows', () => {
+  it('audits capability matrix for honest classifications across all 24 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -717,6 +717,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Disallowed Tools': { runtimeProof: 'untested', userSurface: 'settings' },
       'Turn/Budget Limits': { runtimeProof: 'untested', userSurface: 'settings' },
       'Environment Variables': { runtimeProof: 'untested', userSurface: 'settings' },
+      'Fallback Model': { runtimeProof: 'untested', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'settings' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'settings' },
       'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },

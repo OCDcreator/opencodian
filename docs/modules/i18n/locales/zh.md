@@ -9,6 +9,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 会话设置弹窗本轮还新增了 `chat.sessionSettings.modal.globalDefaultsGroup`、`globalDefaultsDesc` 和 `summary.*` 文案，用于 Display 分组下方的全局默认值摘要行与“打开设置”按钮。
 
+本轮 cap-1 更新了 `settings.claudeCode.fallbackModel.desc`，加入 fallback 路径尚未经过运行时验证的诚实性提示，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
+
 本轮新增 `chat.agentSelector.*` 键，供聊天输入框下方的主 Agent 下拉框使用，包括 trigger、轻量列表标题、OpenCode 默认值选项、default badge、description、加载/空态/失败状态以及选中 tooltip。
 
 最近一轮还重写了 `settings.security.*` 相关文案：把原先容易让人误以为是上游原生“权限模式”的 wording，改成 **OpenCodian 权限模板 + 配置摘要** 语义，并补齐了 security section 的重启 tooltip / notice 键。

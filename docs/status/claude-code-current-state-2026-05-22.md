@@ -65,6 +65,26 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-25 Cap-1: Honest capability wiring and settings exposure
+
+This slice makes Claude Code capability wiring honest at three levels: type interface maturity labels, user-visible settings descriptions, and capability matrix completeness.
+
+### Changes
+
+- Added `@experimental` / `@diagnostic` / `@untested` JSDoc maturity tags to `ClaudeCodeBackendSettings` fields in `src/core/types/settings.ts`.
+- Updated `settings.claudeCode.fallbackModel.desc` locale strings (en + zh) with honest maturity warning that the fallback path has not been verified at runtime.
+- Added "Fallback Model" as the 24th row in the capability matrix (`SettingsCapabilityLabSection.ts`), tracking the SDK fallbackModel option.
+- Updated the comprehensive audit test to expect 24 rows and validate the new Fallback Model classification.
+- resume-at remains diagnostic-only; this slice does not mark Claude Code full capability as complete.
+
+### Impact
+
+- The fallback model settings UI now shows an honest warning about verification status.
+- The capability matrix audit test enforces that no capability row drifts without explicit test updates.
+- No OpenCode behavior changed.
+
+---
+
 ## 2026-05-25 Ordinary resume vs diagnostic resume-at separation
 
 This slice hardens the boundary between the stable ordinary resume path and the diagnostic-only resume-at path. Ordinary resume (validated session identity for continued chat) is promoted to stable. Resume-at (arbitrary session selection via `resumeSessionId`) remains gated behind `runDiagnosticPrompt()` only.

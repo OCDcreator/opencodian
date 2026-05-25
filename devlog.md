@@ -12,6 +12,42 @@
 
 ---
 
+## 2026-05-25 Phase 6 - Cap-1: Honest capability wiring and settings exposure
+
+### 目标
+
+审计并修复 Claude Code 能力连接中的诚实性缺口：确保 `ClaudeCodeBackendSettings` 类型接口携带成熟度标签、用户可见的 fallback 模型描述如实标注验证状态、Capability Lab 能力矩阵完整覆盖所有已暴露的 SDK 选项。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/types/settings.ts` | 类型诚实性 | 为 `ClaudeCodeBackendSettings` 接口的 SDK 诊断开关添加 `@experimental` / `@diagnostic` JSDoc 标签；为 `fallbackModel`、`allowedTools`、`disallowedTools`、`maxTurns`、`maxBudgetUsd`、`env` 添加 `@untested` 标签 |
+| `src/i18n/locales/en.ts` | 用户可见文案 | 更新 `settings.claudeCode.fallbackModel.desc`，加入 "The fallback path has not been verified at runtime yet." |
+| `src/i18n/locales/zh.ts` | 用户可见文案 | 同步更新中文 fallback 模型描述，加入 "fallback 路径尚未经过运行时验证" |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 矩阵完整性 | 新增 "Fallback Model" 矩阵行（第 24 行），`runtimeProof: 'untested'`、`userSurface: 'settings'` |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | TDD 审计 | TDD_RED: 测试期望 24 行含 Fallback Model → 失败；TDD_GREEN: 添加矩阵行后通过 |
+
+### 审计发现
+
+- **后端路由边界全部有意且正确**：`routeConversationForkSession` 已通过 `getCurrentConversationForkService()` 实现能力感知路由
+- **SDK Foundation 开关已有 UI 成熟度警告**，但类型接口缺少对应标签 → 已修复
+- **Fallback 模型描述缺少验证状态** → 已修复
+- **Fallback 模型未在能力矩阵中跟踪** → 已修复
+
+### TDD 证据
+
+- `TDD_RED[cap-1]: tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — 测试期望 24 行和 Fallback Model 分类但矩阵只有 23 行
+- `TDD_GREEN[cap-1]: tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — 添加矩阵行后 80 测试全部通过
+
+### 验证
+
+- TDD_RED: 2 个测试失败（行数 23≠24，Fallback Model 分类 undefined≠settings）
+- TDD_GREEN: 80 tests passed
+- 全量验证：`npm run verify` → 439 suites / 3286 tests passed，lint/typecheck/build clean
+
+---
+
 ## 2026-05-25 Phase 5 - Audit SDK advanced toggles for honesty
 
 ### 目标

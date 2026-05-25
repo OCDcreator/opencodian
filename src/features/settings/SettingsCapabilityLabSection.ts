@@ -515,6 +515,13 @@ export class SettingsCapabilityLabSection {
         userSurface: 'settings',
       },
       {
+        capability: 'Fallback Model',
+        sdkExposed: true, // fallbackModel option in SDK query options
+        adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
+        runtimeProof: 'untested',
+        userSurface: 'settings',
+      },
+      {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)

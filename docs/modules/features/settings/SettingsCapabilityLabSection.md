@@ -40,13 +40,13 @@
 
 ### Capability Matrix
 
-`buildMatrixRows()` 静态评估 23 项 Claude Code SDK 能力（Hooks、File Checkpoint、JSONL History、Session Store、Skills、Plugins、MCP Servers、Allowed Tools、Disallowed Tools、Turn/Budget Limits、Environment Variables、Permission Approval、AskUserQuestion / Elicitation、Agents、Agent Definitions、Structured Output、Subagent Transcript、Include Hook Events、Import Session、Fork Session、Resume Session、Session Detail、Backend Routing），每项包含 SDK Exposed、Adapter Wired、Runtime Proof 和 Stable UI 四个维度。多数 Runtime Proof 默认为 `untested`，在对应诊断面板执行实时调用后更新为 `pass` 或 `fail`。Allowed Tools、Disallowed Tools、Turn/Budget Limits、Environment Variables、Permission Approval、AskUserQuestion / Elicitation 和 MCP Servers 标记为 `Settings` + `Verified/Untested`，表示它们已接入普通用户路径（设置页或聊天 UI），并已进入 SDK options wiring。`Subagent Transcript / Progress` 与 `Include Hook Events` 即使有可持久化 SDK Foundation 开关，也标记为 `Diagnostic` + `Untested`，因为这些开关只喂给 diagnostic/experimental event stream，不构成完整 transcript/progress UI 或 hook authoring 产品面。`Agent Definitions` 只表示 SDK `agent` / `agents` runtime-only 透传已接线，仍是 Hidden/Untested，不代表 agent authoring UI 已完成；`Session Store` 也只是隔离的 diagnostic store proof，不是正式会话存储产品面。
+`buildMatrixRows()` 静态评估 24 项 Claude Code SDK 能力（Hooks、File Checkpoint、JSONL History、Session Store、Skills、Plugins、MCP Servers、Allowed Tools、Disallowed Tools、Turn/Budget Limits、Environment Variables、Fallback Model、Permission Approval、AskUserQuestion / Elicitation、Agents、Agent Definitions、Structured Output、Subagent Transcript、Include Hook Events、Import Session、Fork Session、Resume Session、Session Detail、Backend Routing），每项包含 SDK Exposed、Adapter Wired、Runtime Proof 和 Stable UI 四个维度。多数 Runtime Proof 默认为 `untested`，在对应诊断面板执行实时调用后更新为 `pass` 或 `fail`。Allowed Tools、Disallowed Tools、Turn/Budget Limits、Environment Variables、Fallback Model、Permission Approval、AskUserQuestion / Elicitation 和 MCP Servers 标记为 `Settings` + `Verified/Untested`，表示它们已接入普通用户路径（设置页或聊天 UI），并已进入 SDK options wiring。`Subagent Transcript / Progress` 与 `Include Hook Events` 即使有可持久化 SDK Foundation 开关，也标记为 `Diagnostic` + `Untested`，因为这些开关只喂给 diagnostic/experimental event stream，不构成完整 transcript/progress UI 或 hook authoring 产品面。`Agent Definitions` 只表示 SDK `agent` / `agents` runtime-only 透传已接线，仍是 Hidden/Untested，不代表 agent authoring UI 已完成；`Session Store` 也只是隔离的 diagnostic store proof，不是正式会话存储产品面。
 
 `buildMatrixRows()` 还包含 MCP Servers 行，标记为 SDK exposed + adapter wired、runtime proof `pass`、user surface `settings`；MCP runtime passthrough 已有正向 proof，共享 Settings > MCP 标签提供 authoring，Claude Code Tools 标签提供运行时刷新。
 
 ### 诚实性审计
 
-单元测试中新增 `audits capability matrix for honest classifications across all 23 rows` 用例，显式枚举每行的预期 `runtimeProof` 和 `userSurface`，并强制执行两条不变规则：
+单元测试中新增 `audits capability matrix for honest classifications across all 24 rows` 用例，显式枚举每行的预期 `runtimeProof` 和 `userSurface`，并强制执行两条不变规则：
 1. 恰好三行可以标 `Verified`（MCP Servers、Permission Approval、AskUserQuestion / Elicitation）——任何把未验证行提升为 `Verified` 的改动都会使测试失败；
 2. 恰好六行标 `hidden`（Hooks、Session Store、Skills、Plugins、Agent Definitions、Import Session to Store）——任何把 hidden 行暴露到 settings/diagnostic 的改动都会使测试失败。
 

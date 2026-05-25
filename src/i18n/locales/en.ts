@@ -2223,7 +2223,7 @@ export const enTranslations = {
   'settings.claudeCode.model.desc': 'Optional Claude model id for Claude Code sessions. Leave blank to inherit Claude Code defaults.',
   'settings.claudeCode.model.placeholder': 'claude-sonnet-4-5',
   'settings.claudeCode.fallbackModel.name': 'Fallback model',
-  'settings.claudeCode.fallbackModel.desc': 'Optional fallback model id used only when the adapter enables a fallback path.',
+  'settings.claudeCode.fallbackModel.desc': 'Optional fallback model id used only when the adapter enables a fallback path. The fallback path has not been verified at runtime yet.',
   'settings.claudeCode.fallbackModel.placeholder': 'claude-haiku-4-5',
   'settings.claudeCode.thinking.name': 'Thinking',
   'settings.claudeCode.thinking.desc': 'Controls Claude Code thinking behavior when the selected model supports it.',

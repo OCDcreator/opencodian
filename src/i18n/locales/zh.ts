@@ -2223,7 +2223,7 @@ export const zhTranslations = {
   'settings.claudeCode.model.desc': '可选的 Claude Code 会话模型 ID。留空则继承 Claude Code 默认值。',
   'settings.claudeCode.model.placeholder': 'claude-sonnet-4-5',
   'settings.claudeCode.fallbackModel.name': '备用模型',
-  'settings.claudeCode.fallbackModel.desc': '可选备用模型 ID，仅在适配器启用 fallback 路径时使用。',
+  'settings.claudeCode.fallbackModel.desc': '可选备用模型 ID，仅在适配器启用 fallback 路径时使用。fallback 路径尚未经过运行时验证。',
   'settings.claudeCode.fallbackModel.placeholder': 'claude-haiku-4-5',
   'settings.claudeCode.thinking.name': 'Thinking',
   'settings.claudeCode.thinking.desc': '当所选模型支持时，控制 Claude Code 的 thinking 行为。',

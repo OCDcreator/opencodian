@@ -49,24 +49,25 @@ export interface ClaudeCodeBackendSettings {
   effort: ClaudeCodeEffort;
   additionalDirectories: string[];
   model: string;
+  /** @untested — Fallback model path wired to SDK option but not runtime-verified. */
   fallbackModel: string;
-  /** Tool names that are auto-allowed without prompting. Not a sandbox. */
+  /** Tool names that are auto-allowed without prompting. Not a sandbox. @untested */
   allowedTools: string[];
-  /** Tool names that are removed from context entirely. */
+  /** Tool names that are removed from context entirely. @untested */
   disallowedTools: string[];
-  /** Maximum conversation turns before the query stops. null = unlimited (SDK default). */
+  /** Maximum conversation turns before the query stops. null = unlimited (SDK default). @untested */
   maxTurns: number | null;
-  /** Maximum budget in USD before the query stops. null = unlimited (SDK default). */
+  /** Maximum budget in USD before the query stops. null = unlimited (SDK default). @untested */
   maxBudgetUsd: number | null;
-  /** Environment variables to pass to the Claude Code process. */
+  /** Environment variables to pass to the Claude Code process. @untested */
   env: Record<string, string>;
-  /** Enable Claude Code SDK file checkpoint tracking for later rewind operations. */
+  /** Enable Claude Code SDK file checkpoint tracking for later rewind operations. @experimental — SDK option wired but not runtime-verified in stable paths. */
   enableFileCheckpointing: boolean;
-  /** Ask the SDK to include hook lifecycle events in the stream. */
+  /** Ask the SDK to include hook lifecycle events in the stream. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
   includeHookEvents: boolean;
-  /** Forward subagent text/thinking blocks into the parent stream. */
+  /** Forward subagent text/thinking blocks into the parent stream. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
   forwardSubagentText: boolean;
-  /** Ask the SDK to emit periodic subagent progress summaries. */
+  /** Ask the SDK to emit periodic subagent progress summaries. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
   agentProgressSummaries: boolean;
   /** Product workbench debug channels for future Claude Code logging routes. */
   debugChannels: ClaudeCodeDebugChannelSettings;
