@@ -195,6 +195,7 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
     expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
     expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('tools');
+    expect(resolveSecondaryTabId('claude-code', 'limits')).toBe('model-thinking');
     expect(resolveSecondaryTabId('debug', 'general')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'modules')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'logs')).toBe('export');
@@ -245,6 +246,12 @@ describe('getActiveSecondaryTabId', () => {
 
     // After switching back to server, it should remember 'auth'
     expect(getActiveSecondaryTabId('server', { ...saved, model: 'tools' })).toBe('auth');
+  });
+
+  it('regression: persisted limits selection migrates to model-thinking', () => {
+    const saved = { 'claude-code': 'limits' };
+    const result = getActiveSecondaryTabId('claude-code', saved);
+    expect(result).toBe('model-thinking');
   });
 });
 
