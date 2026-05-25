@@ -96,6 +96,12 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * ordinary session state, preventing resume-at from rebinding stable chat sessions.
    */
   resumeSessionId?: string;
+  /**
+   * Explicit diagnostic gate: must be set to `true` when using `resumeSessionId`.
+   * This flag keeps resume-at behind an explicit opt-in diagnostic boundary,
+   * preventing accidental stable usage of arbitrary session resume.
+   */
+  _diagnosticResumeAt?: boolean;
 }
 
 export interface ClaudeCodeDiagnosticPromptResult {
@@ -575,6 +581,15 @@ export class ClaudeCodeAdapter
   ): Promise<ClaudeCodeDiagnosticPromptResult> {
     if (request.sessionStore && request.enableFileCheckpointing === true) {
       throw new Error('Claude Code sessionStore diagnostics cannot enable file checkpointing.');
+    }
+    // Diagnostic flag gate: resume-at requires explicit opt-in.
+    // This keeps arbitrary session resume behind a diagnostic boundary
+    // and prevents accidental stable usage.
+    if (request.resumeSessionId && request._diagnosticResumeAt !== true) {
+      throw new Error(
+        'Claude Code diagnostic resume-at requires _diagnosticResumeAt flag. ' +
+        'Resume-at is diagnostic-only and must not be used for ordinary chat resume.',
+      );
     }
     await this.ensureReadyForQuery();
     const sdk = await this.getSdk();

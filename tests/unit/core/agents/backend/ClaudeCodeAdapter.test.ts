@@ -818,6 +818,7 @@ describe('ClaudeCodeAdapter', () => {
     const result = await adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'existing-sdk-session-42',
+      _diagnosticResumeAt: true,
     });
 
     expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
@@ -846,6 +847,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'local-placeholder-session',
+      _diagnosticResumeAt: true,
     })).rejects.toThrow('Claude Code diagnostic resume validation failed');
 
     expect(sdk.getSessionInfo).toHaveBeenCalledWith('local-placeholder-session', { dir: '/vault' });
@@ -862,6 +864,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(unavailableAdapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'local-placeholder-session',
+      _diagnosticResumeAt: true,
     })).rejects.toThrow('Claude Code diagnostic resume validation failed');
 
     expect(unavailableSdk.query).not.toHaveBeenCalled();
@@ -883,6 +886,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'sdk-session-1',
+      _diagnosticResumeAt: true,
     })).rejects.toThrow('Claude Code diagnostic resume validation failed');
 
     expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-session-1', { dir: '/vault' });
@@ -905,6 +909,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'sdk-session-1',
+      _diagnosticResumeAt: true,
     })).rejects.toThrow('Claude Code diagnostic resume validation failed');
 
     expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-session-1', { dir: '/vault' });
@@ -937,6 +942,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'sdk-session-1',
+      _diagnosticResumeAt: true,
     })).rejects.toThrow('Claude Code diagnostic resume validation failed');
 
     expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
@@ -968,6 +974,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'sdk-session-1',
+      _diagnosticResumeAt: true,
     })).rejects.toThrow('Claude Code diagnostic resume validation failed');
 
     expect(sdk.query).toHaveBeenCalledWith(expect.objectContaining({
@@ -996,6 +1003,7 @@ describe('ClaudeCodeAdapter', () => {
     await adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'sdk-session-1',
+      _diagnosticResumeAt: true,
     });
 
     expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-session-1', { dir: '/vault' });
@@ -1027,6 +1035,7 @@ describe('ClaudeCodeAdapter', () => {
     await adapter.runDiagnosticPrompt({
       prompt: 'Continue from where we left off.',
       resumeSessionId: 'existing-sdk-session-42',
+      _diagnosticResumeAt: true,
     });
 
     expect(sdk.getSessionInfo).toHaveBeenCalledWith('existing-sdk-session-42', { dir: '/vault' });
@@ -2353,6 +2362,7 @@ describe('ClaudeCodeAdapter', () => {
       await adapter.runDiagnosticPrompt({
         prompt: 'Diagnostic query',
         resumeSessionId: 'diagnostic-sdk-session-2',
+        _diagnosticResumeAt: true,
       });
       expect(sdk.query.mock.calls[2][0].options.resume).toBe('diagnostic-sdk-session-2');
 
@@ -2442,6 +2452,7 @@ describe('ClaudeCodeAdapter', () => {
       await adapter.runDiagnosticPrompt({
         prompt: 'Diagnostic with resume',
         resumeSessionId: 'diag-resume-session',
+        _diagnosticResumeAt: true,
       });
       expect(sdk.query.mock.calls[0][0].options.resume).toBe('diag-resume-session');
 
@@ -2451,6 +2462,55 @@ describe('ClaudeCodeAdapter', () => {
       const sendMessageOptions = sdk.query.mock.calls[1][0].options;
       expect(sendMessageOptions.resume).toBeUndefined();
       expect(sendMessageOptions).not.toHaveProperty('resumeSessionId');
+    });
+
+    it('rejects diagnostic resume-at when the _diagnosticResumeAt flag is not set', async () => {
+      const sdk = createSdk([]);
+      sdk.getSessionInfo.mockResolvedValue({
+        sessionId: 'diag-session-no-flag',
+        summary: 'Diagnostic session',
+        lastModified: 1700000000000,
+      });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await expect(adapter.runDiagnosticPrompt({
+        prompt: 'Resume without flag',
+        resumeSessionId: 'diag-session-no-flag',
+        // _diagnosticResumeAt intentionally omitted
+      })).rejects.toThrow('Claude Code diagnostic resume-at requires _diagnosticResumeAt flag');
+
+      expect(sdk.query).not.toHaveBeenCalled();
+    });
+
+    it('accepts diagnostic resume-at when the _diagnosticResumeAt flag is explicitly true', async () => {
+      const sdk = createSdk([{
+        type: 'system',
+        subtype: 'init',
+        session_id: 'diag-session-with-flag',
+      }]);
+      sdk.getSessionInfo.mockResolvedValue({
+        sessionId: 'diag-session-with-flag',
+        summary: 'Diagnostic session',
+        lastModified: 1700000000000,
+      });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Resume with flag',
+        resumeSessionId: 'diag-session-with-flag',
+        _diagnosticResumeAt: true,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      expect(result.sessionId).toBe('diag-session-with-flag');
     });
   });
 });

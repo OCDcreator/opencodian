@@ -1287,6 +1287,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
       resumeSessionId: 'session-resume-source',
+      _diagnosticResumeAt: true,
       prompt: expect.any(String),
     }));
     expect(containerEl.textContent).toContain('session-resume-source');

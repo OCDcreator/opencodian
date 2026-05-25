@@ -113,7 +113,7 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 - Discovery 面板使用 `hasCapability()` 检查 adapter 声明的能力
 - 文件使用 `eslint-disable max-lines` 注释，因为十个诊断面板共享同一诊断边界
 - Fork Session 诊断探针是 provider-owned 的诊断界面，不是稳定的跨后端 fork UI。它只直接调用 Claude Code adapter 的 `forkSession()`，不触碰权威同步、diff、子会话图或通用 `getSession` 语义
-- Resume Session 诊断探针同样是 provider-owned 的诊断界面，不是稳定的 resume-at / resume product surface。它验证 `runDiagnosticPrompt({ resumeSessionId })` 能否把 SDK `options.resume` 打通到诊断 query，并要求返回的 `result.sessionId` 等于请求的 source session id；如果 SDK 返回不同 session id，探针会标记失败，避免把 fresh session 误报为 resume proof。这不等于普通聊天或正式恢复 UI 已完成。
+- Resume Session 诊断探针同样是 provider-owned 的诊断界面，不是稳定的 resume-at / resume product surface。它验证 `runDiagnosticPrompt({ resumeSessionId, _diagnosticResumeAt: true })` 能否把 SDK `options.resume` 打通到诊断 query，并要求返回的 `result.sessionId` 等于请求的 source session id；如果 SDK 返回不同 session id，探针会标记失败，避免把 fresh session 误报为 resume proof。`_diagnosticResumeAt` 是显式诊断标志，resume-at 必须在此标志为 `true` 时才被接受，防止误用于稳定聊天路径。这不等于普通聊天或正式恢复 UI 已完成。
 - Session Detail 诊断探针是 provider-owned 的诊断界面，不是稳定的跨后端 session-detail object contract。它调用 `adapter.getSession()` 并展示原始字段，仅用于验证 `getSession()` 在 Claude Code runtime 上可执行，不代表任何后端通用 session shape
 - Backend Routing 诊断探针是 provider-owned 的诊断界面，验证后端路由基础设施工作正常。它显示活跃后端、已注册适配器和会话后端分布，并通过 `listSessions()` + `getSession()` 验证 provider-owned 路由路径，同时通过 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 验证 registry 路由层（产品化的窄 seam）。不是稳定产品界面
 - Backend Routing 诊断探针读取已注册适配器时使用 `AgentServiceRegistry.listAll()` 公开接口，不再依赖 registry 私有 `adapters` map 的实现细节

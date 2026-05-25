@@ -1385,6 +1385,7 @@ export class SettingsCapabilityLabSection {
       const result = await adapter.runDiagnosticPrompt({
         prompt: 'Continue the conversation. Reply with exactly one short sentence.',
         resumeSessionId: sessionId,
+        _diagnosticResumeAt: true,
         persistSession: false,
       });
       if (result.sessionId !== sessionId) {
