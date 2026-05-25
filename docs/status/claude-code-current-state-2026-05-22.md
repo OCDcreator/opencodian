@@ -65,6 +65,31 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-25 Ordinary resume vs diagnostic resume-at separation
+
+This slice hardens the boundary between the stable ordinary resume path and the diagnostic-only resume-at path. Ordinary resume (validated session identity for continued chat) is promoted to stable. Resume-at (arbitrary session selection via `resumeSessionId`) remains gated behind `runDiagnosticPrompt()` only.
+
+### What Changed
+
+- Added focused adapter tests that explicitly separate ordinary resume from diagnostic resume-at:
+  - `diagnostic resume-at does not modify ordinary session sdkSessionId or state` — proves that `runDiagnosticPrompt({ resumeSessionId })` with a different session id does not pollute or rebind the ordinary chat session's captured `sdkSessionId`.
+  - `ordinary sendMessage starts a fresh query without resume for new local sessions` — proves that fresh local sessions do not accidentally carry a resume option.
+  - `ordinary sendMessage cannot resume-at an arbitrary session id` — proves that the `sendMessage` options contract does not expose `resumeSessionId`; only the session's own captured `sdkSessionId` drives resume.
+  - `diagnostic resume-at remains behind the runDiagnosticPrompt interface only` — proves that `runDiagnosticPrompt` is the sole interface accepting an arbitrary `resumeSessionId`, and `sendMessage` cannot be coerced into a resume-at operation.
+- The existing ordinary resume identity validation (commit `daf9dd6f`) remains unchanged; these tests document and enforce the separation contract.
+
+### What This Does Not Change
+
+- This does not add new resume-at capabilities to the stable chat path.
+- This does not promote `runDiagnosticPrompt` or Capability Lab resume probe to a stable user-facing surface.
+- This does not change the behavior of ordinary resume validation, checkpoint rewind, or session diff/revert boundaries.
+- This does not mark Claude Code full capability as complete.
+
+### Verification
+
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` passed with `1` suite / `85` tests.
+- Guard gates passed after test additions: `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+
 ## 2026-05-25 Ordinary chat resume identity validation
 
 This slice promotes one narrow resume boundary from diagnostic-only proof into the ordinary Claude chat send path: restored persisted Claude SDK session ids now need positive catalog identity validation before `sendMessage()` starts a resumed SDK query.

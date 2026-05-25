@@ -2295,4 +2295,162 @@ describe('ClaudeCodeAdapter', () => {
       dir: '/vault',
     });
   });
+
+  describe('ClaudeCodeAdapter resume identity separation', () => {
+    it('diagnostic resume-at does not modify ordinary session sdkSessionId or state', async () => {
+      const sdk = createSdk([{
+        type: 'system',
+        subtype: 'init',
+        session_id: 'ordinary-sdk-session-1',
+      }, {
+        type: 'assistant',
+        message: {
+          id: 'msg-1',
+          content: [{ type: 'text', text: 'Ordinary response' }],
+        },
+      }]);
+      sdk.getSessionInfo.mockImplementation(async (sessionId: string) => {
+        if (sessionId === 'ordinary-sdk-session-1') {
+          return {
+            sessionId: 'ordinary-sdk-session-1',
+            summary: 'Ordinary session',
+            lastModified: 1700000000000,
+          };
+        }
+        if (sessionId === 'diagnostic-sdk-session-2') {
+          return {
+            sessionId: 'diagnostic-sdk-session-2',
+            summary: 'Diagnostic session',
+            lastModified: 1700000000001,
+          };
+        }
+        return undefined;
+      });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const ordinarySessionId = await adapter.createSession('Ordinary chat');
+
+      // First ordinary send captures sdkSessionId from stream
+      await collectAsync(adapter.sendMessage({ sessionId: ordinarySessionId, content: 'hello' }));
+      expect(sdk.query.mock.calls[0][0].options.resume).toBeUndefined();
+
+      // Second ordinary send resumes with captured sdkSessionId
+      await collectAsync(adapter.sendMessage({ sessionId: ordinarySessionId, content: 'again' }));
+      expect(sdk.query.mock.calls[1][0].options.resume).toBe('ordinary-sdk-session-1');
+
+      // Override the next query call for the diagnostic prompt to return the diagnostic session id
+      sdk.query.mockReturnValueOnce(Object.assign((async function* () {
+        yield { type: 'system', subtype: 'init', session_id: 'diagnostic-sdk-session-2' };
+      })(), {
+        supportedModels: jest.fn().mockResolvedValue([]),
+        close: jest.fn(),
+      }));
+
+      // Diagnostic resume-at with a different session id
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Diagnostic query',
+        resumeSessionId: 'diagnostic-sdk-session-2',
+      });
+      expect(sdk.query.mock.calls[2][0].options.resume).toBe('diagnostic-sdk-session-2');
+
+      // Third ordinary send still uses the original captured sdkSessionId,
+      // proving diagnostic resume-at did not rebind or pollute ordinary session state
+      await collectAsync(adapter.sendMessage({ sessionId: ordinarySessionId, content: 'third' }));
+      expect(sdk.query.mock.calls[3][0].options.resume).toBe('ordinary-sdk-session-1');
+    });
+
+    it('ordinary sendMessage starts a fresh query without resume for new local sessions', async () => {
+      const sdk = createSdk([{
+        type: 'assistant',
+        message: {
+          id: 'msg-1',
+          content: [{ type: 'text', text: 'Fresh response' }],
+        },
+      }]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession('Fresh chat');
+
+      await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+
+      // Fresh local session must not have resume option — there is no sdkSessionId to resume
+      expect(sdk.query.mock.calls[0][0].options.resume).toBeUndefined();
+    });
+
+    it('ordinary sendMessage cannot resume-at an arbitrary session id', async () => {
+      const sdk = createSdk([{
+        type: 'system',
+        subtype: 'init',
+        session_id: 'captured-sdk-session',
+      }, {
+        type: 'assistant',
+        message: {
+          id: 'msg-1',
+          content: [{ type: 'text', text: 'Captured response' }],
+        },
+      }]);
+      sdk.getSessionInfo.mockResolvedValue({
+        sessionId: 'captured-sdk-session',
+        summary: 'Captured session',
+        lastModified: 1700000000000,
+      });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession('Captured chat');
+
+      // First send captures sdkSessionId from stream
+      await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+      expect(sdk.query.mock.calls[0][0].options.resume).toBeUndefined();
+
+      // Subsequent sends only resume the session's own captured sdkSessionId.
+      // There is no sendMessage option path that allows an arbitrary resume-at override.
+      await collectAsync(adapter.sendMessage({ sessionId, content: 'again' }));
+      const sendOptions = sdk.query.mock.calls[1][0].options;
+      expect(sendOptions.resume).toBe('captured-sdk-session');
+      // The sendMessage options contract does not expose resumeSessionId;
+      // only the session's captured sdkSessionId drives resume.
+      expect(sendOptions).not.toHaveProperty('resumeSessionId');
+    });
+
+    it('diagnostic resume-at remains behind the runDiagnosticPrompt interface only', async () => {
+      const sdk = createSdk([{
+        type: 'system',
+        subtype: 'init',
+        session_id: 'diag-resume-session',
+      }]);
+      sdk.getSessionInfo.mockResolvedValue({
+        sessionId: 'diag-resume-session',
+        summary: 'Diagnostic resume session',
+        lastModified: 1700000000000,
+      });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      // runDiagnosticPrompt is the only interface that accepts an arbitrary resumeSessionId
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Diagnostic with resume',
+        resumeSessionId: 'diag-resume-session',
+      });
+      expect(sdk.query.mock.calls[0][0].options.resume).toBe('diag-resume-session');
+
+      // sendMessage does not accept resumeSessionId; it only uses the session's captured sdkSessionId
+      const sessionId = await adapter.createSession();
+      await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+      const sendMessageOptions = sdk.query.mock.calls[1][0].options;
+      expect(sendMessageOptions.resume).toBeUndefined();
+      expect(sendMessageOptions).not.toHaveProperty('resumeSessionId');
+    });
+  });
 });

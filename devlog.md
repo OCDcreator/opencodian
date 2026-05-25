@@ -12,6 +12,29 @@
 
 ---
 
+## 2026-05-25 Phase 3 - Ordinary resume vs diagnostic resume-at separation
+
+### 目标
+
+在已验证的普通 chat resume 身份边界（commit `daf9dd6f`）基础上，进一步硬化普通 resume 与诊断级 resume-at 之间的隔离：普通 resume 提升到稳定路径，resume-at 继续保持在 `runDiagnosticPrompt()` 诊断接口之后，不得进入普通聊天发送路径。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 聚焦测试 | 新增 4 个 resume 身份隔离测试：诊断 resume-at 不修改普通 session 的 `sdkSessionId`、新本地 session 不携带 resume、普通 `sendMessage` 不接受任意 resume-at id、`runDiagnosticPrompt` 是唯一暴露 `resumeSessionId` 的接口 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 新增 "Ordinary resume vs diagnostic resume-at separation" 状态切片，记录测试覆盖的隔离契约 |
+| `devlog.md` | 日志更新 | 记录本轮 resume 身份分离工作 |
+
+### 验证
+
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 通过，`1` suite / `85` tests passed
+- 门禁：`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check`、`npm run lint` 均通过
+
+### 影响评估
+
+本轮只做测试和文档层面的 resume 身份隔离显式化，不新增代码行为、不提升诊断路径为稳定产品面、不改变 OpenCode 默认路径或 Claude Code full capability 完成度声称。
+
 ## 2026-05-25 Phase 3 - Ordinary Claude chat resume identity validation
 
 ### 目标
