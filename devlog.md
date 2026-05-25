@@ -23,20 +23,20 @@
 | 文件 | 变更类型 | 详情 |
 |---|---|---|
 | `.obsidian-debug/cap-3-runtime-proof-20260526-result.json` | 运行时证明 | 12 条验证检查全部通过：6 个二级标签（无 limits）、limits boundary 存在、maxTurns/maxBudget 在 model-thinking 中、restart button 存在、无孤立 limits section、所有标签内容正确渲染 |
-| `.obsidian-debug/cap-3-claude-code-model-thinking-20260526.png` | 截图 | Claude Code Model & Thinking 标签页截图（含模型、Thinking、Effort、重启、最大轮数、最大预算） |
-| `.obsidian-debug/cap-3-console-20260526.txt` | 控制台 | 原始 `dev:console level=log` 输出（50 行），覆盖插件 reload 到全 6 标签遍历完整周期，所有 SDK spawn exit code=0 |
-| `.obsidian-debug/cap-3-errors-20260526.txt` | 错误 | "No errors captured." |
+| `.obsidian-debug/cap-3-claude-code-model-thinking-20260526.png` | 截图 | `obsidian dev:screenshot` 截取 Claude Code Model & Thinking 标签页（含模型、备用模型、Thinking、Effort、重启会话、最大轮数、最大预算 USD） |
+| `.obsidian-debug/cap-3-console-20260526.txt` | 控制台 | `obsidian dev:console level=log` 原始输出（50 行），时间戳 03:16:22–03:16:31，覆盖 plugin reload 后的 6 标签遍历，所有 SDK spawn exit code=0 |
+| `.obsidian-debug/cap-3-errors-20260526.txt` | 错误 | `obsidian dev:errors vault=testvault` 原始输出：`No errors captured.` |
 | `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 更新 cap-3 运行时证明记录（新 BUILD_ID + 完整 build/deploy 证据） |
 
 ### 验证结果
 
-- Build: `rm -rf dist && npm run build` exit code 0（无管道，直接捕获退出码） ✓
-- BUILD_ID: `task-cap-3.202605260030` ✓
+- Build: `rm -rf dist && npm run build 2>&1; echo "EXIT_CODE=$?"` → `EXIT_CODE=0`（无管道） ✓
+- BUILD_ID: `task-cap-3.202605260314` ✓
 - Deployed to Test Vault and BUILD_ID verified in deployed main.js ✓
 - Secondary tabs: `runtime, model-thinking, permissions, context-sources, tools, sdk-foundations` (6 tabs, no limits) ✓
 - Limits boundary notice (`data-claude-code-limits-boundary="true"`) present in model-thinking tab ✓
 - Max Turns + Max Budget USD controls present in model-thinking tab ✓
-- Restart button present ✓
+- Restart button present (`重启会话`) ✓
 - No orphaned `[data-claude-code-section="limits"]` element ✓
 - All 6 tabs render with expected settings content ✓
 - No console errors after reload and full 6-tab traversal ✓

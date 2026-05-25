@@ -67,13 +67,14 @@ This is a status snapshot, not the long-term design or full implementation plan.
 
 ## 2026-05-26 Cap-3: Test Vault runtime proof for Claude settings IA
 
-Runtime proof against Test Vault build `task-cap-3.202605260030` (clean build from scratch, exit code 0 verified without pipes) confirms the cap-2 settings information architecture changes are live and correct.
+Runtime proof against Test Vault build `task-cap-3.202605260314` (clean build from scratch, exit code 0 verified without pipes) confirms the cap-2 settings information architecture changes are live and correct.
 
 ### Build & Deploy
 
-- `rm -rf dist && npm run build 2>&1; echo "EXIT_CODE=$?"` returned `EXIT_CODE=0` with BUILD_ID `task-cap-3.202605260030`.
+- `rm -rf dist && npm run build 2>&1; echo "EXIT_CODE=$?"` returned `EXIT_CODE=0` with BUILD_ID `task-cap-3.202605260314`.
 - Deployed `dist/main.js`, `dist/manifest.json`, `dist/styles.css`, `dist/assets/`, and `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/` to Test Vault.
-- Verified deployed `main.js` contains BUILD_ID `task-cap-3.202605260030`.
+- Verified deployed `main.js` contains BUILD_ID `task-cap-3.202605260314`.
+- Plugin reloaded via `obsidian plugin:reload id=opencodian`.
 
 ### Runtime Proof
 
@@ -81,9 +82,14 @@ Runtime proof against Test Vault build `task-cap-3.202605260030` (clean build fr
 - Confirmed: 6 Claude Code secondary tabs (no `limits` tab), `limitsBoundaryExists: true`, `hasMaxTurns: true`, `hasMaxBudget: true`, `hasRestartButton: true`, `limitsSectionExists: false`.
 - Model & Thinking tab contains: 模型, 备用模型, Thinking, Effort, limits boundary notice, 最大轮数, 最大预算 USD — in correct order.
 - All 6 secondary tabs render correctly with expected setting labels (runtime, model-thinking, permissions, context-sources, tools, sdk-foundations).
+- DOM traversal performed via `obsidian eval code=...` clicking each secondary tab and reading setting names.
 - No console errors captured after plugin reload and full 6-tab traversal.
-- `obsidian dev:errors` reported `No errors captured.` after reload.
-- Runtime artifacts (in repo-scoped `.obsidian-debug/`): `cap-3-runtime-proof-20260526-result.json`, `cap-3-claude-code-model-thinking-20260526.png`, `cap-3-console-20260526.txt`, `cap-3-errors-20260526.txt`.
+- `obsidian dev:errors vault=testvault` returned raw output `No errors captured.` (not prose).
+- Runtime artifacts (in repo-scoped `.obsidian-debug/`):
+  - `cap-3-runtime-proof-20260526-result.json` — structured DOM assertion result
+  - `cap-3-claude-code-model-thinking-20260526.png` — `obsidian dev:screenshot` of model-thinking tab
+  - `cap-3-console-20260526.txt` — raw `obsidian dev:console level=log` output (50 lines, timestamps 03:16:22–03:16:31)
+  - `cap-3-errors-20260526.txt` — raw `obsidian dev:errors vault=testvault` output
 
 ---
 
