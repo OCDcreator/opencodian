@@ -67,7 +67,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 
 ## 2026-05-26 Cap-3: Test Vault runtime proof for Claude settings IA
 
-Runtime proof against Test Vault build `task-cap-3.202605260314` (clean build from scratch, exit code 0 verified without pipes) confirms the cap-2 settings information architecture changes are live and correct.
+Runtime proof against Test Vault build `task-cap-3.202605260314` (clean build from scratch, exit code 0 verified without pipes) proves the Claude-facing settings paths run correctly in a real Obsidian vault: all 6 secondary tabs render, no errors, and the cap-2 information architecture changes (limits merged into model-thinking) are live.
 
 ### Build & Deploy
 
