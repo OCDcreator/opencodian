@@ -23,11 +23,17 @@
 | 文件 | 变更类型 | 详情 |
 |---|---|---|
 | `.obsidian-debug/cap-4-runtime-proof-20260526-result.json` | 运行时证明 | 全量回归 439 suites/3288 tests + 布局检查（946px 和 430px）零溢出 |
-| `.obsidian-debug/cap-4-model-thinking-top-20260526.png` | 截图（顶部） | `obsidian dev:screenshot` Model & Thinking 标签页顶部 |
-| `.obsidian-debug/cap-4-model-thinking-scroll-20260526.png` | 截图（滚动） | `obsidian dev:screenshot` 滚动至 limits boundary + 最大轮数/最大预算 |
-| `.obsidian-debug/cap-4-console-20260526.txt` | 控制台 | `obsidian dev:console level=log` 原始输出（50 行），时间戳 04:56:39–04:56:52 |
+| `.obsidian-debug/cap-4-runtime-tab-20260526.png` | 截图 | `obsidian dev:screenshot` 运行时标签页（全宽） |
+| `.obsidian-debug/cap-4-model-thinking-top-20260526.png` | 截图 | `obsidian dev:screenshot` Model & Thinking 标签页顶部（全宽） |
+| `.obsidian-debug/cap-4-model-thinking-scroll-20260526.png` | 截图 | `obsidian dev:screenshot` 滚动至 limits boundary + 最大轮数/最大预算（全宽） |
+| `.obsidian-debug/cap-4-permissions-tab-20260526.png` | 截图 | `obsidian dev:screenshot` 权限标签页（全宽） |
+| `.obsidian-debug/cap-4-context-sources-tab-20260526.png` | 截图 | `obsidian dev:screenshot` 上下文与来源标签页（全宽） |
+| `.obsidian-debug/cap-4-tools-tab-20260526.png` | 截图 | `obsidian dev:screenshot` 工具标签页（全宽） |
+| `.obsidian-debug/cap-4-sdk-foundations-tab-20260526.png` | 截图 | `obsidian dev:screenshot` SDK Foundations 标签页（全宽） |
+| `.obsidian-debug/cap-4-narrow-430px-model-thinking-20260526.png` | 截图 | `obsidian dev:screenshot` Model & Thinking 窄屏 430px |
+| `.obsidian-debug/cap-4-console-20260526.txt` | 控制台 | `obsidian dev:console level=log` 原始输出，时间戳 05:05:04–05:06:52 |
 | `.obsidian-debug/cap-4-errors-20260526.txt` | 错误 | `obsidian dev:errors vault=testvault` 原始输出：`No errors captured.` |
-| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 新增 cap-4 最终审查记录 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 新增 cap-4 最终审查记录（含全部 6 标签截图 + 窄屏截图） |
 
 ### 布局检查结果
 

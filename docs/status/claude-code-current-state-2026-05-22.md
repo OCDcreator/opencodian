@@ -84,10 +84,18 @@ Final visual and regression review against Test Vault build `task-cap-4.20260526
 ### Runtime Artifacts
 
 - `.obsidian-debug/cap-4-runtime-proof-20260526-result.json` — structured result with layout metrics and regression results
-- `.obsidian-debug/cap-4-model-thinking-top-20260526.png` — model-thinking tab top
-- `.obsidian-debug/cap-4-model-thinking-scroll-20260526.png` — model-thinking tab scrolled (limits boundary + max turns/budget)
-- `.obsidian-debug/cap-4-console-20260526.txt` — raw `obsidian dev:console level=log` (50 lines, timestamps 04:56:39–04:56:52)
+- `.obsidian-debug/cap-4-runtime-tab-20260526.png` — runtime tab (full width)
+- `.obsidian-debug/cap-4-model-thinking-top-20260526.png` — model-thinking tab top (full width)
+- `.obsidian-debug/cap-4-model-thinking-scroll-20260526.png` — model-thinking tab scrolled to limits boundary (full width)
+- `.obsidian-debug/cap-4-permissions-tab-20260526.png` — permissions tab (full width)
+- `.obsidian-debug/cap-4-context-sources-tab-20260526.png` — context-sources tab (full width)
+- `.obsidian-debug/cap-4-tools-tab-20260526.png` — tools tab (full width)
+- `.obsidian-debug/cap-4-sdk-foundations-tab-20260526.png` — sdk-foundations tab (full width)
+- `.obsidian-debug/cap-4-narrow-430px-model-thinking-20260526.png` — model-thinking at narrow mobile width (430px)
+- `.obsidian-debug/cap-4-console-20260526.txt` — raw `obsidian dev:console level=log`
 - `.obsidian-debug/cap-4-errors-20260526.txt` — raw `obsidian dev:errors vault=testvault`: `No errors captured.`
+
+All 6 secondary tabs have screenshot evidence; 8 screenshots total (6 full-width tabs + 1 scrolled model-thinking + 1 narrow 430px).
 
 ### Conclusion
 
