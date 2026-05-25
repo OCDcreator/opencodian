@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605250010`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605251609`
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -76,7 +76,11 @@ This slice hardens the boundary between the stable ordinary resume path and the 
   - `ordinary sendMessage starts a fresh query without resume for new local sessions` — proves that fresh local sessions do not accidentally carry a resume option.
   - `ordinary sendMessage cannot resume-at an arbitrary session id` — proves that the `sendMessage` options contract does not expose `resumeSessionId`; only the session's own captured `sdkSessionId` drives resume.
   - `diagnostic resume-at remains behind the runDiagnosticPrompt interface only` — proves that `runDiagnosticPrompt` is the sole interface accepting an arbitrary `resumeSessionId`, and `sendMessage` cannot be coerced into a resume-at operation.
-- The existing ordinary resume identity validation (commit `daf9dd6f`) remains unchanged; these tests document and enforce the separation contract.
+- Added `_diagnosticResumeAt: true` as an explicit runtime gate on `ClaudeCodeDiagnosticPromptRequest`. `runDiagnosticPrompt()` now rejects any `resumeSessionId` request unless this diagnostic flag is explicitly set, before any SDK query is created.
+- Updated the Capability Lab Resume Session diagnostic probe to call `runDiagnosticPrompt({ resumeSessionId, _diagnosticResumeAt: true })`, keeping the UI diagnostic path explicit.
+- Added focused adapter coverage for both sides of the gate: missing `_diagnosticResumeAt` rejects without calling `sdk.query()`, while `_diagnosticResumeAt: true` accepts the diagnostic resume-at path.
+- Updated `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` and `docs/modules/features/settings/SettingsCapabilityLabSection.md` to record that resume-at remains diagnostic-only and flag-gated.
+- The existing ordinary resume identity validation (commit `daf9dd6f`) remains unchanged; the new gate hardens the separation contract and prevents accidental stable use of arbitrary resume-at ids.
 
 ### What This Does Not Change
 
@@ -87,8 +91,12 @@ This slice hardens the boundary between the stable ordinary resume path and the 
 
 ### Verification
 
-- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` passed with `1` suite / `85` tests.
-- Guard gates passed after test additions: `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, `git diff --check`, and `npm run lint`.
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` passed with `2` suites / `166` tests.
+- Guard gates passed after the behavior gate and docs updates: `npm run check:graphify`, `npm run check:module-docs`, `npm run check:devlog-order`, and `git diff --check`.
+- Build/deploy proof: `npm run build` produced `BUILD_ID=feature-phase0-capability.202605251609`; `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` were deployed to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`, and deployed `main.js` contains the same `BUILD_ID`.
+- Runtime proof: `.obsidian-debug/positive-resume-authenticated-diagnostic-assertion-2026-05-25-result.json` returned `ok: true` against the deployed Test Vault plugin. The diagnostic resume-at path only succeeded when passing `_diagnosticResumeAt: true`, preserved `sessionId=ed88a5ab-e8b2-42be-940b-5a0640ec329b`, recalled nonce `positive-resume-1779696749347-xkyeg4ss`, and used no OpenCode session API path.
+- Negative runtime proof: `.obsidian-debug/diagnostic-resume-boundary-runtime-assertion-2026-05-25-result.json` returned `ok: true`, proving `resumeSessionId` without `_diagnosticResumeAt` rejects before `getSessionInfo()` or `sdk.query()`.
+- Final Test Vault `dev:errors` returned `No errors captured.`
 
 ## 2026-05-25 Ordinary chat resume identity validation
 

@@ -12,6 +12,32 @@
 
 ---
 
+## 2026-05-25 Phase 3 - Diagnostic resume-at flag gate and ordinary resume separation
+
+### 目标
+
+把普通 resume 与诊断 resume-at 的边界再收紧一层：普通 resume 已稳定，但任何 `resumeSessionId` 的诊断调用都必须显式带 `_diagnosticResumeAt: true`，避免误入稳定聊天路径。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 诊断旗标门禁 | `ClaudeCodeDiagnosticPromptRequest` 新增 `_diagnosticResumeAt?: boolean`；`runDiagnosticPrompt()` 在处理 `resumeSessionId` 前强制要求该 flag 为 `true`，否则提前抛错，避免 resume-at 在普通路径里被意外使用 |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 诊断面板更新 | Capability Lab 的 Resume Session 探针显式传入 `_diagnosticResumeAt: true`，继续把 resume-at 维持在诊断面而非普通 chat UI |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` / `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | TDD 回归测试 | 新增缺失 flag 拒绝与显式 flag 通过的单元测试，并补齐所有调用点的 flag 传递 |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` / `docs/modules/features/settings/SettingsCapabilityLabSection.md` / `docs/status/claude-code-current-state-2026-05-22.md` | 文档更新 | 记录 resume-at 仍是诊断路径，且必须有显式 gate；状态文档不再把这轮写成单纯 tests/docs 工作，而是明确了 runtime 行为门禁 |
+
+### 验证
+
+- Focused green: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 通过，`2` suites / `166` tests passed
+- 门禁：`npm run check:graphify`、`npm run check:module-docs`、`npm run check:devlog-order`、`git diff --check` 均通过
+- 构建部署：`npm run build` 生成 `BUILD_ID=feature-phase0-capability.202605251609`；已顺序部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault，并确认 deployed `main.js` 包含同一 build id
+- Runtime proof：`.obsidian-debug/positive-resume-authenticated-diagnostic-assertion-2026-05-25-result.json` 返回 `ok: true`，显式 `_diagnosticResumeAt: true` 的诊断 resume-at 保持 `sessionId=ed88a5ab-e8b2-42be-940b-5a0640ec329b` 不变并召回 nonce `positive-resume-1779696749347-xkyeg4ss`；`.obsidian-debug/diagnostic-resume-boundary-runtime-assertion-2026-05-25-result.json` 返回 `ok: true`，证明未带 `_diagnosticResumeAt` 的 `resumeSessionId` 在 `getSessionInfo()` / `sdk.query()` 前被拒绝；最终 `obsidian dev:errors vault=testvault` 为 `No errors captured.`
+
+### 影响评估
+
+本轮真正改变了 runtime contract，而不是只做注释或测试说明：`resumeSessionId` 现在在诊断接口上也要显式打标，防止从诊断路径滑回普通聊天路径。普通 resume 与诊断 resume-at 的分离更清楚了，但仍不把 resume-at 或任何更大的 Claude capability surface 宣称成 stable/full capability。
+
 ## 2026-05-25 Phase 3 - Ordinary resume vs diagnostic resume-at separation
 
 ### 目标
