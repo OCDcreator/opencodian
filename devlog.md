@@ -12,6 +12,34 @@
 
 ---
 
+## 2026-05-26 Phase 8 - Cap-3: Test Vault runtime proof for Claude settings IA
+
+### 目标
+
+构建、部署并验证 cap-2 设置信息架构变更在真实 Obsidian Test Vault 中运行正常，捕获控制台错误、DOM 结构证据和截图。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `.obsidian-debug/cap-2-settings-ia-runtime-proof-20260526-result.json` | 运行时证明 | 10 条断言全部通过：6 个二级标签（无 limits）、limits boundary 存在、maxTurns/maxBudget 在 model-thinking 中、restart button 存在、无孤立 limits section |
+| `.obsidian-debug/cap-2-model-thinking-tab-20260526.png` | 截图 | model-thinking 标签页截图 |
+| `.obsidian-debug/cap-2-console-20260526.txt` | 控制台 | reload 后无错误 |
+| `.obsidian-debug/cap-2-errors-20260526.txt` | 错误 | "No errors captured." |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 添加 cap-3 运行时证明记录 |
+
+### 验证结果
+
+- BUILD_ID: `task-cap-3.202605260016` ✓
+- Secondary tabs: `runtime, model-thinking, permissions, context-sources, tools, sdk-foundations` (6 tabs, no limits) ✓
+- Limits boundary notice (`data-claude-code-limits-boundary="true"`) present in model-thinking tab ✓
+- Max Turns + Max Budget USD controls present in model-thinking tab ✓
+- Restart button present ✓
+- No orphaned `[data-claude-code-section="limits"]` element ✓
+- No console errors after reload ✓
+
+---
+
 ## 2026-05-25 Phase 7 - Cap-2: Settings information architecture refinement
 
 ### 目标

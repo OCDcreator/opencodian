@@ -65,6 +65,20 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-26 Cap-3: Test Vault runtime proof for Claude settings IA
+
+Runtime proof against Test Vault build `task-cap-3.202605260016` confirms the cap-2 settings information architecture changes are live and correct.
+
+### Runtime Proof
+
+- `.obsidian-debug/cap-2-settings-ia-runtime-proof-20260526-result.json` returned `ok: true` with `10` assertions.
+- Confirmed: 6 Claude Code secondary tabs (no `limits` tab), `limitsBoundaryExists: true`, `hasMaxTurns: true`, `hasMaxBudget: true`, `hasRestartButton: true`, `limitsSectionExists: false`.
+- Model & Thinking tab contains: 模型, 备用模型, Thinking, Effort, limits boundary notice, 最大轮数, 最大预算 USD — in correct order.
+- No console errors captured after plugin reload.
+- Runtime artifacts: `cap-2-model-thinking-tab-20260526.png`, `cap-2-console-20260526.txt`, `cap-2-errors-20260526.txt`.
+
+---
+
 ## 2026-05-25 Cap-1: Honest capability wiring and settings exposure
 
 This slice makes Claude Code capability wiring honest at three levels: type interface maturity labels, user-visible settings descriptions, and capability matrix completeness.
