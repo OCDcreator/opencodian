@@ -89,7 +89,12 @@ export interface ClaudeCodeDiagnosticPromptRequest {
   enableFileCheckpointing?: boolean;
   includeHookEvents?: boolean;
   persistSession?: boolean;
-  /** Provider-owned diagnostic resume: when set, the diagnostic prompt resumes from this SDK session id. Diagnostic-only, not stable resume-at productization. */
+  /**
+   * Diagnostic resume-at only: resumes the diagnostic prompt from this SDK session id.
+   * This is intentionally gated behind runDiagnosticPrompt() and must never be used
+   * for ordinary chat resume. The diagnostic result is validated but not stored in
+   * ordinary session state, preventing resume-at from rebinding stable chat sessions.
+   */
   resumeSessionId?: string;
 }
 
@@ -597,8 +602,24 @@ export class ClaudeCodeAdapter
       query.close?.();
     }
 
+    const validatedSessionId = this.validateDiagnosticResumeResult(request.resumeSessionId, sessionId);
+
+    // Explicit isolation: diagnostic resume-at must never modify ordinary session state.
+    // The diagnostic result is returned to the caller but is not stored in this.sessions
+    // and cannot rebind any ordinary chat session's sdkSessionId.
+    if (validatedSessionId) {
+      for (const session of this.sessions.values()) {
+        if (session.sdkSessionId === validatedSessionId) {
+          runtimeLogger.debug('diagnostic resume-at collision with ordinary session', {
+            diagnosticSessionId: validatedSessionId,
+            ordinarySessionId: session.id,
+          });
+        }
+      }
+    }
+
     return {
-      sessionId: this.validateDiagnosticResumeResult(request.resumeSessionId, sessionId),
+      sessionId: validatedSessionId,
       rawMessages,
       chunks,
     };
@@ -803,6 +824,8 @@ export class ClaudeCodeAdapter
       skills: this.options.skills,
       agent: this.options.agent,
       agents: this.options.agents,
+      // Ordinary resume path: only the session's own captured sdkSessionId is used.
+      // Arbitrary resume-at ids are rejected; use runDiagnosticPrompt() for diagnostic resume.
       resumeSessionId: session?.sdkSessionId,
     });
   }
@@ -832,6 +855,8 @@ export class ClaudeCodeAdapter
       enableFileCheckpointing: request.sessionStore ? false : request.enableFileCheckpointing,
       includeHookEvents: request.includeHookEvents,
       persistSession: request.persistSession,
+      // Diagnostic resume-at path: accepts arbitrary session id for diagnostic probes only.
+      // Intentionally separate from ordinary session resume in buildSdkOptions above.
       resumeSessionId: request.resumeSessionId,
     });
   }
