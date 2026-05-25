@@ -83,7 +83,7 @@ Runtime proof against Test Vault build `task-cap-3.202605260030` (clean build fr
 - All 6 secondary tabs render correctly with expected setting labels (runtime, model-thinking, permissions, context-sources, tools, sdk-foundations).
 - No console errors captured after plugin reload and full 6-tab traversal.
 - `obsidian dev:errors` reported `No errors captured.` after reload.
-- Runtime artifacts (in repo-scoped `.obsidian-debug/`): `cap-3-runtime-proof-20260526-result.json`, `cap-3-claude-code-settings-20260526.png`, `cap-3-errors-20260526.txt`.
+- Runtime artifacts (in repo-scoped `.obsidian-debug/`): `cap-3-runtime-proof-20260526-result.json`, `cap-3-claude-code-model-thinking-20260526.png`, `cap-3-console-20260526.txt`, `cap-3-errors-20260526.txt`.
 
 ---
 

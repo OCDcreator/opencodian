@@ -23,7 +23,8 @@
 | 文件 | 变更类型 | 详情 |
 |---|---|---|
 | `.obsidian-debug/cap-3-runtime-proof-20260526-result.json` | 运行时证明 | 12 条验证检查全部通过：6 个二级标签（无 limits）、limits boundary 存在、maxTurns/maxBudget 在 model-thinking 中、restart button 存在、无孤立 limits section、所有标签内容正确渲染 |
-| `.obsidian-debug/cap-3-claude-code-settings-20260526.png` | 截图 | Claude Code 设置页完整截图 |
+| `.obsidian-debug/cap-3-claude-code-model-thinking-20260526.png` | 截图 | Claude Code Model & Thinking 标签页截图（含模型、Thinking、Effort、重启、最大轮数、最大预算） |
+| `.obsidian-debug/cap-3-console-20260526.txt` | 控制台 | 插件 reload 和全标签遍历后控制台输出：无错误，SDK spawn exit code 0 |
 | `.obsidian-debug/cap-3-errors-20260526.txt` | 错误 | "No errors captured." |
 | `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 更新 cap-3 运行时证明记录（新 BUILD_ID + 完整 build/deploy 证据） |
 
