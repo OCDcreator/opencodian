@@ -67,7 +67,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 
 ## 2026-05-26 Cap-3: Test Vault runtime proof for Claude settings IA
 
-Runtime proof against Test Vault build `task-cap-3.202605260016` confirms the cap-2 settings information architecture changes are live and correct.
+Runtime proof against Test Vault build `task-cap-3.202605260025` (clean build with all SDK platform artifacts) confirms the cap-2 settings information architecture changes are live and correct.
 
 ### Runtime Proof
 
@@ -75,7 +75,7 @@ Runtime proof against Test Vault build `task-cap-3.202605260016` confirms the ca
 - Confirmed: 6 Claude Code secondary tabs (no `limits` tab), `limitsBoundaryExists: true`, `hasMaxTurns: true`, `hasMaxBudget: true`, `hasRestartButton: true`, `limitsSectionExists: false`.
 - Model & Thinking tab contains: 模型, 备用模型, Thinking, Effort, limits boundary notice, 最大轮数, 最大预算 USD — in correct order.
 - No console errors captured after plugin reload.
-- Runtime artifacts: `cap-2-model-thinking-tab-20260526.png`, `cap-2-console-20260526.txt`, `cap-2-errors-20260526.txt`.
+- Runtime artifacts (in repo-scoped `.obsidian-debug/`): `cap-2-model-thinking-tab-20260526.png`, `cap-2-console-20260526.txt`, `cap-2-errors-20260526.txt`.
 
 ---
 

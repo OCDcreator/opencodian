@@ -30,7 +30,7 @@
 
 ### 验证结果
 
-- BUILD_ID: `task-cap-3.202605260016` ✓
+- BUILD_ID: `task-cap-3.202605260025` (clean build with SDK platform artifacts) ✓
 - Secondary tabs: `runtime, model-thinking, permissions, context-sources, tools, sdk-foundations` (6 tabs, no limits) ✓
 - Limits boundary notice (`data-claude-code-limits-boundary="true"`) present in model-thinking tab ✓
 - Max Turns + Max Budget USD controls present in model-thinking tab ✓
