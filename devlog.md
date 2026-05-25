@@ -12,6 +12,41 @@
 
 ---
 
+## 2026-05-26 Phase 9 - Cap-4: Final visual/layout review and lane completion
+
+### 目标
+
+对 Claude Code 设置表面做最终视觉/布局审查，在全宽和窄屏下检测溢出和布局缺口，运行完整回归套件，确认产品表面、文档和运行时证明三者一致后关闭整条 Claude 能力车道。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `.obsidian-debug/cap-4-runtime-proof-20260526-result.json` | 运行时证明 | 全量回归 439 suites/3288 tests + 布局检查（946px 和 430px）零溢出 |
+| `.obsidian-debug/cap-4-model-thinking-top-20260526.png` | 截图（顶部） | `obsidian dev:screenshot` Model & Thinking 标签页顶部 |
+| `.obsidian-debug/cap-4-model-thinking-scroll-20260526.png` | 截图（滚动） | `obsidian dev:screenshot` 滚动至 limits boundary + 最大轮数/最大预算 |
+| `.obsidian-debug/cap-4-console-20260526.txt` | 控制台 | `obsidian dev:console level=log` 原始输出（50 行），时间戳 04:56:39–04:56:52 |
+| `.obsidian-debug/cap-4-errors-20260526.txt` | 错误 | `obsidian dev:errors vault=testvault` 原始输出：`No errors captured.` |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 新增 cap-4 最终审查记录 |
+
+### 布局检查结果
+
+- 全宽（946px）：6 个二级标签全部零溢出 ✓
+- 窄屏（430px）：6 个二级标签全部零溢出 ✓
+- Inline notice 元素无溢出 ✓
+- Limits boundary 仅在 model-thinking 标签中 ✓
+
+### 回归结果
+
+- `npm run verify`：owner-guard PASS、module-docs OK (448/448)、graphify OK、devlog-order OK (187 sections)、lint clean、typecheck clean、439 suites / 3288 tests passed、build clean
+- BUILD_ID: `task-cap-4.202605260456`
+
+### 结论
+
+无需额外样式/布局修复。产品表面、文档和运行时证明三者一致，Claude 能力车道（phase0-capability）可关闭。
+
+---
+
 ## 2026-05-26 Phase 8 - Cap-3: Test Vault runtime proof for Claude settings IA
 
 ### 目标

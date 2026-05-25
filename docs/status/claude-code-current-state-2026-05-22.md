@@ -65,6 +65,36 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-26 Cap-4: Final visual/layout review and lane completion
+
+Final visual and regression review against Test Vault build `task-cap-4.202605260456` confirms the Claude capability lane is complete with no outstanding layout gaps.
+
+### Layout Check
+
+- All 6 Claude Code secondary tabs inspected at full width (946px) and narrow mobile width (430px).
+- Zero overflow on setting-item names, descriptions, and inline notices at both widths.
+- Limits boundary notice appears only in the model-thinking tab.
+- No orphaned limits section.
+
+### Regression
+
+- `npm run verify`: owner-guard PASS, module-docs OK (448/448), graphify OK, devlog-order OK (187 sections), lint clean, typecheck clean, 439 suites / 3288 tests passed, build clean.
+- BUILD_ID: `task-cap-4.202605260456`.
+
+### Runtime Artifacts
+
+- `.obsidian-debug/cap-4-runtime-proof-20260526-result.json` — structured result with layout metrics and regression results
+- `.obsidian-debug/cap-4-model-thinking-top-20260526.png` — model-thinking tab top
+- `.obsidian-debug/cap-4-model-thinking-scroll-20260526.png` — model-thinking tab scrolled (limits boundary + max turns/budget)
+- `.obsidian-debug/cap-4-console-20260526.txt` — raw `obsidian dev:console level=log` (50 lines, timestamps 04:56:39–04:56:52)
+- `.obsidian-debug/cap-4-errors-20260526.txt` — raw `obsidian dev:errors vault=testvault`: `No errors captured.`
+
+### Conclusion
+
+No visual or layout gaps. The product surface, documentation, and runtime proof are consistent. The Claude capability lane (phase0-capability) is complete.
+
+---
+
 ## 2026-05-26 Cap-3: Test Vault runtime proof for Claude settings IA
 
 Runtime proof against Test Vault build `task-cap-3.202605260314` (clean build from scratch, exit code 0 verified without pipes) proves the Claude-facing settings paths run correctly in a real Obsidian vault: all 6 secondary tabs render, no errors, and the cap-2 information architecture changes (limits merged into model-thinking) are live.
