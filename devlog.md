@@ -22,11 +22,12 @@
 
 | 文件 | 变更类型 | 详情 |
 |---|---|---|
-| `.obsidian-debug/cap-3-runtime-proof-20260526-result.json` | 运行时证明 | 12 条验证检查全部通过：6 个二级标签（无 limits）、limits boundary 存在、maxTurns/maxBudget 在 model-thinking 中、restart button 存在、无孤立 limits section、所有标签内容正确渲染 |
-| `.obsidian-debug/cap-3-claude-code-model-thinking-20260526.png` | 截图 | `obsidian dev:screenshot` 截取 Claude Code Model & Thinking 标签页（含模型、备用模型、Thinking、Effort、重启会话、最大轮数、最大预算 USD） |
-| `.obsidian-debug/cap-3-console-20260526.txt` | 控制台 | `obsidian dev:console level=log` 原始输出（50 行），时间戳 03:16:22–03:16:31，覆盖 plugin reload 后的 6 标签遍历，所有 SDK spawn exit code=0 |
+| `.obsidian-debug/cap-3-runtime-proof-20260526-result.json` | 运行时证明 | 12 条验证检查全部通过：6 个二级标签（无 limits）、limits boundary 仅在 model-thinking 中、maxTurns/maxBudget 在 model-thinking 中、restart button 存在、无孤立 limits section、所有标签内容正确渲染 |
+| `.obsidian-debug/cap-3-claude-code-model-thinking-20260526.png` | 截图（顶部） | `obsidian dev:screenshot` 截取 Claude Code Model & Thinking 标签页顶部（模型、备用模型、Thinking、Effort） |
+| `.obsidian-debug/cap-3-model-thinking-scroll-20260526.png` | 截图（滚动） | `obsidian dev:screenshot` 截取同标签页滚动后可见的 limits boundary notice + 最大轮数 + 最大预算 USD |
+| `.obsidian-debug/cap-3-console-20260526.txt` | 控制台 | `obsidian dev:console level=log` 原始输出（50 行），时间戳 04:13:57–04:14:31，覆盖 plugin reload → 6 标签遍历 → 截图完整周期 |
 | `.obsidian-debug/cap-3-errors-20260526.txt` | 错误 | `obsidian dev:errors vault=testvault` 原始输出：`No errors captured.` |
-| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 更新 cap-3 运行时证明记录（新 BUILD_ID + 完整 build/deploy 证据） |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 更新 cap-3 运行时证明记录（BUILD_ID task-cap-3.202605260314 + 两张截图 + 完整 build/deploy/DOM 证据） |
 
 ### 验证结果
 

@@ -79,16 +79,18 @@ Runtime proof against Test Vault build `task-cap-3.202605260314` (clean build fr
 ### Runtime Proof
 
 - `.obsidian-debug/cap-3-runtime-proof-20260526-result.json` returned `ok: true` with 12 validation checks.
-- Confirmed: 6 Claude Code secondary tabs (no `limits` tab), `limitsBoundaryExists: true`, `hasMaxTurns: true`, `hasMaxBudget: true`, `hasRestartButton: true`, `limitsSectionExists: false`.
+- Confirmed: 6 Claude Code secondary tabs (no `limits` tab), `limitsBoundaryExists: true` (model-thinking tab only), `hasMaxTurns: true`, `hasMaxBudget: true`, `hasRestartButton: true`, `limitsSectionExists: false`.
 - Model & Thinking tab contains: 模型, 备用模型, Thinking, Effort, limits boundary notice, 最大轮数, 最大预算 USD — in correct order.
+- Limits boundary notice (`data-claude-code-limits-boundary="true"`) appears only in the model-thinking section, not in any other tab.
 - All 6 secondary tabs render correctly with expected setting labels (runtime, model-thinking, permissions, context-sources, tools, sdk-foundations).
 - DOM traversal performed via `obsidian eval code=...` clicking each secondary tab and reading setting names.
 - No console errors captured after plugin reload and full 6-tab traversal.
-- `obsidian dev:errors vault=testvault` returned raw output `No errors captured.` (not prose).
+- `obsidian dev:errors vault=testvault` returned raw output `No errors captured.`
 - Runtime artifacts (in repo-scoped `.obsidian-debug/`):
   - `cap-3-runtime-proof-20260526-result.json` — structured DOM assertion result
-  - `cap-3-claude-code-model-thinking-20260526.png` — `obsidian dev:screenshot` of model-thinking tab
-  - `cap-3-console-20260526.txt` — raw `obsidian dev:console level=log` output (50 lines, timestamps 03:16:22–03:16:31)
+  - `cap-3-claude-code-model-thinking-20260526.png` — `obsidian dev:screenshot` of model-thinking tab (top, showing 模型/备用模型/Thinking/Effort)
+  - `cap-3-model-thinking-scroll-20260526.png` — `obsidian dev:screenshot` of model-thinking tab (scrolled to limits boundary + 最大轮数/最大预算)
+  - `cap-3-console-20260526.txt` — raw `obsidian dev:console level=log` output (50 lines, timestamps 04:13:57–04:14:31)
   - `cap-3-errors-20260526.txt` — raw `obsidian dev:errors vault=testvault` output
 
 ---
