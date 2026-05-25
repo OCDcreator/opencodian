@@ -12,6 +12,30 @@
 
 ---
 
+## 2026-05-25 Phase 4 - Wire permission approval, AskUserQuestion, and MCP ordinary user path
+
+### 目标
+
+把 Permission Approval、AskUserQuestion / Elicitation 和 MCP Servers 从 capability lab 的 `Diagnostic` 提升到 `Settings`/`Exposed`，反映它们已接入普通用户路径（聊天权限卡片、提问对话框、共享 MCP 设置标签），而非仅作为诊断证明。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | capability matrix 更新 | Permission Approval `userSurface` `diagnostic` → `settings`；AskUserQuestion / Elicitation `userSurface` `diagnostic` → `settings`；MCP Servers `userSurface` `diagnostic` → `settings`；更新各行列注释说明它们复用现有稳定 UI |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | discovery 面板更新 | Permission Approval / AskUserQuestion discovery row `status` `diagnostic-proof` → `exposed`，描述改为 "Ordinary user path"；MCP Servers discovery row `status` `diagnostic-proof` → `exposed`（有服务器时），描述加入 "Ordinary runtime passthrough" 和共享 Settings > MCP 标签说明 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 测试更新 | 重命名并更新 5 个测试用例，验证 matrix 和 discovery 行的新 `settings`/`exposed` 状态；断言文本匹配新的描述内容 |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 文档更新 | 更新 capability matrix、discovery 面板和注意事项中的诊断/暴露状态描述，明确 Permission Approval / AskUserQuestion 已接入普通聊天路径，MCP 通过共享设置标签管理 |
+
+### 验证
+
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 通过
+- 门禁：`npm run check:module-docs`、`npm run check:devlog-order` 均通过
+
+### 影响评估
+
+本轮把三个已有 runtime proof 且已接入普通用户路径的能力从 capability lab 的 "Diagnostic Proof" 重新标记为 "Settings"/"Exposed"。这不改变任何 runtime 行为——权限卡片、提问对话框和 MCP 刷新早已在普通路径工作——只是把 capability lab 的静态评估更新到与代码实际一致。MCP authoring 仍通过共享 Settings > MCP 标签完成，Claude Code Tools 标签仅提供运行时刷新。
+
 ## 2026-05-25 Phase 3 - Diagnostic resume-at flag gate and ordinary resume separation
 
 ### 目标

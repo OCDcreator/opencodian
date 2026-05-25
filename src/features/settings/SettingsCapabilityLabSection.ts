@@ -483,8 +483,8 @@ export class SettingsCapabilityLabSection {
         capability: 'MCP Servers',
         sdkExposed: true, // mcpServers option in SDK
         adapterWired: true, // buildSdkOptions wires mcpServers + ClaudeCodeMcpConfigAdapter
-        runtimeProof: 'pass', // Direct SDK smoke artifact proves positive MCP passthrough; authoring remains unpromoted.
-        userSurface: 'diagnostic', // Runtime passthrough only; settings tab exposes refresh, not authoring
+        runtimeProof: 'pass', // Direct SDK smoke artifact proves positive MCP passthrough.
+        userSurface: 'settings', // Runtime passthrough via shared MCP settings tab; Claude Code Tools tab exposes refresh.
       },
       {
         capability: 'Allowed Tools',
@@ -517,16 +517,16 @@ export class SettingsCapabilityLabSection {
       {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
-        adapterWired: true, // ClaudeCodePermissionBridge is injected into diagnostic and chat SDK options
+        adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)
         runtimeProof: 'pass', // Direct SDK smoke artifact proves allow/deny canUseTool behavior.
-        userSurface: 'diagnostic', // Existing approval UI is reused; no stable Claude permission authoring surface
+        userSurface: 'settings', // Reuses existing stable permission card UI in ordinary chat; no separate Claude permission settings page.
       },
       {
         capability: 'AskUserQuestion / Elicitation',
         sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
         adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
         runtimeProof: 'pass', // Direct SDK smoke artifact proves elicitation/question callback behavior.
-        userSurface: 'diagnostic', // Runtime passthrough only; settings tab is OpenCode-gated
+        userSurface: 'settings', // Reuses existing stable question dialog in ordinary chat; no separate Claude question settings page.
       },
       {
         capability: 'Agents (Subagents)',
@@ -1978,23 +1978,23 @@ export class SettingsCapabilityLabSection {
       tbody,
       'MCP Servers',
       mcpStatus
-        ? `${mcpServerCount} server(s) loaded. Runtime passthrough via ClaudeCodeMcpConfigAdapter. Claude Code settings Tools tab can refresh runtime config.`
-        : 'Runtime passthrough via ClaudeCodeMcpConfigAdapter. No servers loaded or adapter not started.',
-      { status: mcpStatus ? 'diagnostic-proof' : 'discovery' },
+        ? `${mcpServerCount} server(s) loaded. Ordinary runtime passthrough via ClaudeCodeMcpConfigAdapter. MCP authoring is in the shared Settings > MCP tab; Claude Code Tools tab refreshes runtime config.`
+        : 'Ordinary runtime passthrough via ClaudeCodeMcpConfigAdapter. No servers loaded or adapter not started. MCP authoring is in Settings > MCP.',
+      { status: mcpStatus ? 'exposed' : 'discovery' },
     );
     // Permission approval
     this.addDiscoveryRow(
       tbody,
       'Permission Approval',
-      'Diagnostic proof only. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission UI shape; no stable Claude permission authoring surface is claimed.',
-      { status: 'diagnostic-proof' },
+      'Ordinary user path. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission card UI used in chat; no separate Claude permission settings page exists.',
+      { status: 'exposed' },
     );
     // AskUserQuestion / Elicitation
     this.addDiscoveryRow(
       tbody,
       'AskUserQuestion / Elicitation',
-      'Diagnostic proof only. The question bridge returns AskUserQuestion answers through Claude canUseTool, and onElicitation is forwarded as a runtime SDK callback; OpenCode question APIs remain out of this path.',
-      { status: 'diagnostic-proof' },
+      'Ordinary user path. The question bridge returns AskUserQuestion answers through the shared question dialog in chat, and onElicitation is forwarded as a runtime SDK callback.',
+      { status: 'exposed' },
     );
     // Agent definitions
     this.addDiscoveryRow(tbody, 'Agent Definitions', 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options.');
