@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-05-25 Phase 5 - Audit SDK advanced toggles for honesty
+
+### 目标
+
+审计 capability matrix 中全部 23 行 SDK 高级开关的分类诚实性：确保未经验证的能力不宣称已验证，没有稳定用户面的能力不伪装成 settings，已接入普通路径的能力不被错误降级。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 审计测试 | 新增 `audits capability matrix for honest classifications across all 23 rows` 测试用例，显式列出每行的预期 `runtimeProof` 和 `userSurface`，并强制执行两条诚实规则：(1) 只有 MCP Servers、Permission Approval、AskUserQuestion 三行可以标 `Verified`；(2) hidden 行必须恰好 6 个（Hooks、Session Store、Skills、Plugins、Agent Definitions、Import Session to Store） |
+
+### 验证
+
+- Focused green: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 通过，`80` tests passed
+- 全量验证：`npm run verify` → owner-guard PASS、module-docs OK、graphify OK、devlog-order OK、lint clean、typecheck clean、`439` suites / `3286` tests passed、build success（`BUILD_ID=feature-phase0-capability.202605252205`）
+
+### 影响评估
+
+本轮审计确认当前 matrix 分类是诚实的：
+- 三行有 direct SDK smoke proof（MCP、Permission Approval、AskUserQuestion）→ `runtimeProof: 'pass'` + `userSurface: 'settings'`
+- 六行无用户面且未验证（Hooks、Session Store、Skills、Plugins、Agent Definitions、Import Session）→ `hidden` + `untested`
+- 八行仅在诊断面板暴露且未验证（JSONL History、Agents、Structured Output、Subagent Transcript、Include Hook Events、Fork、Resume、Session Detail、Backend Routing）→ `diagnostic` + `untested`
+- 六行有稳定 settings 控件但缺少 live proof（File Checkpoint、Allowed Tools、Disallowed Tools、Turn/Budget、Environment Variables）→ `settings` + `untested`
+
+新增的综合审计测试会阻止未来任何无意的分类漂移：如果某人把未验证行改成 `Verified` 或减少 hidden 行数量，测试会立即失败。
+
 ## 2026-05-25 Phase 4 - Wire permission approval, AskUserQuestion, and MCP ordinary user path
 
 ### 目标

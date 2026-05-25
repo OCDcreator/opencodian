@@ -44,6 +44,14 @@
 
 `buildMatrixRows()` 还包含 MCP Servers 行，标记为 SDK exposed + adapter wired、runtime proof `pass`、user surface `settings`；MCP runtime passthrough 已有正向 proof，共享 Settings > MCP 标签提供 authoring，Claude Code Tools 标签提供运行时刷新。
 
+### 诚实性审计
+
+单元测试中新增 `audits capability matrix for honest classifications across all 23 rows` 用例，显式枚举每行的预期 `runtimeProof` 和 `userSurface`，并强制执行两条不变规则：
+1. 恰好三行可以标 `Verified`（MCP Servers、Permission Approval、AskUserQuestion / Elicitation）——任何把未验证行提升为 `Verified` 的改动都会使测试失败；
+2. 恰好六行标 `hidden`（Hooks、Session Store、Skills、Plugins、Agent Definitions、Import Session to Store）——任何把 hidden 行暴露到 settings/diagnostic 的改动都会使测试失败。
+
+该审计测试确保 matrix 静态评估不会随代码演进意外漂移，未来若要晋升某行的 classification，必须同时更新测试中的预期映射并给出明确理由。
+
 ### Runtime Proof 更新
 
 `updateRuntimeProof()` 在诊断面板执行后更新页面内嵌标记。不跨标签持久化——矩阵行是静态的，运行时证明反馈只在浏览器区域展示。

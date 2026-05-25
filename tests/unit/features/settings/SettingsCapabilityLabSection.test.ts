@@ -690,6 +690,79 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('hidden');
   });
 
+  it('audits capability matrix for honest classifications across all 23 rows', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
+
+    // Expected honest classifications for every capability row.
+    // runtimeProof: 'pass' only when direct SDK smoke proof exists.
+    // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
+    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
+      Hooks: { runtimeProof: 'untested', userSurface: 'hidden' },
+      'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'settings' },
+      'JSONL History Browser': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Session Store': { runtimeProof: 'untested', userSurface: 'hidden' },
+      Skills: { runtimeProof: 'untested', userSurface: 'hidden' },
+      Plugins: { runtimeProof: 'untested', userSurface: 'hidden' },
+      'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Allowed Tools': { runtimeProof: 'untested', userSurface: 'settings' },
+      'Disallowed Tools': { runtimeProof: 'untested', userSurface: 'settings' },
+      'Turn/Budget Limits': { runtimeProof: 'untested', userSurface: 'settings' },
+      'Environment Variables': { runtimeProof: 'untested', userSurface: 'settings' },
+      'Permission Approval': { runtimeProof: 'pass', userSurface: 'settings' },
+      'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Agent Definitions': { runtimeProof: 'untested', userSurface: 'hidden' },
+      'Structured Output': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Subagent Transcript / Progress': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Include Hook Events': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Import Session to Store': { runtimeProof: 'untested', userSurface: 'hidden' },
+      'Fork Session': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Resume Session': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Session Detail': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Backend Routing': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+    };
+
+    for (const [name, expectedValues] of Object.entries(expected)) {
+      const row = getRow(name);
+      expect(row).not.toBeNull();
+
+      const surface = row?.querySelector('[data-surface]')?.getAttribute('data-surface');
+      expect(surface).toBe(expectedValues.userSurface);
+
+      const proofText = row?.textContent ?? '';
+      const proofLabel = proofText.includes('Verified') ? 'pass'
+        : proofText.includes('Failed') ? 'fail'
+          : 'untested';
+      expect(proofLabel).toBe(expectedValues.runtimeProof);
+    }
+
+    // Honesty rule: untested capabilities must not read as verified.
+    const verifiedRows = rows.filter((row) => row.textContent?.includes('Verified'));
+    const verifiedCapabilities = verifiedRows.map((row) => {
+      const firstCell = row.querySelector('td');
+      return firstCell?.textContent ?? '';
+    });
+    expect(verifiedCapabilities).toEqual(
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation']),
+    );
+    expect(verifiedCapabilities.length).toBe(3);
+
+    // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
+    const hiddenRows = rows.filter((row) => (
+      row.querySelector('[data-surface="hidden"]') !== null
+    ));
+    expect(hiddenRows.length).toBe(6); // Hooks, Session Store, Skills, Plugins, Agent Definitions, Import Session to Store
+  });
+
   it('runs the structured output diagnostic probe through the adapter runtime', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
