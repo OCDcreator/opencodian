@@ -225,5 +225,116 @@
       "updated": "2026-04-30T15:51:30.788Z",
       "description": "Tasks for thick-owner-long context"
     }
+  },
+  "claude-capability-productization": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup worktree and queue infrastructure",
+        "description": "Initialize the dedicated worktree for phase0-capability, install heartbeat with 30-minute interval, and create the review-gated opencode-loop execute queue.",
+        "details": "Create worktree at /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability. Set up tmux session with heartbeat (30 min). Configure opencode-loop to use review gate before each execution. Ensure queue persists across restarts.",
+        "testStrategy": "Verify worktree exists and is clean. Confirm heartbeat fires every 30 minutes. Run a dry-run queue task to ensure review gate blocks execution.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Promote authenticated resume identity to stable user path",
+        "description": "Separate ordinary resume from checkpoint resume-at. Promote only the validated ordinary resume path to stable, keeping resume-at gated or diagnostic.",
+        "details": "Review current resume identity validation (commit daf9dd6f). Add adapter/session tests for resume and resume-at. Ensure resume-at does not rebind session-id. Update docs/status/claude-code-current-state-2026-05-22.md and devlog.md. Keep resume-at hidden behind a diagnostic flag.",
+        "testStrategy": "Write focused tests for resume identity (positive) and resume-at (negative for stable). Run fresh runtime proof in Obsidian/Test Vault with dev:errors equal to 'No errors captured.'",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Wire permission approval, AskUserQuestion, and MCP ordinary user path",
+        "description": "Implement an ordinary Claude user path for permission approvals, AskUserQuestion, and MCP rendering, or keep each diagnostic-only with visible reason.",
+        "details": "Create bridge/UI components for approval dialogs and MCP rendering. Wire AskUserQuestion to a user-facing prompt. If unstable, label as diagnostic with a clear reason. Update docs/requirements/ and docs/modules/. Run npm run graphify:update:src after changes.",
+        "testStrategy": "Write focused bridge/UI tests. Run Obsidian proof with dev:errors equal to 'No errors captured.' Capture runtime screenshot/console artifacts.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Audit SDK advanced toggles for honesty",
+        "description": "Review all SDK advanced toggles. Mature rows stay settings-only/diagnostic until live proof exists; unproven toggles must not read as stable.",
+        "details": "List all SDK toggles and their runtime maturity. For each, update UI labels to reflect diagnostic or hidden status. Add negative stable-claim runtime assertions. Update docs/status/claude-code-current-state-2026-05-22.md.",
+        "testStrategy": "Capability Lab/settings tests. Write negative assertions that no unproven toggle claims stability. Run runtime checks.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Define boundaries for hooks, sessionStore, JSONL, structured output",
+        "description": "Keep hooks, sessionStore, JSONL, and structured output diagnostic/hidden or produce a narrowly scoped stable import/readback path with rollback.",
+        "details": "Assess current state of hooks, sessionStore, JSONL, structured output. If stable path is feasible, implement read-only import/readback with rollback. Otherwise, keep hidden/diagnostic. Update docs/modules/ and devlog.md.",
+        "testStrategy": "Write tests for failure states. Run runtime proof if surfaced. Ensure no false 'Exposed' labels.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Implement subagent transcript/progress, skills/plugins, agent definitions authoring (read-only slice)",
+        "description": "Keep authoring hidden or implement one read-only/productized slice for subagent transcript/progress, skills/plugins, and agent definitions.",
+        "details": "Implement read-only UI for subagent transcript/progress. For skills/plugins and agent definitions, keep authoring hidden. Update docs/requirements/ and docs/modules/. Run npm run graphify:update:src.",
+        "testStrategy": "Focused tests for read-only display. No false 'Exposed' labels. Capture runtime screenshot/console artifacts.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Stabilize rewind/revert/diff and enforce OpenCode-only boundaries",
+        "description": "Prevent Claude conversations from inheriting OpenCode controls. Only promote Claude controls with backend proof. Keep diff/revert OpenCode-only.",
+        "details": "Add routing tests to ensure Claude conversations do not expose OpenCode rewind/fork/diff/revert controls. Update backend to enforce boundaries. Run OpenCode regression tests. Update docs/status/claude-code-current-state-2026-05-22.md.",
+        "testStrategy": "Routing tests, OpenCode regression tests, runtime assertion that Claude conversations lack OpenCode controls.",
+        "priority": "high",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Final integration, documentation, and runtime verification",
+        "description": "Run all project gates (graphify, module-docs, devlog-order, git diff --check), build if runtime-relevant, deploy to Test Vault, verify BUILD_ID, and capture fresh runtime artifacts.",
+        "details": "Run npm run check:graphify, npm run check:module-docs, npm run check:devlog-order, git diff --check. If runtime changes, run npm run build, deploy to Test Vault, verify BUILD_ID, capture screenshot/console/dev-error artifacts. Update devlog.md with final summary.",
+        "testStrategy": "All gates pass. BUILD_ID matches deployment. dev:errors equals 'No errors captured.' Artifacts saved.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-05-25T02:16:11.883Z",
+      "updated": "2026-05-25T02:17:05.745Z",
+      "description": "Tasks for claude-capability-productization context"
+    }
   }
 }
