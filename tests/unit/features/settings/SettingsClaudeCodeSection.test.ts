@@ -318,7 +318,6 @@ describe('SettingsClaudeCodeSection', () => {
     expect(containerEl.querySelector('[data-claude-code-section="permissions"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="context-sources"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="tools"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="limits"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="sdk-foundations"]')).toBeDefined();
 
     const renderedNamesLower = [
@@ -422,6 +421,39 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         .toHaveBeenCalledWith('');
       expect(findDropdown(t('settings.claudeCode.thinking.name'))).toBeDefined();
       expect(findDropdown(t('settings.claudeCode.effort.name'))).toBeDefined();
+    });
+
+    it('renders max turns and budget limits alongside the next-query boundary notice', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
+      expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
+      expect(containerEl.querySelector('[data-claude-code-limits-boundary="true"]')).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
+      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
+    });
+
+    it('regression: limits boundary notice is present whenever max turns and budget controls render', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const hasLimitsBoundary = containerEl.querySelector('[data-claude-code-limits-boundary="true"]');
+      const hasMaxTurns = textRecords.some((r) => r.name === t('settings.claudeCode.maxTurns.name'));
+      const hasMaxBudget = textRecords.some((r) => r.name === t('settings.claudeCode.maxBudgetUsd.name'));
+      expect(hasMaxTurns).toBe(true);
+      expect(hasMaxBudget).toBe(true);
+      expect(hasLimitsBoundary).toBeTruthy();
     });
 
     it('does not render an inert thinking budget input for adaptive thinking', () => {
@@ -779,28 +811,15 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
   });
 
-  describe('limits tab', () => {
-    it('shows the next-query boundary for turn and budget limits', () => {
+  describe('limits (now in model-thinking tab)', () => {
+    it('renders turn and budget limit controls in model-thinking tab', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'limits');
-
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
-      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
-    });
-
-    it('renders and persists turn and budget limits', async () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'limits');
+      section.attachTabbed(containerEl, 'model-thinking');
 
       expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
       expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
@@ -817,7 +836,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'limits');
+      section.attachTabbed(containerEl, 'model-thinking');
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12abc' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('5usd' as never);
@@ -919,7 +938,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   describe('advanced capability gating', () => {
     it('does not render advanced Claude capabilities that lack runtime proof', () => {
       const plugin = createPlugin();
-      const allTabs = ['runtime', 'model-thinking', 'permissions', 'context-sources', 'tools', 'limits', 'sdk-foundations'] as const;
+      const allTabs = ['runtime', 'model-thinking', 'permissions', 'context-sources', 'tools', 'sdk-foundations'] as const;
 
       for (const tab of allTabs) {
         const containerEl = document.createElement('div');

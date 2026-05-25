@@ -5,19 +5,19 @@
 
 ## 概述
 
-`SettingsClaudeCodeSection` 负责 Claude Code backend 的 Phase A/Phase 2 设置面板。它通过 Claude Code 二级标签路由不同配置分组，暴露当前已有 adapter wiring 与测试覆盖的 runtime、模型思考、权限、上下文来源、工具策略、限制项和 SDK foundation 入口；backend 启用仍由 `SettingsBackendSection` 负责，本 section 不注册 runtime，也不导入官方 Claude SDK。
+`SettingsClaudeCodeSection` 负责 Claude Code backend 的 Phase A/Phase 2 设置面板。它通过 Claude Code 二级标签路由不同配置分组，暴露当前已有 adapter wiring 与测试覆盖的 runtime、模型思考、权限、上下文来源、工具策略和 SDK foundation 入口；backend 启用仍由 `SettingsBackendSection` 负责，本 section 不注册 runtime，也不导入官方 Claude SDK。
 
 ## 职责
 
 - 在 Runtime 标签渲染 restart-sensitive runtime boundary notice、Claude Code executable path、带只读状态标记的认证/环境提示、runtime diagnostics 和 env variables 输入
-- 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown；effort 选项与官方 Claude Code CLI/SDK 对齐为 low / medium / high / xhigh / max
+- 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown；effort 选项与官方 Claude Code CLI/SDK 对齐为 low / medium / high / xhigh / max。该标签同时承载 max turns 和 max budget USD 限制控件，并在这些控件前渲染 limits boundary notice，提示这些设置只在下一次 query 生效并提供 restart 操作
 - model 保存时会通过当前注册的 Claude adapter 调用 `setModel()`，让活跃持久 query 尽量 live 更新；没有活跃 query 或 adapter 不可用时仍只保存设置，下一次 query 会读取新值
 - adaptive / disabled thinking 下不渲染 thinking budget，避免显示不会生效的空编辑控件；fixed thinking 下保留用户已有 budget
 - 在 Permissions 标签渲染 permission mode dropdown；保存时会通过 Claude adapter 调用 `setPermissionMode()` 尝试更新活跃 query
 - 在 Context & Sources 标签渲染 setting sources toggles（user/project/local）、项目来源文件可见性（`CLAUDE.md`、`.claude/settings.json`、`.claude/settings.local.json`）、restart-sensitive runtime boundary notice 和 additional directories textarea
 - Runtime 与 Context & Sources 标签都提供 “Restart sessions” 操作，调用 Claude adapter 的 `restartPersistentQueries('settings-change')`，只关闭活跃持久 query，不删除 session；下一次发送会用最新 source/directory/env/tool/limit options 重新启动并在可能时 resume
 - 在 Tools 标签渲染 restart-sensitive runtime boundary notice、MCP runtime 只读状态与刷新按钮，以及 allowed/disallowed tools；MCP 控制只调用当前 Claude adapter 的 `getMcpServerCount()` / `reloadMcpServers()`，不写入 `.claude/mcp.json`，刷新失败会保留明确错误状态
-- 在 Limits 标签渲染 restart-sensitive runtime boundary notice、max turns 和 max budget USD；输入必须是完整正数，`12abc` / `5usd` 这类部分数字会归一化为 unlimited/null，空白仍保持 unlimited/null
+- Max turns 和 max budget USD 输入必须是完整正数，`12abc` / `5usd` 这类部分数字会归一化为 unlimited/null，空白仍保持 unlimited/null
 - 在 SDK Foundations 标签渲染 runtime-only plugin / skill 只读摘要，以及 file checkpoint、hook event stream、subagent transcript/progress 开关；hook/subagent 控件前会显示可见的 diagnostic stream boundary notice。这些字段只进入 SDK options / diagnostic/experimental stream，不宣称 MCP authoring、skills/plugins authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
 - 将多标签设置输入写入 `settings.backendSettings.claudeCode`
 - 通过 `ClaudeCodeProcessResolver` 做本地进程解析诊断，帮助检查 bundled/default resolution 与外部 CLI path
@@ -31,7 +31,7 @@
 
 - `OpenCodianSettings`: classic 设置页在 General 后挂载本 section
 - `OpenCodianSettingsView`: editor-area classic 设置页复用本 section
-- `SettingsTabbedRenderer`: `claude-code/runtime`、`claude-code/model-thinking`、`claude-code/permissions`、`claude-code/context-sources`、`claude-code/tools`、`claude-code/limits`、`claude-code/sdk-foundations` 标签路由到本 section
+- `SettingsTabbedRenderer`: `claude-code/runtime`、`claude-code/model-thinking`、`claude-code/permissions`、`claude-code/context-sources`、`claude-code/tools`、`claude-code/sdk-foundations` 标签路由到本 section
 - `settingsLayoutRegistry`: 声明 `claude-code` 配置标签，但不设置 `backendRequired`
 - `ClaudeCodeProcessResolver`: runtime diagnostics 按当前 Claude settings 解析 process mode
 

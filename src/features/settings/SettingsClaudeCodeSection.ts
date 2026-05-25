@@ -3,12 +3,14 @@
  *
  * Renders backend-specific settings across multiple secondary tabs:
  *   - Runtime: executable path, environment hint, diagnostics
- *   - Model & Thinking: model, fallback model, thinking type/budget, effort
+ *   - Model & Thinking: model, fallback model, thinking type/budget, effort, max turns, budget
  *   - Permissions: permission mode
  *   - Context & Sources: setting sources, additional directories
  *   - Tools: allowed/disallowed tool names
- *   - Limits: max turns, budget
  *   - SDK Foundations: checkpointing and diagnostic stream switches
+ *
+ * The Model & Thinking tab includes the next-query/restart boundary notice
+ * because max-turns and max-budget changes only take effect on the next query.
  *
  * Only controls backed by real adapter wiring and focused tests are exposed
  * as editable. Unverified capabilities remain hidden or read-only.
@@ -81,7 +83,6 @@ const CLAUDE_CLASSIC_TABS = [
   'permissions',
   'context-sources',
   'tools',
-  'limits',
   'sdk-foundations',
 ] as const;
 
@@ -91,7 +92,6 @@ const CLAUDE_TAB_LABEL_KEYS: Record<typeof CLAUDE_CLASSIC_TABS[number], Translat
   permissions: 'settings.claudeCode.tab.permissions',
   'context-sources': 'settings.claudeCode.tab.contextSources',
   tools: 'settings.claudeCode.tab.tools',
-  limits: 'settings.claudeCode.tab.limits',
   'sdk-foundations': 'settings.claudeCode.tab.sdkFoundations',
 };
 
@@ -160,9 +160,6 @@ export class SettingsClaudeCodeSection {
         break;
       case 'tools':
         this.renderToolsTab(bodyEl);
-        break;
-      case 'limits':
-        this.renderLimitsTab(bodyEl);
         break;
       case 'sdk-foundations':
         this.renderSdkFoundationsTab(bodyEl);
@@ -238,6 +235,9 @@ export class SettingsClaudeCodeSection {
       this.renderThinkingBudgetSetting(containerEl);
     }
     this.renderEffortSetting(containerEl);
+    this.renderLimitsBoundaryNotice(containerEl);
+    this.renderMaxTurnsSetting(containerEl);
+    this.renderMaxBudgetSetting(containerEl);
   }
 
   private renderModelSetting(containerEl: HTMLElement): void {
@@ -374,6 +374,24 @@ export class SettingsClaudeCodeSection {
   private renderRuntimeBoundaryNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
       cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-boundary',
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.runtimeBoundary.nextQuery') });
+    new Setting(noticeEl)
+      .setName(t('settings.claudeCode.runtimeBoundary.restartName'))
+      .setDesc(t('settings.claudeCode.runtimeBoundary.restartDesc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.runtimeBoundary.restartButton'))
+          .onClick(async () => {
+            await this.restartClaudePersistentQueries('settings-change');
+          });
+      });
+  }
+
+  private renderLimitsBoundaryNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-limits-boundary',
+      attr: { 'data-claude-code-limits-boundary': 'true' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.runtimeBoundary.nextQuery') });
     new Setting(noticeEl)
@@ -536,14 +554,6 @@ export class SettingsClaudeCodeSection {
         ? t('settings.claudeCode.mcpRuntime.loaded', { count })
         : t('settings.claudeCode.mcpRuntime.empty'),
     );
-  }
-
-  // ─── Limits tab ──────────────────────────────────────────────────
-
-  private renderLimitsTab(containerEl: HTMLElement): void {
-    this.renderRuntimeBoundaryNotice(containerEl);
-    this.renderMaxTurnsSetting(containerEl);
-    this.renderMaxBudgetSetting(containerEl);
   }
 
   // ─── SDK Foundations tab ─────────────────────────────────────────

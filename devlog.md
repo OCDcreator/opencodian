@@ -12,6 +12,31 @@
 
 ---
 
+## 2026-05-25 Phase 7 - Cap-2: Settings information architecture refinement
+
+### 目标
+
+重构 Claude Code 设置页的信息架构，将 Limits 标签合并进 Model & Thinking 标签，同时保留 next-query/restart 边界提示，并添加回归测试防止运行时敏感设置丢失引导信息。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 标签合并 | 将 maxTurns/maxBudget 合并进 `renderModelThinkingTab()`，新增 `renderLimitsBoundaryNotice()` 在 limits 控件前渲染边界提示；删除独立 `renderLimitsTab()` 和 `limits` switch case；从 `CLAUDE_CLASSIC_TABS` 移除 `limits` |
+| `src/features/settings/settingsLayoutRegistry.ts` | 布局更新 | 从 claude-code 二级标签中移除 `limits`，添加 legacy 映射 `limits → model-thinking` |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 回归测试 | 新增 2 个测试：model-thinking 标签同时包含 limits 控件和边界提示；回归测试断言 maxTurns/maxBudget 和 `data-claude-code-limits-boundary` 共存；更新原 limits 标签测试改为渲染 model-thinking 标签 |
+| `tests/unit/features/settings/settingsLayoutRegistry.test.ts` | 测试同步 | 更新 claude-code 二级标签期望列表移除 `limits` |
+| `docs/modules/features/settings/SettingsClaudeCodeSection.md` | 文档同步 | 更新标签描述反映 limits 合并进 model-thinking |
+| `docs/modules/features/settings/settingsLayoutRegistry.md` | 文档同步 | 更新 claude-code 二级标签列表和 legacy 映射说明 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态同步 | 添加 cap-2 变更记录 |
+
+### TDD 记录
+
+- TDD_RED[cap-2]: `npm test -- --runInBand tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` — classic surface 测试期望 `data-claude-code-section="limits"` 不存在；layout registry 测试期望 6 个二级标签而非 7 个
+- TDD_GREEN[cap-2]: 34 passed (SettingsClaudeCodeSection) + 25 passed (settingsLayoutRegistry)
+
+---
+
 ## 2026-05-25 Phase 6 - Cap-1: Honest capability wiring and settings exposure
 
 ### 目标

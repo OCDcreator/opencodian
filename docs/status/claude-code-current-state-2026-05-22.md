@@ -85,6 +85,27 @@ This slice makes Claude Code capability wiring honest at three levels: type inte
 
 ---
 
+## 2026-05-25 Cap-2: Settings information architecture refinement
+
+This slice refines the Claude Code settings information architecture so controls appear in sections that match user intent, with a dedicated regression test for the runtime-sensitive limits boundary.
+
+### Changes
+
+- Merged the Limits secondary tab into the Model & Thinking tab: max turns and max budget USD now appear alongside model, thinking, and effort controls.
+- Added a limits boundary notice (`data-claude-code-limits-boundary`) before the max turns/budget controls in the Model & Thinking tab, preserving the "Changes take effect on next query" / restart-session UX that the old Limits tab provided.
+- Removed the Limits secondary tab from `CLAUDE_CLASSIC_TABS` and `settingsLayoutRegistry`, with legacy mapping (`limits` → `model-thinking`) so persisted tab selections survive the restructure.
+- Added regression tests that verify: (1) the limits boundary notice is present whenever max turns and budget controls render, and (2) the Model & Thinking tab contains all limits controls plus the boundary notice.
+- Updated `SettingsClaudeCodeSection.md`, `settingsLayoutRegistry.md`, and related module docs.
+
+### Impact
+
+- Users now see model, thinking, effort, max turns, and budget controls in one cohesive tab.
+- The next-query/restart boundary notice is preserved, preventing the regression where limits controls moved without their runtime-sensitive guidance.
+- Legacy tab selections for `limits` silently redirect to `model-thinking`.
+- This slice implements the Settings gate for limits controls: they now appear alongside model/thinking settings with an explicit next-query boundary notice, preventing users from changing runtime-sensitive settings without clear guidance.
+
+---
+
 ## 2026-05-25 Ordinary resume vs diagnostic resume-at separation
 
 This slice hardens the boundary between the stable ordinary resume path and the diagnostic-only resume-at path. Ordinary resume (validated session identity for continued chat) is promoted to stable. Resume-at (arbitrary session selection via `resumeSessionId`) remains gated behind `runDiagnosticPrompt()` only.
