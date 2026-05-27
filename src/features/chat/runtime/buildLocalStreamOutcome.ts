@@ -1,7 +1,7 @@
 import { shouldSyncAfterStream } from '../services/MessageFinalizationService';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import { buildStreamErrorNotice } from './AssistantNoticeRenderer';
-import { getStreamedTextContent } from './sendPipelineContent';
+import { filterDuplicateStructuredOutputTextBlocks, getStreamedTextContent } from './sendPipelineContent';
 import type {
   LocalStreamOutcome,
   SendPipelineStreamController,
@@ -21,7 +21,11 @@ export function buildLocalStreamOutcome(options: {
     ?? options.preparedSend.activeModelId;
   const finalizedAssistantMessageId = options.routedStream.finalizedAssistantMetadata?.messageId;
   const finalizedBackendSessionId = options.routedStream.finalizedBackendSessionId ?? undefined;
-  const streamContentBlocks = options.streamController?.getContentBlocks();
+  const rawContentBlocks = options.streamController?.getContentBlocks();
+  const streamContentBlocks = filterDuplicateStructuredOutputTextBlocks(
+    rawContentBlocks,
+    options.routedStream.structuredOutput,
+  );
   const streamedTextContent = getStreamedTextContent(streamContentBlocks);
   const hasStreamContentBlocks = Boolean(streamContentBlocks && streamContentBlocks.length > 0);
   const shouldPersistInterruptedState = options.routedStream.streamInterrupted

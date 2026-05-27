@@ -1,6 +1,9 @@
 import {
+  extractStructuredOutputDuplicateText,
+  filterDuplicateStructuredOutputTextBlocks,
   getStreamedTextContent,
   hasVisibleStreamingContent,
+  isDuplicateStructuredOutputText,
   mapStreamingContentBlocksToMessageContentBlocks,
 } from '../../../../src/features/chat/runtime/sendPipelineContent';
 
@@ -65,5 +68,113 @@ describe('sendPipelineContent', () => {
       name: 'grep',
       input: {},
     })).toBe(true);
+  });
+});
+
+describe('extractStructuredOutputDuplicateText', () => {
+  it('extracts the parsed JSON from the response field', () => {
+    const structured = { response: '{"greeting": "hello"}' };
+    expect(extractStructuredOutputDuplicateText(structured)).toBe('{"greeting":"hello"}');
+  });
+
+  it('returns the raw response string when it is not valid JSON', () => {
+    const structured = { response: 'Plain text answer' };
+    expect(extractStructuredOutputDuplicateText(structured)).toBe('Plain text answer');
+  });
+
+  it('returns null when structured output is undefined', () => {
+    expect(extractStructuredOutputDuplicateText(undefined)).toBeNull();
+  });
+
+  it('returns null when structured output has no response field', () => {
+    expect(extractStructuredOutputDuplicateText({ tags: ['a'] })).toBeNull();
+  });
+
+  it('returns null when response is not a string', () => {
+    expect(extractStructuredOutputDuplicateText({ response: 42 })).toBeNull();
+  });
+});
+
+describe('isDuplicateStructuredOutputText', () => {
+  it('matches exact duplicate text', () => {
+    const structured = { response: '{"greeting": "hello"}' };
+    expect(isDuplicateStructuredOutputText('{"greeting":"hello"}', structured)).toBe(true);
+  });
+
+  it('matches duplicate text with formatting differences', () => {
+    const structured = { response: '{"greeting": "hello"}' };
+    expect(isDuplicateStructuredOutputText('{"greeting": "hello"}', structured)).toBe(true);
+  });
+
+  it('matches plain string response', () => {
+    const structured = { response: 'Hello world' };
+    expect(isDuplicateStructuredOutputText('Hello world', structured)).toBe(true);
+  });
+
+  it('does not match different content', () => {
+    const structured = { response: '{"greeting": "hello"}' };
+    expect(isDuplicateStructuredOutputText('{"greeting": "goodbye"}', structured)).toBe(false);
+  });
+
+  it('does not match when structured output is undefined', () => {
+    expect(isDuplicateStructuredOutputText('{"greeting": "hello"}', undefined)).toBe(false);
+  });
+});
+
+describe('filterDuplicateStructuredOutputTextBlocks', () => {
+  it('removes the last text block when it duplicates structured output', () => {
+    const blocks = [
+      { type: 'text' as const, content: 'Hello' },
+      { type: 'text' as const, content: '{"greeting": "hello"}' },
+    ];
+    const structured = { response: '{"greeting": "hello"}' };
+    const result = filterDuplicateStructuredOutputTextBlocks(blocks, structured);
+    expect(result).toEqual([
+      { type: 'text', content: 'Hello' },
+    ]);
+  });
+
+  it('does not remove the last text block when it does not duplicate', () => {
+    const blocks = [
+      { type: 'text' as const, content: 'Hello' },
+      { type: 'text' as const, content: 'world' },
+    ];
+    const structured = { response: '{"greeting": "hello"}' };
+    const result = filterDuplicateStructuredOutputTextBlocks(blocks, structured);
+    expect(result).toEqual(blocks);
+  });
+
+  it('does not remove non-last text blocks even if they match', () => {
+    const blocks = [
+      { type: 'text' as const, content: '{"greeting": "hello"}' },
+      { type: 'text' as const, content: 'After' },
+    ];
+    const structured = { response: '{"greeting": "hello"}' };
+    const result = filterDuplicateStructuredOutputTextBlocks(blocks, structured);
+    expect(result).toEqual(blocks);
+  });
+
+  it('leaves non-text blocks untouched', () => {
+    const blocks = [
+      { type: 'thinking' as const, content: 'Planning', partId: 'p1' },
+      { type: 'text' as const, content: '{"greeting": "hello"}' },
+    ];
+    const structured = { response: '{"greeting": "hello"}' };
+    const result = filterDuplicateStructuredOutputTextBlocks(blocks, structured);
+    expect(result).toEqual([
+      { type: 'thinking', content: 'Planning', partId: 'p1' },
+    ]);
+  });
+
+  it('returns undefined when blocks is undefined', () => {
+    const structured = { response: '{"greeting": "hello"}' };
+    expect(filterDuplicateStructuredOutputTextBlocks(undefined, structured)).toBeUndefined();
+  });
+
+  it('returns original blocks when structured output is undefined', () => {
+    const blocks = [
+      { type: 'text' as const, content: 'Hello' },
+    ];
+    expect(filterDuplicateStructuredOutputTextBlocks(blocks, undefined)).toEqual(blocks);
   });
 });

@@ -254,6 +254,98 @@ describe('buildLocalStreamOutcome', () => {
   });
 });
 
+describe('buildLocalStreamOutcome structured output duplicate suppression', () => {
+  it('filters out duplicate raw JSON text when structured output is present', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Before' },
+        { type: 'text', content: '{"greeting": "hello"}' },
+      ]),
+    };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: { response: '{"greeting": "hello"}' },
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.streamedTextContent).toBe('Before');
+    expect(outcome.streamContentBlocks).toEqual([
+      { type: 'text', content: 'Before' },
+    ]);
+    expect(outcome.hasStreamContentBlocks).toBe(true);
+  });
+
+  it('keeps all text blocks when structured output does not duplicate them', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Hello' },
+        { type: 'text', content: 'world' },
+      ]),
+    };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: { response: '{"greeting": "hello"}' },
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.streamedTextContent).toBe('Helloworld');
+    expect(outcome.streamContentBlocks).toEqual([
+      { type: 'text', content: 'Hello' },
+      { type: 'text', content: 'world' },
+    ]);
+  });
+
+  it('preserves non-text blocks when filtering duplicate text', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'thinking', content: 'Planning', partId: 'p1', durationSeconds: 2 },
+        { type: 'text', content: '{"greeting": "hello"}' },
+      ]),
+    };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: { response: '{"greeting": "hello"}' },
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.streamedTextContent).toBe('');
+    expect(outcome.streamContentBlocks).toEqual([
+      { type: 'thinking', content: 'Planning', partId: 'p1', durationSeconds: 2 },
+    ]);
+    expect(outcome.hasStreamContentBlocks).toBe(true);
+  });
+});
+
 describe('buildLocalStreamOutcome backend sync routing', () => {
   it('keeps completed non-OpenCode streams on the local persistence path', () => {
     const preparedSend = createPreparedSend({

@@ -12,6 +12,50 @@
 
 ---
 
+## 2026-05-27 Structured Output Duplicate Suppression Fix
+
+### 目标
+
+修复 `/json` 触发路径中 structured output 的重复可见文本问题：
+当模型在调用 StructuredOutput 工具前将 raw JSON 作为可见文本输出时，用户会同时看到 raw JSON 文本和 structured output badge 中的重复内容。
+
+### 变更
+
+- `sendPipelineContent.ts` 新增三个 helper 函数：
+  - `extractStructuredOutputDuplicateText(structuredOutput)`：从结构化输出的 `response` 字段提取原始内容，解析并重新序列化以统一格式
+  - `isDuplicateStructuredOutputText(rawText, structuredOutput)`：支持精确匹配与 JSON 语义匹配
+  - `filterDuplicateStructuredOutputTextBlocks(blocks, structuredOutput)`：仅过滤最后一个重复的 text block
+- `buildLocalStreamOutcome.ts` 在构建本地流结果时，通过 `filterDuplicateStructuredOutputTextBlocks` 过滤重复的 text block，使 `streamContentBlocks` 和 `streamedTextContent` 不再包含重复内容
+- `StreamShellFinalizer.ts` 在 `finalizeStreamingShell` 中，渲染 structured output badge 后，调用 `suppressDuplicateStructuredOutputTextInDom()` 扫描并移除 DOM 中最后一个匹配的 `.streaming-text-block`
+- 模块文档更新：`sendPipelineContent.md`、`buildLocalStreamOutcome.md`、`StreamShellFinalizer.md`
+- 新增测试：
+  - `sendPipelineContent.test.ts`：11 个新测试覆盖 helper 函数
+  - `buildLocalStreamOutcome.test.ts`：3 个新测试覆盖过滤行为
+  - `StreamShellFinalizer.test.ts`：全新测试文件，9 个测试覆盖 DOM 移除行为
+
+### 验证
+
+- 全量测试：443 suites / 3363 tests passed
+- Lint：0 errors / 0 warnings
+- Typecheck：clean
+- Module docs：3 个文件已更新
+- Graphify：已刷新
+- Build：BUILD_ID=feature-phase0-capability.202605272236
+- Test Vault 运行时证明：
+  - `textBlockCount: 0` — 重复 raw JSON text block 已完全从 DOM 移除
+  - `hasStructuredOutputBadge: true` — structured output badge 正常渲染
+  - `assistantPreview` 不再包含 `{"greeting": "hello"}` 等 raw JSON 文本
+  - Errors：`No errors captured`
+
+### 诚实边界
+
+- 仅过滤**最后一个** text block，且要求该 block 的完整内容（trim 后）与结构化输出的 `response` 字段内容匹配
+- 使用 JSON 语义比较，可处理格式化差异（如空格不同）
+- 如果 text block 同时包含 prose 和 JSON，则不会移除（保守策略）
+- 仅当 `structuredOutput` 存在时生效
+
+---
+
 ## 2026-05-27 Structured Output Productization Fix — Hook Leak + Badge Rendering
 
 ### 目标
