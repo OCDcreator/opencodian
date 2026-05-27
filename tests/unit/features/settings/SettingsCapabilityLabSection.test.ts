@@ -3021,9 +3021,9 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(cleanupSpy).toHaveBeenCalledTimes(1);
     expect(outputEl.textContent).toContain('card created successfully');
-    expect(outputEl.textContent).toContain('Bridge host.collectToolApproval wired: true');
+    expect(outputEl.textContent).toContain('Permission bridge host.collectToolApproval wired: true');
     const proofMarkers = outputEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
-    expect(proofMarkers.length).toBe(2); // Permission Approval + AskUserQuestion
+    expect(proofMarkers.length).toBe(1); // Only Permission Approval — AskUserQuestion is NOT proven by this isolation probe
   });
 
   it('streaming context probe reports renderer failure when card creation returns null', async () => {

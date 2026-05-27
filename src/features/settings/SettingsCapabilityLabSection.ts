@@ -3034,7 +3034,11 @@ export class SettingsCapabilityLabSection {
         // Clean up the probe card
         directCardResult.remove();
 
-        // Now verify the bridge host chain is wired
+        // Now verify the permission bridge host chain is wired.
+        // This probe proves the shared streaming insertion path (synthetic context → renderer)
+        // and the permission host seam (collectToolApproval). It does NOT prove the
+        // AskUserQuestion / Elicitation question bridge path, which requires separate
+        // evidence from the actual question bridge DOM/runtime (runLiveQuestionDialogHarness).
         if (hasPermissionRenderer) {
           const host = this.plugin.agentServiceRegistry?.get('claude-code')
             ? (this.plugin.agentServiceRegistry.get('claude-code') as unknown as {
@@ -3043,19 +3047,24 @@ export class SettingsCapabilityLabSection {
             : undefined;
           const hasHostApproval = !!host?.options?.permissionBridge?.host?.collectToolApproval;
           outputEl.createEl('p', {
-            text: `Bridge host.collectToolApproval wired: ${hasHostApproval}`,
+            text: `Permission bridge host.collectToolApproval wired: ${hasHostApproval}`,
           });
 
           if (hasHostApproval) {
             outputEl.createEl('p', {
-              text: 'Full chain verified: synthetic context → renderer → bridge host. The live harness should now work when the chat view is active.',
+              text: 'Permission insertion path verified: synthetic context → renderer → permission host. The live permission harness should now work when the chat view is active. AskUserQuestion proof requires the separate question bridge harness.',
             });
             this.updateRuntimeProof('Permission Approval', 'pass', outputEl);
-            this.updateRuntimeProof('AskUserQuestion / Elicitation', 'pass', outputEl);
+            // NOTE: We do NOT mark AskUserQuestion / Elicitation as pass here.
+            // This probe only proves the shared streaming insertion path and the
+            // permission host seam (collectToolApproval). The question bridge path
+            // (collectQuestionApproval or equivalent) is separate and unproven by
+            // this isolation probe. AskUserQuestion proof is anchored to the actual
+            // question bridge DOM/runtime evidence from runLiveQuestionDialogHarness.
           } else {
             outputEl.createEl('p', {
               cls: 'opencodian-capability-lab-hint',
-              text: 'Renderer works but bridge host is not wired. The blocker is upstream in the bridge → host registration.',
+              text: 'Renderer works but permission bridge host is not wired. The blocker is upstream in the bridge → host registration.',
             });
           }
         }

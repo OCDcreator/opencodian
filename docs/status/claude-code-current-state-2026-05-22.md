@@ -19,6 +19,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
 - Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280147`
+- Latest follow-up polish round (overclaim correction): see "2026-05-28 Streaming Context Probe Overclaim Correction" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -64,6 +65,42 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-28 Streaming Context Probe Overclaim Correction
+
+This slice corrects an overclaim in `runStreamingContextProbe()` where the probe was marking both **Permission Approval** and **AskUserQuestion / Elicitation** as `pass` based on evidence that only proved the shared streaming insertion path and the permission host seam.
+
+### What Changed
+
+- `SettingsCapabilityLabSection.ts`:
+  - `runStreamingContextProbe()`: removed the `this.updateRuntimeProof('AskUserQuestion / Elicitation', 'pass', outputEl)` call.
+  - The probe now only marks **Permission Approval** as `pass` when the direct renderer card creation succeeds AND `collectToolApproval` is wired.
+  - Added explicit inline comments explaining why AskUserQuestion is NOT proven by this isolation probe (the question bridge path requires separate evidence from the actual question bridge DOM/runtime).
+  - Updated probe success message to be precise: "Permission insertion path verified: synthetic context → renderer → permission host" instead of the overbroad "Full chain verified".
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`:
+  - Updated `streaming context probe marks pass when renderer creates card and bridge is wired` to expect `proofMarkers.length === 1` (only Permission Approval) instead of `2`.
+  - Updated assertion text to match the corrected probe output.
+
+### Honest Assessment
+
+- **What the probe truly proves**:
+  1. The shared `StreamingInlineCardRenderer.createStreamingInlineCard()` works when given a synthetic `streamingMessageEl` (shared insertion path).
+  2. The permission host seam `collectToolApproval` is wired in the adapter options (permission-specific host callback).
+  3. Therefore, **Permission Approval** inline UI can render when the chat view is active.
+- **What the probe does NOT prove**:
+  1. The **AskUserQuestion / Elicitation** question bridge path. The probe only inspects `collectToolApproval`, not `collectQuestionApproval` or any question-specific host wiring.
+  2. That the model will actually trigger either tool in ordinary chat (tool calling is non-deterministic).
+  3. That the full Obsidian UI interaction chain (user sees card → clicks button → result propagates back to SDK stream) works in ordinary chat — the harness proves this for the diagnostic path only.
+- **Where the stronger question proof lives**: The actual question bridge evidence is anchored to `runLiveQuestionDialogHarness()`, which directly calls `bridge.canUseTool('AskUserQuestion', …)` and verifies the question dialog renders in the DOM. This is separate from the streaming context isolation probe.
+
+### Classification After Correction
+
+| Capability | Probe Claims | Actual Evidence |
+|---|---|---|
+| Permission Approval | `pass` from streaming context probe | ✅ Correct — probe proves shared insertion path + permission host seam |
+| AskUserQuestion / Elicitation | NOT claimed by probe | ⚠️ Separate evidence required from `runLiveQuestionDialogHarness()` DOM/runtime proof |
+
+---
 
 ## 2026-05-28 Synthetic Streaming Context — Diagnostic-Only Live UI Harness
 

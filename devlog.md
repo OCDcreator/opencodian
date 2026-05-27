@@ -12,6 +12,50 @@
 
 ---
 
+## 2026-05-28 Streaming Context Probe Overclaim Correction
+
+### 目标
+
+修正 `runStreamingContextProbe()` 中的过度声明（overclaim）：该探针之前基于共享 streaming insertion path 和 permission host seam 的证据，同时标记了 **Permission Approval** 和 **AskUserQuestion / Elicitation** 为 `pass`。这是不诚实的——探针只证明了 permission 路径，没有证明 question 路径。
+
+### 背景
+
+- `runStreamingContextProbe()` 的设计目的是：不经过 bridge → host 链条，直接调用 `StreamingInlineCardRenderer.createStreamingInlineCard()` 来隔离验证 synthetic streaming context 本身是否足够。
+- 在 e852f0f3 中，当 direct renderer 调用成功且检测到 `collectToolApproval` 存在时，探针同时更新了 Permission Approval 和 AskUserQuestion 的运行时证明标记。
+- 问题在于：`collectToolApproval` 是 permission host 的回调，与 question bridge 的 `collectQuestionApproval`（或等效机制）是**不同**的 seam。共享的 streaming insertion path 确实被两者共用，但 question bridge 的上游 wiring 未被该探针检查。
+
+### 变更
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`：
+  - `runStreamingContextProbe()`：移除 `this.updateRuntimeProof('AskUserQuestion / Elicitation', 'pass', outputEl)` 调用。
+  - 探针现在仅在 direct renderer 调用成功且 `collectToolApproval` wired 时，标记 **Permission Approval** 为 `pass`。
+  - 添加显式注释说明为什么 AskUserQuestion 不被此隔离探针证明（question bridge 需要来自实际 question bridge DOM/runtime 的独立证据）。
+  - 更新探针成功消息文本，从笼统的 "Full chain verified" 改为精确的 "Permission insertion path verified: synthetic context → renderer → permission host"。
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`：
+  - 更新 `streaming context probe marks pass when renderer creates card and bridge is wired` 测试：期望 `proofMarkers.length === 1`（仅 Permission Approval），而非 `2`。
+  - 更新断言文本以匹配修正后的探针输出。
+
+### 诚实评估
+
+- **探针真正证明的内容**：
+  1. 共享的 `StreamingInlineCardRenderer.createStreamingInlineCard()` 在获得 synthetic `streamingMessageEl` 时能成功创建卡片（共享 insertion path）。
+  2. Permission host seam `collectToolApproval` 已接入 adapter options（permission-specific host callback）。
+  3. 因此，当 chat view 激活时，**Permission Approval** 的 inline UI 能够渲染。
+- **探针未证明的内容**：
+  1. **AskUserQuestion / Elicitation** 的 question bridge 路径。探针只检查了 `collectToolApproval`，没有检查 `collectQuestionApproval` 或任何 question-specific host wiring。
+  2. 模型在普通聊天中一定会触发任一工具（工具调用是非确定性的）。
+  3. 完整的 Obsidian UI 交互链（用户看到卡片 → 点击按钮 → 结果传回 SDK stream）在普通聊天中是否工作——harness 仅证明了诊断路径。
+- **更强的 question proof 应锚定在哪里**：实际的 question bridge 证据应来自 `runLiveQuestionDialogHarness()`，它直接调用 `bridge.canUseTool('AskUserQuestion', …)` 并验证 question dialog 是否在 DOM 中渲染。这与 streaming context 隔离探针是独立的证据来源。
+
+### 分类修正后
+
+| 能力 | 探针声明 | 实际证据 |
+|---|---|---|
+| Permission Approval | `pass` from streaming context probe | ✅ 正确——探针证明了共享 insertion path + permission host seam |
+| AskUserQuestion / Elicitation | 探针不再声明 | ⚠️ 需要来自 `runLiveQuestionDialogHarness()` DOM/runtime 的独立证据 |
+
+---
+
 ## 2026-05-28 Live Harness Classification Fix & Streaming Context Probe Completion
 
 ### 目标
