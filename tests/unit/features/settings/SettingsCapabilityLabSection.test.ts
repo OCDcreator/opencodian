@@ -266,7 +266,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(permissionRow).not.toBeNull();
     expect(permissionRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
-    expect(permissionRow?.textContent).toContain('Wiring only');
+    expect(permissionRow?.textContent).toContain('Verified');
 
     expect(questionRow).not.toBeNull();
     expect(questionRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
@@ -938,7 +938,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Turn/Budget Limits': { runtimeProof: 'readback', userSurface: 'settings' },
       'Environment Variables': { runtimeProof: 'readback', userSurface: 'settings' },
       'Fallback Model': { runtimeProof: 'wiring', userSurface: 'settings' },
-      'Permission Approval': { runtimeProof: 'wiring', userSurface: 'settings' },
+      'Permission Approval': { runtimeProof: 'pass', userSurface: 'settings' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'settings' },
       'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'Agent Definitions': { runtimeProof: 'untested', userSurface: 'hidden' },
@@ -979,9 +979,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'AskUserQuestion / Elicitation']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation']),
     );
-    expect(verifiedCapabilities.length).toBe(2);
+    expect(verifiedCapabilities.length).toBe(3);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (

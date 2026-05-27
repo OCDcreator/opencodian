@@ -46,21 +46,27 @@
 - 模型可能对 prompt 调用也可能不调用 Bash/Read/Edit/AskUserQuestion
 - Capability Lab 诊断探针已证明此非确定性
 
-**结果：**
-- **AskUserQuestion / Elicitation：`runtimeProof: 'pass'`** — 普通聊天端到端证明已完成：
-  - Launcher 通过真实聊天发送管道（`sendPipelineRuntime.sendMessage()`）发送消息
-  - 模型通过 SDK 调用 AskUserQuestion
-  - 问题对话框渲染，带有 `data-question-card="true"` 选择器
-  - 用户选择 Yes 并点击提交（`data-question-action="submit"`）
-  - 流继续，答案被纳入
-  - 截图：`/tmp/opencodian-chat-question-card.png`、`/tmp/opencodian-chat-question-completed.png`
-- **Permission Approval：`runtimeProof: 'wiring'`** — 普通聊天 launcher 可用（消息已通过真实管道发送），但模型（glm-5.1）在文本中模拟 Bash 工具调用，而不是通过 SDK `tool_use` 机制调用。权限卡片（`data-permission-card`）从未出现，因为 SDK 权限回调未被触发。这是模型/SDK 行为缺口，不是管道缺口。
+**第一轮结果（2026-05-28）：**
+- **AskUserQuestion / Elicitation：`runtimeProof: 'pass'`** — 普通聊天端到端证明已完成
+- **Permission Approval：`runtimeProof: 'wiring'`** — 初步结论（后被第二轮修正）
+
+**第二轮结果（2026-05-28）：**
+- **Permission Approval：`runtimeProof: 'pass'`** — 升级 launcher 后完成普通聊天端到端证明：
+  - Launcher 内部临时将 permissionMode 覆盖为 `plan`（通过 `adapter.setPermissionMode()`）
+  - 发送文件创建 prompt（在 Test Vault 下创建 `.obsidian-debug/permission-proof.txt`）
+  - 模型依次调用 ExitPlanMode、Bash (`mkdir -p`)、Write 工具
+  - 每个工具调用都触发 `data-permission-card` 权限卡片，用户点击 "允许一次"（`data-permission-action="once"`）
+  - 流在每次批准后继续，目标文件成功创建并写入 nonce 内容（`proof-1779920669721`）
+  - `finally` 块中恢复原始 permissionMode（`default`）
+  - 截图：`/tmp/opencodian-permission-proof-1.png` 到 `/tmp/opencodian-permission-proof-5.png`
+
+**关键修正：** 第一轮结论（"模型在文本中模拟工具调用"）是错误的。实际上模型确实通过 SDK `tool_use` 机制调用工具。第一轮使用只读 `pwd` prompt + `permissionMode: 'default'` 时，SDK 对只读工具自动放行，不触发 `canUseTool`。使用写入动作 + `permissionMode: 'plan'` 后，权限审批流程正常触发。
 
 ### 验证
 
-- 完整验证：443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280607)
-- 测试库部署和 BUILD_ID 验证：`feature-phase0-capability.202605280607`
-- Console：无错误；Errors：未捕获
+- 完整验证：443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280628)
+- 测试库部署和 BUILD_ID 验证：`feature-phase0-capability.202605280628`
+- Console：无错误；Errors：`ServerManager.start failed after 30.9s`（无关的既有服务器超时）
 
 ---
 

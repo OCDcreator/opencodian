@@ -26,7 +26,7 @@ import {
 } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { createLogger } from '../../shared';
+import { createLogger, getVaultBasePath } from '../../shared';
 
 const labLogger = createLogger('CapabilityLab');
 
@@ -572,7 +572,7 @@ export class SettingsCapabilityLabSection {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)
-        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Permission Card) can exercise the full bridge → host → renderer → user → result chain. Ordinary chat end-to-end proof attempted: message sent through real chat pipeline, but the model (glm-5.1) simulates tool calls in text rather than invoking them through the SDK tool_use mechanism, so the permission card never appears. This is a model/SDK behavior gap, not a pipeline gap. Added data-permission-card and data-permission-action selectors for future verification. Added ordinary chat launcher in Capability Lab.
+        runtimeProof: 'pass', // Ordinary chat end-to-end proof achieved: launcher sends message through real chat pipeline (sendPipelineRuntime.sendMessage) with proof-time permissionMode override to 'plan'. Model calls ExitPlanMode, Bash (mkdir), and Write tools through SDK tool_use mechanism. Permission cards render with data-permission-card and data-permission-action selectors for EACH tool call. User clicks 'once' on each card. Stream continues after each approval. Target file is created with correct nonce content. Settings restored to original values in finally block.
         userSurface: 'settings', // Reuses existing stable permission card UI in ordinary chat; no separate Claude permission settings page.
       },
       {
@@ -2900,14 +2900,32 @@ export class SettingsCapabilityLabSection {
 
   /**
    * Launch an ordinary-chat permission proof by sending a real message through the
-   * OpenCodian chat view's send pipeline. This does NOT bypass the model; it relies
-   * on the model calling a tool that triggers the permission card.
+   * OpenCodian chat view's send pipeline. Temporarily switches permission mode to
+   * 'plan' (ask-by-default, deny edit/write) to maximize the chance of triggering
+   * the permission card for a file-write tool call. Restores original settings in
+   * finally block regardless of outcome.
    */
   private async launchOrdinaryChatPermissionProof(outputEl: HTMLElement): Promise<void> {
     outputEl.empty();
     outputEl.createEl('p', { text: 'Launching ordinary chat permission proof…' });
 
+    const adapter = getClaudeCodeAdapter(this.plugin);
+    const originalPermissionMode = this.plugin.settings.backendSettings.claudeCode.permissionMode;
+    const originalModel = this.plugin.settings.backendSettings.claudeCode.model;
+    const proofPermissionMode = 'plan' as const;
+    const nonce = `proof-${Date.now()}`;
+    const targetPath = `${getVaultBasePath(this.plugin.app) ?? ''}/.obsidian-debug/permission-proof.txt`;
+    const prompt = `Please create a file at "${targetPath}" with the exact content "${nonce}" and confirm when done.`;
+
+    outputEl.createEl('p', {
+      text: `Proof config — permissionMode: ${originalPermissionMode} → ${proofPermissionMode}, model: ${originalModel || 'default'}, prompt: "${prompt}"`,
+    });
+
     try {
+      // Temporarily override permission mode to 'plan' for this proof run
+      this.plugin.settings.backendSettings.claudeCode.permissionMode = proofPermissionMode;
+      await adapter?.setPermissionMode(proofPermissionMode);
+
       const leaf = this.plugin.app.workspace.getLeavesOfType('opencodian-view')[0];
       const view = leaf?.view as unknown as Record<string, unknown> | undefined;
       if (!view) {
@@ -2929,23 +2947,32 @@ export class SettingsCapabilityLabSection {
         return;
       }
 
-      // Reveal the chat view so the user can see the permission card when it appears
       this.plugin.app.workspace.revealLeaf(leaf);
-
-      const prompt = 'Please run the command "pwd" to show me the current working directory.';
       await sendPipelineRuntime.sendMessage(prompt);
 
       outputEl.createEl('p', {
-        text: `Message sent through ordinary chat pipeline. Prompt: "${prompt}"`,
+        text: `Message sent through ordinary chat pipeline. Target file: ${targetPath}, nonce: ${nonce}`,
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: 'Waiting for model response. If the model calls a tool, the permission card should appear in the chat view with data-permission-card selector.',
+        text: 'Waiting for model response. If the model calls a write tool, the permission card should appear in the chat view with data-permission-card selector.',
       });
     } catch (err) {
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
         text: `Ordinary chat permission proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    } finally {
+      // Restore original settings
+      this.plugin.settings.backendSettings.claudeCode.permissionMode = originalPermissionMode;
+      try {
+        await adapter?.setPermissionMode(originalPermissionMode);
+      } catch {
+        // ignore restore errors
+      }
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Restored — permissionMode: ${proofPermissionMode} → ${originalPermissionMode}, model: ${originalModel || 'default'}`,
       });
     }
   }

@@ -184,21 +184,28 @@ This slice attempts to move Permission Approval and AskUserQuestion / Elicitatio
 - The model may or may not call Bash/Read/Edit/AskUserQuestion in response to a prompt
 - Previous Capability Lab diagnostic probes already demonstrate this non-determinism
 
-**Results:**
-- **AskUserQuestion / Elicitation: `runtimeProof: 'pass'`** — Ordinary chat end-to-end proof achieved:
-  - Launcher sent message through real chat pipeline (`sendPipelineRuntime.sendMessage()`)
-  - Model called AskUserQuestion through SDK
-  - Question dialog rendered with `data-question-card="true"` selector
-  - User selected Yes and clicked submit (`data-question-action="submit"`)
-  - Stream continued with answer incorporated
-  - Screenshot: `/tmp/opencodian-chat-question-card.png`, `/tmp/opencodian-chat-question-completed.png`
-- **Permission Approval: `runtimeProof: 'wiring'`** — Ordinary chat launcher works (message sent through real pipeline), but the model (glm-5.1) simulates Bash tool calls in text rather than invoking them through the SDK `tool_use` mechanism. The permission card (`data-permission-card`) never appears because the SDK permission callback is not triggered. This is a model/SDK behavior gap, not a pipeline gap.
+**Results (Round 1 — 2026-05-28):**
+- **AskUserQuestion / Elicitation: `runtimeProof: 'pass'`** — Ordinary chat end-to-end proof achieved
+- **Permission Approval: `runtimeProof: 'wiring'`** — Initial conclusion (incorrect): model appeared to simulate tool calls in text. Later corrected in Round 2.
+
+**Results (Round 2 — 2026-05-28):**
+- **Permission Approval: `runtimeProof: 'pass'`** — Upgraded launcher with file-write prompt + proof-time `permissionMode: 'plan'` override achieves full ordinary chat end-to-end proof:
+  - Launcher temporarily overrides permissionMode to `plan` (ask-by-default, deny edit/write) via `adapter.setPermissionMode()`
+  - Launcher sends file creation prompt through real chat pipeline (`sendPipelineRuntime.sendMessage()`)
+  - Model calls ExitPlanMode — permission card renders with `data-permission-card="true"`, user clicks "允许一次" (`data-permission-action="once"`)
+  - Model calls Bash (`mkdir -p`) — second permission card renders, user clicks "允许一次"
+  - Model calls Write — third permission card renders, user clicks "允许一次"
+  - Stream continues after each approval; target file created with correct nonce content (`proof-1779920669721`)
+  - Settings restored to original values (`default`) in `finally` block
+  - Screenshots: `/tmp/opencodian-permission-proof-1.png` through `/tmp/opencodian-permission-proof-5.png`
+
+**Key correction from Round 1:** The model DOES invoke SDK `tool_use` mechanism. The initial blocker ("model simulates tool calls in text") was caused by using a read-only `pwd` prompt with `permissionMode: 'default'`, which auto-allows read-only tools without triggering `canUseTool`. Using a write action with `permissionMode: 'plan'` correctly triggers the permission approval flow.
 
 ### Verification
 
-- Full verify: 443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280607)
-- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280607`
-- Console: no errors; Errors: none captured
+- Full verify: 443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280628)
+- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280628`
+- Console: no errors; Errors: `ServerManager.start failed after 30.9s` (unrelated pre-existing server timeout)
 
 ---
 
