@@ -22,7 +22,7 @@
 | Resume Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并以 `resumeSessionId` 运行诊断 prompt；只有 resulting session id 等于请求的 source session id 时才标 pass，并输出文本预览 | `adapter.listSessions()` / `adapter.runDiagnosticPrompt({ resumeSessionId })` |
 | Session Detail Inspection | Provider-owned 诊断探针：选择一个 Claude 会话并调用 `getSession()`，输出 raw session 字段（sessionId, summary, lastModified, messageCount 等）| `adapter.listSessions()` / `adapter.getSession()` |
 | Backend Routing Verification | Provider-owned 诊断探针：显示活跃后端、已注册适配器、会话后端分布，验证 `listSessions()` + `getSession()` 通过 provider-owned 路由路径工作，并额外验证 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 通过 registry 路由层工作 | `AgentServiceRegistry` / `adapter.listSessions()` / `adapter.getSession()` / `listBackendSessions()` / `getBackendSessionPreview()` / `readBackendSessionTitle()` / `readBackendSessionShareUrl()` |
-| Discovery & Status | hooks/plugins/skills/agent-definitions 状态概览，附带 SessionStart hook runtime proof；Plugins、Skills 和 Agent Definitions 使用 `getPluginCount()` / `getSkillCount()` / `getAgentDefinitionCount()` 显示配置/发现计数，并通过 `getPluginsList()` / `getSkillsList()` / `getAgentDefinitionsList()` 在 notes 中显示配置名称列表，但始终保持 Discovery Only，不标为 Exposed | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
+| Discovery & Status | hooks/plugins/skills/agent-definitions/fallback-model 状态概览，附带 SessionStart hook runtime proof 和 Fallback Model wiring proof；Plugins、Skills 和 Agent Definitions 使用 `getPluginCount()` / `getSkillCount()` / `getAgentDefinitionCount()` 显示配置/发现计数，并通过 `getPluginsList()` / `getSkillsList()` / `getAgentDefinitionsList()` 在 notes 中显示配置名称列表，但始终保持 Discovery Only，不标为 Exposed；Fallback Model 行显示当前配置值和 "Run Fallback Model Proof" 按钮 | `hasCapability()` + adapter.capabilities + `adapter.runDiagnosticPrompt()` |
 | Permission Approval Discovery | Discovery & Status 面板中的 exposed 行：Claude `canUseTool` approval bridge 已接入普通聊天路径的共享权限卡片 UI；无独立 Claude permission 设置页 | `ClaudeCodePermissionBridge.canUseTool()` via adapter SDK options |
 | AskUserQuestion / Elicitation Discovery | Discovery & Status 面板中的 exposed 行：AskUserQuestion answer bridge 与 `onElicitation` callback 已接入普通聊天路径的共享提问对话框 | `ClaudeCodePermissionBridge` + adapter `onElicitation` SDK option |
 | MCP Servers Discovery | Discovery & Status 面板中的 exposed/discovery 行：显示 adapter 已加载 MCP server 数量；MCP authoring 在共享 Settings > MCP 标签，Claude Code Tools 标签提供运行时刷新 | `adapter.getMcpServerCount()` |
@@ -55,7 +55,7 @@
 
 ### Runtime Proof 更新
 
-`updateRuntimeProof()` 在诊断面板执行后更新页面内嵌标记。不跨标签持久化——矩阵行是静态的，运行时证明反馈只在浏览器区域展示。
+`updateRuntimeProof()` 在诊断面板执行后更新页面内嵌标记，支持四种状态：`pass`（运行时验证通过）、`fail`（运行时验证失败）、`untested`（未测试）、`wiring`（仅验证选项被 SDK 接受，未验证真实行为）。不跨标签持久化——矩阵行是静态的，运行时证明反馈只在浏览器区域展示。
 
 ### Diagnostic Session Store
 
@@ -94,6 +94,7 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 | `renderSessionDetailProbe()` | 渲染 Session Detail 诊断探针（provider-owned, diagnostic only） |
 | `renderBackendRoutingProbe()` | 渲染 Backend Routing 诊断探针（provider-owned, diagnostic only） |
 | `renderDiscoveryStatus()` | 渲染发现/状态面板 |
+| `runFallbackModelProof()` | 运行 Fallback Model wiring 诊断探针：使用 `fallbackModel: 'claude-haiku-4-5'` 覆盖启动诊断 prompt，验证 SDK option acceptance；成功后调用 `updateRuntimeProof('Fallback Model', 'wiring', ...)`（不是 `'pass'`），诚实边界说明只能证明 wiring，不证明实际 fallback switching |
 
 ## 数据属性标记
 
@@ -134,3 +135,4 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 - Discovery 面板里的 Permission Approval / AskUserQuestion / Elicitation 条目显示为 `Exposed`：它们已接入普通聊天路径的共享权限卡片和提问对话框。MCP Servers 条目在有服务器加载时显示为 `Exposed`，运行时透传通过共享 Settings > MCP 标签管理，Claude Code Tools 标签提供刷新控件
 - Capability Matrix 中 `Subagent Transcript / Progress` 与 `Include Hook Events` 使用 `Diagnostic` surface：SDK Foundation 设置可以配置 options，但不表示普通聊天 transcript/progress 或 hook authoring 已稳定提供
 - Subagent Transcript / Progress 的 runtime proof 遵循诚实性边界：`runSubagentStreamProof()` 只有在诊断流中真实捕获到 `subagent`、`tool_progress` 或含 `subagentId`/`agentId`/`progress` 的 backend_event 时才标记为 pass；仅成功运行 diagnostic prompt 且 SDK 接受了 `forwardSubagentText` / `agentProgressSummaries` options 但零子代理事件出现时，必须标记为 fail，不能把 option acceptance 伪装成 runtime proof。Discovery 控制区现在提供 `Run Subagent Stream Proof` 按钮，运行 diagnostic prompt 时启用 `forwardSubagentText` 和 `agentProgressSummaries`，成功后更新 `Subagent Transcript / Progress` 运行时证明；即使未捕获到子代理事件（单轮 prompt 不触发子代理生成），也会诚实标注 wiring 已验证
+- Fallback Model proof 遵循诚实性边界：`runFallbackModelProof()` 使用 `fallbackModel: 'claude-haiku-4-5'` 覆盖运行诊断 prompt，仅验证 SDK 接受 fallbackModel option 的无误 wiring；成功后使用 `updateRuntimeProof('Fallback Model', 'wiring', ...)` 标记——`wiring` 是专门的 runtime proof 状态，标签显示 "⚠ Wiring only — not behavior verified"，明确区分 option acceptance 与真实行为验证。矩阵中 Fallback Model 行仍保持 `untested` / `Settings`（静态评估不变），inline marker 的 `wiring` 状态只表示诊断探针验证了 SDK 接受了该选项，不表示实际 fallback switching 已被验证（需要主模型失败才会触发）

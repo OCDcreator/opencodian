@@ -2012,6 +2012,19 @@ export class SettingsCapabilityLabSection {
       'Ordinary user path. The question bridge returns AskUserQuestion answers through the shared question dialog in chat, and onElicitation is forwarded as a runtime SDK callback.',
       { status: 'exposed' },
     );
+    // Fallback Model
+    const configuredFallbackModel = adapter
+      ? (adapter as unknown as { options?: { settings?: { fallbackModel?: string } } }).options?.settings?.fallbackModel
+      : undefined;
+    const hasFallbackModel = Boolean(configuredFallbackModel && configuredFallbackModel.trim().length > 0);
+    this.addDiscoveryRow(
+      tbody,
+      'Fallback Model',
+      hasFallbackModel
+        ? `Configured fallback model: "${configuredFallbackModel}". Wired through buildSdkOptions / buildDiagnosticSdkOptions. Changes require session restart; not live-updated like the main model. Actual fallback switching behavior is not runtime-verified.`
+        : 'Wired through buildSdkOptions / buildDiagnosticSdkOptions. No fallback model configured or adapter not started. Changes require session restart; not live-updated like the main model. Actual fallback switching behavior is not runtime-verified.',
+      { status: 'discovery' },
+    );
     // Agent definitions
     this.renderAgentDefinitionsDiscoveryRow(tbody, adapter);
     // Agents / Subagents
@@ -2057,6 +2070,20 @@ export class SettingsCapabilityLabSection {
     });
     subagentProofBtn.addEventListener('click', () => {
       void this.runSubagentStreamProof(adapter, subagentOutputEl);
+    });
+
+    // Fallback model proof
+    const fallbackModelProofBtn = proofControls.createEl('button', {
+      text: 'Run Fallback Model Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const fallbackModelOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    fallbackModelProofBtn.addEventListener('click', () => {
+      void this.runFallbackModelProof(adapter, fallbackModelOutputEl);
     });
   }
 
@@ -2287,13 +2314,60 @@ export class SettingsCapabilityLabSection {
     }
   }
 
+  private async runFallbackModelProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running a fallback model wiring proof…' });
+    try {
+      const testFallbackModel = 'claude-haiku-4-5';
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Reply with the words fallback model proof.',
+        fallbackModel: testFallbackModel,
+        persistSession: false,
+      });
+
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `Fallback model diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
+      });
+      if (result.sessionId) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Session ID: ${result.sessionId}`,
+        });
+      }
+
+      outputEl.createEl('p', {
+        text: `Diagnostic prompt completed with fallbackModel="${testFallbackModel}" option set.`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'The SDK accepted the fallbackModel option without error. This proves wiring only; actual fallback model switching behavior (triggered when the primary model fails) cannot be verified without provoking a real model failure.',
+      });
+
+      // Honesty boundary: the SDK accepted the fallbackModel option, which proves
+      // wiring only. Actual fallback switching behavior (triggered when the primary
+      // model fails) cannot be verified without provoking a real model failure.
+      this.updateRuntimeProof('Fallback Model', 'wiring', outputEl);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Fallback model proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Fallback Model', 'fail', outputEl);
+    }
+  }
+
   // =======================================================================
   // Runtime Proof Update (in-page notification)
   // =======================================================================
 
   private updateRuntimeProof(
     _capability: string,
-    _status: 'pass' | 'fail' | 'untested',
+    _status: 'pass' | 'fail' | 'untested' | 'wiring',
     outputEl: HTMLElement,
   ): void {
     // Lightweight inline marker — does not persist across tab switches.
@@ -2309,6 +2383,7 @@ export class SettingsCapabilityLabSection {
     });
     const label = _status === 'pass' ? '✓ Runtime verified'
       : _status === 'fail' ? '✗ Runtime failed'
+      : _status === 'wiring' ? '⚠ Wiring only — not behavior verified'
       : '? Not tested';
     marker.createSpan({ text: label });
   }

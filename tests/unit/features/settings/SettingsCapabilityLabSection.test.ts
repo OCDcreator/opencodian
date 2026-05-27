@@ -551,6 +551,70 @@ describe('SettingsCapabilityLabSection', () => {
     expect(agentRow?.textContent).toContain('Discovery Only');
   });
 
+  it('renders Fallback Model discovery row with configured value when adapter has fallbackModel', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getPluginCount: jest.fn().mockReturnValue(0),
+      getPluginsList: jest.fn().mockReturnValue([]),
+      getMcpServerCount: jest.fn().mockReturnValue(0),
+      getSkillCount: jest.fn().mockReturnValue(0),
+      getSkillsList: jest.fn().mockReturnValue([]),
+      getAgentDefinitionCount: jest.fn().mockReturnValue(0),
+      getAgentDefinitionsList: jest.fn().mockReturnValue([]),
+      options: {
+        settings: {
+          fallbackModel: 'claude-haiku-4-5',
+        },
+      },
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
+    expect(fallbackRow?.textContent).toContain('claude-haiku-4-5');
+    expect(fallbackRow?.textContent).toContain('Discovery Only');
+    expect(fallbackRow?.textContent).toContain('not runtime-verified');
+  });
+
+  it('renders Fallback Model discovery row as empty when adapter has no fallbackModel', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getPluginCount: jest.fn().mockReturnValue(0),
+      getPluginsList: jest.fn().mockReturnValue([]),
+      getMcpServerCount: jest.fn().mockReturnValue(0),
+      getSkillCount: jest.fn().mockReturnValue(0),
+      getSkillsList: jest.fn().mockReturnValue([]),
+      getAgentDefinitionCount: jest.fn().mockReturnValue(0),
+      getAgentDefinitionsList: jest.fn().mockReturnValue([]),
+      options: {
+        settings: {
+          fallbackModel: '',
+        },
+      },
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
+    expect(fallbackRow?.textContent).toContain('No fallback model configured');
+    expect(fallbackRow?.textContent).toContain('Discovery Only');
+    expect(fallbackRow?.textContent).toContain('not runtime-verified');
+  });
+
   it('renders advanced Claude settings as settings-surface untested SDK option rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -1070,6 +1134,94 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('Subagent stream proof failed');
     expect(containerEl.textContent).toContain('SDK subagent error');
     const proofMarker = containerEl.querySelector('[data-capability="Subagent Transcript / Progress"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  it('renders fallback model proof button in discovery controls', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fallback Model Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks Fallback Model as wiring-only when diagnostic prompt completes with fallbackModel option', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-fallback-1',
+        rawMessages: [],
+        chunks: [{
+          type: 'text',
+          content: 'fallback model proof',
+        }],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fallback Model Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      fallbackModel: 'claude-haiku-4-5',
+      persistSession: false,
+    }));
+    expect(containerEl.textContent).toContain('fallbackModel="claude-haiku-4-5"');
+    expect(containerEl.textContent).toContain('The SDK accepted the fallbackModel option');
+    const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-wiring')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  it('handles fallback model proof failure', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('SDK fallback model error')),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fallback Model Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Fallback model proof failed');
+    expect(containerEl.textContent).toContain('SDK fallback model error');
+    const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);

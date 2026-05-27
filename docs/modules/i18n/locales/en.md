@@ -83,6 +83,10 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
 
+2026-05-27 新增 `settings.claudeCode.fallbackModel.boundaryNotice` 键，用于 Model & Thinking 标签中 fallback model 控件后的边界提示。文案说明 fallbackModel 的修改需要重启活跃 Claude Code 会话或开始新的查询,无法像主模型一样在已运行的流中实时更新。
+
+本轮更新 `settings.claudeCode.model.desc` 和 `settings.claudeCode.fallbackModel.desc`，在主/备用模型描述中明确区分 live apply 与 restart-only 的产品边界，并提示用户通过下方 quick-select 下拉框选择模型。新增 `settings.claudeCode.model.quickSelectName` / `quickSelectDesc` 和 `settings.claudeCode.fallbackModel.quickSelectName` / `quickSelectDesc` 键，用于 Model & Thinking 标签中模型/备用模型的 quick-select 下拉框；保留 `settings.claudeCode.modelCatalog.quickSelectPlaceholder` 作为下拉框的默认占位文案。旧的 `modelCatalog.*` 系列键（refreshButton、loading、empty、error、useAsMain、useAsFallback）已随分离式目录列表的移除而废弃。
+
 本轮还将 `chat.question.title` 调整为 backend-neutral 的 “Question from agent”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。
 
 2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告。

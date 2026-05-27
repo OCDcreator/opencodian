@@ -293,4 +293,29 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
     expect(options.agentProgressSummaries).toBe(true);
     expect(options.enableFileCheckpointing).toBeUndefined();
   });
+
+  it('lets fallbackModel override take precedence over settings fallbackModel', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        fallbackModel: 'claude-sonnet-4-5',
+      },
+      fallbackModel: 'claude-haiku-4-5',
+    });
+
+    expect(options.fallbackModel).toBe('claude-haiku-4-5');
+  });
+
+  it('falls back to settings fallbackModel when no override is provided', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        fallbackModel: 'claude-sonnet-4-5',
+      },
+    });
+
+    expect(options.fallbackModel).toBe('claude-sonnet-4-5');
+  });
 });

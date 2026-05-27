@@ -99,6 +99,8 @@ export class SettingsClaudeCodeSection {
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: SettingsClaudeCodeSectionOptions['createSectionHeading'];
   private readonly resolveProcess: (options: ClaudeCodeProcessResolverOptions) => ClaudeCodeProcessResolution;
+  private cachedModelCatalog: Array<{ id: string; name: string; provider: string }> | null = null;
+  private modelCatalogLoadPromise: Promise<Array<{ id: string; name: string; provider: string }>> | null = null;
 
   constructor(options: SettingsClaudeCodeSectionOptions) {
     this.plugin = options.plugin;
@@ -228,8 +230,11 @@ export class SettingsClaudeCodeSection {
   // ─── Model & Thinking tab ─────────────────────────────────────────
 
   private renderModelThinkingTab(containerEl: HTMLElement): void {
-    this.renderModelSetting(containerEl);
-    this.renderFallbackModelSetting(containerEl);
+    const modelTextControl = this.renderModelSetting(containerEl);
+    this.renderModelQuickSelect(containerEl, modelTextControl);
+    const fallbackTextControl = this.renderFallbackModelSetting(containerEl);
+    this.renderFallbackModelQuickSelect(containerEl, fallbackTextControl);
+    this.renderFallbackModelBoundaryNotice(containerEl);
     this.renderThinkingSetting(containerEl);
     if (this.settings.thinking.type === 'fixed') {
       this.renderThinkingBudgetSetting(containerEl);
@@ -240,11 +245,13 @@ export class SettingsClaudeCodeSection {
     this.renderMaxBudgetSetting(containerEl);
   }
 
-  private renderModelSetting(containerEl: HTMLElement): void {
+  private renderModelSetting(containerEl: HTMLElement): unknown {
+    let textControl: unknown = null;
     new Setting(containerEl)
       .setName(t('settings.claudeCode.model.name'))
       .setDesc(t('settings.claudeCode.model.desc'))
       .addText((text) => {
+        textControl = text;
         text
           .setPlaceholder(t('settings.claudeCode.model.placeholder'))
           .setValue(this.settings.model)
@@ -255,13 +262,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    return textControl;
   }
 
-  private renderFallbackModelSetting(containerEl: HTMLElement): void {
+  private renderFallbackModelSetting(containerEl: HTMLElement): unknown {
+    let textControl: unknown = null;
     new Setting(containerEl)
       .setName(t('settings.claudeCode.fallbackModel.name'))
       .setDesc(t('settings.claudeCode.fallbackModel.desc'))
       .addText((text) => {
+        textControl = text;
         text
           .setPlaceholder(t('settings.claudeCode.fallbackModel.placeholder'))
           .setValue(this.settings.fallbackModel)
@@ -270,6 +280,7 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    return textControl;
   }
 
   private renderThinkingSetting(containerEl: HTMLElement): void {
@@ -404,6 +415,90 @@ export class SettingsClaudeCodeSection {
             await this.restartClaudePersistentQueries('settings-change');
           });
       });
+  }
+
+  private renderFallbackModelBoundaryNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-fallback-model-boundary',
+      attr: { 'data-claude-code-fallback-model-boundary': 'true' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.fallbackModel.boundaryNotice') });
+  }
+
+  private renderModelQuickSelect(containerEl: HTMLElement, textControl: unknown): void {
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.model.quickSelectName'))
+      .setDesc(t('settings.claudeCode.model.quickSelectDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.claudeCode.modelCatalog.quickSelectPlaceholder'));
+        dropdown.setValue('');
+
+        void this.loadModelCatalog().then((models) => {
+          for (const model of models) {
+            dropdown.addOption(model.id, model.name || model.id);
+          }
+        });
+
+        dropdown.onChange(async (value) => {
+          if (!value) return;
+          this.settings.model = value;
+          if (textControl && typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
+            (textControl as { setValue: (v: string) => unknown }).setValue(value);
+          }
+          await this.applyClaudeModel(value).catch(() => undefined);
+          await this.saveSettings();
+        });
+      });
+  }
+
+  private renderFallbackModelQuickSelect(containerEl: HTMLElement, textControl: unknown): void {
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.fallbackModel.quickSelectName'))
+      .setDesc(t('settings.claudeCode.fallbackModel.quickSelectDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.claudeCode.modelCatalog.quickSelectPlaceholder'));
+        dropdown.setValue('');
+
+        void this.loadModelCatalog().then((models) => {
+          for (const model of models) {
+            dropdown.addOption(model.id, model.name || model.id);
+          }
+        });
+
+        dropdown.onChange(async (value) => {
+          if (!value) return;
+          this.settings.fallbackModel = value;
+          if (textControl && typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
+            (textControl as { setValue: (v: string) => unknown }).setValue(value);
+          }
+          await this.saveSettings();
+        });
+      });
+  }
+
+  private async loadModelCatalog(): Promise<Array<{ id: string; name: string; provider: string }>> {
+    if (this.cachedModelCatalog !== null) {
+      return this.cachedModelCatalog;
+    }
+    if (this.modelCatalogLoadPromise !== null) {
+      return this.modelCatalogLoadPromise;
+    }
+
+    this.modelCatalogLoadPromise = (async () => {
+      try {
+        const adapter = this.getClaudeAdapter() as {
+          supportedModels?: () => Promise<Array<{ id: string; name: string; provider: string }>>;
+        } | null;
+        const models = await adapter?.supportedModels?.() ?? [];
+        this.cachedModelCatalog = models;
+        return models;
+      } catch {
+        this.cachedModelCatalog = [];
+        return [];
+      }
+    })();
+
+    return this.modelCatalogLoadPromise;
   }
 
   private renderSettingSources(containerEl: HTMLElement): void {

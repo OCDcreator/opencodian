@@ -48,6 +48,9 @@
 - 通过 `createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel })` 写入摘要级诊断日志：`runtime` 覆盖 start/stop/dispose/status change、sendMessage、runtime create/reuse/close、SDK load/query creation、supportedModels、spawn command/exit/error；`sessions` 覆盖 create/delete/update/list/get/fork/rewind/restore；`mcp` 覆盖 MCP config load/reload。日志只记录 id、cwd、count、length、状态和错误摘要，不记录 prompt、tool input、secret 或完整 env
 - `buildSdkOptions` 在构造完 SDK options 后记录 `buildSdkOptions tool config` 日志，包含 `allowedToolCount`、`disallowedToolCount`、`allowedTools` 和 `disallowedTools`，用于在运行时验证工具策略是否进入 SDK query 选项
 - `buildSdkOptions` 同时记录 `buildSdkOptions limits config` 日志，包含 `maxTurns` 和 `maxBudgetUsd`（未设置时为 `null`），用于在运行时验证限制项是否进入 SDK query 选项
+- `buildSdkOptions` 还记录 `buildSdkOptions fallback model` 日志，包含 `fallbackModel` 值（未设置时为 `null`），用于在运行时验证 fallback model 是否进入 SDK query 选项
+- `ClaudeCodeDiagnosticPromptRequest` 接口现在接受可选 `fallbackModel?: string` 字段，允许 Capability Lab 诊断探针在运行诊断 prompt 时覆盖 fallback model
+- `buildDiagnosticSdkOptions()` 将 `request.fallbackModel` 透传到 options builder，用于诊断级的 fallback model 覆盖验证
 
 ## 维护约束
 

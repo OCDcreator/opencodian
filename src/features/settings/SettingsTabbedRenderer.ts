@@ -90,6 +90,7 @@ export class SettingsTabbedRenderer {
   }
 
   renderDisplay(containerEl: HTMLElement): void {
+    containerEl.empty();
     containerEl.classList.add('opencodian-settings-tabbed');
     const activeBackend = this.getActiveBackend();
     const visibleTabs = SETTINGS_PRIMARY_TABS.filter((tab) => {

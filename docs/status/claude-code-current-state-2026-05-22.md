@@ -65,6 +65,32 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-27 Fallback Model wiring-only honesty correction
+
+This slice corrects the Fallback Model diagnostic proof to be honest about what it actually verifies.
+
+### What Changed
+
+- `SettingsCapabilityLabSection.runFallbackModelProof()` now calls `updateRuntimeProof('Fallback Model', 'wiring', ...)` instead of `...'pass'`.
+- Added a new `wiring` runtime proof state to `updateRuntimeProof()` with visual marker `⚠ Wiring only — not behavior verified`.
+- Added `.opencodian-capability-lab-proof-wiring` CSS style (warning-colored inline marker).
+- The matrix row for Fallback Model remains `untested` / `Settings` (static assessment unchanged).
+- The diagnostic output still explains: "The SDK accepted the fallbackModel option without error. This proves wiring only; actual fallback model switching behavior (triggered when the primary model fails) cannot be verified without provoking a real model failure."
+
+### What This Does Not Change
+
+- This does not claim Fallback Model as a verified runtime capability.
+- This does not change the settings UI, locale strings, or the options builder wiring.
+- The `wiring` state is only used for inline proof markers, not matrix rows.
+- This does not add new capabilities or expand the Claude Code surface.
+
+### Verification
+
+- Focused test updated: `marks Fallback Model as wiring-only when diagnostic prompt completes with fallbackModel option` expects `.opencodian-capability-lab-proof-wiring` and explicitly rejects `.opencodian-capability-lab-proof-pass`.
+- Full verify: `npm run verify` passes all gates.
+
+---
+
 ## 2026-05-26 Cap-4: Final visual/layout review and lane completion
 
 Final visual and regression review against Test Vault build `task-cap-4.202605260456` confirms the Claude capability lane is complete with no outstanding layout gaps.

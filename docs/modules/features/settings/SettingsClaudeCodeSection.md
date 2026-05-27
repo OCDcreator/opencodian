@@ -10,8 +10,9 @@
 ## 职责
 
 - 在 Runtime 标签渲染 restart-sensitive runtime boundary notice、Claude Code executable path、带只读状态标记的认证/环境提示、runtime diagnostics 和 env variables 输入
-- 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown；effort 选项与官方 Claude Code CLI/SDK 对齐为 low / medium / high / xhigh / max。该标签同时承载 max turns 和 max budget USD 限制控件，并在这些控件前渲染 limits boundary notice，提示这些设置只在下一次 query 生效并提供 restart 操作
+- 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown；effort 选项与官方 Claude Code CLI/SDK 对齐为 low / medium / high / xhigh / max。该标签同时承载 max turns 和 max budget USD 限制控件，并在这些控件前渲染 limits boundary notice，提示这些设置只在下一次 query 生效并提供 restart 操作。fallback model 控件后渲染 `renderFallbackModelBoundaryNotice()`，提示 fallbackModel 需要重启/下一次查询才能生效，无法像主 model 一样在活跃流中实时更新
 - model 保存时会通过当前注册的 Claude adapter 调用 `setModel()`，让活跃持久 query 尽量 live 更新；没有活跃 query 或 adapter 不可用时仍只保存设置，下一次 query 会读取新值
+- Model & Thinking 标签在 model / fallbackModel 文本输入下方各渲染一个 `renderModelQuickSelect()` / `renderFallbackModelQuickSelect()` 下拉框。下拉框在标签渲染时自动通过当前 Claude adapter 异步调用 `supportedModels()` 加载可用模型目录；用户从下拉框选择模型后，会自动更新上方的文本输入值并保存设置（主模型还会尝试 live apply）。该设计将目录发现与字段输入收敛为统一的 quick-select 体验，既保留文本输入的自由度（支持自定义模型名），又让用户不必仅靠 placeholder 猜测合法模型 ID。目录结果在实例级别缓存，避免重复请求
 - adaptive / disabled thinking 下不渲染 thinking budget，避免显示不会生效的空编辑控件；fixed thinking 下保留用户已有 budget
 - 在 Permissions 标签渲染 permission mode dropdown；保存时会通过 Claude adapter 调用 `setPermissionMode()` 尝试更新活跃 query
 - 在 Context & Sources 标签渲染 setting sources toggles（user/project/local）、项目来源文件可见性（`CLAUDE.md`、`.claude/settings.json`、`.claude/settings.local.json`）、restart-sensitive runtime boundary notice 和 additional directories textarea

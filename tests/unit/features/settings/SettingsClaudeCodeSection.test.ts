@@ -456,6 +456,20 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(hasLimitsBoundary).toBeTruthy();
     });
 
+    it('renders fallback model boundary notice in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-fallback-model-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.fallbackModel.boundaryNotice'));
+    });
+
     it('does not render an inert thinking budget input for adaptive thinking', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -530,6 +544,94 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       await findDropdown(t('settings.claudeCode.effort.name')).onChange?.('high' as never);
       expect(plugin.settings.backendSettings.claudeCode.effort).toBe('high');
       expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('renders model quick-select dropdowns in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      expect(findDropdown(t('settings.claudeCode.model.quickSelectName'))).toBeDefined();
+      expect(findDropdown(t('settings.claudeCode.fallbackModel.quickSelectName'))).toBeDefined();
+    });
+
+    it('selects a model from the quick-select dropdown and updates the model field', async () => {
+      const claudeAdapter = {
+        supportedModels: jest.fn().mockResolvedValue([
+          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic' },
+        ]),
+        setModel: jest.fn().mockResolvedValue(undefined),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      // Wait for async catalog load
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+      expect(claudeAdapter.supportedModels).toHaveBeenCalled();
+
+      await findDropdown(t('settings.claudeCode.model.quickSelectName')).onChange?.('claude-opus-4-5' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-opus-4-5');
+      expect(claudeAdapter.setModel).toHaveBeenCalledWith('claude-opus-4-5');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('selects a fallback model from the quick-select dropdown', async () => {
+      const claudeAdapter = {
+        supportedModels: jest.fn().mockResolvedValue([
+          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic' },
+        ]),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      // Wait for async catalog load
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+      await findDropdown(t('settings.claudeCode.fallbackModel.quickSelectName')).onChange?.('claude-opus-4-5' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('claude-opus-4-5');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('ignores empty selection in quick-select dropdowns', async () => {
+      const claudeAdapter = {
+        supportedModels: jest.fn().mockResolvedValue([
+          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+        ]),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      // Wait for async catalog load
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+      const originalModel = plugin.settings.backendSettings.claudeCode.model;
+      await findDropdown(t('settings.claudeCode.model.quickSelectName')).onChange?.('' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe(originalModel);
     });
 
     it('persists thinking type changes from Model & Thinking tab', async () => {

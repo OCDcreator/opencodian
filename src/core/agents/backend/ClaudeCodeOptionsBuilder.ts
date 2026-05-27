@@ -58,6 +58,7 @@ export interface ClaudeCodeOptionsBuilderInput {
   abortController?: AbortController;
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
   resumeSessionId?: string;
+  fallbackModel?: string;
 }
 
 export interface ClaudeCodeSdkOptionsShape {
@@ -144,7 +145,8 @@ export function buildClaudeCodeOptions(
   if (model) {
     options.model = model;
   }
-  const fallbackModel = trimOptionalString(input.settings.fallbackModel);
+  const fallbackModel = trimOptionalString(input.fallbackModel)
+    ?? trimOptionalString(input.settings.fallbackModel);
   if (fallbackModel) {
     options.fallbackModel = fallbackModel;
   }

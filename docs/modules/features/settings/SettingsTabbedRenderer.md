@@ -31,7 +31,7 @@
 
 ## 标签导航
 
-- `renderDisplay(containerEl)`: 完整渲染标签布局（agent switcher overlay/chips + 一级栏 + 二级栏 + 内容面板）
+- `renderDisplay(containerEl)`: 完整渲染标签布局（agent switcher overlay/chips + 一级栏 + 二级栏 + 内容面板）。每次渲染前调用 `containerEl.empty()` 清空旧内容，防止 tab 切换时旧 section DOM 残留导致视觉重叠和截图误判。
 - `switchToPrimaryTab(primaryTabId, secondaryTabId?)`: 切换一级标签并持久化
 - 内部 `switchSecondaryTab()`: 切换二级标签并持久化
 

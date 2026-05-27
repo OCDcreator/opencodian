@@ -91,6 +91,7 @@ export interface ClaudeCodeDiagnosticPromptRequest {
   forwardSubagentText?: boolean;
   agentProgressSummaries?: boolean;
   persistSession?: boolean;
+  fallbackModel?: string;
   /**
    * Diagnostic resume-at only: resumes the diagnostic prompt from this SDK session id.
    * This is intentionally gated behind runDiagnosticPrompt() and must never be used
@@ -855,6 +856,9 @@ export class ClaudeCodeAdapter
       maxTurns: options.maxTurns ?? null,
       maxBudgetUsd: options.maxBudgetUsd ?? null,
     });
+    runtimeLogger.debug('buildSdkOptions fallback model', {
+      fallbackModel: options.fallbackModel ?? null,
+    });
     return options;
   }
 
@@ -888,6 +892,7 @@ export class ClaudeCodeAdapter
       // Diagnostic resume-at path: accepts arbitrary session id for diagnostic probes only.
       // Intentionally separate from ordinary session resume in buildSdkOptions above.
       resumeSessionId: request.resumeSessionId,
+      fallbackModel: request.fallbackModel,
     });
   }
 

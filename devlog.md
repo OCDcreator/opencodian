@@ -12,6 +12,209 @@
 
 ---
 
+## 2026-05-27 Fix Blank Screenshot and Settings Tab Content Leak
+
+### 目标
+
+修复阻断后续所有运行时验证的 debug gap：Obsidian/插件验证截图经常是空白或没有抓到真正目标 surface。根因分析发现双重问题：autodebug skill 的 CLI screenshot 只抓整窗且没有 pre-screenshot 导航 hook；repo runtime 的 settings tab 切换时旧内容残留在 DOM 中导致视觉重叠。
+
+### 根因
+
+1. **Skill workflow 缺陷**：`obsidian dev:screenshot` 抓取整个 Obsidian 窗口。如果 settings modal 没有先导航到目标 tab，截图会抓到错误的 surface（例如第三方插件列表页而不是 Claude Code Model & Thinking）。
+2. **Repo runtime 缺陷**：`SettingsTabbedRenderer.renderDisplay()` 每次渲染都往 `containerEl` 中 `createDiv` 追加新内容，但从未清空旧内容。tab 切换后旧的 `[data-claude-code-section]` 和 `.opencodian-settings-content-shell` 仍然留在 DOM 中且保持 `display:block`，导致新旧内容重叠。DOM assertions 可以通过（查询的是整个 document），但截图抓到的可能是被遮挡的错误内容。
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsTabbedRenderer.ts` | Bugfix | `renderDisplay(containerEl)` 开头添加 `containerEl.empty()`，防止 tab 切换时旧 section DOM 残留 |
+| `docs/modules/features/settings/SettingsTabbedRenderer.md` | 文档 | 记录 `containerEl.empty()` 行为 |
+
+### Autodebug Skill 改进（全局）
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `scripts/obsidian_cdp_capture_ui.mjs` | 增强 | 新增 `--pre-eval <js>` 选项（截图前执行自定义 JS）和 `--ensure-visible` 选项（默认启用）。截图前执行 `scrollIntoView` + `requestAnimationFrame` + `setTimeout(150)` 等待渲染，检查 `checkVisibility()` 和视口交叉，尝试激活 modal-like 祖先元素 |
+| `scripts/obsidian_plugin_debug_cycle.sh` | 增强 | 新增 `--pre-screenshot-eval` 参数。CLI 路径在 `dev:screenshot` 前执行 `obsidian eval`；CDP 路径将 eval 传给 `obsidian_cdp_capture_ui.mjs` 的 `--pre-eval` |
+| `scripts/obsidian_plugin_debug_cycle.ps1` | 增强 | 新增 `PreScreenshotEval` 参数，截图前执行 eval |
+| `scripts/obsidian_debug_job.mjs` | 增强 | capture section 新增 `preScreenshotEval` 选项，透传给 debug cycle |
+| `job-specs/generic-debug-job.template.json` | 模板 | capture section 新增 `"preScreenshotEval": ""` 示例 |
+
+### 验证
+
+- 全量验证：`npm run verify` → owner-guard PASS、module-docs OK、graphify OK、devlog-order OK、lint clean、typecheck clean、439 suites / 3326 tests passed、build success（BUILD_ID=feature-phase0-capability.202605271832）。
+- Test Vault 运行时验证：
+  - DOM 断言：model-thinking section 渲染正确，所有 9 个 setting labels 存在（模型、快速选择模型、备用模型、快速选择备用模型、Thinking、Effort、重启、最大轮数、最大预算 USD）。
+  - 截图：`.obsidian-debug/final-verification-model-thinking-20260527.png` — 清晰显示 Model & Thinking tab，无重叠/空白/错误内容。
+  - 控制台：`.obsidian-debug/final-verification-console-20260527.txt` — clean，无 error。
+  - 错误：`.obsidian-debug/final-verification-errors-20260527.txt` — "No errors captured."。
+
+---
+
+## 2026-05-27 Converged Model Catalog Quick-Select in Settings
+
+### 目标
+
+将 Claude Code Settings 中分离式的模型目录发现（"Refresh catalog" 按钮 + 独立列表 + 每模型 "Main"/"Fallback" 按钮）收敛为更合理的统一 UI：每个模型字段（model / fallbackModel）自带 quick-select 下拉框，自动加载目录，选择后直接更新对应文本输入并保存。
+
+### 三个问题
+
+1. **UX 碎片**: 文本输入和目录发现是两个独立控件，用户需要在列表和输入框之间来回操作。
+2. **DOM 脆弱性**: `updateModelInputValue()` 通过 `document.querySelector` 扫描 DOM 来更新文本框，依赖 DOM 结构和文案匹配，容易因布局调整而失效。
+3. **无自动加载**: 目录需要手动点击 "Refresh" 才加载，增加一步操作。
+
+### 实现方向
+
+选择**收敛方案**：移除独立的 `renderModelCatalogDiscovery()` 列表区域，改为在每个模型文本输入下方渲染 `renderModelQuickSelect()` / `renderFallbackModelQuickSelect()` 下拉框 Setting。下拉框在标签渲染时自动异步调用 `adapter.supportedModels()` 加载目录（实例级缓存避免重复请求），选择后直接更新 settings、尝试 live apply（主模型）、保存，并通过闭包引用同步更新上方文本输入的可见值。
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 重构 | 移除 `renderModelCatalogDiscovery()` / `refreshModelCatalog()` / `updateModelInputValue()`；新增 `renderModelQuickSelect()` / `renderFallbackModelQuickSelect()` / `loadModelCatalog()`；修改 `renderModelSetting()` / `renderFallbackModelSetting()` 返回 text control 引用供下拉框同步更新；新增实例级目录缓存 |
+| `src/i18n/locales/en.ts` | 文案 | 更新 `model.desc`；新增 `model.quickSelectName` / `quickSelectDesc`、`fallbackModel.quickSelectName` / `quickSelectDesc`；保留 `modelCatalog.quickSelectPlaceholder`；移除已废弃的 `modelCatalog.*` 键 |
+| `src/i18n/locales/zh.ts` | 文案 | 同上，中文翻译 |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 测试 | 替换 4 个旧目录发现测试为 4 个 quick-select 测试：下拉框渲染、主模型选择、备用模型选择、空值忽略 |
+| `docs/modules/features/settings/SettingsClaudeCodeSection.md` | 文档 | 更新 Model & Thinking 标签职责，记录 converged quick-select 行为 |
+| `docs/modules/i18n/locales/en.md` + `zh.md` | 文档 | 记录 locale 键变更：新增 quick-select 键、废弃旧 catalog 键 |
+| `graphify-out/` | 图谱 | `npm run graphify:update:src` 刷新 |
+
+### 验证
+
+- 聚焦测试：`npm test -- --runInBand tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` → 46 passed。
+- 全量验证：`npm run verify` → owner-guard PASS、module-docs OK、graphify OK、devlog-order OK、lint clean、typecheck clean、439 suites / 3326 tests passed、build success（BUILD_ID=feature-phase0-capability.202605271748）。
+- Test Vault 运行时验证：
+  - DOM 断言：model-thinking 标签渲染正常；"模型" / "快速选择模型" / "备用模型" / "快速选择备用模型" 四个控件均存在；fallback model 边界提示存在；目录自动加载，下拉框包含 default / glm-5.1 / glm-5-turbo 等选项。
+  - 截图：`.obsidian-debug/model-converge-model-thinking-20260527.png`
+  - 控制台：`.obsidian-debug/model-converge-console-20260527.txt`
+  - 错误：`.obsidian-debug/model-converge-errors-20260527.txt`
+
+---
+
+## 2026-05-27 Claude Code Model Catalog Discovery in Settings
+
+### 目标
+
+关闭 Claude Code `model` / `fallbackModel` settings 的 discoverability gap。当前用户只能依靠 placeholder 手填模型 ID，无法知道有哪些合法模型可选；同时主模型与备用模型的产品边界（live apply vs restart-only）表达不够清晰。
+
+### 三个缺口分析
+
+1. **Capability gap**: `ClaudeCodeAdapter.supportedModels()` 已存在并可返回 SDK 模型目录，但 settings UI 从未调用它。
+2. **Settings gap**: Model & Thinking tab 的 model / fallbackModel 是纯文本输入，discoverability 太弱，用户只能靠 placeholder 猜测合法 ID。
+3. **Chat/product gap**: model 可 live apply（`setModel()`），fallbackModel 不能；settings 中的边界差异需要更清晰地表达。
+
+### 实现方向
+
+选择**增强型方案 B**：保持文本输入的自由度（支持未来模型 ID 和自定义模型），但在 model / fallbackModel 下方引入“可用模型”异步发现区域。该区域通过 "Refresh catalog" 按钮调用 `adapter.supportedModels()`，以只读列表展示模型名称和 provider，每个模型项附带 "Main" / "Fallback" 两个操作按钮，点击后自动填入对应字段并执行相应保存/应用逻辑。
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 功能 | 新增 `renderModelCatalogDiscovery()` 和 `refreshModelCatalog()`，在 Model & Thinking 标签中渲染模型目录发现区域；新增 `updateModelInputValue()` 通过 DOM 更新对应文本框的可见值 |
+| `src/i18n/locales/en.ts` | 文案 | 更新 `settings.claudeCode.model.desc` / `fallbackModel.desc` 强化 live-vs-restart 差异；新增 `settings.claudeCode.modelCatalog.*` 8 个键 |
+| `src/i18n/locales/zh.ts` | 文案 | 同上，中文翻译 |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 测试 | 新增 4 个测试：discovery 区域渲染、模型列表加载与 Main/Fallback 应用、空状态、错误状态 |
+| `docs/modules/features/settings/SettingsClaudeCodeSection.md` | 文档 | 更新 Model & Thinking 标签职责，记录模型目录发现行为 |
+| `docs/modules/i18n/locales/en.md` + `zh.md` | 文档 | 记录新增 locale 键和更新的 model 描述文案 |
+
+### 验证
+
+- 聚焦测试：`npm test -- --runInBand tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` → 46 passed（含 4 个新增测试）。
+- 后续完整 `npm run verify` 执行中确认通过。
+
+### 产品化状态分类
+
+- **model**: `live-apply + discoverable` — 文本输入保留，但用户现在可以通过 Refresh catalog 发现可用模型并一键填入；live apply 行为不变。
+- **fallbackModel**: `restart-only + discoverable` — 文本输入保留，同样支持从目录一键填入；boundary notice 已存在，文案已强化差异。
+
+---
+
+## 2026-05-27 Fallback Model wiring-only proof state correction
+
+### 目标
+
+修正 `Fallback Model` 诊断探针的 runtime proof 标记过于夸大的问题。原实现中 `runFallbackModelProof()` 在诊断成功后调用 `updateRuntimeProof('Fallback Model', 'pass', ...)`，这会让用户误以为真实的 fallback switching 行为已被验证，与文案中 "proves wiring only" 的声明自相矛盾。
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 诚实性收紧 | `runFallbackModelProof()` 成功路径从 `'pass'` 改为 `'wiring'`；`updateRuntimeProof()` 的 `_status` 类型扩展为 `'pass' \| 'fail' \| 'untested' \| 'wiring'` |
+| `src/style/components/settings-capability-lab.css` | 样式 | 新增 `.opencodian-capability-lab-proof-wiring` 警告色 inline marker 样式 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 测试 | 更新 `marks Fallback Model as wiring-only...` 测试：期望 `proof-wiring` class，显式拒绝 `proof-pass` |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态锚点 | 新增 "Fallback Model wiring-only honesty correction" 连续性记录 |
+
+### 为什么 `wiring` 比 `pass` 更诚实
+
+- `pass` 的 visual marker 显示 "✓ Runtime verified"，暗示该 capability 的**完整运行时行为**已被验证。
+- Fallback Model 诊断探针只能证明 SDK 接受了 `fallbackModel` 选项（wiring），无法证明当主模型失败时真的会切换到备用模型（behavior）。
+- `wiring` 的 visual marker 显示 "⚠ Wiring only — not behavior verified"，明确区分了 "选项被接受" 和 "行为被验证" 两个层级。
+- 矩阵中 Fallback Model 的行仍然保持 `untested` / `Settings`，静态评估未变；只有 inline proof marker 的语义被收紧。
+
+### 验证
+
+- 聚焦测试：`npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 通过（含 wiring-only 断言）。
+- 全量 verify：后续 `npm run verify` 执行中确认通过。
+
+---
+
+## 2026-05-27 Claude Code Fallback Model Runtime Visibility and Honesty Boundary
+
+### 目标
+
+关闭 Claude Code `fallbackModel` 在 capability、settings、chat/product 三个维度的诚实性缺口。`fallbackModel` 是最后一个已暴露为 settings 表面但缺少运行时验证路径和边界提示的 Claude Code 配置项。
+
+### 三个缺口分析
+
+1. **Capability gap**: `fallbackModel` 有 SDK wiring (`ClaudeCodeOptionsBuilder.ts`) 和 adapter 日志（新增），但缺少诊断探针验证选项是否被 SDK 接受。
+2. **Settings gap**: `fallbackModel` 没有像 `model` 那样的 live apply 能力（`setModel()`），也没有边界提示告诉用户何时生效。
+3. **Chat/product gap**: 设置表面已经诚实（"not yet runtime-verified"），但缺少运行时可见性和诊断路径让用户验证 wiring。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 运行时可见性 | `buildSdkOptions()` 新增 `buildSdkOptions fallback model` 日志，记录 `fallbackModel` 值（或 null） |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 诊断探针支持 | `ClaudeCodeDiagnosticPromptRequest` 新增可选 `fallbackModel?: string` 字段，供诊断探针覆盖测试 |
+| `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts` | 诊断覆盖 | `ClaudeCodeOptionsBuilderInput` 新增 `fallbackModel?: string`；override 优先于 `settings.fallbackModel` |
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 边界提示 | `renderFallbackModelBoundaryNotice()` 方法：在 Model & Thinking tab 的 fallbackModel 输入下方显示边界提示，说明备用模型需要重启/新查询生效，无法像主模型一样 live 更新 |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 诊断探针 | 新增 "Fallback Model" discovery row，显示当前配置值和诚实性声明；新增 "Run Fallback Model Proof" 按钮和 `runFallbackModelProof()` 方法 |
+| `src/i18n/locales/en.ts` | 文案 | 新增 `settings.claudeCode.fallbackModel.boundaryNotice` |
+| `src/i18n/locales/zh.ts` | 文案 | 新增中文边界提示文案 |
+| `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts` | 测试 | 新增 2 个测试：override 优先于 settings、无 override 时回退到 settings |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 测试 | 新增 1 个测试：验证 fallback model boundary notice 在 model-thinking tab 中渲染 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 测试 | 新增 5 个测试：discovery row 有/无配置值、proof button 存在、proof pass 路径、proof failure 路径 |
+
+### 运行时验证
+
+- **BUILD_ID**: `feature-phase0-capability.202605271654`
+- **Test Vault 部署**: BUILD_ID 已确认写入 deployed main.js
+- **Model & Thinking tab**: fallback model boundary notice 渲染成功（中文文案："备用模型的修改需要重启当前 Claude Code 会话或开始新的查询。与主模型不同，备用模型无法在已运行的流中实时更新。"）
+- **Capability Lab**: Fallback Model matrix row 显示 SDK=✓, Adapter=✓, Runtime=Untested, Surface=Settings
+- **诊断探针**: 点击 "Run Fallback Model Proof" 成功运行诊断 prompt，sessionId=`3020c3fa-...`，marker class=`opencodian-capability-lab-proof-pass`
+- **Console**: 显示 SDK spawn、hook events、message metadata、assistant response、usage stats、spawn exit code=0、CapabilityLab runtime proof update
+- **Errors**: No errors captured
+
+### fallbackModel 最终分类
+
+| 维度 | 状态 | 说明 |
+|---|---|---|
+| SDK wiring | ✅ proven | `ClaudeCodeOptionsBuilder` 单元测试 + adapter 日志 |
+| Settings UI | ✅ exposed | Model & Thinking tab 文本输入 + 边界提示 |
+| Live apply | ❌ not supported | 无 `setFallbackModel()` 方法，需重启/新查询 |
+| 运行时选项传递 | ✅ proven | adapter 日志显示 `fallbackModel` 进入 `buildSdkOptions`；诊断探针证明 SDK 接受该选项 |
+| 实际 fallback 切换行为 | ⚠️ unverified | 需要真实模型失败事件触发，诊断探针无法验证 |
+| **最终分类** | **wiring+visible / diagnostic** | 选项传递和设置表面已诚实暴露，但实际 fallback 行为仍属未验证的诊断领域 |
+
+### 下一步高价值缺口
+
+1. **Claude Code 后端切换体验**: `fallbackModel` 和 `model` 切换的边界提示已完善，但用户仍需要手动重启会话。可以考虑在 model/fallbackModel 变化时自动提示重启，或提供一键重启按钮。
+2. **Capability Lab 诊断探针自动化**: 目前所有诊断探针（hook、subagent、fallback model）都需要手动点击。可以考虑在 Capability Lab 打开时自动运行轻量级 wiring 验证探针。
+3. **运行时模型目录集成**: `fallbackModel` 目前是纯文本输入，没有模型目录下拉。与 `supportedModels()` 集成可以提供合法的 fallback model 选项。
+
+---
+
 ## 2026-05-27 Claude Code maxTurns/maxBudgetUsd Limits Hardening and Honesty
 
 ### 目标

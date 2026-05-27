@@ -359,6 +359,12 @@
   color: var(--opencodian-status-warning);
 }
 
+.opencodian-settings .opencodian-capability-lab-proof-wiring {
+  border-color: var(--opencodian-status-warning-border);
+  background: var(--opencodian-status-warning-subtle);
+  color: var(--opencodian-status-warning);
+}
+
 .opencodian-settings .opencodian-capability-lab-cap-list {
   display: flex;
   flex-wrap: wrap;
