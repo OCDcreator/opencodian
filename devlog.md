@@ -12,6 +12,98 @@
 
 ---
 
+## 2026-05-28 Synthetic Streaming Context — Diagnostic-Only Inline UI Proof
+
+### 目标
+
+在 Capability Lab 的 deterministic live UI harness 中注入一个 **diagnostic-only synthetic streaming assistant message element**，让共享 inline permission/question card renderers 在不依赖真实模型流的情况下获得临时 `streamingMessageEl`，从而验证 renderer 本身能否真正渲染并收集用户动作。
+
+### 背景
+
+- 上一轮的 harness（`dd28bed2`）已经证明：bridge → host → renderer 链条功能正常，renderer 实例存在且已注册。
+- 但 `StreamingInlineCardRenderer.createStreamingInlineCard()` 需要 `host.getTabRuntimeState(tabId)?.streamingMessageEl` 非 null。没有 active streaming assistant message 时返回 null，导致 bridge 返回 `interrupt: true`。
+- 用户要求一个最小 diagnostic-only pass，让现有共享 inline UI 能在不依赖真实模型流的前提下拿到临时 `streamingMessageEl`。
+
+### 变更
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`：
+  - 新增 `injectSyntheticStreamingContext()` 方法：
+    - 通过 `plugin.app.workspace.getLeavesOfType('opencodian-view')` 获取活跃 chat view
+    - 通过运行时反射访问 chat view 私有方法 `getActiveTabId()` 和 `getTabRuntimeState()` 获取 tab runtime state
+    - 创建一个临时 synthetic assistant message element（`div.opencodian-message.opencodian-message-assistant.opencodian-diagnostic-synthetic-streaming`），包含 `.opencodian-message-content` 子元素
+    - 将临时 element append 到 chat view 的 `messagesContainer`
+    - 保存原有的 `streamingMessageEl`，注入临时 element
+    - 返回 `{ cleanup, success, message }`，cleanup 负责移除临时 element 并恢复原有 `streamingMessageEl`
+  - 修改 `runLivePermissionCardHarness()`：
+    - 在 renderer 检查通过后，先调用 `injectSyntheticStreamingContext()`
+    - 若注入失败（聊天视图未打开或内部不可访问），标记 `boundary` 并说明原因
+    - 若注入成功，在 try/finally 中调用 `bridge.canUseTool('Bash', ...)`，最后执行 cleanup
+  - 修改 `runLiveQuestionDialogHarness()`：
+    - 同样先调用 `injectSyntheticStreamingContext()`
+    - 成功后在 try/finally 中调用 `bridge.canUseTool('AskUserQuestion', ...)`，最后 cleanup
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`：
+  - 新增 `injectSyntheticStreamingContext()` 方法文档
+  - 更新 `runLivePermissionCardHarness()` 和 `runLiveQuestionDialogHarness()` 文档，说明 synthetic streaming context 的作用
+  - 更新 Discovery 面板描述，说明 harness 现在先注入临时 streaming context
+
+### 诚实评估
+
+- **实现范围**：严格限定在 diagnostic/harness 范围。`injectSyntheticStreamingContext()` 只在 Capability Lab 的 live UI harness 中使用，不暴露为公共 API，不影响普通聊天稳定路径。
+- **架构影响**：
+  - 不修改 `OpenCodianView.ts` 的公共 API 或 runtime ownership
+  - 不修改 `StreamingInlineCardRenderer`、`PermissionInlineCardRenderer` 或 `QuestionInlineCardRenderer`
+  - 只通过运行时反射临时修改 runtime state，cleanup 确保状态恢复
+- **预期行为**：
+  1. harness 运行时，临时 synthetic streaming message element 被插入 chat view 的 messages container
+  2. `StreamingInlineCardRenderer.createStreamingInlineCard()` 能拿到非 null 的 `streamingMessageEl`
+  3. permission card / question dialog 被插入 synthetic element 中
+  4. 用户在 chat view 中看到真实的 inline UI 并可以交互（允许/拒绝/回答问题）
+  5. 用户交互结果通过 renderer → host → bridge 返回 harness
+  6. cleanup 移除临时 element，恢复 `streamingMessageEl`，不留残留
+- **边界条件**：
+  - 若聊天视图未打开：`injectSyntheticStreamingContext()` 返回 `success: false`，harness 标记 `boundary`
+  - 若 chat view 内部结构不可访问（未来重构导致私有方法改名）：同样返回 `success: false`
+  - 若用户同时开始真实聊天： synthetic element 只是另一个 assistant message，不会冲突；但真实流的 `streamingMessageEl` 设置可能会覆盖 synthetic。这是可接受的 diagnostic-only 风险。
+
+### 运行时证明
+
+- Test Vault 部署：BUILD_ID=feature-phase0-capability.202605280140
+- Plugin reload：尝试通过 AppleScript 自动化 reload，但 macOS System Events 权限对话框（"Codex 想要控制 System Events"）阻止了所有 AppleScript 自动化
+- **环境限制**：
+  - 权限对话框出现后，所有 `tell application "System Events"` 的 AppleScript 命令都会超时
+  - `screencapture` 可以工作，但无法自动 dismiss 权限对话框
+  - 无法通过自动化完成 UI 交互验证
+- **代码逻辑验证**：
+  - `injectSyntheticStreamingContext()` 的代码路径已覆盖所有分支：聊天视图存在/不存在、runtime state 存在/不存在
+  - harness 的 try/finally 确保 cleanup 总是被调用
+  - TypeScript 编译通过，lint 通过，443 suites / 3374 tests 通过
+- **预期 DOM 结构**（基于代码分析）：
+  - synthetic element: `<div class="opencodian-message opencodian-message-assistant opencodian-diagnostic-synthetic-streaming">`
+    - 子元素: `<div class="opencodian-message-content"><p>🔬 Diagnostic streaming shell...</p></div>`
+  - permission card 被插入 `.opencodian-message-content` 或 `div.opencodian-message` 内部（取决于 `StreamingInlineCardRenderer.insertCard` 的 fallback 逻辑）
+  - question dialog 同理
+- **替代验证策略**：由于环境限制无法自动化截图，建议手动验证步骤：
+  1. 打开 Obsidian Test Vault，确保 opencodian 聊天视图已打开
+  2. 打开 Settings → Debug → Capability Lab
+  3. 点击 "Trigger Live Permission Card"
+  4. 预期：chat view 中出现 synthetic streaming message，其中包含真实的 permission card（🔐 标题 + tool 信息 + Allow Once/Always/Session/Reject 按钮）
+  5. 点击任一按钮，harness 输出应显示 "User decision: once/always/session/reject" 并标记 `pass`
+  6. 点击 "Trigger Live Question Dialog"
+  7. 预期：chat view 中出现 question dialog（? 标题 + diagnostic 问题 + Option A/B + Submit/Reject 按钮）
+  8. 选择选项并点击 Submit，harness 输出应显示 "User decision: allow" 并标记 `pass`
+
+### 验证
+
+- 全量测试：443 suites / 3374 tests passed
+- Lint：0 errors / 0 warnings
+- Typecheck：clean
+- Build：BUILD_ID=feature-phase0-capability.202605280140
+- Graphify：updated
+- Module docs：updated (1 required doc target)
+- Devlog order：OK (210 sections)
+
+---
+
 ## 2026-05-28 Live UI Harness — Deterministic Permission/Question Bridge Proof
 
 ### 目标

@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280042`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280147`
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -64,6 +64,45 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-28 Synthetic Streaming Context — Diagnostic-Only Live UI Harness
+
+This slice adds a minimal diagnostic-only synthetic streaming assistant message shell so that shared inline card renderers (permission cards, question dialogs) have a DOM target during deterministic live UI harnesses, without requiring a real model stream.
+
+### What Changed
+
+- `SettingsCapabilityLabSection.ts`:
+  - Added `injectSyntheticStreamingContext()` private method: creates a temporary DOM element, appends it to the chat view's `messagesContainer`, and sets `runtime.streamingMessageEl` so that `StreamingInlineCardRenderer.createStreamingInlineCard()` has a valid insertion target.
+  - Returns `{ cleanup, success, message }` — the caller MUST invoke `cleanup()` to remove the synthetic element and restore the previous `streamingMessageEl`.
+  - Modified `runLivePermissionCardHarness()` and `runLiveQuestionDialogHarness()` to call `injectSyntheticStreamingContext()` before the bridge call, and to call `synthetic.cleanup()` in a `finally` block.
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`:
+  - Added 5 focused tests covering: chat view missing returns boundary/cleanup no-op, runtime state recovery cleanup restores previous `streamingMessageEl`, success path calls cleanup in finally, error path calls cleanup in finally, and the same for the question dialog harness.
+
+### Honest Assessment
+
+- **Synthetic streaming context is a valid minimal diagnostic-only approach**: it does not modify the renderer architecture or `OpenCodianView` public API. It is strictly transient and isolated to the Capability Lab diagnostic path.
+- **Runtime reflection is acceptable here**: accessing private view methods via bracket notation (`view['getActiveTabId']`, `view['getTabRuntimeState']`) is acceptable for diagnostic code that lives in the Capability Lab and is never called from stable product paths.
+- **try/finally cleanup is essential**: the `finally` block guarantees DOM/runtime state is restored even if the bridge call throws or the user closes the dialog unexpectedly.
+- **Environment limitation**: Automated runtime proof (screenshots, DOM collection) was blocked by a macOS System Events permission dialog ("Codex wants to control System Events"). This dialog blocks all AppleScript automation, preventing automated screenshot/DOM collection. Manual verification steps are documented in `devlog.md` for human operators. Future iterations should pre-grant permissions or use alternative automation (e.g., Playwright via remote debugging port).
+
+### Verification
+
+- Full verify: 443 suites / 3374 tests passed, lint/typecheck/build clean (BUILD_ID=feature-phase0-capability.202605280147)
+- Module docs: OK (1 required doc target updated)
+- Graphify: refreshed
+- Devlog order: OK (210 sections)
+- Test Vault deployed and BUILD_ID verified (feature-phase0-capability.202605280147)
+- Plugin reload: no errors
+- Focused unit tests: 101 tests in SettingsCapabilityLabSection.test.ts, including 5 new synthetic-streaming-context tests
+
+### Runtime Proof
+
+- **Code logic**: VERIFIED — `injectSyntheticStreamingContext()` creates temporary element, appends to `messagesContainer`, sets `runtime.streamingMessageEl`, returns cleanup.
+- **Expected DOM flow**: synthetic assistant message shell → permission/question card insertion → user interaction → result return → cleanup removal.
+- **Environment limitation**: macOS System Events permission dialog blocks all AppleScript automation, preventing automated screenshot/DOM collection.
+- **Manual verification steps documented in devlog**: human operator opens Capability Lab, clicks "Trigger Live Permission Card" or "Trigger Live Question Dialog", verifies synthetic shell appears and is removed after interaction.
+
+---
 
 ## 2026-05-28 Prompt Hardening — Second Attempt and Honest Conclusion
 

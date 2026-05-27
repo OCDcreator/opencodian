@@ -2767,4 +2767,147 @@ describe('SettingsCapabilityLabSection', () => {
     expect(errorEl).toBeTruthy();
     expect(errorEl!.textContent).toContain('SDK session list failed');
   });
+
+  // =======================================================================
+  // Synthetic Streaming Context — focused unit tests
+  // =======================================================================
+  /* eslint-disable @typescript-eslint/no-explicit-any -- Accessing private methods via bracket notation in tests */
+
+  it('injectSyntheticStreamingContext returns boundary when chat view is not open', () => {
+    const plugin = createMockPlugin() as any;
+    plugin.app = {
+      workspace: {
+        getLeavesOfType: jest.fn().mockReturnValue([]),
+      },
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    const result = (section as any).injectSyntheticStreamingContext();
+    expect(result).toMatchObject({
+      success: false,
+      message: expect.stringContaining('not found'),
+    });
+    // Cleanup must be a no-op when the view is missing.
+    expect(() => result.cleanup()).not.toThrow();
+  });
+
+  it('injectSyntheticStreamingContext restores previous runtime state on cleanup', () => {
+    const previousEl = document.createElement('div');
+    const runtime: { streamingMessageEl: HTMLElement | null } = { streamingMessageEl: previousEl };
+    const messagesContainer = document.createElement('div');
+    const mockView = {
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+      messagesContainer,
+    };
+    const plugin = createMockPlugin() as any;
+    plugin.app = {
+      workspace: {
+        getLeavesOfType: jest.fn().mockReturnValue([{ view: mockView }]),
+      },
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    const result = (section as any).injectSyntheticStreamingContext();
+    expect(result.success).toBe(true);
+    expect(runtime.streamingMessageEl).not.toBe(previousEl);
+    expect(messagesContainer.children.length).toBe(1);
+    expect(messagesContainer.children[0].classList.contains('opencodian-diagnostic-synthetic-streaming')).toBe(true);
+
+    result.cleanup();
+    expect(runtime.streamingMessageEl).toBe(previousEl);
+    expect(messagesContainer.children.length).toBe(0);
+  });
+
+  it('live permission card harness calls cleanup in finally on success path', async () => {
+    const cleanupSpy = jest.fn();
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionBridge = {
+      canUseTool: jest.fn().mockResolvedValue({ behavior: 'allow' }),
+    };
+    plugin.claudeCodePermissionHostContext = {
+      permissionCardRenderer: true,
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    // Inject a spy so we can verify cleanup is invoked without needing a real view.
+    (section as any).injectSyntheticStreamingContext = jest.fn().mockReturnValue({
+      cleanup: cleanupSpy,
+      success: true,
+      message: 'ok',
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runLivePermissionCardHarness(outputEl);
+
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(outputEl.textContent).toContain('User approved');
+  });
+
+  it('live permission card harness calls cleanup in finally when bridge throws', async () => {
+    const cleanupSpy = jest.fn();
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionBridge = {
+      canUseTool: jest.fn().mockRejectedValue(new Error('Bridge error')),
+    };
+    plugin.claudeCodePermissionHostContext = {
+      permissionCardRenderer: true,
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    (section as any).injectSyntheticStreamingContext = jest.fn().mockReturnValue({
+      cleanup: cleanupSpy,
+      success: true,
+      message: 'ok',
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runLivePermissionCardHarness(outputEl);
+
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(outputEl.textContent).toContain('Bridge error');
+  });
+
+  it('live question dialog harness calls cleanup in finally on success path', async () => {
+    const cleanupSpy = jest.fn();
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionBridge = {
+      canUseTool: jest.fn().mockResolvedValue({ behavior: 'allow' }),
+    };
+    plugin.claudeCodePermissionHostContext = {
+      questionCardRenderer: true,
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    (section as any).injectSyntheticStreamingContext = jest.fn().mockReturnValue({
+      cleanup: cleanupSpy,
+      success: true,
+      message: 'ok',
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runLiveQuestionDialogHarness(outputEl);
+
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(outputEl.textContent).toContain('User answered');
+  });
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 });

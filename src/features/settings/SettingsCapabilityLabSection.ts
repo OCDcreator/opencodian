@@ -2686,6 +2686,64 @@ export class SettingsCapabilityLabSection {
   // =======================================================================
 
   /**
+   * Create a temporary synthetic streaming assistant message element so that
+   * shared inline card renderers have a DOM target without a real model stream.
+   *
+   * This is strictly diagnostic-only: it mutates the active tab runtime state
+   * transiently and returns a cleanup function that MUST be invoked.
+   */
+  private injectSyntheticStreamingContext(): {
+    cleanup: () => void;
+    success: boolean;
+    message: string;
+  } {
+    try {
+      const leaf = this.plugin.app.workspace.getLeavesOfType('opencodian-view')[0];
+      const view = leaf?.view as unknown as Record<string, unknown> | undefined;
+      if (!view) {
+        return { cleanup: () => {}, success: false, message: 'OpenCodian chat view not found.' };
+      }
+
+      const getActiveTabId = view['getActiveTabId'] as (() => string | null) | undefined;
+      const getTabRuntimeState = view['getTabRuntimeState'] as ((tabId: string | null) => Record<string, unknown> | null) | undefined;
+      const messagesContainer = view['messagesContainer'] as HTMLElement | null;
+
+      if (!getActiveTabId || !getTabRuntimeState || !messagesContainer) {
+        return { cleanup: () => {}, success: false, message: 'Chat view internals not accessible.' };
+      }
+
+      const tabId = getActiveTabId();
+      const runtime = getTabRuntimeState(tabId);
+      if (!runtime) {
+        return { cleanup: () => {}, success: false, message: 'No active tab runtime state.' };
+      }
+
+      const syntheticEl = document.createElement('div');
+      syntheticEl.className = 'opencodian-message opencodian-message-assistant opencodian-diagnostic-synthetic-streaming';
+      const contentEl = syntheticEl.createDiv({ cls: 'opencodian-message-content' });
+      contentEl.createEl('p', { text: '🔬 Diagnostic streaming shell — temporary context for inline card rendering' });
+
+      messagesContainer.appendChild(syntheticEl);
+
+      const previousStreamingMessageEl = runtime['streamingMessageEl'] as HTMLElement | null;
+      runtime['streamingMessageEl'] = syntheticEl;
+
+      const cleanup = (): void => {
+        syntheticEl.remove();
+        runtime['streamingMessageEl'] = previousStreamingMessageEl;
+      };
+
+      return { cleanup, success: true, message: 'Synthetic streaming context injected.' };
+    } catch (err) {
+      return {
+        cleanup: () => {},
+        success: false,
+        message: `Failed to inject synthetic context: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
+
+  /**
    * Deterministically trigger the live permission card through the bridge.
    * This does NOT involve the model; it directly calls canUseTool with a mock
    * request so the bridge → host → renderer → user → result chain is exercised.
@@ -2711,6 +2769,16 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
         text: 'Permission card renderer is not available. Open the OpenCodian chat view first to register the UI renderer.',
+      });
+      this.updateRuntimeProof('Permission Approval', 'boundary', outputEl);
+      return;
+    }
+
+    const synthetic = this.injectSyntheticStreamingContext();
+    if (!synthetic.success) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Cannot create diagnostic streaming context: ${synthetic.message} The renderer exists but requires an active streaming assistant message. This is an architectural boundary: shared inline cards are designed to render within a live chat stream, not in isolation.`,
       });
       this.updateRuntimeProof('Permission Approval', 'boundary', outputEl);
       return;
@@ -2750,6 +2818,8 @@ export class SettingsCapabilityLabSection {
         text: `Live permission card failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('Permission Approval', 'fail', outputEl);
+    } finally {
+      synthetic.cleanup();
     }
   }
 
@@ -2779,6 +2849,16 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
         text: 'Question dialog renderer is not available. Open the OpenCodian chat view first to register the UI renderer.',
+      });
+      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'boundary', outputEl);
+      return;
+    }
+
+    const synthetic = this.injectSyntheticStreamingContext();
+    if (!synthetic.success) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Cannot create diagnostic streaming context: ${synthetic.message} The renderer exists but requires an active streaming assistant message. This is an architectural boundary: shared inline dialogs are designed to render within a live chat stream, not in isolation.`,
       });
       this.updateRuntimeProof('AskUserQuestion / Elicitation', 'boundary', outputEl);
       return;
@@ -2827,6 +2907,8 @@ export class SettingsCapabilityLabSection {
         text: `Live question dialog failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+    } finally {
+      synthetic.cleanup();
     }
   }
 
