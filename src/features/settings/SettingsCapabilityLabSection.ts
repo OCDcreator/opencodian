@@ -2030,6 +2030,8 @@ export class SettingsCapabilityLabSection {
   private renderDiscoveryControls(containerEl: HTMLElement, adapter: ClaudeCodeAdapter | null): void {
     if (!adapter) return;
     const proofControls = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+
+    // Hook proof
     const hookProofBtn = proofControls.createEl('button', {
       text: 'Run Hook Proof',
       cls: 'opencodian-capability-lab-button',
@@ -2041,6 +2043,20 @@ export class SettingsCapabilityLabSection {
     });
     hookProofBtn.addEventListener('click', () => {
       void this.runHookProof(adapter, hookOutputEl);
+    });
+
+    // Subagent stream proof
+    const subagentProofBtn = proofControls.createEl('button', {
+      text: 'Run Subagent Stream Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const subagentOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    subagentProofBtn.addEventListener('click', () => {
+      void this.runSubagentStreamProof(adapter, subagentOutputEl);
     });
   }
 
@@ -2167,6 +2183,11 @@ export class SettingsCapabilityLabSection {
           );
         }
         this.updateRuntimeProof('Hooks', 'pass', outputEl);
+        // Include Hook Events achieves pass here because the hook proof explicitly sets
+        // includeHookEvents: true and then captures real hook backend_event chunks in the
+        // stream. This is legitimate runtime proof: without includeHookEvents, those hook
+        // events would not appear in the diagnostic output.
+        this.updateRuntimeProof('Include Hook Events', 'pass', outputEl);
         return;
       }
       outputEl.createEl('p', {
@@ -2185,6 +2206,84 @@ export class SettingsCapabilityLabSection {
         text: `Hook proof failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('Hooks', 'fail', outputEl);
+    }
+  }
+
+  private async runSubagentStreamProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running a subagent stream proof…' });
+    try {
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Reply with the words subagent stream proof.',
+        forwardSubagentText: true,
+        agentProgressSummaries: true,
+        includeHookEvents: true,
+        persistSession: false,
+      });
+
+      // Look for any subagent-related backend events or chunks
+      const subagentChunks = result.chunks.filter((chunk): chunk is Extract<import('../../core/types/chat').StreamChunk, { type: 'backend_event' }> => {
+        if (chunk.type !== 'backend_event') return false;
+        const eventType = chunk.event ?? '';
+        const meta = chunk.metadata ?? {};
+        return (
+          eventType === 'subagent' ||
+          eventType === 'tool_progress' ||
+          meta.subagentId != null ||
+          meta.agentId != null ||
+          meta.progress != null
+        );
+      });
+
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `Subagent stream diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
+      });
+      if (result.sessionId) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Session ID: ${result.sessionId}`,
+        });
+      }
+
+      outputEl.createEl('p', {
+        text: 'Diagnostic prompt completed with forwardSubagentText and agentProgressSummaries enabled.',
+      });
+
+      // Honesty boundary: Subagent Transcript / Progress only achieves runtime proof
+      // when real subagent/progress backend events are captured in the stream.
+      // Merely accepting the options in the SDK query is not sufficient evidence.
+      if (subagentChunks.length > 0) {
+        outputEl.createEl('p', {
+          text: `Captured ${subagentChunks.length} subagent-related event(s) from the diagnostic stream.`,
+        });
+        renderMessagePreviewList(
+          outputEl,
+          'Subagent event timeline',
+          subagentChunks.map((chunk) => ({
+            type: chunk.event ?? 'backend_event',
+            id: chunk.id,
+            content: chunk.content ?? chunk.metadata,
+          })),
+        );
+        this.updateRuntimeProof('Subagent Transcript / Progress', 'pass', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'No subagent events captured — expected for a single-turn prompt without subagent spawning. Options were accepted by the SDK, but this is not runtime proof of subagent transcript / progress behavior.',
+        });
+        this.updateRuntimeProof('Subagent Transcript / Progress', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Subagent stream proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Subagent Transcript / Progress', 'fail', outputEl);
     }
   }
 

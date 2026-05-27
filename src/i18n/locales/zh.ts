@@ -2283,7 +2283,7 @@ export const zhTranslations = {
   'settings.claudeCode.sdkStreamBoundary.title': '诊断 stream 标记',
   'settings.claudeCode.sdkStreamBoundary.desc': 'Hook 和子代理 stream 标记只供诊断/实验事件流使用，不启用稳定的 hook authoring 或完整子代理 transcript/progress UI。',
   'settings.claudeCode.env.name': '环境变量',
-  'settings.claudeCode.env.desc': '每行一个 KEY=VALUE，传给 Claude Code SDK 进程选项。',
+  'settings.claudeCode.env.desc': '每行一个 KEY=VALUE，传给 Claude Code SDK 进程选项。键名必须符合标准 POSIX 命名规范（字母、数字、下划线）。此路径已连接但尚未经过运行时验证。',
   'settings.claudeCode.env.placeholder': 'ANTHROPIC_API_KEY=...',
   'settings.claudeCode.diagnostics.name': '运行时诊断',
   'settings.claudeCode.diagnostics.desc': '解析已配置的 Claude Code 进程模式以及 bundled/external 可执行文件路径。',

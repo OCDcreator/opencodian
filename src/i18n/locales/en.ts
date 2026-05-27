@@ -2283,7 +2283,7 @@ export const enTranslations = {
   'settings.claudeCode.sdkStreamBoundary.title': 'Diagnostic stream flags',
   'settings.claudeCode.sdkStreamBoundary.desc': 'Hook and subagent stream flags feed diagnostic/experimental event streams. They do not enable stable hook authoring or complete subagent transcript/progress UI.',
   'settings.claudeCode.env.name': 'Environment variables',
-  'settings.claudeCode.env.desc': 'One KEY=VALUE pair per line for Claude Code SDK process options.',
+  'settings.claudeCode.env.desc': 'One KEY=VALUE pair per line for Claude Code SDK process options. Keys must match standard POSIX naming (letters, digits, underscores). This path is wired but not yet runtime-verified.',
   'settings.claudeCode.env.placeholder': 'ANTHROPIC_API_KEY=...',
   'settings.claudeCode.diagnostics.name': 'Runtime diagnostics',
   'settings.claudeCode.diagnostics.desc': 'Resolve the configured Claude Code process mode and bundled/external executable path.',

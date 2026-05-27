@@ -12,6 +12,91 @@
 
 ---
 
+## 2026-05-27 Claude Code Environment Variables Hardening and Honesty
+
+### 目标
+
+推进 Claude Code 设置中已暴露但尚未运行时验证的 `env` 配置，作为本轮最高-value 的稳定设置缺口。通过解析硬化、UI 诚实性声明和 spawn 日志增强，将 env 从纯 wiring 推进到具备边界验证和运行时可见性的产品状态。
+
+### 选择理由
+
+在 `fallbackModel`、`allowed/disallowed tools`、`env`、`maxTurns/maxBudgetUsd` 四个候选中，`env` 是最现实可运行时验证的：
+- env 直接传入 `child_process.spawn()`，spawn 日志已可观测
+- 用户实际配置环境变量（API key 等）的场景高频且高价值
+- 解析边界硬化可立即提升产品安全性（拒绝非法键名）
+- 相比 maxTurns/maxBudgetUsd 需要长对话才能验证，env 的验证路径最短
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 硬化解析 | `parseEnv()` 新增 `isValidEnvKey()` 校验，只接受标准 POSIX 键名 `[A-Za-z_][A-Za-z0-9_]*`；含空格、连字符、以数字开头的键被静默丢弃 |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 增强日志 | `spawnClaudeCodeProcess` 的 debug 日志从只记录 `envKeyCount` 扩展为同时记录 `envKeys`（不记录值，保护隐私），提供运行时可见性 |
+| `src/i18n/locales/en.ts` | UI 诚实性 | `settings.claudeCode.env.desc` 追加 POSIX 命名规范提示和 "not yet runtime-verified" 声明 |
+| `src/i18n/locales/zh.ts` | UI 诚实性 | 中文描述同步追加 POSIX 规范提示和 "尚未经过运行时验证" 声明 |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 新增测试 | 覆盖非法键名拒绝（空格、数字开头、连字符）和合法键名接受（下划线开头、尾部数字） |
+
+### 运行时验证
+
+- 构建: `npm run verify` → 439 suites / 3310 tests passed, lint/typecheck/build clean
+- BUILD_ID: `feature-phase0-capability.202605271550`
+- 部署到 Test Vault 并验证 BUILD_ID 匹配
+- 通过 `obsidian dev:console` 确认 spawn 日志包含 `envKeys` 字段
+
+### 诚实分类
+
+| 维度 | 状态 | 说明 |
+|---|---|---|
+| 解析硬化 | ✅ 已验证 | 单元测试覆盖非法/合法键名边界 |
+| spawn 日志 | ✅ 已验证 | 代码层面确认 envKeys 被记录，Test Vault console 捕获确认 |
+| SDK 选项传递 | ✅ 已验证 | `ClaudeCodeOptionsBuilder.test.ts` 已有 env 传递测试 |
+| 子进程实际接收 | ⚠️ 仅 wiring | 受限于 Node.js spawn 内部行为，无法在不侵入子进程的情况下直接验证；视为 SDK/宿主边界，非 OpenCodian 可证 |
+| 长周期稳定性 | ⚠️ 未验证 | 未做持续多轮对话下的 env 继承验证 |
+
+### 剩余阻塞
+
+- **子进程实际接收**: 需要侵入 Claude Code 进程内部读取 `process.env` 才能完全证明，属于 SDK/宿主边界，当前架构无法安全做到
+- **长周期稳定性**: 多轮对话 resume 时 env 是否继承，需要专门的端到端探针，留待后续诊断能力提升
+
+---
+
+## 2026-05-27 Subagent Stream Proof and Hook Events Runtime Deepening
+
+### 目标
+
+为 Capability Lab 的 `Subagent Transcript / Progress` 和 `Include Hook Events` 两项诊断能力加深运行时证明，通过新增诊断探针和扩展现有 hook proof 的覆盖范围，使矩阵中的 static assessment 更接近 runtime reality。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 新增诊断方法 | `runSubagentStreamProof()` 运行带 `forwardSubagentText` + `agentProgressSummaries` 的诊断 prompt，检查 subagent 相关 backend_event；仅当真实捕获到 subagent/progress backend_event 时才标 pass，零事件时标 fail（不把 option acceptance 伪装成 runtime proof） |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 扩展现有方法 | `runHookProof()` 成功时同时更新 `Hooks` 和 `Include Hook Events` 运行时证明 |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 新增 UI 控件 | Discovery 控制区新增 `Run Subagent Stream Proof` 按钮 |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 扩展接口 | `ClaudeCodeDiagnosticPromptRequest` 新增 `forwardSubagentText?: boolean` 和 `agentProgressSummaries?: boolean` |
+| `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts` | 扩展输入 | `ClaudeCodeOptionsBuilderInput` 新增 `forwardSubagentText?: boolean` 和 `agentProgressSummaries?: boolean`；builder 支持 input 层覆盖（不仅限 settings） |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 扩展 wiring | `buildDiagnosticSdkOptions()` 透传 `forwardSubagentText` 和 `agentProgressSummaries` 到 builder |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 新增测试 | 4 个测试：subagent stream proof 按钮渲染、无事件成功路径、有事件成功路径、失败路径；更新 hook proof 测试验证 Include Hook Events 标记 |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 新增测试 | 2 个测试：诊断 prompt 透传 subagent 选项、未提供时不设置 |
+| `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts` | 更新测试 | 诊断 runtime override 测试增加 `forwardSubagentText` 和 `agentProgressSummaries` 断言 |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 更新文档 | 记录 hook proof 同时更新 Include Hook Events、subagent stream proof 行为 |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 更新文档 | runDiagnosticPrompt 职责描述包含 subagent stream 选项 |
+
+### 验证结果
+
+- `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` → 87 passed ✓
+- `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` → 99 passed ✓
+- `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts` → 16 passed ✓
+
+### 诚实性说明
+
+- `Subagent Transcript / Progress` 的 runtime proof 仍标 `Diagnostic` + `Untested` 在静态矩阵中；探针仅当真实捕获到 subagent/progress backend_event 时才通过 `updateRuntimeProof` 动态更新为 pass，零事件时标 fail
+- 单轮 diagnostic prompt 通常不会触发子代理生成，因此探针会在无 subagent 事件时标 fail，UI 明确提示 "No subagent events captured — expected for a single-turn prompt without subagent spawning. Options were accepted by the SDK, but this is not runtime proof of subagent transcript / progress behavior."
+- `Include Hook Events` 的 runtime proof 现在与 `Hooks` 探针绑定：当 Hook Proof 显式设置 `includeHookEvents: true` 并捕获到 SessionStart hook backend_event 时，同时标记 Include Hook Events 为 pass。这是诚实的 runtime proof，因为无 includeHookEvents 时这些 hook 事件不会出现在流中
+- 这仍属于诊断边界内的 runtime proof，不构成 stable hook authoring 或 subagent transcript UI 的完成声明
+
+---
+
 ## 2026-05-27 Agent Definitions Runtime Summary
 
 ### 目标

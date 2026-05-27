@@ -49,6 +49,8 @@ export interface ClaudeCodeOptionsBuilderInput {
   persistSession?: boolean;
   enableFileCheckpointing?: boolean;
   includeHookEvents?: boolean;
+  forwardSubagentText?: boolean;
+  agentProgressSummaries?: boolean;
   plugins?: unknown[];
   skills?: string[] | 'all';
   agent?: string;
@@ -224,10 +226,10 @@ export function buildClaudeCodeOptions(
   if (input.includeHookEvents || input.settings.includeHookEvents) {
     options.includeHookEvents = true;
   }
-  if (input.settings.forwardSubagentText) {
+  if (input.forwardSubagentText || input.settings.forwardSubagentText) {
     options.forwardSubagentText = true;
   }
-  if (input.settings.agentProgressSummaries) {
+  if (input.agentProgressSummaries || input.settings.agentProgressSummaries) {
     options.agentProgressSummaries = true;
   }
 

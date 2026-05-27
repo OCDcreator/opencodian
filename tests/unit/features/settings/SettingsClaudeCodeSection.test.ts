@@ -728,6 +728,44 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
+
+    it('rejects env keys with spaces or invalid characters', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findTextArea(t('settings.claudeCode.env.name')).onChange?.(
+        'VALID_KEY=value\nINVALID KEY=space\n123_START=digit\nSPECIAL-KEY=hyphen' as never,
+      );
+
+      expect(plugin.settings.backendSettings.claudeCode.env).toEqual({
+        VALID_KEY: 'value',
+      });
+    });
+
+    it('accepts env keys with underscores and trailing digits', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findTextArea(t('settings.claudeCode.env.name')).onChange?.(
+        '_PRIVATE=secret\nAPI_KEY_2=token\nCLAUDE_V1=enabled' as never,
+      );
+
+      expect(plugin.settings.backendSettings.claudeCode.env).toEqual({
+        _PRIVATE: 'secret',
+        API_KEY_2: 'token',
+        CLAUDE_V1: 'enabled',
+      });
+    });
   });
 
   describe('tools tab', () => {

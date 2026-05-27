@@ -926,6 +926,153 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('Captured 1 hook event');
     expect(containerEl.textContent).toContain('SessionStart');
     expect(containerEl.textContent).toContain('diag-hook-1');
+    // Verify both Hooks and Include Hook Events are marked as pass
+    const proofMarkers = containerEl.querySelectorAll('[data-capability]');
+    const hookMarker = Array.from(proofMarkers).find((el) => el.getAttribute('data-capability') === 'Hooks');
+    const includeHookMarker = Array.from(proofMarkers).find((el) => el.getAttribute('data-capability') === 'Include Hook Events');
+    expect(hookMarker).toBeTruthy();
+    expect(includeHookMarker).toBeTruthy();
+  });
+
+  it('renders subagent stream proof button in discovery controls', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Subagent Stream Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks Subagent Transcript / Progress as fail when no real subagent events are captured', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-subagent-1',
+        rawMessages: [],
+        chunks: [{
+          type: 'text',
+          content: 'subagent stream proof',
+        }],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Subagent Stream Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      forwardSubagentText: true,
+      agentProgressSummaries: true,
+      includeHookEvents: true,
+      persistSession: false,
+    }));
+    expect(containerEl.textContent).toContain('Diagnostic prompt completed with forwardSubagentText and agentProgressSummaries enabled');
+    expect(containerEl.textContent).toContain('No subagent events captured');
+    // Honesty boundary: zero real subagent/progress events means this is NOT a pass.
+    const proofMarker = containerEl.querySelector('[data-capability="Subagent Transcript / Progress"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  it('marks Subagent Transcript / Progress as pass when real subagent backend events are captured', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-subagent-2',
+        rawMessages: [],
+        chunks: [
+          {
+            type: 'backend_event',
+            source: 'claude-code',
+            event: 'subagent',
+            id: 'subagent-1',
+            content: 'subagent started',
+            metadata: { agentId: 'agent-1' },
+          },
+          {
+            type: 'backend_event',
+            source: 'claude-code',
+            event: 'tool_progress',
+            metadata: { progress: 50 },
+          },
+        ],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Subagent Stream Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Captured 2 subagent-related event(s)');
+    expect(containerEl.textContent).toContain('subagent');
+    expect(containerEl.textContent).toContain('tool_progress');
+    // Only when real subagent/progress events are captured does this become pass.
+    const proofMarker = containerEl.querySelector('[data-capability="Subagent Transcript / Progress"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(false);
+  });
+
+  it('handles subagent stream proof failure', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('SDK subagent error')),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Subagent Stream Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Subagent stream proof failed');
+    expect(containerEl.textContent).toContain('SDK subagent error');
+    const proofMarker = containerEl.querySelector('[data-capability="Subagent Transcript / Progress"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
   });
 
   // =======================================================================

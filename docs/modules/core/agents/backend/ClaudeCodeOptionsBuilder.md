@@ -17,7 +17,7 @@
 - 当 `permissionMode === 'bypassPermissions'` 时显式写入 SDK 要求的 `allowDangerouslySkipPermissions: true`
 - 将 OpenCodian UI 中的 `thinking.type === 'fixed'` 映射为官方 SDK `thinking: { type: 'enabled', budgetTokens }`
 - 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`pathToClaudeCodeExecutable`、`canUseTool`、`mcpServers`
-- 只在用户显式开启时写入 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`；这些是 SDK 诊断/后续能力 foundation，不等同于稳定 JSONL browser、hook authoring 或 rewind UI
+- 只在用户显式开启或 runtime 明确注入时写入 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`；这些是 SDK 诊断/后续能力 foundation，不等同于稳定 JSONL browser、hook authoring 或 rewind UI。`forwardSubagentText` 和 `agentProgressSummaries` 现在支持 runtime-only 覆盖，让 Capability Lab 的 subagent stream proof 可以在不污染稳定设置的情况下强制打开子代理事件流
 - 只在 adapter 已捕获真实 Claude SDK session id 时写入 `resume`，让后续 per-send `query()` 续接同一个 Claude session
 - 只在 runtime 提供时写入 `abortController` 和 `spawnClaudeCodeProcess`，用于 Obsidian/Electron 下的流取消和进程启动兼容层
 - 只在 runtime 明确注入时透传 `hooks`、`sessionStore` / `sessionStoreFlush`、`outputFormat`、`persistSession`、`plugins`、`skills`（包含 SDK 的 `'all'` skills sentinel）、`agent` 和 `agents`，为后续 Claude Code authoring、structured output、agent definitions 和 JSONL mirror/import 诊断保留官方 SDK 通道；这些字段不来自用户设置，也不等同于稳定 UI 已完成

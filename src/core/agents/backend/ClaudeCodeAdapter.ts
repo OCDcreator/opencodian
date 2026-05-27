@@ -88,6 +88,8 @@ export interface ClaudeCodeDiagnosticPromptRequest {
   outputFormat?: ClaudeCodeOptionsBuilderInput['outputFormat'];
   enableFileCheckpointing?: boolean;
   includeHookEvents?: boolean;
+  forwardSubagentText?: boolean;
+  agentProgressSummaries?: boolean;
   persistSession?: boolean;
   /**
    * Diagnostic resume-at only: resumes the diagnostic prompt from this SDK session id.
@@ -869,6 +871,8 @@ export class ClaudeCodeAdapter
       outputFormat: request.outputFormat ?? this.options.outputFormat,
       enableFileCheckpointing: request.sessionStore ? false : request.enableFileCheckpointing,
       includeHookEvents: request.includeHookEvents,
+      forwardSubagentText: request.forwardSubagentText,
+      agentProgressSummaries: request.agentProgressSummaries,
       persistSession: request.persistSession,
       // Diagnostic resume-at path: accepts arbitrary session id for diagnostic probes only.
       // Intentionally separate from ordinary session resume in buildSdkOptions above.
@@ -1218,11 +1222,13 @@ export class ClaudeCodeAdapter
   }
 
   private readonly spawnClaudeCodeProcess = (request: ClaudeCodeSpawnRequest) => {
+    const envKeys = Object.keys(request.env ?? {});
     runtimeLogger.debug('spawn command', {
       command: request.command,
       cwd: request.cwd,
       argCount: request.args.length,
-      envKeyCount: Object.keys(request.env ?? {}).length,
+      envKeyCount: envKeys.length,
+      envKeys,
     });
     const child = spawn(request.command, request.args, {
       cwd: request.cwd,

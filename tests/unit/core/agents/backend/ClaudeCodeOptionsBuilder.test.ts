@@ -282,11 +282,15 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
       persistSession: false,
       enableFileCheckpointing: false,
       includeHookEvents: true,
+      forwardSubagentText: true,
+      agentProgressSummaries: true,
     });
 
     expect(options.outputFormat).toBe(outputFormat);
     expect(options.persistSession).toBe(false);
     expect(options.includeHookEvents).toBe(true);
+    expect(options.forwardSubagentText).toBe(true);
+    expect(options.agentProgressSummaries).toBe(true);
     expect(options.enableFileCheckpointing).toBeUndefined();
   });
 });

@@ -2608,4 +2608,46 @@ describe('ClaudeCodeAdapter', () => {
       expect(result.sessionId).toBe('diag-session-with-flag');
     });
   });
+
+  describe('diagnostic subagent stream options', () => {
+    it('passes forwardSubagentText and agentProgressSummaries through buildDiagnosticSdkOptions', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Subagent stream test',
+        forwardSubagentText: true,
+        agentProgressSummaries: true,
+        persistSession: false,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.forwardSubagentText).toBe(true);
+      expect(passedOptions.agentProgressSummaries).toBe(true);
+    });
+
+    it('does not set subagent options when not provided', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Plain diagnostic test',
+        persistSession: false,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.forwardSubagentText).toBeUndefined();
+      expect(passedOptions.agentProgressSummaries).toBeUndefined();
+    });
+  });
 });

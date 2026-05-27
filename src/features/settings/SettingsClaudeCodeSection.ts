@@ -866,11 +866,23 @@ export class SettingsClaudeCodeSection {
         continue;
       }
       const key = line.slice(0, separatorIndex).trim();
-      if (!key) {
+      const val = line.slice(separatorIndex + 1).trim();
+      if (!this.isValidEnvKey(key)) {
         continue;
       }
-      env[key] = line.slice(separatorIndex + 1).trim();
+      env[key] = val;
     }
     return env;
+  }
+
+  private isValidEnvKey(key: string): boolean {
+    if (!key || key.length === 0) {
+      return false;
+    }
+    // Standard POSIX env var naming: [A-Za-z_][A-Za-z0-9_]*
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+      return false;
+    }
+    return true;
   }
 }
