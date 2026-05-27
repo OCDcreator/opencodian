@@ -10,10 +10,13 @@
  * See openspec/phase1-capability-lab.md for design rationale.
  */
 import { existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { Notice, Setting } from 'obsidian';
 
-import { type BackendCapabilities,hasCapability } from '../../core/agents/AgentCapability';
+import type { BackendCapabilities } from '../../core/agents/AgentCapability';
+import { hasCapability } from '../../core/agents/AgentCapability';
 import {
   getBackendSessionPreview,
   listBackendSessions,
@@ -3649,7 +3652,7 @@ export class SettingsCapabilityLabSection {
 
     const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const envKey = `OPENCODIAN_ENV_PROOF_${Date.now()}`;
-    const envProofPath = `/tmp/opencodian-env-proof-${nonce}`;
+    const envProofPath = join(tmpdir(), `opencodian-env-proof-${nonce}`);
     const prompt = [
       'Environment proof task. You MUST call Bash with this exact command:',
       'touch "$OPENCODIAN_ENV_PROOF_PATH"',
