@@ -25,4 +25,5 @@
 - 这个模块不直接依赖 `OpenCodeService`；最终结果通过 `collectAndRespond()` 的 responder seam 回传
 - `session` 是 UI 返回值；renderer 在本地按 tool + action + 完整 pattern set 记录 session-scoped approval，并把实际 wire reply 交给 responder 的 `always` 路径
 - `patterns === ['*']` 时仍保持不渲染 pattern 区块的旧行为
+- Permission card root 设置 `data-permission-card="true"`，四个操作按钮分别设置 `data-permission-action="once|always|session|reject"`，供自动化测试和诊断探针稳定定位卡片与操作
 - 不要在这里重复实现 streaming shell 查询或 reveal 逻辑，统一继续走 `StreamingInlineCardRenderer`

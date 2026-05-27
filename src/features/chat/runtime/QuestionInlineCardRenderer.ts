@@ -70,6 +70,7 @@ export class QuestionInlineCardRenderer {
     if (!cardEl) {
       return null;
     }
+    cardEl.setAttribute('data-question-card', 'true');
 
     if (runtime) {
       runtime.questionInlineCardEl = cardEl;
@@ -447,12 +448,12 @@ export class QuestionInlineCardRenderer {
     const submitBtn = buttonsEl.createEl('button', {
       cls: 'opencodian-question-inline-btn is-submit',
       text: submitText,
-      attr: { type: 'button' },
+      attr: { type: 'button', 'data-question-action': 'submit' },
     });
     const rejectBtn = buttonsEl.createEl('button', {
       cls: 'opencodian-question-inline-btn is-reject',
       text: t('chat.question.reject'),
-      attr: { type: 'button' },
+      attr: { type: 'button', 'data-question-action': 'reject' },
     });
 
     return {

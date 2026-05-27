@@ -154,6 +154,51 @@ This slice removes the stable `sdk-foundations` tab entirely. After the previous
 
 ---
 
+## 2026-05-28 Permission / AskUserQuestion Ordinary Chat Proof Attempt
+
+This slice attempts to move Permission Approval and AskUserQuestion / Elicitation from `wiring` toward actual ordinary chat end-to-end runtime proof. It adds stable DOM selectors to permission and question inline cards, attempts automated ordinary chat message sending, and documents the exact blockers encountered.
+
+### What Changed
+
+- `PermissionInlineCardRenderer.ts`:
+  - Added `data-permission-card="true"` to the root permission inline card element
+  - Added `data-permission-action="once|always|session|reject"` to each permission action button
+- `QuestionInlineCardRenderer.ts`:
+  - Added `data-question-card="true"` to the root question inline card element
+  - Added `data-question-action="submit|reject"` to question action buttons
+- `SettingsCapabilityLabSection.ts`:
+  - Updated capability matrix comments for Permission Approval and AskUserQuestion to document the two concrete blockers preventing ordinary chat proof
+
+### Ordinary Chat Proof Blockers
+
+**Attempted approaches:**
+1. Open chat view via `opencodian:open-chat-view` / `opencodian:open-view` commands
+2. Send tool-inducing prompt ("Please run pwd and ls...") via CodeMirror DOM manipulation (focus, execCommand insertText, click send button)
+3. Direct adapter message sending via `ClaudeCodeAdapter.sendMessage()`
+
+**Blocker 1: Chat view composer automation**
+- The OpenCodian chat view does not appear as a standard Obsidian workspace leaf after plugin reload; `app.workspace.getLeavesOfType('opencodian')` returns 0 leaves even after opening the view
+- The CodeMirror 6 composer editor (`.cm-editor`) does not respond to standard DOM manipulation: `execCommand('insertText')`, `focus()`, and `click()` on the send button do not result in an actual message being sent
+- No Obsidian command exists for programmatic message sending; the plugin's `sendMessage` method is on the OpenCode service (not Claude adapter) and requires async handling not available in `obsidian eval`
+- The Claude adapter's `sendMessage()` is an async generator that cannot be consumed through the synchronous `obsidian eval` context
+
+**Blocker 2: Non-deterministic tool calling**
+- Even if message sending were automated, model tool calling is inherently non-deterministic
+- The model may or may not call Bash/Read/Edit/AskUserQuestion in response to a prompt
+- Previous Capability Lab diagnostic probes already demonstrate this non-determinism
+
+**Current honest classification:**
+- Permission Approval: `runtimeProof: 'wiring'` — bridge and SDK options wired; direct harness works; ordinary chat proof blocked by composer automation + tool non-determinism
+- AskUserQuestion / Elicitation: `runtimeProof: 'wiring'` — same blockers as Permission Approval
+
+### Next Steps to Unblock Ordinary Chat Proof
+
+1. **Composer automation**: Add a programmatic send API to the chat view (e.g., `view.sendMessage(text)`) or expose an Obsidian command for test automation
+2. **Streaming context injection**: Ensure the chat view's streaming message element exists before sending, so permission/question cards have a DOM target
+3. **Deterministic tool triggers**: Use capability-lab-style diagnostic prompts that explicitly request tool use, but route them through the ordinary chat send path instead of `runDiagnosticPrompt()`
+
+---
+
 ## 2026-05-28 Stable Settings Readback Proof
 
 This slice adds runtime readback proof for Claude Code stable settings (Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables, Fallback Model) by capturing the actual SDK options built during a diagnostic prompt and verifying these fields are present.

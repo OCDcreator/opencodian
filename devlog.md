@@ -12,6 +12,55 @@
 
 ---
 
+## 2026-05-28 Permission / AskUserQuestion Ordinary Chat Proof Attempt
+
+### 目标
+
+尝试将 Permission Approval 和 AskUserQuestion / Elicitation 从 `wiring` 推向真实的普通聊天端到端运行期证明。添加稳定的 DOM 选择器，尝试自动化普通聊天消息发送，并记录遇到的精确阻塞点。
+
+### 改动
+
+1. **PermissionInlineCardRenderer.ts**：
+   - 根权限 inline card 元素添加 `data-permission-card="true"`
+   - 四个操作按钮分别添加 `data-permission-action="once|always|session|reject"`
+
+2. **QuestionInlineCardRenderer.ts**：
+   - 根问题 inline card 元素添加 `data-question-card="true"`
+   - 提交和拒绝按钮分别添加 `data-question-action="submit|reject"`
+
+3. **SettingsCapabilityLabSection.ts**：
+   - 更新 capability matrix 注释，记录阻止普通聊天证明的两个具体阻塞点
+
+### 普通聊天证明阻塞点
+
+**尝试的方法：**
+1. 通过 `opencodian:open-chat-view` / `opencodian:open-view` 命令打开聊天视图
+2. 通过 CodeMirror DOM 操作（focus、execCommand insertText、点击发送按钮）发送诱导工具调用的 prompt
+3. 直接通过 `ClaudeCodeAdapter.sendMessage()` 发送消息
+
+**阻塞点 1：聊天视图编辑器自动化**
+- 插件 reload 后，OpenCodian 聊天视图不显示为标准 Obsidian workspace leaf；`app.workspace.getLeavesOfType('opencodian')` 返回 0
+- CodeMirror 6 编辑器（`.cm-editor`）不响应标准 DOM 操作：`execCommand('insertText')`、`focus()` 和发送按钮 `click()` 均未导致消息实际发送
+- 不存在用于程序化消息发送的 Obsidian 命令；插件的 `sendMessage` 在 OpenCode service 上（非 Claude adapter），且需要 eval 不支持的异步处理
+- Claude adapter 的 `sendMessage()` 是 async generator，无法通过同步 `obsidian eval` 消费
+
+**阻塞点 2：非确定性工具调用**
+- 即使消息发送自动化，模型工具调用本身是非确定性的
+- 模型可能对 prompt 调用也可能不调用 Bash/Read/Edit/AskUserQuestion
+- Capability Lab 诊断探针已证明此非确定性
+
+**当前诚实分类：**
+- Permission Approval：`runtimeProof: 'wiring'` — bridge 和 SDK options 已接线；direct harness 可用；普通聊天证明被编辑器自动化 + 工具非确定性阻塞
+- AskUserQuestion / Elicitation：`runtimeProof: 'wiring'` — 与 Permission Approval 相同阻塞点
+
+### 下一步解堵方案
+
+1. **编辑器自动化**：为聊天视图添加程序化发送 API（如 `view.sendMessage(text)`）或暴露用于测试自动化的 Obsidian 命令
+2. **流式上下文注入**：确保发送前聊天视图的 streaming message 元素存在，使权限/问题卡片有 DOM 目标
+3. **确定性工具触发**：使用 Capability Lab 风格的诊断 prompt 显式请求工具调用，但通过普通聊天发送路径而非 `runDiagnosticPrompt()` 路由
+
+---
+
 ## 2026-05-28 SDK Foundations Tab Removal
 
 ### 目标

@@ -572,14 +572,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)
-        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Permission Card) can exercise the full bridge → host → renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model calls tool → permission card renders → user approves/denies → stream continues) is still not available because tool calling is non-deterministic.
+        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Permission Card) can exercise the full bridge → host → renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model calls tool → permission card renders → user approves/denies → stream continues) is blocked by two issues: (1) tool calling is non-deterministic — the model may not call a tool even with tool-inducing prompts; (2) the chat view composer (CodeMirror) does not respond to automated DOM input, making it impossible to programmatically send messages through the ordinary chat path for repeated proof attempts. Added data-permission-card and data-permission-action selectors to the permission card DOM for future verification stability.
         userSurface: 'settings', // Reuses existing stable permission card UI in ordinary chat; no separate Claude permission settings page.
       },
       {
         capability: 'AskUserQuestion / Elicitation',
         sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
         adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
-        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Question Dialog) can exercise the full bridge → host → question renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model asks question → dialog renders → user answers → stream continues) is still not available because tool calling is non-deterministic.
+        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Question Dialog) can exercise the full bridge → host → question renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model asks question → dialog renders → user answers → stream continues) is blocked by the same two issues as Permission Approval: non-deterministic tool calling and the chat view composer not accepting automated DOM input. Added data-question-card and data-question-action selectors to the question card DOM for future verification stability.
         userSurface: 'settings', // Reuses existing stable question dialog in ordinary chat; no separate Claude question settings page.
       },
       {
