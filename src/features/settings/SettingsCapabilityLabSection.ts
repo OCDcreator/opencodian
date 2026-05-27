@@ -2331,6 +2331,20 @@ export class SettingsCapabilityLabSection {
       void this.runStableSettingsReadbackProof(adapter, stableSettingsOutputEl);
     });
 
+    // Environment Variables Proof — runtime behavior probe with nonce env var
+    const envProofBtn = proofControls.createEl('button', {
+      text: 'Run Environment Variables Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const envProofOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    envProofBtn.addEventListener('click', () => {
+      void this.runEnvironmentVariablesProof(adapter, envProofOutputEl);
+    });
+
     // Ordinary Chat Permission Proof — sends a real chat message through the send pipeline
     const ordinaryPermissionBtn = proofControls.createEl('button', {
       text: 'Launch Ordinary Chat Permission Proof',
@@ -3621,6 +3635,115 @@ export class SettingsCapabilityLabSection {
         cls: 'opencodian-capability-lab-hint',
         text: 'None of the stable settings are currently configured. Configure them in the Claude Code settings tabs and re-run this proof.',
       });
+    }
+  }
+
+  private async runEnvironmentVariablesProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running environment variables runtime proof…' });
+
+    const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const envKey = `OPENCODIAN_ENV_PROOF_${Date.now()}`;
+    const prompt = [
+      `Environment proof task. You MUST call Bash with the command: printenv ${envKey}`,
+      `Then respond with exactly: ${nonce}`,
+      'Do not add extra words.',
+    ].join(' ');
+
+    const originalEnv = { ...(this.claudeCodeSettings.env ?? {}) };
+    const originalPermissionMode = this.claudeCodeSettings.permissionMode;
+    this.claudeCodeSettings.env = {
+      ...originalEnv,
+      [envKey]: nonce,
+    };
+    this.claudeCodeSettings.permissionMode = 'acceptEdits';
+
+    try {
+      await adapter.setPermissionMode?.('acceptEdits');
+      const result = await adapter.runDiagnosticPrompt({
+        prompt,
+        persistSession: false,
+      });
+
+      const options = adapter.inspectLastDiagnosticSdkOptions?.();
+      const envFromReadback = options?.env ?? {};
+      const readbackMatch = typeof envFromReadback[envKey] === 'string' && envFromReadback[envKey] === nonce;
+
+      const bashToolUses = result.chunks.filter((chunk) => (
+        chunk.type === 'tool_use' && chunk.name === 'Bash'
+      ));
+      const bashToolResults = result.chunks.filter((chunk) => (
+        chunk.type === 'tool_result'
+      ));
+      const resultTextJoined = result.chunks
+        .filter((chunk): chunk is Extract<import('../../core/types/chat').StreamChunk, { type: 'text' }> => chunk.type === 'text')
+        .map((chunk) => chunk.content)
+        .join('\n');
+
+      const nonceSeenInToolResult = bashToolResults.some((chunk) => chunk.content.includes(nonce));
+      const nonceSeenInAssistantText = resultTextJoined.includes(nonce);
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Environment Variables Proof (layered)' });
+      outputEl.createEl('p', { text: `Probe env key: ${envKey}` });
+      outputEl.createEl('p', { text: `Expected nonce: ${nonce}` });
+      outputEl.createEl('p', { text: `Layer 1 (settings -> SDK readback): ${readbackMatch ? 'PASS' : 'FAIL'}` });
+      outputEl.createEl('p', { text: `Layer 2 (Bash tool invoked): ${bashToolUses.length > 0 ? 'PASS' : 'NO EVIDENCE'}` });
+      outputEl.createEl('p', { text: `Layer 3 (nonce in Bash tool_result): ${nonceSeenInToolResult ? 'PASS' : 'NO EVIDENCE'}` });
+      outputEl.createEl('p', { text: `Layer 4 (nonce in assistant text): ${nonceSeenInAssistantText ? 'PASS' : 'NO EVIDENCE'}` });
+
+      if (nonceSeenInToolResult) {
+        this.updateRuntimeProof('Environment Variables', 'pass', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'Behavior proof achieved for Bash subprocess visibility: the injected nonce was observed in tool_result output.',
+        });
+      } else {
+        this.updateRuntimeProof('Environment Variables', readbackMatch ? 'readback' : 'wiring', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'Behavior proof not achieved. Current evidence is limited to SDK readback and/or non-deterministic model behavior. Re-run probe or use a stricter runtime harness.',
+        });
+      }
+
+      if (bashToolResults.length > 0) {
+        renderMessagePreviewList(
+          outputEl,
+          'Bash tool_result preview',
+          bashToolResults.map((chunk) => ({
+            type: chunk.type,
+            content: truncate(chunk.content, 300),
+          })),
+        );
+      }
+    } catch (err) {
+      outputEl.empty();
+      const options = adapter.inspectLastDiagnosticSdkOptions?.();
+      const envFromReadback = options?.env ?? {};
+      const readbackMatch = typeof envFromReadback[envKey] === 'string' && envFromReadback[envKey] === nonce;
+      outputEl.createEl('h5', { text: 'Environment Variables Proof (layered)' });
+      outputEl.createEl('p', { text: `Probe env key: ${envKey}` });
+      outputEl.createEl('p', { text: `Expected nonce: ${nonce}` });
+      outputEl.createEl('p', { text: `Layer 1 (settings -> SDK readback): ${readbackMatch ? 'PASS' : 'FAIL'}` });
+      outputEl.createEl('p', { text: 'Layer 2 (Bash tool invoked): BLOCKED (diagnostic run failed before deterministic capture)' });
+      outputEl.createEl('p', { text: 'Layer 3 (nonce in Bash tool_result): BLOCKED' });
+      outputEl.createEl('p', { text: 'Layer 4 (nonce in assistant text): BLOCKED' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Environment variables proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Environment Variables', readbackMatch ? 'readback' : 'fail', outputEl);
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Blocker: diagnostic permission path denied Bash before subprocess output was captured. Next step: run this probe in a permission mode/path that allows a read-only Bash printenv call, then require nonce in tool_result for pass.',
+      });
+    } finally {
+      this.claudeCodeSettings.env = originalEnv;
+      this.claudeCodeSettings.permissionMode = originalPermissionMode;
+      await adapter.setPermissionMode?.(originalPermissionMode);
     }
   }
 

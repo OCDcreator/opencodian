@@ -12,6 +12,50 @@
 
 ---
 
+## 2026-05-28 Environment Variables Layered Runtime Proof
+
+### 目标
+
+把 Environment Variables 从单层 `readback` 证明推进到可复跑的分层 runtime 行为证明，优先做成 Capability Lab harness，而不是一次性手工结论。
+
+### 改动
+
+1. **SettingsCapabilityLabSection.ts**
+   - Discovery controls 新增按钮：`Run Environment Variables Proof`
+   - 新增 `runEnvironmentVariablesProof()`：
+     - 生成唯一 nonce：`OPENCODIAN_ENV_PROOF_<timestamp>` + value nonce
+     - 临时写入稳定 Claude env 设置（仅 probe 生命周期内）
+     - 运行诊断 prompt，显式要求 Bash 执行 `printenv <nonce-key>`
+     - 分层输出四类证据：
+       1) settings -> SDK readback 命中；
+       2) Bash `tool_use` 是否触发；
+       3) `tool_result` 是否包含 nonce（最强行为证据）；
+       4) assistant text 是否包含 nonce（辅助证据）。
+     - 分类策略：仅当 layer 3 命中才把 `Environment Variables` 标记为 `pass`；否则保持 `readback`/`wiring` 并写明 blocker。
+     - `finally` 恢复原 env，避免污染用户稳定配置。
+
+2. **SettingsCapabilityLabSection.test.ts**
+   - 新增按钮渲染测试：`Run Environment Variables Proof`
+   - 新增正向路径测试：当 `tool_result` 含 nonce 时，`Environment Variables` runtime marker 升级为 `pass`，并验证 env 还原。
+
+### 证明策略（比纯 readback 更强）
+
+- 旧策略只证明 `settings -> options.env` 映射正确。
+- 新策略在保留 readback 的同时，额外捕获 **工具执行边界行为证据**：
+  - 是否真正走到 Bash 工具路径；
+  - 子进程输出（tool_result）是否看到了注入 nonce。
+- 这样可明确区分：
+  - 仅配置映射成功（readback）；
+  - 会话中工具路径已触发（tool_use seen）；
+  - 子进程环境可见（tool_result seen，行为级最强）。
+
+### 诚实边界
+
+- 只有 `tool_result` 中看到 nonce 才升 `pass`。
+- 若模型未触发 Bash 或输出未含 nonce，不伪造 pass，保留 `readback`/`wiring` 并给出下一步重跑/收敛建议。
+
+---
+
 ## 2026-05-28 Claude Chat Surface Honesty + Validation Pass
 
 ### 目标

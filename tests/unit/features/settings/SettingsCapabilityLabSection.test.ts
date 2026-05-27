@@ -3241,6 +3241,85 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
+  it('renders environment variables proof button in discovery controls', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Environment Variables Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks Environment Variables as pass when nonce appears in tool_result', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-env-proof-pass',
+        rawMessages: [],
+        chunks: [
+          { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'printenv proof' } },
+          { type: 'tool_result', toolUseId: 'tool-1', content: 'prefix-12345-suffix' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        env: { OPENCODIAN_ENV_PROOF_TEST: '12345' },
+      }),
+      capabilities: new Set(),
+    };
+    const plugin = createMockPlugin(adapter, 'claude-code', { env: {} }) as unknown as {
+      settings: { backendSettings: { claudeCode: { env: Record<string, string> } } };
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.12345);
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Environment Variables Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    // Align adapter evidence with deterministic nonce/key
+    (adapter.inspectLastDiagnosticSdkOptions as jest.Mock).mockReturnValue({
+      env: { OPENCODIAN_ENV_PROOF_1700000000000: '1700000000000-4fzolfdn' },
+    });
+    (adapter.runDiagnosticPrompt as jest.Mock).mockResolvedValue({
+      sessionId: 'diag-env-proof-pass',
+      rawMessages: [],
+      chunks: [
+        { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'printenv OPENCODIAN_ENV_PROOF_1700000000000' } },
+        { type: 'tool_result', toolUseId: 'tool-1', content: '1700000000000-4fzolfdn' },
+      ],
+    });
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Layer 3 (nonce in Bash tool_result): PASS');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Environment Variables"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
+    expect(plugin.settings.backendSettings.claudeCode.env).toEqual({});
+
+    dateNowSpy.mockRestore();
+    randomSpy.mockRestore();
+  });
+
   it('marks stable settings as readback verified when options contain configured values', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),

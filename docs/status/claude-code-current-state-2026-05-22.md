@@ -66,6 +66,50 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-28 Environment Variables Layered Runtime Proof
+
+This slice upgrades Environment Variables evidence from single-layer runtime readback to a reusable layered runtime harness in Capability Lab.
+
+### What Changed
+
+- `SettingsCapabilityLabSection.ts`:
+  - Added `Run Environment Variables Proof` button in Discovery controls.
+  - Added `runEnvironmentVariablesProof()` probe:
+    - Injects a unique nonce env key/value into stable Claude env settings for the probe run.
+    - Runs a diagnostic prompt that explicitly asks for Bash `printenv <nonce-key>`.
+    - Produces layered evidence output:
+      1. settings -> SDK readback nonce match,
+      2. Bash `tool_use` seen,
+      3. nonce seen in `tool_result` (strong behavior proof),
+      4. nonce seen in assistant text.
+    - Classifies `Environment Variables` as `pass` only when layer 3 is proven; otherwise keeps `readback`/`wiring` with explicit blocker text.
+    - Restores original env settings in `finally` to avoid persistent config pollution.
+- `SettingsCapabilityLabSection.test.ts`:
+  - Added button render test for `Run Environment Variables Proof`.
+  - Added proof-path test that marks `Environment Variables` as `pass` when nonce appears in `tool_result`.
+
+### Why This Is Stronger Than Readback
+
+- Previous proof only validated option mapping into SDK options (`options.env`).
+- New proof still preserves readback, but adds behavior-facing evidence at tool execution boundary:
+  - whether Bash tool path is invoked,
+  - whether subprocess-visible output includes the injected nonce.
+- This creates an honest, reusable ladder from mapping proof to runtime behavior proof without overclaiming full global env enforcement.
+
+### Classification Boundary
+
+| Layer | Meaning | Current probe output |
+|---|---|---|
+| settings -> SDK readback | Option wiring/mapping proof | always measured |
+| session/tool request | model invoked Bash tool path | measured when tool_use appears |
+| subprocess env seen | nonce in Bash `tool_result` | strongest behavior proof in this harness |
+| assistant echo | nonce in assistant text | supporting, not authoritative |
+
+### Honest Outcome Rule
+
+- `Environment Variables` => `pass` **only** when nonce appears in `tool_result`.
+- If readback passes but tool/nonces are not observed, remain `readback` (or `wiring` if readback also missing) and report non-deterministic/tool-path blocker explicitly.
+
 ## 2026-05-28 SDK Foundations Diagnostic Surface Migration
 
 This slice moves three purely diagnostic stream flags (`includeHookEvents`, `forwardSubagentText`, `agentProgressSummaries`) out of the stable Claude Code settings UI into the Debug → Capability Lab diagnostic surface. The stable `sdk-foundations` tab now only exposes `enableFileCheckpointing` (the only @experimental toggle, not @diagnostic).
