@@ -8881,6 +8881,12 @@ img.opencodian-model-provider-header-icon {
   color: var(--opencodian-status-error);
 }
 
+.opencodian-settings .opencodian-capability-lab-chip-surface-chat {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
+}
+
 .opencodian-settings .opencodian-capability-lab-chip-surface-hidden {
   border-style: dashed;
   color: var(--text-faint);

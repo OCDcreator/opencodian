@@ -48,7 +48,7 @@ interface MatrixRow {
   sdkExposed: boolean;
   adapterWired: boolean;
   runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback';
-  userSurface: 'settings' | 'diagnostic' | 'hidden';
+  userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat';
 }
 
 interface CapabilityLabSessionStoreEntry {
@@ -192,6 +192,7 @@ function createSurfaceChip(containerEl: HTMLElement, surface: MatrixRow['userSur
     settings: 'Settings',
     diagnostic: 'Diagnostic',
     hidden: 'Hidden',
+    chat: 'Chat',
   };
   const chip = containerEl.createSpan({
     cls: `opencodian-capability-lab-chip opencodian-capability-lab-chip-surface-${surface}`,
@@ -573,14 +574,14 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)
         runtimeProof: 'pass', // Ordinary chat end-to-end proof achieved: launcher sends message through real chat pipeline (sendPipelineRuntime.sendMessage) with proof-time permissionMode override to 'plan'. Model calls ExitPlanMode, Bash (mkdir), and Write tools through SDK tool_use mechanism. Permission cards render with data-permission-card and data-permission-action selectors for EACH tool call. User clicks 'once' on each card. Stream continues after each approval. Target file is created with correct nonce content. Settings restored to original values in finally block.
-        userSurface: 'settings', // Reuses existing stable permission card UI in ordinary chat; no separate Claude permission settings page.
+        userSurface: 'chat', // Reuses existing shared permission card UI in ordinary chat; no separate Claude permission settings page. The user surface is the chat interaction itself, not a settings control.
       },
       {
         capability: 'AskUserQuestion / Elicitation',
         sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
         adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
         runtimeProof: 'pass', // Ordinary chat end-to-end proof achieved: message sent through real chat pipeline (sendPipelineRuntime.sendMessage), model called AskUserQuestion through SDK, question dialog rendered with data-question-card selector, user selected Yes and clicked submit (data-question-action), stream continued with answer incorporated. The chat view (opencodian-view leaf) and send pipeline are fully accessible. Added data-question-card and data-question-action selectors for verification stability. Added ordinary chat launcher in Capability Lab.
-        userSurface: 'settings', // Reuses existing stable question dialog in ordinary chat; no separate Claude question settings page.
+        userSurface: 'chat', // Reuses existing shared question dialog in ordinary chat; no separate Claude question settings page. The user surface is the chat interaction itself, not a settings control.
       },
       {
         capability: 'Agents (Subagents)',
@@ -600,8 +601,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Structured Output',
         sdkExposed: true, // outputFormat option in SDK
         adapterWired: true, // buildSdkOptions wires outputFormat
-        runtimeProof: 'untested',
-        userSurface: 'diagnostic', // authoring/triggering remains diagnostic; transcript rendering is stable
+        runtimeProof: 'pass', // Ordinary chat end-to-end proof achieved: /json prefix trigger works in SendPipelineRuntime.sendMessage(), stripping the prefix and injecting a fixed JSON schema into outputFormat. Duplicate raw JSON suppression works (textBlockCount=0 during stream, filterDuplicateStructuredOutputContentBlocks during hydration). Hook text leak fixed (ClaudeCodeStreamNormalizer filters synthetic user messages). Structured output badge renders during streaming (StreamShellFinalizer) and survives reload/hydration. Residual ~4 chars of follow-up prose ("Done") after StructuredOutput tool_call is an SDK/model boundary, not a plugin bug.
+        userSurface: 'chat', // Triggered via /json prefix in ordinary chat. Fixed schema (response + tags + confidence), one-shot per message, no schema authoring UI. Claude Code backend only; OpenCode ignores unknown outputFormat.
       },
       {
         capability: 'Subagent Transcript / Progress',
@@ -2095,7 +2096,7 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'Permission Approval',
-      'Wired only. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission card UI, and the options builder forwards the callback to the SDK. Unit-test smoke confirms the bridge wiring, but live Obsidian ordinary chat end-to-end runtime proof (model calls tool → permission card renders → user approves/denies → stream continues) is not yet available.',
+      'Chat-surface validated in Capability Lab harness. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission card UI. End-to-end proof is anchored to ordinary chat + deterministic harness evidence (chat surface activated and bridge-rendered cards observed with stable selectors). No separate Claude permission settings page — the user surface is the chat interaction itself.',
       { status: 'exposed' },
     );
 
@@ -2103,7 +2104,15 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'AskUserQuestion / Elicitation',
-      'Wired only. The question bridge returns AskUserQuestion answers through the shared question dialog, and onElicitation is forwarded as a runtime SDK callback. Unit-test smoke confirms the bridge wiring, but live Obsidian ordinary chat end-to-end runtime proof (model asks question → dialog renders → user answers → stream continues) is not yet available.',
+      'Chat-surface validated in Capability Lab harness. The question bridge returns AskUserQuestion answers through the shared question dialog, and onElicitation is forwarded as a runtime SDK callback. End-to-end proof is anchored to ordinary chat + deterministic harness evidence (chat surface activated and bridge-rendered question dialog observed with stable selectors). No separate Claude question settings page — the user surface is the chat interaction itself.',
+      { status: 'exposed' },
+    );
+
+    // Structured Output
+    this.addDiscoveryRow(
+      tbody,
+      'Structured Output',
+      'Ordinary chat verified (execution path). Type /json followed by a prompt in the chat composer to trigger fixed-schema structured output. The /json prefix is stripped and a fixed JSON schema (response + tags + confidence) is injected into outputFormat. Duplicate raw JSON suppression works; structured output badge renders during streaming and survives reload/hydration. Fixed schema only — no arbitrary schema authoring UI. Claude Code backend only; OpenCode ignores unknown outputFormat. Composer-level discoverability remains unimplemented in this slice by design (maintainability / owner-boundary blocker).',
       { status: 'exposed' },
     );
 

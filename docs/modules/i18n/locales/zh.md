@@ -326,6 +326,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 2026-05-28 SDK Foundations 诊断表面迁移：新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`，用于在稳定 SDK Foundations 标签中提示用户诊断流控制已迁移到能力实验室；新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`，用于能力实验室中诊断流控制子区的标题和说明。保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些设置键仍然有效，只是 UI 表面从稳定设置迁移到了诊断面板。
 
+2026-05-28 文档更正：移除“`chat.input.placeholderJsonSuffix` 与后端感知输入框占位符已落地”的描述。当前实现并未新增该 i18n 键，也未在输入框占位符追加 `/json` 可发现性提示；`/json` 仍可在普通聊天中触发结构化输出，但 discoverability 继续保持“未实现”（maintainability / owner-boundary blocker）。
+
 ## 2026-05-22 Capability Lab 诊断面板
 
 新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的"能力实验室"二级标签提供中文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、回退 dry-run 预览、结构化输出实验场、会话分叉诊断探针、会话恢复诊断探针、会话详情检查和发现状态九个诊断面板。新增 `settings.capabilityLab.fork.*` 与 `settings.capabilityLab.resume.*`，明确把 Claude `forkSession()` 和 SDK `resume` 仅作为 provider-owned 的诊断探针暴露，而不是稳定的跨后端 fork / resume-at UI。所有面板标记为 ⚠️ 诊断 / 实验 / 非稳定，不连接稳定设置持久化。

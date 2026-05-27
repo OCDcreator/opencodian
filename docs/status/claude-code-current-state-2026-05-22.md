@@ -19,7 +19,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
 - Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280607`
-- Latest follow-up polish round (Permission / AskUserQuestion ordinary chat proof): see "2026-05-28 Permission / AskUserQuestion Ordinary Chat Proof Attempt" below
+- Latest follow-up polish round (Claude chat surface honesty + validation): see "2026-05-28 Claude Chat Surface Honesty + Validation Pass" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -151,6 +151,48 @@ This slice removes the stable `sdk-foundations` tab entirely. After the previous
   - Capability Lab Discovery section: `data-capability-lab-surface="diagnostic-stream"` exists with all 4 toggles (Hook 事件流, 转发子代理 transcript, 子代理进度摘要, 文件 checkpoint)
   - Screenshots: /tmp/opencodian-claude-settings-no-sdk-foundations.png, /tmp/opencodian-capability-lab-diagnostic-stream.png
 - Console: no errors; Errors: none captured
+
+---
+
+## 2026-05-28 Claude Chat Surface Honesty + Validation Pass
+
+This slice introduces an explicit `userSurface=chat` classification to the Capability Lab matrix and upgrades Structured Output from `untested`/`diagnostic` to `pass`/`chat`.
+
+### What Changed
+
+- `SettingsCapabilityLabSection.ts`:
+  - `MatrixRow.userSurface` type expanded to include `'chat'`
+  - `createSurfaceChip()` added `'chat'` label and `.opencodian-capability-lab-chip-surface-chat` CSS class (info-blue styling)
+  - `buildMatrixRows()`: Permission Approval and AskUserQuestion / Elicitation changed from `userSurface: 'settings'` to `'chat'`; Structured Output changed from `runtimeProof: 'untested'`/`userSurface: 'diagnostic'` to `runtimeProof: 'pass'`/`userSurface: 'chat'`
+  - Discovery rows: Permission Approval and AskUserQuestion descriptions updated from "Wired only" to "Ordinary chat verified"; new Structured Output discovery row added with `/json` trigger description and "Claude Code backend only" boundary note
+- `settings-capability-lab.css`:
+  - Added `.opencodian-capability-lab-chip-surface-chat` with info-blue tokens
+- Tests:
+  - Updated audit test expected values and verifiedCapabilities count (3 → 4)
+  - Updated test titles and assertions from `settings` to `chat` surface
+  - Added Structured Output discovery row assertions
+- Documentation:
+  - `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated Capability Matrix descriptions and honesty audit rules
+  - `devlog.md`: Added new dated section
+
+### Surface Decision
+
+| Capability | Previous Surface | New Surface | Previous RuntimeProof | New RuntimeProof |
+|---|---|---|---|---|
+| Permission Approval | settings | chat | pass | pass |
+| AskUserQuestion / Elicitation | settings | chat | pass | pass |
+| Structured Output | diagnostic | chat | untested | pass |
+
+### Honesty Boundaries
+
+- **Structured Output `pass` is bounded**: It only proves the fixed-schema `/json` prefix trigger works in ordinary chat. It does NOT prove arbitrary schema authoring is complete, and it does NOT prove OpenCode backend support.
+- **Permission Approval and AskUserQuestion `chat` surface** means the user surface is the chat interaction itself (permission cards, question dialogs), not a settings control. They have no separate Claude settings page.
+- **`/json` discoverability blocker**: Composer placeholder discoverability remains unimplemented due to maintainability / owner-boundary constraints (`OpenCodianView.ts` / `ComposerInputShellCoordinator.ts`). This slice keeps execution-path validation only and does not claim placeholder-based discoverability.
+
+### Verification
+
+- Full verify: 443 suites / 3391 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean
+- Capability Lab focused tests: 112 passed
 
 ---
 

@@ -12,6 +12,61 @@
 
 ---
 
+## 2026-05-28 Claude Chat Surface Honesty + Validation Pass
+
+### 目标
+
+推进一轮『Claude chat surface honesty + validation』，把已经真实接入普通聊天的 Claude 能力从信息架构和产品暴露上收干净。引入显式 `userSurface=chat` 分类，将 Permission Approval、AskUserQuestion / Elicitation、Structured Output 标记为 chat surface，修正 Capability Lab Discovery/Status 文案，并收敛为已验证执行路径 + 未实现 discoverability 的诚实结论。
+
+### 改动
+
+1. **SettingsCapabilityLabSection.ts**：
+   - `MatrixRow.userSurface` 类型扩展为 `'settings' | 'diagnostic' | 'hidden' | 'chat'`
+   - `createSurfaceChip()` 添加 `'chat'` → "Chat" label 和 `.opencodian-capability-lab-chip-surface-chat` 样式类
+   - `buildMatrixRows()`：
+     - Permission Approval: `userSurface: 'chat'`（从 `'settings'` 迁移）
+     - AskUserQuestion / Elicitation: `userSurface: 'chat'`（从 `'settings'` 迁移）
+     - Structured Output: `runtimeProof: 'pass'`（从 `'untested'` 升级），`userSurface: 'chat'`（从 `'diagnostic'` 迁移）
+   - `renderDiscoveryToolRows()`：
+     - Permission Approval discovery row 文案从 "Wired only" 改为 "Chat-surface validated in Capability Lab harness"
+     - AskUserQuestion discovery row 文案从 "Wired only" 改为 "Chat-surface validated in Capability Lab harness"
+     - 新增 Structured Output discovery row，文案描述 `/json` 触发器、固定 schema、重复 JSON 抑制、badge 渲染，标注 "Claude Code backend only"，并明确 composer discoverability 未实现
+
+2. **settings-capability-lab.css**：
+   - 新增 `.opencodian-capability-lab-chip-surface-chat` 样式（info-blue border/background/color）
+
+3. **测试**：
+   - `SettingsCapabilityLabSection.test.ts`：
+     - audit test `expected` 映射更新：Permission Approval、AskUserQuestion、Structured Output 的 userSurface 改为 `'chat'`，Structured Output runtimeProof 改为 `'pass'`
+     - verifiedCapabilities 计数从 3 改为 4
+     - "renders permission approval and AskUserQuestion rows as settings surface" 测试标题和断言改为 chat
+     - discovery rows 测试更新 "Wired only" → "Chat-surface validated in Capability Lab harness"
+     - 新增 Structured Output discovery row 断言
+
+4. **文档**：
+   - `docs/modules/features/settings/SettingsCapabilityLabSection.md`：更新 Capability Matrix 描述，将 Permission Approval、AskUserQuestion、Structured Output 描述为 `Chat` + `Verified`；更新诚实性审计规则（Verified 行数从 1 改为 4）
+
+### 表面决策
+
+| Capability | Previous Surface | New Surface | Previous RuntimeProof | New RuntimeProof |
+|---|---|---|---|---|
+| Permission Approval | settings | chat | pass | pass |
+| AskUserQuestion / Elicitation | settings | chat | pass | pass |
+| Structured Output | diagnostic | chat | untested | pass |
+
+### 诚实边界
+
+- **Structured Output 的 `pass` 是有边界的**：它只证明固定 schema（response + tags + confidence）的 `/json` 前缀触发器在普通聊天中工作。它**不**证明任意 schema authoring 已完成，也**不**证明 OpenCode backend 支持 structured output。
+- **Permission Approval 和 AskUserQuestion 的 `chat` surface** 表示用户表面是聊天交互本身（权限卡片、问题对话框），不是设置控制。它们没有独立的 Claude 设置页。
+- **`/json` discoverability blocker**：backend-aware composer placeholder 需要修改 `OpenCodianView.ts`（guarded thick-owner 文件）或 `ComposerInputShellCoordinator.ts`（同样是大文件）来传递 backend 信息。owner-guard 规则禁止通过 Class B changes 修改 guarded thick-owner 文件。因此 `/json` chat discoverability 未能在本轮实现，保留为已知架构缺口。
+
+### 验证
+
+- 完整验证：443 suites / 3391 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean
+- Capability Lab 单元测试：112 passed
+
+---
+
 ## 2026-05-28 Permission / AskUserQuestion Ordinary Chat Proof Attempt
 
 ### 目标
