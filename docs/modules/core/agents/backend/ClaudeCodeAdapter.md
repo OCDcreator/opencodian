@@ -33,7 +33,6 @@
 - 将 SDK `onElicitation` callback 注入 options，生产 host 会把 elicitation 转成 OpenCodian question flow 的统一交互入口
 - 将 runtime-only `hooks`、`sessionStore` / `sessionStoreFlush`、`outputFormat`、`plugins`、`skills`、`agent` 和 `agents` 注入 options builder；这些字段只允许由 backend runtime/诊断 owner 传入，不会保存到用户设置，也不会让 settings UI 宣称 hooks/skills/agent authoring 已完成
 - `buildSdkOptions()` 现在支持 send-time `outputFormat` 覆盖：如果 `sendOptions.outputFormat` 存在且为对象，则优先使用 send-time 值，否则回退到 adapter 级别的 `this.options.outputFormat`。这使普通聊天路径的 `/json` 一次性触发能正确覆盖诊断/实验性的默认 schema
-- `sendMessage()` 在检测到 send-time `outputFormat` 时，会在用户 prompt 前附加一条结构化输出约束前缀：`You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output.`。该 hardening 仅作用于 structured-output 发送，不影响普通聊天；目的是减少模型在 StructuredOutput 工具调用之外输出额外 prose 或 markdown JSON code fence 的概率，而非保证完全消除
 - 将自定义 `abortController` 和 `spawnClaudeCodeProcess` 注入 SDK options，绕开 Obsidian/Electron renderer 对 `child_process.spawn({ signal })` 的 `AbortSignal` 兼容问题
 - 支持 `cancelStream()`、`stop()`、`dispose()` 的本地取消和资源清理
 - 将 SDK stream 异常转换为 backend-labelled error chunk，避免发送管线无响应
