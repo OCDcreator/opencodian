@@ -9,6 +9,8 @@
  *
  * See openspec/phase1-capability-lab.md for design rationale.
  */
+import { existsSync, rmSync } from 'node:fs';
+
 import { Notice, Setting } from 'obsidian';
 
 import { type BackendCapabilities,hasCapability } from '../../core/agents/AgentCapability';
@@ -3647,8 +3649,10 @@ export class SettingsCapabilityLabSection {
 
     const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const envKey = `OPENCODIAN_ENV_PROOF_${Date.now()}`;
+    const envProofPath = `/tmp/opencodian-env-proof-${nonce}`;
     const prompt = [
-      `Environment proof task. You MUST call Bash with the command: printenv ${envKey}`,
+      'Environment proof task. You MUST call Bash with this exact command:',
+      'touch "$OPENCODIAN_ENV_PROOF_PATH"',
       `Then respond with exactly: ${nonce}`,
       'Do not add extra words.',
     ].join(' ');
@@ -3658,10 +3662,12 @@ export class SettingsCapabilityLabSection {
     this.claudeCodeSettings.env = {
       ...originalEnv,
       [envKey]: nonce,
+      OPENCODIAN_ENV_PROOF_PATH: envProofPath,
     };
     this.claudeCodeSettings.permissionMode = 'acceptEdits';
 
     try {
+      rmSync(envProofPath, { force: true });
       await adapter.setPermissionMode?.('acceptEdits');
       const result = await adapter.runDiagnosticPrompt({
         prompt,
@@ -3683,8 +3689,8 @@ export class SettingsCapabilityLabSection {
         .map((chunk) => chunk.content)
         .join('\n');
 
-      const nonceSeenInToolResult = bashToolResults.some((chunk) => chunk.content.includes(nonce));
       const nonceSeenInAssistantText = resultTextJoined.includes(nonce);
+      const envSideEffectObserved = existsSync(envProofPath);
 
       outputEl.empty();
       outputEl.createEl('h5', { text: 'Environment Variables Proof (layered)' });
@@ -3692,20 +3698,20 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('p', { text: `Expected nonce: ${nonce}` });
       outputEl.createEl('p', { text: `Layer 1 (settings -> SDK readback): ${readbackMatch ? 'PASS' : 'FAIL'}` });
       outputEl.createEl('p', { text: `Layer 2 (Bash tool invoked): ${bashToolUses.length > 0 ? 'PASS' : 'NO EVIDENCE'}` });
-      outputEl.createEl('p', { text: `Layer 3 (nonce in Bash tool_result): ${nonceSeenInToolResult ? 'PASS' : 'NO EVIDENCE'}` });
-      outputEl.createEl('p', { text: `Layer 4 (nonce in assistant text): ${nonceSeenInAssistantText ? 'PASS' : 'NO EVIDENCE'}` });
+      outputEl.createEl('p', { text: `Layer 3 (env-derived filesystem side effect observed): ${envSideEffectObserved ? 'PASS' : 'NO EVIDENCE'}` });
+      outputEl.createEl('p', { text: `Layer 4 (assistant text nonce echo): ${nonceSeenInAssistantText ? 'PASS' : 'NO EVIDENCE'}` });
 
-      if (nonceSeenInToolResult) {
+      if (envSideEffectObserved) {
         this.updateRuntimeProof('Environment Variables', 'pass', outputEl);
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: 'Behavior proof achieved for Bash subprocess visibility: the injected nonce was observed in tool_result output.',
+          text: 'Behavior proof achieved for Bash subprocess visibility: env-derived filesystem side effect was observed at the nonce path.',
         });
       } else {
         this.updateRuntimeProof('Environment Variables', readbackMatch ? 'readback' : 'wiring', outputEl);
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: 'Behavior proof not achieved. Current evidence is limited to SDK readback and/or non-deterministic model behavior. Re-run probe or use a stricter runtime harness.',
+          text: 'Behavior proof not achieved. Current evidence is limited to SDK readback and/or non-deterministic model behavior. Re-run probe and require env-derived filesystem side effect for pass.',
         });
       }
 
@@ -3726,11 +3732,12 @@ export class SettingsCapabilityLabSection {
       const readbackMatch = typeof envFromReadback[envKey] === 'string' && envFromReadback[envKey] === nonce;
       outputEl.createEl('h5', { text: 'Environment Variables Proof (layered)' });
       outputEl.createEl('p', { text: `Probe env key: ${envKey}` });
+      outputEl.createEl('p', { text: `Probe env path: ${envProofPath}` });
       outputEl.createEl('p', { text: `Expected nonce: ${nonce}` });
       outputEl.createEl('p', { text: `Layer 1 (settings -> SDK readback): ${readbackMatch ? 'PASS' : 'FAIL'}` });
       outputEl.createEl('p', { text: 'Layer 2 (Bash tool invoked): BLOCKED (diagnostic run failed before deterministic capture)' });
-      outputEl.createEl('p', { text: 'Layer 3 (nonce in Bash tool_result): BLOCKED' });
-      outputEl.createEl('p', { text: 'Layer 4 (nonce in assistant text): BLOCKED' });
+      outputEl.createEl('p', { text: 'Layer 3 (env-derived filesystem side effect observed): BLOCKED' });
+      outputEl.createEl('p', { text: 'Layer 4 (assistant text nonce echo): BLOCKED' });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
         text: `Environment variables proof failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -3738,9 +3745,10 @@ export class SettingsCapabilityLabSection {
       this.updateRuntimeProof('Environment Variables', readbackMatch ? 'readback' : 'fail', outputEl);
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: 'Blocker: diagnostic permission path denied Bash before subprocess output was captured. Next step: run this probe in a permission mode/path that allows a read-only Bash printenv call, then require nonce in tool_result for pass.',
+        text: 'Blocker: diagnostic permission path denied Bash before env-derived side effect could be captured. Next step: run this probe in a permission mode/path that allows common filesystem Bash commands under acceptEdits.',
       });
     } finally {
+      rmSync(envProofPath, { force: true });
       this.claudeCodeSettings.env = originalEnv;
       this.claudeCodeSettings.permissionMode = originalPermissionMode;
       await adapter.setPermissionMode?.(originalPermissionMode);

@@ -1,4 +1,6 @@
 /* eslint-disable max-lines -- Capability Lab tests intentionally keep the full diagnostic surface matrix, history, rewind, structured, and fork probe behavior together. */
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { SettingsCapabilityLabSection } from '../../../../src/features/settings/SettingsCapabilityLabSection';
 import { setLocale, t } from '../../../../src/i18n';
 
@@ -3261,7 +3263,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
-  it('marks Environment Variables as pass when nonce appears in tool_result', async () => {
+  it('marks Environment Variables as pass when env-derived filesystem side effect is observed', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn().mockResolvedValue({
@@ -3299,22 +3301,28 @@ describe('SettingsCapabilityLabSection', () => {
     (adapter.inspectLastDiagnosticSdkOptions as jest.Mock).mockReturnValue({
       env: { OPENCODIAN_ENV_PROOF_1700000000000: '1700000000000-4fzolfdn' },
     });
-    (adapter.runDiagnosticPrompt as jest.Mock).mockResolvedValue({
+    const expectedProofPath = '/tmp/opencodian-env-proof-1700000000000-4fzolfdn';
+    (adapter.runDiagnosticPrompt as jest.Mock).mockImplementation(async () => {
+      mkdirSync('/tmp', { recursive: true });
+      writeFileSync(expectedProofPath, 'proof', 'utf8');
+      return {
       sessionId: 'diag-env-proof-pass',
       rawMessages: [],
       chunks: [
-        { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'printenv OPENCODIAN_ENV_PROOF_1700000000000' } },
-        { type: 'tool_result', toolUseId: 'tool-1', content: '1700000000000-4fzolfdn' },
+        { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'touch "$OPENCODIAN_ENV_PROOF_PATH"' } },
+        { type: 'tool_result', toolUseId: 'tool-1', content: 'ok' },
       ],
+      };
     });
 
     button!.click();
     await flushUi();
 
-    expect(containerEl.textContent).toContain('Layer 3 (nonce in Bash tool_result): PASS');
+    expect(containerEl.textContent).toContain('Layer 3 (env-derived filesystem side effect observed): PASS');
     const passMarkers = containerEl.querySelectorAll('[data-capability="Environment Variables"].opencodian-capability-lab-proof-pass');
     expect(passMarkers.length).toBeGreaterThan(0);
     expect(plugin.settings.backendSettings.claudeCode.env).toEqual({});
+    rmSync(expectedProofPath, { force: true });
 
     dateNowSpy.mockRestore();
     randomSpy.mockRestore();

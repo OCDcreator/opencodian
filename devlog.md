@@ -12,6 +12,44 @@
 
 ---
 
+## 2026-05-28 Environment Variables Proof Strategy Upgrade (Filesystem Side Effect)
+
+### 目标
+
+把 Environment Variables proof 从 `printenv` 输出依赖切换为 `acceptEdits` 兼容度更高的文件系统副作用证明，降低 diagnostic permission 路径对 read-only Bash 的拦截影响，并保持严格诚实边界。
+
+### 改动
+
+1. **SettingsCapabilityLabSection.ts**
+   - `runEnvironmentVariablesProof()` 改为注入双层 env：
+     - `OPENCODIAN_ENV_PROOF_<timestamp>=<nonce>`（readback 锚点）
+     - `OPENCODIAN_ENV_PROOF_PATH=/tmp/opencodian-env-proof-<nonce>`（行为证据路径）
+   - 诊断 prompt 从 `printenv <key>` 改为要求 Bash 执行：
+     - `touch "$OPENCODIAN_ENV_PROOF_PATH"`
+   - 分层证据更新为：
+     1) settings -> SDK readback；
+     2) Bash tool_use；
+     3) env 派生文件副作用命中；
+     4) assistant text nonce echo（辅助）。
+   - `pass` 规则收敛：仅 layer 3 命中才升级 `Environment Variables`。
+   - 运行前后清理 probe 文件，`finally` 恢复原 env + permissionMode。
+
+2. **SettingsCapabilityLabSection.test.ts**
+   - Environment Variables 正向测试改为文件副作用路径：mock 诊断执行时创建 `/tmp/opencodian-env-proof-<nonce>`，断言 layer 3 PASS 和 runtime marker 为 pass。
+
+### 为什么这轮是 proof strategy mismatch 修复
+
+- 已有运行时证据表明 env 注入本身已进入 Claude 进程（readback 与 envKeyCount 路径成立），但旧 harness 强依赖 `printenv`，该命令在当前 diagnostic permission path 更容易被拒。
+- 因此 blocker 更像“证明策略与权限默认白名单不匹配”，而不是“env capability 缺失”。
+- 新策略改用 `touch/cp` 这类 acceptEdits 常见文件系统命令类别，保持同等或更强行为证明强度，同时规避 `printenv` 特定阻断。
+
+### 诚实边界
+
+- 仍不接受 assistant 口头回显作为通过条件。
+- 若未触发 Bash 或未出现 env 派生文件副作用，维持 `readback`/`wiring` 并输出明确 blocker。
+
+---
+
 ## 2026-05-28 Environment Variables Layered Runtime Proof
 
 ### 目标
