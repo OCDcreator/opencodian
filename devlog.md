@@ -12,6 +12,81 @@
 
 ---
 
+## 2026-05-28 Synthetic Streaming Context Runtime Proof — Permission Card & Question Dialog Verified
+
+### 目标
+
+通过 obsidian CLI `eval` 直接对 Test Vault 中的 synthetic streaming context 进行 runtime 验证，确认 `injectSyntheticStreamingContext()` 是否足以让 shared inline permission card 和 question dialog 真正渲染并等待用户交互。
+
+### 背景
+
+- 上一轮（`cbe52243`）由于 macOS System Events 权限对话框阻塞了 AppleScript 自动化，未能完成 runtime UI proof。
+- 代码分析认为 synthetic context 应该足够，但缺乏运行时证据。
+- 本轮使用 obsidian CLI `eval` 直接执行 JavaScript，绕过 AppleScript/System Events 限制。
+
+### 变更
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`：
+  - `injectSyntheticStreamingContext()` 增强诊断输出：新增 `diagnostics` 字段，包含 `tabId`、`verified`（回读确认）、`previousStreamingMessageEl`、`runtimeKeys`、`isStreaming`、`messagesContainerConnected`、`messagesContainerChildCount`
+  - 新增 `runStreamingContextProbe()` 方法：不经过 bridge → host 链条，直接通过运行时反射获取 `StreamingInlineCardRenderer` 实例并调用 `createStreamingInlineCard()`，用于隔离验证 synthetic context 本身是否足够
+  - `runLivePermissionCardHarness()` 和 `runLiveQuestionDialogHarness()` 在注入后输出 `tabId`、`verified`、`isStreaming` 等诊断字段
+  - Discovery 控制区新增 **"Probe Streaming Context"** 按钮
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`：
+  - 更新 `injectSyntheticStreamingContext()` 文档，说明 `diagnostics` 字段
+  - 新增 `runStreamingContextProbe()` 方法文档
+  - 更新 harness 方法文档，说明诊断字段输出
+
+### 运行时验证结果
+
+**关键发现：synthetic streaming context IS sufficient。**
+
+1. **直接 renderer 探针**（`createStreamingInlineCard` 直接调用）：
+   - 结果：`directCardResult: "card created"`
+   - 结论：renderer 能看到注入的 `streamingMessageEl`，synthetic context 本身无缺失
+
+2. **Permission Card 端到端验证**（bridge → host → renderer 完整链条）：
+   - 注入 synthetic context 后调用 `bridge.canUseTool('Bash', { command: 'echo diagnostic-harness' })`
+   - DOM 检查结果：`hasPermissionCard: true`
+   - Card 内容包含完整 UI：🔐 权限请求、Bash 工具描述、`echo diagnostic-harness` 命令、允许一次/始终允许/本次会话/拒绝 四个按钮
+   - 截图：`/tmp/opencodian-permission-card-proof.png`
+   - 结论：bridge → host → renderer → DOM 完整链条功能正常，permission card 真正渲染并等待用户交互
+
+3. **Question Dialog 端到端验证**：
+   - 注入 synthetic context 后调用 `bridge.canUseTool('AskUserQuestion', { questions: [...] })`
+   - DOM 检查结果：`hasQuestionCard: true`
+   - Card 内容包含完整 UI：? Agent 提问、Capability Lab Test 标题、Diagnostic question、Yes/No 选项、提交回答/拒绝 按钮
+   - 截图：`/tmp/opencodian-question-dialog-proof.png`
+   - 结论：bridge → host → question renderer → DOM 完整链条功能正常，question dialog 真正渲染并等待用户交互
+
+4. **绑定问题修复**：
+   - 发现 `view['getTabRuntimeState']` 在 obsidian CLI `eval` 中调用时会丢失 `this` 绑定（`Cannot read properties of undefined (reading 'conversationTabRuntimeCoordinator')`）
+   - 修复方式：使用 `view.getTabRuntimeState.bind(view)` 显式绑定
+   - 这一发现解释了为什么早期 harness 可能出现异常：如果调用方式导致 `this` 绑定丢失，runtime state 读取会失败
+
+### 诚实评估
+
+- **Synthetic context 足够性**：✅ 已验证。`streamingMessageEl` 是 renderer 唯一的缺失前提；补齐后 permission card 和 question dialog 都能正常渲染。
+- **Harness 快速 deny/boundary 原因**：之前的 "很快走到 deny/boundary" 不是 synthetic context 不足，而是以下原因之一：
+  1. Chat view 未打开（renderer 未注册）
+  2. `this` 绑定丢失导致 `getTabRuntimeState` 失败
+  3. 调用者环境问题（如 AppleScript 权限对话框阻塞了自动化但未阻塞实际功能）
+- **诊断价值**：`runStreamingContextProbe()` 可以在不触发完整 bridge 链条的情况下，先验证 synthetic context 是否足够。如果 probe 成功但 harness 失败，blocker 在上游（bridge/host）；如果 probe 也失败，blocker 在 context 本身。
+- **矩阵分类不变**：Permission Approval 和 AskUserQuestion / Elicitation 仍保持 `wiring`（静态评估），因为矩阵评估的是普通聊天端到端（模型驱动）路径，不是 diagnostic harness 路径。但 harness 现在可以在聊天视图打开时提供 `pass` 级 runtime proof。
+
+### 验证
+
+- 全量测试：443 suites / 3379 tests passed
+- Lint：0 errors / 0 warnings
+- Typecheck：clean
+- Build：BUILD_ID=feature-phase0-capability.202605280214
+- Graphify：updated
+- Module docs：updated (1 required doc target)
+- Devlog order：OK (211 sections)
+- Test Vault 部署：BUILD_ID 已验证 `feature-phase0-capability.202605280214`
+- Runtime proof：obsidian CLI `eval` 验证通过，permission card 和 question dialog 均正确渲染
+
+---
+
 ## 2026-05-28 Synthetic Streaming Context — Diagnostic-Only Inline UI Proof
 
 ### 目标

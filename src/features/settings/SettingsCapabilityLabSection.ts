@@ -2197,6 +2197,20 @@ export class SettingsCapabilityLabSection {
     liveQuestionBtn.addEventListener('click', () => {
       void this.runLiveQuestionDialogHarness(liveQuestionOutputEl);
     });
+
+    // Streaming Context Probe — tests synthetic context in isolation
+    const streamingProbeBtn = proofControls.createEl('button', {
+      text: 'Probe Streaming Context',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const streamingProbeOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    streamingProbeBtn.addEventListener('click', () => {
+      void this.runStreamingContextProbe(streamingProbeOutputEl);
+    });
   }
 
   private renderDeclaredCapabilities(containerEl: HTMLElement, caps: ReadonlySet<string> | undefined): void {
@@ -2696,6 +2710,7 @@ export class SettingsCapabilityLabSection {
     cleanup: () => void;
     success: boolean;
     message: string;
+    diagnostics?: Record<string, unknown>;
   } {
     try {
       const leaf = this.plugin.app.workspace.getLeavesOfType('opencodian-view')[0];
@@ -2709,13 +2724,27 @@ export class SettingsCapabilityLabSection {
       const messagesContainer = view['messagesContainer'] as HTMLElement | null;
 
       if (!getActiveTabId || !getTabRuntimeState || !messagesContainer) {
-        return { cleanup: () => {}, success: false, message: 'Chat view internals not accessible.' };
+        return {
+          cleanup: () => {},
+          success: false,
+          message: 'Chat view internals not accessible.',
+          diagnostics: {
+            hasGetActiveTabId: !!getActiveTabId,
+            hasGetTabRuntimeState: !!getTabRuntimeState,
+            hasMessagesContainer: !!messagesContainer,
+          },
+        };
       }
 
       const tabId = getActiveTabId();
       const runtime = getTabRuntimeState(tabId);
       if (!runtime) {
-        return { cleanup: () => {}, success: false, message: 'No active tab runtime state.' };
+        return {
+          cleanup: () => {},
+          success: false,
+          message: 'No active tab runtime state.',
+          diagnostics: { tabId, hasRuntime: false },
+        };
       }
 
       const syntheticEl = document.createElement('div');
@@ -2728,12 +2757,29 @@ export class SettingsCapabilityLabSection {
       const previousStreamingMessageEl = runtime['streamingMessageEl'] as HTMLElement | null;
       runtime['streamingMessageEl'] = syntheticEl;
 
+      // Verify the injection took effect by re-reading from the view
+      const runtimeAfter = getTabRuntimeState(tabId);
+      const verified = runtimeAfter?.['streamingMessageEl'] === syntheticEl;
+
       const cleanup = (): void => {
         syntheticEl.remove();
         runtime['streamingMessageEl'] = previousStreamingMessageEl;
       };
 
-      return { cleanup, success: true, message: 'Synthetic streaming context injected.' };
+      return {
+        cleanup,
+        success: true,
+        message: 'Synthetic streaming context injected.',
+        diagnostics: {
+          tabId,
+          verified,
+          previousStreamingMessageEl: previousStreamingMessageEl ? 'present' : 'null',
+          runtimeKeys: Object.keys(runtime).filter((k) => !k.startsWith('_')),
+          isStreaming: runtime['isStreaming'],
+          messagesContainerConnected: messagesContainer.isConnected,
+          messagesContainerChildCount: messagesContainer.childElementCount,
+        },
+      };
     } catch (err) {
       return {
         cleanup: () => {},
@@ -2782,6 +2828,14 @@ export class SettingsCapabilityLabSection {
       });
       this.updateRuntimeProof('Permission Approval', 'boundary', outputEl);
       return;
+    }
+
+    // Log injection diagnostics for debugging
+    if (synthetic.diagnostics) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Injection diagnostics: tabId=${String(synthetic.diagnostics.tabId)}, verified=${String(synthetic.diagnostics.verified)}, isStreaming=${String(synthetic.diagnostics.isStreaming)}`,
+      });
     }
 
     try {
@@ -2864,6 +2918,14 @@ export class SettingsCapabilityLabSection {
       return;
     }
 
+    // Log injection diagnostics for debugging
+    if (synthetic.diagnostics) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Injection diagnostics: tabId=${String(synthetic.diagnostics.tabId)}, verified=${String(synthetic.diagnostics.verified)}, isStreaming=${String(synthetic.diagnostics.isStreaming)}`,
+      });
+    }
+
     try {
       // Direct deterministic call with AskUserQuestion input.
       const result = await bridge.canUseTool('AskUserQuestion', {
@@ -2907,6 +2969,99 @@ export class SettingsCapabilityLabSection {
         text: `Live question dialog failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+    } finally {
+      synthetic.cleanup();
+    }
+  }
+
+  /**
+   * Probe the synthetic streaming context in isolation.
+   * Directly invokes the renderer's createStreamingInlineCard to verify
+   * that the synthetic context is sufficient for card insertion, without
+   * going through the bridge → host chain.
+   */
+  private async runStreamingContextProbe(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Probing synthetic streaming context in isolation…' });
+
+    const hostCtx = this.plugin.claudeCodePermissionHostContext;
+    const hasPermissionRenderer = !!hostCtx.permissionCardRenderer;
+    const hasQuestionRenderer = !!hostCtx.questionCardRenderer;
+
+    // Log renderer registration state
+    const regState = outputEl.createDiv({ cls: 'opencodian-capability-lab-hint' });
+    regState.createEl('p', { text: `Permission renderer registered: ${hasPermissionRenderer}` });
+    regState.createEl('p', { text: `Question renderer registered: ${hasQuestionRenderer}` });
+
+    const synthetic = this.injectSyntheticStreamingContext();
+
+    // Log injection diagnostics
+    if (synthetic.diagnostics) {
+      const diagEl = outputEl.createDiv({ cls: 'opencodian-capability-lab-hint' });
+      diagEl.createEl('p', { text: 'Injection diagnostics:' });
+      diagEl.createEl('pre', {
+        cls: 'opencodian-capability-lab-json-preview',
+        text: formatJsonPreview(synthetic.diagnostics),
+      });
+    }
+
+    if (!synthetic.success) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Synthetic context injection failed: ${synthetic.message}`,
+      });
+      return;
+    }
+
+    try {
+      // Try to directly call the renderer's createStreamingInlineCard via reflection.
+      // This bypasses the bridge and host to test ONLY whether the synthetic
+      // streamingMessageEl is visible to the renderer.
+      const leaf = this.plugin.app.workspace.getLeavesOfType('opencodian-view')[0];
+      const view = leaf?.view as unknown as Record<string, unknown> | undefined;
+      const streamingInlineCardRenderer = view?.['streamingInlineCardRenderer'] as {
+        createStreamingInlineCard?: (className: string, tabId: string | null) => HTMLElement | null;
+      } | undefined;
+
+      const directCardResult = streamingInlineCardRenderer?.createStreamingInlineCard?.(
+        'opencodian-diagnostic-probe',
+        (synthetic.diagnostics?.tabId as string | null) ?? null,
+      );
+
+      outputEl.createEl('p', {
+        text: `Direct renderer probe: ${directCardResult ? 'card created successfully' : 'card creation returned null'}`,
+      });
+
+      if (directCardResult) {
+        outputEl.createEl('p', {
+          text: 'The synthetic streaming context IS sufficient for the renderer to create a card. If the live harness still hits boundary, the blocker is upstream (bridge, host, or tabId mismatch).',
+        });
+        // Clean up the probe card
+        directCardResult.remove();
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'The synthetic streaming context is NOT sufficient — the renderer still sees streamingMessageEl as null. This means either: (1) the runtime object the harness modifies is not the same object the renderer reads, (2) streamingMessageEl is being cleared between injection and probe, or (3) the tabId does not match.',
+        });
+      }
+
+      // Also test through the bridge host chain to see where it breaks
+      if (hasPermissionRenderer) {
+        const host = this.plugin.agentServiceRegistry?.get('claude-code')
+          ? (this.plugin.agentServiceRegistry.get('claude-code') as unknown as {
+              options?: { permissionBridge?: { host?: { collectToolApproval?: unknown } } };
+            })
+          : undefined;
+        const hasHostApproval = !!host?.options?.permissionBridge?.host?.collectToolApproval;
+        outputEl.createEl('p', {
+          text: `Bridge host.collectToolApproval wired: ${hasHostApproval}`,
+        });
+      }
+    } catch (err) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     } finally {
       synthetic.cleanup();
     }
