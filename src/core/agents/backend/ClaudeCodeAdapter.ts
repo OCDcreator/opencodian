@@ -978,6 +978,40 @@ export class ClaudeCodeAdapter
       : [];
   }
 
+  /**
+   * Return the number of agent definitions currently wired into the adapter.
+   * Counts both the single `agent` selector and entries in the `agents` map.
+   * Returns 0 if neither is configured.
+   * Diagnostic read-only surface — no authoring UI.
+   */
+  getAgentDefinitionCount(): number {
+    let count = 0;
+    if (typeof this.options.agent === 'string' && this.options.agent.trim().length > 0) {
+      count += 1;
+    }
+    if (this.options.agents && typeof this.options.agents === 'object') {
+      count += Object.keys(this.options.agents).length;
+    }
+    return count;
+  }
+
+  /**
+   * Return the list of agent definition names currently wired into the adapter.
+   * Includes the single `agent` selector (if set) followed by keys from the
+   * `agents` map. Returns an empty array if neither is configured.
+   * Diagnostic read-only surface — no authoring UI.
+   */
+  getAgentDefinitionsList(): string[] {
+    const names: string[] = [];
+    if (typeof this.options.agent === 'string' && this.options.agent.trim().length > 0) {
+      names.push(this.options.agent.trim());
+    }
+    if (this.options.agents && typeof this.options.agents === 'object') {
+      names.push(...Object.keys(this.options.agents));
+    }
+    return names;
+  }
+
   private async applyToActiveQueries(
     apply: (runtime: ClaudeCodeSessionRuntime) => Promise<unknown> | void | undefined,
   ): Promise<void> {

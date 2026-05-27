@@ -2205,6 +2205,101 @@ describe('ClaudeCodeAdapter', () => {
     });
   });
 
+  describe('ClaudeCodeAdapter agent definition introspection', () => {
+    it('getAgentDefinitionCount returns 0 when no agent or agents configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      expect(adapter.getAgentDefinitionCount()).toBe(0);
+    });
+
+    it('getAgentDefinitionCount returns 1 when only agent is configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agent: 'my-agent',
+      });
+      expect(adapter.getAgentDefinitionCount()).toBe(1);
+    });
+
+    it('getAgentDefinitionCount returns count from agents map', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agents: { 'agent-a': {}, 'agent-b': {} },
+      });
+      expect(adapter.getAgentDefinitionCount()).toBe(2);
+    });
+
+    it('getAgentDefinitionCount sums agent and agents when both configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agent: 'main-agent',
+        agents: { 'agent-a': {}, 'agent-b': {}, 'agent-c': {} },
+      });
+      expect(adapter.getAgentDefinitionCount()).toBe(4);
+    });
+
+    it('getAgentDefinitionCount ignores empty agent string', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agent: '   ',
+      });
+      expect(adapter.getAgentDefinitionCount()).toBe(0);
+    });
+
+    it('getAgentDefinitionsList returns empty array when nothing configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      expect(adapter.getAgentDefinitionsList()).toEqual([]);
+    });
+
+    it('getAgentDefinitionsList returns agent name when only agent is configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agent: 'my-agent',
+      });
+      expect(adapter.getAgentDefinitionsList()).toEqual(['my-agent']);
+    });
+
+    it('getAgentDefinitionsList returns agent keys from agents map', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agents: { 'agent-a': {}, 'agent-b': {} },
+      });
+      expect(adapter.getAgentDefinitionsList()).toEqual(['agent-a', 'agent-b']);
+    });
+
+    it('getAgentDefinitionsList returns agent first then agents map keys when both configured', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agent: 'main-agent',
+        agents: { 'agent-a': {}, 'agent-b': {} },
+      });
+      expect(adapter.getAgentDefinitionsList()).toEqual(['main-agent', 'agent-a', 'agent-b']);
+    });
+
+    it('getAgentDefinitionsList returns a defensive copy', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        agent: 'main-agent',
+        agents: { 'agent-a': {} },
+      });
+      const list = adapter.getAgentDefinitionsList();
+      list.push('agent-b');
+      expect(adapter.getAgentDefinitionsList()).toEqual(['main-agent', 'agent-a']);
+    });
+  });
+
   describe('ClaudeCodeAdapter diagnostic session lookup', () => {
     it('passes diagnostic sessionStore through getSession to the SDK', async () => {
       const sdk = createSdk([]);

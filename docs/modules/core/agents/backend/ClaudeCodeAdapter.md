@@ -24,6 +24,8 @@
 - 暴露 `getSkillCount()` 供 Capability Lab 做只读 skill 检测；该方法返回 `options.skills` 的计数（数组长度），`skills` 为 `'all'` 时返回 `-1` 表示"全量启用"，未配置时返回 0，不提供 skill authoring 能力
 - 暴露 `getSkillsList()` 供 Capability Lab 做只读 skill 名称列表诊断；该方法返回 `options.skills` 的防御性拷贝（`string[]`），`skills` 为 `'all'` 时返回 `'all'` sentinel，未配置时返回空数组，不提供 skill authoring 能力
 - 暴露 `getPluginsList()` 供 Capability Lab 做只读 plugin 名称列表诊断；该方法返回 `options.plugins` 的字符串化拷贝（处理 `unknown[]` 类型：字符串直接返回，对象 JSON 序列化），未配置时返回空数组，不提供 plugin authoring 能力
+- 暴露 `getAgentDefinitionCount()` 供 Capability Lab 做只读 agent definition 检测；该方法统计 `options.agent`（单个 selector，存在且非空时计 1）与 `options.agents`（map 的键数量）之和，未配置时返回 0，不提供 agent authoring 能力
+- 暴露 `getAgentDefinitionsList()` 供 Capability Lab 做只读 agent definition 名称列表诊断；该方法返回 `options.agent`（若存在且非空）后接 `options.agents` 的键列表，未配置时返回空数组，不提供 agent authoring 能力
 - 对活跃持久 `Query` 暴露后端 live control：`setModel()`、`setPermissionMode()` 和 `reloadMcpServers()` 会分别委托 SDK `Query.setModel()`、`Query.setPermissionMode()` 和 `Query.setMcpServers()`；没有活跃 query 时保持无害 no-op，MCP reload 会先刷新 adapter 缓存
 - 对 restart-sensitive Claude SDK options 暴露 `restartPersistentQueries(reason)`：只关闭活跃持久 query，不删除本地 session handle。下一次发送会重新创建 SDK query，并在已经捕获真实 SDK `session_id` 时带上 `options.resume`，用于让 settingSources、additionalDirectories、env、allowed/disallowed tools、limits 等只能在 query 启动时读取的设置生效
 - 从真实 SDK `Query.supportedModels()` 读取模型目录；本地 facade 兼容官方 `ModelInfo.value/displayName` 与旧 fixture `id/name` 形状，避免把 `supportedModels()` 误挂到顶层 SDK module

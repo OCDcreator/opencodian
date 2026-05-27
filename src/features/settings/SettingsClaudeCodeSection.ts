@@ -574,6 +574,7 @@ export class SettingsClaudeCodeSection {
     const listEl = statusEl.createEl('ul');
     listEl.createEl('li', { text: this.describeRuntimePlugins() });
     listEl.createEl('li', { text: this.describeRuntimeSkills() });
+    listEl.createEl('li', { text: this.describeRuntimeAgentDefinitions() });
   }
 
   private renderSdkStreamBoundaryNotice(containerEl: HTMLElement): void {
@@ -794,6 +795,29 @@ export class SettingsClaudeCodeSection {
     return t('settings.claudeCode.runtimeEcosystem.skills.loaded', {
       count,
       names: Array.isArray(names) && names.length > 0
+        ? names.join(', ')
+        : t('settings.claudeCode.runtimeEcosystem.unnamed'),
+    });
+  }
+
+  private describeRuntimeAgentDefinitions(): string {
+    const adapter = this.getClaudeAdapter() as {
+      getAgentDefinitionCount?: () => number;
+      getAgentDefinitionsList?: () => string[];
+    } | null;
+    const count = adapter?.getAgentDefinitionCount?.() ?? 0;
+    if (count <= 0) {
+      return t('settings.claudeCode.runtimeEcosystem.agentDefinitions.empty');
+    }
+    const names = adapter?.getAgentDefinitionsList?.() ?? [];
+    if (count === 1) {
+      return t('settings.claudeCode.runtimeEcosystem.agentDefinitions.single', {
+        name: names[0] ?? t('settings.claudeCode.runtimeEcosystem.unnamed'),
+      });
+    }
+    return t('settings.claudeCode.runtimeEcosystem.agentDefinitions.loaded', {
+      count,
+      names: names.length > 0
         ? names.join(', ')
         : t('settings.claudeCode.runtimeEcosystem.unnamed'),
     });

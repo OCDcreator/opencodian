@@ -480,6 +480,77 @@ describe('SettingsCapabilityLabSection', () => {
     expect(skillsRow?.textContent).not.toContain('Exposed');
   });
 
+  it('renders Agent Definitions discovery row with names when adapter has definitions', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getPluginCount: jest.fn().mockReturnValue(0),
+      getPluginsList: jest.fn().mockReturnValue([]),
+      getMcpServerCount: jest.fn().mockReturnValue(0),
+      getSkillCount: jest.fn().mockReturnValue(0),
+      getSkillsList: jest.fn().mockReturnValue([]),
+      getAgentDefinitionCount: jest.fn().mockReturnValue(2),
+      getAgentDefinitionsList: jest.fn().mockReturnValue(['agent-a', 'agent-b']),
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const agentRow = rows.find((row) => row.textContent?.includes('Agent Definitions'));
+    expect(agentRow?.textContent).toContain('2 agent definition(s)');
+    expect(agentRow?.textContent).toContain('agent-a');
+    expect(agentRow?.textContent).toContain('agent-b');
+    expect(agentRow?.textContent).toContain('Discovery Only');
+    expect(agentRow?.textContent).not.toContain('Exposed');
+  });
+
+  it('renders Agent Definitions discovery row as empty when adapter has no definitions', () => {
+    const containerEl = document.createElement('div');
+    const adapter = {
+      capabilities: new Set(['chat']),
+      getPluginCount: jest.fn().mockReturnValue(0),
+      getPluginsList: jest.fn().mockReturnValue([]),
+      getMcpServerCount: jest.fn().mockReturnValue(0),
+      getSkillCount: jest.fn().mockReturnValue(0),
+      getSkillsList: jest.fn().mockReturnValue([]),
+      getAgentDefinitionCount: jest.fn().mockReturnValue(0),
+      getAgentDefinitionsList: jest.fn().mockReturnValue([]),
+    };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const agentRow = rows.find((row) => row.textContent?.includes('Agent Definitions'));
+    expect(agentRow?.textContent).toContain('No agent definitions loaded');
+    expect(agentRow?.textContent).toContain('Discovery Only');
+  });
+
+  it('renders Agent Definitions discovery row as empty when no adapter', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const table = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    const rows = Array.from(table?.querySelectorAll('tr') ?? []);
+    const agentRow = rows.find((row) => row.textContent?.includes('Agent Definitions'));
+    expect(agentRow?.textContent).toContain('No agent definitions loaded');
+    expect(agentRow?.textContent).toContain('Discovery Only');
+  });
+
   it('renders advanced Claude settings as settings-surface untested SDK option rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({

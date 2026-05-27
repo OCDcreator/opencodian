@@ -11,7 +11,7 @@
  */
 import { Notice } from 'obsidian';
 
-import { hasCapability } from '../../core/agents/AgentCapability';
+import { type BackendCapabilities,hasCapability } from '../../core/agents/AgentCapability';
 import {
   getBackendSessionPreview,
   listBackendSessions,
@@ -1949,7 +1949,16 @@ export class SettingsCapabilityLabSection {
     headerRow.createEl('th', { text: 'Notes' });
 
     const tbody = table.createEl('tbody');
+    this.renderDiscoveryRows(tbody, adapter, caps);
+    this.renderDiscoveryControls(containerEl, adapter);
+    this.renderDeclaredCapabilities(containerEl, caps);
+  }
 
+  private renderDiscoveryRows(
+    tbody: HTMLTableSectionElement,
+    adapter: ClaudeCodeAdapter | null,
+    caps: BackendCapabilities | undefined,
+  ): void {
     // Hooks
     this.addDiscoveryRow(tbody, 'Hooks', 'No authoring UI. buildSdkOptions wires hooks from adapter options.');
     // Plugins
@@ -2004,7 +2013,7 @@ export class SettingsCapabilityLabSection {
       { status: 'exposed' },
     );
     // Agent definitions
-    this.addDiscoveryRow(tbody, 'Agent Definitions', 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options.');
+    this.renderAgentDefinitionsDiscoveryRow(tbody, adapter);
     // Agents / Subagents
     this.addDiscoveryRow(
       tbody,
@@ -2016,39 +2025,40 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(tbody, 'Session Store', 'No UI. Wired as runtime-only option.');
     // Import/Delete/Restore
     this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'Adapter methods exist but no UI. Deliberately not exposed in this lab (read-only focus).');
+  }
 
-    if (adapter) {
-      const proofControls = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
-      const hookProofBtn = proofControls.createEl('button', {
-        text: 'Run Hook Proof',
-        cls: 'opencodian-capability-lab-button',
-        attr: { 'data-diagnostic': 'true' },
-      });
-      const hookOutputEl = containerEl.createDiv({
-        cls: 'opencodian-capability-lab-output',
-        attr: { 'data-diagnostic': 'true' },
-      });
-      hookProofBtn.addEventListener('click', () => {
-        void this.runHookProof(adapter, hookOutputEl);
+  private renderDiscoveryControls(containerEl: HTMLElement, adapter: ClaudeCodeAdapter | null): void {
+    if (!adapter) return;
+    const proofControls = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+    const hookProofBtn = proofControls.createEl('button', {
+      text: 'Run Hook Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const hookOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    hookProofBtn.addEventListener('click', () => {
+      void this.runHookProof(adapter, hookOutputEl);
+    });
+  }
+
+  private renderDeclaredCapabilities(containerEl: HTMLElement, caps: ReadonlySet<string> | undefined): void {
+    if (!caps) return;
+    containerEl.createEl('h5', { text: 'Declared Backend Capabilities:' });
+    const capList = containerEl.createEl('div', {
+      cls: 'opencodian-capability-lab-cap-list',
+    });
+    const allCaps = Array.from(caps);
+    for (const cap of allCaps) {
+      capList.createSpan({
+        cls: 'opencodian-capability-lab-chip opencodian-capability-lab-chip-active',
+        text: cap,
       });
     }
-
-    // Show adapter declared capabilities
-    if (caps) {
-      containerEl.createEl('h5', { text: 'Declared Backend Capabilities:' });
-      const capList = containerEl.createEl('div', {
-        cls: 'opencodian-capability-lab-cap-list',
-      });
-      const allCaps = Array.from(caps);
-      for (const cap of allCaps) {
-        capList.createSpan({
-          cls: 'opencodian-capability-lab-chip opencodian-capability-lab-chip-active',
-          text: cap,
-        });
-      }
-      if (allCaps.length === 0) {
-        capList.createEl('p', { text: 'No capabilities declared.' });
-      }
+    if (allCaps.length === 0) {
+      capList.createEl('p', { text: 'No capabilities declared.' });
     }
   }
 
@@ -2078,6 +2088,22 @@ export class SettingsCapabilityLabSection {
       text: statusText,
     });
     tr.createEl('td', { text: notes });
+  }
+
+  private renderAgentDefinitionsDiscoveryRow(
+    tbody: HTMLTableSectionElement,
+    adapter: ClaudeCodeAdapter | null,
+  ): void {
+    const agentDefCount = adapter?.getAgentDefinitionCount?.() ?? 0;
+    const agentDefList = adapter?.getAgentDefinitionsList?.() ?? [];
+    this.addDiscoveryRow(
+      tbody,
+      'Agent Definitions',
+      agentDefCount > 0
+        ? `${agentDefCount} agent definition(s): ${agentDefList.join(', ')}. Configuration summary only; runtime passthrough is wired but not live-proofed here. No authoring UI.`
+        : 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options. No agent definitions loaded or adapter not started.',
+      { status: 'discovery' },
+    );
   }
 
   private async runHookProof(

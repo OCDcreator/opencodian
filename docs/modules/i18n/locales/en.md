@@ -75,6 +75,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 同日继续新增 `settings.claudeCode.runtimeEcosystem.*` 键，用于 SDK Foundations 标签中的只读 runtime plugins / skills 摘要。文案明确这是 adapter runtime-only options 的状态披露，不提供 skills/plugins authoring。
 
+本轮继续扩展 `settings.claudeCode.runtimeEcosystem.*` 键空间，新增 `agentDefinitions.empty` / `loaded` / `single`，用于 SDK Foundations 标签中的只读 runtime agent definitions 摘要，与 plugins / skills 摘要对齐显示。文案明确这是 adapter runtime-only `agent` / `agents` options 的状态披露，不提供 agent authoring。
+
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
 
 本轮还将 `chat.question.title` 调整为 backend-neutral 的 “Question from agent”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。

@@ -848,12 +848,14 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('sdk-foundations tab', () => {
-    it('shows read-only runtime plugins and skills status from the active Claude adapter', () => {
+    it('shows read-only runtime plugins, skills, and agent definitions status from the active Claude adapter', () => {
       const claudeAdapter = {
         getPluginCount: jest.fn().mockReturnValue(2),
         getPluginsList: jest.fn().mockReturnValue(['plugin-a', 'plugin-b']),
         getSkillCount: jest.fn().mockReturnValue(3),
         getSkillsList: jest.fn().mockReturnValue(['skill-a', 'skill-b', 'skill-c']),
+        getAgentDefinitionCount: jest.fn().mockReturnValue(2),
+        getAgentDefinitionsList: jest.fn().mockReturnValue(['agent-a', 'agent-b']),
       };
       const plugin = createPlugin({ claudeAdapter });
       const containerEl = document.createElement('div');
@@ -870,6 +872,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(
         t('settings.claudeCode.runtimeEcosystem.skills.loaded', { count: 3, names: 'skill-a, skill-b, skill-c' }),
       );
+      expect(containerEl.textContent).toContain(
+        t('settings.claudeCode.runtimeEcosystem.agentDefinitions.loaded', { count: 2, names: 'agent-a, agent-b' }),
+      );
     });
 
     it('shows all-skills sentinel in the runtime ecosystem summary', () => {
@@ -878,6 +883,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         getPluginsList: jest.fn().mockReturnValue([]),
         getSkillCount: jest.fn().mockReturnValue(-1),
         getSkillsList: jest.fn().mockReturnValue('all'),
+        getAgentDefinitionCount: jest.fn().mockReturnValue(0),
+        getAgentDefinitionsList: jest.fn().mockReturnValue([]),
       };
       const plugin = createPlugin({ claudeAdapter });
       const containerEl = document.createElement('div');
@@ -889,6 +896,29 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.plugins.empty'));
       expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.skills.all'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.agentDefinitions.empty'));
+    });
+
+    it('shows single agent definition in the runtime ecosystem summary', () => {
+      const claudeAdapter = {
+        getPluginCount: jest.fn().mockReturnValue(0),
+        getPluginsList: jest.fn().mockReturnValue([]),
+        getSkillCount: jest.fn().mockReturnValue(0),
+        getSkillsList: jest.fn().mockReturnValue([]),
+        getAgentDefinitionCount: jest.fn().mockReturnValue(1),
+        getAgentDefinitionsList: jest.fn().mockReturnValue(['single-agent']),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'sdk-foundations');
+
+      expect(containerEl.textContent).toContain(
+        t('settings.claudeCode.runtimeEcosystem.agentDefinitions.single', { name: 'single-agent' }),
+      );
     });
 
     it('renders SDK foundation toggles without stable authoring UI', async () => {

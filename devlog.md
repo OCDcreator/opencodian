@@ -12,6 +12,40 @@
 
 ---
 
+## 2026-05-27 Agent Definitions Runtime Summary
+
+### 目标
+
+为 Claude Code 运行时配置的 agent definitions 添加只读摘要，与已有的 plugins/skills 运行时摘要对齐。范围限定在 adapter 层 helper、settings UI 渲染和 Capability Lab 发现状态三处，不引入任何 authoring UI。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 新增 helper | `getAgentDefinitionCount()` 统计 `options.agent` + `options.agents`；`getAgentDefinitionsList()` 返回稳定名称列表；均处理空/缺失值安全 |
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 新增渲染 | `describeRuntimeAgentDefinitions()` 在 SDK Foundations 标签的 runtime ecosystem 块中渲染 agent definitions 摘要行 |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 更新发现行 | Agent Definitions discovery row 从固定 stub 改为调用 adapter helper 显示实时配置摘要（计数+名称），仍保持 `Discovery Only` |
+| `src/i18n/locales/en.ts` + `zh.ts` | 新增文案 | `settings.claudeCode.runtimeEcosystem.agentDefinitions.{empty,loaded,single}` |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 新增测试 | 12 个 adapter helper 测试：空配置、仅 agent、仅 agents、混合、空白忽略、防御性拷贝 |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 更新/新增测试 | 更新已有 runtime ecosystem 测试以包含 agent definitions；新增单 agent definition 测试 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 新增测试 | 3 个 discovery row 测试：有 definitions 显示名称、无 definitions 显示空态、无 adapter 显示空态 |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 更新文档 | 记录 `getAgentDefinitionCount()` 和 `getAgentDefinitionsList()` 职责 |
+| `docs/modules/features/settings/SettingsClaudeCodeSection.md` | 更新文档 | 记录 SDK Foundations 标签新增 agent definition 只读摘要 |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 更新文档 | 记录 Agent Definitions Discovery 行和 discovery 面板描述更新 |
+| `docs/modules/i18n/locales/en.md` + `zh.md` | 更新文档 | 记录新增 `agentDefinitions.*` 键空间 |
+
+### 验证结果
+
+- `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` → 97 passed ✓
+- `npm test -- --runInBand tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` → 35 passed ✓
+- `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` → 83 passed ✓
+
+### 结论
+
+Agent definitions 运行时摘要与 plugins/skills 摘要对齐，保持只读、无 authoring、Discovery Only 的约束。
+
+---
+
 ## 2026-05-26 Phase 9 - Cap-4: Final visual/layout review and lane completion
 
 ### 目标
