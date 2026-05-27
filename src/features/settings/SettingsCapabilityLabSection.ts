@@ -43,7 +43,7 @@ interface MatrixRow {
   capability: string;
   sdkExposed: boolean;
   adapterWired: boolean;
-  runtimeProof: 'untested' | 'pass' | 'fail';
+  runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring';
   userSurface: 'settings' | 'diagnostic' | 'hidden';
 }
 
@@ -453,6 +453,7 @@ export class SettingsCapabilityLabSection {
       const runtimeCell = tr.createEl('td');
       const proofLabel = row.runtimeProof === 'pass' ? 'Verified'
         : row.runtimeProof === 'fail' ? 'Failed'
+        : row.runtimeProof === 'wiring' ? 'Wiring only'
         : 'Untested';
       runtimeCell.createSpan({
         cls: `opencodian-capability-lab-chip opencodian-capability-lab-chip-${row.runtimeProof}`,
@@ -555,14 +556,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)
-        runtimeProof: 'pass', // Direct SDK smoke artifact proves allow/deny canUseTool behavior.
+        runtimeProof: 'wiring', // Bridge and SDK option are wired, but ordinary chat end-to-end runtime proof is not yet available. The current evidence is unit-test smoke only (mocked SDK + bridge callbacks), not live Obsidian permission card interaction.
         userSurface: 'settings', // Reuses existing stable permission card UI in ordinary chat; no separate Claude permission settings page.
       },
       {
         capability: 'AskUserQuestion / Elicitation',
         sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
         adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
-        runtimeProof: 'pass', // Direct SDK smoke artifact proves elicitation/question callback behavior.
+        runtimeProof: 'wiring', // Bridge and SDK option are wired, but ordinary chat end-to-end runtime proof is not yet available. The current evidence is unit-test smoke only (mocked SDK + bridge callbacks), not live Obsidian question dialog interaction.
         userSurface: 'settings', // Reuses existing stable question dialog in ordinary chat; no separate Claude question settings page.
       },
       {
@@ -2055,14 +2056,14 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'Permission Approval',
-      'Ordinary user path. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission card UI used in chat; no separate Claude permission settings page exists.',
+      'Wired only. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission card UI, and the options builder forwards the callback to the SDK. Unit-test smoke confirms the bridge wiring, but live Obsidian ordinary chat end-to-end runtime proof (model calls tool → permission card renders → user approves/denies → stream continues) is not yet available.',
       { status: 'exposed' },
     );
     // AskUserQuestion / Elicitation
     this.addDiscoveryRow(
       tbody,
       'AskUserQuestion / Elicitation',
-      'Ordinary user path. The question bridge returns AskUserQuestion answers through the shared question dialog in chat, and onElicitation is forwarded as a runtime SDK callback.',
+      'Wired only. The question bridge returns AskUserQuestion answers through the shared question dialog, and onElicitation is forwarded as a runtime SDK callback. Unit-test smoke confirms the bridge wiring, but live Obsidian ordinary chat end-to-end runtime proof (model asks question → dialog renders → user answers → stream continues) is not yet available.',
       { status: 'exposed' },
     );
     // Fallback Model
@@ -2137,6 +2138,34 @@ export class SettingsCapabilityLabSection {
     });
     fallbackModelProofBtn.addEventListener('click', () => {
       void this.runFallbackModelProof(adapter, fallbackModelOutputEl);
+    });
+
+    // Permission approval proof
+    const permissionProofBtn = proofControls.createEl('button', {
+      text: 'Run Permission Approval Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const permissionOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    permissionProofBtn.addEventListener('click', () => {
+      void this.runPermissionApprovalProof(adapter, permissionOutputEl);
+    });
+
+    // AskUserQuestion proof
+    const questionProofBtn = proofControls.createEl('button', {
+      text: 'Run AskUserQuestion Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const questionOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    questionProofBtn.addEventListener('click', () => {
+      void this.runAskUserQuestionProof(adapter, questionOutputEl);
     });
   }
 
@@ -2449,6 +2478,173 @@ export class SettingsCapabilityLabSection {
         text: 'The query failed with an invalid primary model even though a fallback was configured. This suggests the SDK did not fall back, or the fallback model is also unavailable.',
       });
       this.updateRuntimeProof('Fallback Model', 'fail', outputEl);
+    }
+  }
+
+  private async runPermissionApprovalProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running a permission approval behavior proof…' });
+    try {
+      // Use a prompt likely to trigger a tool call. The model may or may not call a tool;
+      // this is intentionally non-deterministic because tool calling depends on the model.
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Please read the file named README.md in the current directory and tell me its first line.',
+        persistSession: false,
+      });
+
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `Permission approval diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
+      });
+      if (result.sessionId) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Session ID: ${result.sessionId}`,
+        });
+      }
+
+      // Check for tool_use chunks — this proves the model attempted a tool call,
+      // which means canUseTool would have been invoked if the bridge is wired.
+      const toolUseChunks = result.chunks.filter((c) => c.type === 'tool_use');
+      const toolResultChunks = result.chunks.filter((c) => c.type === 'tool_result');
+      const hasToolUse = toolUseChunks.length > 0;
+      const hasToolResult = toolResultChunks.length > 0;
+
+      if (hasToolUse) {
+        outputEl.createEl('p', {
+          text: `Model emitted ${toolUseChunks.length} tool_use chunk(s).`,
+        });
+        renderMessagePreviewList(
+          outputEl,
+          'Tool use timeline',
+          toolUseChunks.map((chunk) => ({
+            type: chunk.type,
+            id: (chunk as Record<string, unknown>).id ?? 'unknown',
+            content: (chunk as Record<string, unknown>).name ?? 'unknown',
+          })),
+        );
+      }
+
+      if (hasToolResult) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Model received ${toolResultChunks.length} tool_result chunk(s).`,
+        });
+      }
+
+      // Honesty boundary: we can only prove wiring here.
+      // True end-to-end permission approval proof requires:
+      // 1. The model to call a tool (non-deterministic)
+      // 2. The SDK to invoke canUseTool
+      // 3. The permission card to render in Obsidian
+      // 4. The user to approve/deny
+      // 5. The stream to continue with the correct result
+      // Steps 3-5 are outside the diagnostic prompt path.
+      if (hasToolUse && hasToolResult) {
+        outputEl.createEl('p', {
+          text: 'The model called a tool and received a result. This suggests the SDK accepted the canUseTool wiring, but it does not prove the Obsidian permission card UI was shown or that user approval was required.',
+        });
+        this.updateRuntimeProof('Permission Approval', 'wiring', outputEl);
+      } else if (hasToolUse) {
+        outputEl.createEl('p', {
+          text: 'The model called a tool but no tool_result was captured. The tool may have been denied or the call may have failed.',
+        });
+        this.updateRuntimeProof('Permission Approval', 'wiring', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'The model did not call any tool in this diagnostic prompt. Tool calling is non-deterministic and depends on the model, prompt, and context. This does not prove or disprove the permission approval wiring.',
+        });
+        this.updateRuntimeProof('Permission Approval', 'wiring', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Permission approval proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Permission Approval', 'fail', outputEl);
+    }
+  }
+
+  private async runAskUserQuestionProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running an AskUserQuestion behavior proof…' });
+    try {
+      // Use a prompt likely to trigger the AskUserQuestion tool. The model may or may not
+      // use this tool; it is non-deterministic.
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'Ask me a single yes/no question using the AskUserQuestion tool: "Should I continue?"',
+        persistSession: false,
+      });
+
+      outputEl.empty();
+      outputEl.createEl('h5', {
+        text: `AskUserQuestion diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
+      });
+      if (result.sessionId) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Session ID: ${result.sessionId}`,
+        });
+      }
+
+      // Check for AskUserQuestion tool_use
+      const askUserQuestionChunks = result.chunks.filter((c) => {
+        if (c.type !== 'tool_use') return false;
+        const name = (c as Record<string, unknown>).name;
+        return typeof name === 'string' && name.toLowerCase().includes('askuser');
+      });
+      const hasAskUserQuestion = askUserQuestionChunks.length > 0;
+
+      if (hasAskUserQuestion) {
+        outputEl.createEl('p', {
+          text: `Model emitted ${askUserQuestionChunks.length} AskUserQuestion tool_use chunk(s).`,
+        });
+        renderMessagePreviewList(
+          outputEl,
+          'AskUserQuestion timeline',
+          askUserQuestionChunks.map((chunk) => ({
+            type: chunk.type,
+            id: (chunk as Record<string, unknown>).id ?? 'unknown',
+            content: (chunk as Record<string, unknown>).name ?? 'unknown',
+          })),
+        );
+      }
+
+      // Honesty boundary: we can only prove wiring here.
+      // True end-to-end AskUserQuestion proof requires:
+      // 1. The model to call AskUserQuestion (non-deterministic)
+      // 2. The SDK to invoke canUseTool with the question
+      // 3. The question dialog to render in Obsidian
+      // 4. The user to answer
+      // 5. The stream to continue with the answer
+      // Steps 3-5 are outside the diagnostic prompt path.
+      if (hasAskUserQuestion) {
+        outputEl.createEl('p', {
+          text: 'The model called AskUserQuestion. This suggests the SDK accepted the question bridge wiring, but it does not prove the Obsidian question dialog UI was shown or that user answers were collected.',
+        });
+        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'wiring', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'The model did not call AskUserQuestion in this diagnostic prompt. Tool calling is non-deterministic and depends on the model, prompt, and context. This does not prove or disprove the AskUserQuestion wiring.',
+        });
+        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'wiring', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `AskUserQuestion proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
     }
   }
 

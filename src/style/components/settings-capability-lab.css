@@ -207,6 +207,7 @@
   color: var(--opencodian-status-warning);
 }
 
+.opencodian-settings .opencodian-capability-lab-chip-wiring,
 .opencodian-settings .opencodian-capability-lab-chip-fail {
   border-color: var(--opencodian-status-error-border);
   background: var(--opencodian-status-error-subtle);

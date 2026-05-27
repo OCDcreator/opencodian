@@ -181,11 +181,11 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(permissionRow).not.toBeNull();
     expect(permissionRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
-    expect(permissionRow?.textContent).toContain('Verified');
+    expect(permissionRow?.textContent).toContain('Wiring only');
 
     expect(questionRow).not.toBeNull();
     expect(questionRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
-    expect(questionRow?.textContent).toContain('Verified');
+    expect(questionRow?.textContent).toContain('Wiring only');
   });
 
   it('keeps hook and subagent stream option rows diagnostic-facing while untested', () => {
@@ -234,13 +234,13 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(permissionRow).not.toBeNull();
     expect(permissionRow?.textContent).toContain('Exposed');
-    expect(permissionRow?.textContent).toContain('Ordinary user path');
+    expect(permissionRow?.textContent).toContain('Wired only');
     expect(permissionRow?.textContent).toContain('permission card UI');
     expect(permissionRow?.querySelector('.opencodian-capability-lab-chip-active')).not.toBeNull();
 
     expect(questionRow).not.toBeNull();
     expect(questionRow?.textContent).toContain('Exposed');
-    expect(questionRow?.textContent).toContain('Ordinary user path');
+    expect(questionRow?.textContent).toContain('Wired only');
     expect(questionRow?.textContent).toContain('question dialog');
     expect(questionRow?.querySelector('.opencodian-capability-lab-chip-active')).not.toBeNull();
 
@@ -840,7 +840,7 @@ describe('SettingsCapabilityLabSection', () => {
     // Expected honest classifications for every capability row.
     // runtimeProof: 'pass' only when direct SDK smoke proof exists.
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
-    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
+    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
       Hooks: { runtimeProof: 'untested', userSurface: 'hidden' },
       'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'settings' },
       'JSONL History Browser': { runtimeProof: 'untested', userSurface: 'diagnostic' },
@@ -853,8 +853,8 @@ describe('SettingsCapabilityLabSection', () => {
       'Turn/Budget Limits': { runtimeProof: 'untested', userSurface: 'settings' },
       'Environment Variables': { runtimeProof: 'untested', userSurface: 'settings' },
       'Fallback Model': { runtimeProof: 'untested', userSurface: 'settings' },
-      'Permission Approval': { runtimeProof: 'pass', userSurface: 'settings' },
-      'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Permission Approval': { runtimeProof: 'wiring', userSurface: 'settings' },
+      'AskUserQuestion / Elicitation': { runtimeProof: 'wiring', userSurface: 'settings' },
       'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'Agent Definitions': { runtimeProof: 'untested', userSurface: 'hidden' },
       'Structured Output': { runtimeProof: 'untested', userSurface: 'diagnostic' },
@@ -877,7 +877,8 @@ describe('SettingsCapabilityLabSection', () => {
       const proofText = row?.textContent ?? '';
       const proofLabel = proofText.includes('Verified') ? 'pass'
         : proofText.includes('Failed') ? 'fail'
-          : 'untested';
+          : proofText.includes('Wiring only') ? 'wiring'
+            : 'untested';
       expect(proofLabel).toBe(expectedValues.runtimeProof);
     }
 
@@ -888,9 +889,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation']),
+      expect.arrayContaining(['MCP Servers']),
     );
-    expect(verifiedCapabilities.length).toBe(3);
+    expect(verifiedCapabilities.length).toBe(1);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (

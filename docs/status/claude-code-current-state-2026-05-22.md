@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280015`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280042`
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -120,6 +120,39 @@ This slice makes a second attempt at plugin-side prompt hardening for the `/json
 - The remaining ~4 chars of follow-up text ("Done") appears to be an **SDK/model boundary**: the Claude Code SDK allows the model to emit a final assistant text block after the `StructuredOutput` tool call, and the model uses this to acknowledge completion regardless of prompt constraints.
 - **Further plugin-side improvement would require post-processing** (e.g., suppressing all non-duplicate text blocks when structured output is present for `/json` triggers), not more prompt hardening.
 - The current state is acceptable for ordinary chat UX: the structured output badge is prominent, duplicate JSON is suppressed, and the residual prose is minimal (~4 chars).
+
+---
+
+## 2026-05-28 Permission / AskUserQuestion Honesty Correction
+
+This slice corrects the Capability Lab classification for Permission Approval and AskUserQuestion / Elicitation from `runtimeProof: 'pass'` to `runtimeProof: 'wiring'`, because the previous "pass" claim was based on mocked unit-test smoke only, not Obsidian ordinary chat end-to-end runtime proof.
+
+### What Changed
+
+- `SettingsCapabilityLabSection.ts`:
+  - Matrix rows for Permission Approval and AskUserQuestion / Elicitation changed from `runtimeProof: 'pass'` to `'wiring'`
+  - `MatrixRow.runtimeProof` type expanded to include `'wiring'`
+  - Discovery row notes updated from "Ordinary user path" to "Wired only" with explicit explanation that unit-test smoke confirms bridge wiring but live Obsidian end-to-end runtime proof is not yet available
+  - Added "Run Permission Approval Proof" and "Run AskUserQuestion Proof" diagnostic buttons to Discovery & Status panel
+  - Added `runPermissionApprovalProof()` and `runAskUserQuestionProof()` methods that attempt to trigger tool use via diagnostic prompt, but correctly mark as `wiring` regardless of result because tool calling is non-deterministic and these probes cannot prove the full UI interaction chain
+- `settings-capability-lab.css`: Added `.opencodian-capability-lab-chip-wiring` styling (shares error-border styling with `.opencodian-capability-lab-chip-fail`)
+- Tests updated to expect `wiring` classification and only 1 Verified row (MCP Servers)
+
+### Honest Assessment
+
+- **Permission Approval**: Bridge (`ClaudeCodePermissionBridge.canUseTool`) and SDK options (`canUseTool` callback) are wired into the ordinary chat send path. The shared permission card UI exists. However, no live Obsidian runtime proof exists showing: model calls tool → permission card renders → user approves/denies → stream continues with correct result.
+- **AskUserQuestion / Elicitation**: Bridge (`ClaudeCodePermissionBridge.handleAskUserQuestion`) and SDK options (`onElicitation`) are wired. The shared question dialog exists. However, no live Obsidian runtime proof exists showing: model asks question → dialog renders → user answers → stream continues with answer incorporated.
+- **Why downgraded**: The previous "pass" claim relied on `ClaudeCodeSmokeHarness.test.ts` unit tests with mocked SDK. These tests prove the adapter-level wiring (bridge receives callbacks, returns decisions, builds correct input) but do not prove the full Obsidian UI-to-SDK loop in ordinary chat.
+- **Why not immediately provable**: Tool calling (including AskUserQuestion) is non-deterministic and model-dependent. A diagnostic prompt may or may not trigger tool use. Even when triggered, the diagnostic `runDiagnosticPrompt` path bypasses the chat view UI, so it cannot prove the permission card or question dialog interaction.
+
+### Verification
+
+- Full verify: 443 suites / 3374 tests passed, lint/typecheck/build clean (BUILD_ID=feature-phase0-capability.202605280042)
+- Module docs: 2 required doc targets updated
+- Graphify: refreshed
+- Devlog order: OK (205 sections after consolidation)
+- Test Vault deployed and BUILD_ID verified (feature-phase0-capability.202605280042)
+- Runtime proof: Capability Lab matrix shows "Wiring only" for both rows; Discovery rows show "Wired only" notes; diagnostic probes run and correctly report wiring/fail
 
 ---
 

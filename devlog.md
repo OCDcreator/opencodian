@@ -12,78 +12,74 @@
 
 ---
 
-## 2026-05-28 Prompt Hardening — Second Attempt
+## 2026-05-28 Permission / AskUserQuestion 诚实性纠正
 
 ### 目标
 
-在 ordinary `/json` 路径里通过插件侧 prompt hardening 减少模型在 StructuredOutput 工具调用之外输出额外 prose。这是第二轮尝试；第一轮（commit `1c7a380a`）被 revert，因为运行时证明它未能稳定消除额外 prose。
+将 Capability Lab 中 Permission Approval 和 AskUserQuestion / Elicitation 的分类从 `runtimeProof: 'pass'` 降级为 `'wiring'`，因为之前 "pass" 声称仅基于 mock 单元测试 smoke，缺乏 Obsidian 普通聊天路径的端到端 runtime proof。
+
+### 背景
+
+- Permission Approval 和 AskUserQuestion / Elicitation 的 capability matrix 行此前标记为 `pass`，注释为 "Direct SDK smoke artifact proves..."
+- 但该 "smoke" 实际上是 `ClaudeCodeSmokeHarness.test.ts` 中的 mock 单元测试：mock SDK 发射 tool_use，bridge 回调返回 allow/deny，验证 adapter 正确处理。这不是真实的 Obsidian UI → SDK → UI 闭环证明。
+- 普通聊天路径里，工具调用（包括 AskUserQuestion）是非确定性的，取决于模型、prompt 和上下文。即使触发了工具调用，诊断探针 `runDiagnosticPrompt` 也绕过聊天视图，无法证明权限卡片或提问对话框的完整交互。
 
 ### 变更
 
-- `src/core/agents/backend/ClaudeCodeAdapter.ts`：
-  - `sendMessage()` 在检测到 `request.options.outputFormat` 时，于用户 prompt 前附加更强约束前缀：`You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output.`
-  - 仅作用于 structured-output 发送，不影响普通聊天
-- `src/features/chat/runtime/SendPipelineRuntime.ts`：
-  - `STRUCTURED_OUTPUT_FIXED_SCHEMA` 根对象和 `response` 属性上添加 `description`
-- 测试：
-  - `ClaudeCodeAdapter.test.ts`：更新 hardening 测试以匹配新 prompt 文本
-- 文档：
-  - `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`：更新 hardening 描述
-  - `docs/modules/features/chat/runtime/SendPipelineRuntime.md`：记录 schema description
-  - `docs/status/claude-code-current-state-2026-05-22.md`：更新为诚实结论
+- `src/features/settings/SettingsCapabilityLabSection.ts`：
+  - Permission Approval 和 AskUserQuestion / Elicitation 的 matrix `runtimeProof` 从 `'pass'` 改为 `'wiring'`
+  - `MatrixRow.runtimeProof` 类型扩展为包含 `'wiring'`
+  - Discovery row notes 从 "Ordinary user path" 改为 "Wired only"，并明确说明当前证据仅为单元测试 smoke，尚缺端到端 runtime proof
+  - 在 Discovery & Status 面板新增 "Run Permission Approval Proof" 和 "Run AskUserQuestion Proof" 诊断按钮
+  - 新增 `runPermissionApprovalProof()` 和 `runAskUserQuestionProof()` 方法：通过诊断 prompt 尝试触发工具调用，但无论结果如何都标记为 `wiring`，因为工具调用非确定性且探针无法证明完整 UI 交互链
+- `src/style/components/settings-capability-lab.css`：新增 `.opencodian-capability-lab-chip-wiring` 样式（与 `.opencodian-capability-lab-chip-fail` 共享 error-border 样式）
+- 测试更新：预期 `wiring` 分类，Verified 行数从 3 降至 1（仅 MCP Servers）
+
+### 诚实评估
+
+- **Permission Approval**: Bridge (`ClaudeCodePermissionBridge.canUseTool`) 和 SDK options (`canUseTool`) 已接入普通聊天路径。共享权限卡片 UI 存在。但尚无 live Obsidian runtime proof 证明：模型调用工具 → 权限卡片渲染 → 用户批准/拒绝 → 流继续。
+- **AskUserQuestion / Elicitation**: Bridge (`handleAskUserQuestion`) 和 SDK options (`onElicitation`) 已接入。共享提问对话框存在。但尚无 live Obsidian runtime proof 证明：模型提问 → 对话框渲染 → 用户回答 → 流继续。
+- **降级原因**: 之前的 "pass" 仅基于 mock 单元测试，证明了 adapter-level wiring，但未证明 Obsidian UI-to-SDK 闭环。
+- **为何难以立即证明**: 工具调用非确定性，诊断 prompt 可能触发也可能不触发。即使触发，`runDiagnosticPrompt` 绕过聊天视图 UI，无法证明权限卡片或提问对话框交互。
 
 ### 验证
 
 - 全量测试：443 suites / 3374 tests passed
 - Lint：0 errors / 0 warnings
 - Typecheck：clean
-- Build：BUILD_ID=feature-phase0-capability.202605280011
-- Test Vault 运行时证明（Claude Code backend，fresh conversation）：
-  - 新 prompt（"You MUST return..."）：模型输出 "Done"（~4 chars）
-  - StructuredOutput 工具调用和 structured_output backend_event 均正常到达
-  - assistant message 中仍存在 `.streaming-text-block`（"Done"），但长度显著减少
-  - Thinking block 正常出现（"Thought for 4.4s"）
-  - Reload/hydration：structured output 完整存活，无 regression
-  - Errors：`No errors captured`
-  - 截图：`.obsidian-debug/json-hardening-v2-proof-20260527.png`, `.obsidian-debug/json-hardening-v2-reload-proof-20260527.png`
-  - 结果 JSON：`.obsidian-debug/json-hardening-v2-result-20260527.json`
-
-### 诚实评估
-
-- Prompt hardening **部分有效**：将额外 prose 从 ~31 chars 降至 ~4 chars，但无法完全消除
-- 剩余 ~4 chars（"Done"）属于 **SDK/model 边界**：Claude Code SDK 允许模型在 StructuredOutput 工具调用后输出 final assistant text block，且该行为不受用户 prompt 约束影响
-- **进一步 plugin-side 改进需依赖 post-processing**（如 `/json` 触发时抑制所有非 duplicate text block），而非更多 prompt hardening
-- 当前 ordinary `/json` UX 已可接受：structured output badge 显式，duplicate JSON 已抑制，残留 prose 极短（~4 chars）
+- Build：BUILD_ID=feature-phase0-capability.202605280042
+- Test Vault 运行时证明：
+  - Capability Lab matrix 显示 Permission Approval 和 AskUserQuestion / Elicitation 为 "Wiring only"
+  - Discovery rows 显示 "Wired only" notes
+  - Permission Approval 诊断探针运行后标记为 `wiring`（模型未触发工具调用，探针正确报告 wiring）
+  - AskUserQuestion 诊断探针运行后标记为 `fail`（模型未触发 AskUserQuestion，探针正确报告 fail）
+- Errors：`No errors captured`（plugin reload 后无错误；AskUserQuestion proof 有一个预期的 `No streaming message element found for question card`，因诊断 prompt 在聊天视图外运行）
 
 ---
 
-## 2026-05-28 Prompt Hardening Revert — 诚实性纠正
+## 2026-05-28 Prompt Hardening — Attempted, Reverted, Honest Conclusion
 
 ### 目标
 
-撤销 commit `1c7a380a` 的 prompt hardening 尝试，因为运行时 artifact 证明它未能提供稳定、可复现的收益。
+在 ordinary `/json` 路径里尝试插件侧 prompt hardening 以减少 StructuredOutput 工具调用后的额外 prose；运行时 artifact 证明无效后 revert，恢复诚实状态。
 
 ### 背景
 
-- 上一轮（commit `1c7a380a`）在 `ClaudeCodeAdapter.sendMessage()` 中添加了更强的 prompt constraint，并在 `SendPipelineRuntime.ts` 的 schema 中增加了 description 字段，声称 "Plugin hardening successful"（分类 A）。
-- 但运行时 artifact `.obsidian-debug/json-hardening-proof-result-20260527.json` 明确显示：
+- **第一轮**（commit `1c7a380a`）：添加 prompt constraint，声称 "Plugin hardening successful"。但 artifact 证明：
   - `promptHardeningEffective: false`
   - `extraProseEliminated: false`
   - `extraProseContent: "Done."`
   - `boundary: "SDK/model"`
-- 上一轮的 proof 使用了错误的 DOM selector，误报了 `assistantTextBlockCount=0`；artifact（截图 + JSON result）才是权威证据。
+  - 且 proof 使用了错误 DOM selector，误报 `assistantTextBlockCount=0`
+- **第二轮**（commit `87b90fb1`，本 worktree）：使用更强 prompt（"You MUST return..."）+ schema description，结果仍为 "Done"（~4 chars），无本质改善。
 
-### 撤销内容
+### 变更
 
-- Revert commit `8bdabcc7`（`git revert 1c7a380a --no-edit`）移除：
-  - `ClaudeCodeAdapter.sendMessage()` 中的 prompt hardening prefix
-  - `STRUCTURED_OUTPUT_FIXED_SCHEMA` 中的 schema description 字段
-  - 2 个 hardening 行为的单元测试
-  - 文档中 "successful" 的不实声称
+- `ClaudeCodeAdapter.sendMessage()`：尝试更强 prompt constraint（已 revert）
+- `SendPipelineRuntime.ts`：尝试 schema description（已 revert）
+- Revert `1c7a380a`（生成 `8bdabcc7`）：移除 hardening prefix、schema description、2 个 hardening 测试、不实文档声称
 
-### 保留内容
-
-所有来自 `0aba72bf` 及之前的已验证修复均保留：
+### 保留的已验证修复
 
 | 修复 | Commit | 状态 |
 |---|---|---|
@@ -94,28 +90,16 @@
 | `/json` 前缀剥离 | `d63c0d87` 之前 | ✅ 保留 |
 | Reload/hydration structured output 存活 | `0aba72bf` | ✅ 保留 |
 
-### 当前分类
+### 诚实结论
 
-| 边界 | 状态 | 原因 |
-|---|---|---|
-| 重复 raw JSON 抑制 | ✅ Plugin 已修复 | 运行时证明确认 |
-| Hook text leak | ✅ Plugin 已修复 | 运行时证明确认 |
-| Structured output badge | ✅ Plugin 已修复 | 运行时证明确认 |
-| `/json` 前缀剥离 | ✅ Plugin 已修复 | 运行时证明确认 |
-| Reload/hydration 存活 | ✅ Plugin 已修复 | 运行时证明确认 |
-| StructuredOutput 工具调用后的额外 prose | ℹ️ SDK/model 边界 | 模型在明确指令后仍输出 follow-up text；prompt hardening 无法解决 |
-| Prompt hardening | ❌ 已撤销 | 尝试过但未稳定改善；artifact 证明无可复现收益 |
-
-### 诚实评估
-
-- **Prompt hardening 不是可行的 plugin-side 修复方案**。Claude Code SDK 允许模型在 `StructuredOutput` 工具调用后输出 assistant text block，这种行为无法通过用户 prompt constraint 控制。
-- **剩余的额外 prose 属于 SDK/model 边界**，不是 plugin gap。进一步改进需要 SDK 级别变更或后置处理抑制（而非 prompt engineering）。
-- 本次撤销恢复了诚实状态：有效的 plugin 修复保留；未证实的尝试移除。
+- **Prompt hardening 不是可行的 plugin-side 修复方案**。Claude Code SDK 允许模型在 `StructuredOutput` 工具调用后输出 assistant text block，该行为不受用户 prompt constraint 控制。
+- 剩余 ~4 chars 额外 prose 属于 **SDK/model 边界**，不是 plugin gap。
+- 进一步 plugin-side 改进需依赖 **post-processing**（如 `/json` 触发时抑制非 duplicate text block），而非更多 prompt engineering。
+- 当前 ordinary `/json` UX 已可接受：structured output badge 显式，duplicate JSON 已抑制，残留 prose 极短。
 
 ### 验证
 
-- Revert: `git revert 1c7a380a --no-edit` → 成功生成 revert commit `8bdabcc7`
-- Build: `npm run build` → BUILD_ID=`feature-phase0-capability.202605280009`
+- Build: `npm run build` → BUILD_ID=`feature-phase0-capability.202605280015`
 - Test Vault 部署: BUILD_ID 已确认写入 deployed main.js
 - Plugin reload: 无错误
 - 运行时证明: StructuredOutput 工具仍正常调用，structured_output backend_event 正常到达
