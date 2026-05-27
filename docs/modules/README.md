@@ -318,7 +318,9 @@ docs/modules/
 ├── vendor/
 │   └── three.md
 ├── style/
-│   └── README.md
+│   ├── README.md
+│   └── components/
+│       └── settings-claude-code.md
 └── infrastructure/
     ├── build-pipeline.md
     ├── scripts.md

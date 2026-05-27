@@ -179,6 +179,7 @@ export class SettingsClaudeCodeSection {
     this.renderExecutableSetting(containerEl);
     this.renderEnvironmentHint(containerEl);
     this.renderDiagnostics(containerEl);
+    this.renderEnvProofStatusNotice(containerEl);
     this.renderEnvironmentVariablesSetting(containerEl);
   }
 
@@ -240,6 +241,7 @@ export class SettingsClaudeCodeSection {
       this.renderThinkingBudgetSetting(containerEl);
     }
     this.renderEffortSetting(containerEl);
+    this.renderLimitsProofStatusNotice(containerEl);
     this.renderLimitsBoundaryNotice(containerEl);
     this.renderMaxTurnsSetting(containerEl);
     this.renderMaxBudgetSetting(containerEl);
@@ -423,6 +425,30 @@ export class SettingsClaudeCodeSection {
       attr: { 'data-claude-code-fallback-model-boundary': 'true' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.fallbackModel.boundaryNotice') });
+  }
+
+  private renderToolsProofStatusNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
+      attr: { 'data-claude-code-proof-status': 'tools', 'data-proof-state': 'readback' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.tools') });
+  }
+
+  private renderLimitsProofStatusNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
+      attr: { 'data-claude-code-proof-status': 'limits', 'data-proof-state': 'readback' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.limits') });
+  }
+
+  private renderEnvProofStatusNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
+      attr: { 'data-claude-code-proof-status': 'env', 'data-proof-state': 'readback' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.env') });
   }
 
   private renderModelQuickSelect(containerEl: HTMLElement, textControl: unknown): void {
@@ -613,6 +639,7 @@ export class SettingsClaudeCodeSection {
   private renderToolsTab(containerEl: HTMLElement): void {
     this.renderRuntimeBoundaryNotice(containerEl);
     this.renderMcpRuntimeControls(containerEl);
+    this.renderToolsProofStatusNotice(containerEl);
     this.renderAllowedToolsSetting(containerEl);
     this.renderDisallowedToolsSetting(containerEl);
   }

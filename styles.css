@@ -8855,6 +8855,12 @@ img.opencodian-model-provider-header-icon {
   color: var(--opencodian-status-success);
 }
 
+.opencodian-settings .opencodian-capability-lab-chip-readback {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
+}
+
 .opencodian-settings .opencodian-capability-lab-chip-untested,
 .opencodian-settings .opencodian-capability-lab-chip-surface-diagnostic {
   border-color: var(--opencodian-status-warning-border);
@@ -9009,6 +9015,12 @@ img.opencodian-model-provider-header-icon {
   color: var(--opencodian-status-success);
 }
 
+.opencodian-settings .opencodian-capability-lab-proof-readback {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
+}
+
 .opencodian-settings .opencodian-capability-lab-proof-fail {
   border-color: var(--opencodian-status-error-border);
   background: var(--opencodian-status-error-subtle);
@@ -9047,6 +9059,32 @@ img.opencodian-model-provider-header-icon {
   .opencodian-settings .opencodian-capability-lab-preview-row {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* components/settings-claude-code.css */
+/* ─── Claude Code settings proof-status notices ─────────────────────── */
+.opencodian-settings .opencodian-settings-proof-status {
+  display: flex;
+  align-items: center;
+  gap: var(--opencodian-settings-space-sm);
+  padding: 8px 12px;
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: color-mix(in srgb, var(--text-success, var(--color-green)) 6%, var(--opencodian-settings-row-bg));
+  border: 1px solid color-mix(in srgb, var(--text-success, var(--color-green)) 18%, var(--opencodian-settings-row-border));
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.opencodian-settings .opencodian-settings-proof-status[data-proof-state="readback"] {
+  background: color-mix(in srgb, var(--text-success, var(--color-green)) 6%, var(--opencodian-settings-row-bg));
+  border-color: color-mix(in srgb, var(--text-success, var(--color-green)) 18%, var(--opencodian-settings-row-border));
+}
+
+.opencodian-settings .opencodian-settings-proof-status[data-proof-state="wiring"] {
+  background: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 6%, var(--opencodian-settings-row-bg));
+  border-color: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 18%, var(--opencodian-settings-row-border));
 }
 
 

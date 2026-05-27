@@ -18,8 +18,8 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280147`
-- Latest follow-up polish round (overclaim correction): see "2026-05-28 Streaming Context Probe Overclaim Correction" below
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280359`
+- Latest follow-up polish round (stable settings readback proof): see "2026-05-28 Stable Settings Readback Proof" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -65,6 +65,94 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-28 Stable Settings Readback Proof
+
+This slice adds runtime readback proof for Claude Code stable settings (Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables, Fallback Model) by capturing the actual SDK options built during a diagnostic prompt and verifying these fields are present.
+
+### What Changed
+
+- `ClaudeCodeAdapter.ts`:
+  - Added `lastDiagnosticSdkOptions` private field to cache the last options built by `buildDiagnosticSdkOptions()`
+  - Added `inspectLastDiagnosticSdkOptions()` public diagnostic method returning the cached options
+- `SettingsCapabilityLabSection.ts`:
+  - Added `runStableSettingsReadbackProof()` method: runs a minimal diagnostic prompt, then reads back `adapter.inspectLastDiagnosticSdkOptions()` to verify 6 stable settings
+  - Added "Run Stable Settings Readback" button in Discovery controls
+  - Extended `MatrixRow.runtimeProof` type with `'readback'`
+  - Updated matrix rendering to show "Readback verified" (blue info style) for `readback` state
+  - Updated `updateRuntimeProof()` to support `readback` marker: "✓ Readback verified — not behavior verified"
+  - Allowed Tools / Disallowed Tools / Turn/Budget Limits / Environment Variables: upgraded from `untested` to `readback`
+  - Fallback Model: kept at `wiring` with precise blocker note
+  - Discovery rows added for Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables with current config values
+- `settings-capability-lab.css`:
+  - Added `.opencodian-capability-lab-chip-readback` and `.opencodian-capability-lab-proof-readback` (blue info tokens)
+- Tests:
+  - Updated audit test expectations and proofLabel parsing
+  - Added 3 new tests for stable settings readback proof
+
+### Honest Assessment
+
+- **What readback proof truly proves**: The settings UI values were correctly mapped into the SDK options shape that was passed to `sdk.query()`. This is stronger than static code inspection or unit-test mocking because it verifies the actual runtime options object.
+- **What readback proof does NOT prove**: That the SDK or model actually enforced these constraints. For example, readback cannot prove the model respects `maxTurns` or that environment variables reach the child process. Those require behavior-level or OS-level verification.
+- **Fallback Model blocker**: Behavior proof was attempted with invalid primary + valid fallback. SDK returned 400 "模型不存在" rather than falling back. The exact trigger conditions for fallback are unknown (may require rate-limit or service-unavailable, not invalid-model).
+
+### Classification
+
+| Capability | Classification | Reason |
+|---|---|---|
+| Allowed Tools | `readback` | Runtime-readback verified: options.allowedTools built from settings |
+| Disallowed Tools | `readback` | Runtime-readback verified: options.disallowedTools built from settings |
+| Turn/Budget Limits | `readback` | Runtime-readback verified: options.maxTurns/maxBudgetUsd built from settings |
+| Environment Variables | `readback` | Runtime-readback verified: options.env built from settings |
+| Fallback Model | `wiring` | Option wired but behavior proof failed: SDK returned 400 on invalid primary |
+
+### Verification
+
+- Full verify: 443 suites / 3387 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280359)
+- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280359`
+- Runtime proof (Test Vault):
+  - Empty config: correctly reports "None of the stable settings are currently configured"
+  - Configured values (allowedTools=['Read','Bash'], disallowedTools=['Edit'], maxTurns=10, maxBudgetUsd=5, env={TEST_VAR:'test_value'}, fallbackModel='claude-haiku-4-5'): all 6 items marked "✓ Readback verified — not behavior verified"
+- Console: no errors
+- Errors: No errors captured
+
+---
+
+## 2026-05-28 Stable Settings UI Honesty Pass
+
+This slice updates the Claude Code stable settings UI surface to match the Capability Lab classifications: stable settings that have runtime readback proof no longer claim "wired but not yet runtime-verified," and the fallback model is honest about behavior being unproven.
+
+### What Changed
+
+- `src/i18n/locales/en.ts` + `zh.ts`:
+  - Updated `allowedTools.desc`, `disallowedTools.desc`, `maxTurns.desc`, `maxBudgetUsd.desc`, `env.desc` to remove stale "wired but not yet runtime-verified" copy
+  - Updated `fallbackModel.desc` and `fallbackModel.boundaryNotice` to include "automatic fallback behavior is unproven with the current SDK"
+  - Added `proofStatus.tools`, `proofStatus.limits`, `proofStatus.env` shared notice keys
+- `SettingsClaudeCodeSection.ts`:
+  - Added `renderToolsProofStatusNotice()`, `renderLimitsProofStatusNotice()`, `renderEnvProofStatusNotice()`
+  - Render compact proof-status notices in Tools, Model & Thinking, and Runtime tabs with `data-claude-code-proof-status` and `data-proof-state="readback"` selectors
+- `src/style/components/settings-claude-code.css` (new):
+  - `.opencodian-settings-proof-status` with subtle green border/background for readback state
+- Tests:
+  - Added 3 focused tests verifying DOM presence, data attributes, and copy for each proof-status notice
+
+### Classification Update
+
+| Capability | Old Settings UI Claim | New Settings UI Claim |
+|---|---|---|
+| Allowed Tools | "wired but not yet runtime-verified" | Runtime readback verified + behavior is SDK/model-dependent |
+| Disallowed Tools | "wired but not yet runtime-verified" | Runtime readback verified + behavior is SDK/model-dependent |
+| Turn/Budget Limits | "wired but not yet runtime-verified" | Runtime readback verified + behavior is SDK/model-dependent |
+| Environment Variables | "wired but not yet runtime-verified" | Runtime readback verified |
+| Fallback Model | Implied stable | Option wiring/readback proven; automatic fallback behavior unproven |
+
+### Verification
+
+- Full verify: pending
+- Test Vault deployed and BUILD_ID verified: pending
+- Runtime UI proof (obsidian-plugin-autodebug): pending
+
+---
 
 ## 2026-05-28 Streaming Context Probe Overclaim Correction
 

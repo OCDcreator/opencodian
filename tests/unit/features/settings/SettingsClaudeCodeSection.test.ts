@@ -470,6 +470,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.fallbackModel.boundaryNotice'));
     });
 
+    it('renders limits proof status notice with readback state in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="limits"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.limits'));
+    });
+
     it('does not render an inert thinking budget input for adaptive thinking', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -831,6 +846,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
+    it('renders env proof status notice with readback state in runtime tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="env"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.env'));
+    });
+
     it('rejects env keys with spaces or invalid characters', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -899,6 +929,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       await findTextArea(t('settings.claudeCode.allowedTools.name')).onChange?.('Read\nGrep\nRead' as never);
       expect(plugin.settings.backendSettings.claudeCode.allowedTools).toEqual(['Read', 'Grep']);
       expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('renders tools proof status notice with readback state in tools tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="tools"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.tools'));
     });
 
     it('rejects invalid tool names and keeps only valid PascalCase alphanumeric names', async () => {

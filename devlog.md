@@ -12,6 +12,179 @@
 
 ---
 
+## 2026-05-28 Claude Code Stable Settings UI Honesty Pass
+
+### 目标
+
+更新 Claude Code 稳定设置界面的文案和状态提示，使其与 Capability Lab 的运行时回读验证状态保持一致：已回读验证的能力不再声称“尚未验证”，回退模型则诚实标注行为未验证。
+
+### 改动
+
+1. **Locale 文案更新**（en.ts + zh.ts）：
+   - `allowedTools.desc`、`disallowedTools.desc`、`maxTurns.desc`、`maxBudgetUsd.desc`、`env.desc`：移除过时的“已连接但尚未经过运行时验证”文案
+   - `fallbackModel.desc`：添加“选项连接和回读已验证；当前 SDK 下自动回退行为尚未验证”
+   - `fallbackModel.boundaryNotice`：添加“当前 SDK 下自动回退行为尚未验证”
+   - 新增 `proofStatus.tools`、`proofStatus.limits`、`proofStatus.env` 三个共享提示键
+
+2. **SettingsClaudeCodeSection.ts**：
+   - 新增 `renderToolsProofStatusNotice()`、`renderLimitsProofStatusNotice()`、`renderEnvProofStatusNotice()`
+   - 在 Tools 标签的 MCP 控件后渲染 tools proof-status notice
+   - 在 Model & Thinking 标签的 limits boundary notice 前渲染 limits proof-status notice
+   - 在 Runtime 标签的 diagnostics 后渲染 env proof-status notice
+   - 所有 notice 使用 `data-claude-code-proof-status` 和 `data-proof-state="readback"` 选择器
+
+3. **样式**（新增 `src/style/components/settings-claude-code.css`）：
+   - `.opencodian-settings-proof-status` 使用绿色/成功色系的 subtle background 和 border
+   - 支持 `[data-proof-state="readback"]` 和 `[data-proof-state="wiring"]` 两种状态
+
+4. **测试**：
+   - 新增 3 个 focused tests，验证每个 proof-status notice 的 DOM 存在、data 属性和文案内容
+   - SettingsClaudeCodeSection 测试套件：49 passed
+
+5. **文档**：
+   - 更新 `docs/modules/features/settings/SettingsClaudeCodeSection.md`
+   - 更新 `docs/status/claude-code-current-state-2026-05-22.md`
+
+### 验证
+
+- 完整 verify：443 suites / 3390 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280418)
+- Test Vault 部署：BUILD_ID 已验证 `feature-phase0-capability.202605280418`
+- obsidian-plugin-autodebug UI 验证：
+  - Tools tab：proof-status notice 存在，文案 "运行时回读已验证。SDK 接受这些值；实际工具 enforcement 取决于 SDK 版本和模型。"，data-proof-state="readback"
+  - Model & Thinking tab：limits proof-status notice 存在，文案 "运行时回读已验证。SDK 接受这些值；实际轮数/预算 enforcement 取决于 SDK 和模型。"
+  - Runtime tab：env proof-status notice 存在，文案 "运行时回读已验证。SDK 接受这些环境变量。"
+  - Fallback model boundary notice：文案包含 "当前 SDK 下自动回退行为尚未验证"
+  - Console：无错误
+  - Errors：无错误捕获
+  - 截图：/tmp/opencodian-tools-tab.png, /tmp/opencodian-runtime-tab.png, /tmp/opencodian-model-thinking-top.png
+
+### 设计选择
+
+- 采用“tab 级别共享 notice + 精简字段描述”的 IA，避免每个字段重复标注状态
+- Proof-status notice 使用 compact inline notice 样式，与现有 boundary notice 视觉层级区分但保持一致
+- Fallback model 保留独立的 boundary notice，因为其状态为 wiring（行为未验证），与其他 readback 字段区分
+
+---
+
+## 2026-05-28 Stable Settings Readback Proof — Correction Round
+
+### 目标
+
+修正上一轮 Stable Settings Readback Proof 的明确问题：lint warnings、UI 质量、文档一致性和安全 clone。
+
+### 修正项
+
+1. **Lint warnings 清零**：
+   - `renderDiscoveryRows` 复杂度从 30 降到 ≤20：提取 `renderDiscoveryPluginRows`、`renderDiscoveryToolRows`、`renderDiscoveryStandardRows` 三个子方法
+   - `runStableSettingsReadbackProof` 复杂度从 30 降到 ≤20：提取 `buildReadbackResults`、`renderReadbackResults`、`updateMatrixFromReadback` 三个子方法
+   - 最终 verify：`0 errors / 0 warnings`
+
+2. **`inspectLastDiagnosticSdkOptions()` 返回安全副本**：
+   - 实现从直接返回 `lastDiagnosticSdkOptions` 活对象改为返回 `structuredClone` 深拷贝（带 JSON fallback）
+   - 避免诊断 UI 意外污染 adapter 内部状态
+
+3. **Readback proof UI 质量收敛**：
+   - 消除匿名重复的 "✓ Readback verified — not behavior verified" marker
+   - 每个 capability 只显示一条明确、带名称的 readback 结果
+   - Turn/Budget Limits 合并为单条（不再因 maxTurns/maxBudget 各自 present 而重复）
+   - Fallback Model 明确标注："Option read back correctly, but overall capability remains wiring-only because behavior proof failed"
+
+4. **Fallback Model 分类诚实化**：
+   - 总体 classification 保持 `wiring`（行为证明已明确失败：无效主模型时 SDK 返回 400 而非 fallback）
+   - Readback proof 只验证选项被传入 SDK，不提升总体分类
+   - UI 明确区分：readback 子文本 + wiring 总体 marker
+
+5. **文档对齐**：
+   - `docs/modules/features/settings/SettingsCapabilityLabSection.md`：更新 Allowed/Disallowed/Turn-Budget/Env 为 `readback`（不再是旧 `Untested`），Fallback Model 描述更新为当前诚实状态
+   - `ClaudeCodeAdapter.md`：`inspectLastDiagnosticSdkOptions()` 文档更新为"深拷贝副本"
+
+6. **测试库清理**：
+   - 验证前配置测试值（allowedTools, disallowedTools, maxTurns, maxBudgetUsd, env, fallbackModel）
+   - 验证后恢复为默认值（清空所有测试配置）
+
+### 验证结果
+
+- Full verify：`443 suites / 3387 tests passed`, `0 errors / 0 warnings`, typecheck clean
+- Build：`BUILD_ID=feature-phase0-capability.202605280359`
+- Test Vault 部署并 BUILD_ID 验证通过
+- Autodebug 证据：
+  - Surface activation：OpenCodian settings → Debug → Capability Lab → Run Stable Settings Readback 按钮找到并点击
+  - DOM：5 个 capability 各一条明确结果，readback markers = 4，wiring markers = 1（Fallback Model）
+  - Console：无错误
+  - Errors：无
+- 截图：`/tmp/opencodian-readback-proof-20260528.png`
+- JSON 证据：`/tmp/opencodian-readback-evidence-20260528.json`
+
+### 最终分类说明
+
+| Capability | Classification | Why |
+|------------|---------------|-----|
+| Allowed Tools | readback | Option read back verified. Behavior (model respects allowlist) not proven. |
+| Disallowed Tools | readback | Option read back verified. Behavior (model respects blocklist) not proven. |
+| Turn/Budget Limits | readback | Option read back verified. Behavior (model stops at limit) not proven. |
+| Environment Variables | readback | Option read back verified. Behavior (vars reach child process) not proven. |
+| Fallback Model | wiring | Option can be read back, but behavior proof failed (SDK returned 400 on invalid primary instead of falling back). |
+
+---
+
+## 2026-05-28 Stable Settings Readback Proof
+
+### 目标
+
+为 Claude Code 稳定设置（Allowed Tools / Disallowed Tools / Turn-Budget Limits / Environment Variables / Fallback Model）添加 runtime readback proof，把 classification 从 wiring-only 推进到 runtime-readback verified，并诚实区分 behavior verified 与 readback verified。
+
+### 背景
+
+- 这 5 项 stable settings 已经在 Settings UI 暴露、在 `buildClaudeCodeOptions` 中接线，但之前没有任何 runtime proof
+- 它们无法轻易做 behavior proof（需要证明模型遵守 allowlist、在 N 轮后停止、实际接收到环境变量等），这些要么是 SDK/model 边界，要么需要 OS-level 或 multi-turn instrumentation
+- 但可以做到 runtime-readback proof：运行诊断 prompt 后，读取实际构建并传给 SDK 的 options，验证这些字段确实被包含
+
+### 变更
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`：
+  - 新增 `lastDiagnosticSdkOptions` 私有字段
+  - `buildDiagnosticSdkOptions()` 在返回前保存 options 到该字段
+  - 新增 `inspectLastDiagnosticSdkOptions()` 公共诊断方法，返回最后一次构建的 options 副本
+- `src/features/settings/SettingsCapabilityLabSection.ts`：
+  - 新增 `runStableSettingsReadbackProof()` 方法：运行最小诊断 prompt，通过 `adapter.inspectLastDiagnosticSdkOptions()` 读取实际 options，验证 6 项 stable setting 的存在和值
+  - Capability Matrix 的 `runtimeProof` 类型扩展 `'readback'`，渲染显示 "Readback verified"
+  - Allowed Tools / Disallowed Tools / Turn/Budget Limits / Environment Variables 从 `untested` 提升到 `readback`
+  - Fallback Model 保持 `wiring`（behavior proof 已明确失败）
+  - Discovery 面板新增 Allowed Tools / Disallowed Tools / Turn/Budget Limits / Environment Variables 的 exposed 行，显示当前配置值和 readback 状态
+  - Fallback Model 的 Discovery 行更新为包含精确的 blocker 说明："Behavior proof attempted with invalid-primary + valid-fallback: SDK returned 400 rather than falling back. Blocker: unknown fallback trigger conditions"
+  - `updateRuntimeProof()` 支持 `'readback'` 状态，inline marker 显示 "✓ Readback verified — not behavior verified"
+- `src/style/components/settings-capability-lab.css`：
+  - 新增 `.opencodian-capability-lab-chip-readback` 和 `.opencodian-capability-lab-proof-readback` 样式（蓝色 info token）
+- 测试更新：
+  - audit test 更新 expected 分类和 proofLabel 解析逻辑
+  - 新增 3 个测试：按钮渲染、配置值 readback 验证、空配置提示
+
+### 运行时验证
+
+- Test Vault 部署：BUILD_ID `feature-phase0-capability.202605280359`
+- 空配置 readback：正确显示 "None of the stable settings are currently configured"
+- 配置测试值后 readback：
+  - allowedTools=['Read','Bash'] → ✓ Readback verified
+  - disallowedTools=['Edit'] → ✓ Readback verified
+  - maxTurns=10 → ✓ Readback verified
+  - maxBudgetUsd=5 → ✓ Readback verified
+  - env={TEST_VAR:'test_value'} → ✓ Readback verified
+  - fallbackModel='claude-haiku-4-5' → ✓ Readback verified
+- Console: 无错误
+- Errors: No errors captured
+
+### 分类更新
+
+| Capability | 旧分类 | 新分类 | 原因 |
+|---|---|---|---|
+| Allowed Tools | untested | readback | Runtime-readback verified: options.allowedTools 被正确构建 |
+| Disallowed Tools | untested | readback | Runtime-readback verified: options.disallowedTools 被正确构建 |
+| Turn/Budget Limits | untested | readback | Runtime-readback verified: options.maxTurns/maxBudgetUsd 被正确构建 |
+| Environment Variables | untested | readback | Runtime-readback verified: options.env 被正确构建 |
+| Fallback Model | untested | wiring | Behavior proof 失败: 无效主模型时 SDK 返回 400 而非 fallback |
+
+---
+
 ## 2026-05-28 Streaming Context Probe Overclaim Correction
 
 ### 目标

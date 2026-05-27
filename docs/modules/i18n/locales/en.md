@@ -79,7 +79,9 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮更新 `settings.claudeCode.env.desc`，在环境变量描述中加入 POSIX 键名规范提示和未运行时验证的诚实性声明，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
 
-本轮更新 `settings.claudeCode.allowedTools.desc` 和 `settings.claudeCode.disallowedTools.desc`，在工具描述中加入 PascalCase 字母数字校验提示和未运行时验证的诚实性声明，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
+本轮更新 `settings.claudeCode.allowedTools.desc` 和 `settings.claudeCode.disallowedTools.desc`，移除过时的“未运行时验证”声明，改为在 Tools 标签通过 `settings.claudeCode.proofStatus.tools` 共享 notice 统一标注 runtime readback verified 状态。
+
+2026-05-28 本轮更新 `settings.claudeCode.maxTurns.desc`、`settings.claudeCode.maxBudgetUsd.desc`、`settings.claudeCode.env.desc`，移除过时的“wired but not yet runtime-verified”文案；新增 `settings.claudeCode.proofStatus.tools`、`settings.claudeCode.proofStatus.limits`、`settings.claudeCode.proofStatus.env` 三个共享 proof-status notice 键，用于在 Tools、Model & Thinking、Runtime 标签中 compact 地展示 runtime readback verified 状态。更新 `settings.claudeCode.fallbackModel.desc` 和 `settings.claudeCode.fallbackModel.boundaryNotice`，诚实标注“option wiring and readback are proven; automatic fallback behavior is unproven with the current SDK”。
 
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
 
