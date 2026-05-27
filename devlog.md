@@ -31,33 +31,36 @@
 3. **SettingsCapabilityLabSection.ts**：
    - 更新 capability matrix 注释，记录阻止普通聊天证明的两个具体阻塞点
 
-### 普通聊天证明阻塞点
+### 普通聊天证明状态（修正上一轮不准确的 blocker）
 
-**尝试的方法：**
-1. 通过 `opencodian:open-chat-view` / `opencodian:open-view` 命令打开聊天视图
-2. 通过 CodeMirror DOM 操作（focus、execCommand insertText、点击发送按钮）发送诱导工具调用的 prompt
-3. 直接通过 `ClaudeCodeAdapter.sendMessage()` 发送消息
+**修正：** 聊天视图确实以 `opencodian-view` workspace leaf 形式存在。发送管道可通过运行时属性访问 view 的 `sendPipelineRuntime.sendMessage()`。上一轮"聊天视图不存在 / 编辑器自动化被阻塞"的结论不准确。
 
-**阻塞点 1：聊天视图编辑器自动化**
-- 插件 reload 后，OpenCodian 聊天视图不显示为标准 Obsidian workspace leaf；`app.workspace.getLeavesOfType('opencodian')` 返回 0
-- CodeMirror 6 编辑器（`.cm-editor`）不响应标准 DOM 操作：`execCommand('insertText')`、`focus()` 和发送按钮 `click()` 均未导致消息实际发送
-- 不存在用于程序化消息发送的 Obsidian 命令；插件的 `sendMessage` 在 OpenCode service 上（非 Claude adapter），且需要 eval 不支持的异步处理
-- Claude adapter 的 `sendMessage()` 是 async generator，无法通过同步 `obsidian eval` 消费
+**已实现：**
+- Capability Lab 新增 `launchOrdinaryChatPermissionProof()` 和 `launchOrdinaryChatQuestionProof()` 方法
+- 这些方法找到 `opencodian-view` leaf，reveal 它，然后通过真实聊天发送管道（`sendPipelineRuntime.sendMessage()`）发送预设 prompt
+- Capability Lab Discovery 控制区新增对应的 launcher 按钮
+- 权限/问题 inline card 添加稳定 DOM 选择器（`data-permission-card`、`data-permission-action`、`data-question-card`、`data-question-action`）
 
-**阻塞点 2：非确定性工具调用**
-- 即使消息发送自动化，模型工具调用本身是非确定性的
+**剩余阻塞点：非确定性工具调用**
+- 即使消息发送已自动化，模型工具调用本身仍是非确定性的
 - 模型可能对 prompt 调用也可能不调用 Bash/Read/Edit/AskUserQuestion
 - Capability Lab 诊断探针已证明此非确定性
 
-**当前诚实分类：**
-- Permission Approval：`runtimeProof: 'wiring'` — bridge 和 SDK options 已接线；direct harness 可用；普通聊天证明被编辑器自动化 + 工具非确定性阻塞
-- AskUserQuestion / Elicitation：`runtimeProof: 'wiring'` — 与 Permission Approval 相同阻塞点
+**结果：**
+- **AskUserQuestion / Elicitation：`runtimeProof: 'pass'`** — 普通聊天端到端证明已完成：
+  - Launcher 通过真实聊天发送管道（`sendPipelineRuntime.sendMessage()`）发送消息
+  - 模型通过 SDK 调用 AskUserQuestion
+  - 问题对话框渲染，带有 `data-question-card="true"` 选择器
+  - 用户选择 Yes 并点击提交（`data-question-action="submit"`）
+  - 流继续，答案被纳入
+  - 截图：`/tmp/opencodian-chat-question-card.png`、`/tmp/opencodian-chat-question-completed.png`
+- **Permission Approval：`runtimeProof: 'wiring'`** — 普通聊天 launcher 可用（消息已通过真实管道发送），但模型（glm-5.1）在文本中模拟 Bash 工具调用，而不是通过 SDK `tool_use` 机制调用。权限卡片（`data-permission-card`）从未出现，因为 SDK 权限回调未被触发。这是模型/SDK 行为缺口，不是管道缺口。
 
-### 下一步解堵方案
+### 验证
 
-1. **编辑器自动化**：为聊天视图添加程序化发送 API（如 `view.sendMessage(text)`）或暴露用于测试自动化的 Obsidian 命令
-2. **流式上下文注入**：确保发送前聊天视图的 streaming message 元素存在，使权限/问题卡片有 DOM 目标
-3. **确定性工具触发**：使用 Capability Lab 风格的诊断 prompt 显式请求工具调用，但通过普通聊天发送路径而非 `runDiagnosticPrompt()` 路由
+- 完整验证：443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280607)
+- 测试库部署和 BUILD_ID 验证：`feature-phase0-capability.202605280607`
+- Console：无错误；Errors：未捕获
 
 ---
 

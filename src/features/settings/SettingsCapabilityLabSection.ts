@@ -572,14 +572,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)
-        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Permission Card) can exercise the full bridge → host → renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model calls tool → permission card renders → user approves/denies → stream continues) is blocked by two issues: (1) tool calling is non-deterministic — the model may not call a tool even with tool-inducing prompts; (2) the chat view composer (CodeMirror) does not respond to automated DOM input, making it impossible to programmatically send messages through the ordinary chat path for repeated proof attempts. Added data-permission-card and data-permission-action selectors to the permission card DOM for future verification stability.
+        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Permission Card) can exercise the full bridge → host → renderer → user → result chain. Ordinary chat end-to-end proof attempted: message sent through real chat pipeline, but the model (glm-5.1) simulates tool calls in text rather than invoking them through the SDK tool_use mechanism, so the permission card never appears. This is a model/SDK behavior gap, not a pipeline gap. Added data-permission-card and data-permission-action selectors for future verification. Added ordinary chat launcher in Capability Lab.
         userSurface: 'settings', // Reuses existing stable permission card UI in ordinary chat; no separate Claude permission settings page.
       },
       {
         capability: 'AskUserQuestion / Elicitation',
         sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
         adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
-        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Question Dialog) can exercise the full bridge → host → question renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model asks question → dialog renders → user answers → stream continues) is blocked by the same two issues as Permission Approval: non-deterministic tool calling and the chat view composer not accepting automated DOM input. Added data-question-card and data-question-action selectors to the question card DOM for future verification stability.
+        runtimeProof: 'pass', // Ordinary chat end-to-end proof achieved: message sent through real chat pipeline (sendPipelineRuntime.sendMessage), model called AskUserQuestion through SDK, question dialog rendered with data-question-card selector, user selected Yes and clicked submit (data-question-action), stream continued with answer incorporated. The chat view (opencodian-view leaf) and send pipeline are fully accessible. Added data-question-card and data-question-action selectors for verification stability. Added ordinary chat launcher in Capability Lab.
         userSurface: 'settings', // Reuses existing stable question dialog in ordinary chat; no separate Claude question settings page.
       },
       {
@@ -2321,6 +2321,34 @@ export class SettingsCapabilityLabSection {
     stableSettingsBtn.addEventListener('click', () => {
       void this.runStableSettingsReadbackProof(adapter, stableSettingsOutputEl);
     });
+
+    // Ordinary Chat Permission Proof — sends a real chat message through the send pipeline
+    const ordinaryPermissionBtn = proofControls.createEl('button', {
+      text: 'Launch Ordinary Chat Permission Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const ordinaryPermissionOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    ordinaryPermissionBtn.addEventListener('click', () => {
+      void this.launchOrdinaryChatPermissionProof(ordinaryPermissionOutputEl);
+    });
+
+    // Ordinary Chat Question Proof — sends a real chat message through the send pipeline
+    const ordinaryQuestionBtn = proofControls.createEl('button', {
+      text: 'Launch Ordinary Chat Question Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const ordinaryQuestionOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    ordinaryQuestionBtn.addEventListener('click', () => {
+      void this.launchOrdinaryChatQuestionProof(ordinaryQuestionOutputEl);
+    });
   }
 
   private renderDiagnosticStreamControls(containerEl: HTMLElement): void {
@@ -2863,6 +2891,112 @@ export class SettingsCapabilityLabSection {
         text: `AskUserQuestion proof failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+    }
+  }
+
+  // =======================================================================
+  // Ordinary Chat Proof Launchers — send preset prompts through real chat pipeline
+  // =======================================================================
+
+  /**
+   * Launch an ordinary-chat permission proof by sending a real message through the
+   * OpenCodian chat view's send pipeline. This does NOT bypass the model; it relies
+   * on the model calling a tool that triggers the permission card.
+   */
+  private async launchOrdinaryChatPermissionProof(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Launching ordinary chat permission proof…' });
+
+    try {
+      const leaf = this.plugin.app.workspace.getLeavesOfType('opencodian-view')[0];
+      const view = leaf?.view as unknown as Record<string, unknown> | undefined;
+      if (!view) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: 'OpenCodian chat view not found. Open the chat view first.',
+        });
+        return;
+      }
+
+      const sendPipelineRuntime = view.sendPipelineRuntime as
+        | { sendMessage: (input: string | Record<string, unknown>) => Promise<void> }
+        | undefined;
+      if (!sendPipelineRuntime) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: 'Chat view send pipeline not accessible.',
+        });
+        return;
+      }
+
+      // Reveal the chat view so the user can see the permission card when it appears
+      this.plugin.app.workspace.revealLeaf(leaf);
+
+      const prompt = 'Please run the command "pwd" to show me the current working directory.';
+      await sendPipelineRuntime.sendMessage(prompt);
+
+      outputEl.createEl('p', {
+        text: `Message sent through ordinary chat pipeline. Prompt: "${prompt}"`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Waiting for model response. If the model calls a tool, the permission card should appear in the chat view with data-permission-card selector.',
+      });
+    } catch (err) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Ordinary chat permission proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  /**
+   * Launch an ordinary-chat AskUserQuestion proof by sending a real message through the
+   * OpenCodian chat view's send pipeline.
+   */
+  private async launchOrdinaryChatQuestionProof(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Launching ordinary chat question proof…' });
+
+    try {
+      const leaf = this.plugin.app.workspace.getLeavesOfType('opencodian-view')[0];
+      const view = leaf?.view as unknown as Record<string, unknown> | undefined;
+      if (!view) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: 'OpenCodian chat view not found. Open the chat view first.',
+        });
+        return;
+      }
+
+      const sendPipelineRuntime = view.sendPipelineRuntime as
+        | { sendMessage: (input: string | Record<string, unknown>) => Promise<void> }
+        | undefined;
+      if (!sendPipelineRuntime) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: 'Chat view send pipeline not accessible.',
+        });
+        return;
+      }
+
+      this.plugin.app.workspace.revealLeaf(leaf);
+
+      const prompt = 'Before you proceed, please ask me a single yes/no question using the AskUserQuestion tool: "Should I continue with the analysis?"';
+      await sendPipelineRuntime.sendMessage(prompt);
+
+      outputEl.createEl('p', {
+        text: `Message sent through ordinary chat pipeline. Prompt: "${prompt}"`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Waiting for model response. If the model calls AskUserQuestion, the question dialog should appear in the chat view with data-question-card selector.',
+      });
+    } catch (err) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Ordinary chat question proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 

@@ -18,8 +18,8 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280519`
-- Latest follow-up polish round (SDK Foundations tab removal): see "2026-05-28 SDK Foundations Tab Removal" below
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280607`
+- Latest follow-up polish round (Permission / AskUserQuestion ordinary chat proof): see "2026-05-28 Permission / AskUserQuestion Ordinary Chat Proof Attempt" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -169,33 +169,36 @@ This slice attempts to move Permission Approval and AskUserQuestion / Elicitatio
 - `SettingsCapabilityLabSection.ts`:
   - Updated capability matrix comments for Permission Approval and AskUserQuestion to document the two concrete blockers preventing ordinary chat proof
 
-### Ordinary Chat Proof Blockers
+### Ordinary Chat Proof Status
 
-**Attempted approaches:**
-1. Open chat view via `opencodian:open-chat-view` / `opencodian:open-view` commands
-2. Send tool-inducing prompt ("Please run pwd and ls...") via CodeMirror DOM manipulation (focus, execCommand insertText, click send button)
-3. Direct adapter message sending via `ClaudeCodeAdapter.sendMessage()`
+**Correction from previous round:** The chat view DOES exist as an `opencodian-view` workspace leaf. The send pipeline is accessible via runtime property access to the view's `sendPipelineRuntime.sendMessage()`. The previous "chat view not found / composer automation blocked" conclusion was inaccurate.
 
-**Blocker 1: Chat view composer automation**
-- The OpenCodian chat view does not appear as a standard Obsidian workspace leaf after plugin reload; `app.workspace.getLeavesOfType('opencodian')` returns 0 leaves even after opening the view
-- The CodeMirror 6 composer editor (`.cm-editor`) does not respond to standard DOM manipulation: `execCommand('insertText')`, `focus()`, and `click()` on the send button do not result in an actual message being sent
-- No Obsidian command exists for programmatic message sending; the plugin's `sendMessage` method is on the OpenCode service (not Claude adapter) and requires async handling not available in `obsidian eval`
-- The Claude adapter's `sendMessage()` is an async generator that cannot be consumed through the synchronous `obsidian eval` context
+**What was implemented:**
+- Added `launchOrdinaryChatPermissionProof()` and `launchOrdinaryChatQuestionProof()` methods to Capability Lab
+- These methods find the `opencodian-view` leaf, reveal it, and send preset prompts through the real chat send pipeline (`sendPipelineRuntime.sendMessage()`)
+- Added corresponding launcher buttons in Capability Lab Discovery controls
+- Added stable DOM selectors (`data-permission-card`, `data-permission-action`, `data-question-card`, `data-question-action`) to permission and question inline cards
 
-**Blocker 2: Non-deterministic tool calling**
-- Even if message sending were automated, model tool calling is inherently non-deterministic
+**Remaining blocker: Non-deterministic tool calling**
+- Even with message sending working, model tool calling is inherently non-deterministic
 - The model may or may not call Bash/Read/Edit/AskUserQuestion in response to a prompt
 - Previous Capability Lab diagnostic probes already demonstrate this non-determinism
 
-**Current honest classification:**
-- Permission Approval: `runtimeProof: 'wiring'` — bridge and SDK options wired; direct harness works; ordinary chat proof blocked by composer automation + tool non-determinism
-- AskUserQuestion / Elicitation: `runtimeProof: 'wiring'` — same blockers as Permission Approval
+**Results:**
+- **AskUserQuestion / Elicitation: `runtimeProof: 'pass'`** — Ordinary chat end-to-end proof achieved:
+  - Launcher sent message through real chat pipeline (`sendPipelineRuntime.sendMessage()`)
+  - Model called AskUserQuestion through SDK
+  - Question dialog rendered with `data-question-card="true"` selector
+  - User selected Yes and clicked submit (`data-question-action="submit"`)
+  - Stream continued with answer incorporated
+  - Screenshot: `/tmp/opencodian-chat-question-card.png`, `/tmp/opencodian-chat-question-completed.png`
+- **Permission Approval: `runtimeProof: 'wiring'`** — Ordinary chat launcher works (message sent through real pipeline), but the model (glm-5.1) simulates Bash tool calls in text rather than invoking them through the SDK `tool_use` mechanism. The permission card (`data-permission-card`) never appears because the SDK permission callback is not triggered. This is a model/SDK behavior gap, not a pipeline gap.
 
-### Next Steps to Unblock Ordinary Chat Proof
+### Verification
 
-1. **Composer automation**: Add a programmatic send API to the chat view (e.g., `view.sendMessage(text)`) or expose an Obsidian command for test automation
-2. **Streaming context injection**: Ensure the chat view's streaming message element exists before sending, so permission/question cards have a DOM target
-3. **Deterministic tool triggers**: Use capability-lab-style diagnostic prompts that explicitly request tool use, but route them through the ordinary chat send path instead of `runDiagnosticPrompt()`
+- Full verify: 443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280607)
+- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280607`
+- Console: no errors; Errors: none captured
 
 ---
 
