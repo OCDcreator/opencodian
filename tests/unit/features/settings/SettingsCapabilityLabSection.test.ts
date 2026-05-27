@@ -116,6 +116,43 @@ describe('SettingsCapabilityLabSection', () => {
     expect(claudeSettings.agentProgressSummaries).toBe(false);
   });
 
+  it('renders file checkpoint toggle in diagnostic stream controls', async () => {
+    const plugin = createMockPlugin(null, null, {
+      enableFileCheckpointing: false,
+    });
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const controlsEl = containerEl.querySelector('[data-capability-lab-surface="diagnostic-stream"]');
+    expect(controlsEl).toBeTruthy();
+    expect(controlsEl!.getAttribute('data-diagnostic')).toBe('true');
+
+    // Verify settings object reflects initial value
+    const claudeSettings = (plugin as unknown as { settings: { backendSettings: { claudeCode: Record<string, unknown> } } }).settings.backendSettings.claudeCode;
+    expect(claudeSettings.enableFileCheckpointing).toBe(false);
+  });
+
+  it('renders File Checkpoint row in capability matrix with diagnostic surface', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const checkpointRow = rows.find((row) => row.textContent?.includes('File Checkpoint / Rewind'));
+    expect(checkpointRow).not.toBeNull();
+    expect(checkpointRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
+    expect(checkpointRow?.textContent).toContain('Untested');
+  });
+
   it('renders all ten diagnostic panels including fork, resume, session detail, and backend routing probes', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -890,7 +927,7 @@ describe('SettingsCapabilityLabSection', () => {
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
     const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
       Hooks: { runtimeProof: 'untested', userSurface: 'hidden' },
-      'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'settings' },
+      'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'JSONL History Browser': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'Session Store': { runtimeProof: 'untested', userSurface: 'hidden' },
       Skills: { runtimeProof: 'untested', userSurface: 'hidden' },

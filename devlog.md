@@ -12,6 +12,59 @@
 
 ---
 
+## 2026-05-28 SDK Foundations Tab Removal
+
+### 目标
+
+移除稳定的 Claude Code "SDK Foundations" 设置标签。在前一次迁移中，三个纯诊断流开关已移至 Capability Lab，唯一剩余的控制是 `enableFileCheckpointing` —— 一个 @experimental 开关，没有任何稳定用户界面效果（仅驱动 Capability Lab 的 rewind dry-run 预览）。标签其余内容为只读运行时生态摘要和陈旧的迁移提示。用户明确要求聊天/设置表面基于真实能力边界而非历史布线来暴露或隐藏。
+
+### 改动
+
+1. **SettingsClaudeCodeSection.ts**：
+   - 从 `CLAUDE_CLASSIC_TABS` 和 `CLAUDE_TAB_LABEL_KEYS` 中移除 `sdk-foundations`
+   - 从 `renderTabContent()` switch 中移除 `case 'sdk-foundations'`
+   - 删除 8 个方法：`renderSdkFoundationsTab`、`renderRuntimeEcosystemStatus`、`renderSdkStreamBoundaryNotice`、`renderSdkFoundationOptions`、`renderDiagnosticStreamMovedNotice`、`describeRuntimePlugins`、`describeRuntimeSkills`、`describeRuntimeAgentDefinitions`
+   - 更新类 JSDoc，移除 SDK Foundations 标签描述
+
+2. **settingsLayoutRegistry.ts**：
+   - 从 `claude-code` 二级标签组中移除 `sdk-foundations`
+
+3. **SettingsCapabilityLabSection.ts**：
+   - 在 `renderDiagnosticStreamControls()` 中新增 `enableFileCheckpointing` toggle（诊断流控制区现有 4 个开关）
+   - 更新 capability matrix：File Checkpoint / Rewind 的 userSurface 从 `settings` 改为 `diagnostic`
+
+4. **测试**：
+   - `SettingsClaudeCodeSection.test.ts`：移除所有 `sdk-foundations` 标签测试；更新 `allTabs` 数组排除 `sdk-foundations`
+   - `SettingsCapabilityLabSection.test.ts`：新增 File Checkpoint matrix 行测试（`diagnostic` surface）；新增 checkpoint toggle 在诊断流控制区的测试；更新 matrix audit 预期值
+
+5. **文档**：
+   - `docs/status/claude-code-current-state-2026-05-22.md`：添加 "SDK Foundations Tab Removal" 章节
+   - `docs/modules/features/settings/SettingsClaudeCodeSection.md`：更新职责和集成描述，移除 SDK Foundations 引用
+   - `docs/modules/features/settings/SettingsCapabilityLabSection.md`：更新 Discovery & Status 和 Capability Matrix 描述，反映 File Checkpoint 现为 diagnostic surface
+
+### 表面决策
+
+| 控制 | 之前表面 | 新表面 | 原因 |
+|---|---|---|---|
+| `enableFileCheckpointing` | SDK Foundations (stable) | Capability Lab → Diagnostic Stream Controls | @experimental — 仅驱动诊断 rewind dry-run 预览；无稳定 rewind UI |
+| Runtime ecosystem summary | SDK Foundations (stable) | Capability Lab → Discovery rows (已存在) | 只读诊断内省，非设置 |
+| `includeHookEvents` | SDK Foundations (stable) → Capability Lab | Capability Lab → Diagnostic Stream Controls | 无变化；此前已迁移 |
+| `forwardSubagentText` | SDK Foundations (stable) → Capability Lab | Capability Lab → Diagnostic Stream Controls | 无变化；此前已迁移 |
+| `agentProgressSummaries` | SDK Foundations (stable) → Capability Lab | Capability Lab → Diagnostic Stream Controls | 无变化；此前已迁移 |
+
+### 验证
+
+- 完整验证：443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280519)
+- 测试库部署和 BUILD_ID 验证：`feature-phase0-capability.202605280519`
+- 运行时 UI 证明（测试库）：
+  - 稳定 Claude Code 设置：无 `sdk-foundations` 标签；仅剩 5 个标签（运行时, 模型与 Thinking, 权限, 上下文与来源, 工具）
+  - DOM 断言：稳定设置视图共 17 个按钮，无 "SDK Foundations" 文本；无 `data-secondary-tab="sdk-foundations"` 元素
+  - Capability Lab Discovery 区：`data-capability-lab-surface="diagnostic-stream"` 存在，包含全部 4 个开关（Hook 事件流、转发子代理 transcript、子代理进度摘要、文件 checkpoint）
+  - 截图：/tmp/opencodian-claude-settings-no-sdk-foundations.png、/tmp/opencodian-capability-lab-diagnostic-stream.png
+- Console：无错误；Errors：未捕获
+
+---
+
 ## 2026-05-28 SDK Foundations Diagnostic Surface Migration
 
 ### 目标

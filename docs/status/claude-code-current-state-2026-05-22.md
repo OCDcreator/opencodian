@@ -18,8 +18,8 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280418`
-- Latest follow-up polish round (stable settings UI honesty pass): see "2026-05-28 Stable Settings UI Honesty Pass" below
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280519`
+- Latest follow-up polish round (SDK Foundations tab removal): see "2026-05-28 SDK Foundations Tab Removal" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -104,6 +104,52 @@ This slice moves three purely diagnostic stream flags (`includeHookEvents`, `for
   - Stable SDK Foundations tab: only `enableFileCheckpointing` toggle present, `data-claude-code-diagnostic-stream-moved` notice visible with Chinese locale text "诊断流控制已迁移"
   - Capability Lab Discovery section: `data-capability-lab-surface="diagnostic-stream"` controls present with all three toggles (Hook 事件流, 转发子代理 transcript, 子代理进度摘要)
   - DOM assertions: `findToggleRaw` confirms diagnostic toggles absent from stable settings; `capSurface` confirms all three toggles present in Capability Lab
+- Console: no errors; Errors: none captured
+
+---
+
+## 2026-05-28 SDK Foundations Tab Removal
+
+This slice removes the stable `sdk-foundations` tab entirely. After the previous migration moved three diagnostic stream flags to Capability Lab, the only remaining control was `enableFileCheckpointing` — an @experimental toggle with no stable user-facing effect (it only powers the Capability Lab rewind dry-run preview). The rest of the tab was read-only runtime ecosystem status + stale moved notices. The user explicitly wants chat/settings surfaces exposed or hidden based on real capability boundaries, not historical wiring.
+
+### What Changed
+
+- `SettingsClaudeCodeSection.ts`:
+  - Removed `sdk-foundations` from `CLAUDE_CLASSIC_TABS` and `CLAUDE_TAB_LABEL_KEYS`
+  - Removed `case 'sdk-foundations'` from `renderTabContent()`
+  - Removed 8 methods: `renderSdkFoundationsTab`, `renderRuntimeEcosystemStatus`, `renderSdkStreamBoundaryNotice`, `renderSdkFoundationOptions`, `renderDiagnosticStreamMovedNotice`, `describeRuntimePlugins`, `describeRuntimeSkills`, `describeRuntimeAgentDefinitions`
+  - Updated class JSDoc to remove SDK Foundations mention
+- `settingsLayoutRegistry.ts`:
+  - Removed `sdk-foundations` secondary tab from `claude-code` tab group
+- `SettingsCapabilityLabSection.ts`:
+  - Added `enableFileCheckpointing` toggle to `renderDiagnosticStreamControls()` (now 4 diagnostic toggles)
+  - Updated capability matrix: File Checkpoint / Rewind userSurface changed from `settings` to `diagnostic`
+- Tests:
+  - Removed all `sdk-foundations` tab tests from `SettingsClaudeCodeSection.test.ts`
+  - Updated `allTabs` array in advanced capability gating test to exclude `sdk-foundations`
+  - Added test for File Checkpoint row in capability matrix with `diagnostic` surface
+  - Added test for checkpoint toggle presence in diagnostic stream controls
+  - Updated capability matrix audit test expected values for File Checkpoint / Rewind
+
+### Surface Decision
+
+| Control | Previous Surface | New Surface | Reason |
+|---|---|---|---|
+| `enableFileCheckpointing` | SDK Foundations (stable) | Capability Lab → Diagnostic Stream Controls | @experimental — only powers diagnostic rewind dry-run preview; no stable rewind UI |
+| Runtime ecosystem summary | SDK Foundations (stable) | Capability Lab → Discovery rows (already existed) | Read-only diagnostic introspection, not a setting |
+| `includeHookEvents` | SDK Foundations (stable) → Capability Lab | Capability Lab → Diagnostic Stream Controls | No change; already migrated |
+| `forwardSubagentText` | SDK Foundations (stable) → Capability Lab | Capability Lab → Diagnostic Stream Controls | No change; already migrated |
+| `agentProgressSummaries` | SDK Foundations (stable) → Capability Lab | Capability Lab → Diagnostic Stream Controls | No change; already migrated |
+
+### Verification
+
+- Full verify: 443 suites / 3388 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280519)
+- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280519`
+- Runtime UI proof (Test Vault):
+  - Stable Claude Code settings: no `sdk-foundations` tab visible; only 5 tabs (运行时, 模型与 Thinking, 权限, 上下文与来源, 工具)
+  - DOM assertions: stable settings view has 17 buttons, none with "SDK Foundations" text; no `data-secondary-tab="sdk-foundations"` element found
+  - Capability Lab Discovery section: `data-capability-lab-surface="diagnostic-stream"` exists with all 4 toggles (Hook 事件流, 转发子代理 transcript, 子代理进度摘要, 文件 checkpoint)
+  - Screenshots: /tmp/opencodian-claude-settings-no-sdk-foundations.png, /tmp/opencodian-capability-lab-diagnostic-stream.png
 - Console: no errors; Errors: none captured
 
 ---

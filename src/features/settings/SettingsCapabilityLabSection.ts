@@ -496,7 +496,7 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // enableFileCheckpointing option + rewindFiles on query
         adapterWired: true, // adapter.rewindFiles() exists
         runtimeProof: 'untested',
-        userSurface: 'settings', // SDK Foundations toggle exists
+        userSurface: 'diagnostic', // Capability Lab toggle; no stable rewind UI exposed
       },
       {
         capability: 'JSONL History Browser',
@@ -2366,6 +2366,19 @@ export class SettingsCapabilityLabSection {
           .setValue(this.claudeCodeSettings.agentProgressSummaries)
           .onChange(async (value) => {
             this.claudeCodeSettings.agentProgressSummaries = value;
+            await this.saveClaudeCodeSettings();
+          });
+      });
+
+    // File checkpointing — experimental, powers rewind dry-run preview only
+    new Setting(controlsEl)
+      .setName(t('settings.claudeCode.enableFileCheckpointing.name'))
+      .setDesc(t('settings.claudeCode.enableFileCheckpointing.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.claudeCodeSettings.enableFileCheckpointing)
+          .onChange(async (value) => {
+            this.claudeCodeSettings.enableFileCheckpointing = value;
             await this.saveClaudeCodeSettings();
           });
       });

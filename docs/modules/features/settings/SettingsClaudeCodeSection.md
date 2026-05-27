@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsClaudeCodeSection` 负责 Claude Code backend 的 Phase A/Phase 2 设置面板。它通过 Claude Code 二级标签路由不同配置分组，暴露当前已有 adapter wiring 与测试覆盖的 runtime、模型思考、权限、上下文来源、工具策略和 SDK foundation 入口；backend 启用仍由 `SettingsBackendSection` 负责，本 section 不注册 runtime，也不导入官方 Claude SDK。
+`SettingsClaudeCodeSection` 负责 Claude Code backend 的 Phase A/Phase 2 设置面板。它通过 Claude Code 二级标签路由不同配置分组，暴露当前已有 adapter wiring 与测试覆盖的 runtime、模型思考、权限、上下文来源和工具策略；backend 启用仍由 `SettingsBackendSection` 负责，本 section 不注册 runtime，也不导入官方 Claude SDK。
 
 ## 职责
 
@@ -21,7 +21,7 @@
 - Max turns 和 max budget USD 输入必须是完整正数，`12abc` / `5usd` 这类部分数字会归一化为 unlimited/null，空白仍保持 unlimited/null
 - Environment variables 输入通过 `parseEnv()` 解析，只接受标准 POSIX 键名（`[A-Za-z_][A-Za-z0-9_]*`），含空格、连字符或以数字开头的键会被静默丢弃；值部分保留trim后的原始内容
 - Allowed/disallowed tools 输入通过 `parseToolList()` 解析，只接受 PascalCase 字母数字工具名（`[A-Za-z][A-Za-z0-9]*`），含空格、连字符或以数字开头的名称会被静默丢弃；runtime readback verified（Stable Settings Readback Proof 确认 options.allowedTools / options.disallowedTools 从设置正确构建）
-- 在 SDK Foundations 标签渲染 runtime-only plugin / skill / agent definition 只读摘要，以及 file checkpoint 开关（唯一保留在稳定设置中的实验性 SDK Foundations 控制）。hook event stream、forward subagent transcript 和 subagent progress summaries 三个诊断流开关已移至 Debug → Capability Lab 的诊断流控制区；稳定标签中取而代之的是 `renderDiagnosticStreamMovedNotice()` 提示，告知用户这些控制已迁移且仍仅限诊断用途。agent definition 摘要与 plugin/skill 摘要并排显示在 runtime ecosystem 块中，通过 `adapter.getAgentDefinitionCount()` 与 `adapter.getAgentDefinitionsList()` 读取配置状态。这些字段只进入 SDK options / diagnostic/experimental stream，不宣称 MCP authoring、skills/plugins authoring、agent authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
+- SDK Foundations 标签已移除；file checkpoint 开关（`enableFileCheckpointing`）以及 runtime ecosystem 摘要（plugins/skills/agent definitions）均已移至 Debug → Capability Lab 诊断面板。稳定设置中不再暴露任何 SDK Foundations 控制，因为这些功能均为实验性/诊断性，尚无稳定用户界面效果。hook event stream、forward subagent transcript 和 subagent progress summaries 三个诊断流开关此前已移至 Capability Lab 诊断流控制区
 - 将多标签设置输入写入 `settings.backendSettings.claudeCode`
 - 通过 `ClaudeCodeProcessResolver` 做本地进程解析诊断，帮助检查 bundled/default resolution 与外部 CLI path
 - 新增 `renderToolsProofStatusNotice()`、`renderLimitsProofStatusNotice()` 和 `renderEnvProofStatusNotice()` 三个 compact proof-status notice 方法，在对应标签中渲染 runtime readback verified 状态；样式位于 `src/style/components/settings-claude-code.css`，使用 `data-proof-state="readback"` 和 `data-claude-code-proof-status` 选择器
@@ -35,14 +35,14 @@
 
 - `OpenCodianSettings`: classic 设置页在 General 后挂载本 section
 - `OpenCodianSettingsView`: editor-area classic 设置页复用本 section
-- `SettingsTabbedRenderer`: `claude-code/runtime`、`claude-code/model-thinking`、`claude-code/permissions`、`claude-code/context-sources`、`claude-code/tools`、`claude-code/sdk-foundations` 标签路由到本 section
+- `SettingsTabbedRenderer`: `claude-code/runtime`、`claude-code/model-thinking`、`claude-code/permissions`、`claude-code/context-sources`、`claude-code/tools` 标签路由到本 section
 - `settingsLayoutRegistry`: 声明 `claude-code` 配置标签，但不设置 `backendRequired`
 - `ClaudeCodeProcessResolver`: runtime diagnostics 按当前 Claude settings 解析 process mode
 
 ## 维护约束
 
 - 该 section 是 Phase A 多标签设置 surface；不要把 SDK option builder 支持的字段等同于已经可以给用户操作的产品能力
-- SDK Foundations 中 hook/subagent stream 开关虽可配置，但必须伴随 diagnostic/experimental 边界提示；除非有新的稳定 E2E proof，不得把它们写成 hook authoring 或完整 transcript/progress 产品能力
+- 所有实验性/诊断性控制（hook/subagent stream、file checkpointing、runtime ecosystem 摘要）已移至 Capability Lab；稳定设置只保留有真实用户界面效果或 runtime readback verified 的控制
 - 新增或调整 Claude Code 二级标签时，同步 `renderTabContent()` 路由、classic `attach()` 分组、settings layout registry、locale 文案、稳定 `data-settings-target` / `data-claude-code-section` 属性和测试覆盖
 - 该 section 不应直接依赖 `@anthropic-ai/claude-agent-sdk`；真实 SDK runtime 由 `ClaudeCodeAdapter` / `ClaudeCodeSdkLoader` 负责
 - 所有文案必须通过 locale key 获取

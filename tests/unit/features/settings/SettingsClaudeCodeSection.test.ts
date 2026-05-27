@@ -318,7 +318,6 @@ describe('SettingsClaudeCodeSection', () => {
     expect(containerEl.querySelector('[data-claude-code-section="permissions"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="context-sources"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="tools"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="sdk-foundations"]')).toBeDefined();
 
     const renderedNamesLower = [
       ...textRecords,
@@ -1103,130 +1102,10 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
   });
 
-  describe('sdk-foundations tab', () => {
-    it('shows read-only runtime plugins, skills, and agent definitions status from the active Claude adapter', () => {
-      const claudeAdapter = {
-        getPluginCount: jest.fn().mockReturnValue(2),
-        getPluginsList: jest.fn().mockReturnValue(['plugin-a', 'plugin-b']),
-        getSkillCount: jest.fn().mockReturnValue(3),
-        getSkillsList: jest.fn().mockReturnValue(['skill-a', 'skill-b', 'skill-c']),
-        getAgentDefinitionCount: jest.fn().mockReturnValue(2),
-        getAgentDefinitionsList: jest.fn().mockReturnValue(['agent-a', 'agent-b']),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'sdk-foundations');
-
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.name'));
-      expect(containerEl.textContent).toContain(
-        t('settings.claudeCode.runtimeEcosystem.plugins.loaded', { count: 2, names: 'plugin-a, plugin-b' }),
-      );
-      expect(containerEl.textContent).toContain(
-        t('settings.claudeCode.runtimeEcosystem.skills.loaded', { count: 3, names: 'skill-a, skill-b, skill-c' }),
-      );
-      expect(containerEl.textContent).toContain(
-        t('settings.claudeCode.runtimeEcosystem.agentDefinitions.loaded', { count: 2, names: 'agent-a, agent-b' }),
-      );
-    });
-
-    it('shows all-skills sentinel in the runtime ecosystem summary', () => {
-      const claudeAdapter = {
-        getPluginCount: jest.fn().mockReturnValue(0),
-        getPluginsList: jest.fn().mockReturnValue([]),
-        getSkillCount: jest.fn().mockReturnValue(-1),
-        getSkillsList: jest.fn().mockReturnValue('all'),
-        getAgentDefinitionCount: jest.fn().mockReturnValue(0),
-        getAgentDefinitionsList: jest.fn().mockReturnValue([]),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'sdk-foundations');
-
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.plugins.empty'));
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.skills.all'));
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.agentDefinitions.empty'));
-    });
-
-    it('shows single agent definition in the runtime ecosystem summary', () => {
-      const claudeAdapter = {
-        getPluginCount: jest.fn().mockReturnValue(0),
-        getPluginsList: jest.fn().mockReturnValue([]),
-        getSkillCount: jest.fn().mockReturnValue(0),
-        getSkillsList: jest.fn().mockReturnValue([]),
-        getAgentDefinitionCount: jest.fn().mockReturnValue(1),
-        getAgentDefinitionsList: jest.fn().mockReturnValue(['single-agent']),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'sdk-foundations');
-
-      expect(containerEl.textContent).toContain(
-        t('settings.claudeCode.runtimeEcosystem.agentDefinitions.single', { name: 'single-agent' }),
-      );
-    });
-
-    it('renders only the experimental file checkpoint toggle in stable SDK foundations', async () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'sdk-foundations');
-
-      // Only enableFileCheckpointing remains in stable settings
-      expect(findToggle(t('settings.claudeCode.enableFileCheckpointing.name'))).toBeDefined();
-      // Diagnostic stream toggles moved to Capability Lab
-      const findToggleRaw = (name: string) => toggleRecords.find((candidate) => candidate.name === name);
-      expect(findToggleRaw(t('settings.claudeCode.includeHookEvents.name'))).toBeUndefined();
-      expect(findToggleRaw(t('settings.claudeCode.forwardSubagentText.name'))).toBeUndefined();
-      expect(findToggleRaw(t('settings.claudeCode.agentProgressSummaries.name'))).toBeUndefined();
-
-      // Moved notice is present
-      const movedNotice = containerEl.querySelector('[data-claude-code-diagnostic-stream-moved="true"]');
-      expect(movedNotice).toBeTruthy();
-      expect(movedNotice?.textContent).toContain(t('settings.claudeCode.diagnosticStreamMoved.title'));
-
-      await findToggle(t('settings.claudeCode.enableFileCheckpointing.name')).onChange?.(true as never);
-      expect(plugin.settings.backendSettings.claudeCode.enableFileCheckpointing).toBe(true);
-      expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
-    it('shows a diagnostic boundary for hook and subagent stream options', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'sdk-foundations');
-
-      const noticeEl = containerEl.querySelector('[data-claude-code-sdk-stream-boundary="true"]');
-      expect(noticeEl).toBeTruthy();
-      expect(noticeEl?.textContent).toContain(t('settings.claudeCode.sdkStreamBoundary.title'));
-      expect(noticeEl?.textContent).toContain(t('settings.claudeCode.sdkStreamBoundary.desc'));
-      expect(noticeEl?.textContent).toContain('diagnostic/experimental event streams');
-      expect(noticeEl?.textContent).toContain('do not enable stable hook authoring');
-      expect(noticeEl?.textContent).toContain('complete subagent transcript/progress UI');
-    });
-  });
-
   describe('advanced capability gating', () => {
     it('does not render advanced Claude capabilities that lack runtime proof', () => {
       const plugin = createPlugin();
-      const allTabs = ['runtime', 'model-thinking', 'permissions', 'context-sources', 'tools', 'sdk-foundations'] as const;
+      const allTabs = ['runtime', 'model-thinking', 'permissions', 'context-sources', 'tools'] as const;
 
       for (const tab of allTabs) {
         const containerEl = document.createElement('div');

@@ -7,7 +7,6 @@
  *   - Permissions: permission mode
  *   - Context & Sources: setting sources, additional directories
  *   - Tools: allowed/disallowed tool names
- *   - SDK Foundations: checkpointing and diagnostic stream switches
  *
  * The Model & Thinking tab includes the next-query/restart boundary notice
  * because max-turns and max-budget changes only take effect on the next query.
@@ -83,7 +82,6 @@ const CLAUDE_CLASSIC_TABS = [
   'permissions',
   'context-sources',
   'tools',
-  'sdk-foundations',
 ] as const;
 
 const CLAUDE_TAB_LABEL_KEYS: Record<typeof CLAUDE_CLASSIC_TABS[number], TranslationKey> = {
@@ -92,7 +90,6 @@ const CLAUDE_TAB_LABEL_KEYS: Record<typeof CLAUDE_CLASSIC_TABS[number], Translat
   permissions: 'settings.claudeCode.tab.permissions',
   'context-sources': 'settings.claudeCode.tab.contextSources',
   tools: 'settings.claudeCode.tab.tools',
-  'sdk-foundations': 'settings.claudeCode.tab.sdkFoundations',
 };
 
 export class SettingsClaudeCodeSection {
@@ -162,9 +159,6 @@ export class SettingsClaudeCodeSection {
         break;
       case 'tools':
         this.renderToolsTab(bodyEl);
-        break;
-      case 'sdk-foundations':
-        this.renderSdkFoundationsTab(bodyEl);
         break;
       default:
         this.renderRuntimeTab(bodyEl);
@@ -678,36 +672,6 @@ export class SettingsClaudeCodeSection {
     );
   }
 
-  // ─── SDK Foundations tab ─────────────────────────────────────────
-
-  private renderSdkFoundationsTab(containerEl: HTMLElement): void {
-    this.renderRuntimeEcosystemStatus(containerEl);
-    this.renderSdkStreamBoundaryNotice(containerEl);
-    this.renderSdkFoundationOptions(containerEl);
-  }
-
-  private renderRuntimeEcosystemStatus(containerEl: HTMLElement): void {
-    const statusEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-ecosystem',
-      attr: { 'data-claude-code-runtime-ecosystem': 'true' },
-    });
-    statusEl.createEl('strong', { text: t('settings.claudeCode.runtimeEcosystem.name') });
-    statusEl.createEl('p', { text: t('settings.claudeCode.runtimeEcosystem.desc') });
-    const listEl = statusEl.createEl('ul');
-    listEl.createEl('li', { text: this.describeRuntimePlugins() });
-    listEl.createEl('li', { text: this.describeRuntimeSkills() });
-    listEl.createEl('li', { text: this.describeRuntimeAgentDefinitions() });
-  }
-
-  private renderSdkStreamBoundaryNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-sdk-stream-boundary',
-      attr: { 'data-claude-code-sdk-stream-boundary': 'true' },
-    });
-    noticeEl.createEl('strong', { text: t('settings.claudeCode.sdkStreamBoundary.title') });
-    noticeEl.createEl('p', { text: t('settings.claudeCode.sdkStreamBoundary.desc') });
-  }
-
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.claudeCode.allowedTools.name'))
@@ -766,31 +730,6 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-  }
-
-  private renderSdkFoundationOptions(containerEl: HTMLElement): void {
-    this.renderDiagnosticStreamMovedNotice(containerEl);
-
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.enableFileCheckpointing.name'))
-      .setDesc(t('settings.claudeCode.enableFileCheckpointing.desc'))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.settings.enableFileCheckpointing)
-          .onChange(async (value) => {
-            this.settings.enableFileCheckpointing = value;
-            await this.saveSettings();
-          });
-      });
-  }
-
-  private renderDiagnosticStreamMovedNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-diagnostic-stream-moved',
-      attr: { 'data-claude-code-diagnostic-stream-moved': 'true' },
-    });
-    noticeEl.createEl('strong', { text: t('settings.claudeCode.diagnosticStreamMoved.title') });
-    noticeEl.createEl('p', { text: t('settings.claudeCode.diagnosticStreamMoved.desc') });
   }
 
   private renderEnvironmentVariablesSetting(containerEl: HTMLElement): void {
@@ -858,66 +797,6 @@ export class SettingsClaudeCodeSection {
       reloadMcpServers?: () => Promise<void> | void;
     } | null;
     await adapter?.reloadMcpServers?.();
-  }
-
-  private describeRuntimePlugins(): string {
-    const adapter = this.getClaudeAdapter() as {
-      getPluginCount?: () => number;
-      getPluginsList?: () => string[];
-    } | null;
-    const count = adapter?.getPluginCount?.() ?? 0;
-    if (count <= 0) {
-      return t('settings.claudeCode.runtimeEcosystem.plugins.empty');
-    }
-    const names = adapter?.getPluginsList?.() ?? [];
-    return t('settings.claudeCode.runtimeEcosystem.plugins.loaded', {
-      count,
-      names: names.length > 0 ? names.join(', ') : t('settings.claudeCode.runtimeEcosystem.unnamed'),
-    });
-  }
-
-  private describeRuntimeSkills(): string {
-    const adapter = this.getClaudeAdapter() as {
-      getSkillCount?: () => number;
-      getSkillsList?: () => string[] | 'all';
-    } | null;
-    const count = adapter?.getSkillCount?.() ?? 0;
-    if (count === -1) {
-      return t('settings.claudeCode.runtimeEcosystem.skills.all');
-    }
-    if (count <= 0) {
-      return t('settings.claudeCode.runtimeEcosystem.skills.empty');
-    }
-    const names = adapter?.getSkillsList?.() ?? [];
-    return t('settings.claudeCode.runtimeEcosystem.skills.loaded', {
-      count,
-      names: Array.isArray(names) && names.length > 0
-        ? names.join(', ')
-        : t('settings.claudeCode.runtimeEcosystem.unnamed'),
-    });
-  }
-
-  private describeRuntimeAgentDefinitions(): string {
-    const adapter = this.getClaudeAdapter() as {
-      getAgentDefinitionCount?: () => number;
-      getAgentDefinitionsList?: () => string[];
-    } | null;
-    const count = adapter?.getAgentDefinitionCount?.() ?? 0;
-    if (count <= 0) {
-      return t('settings.claudeCode.runtimeEcosystem.agentDefinitions.empty');
-    }
-    const names = adapter?.getAgentDefinitionsList?.() ?? [];
-    if (count === 1) {
-      return t('settings.claudeCode.runtimeEcosystem.agentDefinitions.single', {
-        name: names[0] ?? t('settings.claudeCode.runtimeEcosystem.unnamed'),
-      });
-    }
-    return t('settings.claudeCode.runtimeEcosystem.agentDefinitions.loaded', {
-      count,
-      names: names.length > 0
-        ? names.join(', ')
-        : t('settings.claudeCode.runtimeEcosystem.unnamed'),
-    });
   }
 
   private isKnownClaudeTabId(tabId: string): tabId is typeof CLAUDE_CLASSIC_TABS[number] {

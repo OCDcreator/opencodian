@@ -49,7 +49,6 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'permissions', labelKey: 'settings.claudeCode.tab.permissions' },
       { id: 'context-sources', labelKey: 'settings.claudeCode.tab.contextSources' },
       { id: 'tools', labelKey: 'settings.claudeCode.tab.tools' },
-      { id: 'sdk-foundations', labelKey: 'settings.claudeCode.tab.sdkFoundations' },
     ],
   },
   {
