@@ -692,7 +692,16 @@ export class ClaudeCodeAdapter
       ...summarizeSendOptions(request.options),
     });
     this.cancelledSessions.delete(request.sessionId);
-    const prompt = createUserPrompt(request.content);
+    // Prompt hardening for structured-output sends: explicitly constrain the model
+    // to return ONLY through the StructuredOutput tool and avoid any visible text
+    // outside the structured output (markdown code fences, explanations, prose).
+    const hasOutputFormat = request.options?.outputFormat != null
+      && typeof request.options.outputFormat === 'object'
+      && Object.keys(request.options.outputFormat).length > 0;
+    const promptContent = hasOutputFormat
+      ? `You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output.\n\n${request.content}`
+      : request.content;
+    const prompt = createUserPrompt(promptContent);
     session.messages.push(prompt);
     let runtime: ClaudeCodeSessionRuntime;
     try {

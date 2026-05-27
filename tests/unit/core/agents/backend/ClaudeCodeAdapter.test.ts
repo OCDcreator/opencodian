@@ -398,6 +398,70 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdk.query.mock.calls[0][0].options.outputFormat).toEqual(sendTimeFormat);
   });
 
+  it('prefixes structured-output sends with a hardening prompt constraint', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-structured-hardened',
+        content: [{ type: 'text', text: '{"response":"hi"}' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+    const outputFormat = {
+      type: 'json_schema',
+      schema: { type: 'object', properties: { response: { type: 'string' } }, required: ['response'] },
+    };
+
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'say hello',
+      options: { outputFormat },
+    }));
+
+    const call = sdk.query.mock.calls[0][0];
+    const prompts = await collectAsync(call.prompt);
+    expect(prompts).toEqual([{
+      type: 'user',
+      message: {
+        role: 'user',
+        content: 'You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output.\n\nsay hello',
+      },
+    }]);
+  });
+
+  it('does not harden prompt for sends without outputFormat', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-plain',
+        content: [{ type: 'text', text: 'Hello' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'say hello',
+    }));
+
+    const call = sdk.query.mock.calls[0][0];
+    const prompts = await collectAsync(call.prompt);
+    expect(prompts).toEqual([{
+      type: 'user',
+      message: { role: 'user', content: 'say hello' },
+    }]);
+  });
+
   it('starts a fresh resumed SDK query when composer effort changes', async () => {
     const sdkOutputs = [
       createAsyncQueue<unknown>(),

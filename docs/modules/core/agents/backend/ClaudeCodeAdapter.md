@@ -50,6 +50,7 @@
 - `buildSdkOptions` 在构造完 SDK options 后记录 `buildSdkOptions tool config` 日志，包含 `allowedToolCount`、`disallowedToolCount`、`allowedTools` 和 `disallowedTools`，用于在运行时验证工具策略是否进入 SDK query 选项
 - `buildSdkOptions` 同时记录 `buildSdkOptions limits config` 日志，包含 `maxTurns` 和 `maxBudgetUsd`（未设置时为 `null`），用于在运行时验证限制项是否进入 SDK query 选项
 - `buildSdkOptions` 还记录 `buildSdkOptions fallback model` 日志，包含 `fallbackModel` 值（未设置时为 `null`），用于在运行时验证 fallback model 是否进入 SDK query 选项
+- 2026-05-28: prompt hardening 尝试（commit `1c7a380a`）已被 revert，因为运行时 artifact 证明它未能稳定消除 structured output 路径中的额外 prose；该问题目前归为 SDK/model 边界
 - `ClaudeCodeDiagnosticPromptRequest` 接口现在接受可选 `fallbackModel?: string` 字段，允许 Capability Lab 诊断探针在运行诊断 prompt 时覆盖 fallback model；同时接受可选 `model?: string` 字段，允许诊断探针使用故意无效的主模型名称来触发 fallback 行为验证
 - `buildDiagnosticSdkOptions()` 将 `request.fallbackModel` 和 `request.model` 透传到 options builder，用于诊断级的模型覆盖验证
 - `runFallbackModelProof()` 现在使用故意无效的主模型（`opencodian-invalid-model-test-xyz123`）配合有效 fallback 模型运行诊断 prompt，通过检查返回的 `message_metadata` chunk 中的 `modelId` 来诚实判断 SDK 是否真的发生了 fallback 切换；只有在检测到查询成功且使用的模型不是无效主模型时，才会标记为 `pass`，否则保持 `wiring` 或标记 `fail`

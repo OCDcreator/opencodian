@@ -29,6 +29,8 @@
 
 这是结构化输出在普通聊天路径中的最 honest、最小表面触发方式：不新增 UI chrome，不暴露 schema 编辑，只提供一个显式前缀触发。当前只支持 Claude Code backend；OpenCode backend 会忽略未知的 `outputFormat` option。
 
+2026-05-28 更新：prompt hardening 尝试（在 schema 中增加 description 字段）已被 revert，因为运行时 artifact 证明它未能稳定消除 structured output 路径中的额外 prose；该问题目前归为 SDK/model 边界，不是 plugin-side fixable。
+
 ## 公开接口
 
 ```typescript

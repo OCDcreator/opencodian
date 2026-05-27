@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605272319`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280015`
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -64,6 +64,64 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-28 Prompt Hardening — Second Attempt and Honest Conclusion
+
+This slice makes a second attempt at plugin-side prompt hardening for the `/json` structured output path, with rigorous runtime proof. The conclusion confirms the first attempt's finding: prompt hardening reduces but does not eliminate extra prose.
+
+### What Was Tried (Second Attempt)
+
+- `ClaudeCodeAdapter.sendMessage()`: strengthened prompt constraint from "Respond ONLY using..." to "You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output."
+- `SendPipelineRuntime.ts`: added `description` fields to `STRUCTURED_OUTPUT_FIXED_SCHEMA` root and `response` property
+- Updated tests and module docs
+
+### Runtime Evidence (Second Attempt)
+
+- Test Vault deployed build: `feature-phase0-capability.202605280011`
+- Fresh conversation, Claude Code backend, prompt: `/json say hello in JSON`
+- Streaming evidence:
+  - `StructuredOutput` tool_use emitted at 00:12:34
+  - `structured_output` backend_event received at 00:12:39 with `contentLength: 94`
+  - Extra prose "Done" (4 chars) emitted after tool call at 00:12:39
+- DOM assertions (last assistant message):
+  - `lastMessageHasTextBlock: true` — `.streaming-text-block` with `<p>Done</p>` present
+  - `lastMessageHasStructuredOutput: true` — `.opencodian-structured-output-details` present
+  - `structuredCodeText: {"response": "{\"greeting\": \"Hello!\", \"message\": \"Welcome! How can I help you today?\"}"}`
+  - Thinking block present: "Thought for 4.4s" with content about using StructuredOutput tool
+- Reload verification:
+  - Plugin reload succeeds without errors
+  - Structured output badge survives hydration
+  - Text block "Done" survives hydration (no regression)
+- Errors: `No errors captured`
+
+### Comparison Across Attempts
+
+| Attempt | Prompt | Result | Length |
+|---|---|---|---|
+| First (old prompt, no hardening) | None | "All done! Said hello in JSON." | ~31 chars |
+| First (hardening commit `1c7a380a`) | "Respond ONLY using..." | "Done." (~5 chars) — misreported as 0 in some tests | ~5 chars |
+| Second (this attempt) | "You MUST return..." | "Done" (~4 chars) | ~4 chars |
+
+### Classification
+
+| Boundary | Status | Reason |
+|---|---|---|
+| Duplicate raw JSON suppression | ✅ Plugin fixed | Confirmed by runtime proof |
+| Hook text leak | ✅ Plugin fixed | Confirmed by runtime proof |
+| Structured output badge | ✅ Plugin fixed | Confirmed by runtime proof |
+| `/json` prefix stripping | ✅ Plugin fixed | Confirmed by runtime proof |
+| Reload/hydration survival | ✅ Plugin fixed | Confirmed by runtime proof |
+| Extra prose after StructuredOutput tool call | ℹ️ SDK/model boundary | Model outputs follow-up text ("Done") despite explicit instruction not to; prompt hardening reduces verbosity but cannot eliminate it |
+| Prompt hardening | ⚠️ Partial / Reverted | Reduces prose length (~31 chars → ~4 chars) but does not eliminate it; not a stable plugin-side fix |
+
+### Honest Assessment
+
+- **Prompt hardening is partially effective** at reducing extra prose verbosity, but **not sufficient to eliminate it**.
+- The remaining ~4 chars of follow-up text ("Done") appears to be an **SDK/model boundary**: the Claude Code SDK allows the model to emit a final assistant text block after the `StructuredOutput` tool call, and the model uses this to acknowledge completion regardless of prompt constraints.
+- **Further plugin-side improvement would require post-processing** (e.g., suppressing all non-duplicate text blocks when structured output is present for `/json` triggers), not more prompt hardening.
+- The current state is acceptable for ordinary chat UX: the structured output badge is prominent, duplicate JSON is suppressed, and the residual prose is minimal (~4 chars).
+
+---
 
 ## 2026-05-27 Structured Output Productization Fix
 
