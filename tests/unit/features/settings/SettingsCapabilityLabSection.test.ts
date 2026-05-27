@@ -1,5 +1,7 @@
 /* eslint-disable max-lines -- Capability Lab tests intentionally keep the full diagnostic surface matrix, history, rewind, structured, and fork probe behavior together. */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { SettingsCapabilityLabSection } from '../../../../src/features/settings/SettingsCapabilityLabSection';
 import { setLocale, t } from '../../../../src/i18n';
@@ -3301,9 +3303,9 @@ describe('SettingsCapabilityLabSection', () => {
     (adapter.inspectLastDiagnosticSdkOptions as jest.Mock).mockReturnValue({
       env: { OPENCODIAN_ENV_PROOF_1700000000000: '1700000000000-4fzolfdn' },
     });
-    const expectedProofPath = '/tmp/opencodian-env-proof-1700000000000-4fzolfdn';
+    const expectedProofPath = join(tmpdir(), 'opencodian-env-proof-1700000000000-4fzolfdn');
     (adapter.runDiagnosticPrompt as jest.Mock).mockImplementation(async () => {
-      mkdirSync('/tmp', { recursive: true });
+      mkdirSync(tmpdir(), { recursive: true });
       writeFileSync(expectedProofPath, 'proof', 'utf8');
       return {
       sessionId: 'diag-env-proof-pass',
