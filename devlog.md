@@ -12,6 +12,49 @@
 
 ---
 
+## 2026-05-27 Structured Output Prompt Hardening
+
+### 目标
+
+在 ordinary `/json` 路径里通过插件侧 prompt hardening 减少模型在 StructuredOutput 工具调用之外输出额外 prose 或 markdown JSON code fence 的概率。
+
+### 发现的问题
+
+之前的修复已解决 duplicate raw JSON suppression 和 hook text leak，但模型仍可能在 structured output 之外输出额外 prose（例如 "All done! Said hello in JSON."）或先输出 markdown code-fenced JSON，再调用 StructuredOutput。这是 plugin-side 可以合理加强的最后一道约束。
+
+### 变更
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`：
+  - `sendMessage()` 在检测到 `request.options.outputFormat` 时，于用户 prompt 前附加最小化约束前缀：`Respond ONLY using the required structured output format. Do not include markdown code blocks, JSON fences, or additional prose.`
+  - 仅作用于 structured-output 发送，不影响普通聊天
+- 测试：
+  - `ClaudeCodeAdapter.test.ts`：新增 2 个测试验证 hardening 行为（有/无 outputFormat）
+- 文档：
+  - `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`：记录 hardening 行为
+  - `docs/status/claude-code-current-state-2026-05-22.md`：添加 "Structured Output Prompt Hardening" section
+
+### 验证
+
+- 全量测试：443 suites / 3374 tests passed（新增 2 个测试全部通过）
+- Lint：0 errors / 0 warnings
+- Typecheck：clean
+- Build：BUILD_ID=feature-phase0-capability.202605272354
+- Test Vault 运行时证明（Claude Code backend）：
+  - 消息 1：`/json say hello in JSON` → `assistantTextBlockCount: 0`, `hasStructuredOutput: true`, `hasHookText: false`
+  - 消息 2：`/json generate a greeting` → `assistantTextBlockCount: 0`, `hasStructuredOutput: true`, `hasHookText: false`
+  - Reload/hydration：persisted conversation 在 reload 后 structured output 完整存活，无 regression
+  - Model thinking block 中明确出现 "return it only through the StructuredOutput tool"，证明 hardening prompt 已到达模型
+  - Errors：`No errors captured`
+  - Console：SDK 活动日志正常
+  - 截图：`.obsidian-debug/json-hardening-proof-20260527.png`, `.obsidian-debug/json-hardening-second-msg-20260527.png`
+  - 结果 JSON：`.obsidian-debug/json-hardening-proof-result-20260527.json`
+
+### 分类结论
+
+**A — Plugin hardening 成功**：assistant 正文已无额外 prose / markdown JSON，只剩 structured output（加上 thinking 摘要，这是正常 SDK 行为）。之前的 "All done!" 类额外 prose 在 hardening 后不再复现。
+
+---
+
 ## 2026-05-27 Structured Output Reload/Hydration Proof
 
 ### 目标

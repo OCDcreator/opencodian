@@ -51,8 +51,9 @@ export interface SendPipelineSlashCommandPort {
 /** Fixed JSON schema used for the `/json` ordinary-chat structured-output trigger. */
 const STRUCTURED_OUTPUT_FIXED_SCHEMA: Record<string, unknown> = {
   type: 'object',
+  description: 'Return your complete response ONLY as a JSON object matching this schema. Do not include markdown code blocks, explanations, or conversational text.',
   properties: {
-    response: { type: 'string', description: 'The main response text' },
+    response: { type: 'string', description: 'Put all response content here as a single JSON string value. Do not include markdown formatting.' },
     tags: { type: 'array', items: { type: 'string' } },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
   },

@@ -24,6 +24,7 @@
 - 前缀被剥离，剩余内容进入正常的 preparation / stream 路径
 - 一个固定的 JSON schema（`STRUCTURED_OUTPUT_FIXED_SCHEMA`）被注入到 `PrepareMessageSendOptions.outputFormat`
 - 该 schema 通过 `PreparedMessageSend.modelOptions` 进入 `sendStreamMessage` options，最终到达 `ClaudeCodeAdapter.buildSdkOptions()`
+- schema 在根对象和 `response` 属性上附加了 `description`，用于提示模型只返回结构化输出、不附加 markdown 或 conversational text
 - 触发是**一次性的**：只影响当前这条消息，不会持久化到设置或影响后续发送
 - 前缀剥离发生在 `tryRunSlashCommand` 之前，因此 slash command 服务看到的是已剥离的内容，不会把 `/json` 误判为未知 slash command
 
