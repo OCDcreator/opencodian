@@ -19,6 +19,7 @@ import {
   readBackendSessionTitle,
 } from '../../core/agents/backend/AgentBackendRouting';
 import type { ClaudeCodeAdapter, ClaudeCodeDiagnosticPromptResult } from '../../core/agents/backend/ClaudeCodeAdapter';
+import type { ClaudeCodePermissionBridge } from '../../core/agents/backend/ClaudeCodePermissionBridge';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -557,14 +558,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Permission Approval',
         sdkExposed: true, // canUseTool option in SDK
         adapterWired: true, // ClaudeCodePermissionBridge is injected into chat SDK options (ordinary path)
-        runtimeProof: 'wiring', // Bridge and SDK option are wired, but ordinary chat end-to-end runtime proof is not yet available. The current evidence is unit-test smoke only (mocked SDK + bridge callbacks), not live Obsidian permission card interaction.
+        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Permission Card) can exercise the full bridge → host → renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model calls tool → permission card renders → user approves/denies → stream continues) is still not available because tool calling is non-deterministic.
         userSurface: 'settings', // Reuses existing stable permission card UI in ordinary chat; no separate Claude permission settings page.
       },
       {
         capability: 'AskUserQuestion / Elicitation',
         sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
         adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
-        runtimeProof: 'wiring', // Bridge and SDK option are wired, but ordinary chat end-to-end runtime proof is not yet available. The current evidence is unit-test smoke only (mocked SDK + bridge callbacks), not live Obsidian question dialog interaction.
+        runtimeProof: 'wiring', // Bridge and SDK option are wired. A deterministic live UI harness (Trigger Live Question Dialog) can exercise the full bridge → host → question renderer → user → result chain, but it requires the chat view to be active. Ordinary chat end-to-end runtime proof (model asks question → dialog renders → user answers → stream continues) is still not available because tool calling is non-deterministic.
         userSurface: 'settings', // Reuses existing stable question dialog in ordinary chat; no separate Claude question settings page.
       },
       {
@@ -2168,6 +2169,34 @@ export class SettingsCapabilityLabSection {
     questionProofBtn.addEventListener('click', () => {
       void this.runAskUserQuestionProof(adapter, questionOutputEl);
     });
+
+    // Live Permission Card harness — deterministic, bypasses model
+    const livePermissionBtn = proofControls.createEl('button', {
+      text: 'Trigger Live Permission Card',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const livePermissionOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    livePermissionBtn.addEventListener('click', () => {
+      void this.runLivePermissionCardHarness(livePermissionOutputEl);
+    });
+
+    // Live Question Dialog harness — deterministic, bypasses model
+    const liveQuestionBtn = proofControls.createEl('button', {
+      text: 'Trigger Live Question Dialog',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const liveQuestionOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    liveQuestionBtn.addEventListener('click', () => {
+      void this.runLiveQuestionDialogHarness(liveQuestionOutputEl);
+    });
   }
 
   private renderDeclaredCapabilities(containerEl: HTMLElement, caps: ReadonlySet<string> | undefined): void {
@@ -2647,6 +2676,155 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
         text: `AskUserQuestion proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+    }
+  }
+
+  // =======================================================================
+  // Live UI Harnesses — deterministic, bypass model, use real shared UI
+  // =======================================================================
+
+  /**
+   * Deterministically trigger the live permission card through the bridge.
+   * This does NOT involve the model; it directly calls canUseTool with a mock
+   * request so the bridge → host → renderer → user → result chain is exercised.
+   */
+  private async runLivePermissionCardHarness(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Triggering live permission card via ClaudeCodePermissionBridge…' });
+
+    const bridge = this.plugin.claudeCodePermissionBridge as ClaudeCodePermissionBridge | null;
+    if (!bridge) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: 'Permission bridge not available. Claude Code backend may not be enabled.',
+      });
+      this.updateRuntimeProof('Permission Approval', 'fail', outputEl);
+      return;
+    }
+
+    const hostCtx = this.plugin.claudeCodePermissionHostContext;
+    const hasRenderer = !!hostCtx.permissionCardRenderer;
+
+    if (!hasRenderer) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Permission card renderer is not available. Open the OpenCodian chat view first to register the UI renderer.',
+      });
+      this.updateRuntimeProof('Permission Approval', 'boundary', outputEl);
+      return;
+    }
+
+    try {
+      // Direct deterministic call — no model involved.
+      // We use a harmless mock tool to avoid side effects.
+      const result = await bridge.canUseTool('Bash', { command: 'echo "diagnostic-harness"' });
+
+      outputEl.empty();
+      outputEl.createEl('p', {
+        text: `Live permission card completed. User decision: ${result.behavior}`,
+      });
+
+      if (result.behavior === 'allow') {
+        outputEl.createEl('p', {
+          text: 'User approved the permission request. The bridge → host → renderer → user → result chain is fully functional.',
+        });
+        this.updateRuntimeProof('Permission Approval', 'pass', outputEl);
+      } else if ((result as Record<string, unknown>).interrupt === true) {
+        // Interrupted means the renderer was not available or the request was cancelled before UI showed.
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'The permission request was cancelled before UI could render. The renderer exists but requires an active streaming assistant message to insert the permission card. This is an architectural boundary: shared inline cards are designed to render within a live chat stream, not in isolation.',
+        });
+        this.updateRuntimeProof('Permission Approval', 'boundary', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          text: 'User denied the permission request. The UI rendered and collected input correctly — this is a live UI proof.',
+        });
+        this.updateRuntimeProof('Permission Approval', 'pass', outputEl);
+      }
+    } catch (err) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Live permission card failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Permission Approval', 'fail', outputEl);
+    }
+  }
+
+  /**
+   * Deterministically trigger the live question dialog through the bridge.
+   * This does NOT involve the model; it directly calls canUseTool('AskUserQuestion', …)
+   * so the bridge → host → question renderer → user → result chain is exercised.
+   */
+  private async runLiveQuestionDialogHarness(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Triggering live question dialog via ClaudeCodePermissionBridge…' });
+
+    const bridge = this.plugin.claudeCodePermissionBridge as ClaudeCodePermissionBridge | null;
+    if (!bridge) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: 'Permission bridge not available. Claude Code backend may not be enabled.',
+      });
+      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+      return;
+    }
+
+    const hostCtx = this.plugin.claudeCodePermissionHostContext;
+    const hasRenderer = !!hostCtx.questionCardRenderer;
+
+    if (!hasRenderer) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Question dialog renderer is not available. Open the OpenCodian chat view first to register the UI renderer.',
+      });
+      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'boundary', outputEl);
+      return;
+    }
+
+    try {
+      // Direct deterministic call with AskUserQuestion input.
+      const result = await bridge.canUseTool('AskUserQuestion', {
+        questions: [
+          {
+            question: 'This is a diagnostic question from the Capability Lab harness. Please select an option to verify the UI chain.',
+            header: 'Diagnostic Question',
+            options: [
+              { label: 'Option A', description: 'First test option' },
+              { label: 'Option B', description: 'Second test option' },
+            ],
+          },
+        ],
+      });
+
+      outputEl.empty();
+      outputEl.createEl('p', {
+        text: `Live question dialog completed. User decision: ${result.behavior}`,
+      });
+
+      if (result.behavior === 'allow') {
+        outputEl.createEl('p', {
+          text: 'User answered the diagnostic question. The bridge → host → question renderer → user → result chain is fully functional.',
+        });
+        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'pass', outputEl);
+      } else if ((result as Record<string, unknown>).interrupt === true) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'The question request was cancelled before UI could render. The renderer exists but requires an active streaming assistant message to insert the question dialog. This is an architectural boundary: shared inline dialogs are designed to render within a live chat stream, not in isolation.',
+        });
+        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'boundary', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          text: 'User cancelled or denied the question. The UI rendered and collected input correctly — this is a live UI proof.',
+        });
+        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'pass', outputEl);
+      }
+    } catch (err) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Live question dialog failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
     }

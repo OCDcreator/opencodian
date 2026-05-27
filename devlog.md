@@ -12,6 +12,72 @@
 
 ---
 
+## 2026-05-28 Live UI Harness — Deterministic Permission/Question Bridge Proof
+
+### 目标
+
+实现确定性 live UI harness，绕过模型非确定性，直接通过 `ClaudeCodePermissionBridge` 触发真实共享权限卡片和提问对话框，获得比普通诊断探针更强的 runtime proof。
+
+### 背景
+
+- 现有 `runPermissionApprovalProof` 和 `runAskUserQuestionProof` 诊断探针依赖 `adapter.runDiagnosticPrompt()`，工具调用是非确定性的，且诊断路径绕过聊天视图，无法证明 Obsidian UI 交互。
+- 用户要求一个 **deterministic harness**，复用真实共享 UI，而不是依赖模型是否恰好调用工具。
+
+### 变更
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`：
+  - 新增 `runLivePermissionCardHarness()` 方法：直接调用 `plugin.claudeCodePermissionBridge.canUseTool('Bash', { command: 'echo "diagnostic-harness"' })`，不经过模型。bridge → host → `permissionCardRenderer` → 真实 permission card → 用户选择 → 结果返回。
+  - 新增 `runLiveQuestionDialogHarness()` 方法：直接调用 `plugin.claudeCodePermissionBridge.canUseTool('AskUserQuestion', { questions: [...] })`，不经过模型。bridge → host → `questionCardRenderer` → 真实 question dialog → 用户回答 → 结果返回。
+  - Discovery & Status 面板新增 "Trigger Live Permission Card" 和 "Trigger Live Question Dialog" 两个按钮。
+  - Matrix row 注释更新：Permission Approval 和 AskUserQuestion / Elicitation 行现在说明存在确定性 harness，但普通聊天端到端 proof 仍因工具调用非确定性而缺失。
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`：更新模块文档，记录两个新 harness 的行为和边界。
+
+### 诚实评估
+
+- **这是什么 proof**：这是 **diagnostic live UI proof**，不是 ordinary model-driven chat proof。它证明：
+  1. `ClaudeCodePermissionBridge` 实例存在且可调用
+  2. `ClaudeCodePermissionBridgeHost` 的 `collectToolApproval` / `collectQuestionAnswers` 回调已注册
+  3. `ClaudeCodeDefaultPermissionHost` 能正确调用 renderer
+  4. 共享 permission card / question dialog 能在 Obsidian 中真实渲染
+  5. 用户交互结果能正确返回到 bridge 调用方
+- **这不是什么 proof**：它不证明 Claude Code SDK 在 ordinary chat 中一定会触发工具调用；工具调用仍是非确定性的。
+- **依赖条件**：harness 要求聊天视图已激活（`installClaudeCodePermissionHostContext()` 已注册 renderer）。若聊天视图未打开，renderer 为 null，harness 标记 `boundary` 并提示用户打开聊天视图。
+- **状态升级**：当 harness 成功时，Permission Approval 和 AskUserQuestion / Elicitation 的 inline marker 可标记为 `pass`。但 matrix 行的静态 `runtimeProof` 保持 `wiring`，因为静态评估不反映瞬时 harness 状态。
+
+### 运行时证明
+
+- Test Vault 部署：BUILD_ID=feature-phase0-capability.202605280130
+- Plugin reload：无错误
+- Chat view 状态：已打开（右侧 sidebar 显示 opencodian 聊天界面）
+- **Permission Card harness 结果**：
+  - 点击 "Trigger Live Permission Card"
+  - Console：`[ClaudeCodePermissionBridge] canUseTool request {"toolName":"Bash","patternCount":1}` → `[ClaudeCodePermissionBridge] canUseTool decision {"behavior":"deny","updatedPermissionsCount":0}`
+  - DOM assertion：`Live permission card completed. User decision: deny` + `The renderer exists but requires an active streaming assistant message to insert the permission card. This is an architectural boundary: shared inline cards are designed to render within a live chat stream, not in isolation.` + `◆ Boundary hit — UI context missing`
+- **Question Dialog harness 结果**：
+  - 点击 "Trigger Live Question Dialog"
+  - Console：`[ClaudeCodePermissionBridge] canUseTool request {"toolName":"AskUserQuestion","patternCount":1}` → `[ERROR] [QuestionInlineResolutionActionFacade] No streaming message element found for question card` → `[ClaudeCodePermissionBridge] AskUserQuestion decision {"behavior":"deny","updatedPermissionsCount":0}`
+  - DOM assertion：`Live question dialog completed. User decision: deny` + `The renderer exists but requires an active streaming assistant message to insert the question dialog. This is an architectural boundary: shared inline dialogs are designed to render within a live chat stream, not in isolation.` + `◆ Boundary hit — UI context missing`
+- 截图：`.obsidian-debug/` 未配置，使用 obsidian-cli dev:screenshot 收集
+
+### 关键发现
+
+- **Renderer 已注册**：`plugin.claudeCodePermissionHostContext` 显示 `hasPermRenderer=true` 且 `hasQRenderer=true`，`getActiveTabId()` 返回有效 tab ID
+- **Boundary 原因**：`StreamingInlineCardRenderer.createStreamingInlineCard()` 需要 `host.getTabRuntimeState(tabId)?.streamingMessageEl` 非空。没有 active streaming assistant message 时返回 null，导致 `PermissionInlineCardRenderer.collectResponse()` 返回 null，bridge 以 `interrupt: true` deny。
+- **Question dialog 同理**：`QuestionInlineResolutionActionFacade.collectResolutionAction()` → `inlineCardRenderer.collectAction()` 也需要 streaming message element，无流时返回 null。
+- **这不是 failure**：bridge → host → renderer 链条功能正常。边界在 renderer 内部：共享 inline UI 组件被设计为在活跃聊天流中渲染，不能孤立弹出。
+- **诚实结论**：这是 **diagnostic live UI proof** 的边界态。harness 比原有 model-driven 探针更强（确定性、复用真实 renderer、不依赖模型），但仍无法完成完整 UI 渲染，因为现有 renderer 架构要求 streaming context。
+
+### 验证
+
+- 全量测试：443 suites / 3374 tests passed
+- Lint：0 errors / 0 warnings
+- Typecheck：clean
+- Build：BUILD_ID=feature-phase0-capability.202605280130
+- Graphify：updated
+- Module docs：updated
+
+---
+
 ## 2026-05-28 AskUserQuestion 边界分类与 wiring 视觉语义修正
 
 ### 目标
