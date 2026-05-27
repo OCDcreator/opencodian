@@ -16,8 +16,8 @@
 - `.opencodian-capability-lab-chip`: SDK、adapter、runtime proof、surface 等状态芯片的共享基线。
 - `.opencodian-capability-lab-output`, `.opencodian-capability-lab-status`, `.opencodian-capability-lab-subagent-list`: 诊断输出和只读列表 surface。
 - `.opencodian-capability-lab-preview-list`, `.opencodian-capability-lab-preview-row`, `.opencodian-capability-lab-preview-meta`, `.opencodian-capability-lab-preview-text`: history browser 的紧凑消息预览行，避免 Capability Lab 退化成整块 JSON dump。
-- `.opencodian-capability-lab-chip-pass`, `.opencodian-capability-lab-chip-untested`, `.opencodian-capability-lab-chip-fail`, `.opencodian-capability-lab-chip-wiring`: 能力矩阵 runtime proof 状态芯片。`pass` 为成功（绿色），`untested` 为未测试（黄色），`fail` 和 `wiring` 为失败/仅接线（红色），与 `.opencodian-capability-lab-proof-marker` 的 inline marker 状态对应。
-- `.opencodian-capability-lab-proof-marker`, `.opencodian-capability-lab-proof-pass`, `.opencodian-capability-lab-proof-fail`, `.opencodian-capability-lab-proof-untested`, `.opencodian-capability-lab-proof-wiring`: 运行时证明 inline marker。`pass` 为成功（绿色），`fail` 为失败（红色），`untested` 为未测试（黄色），`wiring` 为仅验证选项被 SDK 接受但未验证真实行为（黄色，标签显示 "Wiring only — not behavior verified"）。
+- `.opencodian-capability-lab-chip-pass`, `.opencodian-capability-lab-chip-untested`, `.opencodian-capability-lab-chip-fail`, `.opencodian-capability-lab-chip-wiring`, `.opencodian-capability-lab-chip-boundary`: 能力矩阵 runtime proof 状态芯片。`pass` 为成功（绿色），`untested` 为未测试（琥珀色），`wiring` 和 `boundary` 为仅接线/边界触发（琥珀色），`fail` 为失败（红色）。`wiring` 与 `fail` 视觉上必须区分：前者是 warning 级别（SDK options 已接受，行为未验证），后者是 error 级别（runtime 验证尝试后失败）。
+- `.opencodian-capability-lab-proof-marker`, `.opencodian-capability-lab-proof-pass`, `.opencodian-capability-lab-proof-fail`, `.opencodian-capability-lab-proof-untested`, `.opencodian-capability-lab-proof-wiring`, `.opencodian-capability-lab-proof-boundary`: 运行时证明 inline marker。`pass` 为成功（绿色），`fail` 为失败（红色），`untested` 为未测试（琥珀色），`wiring` 为仅验证选项被 SDK 接受但未验证真实行为（琥珀色，标签显示 "Wiring only — not behavior verified"），`boundary` 为工具边界被触发但诊断路径缺少 UI 上下文（琥珀色，标签显示 "Boundary hit — UI context missing"）。
 - `.opencodian-capability-lab-json-preview`: JSONL / runtime proof 预览区，使用 monospace、内部滚动和自动换行。
 
 ## 设计约束

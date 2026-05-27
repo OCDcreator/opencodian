@@ -12,6 +12,52 @@
 
 ---
 
+## 2026-05-28 AskUserQuestion 边界分类与 wiring 视觉语义修正
+
+### 目标
+
+修正 AskUserQuestion 诊断探针的分类诚实性，以及 wiring 芯片与 fail 芯片的视觉语义区分。
+
+### 背景
+
+- 上一轮（`41c4444e`）将 AskUserQuestion 从 `pass` 降级为 `wiring`，但运行时 artifact 复查发现：AskUserQuestion 诊断探针在真实运行时确实碰到了 `AskUserQuestion/tool_use` 边界，console 中出现了 `[QuestionInlineResolutionActionFacade] No streaming message element found for question card` 错误。这说明 tool boundary 被触发了，但诊断路径缺少普通聊天 UI 上下文，无法完成完整回答链。
+- 之前的 `wiring` 分类把 "已证明 wiring / tool boundary 被触发" 和 "行为失败" 混在了一起，容易误导后续模型以为这是纯 runtime fail。
+- 同时 `.opencodian-capability-lab-chip-wiring` 和 `.opencodian-capability-lab-chip-fail` 共用 error-border（红色）样式，`wiring` 语义上应更接近 warning/boundary，而不是失败。
+
+### 变更
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`：
+  - `MatrixRow.runtimeProof` 类型扩展为包含 `'boundary'`
+  - `updateRuntimeProof()` 参数类型扩展为包含 `'boundary'`
+  - `runAskUserQuestionProof()`：当模型调用 AskUserQuestion（tool boundary 被触发）时，探针现在标记为 `boundary` 而不是 `wiring`。内联文本说明 SDK tool boundary 被触发证明 wiring 功能正常，但诊断路径缺少普通聊天 UI 上下文，因此 Obsidian 提问对话框未显示。这区分了 "wiring 已证明" 和 "boundary 已触发但 UI 上下文缺失"
+  - `runAskUserQuestionProof()`：当模型未调用 AskUserQuestion 时，保持 `wiring`（工具调用非确定性）
+  - 矩阵渲染：为 `runtimeProof: 'boundary'` 添加 "Boundary hit" 标签和芯片样式
+- `src/style/components/settings-capability-lab.css`：
+  - `.opencodian-capability-lab-chip-wiring` 与 `.opencodian-capability-lab-chip-fail` 分离：wiring 改用 warning-border（琥珀色）样式，不再是 error-border（红色）
+  - `.opencodian-capability-lab-chip-fail` 保留 error-border（红色）样式
+  - 新增 `.opencodian-capability-lab-chip-boundary`，与 wiring 共用 warning-border 样式
+  - `.opencodian-capability-lab-proof-wiring` 与 `.opencodian-capability-lab-proof-boundary` 共用 warning 样式
+- 测试：审计测试类型定义更新，包含 `'boundary'`
+- 文档：`docs/modules/features/settings/SettingsCapabilityLabSection.md`、`docs/status/claude-code-current-state-2026-05-22.md` 更新
+
+### 诚实评估
+
+- **AskUserQuestion 诊断探针边界态**：当模型在诊断 prompt 中调用 AskUserQuestion 时，tool_use chunk 证明 SDK option wiring 功能正常。但诊断 `runDiagnosticPrompt` 路径在聊天视图外运行，Obsidian 提问对话框无法渲染，也无法收集用户回答。这是 **boundary 态** —— 不是 pass（未证明完整 UI 交互），也不是 fail（tool boundary 确实被触发，证明 wiring 工作）。将其标记为 `boundary` 可防止误导后续模型认为这是 runtime failure。
+- **wiring 芯片视觉语义**：`wiring` 现在与 `fail` 视觉上区分。两者都表示证明不完整，但 `wiring` 表示 "SDK options 已接受，行为未验证"（warning 级别），而 `fail` 表示 "runtime 验证尝试后失败"（error 级别）。这种视觉区分对诚实状态沟通很重要。
+
+### 验证
+
+- 全量测试：443 suites / 3374 tests passed
+- Lint：0 errors / 0 warnings
+- Typecheck：clean
+- Build：BUILD_ID=feature-phase0-capability.202605280100
+- Test Vault 运行时证明：
+  - Capability Lab matrix 中 wiring 芯片显示 warning（琥珀色）样式
+  - fail 芯片显示 error（红色）样式
+  - AskUserQuestion 探针在工具触发时显示 "Boundary hit — UI context missing" 内联标记
+
+---
+
 ## 2026-05-28 Permission / AskUserQuestion 诚实性纠正
 
 ### 目标

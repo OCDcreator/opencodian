@@ -55,7 +55,7 @@
 
 ### Runtime Proof 更新
 
-`updateRuntimeProof()` 在诊断面板执行后更新页面内嵌标记，支持四种状态：`pass`（运行时验证通过）、`fail`（运行时验证失败）、`untested`（未测试）、`wiring`（仅验证选项被 SDK 接受，未验证真实行为）。不跨标签持久化——矩阵行是静态的，运行时证明反馈只在浏览器区域展示。
+`updateRuntimeProof()` 在诊断面板执行后更新页面内嵌标记，支持五种状态：`pass`（运行时验证通过）、`fail`（运行时验证失败）、`untested`（未测试）、`wiring`（仅验证选项被 SDK 接受，未验证真实行为）、`boundary`（工具边界被触发但诊断路径缺少 UI 上下文，无法完成完整交互链）。不跨标签持久化——矩阵行是静态的，运行时证明反馈只在浏览器区域展示。
 
 ### Diagnostic Session Store
 

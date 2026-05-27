@@ -840,7 +840,7 @@ describe('SettingsCapabilityLabSection', () => {
     // Expected honest classifications for every capability row.
     // runtimeProof: 'pass' only when direct SDK smoke proof exists.
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
-    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
+    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
       Hooks: { runtimeProof: 'untested', userSurface: 'hidden' },
       'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'settings' },
       'JSONL History Browser': { runtimeProof: 'untested', userSurface: 'diagnostic' },

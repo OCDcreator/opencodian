@@ -208,6 +208,12 @@
 }
 
 .opencodian-settings .opencodian-capability-lab-chip-wiring,
+.opencodian-settings .opencodian-capability-lab-chip-boundary {
+  border-color: var(--opencodian-status-warning-border);
+  background: var(--opencodian-status-warning-subtle);
+  color: var(--opencodian-status-warning);
+}
+
 .opencodian-settings .opencodian-capability-lab-chip-fail {
   border-color: var(--opencodian-status-error-border);
   background: var(--opencodian-status-error-subtle);
@@ -360,7 +366,8 @@
   color: var(--opencodian-status-warning);
 }
 
-.opencodian-settings .opencodian-capability-lab-proof-wiring {
+.opencodian-settings .opencodian-capability-lab-proof-wiring,
+.opencodian-settings .opencodian-capability-lab-proof-boundary {
   border-color: var(--opencodian-status-warning-border);
   background: var(--opencodian-status-warning-subtle);
   color: var(--opencodian-status-warning);

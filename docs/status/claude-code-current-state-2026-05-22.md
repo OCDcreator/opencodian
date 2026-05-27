@@ -156,6 +156,41 @@ This slice corrects the Capability Lab classification for Permission Approval an
 
 ---
 
+## 2026-05-28 AskUserQuestion Boundary Classification Fix
+
+This slice fixes the AskUserQuestion diagnostic probe classification and the wiring chip visual semantics based on runtime artifact review.
+
+### What Changed
+
+- `SettingsCapabilityLabSection.ts`:
+  - `MatrixRow.runtimeProof` type expanded to include `'boundary'`
+  - `updateRuntimeProof()` parameter type expanded to include `'boundary'`
+  - `runAskUserQuestionProof()`: when the model calls AskUserQuestion (tool boundary triggered), the probe now marks `boundary` instead of `wiring`. The inline text explains that the SDK tool boundary was triggered proving wiring is functional, but the diagnostic path lacks normal chat UI context so the Obsidian question dialog was not shown. This separates "wiring proven" from "boundary hit but UI context missing"
+  - `runAskUserQuestionProof()`: when the model does NOT call AskUserQuestion, remains `wiring` (tool calling is non-deterministic)
+  - Matrix rendering: added "Boundary hit" label and chip class for `runtimeProof: 'boundary'`
+- `settings-capability-lab.css`:
+  - `.opencodian-capability-lab-chip-wiring` separated from `.opencodian-capability-lab-chip-fail`: wiring now uses warning-border styling (yellow/amber) instead of error-border styling (red)
+  - `.opencodian-capability-lab-chip-fail` retains error-border styling (red)
+  - Added `.opencodian-capability-lab-chip-boundary` with warning-border styling (same as wiring/untested)
+  - `.opencodian-capability-lab-proof-wiring` and `.opencodian-capability-lab-proof-boundary` share warning styling
+- Tests: audit test type definition updated to include `'boundary'` in runtimeProof union
+
+### Honest Assessment
+
+- **AskUserQuestion diagnostic probe boundary state**: When the model calls AskUserQuestion in a diagnostic prompt, the tool_use chunk proves the SDK option wiring is functional. However, the diagnostic `runDiagnosticPrompt` path runs outside the chat view context, so the Obsidian question dialog cannot render and no user answer can be collected. This is a **boundary state** — not a pass (no full UI interaction proved) and not a fail (the tool boundary WAS triggered, proving wiring works). Labeling this as `boundary` prevents misleading future models into thinking this is a runtime failure.
+- **Wiring chip visual semantics**: `wiring` is now visually distinct from `fail`. Both represent incomplete proof, but `wiring` means "SDK options accepted, behavior unverified" (warning level), while `fail` means "runtime verification attempted and failed" (error level). This visual distinction is important for honest status communication.
+
+### Verification
+
+- Full verify: 443 suites / 3374 tests passed, lint/typecheck/build clean (BUILD_ID=feature-phase0-capability.202605280100)
+- Module docs: SettingsCapabilityLabSection.md and settings-capability-lab.css.md updated
+- Graphify: refreshed
+- Devlog order: OK (208 sections)
+- Test Vault deployed and BUILD_ID verified (feature-phase0-capability.202605280100)
+- Runtime proof: Capability Lab matrix wiring chips show warning (amber) styling; fail chips show error (red) styling; AskUserQuestion probe when tool triggered shows "Boundary hit — UI context missing" inline marker
+
+---
+
 ## 2026-05-27 Structured Output Productization Fix
 
 This slice fixes three productization gaps discovered after the initial `/json` trigger implementation:
