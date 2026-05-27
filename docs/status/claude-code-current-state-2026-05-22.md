@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605251609`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605272022`
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -64,6 +64,163 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `9ab7b6a62b0b31410a7c444a7329933bc72af1f9` — `feat: route share-url read through backend getSession`
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
+
+## 2026-05-27 Structured Output Productization Fix
+
+This slice fixes three productization gaps discovered after the initial `/json` trigger implementation:
+
+1. **Hook text leak fixed**: `ClaudeCodeStreamNormalizer` now filters `text`/`thinking`/`tool_use` blocks from `user` type SDK messages, preventing synthetic hook feedback (e.g., "Stop hook feedback: You MUST call the StructuredOutput tool...") from leaking into visible assistant text. `tool_result` blocks are preserved because tool results still need normal routing.
+
+2. **Structured output badge now renders during streaming**: `StreamShellFinalizer` calls the new `renderStructuredOutputIfPresent()` shell port method when `LocalStreamOutcome.structuredOutput` is present. `AssistantShellViewHostAdapter` injects the collapsible structured output badge into the streaming message DOM at finalization time, so users see the badge immediately without waiting for conversation reload.
+
+3. **Schema enforcement verified**: The captured `structured_output` backend_event contains `{"response": "..."}` with the required `response` field from the fixed schema. The inner value is the model's JSON output, confirming the schema is being honored.
+
+### Runtime Evidence
+
+- Test Vault deployed build: `feature-phase0-capability.202605272152`
+- DOM assertions: `hasHook=false`, `hasBadge=true`, `hasStructuredLabel=true`
+- Console captured: `StructuredOutput` tool_use + `structured_output` backend_event with `contentLength: 40`
+- Errors: `No errors captured`
+
+### Residual Behavior
+
+- The model may still produce intermediate visible text (thinking, markdown JSON) before calling the StructuredOutput tool. This is SDK/model behavior, not a leak.
+- The fixed schema remains limited to `response` + `tags` + `confidence`.
+- `/json ` trigger remains one-shot and non-persisted.
+
+---
+
+## 2026-05-27 Structured Output Ordinary Chat Trigger (`/json`)
+
+This slice closes the stable user-facing trigger gap for Claude Code structured output in ordinary chat. Previously structured output was only accessible through the Capability Lab diagnostic probe.
+
+### What Changed
+
+- `SendPipelineRuntime.sendMessage()` now detects a `/json ` prefix (case-insensitive) before slash command interception.
+- When detected, the prefix is stripped and a fixed JSON schema is injected into `PrepareMessageSendOptions.outputFormat`.
+- `MessageSendPreparationService.prepareMessageSend()` merges the one-shot `outputFormat` into `modelOptions`.
+- `ClaudeCodeAdapter.buildSdkOptions()` extracts `outputFormat` from send-time options, with send-time taking precedence over the adapter-level default.
+- The fixed schema is intentionally simple: `{ response: string, tags: string[], confidence: number }` with only `response` required.
+
+### What This Does Not Change
+
+- This does not add arbitrary schema authoring UI or settings.
+- This does not make structured output persistent across messages; each use requires typing `/json `.
+- This does not add structured output support to OpenCode backend.
+- The Capability Lab Structured Output diagnostic probe remains unchanged and independent.
+
+### Verification
+
+- Unit tests: 6 new focused tests across SendPipelineRuntime, MessageSendPreparationService, and ClaudeCodeAdapter.
+- Full verify: pending `npm run verify`.
+
+### Honesty Boundary
+
+- The trigger is narrow by design: one fixed schema, one message at a time, explicit prefix only.
+- Users cannot customize the schema; arbitrary schema authoring remains a future capability phase.
+
+## 2026-05-27 Fallback Model Behavior Proof
+
+This slice attempts to move Fallback Model from wiring-only to behavior proof by provoking a real primary-model failure with a valid fallback model configured. The result is a classified blocker, not a pass.
+
+### What Changed
+
+- Added diagnostic-only `model?: string` override to `ClaudeCodeDiagnosticPromptRequest` and `ClaudeCodeOptionsBuilderInput`, allowing probes to specify an intentionally invalid primary model.
+- `buildDiagnosticSdkOptions()` now passes `request.model` to the options builder.
+- `runFallbackModelProof()` restructured as behavior proof: uses `model: 'opencodian-invalid-model-test-xyz123'` (intentionally invalid) + `fallbackModel: 'claude-haiku-4-5'` (valid) and inspects the result for model identity via `extractModelFromDiagnosticResult()`.
+- Honest runtime classification:
+  - `pass`: query succeeds AND detected model is NOT the invalid primary
+  - `wiring`: query succeeds but no trustworthy model signal
+  - `fail`: query fails (primary model invalid, fallback did not activate)
+
+### Runtime Evidence
+
+- Test Vault deployed build: `feature-phase0-capability.202605272022`
+- Probe execution: Capability Lab > Discovery & Status > Run Fallback Model Proof
+- SDK spawned successfully, session created: `b379504e-68ba-4879-b587-bab271e14774`
+- SDK returned: `API Error: 400 [1211][模型不存在，请检查模型代码。]` — model does not exist
+- Spawn exit code: 1 (failure)
+- Inline marker: `opencodian-capability-lab-proof-fail` ("✗ Runtime failed")
+
+### Blocker Classification
+
+- **Type**: SDK limitation
+- **Explanation**: The Claude Code SDK does NOT automatically fall back to `fallbackModel` when the primary model is invalid. The `fallbackModel` option is accepted at the options level (wiring proven) but actual fallback switching behavior was not observed under the invalid-primary-model failure mode.
+- **Implication**: Fallback Model remains `wiring`-only / `untested` for behavior. Further testing with other failure modes (rate limiting, service unavailable) would be needed to determine the true fallback trigger conditions.
+
+### Artifacts
+
+- `.obsidian-debug/fallback-model-behavior-result-20260527.json` — structured result with classification
+- `.obsidian-debug/fallback-model-behavior-console-20260527.txt` — full console output
+- `.obsidian-debug/fallback-model-behavior-errors-20260527.txt` — errors output (`No errors captured`)
+- `.obsidian-debug/probe-results-note-20260527.png` — screenshot of probe results note showing both Structured Output (pass) and Fallback Model (fail)
+
+---
+
+## 2026-05-27 Structured Output Runtime Proof
+
+This slice advances Structured Output from diagnostic-only to runtime-proven by hardening the probe and verifying it against a live Claude Code SDK session in Test Vault.
+
+### What Changed
+
+- `runStructuredOutputProbe()` now uses a more specific JSON schema (adds `confidence: number` with `minimum: 0, maximum: 1` and `enum: ['ok', 'error']` on `status`) and a stricter prompt that instructs the model to return ONLY JSON without markdown or explanations.
+- Added fallback detection: if the SDK does not emit a `structured_output` backend_event, the probe falls back to parsing the first text chunk as JSON. If the parsed JSON contains `status` and `surface` fields, the probe still marks as `pass`.
+- Added unit test for the fallback JSON detection path.
+- Updated module docs to document the dual-path detection behavior.
+
+### What This Does Not Change
+
+- This does not add a stable user-facing trigger for structured output in ordinary chat.
+- This does not add schema authoring UI or settings for custom structured output schemas.
+- The capability matrix row for Structured Output remains `diagnostic` / `untested` (static assessment); the inline proof marker updates dynamically when the probe runs.
+- This does not claim structured output authoring/triggering as a stable product surface.
+
+### Verification
+
+- Focused test: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` passed with 93 tests (including new fallback detection test).
+- Full verify: `npm run verify` passed all gates.
+- Test Vault runtime proof: BUILD_ID `feature-phase0-capability.202605271908` deployed and verified.
+- Probe execution: Clicked "Run Structured Output Probe" in Capability Lab. Session ID `176b729d-ad48-47c4-b697-33d60335c623`. Structured output captured from backend_event: `{"status":"ok","surface":"diagnostic","confidence":0.95}`. Inline marker: `opencodian-capability-lab-proof-pass` ("✓ Runtime verified").
+- No errors captured.
+
+### Remaining Blockers
+
+- **Stable trigger**: Users still cannot trigger structured output from ordinary chat; only the diagnostic probe exposes it.
+- **Schema authoring**: No UI for users to define custom JSON schemas for structured output.
+- **Multi-round consistency**: Not verified whether structured output behavior is consistent across resume/fork scenarios.
+
+---
+
+## 2026-05-27 Structured Output fallback validation tightened
+
+This slice closes a capability honesty gap: the fallback JSON detection in `runStructuredOutputProbe()` was too permissive, accepting any JSON object with `status` and `surface` fields regardless of actual values.
+
+### What Changed
+
+- `tryParseFallbackStructuredOutput()` extracted as a standalone helper to reduce `runStructuredOutputProbe()` cyclomatic complexity from 25 back to ≤20 (lint warning eliminated).
+- Fallback validation now enforces strict schema boundary:
+  - `status` must be exactly `"ok"` or `"error"` (string)
+  - `surface` must be exactly `"diagnostic"` (string)
+  - `confidence` must be a finite number within `[0, 1]`
+- Any malformed fallback JSON (out-of-range confidence, wrong status/surface values, missing required fields) now causes the probe to mark `fail` instead of `pass`.
+- Added two focused unit tests:
+  - `rejects malformed fallback JSON that violates schema boundary` — proves `confidence: 1.5` is rejected
+  - `rejects fallback JSON with wrong status or surface values` — proves `status: "partial"` / `surface: "chat"` is rejected
+- The existing success fallback test (`falls back to text-chunk JSON detection when no structured_output backend_event is emitted`) still passes with the stricter validation.
+
+### What This Does Not Change
+
+- The primary `structured_output` backend_event detection path is unchanged.
+- The schema used in the diagnostic prompt already required these fields; this change only tightens the runtime validation of the response.
+- No user-facing behavior changes outside the diagnostic probe.
+
+### Verification
+
+- Focused test: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` passed with 95 tests (was 93, +2 new rejection tests).
+- Full verify: `npm run verify` passed all gates with 0 errors, 0 warnings, 439 suites / 3329 tests.
+- BUILD_ID: `feature-phase0-capability.202605271934`.
+
+---
 
 ## 2026-05-27 Fallback Model wiring-only honesty correction
 

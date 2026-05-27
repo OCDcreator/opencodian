@@ -48,6 +48,38 @@ export interface SendPipelineSlashCommandPort {
   tryRunSlashCommand(content: string): Promise<boolean | string>;
 }
 
+/** Fixed JSON schema used for the `/json` ordinary-chat structured-output trigger. */
+const STRUCTURED_OUTPUT_FIXED_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    response: { type: 'string', description: 'The main response text' },
+    tags: { type: 'array', items: { type: 'string' } },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+  },
+  required: ['response'],
+};
+
+/**
+ * Detect the `/json ` structured-output trigger prefix.
+ * Returns the stripped content and a fixed outputFormat when the prefix is present.
+ * This is intentionally narrow: one fixed schema, one message at a time.
+ */
+function extractStructuredOutputTrigger(content: string): { cleanContent: string; outputFormat: Record<string, unknown> } | null {
+  const trimmed = content.trimStart();
+  const triggerPattern = /^\/json\s+/i;
+  if (!triggerPattern.test(trimmed)) {
+    return null;
+  }
+  const cleanContent = trimmed.replace(triggerPattern, '');
+  return {
+    cleanContent,
+    outputFormat: {
+      type: 'json_schema',
+      schema: STRUCTURED_OUTPUT_FIXED_SCHEMA,
+    },
+  };
+}
+
 export interface SendPipelineHostDependencies {
   getTabRuntimeState(tabId: import('../tabs').TabId | null): SendPipelineTabRuntime | null;
   getActiveTabId(): import('../tabs').TabId | null;
@@ -147,6 +179,13 @@ export class SendPipelineRuntime {
   async sendMessage(input: string | PrepareMessageSendOptions): Promise<void> {
     let preparationOptions = typeof input === 'string' ? { content: input } : input;
     let content = preparationOptions.content;
+
+    // Detect and strip the `/json ` structured-output trigger before any further processing.
+    const structuredTrigger = extractStructuredOutputTrigger(content);
+    if (structuredTrigger) {
+      content = structuredTrigger.cleanContent;
+      preparationOptions = { ...preparationOptions, content, outputFormat: structuredTrigger.outputFormat };
+    }
 
     if (!preparationOptions.skipSlashCommand) {
       const slashCommandResult = await this.slashCommandExecutionService?.tryRunSlashCommand(content);

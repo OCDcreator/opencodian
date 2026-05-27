@@ -16,7 +16,7 @@
 - 映射 Claude 专属 `permissionMode`、`thinking`、`effort`
 - 当 `permissionMode === 'bypassPermissions'` 时显式写入 SDK 要求的 `allowDangerouslySkipPermissions: true`
 - 将 OpenCodian UI 中的 `thinking.type === 'fixed'` 映射为官方 SDK `thinking: { type: 'enabled', budgetTokens }`
-- 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`pathToClaudeCodeExecutable`、`canUseTool`、`mcpServers`；`ClaudeCodeOptionsBuilderInput` 现在接受可选 `fallbackModel?: string` 字段，该覆盖值优先级高于 `settings.fallbackModel`
+- 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`pathToClaudeCodeExecutable`、`canUseTool`、`mcpServers`；`ClaudeCodeOptionsBuilderInput` 现在接受可选 `fallbackModel?: string` 字段，该覆盖值优先级高于 `settings.fallbackModel`；同时接受可选 `model?: string` 字段，该诊断级覆盖值优先级高于 `settings.model`，用于 Capability Lab 的 fallback behavior proof
 - 只在用户显式开启或 runtime 明确注入时写入 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`；这些是 SDK 诊断/后续能力 foundation，不等同于稳定 JSONL browser、hook authoring 或 rewind UI。`forwardSubagentText` 和 `agentProgressSummaries` 现在支持 runtime-only 覆盖，让 Capability Lab 的 subagent stream proof 可以在不污染稳定设置的情况下强制打开子代理事件流
 - 只在用户显式配置时写入 `maxTurns` 和 `maxBudgetUsd`；null 时省略，保持 SDK 默认无限行为
 - 只在 adapter 已捕获真实 Claude SDK session id 时写入 `resume`，让后续 per-send `query()` 续接同一个 Claude session

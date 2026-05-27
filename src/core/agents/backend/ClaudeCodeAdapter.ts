@@ -93,6 +93,11 @@ export interface ClaudeCodeDiagnosticPromptRequest {
   persistSession?: boolean;
   fallbackModel?: string;
   /**
+   * Diagnostic-only model override. Intentionally invalid model names may be used
+   * to provoke fallback behavior. Never leaks into ordinary chat send paths.
+   */
+  model?: string;
+  /**
    * Diagnostic resume-at only: resumes the diagnostic prompt from this SDK session id.
    * This is intentionally gated behind runDiagnosticPrompt() and must never be used
    * for ordinary chat resume. The diagnostic result is validated but not stored in
@@ -837,7 +842,12 @@ export class ClaudeCodeAdapter
       hooks: this.options.hooks,
       sessionStore: this.options.sessionStore,
       sessionStoreFlush: this.options.sessionStoreFlush,
-      outputFormat: this.options.outputFormat,
+      // One-shot structured-output trigger from ordinary chat `/json` prefix takes
+      // precedence over the adapter-level default. Diagnostic probes still use
+      // buildDiagnosticSdkOptions which has its own override path.
+      outputFormat: sendOptions?.outputFormat && typeof sendOptions.outputFormat === 'object'
+        ? sendOptions.outputFormat as Record<string, unknown>
+        : this.options.outputFormat,
       plugins: this.options.plugins,
       skills: this.options.skills,
       agent: this.options.agent,
@@ -893,6 +903,7 @@ export class ClaudeCodeAdapter
       // Intentionally separate from ordinary session resume in buildSdkOptions above.
       resumeSessionId: request.resumeSessionId,
       fallbackModel: request.fallbackModel,
+      model: request.model,
     });
   }
 

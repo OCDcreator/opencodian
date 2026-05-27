@@ -12,6 +12,235 @@
 
 ---
 
+## 2026-05-27 Structured Output Productization Fix — Hook Leak + Badge Rendering
+
+### 目标
+
+修复上一轮 `/json ` 触发路径的三个 productization 缺口：
+1. Hook 反馈文本泄漏到可见 assistant 消息
+2. Structured output badge 在流式消息中不显示
+3. 内联 `eslint-disable` 测试抑制
+
+### 变更
+
+- `ClaudeCodeStreamNormalizer.appendAssistantContentChunks()` 现在过滤 `user` 类型消息中的 `text` / `thinking` / `tool_use` 内容块，只保留 `tool_result` 块。这阻止了 SDK synthetic user 消息（如 Stop hook feedback）的文本泄漏到可见 transcript。
+- `SendPipelineShellPort` 新增 `renderStructuredOutputIfPresent(messageEl, structuredOutput)`。
+- `AssistantShellViewHostAdapter` 实现该方法，在已存在的流式 message DOM 中查找 `.opencodian-message-content` 并注入可折叠 structured output badge。
+- `StreamShellFinalizer.finalizeStreamingShell()` 在有 stream content blocks 时，追加 timestamp 后调用 `host.renderStructuredOutputIfPresent()`，使 badge 在流式消息壳体落地时即出现，无需等待消息重新渲染。
+- 测试重构：
+  - `MessageSendPreparationService.test.ts`：将 `createPromptContextItem` 移入 `.testSupport.ts`，移除 `eslint-disable max-lines`。
+  - `SendPipelineRuntime.test.ts`：提取全部 helper 到 `.testSupport.ts`，将原文件拆分为 `SendPipelineRuntime.test.ts`（4 个核心测试）、`SendPipelineRuntime.structuredOutput.test.ts`（3 个结构化输出测试）、`SendPipelineRuntime.followUp.test.ts`（2 个 follow-up 测试）、`SendPipelineRuntime.transport.test.ts`（2 个 transport 测试），移除全部 `eslint-disable` 抑制。
+
+### 验证
+
+- 全量测试：442 suites / 3336 tests passed
+- Lint：0 errors / 0 warnings（无内联抑制）
+- Typecheck：clean
+- Module docs：4 个文件已更新
+- Graphify：已刷新
+- Build：BUILD_ID=feature-phase0-capability.202605272152
+- Test Vault 运行时证明：
+  - Hook 文本泄漏：`hasHook=false`（已修复）
+  - Structured output badge：`hasBadge=true`, `hasStructuredLabel=true`（已修复）
+  - Schema 强制：`structuredOutputCodeText` 包含 `"response": "..."`（verified）
+  - Console 捕获到 `StructuredOutput` tool_use + `structured_output` backend_event
+  - Errors：`No errors captured`
+
+### 诚实边界
+
+- 模型仍可能在调用 StructuredOutput 工具前产生中间可见文本（如思考过程、markdown JSON）。这是 SDK/model 行为，不是泄漏。
+- 固定 schema 仍然只支持 `response` + `tags` + `confidence`，无任意 schema 创作。
+- `/json ` 触发仍然是一次性、不持久化。
+
+---
+
+## 2026-05-27 Structured Output Ordinary Chat Trigger (`/json`)
+
+### 目标
+
+关闭 Claude Code 结构化输出在普通聊天路径中的触发缺口。此前结构化输出只在 Capability Lab 诊断探针中暴露，用户无法在常规对话中使用。本轮通过 `/json ` 前缀触发实现最 honest、最小的稳定用户表面。
+
+### 选择理由
+
+- **最小表面**: `/json ` 前缀不需要新增 UI chrome、按钮、设置项或 schema 编辑器
+- **显式触发**: 用户必须主动输入前缀，不会意外触发
+- **一次性**: 只影响当前消息，不持久化
+- **诚实边界**: 只支持一个固定 schema，不暗示任意 schema 创作已完成
+- **backend 安全**: 前缀在 `tryRunSlashCommand` 之前被剥离，不会与 OpenCode slash command 基础设施冲突；OpenCode backend 会忽略未知的 `outputFormat` option
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/chat/runtime/SendPipelineRuntime.ts` | 功能 | 新增 `extractStructuredOutputTrigger()`  helper 和 `STRUCTURED_OUTPUT_FIXED_SCHEMA`；`sendMessage()` 在 slash command 拦截前检测 `/json ` 前缀，剥离前缀并将固定 schema 注入 `preparationOptions.outputFormat` |
+| `src/features/chat/services/MessageSendPreparationService.ts` | 类型扩展 | `SendMessageModelOptions` 和 `PrepareMessageSendOptions` 新增 `outputFormat?: Record<string, unknown>`；`prepareMessageSend()` 将 send-time `outputFormat` 合并进 `modelOptions` |
+| `src/features/chat/runtime/SendPipelineTypes.ts` | 类型扩展 | `sendStreamMessage` options 显式声明 `outputFormat?: Record<string, unknown>` |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 功能 | `buildSdkOptions()` 从 `sendOptions` 提取 `outputFormat`，send-time 值优先于 adapter 级别默认值 |
+| `tests/unit/features/chat/SendPipelineRuntime.test.ts` | 新增测试 | 2 个测试：检测 `/json` 前缀并剥离、不检测无空格的 `/jsontext` |
+| `tests/unit/features/chat/MessageSendPreparationService.test.ts` | 新增测试 | 2 个测试：`outputFormat` 合并到 `modelOptions`、无 `outputFormat` 时不污染 `modelOptions` |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 新增测试 | 2 个测试：send-time `outputFormat` 进入 SDK options、send-time 优先于 adapter 级别默认值 |
+| `docs/modules/features/chat/runtime/SendPipelineRuntime.md` | 文档 | 新增 "结构化输出触发（`/json`）" 章节 |
+| `docs/modules/features/chat/services/MessageSendPreparationService.md` | 文档 | 记录 `outputFormat` 合并行为 |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 文档 | 记录 send-time `outputFormat` 覆盖优先级 |
+
+### 固定 Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "response": { "type": "string", "description": "The main response text" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "required": ["response"]
+}
+```
+
+### 验证
+
+- 聚焦测试：`npm test -- --runInBand tests/unit/features/chat/SendPipelineRuntime.test.ts tests/unit/features/chat/MessageSendPreparationService.test.ts tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` → 130 passed
+- 全量验证：待 `npm run verify`
+
+### 诚实性边界
+
+- 这**不是**任意 schema 创作 UI；用户无法自定义 JSON schema
+- 这**不是**持久设置；每次使用都必须重新输入 `/json `
+- 这**不是**跨 backend 功能；目前只有 Claude Code adapter 会消费 `outputFormat`
+- Capability Lab 的 Structured Output 诊断探针仍然独立存在，提供与固定 schema 不同的诊断级 schema
+
+### 剩余阻塞
+
+- **任意 schema 创作**: 无 UI 支持，属于后续 full-capability phase
+- **Fallback Model 行为**: SDK 在主模型无效时不会自动 fallback，仍为 `wiring`-only / `untested`
+
+---
+
+## 2026-05-27 Fallback Model Behavior Proof — SDK Does Not Fall Back on Invalid Primary
+
+### 目标
+
+推进 Fallback Model 从 wiring-only 向 behavior proof 迈进。通过使用故意无效的主模型名称配合有效 fallback 模型运行诊断探针，验证 Claude Code SDK 是否会在主模型失败时自动切换到 fallback 模型。
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts` | 功能 | `ClaudeCodeOptionsBuilderInput` 新增 `model?: string` 字段，诊断级覆盖值优先级高于 `settings.model` |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 功能 | `ClaudeCodeDiagnosticPromptRequest` 新增 `model?: string` 字段；`buildDiagnosticSdkOptions()` 透传 `request.model` 到 options builder |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 重构 | `runFallbackModelProof()` 重构为 behavior proof：使用 `model: 'opencodian-invalid-model-test-xyz123'`（故意无效）+ `fallbackModel: 'claude-haiku-4-5'`（有效）运行诊断 prompt；新增 `extractModelFromDiagnosticResult()` 辅助方法从 chunks/rawMessages 中提取模型标识；根据运行时证据诚实分类：检测到非无效模型且查询成功 → `pass`，查询成功但无模型信号 → `wiring`，查询失败 → `fail` |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 测试 | 重写 fallback model 测试：新增 behavior proof pass 路径（检测到 fallback 模型）、wiring-only 路径（无模型信号）、保留 fail 路径 |
+| `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` | 文档 | 记录 diagnostic model override 和 behavior proof 逻辑 |
+| `docs/modules/core/agents/backend/ClaudeCodeOptionsBuilder.md` | 文档 | 记录 `model` 诊断覆盖字段 |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 文档 | 更新 `runFallbackModelProof()` 和 Fallback Model proof 诚实性边界描述 |
+
+### 运行时验证
+
+- **BUILD_ID**: `feature-phase0-capability.202605272022`
+- **Test Vault 部署**: BUILD_ID 已确认写入 deployed main.js
+- **探针执行**: Capability Lab > Discovery & Status > 点击 "Run Fallback Model Proof"
+- **结果**: `✗ Runtime failed`
+- **SDK 错误**: `API Error: 400 [1211][模型不存在，请检查模型代码。]` — 主模型无效时 SDK 直接返回 400 错误，未触发 fallback 切换
+- **spawn exit code**: 1（失败）
+- **sessionId**: `b379504e-68ba-4879-b587-bab271e14774`
+- **诚实分类**: `fail` — SDK 不接受无效主模型时自动 fallback
+
+### 阻塞分析
+
+- **阻塞类型**: SDK limitation
+- **阻塞说明**: Claude Code SDK 在当前版本下，当主模型无效时不会自动切换到 `fallbackModel`。`fallbackModel` 选项只在 wiring 层面被接受，但实际 fallback switching 行为在当前测试条件下未触发。
+- **下一步**: 需要确认 `fallbackModel` 的触发条件。可能只在主模型过载/限流等特定场景下触发，而非模型名称无效场景。需要进一步测试其他失败模式（如网络超时、服务不可用）才能确认 fallback 的真实行为边界。
+
+### 验证
+
+- 聚焦测试：`npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts` → 213 passed
+- 全量验证：`npm run verify` → 0 errors, 0 warnings, 439 suites / 3330 tests passed
+- BUILD_ID: `feature-phase0-capability.202605272022`
+
+---
+
+## 2026-05-27 Structured Output Fallback Validation Tightened
+
+### 目标
+
+收紧 Structured Output 诊断探针的 fallback JSON 回退检测，使其诚实反映 schema 边界。之前的 fallback 只检查 JSON 包含 `status` 和 `surface` 字段，过于宽松，可能接受任何值。
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 重构 | 提取 `tryParseFallbackStructuredOutput()` helper，将 fallback 解析与验证逻辑移出 `runStructuredOutputProbe()`；fallback 验证现在要求 `status` 必须是 `"ok"` 或 `"error"`、`surface` 必须是 `"diagnostic"`、`confidence` 必须是 `[0,1]` 范围内的有限数字 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 新增测试 | 新增两个 rejection 测试：验证 `confidence: 1.5` 和 `status: "partial"` / `surface: "chat"` 的 malformed JSON 会被正确拒绝并标记 fail |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 文档更新 | 记录 stricter fallback schema 边界和 `tryParseFallbackStructuredOutput()` helper |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 添加 "Structured Output fallback validation tightened" section |
+
+### 验证
+
+- **Focused test**: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` → 95 passed（+2 新 rejection 测试）
+- **Full verify**: `npm run verify` → 0 errors, 0 warnings, 439 suites / 3329 tests passed
+- **BUILD_ID**: `feature-phase0-capability.202605271934`
+
+### 诚实性边界
+
+- fallback 检测的收紧不改变 primary backend_event 路径；它只确保当 SDK 不 emit `structured_output` backend_event 时，text chunk 中的 JSON 必须真正满足 schema 才能被接受。
+- 这防止了探针因接受任意 malformed JSON 而虚假标记 pass。
+
+---
+
+## 2026-05-27 Structured Output Runtime Proof and Probe Hardening
+
+### 目标
+
+推进 Claude Code 结构化输出能力从 diagnostic-only 向 runtime-proven 状态迈进。结构化输出是整个 Claude Code 能力管道中渲染/持久化已稳定、仅触发仍为诊断的缺口。本轮通过增强诊断探针鲁棒性（双路径检测）并在 Test Vault 中运行真实验证，拿到端到端运行时证据。
+
+### 选择理由
+
+在 Capability Lab 所有 runtime-only / no authoring UI / discovery only 的项中，Structured Output 具备最完整的产品化基础：
+1. SDK options 已接线（`outputFormat` → `buildSdkOptions`）
+2. 流捕获已稳定（`ClaudeCodeStreamNormalizer` 识别 `structured_output` → `StreamChunkRouter` 捕获 → `LocalStreamMessagePersistence` 持久化）
+3. 聊天渲染已稳定（`AssistantShellViewHostAdapter` 显示 "Structured Output" 标签）
+4. 唯一缺口是 authoring/triggering 仍只在诊断面板中暴露
+
+### 变更
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 探针增强 | `runStructuredOutputProbe()` 改进：更具体的 JSON schema（增加 `confidence` number 字段和 `enum` 约束），prompt 明确指示模型只返回 JSON 不附带解释文本；新增 fallback 检测路径：若 SDK 未 emit `structured_output` backend_event，则回退检测 text chunk 中的合法 JSON，只要包含 `status` 和 `surface` 字段即视为通过 |
+| `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` | 新增测试 | 新增 fallback JSON 检测测试：模拟无 backend_event 但 text chunk 含合法 JSON 的场景，验证探针正确识别并通过 |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 文档更新 | 记录结构化输出探针的双路径检测行为（backend_event 首选 + text JSON 回退） |
+| `graphify-out/` | 图谱 | `npm run graphify:update:src` 刷新 |
+
+### 运行时验证
+
+- **BUILD_ID**: `feature-phase0-capability.202605271908`
+- **Test Vault 部署**: BUILD_ID 已确认写入 deployed main.js
+- **探针执行**: Capability Lab > Structured Output Playground > 点击 "Run Structured Output Probe"
+- **结果**: sessionId=`176b729d-ad48-47c4-b697-33d60335c623`，从 backend_event 通道捕获结构化输出：`{"status":"ok","surface":"diagnostic","confidence":0.95}`
+- **证明标记**: `opencodian-capability-lab-proof-pass` — "✓ Runtime verified"
+- **错误**: `obsidian dev:errors vault=testvault` → "No errors captured."
+- **截图**: `.obsidian-debug/structured-output-proof-20260527.png`
+- **结果 JSON**: `.obsidian-debug/structured-output-proof-20260527-result.json`
+
+### 验证结果
+
+- `npm run verify` → owner-guard PASS、module-docs OK、graphify OK、devlog-order OK、lint clean、typecheck clean、439 suites / 3327 tests passed、build success（BUILD_ID=feature-phase0-capability.202605271908）。
+- 聚焦测试：`npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` → 93 passed（含新增 fallback 检测测试）。
+
+### 诚实性边界
+
+- 本轮证明的是 **outputFormat 选项被 SDK 接受且 structured_output backend_event 被正确捕获和解析** 的端到端管道行为。
+- 结构化输出的 **transcript 渲染和持久化** 在此前已完成并稳定。
+- **authoring/triggering** 仍只在 Capability Lab 诊断面板中暴露，普通聊天 UI 尚未提供用户触发结构化输出的稳定路径。
+- 探针的 fallback 检测（text chunk JSON 解析）是对 SDK 行为差异的鲁棒性补充，不降低证明标准：只要模型按 schema 返回了结构化数据，无论通过 backend_event 还是 text，都证明 outputFormat wiring 工作正常。
+
+### 剩余阻塞
+
+- **普通聊天路径触发**: 用户仍需通过 Capability Lab 诊断面板触发结构化输出，没有设置项或聊天命令可以让普通用户在常规对话中使用 structured output。
+- **Schema authoring UI**: 用户无法自定义 structured output 的 JSON schema，只能使用诊断探针的硬编码 schema。
+- **多轮对话中的 structured output**: 未验证在 resume/fork 等场景中 structured output 行为是否一致。
+
+---
+
 ## 2026-05-27 Fix Blank Screenshot and Settings Tab Content Leak
 
 ### 目标

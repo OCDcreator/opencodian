@@ -17,6 +17,18 @@
 
 它不是一个“小 helper”，而是发送子系统的总入口；`OpenCodianView` 现在只保留 host 装配与桥接。
 
+## 结构化输出触发（`/json`）
+
+`SendPipelineRuntime.sendMessage()` 在真正处理 slash command 和 preparation 之前，会先检测内容中的 `/json ` 前缀（不区分大小写）。如果检测到：
+
+- 前缀被剥离，剩余内容进入正常的 preparation / stream 路径
+- 一个固定的 JSON schema（`STRUCTURED_OUTPUT_FIXED_SCHEMA`）被注入到 `PrepareMessageSendOptions.outputFormat`
+- 该 schema 通过 `PreparedMessageSend.modelOptions` 进入 `sendStreamMessage` options，最终到达 `ClaudeCodeAdapter.buildSdkOptions()`
+- 触发是**一次性的**：只影响当前这条消息，不会持久化到设置或影响后续发送
+- 前缀剥离发生在 `tryRunSlashCommand` 之前，因此 slash command 服务看到的是已剥离的内容，不会把 `/json` 误判为未知 slash command
+
+这是结构化输出在普通聊天路径中的最 honest、最小表面触发方式：不新增 UI chrome，不暴露 schema 编辑，只提供一个显式前缀触发。当前只支持 Claude Code backend；OpenCode backend 会忽略未知的 `outputFormat` option。
+
 ## 公开接口
 
 ```typescript

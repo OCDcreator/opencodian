@@ -334,6 +334,70 @@ describe('ClaudeCodeAdapter', () => {
     }));
   });
 
+  it('passes one-shot outputFormat from send options into the Claude Code SDK query options', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-structured',
+        content: [{ type: 'text', text: '{"response":"hi"}' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+    const outputFormat = {
+      type: 'json_schema',
+      schema: {
+        type: 'object',
+        properties: { response: { type: 'string' } },
+        required: ['response'],
+      },
+    };
+
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'hello',
+      options: {
+        provider: 'claude-code',
+        outputFormat,
+      },
+    }));
+
+    expect(sdk.query.mock.calls[0][0].options).toEqual(expect.objectContaining({
+      outputFormat,
+    }));
+  });
+
+  it('prefers send-time outputFormat over adapter-level outputFormat', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-structured-override',
+        content: [{ type: 'text', text: '{"response":"hi"}' }],
+      },
+    }]);
+    const adapterLevelFormat = { type: 'json_schema', schema: { type: 'object' } };
+    const sendTimeFormat = { type: 'json_schema', schema: { type: 'object', properties: { a: { type: 'string' } } } };
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+      outputFormat: adapterLevelFormat,
+    });
+    const sessionId = await adapter.createSession();
+
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'hello',
+      options: { outputFormat: sendTimeFormat },
+    }));
+
+    expect(sdk.query.mock.calls[0][0].options.outputFormat).toEqual(sendTimeFormat);
+  });
+
   it('starts a fresh resumed SDK query when composer effort changes', async () => {
     const sdkOutputs = [
       createAsyncQueue<unknown>(),

@@ -25,6 +25,7 @@ export async function finalizeStreamingShell(options: {
       modelId: outcome.finalizedModelId,
       statusLabel: outcome.shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
     });
+    host.renderStructuredOutputIfPresent(messageEl, outcome.structuredOutput);
     return 'timestamp-added';
   }
 

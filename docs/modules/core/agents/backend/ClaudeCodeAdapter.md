@@ -32,6 +32,7 @@
 - 接收 composer per-send `options.model` 与 `options.variant`，在 SDK query options 中映射为 Claude Code `model` 与 `effort`；若同一持久 query 仍活跃且仅 model 变化，model 会通过 `Query.setModel()` 尝试 live 更新；若 effort 变化，则关闭旧 query 并用已捕获的 SDK session id 重新启动 resumed query，确保下一轮发送应用新的 effort
 - 将 SDK `onElicitation` callback 注入 options，生产 host 会把 elicitation 转成 OpenCodian question flow 的统一交互入口
 - 将 runtime-only `hooks`、`sessionStore` / `sessionStoreFlush`、`outputFormat`、`plugins`、`skills`、`agent` 和 `agents` 注入 options builder；这些字段只允许由 backend runtime/诊断 owner 传入，不会保存到用户设置，也不会让 settings UI 宣称 hooks/skills/agent authoring 已完成
+- `buildSdkOptions()` 现在支持 send-time `outputFormat` 覆盖：如果 `sendOptions.outputFormat` 存在且为对象，则优先使用 send-time 值，否则回退到 adapter 级别的 `this.options.outputFormat`。这使普通聊天路径的 `/json` 一次性触发能正确覆盖诊断/实验性的默认 schema
 - 将自定义 `abortController` 和 `spawnClaudeCodeProcess` 注入 SDK options，绕开 Obsidian/Electron renderer 对 `child_process.spawn({ signal })` 的 `AbortSignal` 兼容问题
 - 支持 `cancelStream()`、`stop()`、`dispose()` 的本地取消和资源清理
 - 将 SDK stream 异常转换为 backend-labelled error chunk，避免发送管线无响应
@@ -49,8 +50,9 @@
 - `buildSdkOptions` 在构造完 SDK options 后记录 `buildSdkOptions tool config` 日志，包含 `allowedToolCount`、`disallowedToolCount`、`allowedTools` 和 `disallowedTools`，用于在运行时验证工具策略是否进入 SDK query 选项
 - `buildSdkOptions` 同时记录 `buildSdkOptions limits config` 日志，包含 `maxTurns` 和 `maxBudgetUsd`（未设置时为 `null`），用于在运行时验证限制项是否进入 SDK query 选项
 - `buildSdkOptions` 还记录 `buildSdkOptions fallback model` 日志，包含 `fallbackModel` 值（未设置时为 `null`），用于在运行时验证 fallback model 是否进入 SDK query 选项
-- `ClaudeCodeDiagnosticPromptRequest` 接口现在接受可选 `fallbackModel?: string` 字段，允许 Capability Lab 诊断探针在运行诊断 prompt 时覆盖 fallback model
-- `buildDiagnosticSdkOptions()` 将 `request.fallbackModel` 透传到 options builder，用于诊断级的 fallback model 覆盖验证
+- `ClaudeCodeDiagnosticPromptRequest` 接口现在接受可选 `fallbackModel?: string` 字段，允许 Capability Lab 诊断探针在运行诊断 prompt 时覆盖 fallback model；同时接受可选 `model?: string` 字段，允许诊断探针使用故意无效的主模型名称来触发 fallback 行为验证
+- `buildDiagnosticSdkOptions()` 将 `request.fallbackModel` 和 `request.model` 透传到 options builder，用于诊断级的模型覆盖验证
+- `runFallbackModelProof()` 现在使用故意无效的主模型（`opencodian-invalid-model-test-xyz123`）配合有效 fallback 模型运行诊断 prompt，通过检查返回的 `message_metadata` chunk 中的 `modelId` 来诚实判断 SDK 是否真的发生了 fallback 切换；只有在检测到查询成功且使用的模型不是无效主模型时，才会标记为 `pass`，否则保持 `wiring` 或标记 `fail`
 
 ## 维护约束
 

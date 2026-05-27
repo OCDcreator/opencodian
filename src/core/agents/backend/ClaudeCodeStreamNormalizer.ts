@@ -570,6 +570,7 @@ export class ClaudeCodeStreamNormalizer {
     sessionId: string | undefined,
   ): void {
     const blocks = resolveContentBlocks(record);
+    const isUserMessage = readString(record.type) === 'user';
     blocks.forEach((rawBlock, index) => {
       const block = readRecord(rawBlock);
       if (!block) {
@@ -577,6 +578,9 @@ export class ClaudeCodeStreamNormalizer {
       }
 
       if (isTextBlock(block)) {
+        if (isUserMessage) {
+          return;
+        }
         const key = resolveBlockKey(record, block, index, 'text');
         const text = readString(block.text) ?? '';
         const content = this.takeSuffix(this.state.textLengths, key, text);
@@ -587,6 +591,9 @@ export class ClaudeCodeStreamNormalizer {
       }
 
       if (isThinkingBlock(block)) {
+        if (isUserMessage) {
+          return;
+        }
         const key = resolveBlockKey(record, block, index, 'thinking');
         const thinking = readString(block.thinking) ?? '';
         const content = this.takeSuffix(this.state.thinkingLengths, key, thinking);
@@ -601,6 +608,9 @@ export class ClaudeCodeStreamNormalizer {
       }
 
       if (isToolUseBlock(block)) {
+        if (isUserMessage) {
+          return;
+        }
         this.appendToolUseChunk({
           record,
           block,

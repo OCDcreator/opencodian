@@ -1,9 +1,6 @@
 import type {
   PromptRequestPart,
 } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
-import type {
-  PromptContextItem,
-} from '../../../../src/core/types';
 import {
   buildOptimisticUserMessage,
   MessageSendPreparationService,
@@ -12,21 +9,9 @@ import {
   createComposerSendContext,
   createConversation,
   createHost,
+  createPromptContextItem,
   createStructuredSendPayload,
 } from './MessageSendPreparationService.testSupport';
-
-function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
-  return {
-    id: 'context-1',
-    kind: 'selection',
-    path: 'notes/example.md',
-    label: 'example.md:1-3',
-    mime: 'text/markdown',
-    lineRange: { startLine: 1, endLine: 3 },
-    textSnapshot: 'Selected text',
-    ...overrides,
-  };
-}
 
 describe('buildOptimisticUserMessage', () => {
   it('builds a user message with context attachments', () => {
@@ -195,6 +180,29 @@ describe('MessageSendPreparationService', () => {
     expect(result).not.toBeNull();
     expect(host.applyFallbackConversationTitle).not.toHaveBeenCalled();
     expect(host.startAiConversationTitleGeneration).not.toHaveBeenCalled();
+  });
+
+  it('merges one-shot outputFormat into modelOptions when provided', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const outputFormat = { type: 'json_schema', schema: { type: 'object' } };
+
+    const result = await service.prepareMessageSend({ content: 'Hello', outputFormat });
+
+    expect(result).not.toBeNull();
+    expect(result?.modelOptions).toEqual(expect.objectContaining({ outputFormat }));
+  });
+
+  it('does not add outputFormat to modelOptions when not provided', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'Hello' });
+
+    expect(result).not.toBeNull();
+    expect(result?.modelOptions).not.toHaveProperty('outputFormat');
   });
 });
 

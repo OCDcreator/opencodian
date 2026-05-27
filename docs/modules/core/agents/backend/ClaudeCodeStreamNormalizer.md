@@ -19,6 +19,7 @@
 - 为 Claude tool chunk 写入 `toolMetadata.source = 'claude-code'`，并保留 session/tool id 供后续 UI 与 permission bridge 使用
 - 复用通用 tool identity 规则识别 Claude built-in、MCP、question、plan、task 等工具 kind
 - 将 SDK `hook_started` / `hook_progress` / `hook_response`、`task_started` / `task_progress` / `task_notification` / `task_updated`、`tool_progress` 和 result `structured_output` 映射为 `backend_event` 诊断 chunk，供日志和后续实验 UI 使用
+- 过滤 `user` 类型消息中的 `text` / `thinking` / `tool_use` 内容块，防止 hook 反馈或 synthetic user 文本泄漏到可见 assistant transcript；保留 `user` 消息中的 `tool_result` 块，因为工具结果仍需要正常路由
 - 只把包含 input/output/reasoning token 计数字段的 usage 形状映射为主 `usage` chunk，避免把 subagent `usage.total_tokens` 误写进上下文用量
 - 通过 `claudeCode` debug module 的 `stream` channel 记录 SDK message summary 与产出 chunk summary，覆盖 text、thinking、tool_use、tool_result、backend_event、usage、error、message_metadata；日志跳过无 chunk 消息，并用 fingerprint 节流相同形状的高频 delta summary，只保留 type/subtype/session/message id、content length、metadata keys 和 counts，不记录文本全文、tool input 全文或 message metadata 的 model id
 

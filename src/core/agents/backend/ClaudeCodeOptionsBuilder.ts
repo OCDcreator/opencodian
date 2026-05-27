@@ -59,6 +59,8 @@ export interface ClaudeCodeOptionsBuilderInput {
   spawnClaudeCodeProcess?: ClaudeCodeSpawnClaudeCodeProcess;
   resumeSessionId?: string;
   fallbackModel?: string;
+  /** Diagnostic-only model override. Takes precedence over settings.model. */
+  model?: string;
 }
 
 export interface ClaudeCodeSdkOptionsShape {
@@ -141,7 +143,8 @@ export function buildClaudeCodeOptions(
     options.allowDangerouslySkipPermissions = true;
   }
 
-  const model = trimOptionalString(input.settings.model);
+  const model = trimOptionalString(input.model)
+    ?? trimOptionalString(input.settings.model);
   if (model) {
     options.model = model;
   }

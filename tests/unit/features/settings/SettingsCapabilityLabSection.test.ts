@@ -943,6 +943,118 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('"status":"ok"');
   });
 
+  it('falls back to text-chunk JSON detection when no structured_output backend_event is emitted', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-structured-fallback-1',
+        rawMessages: [],
+        chunks: [
+          {
+            type: 'text',
+            source: 'claude-code',
+            content: '{"status":"ok","surface":"diagnostic","confidence":0.95}',
+          },
+        ],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Structured Output Probe')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('diag-structured-fallback-1');
+    expect(containerEl.textContent).toContain('valid JSON was detected in the text response');
+    expect(containerEl.textContent).toContain('confidence');
+    const marker = containerEl.querySelector('.opencodian-capability-lab-proof-pass');
+    expect(marker).toBeTruthy();
+  });
+
+  it('rejects malformed fallback JSON that violates schema boundary', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-structured-fallback-bad',
+        rawMessages: [],
+        chunks: [
+          {
+            type: 'text',
+            source: 'claude-code',
+            content: '{"status":"ok","surface":"diagnostic","confidence":1.5}',
+          },
+        ],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Structured Output Probe')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('diag-structured-fallback-bad');
+    expect(containerEl.textContent).toContain('no structured_output backend_event or parseable JSON');
+    const failMarker = containerEl.querySelector('.opencodian-capability-lab-proof-fail');
+    expect(failMarker).toBeTruthy();
+    const passMarker = containerEl.querySelector('.opencodian-capability-lab-proof-pass');
+    expect(passMarker).toBeFalsy();
+  });
+
+  it('rejects fallback JSON with wrong status or surface values', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-structured-fallback-wrong-values',
+        rawMessages: [],
+        chunks: [
+          {
+            type: 'text',
+            source: 'claude-code',
+            content: '{"status":"partial","surface":"chat","confidence":0.5}',
+          },
+        ],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Structured Output Probe')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('diag-structured-fallback-wrong-values');
+    const failMarker = containerEl.querySelector('.opencodian-capability-lab-proof-fail');
+    expect(failMarker).toBeTruthy();
+    const passMarker = containerEl.querySelector('.opencodian-capability-lab-proof-pass');
+    expect(passMarker).toBeFalsy();
+  });
+
   it('runs the SessionStart hook proof from the discovery panel', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
@@ -1158,16 +1270,22 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
-  it('marks Fallback Model as wiring-only when diagnostic prompt completes with fallbackModel option', async () => {
+  it('marks Fallback Model as pass when invalid primary fails and fallback model is detected', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn().mockResolvedValue({
         sessionId: 'diag-fallback-1',
         rawMessages: [],
-        chunks: [{
-          type: 'text',
-          content: 'fallback model proof',
-        }],
+        chunks: [
+          {
+            type: 'message_metadata',
+            modelId: 'claude-haiku-4-5',
+          },
+          {
+            type: 'text',
+            text: 'fallback model proof',
+          },
+        ],
       }),
       capabilities: new Set(),
     };
@@ -1187,11 +1305,47 @@ describe('SettingsCapabilityLabSection', () => {
     await flushUi();
 
     expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'opencodian-invalid-model-test-xyz123',
       fallbackModel: 'claude-haiku-4-5',
       persistSession: false,
     }));
-    expect(containerEl.textContent).toContain('fallbackModel="claude-haiku-4-5"');
-    expect(containerEl.textContent).toContain('The SDK accepted the fallbackModel option');
+    expect(containerEl.textContent).toContain('Invalid primary: "opencodian-invalid-model-test-xyz123"');
+    expect(containerEl.textContent).toContain('SDK reported model: "claude-haiku-4-5"');
+    const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-wiring')).toBe(false);
+  });
+
+  it('marks Fallback Model as wiring-only when text output exists but no model is detected', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-fallback-1',
+        rawMessages: [],
+        chunks: [{
+          type: 'text',
+          text: 'fallback model proof',
+        }],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fallback Model Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('no trustworthy runtime signal confirms which model was used');
     const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-wiring')).toBe(true);

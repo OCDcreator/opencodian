@@ -99,6 +99,7 @@ export function createMessageSendPreparationHost(
 
 - OpenCode 与 Claude Code conversation 都会走 model catalog preparation，确保 composer 选择的 model / effort 在 stream transport 前成为 `PreparedMessageSend.modelOptions`
 - Claude Code 的 `modelOptions.variant` 表示 Claude Code effort，不再依赖 OpenCode provider model variants
+- `PrepareMessageSendOptions.outputFormat` 允许 send pipeline 为单条消息注入结构化输出 schema；`prepareMessageSend()` 会在构造完 `modelOptions` 后将其合并进去，使该 schema 能随 `sendStreamMessage` options 到达 backend adapter
 - 其他未接入 model capability 的 backend 仍可通过 host `shouldUseModelCatalog()` 保持跳过
 
 ### stream 进入点

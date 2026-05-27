@@ -5,12 +5,26 @@ import type {
 import type {
   ChatMessage,
   Conversation,
+  PromptContextItem,
 } from '../../../../src/core/types';
 import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
 import {
   type MessageSendPreparationHost,
   type MessageSendPreparationHostDependencies,
 } from '../../../../src/features/chat/services/MessageSendPreparationService';
+
+export function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
+  return {
+    id: 'context-1',
+    kind: 'selection',
+    path: 'notes/example.md',
+    label: 'example.md:1-3',
+    mime: 'text/markdown',
+    lineRange: { startLine: 1, endLine: 3 },
+    textSnapshot: 'Selected text',
+    ...overrides,
+  };
+}
 
 export function createConversation(messages: ChatMessage[] = []): Conversation {
   return {

@@ -43,6 +43,8 @@ export interface SendMessageModelOptions {
   provider?: string;
   model?: string;
   variant?: string;
+  /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
+  outputFormat?: Record<string, unknown>;
 }
 
 export type ComposerInputMode = 'prompt' | 'shell';
@@ -83,6 +85,8 @@ export interface PrepareMessageSendOptions {
   invocationIntent?: SurfaceInvocationIntent;
   targetTabId?: TabId;
   skipSlashCommand?: boolean;
+  /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
+  outputFormat?: Record<string, unknown>;
 }
 
 export interface PreparedMessageSend {
@@ -337,6 +341,10 @@ export class MessageSendPreparationService {
     const modelOptions = usesModelCatalog ? await this.prepareModelOptions(tabId) : {};
     if (!modelOptions) {
       return null;
+    }
+    // Merge one-shot structured-output trigger into model options for this send only.
+    if (options.outputFormat) {
+      modelOptions.outputFormat = options.outputFormat;
     }
     const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);

@@ -89,6 +89,8 @@ export interface SendPipelineTransportPort {
       contextItems: PromptContextItem[];
       messageID: PreparedMessageSend['messageID'];
       requestParts: PreparedMessageSend['requestParts'];
+      /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
+      outputFormat?: Record<string, unknown>;
     },
   ): AsyncGenerator<CoreStreamChunk>;
   detachStream(sessionId: string | undefined): void;
@@ -130,6 +132,10 @@ export interface SendPipelineShellPort {
     modelId?: string;
     statusLabel?: string;
   }): void;
+  renderStructuredOutputIfPresent(
+    messageEl: HTMLElement,
+    structuredOutput: unknown,
+  ): void;
 }
 
 export interface SendPipelinePersistencePort {
@@ -191,7 +197,7 @@ export type StreamChunkRouterHost =
 
 export type StreamShellFinalizerHost = Pick<
   SendPipelineShellPort,
-  'addTimestampWithCopyButton' | 'renderAssistantPlaceholderAsNotice'
+  'addTimestampWithCopyButton' | 'renderAssistantPlaceholderAsNotice' | 'renderStructuredOutputIfPresent'
 >;
 
 export type LocalStreamPersistenceHost =

@@ -17,7 +17,7 @@
 | JSONL History Browser | 浏览本地 JSONL 或 diagnostic store 会话历史，支持 import / mirror proof | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` / `runDiagnosticPrompt()` |
 | Subagent Browser | 列出/检查子代理转录 | `adapter.listSubagents()` / `getSubagentMessages()` |
 | Rewind Dry-Run Preview | 预览文件检查点回退（不执行） | `adapter.rewindFiles(dryRun: true)` |
-| Structured Output Playground | 启动 runtime-only outputFormat probe 并展示 `backend_event` | `adapter.runDiagnosticPrompt()` |
+| Structured Output Playground | 启动 runtime-only outputFormat probe 并展示 `backend_event`；探针支持双路径检测：首选 `structured_output` backend_event，若无则回退检测 text chunk 中的合法 JSON | `adapter.runDiagnosticPrompt()` |
 | Fork Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并执行 fork，输出分叉后的 session ID 和标题 | `adapter.listSessions()` / `adapter.forkSession()` |
 | Resume Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并以 `resumeSessionId` 运行诊断 prompt；只有 resulting session id 等于请求的 source session id 时才标 pass，并输出文本预览 | `adapter.listSessions()` / `adapter.runDiagnosticPrompt({ resumeSessionId })` |
 | Session Detail Inspection | Provider-owned 诊断探针：选择一个 Claude 会话并调用 `getSession()`，输出 raw session 字段（sessionId, summary, lastModified, messageCount 等）| `adapter.listSessions()` / `adapter.getSession()` |
@@ -94,7 +94,7 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 | `renderSessionDetailProbe()` | 渲染 Session Detail 诊断探针（provider-owned, diagnostic only） |
 | `renderBackendRoutingProbe()` | 渲染 Backend Routing 诊断探针（provider-owned, diagnostic only） |
 | `renderDiscoveryStatus()` | 渲染发现/状态面板 |
-| `runFallbackModelProof()` | 运行 Fallback Model wiring 诊断探针：使用 `fallbackModel: 'claude-haiku-4-5'` 覆盖启动诊断 prompt，验证 SDK option acceptance；成功后调用 `updateRuntimeProof('Fallback Model', 'wiring', ...)`（不是 `'pass'`），诚实边界说明只能证明 wiring，不证明实际 fallback switching |
+| `runFallbackModelProof()` | 运行 Fallback Model behavior 诊断探针：使用故意无效的主模型 `model: 'opencodian-invalid-model-test-xyz123'` 配合有效 fallback 模型启动诊断 prompt，通过检查返回的 `message_metadata` chunk 中的 `modelId` 来验证 SDK 是否真的发生了 fallback 切换；只有在检测到查询成功且使用的模型不是无效主模型时，才会标记为 `pass`，否则保持 `wiring` 或标记 `fail`。`extractModelFromDiagnosticResult()` 辅助方法从 chunks 和 rawMessages 中提取模型标识 |
 
 ## 数据属性标记
 
@@ -119,7 +119,7 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 
 - sessionStore import / mirror proof 会写入隔离的 diagnostic store；mirror proof 必须完成 Diagnostic Store list/select/readback 并读到至少一条消息才算通过。这不属于稳定插件状态，也不等于开放正式 import/restore UI
 - `buildMatrixRows()` 的评估基于代码检查，不是运行时探测
-- Structured Output 与 Hooks proof 都通过 `runDiagnosticPrompt()` 直接观察 backend_event；普通 `OpenCodianView` 仍不会把这些事件渲染进稳定 transcript。structured output 的 transcript 渲染已稳定，但 authoring/triggering 仍只在诊断面板里可见。
+- Structured Output 与 Hooks proof 都通过 `runDiagnosticPrompt()` 直接观察 backend_event；普通 `OpenCodianView` 仍不会把这些事件渲染进稳定 transcript。structured output 的 transcript 渲染已稳定，但 authoring/triggering 仍只在诊断面板里可见。`runStructuredOutputProbe()` 支持双路径检测：首选 `structured_output` backend_event，若 SDK 未 emit 该事件，则回退检测 text chunk 中的合法 JSON。fallback 检测不再使用宽松的字段存在性检查，而是要求 JSON 严格满足 schema 边界：`status` 必须是 `"ok"` 或 `"error"`，`surface` 必须是 `"diagnostic"`，`confidence` 必须是有限数字且范围在 `[0, 1]`。不满足这些条件的 JSON（例如 `confidence: 1.5` 或 `status: "partial"`）不会被接受为 fallback structured output，探针会诚实标记为 fail。`tryParseFallbackStructuredOutput()` helper 负责集中 fallback 解析与验证，降低 `runStructuredOutputProbe()` 的圈复杂度。
 - Discovery 面板使用 `hasCapability()` 检查 adapter 声明的能力
 - 文件使用 `eslint-disable max-lines` 注释，因为十个诊断面板共享同一诊断边界
 - Fork Session 诊断探针是 provider-owned 的诊断界面，不是稳定的跨后端 fork UI。它只直接调用 Claude Code adapter 的 `forkSession()`，不触碰权威同步、diff、子会话图或通用 `getSession` 语义
@@ -135,4 +135,4 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 - Discovery 面板里的 Permission Approval / AskUserQuestion / Elicitation 条目显示为 `Exposed`：它们已接入普通聊天路径的共享权限卡片和提问对话框。MCP Servers 条目在有服务器加载时显示为 `Exposed`，运行时透传通过共享 Settings > MCP 标签管理，Claude Code Tools 标签提供刷新控件
 - Capability Matrix 中 `Subagent Transcript / Progress` 与 `Include Hook Events` 使用 `Diagnostic` surface：SDK Foundation 设置可以配置 options，但不表示普通聊天 transcript/progress 或 hook authoring 已稳定提供
 - Subagent Transcript / Progress 的 runtime proof 遵循诚实性边界：`runSubagentStreamProof()` 只有在诊断流中真实捕获到 `subagent`、`tool_progress` 或含 `subagentId`/`agentId`/`progress` 的 backend_event 时才标记为 pass；仅成功运行 diagnostic prompt 且 SDK 接受了 `forwardSubagentText` / `agentProgressSummaries` options 但零子代理事件出现时，必须标记为 fail，不能把 option acceptance 伪装成 runtime proof。Discovery 控制区现在提供 `Run Subagent Stream Proof` 按钮，运行 diagnostic prompt 时启用 `forwardSubagentText` 和 `agentProgressSummaries`，成功后更新 `Subagent Transcript / Progress` 运行时证明；即使未捕获到子代理事件（单轮 prompt 不触发子代理生成），也会诚实标注 wiring 已验证
-- Fallback Model proof 遵循诚实性边界：`runFallbackModelProof()` 使用 `fallbackModel: 'claude-haiku-4-5'` 覆盖运行诊断 prompt，仅验证 SDK 接受 fallbackModel option 的无误 wiring；成功后使用 `updateRuntimeProof('Fallback Model', 'wiring', ...)` 标记——`wiring` 是专门的 runtime proof 状态，标签显示 "⚠ Wiring only — not behavior verified"，明确区分 option acceptance 与真实行为验证。矩阵中 Fallback Model 行仍保持 `untested` / `Settings`（静态评估不变），inline marker 的 `wiring` 状态只表示诊断探针验证了 SDK 接受了该选项，不表示实际 fallback switching 已被验证（需要主模型失败才会触发）
+- Fallback Model proof 现在使用 behavior proof 方式：`runFallbackModelProof()` 使用故意无效的主模型 `model: 'opencodian-invalid-model-test-xyz123'` 配合有效 fallback 模型运行诊断 prompt，通过 `extractModelFromDiagnosticResult()` 检查返回的 chunks 和 rawMessages 中的模型标识；只有当查询成功且检测到的模型不是无效主模型时，才会标记为 `pass`（"✓ Runtime verified"）。如果查询成功但没有检测到可信的模型信号，保持 `wiring`（"⚠ Wiring only — not behavior verified"）。如果查询失败（即使配置了 fallback），标记为 `fail`。矩阵中 Fallback Model 行仍保持 `untested` / `Settings`（静态评估不变），inline marker 的动态状态反映实际运行时证据

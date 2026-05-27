@@ -169,6 +169,8 @@ export class AssistantShellViewHostAdapter {
       renderAssistantPlaceholderAsNotice: (messageEl, noticeMessage, reason) =>
         this.renderAssistantPlaceholderAsNotice({ messageEl, noticeMessage, reason }),
       addTimestampWithCopyButton: (options) => this.addTimestampWithCopyButton(options),
+      renderStructuredOutputIfPresent: (messageEl, structuredOutput) =>
+        this.renderStructuredOutputIfPresent(messageEl, structuredOutput),
     };
   }
 
@@ -342,6 +344,20 @@ export class AssistantShellViewHostAdapter {
     } catch {
       codeEl.setText(String(structured));
     }
+  }
+
+  private renderStructuredOutputIfPresent(
+    messageEl: HTMLElement,
+    structuredOutput: unknown,
+  ): void {
+    if (structuredOutput === undefined) {
+      return;
+    }
+    const contentEl = messageEl.querySelector('.opencodian-message-content') as HTMLElement | null;
+    if (!contentEl) {
+      return;
+    }
+    this.renderStructuredOutput(contentEl, structuredOutput);
   }
 
   createAssistantShellContainer(
