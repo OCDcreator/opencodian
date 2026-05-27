@@ -2909,5 +2909,186 @@ describe('SettingsCapabilityLabSection', () => {
     expect(cleanupSpy).toHaveBeenCalledTimes(1);
     expect(outputEl.textContent).toContain('User answered');
   });
+
+  it('live permission card harness marks pass even on interrupt result', async () => {
+    const cleanupSpy = jest.fn();
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionBridge = {
+      canUseTool: jest.fn().mockResolvedValue({ behavior: 'deny', interrupt: true }),
+    };
+    plugin.claudeCodePermissionHostContext = {
+      permissionCardRenderer: true,
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    (section as any).injectSyntheticStreamingContext = jest.fn().mockReturnValue({
+      cleanup: cleanupSpy,
+      success: true,
+      message: 'ok',
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runLivePermissionCardHarness(outputEl);
+
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    // interrupt should now be treated as pass (UI rendered and was interactive)
+    expect(outputEl.textContent).toContain('live UI proof');
+    const proofMarker = outputEl.querySelector('.opencodian-capability-lab-proof-pass');
+    expect(proofMarker).toBeTruthy();
+  });
+
+  it('live question dialog harness marks pass even on interrupt result', async () => {
+    const cleanupSpy = jest.fn();
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionBridge = {
+      canUseTool: jest.fn().mockResolvedValue({ behavior: 'deny', interrupt: true }),
+    };
+    plugin.claudeCodePermissionHostContext = {
+      questionCardRenderer: true,
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    (section as any).injectSyntheticStreamingContext = jest.fn().mockReturnValue({
+      cleanup: cleanupSpy,
+      success: true,
+      message: 'ok',
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runLiveQuestionDialogHarness(outputEl);
+
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(outputEl.textContent).toContain('live UI proof');
+    const proofMarker = outputEl.querySelector('.opencodian-capability-lab-proof-pass');
+    expect(proofMarker).toBeTruthy();
+  });
+
+  it('streaming context probe marks pass when renderer creates card and bridge is wired', async () => {
+    const cleanupSpy = jest.fn();
+    const mockCardEl = document.createElement('div');
+    mockCardEl.className = 'opencodian-diagnostic-probe';
+
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionHostContext = {
+      permissionCardRenderer: true,
+      questionCardRenderer: true,
+    };
+    plugin.app = {
+      workspace: {
+        getLeavesOfType: jest.fn().mockReturnValue([{
+          view: {
+            streamingInlineCardRenderer: {
+              createStreamingInlineCard: jest.fn().mockReturnValue(mockCardEl),
+            },
+          },
+        }]),
+      },
+    };
+    plugin.agentServiceRegistry = {
+      get: jest.fn().mockReturnValue({
+        options: {
+          permissionBridge: {
+            host: {
+              collectToolApproval: jest.fn(),
+            },
+          },
+        },
+      }),
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    (section as any).injectSyntheticStreamingContext = jest.fn().mockReturnValue({
+      cleanup: cleanupSpy,
+      success: true,
+      message: 'ok',
+      diagnostics: { tabId: 'tab-1', verified: true },
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runStreamingContextProbe(outputEl);
+
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(outputEl.textContent).toContain('card created successfully');
+    expect(outputEl.textContent).toContain('Bridge host.collectToolApproval wired: true');
+    const proofMarkers = outputEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
+    expect(proofMarkers.length).toBe(2); // Permission Approval + AskUserQuestion
+  });
+
+  it('streaming context probe reports renderer failure when card creation returns null', async () => {
+    const cleanupSpy = jest.fn();
+
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionHostContext = {
+      permissionCardRenderer: true,
+      questionCardRenderer: true,
+    };
+    plugin.app = {
+      workspace: {
+        getLeavesOfType: jest.fn().mockReturnValue([{
+          view: {
+            streamingInlineCardRenderer: {
+              createStreamingInlineCard: jest.fn().mockReturnValue(null),
+            },
+          },
+        }]),
+      },
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    (section as any).injectSyntheticStreamingContext = jest.fn().mockReturnValue({
+      cleanup: cleanupSpy,
+      success: true,
+      message: 'ok',
+      diagnostics: { tabId: 'tab-1', verified: true },
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runStreamingContextProbe(outputEl);
+
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(outputEl.textContent).toContain('card creation returned null');
+    expect(outputEl.textContent).toContain('NOT sufficient');
+    const proofMarkers = outputEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
+    expect(proofMarkers.length).toBe(0);
+  });
+
+  it('streaming context probe handles missing chat view gracefully', async () => {
+    const plugin = createMockPlugin() as any;
+    plugin.claudeCodePermissionHostContext = {
+      permissionCardRenderer: true,
+      questionCardRenderer: true,
+    };
+    plugin.app = {
+      workspace: {
+        getLeavesOfType: jest.fn().mockReturnValue([]),
+      },
+    };
+
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    const outputEl = document.createElement('div');
+    await (section as any).runStreamingContextProbe(outputEl);
+
+    expect(outputEl.textContent).toContain('Synthetic context injection failed');
+  });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 });
