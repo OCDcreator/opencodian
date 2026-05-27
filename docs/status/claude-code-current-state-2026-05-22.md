@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605272242`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605272319`
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -121,6 +121,45 @@ This slice provides the corrected runtime proof for structured output duplicate 
 | Duplicate raw JSON suppression | ✅ plugin fixed | `textBlockCount=0`, JSON only in structured output details |
 | Hook text leak | ✅ plugin fixed | `hasHookText=false`, ClaudeCodeStreamNormalizer filters synthetic user messages |
 | Structured output badge | ✅ plugin fixed | `.opencodian-structured-output-details` renders correctly |
+| `/json` prefix stripping | ✅ plugin fixed | User message shows "say hello in JSON" |
+| Thinking content before tool call | ℹ️ SDK/model boundary | Model produces thinking prose before StructuredOutput; this is normal SDK behavior |
+| Response nested as string | ℹ️ SDK/model boundary | Schema defines `response: string`; model serializes JSON into string field |
+
+---
+
+## 2026-05-27 Structured Output Reload/Hydration Runtime Proof
+
+This slice proves that structured output in ordinary chat survives plugin reload and conversation rehydration without regressions.
+
+### What Was Fixed
+
+- **Hydration-time duplicate suppression**: `AssistantShellViewHostAdapter.renderAssistantMessageBody()` now filters duplicate raw JSON text blocks from `message.contentBlocks` when `message.structured` is present. The new `filterDuplicateStructuredOutputContentBlocks()` helper (in `sendPipelineContent.ts`) removes any text block whose content matches the structured-output payload, not just the last block.
+- **Streaming-time filter broadened**: `filterDuplicateStructuredOutputTextBlocks()` was updated from "remove only the last text block" to "remove any matching text block", because the model can emit follow-up prose (e.g. "All done!") after the duplicate JSON and before the StructuredOutput tool call.
+
+### Runtime Evidence
+
+- Test Vault deployed build: `feature-phase0-capability.202605272319`
+- Clean build from scratch: `rm -rf dist && npm run build` → EXIT_CODE=0
+- DOM assertions (last assistant message after reload/hydration):
+  - `assistantTextBlockCount: 1` — only one `.opencodian-message-text` block remains ("All done! Said hello in JSON.")
+  - `duplicateRawJsonSuppressed: true` — the markdown JSON text block (`\`\`\`json\n{...}\n\`\`\``) was removed during hydration rendering
+  - `hasStructuredOutput: true` — `.opencodian-structured-output-details` present after reload
+  - `hasStructuredSummary: true` — `.opencodian-structured-output-summary` present after reload
+  - `hasHookText: false` — no `.opencodian-hook-text` elements
+  - `userMessageText: "say hello in JSON"` — `/json` prefix correctly stripped
+  - `streamingTextBlockCount: 0` — all streaming blocks converted to persisted equivalents
+- Console: 50 lines of SDK activity (spawn, sendMessage, stream controller, structured_output backend_event)
+- Errors: `No errors captured`
+- Screenshots: `.obsidian-debug/so-reload-hydration-proof-20260527.png` shows assistant message with thinking blocks, "All done! Said hello in JSON." prose, and "结构化输出" expandable section, with no raw JSON visible as plain text
+
+### Classification
+
+| Boundary | Status | Reason |
+|---|---|---|
+| Duplicate raw JSON suppression (streaming) | ✅ plugin fixed | Any matching text block removed during stream finalization |
+| Duplicate raw JSON suppression (hydration) | ✅ plugin fixed | `filterDuplicateStructuredOutputContentBlocks` removes matching blocks during message re-render |
+| Structured output badge after reload | ✅ plugin fixed | `.opencodian-structured-output-details` survives hydration |
+| Hook text leak | ✅ plugin fixed | `hasHookText=false`, ClaudeCodeStreamNormalizer filters synthetic user messages |
 | `/json` prefix stripping | ✅ plugin fixed | User message shows "say hello in JSON" |
 | Thinking content before tool call | ℹ️ SDK/model boundary | Model produces thinking prose before StructuredOutput; this is normal SDK behavior |
 | Response nested as string | ℹ️ SDK/model boundary | Schema defines `response: string`; model serializes JSON into string field |

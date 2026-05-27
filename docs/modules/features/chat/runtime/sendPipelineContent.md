@@ -16,6 +16,7 @@ hasVisibleStreamingContent(chunk): boolean
 extractStructuredOutputDuplicateText(structuredOutput): string | null
 isDuplicateStructuredOutputText(rawText, structuredOutput): boolean
 filterDuplicateStructuredOutputTextBlocks(blocks, structuredOutput): StreamingContentBlock[] | undefined
+filterDuplicateStructuredOutputContentBlocks(blocks, structuredOutput): ContentBlock[] | undefined
 ```
 
 ## 关键行为
@@ -25,7 +26,8 @@ filterDuplicateStructuredOutputTextBlocks(blocks, structuredOutput): StreamingCo
 - `hasVisibleStreamingContent()`：统一定义“首次可见内容”的判定，供 pending indicator 与 reveal 逻辑复用
 - `extractStructuredOutputDuplicateText()`：从结构化输出 payload 的 `response` 字段提取原始内容，解析并重新序列化以统一格式
 - `isDuplicateStructuredOutputText()`：判断一段 raw text 是否与结构化输出的内部内容重复（支持精确匹配与 JSON 语义匹配）
-- `filterDuplicateStructuredOutputTextBlocks()`：过滤掉最后一个重复的 text block，仅在有结构化输出时生效
+- `filterDuplicateStructuredOutputTextBlocks()`：过滤掉所有与结构化输出重复的 text block，仅在有结构化输出时生效
+- `filterDuplicateStructuredOutputContentBlocks()`：hydration 时间版，对 persisted `ContentBlock[]` 进行过滤，供消息重新渲染时移除重复内容
 
 ## 下游消费者
 

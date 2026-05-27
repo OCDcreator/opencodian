@@ -105,10 +105,10 @@ export function isDuplicateStructuredOutputText(
 }
 
 /**
- * Remove the last text block if it is an exact duplicate of the structured
- * output inner content.  Only the last text block is considered because the
- * model typically emits the raw JSON immediately before the StructuredOutput
- * tool call.
+ * Remove any text block that duplicates the structured-output payload.
+ * The model may emit raw JSON as visible text at any point before the
+ * StructuredOutput tool call, sometimes interleaving thinking blocks or
+ * follow-up prose, so we scan all text blocks rather than only the last.
  */
 export function filterDuplicateStructuredOutputTextBlocks(
   blocks: StreamingContentBlock[] | undefined,
@@ -123,20 +123,36 @@ export function filterDuplicateStructuredOutputTextBlocks(
     return blocks;
   }
 
-  const lastTextBlockIndex = blocks.findLastIndex(
-    (block): block is Extract<StreamingContentBlock, { type: 'text' }> => block.type === 'text',
-  );
-  if (lastTextBlockIndex === -1) {
+  return blocks.filter((block) => {
+    if (block.type !== 'text') {
+      return true;
+    }
+    return !isDuplicateStructuredOutputText(block.content, structuredOutput);
+  });
+}
+
+/**
+ * Hydration-time variant: works on persisted {@link ContentBlock} arrays
+ * instead of live streaming blocks.  Used when a conversation is reloaded
+ * and assistant messages are reconstructed from storage.
+ */
+export function filterDuplicateStructuredOutputContentBlocks(
+  blocks: ContentBlock[] | undefined,
+  structuredOutput: unknown,
+): ContentBlock[] | undefined {
+  if (!blocks || blocks.length === 0) {
     return blocks;
   }
 
-  const lastTextBlock = blocks[lastTextBlockIndex];
-  if (
-    lastTextBlock.type === 'text'
-    && isDuplicateStructuredOutputText(lastTextBlock.content, structuredOutput)
-  ) {
-    return blocks.filter((_, index) => index !== lastTextBlockIndex);
+  const candidate = extractStructuredOutputDuplicateText(structuredOutput);
+  if (!candidate) {
+    return blocks;
   }
 
-  return blocks;
+  return blocks.filter((block) => {
+    if (block.type !== 'text' || !block.text) {
+      return true;
+    }
+    return !isDuplicateStructuredOutputText(block.text, structuredOutput);
+  });
 }

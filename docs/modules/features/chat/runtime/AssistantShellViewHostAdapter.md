@@ -18,7 +18,7 @@ body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodyS
 - `addTimestampWithCopyButton()`：透传 footer timestamp / copy button 收尾
 - `renderStructuredOutputIfPresent()`：在已存在的 message DOM 中查找 `.opencodian-message-content`，如果存在结构化输出 payload 则注入可折叠的 structured output badge；供 stream finalization 在流式消息壳体上直接追加 badge，而不是等待消息重新渲染
 - `renderPersistedAssistantMessage()`：通过内部 shell + body render + footer renderer，一次性完成普通 persisted assistant message 的壳层、正文与 footer 组装；notice message 也会在这里统一分派到 notice 渲染路径
-- `renderMessageBody()`：公开入口，渲染 assistant message 正文（structured content blocks 或 plain text fallback），并在 `message.structured` 存在时渲染可折叠的结构化输出 JSON 块，供 `ConversationAssistantTailRenderPort` 直接调用
+- `renderMessageBody()`：公开入口，渲染 assistant message 正文（structured content blocks 或 plain text fallback），并在 `message.structured` 存在时渲染可折叠的结构化输出 JSON 块，供 `ConversationAssistantTailRenderPort` 直接调用；在 structured output 存在时会先过滤掉重复的 raw JSON text block，确保 hydration/reload 后不重新显示已被 streaming finalization 移除的内容
 - `getAssistantBodySignature()`：公开入口，为 body 内容生成可序列化的比较指纹，供 render pipeline 判断是否需要重渲染
 - `renderPersistedAssistantNoticeMessage()`：通过内部 shell + notice host 一次性完成 persisted assistant notice 的 shell、card 与 footer 编排
 - `renderAssistantPlaceholderAsNotice()`：通过内部 notice host 把已有 shell 改写成 notice card

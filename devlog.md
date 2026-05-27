@@ -12,6 +12,49 @@
 
 ---
 
+## 2026-05-27 Structured Output Reload/Hydration Proof
+
+### 目标
+
+证明 Claude Code ordinary chat 的 structured output（`/json` 触发）在 plugin reload / conversation hydration 后仍然正确产品化，无重复 raw JSON、无 hook 泄漏、structured output badge 幸存。
+
+### 发现的问题
+
+第一轮 reload/hydration 测试暴露：streaming 阶段的 duplicate suppression 只移除**最后一个** text block，但模型可能在 duplicate JSON 之后、StructuredOutput 工具调用之前，再输出 follow-up prose（如 "All done!"）。这导致 reload 后 hydration 渲染时，markdown JSON text block 重新出现在 DOM 中。
+
+### 变更
+
+- `sendPipelineContent.ts`：
+  - 新增 `filterDuplicateStructuredOutputContentBlocks()`：hydration 时版，对 persisted `ContentBlock[]` 进行过滤
+  - 将 `filterDuplicateStructuredOutputTextBlocks()` 从"仅移除最后一个 text block"改为"移除**所有**匹配的 text block"，因为模型可能在 JSON duplicate 和 tool call 之间插入 thinking 或 follow-up text
+- `AssistantShellViewHostAdapter.ts`：
+  - `renderAssistantMessageBody()` 在 `message.structured` 存在时，先调用 `filterDuplicateStructuredOutputContentBlocks()` 过滤 `contentBlocks`，再传入 `renderAssistantStructuredContent()`
+- 测试：
+  - `sendPipelineContent.test.ts`：新增 9 个测试覆盖 `filterDuplicateStructuredOutputContentBlocks`，以及更新 streaming 版本的测试以匹配新的"移除所有匹配"行为
+
+### 验证
+
+- 全量测试：443 suites / 3363 tests passed（新增 9 个测试全部通过）
+- Lint：0 errors / 0 warnings
+- Typecheck：clean
+- Build：BUILD_ID=feature-phase0-capability.202605272319
+- Test Vault 运行时证明（新建 conversation → 发送 `/json say hello in JSON` → 等完成 → reload plugin → DOM assertion）：
+  - `assistantTextBlockCount: 1` — 仅剩 "All done! Said hello in JSON." 合法 prose
+  - `duplicateRawJsonSuppressed: true` — markdown JSON text block 已从 hydration 渲染中移除
+  - `hasStructuredOutput: true` / `hasStructuredSummary: true` — structured output badge reload 后仍存活
+  - `hasHookText: false` — 无 hook text leak
+  - `streamingTextBlockCount: 0` — streaming block 已正确转换为 persisted 等价物
+  - Errors：`No errors captured`
+  - Console：50 行 SDK 活动日志
+  - 截图：`.obsidian-debug/so-reload-hydration-proof-20260527.png`
+
+### 诚实边界
+
+- 模型仍可能在调用 StructuredOutput 工具前产生中间可见文本（如思考过程、markdown JSON）。这是 SDK/model 行为，不是泄漏。
+- 当模型输出多个 text block 且非最后一个匹配 structured output 时，旧实现会漏删；新实现已覆盖此场景。
+
+---
+
 ## 2026-05-27 Structured Output Duplicate Suppression Fix
 
 ### 目标

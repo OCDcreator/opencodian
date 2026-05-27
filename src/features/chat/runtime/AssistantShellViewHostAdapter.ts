@@ -38,6 +38,9 @@ import {
 import {
   buildQuestionResolutionCardRenderPlan,
 } from './QuestionResolutionCardRenderer';
+import {
+  filterDuplicateStructuredOutputContentBlocks,
+} from './sendPipelineContent';
 import type {
   SendPipelineShellPort,
   SendPipelineStreamElements,
@@ -207,8 +210,15 @@ export class AssistantShellViewHostAdapter {
       });
     }
 
+    // Suppress duplicate raw JSON text blocks when structured output is
+    // present, so hydration/reload does not re-show text that was already
+    // removed during streaming finalization.
+    const contentBlocks = message.structured !== undefined
+      ? filterDuplicateStructuredOutputContentBlocks(message.contentBlocks, message.structured)
+      : message.contentBlocks;
+
     const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan({
-      contentBlocks: message.contentBlocks,
+      contentBlocks,
       questionResolution: message.questionResolution,
       shouldRenderQuestionResolutionCard: this.host.shouldRenderQuestionResolutionCards(),
     });
