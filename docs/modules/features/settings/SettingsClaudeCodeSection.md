@@ -19,6 +19,7 @@
 - 在 Tools 标签渲染 restart-sensitive runtime boundary notice、MCP runtime 只读状态与刷新按钮，以及 allowed/disallowed tools；MCP 控制只调用当前 Claude adapter 的 `getMcpServerCount()` / `reloadMcpServers()`，不写入 `.claude/mcp.json`，刷新失败会保留明确错误状态
 - Max turns 和 max budget USD 输入必须是完整正数，`12abc` / `5usd` 这类部分数字会归一化为 unlimited/null，空白仍保持 unlimited/null
 - Environment variables 输入通过 `parseEnv()` 解析，只接受标准 POSIX 键名（`[A-Za-z_][A-Za-z0-9_]*`），含空格、连字符或以数字开头的键会被静默丢弃；值部分保留trim后的原始内容
+- Allowed/disallowed tools 输入通过 `parseToolList()` 解析，只接受 PascalCase 字母数字工具名（`[A-Za-z][A-Za-z0-9]*`），含空格、连字符或以数字开头的名称会被静默丢弃；UI 描述中明确标注此路径已连接但尚未经过运行时验证
 - 在 SDK Foundations 标签渲染 runtime-only plugin / skill / agent definition 只读摘要，以及 file checkpoint、hook event stream、subagent transcript/progress 开关；hook/subagent 控件前会显示可见的 diagnostic stream boundary notice。agent definition 摘要与 plugin/skill 摘要并排显示在 runtime ecosystem 块中，通过 `adapter.getAgentDefinitionCount()` 与 `adapter.getAgentDefinitionsList()` 读取配置状态。这些字段只进入 SDK options / diagnostic/experimental stream，不宣称 MCP authoring、skills/plugins authoring、agent authoring、hook authoring、stable rewind、structured-output UI 或 full subagent transcript UI 已完成
 - 将多标签设置输入写入 `settings.backendSettings.claudeCode`
 - 通过 `ClaudeCodeProcessResolver` 做本地进程解析诊断，帮助检查 bundled/default resolution 与外部 CLI path

@@ -799,6 +799,27 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
+    it('rejects invalid tool names and keeps only valid PascalCase alphanumeric names', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      await findTextArea(t('settings.claudeCode.allowedTools.name')).onChange?.(
+        'Read\nGrep Tool\nBash\n123Tool\nEdit\nspecial-tool' as never,
+      );
+      // Only valid PascalCase alphanumeric names should be kept.
+      expect(plugin.settings.backendSettings.claudeCode.allowedTools).toEqual(['Read', 'Bash', 'Edit']);
+
+      await findTextArea(t('settings.claudeCode.disallowedTools.name')).onChange?.(
+        'Bash\ninvalid name\nGlob\n' as never,
+      );
+      expect(plugin.settings.backendSettings.claudeCode.disallowedTools).toEqual(['Bash', 'Glob']);
+    });
+
     it('shows MCP runtime status and refreshes the active Claude adapter config', async () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn()
@@ -882,6 +903,56 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
       expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('rejects negative and zero turn and budget limits', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('-5' as never);
+      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('0' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
+      expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+    });
+
+    it('accepts decimal budget but rejects decimal turns', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12.5' as never);
+      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('12.5' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
+      expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBe(12.5);
+    });
+
+    it('clears limits when empty string is provided', async () => {
+      const plugin = createPlugin();
+      plugin.settings.backendSettings.claudeCode.maxTurns = 50;
+      plugin.settings.backendSettings.claudeCode.maxBudgetUsd = 5;
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('' as never);
+      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
+      expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
     });
   });
 

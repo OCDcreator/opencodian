@@ -51,9 +51,9 @@ export interface ClaudeCodeBackendSettings {
   model: string;
   /** @untested — Fallback model path wired to SDK option but not runtime-verified. */
   fallbackModel: string;
-  /** Tool names that are auto-allowed without prompting. Not a sandbox. @untested */
+  /** Tool names that are auto-allowed without prompting. Not a sandbox. Validated as PascalCase alphanumeric. @untested */
   allowedTools: string[];
-  /** Tool names that are removed from context entirely. @untested */
+  /** Tool names that are removed from context entirely. Validated as PascalCase alphanumeric. @untested */
   disallowedTools: string[];
   /** Maximum conversation turns before the query stops. null = unlimited (SDK default). @untested */
   maxTurns: number | null;

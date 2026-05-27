@@ -79,6 +79,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 本轮更新 `settings.claudeCode.env.desc`，在环境变量描述中加入 POSIX 键名规范提示和未运行时验证的诚实性声明，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
 
+本轮更新 `settings.claudeCode.allowedTools.desc` 和 `settings.claudeCode.disallowedTools.desc`，在工具描述中加入 PascalCase 字母数字校验提示和未运行时验证的诚实性声明，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
+
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
 
 本轮还将 `chat.question.title` 调整为 backend-neutral 的 “Question from agent”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。

@@ -12,6 +12,94 @@
 
 ---
 
+## 2026-05-27 Claude Code maxTurns/maxBudgetUsd Limits Hardening and Honesty
+
+### 目标
+
+推进 Claude Code 设置中已暴露但尚未运行时验证的 `maxTurns`/`maxBudgetUsd` 配置，作为 tools/env 硬化后的下一个稳定设置缺口。通过 UI 诚实性声明、输入验证边界测试、SDK options 构建日志增强，将限制项从纯 wiring 推进到具备输入验证和运行时可见性的产品状态。
+
+### 选择理由
+
+在 `fallbackModel`、`maxTurns/maxBudgetUsd` 两个剩余候选中，限制项是用户实际配置场景较直观的（控制 Claude Code 查询长度和花费），且具备清晰的 SDK 语义（`maxTurns`/`maxBudgetUsd` 选项）。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/i18n/locales/en.ts` | UI 诚实性 | `settings.claudeCode.maxTurns.desc` 和 `maxBudgetUsd.desc` 追加输入格式提示（正整数/正数）和 "This path is wired but not yet runtime-verified" 声明 |
+| `src/i18n/locales/zh.ts` | UI 诚实性 | 中文描述同步追加输入格式提示和 "此路径已连接但尚未经过运行时验证" 声明 |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 增强日志 | `buildSdkOptions()` 在 tool config 日志后新增 `buildSdkOptions limits config` 日志，包含 `maxTurns` 和 `maxBudgetUsd`（未设置时为 `null`） |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 新增测试 | 覆盖负数/零拒绝、小数预算接受/小数轮数拒绝、空字符串清除 limits 三个边界场景 |
+
+### 运行时验证
+
+- 构建: `npm run verify` → 439 suites / 3314 tests passed, lint/typecheck/build clean
+- BUILD_ID: `feature-phase0-capability.202605271623`
+- 部署到 Test Vault 并验证 BUILD_ID 匹配
+- Test Vault DOM 验证：模型与 Thinking 标签页中 maxTurns（"最大轮数"）和 maxBudgetUsd（"最大预算 USD"）控件可见，描述文本包含 "此路径已连接但尚未经过运行时验证" 诚实声明和输入格式提示
+- 部署的 `main.js` 中确认 `buildSdkOptions limits config` 日志代码存在
+
+### 诚实分类
+
+| 维度 | 状态 | 说明 |
+|---|---|---|
+| 解析硬化 | ✅ 已验证 | 单元测试覆盖正整数/正数/负数/零/小数/空字符串边界；SettingsClaudeCodeSection 测试 41 passed |
+| SDK options 构建日志 | ✅ 已验证 | 代码层面确认 `buildSdkOptions` 记录 limits config；Adapter 测试 99 passed |
+| SDK 选项传递 | ✅ 已验证 | `ClaudeCodeOptionsBuilder.test.ts` 已有 maxTurns/maxBudgetUsd 传递/省略测试 |
+| SDK 实际尊重限制项 | ⚠️ 仅 wiring | 无法在不运行真实 Claude Code 长对话的情况下直接证明；属于 SDK 内部行为边界 |
+| 运行时限制生效 | ⚠️ 未验证 | 需要真实对话中观察 turn/budget 边界行为才能证明，当前不具备自动化 E2E 验证条件 |
+
+### 剩余阻塞
+
+- **SDK 实际尊重限制项**: 需要真实 Claude Code 查询并验证 turn/budget 边界，属于 SDK 内部行为，当前仅能通过 options wiring 和日志记录证明配置已传入 SDK
+- **运行时限制生效**: 需要端到端对话探针，留待后续诊断能力提升
+
+---
+
+## 2026-05-27 Claude Code Allowed/Disallowed Tools Hardening and Honesty
+
+### 目标
+
+推进 Claude Code 设置中已暴露但尚未运行时验证的 `allowedTools`/`disallowedTools` 配置，作为 env 硬化后的下一个稳定设置缺口。通过工具名解析硬化、UI 诚实性声明和 SDK options 构建日志增强，将工具允许/阻止策略从纯 wiring 推进到具备输入验证和运行时可见性的产品状态。
+
+### 选择理由
+
+在 `fallbackModel`、`allowed/disallowed tools`、`maxTurns/maxBudgetUsd` 三个剩余候选中，工具策略是用户实际配置场景最高频的（控制 Claude Code 可调用工具），且具备清晰的 SDK 语义（`allowedTools`/`disallowedTools` 选项）。
+
+### 实施内容
+
+| 文件 | 变更类型 | 详情 |
+|---|---|---|
+| `src/features/settings/SettingsClaudeCodeSection.ts` | 硬化解析 | 新增 `parseToolList()` 和 `isValidToolName()`，只接受 PascalCase 字母数字工具名 `[A-Za-z][A-Za-z0-9]*`；含空格、连字符、以数字开头的名称被静默丢弃 |
+| `src/core/agents/backend/ClaudeCodeAdapter.ts` | 增强日志 | `buildSdkOptions()` 在构造完 SDK options 后记录 `buildSdkOptions tool config` 日志，包含 `allowedToolCount`、`disallowedToolCount`、`allowedTools`、`disallowedTools` |
+| `src/core/types/settings.ts` | JSDoc 更新 | `allowedTools`/`disallowedTools` 字段追加 "Validated as PascalCase alphanumeric" 说明 |
+| `src/i18n/locales/en.ts` | UI 诚实性 | `settings.claudeCode.allowedTools.desc` 和 `disallowedTools.desc` 追加 PascalCase 校验提示和 "not yet runtime-verified" 声明 |
+| `src/i18n/locales/zh.ts` | UI 诚实性 | 中文描述同步追加 PascalCase 校验提示和 "尚未经过运行时验证" 声明 |
+| `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` | 新增测试 | 覆盖无效工具名拒绝（空格、数字开头、连字符）和有效工具名保留（PascalCase 字母数字） |
+
+### 运行时验证
+
+- 构建: `npm run verify` → 439 suites / 3311 tests passed, lint/typecheck/build clean
+- BUILD_ID: `feature-phase0-capability.202605271607`
+- 部署到 Test Vault 并验证 BUILD_ID 匹配
+
+### 诚实分类
+
+| 维度 | 状态 | 说明 |
+|---|---|---|
+| 解析硬化 | ✅ 已验证 | 单元测试覆盖非法/合法工具名边界；SettingsClaudeCodeSection 测试 38 passed |
+| SDK options 构建日志 | ✅ 已验证 | 代码层面确认 `buildSdkOptions` 记录 tool config；Adapter 测试 99 passed |
+| SDK 选项传递 | ✅ 已验证 | `ClaudeCodeOptionsBuilder.test.ts` 已有 allowedTools/disallowedTools 传递测试 |
+| SDK 实际尊重工具策略 | ⚠️ 仅 wiring | 无法在不运行真实 Claude Code 查询并检查工具调用行为的情况下直接证明；属于 SDK 内部行为边界 |
+| 运行时工具策略生效 | ⚠️ 未验证 | 需要真实对话中观察工具 allow/block 行为才能证明，当前不具备自动化 E2E 验证条件 |
+
+### 剩余阻塞
+
+- **SDK 实际尊重工具策略**: 需要真实 Claude Code 查询并验证工具调用结果，属于 SDK 内部行为，当前仅能通过 options wiring 和日志记录证明配置已传入 SDK
+- **运行时工具策略生效**: 需要端到端对话探针，留待后续诊断能力提升
+
+---
+
 ## 2026-05-27 Claude Code Environment Variables Hardening and Honesty
 
 ### 目标

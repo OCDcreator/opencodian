@@ -46,6 +46,8 @@
 - 提供 `runDiagnosticPrompt()`：用 runtime-only `hooks`、`sessionStore`、`outputFormat`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`、`persistSession`、`resumeSessionId` 覆盖启动一次隔离的诊断 query，返回原始 SDK 消息与经 `ClaudeCodeStreamNormalizer` 归一化后的 `StreamChunk[]`，专供 Capability Lab 做 structured output / hook / session-store / subagent-stream / resume runtime proof，不进入普通 chat path。该诊断 query 也会沿用 adapter options 中的 `permissionBridge.canUseTool`、`onElicitation` 和 `mcpServers` / 动态 MCP cache；这些 seam 已有 focused test 证明会进入 diagnostic SDK options，但仍只是诊断 proof，不把 Claude permission、question 或 MCP authoring 提升为稳定产品面
 - 对活跃、checkpoint-enabled 的 SDK `Query` 暴露后端级 `rewindFiles(sessionId, userMessageId, { dryRun? })` 委托；当前没有接入稳定聊天按钮，调用方必须先完成 dry-run/确认设计。适配器层 `rewindFiles` 已有完整单元测试覆盖（不可用/正常委托/dryRun选项/错误传播/失效session），但生产聊天路径仍显式 gated 为 OpenCode-only。`rewindFiles` 现在强制 `dryRun` 安全默认：不传 options 或传 `{}` 等价于 `{ dryRun: true }`；`userMessageId` 为空或纯空白时立即抛错；显式传 `{ dryRun: false }` 会触发 `warn` 级日志作为审计追踪
 - 通过 `createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel })` 写入摘要级诊断日志：`runtime` 覆盖 start/stop/dispose/status change、sendMessage、runtime create/reuse/close、SDK load/query creation、supportedModels、spawn command/exit/error；`sessions` 覆盖 create/delete/update/list/get/fork/rewind/restore；`mcp` 覆盖 MCP config load/reload。日志只记录 id、cwd、count、length、状态和错误摘要，不记录 prompt、tool input、secret 或完整 env
+- `buildSdkOptions` 在构造完 SDK options 后记录 `buildSdkOptions tool config` 日志，包含 `allowedToolCount`、`disallowedToolCount`、`allowedTools` 和 `disallowedTools`，用于在运行时验证工具策略是否进入 SDK query 选项
+- `buildSdkOptions` 同时记录 `buildSdkOptions limits config` 日志，包含 `maxTurns` 和 `maxBudgetUsd`（未设置时为 `null`），用于在运行时验证限制项是否进入 SDK query 选项
 
 ## 维护约束
 

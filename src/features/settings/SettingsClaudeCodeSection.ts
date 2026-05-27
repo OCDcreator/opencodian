@@ -595,7 +595,7 @@ export class SettingsClaudeCodeSection {
           .setPlaceholder(t('settings.claudeCode.allowedTools.placeholder'))
           .setValue(this.settings.allowedTools.join('\n'))
           .onChange(async (value) => {
-            this.settings.allowedTools = this.parseLineList(value);
+            this.settings.allowedTools = this.parseToolList(value);
             await this.saveSettings();
           });
       });
@@ -610,7 +610,7 @@ export class SettingsClaudeCodeSection {
           .setPlaceholder(t('settings.claudeCode.disallowedTools.placeholder'))
           .setValue(this.settings.disallowedTools.join('\n'))
           .onChange(async (value) => {
-            this.settings.disallowedTools = this.parseLineList(value);
+            this.settings.disallowedTools = this.parseToolList(value);
             await this.saveSettings();
           });
       });
@@ -832,6 +832,22 @@ export class SettingsClaudeCodeSection {
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line.length > 0))];
+  }
+
+  private parseToolList(value: string): string[] {
+    return [...new Set(value
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && this.isValidToolName(line)))];
+  }
+
+  private isValidToolName(name: string): boolean {
+    // Claude Code tool names are PascalCase alphanumeric (e.g. Read, Grep, Bash, Glob, Edit).
+    // Reject names with spaces, hyphens, or non-alphanumeric characters.
+    if (!name || name.length === 0) {
+      return false;
+    }
+    return /^[A-Za-z][A-Za-z0-9]*$/.test(name);
   }
 
   private parseNullablePositiveInteger(value: string): number | null {

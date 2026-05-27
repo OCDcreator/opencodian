@@ -815,7 +815,7 @@ export class ClaudeCodeAdapter
     sendOptions?: Record<string, unknown>,
   ): ClaudeCodeSdkOptionsShape {
     const overrides = resolveSendOptionOverrides(sendOptions);
-    return buildClaudeCodeOptions({
+    const options = buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
       settings: {
         ...this.options.settings,
@@ -845,6 +845,17 @@ export class ClaudeCodeAdapter
       // Arbitrary resume-at ids are rejected; use runDiagnosticPrompt() for diagnostic resume.
       resumeSessionId: session?.sdkSessionId,
     });
+    runtimeLogger.debug('buildSdkOptions tool config', {
+      allowedToolCount: options.allowedTools?.length ?? 0,
+      disallowedToolCount: options.disallowedTools?.length ?? 0,
+      allowedTools: options.allowedTools,
+      disallowedTools: options.disallowedTools,
+    });
+    runtimeLogger.debug('buildSdkOptions limits config', {
+      maxTurns: options.maxTurns ?? null,
+      maxBudgetUsd: options.maxBudgetUsd ?? null,
+    });
+    return options;
   }
 
   private buildDiagnosticSdkOptions(
