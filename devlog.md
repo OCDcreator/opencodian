@@ -40,12 +40,16 @@
 - Typecheck：clean
 - Module docs：3 个文件已更新
 - Graphify：已刷新
-- Build：BUILD_ID=feature-phase0-capability.202605272236
-- Test Vault 运行时证明：
-  - `textBlockCount: 0` — 重复 raw JSON text block 已完全从 DOM 移除
-  - `hasStructuredOutputBadge: true` — structured output badge 正常渲染
-  - `assistantPreview` 不再包含 `{"greeting": "hello"}` 等 raw JSON 文本
+- Build：BUILD_ID=feature-phase0-capability.202605272242
+- Test Vault 运行时证明（使用正确 DOM selector：`.opencodian-input` / `.opencodian-send-btn` / `opencodian-view`）：
+  - `textBlockCount: 0` — 重复 raw JSON text block 已完全从 assistant 消息 DOM 移除
+  - `hasStructuredOutput: true` / `hasStructuredSummary: true` — structured output badge（`.opencodian-structured-output-details`）正常渲染
+  - `hasHookText: false` — 没有 hook text leak
+  - `userMessageText: "say hello in JSON"` — `/json` 前缀已正确剥离
+  - `structuredCodeText` 包含 `{"response": "{\"greeting\": \"hello\"}"}` — JSON 仅出现在 structured output 折叠区域
   - Errors：`No errors captured`
+  - Console：80 行 SDK 活动日志（spawn、sendMessage、stream controller、structured_output backend_event）
+  - 截图：`.obsidian-debug/so-dup-proof-last-msg-20260527.png` 显示无 raw JSON 可见文本
 
 ### 诚实边界
 

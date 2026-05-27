@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605272022`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605272242`
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -87,6 +87,43 @@ This slice fixes three productization gaps discovered after the initial `/json` 
 - The model may still produce intermediate visible text (thinking, markdown JSON) before calling the StructuredOutput tool. This is SDK/model behavior, not a leak.
 - The fixed schema remains limited to `response` + `tags` + `confidence`.
 - `/json ` trigger remains one-shot and non-persisted.
+
+---
+
+## 2026-05-27 Structured Output Duplicate Suppression Runtime Proof
+
+This slice provides the corrected runtime proof for structured output duplicate raw JSON suppression, using the proper DOM selectors (`.opencodian-input`, `.opencodian-send-btn`, view type `opencodian-view`).
+
+### What Was Fixed
+
+- **Previous proof distortion**: An earlier proof attempt used incorrect selectors (`.opencodian-chat-input textarea`, `.opencodian-chat-input-send-btn`, `.opencodian-view`), causing DOM assertions and screenshots to miss the actual chat surface.
+- **Duplicate suppression**: When the model outputs raw JSON text before calling the StructuredOutput tool, `sendPipelineContent.ts` helpers (`extractStructuredOutputDuplicateText`, `isDuplicateStructuredOutputText`, `filterDuplicateStructuredOutputTextBlocks`) identify and remove the duplicate text block. `StreamShellFinalizer.ts` additionally scrubs the DOM after badge rendering.
+
+### Runtime Evidence
+
+- Test Vault deployed build: `feature-phase0-capability.202605272242`
+- Preflight: `obsidian help` confirms Developer commands; plugin reload succeeds
+- DOM assertions (last assistant message after `/json say hello in JSON`):
+  - `assistantTextBlockCount: 0` — no `.opencodian-message-text` blocks in the assistant message
+  - `hasStructuredOutput: true` — `.opencodian-structured-output-details` present
+  - `hasStructuredSummary: true` — `.opencodian-structured-output-summary` present
+  - `hasHookText: false` — no `.opencodian-hook-text` elements
+  - `structuredCodeText: {"response": "{\"greeting\": \"hello\"}"}` — JSON only inside the collapsible structured output section
+  - `userMessageText: "say hello in JSON"` — `/json` prefix correctly stripped before send
+- Console: 80 lines of real SDK activity (spawn, sendMessage, stream controller, structured_output backend_event)
+- Errors: `No errors captured`
+- Screenshots: `.obsidian-debug/so-dup-proof-last-msg-20260527.png` shows assistant message with "Thought for 7.7s" and "结构化输出" expandable section, no raw JSON visible as plain text
+
+### Classification
+
+| Boundary | Status | Reason |
+|---|---|---|
+| Duplicate raw JSON suppression | ✅ plugin fixed | `textBlockCount=0`, JSON only in structured output details |
+| Hook text leak | ✅ plugin fixed | `hasHookText=false`, ClaudeCodeStreamNormalizer filters synthetic user messages |
+| Structured output badge | ✅ plugin fixed | `.opencodian-structured-output-details` renders correctly |
+| `/json` prefix stripping | ✅ plugin fixed | User message shows "say hello in JSON" |
+| Thinking content before tool call | ℹ️ SDK/model boundary | Model produces thinking prose before StructuredOutput; this is normal SDK behavior |
+| Response nested as string | ℹ️ SDK/model boundary | Schema defines `response: string`; model serializes JSON into string field |
 
 ---
 
