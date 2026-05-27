@@ -769,6 +769,8 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderSdkFoundationOptions(containerEl: HTMLElement): void {
+    this.renderDiagnosticStreamMovedNotice(containerEl);
+
     new Setting(containerEl)
       .setName(t('settings.claudeCode.enableFileCheckpointing.name'))
       .setDesc(t('settings.claudeCode.enableFileCheckpointing.desc'))
@@ -780,42 +782,15 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+  }
 
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.includeHookEvents.name'))
-      .setDesc(t('settings.claudeCode.includeHookEvents.desc'))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.settings.includeHookEvents)
-          .onChange(async (value) => {
-            this.settings.includeHookEvents = value;
-            await this.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.forwardSubagentText.name'))
-      .setDesc(t('settings.claudeCode.forwardSubagentText.desc'))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.settings.forwardSubagentText)
-          .onChange(async (value) => {
-            this.settings.forwardSubagentText = value;
-            await this.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.agentProgressSummaries.name'))
-      .setDesc(t('settings.claudeCode.agentProgressSummaries.desc'))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.settings.agentProgressSummaries)
-          .onChange(async (value) => {
-            this.settings.agentProgressSummaries = value;
-            await this.saveSettings();
-          });
-      });
+  private renderDiagnosticStreamMovedNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-diagnostic-stream-moved',
+      attr: { 'data-claude-code-diagnostic-stream-moved': 'true' },
+    });
+    noticeEl.createEl('strong', { text: t('settings.claudeCode.diagnosticStreamMoved.title') });
+    noticeEl.createEl('p', { text: t('settings.claudeCode.diagnosticStreamMoved.desc') });
   }
 
   private renderEnvironmentVariablesSetting(containerEl: HTMLElement): void {

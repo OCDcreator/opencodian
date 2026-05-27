@@ -1177,7 +1177,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       );
     });
 
-    it('renders SDK foundation toggles without stable authoring UI', async () => {
+    it('renders only the experimental file checkpoint toggle in stable SDK foundations', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -1186,19 +1186,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'sdk-foundations');
 
+      // Only enableFileCheckpointing remains in stable settings
       expect(findToggle(t('settings.claudeCode.enableFileCheckpointing.name'))).toBeDefined();
-      expect(findToggle(t('settings.claudeCode.includeHookEvents.name'))).toBeDefined();
-      expect(findToggle(t('settings.claudeCode.forwardSubagentText.name'))).toBeDefined();
-      expect(findToggle(t('settings.claudeCode.agentProgressSummaries.name'))).toBeDefined();
+      // Diagnostic stream toggles moved to Capability Lab
+      const findToggleRaw = (name: string) => toggleRecords.find((candidate) => candidate.name === name);
+      expect(findToggleRaw(t('settings.claudeCode.includeHookEvents.name'))).toBeUndefined();
+      expect(findToggleRaw(t('settings.claudeCode.forwardSubagentText.name'))).toBeUndefined();
+      expect(findToggleRaw(t('settings.claudeCode.agentProgressSummaries.name'))).toBeUndefined();
+
+      // Moved notice is present
+      const movedNotice = containerEl.querySelector('[data-claude-code-diagnostic-stream-moved="true"]');
+      expect(movedNotice).toBeTruthy();
+      expect(movedNotice?.textContent).toContain(t('settings.claudeCode.diagnosticStreamMoved.title'));
 
       await findToggle(t('settings.claudeCode.enableFileCheckpointing.name')).onChange?.(true as never);
-      await findToggle(t('settings.claudeCode.includeHookEvents.name')).onChange?.(true as never);
-      await findToggle(t('settings.claudeCode.forwardSubagentText.name')).onChange?.(true as never);
-      await findToggle(t('settings.claudeCode.agentProgressSummaries.name')).onChange?.(true as never);
       expect(plugin.settings.backendSettings.claudeCode.enableFileCheckpointing).toBe(true);
-      expect(plugin.settings.backendSettings.claudeCode.includeHookEvents).toBe(true);
-      expect(plugin.settings.backendSettings.claudeCode.forwardSubagentText).toBe(true);
-      expect(plugin.settings.backendSettings.claudeCode.agentProgressSummaries).toBe(true);
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 

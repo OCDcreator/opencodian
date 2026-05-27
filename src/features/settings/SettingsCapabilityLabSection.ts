@@ -9,7 +9,7 @@
  *
  * See openspec/phase1-capability-lab.md for design rationale.
  */
-import { Notice } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
 
 import { type BackendCapabilities,hasCapability } from '../../core/agents/AgentCapability';
 import {
@@ -21,6 +21,9 @@ import {
 import type { ClaudeCodeAdapter, ClaudeCodeDiagnosticPromptResult } from '../../core/agents/backend/ClaudeCodeAdapter';
 import type { ClaudeCodePermissionBridge } from '../../core/agents/backend/ClaudeCodePermissionBridge';
 import type { AgentBackendKind } from '../../core/types/chat';
+import {
+  getDefaultClaudeCodeBackendSettings,
+} from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -44,7 +47,7 @@ interface MatrixRow {
   capability: string;
   sdkExposed: boolean;
   adapterWired: boolean;
-  runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary';
+  runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback';
   userSurface: 'settings' | 'diagnostic' | 'hidden';
 }
 
@@ -332,6 +335,16 @@ export class SettingsCapabilityLabSection {
 
   dispose(): void {}
 
+  private get claudeCodeSettings() {
+    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings() };
+    this.plugin.settings.backendSettings.claudeCode ??= getDefaultClaudeCodeBackendSettings();
+    return this.plugin.settings.backendSettings.claudeCode;
+  }
+
+  private async saveClaudeCodeSettings(): Promise<void> {
+    await this.plugin.saveSettings();
+  }
+
   attachTabbed(containerEl: HTMLElement, _secondaryTabId: string): void {
     this.createSectionHeading(
       containerEl,
@@ -453,6 +466,7 @@ export class SettingsCapabilityLabSection {
       createStatusChip(adapterCell, 'Adapter', row.adapterWired);
       const runtimeCell = tr.createEl('td');
       const proofLabel = row.runtimeProof === 'pass' ? 'Verified'
+        : row.runtimeProof === 'readback' ? 'Readback verified'
         : row.runtimeProof === 'fail' ? 'Failed'
         : row.runtimeProof === 'wiring' ? 'Wiring only'
         : row.runtimeProof === 'boundary' ? 'Boundary hit'
@@ -523,35 +537,35 @@ export class SettingsCapabilityLabSection {
         capability: 'Allowed Tools',
         sdkExposed: true, // allowedTools option in SDK
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'untested',
+        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.allowedTools is built from settings when non-empty. Not behavior-verified (cannot prove model respects the allowlist without deterministic tool-calling harness).
         userSurface: 'settings',
       },
       {
         capability: 'Disallowed Tools',
         sdkExposed: true, // disallowedTools option in SDK
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'untested',
+        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.disallowedTools is built from settings when non-empty. Not behavior-verified.
         userSurface: 'settings',
       },
       {
         capability: 'Turn/Budget Limits',
         sdkExposed: true, // maxTurns and maxBudgetUsd options in SDK
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'untested',
+        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.maxTurns / options.maxBudgetUsd are built from settings when non-null. Not behavior-verified (proving the model stops at N turns requires multi-turn chat instrumentation).
         userSurface: 'settings',
       },
       {
         capability: 'Environment Variables',
         sdkExposed: true, // env option for Claude Code process/query environment
         adapterWired: true, // buildSdkOptions/process resolution carries normalized env settings
-        runtimeProof: 'untested',
+        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.env is built from settings when non-empty. Not behavior-verified (proving the child process actually receives the vars requires OS-level inspection).
         userSurface: 'settings',
       },
       {
         capability: 'Fallback Model',
         sdkExposed: true, // fallbackModel option in SDK query options
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'untested',
+        runtimeProof: 'wiring', // Wiring-only: the option is accepted by the SDK and passed through buildSdkOptions, but behavior proof failed. When primary model is invalid, SDK returns 400 rather than falling back. The exact trigger conditions for fallback are unknown (may require rate-limit or service-unavailable, not invalid-model).
         userSurface: 'settings',
       },
       {
@@ -2006,6 +2020,7 @@ export class SettingsCapabilityLabSection {
 
     const tbody = table.createEl('tbody');
     this.renderDiscoveryRows(tbody, adapter, caps);
+    this.renderDiagnosticStreamControls(containerEl);
     this.renderDiscoveryControls(containerEl, adapter);
     this.renderDeclaredCapabilities(containerEl, caps);
   }
@@ -2015,8 +2030,18 @@ export class SettingsCapabilityLabSection {
     adapter: ClaudeCodeAdapter | null,
     caps: BackendCapabilities | undefined,
   ): void {
+    this.renderDiscoveryPluginRows(tbody, adapter);
+    this.renderDiscoveryToolRows(tbody, adapter);
+    this.renderDiscoveryStandardRows(tbody, adapter, caps);
+  }
+
+  private renderDiscoveryPluginRows(
+    tbody: HTMLTableSectionElement,
+    adapter: ClaudeCodeAdapter | null,
+  ): void {
     // Hooks
     this.addDiscoveryRow(tbody, 'Hooks', 'No authoring UI. buildSdkOptions wires hooks from adapter options.');
+
     // Plugins
     const pluginCount = adapter?.getPluginCount?.() ?? 0;
     const pluginsList = adapter?.getPluginsList?.() ?? [];
@@ -2029,6 +2054,7 @@ export class SettingsCapabilityLabSection {
         : 'No authoring UI. buildSdkOptions wires plugins from adapter options. No plugins loaded or adapter not started.',
       { status: 'discovery' },
     );
+
     // Skills
     const skillCount = adapter?.getSkillCount?.() ?? 0;
     const skillsList = adapter?.getSkillsList?.() ?? [];
@@ -2043,6 +2069,7 @@ export class SettingsCapabilityLabSection {
         : 'No authoring UI. buildSdkOptions wires skills (string[]|\'all\') from adapter options. No skills loaded or adapter not started.',
       { status: 'discovery' },
     );
+
     // MCP Servers
     const mcpServerCount = adapter?.getMcpServerCount?.() ?? 0;
     const mcpStatus = mcpServerCount > 0;
@@ -2054,6 +2081,16 @@ export class SettingsCapabilityLabSection {
         : 'Ordinary runtime passthrough via ClaudeCodeMcpConfigAdapter. No servers loaded or adapter not started. MCP authoring is in Settings > MCP.',
       { status: mcpStatus ? 'exposed' : 'discovery' },
     );
+  }
+
+  private renderDiscoveryToolRows(
+    tbody: HTMLTableSectionElement,
+    adapter: ClaudeCodeAdapter | null,
+  ): void {
+    const settings = adapter
+      ? (adapter as unknown as { options?: { settings?: Record<string, unknown> } }).options?.settings
+      : undefined;
+
     // Permission approval
     this.addDiscoveryRow(
       tbody,
@@ -2061,6 +2098,7 @@ export class SettingsCapabilityLabSection {
       'Wired only. ClaudeCodePermissionBridge maps SDK canUseTool approval requests into the shared permission card UI, and the options builder forwards the callback to the SDK. Unit-test smoke confirms the bridge wiring, but live Obsidian ordinary chat end-to-end runtime proof (model calls tool → permission card renders → user approves/denies → stream continues) is not yet available.',
       { status: 'exposed' },
     );
+
     // AskUserQuestion / Elicitation
     this.addDiscoveryRow(
       tbody,
@@ -2068,21 +2106,77 @@ export class SettingsCapabilityLabSection {
       'Wired only. The question bridge returns AskUserQuestion answers through the shared question dialog, and onElicitation is forwarded as a runtime SDK callback. Unit-test smoke confirms the bridge wiring, but live Obsidian ordinary chat end-to-end runtime proof (model asks question → dialog renders → user answers → stream continues) is not yet available.',
       { status: 'exposed' },
     );
+
+    // Allowed Tools
+    const allowedTools = settings?.allowedTools;
+    const hasAllowedTools = Array.isArray(allowedTools) && allowedTools.length > 0;
+    this.addDiscoveryRow(
+      tbody,
+      'Allowed Tools',
+      hasAllowedTools
+        ? `${allowedTools.length} tool(s) allowed: ${allowedTools.join(', ')}. Runtime-readback verified via Stable Settings Readback Proof — the option is correctly built and passed to the SDK. Behavior-verified (model actually respects the allowlist) is not proven.`
+        : 'No tools configured. Runtime-readback verified via Stable Settings Readback Proof — the option is correctly built when non-empty. Behavior-verified is not proven.',
+      { status: 'exposed' },
+    );
+
+    // Disallowed Tools
+    const disallowedTools = settings?.disallowedTools;
+    const hasDisallowedTools = Array.isArray(disallowedTools) && disallowedTools.length > 0;
+    this.addDiscoveryRow(
+      tbody,
+      'Disallowed Tools',
+      hasDisallowedTools
+        ? `${disallowedTools.length} tool(s) disallowed: ${disallowedTools.join(', ')}. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified is not proven.`
+        : 'No tools disallowed. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified is not proven.',
+      { status: 'exposed' },
+    );
+
+    // Turn/Budget Limits
+    const maxTurns = settings?.maxTurns ?? null;
+    const maxBudget = settings?.maxBudgetUsd ?? null;
+    const hasLimits = maxTurns !== null || maxBudget !== null;
+    this.addDiscoveryRow(
+      tbody,
+      'Turn/Budget Limits',
+      hasLimits
+        ? `maxTurns=${String(maxTurns)}, maxBudgetUsd=${String(maxBudget)}. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified (model stops at limit) is not proven.`
+        : 'No limits configured (SDK default: unlimited). Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified is not proven.',
+      { status: 'exposed' },
+    );
+
+    // Environment Variables
+    const env = settings?.env;
+    const hasEnv = env && typeof env === 'object' && Object.keys(env).length > 0;
+    this.addDiscoveryRow(
+      tbody,
+      'Environment Variables',
+      hasEnv
+        ? `${Object.keys(env as Record<string, unknown>).length} variable(s) configured. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified (vars reach the child process) is not proven.`
+        : 'No environment variables configured. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified is not proven.',
+      { status: 'exposed' },
+    );
+
     // Fallback Model
-    const configuredFallbackModel = adapter
-      ? (adapter as unknown as { options?: { settings?: { fallbackModel?: string } } }).options?.settings?.fallbackModel
-      : undefined;
-    const hasFallbackModel = Boolean(configuredFallbackModel && configuredFallbackModel.trim().length > 0);
+    const fallbackModel = settings?.fallbackModel;
+    const hasFallbackModel = typeof fallbackModel === 'string' && fallbackModel.trim().length > 0;
     this.addDiscoveryRow(
       tbody,
       'Fallback Model',
       hasFallbackModel
-        ? `Configured fallback model: "${configuredFallbackModel}". Wired through buildSdkOptions / buildDiagnosticSdkOptions. Changes require session restart; not live-updated like the main model. Actual fallback switching behavior is not runtime-verified.`
-        : 'Wired through buildSdkOptions / buildDiagnosticSdkOptions. No fallback model configured or adapter not started. Changes require session restart; not live-updated like the main model. Actual fallback switching behavior is not runtime-verified.',
+        ? `Configured fallback model: "${fallbackModel}". Wired through buildSdkOptions / buildDiagnosticSdkOptions. Changes require session restart; not live-updated like the main model. Behavior proof attempted with invalid-primary + valid-fallback: SDK returned 400 rather than falling back. Blocker: unknown fallback trigger conditions (may require rate-limit or service-unavailable, not invalid-model).`
+        : 'Wired through buildSdkOptions / buildDiagnosticSdkOptions. No fallback model configured or adapter not started. Changes require session restart; not live-updated like the main model. Behavior proof attempted: SDK returned 400 on invalid primary rather than falling back. Blocker: unknown fallback trigger conditions.',
       { status: 'discovery' },
     );
+  }
+
+  private renderDiscoveryStandardRows(
+    tbody: HTMLTableSectionElement,
+    adapter: ClaudeCodeAdapter | null,
+    caps: BackendCapabilities | undefined,
+  ): void {
     // Agent definitions
     this.renderAgentDefinitionsDiscoveryRow(tbody, adapter);
+
     // Agents / Subagents
     this.addDiscoveryRow(
       tbody,
@@ -2090,8 +2184,10 @@ export class SettingsCapabilityLabSection {
       'Capability not in CLAUDE_CODE_PHASE1_CAPABILITIES. Adapter methods exist but UI gating prevents display.',
       { status: !!caps && hasCapability(caps, 'subagents') ? 'exposed' : 'discovery' },
     );
+
     // Session Store
     this.addDiscoveryRow(tbody, 'Session Store', 'No UI. Wired as runtime-only option.');
+
     // Import/Delete/Restore
     this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'Adapter methods exist but no UI. Deliberately not exposed in this lab (read-only focus).');
   }
@@ -2211,6 +2307,68 @@ export class SettingsCapabilityLabSection {
     streamingProbeBtn.addEventListener('click', () => {
       void this.runStreamingContextProbe(streamingProbeOutputEl);
     });
+
+    // Stable Settings Readback Proof — verifies that settings are mapped into SDK options
+    const stableSettingsBtn = proofControls.createEl('button', {
+      text: 'Run Stable Settings Readback',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const stableSettingsOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    stableSettingsBtn.addEventListener('click', () => {
+      void this.runStableSettingsReadbackProof(adapter, stableSettingsOutputEl);
+    });
+  }
+
+  private renderDiagnosticStreamControls(containerEl: HTMLElement): void {
+    const controlsEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-diagnostic-stream-controls',
+      attr: { 'data-diagnostic': 'true', 'data-capability-lab-surface': 'diagnostic-stream' },
+    });
+    controlsEl.createEl('h5', { text: t('settings.capabilityLab.diagnosticStreamControls.title') });
+    controlsEl.createEl('p', {
+      cls: 'opencodian-capability-lab-description',
+      text: t('settings.capabilityLab.diagnosticStreamControls.description'),
+    });
+
+    new Setting(controlsEl)
+      .setName(t('settings.claudeCode.includeHookEvents.name'))
+      .setDesc(t('settings.claudeCode.includeHookEvents.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.claudeCodeSettings.includeHookEvents)
+          .onChange(async (value) => {
+            this.claudeCodeSettings.includeHookEvents = value;
+            await this.saveClaudeCodeSettings();
+          });
+      });
+
+    new Setting(controlsEl)
+      .setName(t('settings.claudeCode.forwardSubagentText.name'))
+      .setDesc(t('settings.claudeCode.forwardSubagentText.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.claudeCodeSettings.forwardSubagentText)
+          .onChange(async (value) => {
+            this.claudeCodeSettings.forwardSubagentText = value;
+            await this.saveClaudeCodeSettings();
+          });
+      });
+
+    new Setting(controlsEl)
+      .setName(t('settings.claudeCode.agentProgressSummaries.name'))
+      .setDesc(t('settings.claudeCode.agentProgressSummaries.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.claudeCodeSettings.agentProgressSummaries)
+          .onChange(async (value) => {
+            this.claudeCodeSettings.agentProgressSummaries = value;
+            await this.saveClaudeCodeSettings();
+          });
+      });
   }
 
   private renderDeclaredCapabilities(containerEl: HTMLElement, caps: ReadonlySet<string> | undefined): void {
@@ -3111,12 +3269,185 @@ export class SettingsCapabilityLabSection {
   }
 
   // =======================================================================
+  // Stable Settings Readback Proof
+  // =======================================================================
+
+  private async runStableSettingsReadbackProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running stable settings readback proof…' });
+
+    try {
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Reply with the words stable settings readback proof.',
+        persistSession: false,
+      });
+
+      const options = adapter.inspectLastDiagnosticSdkOptions?.();
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Stable Settings Readback Proof' });
+
+      if (!options) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: 'No SDK options were captured. The adapter may not support readback, or no diagnostic prompt has been run yet.',
+        });
+        return;
+      }
+
+      const results = this.buildReadbackResults(options);
+      this.renderReadbackResults(outputEl, results);
+      this.updateMatrixFromReadback(outputEl, results);
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Stable settings readback failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  private buildReadbackResults(
+    options: import('../../core/agents/backend/ClaudeCodeOptionsBuilder').ClaudeCodeSdkOptionsShape,
+  ): Array<{
+    matrixName: string;
+    present: boolean;
+    displayText: string;
+    overallStatus: 'readback' | 'wiring';
+    overallNote: string;
+  }> {
+    const allowedToolsVal = options.allowedTools ?? [];
+    const allowedTools = Array.isArray(allowedToolsVal) && allowedToolsVal.length > 0;
+    const disallowedToolsVal = options.disallowedTools ?? [];
+    const disallowedTools = Array.isArray(disallowedToolsVal) && disallowedToolsVal.length > 0;
+    const hasMaxTurns = options.maxTurns !== undefined && options.maxTurns !== null;
+    const hasMaxBudget = options.maxBudgetUsd !== undefined && options.maxBudgetUsd !== null;
+    const envVal = options.env ?? {};
+    const hasEnv = Object.keys(envVal).length > 0;
+    const hasFallback = options.fallbackModel !== undefined && options.fallbackModel !== null
+      && String(options.fallbackModel).length > 0;
+
+    return [
+      {
+        matrixName: 'Allowed Tools',
+        present: allowedTools,
+        displayText: allowedTools
+          ? `Allowed Tools: ${allowedToolsVal.length} tool(s) configured (${allowedToolsVal.join(', ')})`
+          : 'Allowed Tools: not configured',
+        overallStatus: 'readback',
+        overallNote: 'Option read back. Behavior (model respects allowlist) not proven.',
+      },
+      {
+        matrixName: 'Disallowed Tools',
+        present: disallowedTools,
+        displayText: disallowedTools
+          ? `Disallowed Tools: ${disallowedToolsVal.length} tool(s) configured (${disallowedToolsVal.join(', ')})`
+          : 'Disallowed Tools: not configured',
+        overallStatus: 'readback',
+        overallNote: 'Option read back. Behavior (model respects blocklist) not proven.',
+      },
+      {
+        matrixName: 'Turn/Budget Limits',
+        present: hasMaxTurns || hasMaxBudget,
+        displayText: hasMaxTurns || hasMaxBudget
+          ? `Turn/Budget Limits: maxTurns=${String(options.maxTurns)}, maxBudgetUsd=${String(options.maxBudgetUsd)}`
+          : 'Turn/Budget Limits: not configured (SDK default: unlimited)',
+        overallStatus: 'readback',
+        overallNote: 'Option read back. Behavior (model stops at limit) not proven.',
+      },
+      {
+        matrixName: 'Environment Variables',
+        present: hasEnv,
+        displayText: hasEnv
+          ? `Environment Variables: ${Object.keys(envVal).length} variable(s) configured`
+          : 'Environment Variables: not configured',
+        overallStatus: 'readback',
+        overallNote: 'Option read back. Behavior (vars reach child process) not proven.',
+      },
+      {
+        matrixName: 'Fallback Model',
+        present: hasFallback,
+        displayText: hasFallback
+          ? `Fallback Model: option="${String(options.fallbackModel)}" — option read back correctly`
+          : 'Fallback Model: not configured',
+        overallStatus: 'wiring',
+        overallNote: hasFallback
+          ? 'Option read back correctly, but overall capability remains wiring-only because behavior proof failed (SDK returned 400 on invalid primary instead of falling back).'
+          : 'Not configured. Behavior proof previously failed (SDK returned 400 on invalid primary).',
+      },
+    ];
+  }
+
+  private renderReadbackResults(
+    outputEl: HTMLElement,
+    results: Array<{
+      matrixName: string;
+      present: boolean;
+      displayText: string;
+      overallStatus: 'readback' | 'wiring';
+      overallNote: string;
+    }>,
+  ): void {
+    const resultsEl = outputEl.createDiv({ cls: 'opencodian-capability-lab-readback-results' });
+
+    for (const result of results) {
+      const row = resultsEl.createDiv({
+        cls: `opencodian-capability-lab-readback-row${result.present ? ' opencodian-capability-lab-readback-present' : ''}`,
+      });
+      row.createEl('strong', {
+        text: `${result.present ? '✓' : '○'} ${result.matrixName}: `,
+      });
+      row.createSpan({ text: result.displayText });
+
+      // Overall status note for this capability
+      const noteEl = row.createEl('div', {
+        cls: `opencodian-capability-lab-readback-note opencodian-capability-lab-readback-note-${result.overallStatus}`,
+      });
+      const statusIcon = result.overallStatus === 'readback' ? '📋' : '⚠️';
+      noteEl.createSpan({ text: `${statusIcon} ${result.overallNote}` });
+    }
+
+    outputEl.createEl('p', {
+      cls: 'opencodian-capability-lab-hint',
+      text: 'This proof verifies that settings UI values were correctly mapped into the SDK options shape. It does NOT prove that the SDK enforced these constraints at runtime.',
+    });
+  }
+
+  private updateMatrixFromReadback(
+    outputEl: HTMLElement,
+    results: Array<{
+      matrixName: string;
+      present: boolean;
+      displayText: string;
+      overallStatus: 'readback' | 'wiring';
+      overallNote: string;
+    }>,
+  ): void {
+    let anyPresent = false;
+    for (const result of results) {
+      if (result.present) {
+        anyPresent = true;
+        this.updateRuntimeProof(result.matrixName, result.overallStatus, outputEl);
+      }
+    }
+
+    if (!anyPresent) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'None of the stable settings are currently configured. Configure them in the Claude Code settings tabs and re-run this proof.',
+      });
+    }
+  }
+
+  // =======================================================================
   // Runtime Proof Update (in-page notification)
   // =======================================================================
 
   private updateRuntimeProof(
     _capability: string,
-    _status: 'pass' | 'fail' | 'untested' | 'wiring' | 'boundary',
+    _status: 'pass' | 'fail' | 'untested' | 'wiring' | 'boundary' | 'readback',
     outputEl: HTMLElement,
   ): void {
     // Lightweight inline marker — does not persist across tab switches.
@@ -3131,6 +3462,7 @@ export class SettingsCapabilityLabSection {
       },
     });
     const label = _status === 'pass' ? '✓ Runtime verified'
+      : _status === 'readback' ? '✓ Readback verified — not behavior verified'
       : _status === 'fail' ? '✗ Runtime failed'
       : _status === 'wiring' ? '⚠ Wiring only — not behavior verified'
       : _status === 'boundary' ? '◆ Boundary hit — UI context missing'

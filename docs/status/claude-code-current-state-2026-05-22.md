@@ -18,8 +18,8 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280359`
-- Latest follow-up polish round (stable settings readback proof): see "2026-05-28 Stable Settings Readback Proof" below
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280418`
+- Latest follow-up polish round (stable settings UI honesty pass): see "2026-05-28 Stable Settings UI Honesty Pass" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -66,6 +66,48 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-28 SDK Foundations Diagnostic Surface Migration
+
+This slice moves three purely diagnostic stream flags (`includeHookEvents`, `forwardSubagentText`, `agentProgressSummaries`) out of the stable Claude Code settings UI into the Debug → Capability Lab diagnostic surface. The stable `sdk-foundations` tab now only exposes `enableFileCheckpointing` (the only @experimental toggle, not @diagnostic).
+
+### What Changed
+
+- `SettingsClaudeCodeSection.ts`:
+  - Removed `includeHookEvents`, `forwardSubagentText`, and `agentProgressSummaries` toggles from `renderSdkFoundationOptions()`
+  - Kept `enableFileCheckpointing` as the only stable SDK Foundations toggle
+  - Added `renderDiagnosticStreamMovedNotice()` with `data-claude-code-diagnostic-stream-moved` selector, explaining that diagnostic stream controls moved to Capability Lab
+- `SettingsCapabilityLabSection.ts`:
+  - Added `renderDiagnosticStreamControls()` method with toggle controls for all three diagnostic stream flags
+  - Added `claudeCodeSettings` getter and `saveClaudeCodeSettings()` helper to read/write plugin settings
+  - Diagnostic stream controls render in the Discovery & Status section with `data-capability-lab-surface="diagnostic-stream"`
+- Locale strings (en + zh):
+  - Added `settings.claudeCode.diagnosticStreamMoved.title` / `.desc` for the stable settings notice
+  - Added `settings.capabilityLab.diagnosticStreamControls.title` / `.description` for the Capability Lab section header
+- Tests:
+  - Updated `SettingsClaudeCodeSection.test.ts` to expect only `enableFileCheckpointing` toggle in sdk-foundations tab, plus the moved notice
+  - Added test in `SettingsCapabilityLabSection.test.ts` verifying diagnostic stream controls surface exists with correct data attributes
+
+### Surface Decision
+
+| Control | Previous Surface | New Surface | Reason |
+|---|---|---|---|
+| `enableFileCheckpointing` | SDK Foundations (stable) | SDK Foundations (stable) | @experimental — has future verified rewind use, not purely diagnostic |
+| `includeHookEvents` | SDK Foundations (stable) | Capability Lab → Diagnostic Stream Controls | @diagnostic — only feeds diagnostic stream logs, no stable UI connection |
+| `forwardSubagentText` | SDK Foundations (stable) | Capability Lab → Diagnostic Stream Controls | @diagnostic — only feeds diagnostic event streams, no stable transcript UI |
+| `agentProgressSummaries` | SDK Foundations (stable) | Capability Lab → Diagnostic Stream Controls | @diagnostic — only feeds diagnostic event streams, full progress UI is experimental |
+
+### Verification
+
+- Full verify: 443 suites / 3391 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280451)
+- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280451`
+- Runtime UI proof (Test Vault):
+  - Stable SDK Foundations tab: only `enableFileCheckpointing` toggle present, `data-claude-code-diagnostic-stream-moved` notice visible with Chinese locale text "诊断流控制已迁移"
+  - Capability Lab Discovery section: `data-capability-lab-surface="diagnostic-stream"` controls present with all three toggles (Hook 事件流, 转发子代理 transcript, 子代理进度摘要)
+  - DOM assertions: `findToggleRaw` confirms diagnostic toggles absent from stable settings; `capSurface` confirms all three toggles present in Capability Lab
+- Console: no errors; Errors: none captured
+
+---
+
 ## 2026-05-28 Stable Settings Readback Proof
 
 This slice adds runtime readback proof for Claude Code stable settings (Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables, Fallback Model) by capturing the actual SDK options built during a diagnostic prompt and verifying these fields are present.
@@ -108,8 +150,8 @@ This slice adds runtime readback proof for Claude Code stable settings (Allowed 
 
 ### Verification
 
-- Full verify: 443 suites / 3387 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280359)
-- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280359`
+- Full verify: 443 suites / 3390 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280418)
+- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280418`
 - Runtime proof (Test Vault):
   - Empty config: correctly reports "None of the stable settings are currently configured"
   - Configured values (allowedTools=['Read','Bash'], disallowedTools=['Edit'], maxTurns=10, maxBudgetUsd=5, env={TEST_VAR:'test_value'}, fallbackModel='claude-haiku-4-5'): all 6 items marked "✓ Readback verified — not behavior verified"
@@ -148,9 +190,9 @@ This slice updates the Claude Code stable settings UI surface to match the Capab
 
 ### Verification
 
-- Full verify: pending
-- Test Vault deployed and BUILD_ID verified: pending
-- Runtime UI proof (obsidian-plugin-autodebug): pending
+- Full verify: 443 suites / 3390 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean (BUILD_ID=feature-phase0-capability.202605280418)
+- Test Vault deployed and BUILD_ID verified: `feature-phase0-capability.202605280418`
+- Runtime UI proof (obsidian-plugin-autodebug): verified — proof-status notices visible in Tools, Model & Thinking, and Runtime tabs with `data-proof-state="readback"`
 
 ---
 

@@ -200,6 +200,12 @@
   color: var(--opencodian-status-success);
 }
 
+.opencodian-settings .opencodian-capability-lab-chip-readback {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
+}
+
 .opencodian-settings .opencodian-capability-lab-chip-untested,
 .opencodian-settings .opencodian-capability-lab-chip-surface-diagnostic {
   border-color: var(--opencodian-status-warning-border);
@@ -352,6 +358,12 @@
   border-color: var(--opencodian-status-success-border);
   background: var(--opencodian-status-success-subtle);
   color: var(--opencodian-status-success);
+}
+
+.opencodian-settings .opencodian-capability-lab-proof-readback {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
 }
 
 .opencodian-settings .opencodian-capability-lab-proof-fail {

@@ -83,6 +83,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 2026-05-28 本轮更新 `settings.claudeCode.maxTurns.desc`、`settings.claudeCode.maxBudgetUsd.desc`、`settings.claudeCode.env.desc`，移除过时的“wired but not yet runtime-verified”文案；新增 `settings.claudeCode.proofStatus.tools`、`settings.claudeCode.proofStatus.limits`、`settings.claudeCode.proofStatus.env` 三个共享 proof-status notice 键，用于在 Tools、Model & Thinking、Runtime 标签中 compact 地展示 runtime readback verified 状态。更新 `settings.claudeCode.fallbackModel.desc` 和 `settings.claudeCode.fallbackModel.boundaryNotice`，诚实标注“option wiring and readback are proven; automatic fallback behavior is unproven with the current SDK”。
 
+2026-05-28 SDK Foundations 诊断表面迁移：新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`，用于在稳定 SDK Foundations 标签中提示用户诊断流控制已迁移到 Capability Lab；新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`，用于 Capability Lab 中 Diagnostic Stream Controls 子区的标题和说明。保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些设置键仍然有效，只是 UI 表面从稳定设置迁移到了诊断面板。
+
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
 
 2026-05-27 新增 `settings.claudeCode.fallbackModel.boundaryNotice` 键，用于 Model & Thinking 标签中 fallback model 控件后的边界提示。文案说明 fallbackModel 的修改需要重启活跃 Claude Code 会话或开始新的查询,无法像主模型一样在已运行的流中实时更新。

@@ -12,6 +12,57 @@
 
 ---
 
+## 2026-05-28 SDK Foundations Diagnostic Surface Migration
+
+### 目标
+
+将三个纯诊断流开关（`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`）从稳定的 Claude Code SDK Foundations 设置标签迁移到 Debug → Capability Lab 诊断表面，保持稳定设置表面只暴露真正具有实验性/产品化潜力的控制。
+
+### 改动
+
+1. **SettingsClaudeCodeSection.ts**：
+   - `renderSdkFoundationOptions()` 中移除三个 `@diagnostic` 级别的 toggle（hook event stream、forward subagent transcript、subagent progress summaries）
+   - 保留 `enableFileCheckpointing`（唯一 `@experimental` 而非 `@diagnostic` 的开关）
+   - 新增 `renderDiagnosticStreamMovedNotice()`，在稳定标签中显示迁移提示，使用 `data-claude-code-diagnostic-stream-moved` 选择器
+
+2. **SettingsCapabilityLabSection.ts**：
+   - 新增 `claudeCodeSettings` getter 和 `saveClaudeCodeSettings()`，用于读取/保存插件设置中的 Claude Code 后端配置
+   - 新增 `renderDiagnosticStreamControls()` 方法，在 Discovery & Status 区渲染三个诊断流开关
+   - 使用 `Setting` 组件创建标准 toggle，保持与稳定设置相同的交互体验
+   - 诊断流控制区使用 `data-capability-lab-surface="diagnostic-stream"` 选择器
+
+3. **Locale 文案**（en.ts + zh.ts）：
+   - 新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`：稳定设置中的迁移提示
+   - 新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`：Capability Lab 区段标题和说明
+   - 保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些键仍然描述同一组设置，只是 UI 表面迁移了
+
+4. **测试**：
+   - `SettingsClaudeCodeSection.test.ts`：更新 sdk-foundations tab 测试，只期望 `enableFileCheckpointing` toggle 存在，验证三个诊断 toggle 已消失，验证迁移提示 DOM 存在
+   - `SettingsCapabilityLabSection.test.ts`：新增测试验证诊断流控制区存在且包含正确的 data 属性；更新 `createMockPlugin` 以提供 `settings.backendSettings.claudeCode` 和 `saveSettings`
+
+5. **文档**：
+   - `docs/status/claude-code-current-state-2026-05-22.md`：添加 "SDK Foundations Diagnostic Surface Migration" 章节，记录迁移决策矩阵
+   - `docs/modules/features/settings/SettingsClaudeCodeSection.md`：更新 SDK Foundations 标签描述
+   - `docs/modules/features/settings/SettingsCapabilityLabSection.md`：更新 Discovery & Status 面板描述，加入 Diagnostic Stream Controls 子区
+
+### 表面决策
+
+| 控制 | 之前表面 | 新表面 | 原因 |
+|---|---|---|---|
+| `enableFileCheckpointing` | SDK Foundations (稳定) | SDK Foundations (稳定) | @experimental — 有未来验证 rewind 用途，非纯诊断 |
+| `includeHookEvents` | SDK Foundations (稳定) | Capability Lab → 诊断流控制 | @diagnostic — 只喂诊断流日志，无稳定 UI 连接 |
+| `forwardSubagentText` | SDK Foundations (稳定) | Capability Lab → 诊断流控制 | @diagnostic — 只喂诊断事件流，无稳定 transcript UI |
+| `agentProgressSummaries` | SDK Foundations (稳定) | Capability Lab → 诊断流控制 | @diagnostic — 只喂诊断事件流，完整进度 UI 仍实验性 |
+
+### 验证
+
+- 443 suites / 3391 tests passed（+1 新 Capability Lab 测试，+1 更新的 Claude Code 设置测试）
+- Lint: 0 errors / 0 warnings
+- Typecheck: clean
+- 设置仍然通过 `plugin.settings.backendSettings.claudeCode` 持久化；只有 UI 表面迁移
+
+---
+
 ## 2026-05-28 Claude Code Stable Settings UI Honesty Pass
 
 ### 目标

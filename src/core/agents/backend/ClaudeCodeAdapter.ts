@@ -290,6 +290,7 @@ export class ClaudeCodeAdapter
   private readonly cancelledSessions = new Set<string>();
   private readonly invalidatedSessions = new Set<string>();
   private sdkLoadPromise: Promise<ClaudeCodeSdkFacade> | null = null;
+  private lastDiagnosticSdkOptions: ClaudeCodeSdkOptionsShape | null = null;
 
   constructor(private readonly options: ClaudeCodeAdapterOptions) {}
 
@@ -885,7 +886,7 @@ export class ClaudeCodeAdapter
     abortController: AbortController | undefined,
     request: ClaudeCodeDiagnosticPromptRequest,
   ): ClaudeCodeSdkOptionsShape {
-    return buildClaudeCodeOptions({
+    const options = buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
       settings: this.options.settings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
@@ -914,6 +915,24 @@ export class ClaudeCodeAdapter
       fallbackModel: request.fallbackModel,
       model: request.model,
     });
+    this.lastDiagnosticSdkOptions = options;
+    return options;
+  }
+
+  /**
+   * Return a deep clone of the last SDK options built by a diagnostic prompt.
+   * This is a read-only diagnostic surface for verifying that stable settings
+   * (allowedTools, disallowedTools, maxTurns, maxBudgetUsd, env, fallbackModel)
+   * were correctly mapped into the SDK options shape.
+   */
+  inspectLastDiagnosticSdkOptions(): ClaudeCodeSdkOptionsShape | null {
+    if (!this.lastDiagnosticSdkOptions) return null;
+    try {
+      return structuredClone(this.lastDiagnosticSdkOptions) as ClaudeCodeSdkOptionsShape;
+    } catch {
+      // Fallback for environments where structuredClone is unavailable
+      return JSON.parse(JSON.stringify(this.lastDiagnosticSdkOptions)) as ClaudeCodeSdkOptionsShape;
+    }
   }
 
   /**

@@ -51,6 +51,7 @@
 - `buildSdkOptions` 同时记录 `buildSdkOptions limits config` 日志，包含 `maxTurns` 和 `maxBudgetUsd`（未设置时为 `null`），用于在运行时验证限制项是否进入 SDK query 选项
 - `buildSdkOptions` 还记录 `buildSdkOptions fallback model` 日志，包含 `fallbackModel` 值（未设置时为 `null`），用于在运行时验证 fallback model 是否进入 SDK query 选项
 - 2026-05-28: prompt hardening 尝试（commit `1c7a380a`）已被 revert，因为运行时 artifact 证明它未能稳定消除 structured output 路径中的额外 prose；该问题目前归为 SDK/model 边界
+- 新增 `inspectLastDiagnosticSdkOptions()` 公共诊断方法：返回最后一次 `buildDiagnosticSdkOptions()` 构建的 `ClaudeCodeSdkOptionsShape` 的**深拷贝副本**（使用 `structuredClone` 或 JSON fallback），供 Capability Lab 的 Stable Settings Readback Proof 使用。返回副本而非活对象，确保诊断 UI 不会意外污染 adapter 内部状态。该方法只读取内部缓存的 `lastDiagnosticSdkOptions`，不触发新的 SDK 调用，也不暴露普通聊天路径的 options。它使稳定设置（allowedTools、disallowedTools、maxTurns、maxBudgetUsd、env、fallbackModel）的 runtime-readback proof 成为可能：探针运行诊断 prompt 后，可以验证实际传入 SDK 的 options 中是否包含这些字段，从而区分 "wiring-only" 和 "runtime-readback verified"。
 - `ClaudeCodeDiagnosticPromptRequest` 接口现在接受可选 `fallbackModel?: string` 字段，允许 Capability Lab 诊断探针在运行诊断 prompt 时覆盖 fallback model；同时接受可选 `model?: string` 字段，允许诊断探针使用故意无效的主模型名称来触发 fallback 行为验证
 - `buildDiagnosticSdkOptions()` 将 `request.fallbackModel` 和 `request.model` 透传到 options builder，用于诊断级的模型覆盖验证
 - `runFallbackModelProof()` 现在使用故意无效的主模型（`opencodian-invalid-model-test-xyz123`）配合有效 fallback 模型运行诊断 prompt，通过检查返回的 `message_metadata` chunk 中的 `modelId` 来诚实判断 SDK 是否真的发生了 fallback 切换；只有在检测到查询成功且使用的模型不是无效主模型时，才会标记为 `pass`，否则保持 `wiring` 或标记 `fail`

@@ -6,7 +6,7 @@ import { setLocale, t } from '../../../../src/i18n';
  * Minimal mock plugin that satisfies CapabilityLabDeps.
  * agentServiceRegistry is the only accessed property via getClaudeCodeAdapter().
  */
-function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claude-code' : null): never {
+function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claude-code' : null, settingsOverride?: Record<string, unknown>): never {
   const registry = adapter
     ? {
         get: jest.fn().mockReturnValue(adapter),
@@ -22,9 +22,30 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
         listAll: jest.fn().mockReturnValue([]),
         adapters: new Map(),
       };
+  const defaultClaudeSettings = {
+    enableFileCheckpointing: false,
+    includeHookEvents: false,
+    forwardSubagentText: false,
+    agentProgressSummaries: false,
+    allowedTools: [],
+    disallowedTools: [],
+    maxTurns: null,
+    maxBudgetUsd: null,
+    env: {},
+    fallbackModel: '',
+  };
   return {
     agentServiceRegistry: registry,
     getConversations: jest.fn().mockReturnValue([]),
+    settings: {
+      backendSettings: {
+        claudeCode: {
+          ...defaultClaudeSettings,
+          ...settingsOverride,
+        },
+      },
+    },
+    saveSettings: jest.fn().mockResolvedValue(undefined),
   } as never;
 }
 
@@ -66,6 +87,33 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('DIAGNOSTIC');
     expect(banner!.textContent).toContain('EXPERIMENTAL');
     expect(banner!.textContent).toContain('NOT STABLE');
+  });
+
+  it('renders diagnostic stream controls in Discovery section with toggles backed by plugin settings', async () => {
+    const plugin = createMockPlugin(null, null, {
+      includeHookEvents: false,
+      forwardSubagentText: true,
+      agentProgressSummaries: false,
+    });
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const controlsEl = containerEl.querySelector('[data-capability-lab-surface="diagnostic-stream"]');
+    expect(controlsEl).toBeTruthy();
+    expect(controlsEl!.getAttribute('data-diagnostic')).toBe('true');
+    expect(controlsEl!.textContent).toContain(t('settings.capabilityLab.diagnosticStreamControls.title'));
+    expect(controlsEl!.textContent).toContain(t('settings.capabilityLab.diagnosticStreamControls.description'));
+
+    // Verify settings object reflects initial values
+    const claudeSettings = (plugin as unknown as { settings: { backendSettings: { claudeCode: Record<string, unknown> } } }).settings.backendSettings.claudeCode;
+    expect(claudeSettings.includeHookEvents).toBe(false);
+    expect(claudeSettings.forwardSubagentText).toBe(true);
+    expect(claudeSettings.agentProgressSummaries).toBe(false);
   });
 
   it('renders all ten diagnostic panels including fork, resume, session detail, and backend routing probes', () => {
@@ -580,7 +628,7 @@ describe('SettingsCapabilityLabSection', () => {
     const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
     expect(fallbackRow?.textContent).toContain('claude-haiku-4-5');
     expect(fallbackRow?.textContent).toContain('Discovery Only');
-    expect(fallbackRow?.textContent).toContain('not runtime-verified');
+    expect(fallbackRow?.textContent).toContain('Blocker: unknown fallback trigger conditions');
   });
 
   it('renders Fallback Model discovery row as empty when adapter has no fallbackModel', () => {
@@ -612,10 +660,10 @@ describe('SettingsCapabilityLabSection', () => {
     const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
     expect(fallbackRow?.textContent).toContain('No fallback model configured');
     expect(fallbackRow?.textContent).toContain('Discovery Only');
-    expect(fallbackRow?.textContent).toContain('not runtime-verified');
+    expect(fallbackRow?.textContent).toContain('Blocker: unknown fallback trigger conditions');
   });
 
-  it('renders advanced Claude settings as settings-surface untested SDK option rows', () => {
+  it('renders advanced Claude settings as settings-surface readback-verified SDK option rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -632,7 +680,7 @@ describe('SettingsCapabilityLabSection', () => {
       expect(row).not.toBeNull();
       expect(row?.textContent).toContain('SDK');
       expect(row?.textContent).toContain('Adapter');
-      expect(row?.textContent).toContain('Untested');
+      expect(row?.textContent).toContain('Readback verified');
       expect(row?.textContent).not.toContain('Verified');
       expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
     }
@@ -840,7 +888,7 @@ describe('SettingsCapabilityLabSection', () => {
     // Expected honest classifications for every capability row.
     // runtimeProof: 'pass' only when direct SDK smoke proof exists.
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
-    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
+    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' }> = {
       Hooks: { runtimeProof: 'untested', userSurface: 'hidden' },
       'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'settings' },
       'JSONL History Browser': { runtimeProof: 'untested', userSurface: 'diagnostic' },
@@ -848,11 +896,11 @@ describe('SettingsCapabilityLabSection', () => {
       Skills: { runtimeProof: 'untested', userSurface: 'hidden' },
       Plugins: { runtimeProof: 'untested', userSurface: 'hidden' },
       'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Allowed Tools': { runtimeProof: 'untested', userSurface: 'settings' },
-      'Disallowed Tools': { runtimeProof: 'untested', userSurface: 'settings' },
-      'Turn/Budget Limits': { runtimeProof: 'untested', userSurface: 'settings' },
-      'Environment Variables': { runtimeProof: 'untested', userSurface: 'settings' },
-      'Fallback Model': { runtimeProof: 'untested', userSurface: 'settings' },
+      'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Disallowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Turn/Budget Limits': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Environment Variables': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Fallback Model': { runtimeProof: 'wiring', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'wiring', userSurface: 'settings' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'wiring', userSurface: 'settings' },
       'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
@@ -875,15 +923,20 @@ describe('SettingsCapabilityLabSection', () => {
       expect(surface).toBe(expectedValues.userSurface);
 
       const proofText = row?.textContent ?? '';
-      const proofLabel = proofText.includes('Verified') ? 'pass'
-        : proofText.includes('Failed') ? 'fail'
-          : proofText.includes('Wiring only') ? 'wiring'
-            : 'untested';
+      const proofLabel = proofText.includes('Readback verified') ? 'readback'
+        : proofText.includes('Verified') ? 'pass'
+          : proofText.includes('Failed') ? 'fail'
+            : proofText.includes('Wiring only') ? 'wiring'
+              : 'untested';
       expect(proofLabel).toBe(expectedValues.runtimeProof);
     }
 
-    // Honesty rule: untested capabilities must not read as verified.
-    const verifiedRows = rows.filter((row) => row.textContent?.includes('Verified'));
+    // Honesty rule: only true behavior-verified capabilities count as 'Verified'.
+    // 'Readback verified' is a distinct category and must not inflate the verified count.
+    const verifiedRows = rows.filter((row) => {
+      const text = row.textContent ?? '';
+      return text.includes('Verified') && !text.includes('Readback verified');
+    });
     const verifiedCapabilities = verifiedRows.map((row) => {
       const firstCell = row.querySelector('td');
       return firstCell?.textContent ?? '';
@@ -3089,6 +3142,120 @@ describe('SettingsCapabilityLabSection', () => {
     await (section as any).runStreamingContextProbe(outputEl);
 
     expect(outputEl.textContent).toContain('Synthetic context injection failed');
+  });
+
+  it('renders stable settings readback proof button in discovery controls', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Stable Settings Readback')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks stable settings as readback verified when options contain configured values', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-readback-1',
+        rawMessages: [],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        allowedTools: ['Read', 'Bash'],
+        disallowedTools: ['Edit'],
+        maxTurns: 10,
+        maxBudgetUsd: 5.0,
+        env: { FOO: 'bar' },
+        fallbackModel: 'claude-haiku-4-5',
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Stable Settings Readback')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: expect.stringContaining('stable settings readback proof'),
+      persistSession: false,
+    }));
+
+    // Verify readback results are shown
+    expect(containerEl.textContent).toContain('Allowed Tools:');
+    expect(containerEl.textContent).toContain('2 tool(s) configured');
+    expect(containerEl.textContent).toContain('Disallowed Tools:');
+    expect(containerEl.textContent).toContain('1 tool(s) configured');
+    expect(containerEl.textContent).toContain('maxTurns=10');
+    expect(containerEl.textContent).toContain('maxBudgetUsd=5');
+    expect(containerEl.textContent).toContain('1 variable(s) configured');
+    expect(containerEl.textContent).toContain('option="claude-haiku-4-5"');
+
+    // Verify readback markers for capabilities that are genuinely readback-classified
+    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables = 4 readback markers
+    // Fallback Model is wiring overall (behavior proof failed) so it gets a wiring marker, not readback
+    const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBe(4);
+
+    // Verify Fallback Model gets a wiring marker (not readback) because behavior proof failed
+    const wiringMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-wiring');
+    expect(wiringMarkers.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows no-config hint when stable settings readback finds nothing configured', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-readback-empty',
+        rawMessages: [],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        allowedTools: [],
+        disallowedTools: [],
+        env: {},
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Stable Settings Readback')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('None of the stable settings are currently configured');
+    const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBe(0);
   });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 });
