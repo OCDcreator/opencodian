@@ -440,7 +440,7 @@ export class SettingsClaudeCodeSection {
   private renderEnvProofStatusNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
       cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'env', 'data-proof-state': 'pass' },
+      attr: { 'data-claude-code-proof-status': 'env', 'data-proof-state': 'readback' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.env') });
   }

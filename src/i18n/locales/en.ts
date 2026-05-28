@@ -2232,7 +2232,7 @@ export const enTranslations = {
   'settings.claudeCode.fallbackModel.quickSelectDesc': 'Choose a fallback model from the discovered catalog. The selected value updates the fallback model field above automatically.',
   'settings.claudeCode.proofStatus.tools': 'Runtime readback verified. The SDK accepts these values; actual tool enforcement depends on the SDK version and model.',
   'settings.claudeCode.proofStatus.limits': 'Runtime readback verified. The SDK accepts these values; actual turn/budget enforcement depends on the SDK and model.',
-  'settings.claudeCode.proofStatus.env': 'Runtime verified. Environment variables propagate into Claude and Bash subprocesses (Layer 1-4 PASS via diagnostic bypass). Scope: proves env propagation, not permission approval UX.',
+  'settings.claudeCode.proofStatus.env': 'Runtime readback verified. Settings→SDK mapping proven; live behavior proof (env propagation into Claude/Bash subprocesses) is available via Capability Lab diagnostic bypass.',
   'settings.claudeCode.modelCatalog.quickSelectPlaceholder': '— Select from catalog —',
   'settings.claudeCode.thinking.name': 'Thinking',
   'settings.claudeCode.thinking.desc': 'Controls Claude Code thinking behavior when the selected model supports it.',

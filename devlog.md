@@ -12,6 +12,25 @@
 
 ---
 
+## 2026-05-28 Phase0-Capability Follow-Up: Source/Product Fork Fix — Env Proof Downgrade Synchronization
+
+### 目标
+
+修复上一轮 Close-Out 中未完成的源码/产物分叉：`SettingsClaudeCodeSection.ts` 的 `renderEnvProofStatusNotice()` 已将 `data-proof-state` 从 `pass` 改为 `readback`，locale 字符串也已更新，但测试名称和 module doc 仍包含旧说法。
+
+### 改动
+
+1. **tests/unit/features/settings/SettingsClaudeCodeSection.test.ts**: 测试名称从 `'renders env proof status notice with pass state in runtime tab'` 改为 `'...with readback state in runtime tab'`，与断言 `toBe('readback')` 保持一致
+2. **docs/modules/features/settings/SettingsClaudeCodeSection.md**: Runtime 标签职责描述从 "runtime verified proof-status notice（Layer 1-4 PASS via diagnostic bypass）" 改为 "runtime readback proof-status notice（live behavior proof defers to Capability Lab diagnostic bypass）"
+3. **devlog.md**: 本条目
+
+### 验证
+
+- 所有 8 个 modified 文件现在一致：源码 (`pass`→`readback`)、locale ("Runtime verified"→"Runtime readback verified")、测试（名称+断言均对齐）、文档（描述已同步）
+- 产品边界：稳定 Runtime tab env notice = `readback`；Capability Lab 静态 matrix = `readback`；Capability Lab live proof output / inline runtime marker = `pass`
+
+---
+
 ## 2026-05-28 Phase0-Capability Close-Out: Verify + Deploy + Fresh Runtime Proof
 
 ### 目标

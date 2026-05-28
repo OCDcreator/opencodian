@@ -2232,7 +2232,7 @@ export const zhTranslations = {
   'settings.claudeCode.fallbackModel.quickSelectDesc': '从发现的模型目录中选择备用模型。所选值会自动更新上方的备用模型字段。',
   'settings.claudeCode.proofStatus.tools': '运行时回读已验证。SDK 接受这些值；实际工具 enforcement 取决于 SDK 版本和模型。',
   'settings.claudeCode.proofStatus.limits': '运行时回读已验证。SDK 接受这些值；实际轮数/预算 enforcement 取决于 SDK 和模型。',
-  'settings.claudeCode.proofStatus.env': '运行时已验证。环境变量传播到 Claude 和 Bash 子进程（通过诊断旁路 Layer 1-4 全部通过）。范围：验证环境变量传播，不包括权限审批 UX。',
+  'settings.claudeCode.proofStatus.env': '运行时回读已验证。设置→SDK 映射已确认；实时行为验证（环境变量传播到 Claude/Bash 子进程）可通过 Capability Lab 诊断旁路进行。',
   'settings.claudeCode.modelCatalog.quickSelectPlaceholder': '— 从目录中选择 —',
   'settings.claudeCode.thinking.name': 'Thinking',
   'settings.claudeCode.thinking.desc': '当所选模型支持时，控制 Claude Code 的 thinking 行为。',

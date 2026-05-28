@@ -18,8 +18,8 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280759`
-- Latest follow-up polish round (Claude chat surface honesty + validation): see "2026-05-28 Claude Chat Surface Honesty + Validation Pass" below
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280911`
+- Latest close-out round (Env Variables downgrade + openTabById guard): see "2026-05-28 Environment Variables Honest Downgrade + Proof Hardening + SessionSettingsModal Race Guard (Close-Out)" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
