@@ -2233,6 +2233,7 @@ export const enTranslations = {
   'settings.claudeCode.proofStatus.tools': 'Runtime readback verified. The SDK accepts these values; actual tool enforcement depends on the SDK version and model.',
   'settings.claudeCode.proofStatus.limits': 'Runtime readback verified. The SDK accepts these values; actual turn/budget enforcement depends on the SDK and model.',
   'settings.claudeCode.proofStatus.env': 'Runtime readback verified. Settings→SDK mapping proven; live behavior proof (env propagation into Claude/Bash subprocesses) is available via Capability Lab diagnostic bypass.',
+  'settings.claudeCode.proofStatus.fallbackModel': 'Wiring only. The fallback model option is accepted by the SDK and readback-confirmed, but automatic fallback behavior is unproven — invalid primary model proof returns HTTP 400, not a fallback switch.',
   'settings.claudeCode.modelCatalog.quickSelectPlaceholder': '— Select from catalog —',
   'settings.claudeCode.thinking.name': 'Thinking',
   'settings.claudeCode.thinking.desc': 'Controls Claude Code thinking behavior when the selected model supports it.',

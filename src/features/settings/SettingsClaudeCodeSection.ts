@@ -230,6 +230,7 @@ export class SettingsClaudeCodeSection {
     const fallbackTextControl = this.renderFallbackModelSetting(containerEl);
     this.renderFallbackModelQuickSelect(containerEl, fallbackTextControl);
     this.renderFallbackModelBoundaryNotice(containerEl);
+    this.renderFallbackModelProofStatusNotice(containerEl);
     this.renderThinkingSetting(containerEl);
     if (this.settings.thinking.type === 'fixed') {
       this.renderThinkingBudgetSetting(containerEl);
@@ -419,6 +420,14 @@ export class SettingsClaudeCodeSection {
       attr: { 'data-claude-code-fallback-model-boundary': 'true' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.fallbackModel.boundaryNotice') });
+  }
+
+  private renderFallbackModelProofStatusNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
+      attr: { 'data-claude-code-proof-status': 'fallback-model', 'data-proof-state': 'wiring' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.fallbackModel') });
   }
 
   private renderToolsProofStatusNotice(containerEl: HTMLElement): void {

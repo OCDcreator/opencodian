@@ -469,6 +469,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.fallbackModel.boundaryNotice'));
     });
 
+    it('renders fallback model proof status notice with wiring state in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="fallback-model"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('wiring');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.fallbackModel'));
+    });
+
     it('renders limits proof status notice with readback state in model-thinking tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

@@ -2233,6 +2233,7 @@ export const zhTranslations = {
   'settings.claudeCode.proofStatus.tools': '运行时回读已验证。SDK 接受这些值；实际工具 enforcement 取决于 SDK 版本和模型。',
   'settings.claudeCode.proofStatus.limits': '运行时回读已验证。SDK 接受这些值；实际轮数/预算 enforcement 取决于 SDK 和模型。',
   'settings.claudeCode.proofStatus.env': '运行时回读已验证。设置→SDK 映射已确认；实时行为验证（环境变量传播到 Claude/Bash 子进程）可通过 Capability Lab 诊断旁路进行。',
+  'settings.claudeCode.proofStatus.fallbackModel': '仅连接。备用模型选项已被 SDK 接受且回读确认，但自动回退行为尚未验证——无效主模型验证返回 HTTP 400，而非自动切换。',
   'settings.claudeCode.modelCatalog.quickSelectPlaceholder': '— 从目录中选择 —',
   'settings.claudeCode.thinking.name': 'Thinking',
   'settings.claudeCode.thinking.desc': '当所选模型支持时，控制 Claude Code 的 thinking 行为。',

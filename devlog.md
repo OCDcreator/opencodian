@@ -12,6 +12,35 @@
 
 ---
 
+## 2026-05-28 Phase0-Capability: Fallback Model Settings Proof-Status Notice (Honest UX)
+
+### 目标
+
+为 Fallback Model 的稳定设置 surface（Model & Thinking tab）增加 compact proof-status notice，明确标出选项 wiring + 回读已确认但自动 fallback 行为未验证的真实能力边界。此前只有 boundary notice（"需要重启"），缺乏与 Tools/Limits/Env 一致的 proof-status 表达。
+
+### 改动
+
+1. **src/features/settings/SettingsClaudeCodeSection.ts**: 新增 `renderFallbackModelProofStatusNotice()`，在 `renderModelThinkingTab()` 中 `renderFallbackModelBoundaryNotice()` 后调用。渲染 `data-claude-code-proof-status="fallback-model"` `data-proof-state="wiring"` 的 compact inline notice
+2. **src/i18n/locales/en.ts**: 新增 `settings.claudeCode.proofStatus.fallbackModel` — 英文："Wiring only. The fallback model option is accepted by the SDK and readback-confirmed, but automatic fallback behavior is unproven — invalid primary model proof returns HTTP 400, not a fallback switch."
+3. **src/i18n/locales/zh.ts**: 新增 `settings.claudeCode.proofStatus.fallbackModel` — 中文："仅连接。备用模型选项已被 SDK 接受且回读确认，但自动回退行为尚未验证——无效主模型验证返回 HTTP 400，而非自动切换。"
+4. **tests/unit/features/settings/SettingsClaudeCodeSection.test.ts**: 新增测试：验证 fallback proof-status notice 渲染并携带 `data-proof-state="wiring"` 和正确的 locale 文本
+5. **docs/modules/features/settings/SettingsClaudeCodeSection.md**: 更新 Model & Thinking 标签职责描述和 proof-status notice 列表，增加 `renderFallbackModelProofStatusNotice()` 说明
+6. **docs/status/claude-code-current-state-2026-05-22.md**: 新增 "Fallback Model Settings Proof-Status Notice" 节，记录 gap/改动/classification/scope boundary
+
+### 产品边界
+
+**Fallback Model 当前属于"Diagnostic + Stable UX Honesty"档**：
+- Capability Lab: `wiring`（静态矩阵行 + 诊断 proof 按钮，已确认返回 400）
+- Stable Settings: `wiring`（新增 compact proof-status notice，用户在输入 fallback model 时可见）
+- 不属于 "hidden"：用户需要看到真实能力边界才能做出知情决策
+- 不属于 "stable user-facing"：自动 behavior 未验证，不应暗示可用
+
+### 范围约束
+
+此改动仅触及稳定设置 UI 的诚实表达层（SettingsClaudeCodeSection + locale + tests + docs），不触及 OpenCodianView.ts、OpenCodeService.ts、main.ts、Capability Lab 矩阵或 adapter wiring。CSS（`data-proof-state="wiring"`）已存在，无需修改。
+
+---
+
 ## 2026-05-28 Phase0-Capability Follow-Up: Source/Product Fork Fix — Env Proof Downgrade Synchronization
 
 ### 目标

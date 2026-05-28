@@ -18,8 +18,8 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280911`
-- Latest close-out round (Env Variables downgrade + openTabById guard): see "2026-05-28 Environment Variables Honest Downgrade + Proof Hardening + SessionSettingsModal Race Guard (Close-Out)" below
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280927`
+- Latest close-out round (Fallback Model stable settings proof-status notice + env notice sync + continuity anchor sync): see "2026-05-28 Fallback Model Settings Proof-Status Notice (Honest UX)" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
 - `8361ebe5` — `fix: mark claude stream settings diagnostic`
@@ -2710,6 +2710,33 @@ Environment Variables had real live runtime proof via the diagnostic bypass path
 ### Scope Boundary
 
 The diagnostic bypass proves env propagation into Claude/Bash subprocesses, NOT permission approval UX. Permission approval remains independently proven by ordinary chat + live harness paths.
+
+---
+
+## 2026-05-28 Fallback Model Settings Proof-Status Notice (Honest UX)
+
+### Gap
+
+The stable Model & Thinking tab already had a boundary notice for Fallback Model ("changes require restart") and the Capability Lab matrix correctly showed `wiring`, but the stable settings surface lacked a compact proof-status notice — unlike Tools, Limits, and Env which all render `renderXProofStatusNotice()`. Users saw the fallback model input and quick-select without any inline indication of the proof boundary.
+
+### What Changed
+
+- **`SettingsClaudeCodeSection.ts`**: Added `renderFallbackModelProofStatusNotice()` method rendering a compact inline proof-status notice with `data-claude-code-proof-status="fallback-model"` and `data-proof-state="wiring"`. Inserted into `renderModelThinkingTab()` after the existing `renderFallbackModelBoundaryNotice()`.
+- **`en.ts`**: Added `settings.claudeCode.proofStatus.fallbackModel` key: "Wiring only. The fallback model option is accepted by the SDK and readback-confirmed, but automatic fallback behavior is unproven — invalid primary model proof returns HTTP 400, not a fallback switch."
+- **`zh.ts`**: Added corresponding Chinese locale key.
+- **`SettingsClaudeCodeSection.test.ts`**: Added test asserting the fallback proof-status notice renders with `data-proof-state="wiring"` and correct locale text.
+
+### Classification
+
+| Capability | Capability Lab | Stable Settings Proof-Status |
+|---|---|---|
+| Fallback Model | `wiring` (honest since cc-stable-settings-readback iteration 1) | `wiring` (NEW — added compact proof-status notice) |
+
+The fallback model remains `wiring` in both surfaces. The new proof-status notice makes the honest boundary visible in the stable settings surface where users configure fallback models. Behavior proof was explicitly attempted and failed (invalid primary model returns HTTP 400 instead of triggering fallback). The wiring classification is concrete evidence-based, not speculative.
+
+### Scope Boundary
+
+This change is purely a stable settings UX honesty improvement. No changes to Capability Lab matrix, OpenCodianView, OpenCodeService, main.ts, adapter wiring, or SDK options builder. The existing boundary notice and quick-select remain unchanged.
 
 ---
 
