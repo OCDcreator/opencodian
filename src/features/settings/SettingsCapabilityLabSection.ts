@@ -599,7 +599,7 @@ export class SettingsCapabilityLabSection {
         capability: 'Agent Definitions',
         sdkExposed: true, // SDK options accept agent and agents
         adapterWired: true, // buildSdkOptions wires runtime-only agent definitions
-        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.agent/agents are built when configured. Behavior proof (model invokes Agent tool with defined subagent) is covered by Subagent Browser diagnostic path.
+        runtimeProof: 'pass', // Runtime verified: inline agent definition proof passes. SDK accepts agent/agents options (Layer 1 readback) AND the selected agent alters assistant behavior (Layer 2 marker echo). Agent Definitions remains hidden (no authoring UI).
         userSurface: 'hidden', // No stable authoring UI
       },
       {

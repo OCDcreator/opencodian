@@ -12,6 +12,74 @@
 
 ---
 
+## 2026-05-28 Agent Definition Proof Promotion — Runtime Verified (pass)
+
+### 任务
+
+完成 Agent Definitions 的 live runtime proof，并根据结果将分类从 `readback` 提升为 `pass`。
+
+### 执行顺序（本轮校正重点）
+
+1. 先运行 live Agent Definition Proof（不先 build/deploy）
+2. 根据真实 runtime 结果决定分类
+3. 只有分类为 `pass` 时才修改 `src/`
+
+### Live runtime proof 结果
+
+- **BUILD_ID**: `feature-phase0-capability.202605281627`
+- **Session ID**: `4f932802-679f-4d17-8e4d-d0c93c074cdd`
+- **Layer 1 (SDK options readback)**: PASS — `inspectLastDiagnosticSdkOptions()` 确认 `agent` 和 `agents` 存在于 options 中
+- **Layer 2 (assistant text marker echo)**: PASS — assistant text 包含预期标记 `AGENT-DEF-PROOF-ACTIVATED`
+- **Console**: `[CapabilityLab] runtime proof update {"capability":"Agent Definitions","status":"pass"}`
+- **DOM**: `✓ Runtime verified` (`opencodian-capability-lab-proof-pass`)
+- **Errors**: 无
+- **Screenshot**: `.obsidian-debug/opencodian-agent-def-proof-20260528.png`
+- **JSON artifact**: `.obsidian-debug/agent-definition-proof-20260528-result.json`
+
+### 分类决定
+
+- **Agent Definitions**: `pass`（从 `readback` 提升）
+- `userSurface`: 保持 `hidden`（不暴露 authoring UI）
+
+### 代码改动
+
+1. **`src/features/settings/SettingsCapabilityLabSection.ts`**:
+   - `buildMatrixRows()`: Agent Definitions `runtimeProof` 从 `'readback'` 改为 `'pass'`
+   - 注释更新：说明 runtime verified 的 evidence（inline agent definition 通过 `agent` 选择器激活，SDK 接受 options 且模型行为按 agent prompt 指示改变）
+
+2. **`tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`**:
+   - 审计测试：Agent Definitions 预期从 `readback` 改为 `pass`
+   - `verifiedCapabilities` 从 4 行增加到 5 行（新增 Agent Definitions）
+   - `verifiedCapabilities.length` 从 `4` 改为 `5`
+
+3. **`docs/status/claude-code-current-state-2026-05-22.md`**:
+   - Agent Definition Proof 段落更新为实际 runtime result
+   - 新增 **Four-Bucket Summary** 章节，将 24 项能力分组为 `user-facing` / `diagnostic` / `hidden` / `blocked`
+
+4. **`docs/modules/features/settings/SettingsCapabilityLabSection.md`**:
+   - 审计规则更新：Verified 行数从 4 改为 5
+   - Agent Definitions 描述从 `readback` 改为 `pass`
+
+### 验证
+
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` => PASS
+- `npm run check:devlog-order` => OK
+- `npm run check:module-docs -- --range HEAD` => OK
+- `npm run graphify:update:src` => PASS
+- `npm run verify` => PASS
+- `npm run build` => PASS (BUILD_ID=feature-phase0-capability.202605281631)
+- Test Vault deploy + BUILD_ID verify => PASS
+- Plugin reload => 无新错误
+- Re-run live Agent Definition Proof after deploy => PASS（DOM 再次显示 `✓ Runtime verified`）
+
+### 诚实性边界
+
+- Agent Definitions 的 `pass` 是**行为验证**（SDK 接受 inline agent 且模型按定义改变行为），不是仅 readback
+- 仍保持 `hidden`：不提供 agent definition 创建/编辑/管理 UI
+- 不暴露 authoring UI 是本 round 的明确约束，已遵守
+
+---
+
 ## 2026-05-28 Agent Definition Proof — Inline Agent Definition Diagnostic Probe
 
 ### 任务

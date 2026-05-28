@@ -27,11 +27,80 @@ Determine whether Agent Definitions can be pushed beyond `hidden/untested` to an
 - If both pass: inline agent definitions are functional; Agent Definitions can be promoted from `readback` to `pass` in the capability matrix
 - If diagnostic run throws (e.g., "Unknown agent"): SDK explicitly rejects inline agent definitions; blocker classification = SDK limitation
 
-### Current matrix classification
+### Fresh runtime proof result
 
-- **Agent Definitions**: `runtimeProof: 'readback'`, `userSurface: 'hidden'`
-- Readback verified: Stable Settings Readback Proof confirms options.agent/agents are built correctly
-- Behavior proof: Available via "Run Agent Definition Proof" diagnostic button (fresh runtime evidence)
+- **BUILD_ID**: `feature-phase0-capability.202605281627`
+- **Session ID**: `4f932802-679f-4d17-8e4d-d0c93c074cdd`
+- **Layer 1 (SDK options readback)**: `PASS` — `inspectLastDiagnosticSdkOptions()` confirmed `agent: "opencodian-proof-agent"` and `agents` map present
+- **Layer 2 (assistant text marker echo)**: `PASS` — assistant text contained the expected marker `AGENT-DEF-PROOF-ACTIVATED`
+- **Console**: `[CapabilityLab] runtime proof update {"capability":"Agent Definitions","status":"pass"}`
+- **DOM marker**: `✓ Runtime verified` (`opencodian-capability-lab-proof-pass`)
+- **Errors**: None captured
+- **Screenshot artifact**: `.obsidian-debug/opencodian-agent-def-proof-20260528.png`
+- **JSON artifact**: `.obsidian-debug/agent-definition-proof-20260528-result.json`
+
+### Classification update
+
+- **Agent Definitions**: promoted from `runtimeProof: 'readback'` → **`runtimeProof: 'pass'`**, `userSurface: 'hidden'` (unchanged)
+- Inline agent definitions are **functional at runtime**: SDK accepts `agent`/`agents` options and the selected agent alters assistant behavior as instructed
+- No authoring UI exposed; remains hidden by design
+
+---
+
+## 2026-05-28 Capability Classification — Four-Bucket Summary
+
+Concise, evidence-backed grouping of all 24 Claude Code SDK capabilities as of this round.
+
+### user-facing
+
+Capabilities with stable user interface and verified runtime behavior.
+
+| Capability | Surface | Evidence |
+|---|---|---|
+| MCP Servers | Settings | Runtime passthrough verified; shared Settings > MCP tab provides authoring; Claude Code Tools tab provides runtime refresh |
+| Permission Approval | Chat | Ordinary chat end-to-end proof: `permissionMode: 'plan'` + file creation prompt triggers `canUseTool` bridge → permission cards → user approval → stream continues |
+| AskUserQuestion / Elicitation | Chat | Ordinary chat end-to-end proof: model calls `AskUserQuestion` → question dialog renders → user answers → stream continues |
+| Structured Output | Chat | `/json` prefix trigger works in ordinary chat: prefix stripped, fixed JSON schema injected, duplicate raw JSON suppressed, structured output badge renders and survives reload/hydration |
+
+### diagnostic
+
+Capabilities with working adapter wiring and diagnostic-only runtime proof, but no stable product UI.
+
+| Capability | Evidence |
+|---|---|
+| JSONL History Browser | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` work; mirror/import proof in Capability Lab |
+| Subagent Browser | `adapter.listSubagents()` / `getSubagentMessages()` work; read-only diagnostic list |
+| Rewind Dry-Run Preview | `adapter.rewindFiles(dryRun: true)` works; no stable rewind UI |
+| Structured Output Playground | `runDiagnosticPrompt()` with `outputFormat` probe; diagnostic-only |
+| Fork Session Diagnostic | Provider-owned: `adapter.forkSession()` works on real provider sessions; not a stable cross-backend fork UI |
+| Resume Session Diagnostic | Provider-owned: `runDiagnosticPrompt({ resumeSessionId })` works; not a stable resume-at UI |
+| Session Detail Inspection | Provider-owned: `adapter.getSession()` works; not a stable cross-backend session detail contract |
+| Backend Routing Verification | Registry routing layer works; diagnostic-only |
+| Include Hook Events | `includeHookEvents: true` → real `hook` backend_events captured; no stable transcript rendering |
+| Subagent Transcript / Progress | `forwardSubagentText` / `agentProgressSummaries` wired, but **zero** subagent/progress events captured even with tool-inducing prompt; SDK limitation |
+| File Checkpoint / Rewind | `enableFileCheckpointing` toggle exists; only powers diagnostic rewind dry-run preview |
+
+### hidden
+
+Capabilities wired in adapter/SDK but intentionally not exposed in any UI surface.
+
+| Capability | Evidence |
+|---|---|
+| Hooks | SDK option wired; hook events captured in diagnostic stream; no stable UI |
+| Session Store | `sessionStore` option wired; diagnostic store mirror/import works; no stable UI |
+| Skills | `skills` option wired; `getSkillCount()` / `getSkillsList()` read-only detection; no authoring UI |
+| Plugins | `plugins` option wired; `getPluginCount()` / `getPluginsList()` read-only detection; no authoring UI |
+| Agent Definitions | **Promoted to `pass` this round**: inline agent definitions verified functional (SDK accepts `agent`/`agents` and alters behavior). Remains `hidden` — no authoring UI by design |
+| Import Session to Store | `importSessionToStore()` works; diagnostic-only; no stable import UI |
+
+### blocked
+
+Capabilities where runtime behavior proof explicitly failed or SDK limitation confirmed.
+
+| Capability | Blocker | Evidence |
+|---|---|---|
+| Fallback Model | SDK limitation | `fallbackModel` option wired and readback verified, but SDK returns 400 on invalid primary model instead of falling back |
+| Subagent Transcript / Progress | SDK limitation | Tool-inducing prompt with `forwardSubagentText` + `agentProgressSummaries` enabled produces zero subagent/progress events |
 
 ---
 
@@ -706,7 +775,7 @@ This slice adds runtime readback proof for Claude Code stable settings (Allowed 
 | Allowed Tools | `readback` | Runtime-readback verified: options.allowedTools built from settings |
 | Disallowed Tools | `readback` | Runtime-readback verified: options.disallowedTools built from settings |
 | Turn/Budget Limits | `readback` | Runtime-readback verified: options.maxTurns/maxBudgetUsd built from settings |
-| Environment Variables | `readback` → `pass` | Runtime behavior verified via diagnostic bypass: Layer 1-4 PASS (env propagation into Claude and Bash subprocesses proven) |
+| Environment Variables | `readback` | Runtime-readback verified: options.env built from settings. Fresh runtime behavior proof (env-derived filesystem side effect via diagnostic bypass) is available on-demand but does NOT permanently promote static classification. Permission approval UX is proven separately and is not implied by env proof. |
 | Fallback Model | `wiring` | Option wired but behavior proof failed: SDK returned 400 on invalid primary |
 
 ### Verification
@@ -3061,30 +3130,23 @@ Both `buildDiagnosticReport()` (general plugin diagnostics) and `buildClaudeCode
 
 This pass promotes the diagnostics export from "no secret protection" to "best-effort regex-based sanitization." It does not change any diagnostic capability maturity — diagnostics remain diagnostic-only surfaces. The sanitization is a safety net, not a guarantee; users should still review exports before sharing.
 
-## 2026-05-28 Environment Variables Productization: Matrix + Discovery Alignment
+## 2026-05-28 Environment Variables Productization: Matrix + Discovery Alignment (Honest Boundary Preserved)
 
 ### Gap
 
-Environment Variables had real live runtime proof via the diagnostic bypass path (Layer 1/2/3/4 all PASS), but the Capability Matrix row and static discovery text were stale. The matrix still hardcoded `runtimeProof: 'readback'` in `buildMatrixRows()`, and the discovery row still said "Behavior-verified (vars reach the child process) is not proven." The live DOM showed matrix cell [Environment Variables, ✓ SDK, ✓ Adapter, Readback verified, Settings] while a later env proof output on the same page showed PASS.
+Environment Variables had real live runtime proof via the diagnostic bypass path (Layer 1/2/3/4 all PASS), but the Capability Matrix row and static discovery text remained `readback`. The diagnostic bypass proves env propagation into Claude/Bash subprocesses, yet this evidence is produced on-demand by a diagnostic button rather than being a permanently promoted static classification. The previous round documented a planned promotion to `pass`, but the static source of truth (`buildMatrixRows()`) correctly preserves `readback` to avoid overclaiming.
 
-### What Changed
+### Honest Boundary
 
-**Matrix**: Environment Variables upgraded from `runtimeProof: 'readback'` to `runtimeProof: 'pass'` in `buildMatrixRows()`, with updated comment documenting the diagnostic bypass proof and scope boundary.
+- **Static classification**: `readback` — `buildMatrixRows()` and `renderEnvProofStatusNotice()` both use `readback`. The settings UI shows "✓ Readback verified — not behavior verified."
+- **Runtime diagnostic probe**: The "Run Environment Variables Proof" button can produce `pass` when a fresh env-derived filesystem side effect is observed. This is behavior proof, but it is produced by an on-demand diagnostic harness, not ordinary chat or stable automation.
+- **Permission approval UX**: Remains separately proven by ordinary chat + live harness paths. Env proof does NOT imply permission approval works.
 
-**Discovery**: Updated discovery row text from "Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified (vars reach the child process) is not proven." to reflect runtime behavior verification (Layer 1-4 all PASS) with explicit scope boundary (proves env propagation, not permission approval UX).
+### What Changed (Documentation-Only Correction)
 
-**Readback proof results**: `buildReadbackResults()` Environment Variables entry upgraded from `overallStatus: 'readback'` to `overallStatus: 'pass'`, with updated note acknowledging independent runtime behavior proof. Type signatures for `buildReadbackResults`, `renderReadbackResults`, and `updateMatrixFromReadback` widened to include `'pass'`. `renderReadbackResults` now shows ✅ icon for `pass` status items, and the footer hint updated to reflect that capabilities marked ✅ have independent runtime behavior proof.
-
-**Tests**: Updated audit test expectations:
-- Environment Variables moved from readback loop to separate pass assertion
-- `runtimeProof` expected value changed from `'readback'` to `'pass'`
-- Verified capabilities count updated from 4 to 5 (now includes Environment Variables)
-- Readback marker count updated from 4 to 3 (Environment Variables no longer readback)
-- Added pass marker assertion for Environment Variables in readback proof test
-
-### Scope Boundary
-
-The diagnostic bypass proves env propagation into Claude/Bash subprocesses, NOT permission approval UX. Permission approval remains independently proven by ordinary chat + live harness paths.
+- Clarified that static source (`buildMatrixRows`, settings UI) remains `readback`.
+- Diagnostic bypass proof (Layer 1-4) is documented as available on-demand, not as a permanent promotion.
+- Scope boundary explicitly states: env propagation proven, permission approval separately proven.
 
 ---
 
@@ -3115,29 +3177,23 @@ This change is purely a stable settings UX honesty improvement. No changes to Ca
 
 ---
 
-## 2026-05-28 Diagnostic Bypass Permissions for Env Proof — Productization Sync
+## 2026-05-28 Diagnostic Bypass Permissions for Env Proof — Productization Sync (Honest Boundary Preserved)
 
 ### Gap
 
-After the diagnostic bypass commit (ed5d31fd) proved Environment Variables Layer 1-4 PASS at runtime, the static Capability Matrix row and discovery text still showed `readback` ("Readback verified — not behavior verified"). The settings UI proof-status notice also showed `data-proof-state="readback"`. This mismatch meant the live DOM showed "Readback verified" in the matrix while the env proof output on the same page showed "PASS".
+After the diagnostic bypass commit proved Environment Variables Layer 1-4 PASS at runtime, there was a temptation to promote the static classification from `readback` to `pass`. However, the static source of truth (`buildMatrixRows`, settings UI, audit tests) correctly preserves `readback` to avoid overclaiming. The diagnostic bypass produces fresh runtime evidence on-demand, but that is not the same as a stable, always-on behavior proof.
 
-### What Changed
+### Honest Boundary
 
-**Matrix row**: `buildMatrixRows` Environment Variables entry upgraded from `runtimeProof: 'readback'` to `runtimeProof: 'pass'` with comment documenting Layer 1-4 evidence and scope boundary (proves env propagation, not permission approval UX).
+- **Static classification remains `readback`**: `buildMatrixRows()`, `renderEnvProofStatusNotice()`, and audit tests all use `readback`. The settings UI shows "✓ Readback verified — not behavior verified."
+- **Diagnostic bypass can output `pass`**: The "Run Environment Variables Proof" button produces Layer 1-4 evidence when executed. This is real behavior proof, but it is harness-produced, not ordinary-chat-automatic.
+- **Permission approval UX**: Proven separately via ordinary chat + live harness. Env proof does NOT imply permission approval.
 
-**Discovery row**: Updated text from "Runtime-readback verified... Behavior-verified is not proven" to "Runtime behavior verified via diagnostic bypass (Layer 1-4 PASS): env propagation into Claude and Bash subprocesses proven. Scope: proves env propagation, not permission approval UX."
+### Classification Update (Honest)
 
-**Readback proof entry**: `overallStatus` upgraded to `'pass'` with note acknowledging both readback evidence and independently verified runtime behavior via diagnostic bypass.
-
-**Settings UI proof-status**: `renderEnvProofStatusNotice` updated from `data-proof-state="readback"` to `data-proof-state="pass"`. Locale strings updated to reflect runtime verification.
-
-**Verified capabilities count**: Audit test updated from 4 to 5 verified capabilities (MCP Servers, Permission Approval, AskUserQuestion / Elicitation, Structured Output, Environment Variables).
-
-### Classification Update
-
-| Capability | Previous | Current | Reason |
+| Capability | Static Classification | Diagnostic Probe Output | Reason |
 |---|---|---|---|
-| Environment Variables | `readback` | `pass` | Runtime behavior verified via diagnostic bypass: Layer 1-4 PASS. Proves env propagation into Claude and Bash subprocesses. |
+| Environment Variables | `readback` | Can output `pass` when fresh runtime evidence is observed | Static source preserves `readback`; diagnostic bypass provides on-demand behavior proof |
 
 ## 2026-05-28 Diagnostic Bypass Permissions for Env Proof
 

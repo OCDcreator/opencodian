@@ -218,11 +218,11 @@ describe('SettingsCapabilityLabSection', () => {
     }
 
     // Agent Definitions has a dedicated diagnostic proof path (Run Agent Definition Proof button).
-    // It should show readback status (options wired) but remain hidden (no authoring UI).
+    // Runtime verified: inline agent definition proof passes. Remains hidden (no authoring UI).
     const agentDefRow = getRow('Agent Definitions');
     expect(agentDefRow).not.toBeNull();
     expect(agentDefRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
-    expect(agentDefRow?.textContent).toContain('Readback verified');
+    expect(agentDefRow?.textContent).toContain('Verified');
   });
 
   it('keeps runtime-proved diagnostic capabilities from being marked complete in the matrix', () => {
@@ -248,7 +248,7 @@ describe('SettingsCapabilityLabSection', () => {
     const agentDefRow = getRow('Agent Definitions');
     expect(agentDefRow).not.toBeNull();
     expect(agentDefRow?.textContent).not.toContain('Complete');
-    expect(agentDefRow?.textContent).toContain('Readback verified');
+    expect(agentDefRow?.textContent).toContain('Verified');
   });
 
   it('renders MCP Servers row in capability matrix with settings surface', () => {
@@ -1007,7 +1007,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
       'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'Agent Definitions': { runtimeProof: 'readback', userSurface: 'hidden' },
+      'Agent Definitions': { runtimeProof: 'pass', userSurface: 'hidden' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
       'Subagent Transcript / Progress': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'Include Hook Events': { runtimeProof: 'untested', userSurface: 'diagnostic' },
@@ -1045,9 +1045,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions']),
     );
-    expect(verifiedCapabilities.length).toBe(4);
+    expect(verifiedCapabilities.length).toBe(5);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (

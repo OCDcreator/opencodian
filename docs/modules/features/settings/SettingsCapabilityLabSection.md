@@ -48,9 +48,9 @@
 ### 诚实性审计
 
 单元测试中新增 `audits capability matrix for honest classifications across all 24 rows` 用例，显式枚举每行的预期 `runtimeProof` 和 `userSurface`，并强制执行两条不变规则：
-1. 恰好四行标 `Verified`（MCP Servers、Permission Approval、AskUserQuestion / Elicitation、Structured Output）——任何把未验证行提升为 `Verified` 的改动都会使测试失败；这四行均已有运行时端到端 proof；
+1. 恰好五行标 `Verified`（MCP Servers、Permission Approval、AskUserQuestion / Elicitation、Structured Output、Agent Definitions）——任何把未验证行提升为 `Verified` 的改动都会使测试失败；这五行均已有运行时端到端 proof；
 2. Environment Variables 静态分类为 `Readback`（settings→SDK readback 已证明，行为 proof 通过 diagnostic bypass 按钮获取 fresh runtime 验证后才可能升级）；
-3. Agent Definitions 静态分类为 `Readback`（options.agent/agents 通过 Stable Settings Readback Proof 验证；行为 proof 可通过 "Run Agent Definition Proof" 诊断按钮获取 fresh runtime 验证：探针构造内联 agent definition 并通过 `agent` 选择器激活，验证 SDK 是否接受并应用该定义。若 SDK 拒绝内联 agent，探针诚实标记 `fail` 并记录 blocker）；
+3. Agent Definitions 静态分类为 `pass`（2026-05-28 runtime proof：inline agent definition 通过 `agent` 选择器激活，SDK 接受 options 且模型行为按 agent prompt 指示改变；仍保持 `hidden`，无 authoring UI）；
 4. 恰好六行标 `hidden`（Hooks、Session Store、Skills、Plugins、Agent Definitions、Import Session to Store）——任何把 hidden 行暴露到 settings/diagnostic 的改动都会使测试失败。
 
 该审计测试确保 matrix 静态评估不会随代码演进意外漂移，未来若要晋升某行的 classification，必须同时更新测试中的预期映射并给出明确理由。
