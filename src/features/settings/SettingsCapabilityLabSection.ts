@@ -3661,20 +3661,22 @@ export class SettingsCapabilityLabSection {
     ].join(' ');
 
     const originalEnv = { ...(this.claudeCodeSettings.env ?? {}) };
-    const originalPermissionMode = this.claudeCodeSettings.permissionMode;
     this.claudeCodeSettings.env = {
       ...originalEnv,
       [envKey]: nonce,
       OPENCODIAN_ENV_PROOF_PATH: envProofPath,
     };
-    this.claudeCodeSettings.permissionMode = 'acceptEdits';
 
     try {
       rmSync(envProofPath, { force: true });
-      await adapter.setPermissionMode?.('acceptEdits');
       const result = await adapter.runDiagnosticPrompt({
         prompt,
         persistSession: false,
+        // Diagnostic bypass: skip permission approval host wiring.
+        // This proves env propagation into Claude/Bash subprocesses,
+        // NOT permission approval UX. Permission approval is proven
+        // independently by ordinary chat + live harness paths.
+        _diagnosticBypassPermissions: true,
       });
 
       const options = adapter.inspectLastDiagnosticSdkOptions?.();
@@ -3699,6 +3701,7 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('h5', { text: 'Environment Variables Proof (layered)' });
       outputEl.createEl('p', { text: `Probe env key: ${envKey}` });
       outputEl.createEl('p', { text: `Expected nonce: ${nonce}` });
+      outputEl.createEl('p', { text: `Permission path: diagnostic bypass (proves env propagation, not permission UI)` });
       outputEl.createEl('p', { text: `Layer 1 (settings -> SDK readback): ${readbackMatch ? 'PASS' : 'FAIL'}` });
       outputEl.createEl('p', { text: `Layer 2 (Bash tool invoked): ${bashToolUses.length > 0 ? 'PASS' : 'NO EVIDENCE'}` });
       outputEl.createEl('p', { text: `Layer 3 (env-derived filesystem side effect observed): ${envSideEffectObserved ? 'PASS' : 'NO EVIDENCE'}` });
@@ -3708,13 +3711,13 @@ export class SettingsCapabilityLabSection {
         this.updateRuntimeProof('Environment Variables', 'pass', outputEl);
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: 'Behavior proof achieved for Bash subprocess visibility: env-derived filesystem side effect was observed at the nonce path.',
+          text: 'Behavior proof achieved for Bash subprocess visibility: env-derived filesystem side effect was observed at the nonce path. Permission approval is proven separately by ordinary chat + live harness paths.',
         });
       } else {
         this.updateRuntimeProof('Environment Variables', readbackMatch ? 'readback' : 'wiring', outputEl);
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: 'Behavior proof not achieved. Current evidence is limited to SDK readback and/or non-deterministic model behavior. Re-run probe and require env-derived filesystem side effect for pass.',
+          text: 'Behavior proof not achieved (diagnostic bypass path active). Current evidence is limited to SDK readback and/or non-deterministic model behavior.',
         });
       }
 
@@ -3737,6 +3740,7 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('p', { text: `Probe env key: ${envKey}` });
       outputEl.createEl('p', { text: `Probe env path: ${envProofPath}` });
       outputEl.createEl('p', { text: `Expected nonce: ${nonce}` });
+      outputEl.createEl('p', { text: `Permission path: diagnostic bypass (proves env propagation, not permission UI)` });
       outputEl.createEl('p', { text: `Layer 1 (settings -> SDK readback): ${readbackMatch ? 'PASS' : 'FAIL'}` });
       outputEl.createEl('p', { text: 'Layer 2 (Bash tool invoked): BLOCKED (diagnostic run failed before deterministic capture)' });
       outputEl.createEl('p', { text: 'Layer 3 (env-derived filesystem side effect observed): BLOCKED' });
@@ -3748,13 +3752,11 @@ export class SettingsCapabilityLabSection {
       this.updateRuntimeProof('Environment Variables', readbackMatch ? 'readback' : 'fail', outputEl);
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: 'Blocker: diagnostic permission path denied Bash before env-derived side effect could be captured. Next step: run this probe in a permission mode/path that allows common filesystem Bash commands under acceptEdits.',
+        text: 'Blocker: diagnostic run failed even with bypass path. This suggests an SDK-level issue, not a permission host wiring problem.',
       });
     } finally {
       rmSync(envProofPath, { force: true });
       this.claudeCodeSettings.env = originalEnv;
-      this.claudeCodeSettings.permissionMode = originalPermissionMode;
-      await adapter.setPermissionMode?.(originalPermissionMode);
     }
   }
 

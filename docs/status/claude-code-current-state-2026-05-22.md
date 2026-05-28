@@ -18,7 +18,7 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280607`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280759`
 - Latest follow-up polish round (Claude chat surface honesty + validation): see "2026-05-28 Claude Chat Surface Honesty + Validation Pass" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`
@@ -2685,3 +2685,36 @@ Both `buildDiagnosticReport()` (general plugin diagnostics) and `buildClaudeCode
 ### Impact on Capability Maturity
 
 This pass promotes the diagnostics export from "no secret protection" to "best-effort regex-based sanitization." It does not change any diagnostic capability maturity — diagnostics remain diagnostic-only surfaces. The sanitization is a safety net, not a guarantee; users should still review exports before sharing.
+
+## 2026-05-28 Diagnostic Bypass Permissions for Env Proof
+
+### Gap
+
+Environment Variables Layer 2/3 proof was blocked: the diagnostic `runDiagnosticPrompt` path always wired `canUseTool` from the permission bridge, but the settings UI context had no active chat streaming UI / permission card host, so the bridge denied Bash before the env-derived filesystem side effect could occur. Console evidence confirmed `collectToolApproval` path denied Bash during Capability Lab diagnostic execution.
+
+### Root Cause
+
+`buildDiagnosticSdkOptions()` unconditionally passed `permissionBridge.canUseTool` to the SDK options builder. The bridge's `canUseTool()` checks `if (!this.host.collectToolApproval)` and denies with "No Claude Code permission handler is available" when no host is registered. In the settings UI context (Capability Lab), there's no active chat view providing a streaming message element or permission card host.
+
+Additionally, `runEnvironmentVariablesProof` tried to work around this by temporarily setting `permissionMode: 'acceptEdits'` and calling `adapter.setPermissionMode('acceptEdits')`, but:
+1. `setPermissionMode` only applies to *active* persistent queries, not new diagnostic queries
+2. `buildDiagnosticSdkOptions` used `this.options.settings` (the adapter's original settings), not the temporarily modified settings section copy
+3. `acceptEdits` still requires `canUseTool` approval — it's not a bypass mode
+
+### What Changed
+
+**New flag**: `_diagnosticBypassPermissions` on `ClaudeCodeDiagnosticPromptRequest`
+- When `true`, `buildDiagnosticSdkOptions()` overrides `permissionMode` to `bypassPermissions` (setting `allowDangerouslySkipPermissions: true`) and skips `canUseTool` + `onElicitation` wiring entirely
+- The SDK subprocess executes tools without requiring an approval host
+
+**Updated**: `runEnvironmentVariablesProof()` in `SettingsCapabilityLabSection`
+- Now passes `_diagnosticBypassPermissions: true` instead of trying to set `acceptEdits` + `setPermissionMode`
+- No longer modifies `permissionMode` on the settings section copy (the bypass is scoped to the diagnostic request only)
+- Output shows "diagnostic bypass (proves env propagation, not permission UI)" label
+
+**Scope boundary documented explicitly**: this proves env propagation into Claude/Bash subprocesses, NOT permission approval UX. Permission approval capability remains independently proven by ordinary chat + live harness paths.
+
+### Tests
+
+- 2 new adapter tests: bypass sets `allowDangerouslySkipPermissions` + skips `canUseTool`; non-bypass keeps `canUseTool` wired
+- 3 updated capability lab tests: verifies `_diagnosticBypassPermissions: true` is passed, settings `permissionMode` is NOT modified, and output shows "diagnostic bypass" label

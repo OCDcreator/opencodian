@@ -12,6 +12,45 @@
 
 ---
 
+## 2026-05-28 Diagnostic Bypass Permissions for Env Proof
+
+### 目标
+
+修复 Environment Variables Layer 2/3 证明被 diagnostic permission deny path 阻塞的问题。根因：`buildDiagnosticSdkOptions()` 无条件接线 `canUseTool`（权限桥），但 Capability Lab 设置 UI 上下文中没有活跃的聊天流式 UI / 权限卡片宿主，导致桥在 `canUseTool()` 中拒绝 Bash 执行。
+
+### 根因分析
+
+1. `buildDiagnosticSdkOptions` 在 line 895 始终将 `permissionBridge.canUseTool` 传入 SDK options
+2. 权限桥的 `canUseTool()` 在 line 359 检查 `if (!this.host.collectToolApproval)` 并拒绝
+3. 设置 UI 上下文中无活跃聊天视图提供 streaming message element 或 permission card host
+4. 之前的 workaround（临时设 `acceptEdits` + `setPermissionMode`）无效：`setPermissionMode` 只影响活跃持久查询，不影响新诊断查询；且 `acceptEdits` 仍需 `canUseTool` 审批
+
+### 改动
+
+1. **ClaudeCodeAdapter.ts**
+   - `ClaudeCodeDiagnosticPromptRequest` 新增 `_diagnosticBypassPermissions?: boolean` 标志
+   - `buildDiagnosticSdkOptions()` 当标志为 `true` 时：
+     - 覆盖 `permissionMode` 为 `bypassPermissions`（设置 `allowDangerouslySkipPermissions: true`）
+     - 跳过 `canUseTool` 和 `onElicitation` 接线
+     - SDK 子进程直接执行工具，无需审批宿主
+
+2. **SettingsCapabilityLabSection.ts**
+   - `runEnvironmentVariablesProof()` 改为传 `_diagnosticBypassPermissions: true` 而非临时修改 `permissionMode`
+   - 不再修改设置区的 `permissionMode`（绕过范围限于诊断请求）
+   - 输出显示 "diagnostic bypass (proves env propagation, not permission UI)" 标签
+   - `finally` 块不再恢复 `permissionMode`（因为从未修改）
+
+### 作用域边界
+
+此修复证明 **env 传播到 Claude/Bash 子进程**，**不**证明权限审批 UX。权限审批能力仍由普通聊天 + live harness 路径独立证明。文档和 UI 文本均明确标注此边界。
+
+### 验证
+
+- 2 个新 adapter 测试（bypass 跳过 canUseTool + 设置 allowDangerouslySkipPermissions；非 bypass 保留接线）
+- 3 个更新 capability lab 测试（_diagnosticBypassPermissions 传入验证、permissionMode 不变验证、输出标签验证）
+
+---
+
 ## 2026-05-28 Environment Variables Proof Strategy Upgrade (Filesystem Side Effect)
 
 ### 目标

@@ -110,6 +110,19 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * preventing accidental stable usage of arbitrary session resume.
    */
   _diagnosticResumeAt?: boolean;
+  /**
+   * Diagnostic-only permission bypass. When true, the diagnostic prompt runs
+   * with `bypassPermissions` mode and skips wiring `canUseTool`, so the SDK
+   * subprocess executes tools without requiring an approval host. This is
+   * necessary for Capability Lab probes that test non-permission capabilities
+   * (e.g. environment variable propagation) in contexts where no chat
+   * streaming UI / permission card host is available.
+   *
+   * Scope boundary: this proves env/tool/budget propagation into Claude/Bash
+   * subprocesses, NOT permission approval UX. Permission approval capability
+   * remains independently proven by ordinary chat + live harness paths.
+   */
+  _diagnosticBypassPermissions?: boolean;
 }
 
 export interface ClaudeCodeDiagnosticPromptResult {
@@ -886,19 +899,31 @@ export class ClaudeCodeAdapter
     abortController: AbortController | undefined,
     request: ClaudeCodeDiagnosticPromptRequest,
   ): ClaudeCodeSdkOptionsShape {
+    const bypassPermissions = request._diagnosticBypassPermissions === true;
+    const diagnosticSettings = bypassPermissions
+      ? { ...this.options.settings, permissionMode: 'bypassPermissions' as const }
+      : this.options.settings;
     const options = buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
-      settings: this.options.settings,
+      settings: diagnosticSettings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
-      canUseTool: this.options.permissionBridge
-        ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
-        : undefined,
-      onElicitation: this.options.onElicitation
-        ? async (promptRequest: ElicitationRequest, context: { signal: AbortSignal }) =>
-          await this.options.onElicitation!(promptRequest, context)
-        : undefined,
+      // When diagnostic bypass is active, skip canUseTool wiring entirely so
+      // the SDK subprocess executes tools without requiring an approval host.
+      // This is scoped to diagnostic probes that test non-permission capabilities
+      // (e.g. env propagation) where no chat streaming UI is available.
+      canUseTool: bypassPermissions
+        ? undefined
+        : this.options.permissionBridge
+          ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
+          : undefined,
+      onElicitation: bypassPermissions
+        ? undefined
+        : this.options.onElicitation
+          ? async (promptRequest: ElicitationRequest, context: { signal: AbortSignal }) =>
+            await this.options.onElicitation!(promptRequest, context)
+          : undefined,
       mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
       hooks: request.hooks ?? this.options.hooks,
       sessionStore: request.sessionStore ?? this.options.sessionStore,

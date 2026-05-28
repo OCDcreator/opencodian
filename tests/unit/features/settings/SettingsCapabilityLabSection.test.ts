@@ -3324,7 +3324,95 @@ describe('SettingsCapabilityLabSection', () => {
     const passMarkers = containerEl.querySelectorAll('[data-capability="Environment Variables"].opencodian-capability-lab-proof-pass');
     expect(passMarkers.length).toBeGreaterThan(0);
     expect(plugin.settings.backendSettings.claudeCode.env).toEqual({});
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ _diagnosticBypassPermissions: true }),
+    );
     rmSync(expectedProofPath, { force: true });
+
+    dateNowSpy.mockRestore();
+    randomSpy.mockRestore();
+  });
+
+  it('does not modify permissionMode during env proof (bypass is in diagnostic request, not settings)', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-env-nosideeffect',
+        rawMessages: [],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        env: {},
+      }),
+      capabilities: new Set(),
+    };
+    const plugin = createMockPlugin(adapter, 'claude-code', {
+      env: {},
+      permissionMode: 'acceptEdits',
+    }) as unknown as {
+      settings: { backendSettings: { claudeCode: { env: Record<string, string>; permissionMode: string } } };
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.12345);
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Environment Variables Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    // Settings permissionMode should remain unchanged (bypass is only in diagnostic request)
+    expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('acceptEdits');
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ _diagnosticBypassPermissions: true }),
+    );
+
+    dateNowSpy.mockRestore();
+    randomSpy.mockRestore();
+  });
+
+  it('shows diagnostic bypass path label in env proof output', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-env-label',
+        rawMessages: [],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        env: {},
+      }),
+      capabilities: new Set(),
+    };
+    const plugin = createMockPlugin(adapter, 'claude-code', { env: {} }) as unknown as {
+      settings: { backendSettings: { claudeCode: { env: Record<string, string> } } };
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.12345);
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Environment Variables Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('diagnostic bypass (proves env propagation, not permission UI)');
 
     dateNowSpy.mockRestore();
     randomSpy.mockRestore();

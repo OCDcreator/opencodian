@@ -2778,4 +2778,52 @@ describe('ClaudeCodeAdapter', () => {
       expect(passedOptions.agentProgressSummaries).toBeUndefined();
     });
   });
+
+  describe('diagnostic bypass permissions', () => {
+    it('sets allowDangerouslySkipPermissions and skips canUseTool when _diagnosticBypassPermissions is true', async () => {
+      const mockCanUseTool = jest.fn().mockResolvedValue({ behavior: 'allow' });
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'default' },
+        sdk,
+        permissionBridge: { canUseTool: mockCanUseTool } as never,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Bypass test',
+        persistSession: false,
+        _diagnosticBypassPermissions: true,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.allowDangerouslySkipPermissions).toBe(true);
+      expect(passedOptions.canUseTool).toBeUndefined();
+      expect(passedOptions.permissionMode).toBe('bypassPermissions');
+    });
+
+    it('keeps canUseTool wired when _diagnosticBypassPermissions is false', async () => {
+      const mockCanUseTool = jest.fn().mockResolvedValue({ behavior: 'allow' });
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'acceptEdits' },
+        sdk,
+        permissionBridge: { canUseTool: mockCanUseTool } as never,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Normal diagnostic test',
+        persistSession: false,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.allowDangerouslySkipPermissions).toBeUndefined();
+      expect(passedOptions.canUseTool).toBeTruthy();
+      expect(typeof passedOptions.canUseTool).toBe('function');
+      expect(passedOptions.permissionMode).toBe('acceptEdits');
+    });
+  });
 });
