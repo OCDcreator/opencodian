@@ -208,7 +208,7 @@ describe('SettingsCapabilityLabSection', () => {
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
     // Runtime-only capabilities without dedicated diagnostic proof paths must stay hidden and untested.
-    const hiddenUntestedCapabilities = ['Session Store', 'Plugins', 'Skills', 'Hooks'];
+    const hiddenUntestedCapabilities = ['Plugins', 'Skills', 'Hooks'];
 
     for (const cap of hiddenUntestedCapabilities) {
       const row = getRow(cap);
@@ -237,7 +237,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    for (const cap of ['Hooks', 'Session Store', 'Rewind']) {
+    for (const cap of ['Hooks', 'Rewind']) {
       const row = getRow(cap);
       expect(row).not.toBeNull();
       expect(row?.textContent).not.toContain('Complete');
@@ -794,7 +794,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(envRow).not.toBeNull();
     expect(envRow?.textContent).toContain('SDK');
     expect(envRow?.textContent).toContain('Adapter');
-    expect(envRow?.textContent).toContain('Readback verified');
+    expect(envRow?.textContent).toContain('Verified');
     expect(envRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
   });
 
@@ -1004,15 +1004,15 @@ describe('SettingsCapabilityLabSection', () => {
     const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' }> = {
       Hooks: { runtimeProof: 'untested', userSurface: 'hidden' },
       'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'JSONL History Browser': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'Session Store': { runtimeProof: 'untested', userSurface: 'hidden' },
+      'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Session Store': { runtimeProof: 'pass', userSurface: 'hidden' },
       Skills: { runtimeProof: 'untested', userSurface: 'hidden' },
       Plugins: { runtimeProof: 'untested', userSurface: 'hidden' },
       'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
       'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
       'Disallowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
       'Turn/Budget Limits': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Environment Variables': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Environment Variables': { runtimeProof: 'pass', userSurface: 'settings' },
       'Fallback Model': { runtimeProof: 'wiring', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
@@ -1021,11 +1021,11 @@ describe('SettingsCapabilityLabSection', () => {
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
       'Subagent Transcript / Progress': { runtimeProof: 'fail', userSurface: 'diagnostic' },
       'Include Hook Events': { runtimeProof: 'pass', userSurface: 'diagnostic' },
-      'Import Session to Store': { runtimeProof: 'untested', userSurface: 'hidden' },
-      'Fork Session': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'Resume Session': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'Session Detail': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'Backend Routing': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Import Session to Store': { runtimeProof: 'pass', userSurface: 'hidden' },
+      'Fork Session': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Resume Session': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Session Detail': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Backend Routing': { runtimeProof: 'pass', userSurface: 'diagnostic' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1055,9 +1055,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing']),
     );
-    expect(verifiedCapabilities.length).toBe(6);
+    expect(verifiedCapabilities.length).toBe(14);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (

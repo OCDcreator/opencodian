@@ -494,28 +494,28 @@ export class SettingsCapabilityLabSection {
         capability: 'Hooks',
         sdkExposed: true, // SDK options accept hooks
         adapterWired: true, // buildSdkOptions wires hooks
-        runtimeProof: 'untested', // Requires diagnostic call
+        runtimeProof: 'untested', // Architecture gap: hooks SDK option wiring confirmed (buildSdkOptions passes hooks), but custom hook configuration cannot be isolated from Include Hook Events (which is separately pass). Hook events captured in diagnostic stream prove the hooks system fires, but the hooks option itself (configuring custom pre/post tool execution hooks) has no isolated runtime proof. No stable UI.
         userSurface: 'hidden', // No authoring UI
       },
       {
         capability: 'File Checkpoint / Rewind',
         sdkExposed: true, // enableFileCheckpointing option + rewindFiles on query
         adapterWired: true, // adapter.rewindFiles() exists
-        runtimeProof: 'untested',
+        runtimeProof: 'untested', // Verification gap: rewindFiles requires a live checkpoint-enabled runtime query; diagnostic prompt exits before rewind can be called. Adapter wiring confirmed; runtime proof blocked by session lifecycle constraint.
         userSurface: 'diagnostic', // Capability Lab toggle; no stable rewind UI exposed
       },
       {
         capability: 'JSONL History Browser',
         sdkExposed: !!adapter, // getSessionMessages on SDK facade
         adapterWired: !!adapter, // adapter.getSessionMessages()
-        runtimeProof: 'untested',
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: listSessions returned 38 sessions, getSessionMessages returned 10 messages for d2ea808d…, full message preview rendered. Diagnostic-only — no stable history browser UI.
         userSurface: 'diagnostic', // Only this diagnostic panel
       },
       {
         capability: 'Session Store',
         sdkExposed: true, // sessionStore option in SDK
         adapterWired: true, // buildSdkOptions wires sessionStore
-        runtimeProof: 'untested',
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: runDiagnosticPrompt with sessionStore + sessionStoreFlush='eager' succeeded; store captured 14 entries across 1 key for session 8c762ebb…. importSessionToStore also proven separately. Diagnostic-only — no stable store UI.
         userSurface: 'hidden',
       },
       {
@@ -564,7 +564,7 @@ export class SettingsCapabilityLabSection {
         capability: 'Environment Variables',
         sdkExposed: true, // env option for Claude Code process/query environment
         adapterWired: true, // buildSdkOptions/process resolution carries normalized env settings
-        runtimeProof: 'readback', // Runtime-readback verified: settings→SDK env readback proved via Stable Settings Readback Proof. Behavior proof (env-derived filesystem side effect, Bash tool_use, assistant text nonce echo) is available via "Run Environment Variables Proof" diagnostic bypass button. Scope boundary: does NOT prove permission approval UX (proven separately by ordinary chat + live harness paths).
+        runtimeProof: 'pass', // Runtime behavior proof achieved: env-derived side-effect file contains expected nonce value, proving env propagation into Bash subprocess. All four layers pass: Layer 1 (SDK readback), Layer 2 (Bash tool invoked), Layer 3 (env-derived filesystem side effect), Layer 4 (assistant text nonce echo). Scope boundary: does NOT prove permission approval UX (proven separately by ordinary chat + live harness paths).
         userSurface: 'settings',
       },
       {
@@ -627,35 +627,35 @@ export class SettingsCapabilityLabSection {
         capability: 'Import Session to Store',
         sdkExposed: !!adapter, // importSessionToStore on SDK facade
         adapterWired: !!adapter, // adapter.importSessionToStore()
-        runtimeProof: 'untested',
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: imported session d2ea808d… into diagnostic store with 51 entries, 1 store key. SDK importSessionToStore accepted sessionStore with append/load interface. Diagnostic-only — no stable import UI.
         userSurface: 'hidden',
       },
       {
         capability: 'Fork Session',
         sdkExposed: !!adapter, // forkSession on SDK facade
         adapterWired: !!adapter, // adapter.forkSession()
-        runtimeProof: 'untested',
-        userSurface: 'diagnostic', // Capability Lab fork probe only
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281335: adapter-layer fork of provider session 5983419f→35ba7b0a (valid UUID), UI-path fork d5f325ad→d2ea808d (valid UUID, title "Restored Claude Code chat (fork)"), local-handle rejection confirmed. Both adapter and Capability Lab UI proofs passed with screenshot+JSON artifacts. Diagnostic-only — no stable fork UI.
+        userSurface: 'diagnostic', // Capability Lab fork probe only — not stable fork productization
       },
       {
         capability: 'Resume Session',
         sdkExposed: true, // resume option in SDK
         adapterWired: true, // buildSdkOptions wires resumeSessionId
-        runtimeProof: 'untested',
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: resumed session d2ea808d…, resulting sessionId matches target, model responded "Session resumed successfully.", 1 text chunk, exit code 0. Diagnostic-only — not stable resume-at productization.
         userSurface: 'diagnostic', // Capability Lab resume probe only — not stable resume-at productization
       },
       {
         capability: 'Session Detail',
         sdkExposed: !!adapter, // getSession on SDK facade
         adapterWired: !!adapter, // adapter.getSession()
-        runtimeProof: 'untested',
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: getSession(d2ea808d…) returned 10 keys (sessionId, summary, lastModified, fileSize, customTitle, firstPrompt, gitBranch, cwd, tag, createdAt), id=d2ea808d, summary="Restored Claude Code chat (fork)". Diagnostic-only — no stable session detail UI.
         userSurface: 'diagnostic', // Capability Lab session detail probe only
       },
       {
         capability: 'Backend Routing',
         sdkExposed: true, // AgentServiceRegistry provides routing
         adapterWired: true, // registry.getActive() resolves adapter
-        runtimeProof: 'untested',
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: registry routes correctly: activeKind=claude-code, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell]. Diagnostic-only — no stable routing UI.
         userSurface: 'diagnostic', // Capability Lab backend routing probe only
       },
     ];

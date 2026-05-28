@@ -1,5 +1,48 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-05-28 Capability Matrix Audit — 7 Promotions from `untested` to `pass`
+
+### Objective
+
+Audit 9 capabilities (`Fork Session`, `Resume Session`, `Session Detail`, `Backend Routing`, `JSONL History Browser`, `Import Session to Store`, `File Checkpoint / Rewind`, `Hooks`, `Session Store`) that were classified as `untested` in the 24-capability matrix. Promote those with sufficient runtime evidence; tighten wording for those that stay non-pass.
+
+### Fresh runtime proof (BUILD_ID `feature-phase0-capability.202605281948`)
+
+All probes ran via `obsidian eval` against the Test Vault with deployed BUILD_ID `feature-phase0-capability.202605281948`.
+
+| Capability | Probe Result | Evidence |
+|---|---|---|
+| JSONL History Browser | `pass` | `listSessions` returned 38 sessions; `getSessionMessages` returned 10 messages for `d2ea808d…` |
+| Session Detail | `pass` | `getSession(d2ea808d…)` returned 10 keys (sessionId, summary, lastModified, fileSize, customTitle, firstPrompt, gitBranch, cwd, tag, createdAt) |
+| Backend Routing | `pass` | Registry: `activeKind=claude-code`, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell] |
+| Session Store | `pass` | `runDiagnosticPrompt` with `sessionStore` + `sessionStoreFlush='eager'` → store captured 14 entries across 1 key for session `8c762ebb…` |
+| Import Session to Store | `pass` | Imported session `d2ea808d…` into diagnostic store with 51 entries, 1 store key |
+| Resume Session | `pass` | Resumed session `d2ea808d…`, resulting sessionId matches target, model responded "Session resumed successfully.", exit code 0 |
+| File Checkpoint / Rewind | `untested` | Verification gap: `rewindFiles(dryRun: true)` requires a live checkpoint-enabled runtime query; diagnostic prompt exits before rewind can be called. Fresh checkpoint-enabled session `e2986d3c…` created but runtime already exited when `rewindFiles` was called |
+
+### Capabilities that stayed non-pass
+
+| Capability | Blocker Category | Reason |
+|---|---|---|
+| File Checkpoint / Rewind | Verification gap | `rewindFiles` requires a live `session.runtime.query.rewindFiles`; after diagnostic prompt exits (code 0), the runtime is gone. Adapter wiring confirmed; probe would need a multi-turn session with checkpointing kept alive |
+| Hooks | Architecture gap | Hooks SDK option wiring confirmed (`buildSdkOptions` passes hooks), but custom hook configuration cannot be isolated from Include Hook Events (separately `pass`). Hook events captured in diagnostic stream prove the hooks system fires, but the hooks *option* itself has no isolated runtime proof |
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated 8 matrix rows (Fork Session, JSONL History Browser, Session Store, Import Session to Store, Resume Session, Session Detail, Backend Routing promoted to `pass`; Hooks tightened to explicit architecture gap wording; File Checkpoint tightened to explicit verification gap wording)
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated audit test expectations, verified count (8→14), hidden-untested list
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated four-bucket summary tables
+
+### Matrix summary after this round
+
+- **pass**: 14/24 (MCP Servers, Permission Approval, AskUserQuestion, Structured Output, Agent Definitions, Include Hook Events, Environment Variables, Fork Session, JSONL History Browser, Session Store, Import Session to Store, Resume Session, Session Detail, Backend Routing)
+- **readback**: 3/24 (Allowed Tools, Disallowed Tools, Turn/Budget Limits)
+- **untested**: 5/24 (Agents (Subagents), File Checkpoint / Rewind, Hooks, Skills, Plugins)
+- **wiring**: 1/24 (Fallback Model)
+- **fail**: 1/24 (Subagent Transcript / Progress)
+
+---
+
 ## 2026-05-28 Event-Stream Matrix Convergence + Agent Definitions Discovery Honesty Fix
 
 ### Event-Stream Matrix Convergence
@@ -88,25 +131,25 @@ Capabilities exposed in stable UI. This bucket mixes **behavior-verified** capab
 | 2 | Allowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Behavior proof infeasible**: model tool-calling is non-deterministic, so diagnostic probes can only detect enforcement *failure* (non-allowed tool called), not success |
 | 3 | Disallowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Behavior proof infeasible**: model tool-calling is non-deterministic, so diagnostic probes can only detect enforcement *failure* (blocked tool called), not success |
 | 4 | Turn/Budget Limits | Settings | `readback` | Stable Settings UI exposed; SDK options correctly built and passed to SDK. Fresh runtime proof on final build (`feature-phase0-capability.202605281809`): **`maxBudgetUsd` enforcement observed** — SDK returns `error_max_budget_usd` with message "Reached maximum budget ($0.01)". **`maxTurns` enforcement NOT observed** — model performed 5-6 tool uses despite `maxTurns=1` or `2`, with no turn-limit signal. Partial proof only; overall capability stays `readback` because `maxTurns` dimension is unproven |
-| 5 | Environment Variables | Settings | `readback` | Stable Settings UI exposed; settings→SDK env readback proved. Fresh diagnostic bypass attempted on final build (`feature-phase0-capability.202605281809`): Layer 1 (SDK readback) PASS, but Layer 2-4 blocked because model did **not** invoke Bash tool. Behavior proof remains **unobserved** on this run; static classification stays `readback` because env propagation success is non-deterministic (model may choose not to call Bash). This is a model-behavior gap, not an SDK limitation |
+| 5 | Environment Variables | Settings | `pass` | Stable Settings UI exposed; settings→SDK env readback proved. **Promoted 2026-05-28**: prompt strategy changed to explicitly request "Use the Bash tool" (matching pattern from Subagent Stream Proof). Fresh runtime proof on build `feature-phase0-capability.202605281935`: **All 4 layers PASS** — Layer 1 (SDK readback): env options correctly built; Layer 2 (Bash tool_use): model invoked Bash tool; Layer 3 (env-derived filesystem side effect): nonce value verified in side-effect file at `/tmp/opencodian-env-proof-<nonce>`; Layer 4 (assistant text nonce echo): nonce present in assistant response. Scope boundary: proves env propagation into Bash subprocess, NOT permission approval UX (proven separately) |
 | 6 | Permission Approval | Chat | `pass` | Ordinary chat end-to-end proof: `permissionMode: 'plan'` + file creation prompt triggers `canUseTool` bridge → permission cards → user approval → stream continues |
 | 7 | AskUserQuestion / Elicitation | Chat | `pass` | Ordinary chat end-to-end proof: model calls `AskUserQuestion` → question dialog renders → user answers → stream continues |
 | 8 | Structured Output | Chat | `pass` | `/json` prefix trigger works in ordinary chat: prefix stripped, fixed JSON schema injected, duplicate raw JSON suppressed, structured output badge renders and survives reload/hydration |
 
 ### diagnostic
 
-Capabilities with working adapter wiring and diagnostic-only runtime proof, but no stable product UI. Some are `pass` (real events captured), most are `untested` (wiring confirmed but no runtime proof yet).
+Capabilities with working adapter wiring and runtime proof, but no stable product UI.
 
 | # | Capability | Runtime Proof | Evidence |
 |---|---|---|---|
 | 9 | Agents (Subagents) | `untested` | `adapter.listSubagents()` / `getSubagentMessages()` work; read-only diagnostic list. Not in `CLAUDE_CODE_PHASE1_CAPABILITIES`; UI gating prevents display in stable surfaces |
 | 10 | Include Hook Events | `pass` | `includeHookEvents: true` → real `hook` backend_events captured in diagnostic stream; no stable transcript rendering |
-| 11 | File Checkpoint / Rewind | `untested` | `enableFileCheckpointing` toggle exists; `adapter.rewindFiles(dryRun: true)` works; only powers diagnostic rewind dry-run preview; no stable rewind UI |
-| 12 | JSONL History Browser | `untested` | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` work; mirror/import proof in Capability Lab |
-| 13 | Fork Session | `untested` | Provider-owned: `adapter.forkSession()` works on real provider sessions; not a stable cross-backend fork UI |
-| 14 | Resume Session | `untested` | Provider-owned: `runDiagnosticPrompt({ resumeSessionId })` works; not a stable resume-at UI |
-| 15 | Session Detail | `untested` | Provider-owned: `adapter.getSession()` works; not a stable cross-backend session detail contract |
-| 16 | Backend Routing | `untested` | Registry routing layer works; diagnostic-only |
+| 11 | File Checkpoint / Rewind | `untested` | Verification gap: `rewindFiles(dryRun: true)` requires a live checkpoint-enabled runtime query; diagnostic prompt exits before rewind can be called. Adapter wiring confirmed; runtime proof blocked by session lifecycle constraint |
+| 12 | JSONL History Browser | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: `listSessions` returned 38 sessions, `getSessionMessages` returned 10 messages for `d2ea808d…`, full message preview rendered. Diagnostic-only — no stable history browser UI |
+| 13 | Fork Session | `pass` | Provider-owned: `adapter.forkSession()` verified on real provider sessions (BUILD_ID `feature-phase0-capability.202605281335`); adapter-layer fork `5983419f→35ba7b0a` (valid UUID), UI-path fork `d5f325ad→d2ea808d` (valid UUID, title "Restored Claude Code chat (fork)"), local-handle rejection confirmed. Diagnostic-only — no stable cross-backend fork UI |
+| 14 | Resume Session | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: resumed session `d2ea808d…`, resulting sessionId matches target, model responded "Session resumed successfully.", exit code 0. Diagnostic-only — not stable resume-at productization |
+| 15 | Session Detail | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: `getSession(d2ea808d…)` returned 10 keys (sessionId, summary, lastModified, fileSize, customTitle, firstPrompt, gitBranch, cwd, tag, createdAt). Diagnostic-only — no stable session detail UI |
+| 16 | Backend Routing | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: registry routes correctly: `activeKind=claude-code`, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell]. Diagnostic-only — no stable routing UI |
 
 ### hidden
 
@@ -114,12 +157,12 @@ Capabilities wired in adapter/SDK but intentionally not exposed in any UI surfac
 
 | # | Capability | Runtime Proof | Evidence |
 |---|---|---|---|
-| 17 | Hooks | `untested` | SDK option wired; hook events captured in diagnostic stream; no stable UI |
-| 18 | Session Store | `untested` | `sessionStore` option wired; diagnostic store mirror/import works; no stable UI |
+| 17 | Hooks | `untested` | Architecture gap: hooks SDK option wiring confirmed (`buildSdkOptions` passes hooks), but custom hook configuration cannot be isolated from Include Hook Events (which is separately `pass`). Hook events captured in diagnostic stream prove the hooks system fires, but the hooks option itself (configuring custom pre/post tool execution hooks) has no isolated runtime proof. No stable UI |
+| 18 | Session Store | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: `runDiagnosticPrompt` with `sessionStore` + `sessionStoreFlush='eager'` succeeded; store captured 14 entries across 1 key for session `8c762ebb…`. `importSessionToStore` also proven separately (51 entries). Diagnostic-only — no stable store UI |
 | 19 | Skills | `untested` | `skills` option wired; `getSkillCount()` / `getSkillsList()` read-only detection; no authoring UI |
 | 20 | Plugins | `untested` | `plugins` option wired; `getPluginCount()` / `getPluginsList()` read-only detection; no authoring UI |
 | 21 | Agent Definitions | `pass` | Inline agent definitions verified functional: SDK accepts `agent`/`agents` and alters behavior. Remains `hidden` — no authoring UI by design |
-| 22 | Import Session to Store | `untested` | `importSessionToStore()` works; diagnostic-only; no stable import UI |
+| 22 | Import Session to Store | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: imported session `d2ea808d…` into diagnostic store with 51 entries, 1 store key. SDK `importSessionToStore` accepted `sessionStore` with append/load interface. Diagnostic-only — no stable import UI |
 
 ### blocked
 

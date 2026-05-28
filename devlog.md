@@ -12,6 +12,83 @@
 
 ---
 
+## 2026-05-28 Capability Matrix Audit — 7/9 Capabilities Promoted from `untested` to `pass`
+
+### 变更
+
+审计 24-capability matrix 中 9 个 `untested` 功能，通过 Test Vault 运行时验证确认其中 7 个可晋升为 `pass`：
+
+| Capability | 晋升前 | 晋升后 | 证据 |
+|---|---|---|---|
+| Fork Session | `untested` | `pass` | 已有 BUILD_ID `202605281335` 的 adapter + UI path 证明 |
+| JSONL History Browser | `untested` | `pass` | `listSessions`=38, `getSessionMessages`=10 |
+| Session Store | `untested` | `pass` | diagnostic mirror probe: 14 entries, 1 key |
+| Import Session to Store | `untested` | `pass` | import: 51 entries into store |
+| Resume Session | `untested` | `pass` | same-session resume confirmed, exit code 0 |
+| Session Detail | `untested` | `pass` | `getSession` returned 10-key detail record |
+| Backend Routing | `untested` | `pass` | registry routes correctly, 2 adapters, 38 sessions |
+| File Checkpoint / Rewind | `untested` | `untested` | Verification gap: `rewindFiles` requires live runtime |
+| Hooks | `untested` | `untested` | Architecture gap: hooks option not isolatable from events |
+
+### 文件
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: 8 matrix rows updated
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: audit test expectations, verified count 8→14
+- `docs/status/claude-code-current-state-2026-05-22.md`: four-bucket summary updated
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: module doc
+- `devlog.md`: 本条目
+- `graphify-out/`: refreshed
+
+### 验证
+
+- BUILD_ID: `feature-phase0-capability.202605281948`
+- 443 suites / 3436 tests passed, lint 0 errors, typecheck clean
+
+---
+
+## 2026-05-28 Environment Variables — Promoted from `readback` to `pass`
+
+### 任务
+
+修复 Environment Variables 的 runtime proof：previous attempt (BUILD_ID `feature-phase0-capability.202605281809`) 中模型未调用 Bash 工具，导致 Layer 2-4 blocked。通过最小 prompt 策略调整使模型明确调用 Bash 工具，完成四层行为验证。
+
+### 代码变更
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` `runEnvironmentVariablesProof()`:
+  - prompt 从 "Environment proof task. You MUST call Bash..." 改为 "Use the Bash tool to run this exact command:..."
+  - 该 pattern 与 Subagent Stream Proof 中成功触发 Bash 的 prompt 结构一致
+- `buildMatrixRows()`: Environment Variables `runtimeProof` `'readback'` → `'pass'`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`:
+  - audit test expected: Environment Variables `runtimeProof` `'readback'` → `'pass'`
+  - verifiedCapabilities count: 6 → 7
+  - advanced settings test: Environment Variables 从 "Readback verified" 改为 "Verified"
+
+### Runtime Proof 结果
+
+- BUILD_ID: `feature-phase0-capability.202605281935`
+- Session ID: `4e75ba49-d57d-4189-80e0-da4d06aeea8f`
+- Layer 1 (settings -> SDK readback): **PASS** — env options correctly built
+- Layer 2 (Bash tool invoked): **PASS** — model invoked Bash tool (`tool_use` chunk with `name: "Bash"`)
+- Layer 3 (env-derived filesystem side effect): **PASS** — nonce value `1779968262160-j5u9rdf8` verified in side-effect file at `/tmp/opencodian-env-proof-<nonce>`
+- Layer 4 (assistant text nonce echo): **PASS** — nonce present in assistant response
+- Console: no plugin errors
+- Errors: no errors captured
+- Screenshot: `.obsidian-debug/env-vars-proof-pass-20260528.png`
+- JSON artifact: `.obsidian-debug/env-vars-proof-pass-20260528-result.json`
+
+### 关键发现
+
+Prompt 措辞对模型工具调用行为有显著影响：
+- "You MUST call Bash with this exact command:" → 模型未调用 Bash（可能理解为说明而非指令）
+- "Use the Bash tool to run this exact command:" → 模型成功调用 Bash（明确触发 tool_use pattern）
+
+### 分类更新
+
+- **Environment Variables**: promoted from `runtimeProof: 'readback'` → **`runtimeProof: 'pass'`**, `userSurface: 'settings'` (unchanged)
+- 七行标 `Verified`（MCP Servers、Permission Approval、AskUserQuestion / Elicitation、Structured Output、Agent Definitions、Include Hook Events、Environment Variables）
+
+---
+
 ## 2026-05-28 Turn/Budget Limits Fresh Runtime Proof — Partial Proof Only (maxBudgetUsd pass, maxTurns no signal)
 
 ### 任务
