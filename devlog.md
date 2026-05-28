@@ -12,6 +12,71 @@
 
 ---
 
+## 2026-05-28 Phase0-Capability: Fallback Model fresh runtime proof — 仍为 blocked（SDK 限制）
+
+### 任务
+
+基于当前 live build（BUILD_ID `feature-phase0-capability.202605281335`）重新验证 Fallback Model 行为 proof，确定其当前真实分级。
+
+### Fresh runtime proof
+
+- **Proof 方法**：Capability Lab > Discovery & Status > Run Fallback Model Proof（两次独立运行）
+- **Test 配置**：
+  - Primary model: `opencodian-invalid-model-test-xyz123`（故意无效）
+  - Fallback model: `claude-haiku-4-5`（期望的有效 fallback）
+- **Adapter 诊断选项验证**（通过 `inspectLastDiagnosticSdkOptions`）：
+  - `model: "opencodian-invalid-model-test-xyz123"` ✓
+  - `fallbackModel: "claude-haiku-4-5"` ✓
+  - 两个选项均正确传入 SDK
+
+### Runtime Evidence
+
+| 指标 | Run 1 | Run 2 |
+|------|-------|-------|
+| Session ID | `82d53ac3-2e80-490f-88ab-e5173dc7593f` | `4a331bbe-9788-4939-abad-02c896b7f619` |
+| Spawn exit code | 1 | 1 |
+| Error chunk | contentLength=78 | contentLength=78 |
+| Capability Lab status | `fail` | `fail` |
+| Console errors | No plugin errors | No plugin errors |
+
+### 失败形态
+
+SDK 在接收到无效主模型 + 有效 fallback 模型配置后：
+1. 正常 spawn Claude Code 子进程
+2. 执行 SessionStart 和 UserPromptSubmit hooks
+3. 在 assistant message 阶段返回 error chunk（contentLength=78，与之前相同）
+4. 子进程以 exit code 1 退出
+5. **没有发生 fallback 切换**
+
+### 分级结论
+
+| 维度 | 当前状态 |
+|------|----------|
+| 选项连接（wiring） | **已验证** — `model` 和 `fallbackModel` 均正确传入 SDK |
+| 运行时回读（readback） | **已验证** — `inspectLastDiagnosticSdkOptions` 确认选项存在 |
+| 行为验证（behavior） | **失败** — SDK 在无效主模型时不 fallback，返回错误 |
+| **总体分级** | **blocked** |
+
+### Blocker 分类
+
+- **类型**：SDK 限制
+- **说明**：Claude Code SDK 不会在主模型无效时自动切换到 `fallbackModel`。`fallbackModel` 选项在选项层面被接受（wiring proven），但在无效主模型故障模式下未观察到实际的 fallback 切换行为。
+- **触发条件未知**：fallback 可能需要 rate-limit、service-unavailable 等其他故障模式才会触发，而非 invalid-model。
+
+### 代码决策
+
+**不改代码。** 当前分类已足够诚实：
+- Matrix 静态分类：`wiring`
+- Capability Lab proof 按钮：允许用户自行验证，正确返回 `fail`
+- Settings proof-status notice：`data-proof-state="wiring"`
+- 无需添加掩饰性文案或降级为更宽松的分类
+
+### Artifact
+
+- `.obsidian-debug/fallback-model-fresh-proof-20260528.json` — 结构化证据
+
+---
+
 ## 2026-05-28 Phase0-Capability: Model catalog / supportedModels 稳定性 fresh runtime proof — gap 已关闭
 
 ### 任务

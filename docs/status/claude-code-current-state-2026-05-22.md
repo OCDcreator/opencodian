@@ -69,6 +69,60 @@ That fix (merged in BUILD_ID `feature-phase0-capability.202605281206`) changed `
 - Both adapter-layer and UI-path proofs confirm the gap is closed.
 - No code changes required for this slice.
 
+## 2026-05-28 Fallback Model Fresh Runtime Proof — Still Blocked (SDK Limitation)
+
+### Fresh runtime proof procedure
+
+- Build/deploy/reload with Test Vault BUILD_ID: `feature-phase0-capability.202605281335`.
+- Executed Capability Lab > Discovery & Status > Run Fallback Model Proof **twice** independently.
+- Test configuration: primary model `opencodian-invalid-model-test-xyz123` (intentionally invalid), fallback model `claude-haiku-4-5` (expected valid fallback).
+- Verified adapter diagnostic options via `adapter.inspectLastDiagnosticSdkOptions()`: both `model` and `fallbackModel` correctly reach the SDK.
+
+### Evidence
+
+| Metric | Run 1 | Run 2 |
+|--------|-------|-------|
+| Session ID | `82d53ac3-2e80-490f-88ab-e5173dc7593f` | `4a331bbe-9788-4939-abad-02c896b7f619` |
+| Spawn exit code | 1 | 1 |
+| Error chunk | contentLength=78 | contentLength=78 |
+| Capability Lab status | `fail` | `fail` |
+| Console plugin errors | None | None |
+
+**Adapter diagnostic options (confirmed by `inspectLastDiagnosticSdkOptions`):**
+- `model: "opencodian-invalid-model-test-xyz123"` ✓
+- `fallbackModel: "claude-haiku-4-5"` ✓
+
+### Failure mode
+
+The Claude Code SDK spawns successfully, executes SessionStart and UserPromptSubmit hooks, but returns an error chunk at the assistant message stage when the primary model is invalid. The subprocess exits with code 1. **No fallback switching behavior is observed.**
+
+### Classification
+
+| Dimension | Status |
+|-----------|--------|
+| Option wiring | **Verified** — both `model` and `fallbackModel` correctly passed to SDK |
+| Runtime readback | **Verified** — `inspectLastDiagnosticSdkOptions` confirms options present |
+| Behavior verification | **Failed** — SDK does not fall back on invalid primary model |
+| **Overall grade** | **blocked** |
+
+### Blocker classification
+
+- **Type**: SDK limitation
+- **Explanation**: The Claude Code SDK does NOT automatically fall back to `fallbackModel` when the primary model is invalid. The `fallbackModel` option is accepted at the options level (wiring proven), but actual fallback switching behavior was not observed under the invalid-primary-model failure mode.
+- **Trigger conditions unknown**: Fallback may require rate-limit or service-unavailable failure modes, not invalid-model.
+
+### Code decision
+
+**No code changes.** Current classification is already honest:
+- Capability matrix static row: `wiring`
+- Capability Lab proof button: correctly returns `fail` at runtime
+- Stable settings proof-status notice: `data-proof-state="wiring"`
+- No cosmetic文案 changes needed.
+
+### Artifact
+
+- `.obsidian-debug/fallback-model-fresh-proof-20260528.json`
+
 ## 2026-05-28 Structured Assistant Reload/Hydration Render Truth Gap Fix
 
 ### Root cause (confirmed)
