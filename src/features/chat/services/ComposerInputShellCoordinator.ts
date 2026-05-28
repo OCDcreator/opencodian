@@ -239,6 +239,7 @@ export class ComposerInputShellCoordinator {
 
   refreshToolbarControls(): void {
     this.mountToolbarControls();
+    this.renderCapabilityHint();
   }
 
   private mountToolbarControls(): void {

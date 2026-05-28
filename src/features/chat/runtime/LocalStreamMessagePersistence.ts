@@ -28,7 +28,8 @@ export async function persistLocalStreamOutcome(options: {
 
   let persistLocalMessage: (() => void) | null = null;
 
-  if (outcome.hasStreamContentBlocks && outcome.streamContentBlocks) {
+  const shouldPersistStructuredOnlyAssistantMessage = outcome.structuredOutput !== undefined;
+  if ((outcome.hasStreamContentBlocks && outcome.streamContentBlocks) || shouldPersistStructuredOnlyAssistantMessage) {
     const shouldPersistAssistantMessage = shouldPersistLocalAssistantMessage(
       outcome,
       runtime,
@@ -55,7 +56,9 @@ export async function persistLocalStreamOutcome(options: {
       modelId: outcome.finalizedModelId,
       sourceMessageId: outcome.finalizedAssistantMessageId,
       streamState: outcome.shouldPersistInterruptedState ? 'interrupted' : undefined,
-      contentBlocks: mapStreamingContentBlocksToMessageContentBlocks(outcome.streamContentBlocks),
+      contentBlocks: outcome.streamContentBlocks
+        ? mapStreamingContentBlocksToMessageContentBlocks(outcome.streamContentBlocks)
+        : [],
       questionResolution: runtime.pendingQuestionResolution ?? undefined,
       structured: outcome.structuredOutput,
     };

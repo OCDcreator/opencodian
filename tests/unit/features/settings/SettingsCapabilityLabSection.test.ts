@@ -1575,6 +1575,7 @@ describe('SettingsCapabilityLabSection', () => {
       listSessions: jest.fn().mockResolvedValue([
         { sessionId: 'session-source-1', summary: 'Source session', lastModified: 1 },
       ]),
+      getSession: jest.fn().mockResolvedValue({ sessionId: 'session-source-1' }),
       forkSession: jest.fn().mockResolvedValue({
         id: 'forked-session-999',
         title: 'Source session (fork)',
@@ -1602,6 +1603,77 @@ describe('SettingsCapabilityLabSection', () => {
     expect(adapter.forkSession).toHaveBeenCalledWith('session-source-1');
     expect(containerEl.textContent).toContain('forked-session-999');
     expect(containerEl.textContent).toContain('Source session (fork)');
+  });
+
+  it('resolves authoritative SDK session id before forking when selected id is local handle', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'claude-code-local-1', summary: 'Local handle', lastModified: 1 },
+      ]),
+      getSession: jest.fn().mockResolvedValue({ sessionId: '5983419f-7e60-42f3-907d-e5cfafcac4f9' }),
+      forkSession: jest.fn().mockResolvedValue({
+        id: 'forked-session-uuid',
+        title: 'Local handle (fork)',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement;
+    const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fork Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'claude-code-local-1';
+    forkButton.click();
+    await flushUi();
+
+    expect(adapter.getSession).toHaveBeenCalledWith('claude-code-local-1');
+    expect(adapter.forkSession).toHaveBeenCalledWith('5983419f-7e60-42f3-907d-e5cfafcac4f9');
+  });
+
+  it('prefers provider session id field when probe session payload includes both local sessionId and sdk id', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'claude-code-local-2', summary: 'Local handle', lastModified: 1 },
+      ]),
+      getSession: jest.fn().mockResolvedValue({
+        sessionId: 'claude-code-local-2',
+        id: 'b16a4c61-7906-4e25-9c58-23f19a6f0a90',
+      }),
+      forkSession: jest.fn().mockResolvedValue({
+        id: 'forked-session-uuid-2',
+        title: 'Local handle (fork)',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
+    const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement;
+    const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fork Diagnostic')
+    )) as HTMLButtonElement;
+
+    sessionSelect.value = 'claude-code-local-2';
+    forkButton.click();
+    await flushUi();
+
+    expect(adapter.getSession).toHaveBeenCalledWith('claude-code-local-2');
+    expect(adapter.forkSession).toHaveBeenCalledWith('b16a4c61-7906-4e25-9c58-23f19a6f0a90');
   });
 
   it('shows diagnostic error and hint when forkSession fails', async () => {

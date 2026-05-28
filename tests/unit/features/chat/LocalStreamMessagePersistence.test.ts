@@ -50,8 +50,12 @@ function createRuntime(overrides: Partial<SendPipelineTabRuntime> = {}): SendPip
   };
 }
 
-function createHost(): jest.Mocked<LocalStreamPersistenceHost> {
-  const host: jest.Mocked<LocalStreamPersistenceHost> = {
+type LocalStreamPersistenceTestHost = LocalStreamPersistenceHost & {
+  saveConversation: (conversation: Conversation) => Promise<void>;
+};
+
+function createHost(): jest.Mocked<LocalStreamPersistenceTestHost> {
+  const host: jest.Mocked<LocalStreamPersistenceTestHost> = {
     saveConversation: jest.fn().mockResolvedValue(undefined),
     createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
       conversationId,
@@ -218,6 +222,12 @@ describe('persistLocalStreamOutcome canonical cache boundary', () => {
       expect.anything(),
     );
   });
+});
+
+describe('persistLocalStreamOutcome local persistence details', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('persists structured output on the assistant message when provided', async () => {
     const conversation = createConversation();
@@ -237,6 +247,56 @@ describe('persistLocalStreamOutcome canonical cache boundary', () => {
 
     expect(conversation.messages).toHaveLength(1);
     expect(conversation.messages[0]?.structured).toEqual(structuredPayload);
+  });
+
+  it('persists a new assistant message when structured output exists but visible stream blocks are empty', async () => {
+    const conversation = createConversation([
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'first',
+        timestamp: 1,
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        sourceMessageId: 'assistant-source-1',
+        structured: { status: 'ok', response: '{"marker":"A"}' },
+      },
+      {
+        id: 'user-2',
+        role: 'user',
+        content: 'second',
+        timestamp: 3,
+      },
+    ] as ChatMessage[]);
+    const host = createHost();
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime(),
+      outcome: createOutcome({
+        finalizedAssistantMessageId: 'assistant-source-2',
+        streamContentBlocks: [],
+        hasStreamContentBlocks: false,
+        streamedTextContent: '',
+        shouldSyncFromServer: false,
+        structuredOutput: { status: 'ok', response: '{"marker":"B"}' },
+      }),
+      logAssistantFinalizationStage: jest.fn(),
+    });
+
+    expect(conversation.messages).toHaveLength(4);
+    expect(conversation.messages[3]).toMatchObject({
+      id: 'assistant-source-2',
+      role: 'assistant',
+      sourceMessageId: 'assistant-source-2',
+      structured: { status: 'ok', response: '{"marker":"B"}' },
+    });
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
   });
 
   it('persists question resolution decoration so authoritative merge can preserve it', async () => {

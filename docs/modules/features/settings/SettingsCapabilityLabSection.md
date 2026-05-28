@@ -7,7 +7,7 @@
 
 `SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供十个诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。大多数交互仍是只读或 dry-run；sessionStore proof 只会写入插件内存里的 diagnostic store，并通过 Diagnostic Store 列表和 readback 证明隔离路径可读，不会改稳定设置或普通 chat UI。
 
-设计原则：不把未验证能力包装成稳定 UI。允许最小的 diagnostic-only runtime proof，但不能把 hooks / sessionStore 伪装成 stable/completed。structured output 的 transcript 渲染与持久化已稳定，但 authoring/triggering 仍为 diagnostic-only；Capability Lab 只证明边界，不把诊断态升级成正式产品面。
+设计原则：不把未验证能力包装成稳定 UI。允许最小的 diagnostic-only runtime proof，但不能把 hooks / sessionStore 伪装成 stable/completed。structured output 的 transcript 渲染与持久化已稳定，普通聊天 `/json` trigger 与 composer hint 也已落地；但自定义 schema authoring 仍为 diagnostic-only，Capability Lab 只证明边界，不把诊断态升级成正式产品面。
 
 ## 诊断面板
 
@@ -18,7 +18,7 @@
 | Subagent Browser | 列出/检查子代理转录 | `adapter.listSubagents()` / `getSubagentMessages()` |
 | Rewind Dry-Run Preview | 预览文件检查点回退（不执行） | `adapter.rewindFiles(dryRun: true)` |
 | Structured Output Playground | 启动 runtime-only outputFormat probe 并展示 `backend_event`；探针支持双路径检测：首选 `structured_output` backend_event，若无则回退检测 text chunk 中的合法 JSON | `adapter.runDiagnosticPrompt()` |
-| Fork Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并执行 fork，输出分叉后的 session ID 和标题 | `adapter.listSessions()` / `adapter.forkSession()` |
+| Fork Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并执行 fork，输出分叉后的 session ID 和标题；执行 fork 前会先调用 `adapter.getSession()` 解析可比较会话身份并优先使用 provider 权威 session id，再调用 `adapter.forkSession()`，避免把本地临时 handle 直接传给 SDK。若 probe 返回 `{ sessionId: claude-code-*, id: <sdk-id> }`，会显式优先使用 `id` | `adapter.listSessions()` / `adapter.getSession()` / `adapter.forkSession()` |
 | Resume Session Diagnostic | Provider-owned 诊断探针：选择一个 Claude 会话并以 `resumeSessionId` 运行诊断 prompt；只有 resulting session id 等于请求的 source session id 时才标 pass，并输出文本预览 | `adapter.listSessions()` / `adapter.runDiagnosticPrompt({ resumeSessionId })` |
 | Session Detail Inspection | Provider-owned 诊断探针：选择一个 Claude 会话并调用 `getSession()`，输出 raw session 字段（sessionId, summary, lastModified, messageCount 等）| `adapter.listSessions()` / `adapter.getSession()` |
 | Backend Routing Verification | Provider-owned 诊断探针：显示活跃后端、已注册适配器、会话后端分布，验证 `listSessions()` + `getSession()` 通过 provider-owned 路由路径工作，并额外验证 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 通过 registry 路由层工作 | `AgentServiceRegistry` / `adapter.listSessions()` / `adapter.getSession()` / `listBackendSessions()` / `getBackendSessionPreview()` / `readBackendSessionTitle()` / `readBackendSessionShareUrl()` |
@@ -129,10 +129,13 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 
 - sessionStore import / mirror proof 会写入隔离的 diagnostic store；mirror proof 必须完成 Diagnostic Store list/select/readback 并读到至少一条消息才算通过。这不属于稳定插件状态，也不等于开放正式 import/restore UI
 - `buildMatrixRows()` 的评估基于代码检查，不是运行时探测
-- Structured Output 与 Hooks proof 都通过 `runDiagnosticPrompt()` 直接观察 backend_event；普通 `OpenCodianView` 仍不会把这些事件渲染进稳定 transcript。structured output 的 transcript 渲染已稳定，但 authoring/triggering 仍只在诊断面板里可见。`runStructuredOutputProbe()` 支持双路径检测：首选 `structured_output` backend_event，若 SDK 未 emit 该事件，则回退检测 text chunk 中的合法 JSON。fallback 检测不再使用宽松的字段存在性检查，而是要求 JSON 严格满足 schema 边界：`status` 必须是 `"ok"` 或 `"error"`，`surface` 必须是 `"diagnostic"`，`confidence` 必须是有限数字且范围在 `[0, 1]`。不满足这些条件的 JSON（例如 `confidence: 1.5` 或 `status: "partial"`）不会被接受为 fallback structured output，探针会诚实标记为 fail。`tryParseFallbackStructuredOutput()` helper 负责集中 fallback 解析与验证，降低 `runStructuredOutputProbe()` 的圈复杂度。
+- Structured Output 与 Hooks proof 都通过 `runDiagnosticPrompt()` 直接观察 backend_event；普通 `OpenCodianView` 对 hook 事件仍不做稳定 transcript 渲染。structured output transcript 渲染已稳定，且普通聊天 trigger 也已稳定：Claude Code backend 下用户可在 composer 看到 `/json — structured output` capability hint，并用 `/json` 前缀触发固定 schema 输出；OpenCode backend 不显示该 hint 且忽略未知 `outputFormat`。`runStructuredOutputProbe()` 仍用于诊断双路径检测（首选 `structured_output` backend_event；缺失时回退 text chunk JSON），并继续执行严格 schema 边界校验（`status`=`"ok"|"error"`、`surface`=`"diagnostic"`、`confidence` ∈ `[0,1]`）。
+- `/json` hint 热刷新当前运行时证据：`opencode` 激活时 hint 隐藏，切换到 `claude-code`（不 reload）后 hint 可见，再切回 `opencode`（不 reload）后 hint 再次隐藏；见 `.obsidian-debug/json-hint-hot-refresh-sequence-20260528-result.txt`。当前不再把 hot-refresh 视为已知 blocker。
+- Structured Output 多轮一致性边界需分开陈述：resumed 会话继续 `/json` 的单脚本产品路径现已补齐（`.obsidian-debug/structured-resume-before-20260528-110128.txt` + `.obsidian-debug/structured-resume-after-20260528-110128.txt`）。该路径证明 reload 后在同一 resumed session 仍会触发 `StructuredOutput` tool_use 和 `structured_output` backend_event；但持久层仍有精确缺口：postcheck 显示 `structuredMessageCount: 0`（`.obsidian-debug/structured-resume-postcheck-20260528-110128.txt`），说明 resumed `/json` 的 structured block 未稳定落入 conversation contentBlocks。fork product path 仍未完成验证，且 provider-owned 诊断在 `.obsidian-debug/structured-multiround-consistency-20260528-result.txt` 记录 `Invalid sessionId`。
 - Discovery 面板使用 `hasCapability()` 检查 adapter 声明的能力
 - 文件使用 `eslint-disable max-lines` 注释，因为十个诊断面板共享同一诊断边界
 - Fork Session 诊断探针是 provider-owned 的诊断界面，不是稳定的跨后端 fork UI。它只直接调用 Claude Code adapter 的 `forkSession()`，不触碰权威同步、diff、子会话图或通用 `getSession` 语义
+- Fork Session 探针在触发 fork 前会做一次 provider-owned 会话身份解析：若选择值是本地 handle（例如 `claude-code-*`），会先通过 `adapter.getSession()` 解析出 SDK 权威 session id，并将该 id 用于 `forkSession()`；当 probe 同时返回 `sessionId=claude-code-*` 与 `id=<sdk-id>` 时，强制优先 `id`，避免误把本地 handle 原样传回 fork；这只收敛诊断探针输入，不改变普通产品聊天路径的 session 绑定逻辑
 - Resume Session 诊断探针同样是 provider-owned 的诊断界面，不是稳定的 resume-at / resume product surface。它验证 `runDiagnosticPrompt({ resumeSessionId, _diagnosticResumeAt: true })` 能否把 SDK `options.resume` 打通到诊断 query，并要求返回的 `result.sessionId` 等于请求的 source session id；如果 SDK 返回不同 session id，探针会标记失败，避免把 fresh session 误报为 resume proof。`_diagnosticResumeAt` 是显式诊断标志，resume-at 必须在此标志为 `true` 时才被接受，防止误用于稳定聊天路径。这不等于普通聊天或正式恢复 UI 已完成。
 - Session Detail 诊断探针是 provider-owned 的诊断界面，不是稳定的跨后端 session-detail object contract。它调用 `adapter.getSession()` 并展示原始字段，仅用于验证 `getSession()` 在 Claude Code runtime 上可执行，不代表任何后端通用 session shape
 - Backend Routing 诊断探针是 provider-owned 的诊断界面，验证后端路由基础设施工作正常。它显示活跃后端、已注册适配器和会话后端分布，并通过 `listSessions()` + `getSession()` 验证 provider-owned 路由路径，同时通过 `listBackendSessions()` + `getBackendSessionPreview()` + `readBackendSessionTitle()` + `readBackendSessionShareUrl()` 验证 registry 路由层（产品化的窄 seam）。不是稳定产品界面

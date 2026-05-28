@@ -199,9 +199,10 @@ describe('ClaudeCodeAdapter', () => {
 
   it('returns an empty supported model list when the SDK throws', async () => {
     const sdk = createSdk([]);
+    const close = jest.fn();
     sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
       supportedModels: jest.fn().mockRejectedValue(new Error('model catalog unavailable')),
-      close: jest.fn(),
+      close,
     }));
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
@@ -210,6 +211,7 @@ describe('ClaudeCodeAdapter', () => {
     });
 
     await expect(adapter.supportedModels()).resolves.toEqual([]);
+    expect(close).toHaveBeenCalledTimes(1);
   });
 
   it('returns an empty supported model list when the SDK method is unavailable', async () => {
@@ -222,6 +224,109 @@ describe('ClaudeCodeAdapter', () => {
     });
 
     await expect(adapter.supportedModels()).resolves.toEqual([]);
+  });
+
+  it('reuses runtime query models without closing the live runtime query', async () => {
+    const close = jest.fn();
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-session-runtime-reuse',
+      model: 'claude-sonnet-4-5',
+    }]);
+    const supportedModels = jest.fn().mockResolvedValue([{
+      id: 'claude-sonnet-4-5',
+      name: 'Claude Sonnet 4.5',
+      provider: 'anthropic',
+    }]);
+    const runtimeQuery = Object.assign((async function* () {
+      yield {
+        type: 'assistant',
+        session_id: 'sdk-session-runtime-reuse',
+        message: {
+          id: 'msg-runtime-reuse',
+          content: [{ type: 'text', text: 'runtime alive' }],
+        },
+      };
+    })(), {
+      supportedModels,
+      close,
+    });
+    sdk.query.mockReturnValue(runtimeQuery);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+
+    const chunksPromise = collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'keep runtime alive',
+    }));
+    await waitForExpect(() => {
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+    });
+
+    await expect(adapter.supportedModels()).resolves.toEqual([{
+      id: 'claude-sonnet-4-5',
+      name: 'Claude Sonnet 4.5',
+      provider: 'anthropic',
+    }]);
+    expect(supportedModels).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(0);
+
+    await expect(chunksPromise).resolves.toEqual(expect.arrayContaining([{
+      type: 'text',
+      content: 'runtime alive',
+    }]));
+  });
+
+  it('binds runtime-reuse supportedModels to the live query context', async () => {
+    const close = jest.fn();
+    const runtimeQuery = createAsyncQueue<unknown>() as ReturnType<typeof createAsyncQueue<unknown>> & {
+      supportedModels: () => Promise<Array<{ id: string; name: string; provider: string }>>;
+      close: jest.Mock;
+      sentinel: string;
+    };
+    runtimeQuery.sentinel = 'bound-context';
+    runtimeQuery.supportedModels = jest.fn(function (this: { sentinel?: string }) {
+      if (this.sentinel !== 'bound-context') {
+        throw new TypeError('unbound supportedModels context');
+      }
+      return Promise.resolve([{
+        id: 'claude-opus-4-1',
+        name: 'Claude Opus 4.1',
+        provider: 'anthropic',
+      }]);
+    });
+    runtimeQuery.close = close;
+
+    const sdk = createSdk([]);
+
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: runtimeQuery };
+
+    await expect(adapter.supportedModels()).resolves.toEqual([{
+      id: 'claude-opus-4-1',
+      name: 'Claude Opus 4.1',
+      provider: 'anthropic',
+    }]);
+    expect(runtimeQuery.supportedModels).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(0);
   });
 
   it('creates, renames, and deletes local session handles', async () => {
@@ -702,6 +807,19 @@ describe('ClaudeCodeAdapter', () => {
       upToMessageId: 'message-1',
       title: 'Renamed (fork)',
     });
+  });
+
+  it('rejects forkSession for a local Claude handle before an SDK session is bound', async () => {
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession('Claude chat');
+
+    await expect(adapter.forkSession(sessionId)).rejects.toThrow(/bound SDK session id/i);
+    expect(sdk.forkSession).not.toHaveBeenCalled();
   });
 
   it('delegates Claude JSONL history and subagent transcript APIs behind diagnostic-only methods', async () => {

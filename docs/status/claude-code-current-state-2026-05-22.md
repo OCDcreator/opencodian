@@ -66,6 +66,121 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - `4a5610537e24a3d899e161a222ff112170b6189a` — `docs: refresh Claude continuity after title read routing`
 - `d0a1e216080be2ad201624c538216e8024484952` — `feat: route title session reads through backend getSession`
 
+## 2026-05-28 Runtime Proof Refresh: Resumed /json Closure + Fork Probe Narrowing
+
+## 2026-05-28 Fresh fork/session-id runtime recheck (decision boundary: probe-first)
+
+### Fresh runtime proof result
+
+- Executed a fresh `obsidian-plugin-autodebug` cycle and reran real Claude send + reload/hydration checks:
+  - `.obsidian-debug/fresh-before-reload-20260528.json`
+  - `.obsidian-debug/fresh-after-reload-20260528.json`
+- In both runs, the conversation backend session identity stayed on provider SDK UUID:
+  - `backendSessionId = 5983419f-7e60-42f3-907d-e5cfafcac4f9`
+- Therefore, the product path is **not** proven to regress into local `claude-code-*` handles after real send + hydration.
+
+### Decision
+
+- Do **not** escalate to product-path session binding changes.
+- Keep this slice strictly probe-scoped.
+
+### Probe-side fix applied
+
+- `SettingsCapabilityLabSection` fork diagnostic now resolves authoritative provider session identity before forking:
+  - call `adapter.getSession(selectedSessionId)`;
+  - extract comparable ids (`sessionId`, `id`);
+  - prefer matching id, fallback to first authoritative candidate;
+  - call `adapter.forkSession(resolvedSessionId)`.
+- This prevents provider-owned diagnostic probe from forwarding a local handle when a provider canonical id is available.
+
+### Regression coverage
+
+- Added test ensuring local diagnostic handle selection is resolved to provider UUID before `forkSession()` invocation:
+  - `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+
+## 2026-05-28 ModelSelectionRuntime Gap Fix: runtime-reuse model query close boundary
+
+### Root cause (confirmed)
+
+- `ModelSelectionRuntime` reload/hydration path repeatedly logged `Failed to load models: {}` for Claude backend.
+- The direct SDK call path remained healthy (`runtime.query.supportedModels()` returned non-empty catalog), but `ClaudeCodeAdapter.supportedModels()` failed when runtime-reuse was active.
+- Root cause: `getModelCatalogQuery()` runtime-reuse branch returned the live runtime `query.close`, and `supportedModels()` unconditionally called `query?.close?.()` in `finally`.
+- On reused runtime queries this is wrong semantically (adapter does not own that query) and can trigger unbound/invalid close behavior (`TypeError: this.cleanup is not a function`) while also risking closure of an active session runtime.
+
+### Fix
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`
+  - `ClaudeCodeModelCatalogQuery` now carries lifecycle ownership (`shouldClose?: boolean`).
+  - `supportedModels()` `finally` closes only when `shouldClose !== false`.
+  - `getModelCatalogQuery()` runtime-reuse branch now returns only `supportedModels` + `shouldClose: false` (no live runtime close delegation).
+  - temporary model-catalog query path keeps default close behavior.
+
+### Tests
+
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts`
+  - Added regression: runtime-reuse model lookup succeeds and **does not** call live runtime query `close`.
+  - Hardened throw-path test: when SDK model lookup throws, temporary query `close` still runs once in `finally`.
+  - Existing normalized catalog test continues asserting temporary query close once.
+
+### Runtime expectation after this fix
+
+- `adapter.supportedModels()` should no longer throw `this.cleanup is not a function` in runtime-reuse scenarios.
+- Reload/hydration should no longer degrade Claude model catalog load because of adapter-side query close misuse.
+
+### Resumed /json closure (product path, real runtime)
+
+- Build/deploy/reload closed with Test Vault BUILD_ID: `feature-phase0-capability.202605281118`.
+- In the same Claude conversation (`conv-1779938398375-kvkngkfzu` / backend session `5983419f-7e60-42f3-907d-e5cfafcac4f9`), runtime sequence was executed end-to-end:
+  1) first `/json` marker A,
+  2) plugin reload,
+  3) resumed same conversation second `/json` marker B.
+- Runtime artifacts:
+  - `.obsidian-debug/structured-resume-before-20260528-2.txt`
+  - `.obsidian-debug/structured-resume-after-20260528-2.txt`
+  - `.obsidian-debug/structured-resume-console-20260528-2.txt`
+  - `.obsidian-debug/structured-resume-errors-20260528-2.txt`
+  - screenshot: `.obsidian-debug/structured-resume-20260528-2.png`
+- Persisted conversation proof (disk readback) confirms marker A/B exist in assistant structured payload:
+  - `/Volumes/SDD2T/obsidian-vault-write/testvault/.opencodian/sessions/conv-1779938398375-kvkngkfzu.json`
+  - assistant turns include `structured.response = "RESUME_JSON_A_1779938523829"` and `structured.response = "RESUME_JSON_B_1779938667877"`.
+
+### Gap status update
+
+- The prior resumed second-turn append blocker is now closed by runtime evidence (not test-only).
+- `ModelSelectionRuntime this.cleanup is not a function` did not reproduce in this round.
+
+### Next high-value narrowing (fork path)
+
+- Multi-round probe rerun artifact: `.obsidian-debug/structured-multiround-consistency-20260528-result-2.txt`.
+- `Invalid sessionId: claude-code-...` is reproducible when the probe forks a local temporary session id (not provider session id).
+- Probe script now reads `id ?? sessionId`, but remaining gap is still valid-session source selection before fork.
+
+### Fork guard follow-up
+
+- `ClaudeCodeAdapter.forkSession()` now rejects a local `claude-code-*` handle before it reaches the SDK if no bound SDK session id exists.
+- This closes the adapter-side misuse boundary; the provider-owned fork probe still needs fresh runtime proof against a real provider session id.
+
+## 2026-05-28 Structured Output Resume 第二轮持久化缺口修复
+
+本轮修复了一个被旧描述误导的真实缺口：**问题不是 `message.structured` 字段“整体不持久化”，而是 reload 后 resumed conversation 的第二轮 `/json` assistant turn 在特定流形态下未追加为新 assistant message**。
+
+### 根因
+
+- 第二轮 resumed `/json` 流可见 `StructuredOutput tool_use`、`structured_output backend_event` 和最终文本，但 `streamContentBlocks` 在 duplicate-filter 后可能为空；
+- `LocalStreamMessagePersistence.persistLocalStreamOutcome()` 之前仅在 `hasStreamContentBlocks=true` 时构建 assistant message；
+- 因此这类“structured-only（无可见 blocks）”turn 直接跳过本地 assistant 持久化，reload 后 persisted conversation 只剩 `user1 + assistant1 + user2`。
+
+### 修复
+
+- `src/features/chat/runtime/LocalStreamMessagePersistence.ts`
+  - 持久化入口从“仅有 stream content blocks”扩展为“有 blocks **或** 有 `structuredOutput`”；
+  - `structured-only` 场景也会创建新的 assistant message，并保留 `sourceMessageId` + `structured` payload。
+
+### 回归验证
+
+- 新增测试 `tests/unit/features/chat/LocalStreamMessagePersistence.test.ts`：
+  - 覆盖“已有 assistant1 的 resumed 会话，在第二轮 `structuredOutput` 存在但 `streamContentBlocks=[]` 时，必须追加 assistant2 而非跳过”。
+
 ## 2026-05-28 Environment Variables Layered Runtime Proof (Filesystem Side-Effect Upgrade)
 
 This slice upgrades Environment Variables evidence from single-layer runtime readback to a reusable layered runtime harness in Capability Lab.
@@ -231,7 +346,7 @@ This slice introduces an explicit `userSurface=chat` classification to the Capab
 
 - **Structured Output `pass` is bounded**: It only proves the fixed-schema `/json` prefix trigger works in ordinary chat. It does NOT prove arbitrary schema authoring is complete, and it does NOT prove OpenCode backend support.
 - **Permission Approval and AskUserQuestion `chat` surface** means the user surface is the chat interaction itself (permission cards, question dialogs), not a settings control. They have no separate Claude settings page.
-- **`/json` discoverability blocker**: Composer placeholder discoverability remains unimplemented due to maintainability / owner-boundary constraints (`OpenCodianView.ts` / `ComposerInputShellCoordinator.ts`). This slice keeps execution-path validation only and does not claim placeholder-based discoverability.
+- **`/json` discoverability status**: Composer-level discoverability is now implemented through backend-aware capability hint rendering in the chat composer (`/json — structured output` for Claude Code backend only). This does not imply arbitrary schema authoring; it only exposes the verified fixed-schema trigger.
 
 ### Verification
 
@@ -780,9 +895,10 @@ This slice advances Structured Output from diagnostic-only to runtime-proven by 
 
 ### Remaining Blockers
 
-- **Stable trigger**: Users still cannot trigger structured output from ordinary chat; only the diagnostic probe exposes it.
+- **Stable trigger**: Users can trigger structured output from ordinary chat via the `/json` prefix on Claude Code backend; OpenCode backend still ignores unknown `outputFormat`.
 - **Schema authoring**: No UI for users to define custom JSON schemas for structured output.
-- **Multi-round consistency**: Not verified whether structured output behavior is consistent across resume/fork scenarios.
+- **Multi-round consistency (resume)**: Single-script product-path proof now exists (`.obsidian-debug/structured-resume-before-20260528-110128.txt`, `.obsidian-debug/structured-resume-after-20260528-110128.txt`, `.obsidian-debug/structured-resume-console-20260528-110128.txt`). Reload → resumed same session → second `/json` still emits `StructuredOutput` tool_use and `structured_output` backend_event. Remaining blocker is narrowed: persisted conversation hydration still lacks durable `structured_output` blocks in this resumed path (`.obsidian-debug/structured-resume-postcheck-20260528-110128.txt` reports `structuredMessageCount: 0` despite non-zero badge count).
+- **Multi-round consistency (fork)**: Not verified on product path. Latest provider-owned diagnostic attempt produced `Invalid sessionId: ses_1937dfaddffep013MrRmVdFCD0` in `.obsidian-debug/structured-multiround-consistency-20260528-result.txt`, so this remains an explicit blocker rather than a broad “untested” claim.
 
 ---
 

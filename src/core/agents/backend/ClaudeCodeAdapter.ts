@@ -51,6 +51,7 @@ type ClaudeCodeQueryHandle = Query & {
 type ClaudeCodeModelCatalogQuery = {
   supportedModels(): Promise<ClaudeCodeSdkModelInfo[]>;
   close?: () => void;
+  shouldClose?: boolean;
 };
 
 export interface ClaudeCodeSdkFacade {
@@ -433,7 +434,9 @@ export class ClaudeCodeAdapter
       runtimeLogger.debug('supportedModels error', { error: summarizeError(error) });
       return [];
     } finally {
-      query?.close?.();
+      if (query?.shouldClose !== false) {
+        query?.close?.();
+      }
     }
   }
 
@@ -553,7 +556,13 @@ export class ClaudeCodeAdapter
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
     const sdk = await this.getSdk();
     const state = this.getOrRestoreSession(sessionId);
-    const sourceSessionId = state.sdkSessionId ?? sessionId;
+    if (!state.sdkSessionId) {
+      throw new Error(
+        `Claude Code forkSession requires a bound SDK session id for ${sessionId}. ` +
+        'Send at least one message before forking a local session.',
+      );
+    }
+    const sourceSessionId = state.sdkSessionId;
     sessionLogger.debug('fork session', { sessionId, sourceSessionId, upToMessageId: messageID });
     if (!sdk.forkSession) {
       throw new Error('Claude Code forkSession is unavailable in this SDK.');
@@ -1229,8 +1238,8 @@ export class ClaudeCodeAdapter
           sdkSessionId: session.sdkSessionId,
         });
         return {
-          supportedModels: query.supportedModels,
-          close: query.close,
+          supportedModels: query.supportedModels.bind(query),
+          shouldClose: false,
         };
       }
     }

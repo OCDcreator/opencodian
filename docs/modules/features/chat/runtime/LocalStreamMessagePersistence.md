@@ -26,6 +26,8 @@ persistLocalStreamOutcome(options): Promise<void>
 - 只要本地实际追加了 message / notice，就更新 `updatedAt`、`lastResponseAt` 并执行第一次本地保存
 - 正常 completed assistant 在 canonical sync pending 时只做 cache-deferred 日志，不把 stale body 当作本地 truth 落盘
 - 若 stream metadata 捕获到新的 backend session id，即使 assistant body 延后给 canonical sync，也会单独通过 serialized write 更新 conversation `backendSessionId`
+- Claude resumed `/json` 多轮边界：即使 `streamContentBlocks` 被去重后为空，只要 `structuredOutput` 存在也必须落一条新的 assistant message，避免第二轮 structured turn 因“无可见 blocks”被跳过持久化
+- 2026-05-28 Test Vault 运行时读回证据：`/Volumes/SDD2T/obsidian-vault-write/testvault/.opencodian/sessions/conv-1779938398375-kvkngkfzu.json` 中连续出现 `user(RESUME_JSON_A) -> assistant(structured A) -> user(RESUME_JSON_B) -> assistant(structured B)`
 
 ## 协作模块
 

@@ -221,11 +221,15 @@ describe('ComposerInputShellCoordinator', () => {
     const fixture = createFixture();
 
     expect(fixture.container.querySelector('.opencodian-agent-selector')).not.toBeNull();
+    expect(fixture.container.querySelector('.opencodian-input-capability-hint')).toBeNull();
 
     fixture.host.shouldMountAgentSelector.mockReturnValue(false);
     fixture.coordinator.refreshToolbarControls();
 
     expect(fixture.container.querySelector('.opencodian-agent-selector')).toBeNull();
+    expect(
+      fixture.container.querySelector('.opencodian-input-capability-hint-text')?.textContent,
+    ).toBe(t('chat.input.capabilityHint.json'));
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(2);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(2);
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);

@@ -1327,10 +1327,11 @@ export class SettingsCapabilityLabSection {
     outputEl.createEl('p', { text: 'Running fork diagnostic…' });
 
     try {
-      const result = await adapter.forkSession(sessionId);
+      const sourceSessionId = await this.resolveForkSourceSessionId(adapter, sessionId);
+      const result = await adapter.forkSession(sourceSessionId);
       outputEl.empty();
       outputEl.createEl('h5', {
-        text: `Forked from ${sessionId.slice(0, 12)}…`,
+        text: `Forked from ${sourceSessionId.slice(0, 12)}…`,
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
@@ -1357,6 +1358,38 @@ export class SettingsCapabilityLabSection {
       });
       this.updateRuntimeProof('Fork Session', 'fail', outputEl);
     }
+  }
+
+  private async resolveForkSourceSessionId(adapter: ClaudeCodeAdapter, sessionId: string): Promise<string> {
+    const trimmed = sessionId.trim();
+    if (!trimmed) {
+      return sessionId;
+    }
+    if (typeof adapter.getSession !== 'function') {
+      return trimmed;
+    }
+    const session = await adapter.getSession(trimmed);
+    if (!session || typeof session !== 'object') {
+      return trimmed;
+    }
+    const record = session as { sessionId?: unknown; id?: unknown };
+    const isLocalSessionHandle = (value: string): boolean => value.startsWith('claude-code-');
+    const sessionField = typeof record.sessionId === 'string' ? record.sessionId.trim() : '';
+    const idField = typeof record.id === 'string' ? record.id.trim() : '';
+    if (
+      isLocalSessionHandle(trimmed)
+      && isLocalSessionHandle(sessionField)
+      && idField.length > 0
+      && !isLocalSessionHandle(idField)
+    ) {
+      return idField;
+    }
+    const comparableIds = [sessionField, idField].filter((candidate) => candidate.length > 0);
+    const matching = comparableIds.find((candidate) => candidate === trimmed);
+    if (matching) {
+      return matching;
+    }
+    return comparableIds[0] ?? trimmed;
   }
 
   // =======================================================================
@@ -2117,7 +2150,7 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'Structured Output',
-      'Ordinary chat verified (execution path). Type /json followed by a prompt in the chat composer to trigger fixed-schema structured output. The /json prefix is stripped and a fixed JSON schema (response + tags + confidence) is injected into outputFormat. Duplicate raw JSON suppression works; structured output badge renders during streaming and survives reload/hydration. Fixed schema only — no arbitrary schema authoring UI. Claude Code backend only; OpenCode ignores unknown outputFormat. Composer-level discoverability remains unimplemented in this slice by design (maintainability / owner-boundary blocker).',
+      'Ordinary chat verified (execution path). Type /json followed by a prompt in the chat composer to trigger fixed-schema structured output. The /json prefix is stripped and a fixed JSON schema (response + tags + confidence) is injected into outputFormat. Duplicate raw JSON suppression works; structured output badge renders during streaming and survives reload/hydration. Composer-level discoverability is now exposed via a Claude-only composer capability hint (/json — structured output). Fixed schema only — no arbitrary schema authoring UI. Claude Code backend only; OpenCode ignores unknown outputFormat.',
       { status: 'exposed' },
     );
 

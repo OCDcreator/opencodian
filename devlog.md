@@ -12,6 +12,263 @@
 
 ---
 
+## 2026-05-28 Phase0-Capability: Fork probe `sessionId`/`id` 混合回包修复
+
+### 问题
+
+- Fork Session 诊断探针在 `adapter.getSession()` 返回同时包含本地 `sessionId=claude-code-*` 和 provider 权威 `id=<sdk-uuid>` 时，仍可能把本地 handle 传给 `forkSession()`。
+- 这会制造 `Invalid sessionId` 类诊断噪声，但不代表普通产品聊天路径的 `backendSessionId` 水合有问题。
+
+### 根因
+
+- 探针的会话解析只做了“候选中找首个相等项，否则取首个候选”，没有对“本地 handle + 权威 UUID”这种混合回包做优先级偏置。
+
+### 修复
+
+1. `src/features/settings/SettingsCapabilityLabSection.ts`
+   - `resolveForkSourceSessionId()` 现在会识别本地 `claude-code-*` handle 场景。
+   - 若 `getSession()` 同时返回本地 `sessionId` 和非本地 `id`，会优先返回 `id`，再调用 `forkSession()`。
+   - 仅影响 provider-owned diagnostic probe，不改普通聊天路径。
+
+2. `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+   - 新增回归：`sessionId=claude-code-local-2` + `id=b16a4c61-7906-4e25-9c58-23f19a6f0a90` 时，探针必须 fork 权威 UUID。
+
+### 验证
+
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` ✅
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` ✅
+
+---
+
+## 2026-05-28 Phase0-Capability: Fork/session-id 新鲜 runtime 证据 + probe 侧权威 session 解析修复
+
+### 决策边界复核（按 orchestrator 要求）
+
+- 本轮先做 fresh runtime proof，再决定是否升级到产品路径修复。
+- 结论：**无需升级产品路径**。真实 Claude send + reload/hydration 后，conversation `backendSessionId` 已稳定收敛到 provider SDK session id（UUID），不是本地 `claude-code-*` handle。
+
+### Fresh runtime 证据（-plugin-autodebug 路径）
+
+1. 先执行受控 reload cycle：
+   - `obsidian_plugin_debug_cycle.sh ... --hot-reload-mode controlled --skip-build --skip-deploy`
+2. 运行真实会话脚本（非历史产物复用）：
+   - `.obsidian-debug/structured-resume-before-reload-20260528.js` → 输出 `.obsidian-debug/fresh-before-reload-20260528.json`
+   - plugin reload 一次
+   - `.obsidian-debug/structured-resume-after-reload-20260528.js` → 输出 `.obsidian-debug/fresh-after-reload-20260528.json`
+3. 关键观测：
+   - before: `backendSessionId = 5983419f-7e60-42f3-907d-e5cfafcac4f9`
+   - after reload/hydration: `backendSessionId = 5983419f-7e60-42f3-907d-e5cfafcac4f9`
+   - 两次都为 provider SDK session id（UUID），未回退为 `claude-code-*`。
+
+### 根因收敛（本轮）
+
+- blocker 仍落在 provider-owned fork diagnostic probe 输入选择层：探针可能直接把本地可见 handle 当作 fork source 传给 adapter/sdk，造成 `Invalid sessionId` 类报错。
+- 这不是普通产品聊天路径的 `backendSessionId` 绑定/水合错误。
+
+### 修复（probe 侧最小改动）
+
+1. `src/features/settings/SettingsCapabilityLabSection.ts`
+   - `runForkDiagnostic()` 在执行 fork 前新增 `resolveForkSourceSessionId()`：
+     - 先 `adapter.getSession(selectedId)`；
+     - 从 `{ sessionId, id }` 可比较候选中优先取与输入一致项，否则取首个权威候选；
+     - 再调用 `adapter.forkSession(resolvedId)`。
+   - 该改动严格在 provider-owned diagnostic probe 内，不触碰产品聊天路径。
+
+2. `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+   - 新增回归：当用户选择本地 handle（`claude-code-local-1`）时，probe 会先解析为权威 UUID，再把 UUID 传给 `forkSession()`。
+
+### 验证
+
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` ✅ 118/118
+
+
+## 2026-05-28 Phase0-Capability: ModelSelectionRuntime / supportedModels runtime-reuse close 语义修复
+
+### 问题
+
+- Claude backend 在 reload/hydration 后反复出现 `ModelSelectionRuntime Failed to load models: {}`。
+- 运行时证据显示直接调用 `runtime.query.supportedModels()` 可返回非空目录；但调用 `adapter.supportedModels()` 会报：
+  - `TypeError: this.cleanup is not a function`
+
+### 根因
+
+- `ClaudeCodeAdapter.getModelCatalogQuery()` 的 runtime-reuse 分支把活跃 query 的 `close` 透传给 model-catalog 调用方。
+- `supportedModels()` 在 `finally` 无条件执行 `query?.close?.()`。
+- 这违反 owner 语义：runtime-reuse 路径只是借用 live runtime 的 `supportedModels` 能力，不拥有该 query，不能关闭它；同时 unbound close 还会触发 `this.cleanup` 错误。
+
+### 修复
+
+1. `src/core/agents/backend/ClaudeCodeAdapter.ts`
+   - 为 `ClaudeCodeModelCatalogQuery` 增加 `shouldClose?: boolean` 生命周期标记。
+   - `supportedModels()` 的 `finally` 改为仅当 `shouldClose !== false` 时调用 `close`。
+   - runtime-reuse 分支返回 `{ supportedModels, shouldClose: false }`，不再透传 live query 的 `close`。
+   - 临时 model-catalog query 路径保持可关闭行为。
+
+2. `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts`
+   - 新增回归：runtime-reuse 路径下 `adapter.supportedModels()` 返回目录且不会调用 live query `close`。
+   - 增强 throw-path：SDK 抛错时仍断言临时 query `close` 在 finally 调用一次。
+
+### 语义边界
+
+- 临时目录查询：adapter 拥有 query，必须关闭。
+- runtime-reuse 目录查询：adapter 不拥有 query，禁止关闭 live runtime。
+
+### Follow-up
+
+- `forkSession()` 现在也会在适配器层提前拒绝未绑定 SDK session id 的本地 `claude-code-*` handle，避免把临时 handle 误传给 SDK 的 fork API。
+
+## 2026-05-28 Phase0-Capability: Resumed /json Runtime 闭环 + Fork Probe 字段收窄
+
+### 目标
+
+在不回退既有改动的前提下，完成部署闭环与真实运行时 proof：验证 resumed conversation 第二轮 `/json` assistant 持久化是否真实修复；若通过，继续推进下一个高价值 gap。
+
+### 部署闭环
+
+1. 本地构建：`npm run build`，生成 BUILD_ID `feature-phase0-capability.202605281118`。
+2. 按仓库顺序部署到 Test Vault（独立步骤执行）：
+   - `dist/main.js`
+   - `dist/manifest.json`
+   - `dist/styles.css`
+   - `dist/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/`
+   - `dist/assets/`
+3. `obsidian plugin:reload id=opencodian vault=testvault` 后读取 Test Vault `main.js`，确认 BUILD_ID 已更新为 `feature-phase0-capability.202605281118`（旧值 `feature-phase0-capability.202605281044` 已被覆盖）。
+
+### Resumed /json 真实运行时证据（A 段）
+
+1. 在同一 conversation 执行：首轮 marker A -> reload -> resumed 同会话 marker B。
+2. 产物：
+   - `.obsidian-debug/structured-resume-before-20260528-2.txt`
+   - `.obsidian-debug/structured-resume-after-20260528-2.txt`
+   - `.obsidian-debug/structured-resume-console-20260528-2.txt`
+   - `.obsidian-debug/structured-resume-errors-20260528-2.txt`
+   - `.obsidian-debug/structured-resume-20260528-2.png`
+3. 持久化读回 proof（硬条件）：
+   - `/Volumes/SDD2T/obsidian-vault-write/testvault/.opencodian/sessions/conv-1779938398375-kvkngkfzu.json`
+   - 文件中明确出现 `structured.response: "RESUME_JSON_A_1779938523829"` 与 `structured.response: "RESUME_JSON_B_1779938667877"`，说明 resumed 第二轮 assistant turn 已真实持久化。
+
+### 下一个高价值 gap（B 段）
+
+- fresh reload 后 `this.cleanup is not a function` 未复现；但 `ModelSelectionRuntime Failed to load models` 仍可见。
+- 运行 marker C + fork probe（`.obsidian-debug/structured-multiround-consistency-20260528-result-2.txt`）：
+  - 多轮 marker C 同会话可见；
+  - fork 阶段报错 `Invalid sessionId: claude-code-...`；
+  - 当前高价值 gap 收窄为：fork probe 使用了本地临时 session id（`claude-code-*`），不是 provider 可 fork session id。
+
+## 2026-05-28 Phase0-Capability: Structured Output Resume 第二轮 Assistant 持久化修复
+
+### 目标
+
+修复 reload 后 resumed conversation 第二轮 `/json` assistant turn 未持久化为新消息的问题，并纠正旧 blocker 描述。
+
+### 根因（纠正旧说法）
+
+- 不是 `message.structured` 整体不持久化。
+- 真实缺口是：第二轮 resumed `/json` 在流中会出现 `StructuredOutput tool_use` 与 `structured_output backend_event`，但 duplicate filter 后 `streamContentBlocks` 可能为空。
+- `persistLocalStreamOutcome()` 旧逻辑仅在 `hasStreamContentBlocks` 为真时才构建 assistant message，导致 structured-only turn 被直接跳过，最终 persisted conversation 缺少 assistant2。
+
+### 改动
+
+1. `src/features/chat/runtime/LocalStreamMessagePersistence.ts`
+   - 本地 assistant 持久化条件从“有 stream content blocks”升级为“有 blocks 或有 `structuredOutput`”。
+   - `structuredOutput` 存在但 blocks 为空时也会创建 assistant message（保留 `sourceMessageId` 与 `structured`）。
+2. `tests/unit/features/chat/LocalStreamMessagePersistence.test.ts`
+   - 新增回归：模拟 `user1 -> assistant1(structured A) -> user2` 后，第二轮 structured-only 收尾必须追加 `assistant2(structured B)`。
+3. 文档同步：
+   - `docs/modules/features/chat/runtime/LocalStreamMessagePersistence.md`
+   - `docs/status/claude-code-current-state-2026-05-22.md`
+
+### 验证
+
+- Focused test：`npm test -- tests/unit/features/chat/LocalStreamMessagePersistence.test.ts`（7/7 通过）
+
+### 边界
+
+- 本轮修复的是 assistant turn append/finalization 持久化路径，不是 structured 字段 merge 语义；后者仍由 authoritative merge 的 client-only preservation 规则兜底。
+
+## 2026-05-28 Phase0-Capability: Structured Output Resume Product-Path Single-Script Recheck
+
+### 目标
+
+补齐 continuity 中“resumed 会话继续 `/json`”的产品路径单脚本闭环，并把 blocker 精确到可复现层级。
+
+### Runtime 证据（obsidian-plugin-autodebug 路径）
+
+1. 运行单序列脚本（同一轮内完成：首轮 `/json` 发送 → `plugin:reload` → resumed 会话二次 `/json` 发送），产物：
+   - `.obsidian-debug/structured-resume-before-20260528-110128.txt`
+   - `.obsidian-debug/structured-resume-after-20260528-110128.txt`
+   - `.obsidian-debug/structured-resume-console-20260528-110128.txt`
+   - `.obsidian-debug/structured-resume-errors-20260528-110128.txt`
+2. 首轮 `/json`（reload 前）证据：
+   - `StructuredOutput` `tool_use` 出现（before artifact line 52）
+   - `backend_event: structured_output` 出现（before artifact line 68）
+   - marker `SO_RESUME_A_20260528-110128` 出现在流式文本（before artifact line 61）
+3. resumed 会话 `/json`（reload 后）证据：
+   - `get session ... restored: true`（after artifact line 35）
+   - session id 保持一致：`9988dc44-3e73-400a-9413-78cca3bba74d`（after artifact lines 39-40, 91-94）
+   - 第二轮 `StructuredOutput` `tool_use` 与 `backend_event: structured_output` 再次出现（after artifact lines 59, 75-76）
+   - marker `SO_RESUME_B_20260528-110128` 出现在流式文本（after artifact line 68）
+4. 产品层可见与持久层复核：
+   - DOM structured badge 计数非零：`.obsidian-debug/structured-resume-postcheck-20260528-110128.txt` 中 `badgeCount: 2`（line 19），且 `.obsidian-debug/structured-resume-dom-badge-total-20260528-110128.txt` 返回 `1`
+   - 但 hydration 后 conversation persisted messages 仅有 3 条（2 user + 1 assistant-thinking），`structuredMessageCount: 0`（postcheck lines 15-17, 29-35）
+
+### 结论边界（本轮）
+
+- “单脚本 resumed `/json` 链路缺失”这个旧 blocker 可以关闭：产品路径上已证明 resumed 会话可继续触发 StructuredOutput。
+- 新的精确 blocker：**Structured output 在 resumed `/json` 场景下未稳定持久化进 conversation contentBlocks**（可见 badge/事件存在，但持久层缺少 `structured_output` block，postcheck 可复现）。
+- fork blocker 维持不变：`Invalid sessionId` 仍在 `.obsidian-debug/structured-multiround-consistency-20260528-result.txt`。
+
+---
+
+## 2026-05-28 Phase0-Capability: /json Hot-Refresh Recheck + Structured Multi-round Consistency Boundary
+
+### 目标
+
+补齐两条 continuity truth：
+1) `/json` composer hint 热刷新是否仍有 blocker；
+2) Structured Output 在 resume/fork 多轮场景下的运行时一致性边界。
+
+### Runtime 证据（obsidian-plugin-autodebug 路径）
+
+1. 运行 `obsidian eval` 断言脚本 `.obsidian-debug/json-hint-hot-refresh-sequence-20260528.js`，结果落盘 `.obsidian-debug/json-hint-hot-refresh-sequence-20260528-result.txt`：
+   - `afterSetOpenCode.hint = null`
+   - `afterSetClaudeNoReload.hint = "/json — 结构化输出"`
+   - `afterBackToOpenCodeNoReload.hint = null`
+   结论：`/json` hint 热刷新路径当前可工作，不再维持“切到 Claude 不 reload 仍不可见”的旧 blocker 结论。
+2. 运行 `.obsidian-debug/phase0-structured-multiround-consistency-20260528.js` 并保存结果到 `.obsidian-debug/structured-multiround-consistency-20260528-result.txt`、截图 `.obsidian-debug/structured-multiround-20260528.png`、console/errors 到 `.obsidian-debug/structured-multiround-console-20260528.txt` / `.obsidian-debug/structured-multiround-errors-20260528.txt`：
+   - 可见 StructuredOutput tool_use / backend_event 在普通 `/json` 发送链路出现；
+   - 但 fork 相关探针记录 `Invalid sessionId: ses_1937dfaddffep013MrRmVdFCD0`，无法将 fork 一致性升格为已验证。
+
+### 结论边界（本轮）
+
+- `/json` hint 热刷新：**旧 blocker 关闭**（运行时重验通过）。
+- Structured Output resume consistency：**部分已证**（reload/hydration 与 ordinary resume identity 既有证据成立），但缺少“resumed 会话继续 `/json`”单脚本闭环。
+- Structured Output fork consistency：**未证且仍阻塞**（当前仅 provider-owned 探针，且最新运行时出现 invalid sessionId）。
+
+---
+
+## 2026-05-28 Phase0-Capability: /json Discoverability Honesty Sync (Capability Lab + Continuity Anchor)
+
+### 目标
+
+同步真实产品状态与文档锚点，消除 `/json` discoverability 已实现后仍被误报为 blocker 的诚实性缺口。
+
+### 改动
+
+1. **src/features/settings/SettingsCapabilityLabSection.ts**：Structured Output discovery 行文案从“composer discoverability 未实现”改为“已通过 Claude-only composer capability hint 暴露”。
+2. **docs/status/claude-code-current-state-2026-05-22.md**：
+   - 将 `/json discoverability blocker` 更新为当前状态：Claude backend composer hint 已实现。
+   - 将 “users still cannot trigger structured output from ordinary chat” 更正为可通过 `/json` 前缀触发（Claude backend only）。
+3. **docs/modules/features/settings/SettingsCapabilityLabSection.md**：更新注意事项，明确普通聊天触发与 composer hint 均已落地，同时保留 fixed-schema / Claude-only 边界。
+4. **docs/modules/i18n/locales/en.md + zh.md**：把 “discoverability 未实现” 更正为 “通过 capability hint 落地（非 placeholder suffix）”。
+
+### 边界
+
+- 仍仅支持 fixed schema（response + tags + confidence）；不支持任意 schema authoring。
+- discoverability 仅在 Claude Code backend 显示；OpenCode backend 不显示 hint，且忽略未知 `outputFormat`。
+
+---
+
 ## 2026-05-28 Phase0-Capability: /json Composer Discoverability via Capability Hint
 
 ### 目标
