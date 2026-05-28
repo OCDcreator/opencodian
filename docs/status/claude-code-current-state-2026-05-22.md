@@ -1,5 +1,118 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-05-28 Model Catalog / supportedModels Stability Fresh Runtime Proof — Gap Closed
+
+### Fresh runtime proof procedure
+
+- Build/deploy/reload with Test Vault BUILD_ID: `feature-phase0-capability.202605281335`.
+- Opened `opencodian-view` via `obsidian eval` command.
+- Captured console (`obsidian dev:console`) and errors (`obsidian dev:errors`).
+- Performed plugin reload and rechecked console after hydration settle.
+
+### Evidence
+
+- Console shows `[ClaudeCodeAdapter] supportedModels count {"count":5}` — model catalog loads successfully.
+- No `supportedModels error {"error":"TypeError(category=generic, messageLength=54)"}` entries.
+- No `[ModelSelectionRuntime] Failed to load models: {}` entries.
+- `obsidian dev:errors` returns "No errors captured."
+
+### Root cause (historical)
+
+The `supportedModels error` / `Failed to load models` artifacts observed in `.obsidian-debug/structured-multiround-consistency-20260528-result-2.txt` originated from BUILD_ID `feature-phase0-capability.202605281118`, which predated the `cc-model-catalog-fork-guard` fix.
+
+That fix (merged in BUILD_ID `feature-phase0-capability.202605281206`) changed `ClaudeCodeAdapter.supportedModels()` to only close model-catalog queries it owns (`shouldClose !== false`), preventing the `TypeError: this.cleanup is not a function` that occurred when a runtime-reuse query was incorrectly closed by the adapter.
+
+### Conclusion
+
+- **Model catalog gap is closed** in current live build.
+- No code changes required for this slice.
+- BUILD_ID anchor updated to `feature-phase0-capability.202605281335`.
+
+## 2026-05-28 Fork Diagnostic Provider Session Runtime Proof — Gap Closed
+
+### Fresh runtime proof procedure (Adapter layer)
+
+- Build/deploy/reload with Test Vault BUILD_ID: `feature-phase0-capability.202605281335`.
+- Listed available sessions via `adapter.listSessions()` — 36 sessions returned, all UUID-format provider IDs.
+- Executed `adapter.forkSession('5983419f-7e60-42f3-907d-e5cfafcac4f9')` on a real provider session.
+- Verified local-handle rejection via `adapter.forkSession('claude-code-test-12345')`.
+
+### Fresh runtime proof procedure (UI / Capability Lab path)
+
+- Navigated via autodebug: Settings → OpenCodian → Capability Lab → Fork Section.
+- Selected session `d5f325ad-8604-4a64-a15e-b622ee1c3889` from the dropdown (UUID-format provider session).
+- Clicked "Run Fork Diagnostic".
+- Captured result via DOM inspection and screenshot.
+
+### Evidence
+
+**Adapter layer:**
+- Fork success: `[ClaudeCodeAdapter] fork session complete {"sessionId":"5983419f-...","forkedSessionId":"35ba7b0a-..."}`.
+- New forked session ID is a valid UUID (`35ba7b0a-846e-4c07-8f32-1eab9788bb10`), confirming SDK-level fork executed correctly.
+- Local handle rejection: `Claude Code forkSession requires a bound SDK session id for claude-code-test-12345. Send at least one message before forking a local session.` — adapter layer rejects local handles before they reach the SDK.
+
+**UI / Capability Lab path:**
+- Forked from `d5f325ad-8604-4a64-a15e-b622ee1c3889`.
+- Forked session ID: `d2ea808d-91f9-4974-b0e1-705bc2b02768` (valid UUID).
+- Forked session title: `Restored Claude Code chat (fork)`.
+- Proof marker: `✓ Runtime verified` (`opencodian-capability-lab-proof-pass`).
+- Console: no errors; Errors: none captured.
+- Screenshot artifact: `.obsidian-debug/opencodian-fork-proof-success-20260528.png`.
+- JSON artifact: `.obsidian-debug/opencodian-fork-proof-20260528-result.json`.
+
+### Conclusion
+
+- **Fork diagnostic provider session runtime proof passes** in current live build.
+- `resolveForkSourceSessionId()` correctly prefers provider UUID over local handle.
+- `forkSession()` succeeds on real provider sessions and fails gracefully on unbound local handles.
+- No `Invalid sessionId` errors observed.
+- Both adapter-layer and UI-path proofs confirm the gap is closed.
+- No code changes required for this slice.
+
+## 2026-05-28 Structured Assistant Reload/Hydration Render Truth Gap Fix
+
+### Root cause (confirmed)
+
+Three independent gaps in the render pipeline caused structured assistant messages to be lost or not re-rendered after reload/hydration:
+
+1. **`ConversationIdentityRuntime.shouldRenderConversationMessage()`** did not treat `message.structured` as a renderable field for assistant messages. A structured-only assistant (no `content`, `contentBlocks`, `toolCalls`, `questionResolution`, or `omo`) was filtered out during `getMessagesForRender()`, so it never reached the DOM.
+
+2. **`ConversationIdentityRuntime.getMessageVisualSignature()`** did not include `structured` in the signature. After authoritative sync merge or hydration, if only the `structured` field changed, the visual signature remained identical and the trailing-assistant patch planner skipped re-rendering the tail.
+
+3. **`ConversationRenderService.removeEmptyAssistantShells()`** only checked for `.streaming-text-block`, `.opencodian-message-text`, etc., but did **not** recognize `.opencodian-structured-output-details`. A shell containing only the structured output badge was incorrectly treated as empty and removed.
+
+### Fix
+
+- `src/features/chat/services/ConversationIdentityRuntime.ts`
+  - `shouldRenderConversationMessage()`: added `|| message.structured` to the assistant renderability check.
+  - `getMessageVisualSignature()`: added `structured: message.structured ?? null` to the serialized signature payload.
+
+- `src/features/chat/services/ConversationRenderService.ts`
+  - `removeEmptyAssistantShells()`: added `.opencodian-structured-output-details` to the `hasStructuredContent` query selector list.
+
+### Regression coverage
+
+- `tests/unit/features/chat/ConversationIdentityRuntime.render.test.ts`
+  - Added test: "returns true for assistant with structured only" — verifies structured-only assistant is not dropped by render filtering.
+  - Added test: "returns false for empty assistant without structured or any qualifying field" — verifies the negative case stays correct.
+
+- `tests/unit/features/chat/ConversationIdentityRuntime.test.ts`
+  - Added test: "includes structured field in signature" — verifies visual signature changes when `structured` is added.
+  - Added test: "serializes null structured correctly" — verifies absence of `structured` produces stable null signature.
+
+- `tests/unit/features/chat/ConversationRenderService.test.ts`
+  - Added test: "preserves assistant shells with structured output details" — verifies structured-only shell survives empty-shell cleanup.
+
+### Files changed
+
+- `src/features/chat/services/ConversationIdentityRuntime.ts`
+- `src/features/chat/services/ConversationRenderService.ts`
+- `tests/unit/features/chat/ConversationIdentityRuntime.render.test.ts`
+- `tests/unit/features/chat/ConversationIdentityRuntime.test.ts`
+- `tests/unit/features/chat/ConversationRenderService.test.ts`
+- `docs/modules/features/chat/services/ConversationIdentityRuntime.md`
+- `docs/modules/features/chat/services/ConversationRenderService.md`
+
 ## Purpose
 
 This document is the current continuity handoff for future models continuing the Claude Code SDK lane in OpenCodian.
@@ -18,7 +131,8 @@ This is a status snapshot, not the long-term design or full implementation plan.
 - Worktree: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/.worktrees/phase0-capability`
 - Previous committed continuity anchor before the 2026-05-25 ordinary chat resume identity slice: `e03b9c06`
 - Previous anchor subject: `docs: refresh claude stream settings anchor`
-- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605280927`
+- Latest validated and Test Vault deployed build: `feature-phase0-capability.202605281335` (model catalog stability proof + structured reload/hydration gap fix)
+- Previous validated and Test Vault deployed build: `feature-phase0-capability.202605280927`
 - Latest close-out round (Fallback Model stable settings proof-status notice + env notice sync + continuity anchor sync): see "2026-05-28 Fallback Model Settings Proof-Status Notice (Honest UX)" below
 - Recent continuity commits in this lane before the 2026-05-25 slice:
 - `e03b9c06` — `docs: refresh claude stream settings anchor`

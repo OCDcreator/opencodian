@@ -12,6 +12,93 @@
 
 ---
 
+## 2026-05-28 Phase0-Capability: Model catalog / supportedModels 稳定性 fresh runtime proof — gap 已关闭
+
+### 任务
+
+基于当前 live build 验证 `supportedModels` / `ModelSelectionRuntime` 错误是否仍可复现。
+
+### Fresh runtime proof
+
+- Build/deploy/reload with BUILD_ID: `feature-phase0-capability.202605281335`。
+- `obsidian dev:console` 捕获：`[ClaudeCodeAdapter] supportedModels count {"count":5}`。
+- `obsidian dev:errors`：No errors captured。
+- Reload/hydration 后复测：无 `supportedModels error`，无 `Failed to load models`。
+
+### 历史 artifact 分析
+
+`.obsidian-debug/structured-multiround-consistency-20260528-result-2.txt` 中的 `supportedModels error` / `Failed to load models` 来自 BUILD_ID `feature-phase0-capability.202605281118`（修复前版本）。
+
+`cc-model-catalog-fork-guard`（BUILD_ID `feature-phase0-capability.202605281206`）已修复根因：`ClaudeCodeAdapter.supportedModels()` 不再错误关闭 runtime-reuse query。
+
+### 结论
+
+- **Model catalog gap 已关闭**，当前 live build 无需代码修改。
+- Continuity BUILD_ID 锚点更新为 `feature-phase0-capability.202605281335`。
+- 下一缺口：fork diagnostic provider session runtime proof。
+
+## 2026-05-28 Phase0-Capability: Fork diagnostic provider session runtime proof — gap 已关闭
+
+### Fresh runtime proof（Adapter 层）
+
+- Build/deploy/reload with BUILD_ID: `feature-phase0-capability.202605281335`。
+- `adapter.listSessions()` 返回 36 个 session，均为 UUID 格式 provider ID。
+- `adapter.forkSession('5983419f-7e60-42f3-907d-e5cfafcac4f9')` 成功，返回 `forkedSessionId=35ba7b0a-846e-4c07-8f32-1eab9788bb10`。
+- `adapter.forkSession('claude-code-test-12345')` 被 adapter 层拒绝：`Claude Code forkSession requires a bound SDK session id`。
+- `obsidian dev:errors`：No errors captured。
+
+### Fresh runtime proof（UI / Capability Lab 路径）
+
+- 使用 `$obsidian-plugin-autodebug` workflow：Settings → OpenCodian → Capability Lab → Fork Section。
+- 选择 session `d5f325ad-8604-4a64-a15e-b622ee1c3889`（UUID 格式 provider session）。
+- 点击 "Run Fork Diagnostic"。
+- 结果：
+  - Forked session ID: `d2ea808d-91f9-4974-b0e1-705bc2b02768`
+  - Forked session title: `Restored Claude Code chat (fork)`
+  - Proof marker: `✓ Runtime verified`（`opencodian-capability-lab-proof-pass`）
+- Console：无错误。
+- Errors：无捕获。
+- Screenshot：`.obsidian-debug/opencodian-fork-proof-success-20260528.png`
+- Artifact：`.obsidian-debug/opencodian-fork-proof-20260528-result.json`
+
+### 结论
+
+- **Fork diagnostic provider session runtime proof 通过**，当前 live build 无需代码修改。
+- `resolveForkSourceSessionId()` 正确优先选择 provider UUID。
+- Local handle 被 adapter 层优雅拒绝，无 `Invalid sessionId` 错误。
+- UI 路径与 adapter 路径双验证，fork gap 完全关闭。
+
+## 2026-05-28 Phase0-Capability: Structured assistant reload/hydration render truth 缺口修复
+
+### 问题
+
+- Claude `/json` resumed conversation 在真实运行里已能触发 StructuredOutput、流式阶段也能显示 badge，但 reload/hydration 后 structured assistant 未稳定纳入最终 render truth。
+- 三个独立缺口同时导致此问题：
+  1. `ConversationIdentityRuntime.shouldRenderConversationMessage()` 对 assistant 未把 `message.structured` 作为可渲染依据；
+  2. `ConversationIdentityRuntime.getMessageVisualSignature()` 未把 `structured` 纳入签名，导致 hydration/authoritative merge 后仅 structured 变化时不触发尾部重渲；
+  3. `ConversationRenderService.removeEmptyAssistantShells()` 未识别 `.opencodian-structured-output-details`，把仅 structured 的 assistant shell 当成空壳清掉。
+
+### 修复
+
+1. `src/features/chat/services/ConversationIdentityRuntime.ts`
+   - `shouldRenderConversationMessage()`: assistant 分支增加 `|| message.structured`。
+   - `getMessageVisualSignature()`: 增加 `structured: message.structured ?? null`。
+
+2. `src/features/chat/services/ConversationRenderService.ts`
+   - `removeEmptyAssistantShells()`: CSS 选择器增加 `.opencodian-structured-output-details`。
+
+### 回归测试
+
+- `tests/unit/features/chat/ConversationIdentityRuntime.render.test.ts`: 添加 structured-only assistant render filtering 测试。
+- `tests/unit/features/chat/ConversationIdentityRuntime.test.ts`: 添加 structured visual signature 变化检测测试。
+- `tests/unit/features/chat/ConversationRenderService.test.ts`: 添加 structured output details shell preservation 测试。
+
+### 文档
+
+- `docs/modules/features/chat/services/ConversationIdentityRuntime.md`
+- `docs/modules/features/chat/services/ConversationRenderService.md`
+- `docs/status/claude-code-current-state-2026-05-22.md`
+
 ## 2026-05-28 Phase0-Capability: Fork probe `sessionId`/`id` 混合回包修复
 
 ### 问题
