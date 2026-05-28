@@ -2897,6 +2897,127 @@ describe('ClaudeCodeAdapter', () => {
     });
   });
 
+  describe('diagnostic agent definitions options', () => {
+    it('passes agent and agents through buildDiagnosticSdkOptions when provided in request', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Agent definition test',
+        agent: 'proof-agent',
+        agents: {
+          'proof-agent': {
+            description: 'A proof agent',
+            prompt: 'You are a proof agent.',
+          },
+        },
+        persistSession: false,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.agent).toBe('proof-agent');
+      expect(passedOptions.agents).toEqual({
+        'proof-agent': {
+          description: 'A proof agent',
+          prompt: 'You are a proof agent.',
+        },
+      });
+    });
+
+    it('falls back to adapter options when request does not provide agent/agents', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+        agent: 'default-agent',
+        agents: {
+          'default-agent': {
+            description: 'Default agent',
+            prompt: 'You are the default agent.',
+          },
+        },
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Plain diagnostic test',
+        persistSession: false,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.agent).toBe('default-agent');
+      expect(passedOptions.agents).toEqual({
+        'default-agent': {
+          description: 'Default agent',
+          prompt: 'You are the default agent.',
+        },
+      });
+    });
+
+    it('request agent/agents take precedence over adapter options', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+        agent: 'default-agent',
+        agents: {
+          'default-agent': {
+            description: 'Default agent',
+            prompt: 'You are the default agent.',
+          },
+        },
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Override agent test',
+        agent: 'override-agent',
+        agents: {
+          'override-agent': {
+            description: 'Override agent',
+            prompt: 'You are the override agent.',
+          },
+        },
+        persistSession: false,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.agent).toBe('override-agent');
+      expect(passedOptions.agents).toEqual({
+        'override-agent': {
+          description: 'Override agent',
+          prompt: 'You are the override agent.',
+        },
+      });
+    });
+
+    it('does not set agent or agents when neither request nor adapter provides them', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Plain diagnostic test',
+        persistSession: false,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.agent).toBeUndefined();
+      expect(passedOptions.agents).toBeUndefined();
+    });
+  });
+
   describe('diagnostic bypass permissions', () => {
     it('sets allowDangerouslySkipPermissions and skips canUseTool when _diagnosticBypassPermissions is true', async () => {
       const mockCanUseTool = jest.fn().mockResolvedValue({ behavior: 'allow' });

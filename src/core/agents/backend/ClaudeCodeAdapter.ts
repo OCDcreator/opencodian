@@ -93,6 +93,10 @@ export interface ClaudeCodeDiagnosticPromptRequest {
   agentProgressSummaries?: boolean;
   persistSession?: boolean;
   fallbackModel?: string;
+  /** Runtime-only agent selector for diagnostic probes. */
+  agent?: ClaudeCodeOptionsBuilderInput['agent'];
+  /** Runtime-only agent definitions map for diagnostic probes. */
+  agents?: ClaudeCodeOptionsBuilderInput['agents'];
   /**
    * Diagnostic-only model override. Intentionally invalid model names may be used
    * to provoke fallback behavior. Never leaks into ordinary chat send paths.
@@ -948,6 +952,8 @@ export class ClaudeCodeAdapter
       resumeSessionId: request.resumeSessionId,
       fallbackModel: request.fallbackModel,
       model: request.model,
+      agent: request.agent ?? this.options.agent,
+      agents: request.agents ?? this.options.agents,
     });
     this.lastDiagnosticSdkOptions = options;
     return options;

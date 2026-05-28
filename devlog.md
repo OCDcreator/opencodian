@@ -12,6 +12,156 @@
 
 ---
 
+## 2026-05-28 Agent Definition Proof — Inline Agent Definition Diagnostic Probe
+
+### 任务
+
+推进 Agent Definitions 从 `hidden/untested` 到真实 runtime proof / diagnostic boundary。
+
+**答案：YES。** 存在可行路径 —— 通过在诊断请求中内联定义 agent definition，验证 SDK 是否接受并应用该定义。
+
+### 代码改动
+
+1. **`src/core/agents/backend/ClaudeCodeAdapter.ts`**:
+   - `ClaudeCodeDiagnosticPromptRequest` 接口新增 `agent?: string` 和 `agents?: Record<string, AgentDefinition>` 字段
+   - `buildDiagnosticSdkOptions()` 新增 `agent: request.agent ?? this.options.agent` 和 `agents: request.agents ?? this.options.agents` 透传，修复诊断路径未传递 agent definitions 的 wiring gap
+
+2. **`src/features/settings/SettingsCapabilityLabSection.ts`**:
+   - 新增 **Run Agent Definition Proof** 按钮（在 Environment Variables Proof 之后）
+   - 新增 `runAgentDefinitionProof()` 方法：构造内联 proof agent（system prompt 强制输出标记 `AGENT-DEF-PROOF-ACTIVATED`），通过 `agent` 选择器激活，发送 "Say hello." prompt，分层验证：
+     - Layer 1: SDK options readback（`inspectLastDiagnosticSdkOptions()` 验证 agent/agents 进入 options）
+     - Layer 2: assistant text marker echo（验证模型是否按 agent definition 的 prompt 指示回复）
+   - 探针诚实地处理三种结果：
+     - `pass`: readback 通过且标记出现在 assistant text 中
+     - `readback`: readback 通过但标记未出现（SDK 可能接受 options 但不应用内联 agent）
+     - `fail`: readback 失败或诊断运行抛出异常（如 SDK 报错 "Unknown agent"）
+
+3. **测试更新**:
+   - `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts`: 新增 4 个 diagnostic agent definitions 测试：
+     - request agent/agents 透传验证
+     - adapter options fallback 验证
+     - request 优先于 adapter options 验证
+     - 未提供时保持 undefined 验证
+   - `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: 新增 5 个 Agent Definition Proof 测试：
+     - 按钮存在性
+     - pass 路径（inline agent 改变 assistant behavior）
+     - readback 路径（SDK 接受 options 但行为未变）
+     - fail 路径（readback 不匹配）
+     - error 路径（SDK 拒绝内联 agent）
+   - 更新 capability matrix guardrail 测试：Agent Definitions 从 "必须保持 Untested" 列表中移除，改为独立断言验证 "Readback verified" + "hidden"
+
+### 分类状态
+
+| Capability | Matrix Status | User Surface | Notes |
+|------------|---------------|--------------|-------|
+| Agent Definitions | `readback` | `hidden` | Options wiring verified via Stable Settings Readback Proof; behavior proof available via "Run Agent Definition Proof" diagnostic button |
+
+### 诚实性边界
+
+- **Readback proof**: Stable Settings Readback Proof 验证 `options.agent` / `options.agents` 被正确构建并传入 SDK options
+- **Behavior proof**: "Run Agent Definition Proof" 按钮提供 fresh runtime 验证，探针构造内联 agent definition 并验证模型行为是否改变。如果 SDK 拒绝内联 agent，探针诚实标记 `fail` 并记录 blocker
+- **No authoring UI**: 仍保持 hidden，不提供 agent definition 创建/编辑界面
+- **Blocker classification**: 如果探针失败，可以精确分类是 SDK limitation（拒绝内联 agent）、host restriction 还是架构缺口
+
+---
+
+## 2026-05-28 Agent Definitions Readback Proof
+
+### 任务
+
+推进 Agent Definitions 从 `hidden/untested` 到更诚实的 diagnostic boundary。
+
+**答案：YES。** 存在可行路径 —— 通过 Stable Settings Readback Proof 验证 options.agent/agents 构建正确性，将 classification 从 `untested` 推进到 `readback`。
+
+### 代码改动
+
+1. **`src/core/agents/backend/ClaudeCodeAdapter.ts`**:
+   - `buildDiagnosticSdkOptions()` 新增 `agent: request.agent ?? this.options.agent` 和 `agents: request.agents ?? this.options.agents` 透传，修复诊断路径未传递 agent definitions 的 wiring gap
+
+2. **`src/features/settings/SettingsCapabilityLabSection.ts`**:
+   - `buildMatrixRows()`: Agent Definitions `runtimeProof` 从 `untested` 改为 `readback`，注释说明 readback 来源
+   - `buildReadbackResults()`: 新增 Agent Definitions readback 检查，验证 `options.agent` 和 `options.agents`
+   - `renderAgentDefinitionsDiscoveryRow()`: 更新描述，说明 Runtime-readback verified 和 Subagent Browser behavior proof 边界
+   - `runAgentDefinitionProof()`: 已存在（之前添加但未完整集成），现在通过 buildDiagnosticSdkOptions 的 agent/agents 透传获得完整支持
+
+3. **测试更新**:
+   - `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: 更新审计测试期望（Agent Definitions → readback），更新 discovery row 文本断言，更新 stable settings readback 测试（添加 agent/agents mock 和断言，readback markers 4→5）
+   - `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts`: 已有 diagnostic agent definitions 测试覆盖，全部通过
+
+### 分类变更
+
+| Capability | Before | After | Reason |
+|------------|--------|-------|--------|
+| Agent Definitions | hidden + untested | hidden + readback | Stable Settings Readback Proof verifies options wiring; behavior proof covered by Subagent Browser path |
+
+### 诚实性边界
+
+- **Readback proof**: 验证 `options.agent` / `options.agents` 被正确构建并传入 SDK options
+- **Behavior proof**: 不重复证明 —— 模型是否调用 Agent 工具并使用定义的 subagent，由 Subagent Browser diagnostic path 覆盖
+- **No authoring UI**: 仍保持 hidden，不提供 agent definition 创建/编辑界面
+
+---
+
+## 2026-05-28 Phase0-Capability: Subagent Stream Proof Enhanced Runtime Experiment — Blocker Confirmed (SDK Limitation)
+
+### 任务
+
+回答明确 yes/no：当前代码库是否存在比现有 `runSubagentStreamProof` 更强、能更有机会捕获真实 subagent/progress backend_event 的 runtime proof 路径。
+
+**答案：NO。** 当前 proof 路径已使用最强可行机制（`forwardSubagentText` + `agentProgressSummaries` + backend_event 过滤）。不存在更强的 codebase 内路径。
+
+### 最小 runtime 实验
+
+1. **代码改动**（`src/features/settings/SettingsCapabilityLabSection.ts`）：
+   - `runSubagentStreamProof()` prompt 从简单文本回复改为工具诱导型：`"Use the Bash tool to run the command \"echo subagent-test-12345\" and report the exact output."`
+   - 新增 `_diagnosticBypassPermissions: true`，允许工具在无权限 UI 的情况下执行
+   - 保留 `forwardSubagentText: true` 和 `agentProgressSummaries: true`
+
+2. **BUILD_ID**: `feature-phase0-capability.202605281410`
+
+3. **实验结果**（Test Vault live runtime）：
+   - Session ID: `51b64326-b068-4a90-9365-56beabc4f1c9`
+   - 模型成功调用了 Bash 工具并执行了 `echo subagent-test-12345`
+   - SDK emit 了 `hook` backend_events（SessionStart, UserPromptSubmit, PostToolUse:Bash, Stop）
+   - SDK emit 了 `tool_use` 和 `tool_result` chunks
+   - **但 ZERO `subagent` / `tool_progress` / `task_*` backend events**
+   - Capability Lab DOM 显示 `opencodian-capability-lab-proof-fail`
+
+4. **Blocker 精确分类**：**SDK limitation**
+   - Claude Code SDK 在普通单工具诊断执行期间不 emit `subagent` 或 `tool_progress` backend events
+   - 这些事件类型可能只在实际子代理工作流生成时触发，而简单工具使用 prompt 不会触发该行为
+   - 这不是 prompt 层问题，是 SDK 事件发射行为限制
+
+### 文件变更
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 诊断 prompt 增强 | `runSubagentStreamProof()` 使用工具诱导型 prompt + `_diagnosticBypassPermissions: true` |
+| `docs/modules/features/settings/SettingsCapabilityLabSection.md` | 文档更新 | 记录增强型 subagent proof 行为和 2026-05-28 runtime 实验结果 |
+| `docs/status/claude-code-current-state-2026-05-22.md` | 状态更新 | 新增 "Subagent Stream Proof Enhanced Runtime Experiment" 状态切片 |
+| `devlog.md` | 日志 | 本条目 |
+
+### 验证
+
+- Focused test: `npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` ✅ 119/119 passed
+- Focused test: `npm test -- --runInBand tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` ✅ 108/108 passed
+- `npm run build` ✅ BUILD_ID=`feature-phase0-capability.202605281410`
+- Test Vault deploy + reload ✅
+- Plugin-autodebug console capture ✅
+- `obsidian dev:errors` → "No errors captured."
+
+### 下一步可执行方案
+
+1. **不再继续 prompt tuning**：blocker 在 SDK 层，prompt 变化无法改变 SDK 事件发射行为
+2. **等待 SDK 更新**：若未来 Claude Code SDK 版本更自由地 emit 这些事件，直接用当前工具诱导型 prompt 重跑 proof 即可
+3. **产品化阻塞**：Subagent Transcript / Progress 在以下条件满足前无法升级为稳定 UI：
+   - 发现可靠触发子代理工作流生成的方法，或
+   - SDK 文档明确说明这些事件的精确触发条件，或
+   - 新版 SDK 改变事件发射行为
+4. **当前矩阵保持 honest**：`Subagent Transcript / Progress` 保持 `Diagnostic` + `Untested`（静态），探针动态运行时仍为 `fail`
+
+---
+
 ## 2026-05-28 Phase0-Capability: Fallback Model fresh runtime proof — 仍为 blocked（SDK 限制）
 
 ### 任务

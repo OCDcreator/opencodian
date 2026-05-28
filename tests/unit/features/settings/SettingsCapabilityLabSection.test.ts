@@ -207,15 +207,22 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    // All runtime-only capabilities must stay hidden and untested until explicitly promoted.
-    const hiddenCapabilities = ['Session Store', 'Agent Definitions', 'Plugins', 'Skills', 'Hooks'];
+    // Runtime-only capabilities without dedicated diagnostic proof paths must stay hidden and untested.
+    const hiddenUntestedCapabilities = ['Session Store', 'Plugins', 'Skills', 'Hooks'];
 
-    for (const cap of hiddenCapabilities) {
+    for (const cap of hiddenUntestedCapabilities) {
       const row = getRow(cap);
       expect(row).not.toBeNull(); // ${cap} row must exist
       expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
       expect(row?.textContent).toContain('Untested');
     }
+
+    // Agent Definitions has a dedicated diagnostic proof path (Run Agent Definition Proof button).
+    // It should show readback status (options wired) but remain hidden (no authoring UI).
+    const agentDefRow = getRow('Agent Definitions');
+    expect(agentDefRow).not.toBeNull();
+    expect(agentDefRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
+    expect(agentDefRow?.textContent).toContain('Readback verified');
   });
 
   it('keeps runtime-proved diagnostic capabilities from being marked complete in the matrix', () => {
@@ -230,12 +237,18 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    for (const cap of ['Hooks', 'Session Store', 'Rewind', 'Agent Definitions']) {
+    for (const cap of ['Hooks', 'Session Store', 'Rewind']) {
       const row = getRow(cap);
       expect(row).not.toBeNull();
       expect(row?.textContent).not.toContain('Complete');
       expect(row?.textContent).toContain('Untested');
     }
+
+    // Agent Definitions has a dedicated diagnostic proof path but should not be marked Complete.
+    const agentDefRow = getRow('Agent Definitions');
+    expect(agentDefRow).not.toBeNull();
+    expect(agentDefRow?.textContent).not.toContain('Complete');
+    expect(agentDefRow?.textContent).toContain('Readback verified');
   });
 
   it('renders MCP Servers row in capability matrix with settings surface', () => {
@@ -633,6 +646,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(agentRow?.textContent).toContain('2 agent definition(s)');
     expect(agentRow?.textContent).toContain('agent-a');
     expect(agentRow?.textContent).toContain('agent-b');
+    expect(agentRow?.textContent).toContain('Runtime-readback verified');
     expect(agentRow?.textContent).toContain('Discovery Only');
     expect(agentRow?.textContent).not.toContain('Exposed');
   });
@@ -660,6 +674,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(table?.querySelectorAll('tr') ?? []);
     const agentRow = rows.find((row) => row.textContent?.includes('Agent Definitions'));
     expect(agentRow?.textContent).toContain('No agent definitions loaded');
+    expect(agentRow?.textContent).toContain('Runtime-readback verified');
     expect(agentRow?.textContent).toContain('Discovery Only');
   });
 
@@ -676,6 +691,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(table?.querySelectorAll('tr') ?? []);
     const agentRow = rows.find((row) => row.textContent?.includes('Agent Definitions'));
     expect(agentRow?.textContent).toContain('No agent definitions loaded');
+    expect(agentRow?.textContent).toContain('Runtime-readback verified');
     expect(agentRow?.textContent).toContain('Discovery Only');
   });
 
@@ -991,7 +1007,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
       'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'Agent Definitions': { runtimeProof: 'untested', userSurface: 'hidden' },
+      'Agent Definitions': { runtimeProof: 'readback', userSurface: 'hidden' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
       'Subagent Transcript / Progress': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'Include Hook Events': { runtimeProof: 'untested', userSurface: 'diagnostic' },
@@ -3496,6 +3512,183 @@ describe('SettingsCapabilityLabSection', () => {
     randomSpy.mockRestore();
   });
 
+  it('renders Agent Definition Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Agent Definition Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks Agent Definitions as pass when inline agent alters assistant behavior', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-agent-def-pass',
+        rawMessages: [],
+        chunks: [
+          { type: 'text', content: 'AGENT-DEF-PROOF-ACTIVATED\n\nHello! I am the proof agent.' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        agent: 'opencodian-proof-agent',
+        agents: {
+          'opencodian-proof-agent': {
+            description: 'A diagnostic agent',
+            prompt: 'You are a proof agent.',
+          },
+        },
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Agent Definition Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Layer 1 (SDK options readback): PASS');
+    expect(containerEl.textContent).toContain('Layer 2 (assistant text marker echo): PASS');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Agent Definitions"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: 'opencodian-proof-agent',
+        agents: expect.objectContaining({
+          'opencodian-proof-agent': expect.objectContaining({
+            description: expect.stringContaining('diagnostic agent'),
+            prompt: expect.stringContaining('proof agent'),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('marks Agent Definitions as readback when SDK accepts options but behavior unchanged', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-agent-def-readback',
+        rawMessages: [],
+        chunks: [
+          { type: 'text', content: 'Hello! I am just a regular assistant.' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        agent: 'opencodian-proof-agent',
+        agents: {
+          'opencodian-proof-agent': {
+            description: 'A diagnostic agent',
+            prompt: 'You are a proof agent.',
+          },
+        },
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Agent Definition Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Layer 1 (SDK options readback): PASS');
+    expect(containerEl.textContent).toContain('Layer 2 (assistant text marker echo): NO EVIDENCE');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Agent Definitions"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Agent Definitions as fail when SDK options readback does not match', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-agent-def-fail',
+        rawMessages: [],
+        chunks: [
+          { type: 'text', content: 'AGENT-DEF-PROOF-ACTIVATED\n\nHello!' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        agent: undefined,
+        agents: undefined,
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Agent Definition Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Layer 1 (SDK options readback): FAIL');
+    const failMarkers = containerEl.querySelectorAll('[data-capability="Agent Definitions"].opencodian-capability-lab-proof-fail');
+    expect(failMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Agent Definitions as fail and surfaces SDK rejection in error path', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('Unknown agent: opencodian-proof-agent')),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Agent Definition Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Layer 1 (SDK options readback): BLOCKED');
+    expect(containerEl.textContent).toContain('Layer 2 (assistant text marker echo): BLOCKED');
+    expect(containerEl.textContent).toContain('Unknown agent: opencodian-proof-agent');
+    const failMarkers = containerEl.querySelectorAll('[data-capability="Agent Definitions"].opencodian-capability-lab-proof-fail');
+    expect(failMarkers.length).toBeGreaterThan(0);
+  });
+
   it('marks stable settings as readback verified when options contain configured values', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
@@ -3511,6 +3704,8 @@ describe('SettingsCapabilityLabSection', () => {
         maxBudgetUsd: 5.0,
         env: { FOO: 'bar' },
         fallbackModel: 'claude-haiku-4-5',
+        agent: 'proof-agent',
+        agents: { 'proof-agent': { description: 'test' } },
       }),
       capabilities: new Set(),
     };
@@ -3543,13 +3738,16 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('maxBudgetUsd=5');
     expect(containerEl.textContent).toContain('1 variable(s) configured');
     expect(containerEl.textContent).toContain('option="claude-haiku-4-5"');
+    expect(containerEl.textContent).toContain('Agent Definitions:');
+    expect(containerEl.textContent).toContain('agent="proof-agent"');
+    expect(containerEl.textContent).toContain('1 definition(s)');
 
     // Verify readback markers for capabilities that are genuinely readback-classified
-    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables = 4 readback markers
+    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables, Agent Definitions = 5 readback markers
     // Environment Variables is now 'readback' (static classification defers to fresh runtime evidence)
     // Fallback Model is wiring overall (behavior proof failed) so it gets a wiring marker, not readback
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBe(4);
+    expect(readbackMarkers.length).toBe(5);
 
     // Environment Variables no longer gets a pass marker from readback proof (downgraded to readback)
     const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');

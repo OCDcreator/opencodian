@@ -1,5 +1,96 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-05-28 Agent Definition Proof — Inline Agent Definition Diagnostic Probe Implemented
+
+### Objective
+
+Determine whether Agent Definitions can be pushed beyond `hidden/untested` to an honest diagnostic boundary with real runtime proof, or whether the absence of proof indicates a blocker.
+
+### Code change
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`:
+  - `ClaudeCodeDiagnosticPromptRequest` 新增 `agent?: string` 和 `agents?: Record<string, AgentDefinition>` 字段
+  - `buildDiagnosticSdkOptions()` 透传 `request.agent ?? this.options.agent` 和 `request.agents ?? this.options.agents`
+- `src/features/settings/SettingsCapabilityLabSection.ts`:
+  - 新增 **Run Agent Definition Proof** 按钮
+  - 新增 `runAgentDefinitionProof()` 方法：构造内联 proof agent（强制输出标记 `AGENT-DEF-PROOF-ACTIVATED`），通过 `agent` 选择器激活，分层验证 SDK options readback 和 assistant behavior
+
+### Expected behavior
+
+- Layer 1 (SDK options readback): `PASS` — `inspectLastDiagnosticSdkOptions()` 返回的 options 包含 `agent` 和 `agents`
+- Layer 2 (assistant text marker echo): `PASS` 或 `NO EVIDENCE` — 模型可能或可能不按照内联 agent definition 的 prompt 指示回复
+
+### Honesty boundary
+
+- If Layer 1 fails: wiring gap in adapter (unexpected — code change directly addresses this)
+- If Layer 1 passes but Layer 2 fails: SDK accepts inline agent options but does not apply them (possible SDK limitation or inline agents not supported)
+- If both pass: inline agent definitions are functional; Agent Definitions can be promoted from `readback` to `pass` in the capability matrix
+- If diagnostic run throws (e.g., "Unknown agent"): SDK explicitly rejects inline agent definitions; blocker classification = SDK limitation
+
+### Current matrix classification
+
+- **Agent Definitions**: `runtimeProof: 'readback'`, `userSurface: 'hidden'`
+- Readback verified: Stable Settings Readback Proof confirms options.agent/agents are built correctly
+- Behavior proof: Available via "Run Agent Definition Proof" diagnostic button (fresh runtime evidence)
+
+---
+
+## 2026-05-28 Subagent Stream Proof Enhanced Runtime Experiment — Blocker Confirmed (SDK Limitation)
+
+### Experiment objective
+
+Determine whether a stronger diagnostic prompt (tool-inducing + permission bypass) can capture real `subagent` / `tool_progress` backend events, or whether the absence of such events is a fundamental SDK limitation.
+
+### Code change
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` `runSubagentStreamProof()`:
+  - Prompt changed from simple text reply to tool-inducing: `"Use the Bash tool to run the command \"echo subagent-test-12345\" and report the exact output."`
+  - Added `_diagnosticBypassPermissions: true` to allow tool execution without permission UI
+  - `forwardSubagentText: true` and `agentProgressSummaries: true` retained
+
+### Fresh runtime proof procedure
+
+- Build/deploy/reload with Test Vault BUILD_ID: `feature-phase0-capability.202605281410`.
+- Opened OpenCodian settings → Capability Lab.
+- Clicked "Run Subagent Stream Proof".
+- Captured console (`obsidian dev:console`) and errors (`obsidian dev:errors`).
+
+### Evidence
+
+**Session ID**: `51b64326-b068-4a90-9365-56beabc4f1c9`
+
+**SDK events captured**:
+- `hook` backend_events: SessionStart, UserPromptSubmit, PostToolUse:Bash, Stop
+- `tool_use` chunk: Bash tool invoked with command `echo subagent-test-12345`
+- `tool_result` chunk: tool executed successfully
+- `text` chunk: model reported the output
+
+**Subagent/progress events captured**: **ZERO**
+- No `subagent` backend events
+- No `tool_progress` backend events
+- No `task_started`, `task_progress`, `task_notification`, `task_updated` events
+- No metadata with `subagentId`, `agentId`, or `progress`
+
+**Capability Lab DOM**: Proof marker shows `opencodian-capability-lab-proof-fail` ("✗ Runtime failed").
+
+**Console artifact**: `.obsidian-debug/subagent-proof-console-20260528.txt`
+**Screenshot artifact**: `.obsidian-debug/subagent-proof-result.png`
+
+### Classification
+
+- **Type**: SDK limitation
+- **Explanation**: The Claude Code SDK does NOT emit `subagent` or `tool_progress` backend events during ordinary single-tool diagnostic execution, even when `forwardSubagentText` and `agentProgressSummaries` are enabled and the model actively uses a tool. These event types likely only fire during actual subagent workflow spawning, which is a higher-level orchestration behavior not triggered by simple tool-use prompts.
+- **Honesty boundary preserved**: The proof correctly marks `fail` because zero real subagent/progress events were captured. Option acceptance (`forwardSubagentText` / `agentProgressSummaries` wired correctly) is NOT treated as runtime proof.
+
+### Next steps
+
+1. **No further prompt tuning**: Further prompt variations are unlikely to change SDK event emission behavior; the blocker is at the SDK layer, not the prompt layer.
+2. **Future SDK versions**: If a future Claude Code SDK version emits these events more liberally, re-run this proof unchanged; the current tool-inducing prompt is already the strongest feasible diagnostic trigger.
+3. **Productization blocked**: Subagent Transcript / Progress cannot be promoted to stable UI until either:
+   - A reliable method to trigger subagent workflow spawning is discovered, OR
+   - The SDK documentation clarifies the exact conditions under which these events fire, OR
+   - A newer SDK version changes the event emission behavior.
+
 ## 2026-05-28 Model Catalog / supportedModels Stability Fresh Runtime Proof — Gap Closed
 
 ### Fresh runtime proof procedure
@@ -2138,7 +2229,7 @@ These capabilities are no longer “not wired”, but they are also not stable c
 | JSONL history browser | Capability Lab can browse history read-only and preview messages. | `Diagnostic browser`, not full history productization. |
 | Session detail inspection | Capability Lab can inspect raw `getSession()` output per backend session. | `Diagnostic probe only`, not a stable cross-backend session-detail contract. |
 | Rewind | Adapter-level `rewindFiles()` exists, dry-run surface exists, adapter + coordinator + CapLab probe tests now cover all paths. | Not stable-complete until no-data-loss guard and stronger runtime proof are accepted; test hardening does not promote to stable. |
-| Agent definitions | Runtime-only `agent` / `agents` option wiring exists. | Must remain `Hidden / Untested`. |
+| Agent definitions | Runtime-only `agent` / `agents` option wiring exists. Stable Settings Readback Proof verifies options are correctly built when configured. Behavior proof (model invokes Agent tool with defined subagent) is covered by Subagent Browser diagnostic path. | Must remain `Hidden / Readback`. |
 | Skills / plugins / agent authoring | Runtime-only `skills` and `plugins` channels are wired and have Capability Lab read-only detection counts plus diagnostic name-list summaries (`getSkillsList()` / `getPluginsList()`); no stable Claude-native authoring surface is complete in OpenCodian. | Detection-only with name-list diagnostic, not authoring-complete. |
 
 ## Structured Output Deep-Dive Assessment (2026-05-23)
@@ -2744,7 +2835,7 @@ What changed is the **test coverage depth** — the adapter-level `rewindFiles()
 | Hooks | ✅ | N/A | ✅ | runtime-proved but not stable |
 | Session store | ✅ | N/A | ✅ | diagnostic store proof only |
 | **Rewind** | ✅ **(new)** | ✅ **(new)** | ✅ **(new)** | runtime-proved but not stable |
-| Agent definitions | ⚠️ wiring only | N/A | N/A | Must remain Hidden/Untested |
+| Agent definitions | ⚠️ readback | N/A | N/A | Must remain Hidden/Readback |
 
 ## Stream Normalizer + Runtime Control Test Hardening Round (2026-05-23)
 
@@ -2935,12 +3026,12 @@ The existing `listSubagents()` / `getSubagentMessages()` diagnostic UI and tests
 | **Plugins introspection** | ✅ **(count + list)** | N/A | ✅ **(count + name-list rendering)** | Foundation / diagnostic only |
 | MCP server detection | ✅ | N/A | ✅ | detection-only |
 | Runtime controls | ✅ | N/A | N/A | runtime-proved but not stable |
-| Agent definitions | ⚠️ wiring only | N/A | N/A | Must remain Hidden/Untested |
+| Agent definitions | ⚠️ readback | N/A | N/A | Must remain Hidden/Readback |
 
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.
-- Do not claim `Agent Definitions` complete unless both official basis and runtime product proof justify it.
+- Do not claim `Agent Definitions` behavior-complete unless both official basis and runtime product proof justify it. Readback proof (options wiring verified) is already established; behavior proof is covered by Subagent Browser path.
 - Do not mark hooks, session store, structured output, or rewind as stable merely because the adapter seam exists; hooks now have diagnostic event-timeline proof in Capability Lab, but that is still not stable UI.
 - Do not remove legacy compatibility fields that older OpenCode conversations still rely on without an explicit migration plan.
 - Do not flatten Claude-native semantics into generic settings when the design docs say they are backend-specific.
