@@ -295,7 +295,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(structuredRow?.textContent).toContain('Verified');
   });
 
-  it('keeps hook and subagent stream option rows diagnostic-facing while untested', () => {
+  it('reflects honest event-stream states for hook and subagent rows in capability matrix', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -307,16 +307,23 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    for (const label of ['Subagent Transcript / Progress', 'Include Hook Events']) {
-      const row = getRow(label);
-      expect(row).not.toBeNull();
-      expect(row?.textContent).toContain('SDK');
-      expect(row?.textContent).toContain('Adapter');
-      expect(row?.textContent).toContain('Untested');
-      expect(row?.textContent).toContain('Diagnostic');
-      expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
-      expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).not.toBe('settings');
-    }
+    // Include Hook Events: runtimeProof pass (real hook backend_events captured), diagnostic surface
+    const hookRow = getRow('Include Hook Events');
+    expect(hookRow).not.toBeNull();
+    expect(hookRow?.textContent).toContain('SDK');
+    expect(hookRow?.textContent).toContain('Adapter');
+    expect(hookRow?.textContent).toContain('Verified');
+    expect(hookRow?.textContent).toContain('Diagnostic');
+    expect(hookRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
+
+    // Subagent Transcript / Progress: runtimeProof fail (confirmed SDK limitation), diagnostic surface
+    const subagentRow = getRow('Subagent Transcript / Progress');
+    expect(subagentRow).not.toBeNull();
+    expect(subagentRow?.textContent).toContain('SDK');
+    expect(subagentRow?.textContent).toContain('Adapter');
+    expect(subagentRow?.textContent).toContain('Failed');
+    expect(subagentRow?.textContent).toContain('Diagnostic');
+    expect(subagentRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
   });
 
   it('renders exposed discovery rows for permission approval, AskUserQuestion, and MCP', () => {
@@ -646,7 +653,8 @@ describe('SettingsCapabilityLabSection', () => {
     expect(agentRow?.textContent).toContain('2 agent definition(s)');
     expect(agentRow?.textContent).toContain('agent-a');
     expect(agentRow?.textContent).toContain('agent-b');
-    expect(agentRow?.textContent).toContain('Runtime-readback verified');
+    expect(agentRow?.textContent).toContain('Runtime verified');
+    expect(agentRow?.textContent).toContain('inline Agent Definition Proof');
     expect(agentRow?.textContent).toContain('Discovery Only');
     expect(agentRow?.textContent).not.toContain('Exposed');
   });
@@ -674,7 +682,8 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(table?.querySelectorAll('tr') ?? []);
     const agentRow = rows.find((row) => row.textContent?.includes('Agent Definitions'));
     expect(agentRow?.textContent).toContain('No agent definitions loaded');
-    expect(agentRow?.textContent).toContain('Runtime-readback verified');
+    expect(agentRow?.textContent).toContain('Runtime verified');
+    expect(agentRow?.textContent).toContain('inline Agent Definition Proof');
     expect(agentRow?.textContent).toContain('Discovery Only');
   });
 
@@ -691,7 +700,8 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(table?.querySelectorAll('tr') ?? []);
     const agentRow = rows.find((row) => row.textContent?.includes('Agent Definitions'));
     expect(agentRow?.textContent).toContain('No agent definitions loaded');
-    expect(agentRow?.textContent).toContain('Runtime-readback verified');
+    expect(agentRow?.textContent).toContain('Runtime verified');
+    expect(agentRow?.textContent).toContain('inline Agent Definition Proof');
     expect(agentRow?.textContent).toContain('Discovery Only');
   });
 
@@ -1009,8 +1019,8 @@ describe('SettingsCapabilityLabSection', () => {
       'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'Agent Definitions': { runtimeProof: 'pass', userSurface: 'hidden' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
-      'Subagent Transcript / Progress': { runtimeProof: 'untested', userSurface: 'diagnostic' },
-      'Include Hook Events': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Subagent Transcript / Progress': { runtimeProof: 'fail', userSurface: 'diagnostic' },
+      'Include Hook Events': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Import Session to Store': { runtimeProof: 'untested', userSurface: 'hidden' },
       'Fork Session': { runtimeProof: 'untested', userSurface: 'diagnostic' },
       'Resume Session': { runtimeProof: 'untested', userSurface: 'diagnostic' },
@@ -1045,9 +1055,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events']),
     );
-    expect(verifiedCapabilities.length).toBe(5);
+    expect(verifiedCapabilities.length).toBe(6);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -3686,6 +3696,178 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('Layer 2 (assistant text marker echo): BLOCKED');
     expect(containerEl.textContent).toContain('Unknown agent: opencodian-proof-agent');
     const failMarkers = containerEl.querySelectorAll('[data-capability="Agent Definitions"].opencodian-capability-lab-proof-fail');
+    expect(failMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('renders Allowed Tools Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks Allowed Tools as readback when no non-allowed tool calls are observed', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-allowed-tools',
+        rawMessages: [],
+        chunks: [
+          { type: 'text', content: 'I cannot list files because I only have Read access.' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
+    expect(containerEl.textContent).toContain('No tool calls observed');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Allowed Tools as fail when non-allowed tool is called', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-allowed-tools-fail',
+        rawMessages: [],
+        chunks: [
+          { type: 'tool_use', name: 'Bash' },
+          { type: 'tool_result', content: 'file1.txt\nfile2.txt' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Enforcement likely FAILED');
+    const failMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-fail');
+    expect(failMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('renders Disallowed Tools Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Disallowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks Disallowed Tools as readback when blocked tool is not called', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-disallowed-tools',
+        rawMessages: [],
+        chunks: [
+          { type: 'text', content: 'I cannot use Bash because it is disallowed.' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Disallowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Configured disallowedTools: ["Bash"]');
+    expect(containerEl.textContent).toContain('No tool calls observed');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Disallowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Disallowed Tools as fail when blocked tool is called', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-disallowed-tools-fail',
+        rawMessages: [],
+        chunks: [
+          { type: 'tool_use', name: 'Bash' },
+          { type: 'tool_result', content: 'file1.txt\nfile2.txt' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Disallowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Enforcement likely FAILED');
+    const failMarkers = containerEl.querySelectorAll('[data-capability="Disallowed Tools"].opencodian-capability-lab-proof-fail');
     expect(failMarkers.length).toBeGreaterThan(0);
   });
 

@@ -12,6 +12,298 @@
 
 ---
 
+## 2026-05-28 Turn/Budget Limits Fresh Runtime Proof — Partial Proof Only (maxBudgetUsd pass, maxTurns no signal)
+
+### 任务
+
+在 final build (`feature-phase0-capability.202605281809`) 上运行真实 runtime proof，判断 `maxTurns` 和 `maxBudgetUsd` 是否存在可观察的 enforcement signal。
+
+### 执行
+
+- BUILD_ID: `feature-phase0-capability.202605281809`
+- 方法: 直接调用 `adapter.runDiagnosticPrompt()`，设置不同的 `maxTurns` / `maxBudgetUsd` 值
+- Test 1: `maxBudgetUsd=0.01` → SDK 返回 `error_max_budget_usd`，错误消息 "Reached maximum budget ($0.01)"
+- Test 2: `maxTurns=2` + no budget → 模型执行 6 个 tool_use，返回 `success`，无 turn limit signal
+- Test 3: `maxTurns=1` + no budget → 模型执行 5 个 tool_use，返回 `success`，无 turn limit signal
+
+### 结果
+
+- **`maxBudgetUsd`**: ✅ **enforcement observed** — SDK 明确返回 budget exceeded error
+- **`maxTurns`**: ❌ **no enforcement signal** — 模型在限制内仍执行多轮工具调用，无 error/signal
+
+### 结论
+
+**B. partial proof only**:
+- `maxBudgetUsd` 有真实 enforcement 证据（可观测）
+- `maxTurns` 无 enforcement 信号（可能是 SDK 版本/定义差异，或需要额外仪器化）
+- **Overall capability classification remains `readback + settings`**，因为 `maxTurns` 维度未验证
+
+### 证据
+
+- Evidence JSON: `.obsidian-debug/turn-budget-proof-evidence-20260528.json`
+- Console filtered: `.obsidian-debug/turn-budget-console-filtered-20260528.txt`
+- Errors: `.obsidian-debug/turn-budget-errors-20260528.txt` (No errors)
+
+---
+
+## 2026-05-28 Environment Variables Fresh Runtime Proof — Behavior Proof Unobserved (Model Non-Determinism)
+
+### 任务
+
+在 final build (`feature-phase0-capability.202605281809`) 上运行 `Run Environment Variables Proof`，决定 fresh runtime proof 是否能从 `readback` 提升到 `pass`。
+
+### 执行
+
+- BUILD_ID: `feature-phase0-capability.202605281809`（已部署并重载）
+- Capability Lab > Run Environment Variables Proof
+- 探针注入 nonce env var (`OPENCODIAN_ENV_PROOF_*`) 和 path，prompt 要求 Bash 执行 `printf` 写入 nonce 到文件
+
+### 结果
+
+- **Layer 1 (SDK readback)**: PASS — env options 正确传入 SDK
+- **Layer 2 (Bash tool invoked)**: NO EVIDENCE — 模型未调用 Bash
+- **Layer 3 (env-derived filesystem side effect)**: NO EVIDENCE — 文件未创建
+- **Layer 4 (assistant text nonce echo)**: NO EVIDENCE
+- **Overall**: `readback` — "Behavior proof not achieved"
+
+### 结论
+
+**B. pass not observed**。模型工具调用是非确定性的：即使 prompt 明确指示使用 Bash，模型仍可能选择不调用。这不是 SDK 限制，而是模型行为的不确定性。因此：
+- **Fresh diagnostic runtime proof = readback**（不是 pass）
+- **Static four-bucket / matrix classification remains `readback + settings`**
+- 这不等于 ordinary chat / always-on behavior proof
+
+### 证据
+
+- Screenshot: `.obsidian-debug/env-proof-result-20260528.png`
+- Console: `.obsidian-debug/env-proof-console-20260528.txt`
+- Errors: `.obsidian-debug/env-proof-errors-20260528.txt` (No errors)
+- DOM assertion: `.obsidian-debug/env-proof-dom-20260528.txt`
+
+---
+
+## 2026-05-28 Four-Bucket Classification Tightening — Blocked Overrides Visible Surface
+
+### 任务
+
+修正 `Fallback Model` 的 four-bucket 分类：从 `user-facing` 挪回 `blocked`。
+
+### 口径
+
+- `userSurface`（Capability Matrix 静态字段）描述的是**UI 表面存在性**：`Fallback Model` 确实有 settings control，所以 matrix 中标记 `userSurface: 'settings'` 是正确的。
+- four-bucket（最终产品化分级）描述的是**capability outcome**：`Fallback Model` 的核心行为 proof 已明确失败（invalid primary → SDK 400，不发生 fallback），blocker 是 SDK limitation。因此最终分级应为 `blocked`，即使 settings control 可见。
+- 同理，`Subagent Transcript / Progress` 也在 `blocked`，尽管它通过 diagnostic surface 暴露过 proof button。
+- 这个修正确立了原则：**blocked 优先于 visible surface**。
+
+### 改动
+
+- `docs/status/claude-code-current-state-2026-05-22.md`:
+  - `Fallback Model` 从 user-facing 表移除，加入 blocked 表
+  - blocked 行明确写：stable settings control exists + explicit proof-status notice + but overall capability remains blocked
+  - user-facing 说明添加注释：解释 `userSurface` 与 four-bucket 是两个独立维度
+
+---
+
+## 2026-05-28 Four-Bucket Exhaustiveness Correction — 24-Capability Complete Alignment
+
+### 任务
+
+修正 `docs/status/claude-code-current-state-2026-05-22.md` 的 four-bucket summary，使其与 `SettingsCapabilityLabSection.ts` 的 24-row matrix 和单元测试 `expected` 映射完全对齐。
+
+### 发现的问题
+
+1. **遗漏**: `Turn/Budget Limits` 和 `Environment Variables` 未进入 four-bucket tables（仅在 matrix 中标记为 `readback + settings`）。
+2. **双算/混入 panel 名称**: `Structured Output Playground`（diagnostic probe）被当成独立 capability 写入 diagnostic 表，但真正的 capability `Structured Output` 已经是 `chat + pass`；`Rewind Dry-Run Preview` 与 `File Checkpoint / Rewind` 同时出现，把 probe surface 和 capability 本体双算；`Subagent Browser` 被单独列出，但它是 `Agents (Subagents)` capability 的 diagnostic surface，不应和 capability 命名漂移。
+3. **误导性标题**: user-facing bucket 的标题 "Capabilities with stable user interface and verified runtime behavior" 会误导用户认为所有 user-facing 能力都是 behavior-verified，但 Allowed/Disallowed/Turn-Budget/Env/Fallback 实际上是 `readback` 或 `wiring`。
+
+### 修正内容
+
+- 重写 four-bucket summary，按 capability 本体（而非 panel/probe）整理，恰好覆盖 24 个 capability。
+- user-facing bucket 明确说明混合了 `pass` 和 `readback/wiring`，并保留 readback-only 边界标注。
+- 移除: `Structured Output Playground`、`Rewind Dry-Run Preview`、`Subagent Browser`（这些不是独立 capability）。
+- 补入: `Turn/Budget Limits`、`Environment Variables`、`Fallback Model`（从遗漏/分散状态归入 user-facing）。
+- `Agents (Subagents)` 归入 diagnostic（`untested`），与 matrix 一致。
+- 所有 24 行编号，便于与 matrix 一一核对。
+
+### 验证
+
+- 人工 audit: four-bucket 表与 `buildMatrixRows()` 24 行逐一比对，无遗漏、无双算、无命名漂移。
+- `npm run check:devlog-order` => PASS。
+
+---
+
+## 2026-05-28 Allowed Tools / Disallowed Tools Honesty Gap Fix — Readback-Only Boundary Clarified
+
+### 任务
+
+修复 Allowed Tools / Disallowed Tools 的诚实性缺口：这两个能力在稳定设置 UI 中暴露，但仅有 readback 验证（选项正确构建并传入 SDK），行为验证（模型是否遵守 allowlist/blocklist）之前未明确说明为 infeasible。
+
+### 改动
+
+1. **`src/features/settings/SettingsCapabilityLabSection.ts`**:
+   - Capability Matrix 注释更新：明确说明 Allowed Tools / Disallowed Tools 的行为证明是 infeasible 的，因为模型工具调用是非确定性的
+   - Discovery Row 文本更新：明确说明诊断探针只能证明 enforcement *failure*，不能证明 enforcement *success*
+   - 新增 **Run Allowed Tools Proof** 按钮和 `runAllowedToolsProof()` 方法
+   - 新增 **Run Disallowed Tools Proof** 按钮和 `runDisallowedToolsProof()` 方法
+   - 探针设计诚实：如果受限工具被调用 → `fail`（enforcement 失败）；如果没有工具调用 → `readback`（无反例，但无法证明成功）
+   - 原始设置在 `finally` 块中恢复
+
+2. **`src/features/settings/SettingsClaudeCodeSection.ts`**:
+   - `renderToolsProofStatusNotice()` 保持 `data-proof-state='readback'`，locale 文本更新为更明确的 readback-only 边界
+
+3. **`src/i18n/locales/en.ts` / `zh.ts`**:
+   - `settings.claudeCode.proofStatus.tools` 更新为更明确的 readback-only 边界文案
+
+4. **`docs/status/claude-code-current-state-2026-05-22.md`**:
+   - Four-Bucket Summary 的 user-facing 部分新增 Allowed Tools 和 Disallowed Tools，明确标注 "**Readback-only**"
+
+5. **`docs/modules/features/settings/SettingsCapabilityLabSection.md`**:
+   - 新增 `runAllowedToolsProof()` 和 `runDisallowedToolsProof()` 方法说明
+   - Capability Matrix 和 Discovery 面板描述更新
+
+6. **`docs/modules/i18n/locales/en.md` / `zh.md`**:
+   - 更新 `proofStatus.tools` 的描述
+
+7. **`tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`**:
+   - 新增 6 个测试：按钮存在性、readback 路径、fail 路径（Allowed Tools + Disallowed Tools 各 2 个）
+
+### 验证
+
+- Focused test: `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` => PASS (130/130)
+- Full verify: 443 suites / 3436 tests passed, lint 0 errors / 0 warnings, typecheck clean, build clean
+- BUILD_ID: `feature-phase0-capability.202605281809`
+- Test Vault deploy + BUILD_ID verify => PASS
+- Plugin reload => success
+- Runtime DOM 验证：
+  - Capability Lab 矩阵：Allowed Tools = Readback verified + Settings surface；Disallowed Tools = Readback verified + Settings surface
+  - Capability Lab 按钮："Run Allowed Tools Proof" 和 "Run Disallowed Tools Proof" 存在于 DOM
+  - Stable settings proof notice：`data-proof-state='readback'`，文本包含 readback-only boundary
+  - Screenshot (Capability Lab): `.obsidian-debug/capability-lab-final-20260528.png`
+  - Screenshot (Claude Tools tab): `.obsidian-debug/claude-tools-tab-final-20260528.png`
+  - Final evidence JSON: `.obsidian-debug/allowed-disallowed-tools-evidence-20260528.json`
+
+### 分类决定
+
+| Capability | Runtime Proof | User Surface | Behavior Proof | Reason |
+|---|---|---|---|---|
+| Allowed Tools | `readback` | `settings` | `infeasible` | 模型工具调用非确定性，探针只能检测 enforcement failure |
+| Disallowed Tools | `readback` | `settings` | `infeasible` | 模型工具调用非确定性，探针只能检测 enforcement failure |
+
+### 诚实性边界
+
+- `readback` 表示 SDK 选项正确构建并传入 SDK（Layer 1 验证）
+- 行为证明（Layer 2）是 infeasible 的：即使 SDK 严格执行了 allowlist/blocklist，模型也可能选择不调用受限工具，导致无法区分 "enforcement 成功" 和 "模型未选择调用"
+- 诊断探针的价值在于：如果模型调用了受限工具，可以明确标记 `fail`（enforcement 失败）
+- Four-Bucket Summary 现在明确列出这两个能力，并标注 readback-only 边界
+
+### 残余风险
+
+- 用户可能误以为 readback 验证等同于行为保证；proof-status notice 和 Discovery 文本已尽量明确边界
+- 如果未来 SDK 提供了工具调用的确定性信号（如 "tool blocked by policy" 的 tool_result），可以重新评估行为证明的可行性
+
+---
+
+## 2026-05-28 Agent Definitions Discovery Honesty Fix — Inline Proof Wording Correction
+
+### 任务
+
+修复 Agent Definitions Discovery 面板中仍使用旧描述的诚实性缺口：Agent Definitions 已在上一轮被接受为 `pass + hidden`（inline Agent Definition Proof 验证通过），但 Discovery 文本仍将其描述为 readback-only / Subagent Browser-based proof。
+
+### 改动
+
+1. **`src/features/settings/SettingsCapabilityLabSection.ts`**:
+   - `renderAgentDefinitionsDiscoveryRow()`: 发现文本从 "Runtime-readback verified via Stable Settings Readback Proof... Behavior proof covered by Subagent Browser" 改为 "Runtime verified via inline Agent Definition Proof — SDK accepts agent/agents options (Layer 1 readback) and the selected agent alters assistant behavior (Layer 2 marker echo). Readback remains supporting evidence only."
+   - `buildAgentDefinitionsReadbackResult()`: Readback 注释从 "Behavior proof covered by Subagent Browser" 改为 "Behavior proof comes from the dedicated inline Agent Definition Proof, not duplicated here."
+
+2. **`tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`**:
+   - 三个 Agent Definitions discovery row 测试的断言从 `toContain('Runtime-readback verified')` 改为 `toContain('Runtime verified')` + `toContain('inline Agent Definition Proof')`
+
+3. **`docs/modules/features/settings/SettingsCapabilityLabSection.md`**:
+   - Agent Definitions Discovery 面板描述更新，明确说明 "Runtime verified via inline Agent Definition Proof"，readback 仅作为 Layer 1 支持证据
+
+4. **`docs/status/claude-code-current-state-2026-05-22.md`**:
+   - 新增 "Event-Stream Matrix Convergence + Agent Definitions Discovery Honesty Fix" 章节
+   - Agent definitions 表格行和 Hard Guardrails 文本同步更新
+
+### 验证
+
+- Focused test: `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` => PASS (124/124)
+- Full verify: lint/typecheck/build clean
+- BUILD_ID: feature-phase0-capability.202605281732
+- Test Vault deploy + reload => PASS
+- Runtime validation: autodebug workflow => PASS
+  - Agent Definitions discovery row found in Discovery & Status panel
+  - Row text: "No authoring UI. buildSdkOptions wires runtime-only agent/agents options. Runtime verified via inline Agent Definition Proof when definitions are present. Readback remains supporting evidence only. No agent definitions loaded or adapter not started."
+  - Contains inline-proof wording: PASS
+  - No Subagent Browser as behavior-proof source: PASS
+  - Discovery Only boundary maintained: PASS
+  - Screenshot: `.obsidian-debug/agent-def-discovery-screenshot-20260528.png`
+  - Assertion JSON: `.obsidian-debug/agent-def-discovery-result.json`
+  - Console: no plugin errors (only normal SDK load/list session logs)
+  - Errors: no errors captured
+
+### 诚实性边界
+
+- `pass` 表示 SDK 接受内联 agent definitions 且选中的 agent 改变模型行为（Layer 2 marker echo）
+- `readback` 仅是 Layer 1 支持证据（options 正确构建并传入 SDK），不再作为最终分类
+- 不暴露 authoring UI；`userSurface` 保持 `hidden`
+
+---
+
+## 2026-05-28 Capability Matrix Honesty Gap Fix — Include Hook Events (pass) + Subagent Transcript / Progress (fail)
+
+### 任务
+
+修复静态 Capability Matrix 与已接受的事件流证据之间的诚实性缺口：
+1. Include Hook Events：docs/status 已确认有真实运行时证明（`includeHookEvents: true` 捕获了 `hook` backend_events），但静态矩阵仍标记为 `untested`
+2. Subagent Transcript / Progress：docs/status 已分类为 blocked（SDK limitation），但静态矩阵仍标记为 `untested`
+
+### 改动
+
+1. **`src/features/settings/SettingsCapabilityLabSection.ts`**:
+   - `buildMatrixRows()`: Include Hook Events `runtimeProof` 从 `'untested'` 改为 `'pass'`，`userSurface` 保持 `'diagnostic'`（不声称稳定 hook authoring UI）
+   - `buildMatrixRows()`: Subagent Transcript / Progress `runtimeProof` 从 `'untested'` 改为 `'fail'`，`userSurface` 保持 `'diagnostic'`（不声称稳定 chat transcript/progress UI）
+   - 两行注释更新，明确诊断边界和 blocker 原因
+
+2. **`tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`**:
+   - 测试 `'keeps hook and subagent stream option rows diagnostic-facing while untested'` 重命名为 `'reflects honest event-stream states for hook and subagent rows in capability matrix'`
+   - 断言更新：Include Hook Events 显示 "Verified"，Subagent Transcript / Progress 显示 "Failed"
+   - 审计测试预期值更新：Include Hook Events → `pass`，Subagent Transcript / Progress → `fail`
+   - `verifiedCapabilities` 数组增加 `'Include Hook Events'`，计数从 5 → 6
+
+3. **`docs/modules/features/settings/SettingsCapabilityLabSection.md`**:
+   - Capability Matrix 边界注释更新，明确 `Include Hook Events` 为 `pass`，`Subagent Transcript / Progress` 为 `fail`
+
+4. **`graphify-out/`**: 通过 `npm run graphify:update:src` 刷新
+
+### 验证
+
+- 单元测试：124/124 passed（Capability Lab focused tests）
+- 完整 verify：443 suites / 3430 tests passed，lint 0 errors / 0 warnings，typecheck clean，build clean
+- BUILD_ID：`feature-phase0-capability.202605281710`
+- Test Vault 部署并 reload：BUILD_ID 在 deployed `main.js` 中验证通过
+- 运行时 DOM 断言：
+  - Include Hook Events：`found=true, hasVerified=true, hasDiagnostic=true, surface=diagnostic`
+  - Subagent Transcript / Progress：`found=true, hasFailed=true, hasDiagnostic=true, surface=diagnostic`
+  - Total rows：24
+- Console：无 plugin errors
+- Screenshot：`.obsidian-debug/capability-lab-matrix-20260528.png`
+
+### 分类决定
+
+| Capability | Runtime Proof | User Surface | Evidence |
+|---|---|---|---|
+| Include Hook Events | `pass` | `diagnostic` | `includeHookEvents: true` 时诊断流真实捕获 `hook` backend_events |
+| Subagent Transcript / Progress | `fail` | `diagnostic` | 工具诱导型 prompt + `forwardSubagentText` + `agentProgressSummaries` 条件下仍产出零 subagent/progress 事件，blocker 为 SDK limitation |
+
+### 诚实边界
+
+- 两行均保持 `diagnostic` surface，不声称稳定的 chat UI 或 hook authoring productization
+- `pass` 仅证明诊断流中的事件捕获能力，不等于稳定功能产品化
+- `fail` 诚实反映已确认的 SDK limitation，不因 option 被接受而虚报为 `wiring`
+
+---
+
 ## 2026-05-28 Agent Definition Proof Promotion — Runtime Verified (pass)
 
 ### 任务

@@ -2231,7 +2231,7 @@ export const zhTranslations = {
   'settings.claudeCode.fallbackModel.boundaryNotice': '备用模型的修改需要重启当前 Claude Code 会话或开始新的查询。与主模型不同，备用模型无法在已运行的流中实时更新。当前 SDK 下自动回退行为尚未验证。',
   'settings.claudeCode.fallbackModel.quickSelectName': '快速选择备用模型',
   'settings.claudeCode.fallbackModel.quickSelectDesc': '从发现的模型目录中选择备用模型。所选值会自动更新上方的备用模型字段。',
-  'settings.claudeCode.proofStatus.tools': '运行时回读已验证。SDK 接受这些值；实际工具 enforcement 取决于 SDK 版本和模型。',
+  'settings.claudeCode.proofStatus.tools': '运行时回读已验证。SDK 接受这些值并通过 buildSdkOptions 传递。实际工具 enforcement（模型是否遵守允许/禁用列表）未进行行为验证——模型工具调用是非确定性的，因此诊断探针只能检测 enforcement 失败，无法证明 enforcement 成功。',
   'settings.claudeCode.proofStatus.limits': '运行时回读已验证。SDK 接受这些值；实际轮数/预算 enforcement 取决于 SDK 和模型。',
   'settings.claudeCode.proofStatus.env': '运行时回读已验证。设置→SDK 映射已确认；实时行为验证（环境变量传播到 Claude/Bash 子进程）可通过 Capability Lab 诊断旁路进行。',
   'settings.claudeCode.proofStatus.fallbackModel': '仅连接。备用模型选项已被 SDK 接受且回读确认，但自动回退行为尚未验证——无效主模型验证返回 HTTP 400，而非自动切换。',

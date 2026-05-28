@@ -543,14 +543,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Allowed Tools',
         sdkExposed: true, // allowedTools option in SDK
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.allowedTools is built from settings when non-empty. Not behavior-verified (cannot prove model respects the allowlist without deterministic tool-calling harness).
+        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.allowedTools is built from settings when non-empty. Behavior proof is infeasible: model tool-calling is non-deterministic, so diagnostic probes can only prove enforcement *failure* (non-allowed tool called), not success. Capability Lab now exposes "Run Allowed Tools Proof" for explicit failure detection.
         userSurface: 'settings',
       },
       {
         capability: 'Disallowed Tools',
         sdkExposed: true, // disallowedTools option in SDK
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.disallowedTools is built from settings when non-empty. Not behavior-verified.
+        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.disallowedTools is built from settings when non-empty. Behavior proof is infeasible: model tool-calling is non-deterministic, so diagnostic probes can only prove enforcement *failure* (blocked tool called), not success. Capability Lab now exposes "Run Disallowed Tools Proof" for explicit failure detection.
         userSurface: 'settings',
       },
       {
@@ -613,15 +613,15 @@ export class SettingsCapabilityLabSection {
         capability: 'Subagent Transcript / Progress',
         sdkExposed: true, // forwardSubagentText + agentProgressSummaries options
         adapterWired: true, // buildSdkOptions wires both
-        runtimeProof: 'untested',
-        userSurface: 'diagnostic', // SDK Foundations toggles feed diagnostic/experimental event streams only
+        runtimeProof: 'fail', // Confirmed SDK limitation: tool-inducing prompt with forwardSubagentText + agentProgressSummaries produces zero subagent/progress events. Blocker is at SDK layer, not prompt layer.
+        userSurface: 'diagnostic', // Diagnostic-only; no stable chat transcript/progress UI
       },
       {
         capability: 'Include Hook Events',
         sdkExposed: true, // includeHookEvents option
         adapterWired: true, // buildSdkOptions wires it
-        runtimeProof: 'untested',
-        userSurface: 'diagnostic', // SDK Foundations toggle feeds diagnostic/experimental event streams only
+        runtimeProof: 'pass', // Runtime verified: includeHookEvents: true captures real hook backend_events in diagnostic stream. Diagnostic-only — no stable hook authoring or transcript UI.
+        userSurface: 'diagnostic', // Diagnostic-only; no stable hook authoring productization
       },
       {
         capability: 'Import Session to Store',
@@ -2161,8 +2161,8 @@ export class SettingsCapabilityLabSection {
       tbody,
       'Allowed Tools',
       hasAllowedTools
-        ? `${allowedTools.length} tool(s) allowed: ${allowedTools.join(', ')}. Runtime-readback verified via Stable Settings Readback Proof — the option is correctly built and passed to the SDK. Behavior-verified (model actually respects the allowlist) is not proven.`
-        : 'No tools configured. Runtime-readback verified via Stable Settings Readback Proof — the option is correctly built when non-empty. Behavior-verified is not proven.',
+        ? `${allowedTools.length} tool(s) allowed: ${allowedTools.join(', ')}. Runtime-readback verified via Stable Settings Readback Proof — the option is correctly built and passed to the SDK. Behavior proof is infeasible: model tool-calling is non-deterministic, so diagnostic probes can only prove enforcement *failure* (non-allowed tool called), not success. Run "Run Allowed Tools Proof" in Capability Lab to attempt detection of enforcement failure.`
+        : 'No tools configured. Runtime-readback verified via Stable Settings Readback Proof — the option is correctly built when non-empty. Behavior proof is infeasible: model tool-calling is non-deterministic, so diagnostic probes can only prove enforcement *failure*, not success.',
       { status: 'exposed' },
     );
 
@@ -2173,8 +2173,8 @@ export class SettingsCapabilityLabSection {
       tbody,
       'Disallowed Tools',
       hasDisallowedTools
-        ? `${disallowedTools.length} tool(s) disallowed: ${disallowedTools.join(', ')}. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified is not proven.`
-        : 'No tools disallowed. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified is not proven.',
+        ? `${disallowedTools.length} tool(s) disallowed: ${disallowedTools.join(', ')}. Runtime-readback verified via Stable Settings Readback Proof. Behavior proof is infeasible: model tool-calling is non-deterministic, so diagnostic probes can only prove enforcement *failure* (blocked tool called), not success. Run "Run Disallowed Tools Proof" in Capability Lab to attempt detection of enforcement failure.`
+        : 'No tools disallowed. Runtime-readback verified via Stable Settings Readback Proof. Behavior proof is infeasible: model tool-calling is non-deterministic, so diagnostic probes can only prove enforcement *failure*, not success.',
       { status: 'exposed' },
     );
 
@@ -2397,6 +2397,34 @@ export class SettingsCapabilityLabSection {
       void this.runAgentDefinitionProof(adapter, agentDefProofOutputEl);
     });
 
+    // Allowed Tools Proof — tests whether the SDK enforces the allowedTools list
+    const allowedToolsProofBtn = proofControls.createEl('button', {
+      text: 'Run Allowed Tools Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const allowedToolsProofOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    allowedToolsProofBtn.addEventListener('click', () => {
+      void this.runAllowedToolsProof(adapter, allowedToolsProofOutputEl);
+    });
+
+    // Disallowed Tools Proof — tests whether the SDK enforces the disallowedTools list
+    const disallowedToolsProofBtn = proofControls.createEl('button', {
+      text: 'Run Disallowed Tools Proof',
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const disallowedToolsProofOutputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    disallowedToolsProofBtn.addEventListener('click', () => {
+      void this.runDisallowedToolsProof(adapter, disallowedToolsProofOutputEl);
+    });
+
     // Ordinary Chat Permission Proof — sends a real chat message through the send pipeline
     const ordinaryPermissionBtn = proofControls.createEl('button', {
       text: 'Launch Ordinary Chat Permission Proof',
@@ -2543,8 +2571,8 @@ export class SettingsCapabilityLabSection {
       tbody,
       'Agent Definitions',
       agentDefCount > 0
-        ? `${agentDefCount} agent definition(s): ${agentDefList.join(', ')}. Runtime-readback verified via Stable Settings Readback Proof — options are correctly built when configured. Behavior proof (model invokes Agent tool with defined subagent) is covered by the Subagent Browser diagnostic path. No authoring UI.`
-        : 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options. Runtime-readback verified via Stable Settings Readback Proof. No agent definitions loaded or adapter not started. Behavior proof available via Subagent Browser when definitions are present.',
+        ? `${agentDefCount} agent definition(s): ${agentDefList.join(', ')}. Runtime verified via inline Agent Definition Proof — SDK accepts agent/agents options (Layer 1 readback) and the selected agent alters assistant behavior (Layer 2 marker echo). Readback remains supporting evidence only. No authoring UI.`
+        : 'No authoring UI. buildSdkOptions wires runtime-only agent/agents options. Runtime verified via inline Agent Definition Proof when definitions are present. Readback remains supporting evidence only. No agent definitions loaded or adapter not started.',
       { status: 'discovery' },
     );
   }
@@ -3577,8 +3605,8 @@ export class SettingsCapabilityLabSection {
       : 'Agent Definitions: not configured';
 
     const overallNote = present
-      ? 'Option read back. Behavior proof (model invokes Agent tool with defined subagent) is covered by the Subagent Browser diagnostic path, not duplicated here.'
-      : 'Not configured. Agent definitions are subagent configuration wired at adapter initialization. Behavior proof available via Subagent Browser when definitions are present.';
+      ? 'Option read back (Layer 1 supporting evidence). Behavior proof comes from the dedicated inline Agent Definition Proof — SDK accepts agent/agents options and the selected agent alters assistant behavior. Not duplicated here.'
+      : 'Not configured. Agent definitions are subagent configuration wired at adapter initialization. Behavior proof available via inline Agent Definition Proof when definitions are present.';
 
     return { present, displayText, overallNote };
   }
@@ -3733,7 +3761,7 @@ export class SettingsCapabilityLabSection {
     const envKey = `OPENCODIAN_ENV_PROOF_${Date.now()}`;
     const envProofPath = join(tmpdir(), `opencodian-env-proof-${nonce}`);
     const prompt = [
-      'Environment proof task. You MUST call Bash with this exact command:',
+      'Use the Bash tool to run this exact command:',
       'printf \'%s\' "${OPENCODIAN_ENV_PROOF_NONCE}" > "${OPENCODIAN_ENV_PROOF_PATH}"',
       `Then respond with exactly: ${nonce}`,
       'Do not add extra words.',
@@ -3941,6 +3969,154 @@ export class SettingsCapabilityLabSection {
         cls: 'opencodian-capability-lab-hint',
         text: 'Blocker: the SDK rejected the inline agent definition or the diagnostic run failed for another reason. This is a valid finding — it tells us inline agent definitions are not supported in this SDK version or configuration.',
       });
+    }
+  }
+
+  private async runAllowedToolsProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running allowed tools runtime proof…' });
+
+    const originalAllowedTools = [...this.claudeCodeSettings.allowedTools];
+    const originalDisallowedTools = [...this.claudeCodeSettings.disallowedTools];
+
+    try {
+      this.claudeCodeSettings.allowedTools = ['Read'];
+      this.claudeCodeSettings.disallowedTools = [];
+      await this.saveClaudeCodeSettings();
+
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'List files in the current directory using Bash, then read the first file you find.',
+        persistSession: false,
+        _diagnosticBypassPermissions: true,
+      });
+
+      const toolUses = result.chunks.filter((chunk) => chunk.type === 'tool_use');
+      const toolNames = toolUses.map((chunk) => (chunk as { name?: string }).name).filter(Boolean);
+      const disallowedToolCalls = toolNames.filter((name) => name !== 'Read');
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Allowed Tools Proof' });
+      outputEl.createEl('p', { text: `Configured allowedTools: ["Read"]` });
+      outputEl.createEl('p', { text: `Tools called by model: [${toolNames.map((n) => `"${n}"`).join(', ')}]` });
+
+      if (disallowedToolCalls.length > 0) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `Enforcement likely FAILED: model called ${disallowedToolCalls.join(', ')} which is not in the allowed list.`,
+        });
+        this.updateRuntimeProof('Allowed Tools', 'fail', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'The SDK did not prevent the model from calling tools outside the allowed list. This proves allowedTools enforcement is not working as expected.',
+        });
+      } else if (toolNames.length === 0) {
+        outputEl.createEl('p', {
+          text: 'No tool calls observed. Model may have responded in text without calling any tools.',
+        });
+        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'Inconclusive: no tool calls means we cannot verify whether enforcement would have blocked a non-allowed tool. Readback remains the only verified layer.',
+        });
+      } else {
+        outputEl.createEl('p', {
+          text: 'All observed tool calls are in the allowed list. This is consistent with enforcement, but not conclusive proof (model may have chosen not to call other tools).',
+        });
+        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'Absence of non-allowed tool calls is not proof of enforcement — model behavior is non-deterministic. Readback remains the only verified layer.',
+        });
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Allowed Tools Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Allowed tools proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Allowed Tools', 'fail', outputEl);
+    } finally {
+      this.claudeCodeSettings.allowedTools = originalAllowedTools;
+      this.claudeCodeSettings.disallowedTools = originalDisallowedTools;
+      await this.saveClaudeCodeSettings();
+    }
+  }
+
+  private async runDisallowedToolsProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running disallowed tools runtime proof…' });
+
+    const originalAllowedTools = [...this.claudeCodeSettings.allowedTools];
+    const originalDisallowedTools = [...this.claudeCodeSettings.disallowedTools];
+
+    try {
+      this.claudeCodeSettings.allowedTools = [];
+      this.claudeCodeSettings.disallowedTools = ['Bash'];
+      await this.saveClaudeCodeSettings();
+
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: 'List files in the current directory using Bash.',
+        persistSession: false,
+        _diagnosticBypassPermissions: true,
+      });
+
+      const toolUses = result.chunks.filter((chunk) => chunk.type === 'tool_use');
+      const toolNames = toolUses.map((chunk) => (chunk as { name?: string }).name).filter(Boolean);
+      const blockedToolCalls = toolNames.filter((name) => name === 'Bash');
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Disallowed Tools Proof' });
+      outputEl.createEl('p', { text: `Configured disallowedTools: ["Bash"]` });
+      outputEl.createEl('p', { text: `Tools called by model: [${toolNames.map((n) => `"${n}"`).join(', ')}]` });
+
+      if (blockedToolCalls.length > 0) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: 'Enforcement likely FAILED: model called Bash which is in the disallowed list.',
+        });
+        this.updateRuntimeProof('Disallowed Tools', 'fail', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'The SDK did not prevent the model from calling a disallowed tool. This proves disallowedTools enforcement is not working as expected.',
+        });
+      } else if (toolNames.length === 0) {
+        outputEl.createEl('p', {
+          text: 'No tool calls observed. Model may have responded in text without calling any tools.',
+        });
+        this.updateRuntimeProof('Disallowed Tools', 'readback', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'Inconclusive: no tool calls means we cannot verify whether enforcement would have blocked Bash. Readback remains the only verified layer.',
+        });
+      } else {
+        outputEl.createEl('p', {
+          text: 'Bash was not called. This is consistent with enforcement, but not conclusive proof (model may have chosen not to call Bash).',
+        });
+        this.updateRuntimeProof('Disallowed Tools', 'readback', outputEl);
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: 'Absence of Bash tool calls is not proof of enforcement — model behavior is non-deterministic. Readback remains the only verified layer.',
+        });
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Disallowed Tools Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Disallowed tools proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Disallowed Tools', 'fail', outputEl);
+    } finally {
+      this.claudeCodeSettings.allowedTools = originalAllowedTools;
+      this.claudeCodeSettings.disallowedTools = originalDisallowedTools;
+      await this.saveClaudeCodeSettings();
     }
   }
 

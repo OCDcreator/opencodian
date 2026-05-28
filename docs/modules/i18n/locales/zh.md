@@ -320,7 +320,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 本轮更新 `settings.claudeCode.env.desc`，在环境变量描述中加入 POSIX 键名规范提示和未运行时验证的诚实性声明，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
 
-本轮更新 `settings.claudeCode.allowedTools.desc` 和 `settings.claudeCode.disallowedTools.desc`，移除过时的“尚未经过运行时验证”声明，改为在 Tools 标签通过 `settings.claudeCode.proofStatus.tools` 共享 notice 统一标注运行时回读已验证状态。
+本轮更新 `settings.claudeCode.allowedTools.desc` 和 `settings.claudeCode.disallowedTools.desc`，移除过时的“尚未经过运行时验证”声明，改为在 Tools 标签通过 `settings.claudeCode.proofStatus.tools` 共享 notice 统一标注运行时回读已验证状态。`proofStatus.tools` 已更新为更明确的 readback-only 边界文案："运行时回读已验证。SDK 接受这些值并通过 buildSdkOptions 传递。实际工具 enforcement（模型是否遵守允许/禁用列表）未进行行为验证——模型工具调用是非确定性的，因此诊断探针只能检测 enforcement 失败，无法证明 enforcement 成功。"
 
 2026-05-28 本轮更新 `settings.claudeCode.maxTurns.desc`、`settings.claudeCode.maxBudgetUsd.desc`、`settings.claudeCode.env.desc`，移除过时的“已连接但尚未经过运行时验证”文案；新增 `settings.claudeCode.proofStatus.tools`、`settings.claudeCode.proofStatus.limits`、`settings.claudeCode.proofStatus.env` 三个共享 proof-status notice 键，用于在 Tools、Model & Thinking、Runtime 标签中 compact 地展示运行时 proof 状态。`proofStatus.env` 已更新为 "运行时回读已验证。设置→SDK 映射已确认；实时行为验证可通过 Capability Lab 诊断旁路进行"，反映 Environment Variables 静态分类降回 readback，行为 proof 需 fresh runtime rerun。更新 `settings.claudeCode.fallbackModel.desc` 和 `settings.claudeCode.fallbackModel.boundaryNotice`，诚实标注“选项连接和回读已验证；当前 SDK 下自动回退行为尚未验证”。新增 `settings.claudeCode.proofStatus.fallbackModel`，用于 Model & Thinking 标签的 Fallback Model compact proof-status notice（`data-proof-state="wiring"`），明确标注选项连接+回读已验证但自动 fallback 行为证明失败（无效主模型返回 HTTP 400）。
 

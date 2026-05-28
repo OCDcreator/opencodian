@@ -1,5 +1,30 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-05-28 Event-Stream Matrix Convergence + Agent Definitions Discovery Honesty Fix
+
+### Event-Stream Matrix Convergence
+
+Align static Capability Matrix with accepted event-stream evidence:
+- **Include Hook Events**: `runtimeProof` `'untested'` → `'pass'` (`userSurface` remains `'diagnostic'`). Evidence: `includeHookEvents: true` explicitly set in diagnostic prompt, real `hook` backend_events captured in stream.
+- **Subagent Transcript / Progress**: `runtimeProof` `'untested'` → `'fail'` (`userSurface` remains `'diagnostic'`). Evidence: tool-induction prompt + `forwardSubagentText` + `agentProgressSummaries` conditions still produce zero subagent/progress events; blocker confirmed as SDK limitation.
+
+Files touched: `src/features/settings/SettingsCapabilityLabSection.ts`, `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`, `docs/modules/features/settings/SettingsCapabilityLabSection.md`, `graphify-out/`.
+
+### Agent Definitions Discovery Wording Correction
+
+Gap discovered during acceptance review: Agent Definitions was already accepted as `pass + hidden` after inline agent definition proof, but Discovery panel text still described it as readback-only / Subagent Browser-based proof.
+
+Fixed stale wording in:
+- `renderAgentDefinitionsDiscoveryRow()`: Discovery text now states "Runtime verified via inline Agent Definition Proof" and clarifies "Readback remains supporting evidence only."
+- `buildAgentDefinitionsReadbackResult()`: Readback proof note now states "Behavior proof comes from the dedicated inline Agent Definition Proof, not duplicated here."
+
+Honesty boundary preserved:
+- `pass` means SDK accepts inline agent definitions and the selected agent alters assistant behavior (Layer 2 marker echo).
+- `readback` remains Layer 1 supporting evidence (options correctly built and passed to SDK).
+- No authoring UI implied or exposed; `userSurface` stays `hidden`.
+
+---
+
 ## 2026-05-28 Agent Definition Proof — Inline Agent Definition Diagnostic Probe Implemented
 
 ### Objective
@@ -49,58 +74,61 @@ Determine whether Agent Definitions can be pushed beyond `hidden/untested` to an
 
 ## 2026-05-28 Capability Classification — Four-Bucket Summary
 
-Concise, evidence-backed grouping of all 24 Claude Code SDK capabilities as of this round.
+Exhaustive grouping of all **24** Claude Code SDK capabilities, aligned with `SettingsCapabilityLabSection.ts` `buildMatrixRows()` and the unit-test `expected` mapping. Each capability appears exactly once; panel/probe names are not treated as separate capabilities.
 
 ### user-facing
 
-Capabilities with stable user interface and verified runtime behavior.
+Capabilities exposed in stable UI. This bucket mixes **behavior-verified** capabilities (runtime proof `pass`) with **readback-only** stable settings (runtime proof `readback`). The latter are explicitly marked so users do not mistake SDK option acceptance for guaranteed model behavior.
 
-| Capability | Surface | Evidence |
-|---|---|---|
-| MCP Servers | Settings | Runtime passthrough verified; shared Settings > MCP tab provides authoring; Claude Code Tools tab provides runtime refresh |
-| Permission Approval | Chat | Ordinary chat end-to-end proof: `permissionMode: 'plan'` + file creation prompt triggers `canUseTool` bridge → permission cards → user approval → stream continues |
-| AskUserQuestion / Elicitation | Chat | Ordinary chat end-to-end proof: model calls `AskUserQuestion` → question dialog renders → user answers → stream continues |
-| Structured Output | Chat | `/json` prefix trigger works in ordinary chat: prefix stripped, fixed JSON schema injected, duplicate raw JSON suppressed, structured output badge renders and survives reload/hydration |
+> **Note on `userSurface` vs four-bucket**: `userSurface` in the Capability Matrix is a static UI surface tag (`settings` / `chat` / `diagnostic` / `hidden`). The four-bucket classification expresses final **productization outcome**, not just surface presence. A capability may have a `settings` surface but still be `blocked` if its core behavior proof failed (e.g. Fallback Model). The two dimensions are independent.
+
+| # | Capability | Surface | Runtime Proof | Evidence |
+|---|---|---|---|---|
+| 1 | MCP Servers | Settings | `pass` | Runtime passthrough verified; shared Settings > MCP tab provides authoring; Claude Code Tools tab provides runtime refresh |
+| 2 | Allowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Behavior proof infeasible**: model tool-calling is non-deterministic, so diagnostic probes can only detect enforcement *failure* (non-allowed tool called), not success |
+| 3 | Disallowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Behavior proof infeasible**: model tool-calling is non-deterministic, so diagnostic probes can only detect enforcement *failure* (blocked tool called), not success |
+| 4 | Turn/Budget Limits | Settings | `readback` | Stable Settings UI exposed; SDK options correctly built and passed to SDK. Fresh runtime proof on final build (`feature-phase0-capability.202605281809`): **`maxBudgetUsd` enforcement observed** — SDK returns `error_max_budget_usd` with message "Reached maximum budget ($0.01)". **`maxTurns` enforcement NOT observed** — model performed 5-6 tool uses despite `maxTurns=1` or `2`, with no turn-limit signal. Partial proof only; overall capability stays `readback` because `maxTurns` dimension is unproven |
+| 5 | Environment Variables | Settings | `readback` | Stable Settings UI exposed; settings→SDK env readback proved. Fresh diagnostic bypass attempted on final build (`feature-phase0-capability.202605281809`): Layer 1 (SDK readback) PASS, but Layer 2-4 blocked because model did **not** invoke Bash tool. Behavior proof remains **unobserved** on this run; static classification stays `readback` because env propagation success is non-deterministic (model may choose not to call Bash). This is a model-behavior gap, not an SDK limitation |
+| 6 | Permission Approval | Chat | `pass` | Ordinary chat end-to-end proof: `permissionMode: 'plan'` + file creation prompt triggers `canUseTool` bridge → permission cards → user approval → stream continues |
+| 7 | AskUserQuestion / Elicitation | Chat | `pass` | Ordinary chat end-to-end proof: model calls `AskUserQuestion` → question dialog renders → user answers → stream continues |
+| 8 | Structured Output | Chat | `pass` | `/json` prefix trigger works in ordinary chat: prefix stripped, fixed JSON schema injected, duplicate raw JSON suppressed, structured output badge renders and survives reload/hydration |
 
 ### diagnostic
 
-Capabilities with working adapter wiring and diagnostic-only runtime proof, but no stable product UI.
+Capabilities with working adapter wiring and diagnostic-only runtime proof, but no stable product UI. Some are `pass` (real events captured), most are `untested` (wiring confirmed but no runtime proof yet).
 
-| Capability | Evidence |
-|---|---|
-| JSONL History Browser | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` work; mirror/import proof in Capability Lab |
-| Subagent Browser | `adapter.listSubagents()` / `getSubagentMessages()` work; read-only diagnostic list |
-| Rewind Dry-Run Preview | `adapter.rewindFiles(dryRun: true)` works; no stable rewind UI |
-| Structured Output Playground | `runDiagnosticPrompt()` with `outputFormat` probe; diagnostic-only |
-| Fork Session Diagnostic | Provider-owned: `adapter.forkSession()` works on real provider sessions; not a stable cross-backend fork UI |
-| Resume Session Diagnostic | Provider-owned: `runDiagnosticPrompt({ resumeSessionId })` works; not a stable resume-at UI |
-| Session Detail Inspection | Provider-owned: `adapter.getSession()` works; not a stable cross-backend session detail contract |
-| Backend Routing Verification | Registry routing layer works; diagnostic-only |
-| Include Hook Events | `includeHookEvents: true` → real `hook` backend_events captured; no stable transcript rendering |
-| Subagent Transcript / Progress | `forwardSubagentText` / `agentProgressSummaries` wired, but **zero** subagent/progress events captured even with tool-inducing prompt; SDK limitation |
-| File Checkpoint / Rewind | `enableFileCheckpointing` toggle exists; only powers diagnostic rewind dry-run preview |
+| # | Capability | Runtime Proof | Evidence |
+|---|---|---|---|
+| 9 | Agents (Subagents) | `untested` | `adapter.listSubagents()` / `getSubagentMessages()` work; read-only diagnostic list. Not in `CLAUDE_CODE_PHASE1_CAPABILITIES`; UI gating prevents display in stable surfaces |
+| 10 | Include Hook Events | `pass` | `includeHookEvents: true` → real `hook` backend_events captured in diagnostic stream; no stable transcript rendering |
+| 11 | File Checkpoint / Rewind | `untested` | `enableFileCheckpointing` toggle exists; `adapter.rewindFiles(dryRun: true)` works; only powers diagnostic rewind dry-run preview; no stable rewind UI |
+| 12 | JSONL History Browser | `untested` | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` work; mirror/import proof in Capability Lab |
+| 13 | Fork Session | `untested` | Provider-owned: `adapter.forkSession()` works on real provider sessions; not a stable cross-backend fork UI |
+| 14 | Resume Session | `untested` | Provider-owned: `runDiagnosticPrompt({ resumeSessionId })` works; not a stable resume-at UI |
+| 15 | Session Detail | `untested` | Provider-owned: `adapter.getSession()` works; not a stable cross-backend session detail contract |
+| 16 | Backend Routing | `untested` | Registry routing layer works; diagnostic-only |
 
 ### hidden
 
 Capabilities wired in adapter/SDK but intentionally not exposed in any UI surface.
 
-| Capability | Evidence |
-|---|---|
-| Hooks | SDK option wired; hook events captured in diagnostic stream; no stable UI |
-| Session Store | `sessionStore` option wired; diagnostic store mirror/import works; no stable UI |
-| Skills | `skills` option wired; `getSkillCount()` / `getSkillsList()` read-only detection; no authoring UI |
-| Plugins | `plugins` option wired; `getPluginCount()` / `getPluginsList()` read-only detection; no authoring UI |
-| Agent Definitions | **Promoted to `pass` this round**: inline agent definitions verified functional (SDK accepts `agent`/`agents` and alters behavior). Remains `hidden` — no authoring UI by design |
-| Import Session to Store | `importSessionToStore()` works; diagnostic-only; no stable import UI |
+| # | Capability | Runtime Proof | Evidence |
+|---|---|---|---|
+| 17 | Hooks | `untested` | SDK option wired; hook events captured in diagnostic stream; no stable UI |
+| 18 | Session Store | `untested` | `sessionStore` option wired; diagnostic store mirror/import works; no stable UI |
+| 19 | Skills | `untested` | `skills` option wired; `getSkillCount()` / `getSkillsList()` read-only detection; no authoring UI |
+| 20 | Plugins | `untested` | `plugins` option wired; `getPluginCount()` / `getPluginsList()` read-only detection; no authoring UI |
+| 21 | Agent Definitions | `pass` | Inline agent definitions verified functional: SDK accepts `agent`/`agents` and alters behavior. Remains `hidden` — no authoring UI by design |
+| 22 | Import Session to Store | `untested` | `importSessionToStore()` works; diagnostic-only; no stable import UI |
 
 ### blocked
 
 Capabilities where runtime behavior proof explicitly failed or SDK limitation confirmed.
 
-| Capability | Blocker | Evidence |
-|---|---|---|
-| Fallback Model | SDK limitation | `fallbackModel` option wired and readback verified, but SDK returns 400 on invalid primary model instead of falling back |
-| Subagent Transcript / Progress | SDK limitation | Tool-inducing prompt with `forwardSubagentText` + `agentProgressSummaries` enabled produces zero subagent/progress events |
+| # | Capability | Blocker | Evidence |
+|---|---|---|---|
+| 23 | Fallback Model | SDK limitation | Stable settings control exists and uses explicit `data-proof-state="wiring"` boundary notice, but **overall capability remains blocked**: behavior proof failed (invalid primary model → SDK returns 400 instead of falling back). Exact fallback trigger conditions are unknown |
+| 24 | Subagent Transcript / Progress | SDK limitation | Tool-inducing prompt with `forwardSubagentText` + `agentProgressSummaries` enabled produces zero subagent/progress events |
 
 ---
 
@@ -2298,7 +2326,7 @@ These capabilities are no longer “not wired”, but they are also not stable c
 | JSONL history browser | Capability Lab can browse history read-only and preview messages. | `Diagnostic browser`, not full history productization. |
 | Session detail inspection | Capability Lab can inspect raw `getSession()` output per backend session. | `Diagnostic probe only`, not a stable cross-backend session-detail contract. |
 | Rewind | Adapter-level `rewindFiles()` exists, dry-run surface exists, adapter + coordinator + CapLab probe tests now cover all paths. | Not stable-complete until no-data-loss guard and stronger runtime proof are accepted; test hardening does not promote to stable. |
-| Agent definitions | Runtime-only `agent` / `agents` option wiring exists. Stable Settings Readback Proof verifies options are correctly built when configured. Behavior proof (model invokes Agent tool with defined subagent) is covered by Subagent Browser diagnostic path. | Must remain `Hidden / Readback`. |
+| Agent definitions | Runtime-only `agent` / `agents` option wiring exists. Stable Settings Readback Proof verifies options are correctly built when configured (Layer 1 supporting evidence). Behavior proof comes from the dedicated inline Agent Definition Proof: SDK accepts agent/agents options and the selected agent alters assistant behavior (Layer 2 marker echo). | Must remain `Hidden`. Runtime proof is `pass`, not `readback`. |
 | Skills / plugins / agent authoring | Runtime-only `skills` and `plugins` channels are wired and have Capability Lab read-only detection counts plus diagnostic name-list summaries (`getSkillsList()` / `getPluginsList()`); no stable Claude-native authoring surface is complete in OpenCodian. | Detection-only with name-list diagnostic, not authoring-complete. |
 
 ## Structured Output Deep-Dive Assessment (2026-05-23)
@@ -3095,12 +3123,12 @@ The existing `listSubagents()` / `getSubagentMessages()` diagnostic UI and tests
 | **Plugins introspection** | ✅ **(count + list)** | N/A | ✅ **(count + name-list rendering)** | Foundation / diagnostic only |
 | MCP server detection | ✅ | N/A | ✅ | detection-only |
 | Runtime controls | ✅ | N/A | N/A | runtime-proved but not stable |
-| Agent definitions | ⚠️ readback | N/A | N/A | Must remain Hidden/Readback |
+| Agent definitions | ✅ pass | N/A | ✅ | Must remain Hidden. Runtime proof is pass (inline Agent Definition Proof verifies SDK accepts options and agent alters behavior), not readback-only. |
 
 ## Hard Guardrails
 
 - Do not regress OpenCode while promoting Claude.
-- Do not claim `Agent Definitions` behavior-complete unless both official basis and runtime product proof justify it. Readback proof (options wiring verified) is already established; behavior proof is covered by Subagent Browser path.
+- Do not claim `Agent Definitions` behavior-complete unless both official basis and runtime product proof justify it. Readback proof (options wiring verified) is Layer 1 supporting evidence only; behavior proof comes from the dedicated inline Agent Definition Proof, not Subagent Browser.
 - Do not mark hooks, session store, structured output, or rewind as stable merely because the adapter seam exists; hooks now have diagnostic event-timeline proof in Capability Lab, but that is still not stable UI.
 - Do not remove legacy compatibility fields that older OpenCode conversations still rely on without an explicit migration plan.
 - Do not flatten Claude-native semantics into generic settings when the design docs say they are backend-specific.
