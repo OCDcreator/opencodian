@@ -146,7 +146,7 @@ export class ConversationRenderService {
 
 ### 空壳清理
 
-- `removeEmptyAssistantShells()` 遍历 messagesContainer 内的 assistant shell，跳过 `notice` 和 `background-task` 标记的 shell，移除既无 structured content 又无可见文本的空壳
+- `removeEmptyAssistantShells()` 遍历 messagesContainer 内的 assistant shell，跳过 `notice` 和 `background-task` 标记的 shell，移除既无 structured content 又无可见文本的空壳；**`.opencodian-structured-output-details` 被识别为有效结构化内容**，避免 structured-only assistant shell 被误删
 - 用于 send-pipeline 预清理和 streaming 中断后清理残留空壳
 
 ### 全量重渲

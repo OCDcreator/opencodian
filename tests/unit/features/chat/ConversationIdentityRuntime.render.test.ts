@@ -220,4 +220,23 @@ describe('ConversationIdentityRuntime.shouldRenderConversationMessage', () => {
 
     expect(runtime.shouldRenderConversationMessage(message)).toBe(true);
   });
+
+  it('returns true for assistant with structured only (regression: structured-only assistant must not be dropped)', () => {
+    const host = createHost();
+    const runtime = new ConversationIdentityRuntime(host);
+    const message: ChatMessage = {
+      id: 'msg-1', role: 'assistant', content: '', timestamp: 100,
+      structured: { response: 'test' },
+    };
+
+    expect(runtime.shouldRenderConversationMessage(message)).toBe(true);
+  });
+
+  it('returns false for empty assistant without structured or any qualifying field', () => {
+    const host = createHost();
+    const runtime = new ConversationIdentityRuntime(host);
+    const message: ChatMessage = { id: 'msg-1', role: 'assistant', content: '', timestamp: 100 };
+
+    expect(runtime.shouldRenderConversationMessage(message)).toBe(false);
+  });
 });

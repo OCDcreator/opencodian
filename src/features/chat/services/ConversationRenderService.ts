@@ -512,7 +512,7 @@ export class ConversationRenderService {
 
       const hasStructuredContent = Boolean(
         contentEl.querySelector(
-          '.streaming-text-block, .opencodian-message-text, .streaming-error-block, .streaming-tool-call, .streaming-thinking-block, .opencodian-permission-inline, .opencodian-question-inline, .opencodian-chat-notice-card, .opencodian-pending',
+          '.streaming-text-block, .opencodian-message-text, .streaming-error-block, .streaming-tool-call, .streaming-thinking-block, .opencodian-permission-inline, .opencodian-question-inline, .opencodian-chat-notice-card, .opencodian-pending, .opencodian-structured-output-details',
         ),
       );
       const hasVisibleText = Boolean(contentEl.textContent?.trim());

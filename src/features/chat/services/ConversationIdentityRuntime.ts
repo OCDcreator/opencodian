@@ -107,6 +107,7 @@ export class ConversationIdentityRuntime {
         subagentId: block.subagentId ?? null,
         subagentMode: block.subagentMode ?? null,
       })),
+      structured: message.structured ?? null,
     });
   }
 
@@ -154,7 +155,8 @@ export class ConversationIdentityRuntime {
       || (message.contentBlocks?.length ?? 0) > 0
       || (message.toolCalls?.length ?? 0) > 0
       || message.questionResolution
-      || message.omo,
+      || message.omo
+      || message.structured,
     );
   }
 

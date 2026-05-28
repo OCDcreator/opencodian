@@ -240,6 +240,17 @@ describe('ConversationRenderService tooltip / copy utilities', () => {
 
       expect(container.children).toHaveLength(2);
     });
+
+    it('preserves assistant shells with structured output details (regression: structured-only shell must survive cleanup)', () => {
+      const container = document.createElement('div');
+      const assistant = container.createDiv({ cls: 'opencodian-message opencodian-message--assistant' });
+      const content = assistant.createDiv({ cls: 'opencodian-message-content' });
+      content.createDiv({ cls: 'opencodian-structured-output-details' });
+
+      ConversationRenderService.removeEmptyAssistantShells(container);
+
+      expect(container.children).toHaveLength(1);
+    });
   });
 });
 
