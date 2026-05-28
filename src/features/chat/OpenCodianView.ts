@@ -2981,7 +2981,7 @@ export class OpenCodianView extends ItemView {
           this.plugin.settingsTab?.prepareScrollToLspOnNextOpen();
           const settings = this.appSettings();
           settings.open();
-          settings.openTabById('opencodian');
+          try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
         },
       );
     });
@@ -3346,14 +3346,14 @@ export class OpenCodianView extends ItemView {
     this.plugin.settingsTab?.prepareRestoreScrollOnNextOpen(savedScrollTop);
     const settings = this.appSettings();
     settings.open();
-    settings.openTabById('opencodian');
+    try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
   }
 
   private openPluginSettingsAtServerSection(): void {
     this.plugin.settingsTab?.prepareScrollToServerOnNextOpen();
     const settings = this.appSettings();
     settings.open();
-    settings.openTabById('opencodian');
+    try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
   }
 
   private openPluginSettingsAtActiveBackendRuntimeSection(): void {
@@ -3365,7 +3365,7 @@ export class OpenCodianView extends ItemView {
     this.plugin.settingsTab?.prepareScrollToClaudeCodeOnNextOpen();
     const settings = this.appSettings();
     settings.open();
-    settings.openTabById('opencodian');
+    try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
   }
 
   private async getServerAvailability(): Promise<ChatServerAvailability> {
