@@ -2102,6 +2102,25 @@
   color: var(--text-muted);
 }
 
+/* Backend-specific capability hint rendered near the composer input.
+   Subtle inline chip — visible enough for discovery but not intrusive. */
+.opencodian-input-capability-hint {
+  display: flex;
+  align-items: center;
+  margin: 6px 0 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  border-left: 2px solid var(--color-blue);
+  background: color-mix(in srgb, var(--color-blue) 8%, transparent);
+  border-radius: 0 6px 6px 0;
+}
+
+.opencodian-input-capability-hint-text {
+  white-space: nowrap;
+}
+
 .opencodian-input-toolbar {
   --opencodian-input-toolbar-control-gap: 10px;
   --opencodian-input-toolbar-control-height: 30px;

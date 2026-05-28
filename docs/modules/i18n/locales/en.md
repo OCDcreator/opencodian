@@ -349,3 +349,6 @@ Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` 
 ## 2026-05-22 Structured output transcript rendering
 
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供标签文案。
+
+
+本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在聊天输入区显示 `/json — structured output` 发现性 inline hint。

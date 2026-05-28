@@ -47,6 +47,7 @@ function slashItem(id: string, description: string, overrides: Partial<SlashComm
 function createFixture(options: {
   shouldMountAgentSelector?: boolean;
   composerAvailabilityState?: { kind: 'ready' | 'no-backend' | 'backend-offline'; title?: string; description?: string };
+  composerCapabilityHint?: { text: string } | null;
 } = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
@@ -89,6 +90,12 @@ function createFixture(options: {
     scheduleSettledScrollToBottomIfNeeded: jest.fn(),
     getComposerAvailabilityState: jest.fn(() => options.composerAvailabilityState ?? { kind: 'ready' }),
   };
+
+  // Only mock getComposerCapabilityHint when explicitly provided in options.
+  // When absent, the coordinator falls back to deriving the hint from shouldMountAgentSelector.
+  if (options.composerCapabilityHint !== undefined) {
+    host.getComposerCapabilityHint = jest.fn(() => options.composerCapabilityHint);
+  }
 
   const container = document.createElement('div');
   Object.defineProperty(container, 'offsetHeight', {
@@ -325,6 +332,34 @@ describe('ComposerInputShellCoordinator', () => {
       command: 'npm test',
     });
   });
+  it('derives capability hint from shouldMountAgentSelector=false when host provides no explicit hint', () => {
+    // shouldMountAgentSelector returning false means no Subagents capability → Claude Code backend
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.json'));
+  });
+
+  it('does not derive capability hint when shouldMountAgentSelector returns true', () => {
+    // shouldMountAgentSelector returning true means Subagents capability → OpenCode or similar
+    const fixture = createFixture({ shouldMountAgentSelector: true });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('explicit getComposerCapabilityHint takes priority over derived fallback', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerCapabilityHint: null, // explicit null overrides fallback
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
 });
 
 describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
@@ -489,6 +524,34 @@ describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
     expect(resizeObserver?.disconnect).toHaveBeenCalledTimes(1);
     expect(fixture.host.setContextRowElement).toHaveBeenLastCalledWith(null);
   });
+  it('derives capability hint from shouldMountAgentSelector=false when host provides no explicit hint', () => {
+    // shouldMountAgentSelector returning false means no Subagents capability → Claude Code backend
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.json'));
+  });
+
+  it('does not derive capability hint when shouldMountAgentSelector returns true', () => {
+    // shouldMountAgentSelector returning true means Subagents capability → OpenCode or similar
+    const fixture = createFixture({ shouldMountAgentSelector: true });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('explicit getComposerCapabilityHint takes priority over derived fallback', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerCapabilityHint: null, // explicit null overrides fallback
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
 });
 
 describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () => {
@@ -655,4 +718,81 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
       fixture.container.querySelector('.opencodian-slash-command-menu-item'),
     ).toBeNull();
   });
+
+  it('renders the composer capability hint when host returns a hint', () => {
+    const fixture = createFixture({
+      composerCapabilityHint: { text: '/json — structured output' },
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe('/json — structured output');
+  });
+
+  it('does not render the composer capability hint when host returns null', () => {
+    const fixture = createFixture({ composerCapabilityHint: null });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('removes the composer capability hint when host switches from hint to null via locale refresh', () => {
+    const fixture = createFixture({
+      composerCapabilityHint: { text: '/json — structured output' },
+    });
+
+    let hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+
+    fixture.host.getComposerCapabilityHint.mockReturnValue(null);
+    fixture.coordinator.applyLocaleTexts();
+
+    hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('updates the composer capability hint text when host returns a different hint', () => {
+    const fixture = createFixture({
+      composerCapabilityHint: { text: '/json — structured output' },
+    });
+
+    let hintText = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint-text');
+    expect(hintText?.textContent).toBe('/json — structured output');
+
+    fixture.host.getComposerCapabilityHint.mockReturnValue({ text: '/json — 结构化输出' });
+    fixture.coordinator.applyLocaleTexts();
+
+    // Re-query after applyLocaleTexts() empties and recreates the span element.
+    hintText = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint-text');
+    expect(hintText?.textContent).toBe('/json — 结构化输出');
+  });
+  it('derives capability hint from shouldMountAgentSelector=false when host provides no explicit hint', () => {
+    // shouldMountAgentSelector returning false means no Subagents capability → Claude Code backend
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.json'));
+  });
+
+  it('does not derive capability hint when shouldMountAgentSelector returns true', () => {
+    // shouldMountAgentSelector returning true means Subagents capability → OpenCode or similar
+    const fixture = createFixture({ shouldMountAgentSelector: true });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('explicit getComposerCapabilityHint takes priority over derived fallback', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerCapabilityHint: null, // explicit null overrides fallback
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
 });

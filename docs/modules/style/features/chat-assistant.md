@@ -39,3 +39,6 @@
 - composer disabled shell 只应降低 textarea/footer 的可交互性并显示紧凑说明块，不应把整个 input area 高度清空，也不应影响 history/tabs/question/todo 等相邻 runtime 区块。
 - QuestionDock collapse 只调整 above-input dock shell：折叠时 header 保留，tabs/body/footer 不渲染，样式只负责 toggle button 与 collapsed gap，不应影响 inline question cards。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
+
+
+本轮新增 `.opencodian-input-capability-hint` 与 `.opencodian-input-capability-hint-text` 样式，用于在聊天输入区靠近文本输入框的位置渲染 backend-specific capability discovery hint（当前为 Claude Code backend 的 `/json` structured output inline chip）。

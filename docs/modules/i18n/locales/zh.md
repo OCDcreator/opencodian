@@ -353,3 +353,6 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## 2026-05-22 Structured output 会话渲染
 
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。
+
+
+本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在聊天输入区显示 `/json — 结构化输出` 发现性 inline hint。

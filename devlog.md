@@ -12,6 +12,32 @@
 
 ---
 
+## 2026-05-28 Phase0-Capability: /json Composer Discoverability via Capability Hint
+
+### 目标
+
+为 Claude Code backend 的聊天输入区增加合理的 `/json` structured output discoverability。此前 `/json` trigger 在普通聊天中已验证工作，但 composer input 没有任何发现性提示——Capability Lab 已将其列为 blocker。本轮在 `ComposerInputShellCoordinator` 中新增 backend-specific capability hint 渲染能力，通过 host seam fallback 推导 backend 身份，Claude Code 激活时在输入区显示 `/json — structured output` inline chip。
+
+### 改动
+
+1. **src/features/chat/services/ComposerInputShellCoordinator.ts**: Host interface 新增可选 `getComposerCapabilityHint?()` method。Coordinator 新增 `renderCapabilityHint()` 和 `resolveCapabilityHint()` 私有方法：优先使用 host 显式 hint，若 host 未实现则从 `shouldMountAgentSelector` 推导（返回 false 表示 Claude Code backend）。hint 渲染为 `.opencodian-input-capability-hint` element，置于 input wrapper 中靠近文本输入框，在 `build()` 和 `applyLocaleTexts()` 时刷新。
+2. **src/i18n/locales/en.ts + zh.ts**: 新增 `chat.input.capabilityHint.json` key：EN = `/json — structured output`，ZH = `/json — 结构化输出`
+3. **src/style/features/chat-assistant.css**: 新增 `.opencodian-input-capability-hint` 和 `.opencodian-input-capability-hint-text` 样式——subtle blue inline chip，足够可见但不侵入
+4. **tests/unit/features/chat/ComposerInputShellCoordinator.test.ts**: 新增 7 个 capability hint 测试用例（显式 host hint、null host hint、locale refresh 移除/更新、shouldMountAgentSelector 推导、显式 hint 优先于推导）
+5. **docs/modules/**: 更新 ComposerInputShellCoordinator.md（新增 renderCapabilityHint 关键行为 + host interface）、SettingsCapabilityLabSection.md（更新 /json discoverability blocker → 已实现）、locales/en.md、locales/zh.md、chat-assistant.md
+
+### 设计决策
+
+- **Coordinator owns the hint rendering**：不修改 `OpenCodianView.ts`（避免 owner-guard Class B 阻塞）。Coordinator 通过现有 host seam `shouldMountAgentSelector` 推导 backend 身份（false = Claude Code，无 Subagents capability）。此推导对当前两 backend 架构足够 tight，且 host 仍可显式 override。
+- **诚实的 hint surface**：不提示任意 schema authoring，只暴露已验证的 fixed-schema `/json` trigger。hint 仅在 Claude Code backend 激活时显示，OpenCode 路径不受影响。
+- **Coordinator seam over view method**：`renderCapabilityHint()` 是 coordinator 内部 concern，host 只负责提供 capability truth，不负责渲染逻辑。
+
+### 范围约束
+
+此改动不新增 `AgentCapability`，不修改 `OpenCodianView.ts`，不改变 `/json` trigger 的执行路径。capability hint 是纯发现性 surface。
+
+---
+
 ## 2026-05-28 Phase0-Capability: Fallback Model Settings Proof-Status Notice (Honest UX)
 
 ### 目标

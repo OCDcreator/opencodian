@@ -1673,6 +1673,7 @@ export const zhTranslations = {
 
   // Chat UI
   'chat.input.placeholder': '可向 opencodian 询问任何事，输入 @ 使用自定义代理或提及文件，输入 / 使用命令或技能',
+  'chat.input.capabilityHint.json': '/json — 结构化输出',
   'chat.input.send': '发送',
   'chat.input.sendMessage': '发送消息',
   'chat.input.stopStreaming': '停止生成',

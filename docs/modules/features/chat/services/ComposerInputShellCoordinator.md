@@ -52,6 +52,8 @@ export interface ComposerInputShellCoordinatorHost {
     title?: string;
     description?: string;
   };
+  /** Backend-specific capability hint rendered near the composer input (null = no hint). */
+  getComposerCapabilityHint?(): { text: string } | null;
 }
 
 export class ComposerInputShellCoordinator {
@@ -83,6 +85,7 @@ export class ComposerInputShellCoordinator {
 - `applyLocaleTexts()` 刷新 placeholder overlay 文本、add-context tooltip 和 send/stop tooltip；textarea 不再设置 `aria-label`，避免在 Obsidian Electron 中产生多余的原生 hover tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
 - `updateComposerAvailabilityState()` 只消费 host 给出的高层 surface 状态，不直接判断 backend / service；这样“无 backend”和“backend offline”的运行时所有权仍留在 `OpenCodianView`
+- `renderCapabilityHint()` 向 host 查询可选的 `getComposerCapabilityHint()`，若返回非 null 结果则渲染到一个 `.opencodian-input-capability-hint` element（放在 input wrapper 中靠近输入框），并在 `build()` 和 `applyLocaleTexts()` 时刷新；若结果为 null 则移除该 element。此 seam 由 host（`OpenCodianView`）决定对哪个 backend 展示哪种 hint，结构上不污染 OpenCode-only 路径。当前唯一 hint 是 Claude Code backend 的 `/json — structured output` 触发器，诚实地指向已验证的单 schema trigger 而不暗示任意 schema authoring
 - `refreshSlashCommandMenu()` 只负责调用 `SlashCommandMenuCoordinator.refresh()`；菜单 coordinator 每次 slash query 刷新都会向 host 读取 merged visible menu items，再通过 `slashCommandMenuFilter.ts` 本地过滤。host 背后的 `SlashCommandMenuCatalogCache` 继续负责 TTL / pending promise / hidden-command cache key，因此设置页隐藏命令或切换 skill 模式后不会被 composer 层旧数组挡住，也不会每次按键直接打 SDK
 - slash catalog 首次异步加载完成后，coordinator 会重新执行一次 backdrop 高亮同步，这样输入中的已知 slash item 能在 catalog 到位后立即着色，而未知 token 会自动退回普通文本
 - `SlashCommandMenuCoordinator` 会把 `getSlashCommandSkillMode()` 传给过滤 helper；direct mode 直接展示 skill，prefixed mode 则顶层展示 `/skills` 并在 `/skills <query>` 下展示 nested skill suggestions

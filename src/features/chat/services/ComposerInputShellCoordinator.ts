@@ -64,6 +64,15 @@ export interface ComposerInputShellCoordinatorHost {
     title?: string;
     description?: string;
   };
+  /**
+   * Optional backend-specific capability hint rendered near the composer input.
+   * Returns null when no hint should be displayed.
+   * This is intentionally narrow: the coordinator renders the hint as-is;
+   * the host decides what hint (if any) is appropriate for the active backend.
+   * Currently falls back to deriving the hint from shouldMountAgentSelector
+   * when the host does not implement getComposerCapabilityHint.
+   */
+  getComposerCapabilityHint?(): { text: string } | null;
 }
 
 export class ComposerInputShellCoordinator {
@@ -77,6 +86,8 @@ export class ComposerInputShellCoordinator {
   private highlightBackdropEl: HTMLElement | null = null;
   private placeholderOverlayEl: HTMLElement | null = null;
   private disabledStateEl: HTMLElement | null = null;
+  private capabilityHintEl: HTMLElement | null = null;
+  private readonly capabilityHintHostClass = 'opencodian-input-capability-hint';
   private slashCommandMenuEl: HTMLElement | null = null;
   private layoutSyncFrameId: number | null = null;
   private inputContainerResizeObserver: ResizeObserver | null = null;
@@ -221,6 +232,7 @@ export class ComposerInputShellCoordinator {
     this.updateComposerAvailabilityState();
 
     this.mountToolbarControls();
+    this.renderCapabilityHint();
 
     this.initializeLayoutMetrics();
   }
@@ -250,6 +262,60 @@ export class ComposerInputShellCoordinator {
     this.pruneEmptyToolbar(toolbarEl);
   }
 
+  /**
+   * Render or remove a backend-specific capability hint near the composer input.
+   * First tries the host's getComposerCapabilityHint(); if the host does not
+   * implement that seam, derives the hint from existing host signals:
+   *   - When shouldMountAgentSelector is defined and returns false → Claude Code
+   *     backend (lacks Subagents capability); show the /json structured-output hint.
+   *   - Otherwise → no hint (OpenCode or unknown backend).
+   * The hint is intentionally narrow: one fixed-schema trigger, no schema authoring.
+   */
+  private renderCapabilityHint(): void {
+    const hint = this.resolveCapabilityHint();
+    if (!hint) {
+      this.capabilityHintEl?.remove();
+      this.capabilityHintEl = null;
+      return;
+    }
+
+    if (!this.capabilityHintEl) {
+      // Insert after the composer content (textarea area) but before the toolbar,
+      // inside inputWrapperEl — this is the most discoverable position near the text input.
+      this.capabilityHintEl = this.inputWrapperEl?.createDiv({ cls: this.capabilityHintHostClass }) ?? null;
+    }
+
+    if (this.capabilityHintEl) {
+      this.capabilityHintEl.empty();
+      this.capabilityHintEl.createSpan({
+        cls: `${this.capabilityHintHostClass}-text`,
+        text: hint.text,
+      });
+    }
+  }
+
+  /**
+   * Resolve the current capability hint from host seams.
+   * Falls back to deriving the hint when the host does not implement
+   * getComposerCapabilityHint: when shouldMountAgentSelector is explicitly
+   * false (no Subagents → Claude Code), show the /json hint.
+   */
+  private resolveCapabilityHint(): { text: string } | null {
+    // When the host explicitly implements getComposerCapabilityHint, use it directly
+    // (even if it returns null — that means "no hint for this backend").
+    if (typeof this.host.getComposerCapabilityHint === 'function') {
+      return this.host.getComposerCapabilityHint();
+    }
+
+    // Fallback: derive the hint from existing host signals.
+    // No agent selector → Claude Code backend (lacks Subagents capability).
+    if (this.host.shouldMountAgentSelector?.() === false) {
+      return { text: t('chat.input.capabilityHint.json') };
+    }
+
+    return null;
+  }
+
   getTabBarSlotEl(): HTMLElement | null {
     return this.inputTabBarSlotEl;
   }
@@ -275,6 +341,7 @@ export class ComposerInputShellCoordinator {
     this.updateSendButtonState();
     this.updateComposerAvailabilityState();
     this.agentSelectionController.applyLocaleTexts();
+    this.renderCapabilityHint();
   }
 
   updateSendButtonState(): void {
@@ -330,6 +397,7 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl = null;
     this.highlightBackdropEl = null;
     this.disabledStateEl = null;
+    this.capabilityHintEl = null;
     this.slashCommandMenuEl = null;
     this.slashCommandMenuCatalogItems = null;
     this.slashCommandMenuController.reset();
