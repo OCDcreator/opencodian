@@ -332,7 +332,7 @@ This slice adds runtime readback proof for Claude Code stable settings (Allowed 
 | Allowed Tools | `readback` | Runtime-readback verified: options.allowedTools built from settings |
 | Disallowed Tools | `readback` | Runtime-readback verified: options.disallowedTools built from settings |
 | Turn/Budget Limits | `readback` | Runtime-readback verified: options.maxTurns/maxBudgetUsd built from settings |
-| Environment Variables | `readback` | Runtime-readback verified: options.env built from settings |
+| Environment Variables | `readback` → `pass` | Runtime behavior verified via diagnostic bypass: Layer 1-4 PASS (env propagation into Claude and Bash subprocesses proven) |
 | Fallback Model | `wiring` | Option wired but behavior proof failed: SDK returned 400 on invalid primary |
 
 ### Verification
@@ -2685,6 +2685,57 @@ Both `buildDiagnosticReport()` (general plugin diagnostics) and `buildClaudeCode
 ### Impact on Capability Maturity
 
 This pass promotes the diagnostics export from "no secret protection" to "best-effort regex-based sanitization." It does not change any diagnostic capability maturity — diagnostics remain diagnostic-only surfaces. The sanitization is a safety net, not a guarantee; users should still review exports before sharing.
+
+## 2026-05-28 Environment Variables Productization: Matrix + Discovery Alignment
+
+### Gap
+
+Environment Variables had real live runtime proof via the diagnostic bypass path (Layer 1/2/3/4 all PASS), but the Capability Matrix row and static discovery text were stale. The matrix still hardcoded `runtimeProof: 'readback'` in `buildMatrixRows()`, and the discovery row still said "Behavior-verified (vars reach the child process) is not proven." The live DOM showed matrix cell [Environment Variables, ✓ SDK, ✓ Adapter, Readback verified, Settings] while a later env proof output on the same page showed PASS.
+
+### What Changed
+
+**Matrix**: Environment Variables upgraded from `runtimeProof: 'readback'` to `runtimeProof: 'pass'` in `buildMatrixRows()`, with updated comment documenting the diagnostic bypass proof and scope boundary.
+
+**Discovery**: Updated discovery row text from "Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified (vars reach the child process) is not proven." to reflect runtime behavior verification (Layer 1-4 all PASS) with explicit scope boundary (proves env propagation, not permission approval UX).
+
+**Readback proof results**: `buildReadbackResults()` Environment Variables entry upgraded from `overallStatus: 'readback'` to `overallStatus: 'pass'`, with updated note acknowledging independent runtime behavior proof. Type signatures for `buildReadbackResults`, `renderReadbackResults`, and `updateMatrixFromReadback` widened to include `'pass'`. `renderReadbackResults` now shows ✅ icon for `pass` status items, and the footer hint updated to reflect that capabilities marked ✅ have independent runtime behavior proof.
+
+**Tests**: Updated audit test expectations:
+- Environment Variables moved from readback loop to separate pass assertion
+- `runtimeProof` expected value changed from `'readback'` to `'pass'`
+- Verified capabilities count updated from 4 to 5 (now includes Environment Variables)
+- Readback marker count updated from 4 to 3 (Environment Variables no longer readback)
+- Added pass marker assertion for Environment Variables in readback proof test
+
+### Scope Boundary
+
+The diagnostic bypass proves env propagation into Claude/Bash subprocesses, NOT permission approval UX. Permission approval remains independently proven by ordinary chat + live harness paths.
+
+---
+
+## 2026-05-28 Diagnostic Bypass Permissions for Env Proof — Productization Sync
+
+### Gap
+
+After the diagnostic bypass commit (ed5d31fd) proved Environment Variables Layer 1-4 PASS at runtime, the static Capability Matrix row and discovery text still showed `readback` ("Readback verified — not behavior verified"). The settings UI proof-status notice also showed `data-proof-state="readback"`. This mismatch meant the live DOM showed "Readback verified" in the matrix while the env proof output on the same page showed "PASS".
+
+### What Changed
+
+**Matrix row**: `buildMatrixRows` Environment Variables entry upgraded from `runtimeProof: 'readback'` to `runtimeProof: 'pass'` with comment documenting Layer 1-4 evidence and scope boundary (proves env propagation, not permission approval UX).
+
+**Discovery row**: Updated text from "Runtime-readback verified... Behavior-verified is not proven" to "Runtime behavior verified via diagnostic bypass (Layer 1-4 PASS): env propagation into Claude and Bash subprocesses proven. Scope: proves env propagation, not permission approval UX."
+
+**Readback proof entry**: `overallStatus` upgraded to `'pass'` with note acknowledging both readback evidence and independently verified runtime behavior via diagnostic bypass.
+
+**Settings UI proof-status**: `renderEnvProofStatusNotice` updated from `data-proof-state="readback"` to `data-proof-state="pass"`. Locale strings updated to reflect runtime verification.
+
+**Verified capabilities count**: Audit test updated from 4 to 5 verified capabilities (MCP Servers, Permission Approval, AskUserQuestion / Elicitation, Structured Output, Environment Variables).
+
+### Classification Update
+
+| Capability | Previous | Current | Reason |
+|---|---|---|---|
+| Environment Variables | `readback` | `pass` | Runtime behavior verified via diagnostic bypass: Layer 1-4 PASS. Proves env propagation into Claude and Bash subprocesses. |
 
 ## 2026-05-28 Diagnostic Bypass Permissions for Env Proof
 

@@ -564,7 +564,7 @@ export class SettingsCapabilityLabSection {
         capability: 'Environment Variables',
         sdkExposed: true, // env option for Claude Code process/query environment
         adapterWired: true, // buildSdkOptions/process resolution carries normalized env settings
-        runtimeProof: 'readback', // Runtime-readback verified: Stable Settings Readback Proof confirms options.env is built from settings when non-empty. Not behavior-verified (proving the child process actually receives the vars requires OS-level inspection).
+        runtimeProof: 'pass', // Runtime behavior verified via diagnostic bypass: Layer 1 (settings→SDK readback), Layer 2 (Bash tool_use invoked), Layer 3 (env-derived filesystem side effect observed at nonce path), Layer 4 (assistant text nonce echo). Proves env propagation into Claude and Bash subprocesses. Scope boundary: does NOT prove permission approval UX (proven separately by ordinary chat + live harness paths).
         userSurface: 'settings',
       },
       {
@@ -2165,8 +2165,8 @@ export class SettingsCapabilityLabSection {
       tbody,
       'Environment Variables',
       hasEnv
-        ? `${Object.keys(env as Record<string, unknown>).length} variable(s) configured. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified (vars reach the child process) is not proven.`
-        : 'No environment variables configured. Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified is not proven.',
+        ? `${Object.keys(env as Record<string, unknown>).length} variable(s) configured. Runtime behavior verified via diagnostic bypass (Layer 1-4 PASS): env propagation into Claude and Bash subprocesses proven. Scope: proves env propagation, not permission approval UX.`
+        : 'No environment variables configured. Runtime behavior verified via diagnostic bypass (Layer 1-4 PASS): env propagation into Claude and Bash subprocesses proven when vars are present. Scope: proves env propagation, not permission approval UX.',
       { status: 'exposed' },
     );
 
@@ -3517,7 +3517,7 @@ export class SettingsCapabilityLabSection {
     matrixName: string;
     present: boolean;
     displayText: string;
-    overallStatus: 'readback' | 'wiring';
+    overallStatus: 'readback' | 'wiring' | 'pass';
     overallNote: string;
   }> {
     const allowedToolsVal = options.allowedTools ?? [];
@@ -3565,8 +3565,8 @@ export class SettingsCapabilityLabSection {
         displayText: hasEnv
           ? `Environment Variables: ${Object.keys(envVal).length} variable(s) configured`
           : 'Environment Variables: not configured',
-        overallStatus: 'readback',
-        overallNote: 'Option read back. Behavior (vars reach child process) not proven.',
+        overallStatus: 'pass',
+        overallNote: 'Option read back AND runtime behavior independently verified via diagnostic bypass path. Env vars propagate to Claude/Bash subprocesses (Layer 1-4 PASS).',
       },
       {
         matrixName: 'Fallback Model',
@@ -3588,7 +3588,7 @@ export class SettingsCapabilityLabSection {
       matrixName: string;
       present: boolean;
       displayText: string;
-      overallStatus: 'readback' | 'wiring';
+      overallStatus: 'readback' | 'wiring' | 'pass';
       overallNote: string;
     }>,
   ): void {
@@ -3603,17 +3603,16 @@ export class SettingsCapabilityLabSection {
       });
       row.createSpan({ text: result.displayText });
 
-      // Overall status note for this capability
       const noteEl = row.createEl('div', {
         cls: `opencodian-capability-lab-readback-note opencodian-capability-lab-readback-note-${result.overallStatus}`,
       });
-      const statusIcon = result.overallStatus === 'readback' ? '📋' : '⚠️';
+      const statusIcon = result.overallStatus === 'pass' ? '✅' : result.overallStatus === 'readback' ? '📋' : '⚠️';
       noteEl.createSpan({ text: `${statusIcon} ${result.overallNote}` });
     }
 
     outputEl.createEl('p', {
       cls: 'opencodian-capability-lab-hint',
-      text: 'This proof verifies that settings UI values were correctly mapped into the SDK options shape. It does NOT prove that the SDK enforced these constraints at runtime.',
+      text: 'This proof verifies that settings UI values were correctly mapped into the SDK options shape. Capabilities marked ✅ have independent runtime behavior proof via the diagnostic bypass path.',
     });
   }
 
@@ -3623,7 +3622,7 @@ export class SettingsCapabilityLabSection {
       matrixName: string;
       present: boolean;
       displayText: string;
-      overallStatus: 'readback' | 'wiring';
+      overallStatus: 'readback' | 'wiring' | 'pass';
       overallNote: string;
     }>,
   ): void {

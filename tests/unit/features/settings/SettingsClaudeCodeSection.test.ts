@@ -845,7 +845,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
-    it('renders env proof status notice with readback state in runtime tab', () => {
+    it('renders env proof status notice with pass state in runtime tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -856,7 +856,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="env"]');
       expect(noticeEl).toBeTruthy();
-      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('pass');
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.env'));
     });
 

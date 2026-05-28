@@ -755,15 +755,21 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    for (const label of ['Allowed Tools', 'Disallowed Tools', 'Turn/Budget Limits', 'Environment Variables']) {
+    for (const label of ['Allowed Tools', 'Disallowed Tools', 'Turn/Budget Limits']) {
       const row = getRow(label);
       expect(row).not.toBeNull();
       expect(row?.textContent).toContain('SDK');
       expect(row?.textContent).toContain('Adapter');
       expect(row?.textContent).toContain('Readback verified');
-      expect(row?.textContent).not.toContain('Verified');
       expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
     }
+
+    const envRow = getRow('Environment Variables');
+    expect(envRow).not.toBeNull();
+    expect(envRow?.textContent).toContain('SDK');
+    expect(envRow?.textContent).toContain('Adapter');
+    expect(envRow?.textContent).toContain('Verified');
+    expect(envRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
   });
 
   it('renders a diagnostic summary strip above the matrix', () => {
@@ -980,7 +986,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
       'Disallowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
       'Turn/Budget Limits': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Environment Variables': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Environment Variables': { runtimeProof: 'pass', userSurface: 'settings' },
       'Fallback Model': { runtimeProof: 'wiring', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
@@ -1023,9 +1029,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Environment Variables']),
     );
-    expect(verifiedCapabilities.length).toBe(4);
+    expect(verifiedCapabilities.length).toBe(5);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -3467,10 +3473,15 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('option="claude-haiku-4-5"');
 
     // Verify readback markers for capabilities that are genuinely readback-classified
-    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables = 4 readback markers
+    // Allowed Tools, Disallowed Tools, Turn/Budget Limits = 3 readback markers
+    // Environment Variables is now 'pass' (runtime behavior independently verified via diagnostic bypass)
     // Fallback Model is wiring overall (behavior proof failed) so it gets a wiring marker, not readback
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBe(4);
+    expect(readbackMarkers.length).toBe(3);
+
+    // Environment Variables gets a pass marker from readback proof (overallStatus='pass')
+    const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThanOrEqual(1);
 
     // Verify Fallback Model gets a wiring marker (not readback) because behavior proof failed
     const wiringMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-wiring');

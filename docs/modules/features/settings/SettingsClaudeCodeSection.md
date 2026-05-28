@@ -9,7 +9,7 @@
 
 ## 职责
 
-- 在 Runtime 标签渲染 restart-sensitive runtime boundary notice、Claude Code executable path、带只读状态标记的认证/环境提示、runtime diagnostics、env variables 的 runtime readback verified proof-status notice 和 env variables 输入
+- 在 Runtime 标签渲染 restart-sensitive runtime boundary notice、Claude Code executable path、带只读状态标记的认证/环境提示、runtime diagnostics、env variables 的 runtime verified proof-status notice（Layer 1-4 PASS via diagnostic bypass）和 env variables 输入
 - 在 Model & Thinking 标签渲染 model、fallback model、thinking dropdown、thinking budget 和 effort dropdown；effort 选项与官方 Claude Code CLI/SDK 对齐为 low / medium / high / xhigh / max。该标签同时承载 max turns 和 max budget USD 限制控件，并在这些控件前渲染 limits proof-status notice（runtime readback verified）和 limits boundary notice，提示这些设置只在下一次 query 生效并提供 restart 操作。fallback model 控件后渲染 `renderFallbackModelBoundaryNotice()`，提示 fallbackModel 需要重启/下一次查询才能生效，无法像主 model 一样在活跃流中实时更新，且自动 fallback 行为在当前 SDK 下尚未验证
 - model 保存时会通过当前注册的 Claude adapter 调用 `setModel()`，让活跃持久 query 尽量 live 更新；没有活跃 query 或 adapter 不可用时仍只保存设置，下一次 query 会读取新值
 - Model & Thinking 标签在 model / fallbackModel 文本输入下方各渲染一个 `renderModelQuickSelect()` / `renderFallbackModelQuickSelect()` 下拉框。下拉框在标签渲染时自动通过当前 Claude adapter 异步调用 `supportedModels()` 加载可用模型目录；用户从下拉框选择模型后，会自动更新上方的文本输入值并保存设置（主模型还会尝试 live apply）。该设计将目录发现与字段输入收敛为统一的 quick-select 体验，既保留文本输入的自由度（支持自定义模型名），又让用户不必仅靠 placeholder 猜测合法模型 ID。目录结果在实例级别缓存，避免重复请求
@@ -24,7 +24,7 @@
 - SDK Foundations 标签已移除；file checkpoint 开关（`enableFileCheckpointing`）以及 runtime ecosystem 摘要（plugins/skills/agent definitions）均已移至 Debug → Capability Lab 诊断面板。稳定设置中不再暴露任何 SDK Foundations 控制，因为这些功能均为实验性/诊断性，尚无稳定用户界面效果。hook event stream、forward subagent transcript 和 subagent progress summaries 三个诊断流开关此前已移至 Capability Lab 诊断流控制区
 - 将多标签设置输入写入 `settings.backendSettings.claudeCode`
 - 通过 `ClaudeCodeProcessResolver` 做本地进程解析诊断，帮助检查 bundled/default resolution 与外部 CLI path
-- 新增 `renderToolsProofStatusNotice()`、`renderLimitsProofStatusNotice()` 和 `renderEnvProofStatusNotice()` 三个 compact proof-status notice 方法，在对应标签中渲染 runtime readback verified 状态；样式位于 `src/style/components/settings-claude-code.css`，使用 `data-proof-state="readback"` 和 `data-claude-code-proof-status` 选择器
+- 新增 `renderToolsProofStatusNotice()`、`renderLimitsProofStatusNotice()` 和 `renderEnvProofStatusNotice()` 三个 compact proof-status notice 方法，在对应标签中渲染 runtime proof status；env notice 使用 `data-proof-state="pass"`（runtime behavior verified via diagnostic bypass），tools/limits 使用 `data-proof-state="readback"`（runtime readback verified）；样式位于 `src/style/components/settings-claude-code.css`，使用 `data-proof-state` 和 `data-claude-code-proof-status` 选择器
 - 保持 hook authoring、skills authoring、agent authoring、external SessionStore、JSONL import/browser 等未完成能力不在 UI 中暴露，直到对应 phase 有端到端 runtime proof
 
 ## 公共导出

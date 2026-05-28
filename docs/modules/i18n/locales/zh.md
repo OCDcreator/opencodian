@@ -322,7 +322,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 本轮更新 `settings.claudeCode.allowedTools.desc` 和 `settings.claudeCode.disallowedTools.desc`，移除过时的“尚未经过运行时验证”声明，改为在 Tools 标签通过 `settings.claudeCode.proofStatus.tools` 共享 notice 统一标注运行时回读已验证状态。
 
-2026-05-28 本轮更新 `settings.claudeCode.maxTurns.desc`、`settings.claudeCode.maxBudgetUsd.desc`、`settings.claudeCode.env.desc`，移除过时的“已连接但尚未经过运行时验证”文案；新增 `settings.claudeCode.proofStatus.tools`、`settings.claudeCode.proofStatus.limits`、`settings.claudeCode.proofStatus.env` 三个共享 proof-status notice 键，用于在 Tools、Model & Thinking、Runtime 标签中 compact 地展示运行时回读已验证状态。更新 `settings.claudeCode.fallbackModel.desc` 和 `settings.claudeCode.fallbackModel.boundaryNotice`，诚实标注“选项连接和回读已验证；当前 SDK 下自动回退行为尚未验证”。
+2026-05-28 本轮更新 `settings.claudeCode.maxTurns.desc`、`settings.claudeCode.maxBudgetUsd.desc`、`settings.claudeCode.env.desc`，移除过时的“已连接但尚未经过运行时验证”文案；新增 `settings.claudeCode.proofStatus.tools`、`settings.claudeCode.proofStatus.limits`、`settings.claudeCode.proofStatus.env` 三个共享 proof-status notice 键，用于在 Tools、Model & Thinking、Runtime 标签中 compact 地展示运行时 proof 状态。`proofStatus.env` 已从 "运行时回读已验证" 更新为 "运行时已验证（Layer 1-4 PASS via diagnostic bypass）"，反映 Environment Variables 行为证明升级。更新 `settings.claudeCode.fallbackModel.desc` 和 `settings.claudeCode.fallbackModel.boundaryNotice`，诚实标注“选项连接和回读已验证；当前 SDK 下自动回退行为尚未验证”。
 
 2026-05-28 SDK Foundations 诊断表面迁移：新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`，用于在稳定 SDK Foundations 标签中提示用户诊断流控制已迁移到能力实验室；新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`，用于能力实验室中诊断流控制子区的标题和说明。保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些设置键仍然有效，只是 UI 表面从稳定设置迁移到了诊断面板。
 

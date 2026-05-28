@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-05-28 Environment Variables Productization: Matrix + Discovery Alignment
+
+### 目标
+
+修复 Environment Variables 的 Capability Matrix 行和静态发现文本与新运行时证明状态不一致的问题。诊断绕过路径已证明 Layer 1-4 全部 PASS，但矩阵行仍硬编码 `runtimeProof: 'readback'`，发现行仍声称 "Behavior-verified is not proven"。
+
+### 改动
+
+1. **SettingsCapabilityLabSection.ts**
+   - `buildMatrixRows()` Environment Variables 从 `runtimeProof: 'readback'` 升级为 `runtimeProof: 'pass'`，注释更新记录诊断绕过证明和作用域边界
+   - 发现行文本更新：从 "Runtime-readback verified via Stable Settings Readback Proof. Behavior-verified (vars reach the child process) is not proven." 改为反映运行时行为验证（Layer 1-4 all PASS）+ 明确作用域边界
+   - `buildReadbackResults()` Environment Variables 从 `overallStatus: 'readback'` 升级为 `overallStatus: 'pass'`
+   - `renderReadbackResults()` 支持 `'pass'` 类型，✅ 图标，更新底部提示
+   - `updateMatrixFromReadback()` 类型签名加入 `'pass'`
+
+2. **SettingsCapabilityLabSection.test.ts**
+   - Environment Variables 从 readback 循环移出，单独断言 pass
+   - 审计测试期望值更新：`runtimeProof: 'readback'` → `'pass'`
+   - Verified 行数从 4 更新为 5
+   - Readback 标记数从 4 更新为 3，新增 pass 标记断言
+
+### 作用域边界
+
+诊断绕过证明 env 传播到 Claude/Bash 子进程，不证明权限审批 UX。
+
+---
+
 ## 2026-05-28 Diagnostic Bypass Permissions for Env Proof
 
 ### 目标
