@@ -10,114 +10,190 @@
 ## 1. 阶段总览
 
 ```
-Phase 0: 抽象 OpenCode ──── 基础设施搭建
-  ├── 0a: 定义 AgentService 接口 + 类型
-  ├── 0b: 实现 OpenCodeAdapter（核心）
-  ├── 0c: 实现 OpenCodeAdapter（全部能力）
-  └── 0d: 视图层迁移到 AgentServiceRegistry
+Phase 0: 前端 Capability 驱动改造 ──── UI 先行，零 backend 依赖
+  ├── 0a: 定义 AgentCapability 类型枚举
+  ├── 0b: 聊天 UI: hasCapability() 替换硬编码
+  ├── 0c: 设置 UI: Backend 管理 + 条件显示
+  └── 0d: 会话归属 + 历史过滤（硬编码 'opencode'）
 
-Phase 1: 第二个 Agent ────── 验证架构可行性
-  ├── 1a: 实现 ClaudeCodeAdapter（核心）
-  ├── 1b: Agent 选择器 UI
-  └── 1c: 会话归属和切换
+Phase 1: Backend 抽象 — OpenCodeAdapter ──── 接口已被前端验证
+  ├── 1a: 定义完整 AgentService 接口 + 实现 OpenCodeAdapter
+  ├── 1b: 视图层迁移到 AgentServiceRegistry
+  └── 1c: 模型选择器 / Server Badge 适配
 
-Phase 2: 扩展更多 Agent ─── 横向扩展
-  ├── 2a: 实现 CodexAdapter
-  └── 2b: 实现 CopilotAdapter
+Phase 2: 第二个 Agent ────── 架构可行性验证
+  ├── 2a: 实现 ClaudeCodeAdapter（核心）
+  └── 2b: Claude Code 设置标签
 
-Phase 3: 完善生态 ──────── 补齐最后一块
-  ├── 3a: 实现 PiAdapter
-  └── 3b: 统一事件归一化层
+Phase 3: 扩展更多 Agent ─── 横向扩展
+  ├── 3a: 实现 CodexAdapter
+  └── 3b: 实现 CopilotAdapter
 
-Phase 4: Agent 选择器 + UI 完善
-  └── 4a: 完整的 agent 管理界面
+Phase 4: 完善生态 ──────── 补齐最后一块
+  ├── 4a: 实现 PiAdapter
+  └── 4b: 统一事件归一化层
+
+Phase 5: 编排层对接
+  └── 5a: 与 multi-agent-board.md 的编排层对接
 ```
 
-## 2. Phase 0 详细计划
+## 2. Phase 0 详细计划 — 前端 Capability 驱动改造
 
-### Phase 0a: 定义接口 + 类型
+> **核心原则**: 前端先行，UI 层解耦 backend 假设。
+> Phase 0 全程只操作 OpenCode，不改任何 backend 代码，零风险、完全可逆。
 
-**目标**: 创建 `src/core/agents/` 目录，定义所有接口和类型
+### Phase 0a: 定义 Capability 类型
+
+**目标**: 创建 `AgentCapability` 枚举和最小查询接口
 
 **产出文件**:
-- `src/core/agents/types.ts`
-- `src/core/agents/AgentService.ts`
-- `src/core/agents/capabilities/index.ts` + 各能力接口文件
+- `src/core/agents/capabilities.ts`（或扩展 `types.ts`）
+
+**关键任务**:
+1. 定义 `AgentCapability` 枚举：`tools` / `mcp` / `permissions` / `branching` / `todos` / `questions` / `models` / `subagents` / `context` / `providers` / `compaction` / `cost-tracking` / `thinking` / `hooks` / `config` / `file-ops` / `shell` / `export`
+2. 定义 `BackendCapabilities` 类型（`ReadonlySet<AgentCapability>`，与 02-architecture 保持一致）
+3. 定义 `getActiveBackendCapabilities()` 工具方法
+   - 第一版：硬编码返回 OpenCode 的全量 capabilities（全部 `true`）
+   - Phase 1 后自动切换到从 AgentServiceRegistry 读取
 
 **验证**:
 - TypeScript 编译通过
-- 接口类型正确
+- `hasCapability('todos')` → `true`
 - 无业务逻辑变更
 
-**回滚**: 删除 `src/core/agents/` 目录即可
+**回滚**: 删除新文件即可
 
-### Phase 0b: OpenCodeAdapter 核心
+### Phase 0b: 聊天 UI Capability 驱动
 
-**目标**: 包装 OpenCodeService 为 AgentService
+**目标**: 聊天界面用 `hasCapability()` 替换硬编码的 OpenCode 假设
 
-**产出文件**:
-- `src/core/agents/adapters/OpenCodeAdapter.ts`
-- `src/core/agents/AgentServiceRegistry.ts`
+**前置依赖**: Phase 0a
+
+**关键任务**（按 §09 优先级排序）:
+1. TodoDock → `todos` capability
+2. QuestionDock → `questions` capability
+3. Fork/Revert buttons → `branching` capability
+4. PermissionInlineCard → `permissions` capability
+5. ContextRing → `context` capability
+6. BackgroundTaskPanel → `subagents` capability
+7. ChildSessionTree → `subagents` capability
+8. ModifiedFilesSidebar → session diff data
+9. Agent mention / Slash command / LSP → OpenCode only
+10. Tool skill blocks → OpenCode only
+
+**验证**:
+- OpenCode 下所有 UI 不变（全量 capability）
+- mock 空 capability 集合 → 验证隐藏逻辑
+- `npm run verify` 通过
+
+**回滚**: 移除 `hasCapability()` 包裹，恢复无条件渲染
+
+### Phase 0c: 设置 UI Backend 管理 + 条件显示
+
+**目标**: 设置界面新增智能体管理，10 个 OpenCode 专属标签 + Conversation 的 3 个子标签（compaction/sharing/questions）改为条件显示
+
+**前置依赖**: Phase 0a
+
+**关键任务**（详见 §10）:
+1. 扩展 `OpenCodianSettings` 加 `activeBackend` / `enabledBackends`
+2. General 标签下新增 `智能体管理` 子标签
+3. 10 个 OpenCode 专属标签 + Conversation 的 3 个子标签（compaction/sharing/questions）加条件判断
+4. normalize 旧数据（旧用户保持 `['opencode']`，新安装默认 `[]`）
+
+**验证**:
+- 默认状态（OpenCode 启用）所有设置不变
+- 禁用 OpenCode → 10 个标签 + 3 个子标签消失（所有智能体都可禁用）
+- 重新启用 → 标签恢复
+
+**回滚**: 恢复无条件标签注册
+
+### Phase 0d: 会话归属 + 历史过滤
+
+**目标**: 每个会话绑定 backend 标记
+
+**前置依赖**: Phase 0b
 
 **关键任务**:
-1. OpenCodeAdapter 实现核心 AgentService 接口
-2. 实现 sendMessage 的流式事件归一化
+1. Conversation 类型加 `backend: AgentBackendKind`
+2. 新建会话时标记 `'opencode'`（硬编码，Phase 1 后自动切换）
+3. 历史列表按 `activeBackend` 过滤
+4. 旧数据 fallback 为 `'opencode'`
+
+**验证**:
+- 现有会话（无 backend 字段）显示正常
+- 新建会话有 `backend: 'opencode'` 标记
+- 历史过滤不丢失数据
+
+**验收标准**:
+- 所有现有聊天功能正常
+- 无性能退化
+- `npm run verify` 通过
+- grep `openCodeService` 调用数量不增不减（Phase 0 不改 backend 调用）
+
+## 3. Phase 1 详细计划 — Backend 抽象
+
+> Phase 0 已验证 Capability 接口设计和 UI 条件逻辑。
+> Phase 1 正式实现 backend 抽象层，接入已准备好的前端。
+
+### Phase 1a: 定义完整接口 + 实现 OpenCodeAdapter
+
+**目标**: 实现 AgentService 接口和 OpenCodeAdapter
+
+**前置依赖**: Phase 0 完成（Capability 类型已被 UI 验证）
+
+**产出文件**:
+- `src/core/agents/AgentService.ts`
+- `src/core/agents/AgentServiceRegistry.ts`
+- `src/core/agents/adapters/OpenCodeAdapter.ts`
+
+**关键任务**:
+1. 定义完整 `AgentService` 接口
+2. 实现 OpenCodeAdapter 核心 + 全部 Capability
 3. 实现 AgentServiceRegistry
 4. 注册 OpenCodeAdapter 为默认 agent
+5. 替换 Phase 0a 中 `getActiveBackendCapabilities()` 的硬编码实现为从 Registry 读取
 
 **验证**:
 - `npm run verify` 通过
 - 现有聊天功能不受影响
 - adapter 的单元测试通过
 
-**回滚**: 移除 adapter 和 registry 代码，现有代码不变
+**回滚**: 移除 adapter 和 registry 代码，恢复 Phase 0a 的硬编码 capabilities
 
-### Phase 0c: OpenCodeAdapter 全部能力
+### Phase 1b: 视图层迁移到 AgentServiceRegistry
 
-**目标**: 实现所有 Capability 接口
+**目标**: 把视图层和相关服务从直接调用 `openCodeService` 迁移到 AgentServiceRegistry
 
-**关键任务**:
-1. 实现 AgentToolCapability
-2. 实现 AgentMcpCapability
-3. 实现 AgentPermissionCapability
-4. 实现 AgentBranchCapability
-5. 实现 AgentConfigCapability
-6. 实现 AgentModelCapability
-7. 实现 AgentTodoCapability
-8. 实现 AgentQuestionCapability
-
-**验证**:
-- 每个 capability 的映射测试
-- 现有功能通过 adapter 工作正常
-
-**回滚**: 保留核心接口，移除未完成的 capability 实现
-
-### Phase 0d: 视图层迁移
-
-**目标**: 分三步把视图层和相关服务迁移到 AgentServiceRegistry，避免一次性替换造成所有权守卫和回归风险
+**前置依赖**: Phase 1a
 
 **关键任务**:
-1. Phase 0d-1: Server lifecycle（62 次调用，约 7 个文件）
-2. Phase 0d-2: Session management（32 次调用，OpenCodianView + 4 个服务），使用 Proxy delegation pattern 避免 Owner Guard violation
-3. Phase 0d-3: MCP/Config/Model/Events（34 次调用，约 15 个 settings 文件）
-4. 使用 `hasCapability()` 做条件渲染
+1. Server lifecycle（62 次调用，约 7 个文件）
+2. Session management（32 次调用，OpenCodianView + 4 个服务）
+3. MCP/Config/Model/Events（34 次调用，约 15 个 settings 文件）
 
-**风险**: 128 次方法调用，53 个不同方法，26 个文件需要分阶段迁移
+**风险**: 128 次方法调用，53 个不同方法，26 个文件需分阶段迁移
 
 **回滚**: 恢复直接使用 `openCodeService` 的代码
 
-**验收标准**:
-- 所有现有聊天功能正常
-- 无性能退化
-- `npm run verify` 通过
+### Phase 1c: 模型选择器 / Server Badge 适配
 
-## 3. Phase 1 详细计划
+**目标**: 模型选择器和 Badge 接入 AgentService
 
-### Phase 1a: ClaudeCodeAdapter 核心
+**前置依赖**: Phase 1b
+
+**关键任务**:
+1. 模型列表从 `adapter.listModels()` 获取
+2. Backend 切换时刷新列表
+3. Badge 状态订阅 `adapter.onStatusChange()`
+4. Badge 文案改为 "BackendName · Status"
+
+## 4. Phase 2 详细计划
+
+### Phase 2a: ClaudeCodeAdapter 核心
 
 **目标**: 实现第二个 agent adapter
 
-**前置依赖**: Phase 0 完成
+**前置依赖**: Phase 1 完成
 
 **关键任务**:
 1. `npm install @anthropic-ai/claude-agent-sdk`
@@ -131,29 +207,16 @@ Phase 4: Agent 选择器 + UI 完善
 - 能发送消息并接收流式回复
 - 工具调用正确显示
 - 切换回 OpenCode 无问题
+- Phase CS-1 的 `hasCapability()` 自动正确隐藏 Claude Code 不支持的 UI
 
 **回滚**: 移除 ClaudeCodeAdapter + SDK 依赖
 
-### Phase 1b: Agent 选择器 UI
-
-**目标**: 在聊天界面添加 agent 切换功能
+### Phase 2b: Claude Code 设置标签
 
 **关键任务**:
-1. 设计 agent 选择器组件（下拉/按钮组）
-2. 实现切换逻辑
-3. 切换时创建新会话
-4. 显示当前 agent 图标和名称
-5. 每个会话记住其 agent 归属
-
-### Phase 1c: 会话归属
-
-**目标**: 每个会话绑定一个 agent
-
-**关键任务**:
-1. Conversation 类型增加 `backend: AgentBackendKind` / `backendSessionId` 等字段
-2. 打开会话时使用对应的 agent adapter
-3. 会话列表显示 agent 标识
-4. 本地持久化会话归属
+1. 实现 Claude Code 专属设置标签（API key + 默认模型）
+2. 注册为条件显示
+3. 启用后显示，禁用后隐藏
 
 ## 4. 回滚策略总则
 
@@ -247,12 +310,14 @@ adapterRegistry.register({
 
 ## 7. 与 multi-agent-board.md 的对接
 
-当 Phase 0-1 完成后：
-- `AgentService` 接口可直接作为 board spec 中 `AgentAdapter` 的实现
+当 Phase 0-2 完成后：
+- 前端已经完全 backend-aware（Phase 0 验证）
+- `AgentService` 接口已被前端消费验证（Phase 1）
+- 第二个 adapter 已实现并验证（Phase 2）
 - `AgentServiceRegistry` 可作为 board 的 adapter 来源
 - 每个 adapter 的 capabilities 直接驱动看板卡片的动作可用性
 
-建议在 Phase 1 完成后再启动 board spec 的 Phase 0b。
+建议在 Phase 2 完成后再启动 board spec 的 Phase 0b。
 
 ## 8. 开发调试指南
 
@@ -315,9 +380,12 @@ window.opencodian?.agents?.getSessionOwner('session-xxx')
 
 | Phase | 关注点 | 验证方法 |
 |-------|--------|---------|
-| Phase 0a | 接口编译是否正确 | `npm run typecheck` |
-| Phase 0b | OpenCodeAdapter 包装是否完整 | 现有聊天功能全流程回归 |
-| Phase 0c | 能力映射是否正确 | 每个 capability 的单独测试 |
-| Phase 0d | 视图层迁移无遗漏 | grep `openCodeService` 确认无直接引用 |
-| Phase 1 | 新 agent SDK 是否可用 | Phase 0 技术验证门控 |
-| Phase 2+ | agent 间切换无状态泄漏 | 切换后检查 registry 状态快照 |
+| Phase 0a | Capability 类型枚举是否覆盖所有 UI 需求 | 对照 §09 §10 的 UI 映射表 |
+| Phase 0b | hasCapability() 在 OpenCode 全量下 UI 不变 | 全流程回归 |
+| Phase 0c | 设置条件显示逻辑 | mock 禁用 OpenCode → 10 个标签 + 3 个子标签消失 |
+| Phase 0d | 会话归属 + 旧数据 fallback | 新旧会话都能正常打开 |
+| Phase 1a | OpenCodeAdapter 包装是否完整 | 现有聊天功能全流程回归 |
+| Phase 1b | 视图层迁移无遗漏 | grep `openCodeService` 确认无直接引用 |
+| Phase 1c | 模型选择器/Badge 接入 | 切换 backend 后 UI 正确更新 |
+| Phase 2 | 新 agent SDK 是否可用 | Phase 0b 的 hasCapability() 自动隐藏不支持 UI |
+| Phase 3+ | agent 间切换无状态泄漏 | 切换后检查 registry 状态快照 |
