@@ -544,7 +544,11 @@ export class ConversationSessionSettingsModal extends Modal {
         setting: { open: () => void; openTabById: (id: string) => void };
       }).setting;
       appSetting.open();
-      appSetting.openTabById('opencodian');
+      try {
+        appSetting.openTabById('opencodian');
+      } catch {
+        // Obsidian openTabById may throw if modal DOM isn't ready (race condition).
+      }
       if (target?.layoutMode !== 'tabbed') {
         this.scheduleClassicSettingsDeepLink(row.id, target?.plugin);
       }

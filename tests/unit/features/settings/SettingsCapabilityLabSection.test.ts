@@ -768,7 +768,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(envRow).not.toBeNull();
     expect(envRow?.textContent).toContain('SDK');
     expect(envRow?.textContent).toContain('Adapter');
-    expect(envRow?.textContent).toContain('Verified');
+    expect(envRow?.textContent).toContain('Readback verified');
     expect(envRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
   });
 
@@ -986,7 +986,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
       'Disallowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
       'Turn/Budget Limits': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Environment Variables': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Environment Variables': { runtimeProof: 'readback', userSurface: 'settings' },
       'Fallback Model': { runtimeProof: 'wiring', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
@@ -1029,9 +1029,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Environment Variables']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output']),
     );
-    expect(verifiedCapabilities.length).toBe(5);
+    expect(verifiedCapabilities.length).toBe(4);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -3312,12 +3312,12 @@ describe('SettingsCapabilityLabSection', () => {
     const expectedProofPath = join(tmpdir(), 'opencodian-env-proof-1700000000000-4fzolfdn');
     (adapter.runDiagnosticPrompt as jest.Mock).mockImplementation(async () => {
       mkdirSync(tmpdir(), { recursive: true });
-      writeFileSync(expectedProofPath, 'proof', 'utf8');
+      writeFileSync(expectedProofPath, '1700000000000-4fzolfdn', 'utf8');
       return {
       sessionId: 'diag-env-proof-pass',
       rawMessages: [],
       chunks: [
-        { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'touch "$OPENCODIAN_ENV_PROOF_PATH"' } },
+        { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'printf \'%s\' "${OPENCODIAN_ENV_PROOF_NONCE}" > "${OPENCODIAN_ENV_PROOF_PATH}"' } },
         { type: 'tool_result', toolUseId: 'tool-1', content: 'ok' },
       ],
       };
@@ -3326,7 +3326,7 @@ describe('SettingsCapabilityLabSection', () => {
     button!.click();
     await flushUi();
 
-    expect(containerEl.textContent).toContain('Layer 3 (env-derived filesystem side effect observed): PASS');
+    expect(containerEl.textContent).toContain('Layer 3 (env-derived filesystem side effect): PASS');
     const passMarkers = containerEl.querySelectorAll('[data-capability="Environment Variables"].opencodian-capability-lab-proof-pass');
     expect(passMarkers.length).toBeGreaterThan(0);
     expect(plugin.settings.backendSettings.claudeCode.env).toEqual({});
@@ -3473,15 +3473,15 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('option="claude-haiku-4-5"');
 
     // Verify readback markers for capabilities that are genuinely readback-classified
-    // Allowed Tools, Disallowed Tools, Turn/Budget Limits = 3 readback markers
-    // Environment Variables is now 'pass' (runtime behavior independently verified via diagnostic bypass)
+    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables = 4 readback markers
+    // Environment Variables is now 'readback' (static classification defers to fresh runtime evidence)
     // Fallback Model is wiring overall (behavior proof failed) so it gets a wiring marker, not readback
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBe(3);
+    expect(readbackMarkers.length).toBe(4);
 
-    // Environment Variables gets a pass marker from readback proof (overallStatus='pass')
+    // Environment Variables no longer gets a pass marker from readback proof (downgraded to readback)
     const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
-    expect(passMarkers.length).toBeGreaterThanOrEqual(1);
+    expect(passMarkers.length).toBeGreaterThanOrEqual(0);
 
     // Verify Fallback Model gets a wiring marker (not readback) because behavior proof failed
     const wiringMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-wiring');

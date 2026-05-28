@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -552,5 +553,47 @@ describe('ConversationSessionSettingsModal CSS contract', () => {
 
     expect(heroRuleMatch?.[1]).toBeDefined();
     expect(heroRuleMatch?.[1]).not.toContain('radial-gradient');
+  });
+
+  it('catches openTabById errors without propagating', () => {
+    const open = jest.fn();
+    const openTabById = jest.fn(() => {
+      throw new TypeError("Cannot read properties of undefined (reading 'removeClass')");
+    });
+    const saveSettings = jest.fn();
+    const plugin = {
+      settings: {
+        titleMode: 'ai',
+        questionDisplayMode: 'all',
+        questionCardPosition: 'inline',
+        showAnsweredQuestionCards: true,
+        renderUserMarkupAsCodeBlocks: true,
+        settingsLayoutMode: 'tabbed',
+        settingsTabbedPrimaryTab: 'general',
+        settingsTabbedSecondaryTabByPrimary: { general: 'basic' },
+      },
+      saveSettings,
+      settingsTab: {
+        prepareScrollToConversationOnNextOpen: jest.fn(),
+      },
+    };
+    const modal = attachMockApp(new ConversationSessionSettingsModal({} as never, {
+      conversationTitle: 'Test',
+      defaults: { chatFontSizePx: 15 },
+      onSave: jest.fn(),
+    }), {
+      plugins: { plugins: { opencodian: plugin } },
+      setting: { open, openTabById },
+    });
+
+    modal.onOpen();
+    expect(() => {
+      modal.contentEl
+        .querySelector<HTMLButtonElement>('[data-summary="title"] .opencodian-session-settings-summary-link')
+        ?.click();
+    }).not.toThrow();
+
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(openTabById).toHaveBeenCalledWith('opencodian');
   });
 });

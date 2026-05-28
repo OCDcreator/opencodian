@@ -65,6 +65,7 @@ class ConversationSessionSettingsModal extends Modal {
 - Title generation 摘要会根据当前全局模式显示用户向说明：首条消息标题会说明直接使用第一条用户消息开头，智能标题会说明先等待 OpenCode 自动命名，失败时再使用备用模型
 - 摘要通过 `this.app.plugins` 读取 `PLUGIN_ID` 对应插件的当前 settings，用于展示正在继承的全局默认值
 - “Open settings” 会把全局设置页定位到 Conversation 对应二级项；tabbed layout 下更新 `settingsTabbedPrimaryTab` / `settingsTabbedSecondaryTabByPrimary`，classic layout 下优先通过 `data-settings-target="conversation-*"` 找到二级分组并做 deferred scroll，标题文本匹配只作为兼容兜底
+- "Open settings" 动作中的 `openTabById('opencodian')` 已加 try/catch 防护：当 Obsidian 设置 modal DOM 尚未就绪时（race condition），错误被静默捕获；设置 modal 已成功打开，用户可手动切换标签
 - number input 留空时会回写 `null` 语义（继承）；只有输入内容时才做正数 / supported-range 校验
 - 聊天字体大小输入与步进按钮会通过 `onPreview()` 实时预览当前会话字号，但不写入 conversation；右上角关闭或取消会调用 `onCancelPreview()` 让 coordinator 恢复打开弹窗前的 effective state
 - 如果字段回到 inherit，`buildOverrides()` 会直接返回 `undefined`，上游可以把 `Conversation.sessionSettings` 折叠删除

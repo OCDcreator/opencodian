@@ -9,7 +9,7 @@
  *
  * See openspec/phase1-capability-lab.md for design rationale.
  */
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -564,7 +564,7 @@ export class SettingsCapabilityLabSection {
         capability: 'Environment Variables',
         sdkExposed: true, // env option for Claude Code process/query environment
         adapterWired: true, // buildSdkOptions/process resolution carries normalized env settings
-        runtimeProof: 'pass', // Runtime behavior verified via diagnostic bypass: Layer 1 (settings→SDK readback), Layer 2 (Bash tool_use invoked), Layer 3 (env-derived filesystem side effect observed at nonce path), Layer 4 (assistant text nonce echo). Proves env propagation into Claude and Bash subprocesses. Scope boundary: does NOT prove permission approval UX (proven separately by ordinary chat + live harness paths).
+        runtimeProof: 'readback', // Runtime-readback verified: settings→SDK env readback proved via Stable Settings Readback Proof. Behavior proof (env-derived filesystem side effect, Bash tool_use, assistant text nonce echo) is available via "Run Environment Variables Proof" diagnostic bypass button. Scope boundary: does NOT prove permission approval UX (proven separately by ordinary chat + live harness paths).
         userSurface: 'settings',
       },
       {
@@ -2165,8 +2165,8 @@ export class SettingsCapabilityLabSection {
       tbody,
       'Environment Variables',
       hasEnv
-        ? `${Object.keys(env as Record<string, unknown>).length} variable(s) configured. Runtime behavior verified via diagnostic bypass (Layer 1-4 PASS): env propagation into Claude and Bash subprocesses proven. Scope: proves env propagation, not permission approval UX.`
-        : 'No environment variables configured. Runtime behavior verified via diagnostic bypass (Layer 1-4 PASS): env propagation into Claude and Bash subprocesses proven when vars are present. Scope: proves env propagation, not permission approval UX.',
+        ? `${Object.keys(env as Record<string, unknown>).length} variable(s) configured. Runtime behavior proof available via diagnostic bypass (Layer 1-4). Static classification is readback; fresh runtime evidence required for behavior proof. Scope: proves env propagation, not permission approval UX.`
+        : 'No environment variables configured. Runtime behavior proof available via diagnostic bypass when vars are present. Static classification is readback; fresh runtime evidence required for behavior proof.',
       { status: 'exposed' },
     );
 
@@ -3565,8 +3565,8 @@ export class SettingsCapabilityLabSection {
         displayText: hasEnv
           ? `Environment Variables: ${Object.keys(envVal).length} variable(s) configured`
           : 'Environment Variables: not configured',
-        overallStatus: 'pass',
-        overallNote: 'Option read back AND runtime behavior independently verified via diagnostic bypass path. Env vars propagate to Claude/Bash subprocesses (Layer 1-4 PASS).',
+        overallStatus: 'readback',
+        overallNote: 'Option read back. Runtime behavior proof available via "Run Environment Variables Proof" diagnostic bypass — static classification defers to fresh runtime evidence.',
       },
       {
         matrixName: 'Fallback Model',
@@ -3654,7 +3654,7 @@ export class SettingsCapabilityLabSection {
     const envProofPath = join(tmpdir(), `opencodian-env-proof-${nonce}`);
     const prompt = [
       'Environment proof task. You MUST call Bash with this exact command:',
-      'touch "$OPENCODIAN_ENV_PROOF_PATH"',
+      'printf \'%s\' "${OPENCODIAN_ENV_PROOF_NONCE}" > "${OPENCODIAN_ENV_PROOF_PATH}"',
       `Then respond with exactly: ${nonce}`,
       'Do not add extra words.',
     ].join(' ');
@@ -3663,6 +3663,7 @@ export class SettingsCapabilityLabSection {
     this.claudeCodeSettings.env = {
       ...originalEnv,
       [envKey]: nonce,
+      OPENCODIAN_ENV_PROOF_NONCE: nonce,
       OPENCODIAN_ENV_PROOF_PATH: envProofPath,
     };
 
@@ -3694,7 +3695,21 @@ export class SettingsCapabilityLabSection {
         .join('\n');
 
       const nonceSeenInAssistantText = resultTextJoined.includes(nonce);
-      const envSideEffectObserved = existsSync(envProofPath);
+      let envSideEffectObserved = false;
+      let envSideEffectDetail = '';
+      if (existsSync(envProofPath)) {
+        try {
+          const fileContent = readFileSync(envProofPath, 'utf-8').trim();
+          envSideEffectObserved = fileContent === nonce;
+          envSideEffectDetail = envSideEffectObserved
+            ? 'PASS (nonce value verified in side-effect file)'
+            : `PARTIAL (file exists but content mismatch: expected "${nonce}", got "${truncate(fileContent, 80)}")`;
+        } catch {
+          envSideEffectDetail = 'PARTIAL (file exists but unreadable)';
+        }
+      } else {
+        envSideEffectDetail = 'NO EVIDENCE (side-effect file not created)';
+      }
 
       outputEl.empty();
       outputEl.createEl('h5', { text: 'Environment Variables Proof (layered)' });
@@ -3703,14 +3718,14 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('p', { text: `Permission path: diagnostic bypass (proves env propagation, not permission UI)` });
       outputEl.createEl('p', { text: `Layer 1 (settings -> SDK readback): ${readbackMatch ? 'PASS' : 'FAIL'}` });
       outputEl.createEl('p', { text: `Layer 2 (Bash tool invoked): ${bashToolUses.length > 0 ? 'PASS' : 'NO EVIDENCE'}` });
-      outputEl.createEl('p', { text: `Layer 3 (env-derived filesystem side effect observed): ${envSideEffectObserved ? 'PASS' : 'NO EVIDENCE'}` });
+      outputEl.createEl('p', { text: `Layer 3 (env-derived filesystem side effect): ${envSideEffectDetail}` });
       outputEl.createEl('p', { text: `Layer 4 (assistant text nonce echo): ${nonceSeenInAssistantText ? 'PASS' : 'NO EVIDENCE'}` });
 
       if (envSideEffectObserved) {
         this.updateRuntimeProof('Environment Variables', 'pass', outputEl);
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: 'Behavior proof achieved for Bash subprocess visibility: env-derived filesystem side effect was observed at the nonce path. Permission approval is proven separately by ordinary chat + live harness paths.',
+          text: 'Behavior proof achieved: env-derived side-effect file contains the expected nonce value, proving env propagation into the Bash subprocess. Permission approval is proven separately by ordinary chat + live harness paths.',
         });
       } else {
         this.updateRuntimeProof('Environment Variables', readbackMatch ? 'readback' : 'wiring', outputEl);
