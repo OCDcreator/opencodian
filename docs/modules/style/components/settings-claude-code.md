@@ -19,13 +19,17 @@ Compact inline notice，用于在 Claude Code 设置标签中显示运行时验�
 - 默认边框色为 `color-mix(in srgb, var(--text-success, var(--color-green)) 18%, var(--opencodian-settings-row-border))`
 - 字体大小 12px，颜色 `var(--text-muted)`
 
+### `[data-proof-state="pass"]`
+
+使用默认绿色/成功色系（base `.opencodian-settings-proof-status` 样式），表示该设置已通过运行时行为验证。当前用于 Turn/Budget Limits proof-status notice（maxTurns 和 maxBudgetUsd enforcement 已确认）。
+
 ### `[data-proof-state="readback"]`
 
 Readback 验证状态使用绿色/成功色系，表示该设置已被运行时回读验证。
 
 ### `[data-proof-state="wiring"]`
 
-Wiring 状态使用黄色/警告色系，表示选项已连接但行为尚未验证。当前未在 stable settings 中使用，保留给未来需要区分 wiring/readback 的字段。
+Wiring 状态使用黄色/警告色系，表示选项已连接但行为尚未验证。当前未在 stable settings 中使用（Fallback Model 已从 `wiring` 晋升为 `readback`），保留给未来需要区分 wiring/readback 的字段。
 
 ## 维护约束
 

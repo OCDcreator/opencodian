@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Capability Lab tests intentionally keep the full diagnostic surface matrix, history, rewind, structured, and fork probe behavior together. */
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,6 +33,7 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
     agentProgressSummaries: false,
     allowedTools: [],
     disallowedTools: [],
+    restrictedBuiltinTools: [],
     maxTurns: null,
     maxBudgetUsd: null,
     env: {},
@@ -154,7 +155,7 @@ describe('SettingsCapabilityLabSection', () => {
     const checkpointRow = rows.find((row) => row.textContent?.includes('File Checkpoint / Rewind'));
     expect(checkpointRow).not.toBeNull();
     expect(checkpointRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
-    expect(checkpointRow?.textContent).toContain('Untested');
+    expect(checkpointRow?.textContent).toContain('Readback verified');
   });
 
   it('renders all ten diagnostic panels including fork, resume, session detail, and backend routing probes', () => {
@@ -207,14 +208,16 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    // Runtime-only capabilities without dedicated diagnostic proof paths must stay hidden and untested.
-    const hiddenUntestedCapabilities = ['Plugins', 'Skills', 'Hooks'];
+    // Runtime-only capabilities without dedicated diagnostic proof paths must stay hidden.
+    // All hidden capabilities with runtime proof are now either 'pass' or 'readback' with evidence.
+    // No hidden-readback capabilities remain — Plugins promoted to pass (marketplace plugin → MCP server chain).
+    const hiddenReadbackCapabilities: string[] = [];
 
-    for (const cap of hiddenUntestedCapabilities) {
+    for (const cap of hiddenReadbackCapabilities) {
       const row = getRow(cap);
       expect(row).not.toBeNull(); // ${cap} row must exist
       expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
-      expect(row?.textContent).toContain('Untested');
+      expect(row?.textContent).toContain('Readback verified');
     }
 
     // Agent Definitions has a dedicated diagnostic proof path (Run Agent Definition Proof button).
@@ -237,12 +240,17 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    for (const cap of ['Hooks', 'Rewind']) {
-      const row = getRow(cap);
-      expect(row).not.toBeNull();
-      expect(row?.textContent).not.toContain('Complete');
-      expect(row?.textContent).toContain('Untested');
-    }
+    // Hooks is pass (Verified), Rewind is still Untested
+    const hooksRow = getRow('Hooks');
+    expect(hooksRow).not.toBeNull();
+    expect(hooksRow?.textContent).not.toContain('Complete');
+    expect(hooksRow?.textContent).toContain('Verified');
+    expect(hooksRow?.textContent).not.toContain('Untested');
+
+    const rewindRow = getRow('Rewind');
+    expect(rewindRow).not.toBeNull();
+    expect(rewindRow?.textContent).not.toContain('Complete');
+    expect(rewindRow?.textContent).toContain('Readback verified');
 
     // Agent Definitions has a dedicated diagnostic proof path but should not be marked Complete.
     const agentDefRow = getRow('Agent Definitions');
@@ -316,12 +324,12 @@ describe('SettingsCapabilityLabSection', () => {
     expect(hookRow?.textContent).toContain('Diagnostic');
     expect(hookRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
 
-    // Subagent Transcript / Progress: runtimeProof fail (confirmed SDK limitation), diagnostic surface
+    // Subagent Transcript / Progress: runtimeProof pass (inline agents + Agent tool prompt triggers real subagent spawning), diagnostic surface
     const subagentRow = getRow('Subagent Transcript / Progress');
     expect(subagentRow).not.toBeNull();
     expect(subagentRow?.textContent).toContain('SDK');
     expect(subagentRow?.textContent).toContain('Adapter');
-    expect(subagentRow?.textContent).toContain('Failed');
+    expect(subagentRow?.textContent).toContain('Verified');
     expect(subagentRow?.textContent).toContain('Diagnostic');
     expect(subagentRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
   });
@@ -455,8 +463,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
     const pluginsRow = rows.find((row) => row.textContent?.includes('Plugins'));
     expect(pluginsRow).not.toBeNull();
-    expect(pluginsRow?.textContent).toContain('Discovery Only');
-    expect(pluginsRow?.textContent).toContain('No plugins loaded');
+    expect(pluginsRow?.textContent).toContain('dead-letter at runtime');
   });
 
   it('renders Plugins in discovery table as Discovery Only when adapter has plugins', () => {
@@ -480,10 +487,9 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
     const pluginsRow = rows.find((row) => row.textContent?.includes('Plugins'));
     expect(pluginsRow).not.toBeNull();
-    expect(pluginsRow?.textContent).toContain('Discovery Only');
-    expect(pluginsRow?.textContent).not.toContain('Exposed');
-    expect(pluginsRow?.querySelector('.opencodian-capability-lab-chip')?.classList.contains('opencodian-capability-lab-chip-active')).toBe(false);
-    expect(pluginsRow?.textContent).toContain('2 plugin(s): plugin-a, plugin-b');
+    expect(pluginsRow?.textContent).toContain('adapter plugin option(s)');
+    expect(pluginsRow?.textContent).toContain('dead-letter at runtime');
+    expect(pluginsRow?.textContent).toContain('2 adapter plugin option(s): plugin-a, plugin-b');
   });
 
   it('renders Skills in discovery table as Discovery Only when no adapter', () => {
@@ -734,7 +740,9 @@ describe('SettingsCapabilityLabSection', () => {
     const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
     expect(fallbackRow?.textContent).toContain('claude-haiku-4-5');
     expect(fallbackRow?.textContent).toContain('Discovery Only');
-    expect(fallbackRow?.textContent).toContain('Blocker: unknown fallback trigger conditions');
+    expect(fallbackRow?.textContent).toContain('same-model validation');
+    expect(fallbackRow?.textContent).toContain('HTTP 529');
+    expect(fallbackRow?.textContent).toContain('switching not locally provable');
   });
 
   it('renders Fallback Model discovery row as empty when adapter has no fallbackModel', () => {
@@ -766,7 +774,7 @@ describe('SettingsCapabilityLabSection', () => {
     const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
     expect(fallbackRow?.textContent).toContain('No fallback model configured');
     expect(fallbackRow?.textContent).toContain('Discovery Only');
-    expect(fallbackRow?.textContent).toContain('Blocker: unknown fallback trigger conditions');
+    expect(fallbackRow?.textContent).toContain('overload-oriented');
   });
 
   it('renders advanced Claude settings as settings-surface readback-verified SDK option rows', () => {
@@ -781,7 +789,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    for (const label of ['Allowed Tools', 'Disallowed Tools', 'Turn/Budget Limits']) {
+    for (const label of ['Allowed Tools']) {
       const row = getRow(label);
       expect(row).not.toBeNull();
       expect(row?.textContent).toContain('SDK');
@@ -789,6 +797,22 @@ describe('SettingsCapabilityLabSection', () => {
       expect(row?.textContent).toContain('Readback verified');
       expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
     }
+
+    // Disallowed Tools is now pass (init-message tool catalog inspection)
+    const disallowedRow = getRow('Disallowed Tools');
+    expect(disallowedRow).not.toBeNull();
+    expect(disallowedRow?.textContent).toContain('SDK');
+    expect(disallowedRow?.textContent).toContain('Adapter');
+    expect(disallowedRow?.textContent).toContain('Verified');
+    expect(disallowedRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
+
+    // Turn/Budget Limits is now pass (live maxTurns proof), not readback
+    const turnRow = getRow('Turn/Budget Limits');
+    expect(turnRow).not.toBeNull();
+    expect(turnRow?.textContent).toContain('SDK');
+    expect(turnRow?.textContent).toContain('Adapter');
+    expect(turnRow?.textContent).toContain('Verified');
+    expect(turnRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
 
     const envRow = getRow('Environment Variables');
     expect(envRow).not.toBeNull();
@@ -860,11 +884,15 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
     const getRow = (feature: string) => rows.find((row) => row.textContent?.includes(feature));
 
-    for (const feature of ['Hooks', 'Plugins', 'Skills', 'Agent Definitions', 'Session Store']) {
+    for (const feature of ['Hooks', 'Skills', 'Agent Definitions', 'Session Store']) {
       const row = getRow(feature);
       expect(row).toBeTruthy();
       expect(row?.textContent).toContain('Discovery Only');
     }
+    // Plugins discovery row shows dead-letter programmatic options wording
+    const pluginsRow = getRow('Plugins');
+    expect(pluginsRow).toBeTruthy();
+    expect(pluginsRow?.textContent).toContain('dead-letter at runtime');
   });
 
   it('uses i18n keys for section title', () => {
@@ -950,7 +978,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(24);
+    expect(rows.length).toBe(25);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -986,7 +1014,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('chat');
   });
 
-  it('audits capability matrix for honest classifications across all 24 rows', () => {
+  it('audits capability matrix for honest classifications across all 25 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1002,24 +1030,25 @@ describe('SettingsCapabilityLabSection', () => {
     // runtimeProof: 'pass' only when direct SDK smoke proof exists.
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
     const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' }> = {
-      Hooks: { runtimeProof: 'untested', userSurface: 'hidden' },
-      'File Checkpoint / Rewind': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      Hooks: { runtimeProof: 'pass', userSurface: 'hidden' },
+      'File Checkpoint / Rewind': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Session Store': { runtimeProof: 'pass', userSurface: 'hidden' },
-      Skills: { runtimeProof: 'untested', userSurface: 'hidden' },
-      Plugins: { runtimeProof: 'untested', userSurface: 'hidden' },
+      Skills: { runtimeProof: 'pass', userSurface: 'hidden' },
+      Plugins: { runtimeProof: 'pass', userSurface: 'hidden' },
       'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
       'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Disallowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Turn/Budget Limits': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Disallowed Tools': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Restricted Built-in Tools': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Turn/Budget Limits': { runtimeProof: 'pass', userSurface: 'settings' },
       'Environment Variables': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Fallback Model': { runtimeProof: 'wiring', userSurface: 'settings' },
+      'Fallback Model': { runtimeProof: 'readback', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
-      'Agents (Subagents)': { runtimeProof: 'untested', userSurface: 'diagnostic' },
+      'Agents (Subagents)': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Agent Definitions': { runtimeProof: 'pass', userSurface: 'hidden' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
-      'Subagent Transcript / Progress': { runtimeProof: 'fail', userSurface: 'diagnostic' },
+      'Subagent Transcript / Progress': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Include Hook Events': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Import Session to Store': { runtimeProof: 'pass', userSurface: 'hidden' },
       'Fork Session': { runtimeProof: 'pass', userSurface: 'diagnostic' },
@@ -1055,9 +1084,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools']),
     );
-    expect(verifiedCapabilities.length).toBe(14);
+    expect(verifiedCapabilities.length).toBe(22);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -1269,12 +1298,159 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('Captured 1 hook event');
     expect(containerEl.textContent).toContain('SessionStart');
     expect(containerEl.textContent).toContain('diag-hook-1');
-    // Verify both Hooks and Include Hook Events are marked as pass
+    // Layer 1/2/3 text should appear
+    expect(containerEl.textContent).toContain('Layer 1');
+    expect(containerEl.textContent).toContain('Layer 2');
+    expect(containerEl.textContent).toContain('Layer 3');
+    // Hooks matrix row shows 'Verified' (pass) based on static assessment
     const proofMarkers = containerEl.querySelectorAll('[data-capability]');
     const hookMarker = Array.from(proofMarkers).find((el) => el.getAttribute('data-capability') === 'Hooks');
-    const includeHookMarker = Array.from(proofMarkers).find((el) => el.getAttribute('data-capability') === 'Include Hook Events');
     expect(hookMarker).toBeTruthy();
-    expect(includeHookMarker).toBeTruthy();
+    // Include Hook Events is NOT updated by runHookProof (independent pass)
+    const includeHookMarker = Array.from(proofMarkers).find((el) => el.getAttribute('data-capability') === 'Include Hook Events');
+    expect(includeHookMarker).toBeFalsy();
+  });
+
+  describe('Hook proof settings.local.json restore/cleanup', () => {
+    // These tests verify the Layer 3 shell-hook config merge/restore logic
+    // using a real temp directory on disk, not mocks.
+    let proofTmpDir: string;
+    let claudeDir: string;
+    let settingsPath: string;
+
+    beforeEach(() => {
+      proofTmpDir = join(tmpdir(), `opencodian-hook-restore-test-${Date.now()}`);
+      claudeDir = join(proofTmpDir, '.claude');
+      settingsPath = join(claudeDir, 'settings.local.json');
+    });
+
+    afterEach(() => {
+      // Clean up test temp dir
+      try { rmSync(proofTmpDir, { recursive: true, force: true }); } catch { /* best-effort */ }
+    });
+
+    it('restores pre-existing settings.local.json after hook proof', async () => {
+      // Create a pre-existing settings.local.json with user content
+      mkdirSync(claudeDir, { recursive: true });
+      const userContent = JSON.stringify({
+        permissions: { allow: ['Bash(git *)'] },
+        hooks: {
+          PostToolUse: [{ matcher: 'Write', hooks: [{ type: 'command', command: 'prettier' }] }],
+        },
+      }, null, 2);
+      writeFileSync(settingsPath, userContent, 'utf8');
+
+      const adapter = {
+        listSessions: jest.fn().mockResolvedValue([]),
+        runDiagnosticPrompt: jest.fn().mockResolvedValue({
+          sessionId: 'diag-hook-restore-1',
+          rawMessages: [],
+          chunks: [{
+            type: 'backend_event',
+            source: 'claude-code',
+            event: 'hook',
+            status: 'response',
+            id: 'hook-restore-1',
+            metadata: { hookEvent: 'SessionStart' },
+          }],
+        }),
+        inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+          hooks: { SessionStart: [{ hooks: [] }] },
+        }),
+        capabilities: new Set(),
+      };
+
+      // Use a plugin mock that returns the proof temp dir as vault path
+      const mockPlugin = createMockPlugin(adapter);
+      (mockPlugin as Record<string, unknown>).app = {
+        vault: {
+          adapter: {
+            getBasePath: () => proofTmpDir,
+          },
+        },
+      };
+
+      const containerEl = document.createElement('div');
+      const section = new SettingsCapabilityLabSection({
+        plugin: mockPlugin,
+        createSectionHeading: createHeadingStub(),
+      });
+
+      section.attachTabbed(containerEl, 'capability-lab');
+      const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+        el.textContent?.includes('Run Hook Proof')
+      )) as HTMLButtonElement | undefined;
+      expect(button).toBeTruthy();
+
+      button!.click();
+      await flushUi();
+
+      // After proof completes, settings.local.json should be restored to original content
+      expect(existsSync(settingsPath)).toBe(true);
+      const restoredContent = readFileSync(settingsPath, 'utf8');
+      const restored = JSON.parse(restoredContent);
+      expect(restored.permissions.allow).toEqual(['Bash(git *)']);
+      expect(restored.hooks.PostToolUse).toEqual([{ matcher: 'Write', hooks: [{ type: 'command', command: 'prettier' }] }]);
+      // Our injected SessionStart hook should be removed
+      expect(restored.hooks.SessionStart).toBeUndefined();
+    });
+
+    it('removes settings.local.json when no pre-existing file existed', async () => {
+      mkdirSync(claudeDir, { recursive: true });
+      // Do NOT create settings.local.json — it should not exist before probe
+
+      const adapter = {
+        listSessions: jest.fn().mockResolvedValue([]),
+        runDiagnosticPrompt: jest.fn().mockResolvedValue({
+          sessionId: 'diag-hook-restore-2',
+          rawMessages: [],
+          chunks: [{
+            type: 'backend_event',
+            source: 'claude-code',
+            event: 'hook',
+            status: 'response',
+            id: 'hook-restore-2',
+            metadata: { hookEvent: 'SessionStart' },
+          }],
+        }),
+        inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+          hooks: { SessionStart: [{ hooks: [] }] },
+        }),
+        capabilities: new Set(),
+      };
+
+      const mockPlugin = createMockPlugin(adapter);
+      (mockPlugin as Record<string, unknown>).app = {
+        vault: {
+          adapter: {
+            getBasePath: () => proofTmpDir,
+          },
+        },
+      };
+
+      const containerEl = document.createElement('div');
+      const section = new SettingsCapabilityLabSection({
+        plugin: mockPlugin,
+        createSectionHeading: createHeadingStub(),
+      });
+
+      section.attachTabbed(containerEl, 'capability-lab');
+      const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+        el.textContent?.includes('Run Hook Proof')
+      )) as HTMLButtonElement | undefined;
+      expect(button).toBeTruthy();
+
+      // Verify no settings.local.json before probe
+      expect(existsSync(settingsPath)).toBe(false);
+
+      button!.click();
+      await flushUi();
+
+      // After proof completes, settings.local.json should be removed (it didn't exist before)
+      expect(existsSync(settingsPath)).toBe(false);
+      // .claude/ directory should still exist (not removed)
+      expect(existsSync(claudeDir)).toBe(true);
+    });
   });
 
   it('renders subagent stream proof button in discovery controls', () => {
@@ -1437,22 +1613,29 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
-  it('marks Fallback Model as pass when invalid primary fails and fallback model is detected', async () => {
+  it('marks Fallback Model as readback when invalid primary succeeds without fallback (SDK does not validate model names)', async () => {
+    // Phase 1: valid wiring check → succeeds, options readback confirms fallbackModel
+    // Phase 2: invalid primary → SDK ACCEPTS without error, reports same invalid string back, no fallback
+    // This matches BUILD_ID feature-phase0-capability.202605300441 runtime evidence
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
-      runDiagnosticPrompt: jest.fn().mockResolvedValue({
-        sessionId: 'diag-fallback-1',
-        rawMessages: [],
-        chunks: [
-          {
-            type: 'message_metadata',
-            modelId: 'claude-haiku-4-5',
-          },
-          {
-            type: 'text',
-            text: 'fallback model proof',
-          },
-        ],
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({ // Phase 1: wiring check
+          sessionId: 'diag-wiring-1',
+          rawMessages: [],
+          chunks: [{ type: 'text', text: 'fallback wiring check' }],
+        })
+        .mockResolvedValueOnce({ // Phase 2: invalid primary accepted without error
+          sessionId: 'diag-fallback-1',
+          rawMessages: [],
+          chunks: [
+            { type: 'message_metadata', modelId: 'opencodian-invalid-model-test-xyz123' },
+            { type: 'text', text: 'fallback model proof' },
+          ],
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        fallbackModel: 'claude-haiku-4-5',
+        model: undefined,
       }),
       capabilities: new Set(),
     };
@@ -1471,29 +1654,47 @@ describe('SettingsCapabilityLabSection', () => {
     button!.click();
     await flushUi();
 
+    // Phase 1: wiring check succeeds
     expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
-      model: 'opencodian-invalid-model-test-xyz123',
       fallbackModel: 'claude-haiku-4-5',
       persistSession: false,
     }));
-    expect(containerEl.textContent).toContain('Invalid primary: "opencodian-invalid-model-test-xyz123"');
-    expect(containerEl.textContent).toContain('SDK reported model: "claude-haiku-4-5"');
+    expect(containerEl.textContent).toContain('Phase 1 PASS');
+    // Phase 2: invalid primary accepted without error, reported same invalid model back
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'opencodian-invalid-model-test-xyz123',
+      fallbackModel: 'claude-haiku-4-5',
+    }));
+    expect(containerEl.textContent).toContain('Unexpected');
+    expect(containerEl.textContent).toContain('opencodian-invalid-model-test-xyz123');
+    // Overall classification: readback (option wired, no fallback occurred)
     const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-wiring')).toBe(false);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
   });
 
-  it('marks Fallback Model as wiring-only when text output exists but no model is detected', async () => {
+  it('marks Fallback Model as pass if SDK somehow falls back for invalid primary', async () => {
+    // Edge case: if Phase 2 succeeds and returns a non-invalid model, mark as pass
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
-      runDiagnosticPrompt: jest.fn().mockResolvedValue({
-        sessionId: 'diag-fallback-1',
-        rawMessages: [],
-        chunks: [{
-          type: 'text',
-          text: 'fallback model proof',
-        }],
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({ // Phase 1: wiring check
+          sessionId: 'diag-wiring-1',
+          rawMessages: [],
+          chunks: [{ type: 'text', text: 'fallback wiring check' }],
+        })
+        .mockResolvedValueOnce({ // Phase 2: invalid primary but SDK falls back
+          sessionId: 'diag-fallback-1',
+          rawMessages: [],
+          chunks: [
+            { type: 'message_metadata', modelId: 'claude-haiku-4-5' },
+            { type: 'text', text: 'fallback model proof' },
+          ],
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        fallbackModel: 'claude-haiku-4-5',
+        model: undefined,
       }),
       capabilities: new Set(),
     };
@@ -1512,14 +1713,12 @@ describe('SettingsCapabilityLabSection', () => {
     button!.click();
     await flushUi();
 
-    expect(containerEl.textContent).toContain('no trustworthy runtime signal confirms which model was used');
     const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-wiring')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
   });
 
-  it('handles fallback model proof failure', async () => {
+  it('handles fallback model proof failure when wiring check fails', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('SDK fallback model error')),
@@ -1540,12 +1739,86 @@ describe('SettingsCapabilityLabSection', () => {
     button!.click();
     await flushUi();
 
-    expect(containerEl.textContent).toContain('Fallback model proof failed');
+    // Phase 1 wiring check fails — error shown
+    expect(containerEl.textContent).toContain('Phase 1 error');
     expect(containerEl.textContent).toContain('SDK fallback model error');
-    const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
-    expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  // =======================================================================
+  // extractModelUsage helper — Fallback Model detection plumbing
+  // =======================================================================
+
+  it('extractModelUsage returns modelUsage from result message', () => {
+    const adapter = { capabilities: new Set() };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+    // Access private method via bracket notation
+    const extract = (section as unknown as { extractModelUsage: (r: unknown) => unknown }).extractModelUsage.bind(section);
+    const result = {
+      rawMessages: [
+        { type: 'assistant', message: { role: 'assistant' } },
+        { type: 'result', subtype: 'success', modelUsage: { 'claude-sonnet-4-6': { inputTokens: 100, outputTokens: 50 } } },
+      ],
+      chunks: [],
+    };
+    const usage = extract(result);
+    expect(usage).toEqual({ 'claude-sonnet-4-6': { inputTokens: 100, outputTokens: 50 } });
+  });
+
+  it('extractModelUsage returns undefined when no result message exists', () => {
+    const adapter = { capabilities: new Set() };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+    const extract = (section as unknown as { extractModelUsage: (r: unknown) => unknown }).extractModelUsage.bind(section);
+    const result = {
+      rawMessages: [
+        { type: 'assistant', message: { role: 'assistant' } },
+      ],
+      chunks: [],
+    };
+    expect(extract(result)).toBeUndefined();
+  });
+
+  it('extractModelUsage returns undefined when result has no modelUsage', () => {
+    const adapter = { capabilities: new Set() };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+    const extract = (section as unknown as { extractModelUsage: (r: unknown) => unknown }).extractModelUsage.bind(section);
+    const result = {
+      rawMessages: [
+        { type: 'result', subtype: 'success' },
+      ],
+      chunks: [],
+    };
+    expect(extract(result)).toBeUndefined();
+  });
+
+  it('extractModelUsage returns multi-model usage when fallback occurred', () => {
+    const adapter = { capabilities: new Set() };
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+    const extract = (section as unknown as { extractModelUsage: (r: unknown) => unknown }).extractModelUsage.bind(section);
+    const result = {
+      rawMessages: [
+        { type: 'result', subtype: 'success', modelUsage: {
+          'claude-sonnet-4-6': { inputTokens: 100, outputTokens: 0 },
+          'claude-haiku-4-5': { inputTokens: 50, outputTokens: 50 },
+        } },
+      ],
+      chunks: [],
+    };
+    const usage = extract(result) as Record<string, unknown>;
+    expect(Object.keys(usage)).toHaveLength(2);
+    expect(usage['claude-sonnet-4-6']).toBeDefined();
+    expect(usage['claude-haiku-4-5']).toBeDefined();
   });
 
   // =======================================================================
@@ -2695,8 +2968,10 @@ describe('SettingsCapabilityLabSection', () => {
         { sessionId: 'rewind-session-1', summary: 'Test session for rewind', lastModified: 1 },
       ]),
       rewindFiles: jest.fn().mockResolvedValue({
-        dryRun: true,
-        filesAffected: ['src/main.ts', 'src/utils.ts'],
+        canRewind: true,
+        filesChanged: ['src/main.ts', 'src/utils.ts'],
+        insertions: 5,
+        deletions: 2,
         description: 'Would revert changes from message msg-rewind-target',
       }),
     };
@@ -2729,6 +3004,97 @@ describe('SettingsCapabilityLabSection', () => {
     const outputEl = rewindBlock!.querySelector('.opencodian-capability-lab-output') as HTMLElement;
     expect(outputEl.textContent).toContain('Dry-Run Rewind Preview');
     expect(outputEl.textContent).toContain('src/main.ts');
+    // canRewind:true + non-empty filesChanged → pass
+    const proofMarker = outputEl.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker?.textContent).toContain('Runtime verified');
+  });
+
+  it('classifies rewind dry-run as readback when canRewind is false', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'rewind-session-norw', summary: 'No rewind session', lastModified: 1 },
+      ]),
+      rewindFiles: jest.fn().mockResolvedValue({
+        canRewind: false,
+        error: 'No file checkpoint found for this message.',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const rewindBlock = containerEl.querySelector('[data-section-block="rewind"]') as HTMLElement | null;
+    const sessionSelect = rewindBlock!.querySelector('select') as HTMLSelectElement;
+    const msgInput = rewindBlock!.querySelector('input[type="text"]') as HTMLInputElement;
+    const dryRunBtn = Array.from(rewindBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Dry-Run Preview')
+    )) as HTMLButtonElement | undefined;
+
+    sessionSelect.value = 'rewind-session-norw';
+    sessionSelect.dispatchEvent(new Event('change'));
+    msgInput.value = 'msg-target';
+    dryRunBtn!.click();
+    await flushUi();
+
+    const outputEl = rewindBlock!.querySelector('.opencodian-capability-lab-output') as HTMLElement;
+    expect(outputEl.textContent).toContain('Dry-Run Rewind Preview');
+    // canRewind:false → readback, NOT pass
+    const proofMarker = outputEl.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker?.textContent).toContain('Readback verified');
+    expect(proofMarker?.textContent).not.toContain('Runtime verified');
+    // Blocker hint should explain the precise blocker
+    expect(outputEl.textContent).toContain('Blocker: SDK returns canRewind:false');
+    expect(outputEl.textContent).toContain('#236');
+  });
+
+  it('classifies rewind dry-run as readback when canRewind is true but filesChanged is empty', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        { sessionId: 'rewind-session-empty', summary: 'Empty files session', lastModified: 1 },
+      ]),
+      rewindFiles: jest.fn().mockResolvedValue({
+        canRewind: true,
+        filesChanged: [],
+        insertions: 0,
+        deletions: 0,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const rewindBlock = containerEl.querySelector('[data-section-block="rewind"]') as HTMLElement | null;
+    const sessionSelect = rewindBlock!.querySelector('select') as HTMLSelectElement;
+    const msgInput = rewindBlock!.querySelector('input[type="text"]') as HTMLInputElement;
+    const dryRunBtn = Array.from(rewindBlock!.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Dry-Run Preview')
+    )) as HTMLButtonElement | undefined;
+
+    sessionSelect.value = 'rewind-session-empty';
+    sessionSelect.dispatchEvent(new Event('change'));
+    msgInput.value = 'msg-target';
+    dryRunBtn!.click();
+    await flushUi();
+
+    const outputEl = rewindBlock!.querySelector('.opencodian-capability-lab-output') as HTMLElement;
+    expect(outputEl.textContent).toContain('Dry-Run Rewind Preview');
+    // canRewind:true + empty filesChanged → readback, NOT pass
+    const proofMarker = outputEl.querySelector('.opencodian-capability-lab-proof-marker');
+    expect(proofMarker?.textContent).toContain('Readback verified');
+    expect(proofMarker?.textContent).not.toContain('Runtime verified');
+    // Blocker hint should explain the empty filesChanged blocker
+    expect(outputEl.textContent).toContain('empty filesChanged');
+    expect(outputEl.textContent).toContain('#236');
   });
 
   it('renders error output when rewind dry-run probe fails', async () => {
@@ -3719,16 +4085,27 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
-  it('marks Allowed Tools as readback when no non-allowed tool calls are observed', async () => {
+  it('marks Allowed Tools as readback when init catalog coincidentally contains only Read (not allowedTools enforcement)', async () => {
+    // Even when the init catalog is a subset, that is NOT allowedTools enforcement.
+    // The SDK `tools` restrictor is owned by "Restricted Built-in Tools".
+    // allowedTools is a pre-approve/auto-approve shortcut only.
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
-      runDiagnosticPrompt: jest.fn().mockResolvedValue({
-        sessionId: 'diag-allowed-tools',
-        rawMessages: [],
-        chunks: [
-          { type: 'text', content: 'I cannot list files because I only have Read access.' },
-        ],
-      }),
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-coincidental-a',
+          rawMessages: [
+            { type: 'system', subtype: 'init', tools: ['Read'], model: 'claude-sonnet' },
+          ],
+          chunks: [
+            { type: 'text', content: 'I only have Read access.' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-coincidental-b',
+          rawMessages: [],
+          chunks: [],
+        }),
       inspectLastDiagnosticSdkOptions: jest.fn(),
       capabilities: new Set(),
     };
@@ -3747,22 +4124,34 @@ describe('SettingsCapabilityLabSection', () => {
     await flushUi();
 
     expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
-    expect(containerEl.textContent).toContain('No tool calls observed');
+    expect(containerEl.textContent).toContain('NOT allowedTools enforcement');
+    expect(containerEl.textContent).toContain('pre-approve/auto-approve shortcut');
     const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
     expect(readbackMarkers.length).toBeGreaterThan(0);
+    // Must NOT have pass markers — coincidental catalog subset is not enforcement
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBe(0);
   });
 
-  it('marks Allowed Tools as fail when non-allowed tool is called', async () => {
+  it('marks Allowed Tools as readback when init catalog contains non-allowed tools', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
-      runDiagnosticPrompt: jest.fn().mockResolvedValue({
-        sessionId: 'diag-allowed-tools-fail',
-        rawMessages: [],
-        chunks: [
-          { type: 'tool_use', name: 'Bash' },
-          { type: 'tool_result', content: 'file1.txt\nfile2.txt' },
-        ],
-      }),
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-catalog-unfiltered-a',
+          rawMessages: [
+            { type: 'system', subtype: 'init', tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob'], model: 'claude-sonnet' },
+          ],
+          chunks: [
+            { type: 'text', content: 'I only used Read.' },
+          ],
+        })
+        // Phase B: non-bypass returns empty
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-catalog-unfiltered-b',
+          rawMessages: [],
+          chunks: [],
+        }),
       inspectLastDiagnosticSdkOptions: jest.fn(),
       capabilities: new Set(),
     };
@@ -3780,9 +4169,302 @@ describe('SettingsCapabilityLabSection', () => {
     button!.click();
     await flushUi();
 
-    expect(containerEl.textContent).toContain('Enforcement likely FAILED');
+    expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
+    expect(containerEl.textContent).toContain('Non-allowed in catalog: 4');
+    // Phase B produced zero tool calls → inconclusive → readback
+    expect(containerEl.textContent).toContain('Phase B inconclusive');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Allowed Tools as readback when init catalog unfiltered and non-allowed tools called (bypassPermissions active)', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-catalog-unfiltered-with-calls-a',
+          rawMessages: [
+            { type: 'system', subtype: 'init', tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob'], model: 'claude-sonnet' },
+          ],
+          chunks: [
+            { type: 'tool_use', name: 'Bash' },
+            { type: 'tool_use', name: 'Glob' },
+            { type: 'tool_result', content: 'file1.txt' },
+          ],
+        })
+        // Phase B: non-bypass returns empty
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-catalog-unfiltered-with-calls-b',
+          rawMessages: [],
+          chunks: [],
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
+    expect(containerEl.textContent).toContain('Non-allowed in catalog: 4');
+    // Phase B inconclusive → readback
+    expect(containerEl.textContent).toContain('Phase B inconclusive');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+    // Must NOT have fail markers in this branch
     const failMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-fail');
-    expect(failMarkers.length).toBeGreaterThan(0);
+    expect(failMarkers.length).toBe(0);
+  });
+
+  it('marks Allowed Tools as readback when no init message and no tool calls', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-a',
+          rawMessages: [],
+          chunks: [
+            { type: 'text', content: 'I cannot list files because I only have Read access.' },
+          ],
+        })
+        // Phase B: non-bypass returns empty
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-b',
+          rawMessages: [],
+          chunks: [],
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Allowed Tools as readback when non-allowed tool is called (not a restrictor)', async () => {
+    // Under the product boundary, observing non-allowed tool calls proves
+    // allowedTools is not an availability restrictor — but that is not
+    // a "fail", it confirms readback (pre-approve shortcut only).
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-not-restrictor-a',
+          rawMessages: [],
+          chunks: [
+            { type: 'tool_use', name: 'Bash' },
+            { type: 'tool_result', content: 'file1.txt\nfile2.txt' },
+          ],
+        })
+        // Phase B: non-bypass returns empty
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-not-restrictor-b',
+          rawMessages: [],
+          chunks: [],
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Phase A');
+    expect(containerEl.textContent).toContain('NOT an availability restrictor');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+    // Must NOT have fail markers — non-allowed calls prove it's not a restrictor, not that it "failed"
+    const failMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-fail');
+    expect(failMarkers.length).toBe(0);
+  });
+
+  it('marks Allowed Tools as readback when Phase B synthetic canUseTool only sees Read (inconclusive, not pass)', async () => {
+    // Phase A: bypass-mode shows unfiltered catalog (the usual case).
+    // Phase B: non-bypass with synthetic canUseTool that records tool names.
+    // Even if only Read reaches canUseTool, this is model-behavior omission,
+    // not deterministic SDK-owned enforcement proof.
+    const phaseBCanUseToolCalls: string[] = [];
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn()
+        .mockImplementationOnce(async () => ({
+          sessionId: 'diag-allowed-tools-phaseb-readback-a',
+          rawMessages: [
+            { type: 'system', subtype: 'init', tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob'], model: 'claude-sonnet' },
+          ],
+          chunks: [
+            { type: 'tool_use', name: 'Bash' },
+            { type: 'tool_result', content: 'file1.txt' },
+            { type: 'tool_use', name: 'Read' },
+            { type: 'tool_result', content: 'hello' },
+          ],
+        }))
+        // Phase B: non-bypass. Simulate SDK calling canUseTool for Read only.
+        .mockImplementationOnce(async (_req: Record<string, unknown>) => {
+          const canUseTool = _req._diagnosticCanUseTool as (name: string, input: Record<string, unknown>, ctx: Record<string, unknown>) => Promise<{ behavior: string }>;
+          if (canUseTool) {
+            await canUseTool('Read', {}, {});
+            phaseBCanUseToolCalls.push('Read');
+          }
+          return {
+            sessionId: 'diag-allowed-tools-phaseb-readback-b',
+            rawMessages: [],
+            chunks: [
+              { type: 'tool_use', name: 'Read' },
+              { type: 'tool_result', content: 'hello' },
+            ],
+          };
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    // Single-run model omission of non-allowed tools is NOT pass
+    expect(containerEl.textContent).toContain('Phase B inconclusive');
+    expect(containerEl.textContent).toContain('not deterministic proof');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+    // Must NOT have pass markers from single-run model omission
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBe(0);
+  });
+
+  it('marks Allowed Tools as readback when Phase B synthetic canUseTool sees non-allowed tools', async () => {
+    // Phase A: bypass-mode, unfiltered catalog.
+    // Phase B: non-bypass, synthetic canUseTool sees Bash and Read.
+    // This proves the SDK does NOT enforce allowedTools before canUseTool.
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn()
+        // Phase A
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-phaseb-readback-a',
+          rawMessages: [
+            { type: 'system', subtype: 'init', tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob'], model: 'claude-sonnet' },
+          ],
+          chunks: [
+            { type: 'tool_use', name: 'Bash' },
+            { type: 'tool_result', content: 'file1.txt' },
+          ],
+        })
+        // Phase B: non-bypass, SDK does not call canUseTool in query() mode —
+        // returns executed tools directly. This matches real SDK behavior.
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-phaseb-readback-b',
+          rawMessages: [],
+          chunks: [
+            { type: 'tool_use', name: 'Bash' },
+            { type: 'tool_result', content: 'file1.txt' },
+            { type: 'tool_use', name: 'Read' },
+            { type: 'tool_result', content: 'hello' },
+          ],
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    // Phase B: zero canUseTool calls (SDK doesn't invoke it in query() mode)
+    // but tools were executed → falls into the "zero canUseTool calls" readback path
+    expect(containerEl.textContent).toContain('Phase B');
+    expect(containerEl.textContent).toContain('Readback verified');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Allowed Tools as readback when Phase B errors', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({
+          sessionId: 'diag-allowed-tools-phaseb-error-a',
+          rawMessages: [
+            { type: 'system', subtype: 'init', tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob'], model: 'claude-sonnet' },
+          ],
+          chunks: [],
+        })
+        // Phase B: non-bypass rejects
+        .mockRejectedValueOnce(new Error('Non-bypass diagnostic failed: subprocess error')),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Allowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Non-bypass error');
+    expect(containerEl.textContent).toContain('Layer 0 — Proven readback');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
   });
 
   it('renders Disallowed Tools Proof button', () => {
@@ -3805,12 +4487,14 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
-  it('marks Disallowed Tools as readback when blocked tool is not called', async () => {
+  it('marks Disallowed Tools as pass when init message tools catalog excludes Bash', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn().mockResolvedValue({
         sessionId: 'diag-disallowed-tools',
-        rawMessages: [],
+        rawMessages: [
+          { type: 'system', subtype: 'init', tools: ['Read', 'Write', 'Edit', 'Glob', 'Grep'], model: 'claude-sonnet' },
+        ],
         chunks: [
           { type: 'text', content: 'I cannot use Bash because it is disallowed.' },
         ],
@@ -3833,9 +4517,10 @@ describe('SettingsCapabilityLabSection', () => {
     await flushUi();
 
     expect(containerEl.textContent).toContain('Configured disallowedTools: ["Bash"]');
-    expect(containerEl.textContent).toContain('No tool calls observed');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Disallowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
+    expect(containerEl.textContent).toContain('Bash in init catalog: false');
+    expect(containerEl.textContent).toContain('Enforcement PASS');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Disallowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
   });
 
   it('marks Disallowed Tools as fail when blocked tool is called', async () => {
@@ -3843,7 +4528,9 @@ describe('SettingsCapabilityLabSection', () => {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn().mockResolvedValue({
         sessionId: 'diag-disallowed-tools-fail',
-        rawMessages: [],
+        rawMessages: [
+          { type: 'system', subtype: 'init', tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'], model: 'claude-sonnet' },
+        ],
         chunks: [
           { type: 'tool_use', name: 'Bash' },
           { type: 'tool_result', content: 'file1.txt\nfile2.txt' },
@@ -3866,9 +4553,41 @@ describe('SettingsCapabilityLabSection', () => {
     button!.click();
     await flushUi();
 
-    expect(containerEl.textContent).toContain('Enforcement likely FAILED');
+    expect(containerEl.textContent).toContain('Enforcement FAILED');
     const failMarkers = containerEl.querySelectorAll('[data-capability="Disallowed Tools"].opencodian-capability-lab-proof-fail');
     expect(failMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Disallowed Tools as readback when no init message and no tool calls', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-disallowed-tools-noinit',
+        rawMessages: [],
+        chunks: [
+          { type: 'text', content: 'I cannot use Bash.' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Disallowed Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Configured disallowedTools: ["Bash"]');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Disallowed Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
   });
 
   it('marks stable settings as readback verified when options contain configured values', async () => {
@@ -3924,20 +4643,20 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('agent="proof-agent"');
     expect(containerEl.textContent).toContain('1 definition(s)');
 
-    // Verify readback markers for capabilities that are genuinely readback-classified
-    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables, Agent Definitions = 5 readback markers
-    // Environment Variables is now 'readback' (static classification defers to fresh runtime evidence)
-    // Fallback Model is wiring overall (behavior proof failed) so it gets a wiring marker, not readback
+    // Verify readback markers for capabilities that have options present in SDK options
+    // The stable settings readback proof marks capabilities as readback when options are present,
+    // regardless of the capability's overall matrix classification.
+    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables, Fallback Model, Agent Definitions = 6
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBe(5);
+    expect(readbackMarkers.length).toBe(6);
 
-    // Environment Variables no longer gets a pass marker from readback proof (downgraded to readback)
+    // Environment Variables no longer gets a pass marker from readback proof (it's pass overall)
     const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
     expect(passMarkers.length).toBeGreaterThanOrEqual(0);
 
-    // Verify Fallback Model gets a wiring marker (not readback) because behavior proof failed
+    // Fallback Model is readback (not wiring) — behavior proof failed: SDK accepted invalid primary without error, no fallback triggered; options verified
     const wiringMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-wiring');
-    expect(wiringMarkers.length).toBeGreaterThanOrEqual(1);
+    expect(wiringMarkers.length).toBe(0);
   });
 
   it('shows no-config hint when stable settings readback finds nothing configured', async () => {
@@ -3974,5 +4693,401 @@ describe('SettingsCapabilityLabSection', () => {
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
     expect(readbackMarkers.length).toBe(0);
   });
+
+  // ── Restricted Built-in Tools Proof Tests ──
+
+  it('renders Restricted Built-in Tools Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Restricted Built-in Tools Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('restricted builtin proof uses real settings wiring not diagnostic escape hatch', async () => {
+    // The proof must temporarily set restrictedBuiltinTools=['Read'] on the live
+    // settings object, NOT pass _diagnosticToolRestriction to the diagnostic prompt.
+    const diagnosticCalls: Record<string, unknown>[] = [];
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockImplementation(async (req: Record<string, unknown>) => {
+        diagnosticCalls.push(req);
+        return {
+          sessionId: 'diag-restricted-builtin-wiring',
+          rawMessages: [
+            { type: 'system', subtype: 'init', tools: ['Read', 'mcp__server__tool'], model: 'claude-sonnet' },
+          ],
+          chunks: [],
+        };
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({ tools: ['Read'] }),
+      capabilities: new Set(),
+    };
+    const plugin = createMockPlugin(adapter);
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Restricted Built-in Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    // Verify the diagnostic prompt was called WITHOUT _diagnosticToolRestriction
+    expect(diagnosticCalls.length).toBe(1);
+    expect(diagnosticCalls[0]).not.toHaveProperty('_diagnosticToolRestriction');
+    // Verify it WAS called with bypassPermissions (the proof uses bypass mode)
+    expect(diagnosticCalls[0]._diagnosticBypassPermissions).toBe(true);
+  });
+
+  it('restricted builtin proof restores original setting after pass', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-restricted-builtin-restore',
+        rawMessages: [
+          { type: 'system', subtype: 'init', tools: ['Read', 'mcp__server__tool'], model: 'claude-sonnet' },
+        ],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({ tools: ['Read'] }),
+      capabilities: new Set(),
+    };
+    // Pre-set a non-empty original value to verify restore
+    const plugin = createMockPlugin(adapter, 'claude-code', {
+      restrictedBuiltinTools: ['Bash', 'Write'],
+    });
+    const originalValue = (plugin.settings.backendSettings.claudeCode as Record<string, unknown>).restrictedBuiltinTools;
+    expect(originalValue).toEqual(['Bash', 'Write']);
+
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Restricted Built-in Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    // The original restrictedBuiltinTools must be restored on the live settings object
+    const currentValue = (plugin.settings.backendSettings.claudeCode as Record<string, unknown>).restrictedBuiltinTools;
+    expect(currentValue).toEqual(['Bash', 'Write']);
+  });
+
+  it('restricted builtin proof restores original setting after error', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('SDK subprocess crashed')),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const plugin = createMockPlugin(adapter, 'claude-code', {
+      restrictedBuiltinTools: ['Glob'],
+    });
+
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Restricted Built-in Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    // Even on error, the original setting must be restored
+    const currentValue = (plugin.settings.backendSettings.claudeCode as Record<string, unknown>).restrictedBuiltinTools;
+    expect(currentValue).toEqual(['Glob']);
+  });
+
+  it('restricted builtin proof passes when only Read and MCP tools in catalog', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-restricted-builtin-pass',
+        rawMessages: [
+          { type: 'system', subtype: 'init', tools: ['Read', 'mcp__ctx7__resolve', 'mcp__mem__search'], model: 'claude-sonnet' },
+        ],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({ tools: ['Read'] }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Restricted Built-in Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('PASS');
+    expect(containerEl.textContent).toContain('MCP tools [mcp__ctx7__resolve, mcp__mem__search] correctly pass through');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Restricted Built-in Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('restricted builtin proof readbacks when non-MCP extra tools remain', async () => {
+    // Init catalog has Read (requested) + mcp__tool (ok) + Bash (NOT ok — non-MCP extra)
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-restricted-builtin-readback',
+        rawMessages: [
+          { type: 'system', subtype: 'init', tools: ['Read', 'Bash', 'mcp__server__tool'], model: 'claude-sonnet' },
+        ],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({ tools: ['Read'] }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Restricted Built-in Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('READBACK');
+    expect(containerEl.textContent).toContain('non-MCP non-requested tools remain');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Restricted Built-in Tools"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+    // Must NOT be pass
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Restricted Built-in Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBe(0);
+  });
+
+  it('restricted builtin proof fails when Read missing from catalog', async () => {
+    // Init catalog has no Read at all — the requested tool is absent
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-restricted-builtin-fail',
+        rawMessages: [
+          { type: 'system', subtype: 'init', tools: ['mcp__server__tool'], model: 'claude-sonnet' },
+        ],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({ tools: ['Read'] }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Restricted Built-in Tools Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('FAIL');
+    const failMarkers = containerEl.querySelectorAll('[data-capability="Restricted Built-in Tools"].opencodian-capability-lab-proof-fail');
+    expect(failMarkers.length).toBeGreaterThan(0);
+  });
+
+  // ── Plugins Proof Tests ──
+
+  it('renders Plugins Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn(),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Plugins Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks Plugins as readback when plugin MCP servers exist but no plugin skills', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-plugins-mcp-only',
+        rawMessages: [
+          {
+            type: 'system',
+            subtype: 'init',
+            plugins: [
+              { name: 'context7@claude-plugins-official', path: '/Users/test/.claude/plugins/cache/claude-plugins-official/context7/abc123' },
+              { name: 'claude-mem@thedotmack', path: '/Users/test/.claude/plugins/cache/thedotmack/claude-mem/1.0' },
+            ],
+            mcp_servers: [
+              { name: 'context7', status: 'connected' },
+              { name: 'filesystem', status: 'connected' },
+            ],
+            skills: ['some-skill'],
+            slash_commands: [],
+            tools: ['Read', 'Write'],
+          },
+        ],
+        chunks: [
+          { type: 'text', content: 'PLUGINS-PROOF-ACK' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Plugins Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    // MCP servers alone are registration evidence, not behavior proof.
+    // Pass requires plugin-provided skills in init.skills.
+    expect(containerEl.textContent).toContain('READBACK');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Plugins"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Plugins as pass when init message shows plugin-contributed skills', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-plugins-skills',
+        rawMessages: [
+          {
+            type: 'system',
+            subtype: 'init',
+            plugins: [
+              { name: 'document-skills@anthropic-agent-skills', path: '/Users/test/.claude/plugins/cache/anthropic-agent-skills/document-skills/abc' },
+            ],
+            mcp_servers: [],
+            skills: ['document-skills', 'other-skill'],
+            slash_commands: [],
+            tools: ['Read'],
+          },
+        ],
+        chunks: [
+          { type: 'text', content: 'PLUGINS-PROOF-ACK' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Plugins Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('PASS');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Plugins"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
+  });
+
+  it('marks Plugins as readback when plugins loaded but no correlated contributions', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-plugins-readback',
+        rawMessages: [
+          {
+            type: 'system',
+            subtype: 'init',
+            plugins: [
+              { name: 'my-plugin@some-marketplace', path: '/Users/test/.claude/plugins/cache/some-marketplace/my-plugin/1.0' },
+            ],
+            mcp_servers: [{ name: 'unrelated-server', status: 'connected' }],
+            skills: ['unrelated-skill'],
+            slash_commands: [],
+            tools: ['Read'],
+          },
+        ],
+        chunks: [
+          { type: 'text', content: 'PLUGINS-PROOF-ACK' },
+        ],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Plugins Proof')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('READBACK');
+    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Plugins"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBeGreaterThan(0);
+  });
+
   /* eslint-enable @typescript-eslint/no-explicit-any */
 });

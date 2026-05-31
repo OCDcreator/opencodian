@@ -469,7 +469,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.fallbackModel.boundaryNotice'));
     });
 
-    it('renders fallback model proof status notice with wiring state in model-thinking tab', () => {
+    it('renders fallback model proof status notice with readback state in model-thinking tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -480,7 +480,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="fallback-model"]');
       expect(noticeEl).toBeTruthy();
-      expect(noticeEl?.getAttribute('data-proof-state')).toBe('wiring');
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.fallbackModel'));
     });
 
@@ -495,7 +495,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="limits"]');
       expect(noticeEl).toBeTruthy();
-      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('pass');
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.limits'));
     });
 
@@ -960,6 +960,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.tools'));
     });
 
+    it('renders restricted-builtin-tools proof status notice with pass state in tools tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="restricted-builtin-tools"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('pass');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.restrictedBuiltinTools'));
+    });
+
     it('rejects invalid tool names and keeps only valid PascalCase alphanumeric names', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -1114,6 +1129,119 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+    });
+  });
+
+  describe('same-model fallback guard', () => {
+    it('rejects fallback model text input when value matches main model', async () => {
+      const plugin = createPlugin();
+      // model is 'claude-sonnet-4-5' by default
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const fallbackControl = findText(t('settings.claudeCode.fallbackModel.name'));
+      await fallbackControl.onChange?.('claude-sonnet-4-5' as never);
+
+      // Should NOT update fallbackModel
+      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
+      // Should NOT save
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+    });
+
+    it('rejects fallback model quick-select when value matches main model', async () => {
+      const claudeAdapter = {
+        supportedModels: jest.fn().mockResolvedValue([
+          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic' },
+        ]),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+      // Try to select same model as main model (claude-sonnet-4-5)
+      await findDropdown(t('settings.claudeCode.fallbackModel.quickSelectName')).onChange?.('claude-sonnet-4-5' as never);
+
+      // Should NOT update fallbackModel
+      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
+    });
+
+    it('clears fallback model when model text input is changed to match fallback', async () => {
+      const plugin = createPlugin();
+      plugin.settings.backendSettings.claudeCode.fallbackModel = 'claude-haiku-4-5';
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      // Change main model to match fallback
+      const modelControl = findText(t('settings.claudeCode.model.name'));
+      await modelControl.onChange?.('claude-haiku-4-5' as never);
+
+      // Fallback should be cleared
+      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
+      // Model should be updated
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-haiku-4-5');
+      // Should save
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('clears fallback model when model quick-select is changed to match fallback', async () => {
+      const claudeAdapter = {
+        supportedModels: jest.fn().mockResolvedValue([
+          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+          { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'anthropic' },
+        ]),
+        setModel: jest.fn().mockResolvedValue(undefined),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      plugin.settings.backendSettings.claudeCode.fallbackModel = 'claude-haiku-4-5';
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+      // Select model that matches fallback
+      await findDropdown(t('settings.claudeCode.model.quickSelectName')).onChange?.('claude-haiku-4-5' as never);
+
+      // Fallback should be cleared
+      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
+      // Model should be updated
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-haiku-4-5');
+    });
+
+    it('allows fallback model text input when value differs from main model', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const fallbackControl = findText(t('settings.claudeCode.fallbackModel.name'));
+      await fallbackControl.onChange?.('claude-haiku-4-5' as never);
+
+      // Should update fallbackModel
+      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('claude-haiku-4-5');
+      // Should save
+      expect(plugin.saveSettings).toHaveBeenCalled();
     });
   });
 

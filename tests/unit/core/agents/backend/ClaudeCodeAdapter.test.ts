@@ -2067,6 +2067,195 @@ describe('ClaudeCodeAdapter', () => {
     });
   });
 
+  describe('runCheckpointRewindProbe applyFlagSettings seam', () => {
+    /** Creates an SDK facade with a mockable query for runCheckpointRewindProbe testing */
+    function createProbeSdk(opts: {
+      /** Mock for query.applyFlagSettings — if omitted, method is not present on query */
+      applyFlagSettings?: jest.Mock;
+      /** Messages to yield from Phase 1 query */
+      phase1Messages: unknown[];
+      /** Messages to yield from Phase 2 query */
+      phase2Messages: unknown[];
+      /** Mock for query.rewindFiles */
+      rewindFiles?: jest.Mock;
+      /** If true, query does NOT have rewindFiles method */
+      noRewindFiles?: boolean;
+    }): ClaudeCodeSdkFacade & { query: jest.Mock } {
+      let queryIndex = 0;
+      const allMessages = [opts.phase1Messages, opts.phase2Messages];
+
+      const mockQuery = jest.fn(() => {
+        const messages = allMessages[queryIndex] ?? [];
+        queryIndex += 1;
+        const queue = createAsyncQueue<unknown>();
+        const closeQueue = queue.close;
+        const q: Record<string, unknown> = Object.assign(queue, {
+          supportedModels: jest.fn().mockResolvedValue([]),
+          close: jest.fn(() => closeQueue()),
+        });
+        if (!opts.noRewindFiles) {
+          q.rewindFiles = opts.rewindFiles ?? jest.fn().mockResolvedValue({ canRewind: false, error: 'No file checkpoint found' });
+        }
+        if (opts.applyFlagSettings) {
+          q.applyFlagSettings = opts.applyFlagSettings;
+        }
+        // Push messages after a tick so the async iterator is ready
+        setTimeout(() => {
+          for (const msg of messages) {
+            (q as AsyncIterable<unknown> & { push: (v: unknown) => void }).push(msg);
+          }
+          (q as { close: () => void }).close();
+        }, 0);
+        return q;
+      });
+
+      return {
+        query: mockQuery as unknown as ClaudeCodeSdkFacade['query'] & jest.Mock,
+        listSessions: jest.fn().mockResolvedValue([]),
+        getSessionInfo: jest.fn().mockResolvedValue(undefined),
+        getSessionMessages: jest.fn().mockResolvedValue([]),
+        listSubagents: jest.fn().mockResolvedValue([]),
+        getSubagentMessages: jest.fn().mockResolvedValue([]),
+        importSessionToStore: jest.fn().mockResolvedValue(undefined),
+        forkSession: jest.fn().mockResolvedValue({ sessionId: 'sdk-fork-session' }),
+        renameSession: jest.fn().mockResolvedValue(undefined),
+      };
+    }
+
+    it('sets applyFlagSettingsAttempted=true and applyFlagSettingsError=undefined when call succeeds', async () => {
+      const applyFlagSettings = jest.fn().mockResolvedValue(undefined);
+      const sdk = createProbeSdk({
+        applyFlagSettings,
+        phase1Messages: [
+          { type: 'user', uuid: 'user-msg-001', session_id: 'probe-session-1' },
+          { type: 'assistant', session_id: 'probe-session-1', message: { role: 'assistant' } },
+          { type: 'tool_use', name: 'Write', session_id: 'probe-session-1' },
+          { type: 'user', uuid: 'tool-result-001', session_id: 'probe-session-1' },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-1' },
+        ],
+        phase2Messages: [
+          { type: 'assistant', session_id: 'probe-session-1', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-1' },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-probe',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runCheckpointRewindProbe();
+
+      expect(result.applyFlagSettingsAttempted).toBe(true);
+      expect(result.applyFlagSettingsError).toBeUndefined();
+      expect(applyFlagSettings).toHaveBeenCalledWith({ fileCheckpointingEnabled: true });
+    });
+
+    it('sets applyFlagSettingsError when applyFlagSettings is not available on Query', async () => {
+      // Don't provide applyFlagSettings mock — method won't exist on query
+      const sdk = createProbeSdk({
+        phase1Messages: [
+          { type: 'user', uuid: 'user-msg-002', session_id: 'probe-session-2' },
+          { type: 'assistant', session_id: 'probe-session-2', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-2' },
+        ],
+        phase2Messages: [
+          { type: 'assistant', session_id: 'probe-session-2', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-2' },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-probe',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runCheckpointRewindProbe();
+
+      expect(result.applyFlagSettingsAttempted).toBe(true);
+      expect(result.applyFlagSettingsError).toBe('applyFlagSettings not available on Query');
+    });
+
+    it('sets applyFlagSettingsError when applyFlagSettings throws', async () => {
+      const applyFlagSettings = jest.fn().mockRejectedValue(new Error('control request failed'));
+      const sdk = createProbeSdk({
+        applyFlagSettings,
+        phase1Messages: [
+          { type: 'user', uuid: 'user-msg-003', session_id: 'probe-session-3' },
+          { type: 'assistant', session_id: 'probe-session-3', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-3' },
+        ],
+        phase2Messages: [
+          { type: 'assistant', session_id: 'probe-session-3', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-3' },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-probe',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runCheckpointRewindProbe();
+
+      expect(result.applyFlagSettingsAttempted).toBe(true);
+      expect(result.applyFlagSettingsError).toBe('control request failed');
+    });
+
+    it('sets applyFlagSettingsAttempted=false when no assistant message is seen', async () => {
+      const applyFlagSettings = jest.fn().mockResolvedValue(undefined);
+      const sdk = createProbeSdk({
+        applyFlagSettings,
+        phase1Messages: [
+          { type: 'user', uuid: 'user-msg-004', session_id: 'probe-session-4' },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-4' },
+        ],
+        phase2Messages: [
+          { type: 'result', subtype: 'success', session_id: 'probe-session-4' },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-probe',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runCheckpointRewindProbe();
+
+      expect(result.applyFlagSettingsAttempted).toBe(false);
+      expect(applyFlagSettings).not.toHaveBeenCalled();
+    });
+
+    it('returns applyFlagSettings fields on early-return path (no initial user message)', async () => {
+      const applyFlagSettings = jest.fn().mockResolvedValue(undefined);
+      const sdk = createProbeSdk({
+        applyFlagSettings,
+        // No user message with uuid — probe should early-return
+        phase1Messages: [
+          { type: 'system', subtype: 'init', session_id: 'probe-session-5' },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-5' },
+        ],
+        phase2Messages: [],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-probe',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runCheckpointRewindProbe();
+
+      // Early return path still includes applyFlagSettings fields
+      expect(result).toHaveProperty('applyFlagSettingsAttempted');
+      expect(result).toHaveProperty('applyFlagSettingsError');
+    });
+  });
+
   describe('ClaudeCodeAdapter runtime controls and diagnostic session lookup', () => {
     function createRuntimeControlQuery(overrides: {
       setModel?: jest.Mock;
@@ -3063,6 +3252,77 @@ describe('ClaudeCodeAdapter', () => {
       expect(passedOptions.canUseTool).toBeTruthy();
       expect(typeof passedOptions.canUseTool).toBe('function');
       expect(passedOptions.permissionMode).toBe('acceptEdits');
+    });
+
+    it('uses _diagnosticCanUseTool override instead of bridge when provided and non-bypass', async () => {
+      const bridgeCanUseTool = jest.fn().mockResolvedValue({ behavior: 'allow' });
+      const overrideCanUseTool = jest.fn().mockResolvedValue({ behavior: 'allow' });
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'default' },
+        sdk,
+        permissionBridge: { canUseTool: bridgeCanUseTool } as never,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Override canUseTool test',
+        persistSession: false,
+        _diagnosticCanUseTool: overrideCanUseTool,
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      // Override should be used instead of bridge
+      expect(passedOptions.canUseTool).toBe(overrideCanUseTool);
+      // Bridge should not have been called
+      expect(bridgeCanUseTool).not.toHaveBeenCalled();
+    });
+
+    it('forces permissionMode via _diagnosticForcePermissionMode when non-bypass', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Force permissionMode test',
+        persistSession: false,
+        _diagnosticForcePermissionMode: 'default',
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      expect(passedOptions.permissionMode).toBe('default');
+      // Should NOT have allowDangerouslySkipPermissions when forced to default
+      expect(passedOptions.allowDangerouslySkipPermissions).toBeUndefined();
+    });
+
+    it('ignores _diagnosticCanUseTool and _diagnosticForcePermissionMode when bypass is true', async () => {
+      const overrideCanUseTool = jest.fn().mockResolvedValue({ behavior: 'allow' });
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'default' },
+        sdk,
+      });
+
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Bypass ignores overrides',
+        persistSession: false,
+        _diagnosticBypassPermissions: true,
+        _diagnosticCanUseTool: overrideCanUseTool,
+        _diagnosticForcePermissionMode: 'plan',
+      });
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      const passedOptions = sdk.query.mock.calls[0][0].options;
+      // Bypass still takes precedence
+      expect(passedOptions.permissionMode).toBe('bypassPermissions');
+      expect(passedOptions.allowDangerouslySkipPermissions).toBe(true);
+      expect(passedOptions.canUseTool).toBeUndefined();
     });
   });
 });

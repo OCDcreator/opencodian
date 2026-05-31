@@ -111,6 +111,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     const defaults = getDefaultClaudeCodeBackendSettings();
     expect(defaults.allowedTools).toEqual([]);
     expect(defaults.disallowedTools).toEqual([]);
+    expect(defaults.restrictedBuiltinTools).toEqual([]);
     expect(defaults.maxTurns).toBeNull();
     expect(defaults.maxBudgetUsd).toBeNull();
     expect(defaults.env).toEqual({});
@@ -128,6 +129,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     const result = normalizeClaudeCodeBackendSettings(null);
     expect(result.allowedTools).toEqual([]);
     expect(result.disallowedTools).toEqual([]);
+    expect(result.restrictedBuiltinTools).toEqual([]);
     expect(result.maxTurns).toBeNull();
     expect(result.maxBudgetUsd).toBeNull();
     expect(result.env).toEqual({});
@@ -138,6 +140,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     const result = normalizeClaudeCodeBackendSettings({
       allowedTools: [' Read ', 'Bash', 'Read'],
       disallowedTools: [' Write '],
+      restrictedBuiltinTools: ['Read', ' Grep ', 'Read'],
       maxTurns: 100,
       maxBudgetUsd: 10.5,
       env: { API_KEY: 'test', DEBUG: 'true' },
@@ -152,6 +155,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     });
     expect(result.allowedTools).toEqual(['Read', 'Bash']);
     expect(result.disallowedTools).toEqual(['Write']);
+    expect(result.restrictedBuiltinTools).toEqual(['Read', 'Grep']);
     expect(result.maxTurns).toBe(100);
     expect(result.maxBudgetUsd).toBe(10.5);
     expect(result.env).toEqual({ API_KEY: 'test', DEBUG: 'true' });
@@ -169,6 +173,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     const result = normalizeClaudeCodeBackendSettings({
       allowedTools: 'not-array',
       disallowedTools: 42,
+      restrictedBuiltinTools: 'bad',
       maxTurns: -5,
       maxBudgetUsd: 'free',
       env: 'nope',

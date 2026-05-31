@@ -16,7 +16,7 @@
  */
 /* eslint-disable max-lines -- Claude Code settings keeps cross-layout tab rendering and persistence controls co-located for auditability. */
 
-import { Setting } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
 
 import {
   type ClaudeCodeProcessResolution,
@@ -255,6 +255,11 @@ export class SettingsClaudeCodeSection {
           .onChange(async (value) => {
             const model = value.trim();
             this.settings.model = model;
+            // If model now matches fallbackModel, clear fallback to avoid guaranteed SDK error
+            if (model && this.settings.fallbackModel && model === this.settings.fallbackModel) {
+              this.settings.fallbackModel = '';
+              new Notice(t('settings.claudeCode.fallbackModel.clearedByModelChange'));
+            }
             await this.applyClaudeModel(model || undefined).catch(() => undefined);
             await this.saveSettings();
           });
@@ -273,7 +278,16 @@ export class SettingsClaudeCodeSection {
           .setPlaceholder(t('settings.claudeCode.fallbackModel.placeholder'))
           .setValue(this.settings.fallbackModel)
           .onChange(async (value) => {
-            this.settings.fallbackModel = value.trim();
+            const trimmed = value.trim();
+            if (trimmed && trimmed === this.settings.model) {
+              // SDK throws on same-model fallback; reject and revert
+              new Notice(t('settings.claudeCode.fallbackModel.sameModelWarning'));
+              if (typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
+                (textControl as { setValue: (v: string) => unknown }).setValue(this.settings.fallbackModel);
+              }
+              return;
+            }
+            this.settings.fallbackModel = trimmed;
             await this.saveSettings();
           });
       });
@@ -425,7 +439,7 @@ export class SettingsClaudeCodeSection {
   private renderFallbackModelProofStatusNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
       cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'fallback-model', 'data-proof-state': 'wiring' },
+      attr: { 'data-claude-code-proof-status': 'fallback-model', 'data-proof-state': 'readback' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.fallbackModel') });
   }
@@ -441,7 +455,7 @@ export class SettingsClaudeCodeSection {
   private renderLimitsProofStatusNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
       cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'limits', 'data-proof-state': 'readback' },
+      attr: { 'data-claude-code-proof-status': 'limits', 'data-proof-state': 'pass' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.limits') });
   }
@@ -474,6 +488,11 @@ export class SettingsClaudeCodeSection {
           if (textControl && typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
             (textControl as { setValue: (v: string) => unknown }).setValue(value);
           }
+          // If model now matches fallbackModel, clear fallback to avoid guaranteed SDK error
+          if (this.settings.fallbackModel && value === this.settings.fallbackModel) {
+            this.settings.fallbackModel = '';
+            new Notice(t('settings.claudeCode.fallbackModel.clearedByModelChange'));
+          }
           await this.applyClaudeModel(value).catch(() => undefined);
           await this.saveSettings();
         });
@@ -496,6 +515,12 @@ export class SettingsClaudeCodeSection {
 
         dropdown.onChange(async (value) => {
           if (!value) return;
+          if (value === this.settings.model) {
+            // SDK throws on same-model fallback; reject and revert
+            new Notice(t('settings.claudeCode.fallbackModel.sameModelWarning'));
+            dropdown.setValue('');
+            return;
+          }
           this.settings.fallbackModel = value;
           if (textControl && typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
             (textControl as { setValue: (v: string) => unknown }).setValue(value);
@@ -645,6 +670,8 @@ export class SettingsClaudeCodeSection {
     this.renderToolsProofStatusNotice(containerEl);
     this.renderAllowedToolsSetting(containerEl);
     this.renderDisallowedToolsSetting(containerEl);
+    this.renderRestrictedBuiltinToolsSetting(containerEl);
+    this.renderRestrictedBuiltinToolsProofStatusNotice(containerEl);
   }
 
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
@@ -709,6 +736,40 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+  }
+
+  private renderRestrictedBuiltinToolsSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.restrictedBuiltinTools.name'))
+      .setDesc(t('settings.claudeCode.restrictedBuiltinTools.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.restrictedBuiltinTools.placeholder'))
+          .setValue(this.settings.restrictedBuiltinTools.join('\n'))
+          .onChange(async (value) => {
+            this.settings.restrictedBuiltinTools = this.parseToolList(value);
+            await this.saveSettings();
+          });
+      });
+  }
+
+  private renderRestrictedBuiltinToolsProofStatusNotice(containerEl: HTMLElement): void {
+    // Evidence-based static classification: the SDK `tools` option is
+    // deterministic at init tool-catalog level for built-in tools.
+    // This does not depend on whether the setting textbox is filled.
+    //
+    // Runtime proof boundary (Capability Lab → runRestrictedBuiltinToolsProof):
+    //   - Exercises the normal settings wiring path (not _diagnosticToolRestriction)
+    //   - Temporarily sets restrictedBuiltinTools=['Read'] on live settings object
+    //   - Runs diagnostic prompt, verifies init catalog contains only Read + MCP tools
+    //   - Restores original setting
+    //   - Built-in tools only: MCP tools always pass through (mcp__ prefix)
+    //   - Pass condition: requested tools present, every extra tool has mcp__ prefix
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
+      attr: { 'data-claude-code-proof-status': 'restricted-builtin-tools', 'data-proof-state': 'pass' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.restrictedBuiltinTools') });
   }
 
   private renderMaxTurnsSetting(containerEl: HTMLElement): void {

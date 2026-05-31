@@ -94,6 +94,7 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       fallbackModel: 'claude-sonnet-4-5',
       allowedTools: [],
       disallowedTools: [],
+      restrictedBuiltinTools: [],
       maxTurns: null,
       maxBudgetUsd: null,
       env: {},

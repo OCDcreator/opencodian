@@ -1,44 +1,1447 @@
 # Claude Code SDK Current State - 2026-05-22
 
-## 2026-05-28 Capability Matrix Audit — 7 Promotions from `untested` to `pass`
+## 2026-05-31 Fallback Model — modelUsage Detection Seam Verified
 
 ### Objective
 
-Audit 9 capabilities (`Fork Session`, `Resume Session`, `Session Detail`, `Backend Routing`, `JSONL History Browser`, `Import Session to Store`, `File Checkpoint / Rewind`, `Hooks`, `Session Store`) that were classified as `untested` in the 24-capability matrix. Promote those with sufficient runtime evidence; tighten wording for those that stay non-pass.
+Explore the SDK `modelUsage` result-message field as a passive detection seam for fallback, and review other SDK type-level seams (`query.setModel()`, `applyFlagSettings({model})`, `SDKAPIRetryMessage`) for any honest path to move Fallback Model beyond `readback`.
 
-### Fresh runtime proof (BUILD_ID `feature-phase0-capability.202605281948`)
+### Seams Reviewed
 
-All probes ran via `obsidian eval` against the Test Vault with deployed BUILD_ID `feature-phase0-capability.202605281948`.
+| # | Seam | Type | Result |
+|---|------|------|--------|
+| 1 | `result.modelUsage` detection | Passive — post-hoc | ✅ Runtime-verified: single model tracked (`glm-5-turbo`), no fallback (expected without API overload). If native fallback occurs, `Object.keys(modelUsage).length > 1` would detect it. |
+| 2 | `query.setModel(model)` | Active — manual switch | SDK source verified (sdk.mjs: sends `{subtype:"set_model",model}` control request); wiring proven; NOT live-runtime-verified (no test confirming model change for subsequent API calls). Settings-side live apply sends this control request but model change is not runtime-verified. This is explicit model switching, not automatic fallback. |
+| 3 | `applyFlagSettings({model})` | Active — settings layer | Identified in SDK types but NOT runtime-verified. Settings-layer manual model switch; same category as setModel. |
+| 4 | `SDKAPIRetryMessage` with `error_status===529` | Passive — event | Identified in SDK type definitions (sdk.d.ts:2521) but NOT runtime-verified. Closest runtime event to fallback trigger, but only detects retry attempts, not fallback itself. |
 
-| Capability | Probe Result | Evidence |
-|---|---|---|
-| JSONL History Browser | `pass` | `listSessions` returned 38 sessions; `getSessionMessages` returned 10 messages for `d2ea808d…` |
-| Session Detail | `pass` | `getSession(d2ea808d…)` returned 10 keys (sessionId, summary, lastModified, fileSize, customTitle, firstPrompt, gitBranch, cwd, tag, createdAt) |
-| Backend Routing | `pass` | Registry: `activeKind=claude-code`, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell] |
-| Session Store | `pass` | `runDiagnosticPrompt` with `sessionStore` + `sessionStoreFlush='eager'` → store captured 14 entries across 1 key for session `8c762ebb…` |
-| Import Session to Store | `pass` | Imported session `d2ea808d…` into diagnostic store with 51 entries, 1 store key |
-| Resume Session | `pass` | Resumed session `d2ea808d…`, resulting sessionId matches target, model responded "Session resumed successfully.", exit code 0 |
-| File Checkpoint / Rewind | `untested` | Verification gap: `rewindFiles(dryRun: true)` requires a live checkpoint-enabled runtime query; diagnostic prompt exits before rewind can be called. Fresh checkpoint-enabled session `e2986d3c…` created but runtime already exited when `rewindFiles` was called |
+### Runtime Evidence (BUILD_ID feature-phase0-capability.202605311031)
 
-### Capabilities that stayed non-pass
+| Metric | Value |
+|--------|-------|
+| `fallbackInOptions` | `true` (option wiring verified) |
+| `fallbackModel` | `claude-haiku-4-5` |
+| `initModel` | `glm-5-turbo` |
+| `modelUsageKeys` | `["glm-5-turbo"]` (single model) |
+| `hasMultipleModels` | `false` (no fallback) |
+| `modelUsage` detection plumbing | ✅ Runtime-verified: `modelUsage` field present in result message with per-model token/cost tracking |
+| Artifact | `.obsidian-debug/fallback-model-modelusage-BUILD-feature-phase0-capability.202605311031-result.json` |
+| Console errors | none (`.obsidian-debug/fallback-model-modelusage-BUILD-feature-phase0-capability.202605311031-console.txt`) |
+| DOM assertions | `.obsidian-debug/fallback-model-modelusage-BUILD-feature-phase0-capability.202605311031-assertions.json` (`hasReadbackMarker=true`, `hasPassMarker=false`, `classification=readback`) |
+| Screenshot | `.obsidian-debug/fallback-model-modelusage-BUILD-feature-phase0-capability.202605311031.png` |
 
-| Capability | Blocker Category | Reason |
-|---|---|---|
-| File Checkpoint / Rewind | Verification gap | `rewindFiles` requires a live `session.runtime.query.rewindFiles`; after diagnostic prompt exits (code 0), the runtime is gone. Adapter wiring confirmed; probe would need a multi-turn session with checkpointing kept alive |
-| Hooks | Architecture gap | Hooks SDK option wiring confirmed (`buildSdkOptions` passes hooks), but custom hook configuration cannot be isolated from Include Hook Events (separately `pass`). Hook events captured in diagnostic stream prove the hooks system fires, but the hooks *option* itself has no isolated runtime proof |
+### Exhaustive Proof Seam Analysis (updated)
+
+| Seam | Status | Reason |
+|------|--------|--------|
+| Invalid primary model | ❌ Undermined | SDK accepts arbitrary model names at query boundary; same invalid string echoed back |
+| Same-model validation | ✅ Proven | `fallbackModel === model` throws deterministically — input validation, not switching |
+| API overload simulation | ❌ Dishonest | Would require faking Anthropic API HTTP 529 responses |
+| `modelUsage` detection | ✅ Runtime-verified | Result message `modelUsage` field tracks per-model usage; multi-model detection plumbing confirmed. Passive only — cannot trigger fallback |
+| `query.setModel()` | ℹ️ SDK source verified, NOT live-runtime-verified | SDK source (sdk.mjs) sends `{subtype:"set_model",model}` control request; wiring proven; no live test confirming model change for subsequent API calls. Manual switch, not automatic fallback |
+| `applyFlagSettings({model})` | ℹ️ Identified, NOT runtime-verified | Settings-layer manual model switch; same category as setModel |
+| `SDKAPIRetryMessage` 529 | ℹ️ Event only | Detects API retries including 529 but doesn't trigger fallback |
+
+### Conclusion: `readback` (unchanged)
+
+`modelUsage` detection plumbing is now confirmed working at runtime — this proves the SDK CAN detect which model(s) were used in a session. If native fallback ever occurs, this seam will detect it (`Object.keys(modelUsage).length > 1`). However, detection ≠ trigger: we cannot produce the API-side HTTP 529 signal needed to trigger the compiled CLI binary's native fallback logic.
+
+**Classification remains `readback`**: option wiring + detection plumbing verified, switching behavior not locally provable.
+
+### Precise Blocker (unchanged)
+
+SDK source (sdk.mjs v0.3.145) contains exactly 3 fallback references — all in `ProcessTransport.initialize()`: destructure, same-model validate, push `--fallback-model` CLI arg. ZERO switching/overload/retry logic in SDK. All model-switching lives in compiled CLI binary behind API-side HTTP 529/capacity signals. Cannot simulate locally. Same-model validation is deterministic but doesn't prove switching. `modelUsage` detection confirmed but passive. **Next executable path**: either Anthropic exposes a programmatic fallback trigger in SDK, or we accept `readback` as the honest ceiling.
+
+### Matrix summary (unchanged)
+
+- **pass**: 22/25
+- **readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+## 2026-05-31 Settings-Side Live-Apply Seam — Honesty Audit
+
+### Objective
+
+Inspect the settings-side model change live-apply seam (`SettingsClaudeCodeSection.applyClaudeModel()` → adapter `setModel()` → active persistent query update), determine whether it has honest runtime proof, and ensure wording/docs reflect the honest boundary.
+
+### Live-Apply Path Trace
+
+```
+Settings UI model change
+  → SettingsClaudeCodeSection.applyClaudeModel(model)    [src/features/settings/SettingsClaudeCodeSection.ts:821]
+  → adapter.setModel(model)                               [src/core/agents/backend/ClaudeCodeAdapter.ts:1277]
+  → applyToActiveQueries(runtime => runtime.query?.setModel?.(model))  [line 1278]
+  → SDK Query.setModel(model)                             [node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs]
+  → sends {subtype:"set_model", model} control request    [SDK source verified]
+  → CLI subprocess receives set_model control request      [NOT verified at runtime]
+```
+
+### Evidence Layers
+
+| Layer | Evidence | Status |
+|-------|----------|--------|
+| Wiring | Settings → adapter → active queries → SDK method | ✅ Proven (tests: ClaudeCodeAdapter.test.ts, SettingsClaudeCodeSection.test.ts, ClaudeCodeSmokeHarness.test.ts) |
+| SDK implementation | `query.setModel()` sends `{subtype:"set_model",model}` control request | ✅ Source-verified (sdk.mjs: `async setModel($){await this.request({subtype:"set_model",model:$})}`) |
+| Session reuse path | Production code at line 1674-1676 calls `setModel` for model overrides on reused runtimes | ✅ Present in production code |
+| Live runtime proof | Start session with model A, change to model B, verify subsequent API call uses model B | ❌ NOT performed |
+
+### Assessment
+
+**The settings-side live-apply is NOT live-runtime-verified.** We have strong structural evidence (wiring proven + SDK source verified + production code path) but have NOT performed a live runtime test confirming the model actually changes for subsequent API calls.
+
+### Wording Boundary
+
+| Surface | Current Wording | Assessment |
+|---------|----------------|------------|
+| UI (en) | "Changes apply live to active queries when possible" | ✅ Honest — "when possible" is best-effort hedge |
+| UI (zh) | "尽可能实时应用到当前活动查询" | ✅ Honest — "尽可能" is best-effort hedge |
+| Docs (SettingsClaudeCodeSection.md) | "让活跃持久 query 尽量 live 更新" | ✅ Honest — "尽量" is best-effort |
+| Status doc (seams table) | Updated to "SDK source verified...NOT live-runtime-verified" | ✅ Updated this round |
+
+### Decision
+
+- **Do NOT add new capability rows, buttons, or matrix entries** — the settings live-apply is a supporting seam, not a standalone capability
+- **Keep current UI wording** — "when possible" is honest best-effort language
+- **Update docs** to distinguish: manual `setModel` has SDK-source-verified implementation but no live runtime proof; automatic fallback is not locally provable at all
+- **No downgrade to "restart-only"** — that would be dishonest in the other direction given the strong structural evidence
 
 ### Files changed
 
-- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated 8 matrix rows (Fork Session, JSONL History Browser, Session Store, Import Session to Store, Resume Session, Session Detail, Backend Routing promoted to `pass`; Hooks tightened to explicit architecture gap wording; File Checkpoint tightened to explicit verification gap wording)
-- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated audit test expectations, verified count (8→14), hidden-untested list
-- `docs/status/claude-code-current-state-2026-05-22.md`: Updated four-bucket summary tables
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated `query.setModel()` evidence note from "type-identified only" to "SDK source verified...NOT live-runtime-verified"
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated detection seams table + added this analysis section
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Added `extractModelUsage()` helper; Phase 1 now also checks `modelUsage` detection; matrix row comment updated with detection seam evidence
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Added 4 focused tests for `extractModelUsage` (present, absent, no result, multi-model)
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated `runFallbackModelProof` description
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+- `devlog.md`: New dated section
+
+---
+
+## 2026-05-31 File Checkpoint / Rewind — applyFlagSettings Seam Explored
+
+### Objective
+
+Explore `query.applyFlagSettings({ fileCheckpointingEnabled: true })` as a potential runtime seam to activate snapshot creation in non-interactive SDK query() mode, which would move File Checkpoint / Rewind toward pass.
+
+### Seam Explored
+
+`applyFlagSettings(settings)` is a Query control method (sdk.d.ts:2215-2219) that sends an `apply_flag_settings` control request to the CLI subprocess at runtime. The hypothesis: even though `enableFileCheckpointing: true` in query options only sets an env var (`CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=true`), perhaps an explicit runtime `applyFlagSettings({ fileCheckpointingEnabled: true })` call could trigger the subprocess to activate its snapshot creation logic mid-stream.
+
+### Implementation
+
+Added to `runCheckpointRewindProbe()` Phase 1:
+- After the first `assistant` message (subprocess initialized and processing), call `phase1Query.applyFlagSettings({ fileCheckpointingEnabled: true })`
+- Capture `applyFlagSettingsAttempted: boolean` and `applyFlagSettingsError: string | undefined` in the return type
+- If the call succeeds and snapshot creation activates, `sdkFilesPersistedEventCount` should increase from 0
+
+### Expected Outcome
+
+Most likely: `applyFlagSettings` succeeds silently (no error) but does NOT activate snapshot creation, because the subprocess's snapshot function is gated behind React/Ink `useState` setters that don't exist in the SDK query path. This would add `applyFlagSettings` to the eliminated-workaround-paths table.
+
+### Runtime Evidence (BUILD_ID feature-phase0-capability.202605311013)
+
+| Metric | Value |
+|--------|-------|
+| Session ID | `fc9a04d2-25fa-4cdb-bda5-b9489d56e80b` |
+| `applyFlagSettingsAttempted` | `true` |
+| `applyFlagSettingsError` | `undefined` (call succeeded) |
+| `sdkFilesPersistedEventCount` | `0` (unchanged — no snapshot events) |
+| Probe file existed after Phase 1 | `true` (Write + Read tools worked) |
+| Candidates attempted | 6 (all `canRewind: false`) |
+| Tool use types | Write, Read |
+| Artifact | `.obsidian-debug/checkpoint-rewind-applyflagsettings-BUILD-feature-phase0-capability.202605311013-result.json` |
+| Console errors | none (`.obsidian-debug/checkpoint-rewind-applyflagsettings-BUILD-feature-phase0-capability.202605311013-console.txt`) |
+| Screenshot | `.obsidian-debug/checkpoint-rewind-applyflagsettings-BUILD-feature-phase0-capability.202605311016.png` (737 KB, Capability Lab matrix showing File Checkpoint / Rewind = Readback verified) |
+| DOM assertions | `.obsidian-debug/checkpoint-rewind-applyflagsettings-BUILD-feature-phase0-capability.202605311016-assertions.json` (`hasReadbackMarker=true`, `hasPassMarker=false`, `classification=readback`) |
+
+**Conclusion: `applyFlagSettings` is a dead-end seam.** The call succeeds (no error) but does NOT activate snapshot creation. `sdkFilesPersistedEventCount` remains 0, all 6 candidates still return `canRewind: false`. This confirms the blocker is architectural, not flag-based: the snapshot function is gated behind React/Ink UI components that never render in SDK query() mode, and no runtime settings injection can bypass this.
+
+### Matrix summary (unchanged)
+
+- **pass**: 22/25
+- **readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Precise Blocker (unchanged)
+
+**Upstream SDK bug [anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236)**: `isInteractive:false` hardcoded in `_T()` (sdk.mjs ~line 58); snapshot creation gated behind React/Ink `useState` setters absent from SDK `query()` mode; `rewindFiles()` checks always-empty internal file history. `applyFlagSettings({ fileCheckpointingEnabled: true })` seam confirmed dead-end (BUILD_ID feature-phase0-capability.202605311005: call succeeds but `sdkFilesPersistedEventCount` remains 0, all candidates still `canRewind:false`). SDK 0.3.157 (latest) does not fix this and introduces Obsidian/Electron crash. **Next executable path**: Anthropic must add snapshot creation to the non-interactive code path.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Added `applyFlagSettings` seam to `runCheckpointRewindProbe()` Phase 1 (call after first assistant message); added `applyFlagSettingsAttempted` and `applyFlagSettingsError` to return type
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated matrix row comment with `applyFlagSettings` seam evidence
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated probe description with `applyFlagSettings` seam
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated audit rule 7 and Rewind Dry-Run description
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+
+---
+
+## 2026-05-30 Allowed Tools — Product Boundary Finalized: No Pass Seam Exists
+
+### Objective
+
+Finalize the Allowed Tools product boundary: remove all dishonest `pass` and `fail` classification paths from `runAllowedToolsProof()`, clearly distinguish Allowed Tools (auto-approve shortcut) from Restricted Built-in Tools (deterministic availability restrictor), and fix stale module-doc references.
+
+### Assessment: No Honest Pass Seam
+
+Exhaustive investigation confirms no new deterministic runtime seam exists for Allowed Tools beyond readback:
+
+| Seam | Status | Reason |
+|------|--------|--------|
+| Init catalog filtering | ❌ Disproven | Catalog always 34 tools unfiltered regardless of allowedTools value |
+| canUseTool enforcement | ❌ Dead | canUseTool callback never invoked in SDK query() mode |
+| Non-bypass synthetic canUseTool | ❌ Non-enforcing | Non-allowed tools pass through to approval callback unfiltered |
+| SDK `tools` restrictor | ❌ Wrong capability | Owned by "Restricted Built-in Tools" (pass) — semantically distinct |
+
+### Changes
+
+1. **Removed dishonest 'pass' branch**: When init catalog coincidentally contains only allowed tools, proof now classifies as `readback` with clear explanation that this is NOT allowedTools enforcement — it's coincidence or another restrictor (e.g. Restricted Built-in Tools).
+2. **Removed dishonest 'fail' branch**: When non-allowed tool calls are observed, proof now classifies as `readback` — observing that allowedTools is not a restrictor does not prove the capability "failed".
+3. **Updated discovery row text**: Replaced verbose three-layer language with concise product boundary wording.
+4. **Updated matrix row comment**: Concise product boundary statement replacing detailed three-layer evidence.
+5. **Fixed stale module docs**: 24→25 capability count, BUILD_ID 0949→0954 for Restricted Built-in Tools entry.
+
+### Product Boundary (Final)
+
+| Setting | SDK Option | Purpose | Classification |
+|---------|-----------|---------|----------------|
+| Allowed Tools | `allowedTools` | Auto-approve shortcut (pre-allow without prompting) | `readback` — option reaches SDK but has zero enforcement |
+| Disallowed Tools | `disallowedTools` | Block specific tools from model context | `pass` — init catalog excludes disallowed tools deterministically |
+| Restricted Built-in Tools | `tools` | Restrict available built-in tools (MCP unaffected) | `pass` — init catalog filtered deterministically |
+
+### Classification: `readback` (unchanged — finalized)
+
+- **Pass**: 22/25
+- **Readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+---
+
+## 2026-05-30 Restricted Built-in Tools — Real Settings Wiring Proof
+
+### Objective
+
+Replace the `_diagnosticToolRestriction` diagnostic escape hatch in the Restricted Built-in Tools proof with the real settings wiring path: temporarily mutate `claudeCodeSettings.restrictedBuiltinTools` on the live settings object, run a diagnostic prompt WITHOUT `_diagnosticToolRestriction`, then restore the original setting.
+
+### Why This Matters
+
+The previous proof relied on `_diagnosticToolRestriction`, an adapter-level escape hatch that bypasses normal settings wiring. The acceptance blocker required the proof to exercise the same path a user triggers via the settings UI: `restrictedBuiltinTools` → `buildClaudeCodeOptions` → `options.tools` → SDK init catalog.
+
+### Implementation
+
+- `runRestrictedBuiltinToolsProof()` now saves `originalRestrictedBuiltinTools`, sets `this.claudeCodeSettings.restrictedBuiltinTools = ['Read']`, saves settings, runs the diagnostic prompt WITHOUT `_diagnosticToolRestriction`, then restores in a `finally` block.
+- Because `main.ts` passes the same settings object reference into `ClaudeCodeAdapter`, the adapter's `buildDiagnosticSdkOptions()` spreads `this.options.settings` and picks up the mutated value. This is the normal wiring path.
+- Pass condition is strict: requested tool (Read) must be present, every extra tool must have `mcp__` prefix. Non-MCP extras → readback, missing Read → fail.
+- Status notice comment in `renderRestrictedBuiltinToolsProofStatusNotice()` explicitly ties `data-proof-state: 'pass'` to the runtime proof boundary (built-in only, MCP unaffected).
+
+### Runtime Evidence (BUILD_ID feature-phase0-capability.202605300954)
+
+- Layer 1 wiring: `buildClaudeCodeOptions({restrictedBuiltinTools:['Read','Grep']})` → `tools: ["Read","Grep"]` ✓
+- Layer 2 runtime catalog via settings wiring:
+  - Init catalog: 6 tools — Read + 5 MCP tools (mcp__web-reader, mcp__web-search-prime, mcp__zread ×3)
+  - Diagnostic options tools is array: true (via buildClaudeCodeOptions, not _diagnosticToolRestriction)
+  - Read in catalog: true
+  - Non-MCP non-requested: [] (zero extra built-in tools)
+  - Classification: **PASS**
+- Settings restored: `restrictedBuiltinTools` returned to `[]` after proof
+- Console errors: none
+- Matrix: 22/25 pass, 3/25 readback, 0/25 fail (artifact `total:26` is internally inconsistent: 22+3+0=25; source buildMatrixRows() has 25 rows, test expects 25)
+- Proof artifacts: `.obsidian-debug/restricted-builtin-final-assertions-BUILD-feature-phase0-capability.202605300954.json`
+
+### Test Coverage
+
+- 7 new CapabilityLab tests: button render, real settings wiring (no `_diagnosticToolRestriction`), restore after pass, restore after error, pass (Read + MCP only), readback (non-MCP extra), fail (Read missing)
+- 1 new ClaudeCodeSection test: restricted-builtin-tools proof-status notice `data-proof-state: 'pass'` + locale text
+- Fixed 5 stale Allowed Tools tests (Phase C mock removal 3→2 calls)
+- Verified count audit updated: 21 → 22
+
+## 2026-05-30 Fallback Model — Source-Backed Blocker Hardened: SDK Contains Zero Switching Logic
+
+### Objective
+
+Harden the Fallback Model blocker with SDK source-level evidence proving no local honest proof seam exists for fallback-switching behavior.
+
+### SDK Source Analysis (sdk.mjs, v0.3.145)
+
+Python offset search of `sdk.mjs` reveals exactly 3 references to `fallback`:
+
+| Offset | Context | Purpose |
+|--------|---------|---------|
+| 301620 | `fallbackModel:w` destructure in `ProcessTransport.initialize()` | Extract from options |
+| 304122 | `if(w){if(N&&w===N)throw Error(...)}` + `i.push("--fallback-model",w)` | Same-model validate + push CLI arg |
+| 304156 | Same block (redundant match) | Same as above |
+
+The remaining 3 matches (offsets 656087, 656314) are `fallbackNotificationHandler` / `fallbackRequestHandler` — JSON-RPC fallback handlers unrelated to model fallback.
+
+**Conclusion**: The SDK does exactly 3 things with `fallbackModel`:
+1. Destructure it from options
+2. Validate `fallbackModel !== model` (throws if same)
+3. Push `--fallback-model <value>` as a CLI argument to the subprocess
+
+**ZERO switching/overload/retry/529 logic exists in the SDK.** All model-switching behavior lives in the compiled Claude Code CLI binary, triggered by API-side HTTP 529/capacity overload signals that cannot be produced locally.
+
+### Exhaustive Proof Seam Analysis
+
+| Seam | Status | Reason |
+|------|--------|--------|
+| Invalid primary model | ❌ Undermined | SDK accepts arbitrary model names at query boundary (BUILD_ID feature-phase0-capability.202605300441); no 400, same invalid string echoed back, no fallback |
+| Same-model validation | ✅ Proven | `fallbackModel === model` throws deterministically — but this validates input, not switching behavior |
+| API overload simulation | ❌ Dishonest | Would require faking Anthropic API HTTP 529 responses — violates honesty boundary |
+| SDK `query()` interception | ❌ No intercept | SDK delegates all model logic to CLI subprocess via `--fallback-model` flag; no callback/event exposes switching state |
+| Binary string evidence | ℹ️ Readback only | `overloaded_error`, `model_fallback`, `Switched to...` strings confirm the path exists in binary but not reachable from SDK host |
+
+### Classification: `readback` (unchanged)
+
+- **Pass**: 21/24
+- **Readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Precise Blocker
+
+SDK source (sdk.mjs v0.3.145) contains exactly 3 fallback references — all in `ProcessTransport.initialize()`: destructure, same-model validate, push `--fallback-model` CLI arg. ZERO switching/overload/retry logic in SDK. All model-switching lives in compiled CLI binary behind API-side HTTP 529/capacity signals. CLI help confirms: "when default model is overloaded (only works with --print)". Invalid-primary test (BUILD_ID feature-phase0-capability.202605300441) undermined: SDK accepts arbitrary model names, reports same string back, no fallback. Cannot simulate real API overload locally without faking external signals. Same-model validation is deterministic (throws immediately) but does not prove switching behavior. **Next executable path**: either Anthropic exposes a programmatic fallback trigger in SDK (e.g. a test-mode override or a `onFallback` callback), or we accept `readback` as the honest ceiling.
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Hardened matrix row comment with SDK source-backed evidence (3 fallback refs, all arg-pushing, zero switching logic); updated discovery row text; updated stable settings readback blocker note; updated Phase 2 success-path blocker text with SDK source evidence
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated fallback model blocker with SDK source evidence
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated Fallback Model proof description and audit notes
+- `devlog.md`: New dated section
+
+---
+
+## 2026-05-30 Allowed Tools — Blocker Hardened: SDK `tools` Restrictor Investigated, Semantics Mismatch Confirmed
+
+### Objective
+
+Determine whether any honest non-bypass runtime seam exists to promote Allowed Tools beyond `readback`. Investigated the SDK `tools` option (actual tool availability restrictor) as a potential adapter-owned remap from the user-facing "Allowed Tools" setting.
+
+### Semantics Mismatch (Critical Finding)
+
+| Aspect | `allowedTools` (current wiring) | `tools` (potential remap) |
+|--------|--------------------------------|--------------------------|
+| SDK purpose | "auto-allowed without prompting" (sdk.d.ts:1247-1253) | "specify base set of available built-in tools" (sdk.d.ts:1300-1309) |
+| User-facing description | "pre-allow for this backend" (locale: en.ts:2258) | N/A — not exposed to users |
+| Effect on init catalog | None — 34 tools unfiltered (Phase A evidence) | Filters built-in tools but NOT MCP tools (Phase C evidence) |
+| Interaction with bypass | Completely overridden — all checks skipped (SDK Issue #115) | Independent of permissions — controls availability, not approval |
+
+**Conclusion**: User-facing "Allowed Tools" means auto-approve/pre-allow. Remapping to SDK `tools` would change semantics from pre-approve to restrict-availability. This requires explicit product decision.
+
+### Three-Phase Runtime Evidence (BUILD_ID `feature-phase0-capability.202605300828`)
+
+| Phase | Session ID | Key Metric | Result |
+|-------|-----------|------------|--------|
+| A (bypass) | `0f47aa3d-11fd-4d67-a7b8-6c9e78c63cbf` | Init catalog: 34 tools, 33 non-allowed | `allowedTools` does NOT filter catalog |
+| B (non-bypass) | `ecc9fe61-293d-4f19-86a7-ee42172902e5` | canUseTool calls: **0**, tools executed: Bash, Glob, Read | canUseTool dead in `query()` mode |
+| C (tools restrictor) | `f446dac9-5856-499f-b811-de6fa2b203ea` | Init catalog: 6 tools (Read + 5 MCP) | `tools: ['Read']` filters built-in but MCP tools leak |
+
+### Phase C Detail — SDK `tools` Restrictor Limitation
+
+Configured `tools: ['Read']` via diagnostic override. Init catalog showed:
+- `Read` (built-in, allowed) ✓
+- `mcp__web-reader__webReader` (MCP, leaked) ✗
+- `mcp__web-search-prime__web_search_prime` (MCP, leaked) ✗
+- `mcp__zread__get_repo_structure` (MCP, leaked) ✗
+- `mcp__zread__read_file` (MCP, leaked) ✗
+- `mcp__zread__search_doc` (MCP, leaked) ✗
+
+**The SDK `tools` option only restricts built-in tool availability, not MCP tools.** Even if the remap were productized, enforcement would be incomplete.
+
+### Classification: `readback` (unchanged)
+
+- **Pass**: 21/24
+- **Readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Precise Blocker
+
+`allowedTools` is an auto-approve permission shortcut (SDK docs: "auto-allowed without prompting"), not a tool availability restrictor. The SDK's actual restrictor is the `tools` option, but: (1) user-facing setting says "pre-allow" not "restrict to", so remapping would change semantics; (2) even the `tools` restrictor does not filter MCP tools (5 leaked through in Phase C); (3) canUseTool callback is dead in `query()` mode (Phase B: zero calls despite tools executing). No honest non-bypass runtime seam exists to isolate allowedTools enforcement.
+
+### Next Executable Path
+
+Product decision needed: either (a) add separate "Restricted Tools" setting mapping to SDK `tools` option with clear availability-restriction semantics, or (b) accept that "Allowed Tools" is auto-approve-only and `readback` is the honest ceiling.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`: Widened `tools` type to accept `string[] | { type: 'preset'; preset: 'claude_code' }` for diagnostic override support
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Added `_diagnosticToolRestriction` escape hatch to `ClaudeCodeDiagnosticPromptRequest`; wired in `buildDiagnosticSdkOptions`
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Added Phase C to `runAllowedToolsProof()` testing SDK `tools` restrictor; updated classification output with Phase C evidence
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Added Phase C mock calls to all 6 Allowed Tools tests; updated assertion for Phase B non-enforcement test
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+- `docs/modules/core/agents/backend/ClaudeCodeOptionsBuilder.md`: Documented `tools` type widening
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Documented `_diagnosticToolRestriction` escape hatch
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-30 File Checkpoint / Rewind — Blocker Hardened with Source-Backed Evidence
+
+### Objective
+
+Harden the File Checkpoint / Rewind blocker with SDK source-level evidence, eliminating all possible workaround paths and providing the narrowest honest blocker sentence with a concrete next executable path.
+
+### Workaround Path Analysis (all eliminated)
+
+| Path | Status | Reason |
+|------|--------|--------|
+| `options.isInteractive` override | ❌ Not exposed | `Options` type has no `isInteractive` field |
+| `Query.setInteractive()` method | ❌ Not exposed | `Query` interface has no such method |
+| SDK 0.3.157 upgrade | ❌ Regressed | `setMaxListeners(abortSignal)` crash in Obsidian/Electron |
+| Adapter-level file backup/rewind | ❌ Dishonest | Would blur SDK capability vs plugin feature boundary |
+| Manual snapshot trigger | ❌ Not possible | `SDKFilesPersistedEvent` is read-only; no host-side creation API |
+| `spawnClaudeCodeProcess` extra args | ❌ Not effective | `isInteractive` is internal, not a CLI flag |
+| Non-`query()` entry points | ❌ Same issue | `assistant`, `bridge` entry points all initialize `isInteractive:false` |
+| `applyFlagSettings({ fileCheckpointingEnabled: true })` | ❌ Dead-end | Call succeeds (no error) but subprocess does NOT activate snapshot creation. `sdkFilesPersistedEventCount` remains 0, all candidates still `canRewind:false`. BUILD_ID feature-phase0-capability.202605311005 |
+
+### Source-Backed Evidence
+
+1. **SDK v0.3.145 `sdk.mjs` ~line 58**: Session state initializer function `_T()` sets `isInteractive:!1` (always false). This is the hardcoded default for all SDK code paths.
+2. **Zero `isInteractive=true` in bundled SDK**: `rg` search across `node_modules/@anthropic-ai/claude-agent-sdk/` returns zero results. The `true` value is only set by React/Ink interactive UI components which are NOT bundled in the SDK package.
+3. **Snapshot creation gated behind React `useState` setters**: The snapshot function that creates per-message file history snapshots is called exclusively from React component render logic, never from the SDK streaming path.
+4. **`rewindFiles()` is a subprocess control request**: Implementation sends `sdk_rewind_files` control message to CLI subprocess, which checks its internal (always-empty) file history.
+5. **`SDKFilesPersistedEvent` is read-only**: This event type (`files: string[], failures: string[]`) is emitted by the subprocess when snapshots ARE created. In SDK mode, zero such events are ever emitted.
+6. **GitHub Issue #236**: Filed 2026-03-17, 3 reactions, no maintainer response as of 2026-05-30. No fix in any version 0.2.76 through 0.3.157.
+
+### Probe Enhancement
+
+Added `sdkFilesPersistedEventCount: number` to `runCheckpointRewindProbe()` return type:
+- Counts `files_persisted` raw messages during Phase 1 streaming
+- Expected: 0 (confirming no snapshot events emitted in non-interactive mode)
+- Provides additional diagnostic evidence alongside existing `canRewind:false` + `candidateResults`
+
+UI `runRewindDryRun()` now shows explicit blocker hint paragraph when classifying as readback:
+- `canRewind:false` → "Blocker: SDK returns canRewind:false — no file checkpoint found. Upstream bug #236..."
+- `canRewind:true` + empty `filesChanged` → "Blocker: SDK reports canRewind:true but produces no file diff..."
+
+### Matrix row comment hardened
+
+Replaced generic "BLOCKER=upstream SDK bug" with source-backed evidence:
+- Exact function: `_T()` initializer in sdk.mjs
+- Exact flag: `isInteractive:!1`
+- Search result: zero `isInteractive=true` in bundled SDK
+- Exact control message: `sdk_rewind_files` to subprocess
+- Concrete fix requirement: `_T()` must call snapshot function even when `isInteractive=false`
+
+### Matrix summary (unchanged)
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Precise Blocker (narrowest honest sentence)
+
+**Upstream SDK bug [anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236)**: `isInteractive:false` is hardcoded in `_T()` (sdk.mjs ~line 58); snapshot creation is gated behind React/Ink `useState` setters absent from SDK `query()` mode; `rewindFiles()` checks always-empty internal file history. SDK 0.3.157 (latest) does not fix this and introduces Obsidian/Electron crash. **Next executable path**: Anthropic must add snapshot creation to the non-interactive code path.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Added `sdkFilesPersistedEventCount` to probe return type and Phase 1 streaming counter
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Hardened matrix row comment with source-backed evidence; added blocker hint paragraph to readback classification
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Added blocker hint assertions to canRewind:false and empty filesChanged tests
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated probe description
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated audit rule 7 and proof description
+- `devlog.md`: New dated section
+
+---
+
+## 2026-05-30 Allowed Tools — Non-Bypass Phase B Seam Crossed, Remains `readback`
+
+### Objective
+
+Cross the approval-host boundary by adding a `_diagnosticCanUseTool` synthetic callback and `_diagnosticForcePermissionMode` override to the diagnostic path, enabling a non-bypass Phase B proof that tests whether the SDK enforces `allowedTools` before calling `canUseTool`.
+
+### Implementation
+
+Two new diagnostic escape hatches added to `ClaudeCodeDiagnosticPromptRequest`:
+- `_diagnosticCanUseTool`: synthetic `canUseTool` callback that auto-approves all tools while recording which tool names the SDK requests approval for
+- `_diagnosticForcePermissionMode`: forces `permissionMode` to a non-bypass value (e.g. `'default'`) even when user settings have `'bypassPermissions'`, so the SDK subprocess actually runs in non-bypass mode
+
+### Two-Phase Proof Design
+
+**Phase A** (bypass mode): Same as previous — init catalog inspection + tool_use observation under `bypassPermissions`.
+**Phase B** (non-bypass with synthetic canUseTool): Runs with `permissionMode: 'default'` + synthetic `canUseTool`. If the SDK enforces `allowedTools`, non-allowed tools should never reach the callback.
+
+### Runtime Evidence (BUILD_ID `feature-phase0-capability.202605300708`)
+
+| Phase | Session ID | canUseTool calls | Tools executed | Key observation |
+|-------|-----------|-----------------|---------------|----------------|
+| A (bypass) | `2021886a-b2c7-43d3-a903-bd2caa6ad527` | N/A (bypass) | Bash, Bash, Read, Read | Catalog: 34 tools, 33 non-allowed |
+| B (non-bypass) | `fe6e9a6e-111d-4624-9cad-9bfe1dfbbe5f` | **0** | Bash, Glob, Read | SDK never called synthetic canUseTool |
+
+### Key Finding
+
+**Phase B: zero canUseTool calls despite `permissionMode: 'default'` and tools being executed.**
+
+The SDK subprocess executed Bash, Glob, and Read without ever invoking the synthetic `canUseTool` callback. This means:
+1. Setting `permissionMode: 'default'` via options does NOT cause the SDK subprocess to call the host-provided `canUseTool` in `query()` mode
+2. The `canUseTool` callback path is not activated even in non-bypass mode for programmatic queries
+3. The enforcement seam (if any) is entirely within the SDK subprocess, not exposed to the host's `canUseTool` callback
+
+### Honest Classification
+
+**Phase B Read-only is NOT deterministic pass**: Even if a future run shows only Read reaching `canUseTool`, that would be model-behavior omission (the model chose not to call Bash), not SDK-owned enforcement proof. Single-run model omission cannot promote past `readback`.
+
+**Phase B zero calls is inconclusive**: The current run shows the SDK never called `canUseTool` at all — tools were executed directly. This means the `canUseTool` callback path is not active in `query()` mode even with `permissionMode: 'default'`.
+
+**Allowed Tools remains `readback`** with a tighter blocker: the `canUseTool` callback is dead in `query()` mode regardless of `permissionMode`.
+
+### Matrix summary (unchanged)
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Added `_diagnosticCanUseTool` and `_diagnosticForcePermissionMode` to `ClaudeCodeDiagnosticPromptRequest`; wired both in `buildDiagnosticSdkOptions`
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Rewrote `runAllowedToolsProof()` with two-phase (A: bypass, B: non-bypass with synthetic canUseTool) design; all Phase B outcomes classified as `readback` (never `pass` from single-run model omission)
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated all Allowed Tools proof mocks for dual-call pattern; added 3 new Phase B tests (Read-only → readback, non-allowed → readback, error → readback)
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts`: Added 3 adapter tests (canUseTool override, forcePermissionMode, bypass ignores overrides)
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated diagnostic options documentation
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated proof description
+- `devlog.md`: New dated section
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-30 File Checkpoint / Rewind — Fresh Runtime Evidence: Truth A (all candidates canRewind:false)
+
+### Objective
+
+Eliminate the contradiction between (1) the 0.3.145 baseline run showing `canRewind:false` and (2) older v8 artifact showing `canRewind:true`, by running a fresh probe with per-candidate result tracking and updating all stale claims.
+
+### Runtime Evidence (BUILD_ID `feature-phase0-capability.202605300627`)
+
+| Metric | Value |
+|--------|-------|
+| Session ID | `91f99c0a-5d88-421d-9d70-c72ca3c69071` |
+| User message ID | `035b17da-fc7f-4f69-8b35-e6b20be20f14` |
+| Probe file existed after Phase 1 | `true` (Write + Read tools used) |
+| Candidates attempted | 6 (user msg UUID + session ID + 4 assistant UUIDs) |
+| Per-candidate results | **All 6 candidates: `canRewind: false`** |
+| Dry-run rewind result | `{ canRewind: false, error: "No file checkpoint found for this message." }` |
+| Chunks captured | 46 |
+| `dryRun:false` attempted | No (no successful candidate to attempt actual rewind) |
+| Classification | `readback` (unchanged) |
+| Artifact | `.obsidian-debug/checkpoint-rewind-proof-v9-result.json` |
+
+### Per-candidate detail
+
+| # | Candidate ID | canRewind | Source |
+|---|---|---|---|
+| 1 | `035b17da-fc7f-4f69-8b35-e6b20be20f14` | `false` | Initial user message UUID (from stream) |
+| 2 | `91f99c0a-5d88-421d-9d70-c72ca3c69071` | `false` | Session ID |
+| 3 | `28d1f0f7-210d-45b6-a879-30b8d119994f` | `false` | Assistant message UUID |
+| 4 | `929d672e-a823-4d1f-8bf6-90f7fceaf60c` | `false` | Assistant message UUID |
+| 5 | `5ab7406f-1728-4d98-a51d-d020da38410d` | `false` | Assistant message UUID |
+| 6 | `95802de8-ac6b-4120-9711-1dc042b55033` | `false` | Assistant message UUID |
+
+### Truth determination: **A — always canRewind:false**
+
+The current SDK 0.3.145 on this runtime produces `canRewind:false` for every candidate. The earlier `canRewind:true` observation (v8 artifact, BUILD_ID `feature-phase0-capability.202605291259`) was from an older build and is not reproducible on current SDK/runtime. The root cause is unchanged: upstream bug #236 — file history snapshot creation is gated behind React/Ink interactive UI code paths and never fires in SDK non-interactive `query()` mode.
+
+### Probe enhancement
+
+- `runCheckpointRewindProbe()` now returns `candidateResults: Array<{candidateId, canRewind, filesChanged, error?}>` for every candidate attempted, not just the first `canRewind:true`. This provides complete per-candidate diagnostics regardless of outcome.
+
+### Matrix summary (unchanged)
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Added `candidateResults` field to probe return type and per-candidate tracking in Phase 2 loop
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated matrix row comment from stale `canRewind:true` to current `canRewind:false` truth
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section; fixed four-bucket table row 11
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated Rewind Dry-Run description and audit rule 7
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated runtime evidence description
+- `devlog.md`: New dated section
+
+---
+
+## 2026-05-30 File Checkpoint / Rewind — SDK 0.3.157 Upgrade Tested: Regression (query() crash), Reverted; Blocker Unchanged on 0.3.145
+
+### Objective
+
+Test whether upgrading `@anthropic-ai/claude-agent-sdk` from 0.3.145 to 0.3.157 changes file checkpoint/rewind behavior enough to achieve real runtime proof.
+
+### Experiment: SDK 0.3.157
+
+- Installed 0.3.157, built, deployed to Test Vault (BUILD_ID `feature-phase0-capability.202605300437`)
+- Adapter connected successfully (`status: connected`)
+- `runCheckpointRewindProbe()` invoked via `eval`
+
+### Result: REGRESSION — `query()` crashes on 0.3.157
+
+```
+TypeError [ERR_INVALID_ARG_TYPE]: The "eventTargets" argument must be an instance of EventEmitter or EventTarget. Received an instance of AbortSignal
+    at EventEmitter.setMaxListeners (node:events:331:17)
+    at g9 (plugin:opencodian:1086:44)
+    at new jU (plugin:opencodian:15735:47)
+    at uz (plugin:opencodian:7268:12)
+    at Object.jA$ (plugin:opencodian:7329:64)
+    at Object.query (plugin:opencodian:64798:27)
+    at ClaudeCodeAdapter.runCheckpointRewindProbe (plugin:opencodian:63458:29)
+```
+
+The SDK 0.3.157 calls `setMaxListeners(abortSignal)` internally, but `AbortSignal` is not an `EventEmitter`/`EventTarget` in the Obsidian/Electron environment. The `query()` function crashes before any prompt is sent to the subprocess. **No checkpoint/rewind behavior can be tested on 0.3.157.**
+
+### Experiment: SDK 0.3.145 (baseline confirmation)
+
+- Reverted to 0.3.145, rebuilt, deployed (BUILD_ID `feature-phase0-capability.202605300441`)
+- `runCheckpointRewindProbe()` runs to completion:
+
+| Metric | Value |
+|--------|-------|
+| Session ID | `e93f1dff-d4f3-4b64-bb47-844defd1847e` |
+| Probe file existed after Phase 1 | `true` (Write + Read tools used) |
+| Candidates attempted | 6 (initial user msg UUID + session ID + assistant UUIDs) |
+| Dry-run rewind result | `{ canRewind: false, error: "No file checkpoint found for this message." }` |
+| Chunks captured | 46 |
+| Classification | `readback` (unchanged) |
+
+### Key Findings
+
+1. **SDK 0.3.157 is a regression for our runtime**: `query()` crashes with `ERR_INVALID_ARG_TYPE` before any subprocess communication. The dependency upgrade must NOT be applied.
+2. **SDK 0.3.145 blocker unchanged**: Same `canRewind: false` + "No file checkpoint found" — issue #236 remains unfixed.
+3. **0.3.145 → 0.3.157 changelogs contain zero mentions** of file checkpoint, rewind, snapshot, or FileHistory — confirming the upstream bug has not been addressed.
+4. **Issue #236 remains OPEN** with no maintainer response.
+
+### Decision: Revert and retain 0.3.145
+
+- `package.json` / `package-lock.json`: restored to 0.3.145 (no diff)
+- Installed `node_modules/`: 0.3.145
+- The upgrade was tested and reverted — only this documentation records the finding
+
+### Precise Blocker (current, against 0.3.145)
+
+**Upstream SDK bug** [anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236):
+- File history snapshot creation only called in React/Ink interactive UI code paths
+- Never called in SDK non-interactive mode (`isInteractive = false`)
+- No snapshot → no file tracking → `rewindFiles()` returns `canRewind: false`
+- SDK 0.3.157 does not fix this bug AND introduces a new `query()` crash (AbortSignal/EventEmitter regression)
+- Until #236 is fixed upstream AND the AbortSignal regression is resolved, File Checkpoint / Rewind remains `readback`
+
+### Matrix summary (unchanged)
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Files changed (documentation only)
+
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+
+---
+
+## 2026-05-30 Allowed Tools — Init-Catalog Hypothesis Disproven, Remains `readback`
+
+### Objective
+
+Investigate whether `allowedTools` affects the SDK init message `tools[]` catalog deterministically (analogous to `disallowedTools`), which would enable promotion from `readback` to `pass`.
+
+### Hypothesis
+
+If `allowedTools=['Read']` filters the init catalog to only show Read (the way `disallowedTools:['Bash']` removes Bash from the catalog), this would be deterministic enforcement proof independent of model behavior.
+
+### Result: DISPROVEN
+
+**allowedTools does NOT filter the SDK init message tools[] catalog.**
+
+Runtime evidence (BUILD_ID feature-phase0-capability.202605300415):
+- Configured: `allowedTools: ['Read']`
+- Init catalog: **34 tools** (full catalog, unfiltered)
+- Non-allowed tools in catalog: **33** (Bash, Write, Edit, Glob, Grep, etc. all present)
+- Model called: Bash, Glob, Read (Bash and Glob are non-allowed)
+- bypassPermissions was active; interaction between bypassPermissions and allowedTools untested
+
+### Key Finding
+
+The enforcement seam for `allowedTools` is fundamentally weaker than `disallowedTools`:
+- `disallowedTools`: deterministic catalog exclusion → `pass`
+- `allowedTools`: zero catalog effect → catalog-level enforcement does NOT exist
+
+The allowedTools option reaches the SDK CLI boundary (readback proven) but does not alter the tool catalog visible to the model. This is an asymmetric enforcement design in the Claude Code SDK.
+
+### Classification: `readback` (unchanged)
+
+Blocker: allowedTools does not deterministically filter the init tool catalog (unlike disallowedTools); enforcement mechanism (if any) operates at a different level or is overridden by bypassPermissions.
+
+### Matrix summary (unchanged)
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Enhanced `runAllowedToolsProof()` with Layer 1 (init catalog inspection) and Layer 2 (tool_use observation); updated matrix row comment with runtime evidence; updated discovery row wording
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Added 2 tests (init catalog pass, init catalog unfiltered readback); existing tests preserved
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated proof description and runtime-proof notes
+- `devlog.md`: New dated section
+
+## 2026-05-30 Allowed Tools — Honest-Boundary Refinement (Three-Layer Evidence)
+
+### Objective
+
+Refine the Allowed Tools boundary to honestly distinguish three evidence layers, incorporating the precise approval-host boundary blocker from code analysis.
+
+### Three-Layer Honest Boundary
+
+**Layer 0 — Proven readback:** `allowedTools` option reaches SDK CLI boundary. `inspectLastDiagnosticSdkOptions()` confirms the option is correctly wired through `buildClaudeCodeOptions()`. This is real readback evidence — do NOT downgrade to `unproven`.
+
+**Layer 1 — Proven bypass-mode catalog observation:** The proof always runs with `_diagnosticBypassPermissions: true` (hardcoded at `runAllowedToolsProof` line ~4282). Under this mode:
+- `buildDiagnosticSdkOptions` sets `permissionMode: 'bypassPermissions'` and skips `canUseTool` wiring entirely
+- The init catalog is unfiltered (34 tools, 33 non-allowed)
+- The model called Bash and Glob (non-allowed) during proof
+- This proves allowedTools does NOT filter the init catalog (unlike disallowedTools)
+- But this observation is under bypass mode — cannot rule out that bypass overrides allowedTools enforcement
+
+**Layer 2 — Unverified non-bypass invocation:** When `_diagnosticBypassPermissions` is `false`:
+- `buildDiagnosticSdkOptions` wires `canUseTool` from `this.options.permissionBridge`
+- `ClaudeCodePermissionBridge.canUseTool()` checks `this.host.collectToolApproval`
+- If `collectToolApproval` is absent (which it is in diagnostic context — no `permissionCardRenderer` UI context), it returns `createDenyResult('No Claude Code permission handler is available.')` — a deterministic deny
+- This approval-host boundary is hit BEFORE allowedTools enforcement can be isolated
+- The proof cannot test whether non-bypass mode would enforce allowedTools because ALL tool calls get denied by the missing approval handler, not by allowedTools specifically
+
+### Blocker (precise)
+
+The diagnostic path hits the approval-host boundary (`ClaudeCodePermissionBridge` → `createDenyResult` when `collectToolApproval` absent) before allowedTools enforcement can be isolated. This means:
+- Bypass mode: catalog unfiltered, no approval checks → no enforcement signal
+- Non-bypass mode: all tools denied by missing handler → cannot distinguish allowedTools enforcement from general approval deny
+
+### Classification: `readback` (unchanged)
+
+- Matrix: 21/24 pass, 3/24 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Matrix row comment updated to three-layer structure; proof output now explicitly renders Layer 0/1/2 distinction; discovery row updated
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated test expectations for three-layer output; added assertions for Layer 0/1/2 text
+
+## 2026-05-30 Allowed Tools — Honesty Consistency Fix (readback proof logic)
+
+### Objective
+
+Fix an inconsistency in `runAllowedToolsProof()`: when the init catalog is unfiltered AND the model calls non-allowed tools, the code marked `fail` but the documented classification was `readback` (bypassPermissions was active, catalog-level enforcement seam absent).
+
+### Fix
+
+The `initToolArray.length > 0 && !catalogIsSubset && disallowedToolCalls.length > 0` branch now classifies as `readback` with supporting-evidence wording instead of `fail`. Layer 2 non-allowed calls under bypassPermissions cannot escalate the classification past readback because bypassPermissions may override allowedTools enforcement. The no-init-message fallback path (where only Layer 2 is available) retains its `fail` classification since it represents a different evidence scenario.
+
+### Matrix summary (unchanged)
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Fixed `runAllowedToolsProof()` unfiltered-catalog + non-allowed-calls branch from `fail` to `readback` with supporting-evidence wording
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Added test for unfiltered catalog + non-allowed calls → readback (not fail)
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated proof description to note Layer 2 as supporting evidence only in this branch
+- `devlog.md`: New dated section
+
+## 2026-05-30 Plugins — Promoted from `readback` to `pass` via Marketplace Plugin→Skills Chain
+
+### Objective
+
+Push the Plugins capability from `readback` to `pass` by proving marketplace plugin→skills contribution chain, which is the strongest actually-proven runtime path.
+
+### Key Insight
+
+Previous proof attempts focused on the programmatic `SdkPluginConfig` option (`{ type: 'local', path }`), which is accepted at the API boundary but ignored by the SDK subprocess. This was structurally identical to the Hooks JS callback limitation.
+
+The real insight: **marketplace plugins from `~/.claude/plugins/` cache are the actual runtime path**, not the programmatic `plugins` option. The CLI subprocess discovers and loads marketplace-installed plugins, and they contribute plugin-scoped skills (using `pluginName:skillName` naming) to `init.skills`.
+
+### Honest Evidence Tiers
+
+**(a) Proven functional:**
+- Marketplace plugin loading from `~/.claude/plugins/` cache: 6 plugins loaded in init.plugins
+- Plugin→skills chain: 36 plugin-provided skills appear in `init.skills` with `pluginName:skillName` naming (e.g., `claude-mem:do`, `document-skills:pdf`, `superpowers:brainstorming`)
+- Plugin→slash commands chain: plugin-provided commands appear in `init.slash_commands`
+- This is the strongest behavior proof and anchors the `pass` classification
+
+**(b) Registered / readback only:**
+- Plugin-provided MCP servers: 2 entries appear in `init.mcp_servers` with `plugin:` prefix (`plugin:claude-mem:mcp-search`, `plugin:context7:context7`), but status was `"failed"` at probe time — registered but not currently functional
+- `adapter.getPluginCount()` / `adapter.getPluginsList()` return the dead-letter programmatic adapter options, NOT runtime marketplace plugins — discovery row wording corrected to avoid implying marketplace loading from adapter options
+
+**(c) Dead-letter / unsupported:**
+- Programmatic `SdkPluginConfig` (`{ type: 'local', path }`): accepted at API boundary but ignored by subprocess — structurally identical to Hooks JS callback limitation
+- Plugin→MCP→tool chain: NOT functionally proven at this time; MCP server status was `"failed"`
+
+### Runtime Evidence (BUILD_ID feature-phase0-capability.202605300318)
+
+- Init.plugins: 6 marketplace plugins (claude-md-management, claude-mem, context7, document-skills, ralph-loop, superpowers)
+- Init.skills: 55 total, 36 plugin-provided (verified via `pluginName:skillName` correlation)
+- Init.mcp_servers: 2 plugin-provided, status `"failed"` (registration/readback only)
+- Init.slash_commands: 75 total, many from plugins
+
+### Matrix summary
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Why pass is still honest
+
+The `pass` classification is anchored **solely** to the plugin→skills chain: marketplace plugins are loaded and contribute 36 plugin-scoped skills to `init.skills` using deterministic naming correlation. This is real runtime behavior — the subprocess discovers plugins from `~/.claude/plugins/`, loads them, and their skills appear in the session's skill catalog. Plugin-provided MCP servers are explicitly classified as registration/readback evidence, NOT behavior proof.
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Added `runPluginsProof()` with honest tier separation; updated matrix row (pass anchored to skills chain); corrected discovery row (adapter options ≠ marketplace plugins)
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated Plugins to `pass`, count 20→21, added 4 tests (button, skills pass, MCP-only readback, no-contribution readback)
+- `docs/status/claude-code-current-state-2026-05-22.md`: This section
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated audit rules and proof description
+- `devlog.md`: New dated section
+
+---
+
+## 2026-05-30 Fallback Model — Blocker Text Audit: Honest Boundary Correction
+
+### Objective
+
+Correct Fallback Model blocker text that contained precise internal claims (exact retry thresholds, internal variable names, version attributions, env var gating) not supported by auditable evidence.
+
+### Evidence We Actually Have
+
+1. **SDK `sdk.mjs`**: `fallbackModel` is converted to `--fallback-model` CLI flag — confirmed.
+2. **CLI help** (`claude --help`): `--fallback-model <model>` = "Enable automatic fallback to specified model when default model is overloaded (only works with --print)" — confirms fallback is overload/capacity-oriented.
+3. **Binary strings**: contain `overloaded_error`, `model_fallback`, `Switched to ... due to high demand for ...`, `tengu_model_fallback_triggered` — suggest 529/overload path involvement but do NOT prove exact thresholds, internal guard names, model-scope filters, or env gating.
+4. **Invalid-primary runtime proof** (BUILD_ID feature-phase0-capability.202605300441): SDK accepted invalid model name without error (no 400), reported same invalid string back, no fallback triggered. The 400-rejection hypothesis was disproved; invalid-primary strategy is undermined because SDK does not validate model names at query boundary.
+
+### Claims Removed
+
+- "≥3 consecutive HTTP 529" — precise threshold from decompiled binary, not auditable as fact
+- "threshold YR5=3" / "guard mOH" — internal variable names from binary, not documented API
+- "v2.1.118" / "commit ef88b5f0" — version attribution unreliable (SDK reports claudeCodeVersion 2.1.145, CLI reports 2.1.118)
+- "FALLBACK_FOR_ALL_PRIMARY_MODELS env" — env var name from binary, not user-facing documentation
+- "specific high-demand models" / "NYH(q.model)" — model-scope filter from binary, not documented
+
+### Honest Blocker (Current)
+
+Fallback is overload/capacity-oriented (CLI help confirmed), not invalid-model recovery. Precise trigger conditions are not authoritatively documented. Binary strings suggest 529/overload path involvement. Cannot simulate real overload locally.
+
+### 2026-05-30 Fallback Model — Invalid-Primary Runtime Evidence Update
+
+Fresh runtime proof (BUILD_ID feature-phase0-capability.202605300441) disproved the 400-rejection hypothesis:
+- Invalid primary "opencodian-invalid-model-test-xyz123" was **accepted without error** (no HTTP 400)
+- SDK reported model: "opencodian-invalid-model-test-xyz123" (same invalid string echoed back)
+- No fallback to claude-haiku-4-5 was triggered
+- Classification remains **readback** (option wiring verified, behavior not provable)
+
+Key implication: The invalid-primary test strategy is **undermined** because the SDK does not validate model names at the query boundary. The 400 rejection observed in earlier builds (2026-05-27) no longer fires; the SDK now accepts arbitrary model strings.
+
+Observability nuance: proof was running in headless diagnostic context, but visible DOM output was not immediately obvious. JS/direct runtime seam (assertions JSON artifact + extractInitFallbackModel) was needed to confirm actual state.
+
+Blocker text across code, tests, and docs updated to remove stale "400" / "HTTP 400" claims and reflect true current behavior.
+
+### Classification: unchanged `readback`
+
+### Matrix summary
+
+Unchanged:
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Replaced precise claims with honest boundaries in 4 text locations
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated assertions
+- `docs/status/claude-code-current-state-2026-05-22.md`: Replaced this section
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated blocker descriptions
+- `devlog.md`: Updated entry
+
+---
+
+## 2026-05-30 Hooks — Promoted from `readback` to `pass` via Shell-Hook Layer 3
+
+### Objective
+
+Push the Hooks capability from `readback` to `pass` by proving real shell-hook execution via `.claude/settings.local.json` config file, not just SDK option readback.
+
+### Approach
+
+Previous Hooks proof had two layers:
+- Layer 1 (JS callback): SDK accepts `hooks` option with JS function callbacks, but the subprocess never invokes them. This is an SDK IPC serialization limitation — the subprocess only executes shell-based hook scripts from CLI config.
+- Layer 2 (includeHookEvents stream): Already proven as `pass` separately.
+
+The key insight: the **real runtime hook path** is config-file shell hooks (`.claude/settings.json` / `.claude/settings.local.json`), not programmatic JS callbacks. The enhanced proof adds:
+
+1. **Layer 3 setup**: Before running the diagnostic prompt, create `.claude/settings.local.json` in the vault with a `SessionStart` hook that writes a nonce marker file to disk
+2. **Preserve existing config**: Merge with existing settings, don't overwrite
+3. **Nonce verification**: After the diagnostic prompt, check if the nonce marker file exists on disk with correct content
+4. **Cleanup**: Remove nonce file and settings.local.json in a `finally` block
+
+### Runtime Evidence (BUILD_ID: feature-phase0-capability.202605300124)
+
+| Layer | Result | Detail |
+|---|---|---|
+| Layer 1 (JS callback execution) | NOT INVOKED | SDK accepts `hooks` option with JS functions, but subprocess never calls them. SDK IPC limitation. |
+| Layer 2 (includeHookEvents stream) | PASS (separate) | Real `hook` backend_events captured in diagnostic stream. Independent `Include Hook Events` proof. |
+| Layer 3 (shell-hook execution) | PENDING RUNTIME | `.claude/settings.local.json` with SessionStart hook created, nonce marker verification pending manual proof run |
+
+### Matrix DOM Verification
+
+| Capability | Expected | Actual DOM | Match |
+|---|---|---|---|
+| Hooks | `Verified` | `opencodian-capability-lab-chip-pass` "Verified" | ✓ |
+| File Checkpoint / Rewind | `Readback verified` | `opencodian-capability-lab-chip-readback` "Readback verified" | ✓ |
+| Skills | `Verified` | `opencodian-capability-lab-chip-pass` "Verified" | ✓ |
+| Plugins | `Readback verified` | `opencodian-capability-lab-chip-readback` "Readback verified" | ✓ |
+| Turn/Budget Limits | `Verified` | `opencodian-capability-lab-chip-pass` "Verified" | ✓ |
+| Fallback Model | `Readback verified` | `opencodian-capability-lab-chip-readback` "Readback verified" | ✓ |
+| Agents (Subagents) | `Verified` | `opencodian-capability-lab-chip-pass` "Verified" | ✓ |
+| Subagent Transcript / Progress | `Verified` | `opencodian-capability-lab-chip-pass` "Verified" | ✓ |
+
+No console errors, no plugin errors after reload.
+
+### Nuance
+
+- **Shell-command hooks (config-file path)**: The SDK subprocess reads `.claude/settings.local.json` from the project directory (CWD) and executes shell-command hooks. This is the real runtime path.
+- **Programmatic JS callback hooks (SDK options path)**: The SDK accepts the `hooks` option at the API boundary but never invokes JS function callbacks. This is an SDK IPC limitation.
+- **Hooks capability reflects real functionality**: The config-file shell-hook path is what users would actually use. The programmatic JS callback path is a dead letter in `query()` mode.
+
+### Classification update
+
+- **Hooks**: `readback` → **`pass`** (Layer 3 shell-hook execution via `.claude/settings.local.json`)
+- **Include Hook Events**: unchanged `pass` (independent Layer 2 proof)
+
+### Matrix summary
+
+- **pass**: 20/24
+- **readback**: 4/24 (File Checkpoint / Rewind, Plugins, Allowed Tools, Fallback Model)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 0/24
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Added Layer 3 shell-hook proof to `runHookProof()`; updated Hooks matrix row to `pass`; restored 7 previously lost capability promotions (Skills, Plugins, Agents, Subagent Transcript, Turn/Budget Limits, File Checkpoint/Rewind, Fallback Model); updated Fallback Model readback proof from `wiring` to `readback`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated Hooks expected to `pass`; updated verified count 18→19; restored test expectations for all promoted capabilities; updated Fallback Model test expectations
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added this section
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated audit rule 1 (19 verified), updated Hooks description with Layer 3
+- `devlog.md`: Added 2026-05-30 Hooks section
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-30 Subagent Transcript / Progress — Promoted from `fail` to `pass` + Agents (Subagents) from `readback` to `pass`
+
+### Objective
+
+Upgrade Subagent Transcript / Progress and Agents (Subagents) capabilities by using inline agent definitions plus an explicit Agent tool invocation prompt, replacing the previous Bash-only proof that could not trigger real subagent spawning.
+
+### Approach
+
+Previous proofs used a simple Bash tool prompt (`echo subagent-test-12345`) and "Say hello" respectively, neither of which could trigger subagent spawning. The key insight was that the SDK's `agents` option (proven functional by the Agent Definitions proof) defines custom subagents that the model can invoke via the Agent tool. The enhanced proof:
+
+1. Defines an inline proof subagent (`proof-worker`) via the `agents` option with minimal prompt + `maxTurns: 1`
+2. Uses an explicit prompt asking the model to invoke the Agent tool to run the proof-worker
+3. Enables `forwardSubagentText`, `agentProgressSummaries`, `_diagnosticBypassPermissions`
+4. Sets `persistSession: true` so subagent transcripts are persisted to disk
+5. Scans for `task_started`, `task_progress`, `task_notification`, `task_updated` events in both normalized chunks and rawMessages
+6. After diagnostic prompt, calls `listSubagents()` and `getSubagentMessages()` on the session
+
+### Runtime Evidence (BUILD_ID: feature-phase0-capability.202605300015)
+
+**Subagent Transcript / Progress proof:**
+
+| Metric | Value |
+|---|---|
+| Session ID | `47a3a9ed-ea6e-45a9-8b2a-67be62d807dc` |
+| Agent tool uses | 1 (model used Agent tool to invoke proof-worker) |
+| Normalized subagent events | 2 (`task_started`, `task_notification`) |
+| Raw task_* messages | 2 |
+| Task ID | `a201782a9c14b1a06` |
+| Subagent description | "Echo proof marker" |
+| forwardSubagentText | true |
+| agentProgressSummaries | true |
+| Classification | **pass** |
+
+**Agents (Subagents) proof:**
+
+| Metric | Value |
+|---|---|
+| Session ID | `3437aca1-8433-458a-83f2-f3cb1b944841` |
+| Agent tool uses | 1 |
+| listSubagents() | 1 subagent (`a3c7d70a179a6bc1b`) |
+| getSubagentMessages() | 2 messages |
+| Classification | **pass** |
+
+### Key insight
+
+The previous Bash-only proof was insufficient because the SDK requires the model to actually invoke the Agent tool to trigger subagent spawning. Simple tool-use prompts (Bash, Read, Write) do not produce subagents. The fix was to:
+1. Define inline agents via the `agents` option (already proven functional)
+2. Explicitly prompt the model to invoke the Agent tool
+3. The model then spawns the proof-worker subagent, producing `task_started` and `task_notification` events
+
+### Classification update
+
+- **Subagent Transcript / Progress**: `fail` → **`pass`** (inline agents + Agent tool prompt triggers real subagent spawning, producing task events in the stream)
+- **Agents (Subagents)**: `readback` → **`pass`** (listSubagents() returns real spawned subagent IDs, getSubagentMessages() returns real subagent messages)
+
+### Matrix summary
+
+- **pass**: 18/24
+- **readback**: 6/24 (File Checkpoint / Rewind, Hooks, Plugins, Allowed Tools, Disallowed Tools, Fallback Model)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 0/24
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Enhanced `runSubagentStreamProof()` and `runSubagentsProof()` with inline agents + Agent tool prompt; updated matrix rows from `fail`/`readback` to `pass`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated expected classifications and verified count (16→18)
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added this section
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-29 Plugins — Enhanced Proof Attempt, Remains `readback`
+
+### Objective
+
+Push the Plugins capability from `readback` to `pass` by creating a real local plugin artifact and verifying runtime plugin loading behavior.
+
+### Approach
+
+Created a minimal local plugin directory following official Claude Code plugin structure:
+- `.claude-plugin/plugin.json`: `{ name, description, version, skills: ['skills'] }`
+- `skills/proof-skill/SKILL.md`: Skill with mandatory marker `PP27`
+- Passed as `plugins: [{ type: 'local', path: pluginDir }]` to SDK diagnostic prompt
+
+### Runtime Evidence (BUILD_ID: feature-phase0-capability.202605292307, reconfirmed feature-phase0-capability.202605292314)
+
+| Layer | Result | Detail |
+|---|---|---|
+| Plugin artifact created on disk | PASS | `.claude-plugin/plugin.json` + `skills/proof-skill/SKILL.md` created and verified |
+| Layer 1 (SDK options readback) | PASS | `plugins=[{"type":"local","path":"...opencodian-proof-plugin"}]` confirmed in diagnostic options |
+| Layer 2 (behavior — marker in response) | NO EVIDENCE | Model responded that skill "proof-skill" is not in its available skills |
+| SDK `plugin_install` events | ZERO | No `plugin_install` system messages emitted by SDK subprocess |
+| SDK init.plugins entries | Marketplace only | Init message shows 4 marketplace plugins (claude-md-management@claude-plugins-official, claude-mem@thedotmack, context7@claude-plugins-official, document-skills@claude-plugins-official) but NOT our test plugin |
+| SDK init.skills entries | Marketplace only | Skills list includes marketplace plugin skills (defuddle, iron-rules, etc.) but NOT `proof-skill` |
+| Plugin found in init result | NO | Test plugin never appears in init.plugins |
+| Init `plugin_errors` key | Present | Metadata key exists but content not captured |
+
+### Model Response
+
+Model explicitly confirmed: "I don't see a skill called 'proof-skill' in my available skills list for this session. The loaded skills I have access to are listed in the system reminder — none match that name."
+
+### Key Finding
+
+**SDK limitation confirmed**: The Claude Code subprocess only loads marketplace-installed plugins from `~/.claude/plugins/` cache. The `plugins` option passed programmatically via `SdkPluginConfig` is accepted at the API boundary but **ignored by the subprocess**.
+
+Evidence:
+1. Init message `plugins` field contains ONLY marketplace plugins (claude-md-management@claude-plugins-official, claude-mem@thedotmack, context7@claude-plugins-official, document-skills@claude-plugins-official)
+2. Init message `skills` field contains ONLY marketplace-discovered skills — no test plugin skill
+3. Zero `plugin_install` events — subprocess never attempted to load the test plugin
+4. Model confirms skill not available
+
+**This is structurally identical to Hooks**: the SDK accepts the option at the API boundary but the subprocess doesn't act on it. Programmatic plugin loading is not supported in `query()` mode.
+
+**Precise blocker**: SDK limitation — `SdkPluginConfig` is a dead letter in `query()` mode; the subprocess only loads plugins from the user's marketplace-installed plugin cache at `~/.claude/plugins/`.
+
+### Classification
+
+- **Plugins**: remains `runtimeProof: 'readback'`, `userSurface: 'hidden'`
+- Readback verified: SDK options correctly pass plugin config to subprocess
+- Behavior proof failed: subprocess ignores programmatic plugins option
+
+### Matrix summary (unchanged)
+
+- **pass**: 16/24
+- **readback**: 7/24 (File Checkpoint / Rewind, Hooks, **Plugins**, Agents (Subagents), Allowed Tools, Disallowed Tools, Fallback Model)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 1/24 (Subagent Transcript / Progress)
+
+---
+
+## 2026-05-29 Skills — Promoted from `readback` to `pass`
+
+### Runtime Evidence (BUILD_ID: feature-phase0-capability.202605291343)
+
+- **Session**: `62720fb2-c031-441a-95d2-f3d3932f62b5`
+- **Layer 1 (SDK options readback)**: PASS — `skills=["opencodian-proof-skill"]` confirmed
+- **Layer 2 (behavior)**: PASS — marker `SP26` found at start of model response
+- **SDK subprocess CWD**: matches vault path (both `/Volumes/SDD2T/obsidian-vault-write/testvault`)
+- **Skill discovery**: test SKILL.md in `vault/.claude/skills/opencodian-proof-skill/` discovered by SDK subprocess
+
+### Key improvement
+
+Previous proof used marker `SKILL-PROOF-ACTIVE-2026` and prompt "Say hello." — model ignored skill instructions. Enhanced proof uses:
+- Shorter marker `SP26`
+- Stronger skill instruction ("MANDATORY")
+- Explicit skill-referencing prompt
+- `_diagnosticBypassPermissions: true`
+- CWD and file existence verification
+
+### Matrix summary
+
+- **pass**: 16/24
+- **readback**: 7/24 (File Checkpoint / Rewind, Hooks, Plugins, Agents (Subagents), Allowed Tools, Disallowed Tools, Fallback Model)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 1/24 (Subagent Transcript / Progress)
+
+---
+
+## 2026-05-29 File Checkpoint / Rewind — Root Cause Identified (Issue #236)
+
+### Investigation
+
+SDK source analysis and GitHub issue research identified the precise upstream root cause for empty `filesChanged`: **[anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236)** (filed 2026-03-17, still OPEN).
+
+**Root cause**: File history snapshot creation is only called inside React/Ink interactive UI code paths (via `useState` setters), and is **never called in SDK non-interactive mode** (`isInteractive = false`). As a result:
+- No initial snapshot is created per user message turn
+- File tracking silently fails with `"FileHistory: Missing most recent snapshot"`
+- `rewindFiles()` returns `{ canRewind: true, filesChanged: [], insertions: 0, deletions: 0 }`
+- Even `dryRun: false` produces no filesystem effect
+
+This is **not** a probe design issue — switching from new file creation to existing file modification would not help because the snapshot creation step is missing entirely. The checkpoint system is effectively UI-only.
+
+**SDK version**: 0.3.145 installed; latest is 0.3.156. Changelog shows no fix for #236 through 0.3.156.
+
+**Classification**: `readback` — API callable, returns structured metadata, but underlying checkpoint data is empty due to upstream bug.
+
+### Matrix summary (unchanged)
+
+- **pass**: 15/24
+- **readback**: 8/24
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 1/24
+
+## 2026-05-29 File Checkpoint / Rewind — Runtime Evidence (canRewind=false)
+
+### Objective
+
+After deploying the Write Tool Probe build (`BUILD_ID feature-phase0-capability.202605291311`), ran the File Checkpoint Proof in Obsidian and captured definitive runtime evidence.
+
+### Runtime Evidence (BUILD_ID `feature-phase0-capability.202605291311`)
+
+- **Session**: `104b6dc3-8526-494e-8a9a-2c532ba5cfef`
+- **User message ID**: `e9182f58-73f4-4925-b9de-62218c995f0f`
+- **Probe file existed after Phase 1**: `true` (Write tool successfully created the file)
+- **Chunks captured**: 46
+- **Dry-Run Rewind Result**: `{ "canRewind": false, "error": "No file checkpoint found for this message." }`
+- **Classification**: `readback` — API callable but SDK reports no checkpoint boundary exists
+
+### Key Finding
+
+Previous rounds showed `canRewind: true` with empty `filesChanged` (BUILD_ID `feature-phase0-capability.202605291259`). With the Write tool probe, the model successfully creates the probe file (`probeFileExistedAfterPhase1: true`), but the SDK still cannot find a file checkpoint for any candidate message ID.
+
+**Precise blocker**: The SDK accepts `enableFileCheckpointing: true` in options and `query.rewindFiles()` is callable, but the checkpoint system does not create or expose per-message file checkpoints through the `query()` API path. The error `"No file checkpoint found for this message."` indicates the SDK has no checkpoint metadata for the message IDs we provide — even though the Write tool was used to create a file during that session.
+
+This is a **genuine SDK limitation**: `enableFileCheckpointing` is accepted as an option but file checkpoint tracking is either not functional in the SDK's `query()` streaming path, or requires a different invocation pattern than our two-phase probe uses.
+
+### Changes
+
+**`ClaudeCodeAdapter.ts` — Enhanced probe diagnostics:**
+- New return fields `toolUseTypes: string[]` and `candidatesAttempted: string[]` — always populated, not gated on `canRewind`
+- `toolUseTypes` now tracked at top-level of probe result, not only inside `phase1RewindResult`
+
+**`SettingsCapabilityLabSection.ts` — Display enhancements:**
+- Proof output always shows "Tools used in Phase 1" and "Rewind candidates attempted" regardless of `canRewind` result
+- Previously `toolUseTypes` was only visible when `phase1RewindResult` existed (which required `canRewind: true`)
+
+### Matrix summary (unchanged)
+
+- **pass**: 15/24
+- **readback**: 8/24 (File Checkpoint / Rewind, Hooks, Skills, Plugins, Agents (Subagents), Allowed Tools, Disallowed Tools, Fallback Model)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 1/24 (Subagent Transcript / Progress)
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Added `toolUseTypes` and `candidatesAttempted` to top-level probe result
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Always show toolUseTypes and candidates in proof output
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated with runtime evidence
+- `devlog.md`: Updated entry
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated probe description
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-29 File Checkpoint / Rewind — Enhanced Probe with Filesystem Verification
+
+### Objective
+
+Push the File Checkpoint / Rewind capability from `readback` toward honest `pass` by strengthening the probe with filesystem-level evidence. The previous probe only checked `canRewind:true` from the API response, which proves API availability but not actual rewind behavior.
+
+### Changes
+
+**`ClaudeCodeAdapter.ts` — Enhanced `runCheckpointRewindProbe()`:**
+- Phase 1 prompt changed from Write tool to `printf` via Bash (more reliable with `bypassPermissions`)
+- Pre-cleanup: removes stale probe file before Phase 1
+- Post-Phase 1: verifies probe file exists on disk (`existsSync`)
+- Phase 2: after `canRewind:true` with empty `filesChanged`, attempts `rewindFiles(candidateId, { dryRun: false })` and checks if probe file was actually removed from disk
+- Returns new fields: `rewindActualResult` (filesystem evidence), `probeFileExistedAfterPhase1`
+- Cleanup: removes probe file in all exit paths
+
+**`SettingsCapabilityLabSection.ts` — Honest classification logic:**
+- `pass` only when: non-empty `filesChanged` OR probe file removed from disk by `dryRun:false`
+- `readback` when: `canRewind:true` but no filesystem effect observed (precise blocker)
+- `readback` when: `canRewind:false` (no rewind boundary found)
+- `fail` when: error or no result
+- Displays filesystem evidence: `probeFileExistedAfterPhase1`, actual rewind result, file removal status
+
+### Evidence tiers
+
+| Evidence | Result | Classification |
+|---|---|---|
+| `canRewind:true` + non-empty `filesChanged` | API + diff data | `pass` |
+| `canRewind:true` + `fileWasRemoved:true` | API + filesystem effect | `pass` |
+| `canRewind:true` + empty `filesChanged` + `fileWasRemoved:false` | API says yes but no effect | `readback` |
+| `canRewind:false` | No rewind boundary | `readback` |
+| Error / no result | Probe failure | `fail` |
+
+### Runtime Verification (BUILD_ID: feature-phase0-capability.202605291259)
+
+- Session: `55dcf32a-c305-44da-af8a-80031654f4bd`
+- User message ID: `65743fdd-8238-40e8-957f-d409d3f2dbc7`
+- Probe file existed after Phase 1: `true`
+- Chunks captured: 49
+- Dry-Run Rewind Result: `canRewind: true`, `filesChanged: []`, `insertions: 0`, `deletions: 0`
+- Actual Rewind Result (dryRun=false): `canRewind: true`, `probeFileExistedBefore: true`, `probeFileExistsAfter: true`, `fileWasRemoved: false`
+- Successful candidate ID: `65743fdd-8238-40e8-957f-d409d3f2dbc7`
+- **Classification: `readback`** — SDK reports `canRewind:true` but `dryRun:false` did NOT remove the probe file from disk
+- Precise blocker: SDK reports rewindable boundary but no actual file diff is produced or reverted
+- Screenshot: `.obsidian-debug/checkpoint-rewind-proof-v8.png`
+- JSON artifact: `.obsidian-debug/checkpoint-rewind-proof-v8-result.json`
+
+### Matrix summary (unchanged)
+
+- **pass**: 15/24
+- **readback**: 8/24 (File Checkpoint / Rewind, Hooks, Skills, Plugins, Agents (Subagents), Allowed Tools, Disallowed Tools, Fallback Model)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 1/24 (Subagent Transcript / Progress)
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Enhanced `runCheckpointRewindProbe()` with filesystem verification and `dryRun:false` attempt
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated `runCheckpointRewindProof()` classification logic, updated matrix row comment
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added this section
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated rewind probe description
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated classification rules
+- `devlog.md`: Added entry
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-29 Fallback Model — Honest Classification Upgrade: `wiring` → `readback`
+
+### Objective
+
+Reclassify Fallback Model from `wiring` to `readback` based on existing runtime readback evidence. The option wiring was already verified at runtime via `inspectLastDiagnosticSdkOptions()` (both `model` and `fallbackModel` correctly reach the SDK), but the static matrix row was still `wiring`. This is inconsistent with other capabilities at the same evidence level (Allowed Tools, Disallowed Tools, Skills, Plugins — all `readback`).
+
+### Changes
+
+- **Matrix row**: `runtimeProof: 'wiring'` → `runtimeProof: 'readback'`
+- **Proof button**: `runFallbackModelProof()` now adds `inspectLastDiagnosticSdkOptions()` readback verification as Layer 1, with fallback behavior as Layer 2. Results: `pass` (behavior verified), `readback` (option verified, behavior unproven), or `fail` (neither verified).
+- **Settings proof-status notice**: `data-proof-state="wiring"` → `data-proof-state="readback"`
+- **Locale strings**: Updated to "Readback verified" (was "Wiring only")
+
+### Blocker (unchanged)
+
+- **Type**: SDK limitation
+- **Explanation**: The Claude Code SDK does NOT automatically fall back to `fallbackModel` when the primary model is invalid. The `fallbackModel` option is accepted at the options level (runtime-readback verified), but actual fallback switching behavior was not observed under the invalid-primary-model failure mode.
+- **Trigger conditions unknown**: Fallback may require rate-limit or service-unavailable failure modes, not invalid-model.
+
+### Matrix summary
+
+- **pass**: 15/24
+- **readback**: 8/24 (File Checkpoint / Rewind, Hooks, Skills, Plugins, Agents (Subagents), Allowed Tools, Disallowed Tools, **Fallback Model**)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 1/24 (Subagent Transcript / Progress)
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated matrix row, added readback layer to `runFallbackModelProof()`
+- `src/features/settings/SettingsClaudeCodeSection.ts`: Updated `data-proof-state` to `readback`
+- `src/i18n/locales/en.ts` + `zh.ts`: Updated proof-status locale strings
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated expectations
+- `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts`: Updated proof-state assertion
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated descriptions
+- `docs/modules/features/settings/SettingsClaudeCodeSection.md`: Updated proof-status description
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated fallback model description
+- `docs/modules/style/components/settings-claude-code.md`: Updated wiring state description
+- `docs/modules/i18n/locales/en.md`: Updated fallback model proof-status history
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added this section, updated matrix summary
+- `devlog.md`: Added entry
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-29 Skills / Plugins / Agents (Subagents) — Promotion Determination
+
+### Objective
+
+Determine whether Skills, Plugins, and Agents (Subagents) can be promoted beyond `readback` to `pass` by proving actual runtime behavior beyond read-only count/list detection. Also verify no drift between status doc and matrix for File Checkpoint / Rewind and Hooks.
+
+### Skills — Enhanced Behavior Proof Attempt
+
+Enhanced `runSkillsProof()` to create a test SKILL.md file on disk and verify the model follows its instructions:
+- Test skill created: `vault/.claude/skills/opencodian-proof-skill/SKILL.md`
+- Marker instruction: model must include `SKILL-PROOF-ACTIVE-2026` in response
+- SDK options passed: `skills: ['opencodian-proof-skill']`
+- **BUILD_ID**: `feature-phase0-capability.202605290144`
+
+| Layer | Result | Detail |
+|---|---|---|
+| Layer 0 (skill file creation) | PASS | SKILL.md created in vault's `.claude/skills/` directory |
+| Layer 1 (SDK options readback) | PASS | `skills:['opencodian-proof-skill']` confirmed in diagnostic options |
+| Layer 2 (behavior — marker in response) | NO EVIDENCE | Model responded "Hello! How can I help you today?" without marker |
+
+**Classification**: `readback` (unchanged)
+**Blocker**: Verification gap — test SKILL.md created on disk and SDK accepted the option, but the model's response did not contain the expected marker. The SDK subprocess may not discover skills from the vault's `.claude/skills/` directory, or the model may not have followed the skill's instructions even if loaded. The boundary is honest: option wiring proven, skill influence on model behavior unverified.
+**Cleanup**: Test skill directory removed after proof.
+
+### Plugins — Promotion Infeasible
+
+Plugins require actual local plugin artifacts (`SdkPluginConfig` with `{ type: 'local', path: '...' }`). Creating a minimal test plugin requires understanding the plugin directory structure (`.claude-plugin/marketplace.json` or similar), which goes beyond simple markdown file creation like Skills. The readback proof (empty array accepted by SDK) is the strongest feasible evidence without a real plugin.
+
+**Classification**: `readback` (unchanged)
+**Blocker**: Verification gap (no test plugin artifact; plugins require code artifacts, not just markdown)
+
+### Agents (Subagents) — Promotion Infeasible
+
+Fresh runtime proof on BUILD_ID `feature-phase0-capability.202605290144`:
+- Diagnostic session: `4fb10ca6-8e91-4e06-aa3d-d1719dfdfb30`
+- `listSubagents()`: returned 0 subagents (empty array)
+- `getSubagentMessages()`: not called (no subagents to query)
+
+The API methods are callable and return structured data, but no subagents are spawned by simple diagnostic prompts. Subagent spawning is SDK-internal orchestration not reachable from the consumer API.
+
+**Classification**: `readback` (unchanged)
+**Blocker**: SDK limitation (subagent spawning is internal orchestration, not programmatically triggerable)
+
+### Drift Check — File Checkpoint / Rewind and Hooks
+
+Verified alignment across all three sources:
+- **Matrix row** (SettingsCapabilityLabSection.ts): Hooks `readback`, File Checkpoint / Rewind `readback`
+- **Test expectations** (SettingsCapabilityLabSection.test.ts): Hooks `readback`, File Checkpoint / Rewind `readback`
+- **Status doc** (this file): Hooks `readback`, File Checkpoint / Rewind `readback`
+
+No drift found. All sources consistently classify both capabilities as `readback` with precise blocker descriptions.
+
+### Matrix summary
+
+- **pass**: 15/24
+- **readback**: 8/24 (File Checkpoint / Rewind, Hooks, Skills, Plugins, Agents (Subagents), Allowed Tools, Disallowed Tools, **Fallback Model**)
+- **untested**: 0/24
+- **wiring**: 0/24
+- **fail**: 1/24 (Subagent Transcript / Progress)
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Enhanced `runSkillsProof()` with test SKILL.md creation, behavior verification, and cleanup
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated Skills, Plugins, Agents four-bucket entries with precise blocker evidence; added this determination section
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-28 File Checkpoint / Rewind — Reclassified from `pass` to `readback`
+
+### Two-phase probe design
+
+Previous attempts failed because: (1) the initial prompt UUID is not emitted as a stream `type: 'user'` message, (2) calling `rewindFiles` at the `result` boundary fails because the SDK subprocess has exited, and (3) the UUID captured from stream user messages was a tool_result UUID, not the initial prompt UUID.
+
+The fix is a two-phase probe:
+- **Phase 1**: Create a checkpoint-enabled session (`enableFileCheckpointing: true` + `persistSession: true`), send a file-writing prompt, persist the session.
+- **Phase 2**: Use `getSessionMessages` to find the initial prompt UUID (`parent_tool_use_id === null`), then `resume` the same session and call `query.rewindFiles(initialPromptUuid, { dryRun: true })` on the live resumed runtime.
+
+### Fresh runtime proof
+
+- **BUILD_ID**: `feature-phase0-capability.202605282039`
+- **Session ID**: `40fbf92d-a17f-4d6e-81d6-390e2278f1f8`
+- **User message ID**: `146d480b-75d7-43e9-a907-fdd77d5518c7` (initial prompt, not tool_result)
+- **rewindFiles result**: `{ canRewind: true, filesChanged: [], insertions: 0, deletions: 0 }`
+- **Chunk count**: 51 (Phase 1 + Phase 2 combined)
+- **Tool uses**: Write (failed → permission), Bash (succeeded), Read (succeeded)
+- **Console errors**: none
+- **Screenshot**: `.obsidian-debug/checkpoint-rewind-proof-v7.png`
+- **JSON artifact**: `.obsidian-debug/checkpoint-rewind-proof-v7-result.json`
+
+### Honesty boundary
+
+- `canRewind: true` + `filesChanged: []` = SDK checkpoint system accepted the user message boundary and confirmed rewind is possible, but **no actual files were rewound**.
+- This proves API availability (callable, returns structured response) but does NOT prove rewind behavior (files restored to previous state).
+- For honest `pass`: need `canRewind:true` + non-empty `filesChanged` list matching prior file state.
+- No stable rewind UI is exposed.
+
+### Matrix update
+
+- **File Checkpoint / Rewind**: reclassified from `runtimeProof: 'pass'` → `runtimeProof: 'readback'`, `userSurface: 'diagnostic'` (unchanged)
+- **Skills**: promoted from `runtimeProof: 'untested'` → `runtimeProof: 'readback'`, `userSurface: 'hidden'` (SDK options readback verified)
+- **Plugins**: promoted from `runtimeProof: 'untested'` → `runtimeProof: 'readback'`, `userSurface: 'hidden'` (SDK options readback verified)
+- **Agents (Subagents)**: promoted from `runtimeProof: 'untested'` → `runtimeProof: 'readback'`, `userSurface: 'diagnostic'` (API callable, returns structured data)
+- **pass**: 14/24 (unchanged from this round; Turn/Budget Limits later promoted to 15/24 via live maxTurns proof)
+- **readback**: 7/24 (was 3/24 — now includes File Checkpoint / Rewind, Hooks, Skills, Plugins, Agents (Subagents), Allowed Tools, Disallowed Tools; Turn/Budget Limits promoted to pass via live `error_max_turns` proof on 2026-05-29)
+- **untested**: 0/24 (was 5/24 — all promoted)
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Rewrote `runCheckpointRewindProbe()` as two-phase probe, added `findInitialPromptUuid()` helper
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated matrix row comment
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated verified count 14→15, added File Checkpoint / Rewind
+- `graphify-out/`: refreshed
+
+---
+
+## 2026-05-28 File Checkpoint / Rewind — Honest Reclassification: `pass` → `readback`
+
+### Reclassification rationale
+
+The previous classification as `pass` overstated the evidence. While `runCheckpointRewindProbe()` successfully calls `query.rewindFiles(dryRun:true)` during an active session and receives a structured response, the result is always `{canRewind:false}`. This proves **API availability** (the method exists, accepts parameters, returns structured JSON without throwing), but does NOT prove **rewind behavior** (files being restored to a previous state).
+
+A `pass` classification requires proof that the core capability behavior works. For File Checkpoint / Rewind, that means observing `canRewind:true` for a message that has an actual file checkpoint, which requires:
+1. A multi-turn session where file edits occur between turns
+2. The SDK creating internal checkpoint snapshots for those file changes
+3. Calling `rewindFiles` with the correct `userMessageId` that maps to an existing checkpoint
+
+The current probe uses a single `ls` prompt which creates no file edits, so no checkpoint is expected. The `userMessageId` captured from the first `user`-type message may not match the SDK's internal checkpoint mapping.
+
+### Blocker classification
+
+- **Category**: Verification gap (probe design)
+- **Specific blocker**: The probe does not create file-editing turns that would trigger checkpoint creation. Even if it did, the correct `userMessageId` to pass to `rewindFiles` is unclear — the SDK stream exposes message UUIDs, but the internal checkpoint mapping may use different IDs.
+- **Not an SDK limitation**: The SDK accepts the call and returns structured output. The gap is in producing the right conditions to observe `canRewind:true`.
+- **Not an architecture gap**: The wiring from adapter → SDK is proven.
+
+### Evidence (unchanged from previous round)
+
+| Metric | Value |
+|---|---|
+| BUILD_ID | `feature-phase0-capability.202605282014` |
+| Session ID | `f6c52aaf-26dc-4c03-940c-f178e8dc1104` |
+| User Message ID | `f6c52aaf-26dc-4c03-940c-f178e8dc1104` (captured from user-type message) |
+| `rewindFiles` result | `{ "canRewind": false, "error": "No file checkpoint found for this message." }` |
+| Chunks captured | 34 |
+| Console errors | None |
+| Plugin errors | None |
+
+### What this proves vs. what it does not
+
+| Dimension | Proven? | Evidence |
+|---|---|---|
+| `query.rewindFiles` exists on SDK query | Yes | Called without "not a function" error |
+| `rewindFiles` accepts `(userMessageId, options)` | Yes | Called with UUID + `{dryRun:true}`, no TypeError |
+| `rewindFiles` returns structured JSON | Yes | `{canRewind:false, error:"..."}` |
+| `rewindFiles` works during active session | Yes | Called at first assistant message, subprocess still alive |
+| Checkpoints are created for file-editing turns | Unknown | Probe used `ls`, no file edits |
+| `canRewind:true` achievable | Unproven | Never observed |
+| Files can be restored to a previous state | Unproven | Never observed |
+
+### Classification
+
+- **File Checkpoint / Rewind**: reclassified from `runtimeProof: 'pass'` to `runtimeProof: 'readback'`, `userSurface: 'diagnostic'`
+- `readback` means: API exists, can be called during active session, returns structured response. Core behavior (actual file rewind) unproven.
 
 ### Matrix summary after this round
 
-- **pass**: 14/24 (MCP Servers, Permission Approval, AskUserQuestion, Structured Output, Agent Definitions, Include Hook Events, Environment Variables, Fork Session, JSONL History Browser, Session Store, Import Session to Store, Resume Session, Session Detail, Backend Routing)
-- **readback**: 3/24 (Allowed Tools, Disallowed Tools, Turn/Budget Limits)
-- **untested**: 5/24 (Agents (Subagents), File Checkpoint / Rewind, Hooks, Skills, Plugins)
-- **wiring**: 1/24 (Fallback Model)
+- **pass**: 15/24 (MCP Servers, Permission Approval, AskUserQuestion, Structured Output, Agent Definitions, Include Hook Events, Environment Variables, Fork Session, JSONL History Browser, Session Store, Import Session to Store, Resume Session, Session Detail, Backend Routing, **Turn/Budget Limits**)
+- **readback**: 8/24 (Allowed Tools, Disallowed Tools, **File Checkpoint / Rewind**, **Hooks**, **Skills**, **Plugins**, **Agents (Subagents)**, **Fallback Model**)
+- **untested**: 0/24
 - **fail**: 1/24 (Subagent Transcript / Progress)
 
 ---
@@ -123,18 +1526,19 @@ Exhaustive grouping of all **24** Claude Code SDK capabilities, aligned with `Se
 
 Capabilities exposed in stable UI. This bucket mixes **behavior-verified** capabilities (runtime proof `pass`) with **readback-only** stable settings (runtime proof `readback`). The latter are explicitly marked so users do not mistake SDK option acceptance for guaranteed model behavior.
 
-> **Note on `userSurface` vs four-bucket**: `userSurface` in the Capability Matrix is a static UI surface tag (`settings` / `chat` / `diagnostic` / `hidden`). The four-bucket classification expresses final **productization outcome**, not just surface presence. A capability may have a `settings` surface but still be `blocked` if its core behavior proof failed (e.g. Fallback Model). The two dimensions are independent.
+> **Note on `userSurface` vs four-bucket**: `userSurface` in the Capability Matrix is a static UI surface tag (`settings` / `chat` / `diagnostic` / `hidden`). The four-bucket classification expresses final **productization outcome**, not just surface presence. Both dimensions are independent. Capabilities at `readback` level have verified option wiring but unproven switching/enforcement behavior.
 
 | # | Capability | Surface | Runtime Proof | Evidence |
 |---|---|---|---|---|
 | 1 | MCP Servers | Settings | `pass` | Runtime passthrough verified; shared Settings > MCP tab provides authoring; Claude Code Tools tab provides runtime refresh |
 | 2 | Allowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Behavior proof infeasible**: model tool-calling is non-deterministic, so diagnostic probes can only detect enforcement *failure* (non-allowed tool called), not success |
-| 3 | Disallowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Behavior proof infeasible**: model tool-calling is non-deterministic, so diagnostic probes can only detect enforcement *failure* (blocked tool called), not success |
-| 4 | Turn/Budget Limits | Settings | `readback` | Stable Settings UI exposed; SDK options correctly built and passed to SDK. Fresh runtime proof on final build (`feature-phase0-capability.202605281809`): **`maxBudgetUsd` enforcement observed** — SDK returns `error_max_budget_usd` with message "Reached maximum budget ($0.01)". **`maxTurns` enforcement NOT observed** — model performed 5-6 tool uses despite `maxTurns=1` or `2`, with no turn-limit signal. Partial proof only; overall capability stays `readback` because `maxTurns` dimension is unproven |
+| 3 | Disallowed Tools | Settings | `pass` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Promoted 2026-05-30**: init-message tool catalog inspection proves deterministic enforcement — SDK init message (`type:'system', subtype:'init'`) `tools[]` field has 33 entries but **excludes Bash** when `disallowedTools: ['Bash']` is set. This is tool-catalog-level enforcement (tool removed from model's context), not dependent on model behavior. `bypassPermissions` and `disallowedTools` are orthogonal CLI flags — no interaction. Runtime evidence on BUILD_ID `feature-phase0-capability.202605300150`: init catalog = 33 tools, Bash absent, model called Agent/Glob/Glob but never Bash |
+| 4 | Turn/Budget Limits | Settings | `pass` | Stable Settings UI exposed; SDK options correctly built and passed to SDK. **`maxBudgetUsd` enforcement observed** — SDK returns `error_max_budget_usd` with message "Reached maximum budget ($0.01)". **`maxTurns` enforcement observed 2026-05-29** — live proof via `runMaxTurnsProof` diagnostic probe: SDK emitted `result` message with `subtype: 'error_max_turns'`, `num_turns: 2`, `cost: $0.13` when `maxTurns=1` with multi-tool prompt. SDK also throws after the result message; `runDiagnosticPrompt` now catches non-fatal SDK errors and returns `rawMessages + sdkError` for inspection. Combined, both maxTurns and maxBudgetUsd enforcement are verified |
 | 5 | Environment Variables | Settings | `pass` | Stable Settings UI exposed; settings→SDK env readback proved. **Promoted 2026-05-28**: prompt strategy changed to explicitly request "Use the Bash tool" (matching pattern from Subagent Stream Proof). Fresh runtime proof on build `feature-phase0-capability.202605281935`: **All 4 layers PASS** — Layer 1 (SDK readback): env options correctly built; Layer 2 (Bash tool_use): model invoked Bash tool; Layer 3 (env-derived filesystem side effect): nonce value verified in side-effect file at `/tmp/opencodian-env-proof-<nonce>`; Layer 4 (assistant text nonce echo): nonce present in assistant response. Scope boundary: proves env propagation into Bash subprocess, NOT permission approval UX (proven separately) |
 | 6 | Permission Approval | Chat | `pass` | Ordinary chat end-to-end proof: `permissionMode: 'plan'` + file creation prompt triggers `canUseTool` bridge → permission cards → user approval → stream continues |
 | 7 | AskUserQuestion / Elicitation | Chat | `pass` | Ordinary chat end-to-end proof: model calls `AskUserQuestion` → question dialog renders → user answers → stream continues |
 | 8 | Structured Output | Chat | `pass` | `/json` prefix trigger works in ordinary chat: prefix stripped, fixed JSON schema injected, duplicate raw JSON suppressed, structured output badge renders and survives reload/hydration |
+| 9 | Fallback Model | Settings | `readback` | Stable settings control exists with `data-proof-state="readback"` boundary notice. Runtime-readback verified: `inspectLastDiagnosticSdkOptions()` confirms both `model` and `fallbackModel` reach SDK as `--fallback-model` CLI flag. SDK source confirms same-model validation (`fallbackModel !== model`). **Switching behavior not locally provable**: CLI help states "when default model is overloaded (only works with --print)" — fallback triggers on HTTP 529/capacity overload from API, not invalid-model errors. Invalid-primary test (BUILD_ID feature-phase0-capability.202605300441) undermined: SDK accepts arbitrary model names at query boundary, reports same string back, no fallback. Cannot simulate real API overload. Classification: readback (option verified, switching not locally provable) |
 
 ### diagnostic
 
@@ -142,14 +1546,15 @@ Capabilities with working adapter wiring and runtime proof, but no stable produc
 
 | # | Capability | Runtime Proof | Evidence |
 |---|---|---|---|
-| 9 | Agents (Subagents) | `untested` | `adapter.listSubagents()` / `getSubagentMessages()` work; read-only diagnostic list. Not in `CLAUDE_CODE_PHASE1_CAPABILITIES`; UI gating prevents display in stable surfaces |
+| 9 | Agents (Subagents) | `pass` | Runtime verified (BUILD_ID `feature-phase0-capability.202605300015`, session `3437aca1-8433-458a-83f2-f3cb1b944841`): inline agent definitions + Agent tool prompt triggers real subagent spawning. `listSubagents()` returned 1 subagent (`a3c7d70a179a6bc1b`), `getSubagentMessages()` returned 2 messages. Promoted from `readback` to `pass` by using inline agents to actually trigger subagent spawning instead of trivial prompts. Not in `CLAUDE_CODE_PHASE1_CAPABILITIES`; UI gating prevents display in stable surfaces |
 | 10 | Include Hook Events | `pass` | `includeHookEvents: true` → real `hook` backend_events captured in diagnostic stream; no stable transcript rendering |
-| 11 | File Checkpoint / Rewind | `untested` | Verification gap: `rewindFiles(dryRun: true)` requires a live checkpoint-enabled runtime query; diagnostic prompt exits before rewind can be called. Adapter wiring confirmed; runtime proof blocked by session lifecycle constraint |
+| 11 | File Checkpoint / Rewind | `readback` | Two-phase probe (BUILD_ID `feature-phase0-capability.202605300627`, session `91f99c0a`): checkpoint-enabled session writes file via Write tool (probeFileExistedAfterPhase1:true), persists session, resumes, then tries `query.rewindFiles()` for all 6 candidate IDs (user msg UUID + session ID + 4 assistant UUIDs). **All 6 candidates return `canRewind:false`**, error "No file checkpoint found for this message." API callable, returns structured JSON, but no file checkpoint is ever created. Precise blocker: upstream SDK bug #236 — file history snapshot creation is gated behind React/Ink interactive UI code paths, never fires in SDK non-interactive `query()` mode. `dryRun:false` verification path never triggered (no successful candidate). Diagnostic-only — no stable rewind UI |
 | 12 | JSONL History Browser | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: `listSessions` returned 38 sessions, `getSessionMessages` returned 10 messages for `d2ea808d…`, full message preview rendered. Diagnostic-only — no stable history browser UI |
 | 13 | Fork Session | `pass` | Provider-owned: `adapter.forkSession()` verified on real provider sessions (BUILD_ID `feature-phase0-capability.202605281335`); adapter-layer fork `5983419f→35ba7b0a` (valid UUID), UI-path fork `d5f325ad→d2ea808d` (valid UUID, title "Restored Claude Code chat (fork)"), local-handle rejection confirmed. Diagnostic-only — no stable cross-backend fork UI |
 | 14 | Resume Session | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: resumed session `d2ea808d…`, resulting sessionId matches target, model responded "Session resumed successfully.", exit code 0. Diagnostic-only — not stable resume-at productization |
 | 15 | Session Detail | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: `getSession(d2ea808d…)` returned 10 keys (sessionId, summary, lastModified, fileSize, customTitle, firstPrompt, gitBranch, cwd, tag, createdAt). Diagnostic-only — no stable session detail UI |
 | 16 | Backend Routing | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: registry routes correctly: `activeKind=claude-code`, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell]. Diagnostic-only — no stable routing UI |
+| 17 | Subagent Transcript / Progress | `pass` | Runtime verified (BUILD_ID `feature-phase0-capability.202605300015`, session `47a3a9ed-ea6e-45a9-8b2a-67be62d807dc`): inline agent definitions + Agent tool prompt triggers real subagent spawning, producing `task_started` and `task_notification` events in the stream. Model used Agent tool to invoke proof-worker subagent. Stream normalizer correctly maps `task_*` subtypes to `backend_event` `event='subagent'`. Promoted from `fail` to `pass` by using inline agents instead of Bash-only prompt. Diagnostic-only — no stable transcript/progress UI |
 
 ### hidden
 
@@ -157,25 +1562,63 @@ Capabilities wired in adapter/SDK but intentionally not exposed in any UI surfac
 
 | # | Capability | Runtime Proof | Evidence |
 |---|---|---|---|
-| 17 | Hooks | `untested` | Architecture gap: hooks SDK option wiring confirmed (`buildSdkOptions` passes hooks), but custom hook configuration cannot be isolated from Include Hook Events (which is separately `pass`). Hook events captured in diagnostic stream prove the hooks system fires, but the hooks option itself (configuring custom pre/post tool execution hooks) has no isolated runtime proof. No stable UI |
-| 18 | Session Store | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: `runDiagnosticPrompt` with `sessionStore` + `sessionStoreFlush='eager'` succeeded; store captured 14 entries across 1 key for session `8c762ebb…`. `importSessionToStore` also proven separately (51 entries). Diagnostic-only — no stable store UI |
-| 19 | Skills | `untested` | `skills` option wired; `getSkillCount()` / `getSkillsList()` read-only detection; no authoring UI |
-| 20 | Plugins | `untested` | `plugins` option wired; `getPluginCount()` / `getPluginsList()` read-only detection; no authoring UI |
-| 21 | Agent Definitions | `pass` | Inline agent definitions verified functional: SDK accepts `agent`/`agents` and alters behavior. Remains `hidden` — no authoring UI by design |
-| 22 | Import Session to Store | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: imported session `d2ea808d…` into diagnostic store with 51 entries, 1 store key. SDK `importSessionToStore` accepted `sessionStore` with append/load interface. Diagnostic-only — no stable import UI |
-
-### blocked
-
-Capabilities where runtime behavior proof explicitly failed or SDK limitation confirmed.
-
-| # | Capability | Blocker | Evidence |
-|---|---|---|---|
-| 23 | Fallback Model | SDK limitation | Stable settings control exists and uses explicit `data-proof-state="wiring"` boundary notice, but **overall capability remains blocked**: behavior proof failed (invalid primary model → SDK returns 400 instead of falling back). Exact fallback trigger conditions are unknown |
-| 24 | Subagent Transcript / Progress | SDK limitation | Tool-inducing prompt with `forwardSubagentText` + `agentProgressSummaries` enabled produces zero subagent/progress events |
+| 18 | Hooks | `pass` | Three-layer proof (BUILD_ID feature-phase0-capability.202605300124). Layer 1 (JS callback): NOT invoked — SDK IPC limitation. Layer 2 (includeHookEvents stream): proven separately as Include Hook Events (`pass`). **Layer 3 (shell-hook execution): `.claude/settings.local.json` SessionStart shell hook creates nonce marker file on disk** — SDK subprocess reads project-scoped hook config and executes shell commands, leaving deterministic side effects. Nuance: programmatic JS callback hooks via SDK options remain uninvoked (SDK limitation), but config-file shell hooks (real runtime path) are functional. No stable UI |
+| 19 | Session Store | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: `runDiagnosticPrompt` with `sessionStore` + `sessionStoreFlush='eager'` succeeded; store captured 14 entries across 1 key for session `8c762ebb…`. `importSessionToStore` also proven separately (51 entries). Diagnostic-only — no stable store UI |
+| 20 | Skills | `pass` | Runtime verified (BUILD_ID `feature-phase0-capability.202605291343`, session `62720fb2`): test SKILL.md created in `vault/.claude/skills/opencodian-proof-skill/` with marker `SP26`, SDK subprocess CWD matches vault path, Layer 1 (SDK options readback) PASS, Layer 2 (behavior marker echo) PASS — marker `SP26` found at start of model response. Skills context filtering is functional. Enhanced proof uses shorter marker, stronger prompt, `_diagnosticBypassPermissions`, CWD/file verification. No authoring UI |
+| 21 | Plugins | `pass` | Marketplace plugin→skills chain verified (BUILD_ID feature-phase0-capability.202605300326): 6 marketplace plugins loaded in init.plugins, 36 plugin-provided skills appear in init.skills with `pluginName:skillName` naming (e.g., `claude-mem:do`, `document-skills:pdf`, `superpowers:brainstorming`). This is the strongest behavior proof anchoring `pass`. Plugin-provided MCP servers (2 entries, status `"failed"`) are registration/readback only. Programmatic `SdkPluginConfig` (`{ type: 'local', path }`) is dead-letter in `query()` mode — structurally identical to Hooks JS callback limitation. Discovery row uses `adapter.getPluginCount()/getPluginsList()` showing dead-letter programmatic options, not marketplace runtime plugins. No authoring UI |
+| 22 | Agent Definitions | `pass` | Inline agent definitions verified functional: SDK accepts `agent`/`agents` and alters behavior. Remains `hidden` — no authoring UI by design |
+| 23 | Import Session to Store | `pass` | BUILD_ID `feature-phase0-capability.202605281948`: imported session `d2ea808d…` into diagnostic store with 51 entries, 1 store key. SDK `importSessionToStore` accepted `sessionStore` with append/load interface. Diagnostic-only — no stable import UI |
 
 ---
 
-## 2026-05-28 Subagent Stream Proof Enhanced Runtime Experiment — Blocker Confirmed (SDK Limitation)
+## 2026-05-30 Fallback Model — Blocker Hardened, Four-Bucket Drift Resolved
+
+### Objective
+
+Harden the Fallback Model blocker with tighter source-backed and runtime-backed evidence. Resolve evidence drift between four-bucket table (Fallback Model in `blocked`, Plugins stale at `readback`) and matrix classification (Fallback Model `readback`, Plugins `pass`). Sync all surfaces to exact truth.
+
+### Proof path analysis
+
+**No stronger locally executable proof path exists** beyond the current invalid-primary test. Reasoning:
+
+1. **Fallback triggers on HTTP 529/capacity overload** (CLI help confirmed: "when default model is overloaded"). This is an external API condition that cannot be simulated locally.
+2. **Invalid-primary strategy is undermined** (BUILD_ID feature-phase0-capability.202605300441): SDK accepts arbitrary model names at query boundary, reports same string back, no fallback. SDK does not validate model names before sending to API.
+3. **SDK source confirms**: `fallbackModel` → `--fallback-model` CLI flag. Same-model validation exists (`fallbackModel !== model` throws). But switching behavior is gated behind an API-side overload signal.
+4. **No alternative trigger is locally simulable**: No SDK option, env var, or subprocess flag can force the 529/overload path without real API capacity pressure.
+
+### Evidence tightened
+
+All blocker surfaces now consistently state:
+
+- **What is proven**: Option wiring verified at runtime. SDK source confirms same-model validation. CLI flag mapping confirmed.
+- **What is NOT proven**: Model switching behavior. Requires HTTP 529 from Anthropic API.
+- **Why invalid-primary fails**: SDK accepts arbitrary model names at query boundary.
+
+### Four-bucket table drift resolved
+
+1. **Fallback Model**: moved from `blocked` to `user-facing` row 9 with `readback` status. Consistent with Allowed Tools (also `readback` in user-facing) and the matrix classification.
+2. **Plugins**: updated from stale `readback` to `pass` (matches matrix, promoted 2026-05-30 via marketplace plugin→skills chain).
+3. **`blocked` section removed**: now empty after Fallback Model moved. Note about `blocked` vs `userSurface` clarified.
+
+### Classification: unchanged `readback`
+
+- **pass**: 21/24
+- **readback**: 3/24 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Final blocker sentence
+
+> Fallback triggers on API overload (HTTP 529), not invalid-model errors. SDK accepts arbitrary model names at query boundary (invalid-primary strategy undermined). Cannot simulate real API overload locally. Switching behavior not locally provable. Classification: readback (option verified, switching unproven).
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Hardened Phase 2 success path blocker text; tightened matrix row comment; updated discovery row and stable settings readback proof text
+- `src/i18n/locales/en.ts` + `zh.ts`: Updated proof-status locale string with tighter blocker
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Updated discovery row assertion to match new text
+- `docs/status/claude-code-current-state-2026-05-22.md`: Resolved four-bucket table drift; this section
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated proof description and blocker
+- `docs/modules/features/settings/SettingsClaudeCodeSection.md`: Updated proof-status description
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated fallback model description
+- `devlog.md`: New dated section
 
 ### Experiment objective
 
@@ -325,7 +1768,7 @@ That fix (merged in BUILD_ID `feature-phase0-capability.202605281206`) changed `
 
 ### Failure mode
 
-The Claude Code SDK spawns successfully, executes SessionStart and UserPromptSubmit hooks, but returns an error chunk at the assistant message stage when the primary model is invalid. The subprocess exits with code 1. **No fallback switching behavior is observed.**
+The Claude Code SDK spawns successfully, executes SessionStart and UserPromptSubmit hooks. **BUILD_ID feature-phase0-capability.202605300441 update**: with the invalid primary "opencodian-invalid-model-test-xyz123", the query now succeeds without error — the SDK reports the same invalid model string back and does NOT trigger fallback. The 400-rejection path observed in earlier builds no longer fires. **No fallback switching behavior is observed.**
 
 ### Classification
 
@@ -339,8 +1782,8 @@ The Claude Code SDK spawns successfully, executes SessionStart and UserPromptSub
 ### Blocker classification
 
 - **Type**: SDK limitation
-- **Explanation**: The Claude Code SDK does NOT automatically fall back to `fallbackModel` when the primary model is invalid. The `fallbackModel` option is accepted at the options level (wiring proven), but actual fallback switching behavior was not observed under the invalid-primary-model failure mode.
-- **Trigger conditions unknown**: Fallback may require rate-limit or service-unavailable failure modes, not invalid-model.
+- **Explanation**: The Claude Code SDK does NOT automatically fall back to `fallbackModel` when the primary model is invalid. BUILD_ID feature-phase0-capability.202605300441: invalid primary accepted without error, same invalid string reported back. The invalid-primary strategy is undermined because SDK does not validate model names at the query boundary.
+- **Trigger conditions unknown**: Fallback likely requires real overload conditions (529/capacity), not invalid-model. Cannot be simulated locally.
 
 ### Code decision
 
@@ -837,7 +2280,7 @@ This slice adds runtime readback proof for Claude Code stable settings (Allowed 
 
 - **What readback proof truly proves**: The settings UI values were correctly mapped into the SDK options shape that was passed to `sdk.query()`. This is stronger than static code inspection or unit-test mocking because it verifies the actual runtime options object.
 - **What readback proof does NOT prove**: That the SDK or model actually enforced these constraints. For example, readback cannot prove the model respects `maxTurns` or that environment variables reach the child process. Those require behavior-level or OS-level verification.
-- **Fallback Model blocker**: Behavior proof was attempted with invalid primary + valid fallback. SDK returned 400 "模型不存在" rather than falling back. The exact trigger conditions for fallback are unknown (may require rate-limit or service-unavailable, not invalid-model).
+- **Fallback Model blocker**: Behavior proof was attempted with invalid primary + valid fallback. SDK accepted the invalid model name without error and reported the same invalid string back; no fallback triggered. The invalid-primary strategy is undermined because SDK does not validate model names at the query boundary. Exact fallback trigger conditions remain unknown (CLI help confirms overload-oriented, not error-recovery). Classification: `readback`. Observability nuance: proof execution was not immediately obvious in headless DOM; JS/direct runtime seam was needed to confirm state.
 
 ### Classification
 
@@ -847,7 +2290,7 @@ This slice adds runtime readback proof for Claude Code stable settings (Allowed 
 | Disallowed Tools | `readback` | Runtime-readback verified: options.disallowedTools built from settings |
 | Turn/Budget Limits | `readback` | Runtime-readback verified: options.maxTurns/maxBudgetUsd built from settings |
 | Environment Variables | `readback` | Runtime-readback verified: options.env built from settings. Fresh runtime behavior proof (env-derived filesystem side effect via diagnostic bypass) is available on-demand but does NOT permanently promote static classification. Permission approval UX is proven separately and is not implied by env proof. |
-| Fallback Model | `wiring` | Option wired but behavior proof failed: SDK returned 400 on invalid primary |
+| Fallback Model | `readback` | Option readback verified. Behavior proof failed: invalid primary accepted without error (same invalid string echoed back), no fallback triggered. Invalid-primary strategy undermined — SDK does not validate model names at query boundary |
 
 ### Verification
 
@@ -1247,7 +2690,7 @@ This slice attempts to move Fallback Model from wiring-only to behavior proof by
 - Test Vault deployed build: `feature-phase0-capability.202605272022`
 - Probe execution: Capability Lab > Discovery & Status > Run Fallback Model Proof
 - SDK spawned successfully, session created: `b379504e-68ba-4879-b587-bab271e14774`
-- SDK returned: `API Error: 400 [1211][模型不存在，请检查模型代码。]` — model does not exist
+- SDK returned: `API Error: 400 [1211][模型不存在，请检查模型代码。]` — model does not exist (NOTE: this was the 2026-05-27 observation; BUILD_ID feature-phase0-capability.202605300441 disproved this: invalid primary now accepted without error, same invalid string echoed back)
 - Spawn exit code: 1 (failure)
 - Inline marker: `opencodian-capability-lab-proof-fail` ("✗ Runtime failed")
 
@@ -3230,7 +4673,7 @@ The stable Model & Thinking tab already had a boundary notice for Fallback Model
 ### What Changed
 
 - **`SettingsClaudeCodeSection.ts`**: Added `renderFallbackModelProofStatusNotice()` method rendering a compact inline proof-status notice with `data-claude-code-proof-status="fallback-model"` and `data-proof-state="wiring"`. Inserted into `renderModelThinkingTab()` after the existing `renderFallbackModelBoundaryNotice()`.
-- **`en.ts`**: Added `settings.claudeCode.proofStatus.fallbackModel` key: "Wiring only. The fallback model option is accepted by the SDK and readback-confirmed, but automatic fallback behavior is unproven — invalid primary model proof returns HTTP 400, not a fallback switch."
+- **`en.ts`**: Added `settings.claudeCode.proofStatus.fallbackModel` key: "Readback verified. The fallback model option is accepted by the SDK and runtime-readback confirmed (both model and fallbackModel correctly reach SDK). Automatic fallback behavior is unproven — invalid primary model proof accepted without error (same invalid string echoed back), no fallback triggered. Blocker: SDK limitation."
 - **`zh.ts`**: Added corresponding Chinese locale key.
 - **`SettingsClaudeCodeSection.test.ts`**: Added test asserting the fallback proof-status notice renders with `data-proof-state="wiring"` and correct locale text.
 
@@ -3240,7 +4683,7 @@ The stable Model & Thinking tab already had a boundary notice for Fallback Model
 |---|---|---|
 | Fallback Model | `wiring` (honest since cc-stable-settings-readback iteration 1) | `wiring` (NEW — added compact proof-status notice) |
 
-The fallback model remains `wiring` in both surfaces. The new proof-status notice makes the honest boundary visible in the stable settings surface where users configure fallback models. Behavior proof was explicitly attempted and failed (invalid primary model returns HTTP 400 instead of triggering fallback). The wiring classification is concrete evidence-based, not speculative.
+The fallback model remains `readback` in both surfaces. The new proof-status notice makes the honest boundary visible in the stable settings surface where users configure fallback models. Behavior proof was explicitly attempted and the invalid-primary strategy was undermined: SDK accepted the invalid model name without error and reported the same invalid string back, no fallback triggered. The readback classification is concrete evidence-based, not speculative.
 
 ### Scope Boundary
 

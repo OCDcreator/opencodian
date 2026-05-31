@@ -142,6 +142,28 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(options.disallowedTools).toEqual(['Bash']);
   });
 
+  it('keeps default preset tools when restrictedBuiltinTools is empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options.tools).toEqual({ type: 'preset', preset: 'claude_code' });
+  });
+
+  it('overrides tools with restrictedBuiltinTools when set', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      restrictedBuiltinTools: ['Read', 'Grep'],
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.tools).toEqual(['Read', 'Grep']);
+  });
+
   it('omits maxTurns/maxBudgetUsd when null', () => {
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',

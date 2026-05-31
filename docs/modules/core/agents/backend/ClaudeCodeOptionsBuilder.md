@@ -12,7 +12,7 @@
 - 固定 `cwd` 为 vault path
 - 始终显式写入 `settingSources`，避免依赖 SDK 默认值
 - 始终启用 `includePartialMessages: true`
-- 始终使用官方 Claude Code preset system prompt 与默认 built-in tools，避免 SDK 默认 minimal prompt / empty tool set 让真实 coding session 缺失 Read/Edit/Bash 等能力
+- 始终使用官方 Claude Code preset system prompt 与默认 built-in tools，避免 SDK 默认 minimal prompt / empty tool set 让真实 coding session 缺失 Read/Edit/Bash 等能力；`ClaudeCodeSdkOptionsShape.tools` 类型已拓宽为 `string[] | { type: 'preset'; preset: 'claude_code' }`，支持诊断路径用 `string[]` 覆盖默认 preset 进行工具可用性限制测试，但普通 runtime 始终使用 preset
 - 映射 Claude 专属 `permissionMode`、`thinking`、`effort`
 - 当 `permissionMode === 'bypassPermissions'` 时显式写入 SDK 要求的 `allowDangerouslySkipPermissions: true`
 - 将 OpenCodian UI 中的 `thinking.type === 'fixed'` 映射为官方 SDK `thinking: { type: 'enabled', budgetTokens }`

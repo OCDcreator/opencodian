@@ -55,6 +55,14 @@ export interface ClaudeCodeBackendSettings {
   allowedTools: string[];
   /** Tool names that are removed from context entirely. Validated as PascalCase alphanumeric. @untested */
   disallowedTools: string[];
+  /**
+   * Built-in tool whitelist passed as the SDK `tools` option. When non-empty,
+   * only the listed built-in Claude Code tools are available to the model.
+   * MCP tools are NOT restricted by this setting — they always pass through.
+   * Empty array = use the SDK default preset (all built-in tools).
+   * Validated as PascalCase alphanumeric.
+   */
+  restrictedBuiltinTools: string[];
   /** Maximum conversation turns before the query stops. null = unlimited (SDK default). @untested */
   maxTurns: number | null;
   /** Maximum budget in USD before the query stops. null = unlimited (SDK default). @untested */
@@ -104,6 +112,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     fallbackModel: '',
     allowedTools: [],
     disallowedTools: [],
+    restrictedBuiltinTools: [],
     maxTurns: null,
     maxBudgetUsd: null,
     env: {},
@@ -261,6 +270,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     fallbackModel: typeof candidate.fallbackModel === 'string' ? candidate.fallbackModel.trim() : defaults.fallbackModel,
     allowedTools: normalizeClaudeCodeStringArray(candidate.allowedTools),
     disallowedTools: normalizeClaudeCodeStringArray(candidate.disallowedTools),
+    restrictedBuiltinTools: normalizeClaudeCodeStringArray(candidate.restrictedBuiltinTools),
     maxTurns: normalizeClaudeCodeNullablePositiveInt(candidate.maxTurns),
     maxBudgetUsd: normalizeClaudeCodeNullablePositiveNumber(candidate.maxBudgetUsd),
     env: normalizeClaudeCodeEnv(candidate.env),

@@ -1,4 +1,6 @@
 /* eslint-disable max-lines -- Claude Code adapter owns SDK query lifecycle, session identity, permissions, MCP refresh, and model catalog wiring for the same backend boundary. */
+import { existsSync, unlinkSync } from 'node:fs';
+
 import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
@@ -97,6 +99,10 @@ export interface ClaudeCodeDiagnosticPromptRequest {
   agent?: ClaudeCodeOptionsBuilderInput['agent'];
   /** Runtime-only agent definitions map for diagnostic probes. */
   agents?: ClaudeCodeOptionsBuilderInput['agents'];
+  /** Runtime-only skills override for diagnostic probes. */
+  skills?: ClaudeCodeOptionsBuilderInput['skills'];
+  /** Runtime-only plugins override for diagnostic probes. */
+  plugins?: ClaudeCodeOptionsBuilderInput['plugins'];
   /**
    * Diagnostic-only model override. Intentionally invalid model names may be used
    * to provoke fallback behavior. Never leaks into ordinary chat send paths.
@@ -128,12 +134,58 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * remains independently proven by ordinary chat + live harness paths.
    */
   _diagnosticBypassPermissions?: boolean;
+  /**
+   * Diagnostic-only maxTurns override. When set, forces the diagnostic prompt
+   * to use this value instead of the adapter's settings.maxTurns. Used by the
+   * Capability Lab "Run Max Turns Proof" probe to test SDK turn-limit enforcement
+   * with a low value (e.g. 1) without modifying the user's actual settings.
+   */
+  _diagnosticMaxTurns?: number;
+  /**
+   * Diagnostic-only canUseTool override. When provided AND `_diagnosticBypassPermissions`
+   * is NOT true, this callback replaces the bridge's `canUseTool` in the diagnostic
+   * SDK options. Used by the Capability Lab Allowed Tools proof to provide a synthetic
+   * approval handler that auto-approves all tool calls while recording which tools
+   * the SDK requests approval for — this reveals whether the SDK enforces allowedTools
+   * before calling canUseTool or relies on the callback for enforcement.
+   *
+   * Scope boundary: this is a diagnostic-only escape hatch. It does NOT change the
+   * bridge/host architecture for normal chat paths.
+   */
+  _diagnosticCanUseTool?: (toolName: string, input: Record<string, unknown>, context: Record<string, unknown>) => Promise<{ behavior: 'allow' | 'deny'; message?: string }>;
+  /**
+   * Diagnostic-only permissionMode override. When set AND `_diagnosticBypassPermissions`
+   * is NOT true, this forces the diagnostic settings to use this permissionMode instead
+   * of the adapter's settings.permissionMode. Used by the Allowed Tools proof to run
+   * Phase B in 'default' permissionMode (non-bypass) even when the user's settings have
+   * 'bypassPermissions', so the SDK subprocess actually calls canUseTool instead of
+   * silently executing all tools.
+   */
+  _diagnosticForcePermissionMode?: 'default' | 'acceptEdits' | 'plan';
+  /**
+   * Diagnostic-only tool availability restrictor. When set, overrides the
+   * SDK `tools` option from the default preset to a strict string[] allowlist.
+   * Used by the Allowed Tools proof to test whether the SDK `tools` option
+   * deterministically restricts the init tool catalog — providing an honest
+    * plugin-owned product path for the "Restricted Built-in Tools" capability.
+    *
+    * This tests the SDK `tools` option (availability restrictor), NOT the
+    * `allowedTools` option (auto-approve list). The distinction is documented
+    * in the proof classification. MCP tools are unaffected — they always
+    * pass through the SDK `tools` filter.
+    */
+   _diagnosticToolRestriction?: string[];
 }
 
 export interface ClaudeCodeDiagnosticPromptResult {
   sessionId?: string;
   rawMessages: unknown[];
   chunks: StreamChunk[];
+  /** Non-fatal SDK error collected after stream end (e.g. max_turns_reached, max_budget_reached).
+   *  Present when the SDK intentionally stopped with an error result — the messages were already
+   *  collected and are available in rawMessages. Diagnostic probes should inspect this field
+   *  as a secondary signal alongside rawMessages scanning. */
+  sdkError?: Error;
 }
 
 export type ClaudeCodeSdkLoader = () => Promise<ClaudeCodeSdkFacade>;
@@ -611,6 +663,401 @@ export class ClaudeCodeAdapter
     return await rewindFiles(userMessageId, { ...options, dryRun: effectiveDryRun });
   }
 
+  private static extractUserMessageUuid(message: unknown): string | undefined {
+    if (typeof message !== 'object' || message === null || Array.isArray(message)) return undefined;
+    const rec = message as Record<string, unknown>;
+    if (rec.type !== 'user') return undefined;
+    const raw = typeof rec.uuid === 'string' ? rec.uuid.trim() : undefined;
+    return raw || undefined;
+  }
+
+  async runCheckpointRewindProbe(): Promise<{
+    sessionId: string | undefined;
+    userMessageId: string | undefined;
+    rewindDryRunResult: unknown;
+    rewindActualResult: {
+      result: unknown;
+      probeFileExistedBefore: boolean;
+      probeFileExistsAfter: boolean;
+      fileWasRemoved: boolean;
+      successfulCandidateId: string;
+    } | undefined;
+    phase1RewindResult: {
+      dryRunResult: unknown;
+      filesChanged: unknown[];
+      toolUseTypes: string[];
+      userMessageUuid: string;
+    } | undefined;
+    probeFileExistedAfterPhase1: boolean;
+    chunks: StreamChunk[];
+    toolUseTypes: string[];
+    candidatesAttempted: string[];
+    /** Per-candidate rewind results (all candidates, not just first canRewind:true) */
+    candidateResults: Array<{
+      candidateId: string;
+      canRewind: boolean;
+      filesChanged: unknown;
+      error?: string;
+    }>;
+    /** Count of SDK files_persisted events observed during Phase 1 streaming.
+     *  Expected to be 0 when isInteractive=false (upstream bug #236). */
+    sdkFilesPersistedEventCount: number;
+    /** Whether applyFlagSettings({ fileCheckpointingEnabled: true }) was attempted
+     *  on the active Phase 1 query after the first assistant message. Tests whether
+     *  runtime settings injection can activate snapshot creation mid-stream. */
+    applyFlagSettingsAttempted: boolean;
+    /** Error from applyFlagSettings call, if any. undefined = success or not attempted. */
+    applyFlagSettingsError: string | undefined;
+  }> {
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+
+    const probeFilePath = `${this.options.vaultPath}/.opencodian-checkpoint-probe.txt`;
+    try { unlinkSync(probeFilePath); } catch { /* not present, ok */ }
+
+    const phase1Abort = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const phase1Settings: ClaudeCodeBackendSettings = {
+      ...this.options.settings,
+      permissionMode: 'bypassPermissions' as const,
+    };
+    const phase1Options = buildClaudeCodeOptions({
+      vaultPath: this.options.vaultPath,
+      settings: phase1Settings,
+      pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      abortController: phase1Abort,
+      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+      enableFileCheckpointing: true,
+      persistSession: true,
+    });
+    this.lastDiagnosticSdkOptions = phase1Options;
+
+    const phase1Query = sdk.query({
+      prompt: `Write the text "checkpoint-test-content" to the file at "${probeFilePath}" using the Write tool. After writing, use the Read tool to confirm the file content.`,
+      options: phase1Options,
+    });
+    const normalizer = new ClaudeCodeStreamNormalizer();
+    const allChunks: StreamChunk[] = [];
+    let sessionId: string | undefined;
+    let phase1UserMessageUuid: string | undefined;
+    const toolUseTypes: string[] = [];
+    let sdkFilesPersistedEventCount = 0;
+    let applyFlagSettingsAttempted = false;
+    let applyFlagSettingsError: string | undefined;
+
+    try {
+      for await (const message of phase1Query ?? []) {
+        const nextChunks = normalizer.transformSDKMessage(message);
+        if (!sessionId) {
+          sessionId = resolveDiagnosticSessionId(message, nextChunks);
+        }
+        allChunks.push(...nextChunks);
+
+        // Count files_persisted events from raw SDK messages (expected 0 when isInteractive=false).
+        if (typeof message === 'object' && message !== null) {
+          const rec = message as Record<string, unknown>;
+          if (rec.type === 'files_persisted') {
+            sdkFilesPersistedEventCount++;
+          }
+        }
+
+        if (!phase1UserMessageUuid && typeof message === 'object' && message !== null) {
+          const rec = message as Record<string, unknown>;
+          if (rec.type === 'user' && typeof rec.uuid === 'string') {
+            phase1UserMessageUuid = rec.uuid.trim();
+          }
+        }
+
+        // Seam exploration: after first assistant message (subprocess initialized),
+        // inject fileCheckpointingEnabled via applyFlagSettings to test whether
+        // runtime settings injection activates snapshot creation mid-stream.
+        // This tests a seam not covered by the enableFileCheckpointing option alone.
+        if (!applyFlagSettingsAttempted && typeof message === 'object' && message !== null) {
+          const rec = message as Record<string, unknown>;
+          if (rec.type === 'assistant') {
+            applyFlagSettingsAttempted = true;
+            try {
+              if (typeof phase1Query.applyFlagSettings === 'function') {
+                await phase1Query.applyFlagSettings({ fileCheckpointingEnabled: true });
+                sessionLogger.debug('checkpoint rewind probe: applyFlagSettings succeeded', { sessionId });
+              } else {
+                applyFlagSettingsError = 'applyFlagSettings not available on Query';
+              }
+            } catch (flagErr) {
+              applyFlagSettingsError = flagErr instanceof Error ? flagErr.message : String(flagErr);
+              sessionLogger.debug('checkpoint rewind probe: applyFlagSettings failed', {
+                sessionId,
+                error: applyFlagSettingsError,
+              });
+            }
+          }
+        }
+
+        for (const chunk of nextChunks) {
+          if (chunk.type === 'tool_use') {
+            const name = (chunk as unknown as { name?: string }).name;
+            if (typeof name === 'string') {
+              toolUseTypes.push(name);
+            }
+          }
+        }
+      }
+    } finally {
+      phase1Query.close?.();
+    }
+
+    const probeFileExistedAfterPhase1 = existsSync(probeFilePath);
+    sessionLogger.debug('checkpoint rewind probe: phase 1 complete', {
+      sessionId,
+      probeFileExistedAfterPhase1,
+      phase1UserMessageUuid,
+      toolUseTypes,
+    });
+
+    if (!sessionId) {
+      try { unlinkSync(probeFilePath); } catch { /* cleanup */ }
+      throw new Error('Checkpoint rewind probe phase 1 failed: no session ID captured.');
+    }
+
+    let phase1RewindResult: {
+      dryRunResult: unknown;
+      filesChanged: unknown[];
+      toolUseTypes: string[];
+      userMessageUuid: string;
+    } | undefined;
+
+    const initialUserMessageId = phase1UserMessageUuid ?? await this.findInitialPromptUuid(sdk, sessionId);
+    sessionLogger.debug('checkpoint rewind probe: found initial prompt UUID', {
+      sessionId,
+      initialUserMessageId,
+      source: phase1UserMessageUuid ? 'stream' : 'getSessionMessages',
+    });
+
+    if (!initialUserMessageId) {
+      try { unlinkSync(probeFilePath); } catch { /* cleanup */ }
+      return {
+        sessionId,
+        userMessageId: undefined,
+        rewindDryRunResult: undefined,
+        rewindActualResult: undefined,
+        phase1RewindResult: undefined,
+        probeFileExistedAfterPhase1,
+        chunks: allChunks,
+        toolUseTypes,
+        candidatesAttempted: [],
+        candidateResults: [],
+        sdkFilesPersistedEventCount,
+        applyFlagSettingsAttempted,
+        applyFlagSettingsError,
+      };    }
+
+    const candidates = await this.collectRewindCandidateIds(sdk, sessionId, initialUserMessageId);
+    sessionLogger.debug('checkpoint rewind probe: rewind candidates', {
+      sessionId,
+      candidates,
+    });
+
+    const phase2Abort = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const phase2Options = buildClaudeCodeOptions({
+      vaultPath: this.options.vaultPath,
+      settings: phase1Settings,
+      pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      abortController: phase2Abort,
+      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+      enableFileCheckpointing: true,
+      resumeSessionId: sessionId,
+    });
+
+    const phase2Query = sdk.query({
+      prompt: 'The rewind probe is continuing. Say "rewind probe active" and nothing else.',
+      options: phase2Options,
+    });
+    const phase2Normalizer = new ClaudeCodeStreamNormalizer({ sessionId });
+    let rewindDryRunResult: unknown = undefined;
+    let rewindActualResult: {
+      result: unknown;
+      probeFileExistedBefore: boolean;
+      probeFileExistsAfter: boolean;
+      fileWasRemoved: boolean;
+      successfulCandidateId: string;
+    } | undefined;
+    let rewindDone = false;
+    const candidateResults: Array<{
+      candidateId: string;
+      canRewind: boolean;
+      filesChanged: unknown;
+      error?: string;
+    }> = [];
+
+    try {
+      for await (const message of phase2Query ?? []) {
+        const nextChunks = phase2Normalizer.transformSDKMessage(message);
+        allChunks.push(...nextChunks);
+
+        if (!rewindDone && phase2Query.rewindFiles) {
+          const msgType = typeof message === 'object' && message !== null
+            ? (message as Record<string, unknown>).type
+            : undefined;
+          if (msgType === 'assistant') {
+            rewindDone = true;
+            let successfulCandidateId = '';
+            for (const candidateId of candidates) {
+              try {
+                const attempt = await phase2Query.rewindFiles(candidateId, { dryRun: true });
+                const rewindObj = attempt as Record<string, unknown> | null;
+                const canRewind = rewindObj && typeof rewindObj === 'object' && rewindObj.canRewind === true;
+                candidateResults.push({
+                  candidateId,
+                  canRewind: !!canRewind,
+                  filesChanged: rewindObj?.filesChanged,
+                });
+                rewindDryRunResult = attempt;
+                sessionLogger.debug('checkpoint rewind probe: rewindFiles dryRun result for candidate', {
+                  sessionId,
+                  candidateId,
+                  canRewind,
+                  filesChanged: rewindObj?.filesChanged,
+                  insertions: rewindObj?.insertions,
+                  deletions: rewindObj?.deletions,
+                });
+                if (canRewind) {
+                  successfulCandidateId = candidateId;
+                  break;
+                }
+              } catch (rewindErr) {
+                const errMsg = rewindErr instanceof Error ? rewindErr.message : String(rewindErr);
+                candidateResults.push({
+                  candidateId,
+                  canRewind: false,
+                  filesChanged: undefined,
+                  error: errMsg,
+                });
+                sessionLogger.debug('checkpoint rewind probe: rewindFiles threw for candidate', {
+                  sessionId,
+                  candidateId,
+                  error: errMsg,
+                });
+              }
+            }
+            if (!rewindDryRunResult) {
+              rewindDryRunResult = {
+                canRewind: false,
+                error: 'rewindFiles threw for all candidate IDs',
+                candidates,
+              };
+            } else if (successfulCandidateId) {
+              const filesChanged = (rewindDryRunResult as Record<string, unknown>)?.filesChanged;
+              const hasNonEmptyFilesChanged = Array.isArray(filesChanged) && filesChanged.length > 0;
+
+              phase1RewindResult = {
+                dryRunResult: rewindDryRunResult,
+                filesChanged: Array.isArray(filesChanged) ? filesChanged : [],
+                toolUseTypes,
+                userMessageUuid: successfulCandidateId,
+              };
+
+              if (!hasNonEmptyFilesChanged && probeFileExistedAfterPhase1 && phase2Query.rewindFiles) {
+                try {
+                  const fileExistedBefore = existsSync(probeFilePath);
+                  const actualRewindResult = await phase2Query.rewindFiles(successfulCandidateId, { dryRun: false });
+                  const fileExistsAfter = existsSync(probeFilePath);
+                  rewindActualResult = {
+                    result: actualRewindResult,
+                    probeFileExistedBefore: fileExistedBefore,
+                    probeFileExistsAfter: fileExistsAfter,
+                    fileWasRemoved: fileExistedBefore && !fileExistsAfter,
+                    successfulCandidateId,
+                  };
+                  sessionLogger.debug('checkpoint rewind probe: dryRun=false filesystem evidence', {
+                    sessionId,
+                    candidateId: successfulCandidateId,
+                    fileExistedBefore,
+                    fileExistsAfter,
+                    fileWasRemoved: rewindActualResult.fileWasRemoved,
+                  });
+                } catch (actualRewindErr) {
+                  sessionLogger.debug('checkpoint rewind probe: dryRun=false threw', {
+                    sessionId,
+                    candidateId: successfulCandidateId,
+                    error: actualRewindErr instanceof Error ? actualRewindErr.message : String(actualRewindErr),
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      phase2Query.close?.();
+    }
+
+    try { unlinkSync(probeFilePath); } catch { /* cleanup */ }
+
+    return {
+      sessionId,
+      userMessageId: initialUserMessageId,
+      rewindDryRunResult,
+      rewindActualResult,
+      phase1RewindResult,
+      probeFileExistedAfterPhase1,
+      chunks: allChunks,
+      toolUseTypes,
+      candidatesAttempted: candidates,
+      candidateResults,
+      sdkFilesPersistedEventCount,
+      applyFlagSettingsAttempted,
+      applyFlagSettingsError,
+    };
+  }
+
+  private async findInitialPromptUuid(
+    sdk: ClaudeCodeSdkFacade,
+    sessionId: string,
+  ): Promise<string | undefined> {
+    try {
+      const messages = await sdk.getSessionMessages?.(sessionId, { includeSystemMessages: false });
+      if (!Array.isArray(messages)) return undefined;
+      for (const msg of messages) {
+        if (typeof msg !== 'object' || msg === null) continue;
+        const rec = msg as Record<string, unknown>;
+        if (rec.type === 'user' && (!rec.parent_tool_use_id || rec.parent_tool_use_id === null)) {
+          return typeof rec.uuid === 'string' ? rec.uuid.trim() : undefined;
+        }
+      }
+    } catch (err) {
+      sessionLogger.debug('checkpoint rewind probe: getSessionMessages failed', {
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return undefined;
+  }
+
+  private async collectRewindCandidateIds(
+    sdk: ClaudeCodeSdkFacade,
+    sessionId: string,
+    initialUserMessageId: string | undefined,
+  ): Promise<string[]> {
+    const candidates: string[] = [];
+    if (initialUserMessageId) candidates.push(initialUserMessageId);
+    if (sessionId) candidates.push(sessionId);
+    try {
+      const messages = await sdk.getSessionMessages?.(sessionId, { includeSystemMessages: false });
+      if (Array.isArray(messages)) {
+        for (const msg of messages) {
+          if (typeof msg !== 'object' || msg === null) continue;
+          const rec = msg as Record<string, unknown>;
+          const uuid = typeof rec.uuid === 'string' ? rec.uuid.trim() : undefined;
+          if (uuid && rec.type === 'assistant') {
+            candidates.push(uuid);
+          }
+        }
+      }
+    } catch {
+      // best-effort — assistant UUIDs are supplementary candidates
+    }
+    return candidates;
+  }
+
   async runDiagnosticPrompt(
     request: ClaudeCodeDiagnosticPromptRequest,
   ): Promise<ClaudeCodeDiagnosticPromptResult> {
@@ -638,6 +1085,7 @@ export class ClaudeCodeAdapter
     const rawMessages: unknown[] = [];
     const chunks: StreamChunk[] = [];
     let sessionId: string | undefined;
+    let sdkError: Error | undefined;
 
     try {
       for await (const message of query ?? []) {
@@ -648,6 +1096,15 @@ export class ClaudeCodeAdapter
         }
         chunks.push(...nextChunks);
       }
+    } catch (err) {
+      // The SDK throws after emitting intentional stop results (max_turns, max_budget).
+      // These are not failures — the messages were already collected.
+      // Attach the error as a non-fatal signal and return the collected data.
+      sdkError = err instanceof Error ? err : new Error(String(err));
+      runtimeLogger.debug('diagnostic prompt collected SDK error as non-fatal signal', {
+        errorMessage: sdkError.message,
+        messagesCollected: rawMessages.length,
+      });
     } finally {
       query.close?.();
     }
@@ -672,6 +1129,7 @@ export class ClaudeCodeAdapter
       sessionId: validatedSessionId,
       rawMessages,
       chunks,
+      ...(sdkError ? { sdkError } : {}),
     };
   }
 
@@ -913,9 +1371,19 @@ export class ClaudeCodeAdapter
     request: ClaudeCodeDiagnosticPromptRequest,
   ): ClaudeCodeSdkOptionsShape {
     const bypassPermissions = request._diagnosticBypassPermissions === true;
-    const diagnosticSettings = bypassPermissions
+    let diagnosticSettings = bypassPermissions
       ? { ...this.options.settings, permissionMode: 'bypassPermissions' as const }
-      : this.options.settings;
+      : { ...this.options.settings };
+    // Diagnostic maxTurns override: force a low turn limit to test SDK enforcement
+    // without modifying the user's actual settings.
+    if (request._diagnosticMaxTurns !== undefined && request._diagnosticMaxTurns !== null) {
+      diagnosticSettings = { ...diagnosticSettings, maxTurns: request._diagnosticMaxTurns };
+    }
+    // Diagnostic permissionMode override: force non-bypass mode so the SDK subprocess
+    // actually calls canUseTool instead of silently executing all tools.
+    if (!bypassPermissions && request._diagnosticForcePermissionMode) {
+      diagnosticSettings = { ...diagnosticSettings, permissionMode: request._diagnosticForcePermissionMode };
+    }
     const options = buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
       settings: diagnosticSettings,
@@ -926,11 +1394,18 @@ export class ClaudeCodeAdapter
       // the SDK subprocess executes tools without requiring an approval host.
       // This is scoped to diagnostic probes that test non-permission capabilities
       // (e.g. env propagation) where no chat streaming UI is available.
+      //
+      // When a diagnostic canUseTool override is provided and bypass is NOT
+      // active, use the override instead of the bridge's canUseTool. This lets
+      // probes inject a synthetic approval handler without touching the live
+      // permission bridge/host architecture.
       canUseTool: bypassPermissions
         ? undefined
-        : this.options.permissionBridge
-          ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
-          : undefined,
+        : request._diagnosticCanUseTool
+          ? request._diagnosticCanUseTool as unknown
+          : this.options.permissionBridge
+            ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
+            : undefined,
       onElicitation: bypassPermissions
         ? undefined
         : this.options.onElicitation
@@ -954,7 +1429,16 @@ export class ClaudeCodeAdapter
       model: request.model,
       agent: request.agent ?? this.options.agent,
       agents: request.agents ?? this.options.agents,
+      skills: request.skills ?? this.options.skills,
+      plugins: request.plugins ?? this.options.plugins,
     });
+    // Diagnostic tool availability restrictor override: replace the default
+    // preset tools with a strict string[] allowlist. The SDK `tools` option
+    // is the actual availability restrictor (removes tools from model context),
+    // unlike `allowedTools` which is an auto-approve permission shortcut only.
+    if (request._diagnosticToolRestriction) {
+      options.tools = request._diagnosticToolRestriction;
+    }
     this.lastDiagnosticSdkOptions = options;
     return options;
   }

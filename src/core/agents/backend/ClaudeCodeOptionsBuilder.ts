@@ -67,7 +67,7 @@ export interface ClaudeCodeSdkOptionsShape {
   cwd: string;
   includePartialMessages: true;
   systemPrompt: { type: 'preset'; preset: 'claude_code' };
-  tools: { type: 'preset'; preset: 'claude_code' };
+  tools: string[] | { type: 'preset'; preset: 'claude_code' };
   settingSources: ClaudeCodeSettingSource[];
   permissionMode?: ClaudeCodePermissionMode;
   allowDangerouslySkipPermissions?: boolean;
@@ -213,6 +213,9 @@ export function buildClaudeCodeOptions(
   }
   if (input.settings.disallowedTools.length > 0) {
     options.disallowedTools = [...input.settings.disallowedTools];
+  }
+  if (input.settings.restrictedBuiltinTools.length > 0) {
+    options.tools = [...input.settings.restrictedBuiltinTools];
   }
   if (input.settings.maxTurns !== null) {
     options.maxTurns = input.settings.maxTurns;
